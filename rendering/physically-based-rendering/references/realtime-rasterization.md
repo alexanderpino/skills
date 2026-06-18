@@ -155,7 +155,7 @@ Parameter* node, but it is **engine-agnostic** and worth recognizing as a genera
 - **Trade-offs / gotchas.** Precision is bounded by texture **width and bit depth** —
   use enough texels and a float/half format for HDR or steep curves. **Bilinear
   filtering across `v` bleeds between unrelated rows**: point-sample the `v` axis (or
-  pad/duplicate rows) and only filter along `u`. Mind color space — bake in **linear**
+  use a 2D Texture Array to isolate slices) and only filter along `u`. Mind color space — bake in **linear**
   if the curve drives a linear quantity (roughness, weight, scalar), reserve sRGB for
   display-referred color ramps.
 - **Relation to the physics LUTs.** BRDF/energy/LTC LUTs bake *derived physics*; curve
