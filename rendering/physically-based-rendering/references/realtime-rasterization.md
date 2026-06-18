@@ -145,7 +145,7 @@ Parameter* node, but it is **engine-agnostic** and worth recognizing as a genera
 
 - **Mechanics.** Bake each curve into a row of a texture; an atlas packs many curves
   into one texture. The shader samples `u =` the curve input (a `0–1` parameter, `N·V`,
-  height, mask, time…) and `v =` the curve index, which is itself a material parameter.
+  height, mask, time…) and `v = (index + 0.5) / atlas_height` to target the texel center.
   One sampler then serves any curve, selected by index.
 - **What kind of optimization it is.** It trades **ALU for a single filtered fetch**,
   makes the curve **data-driven and artist-tweakable without recompiling the shader**
