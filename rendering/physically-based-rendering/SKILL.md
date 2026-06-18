@@ -173,3 +173,19 @@ texture-mode trade-offs (plus what to substitute in real time).
 - **Prefer plausible and stable over maximally physical.** Especially in real time,
   a clamped, temporally stable, energy-conserving approximation beats a "more
   correct" formula that fireflies, shimmers, or NaNs.
+
+## Related skills
+
+This skill owns the **material/BRDF/BSDF correctness** layer — the shading math itself.
+It is the counterpart to the engine-architecture skill in the same skill set:
+
+- **`game-engine-guru`** — AAA engine architecture to 2026 production standards. Hand
+  off to it (or load it alongside this skill) for the *engine-integration* side of
+  rendering that sits around the BSDF: the render/frame graph and pass scheduling, the
+  Adaptive GBuffer / visibility-buffer packing and resolve, the deferred vs. forward+
+  vs. clustered pipeline decision *as an engine subsystem*, the GI hierarchy and tiering
+  (Lumen/DDGI/ReSTIR/SDF), virtual geometry, shadow architecture, the post-process
+  chain, and how all of this is budgeted across a 16.6 ms frame. Rule of thumb: **how a
+  lobe is evaluated → this skill; where and when the GPU evaluates it → `game-engine-guru`.**
+  Its `references/RENDERING_AND_GRAPHICS.md` is the engine-side companion to this skill's
+  `realtime-rasterization.md` and `scene-integration.md`.

@@ -10,6 +10,7 @@ no packaging or build step.
 
 | Skill | Area | What it does |
 | --- | --- | --- |
+| [`game-engine-guru`](game-engine-guru/) | Game engine architecture | Definitive AAA game-engine-development master skill to 2026 production standards: engine architecture, rendering (Adaptive GBuffer, OpenPBR), ECS, job/fiber systems, memory allocators, physics, animation, audio, networking, asset pipelines, editor tooling, profiling, console, and modern C++23/26. Routes material/BRDF math to `physically-based-rendering`. |
 | [`physically-based-rendering`](rendering/) | Graphics / rendering | Expert knowledge of physically based rendering (PBR) and photorealistic image synthesis across offline path tracing and real-time rasterization. |
 | [`book-writer`](writing/) | Writing | Write full-length fiction and non-fiction books through a reusable author persona, with the full apparatus of a real book (figures, citations, footnotes, TOC, index) and a research/fact-check workflow. |
 
@@ -23,6 +24,7 @@ which installs a skill straight into the agent that's running:
 
 ```bash
 # Install a skill by pointing at its directory in this repo
+npx skills add github:alexanderpino/skills/game-engine-guru
 npx skills add github:alexanderpino/skills/rendering/physically-based-rendering
 npx skills add github:alexanderpino/skills/writing/book-writer
 ```
@@ -51,6 +53,10 @@ directly.
 
 ```
 skills/
+├── game-engine-guru/                      # unpacked, reviewable skill
+│   ├── SKILL.md                           # router + core mental model
+│   ├── references/                        # load-on-demand deep dives
+│   └── assets/                            # copy-paste scaffolds (C++, C#, Python, HLSL)
 ├── rendering/
 │   └── physically-based-rendering/        # unpacked, reviewable skill
 │       ├── SKILL.md                       # router + core mental model

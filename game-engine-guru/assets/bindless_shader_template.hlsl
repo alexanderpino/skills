@@ -234,6 +234,8 @@ float4 PSMain(VSOutput input) : SV_Target0
 
     // Minimal analytic lit term. Replace with the engine's shared BRDF include
     // (forward+ / clustered). Kept local here so the scaffold compiles standalone.
+    // For the actual GGX/Smith/Fresnel + energy-conserving BSDF math, see the
+    // `physically-based-rendering` skill (references/realtime-rasterization.md).
     float3 L        = normalize(float3(0.3f, 1.0f, 0.2f));
     float  NdotL    = saturate(dot(N, L));
     float3 diffuse  = albedo.rgb * (1.0f - metal);

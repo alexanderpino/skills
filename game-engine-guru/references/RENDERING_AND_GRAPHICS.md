@@ -60,12 +60,12 @@ The 2026 standard dictates a shift away from hardcoded shading models (e.g., "De
 **Modular BSDFs (Substrate-style Slabs):**
 Materials are authored and evaluated as a series of layered "Slabs" and "Operators" (blend, add, multiply). A single slab encompasses parameterized responses natively supporting **Mean Free Path (MFP)** for subsurface scattering, **F90 (glancing reflectivity)**, and procedural **Glints/Fuzz** without requiring secondary G-buffer passes.
 
-`hlsl
+```hlsl
 // BSDF Evaluation is now driven by closure unpacking
 FSubstrateClosure closure = UnpackAdaptiveGBuffer(pixelData);
-float3 lighting = EvaluateSlab(closure.BaseSlab, L, V, N) 
+float3 lighting = EvaluateSlab(closure.BaseSlab, L, V, N)
                 + EvaluateSlab(closure.TopSlab, L, V, N);
-`
+```
 
 **Energy Conservation & Multi-scattering:**
 Energy conservation across complex layered slabs is handled intrinsically by the modular framework. For base slabs, multi-scatter compensation (Kulla-Conty/Fdez-Aguera split-sum LUTs) remains the baseline.
