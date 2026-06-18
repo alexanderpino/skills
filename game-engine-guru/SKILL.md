@@ -91,7 +91,7 @@ Every AAA engine converges on these. Skip any one and you are paying interest fo
    └────────────────────────────────────────┘
    ```
 
-3. **Frame Graph / Render Graph.** Declarative per-frame pass graph. Automatic barrier insertion. Transient resource aliasing. Culls unused passes. Every modern engine ships one — Frostbite (2017), UE5, Unity SRP, Snowdrop.
+3. **Frame Graph / Render Graph.** Declarative per-frame pass graph. Automatic barrier insertion. Transient resource aliasing. Culls unused passes. Every modern engine ships one — Frostbite (2017), UE5, Unity SRP, Snowdrop. Deep dive: `FRAME_GRAPH_AND_GPU_DRIVEN.md`.
 
 4. **Fiber-based Job System.** User-space fibers, work-stealing queues, continuation scheduling. Naughty Dog's GDC 2015 talk is still the reference. Avoid `std::async`, avoid OS threads per task — you need hundreds of thousands of tasks per frame.
 
@@ -130,13 +130,13 @@ An engine architecture must be elastic and universal. The same engine binary mus
 
 | Subsystem            | Layer        | Responsibility                                                 | Deep dive |
 |----------------------|--------------|----------------------------------------------------------------|-----------|
-| Job / Fiber System   | Low          | Work distribution, dependency scheduling                        | `PERFORMANCE_AND_PROFILING.md` |
+| Job / Fiber System   | Low          | Work distribution, dependency scheduling                        | `JOB_SYSTEM_AND_FIBERS.md` |
 | Memory Allocators    | Low          | Tiered allocation, tagging, virtual memory                      | `PERFORMANCE_AND_PROFILING.md` |
 | Math / SIMD          | Low          | Vec/Mat/Quat, SSE/AVX/NEON                                      | `PHYSICS_MATH_AND_SIMULATION.md` |
 | RHI (HAL/GAL)        | Platform     | DX12 / Vulkan / Metal / NVN2 adapter                            | `CROSS_PLATFORM_AND_CONSOLE.md` |
-| Render Graph         | Mid          | Declarative per-frame pass graph, barriers, aliasing            | `RENDERING_AND_GRAPHICS.md` |
+| Render Graph         | Mid          | Declarative per-frame pass graph, barriers, aliasing, GPU-driven | `FRAME_GRAPH_AND_GPU_DRIVEN.md` |
 | Rendering Pipeline   | Mid          | Adaptive GBuffer, Modular BSDFs (OpenPBR), GI, shadows, post                       | `RENDERING_AND_GRAPHICS.md` |
-| ECS / World          | High         | Archetype storage, queries, ECB                                 | This doc + `CPP23_26_AND_MODERN_PATTERNS.md` |
+| ECS / World          | High         | Archetype storage, queries, ECB                                 | `ECS_AND_DATA_ORIENTED.md` |
 | Physics              | Mid          | Jolt/PhysX integration, deterministic sim                       | `PHYSICS_MATH_AND_SIMULATION.md` |
 | Animation            | Mid          | State machines, motion matching, IK, skinning                   | `ANIMATION_AND_CHARACTER.md` |
 | Audio                | Mid          | Audio graph, DSP, 3D spatialization, propagation                | `AUDIO_AND_SPATIAL.md` |
@@ -164,6 +164,8 @@ An engine architecture must be elastic and universal. The same engine binary mus
 
 7. **Change detection.** Version counter per component type per chunk. Systems filter `Changed<T>` to skip untouched data.
 
+See `ECS_AND_DATA_ORIENTED.md` for the implementation behind these rules — chunk layout, the archetype graph, query matching, ECB playback, change versioning, and parallel system scheduling.
+
 ---
 
 ## Job System & Threading Model
@@ -174,6 +176,8 @@ An engine architecture must be elastic and universal. The same engine binary mus
 - **Never block on a fiber.** Blocking I/O goes to a dedicated IO thread pool. A waiting fiber parks; the worker picks up another.
 - **False sharing.** Pad per-thread data to 64 B (or 128 B on M1/M2 where cache lines are larger).
 - **Deterministic mode.** A debug build path that serializes jobs in registration order for repro — mandatory for networking and physics bug hunts.
+
+See `JOB_SYSTEM_AND_FIBERS.md` for the fiber scheduler, work-stealing deque implementation, counter/`JobHandle` DAG, fiber park/resume semantics, blocking-I/O handling, and lock-free building blocks.
 
 ---
 
@@ -190,7 +194,7 @@ An engine architecture must be elastic and universal. The same engine binary mus
 
 ## Rendering Pipeline Overview
 
-> For anything deeper than this summary — lighting model math, Nanite cluster hierarchy, tone-map curves, post-process ordering — **load `references/RENDERING_AND_GRAPHICS.md` before continuing**.
+> For anything deeper than this summary — lighting model math, Nanite cluster hierarchy, tone-map curves, post-process ordering, reverse-Z depth — **load `references/RENDERING_AND_GRAPHICS.md` before continuing**. For the per-frame pass-scheduling layer — render/frame graph, transient aliasing, barriers, async compute, GPU-driven culling, two-phase occlusion/HZB, Work Graphs — **load `references/FRAME_GRAPH_AND_GPU_DRIVEN.md`**.
 
 - **Mandatory HW RT pipeline.** Hybrid baked/dynamic is legacy (idTech 8 baseline). Design GI and shadows assuming HW RT (RTX 20-series/RDNA2 minimum). Virtualized geometry (Nanite/idTech 8 style) with mesh shaders (SM 6.5 / Vulkan 1.3) is non-negotiable. Visibility buffer enables single-pass deferred material eval.
 - **PBR: Modular BSDFs & OpenPBR.** Standardized on OpenPBR 1.1.1 parameters. Substrate-style layered closures (Slabs/Operators). Energy conservation and multi-scattering compensation built-in. **For the underlying material math — rendering equation, GGX/Smith/Fresnel/F82, multi-scatter compensation (Kulla-Conty), split-sum IBL, LTC area lights, OpenPBR slab layering, energy/BRDF LUTs, SSS/transmission, MaterialX — load the `physically-based-rendering` skill.** That skill is the authoritative source for BSDF/BRDF correctness; this skill owns only the *engine-integration* concerns (G-buffer packing, deferred closure eval, frame-graph placement). Do not reconstruct BRDF math from compressed memory — route to the PBR skill.
@@ -427,7 +431,7 @@ When reviewing code, apply the **Carmack Standard**: *"Would this survive a code
 
 ## Supplementary Files
 
-This skill ships with **11 reference files** and **7 asset templates**. Total content is ~3,300 lines — **more than a single context window can hold**.
+This skill ships with **14 reference files** and **7 asset templates**. Total content is ~4,000 lines — **more than a single context window can hold**.
 
 > **RAG / context-limit directive — read this as an instruction to *yourself*:** When the conversation enters a complex domain (rendering, physics, networking, asset pipeline, etc.), **proactively advise the user to load the specific reference file for that domain** *before* the discussion goes deeper. Example: *"We're about to discuss Lumen vs DDGI — please load `references/RENDERING_AND_GRAPHICS.md` so I don't have to reconstruct the specifics from compressed memory."*
 >
@@ -439,7 +443,10 @@ This skill ships with **11 reference files** and **7 asset templates**. Total co
 
 | File                                                  | Load when...                                                       |
 |-------------------------------------------------------|--------------------------------------------------------------------|
-| `references/RENDERING_AND_GRAPHICS.md`                | Any rendering topic — pipeline, PBR, GI, shadows, post, volumetrics |
+| `references/RENDERING_AND_GRAPHICS.md`                | Any rendering topic — pipeline, PBR, GI, shadows, post, volumetrics, reverse-Z |
+| `references/FRAME_GRAPH_AND_GPU_DRIVEN.md`            | Render/frame graph, transient aliasing, barriers, async compute, GPU-driven culling, two-phase occlusion/HZB, Work Graphs |
+| `references/ECS_AND_DATA_ORIENTED.md`                 | Archetype chunk storage, archetype graph, queries, ECB, change detection, system scheduling |
+| `references/JOB_SYSTEM_AND_FIBERS.md`                 | Fiber scheduler, work-stealing deques, counters/JobHandle DAG, sync points, lock-free structures |
 | `references/PHYSICS_MATH_AND_SIMULATION.md`           | Physics, math, SIMD, spatial structures, determinism               |
 | `references/ANIMATION_AND_CHARACTER.md`               | Animation graph, motion matching, IK, skinning, cloth, hair, face  |
 | `references/AUDIO_AND_SPATIAL.md`                     | Audio graph, DSP, HRTF, ambisonics, propagation                    |

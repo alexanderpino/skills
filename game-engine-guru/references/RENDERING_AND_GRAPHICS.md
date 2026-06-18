@@ -4,7 +4,9 @@ Reference document for AAA-grade realtime rendering. Audience: senior graphics e
 
 ## Table of Contents
 
+- Frame Graph & GPU-Driven (see `FRAME_GRAPH_AND_GPU_DRIVEN.md`)
 - Deferred vs Forward+ Architecture
+- Depth & Reverse-Z
 - PBR Material Model
 - Global Illumination Hierarchy
 - Shadow Pipeline
@@ -16,6 +18,8 @@ Reference document for AAA-grade realtime rendering. Audience: senior graphics e
 - GPU Particles
 - Neural Rendering
 - Tone Mapping and Color
+
+> **Scope note.** The per-frame *pass scheduling* layer underneath everything here — render/frame graph, transient aliasing, automatic barriers, async compute, GPU-driven culling, two-phase occlusion, Work Graphs — lives in **`FRAME_GRAPH_AND_GPU_DRIVEN.md`**. This file is the catalog of *what each pass computes*; load that file for *where and when* the GPU runs them.
 
 ---
 
@@ -48,6 +52,30 @@ Light lists packed as uint32 bitmasks — 256 lights per view = 8x uint32 per cl
 - Forward+: translucents, hair, skin, wet surfaces, anything needing MSAA, VR (MSAA is mandatory)
 
 On mobile TBDR (Apple Silicon, Adreno, Mali) deferred is a trap — the tile cache pays dearly for the wide G-buffer read. Use forward+ with on-chip depth-prepass resolve.
+
+---
+
+## Depth & Reverse-Z
+
+**Reverse-Z is the default, not an option.** Map the near plane to depth **1.0** and the far plane to **0.0**. This is mandatory for any modern renderer and effectively free; shipping a standard near=0/far=1 depth buffer in 2026 is a bug, not a choice.
+
+**Why it works.** A perspective projection distributes post-projection depth hyperbolically (∝ 1/z) — values bunch up near the far plane. IEEE float32 distributes its precision the opposite way — most representable values cluster near 0. Put the far plane at 0 and the near plane at 1, and the two non-uniformities **cancel**, giving near-uniform *relative* precision across the entire view distance. Without reverse-Z you get catastrophic z-fighting in the distance; with it, distant z-fighting essentially disappears.
+
+**Setup (all four steps, or it silently breaks):**
+1. Build the projection to map near→1, far→0 (swap the near/far terms, or use the infinite-far reverse-Z form below).
+2. **Clear depth to 0.0** (not 1.0).
+3. Flip the depth test to `GREATER` / `GREATER_EQUAL` (was `LESS`/`LESS_EQUAL`).
+4. Use a **floating-point depth format (`D32_FLOAT`)**. The entire precision win comes from float's exponent distribution — reverse-Z does **nothing** for `D24_UNORM`/integer depth, which is already uniform. (If you're stuck on D24 for bandwidth, reverse-Z is harmless but pointless.)
+
+**Infinite far plane.** Reverse-Z lets you push the far plane to infinity at **zero precision cost** — the projection has a clean closed form and you never run out of distant precision. This is why open-world engines default to infinite-far reverse-Z; it removes far-plane clipping of distant geometry entirely.
+
+**API notes.** D3D12/Vulkan/Metal NDC z is already `[0,1]`, the natural fit. Set viewport `minDepth/maxDepth` accordingly. Legacy OpenGL clip-space z is `[-1,1]` (wastes a bit and half the range) — call `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)` before relying on reverse-Z.
+
+**Engine-wide ripple effects** — every depth consumer must adopt the reversed convention or it breaks subtly:
+- **HZB / occlusion culling:** "closest" is now the **largest** depth → build the Hi-Z pyramid with `max` reduction, not `min` (see `FRAME_GRAPH_AND_GPU_DRIVEN.md` §Two-Phase Occlusion). Getting the operator backwards either culls visible geometry or culls nothing — assert it in a unit test against a known-occluder scene.
+- **Depth bias / slope-scaled bias:** signs flip relative to standard-Z.
+- **Depth linearization:** the reconstruction `linearZ = near*far / (far + depth*(near-far))` changes form; centralize it in one shader include so every pass (SSAO, SSR, fog, decals, froxel-slice mapping) uses the same convention.
+- **Anything reading the depth buffer** — SSAO/GTAO, SSR HiZ march, deferred decals, volumetric froxel depth slicing, particle soft-blend — must use the reversed comparison and linearization. A single pass left on standard-Z produces a class of "works near the camera, wrong in the distance" bugs.
 
 ---
 
