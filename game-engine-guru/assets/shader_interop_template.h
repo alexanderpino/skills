@@ -33,9 +33,15 @@
 //      demonstrate the rule — its GLSL UBO MUST be scalar-layout.
 //   4. Matrices: force one majorness everywhere (HLSL `-Zpr` / `row_major`;
 //      GLSL `layout(row_major)`). Mismatched majorness transposes silently.
-//   5. Vertex-input structs are NOT shared here. engine::Vec4 is alignas(16),
-//      which misaligns inside a tightly-packed vertex struct; vertex layouts use
-//      packed (align-4) scalar types and live in a separate definition.
+//   5. Vertex layouts are shared too, but under DIFFERENT rules — see the
+//      "Vertex layouts (packed)" section. They are NOT cbuffer-packed: vertex
+//      data is tightly packed (4-byte scalar alignment, no 16-byte rows), so
+//      they use the `packed_*` types (align-4) and `SI_VERTEX`, never the
+//      alignas(16) `SI_STRUCT`. An alignas(16) `Vec4` would silently misalign a
+//      vertex struct. The packed struct is the source of truth for the
+//      vertex-pulling path; for the input-assembler path, derive the
+//      D3D12_INPUT_ELEMENT_DESC / VkVertexInputAttributeDescription offsets from
+//      `offsetof` so the IA layout can't drift from it either.
 //   6. Pad explicitly. If a struct's last 16-byte row is only partially filled
 //      and no real field completes it, add a NAMED pad field (`float _padN;` /
 //      `float2 _padN;`) — never rely on the compiler to insert it. Make padding
@@ -61,13 +67,24 @@
     using float4   = engine::Vec4;
     using float4x4 = engine::Mat4;
 
-    #define SI_STRUCT(name) struct alignas(16) name   // honor the 16-byte rule
+    // Packed (align-4, tightly sized) variants for vertex layouts — NOT the
+    // alignas(16) math types. PackedVec3 == 12B/align-4, PackedVec4 == 16B/align-4.
+    using packed_float2 = engine::PackedVec2;
+    using packed_float3 = engine::PackedVec3;
+    using packed_float4 = engine::PackedVec4;
+
+    #define SI_STRUCT(name) struct alignas(16) name   // cbuffer: honor 16-byte rule
+    #define SI_VERTEX(name) struct name               // vertex: tight, align-4
     #define SI_CONST        inline constexpr uint
 
 #elif defined(__HLSL_VERSION)
     // -------- HLSL (DXC) -----------------------------------------------------
     // float2/3/4, float4x4, uint are native. No remapping needed.
+    #define packed_float2 float2
+    #define packed_float3 float3
+    #define packed_float4 float4
     #define SI_STRUCT(name) struct name
+    #define SI_VERTEX(name) struct name
     #define SI_CONST        static const uint
 
 #else
@@ -78,8 +95,12 @@
     #define float3   vec3
     #define float4   vec4
     #define float4x4 mat4
+    #define packed_float2 vec2
+    #define packed_float3 vec3
+    #define packed_float4 vec4
     // `uint` is native in GLSL (>= 1.30) — no remap needed.
     #define SI_STRUCT(name) struct name
+    #define SI_VERTEX(name) struct name
     #define SI_CONST        const uint
 #endif
 
@@ -131,6 +152,24 @@ SI_STRUCT(InstanceData)
     float4x4 WorldIT;  // @64  inverse-transpose for normal transform
 };
 
+// =============================================================================
+// Vertex layouts (packed) — DIFFERENT rules from the cbuffer structs above.
+// Tightly packed (4-byte scalar alignment, NO 16-byte rows), so use packed_*
+// + SI_VERTEX, never SI_STRUCT. This struct is the single source of truth for
+// the vertex-PULLING path (StructuredBuffer<MeshVertex> indexed by SV_VertexID).
+// For the input-ASSEMBLER path, build the input-element descriptors from these
+// offsets via offsetof(MeshVertex, Field) so the IA layout can't drift either.
+// GLSL caveat: an SSBO of these needs layout(scalar) — std140/std430 both round
+// vec3 up to 16B and would desync (same family as rule 3).
+// =============================================================================
+SI_VERTEX(MeshVertex)
+{
+    packed_float3 Position;  // @0  (12B)
+    packed_float3 Normal;    // @12 (12B)
+    packed_float4 Tangent;   // @24 (16B)  .w = bitangent sign
+    packed_float2 UV0;       // @40 ( 8B)
+};                           // stride = 48B, tight
+
 // Global bindless descriptor indices baked by the engine at startup — shared so
 // C++ and shaders agree on the slots without a second hand-edited copy.
 SI_CONST kMaterialBufferSlot = 1;   // StructuredBuffer<MaterialParams>
@@ -163,11 +202,20 @@ SI_CONST kPointClampSampler  = 1;
     static_assert(offsetof(PerFrameCB, Jitter) == 144, "PerFrameCB.Jitter moved — check explicit padding");
     static_assert(offsetof(MaterialParams, EmissiveColor) == 48, "MaterialParams float4 misaligned");
 
+    // Vertex layout: tight packing. alignof MUST be 4 (not 16) — a 16-aligned
+    // member would force padding and desync the vertex stride.
+    static_assert(alignof(MeshVertex) == 4,  "MeshVertex must be tightly packed (align 4) — did a SIMD type leak in?");
+    static_assert(sizeof(MeshVertex)  == 48, "MeshVertex stride drift");
+    static_assert(offsetof(MeshVertex, Normal)  == 12, "MeshVertex.Normal offset");
+    static_assert(offsetof(MeshVertex, Tangent) == 24, "MeshVertex.Tangent offset");
+    static_assert(offsetof(MeshVertex, UV0)     == 40, "MeshVertex.UV0 offset");
+
     } // namespace engine::gpu
 #endif
 
 // Keep the macros local to this header so they don't leak into shader bodies.
 #undef SI_STRUCT
+#undef SI_VERTEX
 #undef SI_CONST
 
 #endif // ENGINE_SHADER_INTEROP_H

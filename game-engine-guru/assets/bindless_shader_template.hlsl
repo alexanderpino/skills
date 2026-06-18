@@ -70,20 +70,8 @@
 ConstantBuffer<PushConstants> g_PC    : register(b0);
 ConstantBuffer<PerFrameCB>    g_Frame : register(b1);
 
-//------------------------------------------------------------------------------
-// Vertex-input layout. Deliberately NOT in the shared interop header: the
-// engine's float4 math type is alignas(16), which would misalign a tightly
-// packed vertex struct. Vertex layouts use packed scalar types on the C++ side
-// and are matched to the input-assembler / pulling layout separately.
-//------------------------------------------------------------------------------
-
-struct MeshVertex
-{
-    float3 Position;
-    float3 Normal;
-    float4 Tangent;         // .w = bitangent sign
-    float2 UV0;
-};
+// MeshVertex (the vertex-pulling layout) is also defined in the shared header,
+// under packed rules — see its "Vertex layouts (packed)" section.
 
 //------------------------------------------------------------------------------
 // Stage I/O
