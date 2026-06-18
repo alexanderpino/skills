@@ -139,7 +139,7 @@ What a MaterialX graph actually contains:
 - **Pattern nodes** — `image`, `tiledimage`, math/remap (`mix`, `multiply`, `ramp`,
   `curveadjust`), `noise`, `normalmap` — the texture/value plumbing that feeds inputs.
 - **BSDF/shading nodes** — primitives like `oren_nayar_diffuse_bsdf`,
-  `generalized_schlick_bsdf`, `dielectric_bsdf`, plus `layer`/`mix`/`add` operators
+  `generalized_schlick_bsdf`, `dielectric_bsdf`, plus `layer`/`mix` operators
   that combine lobes. The über-shader nodes (`open_pbr_surface`) are themselves
   nodegraphs built from these primitives. This is the **lobe decomposition and
   layering-vs-mixing** from the skill's core mental model, expressed as a graph.
