@@ -200,7 +200,7 @@ Order matters. Standard chain at native render resolution:
 2. **TAA/TSR** — history reprojection, variance clipping (YCoCg space), neighborhood clamping. Blend factor 0.05-0.1 for static, 0.2+ when disocclusion detected
 3. **SSAO/GTAO** — GTAO (ground-truth AO, Jimenez 2016) is strictly better than HBAO+. 16 samples, 1/2 res, bilateral upsample. ~0.4 ms
 4. **SSR** — hierarchical depth (HiZ) ray march, 32 steps max, fallback to cubemap/DDGI on miss. Temporal accumulation for roughness > 0.1
-5. **Upscaling + Ray Reconstruction** — DLSS 4 (transformer model) / FSR 4 (ML, RDNA4) / XeSS 2 / MetalFX depending on platform. All take motion vectors + depth + color + exposure. The 2026 floor folds the RT denoiser *into* the upscaler — DLSS Ray Reconstruction and the FSR 4 neural path replace separate hand-tuned denoise passes; a denoiser that cannot run a neural path is behind the floor (see Neural Rendering)
+5. **Upscaling + Ray Reconstruction** — DLSS 4 (transformer model) / FSR 4 (ML, RDNA4) / XeSS 2 / MetalFX depending on platform. All take motion vectors + depth + color + exposure. The 2026 floor folds the RT denoiser *into* the upscaler — DLSS Ray Reconstruction and the FSR 4 neural path replace separate hand-tuned denoise passes; a denoiser that cannot run a neural path is behind the floor (see [Neural Rendering](#neural-rendering))
 6. **Depth of Field** — bokeh. Gather method: half-res, 49-tap disk, tile-based classification (near/far/focus). Scatter-as-gather for highlights
 7. **Motion blur** — per-object using motion vectors, tile max 16x16, 8-16 samples along velocity
 8. **Bloom** — downsample pyramid (13-tap Kawase or Call of Duty Siggraph 2014), 6-8 mip levels, upsample with tent filter
