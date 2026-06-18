@@ -284,7 +284,7 @@ buffer<uint> aliveIndicesA, aliveIndicesB, deadIndices;
 ## Neural Rendering
 
 **Production floor (2026) — table stakes, not optional:**
-- **Neural denoising / Ray Reconstruction.** DLSS Ray Reconstruction and the FSR 4 neural path are the production floor for any RT denoiser. The neural denoiser folds into the upscaler (see Post-Processing §5) and replaces separate hand-tuned SVGF/ReLAX passes for RT GI, reflections, and shadows. A denoiser pipeline that *cannot* run a neural path is behind the floor. Provide an `INeuralBackend` (DirectML / CoreML / console ML), stream model weights as cooked assets, and batch inference — never hardwire a classical-only denoiser.
+- **Neural denoising / Ray Reconstruction.** DLSS Ray Reconstruction and the FSR 4 neural path are the production floor for any RT denoiser. The neural denoiser folds into the upscaler (see [Post-Processing Chain](#post-processing-chain) §5) and replaces separate hand-tuned SVGF/ReLAX passes for RT GI, reflections, and shadows. A denoiser pipeline that *cannot* run a neural path is behind the floor. Provide an `INeuralBackend` (DirectML / CoreML / console ML), stream model weights as cooked assets, and batch inference — never hardwire a classical-only denoiser.
 - **DLSS 4 / FSR 4 / XeSS 2:** neural upscalers, production-hardened.
 - **NVIDIA NTC (Neural Texture Compression):** 4-8x smaller than BC7 at comparable quality. Decoder inline in shader (~20 cycles per sample). Use for albedo/normal on distant LODs.
 
