@@ -153,11 +153,14 @@ public:
      * @param m Marker obtained from GetMarker() on this same instance.
      *
      * All allocations made after `m` become invalid. Calling Rewind with a
-     * marker whose offset exceeds the current offset is a programmer error and
-     * is ignored in release builds (debug asserts).
+     * marker whose offset exceeds the current offset is a programmer error; it
+     * is ignored here (the guard below). Wire a `DEV_ASSERT(m.offset <= m_offset, …)`
+     * at this boundary in engine builds — omitted from the template to keep it
+     * dependency-free (only <engine/core/EngineError.h>).
      */
     void Rewind(Marker m) noexcept
     {
+        // DEV_ASSERT(m.offset <= m_offset, "Rewind past current offset");
         if (m.offset <= m_offset) { m_offset = m.offset; }
     }
 

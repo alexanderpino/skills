@@ -50,7 +50,7 @@ Stutter diagnosis rule: if `frameTime` spikes but `gpu_busy_time` is flat, it's 
 
 ## CPU Optimization
 
-**SoA over AoS.** Archetype-based ECS (Bitsquid, Flecs, EnTT) stores components contiguously per archetype. Iteration becomes linear prefetch-friendly scan. Expected speedup over naive AoS object iteration: 3-8x for cache-bound workloads.
+**SoA over AoS.** Archetype-based ECS (Bitsquid, Flecs, EnTT) stores components contiguously per archetype. Iteration becomes linear prefetch-friendly scan. Expected speedup over naive AoS object iteration: 3-8x for cache-bound workloads. (Storage internals — chunk layout, archetype graph, query matching, change detection — in `ECS_AND_DATA_ORIENTED.md`; this section is the perf-tuning angle.)
 
 ```cpp
 // Archetype storage: one contiguous array per component type per archetype
@@ -91,8 +91,8 @@ struct f32x4 {
 **constexpr / consteval:** push everything that can move to compile time there. Reflection data, shader permutation tables, material parameter tables. C++23 `consteval` for strictly-compile-time; C++26 reflection (when available, guarded) will eliminate most hand-rolled codegen.
 
 ```cpp
-#if __cpp_static_reflection >= 202506L
-    // C++26 reflection path
+#if defined(__cpp_reflection) && __cpp_reflection >= 202506L
+    // C++26 reflection path (P2996; real FTM is __cpp_reflection)
 #else
     // C++23 macro + consteval fallback
 #endif

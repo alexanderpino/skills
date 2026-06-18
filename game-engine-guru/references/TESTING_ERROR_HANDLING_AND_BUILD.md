@@ -253,11 +253,13 @@ using AllocatorTypes = ::testing::Types<
 TYPED_TEST_SUITE(AllocatorTest, AllocatorTypes);
 
 TYPED_TEST(AllocatorTest, AllocatedPointersAreAligned) {
-    TypeParam a(1024 * 1024);
+    // Engine allocators are non-owning: caller supplies the backing slab.
+    alignas(256) static std::array<std::byte, 1024 * 1024> backing{};
+    TypeParam a(backing.data(), backing.size());
     for (size_t align : {8, 16, 32, 64, 128, 256}) {
-        void* p = a.allocate(128, align);
-        ASSERT_NE(p, nullptr);
-        EXPECT_EQ(reinterpret_cast<uintptr_t>(p) % align, 0u);
+        auto r = a.Allocate(128, align);   // std::expected<void*, EngineError>
+        ASSERT_TRUE(r.has_value());
+        EXPECT_EQ(reinterpret_cast<uintptr_t>(*r) % align, 0u);
     }
 }
 ```
@@ -354,10 +356,12 @@ TEST(Vec3, NormalizeOfZeroReturnsError) {
 }
 
 TEST(Allocator, ZeroSizeRequestReturnsValidPointer) {
-    // C malloc tradition: zero size returns non-null, distinct from null.
-    LinearAllocator a(1024);
-    void* p = a.allocate(0, 16);
-    EXPECT_NE(p, nullptr);
+    // Zero size returns a valid, distinct pointer (success, not an error).
+    alignas(16) std::array<std::byte, 1024> backing{};
+    LinearAllocator a(backing.data(), backing.size());
+    auto r = a.Allocate(0, 16);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_NE(*r, nullptr);
 }
 ```
 
@@ -519,7 +523,7 @@ WarningsAsErrors: "bugprone-*,performance-*,cert-*"
 
 ## Build System
 
-**CMake 3.25+** is the lingua franca. Alternatives (Bazel, Meson, SCons, custom) have niches but lose on ecosystem. Targets over directories. `target_*` everything.
+**CMake 3.28+** is the lingua franca (matches the `cmake_minimum_required(VERSION 3.28)` and preset schema v6 below, and is the floor for C++20-modules support). Alternatives (Bazel, Meson, SCons, custom) have niches but lose on ecosystem. Targets over directories. `target_*` everything.
 
 ```cmake
 cmake_minimum_required(VERSION 3.28)

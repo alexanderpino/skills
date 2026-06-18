@@ -15,7 +15,7 @@
 
 ## 1. Audio Engine Architecture
 
-Audio is a hard-real-time problem masquerading as an afterthought. The audio callback fires at ~2.9ms intervals (128 samples @ 48kHz) and if you miss it once, the player hears a click that will haunt them through every YouTube review. Design accordingly.
+Audio is a hard-real-time problem masquerading as an afterthought. The audio callback fires at ~2.67 ms intervals (128 samples @ 48 kHz) and if you miss it once, the player hears a click that will haunt them through every YouTube review. Design accordingly.
 
 **Audio graph (DAG).** Nodes produce float buffers; edges carry audio. Leaves are voice sources (one-shot / streamed / synth). Interior nodes are DSP effects. Sinks are output buses. The graph is compiled to a flat execution schedule once per mix configuration change — no virtual dispatch in the per-sample loop.
 

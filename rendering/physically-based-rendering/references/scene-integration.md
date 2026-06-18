@@ -34,6 +34,13 @@ Indirect light (bounce light) is critical. If a red wall is next to a white PBR 
 *   **Screen Space GI (SSGI):** Approximates bounce light using the depth buffer. Cheap but fails for off-screen geometry.
 *   **Hardware Ray Traced GI (Lumen / RTX):** Traces rays into a simplified scene representation (BVH/SDF) to gather accurate indirect diffuse and specular bounce light. The indirect light must be evaluated through the OpenPBR BSDF to maintain correct roughness and Fresnel responses.
 
+> **Engine-integration companion:** the GI *hierarchy and tiering* as an engine
+> subsystem — choosing and falling back across Lumen (HW/SW) → DDGI probes → ReSTIR
+> DI/GI → SDF → SSGI by platform and budget, and their memory/ms costs — is covered by
+> the **`game-engine-guru`** skill (`references/RENDERING_AND_GRAPHICS.md`, "Global
+> Illumination Hierarchy"). This file is responsible only for feeding that indirect
+> light correctly through the BSDF.
+
 ## 4. Anti-Aliasing & Specular Aliasing
 PBR materials, especially highly glossy ones (low roughness) or those with detailed normal maps, suffer from severe sub-pixel specular aliasing (shimmering/flickering).
 *   **Temporal Anti-Aliasing (TAA):** Blends previous frames to smooth edges. Essential for PBR, but can cause ghosting on moving objects.

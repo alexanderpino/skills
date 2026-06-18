@@ -108,6 +108,13 @@ the standard for rect/tube/sphere lights in UE and Unity HDRP.
 - Choose deferred for many dynamic lights and simple materials; forward+/clustered for
   rich layered materials, transparency, and MSAA.
 
+> **Engine-integration companion:** the *architecture* of the Adaptive GBuffer
+> (variable bitstream), tile classification, and the visibility-buffer→GBuffer resolve
+> for Nanite-style geometry — i.e. how this choice is wired into a render/frame graph as
+> an engine subsystem — is covered by the **`game-engine-guru`** skill
+> (`references/RENDERING_AND_GRAPHICS.md`). This file owns the shading math; that file
+> owns where and when the GPU runs it.
+
 ## 6. Mobile and bandwidth-constrained approximations
 
 On mobile/WebGL, replace expensive terms aggressively but keep energy behavior sane:

@@ -4,7 +4,10 @@ Reference document for AAA-grade realtime rendering. Audience: senior graphics e
 
 ## Table of Contents
 
+- Frame Graph & GPU-Driven (see `FRAME_GRAPH_AND_GPU_DRIVEN.md`)
 - Deferred vs Forward+ Architecture
+- Depth & Reverse-Z
+- CPU↔GPU Shared Layout
 - PBR Material Model
 - Global Illumination Hierarchy
 - Shadow Pipeline
@@ -16,6 +19,8 @@ Reference document for AAA-grade realtime rendering. Audience: senior graphics e
 - GPU Particles
 - Neural Rendering
 - Tone Mapping and Color
+
+> **Scope note.** The per-frame *pass scheduling* layer underneath everything here — render/frame graph, transient aliasing, automatic barriers, async compute, GPU-driven culling, two-phase occlusion, Work Graphs — lives in **`FRAME_GRAPH_AND_GPU_DRIVEN.md`**. This file is the catalog of *what each pass computes*; load that file for *where and when* the GPU runs them.
 
 ---
 
@@ -51,19 +56,61 @@ On mobile TBDR (Apple Silicon, Adreno, Mali) deferred is a trap — the tile cac
 
 ---
 
+## Depth & Reverse-Z
+
+**Reverse-Z is the default, not an option.** Map the near plane to depth **1.0** and the far plane to **0.0**. This is mandatory for any modern renderer and effectively free; shipping a standard near=0/far=1 depth buffer in 2026 is a bug, not a choice.
+
+**Why it works.** A perspective projection distributes post-projection depth hyperbolically (∝ 1/z) — values bunch up near the far plane. IEEE float32 distributes its precision the opposite way — most representable values cluster near 0. Put the far plane at 0 and the near plane at 1, and the two non-uniformities **cancel**, giving near-uniform *relative* precision across the entire view distance. Without reverse-Z you get catastrophic z-fighting in the distance; with it, distant z-fighting essentially disappears.
+
+**Setup (all four steps, or it silently breaks):**
+1. Build the projection to map near→1, far→0 (swap the near/far terms, or use the infinite-far reverse-Z form below).
+2. **Clear depth to 0.0** (not 1.0).
+3. Flip the depth test to `GREATER` / `GREATER_EQUAL` (was `LESS`/`LESS_EQUAL`).
+4. Use a **floating-point depth format (`D32_FLOAT`)**. The entire precision win comes from float's exponent distribution — reverse-Z does **nothing** for `D24_UNORM`/integer depth, which is already uniform. (If you're stuck on D24 for bandwidth, reverse-Z is harmless but pointless.)
+
+**Infinite far plane.** Reverse-Z lets you push the far plane to infinity at **zero precision cost** — the projection has a clean closed form and you never run out of distant precision. This is why open-world engines default to infinite-far reverse-Z; it removes far-plane clipping of distant geometry entirely.
+
+**API notes.** D3D12/Vulkan/Metal NDC z is already `[0,1]`, the natural fit. Set viewport `minDepth/maxDepth` accordingly. Legacy OpenGL clip-space z is `[-1,1]` (wastes a bit and half the range) — call `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)` before relying on reverse-Z.
+
+**Engine-wide ripple effects** — every depth consumer must adopt the reversed convention or it breaks subtly:
+- **HZB / occlusion culling:** "closest" is now the **largest** depth → build the Hi-Z pyramid with `max` reduction, not `min` (see `FRAME_GRAPH_AND_GPU_DRIVEN.md` §Two-Phase Occlusion). Getting the operator backwards either culls visible geometry or culls nothing — assert it in a unit test against a known-occluder scene.
+- **Depth bias / slope-scaled bias:** signs flip relative to standard-Z.
+- **Depth linearization:** the reconstruction `linearZ = near*far / (far + depth*(near-far))` changes form; centralize it in one shader include so every pass (SSAO, SSR, fog, decals, froxel-slice mapping) uses the same convention.
+- **Anything reading the depth buffer** — SSAO/GTAO, SSR HiZ march, deferred decals, volumetric froxel depth slicing, particle soft-blend — must use the reversed comparison and linearization. A single pass left on standard-Z produces a class of "works near the camera, wrong in the distance" bugs.
+
+---
+
+## CPU↔GPU Shared Layout
+
+Constant buffers, structured-buffer elements, and push/root constants are read by the CPU (which fills them) and the GPU (which consumes them). The two definitions must agree byte-for-byte, and a mismatch is a *silent* corruption — wrong matrices, garbage material params, no crash.
+
+**Share, don't mirror.** Do not hand-maintain a C++ struct and an HLSL/GLSL struct in parallel. Author the layout **once** in a header compiled by both sides, with macros that alias the shader vector types (`float4`, `float4x4`, `uint`) to the engine math types in C++, leave them native in HLSL, and remap to `vec*`/`mat*` in GLSL. One source of truth → the sides cannot drift. Constants (descriptor slots, feature flags) and trivial helpers can be shared the same way. Scaffold: `assets/shader_interop_template.h`.
+
+**Honor the packing rules or it desyncs across APIs:**
+- **16-byte rows (HLSL cbuffer):** a field never straddles a 16-byte boundary. **Pad explicitly** — when a partial row isn't completed by a real field, add a *named* `float _padN;` rather than trusting the compiler. Padding should be visible in the source.
+- **`float3`/`vec3` is the classic trap:** HLSL packs it as 12 B (next scalar fills the slot); GLSL **std140** rounds it to 16 B — they disagree. Avoid vec3 in shared blocks, or compile the GLSL side with `GL_EXT_scalar_block_layout` (`layout(scalar)`) to match HLSL/C++.
+- **Never `bool`** in a shared block (HLSL cbuffer bool = 4 B, C++ bool = 1 B) — use `uint`. **Force one matrix majorness** everywhere (mismatched majorness transposes silently).
+- **Vertex layouts share too, under different rules.** They are tightly packed (4-byte scalar alignment, no 16-byte rows), so they use *packed* (align-4) types — an `alignas(16)` engine `Vec4` would silently misalign a vertex struct. The packed struct is the source of truth for vertex *pulling* (`StructuredBuffer<Vertex>`); for the input-*assembler* path, derive the `D3D12_INPUT_ELEMENT_DESC` / `VkVertexInputAttributeDescription` offsets from `offsetof` so the IA layout can't drift either. Assert `alignof == 4` (not 16) to catch a SIMD type leaking in. (GLSL vertex SSBOs also need `layout(scalar)` — std140/std430 round vec3 to 16.)
+
+**Assert the layout, including alignment.** On the C++ side, guard every shared struct with `static_assert` on **`alignof` (== 16), `sizeof` (a whole number of 16-byte rows), and key field `offsetof`s.** This turns a layout drift into a build failure instead of a rendering artifact. (The GLSL std140-vs-scalar choice has no compile-time guard — that one is enforced by discipline.)
+
+---
+
 ## PBR Material Model & OpenPBR
 
-The 2026 standard dictates a shift away from hardcoded shading models (e.g., "Default Lit" vs "Clear Coat") toward **Modular BSDF Closures** and strict alignment with the **OpenPBR** specification (supported by Epic, Unity, and Adobe).
+> **Scope split — read this first.** This section covers the *engine-integration* side of PBR: how closures are packed into the Adaptive GBuffer, resolved from the visibility buffer, and evaluated in the deferred/forward lighting pass. The **shading math itself** — the rendering equation, microfacet theory (GGX NDF, Smith height-correlated masking-shadowing, Fresnel/Schlick/F82-tint), diffuse/sheen models, energy conservation & multi-scattering compensation (Kulla-Conty / Fdez-Agüera), split-sum IBL and the BRDF integration LUT, LTC area lights, OpenPBR 1.1.1 slab layering and coat-darkening physics, energy/BRDF LUTs, and SSS/transmission/IOR — **is owned by the `physically-based-rendering` skill. Load it before deriving, debugging, or implementing any BSDF math.** Do not reconstruct those equations from this summary.
+
+The 2026 standard dictates a shift away from hardcoded shading models (e.g., "Default Lit" vs "Clear Coat") toward **Modular BSDF Closures** and strict alignment with the **OpenPBR 1.1.1** specification (supported by Epic, Unity, and Adobe).
 
 **Modular BSDFs (Substrate-style Slabs):**
 Materials are authored and evaluated as a series of layered "Slabs" and "Operators" (blend, add, multiply). A single slab encompasses parameterized responses natively supporting **Mean Free Path (MFP)** for subsurface scattering, **F90 (glancing reflectivity)**, and procedural **Glints/Fuzz** without requiring secondary G-buffer passes.
 
-`hlsl
+```hlsl
 // BSDF Evaluation is now driven by closure unpacking
 FSubstrateClosure closure = UnpackAdaptiveGBuffer(pixelData);
-float3 lighting = EvaluateSlab(closure.BaseSlab, L, V, N) 
+float3 lighting = EvaluateSlab(closure.BaseSlab, L, V, N)
                 + EvaluateSlab(closure.TopSlab, L, V, N);
-`
+```
 
 **Energy Conservation & Multi-scattering:**
 Energy conservation across complex layered slabs is handled intrinsically by the modular framework. For base slabs, multi-scatter compensation (Kulla-Conty/Fdez-Aguera split-sum LUTs) remains the baseline.
@@ -198,7 +245,7 @@ Order matters. Standard chain at native render resolution:
 2. **TAA/TSR** — history reprojection, variance clipping (YCoCg space), neighborhood clamping. Blend factor 0.05-0.1 for static, 0.2+ when disocclusion detected
 3. **SSAO/GTAO** — GTAO (ground-truth AO, Jimenez 2016) is strictly better than HBAO+. 16 samples, 1/2 res, bilateral upsample. ~0.4 ms
 4. **SSR** — hierarchical depth (HiZ) ray march, 32 steps max, fallback to cubemap/DDGI on miss. Temporal accumulation for roughness > 0.1
-5. **Upscaling** — DLSS 3.7 / FSR 3.1 / XeSS 1.3 / Metal-FX depending on platform. All take motion vectors + depth + color + exposure
+5. **Upscaling + Ray Reconstruction** — DLSS 4 (transformer model) / FSR 4 (ML, RDNA4) / XeSS 2 / MetalFX depending on platform. All take motion vectors + depth + color + exposure. The 2026 floor folds the RT denoiser *into* the upscaler — DLSS Ray Reconstruction and the FSR 4 neural path replace separate hand-tuned denoise passes; a denoiser that cannot run a neural path is behind the floor (see [Neural Rendering](#neural-rendering))
 6. **Depth of Field** — bokeh. Gather method: half-res, 49-tap disk, tile-based classification (near/far/focus). Scatter-as-gather for highlights
 7. **Motion blur** — per-object using motion vectors, tile max 16x16, 8-16 samples along velocity
 8. **Bloom** — downsample pyramid (13-tap Kawase or Call of Duty Siggraph 2014), 6-8 mip levels, upsample with tent filter
@@ -208,11 +255,11 @@ Order matters. Standard chain at native render resolution:
 **TAA history rejection:** YCoCg neighborhood clip, velocity weighting, disocclusion mask from depth derivative. Ghosting on thin geometry is the perpetual enemy — neighborhood *clip* (not clamp) and variance-based bounds are non-negotiable.
 
 **Upscaling choice:**
-- NVIDIA RTX: DLSS (superior quality, frame gen for 4070+)
-- AMD / Xbox / PS5: FSR 3.1 (open, no ML hardware required)
-- Intel Arc: XeSS 1.3 (XMX path)
+- NVIDIA RTX: DLSS 4 (transformer super-resolution + Ray Reconstruction; multi-frame gen on 50-series)
+- AMD / Xbox / PS5: FSR 4 (ML path on RDNA4; FSR 3.1 fallback on older GPUs and current consoles, with PS5 Pro PSSR as the platform ML option)
+- Intel Arc: XeSS 2 (XMX path, with frame gen)
 - Apple: MetalFX upscaling
-- Always expose TSR/TAAU as fallback — do not ship without a vendor-neutral path
+- Always expose TSR/TAAU as fallback — do not ship without a vendor-neutral, ML-hardware-free path
 
 ---
 
@@ -281,16 +328,20 @@ buffer<uint> aliveIndicesA, aliveIndicesB, deadIndices;
 
 ## Neural Rendering
 
-**Production-ready (2026):** NVIDIA NTC (Neural Texture Compression) — 4-8x smaller than BC7 at comparable quality. Decoder inline in shader (~20 cycles per sample). Use for albedo/normal on distant LODs.
+**Production floor (2026) — table stakes, not optional:**
+- **Neural denoising / Ray Reconstruction.** DLSS Ray Reconstruction and the FSR 4 neural path are the production floor for any RT denoiser. The neural denoiser folds into the upscaler (see [Post-Processing Chain](#post-processing-chain) §5) and replaces separate hand-tuned SVGF/ReLAX passes for RT GI, reflections, and shadows. A denoiser pipeline that *cannot* run a neural path is behind the floor. Provide an `INeuralBackend` (DirectML / CoreML / console ML), stream model weights as cooked assets, and batch inference — never hardwire a classical-only denoiser.
+- **DLSS 4 / FSR 4 / XeSS 2:** neural upscalers, production-hardened.
+- **NVIDIA NTC (Neural Texture Compression):** 4-8x smaller than BC7 at comparable quality. Decoder inline in shader (~20 cycles per sample). Use for albedo/normal on distant LODs.
 
-**DLSS / FSR / XeSS:** neural upscalers, production-hardened.
+**2027 production trajectory — design for it, gate it behind capability + fallback:**
+- **Neural Radiance Caching (NRC, Müller 2021):** integrated into experimental Lumen configs; converging but still drifts in some configs. Design the GI stack so an NRC tier can slot above the SDF/RT final gather.
+- **Neural LOD / neural materials:** stream model weights as assets; expose the same `INeuralBackend`.
 
 **Research / caution zone:**
-- Radiance caching with neural networks (Muller 2021) — integrated into some experimental Lumen configs, still drifts
-- NeRF-based level-of-detail — interesting for background props, not shipping yet
-- Neural BRDFs — research only; authoring and LOD are unsolved
+- NeRF / Gaussian-splat level-of-detail — interesting for background props and photogrammetry, not a primary-geometry path yet.
+- Neural BRDFs — research only; authoring and LOD are unsolved.
 
-Disclaimer: the neural rendering hype curve runs far ahead of production. Ship what your QA team can repro-test, defer the rest to R&D branches. "Neural" is not an architecture — it is a tool, and the tool is immature outside upscaling and texture compression.
+Disclaimer: outside the production-floor items above, the neural rendering hype curve runs ahead of QA. Ship what your QA team can repro-test, gate everything else behind a capability query with a working classical fallback, and defer true R&D to feature branches. "Neural" is not an architecture — it is a tool with an `INeuralBackend` seam; the *seam* is mandatory now, even where a given model is not.
 
 ---
 
@@ -315,5 +366,6 @@ uint bin = uint(t * 254.0) + 1;  // bin 0 = black pixels
 
 ## See Also
 
+- **`physically-based-rendering` skill** — authoritative for all material/BRDF/BSDF math: rendering equation, GGX/Smith/Fresnel/F82, energy conservation & multi-scatter compensation, split-sum IBL, LTC area lights, OpenPBR 1.1.1 slabs, energy/BRDF LUTs, SSS/transmission/IOR, MaterialX, and path-tracing vs. real-time trade-offs. Load it whenever a rendering task crosses from engine integration into shading correctness.
 - `CROSS_PLATFORM_AND_CONSOLE.md` — HAL/GAL design, platform-specific backends, shader cross-compilation
 - `PERFORMANCE_AND_PROFILING.md` — frame budgets, GPU-driven pipeline optimization, profiler integration

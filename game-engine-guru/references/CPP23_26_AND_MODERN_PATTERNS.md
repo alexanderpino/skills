@@ -151,8 +151,8 @@ C++23 adds `<cmath>` constexpr for most functions — bake LUTs and curves at co
 The single most impactful feature coming. Replaces hand-written `ComponentTraits`, serialization visitors, RPC descriptors. Until it ships on all target SDKs, the engine uses a codegen tool (Python + libclang) that emits equivalent templates — the *shape* of `ComponentTraits` stays identical, so adopting reflection later is a mechanical swap.
 
 ```cpp
-#if defined(__cpp_static_reflection) && __cpp_static_reflection >= 202500L
-// C++26 path: reflect directly on the type
+#if defined(__cpp_reflection) && __cpp_reflection >= 202506L
+// C++26 path (P2996): reflect directly on the type. FTM is __cpp_reflection.
 template<class T> struct ComponentTraits {
     static constexpr std::string_view name = [:name_of(^^T):];
     static constexpr auto fields = []{
@@ -174,7 +174,8 @@ Both branches expose the identical API (`name`, `fields`). Downstream code — p
 ### Contracts
 
 ```cpp
-#if __has_cpp_attribute(contract_assert) >= 202502L
+#if defined(__cpp_contracts)   // P2900 contracts (FTM __cpp_contracts); pre/post are
+                               // function-contract specifiers, NOT the contract_assert statement
 float safe_divide(float a, float b)
     pre(b != 0.0f)
     post(r: std::isfinite(r))
@@ -193,10 +194,12 @@ float safe_divide(float a, float b) noexcept {
 
 Contract violation handlers integrate with the crash reporter the same way asserts do. Contracts don't replace asserts — they add a declarative layer the compiler can exploit for optimization and static analysis.
 
-### Pattern Matching (`inspect`)
+### Pattern Matching (`inspect`) — NOT in C++26
+
+Pattern matching (P2688/P2392, `inspect`) was **not adopted into C++26** — it has no standard feature-test macro and no shipping compiler. Treat it as post-C++26 horizon only; the `std::visit` + `overloaded` fallback below is the actual production approach today and for the foreseeable future. The speculative branch is shown purely to illustrate the eventual shape and will never compile (the guard is permanently false until/unless the proposal lands and a real FTM is assigned).
 
 ```cpp
-#if __cpp_pattern_matching >= 202500L
+#if defined(__cpp_pattern_matching)   // hypothetical — no such macro exists yet (post-C++26)
 auto describe(const Shape& s) -> std::string {
     return inspect (s) {
         <Circle>    [r]          => std::format("circle r={}", r);
@@ -223,7 +226,8 @@ auto describe(const Shape& s) -> std::string {
 Composable async. Replaces most bespoke future/promise code.
 
 ```cpp
-#if __cpp_lib_execution >= 202600L
+#if defined(__cpp_lib_senders)   // P2300 std::execution. FTM is __cpp_lib_senders —
+                                 // NOT __cpp_lib_execution (that's C++17 parallel-algorithm policies)
 namespace ex = std::execution;
 auto work = ex::schedule(io_sched)
           | ex::then ([]{ return load_file("a.bin"); })
@@ -357,11 +361,20 @@ concept Component = std::is_trivially_copyable_v<T>
                  && std::is_standard_layout_v<T>
                  && sizeof(T) <= 256;       // archetype storage constraint
 
+// Every engine allocator exposes a fallible, aligned Allocate and bulk Reset.
+// Bump tiers (Linear/Stack) reclaim only in bulk (Reset / Rewind(Marker)) and
+// intentionally have NO per-allocation free — see linear_allocator_template.h.
 template<class A>
 concept Allocator = requires(A a, size_t n, size_t align) {
-    { a.allocate(n, align) } -> std::same_as<void*>;
-    { a.deallocate(nullptr, n) } noexcept;
-    { a.owns(nullptr) } -> std::convertible_to<bool>;
+    { a.Allocate(n, align) } -> std::same_as<std::expected<void*, EngineError>>;
+    { a.Reset() } noexcept;
+};
+
+// Free-list tiers (Pool, TLSF) refine it with individual free + ownership query.
+template<class A>
+concept FreeListAllocator = Allocator<A> && requires(A a, void* p, size_t n) {
+    { a.Deallocate(p, n) } noexcept;
+    { a.Owns(p) } -> std::convertible_to<bool>;
 };
 
 template<class T>

@@ -45,7 +45,7 @@
 //                       ResourceDescriptorHeap textures)
 //     set 0 binding 1 : unbounded array of samplers (SamplerDescriptorHeap)
 //     set 0 binding 2 : unbounded array of SSBOs (for structured buffers)
-//   Push constants: 16 bytes mirroring RootConstants above.
+//   Push constants: the 16-byte PushConstants struct from shader_interop_template.h.
 //   Compile with DXC: -T ps_6_6 -spirv -fvk-use-dx-layout -fspv-target-env=vulkan1.3
 //
 // -----------------------------------------------------------------------------
@@ -58,72 +58,20 @@
 // =============================================================================
 
 //------------------------------------------------------------------------------
-// Root constants (b0) and per-frame CBV (b1)
+// Shared CPU<->GPU layouts. PushConstants, PerFrameCB, MaterialParams,
+// InstanceData and the descriptor-slot constants come from ONE header compiled
+// by both C++ and HLSL — no hand-mirrored duplicate to drift. See
+// shader_interop_template.h (it carries the 16-byte packing rules and the C++
+// size/alignment/offset static_asserts).
 //------------------------------------------------------------------------------
 
-struct PushConstants
-{
-    uint MaterialIndex;
-    uint MeshIndex;
-    uint InstanceIndex;
-    uint FrameIndex;
-};
-ConstantBuffer<PushConstants> g_PC : register(b0);
+#include "shader_interop_template.h"
 
-struct PerFrameCB
-{
-    float4x4 ViewProj;
-    float4x4 InvViewProj;
-    float3   CameraPos;
-    float    Time;
-};
-ConstantBuffer<PerFrameCB> g_Frame : register(b1);
+ConstantBuffer<PushConstants> g_PC    : register(b0);
+ConstantBuffer<PerFrameCB>    g_Frame : register(b1);
 
-//------------------------------------------------------------------------------
-// Material parameters. Stored in a StructuredBuffer<MaterialParams> reached via
-// ResourceDescriptorHeap[matBufferIndex] where matBufferIndex is baked into the
-// engine's global material SRV slot.
-//------------------------------------------------------------------------------
-
-struct MaterialParams
-{
-    uint   AlbedoTex;       // descriptor-heap index of a Texture2D
-    uint   NormalTex;
-    uint   OrmTex;          // packed Occlusion/Roughness/Metallic
-    uint   EmissiveTex;
-    float4 BaseColor;       // sRGB tint, multiplied against AlbedoTex
-    float  Metallic;
-    float  Roughness;
-    float  NormalScale;
-    float  EmissiveIntensity;
-    float4 EmissiveColor;
-};
-
-struct InstanceData
-{
-    float4x4 World;
-    float4x4 WorldIT;       // inverse-transpose for normal transform
-};
-
-struct MeshVertex
-{
-    float3 Position;
-    float3 Normal;
-    float4 Tangent;         // .w = bitangent sign
-    float2 UV0;
-};
-
-//------------------------------------------------------------------------------
-// Global bindless descriptor indices baked by the engine at startup. These
-// ride in a small CBV referenced through ResourceDescriptorHeap too; values
-// below are illustrative and would come from an engine-side header.
-//------------------------------------------------------------------------------
-
-static const uint kMaterialBufferSlot = 1;   // StructuredBuffer<MaterialParams>
-static const uint kInstanceBufferSlot = 2;   // StructuredBuffer<InstanceData>
-static const uint kMeshVertexSlotBase = 16;  // per-mesh base; add g_PC.MeshIndex
-static const uint kLinearWrapSampler  = 0;   // SamplerDescriptorHeap[0]
-static const uint kPointClampSampler  = 1;
+// MeshVertex (the vertex-pulling layout) is also defined in the shared header,
+// under packed rules — see its "Vertex layouts (packed)" section.
 
 //------------------------------------------------------------------------------
 // Stage I/O
@@ -234,6 +182,8 @@ float4 PSMain(VSOutput input) : SV_Target0
 
     // Minimal analytic lit term. Replace with the engine's shared BRDF include
     // (forward+ / clustered). Kept local here so the scaffold compiles standalone.
+    // For the actual GGX/Smith/Fresnel + energy-conserving BSDF math, see the
+    // `physically-based-rendering` skill (references/realtime-rasterization.md).
     float3 L        = normalize(float3(0.3f, 1.0f, 0.2f));
     float  NdotL    = saturate(dot(N, L));
     float3 diffuse  = albedo.rgb * (1.0f - metal);
