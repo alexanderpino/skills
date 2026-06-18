@@ -113,6 +113,17 @@ Every AAA engine converges on these. Skip any one and you are paying interest fo
 
 ---
 
+## Data-Oriented Design vs SOLID — where each belongs
+
+DOD (Pillar 1) and SOLID are not rivals to pick a winner between; they govern **different layers**, and a master engine uses both deliberately. Cargo-culting either everywhere is the mistake.
+
+- **Hot, data-heavy runtime → data-oriented, SOLID is a liability.** Anything that runs per-entity/per-frame/per-pixel: ECS systems, culling, animation eval, particle sim, render submission. Here SOLID's instincts actively hurt — "program to an interface" becomes virtual dispatch in an inner loop; "single responsibility" fragments a hot transform into cache-missing object graphs; dependency-injection containers hide allocation. Optimize for the *data transformation and its memory layout*, not for class taxonomies. (Mike Acton's CppCon 2014 critique is precisely this.)
+- **Cold, logic-heavy, change-driven code → SOLID earns its keep.** Editor and tooling, asset-import orchestration, build/cook graph wiring, platform/HAL backend selection, high-level game-mode rules, network session management. These are touched rarely, are not in the frame budget, and change for human reasons — interfaces, dependency inversion, and small single-purpose types make them testable and maintainable. The skill's own editor layer (MVVM, command-pattern undo, `IGraphicsDevice` injection) *is* SOLID, and correctly so.
+- **The dividing line is the profiler, not taste.** If code is on a hot path or owns bulk data, DOD wins and you justify every abstraction against cache/bandwidth. If it's orchestration or tooling, SOLID wins and you justify every concretion against testability and churn. State which side a given system is on before arguing the design.
+- **Note the terminology overload:** *data-oriented design* (memory layout first) is not the same as *data-driven* (behavior/config in data, e.g. the audio bus tree as JSON), which is again not the *"data-driven, not paralyzed"* mindset bullet above (decisions backed by measurement). Be explicit about which you mean.
+
+---
+
 ## Scalability: 2D Indie to AAA Open World
 
 An engine architecture must be elastic and universal. The same engine binary must power everything from a Pong-style 2D game (two sprites, a ball, no textures) to a Moana Island-scale open world (100 GB source data, 15+ billion instances, streaming virtual geometry, bounded VRAM working set). **At full quality on both ends.** Two things must be true simultaneously: (1) the ceiling is as high as UE5.8/Frostbite/Snowdrop for large scenes; (2) a simple game pays zero runtime cost for every subsystem it does not use — streaming VG, SVT, RT AS builders, froxel GI must tick at 0 µs when inactive.
@@ -410,6 +421,7 @@ See `CPP23_26_AND_MODERN_PATTERNS.md`.
 | Mocking engine internals                   | Tests green, production red                                 | Null backends + real interfaces              |
 | Strings as identifiers at runtime          | Hash-per-frame, cache miss                                  | `StrongID<Tag>` or pre-hashed FNV/xxhash     |
 | `auto x = vec.back();` (copy)              | Hidden copy of big types                                    | `auto& x = vec.back();`                      |
+| Hand-mirrored CPU/GPU structs              | Silent layout desync — wrong matrices/params, no crash      | Shared interop header + `static_assert` size/align/offset (`assets/shader_interop_template.h`) |
 
 ---
 
@@ -431,7 +443,7 @@ When reviewing code, apply the **Carmack Standard**: *"Would this survive a code
 
 ## Supplementary Files
 
-This skill ships with **14 reference files** and **7 asset templates**. Total content is ~4,000 lines — **more than a single context window can hold**.
+This skill ships with **14 reference files** and **8 asset templates**. Total content is ~4,200 lines — **more than a single context window can hold**.
 
 > **RAG / context-limit directive — read this as an instruction to *yourself*:** When the conversation enters a complex domain (rendering, physics, networking, asset pipeline, etc.), **proactively advise the user to load the specific reference file for that domain** *before* the discussion goes deeper. Example: *"We're about to discuss Lumen vs DDGI — please load `references/RENDERING_AND_GRAPHICS.md` so I don't have to reconstruct the specifics from compressed memory."*
 >
@@ -468,6 +480,7 @@ This skill ships with **14 reference files** and **7 asset templates**. Total co
 | `assets/asset_cooker_template.py`                     | Python cook: DAG, incremental, content-addressable DDC             |
 | `assets/linear_allocator_template.h`                  | Zero-heap bump/arena allocator — frame + scratch tiers             |
 | `assets/bindless_shader_template.hlsl`                | SM 6.6 bindless scaffold — root signature + descriptor heap access |
+| `assets/shader_interop_template.h`                    | Shared CPU↔GPU layout header (C++/HLSL/GLSL) — packing rules + size/align/offset `static_assert`s |
 | `assets/architecture_decision_record.md`              | ADR template — context, decision, consequences, platform matrix    |
 
 ---

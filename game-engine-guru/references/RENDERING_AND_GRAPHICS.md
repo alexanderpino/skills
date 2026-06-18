@@ -7,6 +7,7 @@ Reference document for AAA-grade realtime rendering. Audience: senior graphics e
 - Frame Graph & GPU-Driven (see `FRAME_GRAPH_AND_GPU_DRIVEN.md`)
 - Deferred vs Forward+ Architecture
 - Depth & Reverse-Z
+- CPU↔GPU Shared Layout
 - PBR Material Model
 - Global Illumination Hierarchy
 - Shadow Pipeline
@@ -76,6 +77,22 @@ On mobile TBDR (Apple Silicon, Adreno, Mali) deferred is a trap — the tile cac
 - **Depth bias / slope-scaled bias:** signs flip relative to standard-Z.
 - **Depth linearization:** the reconstruction `linearZ = near*far / (far + depth*(near-far))` changes form; centralize it in one shader include so every pass (SSAO, SSR, fog, decals, froxel-slice mapping) uses the same convention.
 - **Anything reading the depth buffer** — SSAO/GTAO, SSR HiZ march, deferred decals, volumetric froxel depth slicing, particle soft-blend — must use the reversed comparison and linearization. A single pass left on standard-Z produces a class of "works near the camera, wrong in the distance" bugs.
+
+---
+
+## CPU↔GPU Shared Layout
+
+Constant buffers, structured-buffer elements, and push/root constants are read by the CPU (which fills them) and the GPU (which consumes them). The two definitions must agree byte-for-byte, and a mismatch is a *silent* corruption — wrong matrices, garbage material params, no crash.
+
+**Share, don't mirror.** Do not hand-maintain a C++ struct and an HLSL/GLSL struct in parallel. Author the layout **once** in a header compiled by both sides, with macros that alias the shader vector types (`float4`, `float4x4`, `uint`) to the engine math types in C++, leave them native in HLSL, and remap to `vec*`/`mat*` in GLSL. One source of truth → the sides cannot drift. Constants (descriptor slots, feature flags) and trivial helpers can be shared the same way. Scaffold: `assets/shader_interop_template.h`.
+
+**Honor the packing rules or it desyncs across APIs:**
+- **16-byte rows (HLSL cbuffer):** a field never straddles a 16-byte boundary. **Pad explicitly** — when a partial row isn't completed by a real field, add a *named* `float _padN;` rather than trusting the compiler. Padding should be visible in the source.
+- **`float3`/`vec3` is the classic trap:** HLSL packs it as 12 B (next scalar fills the slot); GLSL **std140** rounds it to 16 B — they disagree. Avoid vec3 in shared blocks, or compile the GLSL side with `GL_EXT_scalar_block_layout` (`layout(scalar)`) to match HLSL/C++.
+- **Never `bool`** in a shared block (HLSL cbuffer bool = 4 B, C++ bool = 1 B) — use `uint`. **Force one matrix majorness** everywhere (mismatched majorness transposes silently).
+- **Vertex-input structs are the exception** — an `alignas(16)` engine `Vec4` misaligns inside a tightly-packed vertex struct, so vertex layouts use packed scalar types and are defined separately from cbuffer interop.
+
+**Assert the layout, including alignment.** On the C++ side, guard every shared struct with `static_assert` on **`alignof` (== 16), `sizeof` (a whole number of 16-byte rows), and key field `offsetof`s.** This turns a layout drift into a build failure instead of a rendering artifact. (The GLSL std140-vs-scalar choice has no compile-time guard — that one is enforced by discipline.)
 
 ---
 
