@@ -25,6 +25,8 @@ Exit codes:
     0 - all assets cooked (or cache-hit) successfully
     1 - one or more assets failed
     2 - bad CLI arguments / environment
+
+Requires Python 3.11+ (uses ``enum.StrEnum``).
 """
 
 from __future__ import annotations
@@ -34,9 +36,11 @@ import dataclasses
 import hashlib
 import json
 import logging
+import os
 import shutil
 import sys
 import time
+import uuid
 from collections.abc import Iterable, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -93,10 +97,10 @@ def content_hash(path: Path, *, chunk: int = 1 << 20) -> str:
     """
     if _HAS_BLAKE3:
         h = blake3.blake3()
-        algo = "b3"
+        algo = "blake3"
     else:
         h = hashlib.sha256()
-        algo = "s2"
+        algo = "sha256"
 
     with path.open("rb") as f:
         while True:
@@ -118,7 +122,7 @@ def combined_hash(parts: Iterable[str]) -> str:
     for p in parts:
         h.update(p.encode("utf-8"))
         h.update(b"\x00")
-    return f"s2:{h.hexdigest()}"
+    return f"sha256:{h.hexdigest()}"
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +153,22 @@ class Ddc:
         return True
 
     def put(self, key: str, src: Path) -> None:
-        """Atomically insert `src` into the cache under `key`."""
+        """Atomically insert `src` into the cache under `key`.
+
+        Uses a per-writer-unique temp name so concurrent cooks of the *same*
+        key (the ThreadPoolExecutor below can produce these) never write the
+        same temp file and corrupt each other. The final rename is atomic on
+        the same filesystem (POSIX rename / NTFS MoveFileEx); since content is
+        addressed by hash, whichever writer wins the rename is equivalent.
+        """
         dest = self.path_for(key)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        tmp = dest.with_suffix(".tmp")
-        shutil.copy2(src, tmp)
-        tmp.replace(dest)  # atomic on POSIX and NTFS
+        tmp = dest.with_name(f"{dest.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+        try:
+            shutil.copy2(src, tmp)
+            tmp.replace(dest)  # atomic, same filesystem
+        finally:
+            tmp.unlink(missing_ok=True)  # clean up if copy/replace failed
 
 
 # ---------------------------------------------------------------------------

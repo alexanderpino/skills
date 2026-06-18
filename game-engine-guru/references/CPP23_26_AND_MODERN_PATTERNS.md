@@ -361,11 +361,20 @@ concept Component = std::is_trivially_copyable_v<T>
                  && std::is_standard_layout_v<T>
                  && sizeof(T) <= 256;       // archetype storage constraint
 
+// Every engine allocator exposes a fallible, aligned Allocate and bulk Reset.
+// Bump tiers (Linear/Stack) reclaim only in bulk (Reset / Rewind(Marker)) and
+// intentionally have NO per-allocation free — see linear_allocator_template.h.
 template<class A>
 concept Allocator = requires(A a, size_t n, size_t align) {
-    { a.allocate(n, align) } -> std::same_as<void*>;
-    { a.deallocate(nullptr, n) } noexcept;
-    { a.owns(nullptr) } -> std::convertible_to<bool>;
+    { a.Allocate(n, align) } -> std::same_as<std::expected<void*, EngineError>>;
+    { a.Reset() } noexcept;
+};
+
+// Free-list tiers (Pool, TLSF) refine it with individual free + ownership query.
+template<class A>
+concept FreeListAllocator = Allocator<A> && requires(A a, void* p, size_t n) {
+    { a.Deallocate(p, n) } noexcept;
+    { a.Owns(p) } -> std::convertible_to<bool>;
 };
 
 template<class T>
