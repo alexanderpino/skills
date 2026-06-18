@@ -6,13 +6,15 @@ description: >-
   rendering equation, microfacet BRDF theory (GGX, Smith, Fresnel/Schlick/F82),
   diffuse and sheen models, energy conservation, and production material models
   (Cook-Torrance, Disney Principled, glTF 2.0 metallic-roughness, Unreal/Unity,
-  Autodesk Standard Surface, OpenPBR 1.1.1), plus shader implementation (HLSL/GLSL),
-  image-based lighting and split-sum, importance sampling, volumes and subsurface
-  scattering, texture authoring, color management, scene integration, and debugging.
+  Autodesk Standard Surface, OpenPBR 1.1.1), plus material/node graphs (MaterialX),
+  shader implementation (HLSL/GLSL), image-based lighting and split-sum, importance
+  sampling, baked LUTs/curve atlases, volumes and subsurface scattering, texture
+  authoring, color management, scene integration, and debugging.
   Use whenever the task involves PBR, photorealistic or physically based rendering,
   BRDF/BSDF math, surface shaders, path or ray tracers, material authoring, OpenPBR,
-  Disney Principled, glTF materials, IBL, GGX, Fresnel, roughness or metalness, or
-  subsurface scattering — even if "PBR" is never said.
+  Disney Principled, glTF materials, MaterialX or material graphs, IBL, GGX, Fresnel,
+  curve atlases or baked LUTs, roughness or metalness, or subsurface scattering — even
+  if "PBR" is never said.
 ---
 
 # Physically Based Rendering
@@ -93,17 +95,20 @@ math, or any question that isn't pipeline- or model-specific.*
 The production landscape and how to translate between them: Cook-Torrance, Disney
 Principled BSDF, glTF 2.0 metallic-roughness, Unreal/Unity, Autodesk Standard
 Surface, OpenPBR. Metallic-roughness vs. specular-glossiness; F0/IOR; parameter
-mapping.
+mapping. Also MaterialX — the vendor-neutral **node-graph / interchange form** these
+models ship in (OpenPBR and Standard Surface *are* MaterialX nodes) and its shader
+codegen.
 → **`references/material-models.md`**
-*Use when choosing a material model, porting materials between engines/formats, or
+*Use when choosing a material model, porting materials between engines/formats,
 mapping parameters (e.g. "convert this Disney material to glTF" or "what's the
-OpenPBR equivalent of clearcoat").*
+OpenPBR equivalent of clearcoat"), or working with MaterialX / material node graphs.*
 
 ### 3. Real-time rasterization implementation
 Implementing PBR in Unreal/Unity/custom forward/deferred renderers and writing
 HLSL/GLSL/MSL within a frame budget: split-sum IBL, prefiltered environment maps,
 the BRDF integration LUT, analytic area lights (LTC), clustered/forward+/deferred
-trade-offs, mobile approximations, and OpenPBR real-time specifics.
+trade-offs, mobile approximations, OpenPBR real-time specifics, and the general
+bake-a-function-into-a-texture pattern (energy/BRDF LUTs and artist curve atlases).
 → **`references/realtime-rasterization.md`**
 
 ### 4. Path tracing implementation

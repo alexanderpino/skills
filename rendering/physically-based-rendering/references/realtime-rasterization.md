@@ -14,6 +14,7 @@ This file covers the general real-time toolkit first, then OpenPBR-specific conc
 5. Forward vs. deferred vs. clustered / Forward+
 6. Mobile and bandwidth-constrained approximations
 7. OpenPBR-specific real-time concerns
+8. Baked curves, ramps, and atlases (the general LUT pattern)
 
 ---
 
@@ -131,3 +132,32 @@ Implementing OpenPBR (`openpbr-reference.md`) in real time:
 - **Layering:** forward/forward+ can do true `Fuzz + (1−E)·(Coat + (1−E)·Base)`.
   Deferred must flatten as in §5 — true layered OpenPBR needs forward or a specialized
   clustered/Substrate-style pass.
+
+## 8. Baked curves, ramps, and atlases (the general LUT pattern)
+
+The split-sum BRDF LUT (§2), the energy-compensation LUT (§3), and the LTC table (§4)
+are all the *same optimization*: **precompute an expensive function into a texture and
+sample it** instead of evaluating it per pixel. The same pattern applies to
+**artist-authored 1D functions** — color ramps, gradient/transfer curves, remap curves
+(e.g. weathering vs. height, tint vs. age, emissive pulse vs. time) — baked into
+texture rows. This is the technique behind Unreal's **Curve Atlas** + *Curve Atlas Row
+Parameter* node, but it is **engine-agnostic** and worth recognizing as a general tool.
+
+- **Mechanics.** Bake each curve into a row of a texture; an atlas packs many curves
+  into one texture. The shader samples `u =` the curve input (a `0–1` parameter, `N·V`,
+  height, mask, time…) and `v =` the curve index, which is itself a material parameter.
+  One sampler then serves any curve, selected by index.
+- **What kind of optimization it is.** It trades **ALU for a single filtered fetch**,
+  makes the curve **data-driven and artist-tweakable without recompiling the shader**
+  (the curve is data, not code — the same property a MaterialX `ramp`/`curveadjust`
+  node has, see `material-models.md` §8), and **amortizes one sampler/texture across
+  many curves**.
+- **Trade-offs / gotchas.** Precision is bounded by texture **width and bit depth** —
+  use enough texels and a float/half format for HDR or steep curves. **Bilinear
+  filtering across `v` bleeds between unrelated rows**: point-sample the `v` axis (or
+  pad/duplicate rows) and only filter along `u`. Mind color space — bake in **linear**
+  if the curve drives a linear quantity (roughness, weight, scalar), reserve sRGB for
+  display-referred color ramps.
+- **Relation to the physics LUTs.** BRDF/energy/LTC LUTs bake *derived physics*; curve
+  atlases bake *authored intent*. Both are "function → texture," so the same caveats
+  (resolution, filtering, color space, perceptual vs. linear axes) carry over.

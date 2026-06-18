@@ -14,8 +14,9 @@ engine/format to another without it changing appearance.
 5. Unreal Engine and Unity
 6. Autodesk Standard Surface / Arnold
 7. OpenPBR (the modern ASWF über-shader)
-8. Cross-model parameter mapping cheat sheet
-9. Choosing a model
+8. MaterialX — the node-graph / interchange form of these models
+9. Cross-model parameter mapping cheat sheet
+10. Choosing a model
 
 ---
 
@@ -122,7 +123,42 @@ compensation. Treat it as the reference target for "the most physically complete
 material." Full details in `openpbr-reference.md`; for the broad picture, OpenPBR is
 "Disney/Standard Surface, made rigorous, open, and energy-conserving."
 
-## 8. Cross-model parameter mapping cheat sheet
+## 8. MaterialX — the node-graph / interchange form of these models
+
+The models above describe *what* a surface is; **MaterialX** (ASWF, originated at
+ILM) describes it as a **node graph** and a portable XML document — the vendor-neutral
+way to author and interchange materials between DCCs and renderers. It matters here
+because it is not a separate material model but the **canonical graph form of models
+this skill already covers**: OpenPBR Surface and Autodesk Standard Surface are *defined
+and distributed as MaterialX node definitions* (`<open_pbr_surface>`,
+`<standard_surface>`), and glTF's PBR has a MaterialX node too. When a DCC says it
+"supports OpenPBR," it almost always means the MaterialX OpenPBR node.
+
+What a MaterialX graph actually contains:
+
+- **Pattern nodes** — `image`, `tiledimage`, math/remap (`mix`, `multiply`, `ramp`,
+  `curveadjust`), `noise`, `normalmap` — the texture/value plumbing that feeds inputs.
+- **BSDF/shading nodes** — primitives like `oren_nayar_diffuse_bsdf`,
+  `generalized_schlick_bsdf`, `dielectric_bsdf`, plus `layer`/`mix`/`add` operators
+  that combine lobes. The über-shader nodes (`open_pbr_surface`) are themselves
+  nodegraphs built from these primitives. This is the **lobe decomposition and
+  layering-vs-mixing** from the skill's core mental model, expressed as a graph.
+- A **`surfaceshader`** output wired to a `surfacematerial`.
+
+The crucial point for implementers: a MaterialX graph is **not just data — it
+generates shader code.** MaterialX ships **shader generators** (GLSL, MSL, Vulkan,
+HLSL, OSL, MDL) that compile a nodegraph into the BRDF code described in
+`realtime-rasterization.md` and `path-tracing.md`. So "material graph" → "shader" is a
+real compilation step, not a metaphor.
+
+How it relates to engine graphs: Unreal's **Material Editor**, Unity **Shader Graph**,
+and Blender's shader nodes are engine-specific node graphs that play the same authoring
+role but are **not interchange formats** — MaterialX is the vendor-neutral bridge they
+increasingly import/export through. When porting OpenPBR/Standard Surface materials,
+the MaterialX document *is* the material; map its node inputs with the cheat sheet
+below (the input names match the model parameters).
+
+## 9. Cross-model parameter mapping cheat sheet
 
 Common translations (approximate — always verify with a white furnace test and a
 side-by-side render):
@@ -150,7 +186,7 @@ Pitfalls when mapping:
   if the destination model exposes a specular color (OpenPBR/spec-gloss), you can
   avoid them.
 
-## 9. Choosing a model
+## 10. Choosing a model
 
 - **Learning / minimal engine / WebGL:** Cook-Torrance metallic-roughness
   (`pbr-fundamentals.md` §9). Smallest correct thing.
