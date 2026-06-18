@@ -43,7 +43,7 @@ struct GpuCaps {
     bool waveOps;              // SM 6.0 wave intrinsics
     bool variableRateShading;  // Tier 2 = per-primitive
     bool samplerFeedback;      // SFS on XSX, D3D12 SF
-    uint32_t waveLaneMin, waveLaneMax;  // 32-64 NV, 32-64 AMD RDNA, 16-32 Intel
+    uint32_t waveLaneMin, waveLaneMax;  // NV = 32 fixed; AMD RDNA = 32 or 64 (Wave32/Wave64); Intel = 8/16/32 (SIMD8/16/32)
     uint64_t vramBudget;
 };
 ```
@@ -72,7 +72,7 @@ VkQueue asyncQueue;     // shadow, post-FX, particles overlapping gfx
 VkQueue transferQueue;  // BAR uploads, avoids stalling gfx
 ```
 
-**Descriptors:** descriptor indexing (VK 1.2 core, `VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND`, `VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND`). One giant bindless set per frame: 500k SRV slots, 100k UAV slots, 10k sampler slots. Textures addressed by 32-bit handle in push constants. Never use legacy `VkDescriptorSet` per draw — the bind cost dominates.
+**Descriptors:** descriptor indexing (VK 1.2 core, `VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND`, `VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND`). One giant bindless set per frame: ~500k SRV slots, ~100k UAV slots (D3D12 caps the shader-visible CBV/SRV/UAV heap at 1,000,000 on Tier 2/3; Vulkan limits come from `maxDescriptorSet*` / `maxPerStageDescriptorUpdateAfterBind*` — query them). **Samplers are the exception:** the D3D12 shader-visible sampler heap is hard-capped at **2048**, so use a small static sampler table (or static samplers in the root signature), not a 10k bindless sampler array. Textures addressed by 32-bit handle in push constants. Never use legacy `VkDescriptorSet` per draw — the bind cost dominates.
 
 **Render passes:** dynamic rendering (VK 1.3 core, `vkCmdBeginRendering`). Classic `VkRenderPass` is useful only on tile-based mobile where subpasses preserve on-chip tile memory — keep that path for Mali/Adreno/Apple.
 

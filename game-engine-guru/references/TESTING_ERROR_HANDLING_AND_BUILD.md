@@ -519,7 +519,7 @@ WarningsAsErrors: "bugprone-*,performance-*,cert-*"
 
 ## Build System
 
-**CMake 3.25+** is the lingua franca. Alternatives (Bazel, Meson, SCons, custom) have niches but lose on ecosystem. Targets over directories. `target_*` everything.
+**CMake 3.28+** is the lingua franca (matches the `cmake_minimum_required(VERSION 3.28)` and preset schema v6 below, and is the floor for C++20-modules support). Alternatives (Bazel, Meson, SCons, custom) have niches but lose on ecosystem. Targets over directories. `target_*` everything.
 
 ```cmake
 cmake_minimum_required(VERSION 3.28)

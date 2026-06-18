@@ -381,7 +381,7 @@ See `TESTING_ERROR_HANDLING_AND_BUILD.md`.
 
 > **C++23 is the strict production standard.** `std::expected`, deducing this, multidimensional subscript, `mdspan`, `<stacktrace>`. Assumed available on all shipping targets.
 >
-> **C++26 is horizon knowledge only.** Reflection, contracts, pattern matching, `std::execution` — console toolchains (PS5 Clang SDK, Switch NVN/Clang, Xbox GDK MSVC) routinely trail desktop by 1–2 standards. C++26 features **must never appear in production without a feature-test-macro gate and a working C++23 fallback** (e.g. `#if __cpp_static_reflection >= 202500L` … `#else` code-gen-based fallback `#endif`). Treat C++26 as *design-aware, deployment-forbidden* until your console SDKs ship it.
+> **C++26 is horizon knowledge only.** Reflection, contracts, pattern matching, `std::execution` — console toolchains (PS5 Clang SDK, Switch NVN/Clang, Xbox GDK MSVC) routinely trail desktop by 1–2 standards. C++26 features **must never appear in production without a feature-test-macro gate and a working C++23 fallback** (e.g. `#if defined(__cpp_reflection) && __cpp_reflection >= 202506L` … `#else` code-gen-based fallback `#endif` — use the *real* FTM: `__cpp_reflection` for P2996 reflection, `__cpp_contracts` for contracts, `__cpp_lib_senders` for `std::execution`; pattern matching has none because it isn't in C++26). Treat C++26 as *design-aware, deployment-forbidden* until your console SDKs ship it.
 
 - **EASTL** over `std::` containers for engine data (allocator model + no exceptions + deterministic layout).
 - **Compile-time computation.** `constexpr` FNV-1a / xxhash, LUT generation, frozen type registration.

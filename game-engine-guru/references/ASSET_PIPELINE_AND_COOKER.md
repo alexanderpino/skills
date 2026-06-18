@@ -145,7 +145,7 @@ Implementation gates:
 - Read via `IDStorageFactory::OpenFile` → `EnqueueRequest` → GPU decompression → upload to committed resource.
 - Memory layout of cooked asset must match the layout expected on GPU (no CPU-side swizzle).
 
-PS5 has an equivalent (Kraken + hardware decompressor on I/O complex). Switch has no HW decompressor — use zstd on CPU with a dedicated streaming thread.
+PS5 has an equivalent (Kraken + hardware decompressor on I/O complex). Switch 2 (NVIDIA silicon, NVN2) exposes GPU-side decompression; on the original Switch (no HW decompressor) fall back to zstd on CPU with a dedicated streaming thread. (The skill's baseline is Switch 2 — see `CROSS_PLATFORM_AND_CONSOLE.md`.)
 
 **Compute decompression for BC textures** — when DirectStorage isn't available, upload the BC blocks as `ByteAddressBuffer`, decompress to `RWTexture2D` in a compute pass. Costs GPU cycles but saves disk bandwidth.
 
@@ -166,7 +166,7 @@ Audio is cheap to store, expensive to misconfigure. Loudness discipline matters 
 | **Opus**  | Default for VO and ambience; best quality/bitrate in 2026   |
 | AT9 / MP3 | Platform-specific legacy                                    |
 
-**LUFS normalization to -23 LUFS** (EBU R128) during cook; store the measured integrated loudness in metadata so runtime can apply gain without re-analysis. Mixing engineers set relative levels, the cooker handles absolute.
+**LUFS normalization during cook** — measure integrated loudness (EBU R128 / ITU-R BS.1770 algorithm) and store it in metadata so runtime can apply gain without re-analysis. Target **games, not broadcast**: roughly **-16 to -18 LUFS** for the interactive mix is typical (and follow each platform's loudness cert guidance, e.g. ASWG-R001-style targets); **-23 LUFS is the EBU broadcast target, not a game default** — don't ship it for gameplay. Mixing engineers set relative levels, the cooker handles absolute.
 
 **Ambisonics:** B-format (4-channel W/X/Y/Z) at cook, decode to HRTF / speaker array at runtime. Higher-order ambisonics (HOA3 = 16ch) for VR/critical scenes only — 4x the memory.
 

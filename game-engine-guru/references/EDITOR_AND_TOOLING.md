@@ -79,7 +79,7 @@ Three tiers, pick per-task:
 
 **ImGui** — immediate mode, zero persistent state, 15 min to add a new panel. The entire UI redraws per frame; cost is ~1ms even for complex layouts. This is the right answer for 80% of tools that ship to developers. Bind with `ImGui::Begin`, make widgets, `ImGui::End`. Do not try to build a retained scene graph on top.
 
-**Qt** — Frostbite's editor approach, also CryEngine 5.x, also Unreal's early history. Heavy, industrial, correct. Picks up accessibility, localization, and docking for free. QML for styling, C++ for logic. License carefully (LGPL obligations).
+**Qt** — the standard for heavy cross-platform C++ tooling: CryEngine 5.x's Sandbox, O3DE, and many in-house DCC-adjacent tools. Heavy, industrial, correct. Picks up accessibility, localization, and docking for free. QML for styling, C++ for logic. License carefully (LGPL/commercial obligations). (Accuracy note: Frostbite's FrostEd is WPF/.NET and Unreal's editor was wxWidgets historically, Slate today — neither is Qt; don't cite them as Qt precedent.)
 
 **WPF / MAUI** — Windows-only but mature; MAUI opens macOS/Linux if you need it. XAML + MVVM is productive for data-heavy editors (asset browsers, sequencers, state machine editors).
 
