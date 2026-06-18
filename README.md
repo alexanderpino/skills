@@ -2,8 +2,9 @@
 
 A collection of [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview) —
 self-contained, load-on-demand expertise packages that any compatible coding
-assistant can use. Each skill lives in its own directory as both an installable
-`.skill` package and an unpacked, reviewable tree of plain Markdown.
+assistant can use. Each skill lives in its own directory as an unpacked,
+reviewable tree of plain Markdown — install it straight from the directory, with
+no packaging or build step.
 
 ## Available skills
 
@@ -33,37 +34,36 @@ git clone https://github.com/alexanderpino/skills.git
 npx skills add ./skills/rendering/physically-based-rendering
 ```
 
-Prefer to do it manually? Install the `.skill` package directly (it's just a
-zip), or point your skill loader at the unpacked skill directory:
+Prefer to do it manually? Point your skill loader — or just your assistant — at
+the unpacked skill directory:
 
-- **Claude / Agent Skills:** install the `*.skill` package (e.g.
-  `rendering/physically-based-rendering.skill`), or point a skill loader at the
-  unpacked directory (e.g. `rendering/physically-based-rendering/`).
+- **Claude / Agent Skills:** point a skill loader at the unpacked directory
+  (e.g. `rendering/physically-based-rendering/`), which holds the `SKILL.md` and
+  its `references/`.
 - **Any assistant:** open the skill's `SKILL.md`. It's a router — read it first
   for the core mental model, then open the reference file it points you to.
 
-The unpacked tree is the source of truth and is kept in sync with the `.skill`
-package. It's plain Markdown, so any coding assistant — Claude (Sonnet/Opus),
-Gemini, Codex, etc. — can read the files directly without unzipping.
+The unpacked directory is the source of truth. It's plain Markdown, so any coding
+assistant — Claude (Sonnet/Opus), Gemini, Codex, etc. — can read the files
+directly.
 
 ## Repository layout
 
 ```
 skills/
 ├── rendering/
-│   ├── physically-based-rendering.skill   # installable package (zip)
-│   └── physically-based-rendering/        # same content, unpacked & reviewable
+│   └── physically-based-rendering/        # unpacked, reviewable skill
 │       ├── SKILL.md                       # router + core mental model
 │       └── references/                    # load-on-demand deep dives
 └── writing/
-    └── book-writer.skill                  # installable package (zip)
+    └── book-writer/                       # unpacked, reviewable skill
+        ├── SKILL.md                       # router + core mental model
+        ├── references/                    # load-on-demand deep dives
+        └── templates/                     # scaffolding (LaTeX, scripts)
 ```
 
 ## Maintaining
 
-Edit the files under a skill's unpacked directory, then repackage:
-
-```bash
-python -m scripts.package_skill /path/to/<area>/<skill-name> ./<area>
-# (scripts.package_skill ships with the skill-creator skill)
-```
+Edit the files under a skill's unpacked directory and commit them. That directory
+is the source of truth and `npx skills add` installs straight from it, so there's
+no packaging or build step to keep in sync.

@@ -1,0 +1,194 @@
+% Book template for technical treatises
+% Compatible with pandoc: pandoc --template=book-template.tex
+%
+% This template produces a book-style PDF, not a document-style PDF:
+% - 7"x10" trim, narrow margins, recto/verso awareness
+% - Running headers (chapter title on one side, section title on the other)
+% - Page numbers in outer footer
+% - Deep section numbering (8.6.4.2 levels possible via \subsubsection)
+% - Code listings styled like a real book
+%
+% Tested with xelatex and pandoc 3.x.
+
+\documentclass[10pt,twoside,openright]{book}
+
+% ─── Page geometry ─────────────────────────────────────────────────
+% Trim: 7" x 10" (crown quarto, common for serious technical books)
+% Margins: tighter than document defaults; outer wider than inner
+% to leave room for marginalia.
+\usepackage[
+    paperwidth=7in,
+    paperheight=10in,
+    inner=0.85in,    % binding side
+    outer=1.0in,     % outer side (a touch wider for marginalia)
+    top=0.85in,
+    bottom=0.85in,
+    headsep=0.25in,
+    footskip=0.4in,
+    marginparwidth=0.6in,
+    marginparsep=0.1in
+]{geometry}
+
+% ─── Fonts ─────────────────────────────────────────────────────────
+\usepackage{fontspec}
+% TeX Gyre Pagella is a free Palatino/Garamond-style serif, ships with
+% texlive-fonts-recommended. Looks like a real book body font.
+\setmainfont{TeX Gyre Pagella}
+\setmonofont[Scale=0.85]{DejaVu Sans Mono}
+
+% ─── Microtypography ───────────────────────────────────────────────
+% Better justification, kerning, character protrusion. Cheap polish.
+\usepackage{microtype}
+
+% ─── Graphics ──────────────────────────────────────────────────────
+\usepackage{graphicx}
+% Default: scale figures to fit textwidth if they are wider.
+\setkeys{Gin}{width=\linewidth,keepaspectratio}
+
+% ─── Tables ────────────────────────────────────────────────────────
+% Pandoc emits tables as longtable when they're wider than a page.
+\usepackage{longtable,booktabs,array}
+\usepackage{calc}
+% Allow longtable to handle tables that span multiple pages cleanly.
+\usepackage{etoolbox}
+\makeatletter
+\@ifpackageloaded{longtable}{%
+  \patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}%
+}{}
+\makeatother
+
+% ─── Headers and footers ───────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+% Even pages (verso): chapter title on left, page number on left
+\fancyhead[LE]{\small\nouppercase{\leftmark}}
+\fancyfoot[LE]{\thepage}
+% Odd pages (recto): section title on right, page number on right
+\fancyhead[RO]{\small\nouppercase{\rightmark}}
+\fancyfoot[RO]{\thepage}
+% Header rule
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Customise what \leftmark and \rightmark contain
+\renewcommand{\chaptermark}[1]{\markboth{\thechapter.\ #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+
+% Plain pagestyle (used on chapter-opening pages) keeps page number
+% but no header.
+\fancypagestyle{plain}{%
+    \fancyhf{}
+    \fancyfoot[LE,RO]{\thepage}
+    \renewcommand{\headrulewidth}{0pt}
+}
+
+% ─── Section numbering depth ───────────────────────────────────────
+% Default book class numbers chapter, section, subsection, subsubsection
+% but only displays down to subsubsection. We allow paragraph-level
+% numbering (4 levels deep, like 8.6.4.2 in Gregory).
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{2}
+
+% ─── Chapter and section titles ────────────────────────────────────
+\usepackage{titlesec}
+% Chapter: number on its own line, then title, separated by a thin rule.
+\titleformat{\chapter}[display]
+    {\normalfont\bfseries\Large}
+    {\filright Chapter \thechapter}
+    {0.5em}
+    {\titlerule[0.4pt]\vspace{0.5em}\filright\Huge}
+\titlespacing*{\chapter}{0pt}{30pt}{20pt}
+
+% Section: number, title, thin spacing.
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.5em}{0.5em}
+
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.5em}{}
+\titlespacing*{\subsection}{0pt}{1.2em}{0.4em}
+
+% ─── Paragraph spacing ─────────────────────────────────────────────
+% Books use indented paragraphs, not block-style. Override pandoc default.
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{1.2em}
+
+% ─── Code listings ─────────────────────────────────────────────────
+% Pandoc emits \begin{Shaded} ... \begin{Highlighting}[] ... around code.
+% pandoc itself defines Shaded as a snugshade with a colorbox; we let
+% it do that and just set the shading colour and the font size for
+% Highlighting.
+
+\usepackage{xcolor}
+\definecolor{shadecolor}{rgb}{0.97,0.97,0.95}
+
+\usepackage{fancyvrb}
+\fvset{fontsize=\small,baselinestretch=1.0}
+
+% Air around code blocks. The values are conservative — pandoc already
+% inserts a blank line after code; we add a touch more so the prose
+% doesn't crowd the code on either side.
+\usepackage{etoolbox}
+\AtBeginEnvironment{Shaded}{\vspace{0.6em}}
+\AtEndEnvironment{Shaded}{\vspace{0.6em}}
+
+% ─── Captions ──────────────────────────────────────────────────────
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,labelsep=colon,skip=6pt,
+               belowskip=4pt}
+% Float spacing — air around figures and tables.
+% These set the vertical space above/below floats in the body text.
+\setlength{\textfloatsep}{1.4em plus 0.4em minus 0.4em}
+\setlength{\intextsep}{1.4em plus 0.4em minus 0.4em}
+\setlength{\floatsep}{1.2em plus 0.3em minus 0.3em}
+\setlength{\abovecaptionskip}{0.6em}
+\setlength{\belowcaptionskip}{0.4em}
+
+% ─── Hyperlinks ────────────────────────────────────────────────────
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+
+% ─── Pandoc compatibility ──────────────────────────────────────────
+% pandoc relies on these macros being defined.
+\providecommand{\tightlist}{%
+    \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% Handle pandoc's \pandocbounded for figures (newer pandoc)
+\providecommand{\pandocbounded}[1]{#1}
+
+% pandoc injects code-highlighting macros (Shaded environment, syntax
+% highlighting tokens) here. Without this, code blocks fail to render.
+$if(highlighting-macros)$
+$highlighting-macros$
+$endif$
+
+% Chapter counter: when this template is used for a single chapter
+% extracted from a book, set the counter so that the chapter shows
+% the right number. Pass via metadata: --metadata chapter-start=4
+% (will produce Chapter 5 because counter increments before display).
+$if(chapter-start)$
+\setcounter{chapter}{$chapter-start$}
+$endif$
+
+% ─── Document content ──────────────────────────────────────────────
+\title{$title$}
+$if(author)$
+\author{$for(author)$$author$$sep$ \and $endfor$}
+$endif$
+\date{$date$}
+
+\begin{document}
+
+$if(title)$
+\frontmatter
+\maketitle
+$endif$
+
+$if(toc)$
+\tableofcontents
+\cleardoublepage
+$endif$
+
+\mainmatter
+
+$body$
+
+\end{document}
