@@ -433,7 +433,7 @@ This skill ships with **11 reference files** and **7 asset templates**. Total co
 >
 > This is mandatory. Relying on compressed recall of domain specifics (BRDF terms, texture-format bit-rates, root-signature flags, ACL compression knobs, rollback tick budgets) causes hallucinations. The SKILL.md master stays loaded; reference files are pulled in on demand.
 >
-> **Material/BRDF/BSDF math is owned by a *separate skill*, not a reference file here.** For the rendering equation, microfacet theory (GGX/Smith/Fresnel/F82), energy conservation & multi-scattering compensation, split-sum IBL, LTC area lights, OpenPBR 1.1.1 slab layering, energy/BRDF LUTs, SSS/transmission/IOR, MaterialX, and path-tracing vs. real-time trade-offs, **load the `physically-based-rendering` skill** (see Related Skills). `references/RENDERING_AND_GRAPHICS.md` covers engine integration of these — frame-graph placement, G-buffer packing, deferred closure eval — and intentionally defers the shading math to that skill.
+> **Material/BRDF/BSDF math is owned by a *separate skill*, not a reference file here.** For the rendering equation, microfacet theory (GGX/Smith/Fresnel/F82), energy conservation & multi-scattering compensation, split-sum IBL, LTC area lights, OpenPBR 1.1.1 slab layering, energy/BRDF LUTs, SSS/transmission/IOR, MaterialX, and path-tracing vs. real-time trade-offs, **load the `physically-based-rendering` skill** (see [Related Skills](#related-skills)). `references/RENDERING_AND_GRAPHICS.md` covers engine integration of these — frame-graph placement, G-buffer packing, deferred closure eval — and intentionally defers the shading math to that skill.
 
 ### References — deep-dive knowledge
 
