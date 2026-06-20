@@ -134,9 +134,15 @@ def _mini_yaml(raw):
                 key, val = m.group(1), _strip_comment(m.group(2))
                 if val == "":  # maybe a block list / map follows
                     items, j = [], i + 1
-                    while j < len(lines) and (lines[j].startswith(" ") or not lines[j].strip()):
+                    while j < len(lines):
                         s = lines[j].strip()
-                        if s.startswith("- "): items.append(s[2:].strip())
+                        if not s or s.startswith("#"):
+                            j += 1
+                            continue
+                        if not lines[j].startswith(" "):
+                            break
+                        if s.startswith("- "):
+                            items.append(s[2:].strip())
                         j += 1
                     data[key] = items if items else ""
                     i = j; continue
