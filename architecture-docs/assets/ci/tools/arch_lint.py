@@ -345,7 +345,9 @@ def check_links(root):
     for path in md_files(root):
         base = os.path.dirname(path)
         for target in link_re.findall(open(path, encoding="utf-8").read()):
-            if not os.path.exists(os.path.normpath(os.path.join(base, target))):
+            import urllib.parse
+            decoded_target = urllib.parse.unquote(target)
+            if not os.path.exists(os.path.normpath(os.path.join(base, decoded_target))):
                 add(WARN, path, f"broken relative link: {target}")
 
 # ---------- emit front-matter bundle (for Spectral) ----------
