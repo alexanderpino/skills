@@ -44,7 +44,7 @@ story format (Connextra/Gherkin) and mandatory sections automatically.
 3. **Conform.** Write every new story/criterion in *that* format. Match their field names,
    ordering, and wording style. Consistency with the house style beats any "better" template.
 4. **Only if none exists** → propose the well-grounded default below, confirm it with the
-   user, then **create a reusable house template** in the repo (`user-story.md`) so everything
+   user, then **create a reusable house template** in the repo (`user-story-template.md`) so everything
    after is consistent. Record the chosen convention in `conventions.md`/the repo so future
    work reuses it rather than re-deciding.
 

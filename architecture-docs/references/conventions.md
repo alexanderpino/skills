@@ -75,7 +75,7 @@ validate and filter it. Bold = required on every doc; the rest apply where relev
 |---|---|---|
 | **`id`** | stable ID (see §1) | all |
 | **`title`** | string | all |
-| **`status`** | `draft` \| `in-review` \| `current`/`accepted` \| `deprecated` \| `superseded` \| `rejected`; user stories also use `ready` \| `in-progress` \| `done` | all |
+| **`status`** | `draft` \| `in-review` \| `current`/`accepted` \| `proposed` \| `deprecated` \| `superseded` \| `rejected` \| `withdrawn`; user stories also use `ready` \| `in-progress` \| `done` | all |
 | **`level`** | `enterprise` \| `solution` \| `software` | all |
 | **`updated`** / `date` | ISO 8601 date | all |
 | `owner` | string (accountable team/person) | all (recommended) |
@@ -88,6 +88,7 @@ validate and filter it. Bold = required on every doc; the rest apply where relev
 | `realizes-capabilities` | list of capability IDs | SAD |
 | `security-reviewed` / `cost-reviewed` | boolean | HLD/SAD |
 | `derived-from-rfc` | `RFC-NNNN` | ADR |
+| `resulting-adr` | `ADR-NNNN` | RFC |
 | `format` | `house` \| `default` | user stories |
 | `ac-style` | `gherkin` \| `checklist` | user stories |
 | `supersedes` / `superseded-by` | `ADR-NNNN` | ADR |

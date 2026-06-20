@@ -1,7 +1,7 @@
 ---
 id: RFC-NNNN            # 4-digit, zero-padded; shares the number space intent of its ADR
 title: <short noun phrase>
-status: draft           # draft | review | accepted | rejected | withdrawn
+status: draft           # draft | in-review | accepted | rejected | withdrawn
 level: software         # enterprise | solution | software
 date: <YYYY-MM-DD>
 author: <name>

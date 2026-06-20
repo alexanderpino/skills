@@ -29,8 +29,8 @@ flowchart LR
 
 ### 1. ADR & front-matter linter
 Enforce the machine-readable contract from `conventions.md`:
-- Required front-matter present and well-typed (`id`, `title`, `status`, `level`, `date`,
-  `owner`, …); `status` is one of the allowed values; `level` ∈ {enterprise, solution,
+- Required front-matter present and well-typed (`id`, `title`, `status`, `level`,
+  `updated`/`date`, `owner`, …); `status` is one of the allowed values; `level` ∈ {enterprise, solution,
   software}; ADR IDs are unique and zero-padded.
 - Status transitions are legal (no `accepted → draft`); `superseded` ADRs link both ways.
 - Tools: a YAML/JSON linter such as **Spectral** (https://github.com/stoplightio/spectral)
