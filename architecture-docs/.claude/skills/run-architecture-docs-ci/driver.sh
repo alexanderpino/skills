@@ -171,12 +171,12 @@ rm -f "$PROFILE"   # remove so it isn't linted as a stray doc in step 4
 # ---------- BREAK the tree deliberately and prove the gate catches it ----------
 echo "== 4. arch_lint on a BROKEN tree (expect exit 1 + seeded errors) =="
 # (a) concern framed by an unknown viewpoint (42010 conformance error)
-sed -i 's/VP-CTX | V-CTX/VP-GONE | V-CTX/' "$ROOT/AD.md" 2>/dev/null || true
-sed -i 's/| CN.01 | How do I integrate the system? | VP-CTX |/| CN.01 | How do I integrate the system? | VP-GONE |/' "$ROOT/AD.md"
+sedi 's/VP-CTX | V-CTX/VP-GONE | V-CTX/' "$ROOT/AD.md" 2>/dev/null || true
+sedi 's/| CN.01 | How do I integrate the system? | VP-CTX |/| CN.01 | How do I integrate the system? | VP-GONE |/' "$ROOT/AD.md"
 # (b) RFC in an invalid status ('review' is not allowed; only 'in-review' is)
-sed -i 's/status: in-review/status: review/' "$ROOT/decisions/rfc/RFC-0001-demo.md"
+sedi 's/status: in-review/status: review/' "$ROOT/decisions/rfc/RFC-0001-demo.md"
 # (c) ADR marked superseded but with no 'superseded-by' link
-sed -i 's/status: accepted/status: superseded/' "$ROOT/decisions/ADR-0001-demo.md"
+sedi 's/status: accepted/status: superseded/' "$ROOT/decisions/ADR-0001-demo.md"
 # (d) an unresolved gap left in the conformance checklist
 printf '\n| 1 | Stakeholders identified | \xe2\x9d\x8c | AD.md |\n' >> "$ROOT/conformance-checklist.md"
 
