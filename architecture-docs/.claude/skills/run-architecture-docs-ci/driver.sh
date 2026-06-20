@@ -20,6 +20,15 @@ LINT="$TOOLS/arch_lint.py"
 DETECT="$TOOLS/detect_doc_conventions.py"
 PY="${PYTHON:-python3}"
 
+# Portable sed -i wrapper for macOS/Linux compatibility
+sedi() {
+  if [ "$(uname)" = "Darwin" ]; then
+    sed -i "" "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
 pass=0; fail=0
 ok()   { echo "  PASS: $1"; pass=$((pass+1)); }
 bad()  { echo "  FAIL: $1"; fail=$((fail+1)); }
