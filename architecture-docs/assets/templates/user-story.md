@@ -6,7 +6,7 @@ level: software         # enterprise | solution | software (where the value land
 updated: <YYYY-MM-DD>
 owner: <product owner / BA>
 format: default         # 'house' once conformed to the org's style; 'default' = this template
-epic: <epic id/name>    # parent epic/feature
+epic: <EP-NNN>          # parent epic (epic.md); house epic key if one exists
 satisfies: [<F.xx>]     # PRD functional driver(s) this story delivers
 realizes-capabilities: []   # EA capability id(s), if traced that far up
 ac-style: gherkin       # gherkin | checklist — match the house style

@@ -153,6 +153,7 @@ def doc_kind(path, fm):
     if name.startswith("ADR-"): return "ADR"
     if name.startswith("RFC-"): return "RFC"
     if name.startswith("US-"): return "US"
+    if name.startswith("EP-"): return "EP"
     fid = str(fm.get("id", ""))
     if fid in ("architecture-index", "decision-log"): return "INDEX"
     if fid: return fid.split("-")[0].upper() if fid.startswith(("SD",)) else fid.upper()

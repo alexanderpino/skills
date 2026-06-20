@@ -31,8 +31,9 @@ docs/architecture/
 │   ├── HLD.md                       # C4 L1–L2 (+L3 index), runtime, deployment, threat model, FinOps
 │   └── SD-<area>.md                 # C4 L3 component (+L4 code where useful), interfaces, data
 │
-├── requirements/                 # 📝 BUSINESS ANALYSIS — user stories & acceptance criteria
+├── requirements/                 # 📝 BUSINESS ANALYSIS — epics, user stories & acceptance criteria
 │   ├── user-story-template.md       # the org's HOUSE format (detected, or created if none exists)
+│   ├── EP-NNN-<slug>.md             # epics (large outcomes; parent of features/stories)
 │   └── US-NNN-<slug>.md             # stories (or kept in the tracker; mirror the house format)
 │
 ├── decisions/                    # 🧠 DECISIONS — single source of truth, all altitudes

@@ -58,7 +58,7 @@ def infer_type(path, fm):
         return t.upper()
     fid = str(fm.get("id") or "").strip()
     for pat, label in ((r"^ADR-", "ADR"), (r"^RFC-", "RFC"), (r"^US-", "US"),
-                       (r"^SD-", "SD")):
+                       (r"^EP-", "EP"), (r"^SD-", "SD")):
         if re.match(pat, name) or re.match(pat, fid):
             return label
     for key in ("AD", "PRD", "HLD", "SAD", "EA"):

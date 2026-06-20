@@ -47,16 +47,23 @@ architect's playbook that turns a blank template into a true description.
 
 ## Also a master business analyst
 
-Below the architecture sits the requirements work: turning needs into **user stories with
-testable acceptance criteria** (`US-NNN`), traced to the PRD's functional drivers and up to
-capabilities (`capability → F.xx → US-NNN → acceptance criteria → test`). **Every
-organisation writes stories and acceptance criteria differently** — so the rule is: **detect
-and conform to the company's house format first** (look for `*.feature` Gherkin, issue
-templates under `.github/ISSUE_TEMPLATE/`, an existing role taxonomy, sizing unit, Definition
-of Done), *learn* it, and write new stories that match it. Only when no house style exists do
-you fall back to the default (Connextra + INVEST + Gherkin) and, once confirmed, **create a
-reusable house template** so everything after is consistent. Full method and the quality bar
-are in `references/business-analysis.md`; the format-adaptive template is `user-story.md`.
+Below the architecture sits the requirements work: **epics** (`EP-NNN`, large outcomes) that
+group **functional drivers** (`F.xx`, features) realised as **user stories with testable
+acceptance criteria** (`US-NNN`), traced up to capabilities and down to tests
+(`capability → EP-NNN → F.xx → US-NNN → acceptance criteria → test`). **When these already
+exist** — the usual case for existing software, where you're *given* a backlog of epics,
+functional requirements and stories with acceptance criteria — **ingest and map them, don't
+re-elicit**: each given epic → `EP-NNN`, each requirement → `F.xx`, each story → `US-NNN` with
+its acceptance criteria copied in, each quality expectation promoted to `Q.xx` (the intake
+table is in `references/business-analysis.md` §0). **Every organisation writes stories and
+acceptance criteria differently** — so the rule is: **detect and conform to the company's
+house format first** (look for `*.feature` Gherkin, issue templates under
+`.github/ISSUE_TEMPLATE/`, an existing role taxonomy, sizing unit, Definition of Done),
+*learn* it, and write new ones that match it. Only when no house style exists do you fall back
+to the default (Connextra + INVEST + Gherkin) and, once confirmed, **create a reusable house
+template** so everything after is consistent. Full method and the quality bar are in
+`references/business-analysis.md`; the format-adaptive templates are `epic.md` and
+`user-story.md`.
 
 ## Conform to the house style — every document type
 
@@ -134,7 +141,7 @@ code changes don't.
 | **Architecturally significant** — new boundary/dependency/integration, data-model change, cross-cutting mechanism, or pattern/style adoption (see `references/significance.md`) | **required** | update/add affected SD | update context/container/deployment as relevant | if a driver changed | only if it adds a concern/view | refresh affected views |
 | **New or changed quality target** | usually (how it's met) | maybe | note in trade-offs | **quality scenario (Q.xx)** | add concern + VP-QUAL view | — |
 | **New stakeholder / external consumer** | — | — | context view | maybe a driver | **stakeholders + concerns + viewpoint coverage** | context view |
-| **New feature / functional behaviour to specify** | — | maybe | — | new/updated `F.xx` **+ user story `US-NNN` with acceptance criteria, in the house format** (`business-analysis.md`) | — | — |
+| **New feature / functional behaviour to specify** | — | maybe | — | new/updated `F.xx` **+ user story `US-NNN` (under an epic `EP-NNN`) with acceptance criteria, in the house format** (`business-analysis.md`) | — | — |
 | **Greenfield / docs don't exist yet & task is significant** | first ADR(s) | one SD for the area you touch | context + container | driver stub for what you build | minimal AD + checklist | context + container |
 
 Two rules that override the table: (1) when unsure whether a change is significant,
@@ -385,6 +392,6 @@ manifest in the index README). Condensed:
 
 Enterprise: `enterprise-architecture.md`, `capability-system-map.md`. Solution: `SAD.md`.
 Migration: `transition-architecture.md`. Software: `AD.md` (ISO 42010 root), `PRD.md`,
-`HLD.md`, `SD.md`. Business analysis: `user-story.md` (format-adaptive). Decisions: `RFC.md`,
+`HLD.md`, `SD.md`. Business analysis: `epic.md`, `user-story.md` (format-adaptive). Decisions: `RFC.md`,
 `ADR.md`, `decision-log.md`. Shared: `README.md` (index/manifest), `GLOSSARY.md`,
 `conformance-checklist.md`. Copy the relevant one(s) for the altitude and fill them in.

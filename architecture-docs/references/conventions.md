@@ -14,6 +14,7 @@ that let docs, code, and the index point at each other.
 | Business driver | `B.NN` | `B.03` |
 | Functional driver | `F.NN` | `F.01` |
 | Quality driver | `Q.NN` | `Q.02` |
+| Epic | `EP-NNN` (or the house scheme) | `EP-014` |
 | User story | `US-NNN` (or the house scheme, e.g. `PROJ-123`) | `US-014` |
 | Enterprise principle | `PR.NN` | `PR.01` |
 | RFC (proposal) | `RFC-NNNN` | `RFC-0007` |
@@ -90,6 +91,7 @@ validate and filter it. Bold = required on every doc; the rest apply where relev
 | `derived-from-rfc` | `RFC-NNNN` | ADR |
 | `resulting-adr` | `ADR-NNNN` | RFC |
 | `format` | `house` \| `default` | user stories |
+| `epic` | `EP-NNN` or house epic key | user stories |
 | `ac-style` | `gherkin` \| `checklist` | user stories |
 | `supersedes` / `superseded-by` | `ADR-NNNN` | ADR |
 

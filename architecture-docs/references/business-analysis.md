@@ -12,14 +12,39 @@ and only generating a template when none exists. Grounding: **IIBA BABOK® Guide
 
 ```
 Business capability (EA §4)
-  └─ Epic            (large outcome, weeks–months)
-      └─ Feature     (a coherent slice of value)
+  └─ Epic        (EP-NNN — large outcome, weeks–months)
+      └─ Feature     (≈ a PRD functional driver F.xx — a coherent slice of value)
           └─ User story  (US-NNN, fits one iteration)  ──▶ Acceptance criteria  ──▶ Tests
 ```
 
-Every story links **up** to a PRD functional driver (`F.xx`) and ultimately an EA capability,
-and **down** to the tests that confirm its acceptance criteria. That chain
-(`capability → F.xx → US-NNN → AC → test`) is the BA contribution to end-to-end traceability.
+Each artifact carries a stable ID (`references/conventions.md` §1): an **epic** is `EP-NNN`,
+a feature maps to a functional driver `F.xx`, a story is `US-NNN`. Every story links **up**
+to its epic (`epic: EP-NNN`) and the functional driver it serves (`satisfies: [F.xx]`), and
+ultimately an EA capability; and **down** to the tests that confirm its acceptance criteria.
+That chain (`capability → EP-NNN → F.xx → US-NNN → AC → test`) is the BA contribution to
+end-to-end traceability. Capture each epic in the lean `epic.md` template (`EP-NNN`: outcome,
+parent capability, child `F.xx`/stories, epic-level acceptance) so the parent of a story is a
+real, greppable record — not just a free-text label.
+
+## 0. Working from requirements you're already given
+
+For **existing software** the inputs usually already exist — a backlog of epics, a list of
+functional requirements, user stories with acceptance criteria. **Ingest them; do not
+re-elicit what you've been handed.** Map each one onto the skill's structure, preserving the
+original wording and (where possible) the original IDs:
+
+| You're given | Maps to | Action |
+|---|---|---|
+| An **epic** / large outcome | `EP-NNN` (`epic.md`) | One epic record; link it up to a capability, down to its `F.xx`/stories. Keep the house ID if it has one. |
+| A **functional requirement** / feature | `F.xx` in the **PRD** §4 | One functional driver; phrase with RFC 2119 keywords; note the source. |
+| A **user story** | `US-NNN` (`user-story.md`) | One story, in the **house format** (detect it first, §2); set `epic:` and `satisfies:`. |
+| **Acceptance criteria** | the story's *Acceptance criteria* section | Copy them verbatim into the story; only reshape if they're not testable (§4). |
+| A **non-functional / quality** expectation | `Q.xx` (PRD §5, 6-part scenario) | Don't bury it in a story — promote it to a quality driver and reference `Q.xx`. |
+
+The architecture work (HLD/SD/AD, recovered ADRs) is then **reverse-engineered from the
+existing code** (`references/reverse-engineering.md`, `methods.md` §3) and traced back to these
+ingested drivers. Fill only the genuine gaps, and record anything the given inputs leave
+unanswered as a *visible* assumption — never invent a driver to look complete.
 
 ## 2. Detect & conform to the company's format — do this FIRST
 

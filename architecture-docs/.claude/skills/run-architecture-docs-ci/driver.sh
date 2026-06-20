@@ -180,6 +180,20 @@ echo "$OUT" | grep -qi "invalid status 'review'" && ok "caught invalid RFC statu
 echo "$OUT" | grep -qi "superseded ADR must set" && ok "caught dangling supersession" || bad "missed dangling supersession"
 echo "$OUT" | grep -q "still has" && ok "caught unresolved conformance gap" || bad "missed unresolved checklist gap"
 
+# ---------- the committed worked example must stay conformant ----------
+echo "== 5. arch_lint on the committed worked example (expect exit 0) =="
+EX="$UNIT/examples/brownfield-api-keys"
+if [ -d "$EX/docs/architecture" ]; then
+  EXOUT="$("$PY" "$LINT" all --root "$EX/docs/architecture" --src "$EX/src" 2>&1)"
+  rc=$?
+  echo "$EXOUT" | sed 's/^/    | /'
+  { [ "$rc" -eq 0 ] && echo "$EXOUT" | grep -q "0 error"; } \
+    && ok "worked example (given epic+FRs+ACs → docs) lints clean" \
+    || bad "worked example regressed, exit $rc"
+else
+  bad "worked example missing at $EX"
+fi
+
 echo
 echo "Summary: $pass passed, $fail failed."
 [ "$fail" -eq 0 ] && { echo "DRIVER OK"; exit 0; } || { echo "DRIVER FAILED"; exit 1; }

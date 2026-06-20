@@ -2,6 +2,7 @@
 id: PRD
 title: <Product / system name> — Product Requirements
 status: current        # current | draft | deprecated
+level: software        # enterprise | solution | software
 updated: <YYYY-MM-DD>
 owners: [<team>]
 ---
@@ -30,11 +31,13 @@ What each stakeholder wants, and what they should be able to do with the system.
 
 - **F.01:** The system <MUST/SHOULD> <capability>, taking <inputs> and producing <outputs>.
 
-> **Detailed functional behaviour** is expressed as **user stories with acceptance criteria**
-> (`US-NNN`), each linked back to the `F.xx` it serves (`satisfies: [F.01]`). Write them in the
-> organisation's **house format** — detect and conform to it first; only fall back to the
-> default template when none exists. See `references/business-analysis.md` and the
-> `user-story.md` template. The chain is `capability → F.xx → US-NNN → acceptance criteria → test`.
+> Functional drivers are grouped under **epics** (`EP-NNN`, `epic.md`) — the large outcomes
+> they belong to — and **detailed functional behaviour** is expressed as **user stories with
+> acceptance criteria** (`US-NNN`), each linked back to the `F.xx` it serves
+> (`satisfies: [F.01]`) and its parent epic (`epic: EP-001`). Write them in the organisation's
+> **house format** — detect and conform to it first; only fall back to the default template
+> when none exists. See `references/business-analysis.md` and the `user-story.md` / `epic.md`
+> templates. The chain is `capability → EP-NNN → F.xx → US-NNN → acceptance criteria → test`.
 
 ## 5. Quality drivers — quality attribute scenarios
 > Stable IDs `Q.NN`. Each quality goal targets a specific **ISO/IEC 25010:2023**

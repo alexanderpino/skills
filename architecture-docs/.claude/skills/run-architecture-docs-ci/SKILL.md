@@ -56,6 +56,10 @@ asserts, in order:
 4. After seeding four faults, `arch_lint all` exits **1** and the output contains:
    `unknown viewpoint VP-GONE`, `invalid status 'review'`,
    `superseded ADR must set 'superseded-by'`, and `still has ❌`.
+5. The committed worked example under `examples/brownfield-api-keys/` (a full doc set
+   authored from a *given* epic + functional requirements + story acceptance criteria for an
+   existing service) still lints clean — guarding the skill's authoring workflow against
+   regressions.
 
 No screenshots — these are CLIs; the PASS/FAIL log is the observable output.
 
