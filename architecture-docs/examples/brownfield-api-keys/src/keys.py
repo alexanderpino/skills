@@ -18,6 +18,6 @@ def issue(account_id, repo):
 def verify(token, repo):
     for row in repo.active_keys():
         salt = bytes.fromhex(row["salt"])
-        if hashlib.sha256(salt + token.encode()).hexdigest() == row["key_hash"]:
+        if secrets.compare_digest(hashlib.sha256(salt + token.encode()).hexdigest(), row["key_hash"]):
             return row["account_id"]
     return None
