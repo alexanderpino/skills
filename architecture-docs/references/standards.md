@@ -62,6 +62,9 @@ addressed each cell that matters? — complementary to TOGAF's process.
 | Solution architecture | TOGAF (Phase E, SBBs) + **EIP** | `SAD.md`: end-to-end design, integration patterns, technology selection. |
 | Diagram levels (software) | **C4 model** (Simon Brown) | Context / Container / Component / Code, plus supplementary Dynamic, Deployment, System Landscape. See `mermaid-guide.md`. |
 | Quality requirements | **SEI Quality Attribute Scenarios + ATAM** (Bass, Clements, Kazman, *Software Architecture in Practice*) | Quality drivers are written as the canonical **6-part scenario** and prioritised with a quality/utility tree. |
+| Architecture evaluation | **ATAM** + scenario family (**SAAM**, **CBAM** for cost) + **evolutionary architecture / fitness functions** (Ford, Parsons & Kua) | `architecture-evaluation.md`: risks · non-risks · sensitivity · trade-off points; top scenarios become CI fitness functions. Method in `methods.md` §11. |
+| Interface contracts | **OpenAPI 3.1** · **AsyncAPI 3.0** · **gRPC/Protobuf** · **GraphQL SDL** · **Pact** (consumer-driven) | The contract is the source of truth, linked from `SD` via `api-spec:`; breaking changes are ADR-worthy. See `interfaces.md`. |
+| Privacy & data protection | **ISO/IEC 29134** (PIA) · **GDPR/UK-GDPR Art. 25/35** · CCPA · HIPAA · PCI-DSS | Mandatory DPIA in HLD/SAD §8 where personal/regulated data is processed; `privacy-reviewed` flag. See `privacy.md`. |
 | Decisions (all levels) | **Michael Nygård ADR** (default) + **MADR 4.0.0** (superset) + Y-Statements | One decision per file, immutable, four-state lifecycle, `level:` tagged. Nygård by default; MADR fields when a decision needs them. |
 | Requirement wording | **RFC 2119 / RFC 8174** | Normative keywords MUST / SHALL / SHOULD / MAY used precisely in the PRD. |
 | Requirements process (optional) | **ISO/IEC/IEEE 29148** | If the team does formal requirements engineering, the PRD slots in as the product/stakeholder requirements view. |

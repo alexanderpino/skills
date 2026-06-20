@@ -4,6 +4,7 @@ title: Store only salted hashes of API keys
 status: accepted
 level: software
 date: 2026-06-20
+derivation: recovered
 deciders: [team-platform]
 tags: [security, auth, storage]
 affects: [keysvc, api_keys]

@@ -129,6 +129,7 @@ code changes don't.
 | New/changed **business capability**, portfolio standard, principle, or landscape/roadmap | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
 | New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy | `SAD.md` + solution-level ADR; then software changes per affected system |
 | **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
+| **Evaluate / review an existing architecture** (pre-migration health-check, due-diligence, "keep investing?") | `architecture-evaluation.md` (ATAM-lite: risks · non-risks · sensitivity · trade-offs → ADRs + fitness functions; `methods.md` §11) |
 | Within a single system | the software table below |
 
 **Software-level changes** (the common case):
@@ -138,6 +139,7 @@ code changes don't.
 | **Trivial** — typo, rename, formatting, comment, internal refactor; no change to structure, interface, dependency, data, or a quality attribute | — | only if a line is now wrong | — | — | — | — |
 | **Local** — behaviour change or small feature *inside* an existing component; no new contract | only if a real choice was made | update the affected section | — | — | — | only if the picture changed |
 | **New component / internal interface** within existing structure | if a choice was made | new or updated SD | add a components-table row | — | — | component view |
+| **New / breaking published interface** (API, event, RPC, file format) | **required** (breaking change) | update SD + link/refresh the contract (`api-spec:`, `references/interfaces.md`) | context view if external | — | — | context view |
 | **Architecturally significant** — new boundary/dependency/integration, data-model change, cross-cutting mechanism, or pattern/style adoption (see `references/significance.md`) | **required** | update/add affected SD | update context/container/deployment as relevant | if a driver changed | only if it adds a concern/view | refresh affected views |
 | **New or changed quality target** | usually (how it's met) | maybe | note in trade-offs | **quality scenario (Q.xx)** | add concern + VP-QUAL view | — |
 | **New stakeholder / external consumer** | — | — | context view | maybe a driver | **stakeholders + concerns + viewpoint coverage** | context view |
@@ -284,11 +286,13 @@ approval becomes the ADR (`derived-from-rfc:`). The decision log `decisions/READ
 indexes them. Full guidance, status transitions, and supersession rules are in
 `references/conventions.md`; standards background in `references/standards.md`.
 
-### Security & cost are mandatory in HLD and SAD
+### Security, privacy & cost are mandatory in HLD and SAD
 Every HLD and SAD carries a **threat model** (STRIDE mapped to OWASP Top 10:2025) and a
 **FinOps cost-estimate matrix** (provider calculators + Infracost). These are not optional
-sections — set `security-reviewed`/`cost-reviewed: true` when signed off. A significant
-residual risk or a build-vs-buy cost decision becomes an ADR.
+sections — set `security-reviewed`/`cost-reviewed: true` when signed off. Where the system
+processes **personal or regulated data**, §8 also carries a **DPIA** (`references/privacy.md`)
+— set `privacy-reviewed: true`, or `n/a` if no personal data. A significant residual security,
+privacy, or build-vs-buy cost risk becomes an ADR.
 
 ### Diagrams — C4 is mandatory; render from a model where possible
 Software structure **must** be captured with the **C4 model**: **L1 Context** and **L2
@@ -380,6 +384,13 @@ manifest in the index README). Condensed:
   validator, `tools/detect_doc_conventions.py` — house-style detector, `spectral.yaml`,
   GitHub Actions `workflows/architecture-as-code.yml`); copy it into the target repo to gate
   PRs out-of-the-box.
+- `references/interfaces.md` — **API & interface contracts** as first-class: OpenAPI/AsyncAPI/
+  gRPC/GraphQL/Pact, the contract as source of truth (linked from SD via `api-spec:`),
+  versioning/compat, and contract testing. Read for any service interface (esp. recovering one
+  from existing code).
+- `references/privacy.md` — **privacy & compliance (DPIA)**: when a DPIA is required, the
+  lightweight assessment, privacy-by-design moves, and the regime map (GDPR/CCPA/HIPAA/PCI).
+  The companion to the threat model — both live in HLD/SAD §8.
 - `references/significance.md` — is this change architecturally significant / ADR-worthy?
 - `references/conventions.md` — IDs, the machine-readable front-matter schema, naming,
   status lifecycle, the `ARCH-REF:` marker, grep patterns. Read before editing any doc.
@@ -393,5 +404,7 @@ manifest in the index README). Condensed:
 Enterprise: `enterprise-architecture.md`, `capability-system-map.md`. Solution: `SAD.md`.
 Migration: `transition-architecture.md`. Software: `AD.md` (ISO 42010 root), `PRD.md`,
 `HLD.md`, `SD.md`. Business analysis: `epic.md`, `user-story.md` (format-adaptive). Decisions: `RFC.md`,
-`ADR.md`, `decision-log.md`. Shared: `README.md` (index/manifest), `GLOSSARY.md`,
-`conformance-checklist.md`. Copy the relevant one(s) for the altitude and fill them in.
+`ADR.md`, `decision-log.md`. Evaluation: `architecture-evaluation.md` (ATAM-lite review of an
+existing architecture — distinct from the conformance checklist). Shared: `README.md`
+(index/manifest), `GLOSSARY.md`, `conformance-checklist.md`. Copy the relevant one(s) for the
+altitude and fill them in.

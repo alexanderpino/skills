@@ -9,8 +9,10 @@ owners: [team-platform]
 satisfies: [F.01, F.02, F.03, Q.01]
 related-adrs: [ADR-0001]
 realizes-views: [V-CTX, V-CON]
+source: recovered
 security-reviewed: true
 cost-reviewed: true
+privacy-reviewed: true
 ---
 
 # HLD — LinkShort
@@ -64,6 +66,17 @@ STRIDE → OWASP Top 10:2025.
 | Denial of service | One key floods the API | A04 Insecure Design | Per-key rate limiting (F.03) |
 
 `security-reviewed: true` — threat model signed off.
+
+### Privacy & data protection (DPIA)
+The keys table associates a credential with an integrator **account_id** (personal data), so a
+DPIA applies (`references/privacy.md`).
+
+| Data category | Sensitivity | Lawful basis | Residency | Retention | Safeguard |
+|---|---|---|---|---|---|
+| account_id ↔ key hash | PII (pseudonymous) | contract | EU (RDS eu-west-1) | until key revoked + 90d | salted SHA-256, access-logged |
+
+No key plaintext is ever stored (`Q.01`, `ADR-0001`); erasure = delete the row (crypto-shred).
+`privacy-reviewed: true`.
 
 ## 9. FinOps — cost estimate (mandatory before build)
 | Item | Driver | Est. monthly |

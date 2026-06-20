@@ -6,6 +6,7 @@ level: software
 updated: <YYYY-MM-DD>
 owner: <accountable person/team>
 source: designed       # designed (To-Be) | traced (As-Is, recovered from runtime — migration.md §4)
+api-spec:              # optional: path to the machine-readable contract (OpenAPI/AsyncAPI/proto) — interfaces.md
 related-adrs: []       # ADRs shaping this component, e.g. [ADR-0007]
 satisfies: []          # PRD driver IDs, e.g. [F.02, Q.02]
 realizes-views: [V-COM-<area>, V-RUN-<flow>]   # ISO 42010 views (defined in AD.md §6)
@@ -48,9 +49,12 @@ sequenceDiagram
 ```
 
 ## 4. Interfaces & contracts
-The public surface: functions/APIs/messages/file formats others depend on. For
-each: name, inputs, outputs, errors. Changes here are architecturally significant
-— they need an ADR.
+The public surface: functions/APIs/messages/file formats others depend on. Point
+`api-spec:` at the machine-readable contract (OpenAPI/AsyncAPI/`.proto`/GraphQL SDL) —
+**the spec is the source of truth**; here, summarise only what the schema can't say:
+auth, idempotency, ordering, pagination, error semantics, rate limits, and the
+**versioning/compat policy**. Changes to a published contract are architecturally
+significant — they need an ADR + a version bump (`references/interfaces.md`).
 
 ## 5. Data structures & types
 The important types and their relationships. A `classDiagram` if composition/

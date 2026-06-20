@@ -4,6 +4,7 @@ title: LinkShort — Architecture Description
 status: current
 version: 1.0.0
 level: software
+source: recovered
 updated: 2026-06-20
 entity-of-interest: LinkShort URL-shortener API
 conforms-to:

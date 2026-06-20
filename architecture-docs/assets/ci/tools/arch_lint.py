@@ -235,7 +235,7 @@ def check_frontmatter(root, strict, house=None):
                 add(ERROR, path, f"{kind} must contain a mandatory Threat model section (STRIDE/OWASP)")
             if "finops" not in low and "cost estimate" not in low:
                 add(ERROR, path, f"{kind} must contain a mandatory FinOps cost-estimate section")
-            for flag in ("security-reviewed", "cost-reviewed"):
+            for flag in ("security-reviewed", "cost-reviewed", "privacy-reviewed"):
                 if flag not in fm:
                     add(WARN, path, f"{kind} should declare '{flag}: true|false'")
     # reciprocal supersession links

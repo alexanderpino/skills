@@ -13,6 +13,7 @@ conforms-to:
   - ISO/IEC 25010:2023          # NFRs across the solution
 security-reviewed: false        # set true once the threat model (§8) is signed off
 cost-reviewed: false            # set true once the FinOps estimate (§9) is signed off
+privacy-reviewed: false         # true | false | n/a — DPIA done (§8) where personal/regulated data is processed
 complies-with: []             # enterprise principle IDs, e.g. [PR.01, PR.03]
 realizes-capabilities: []     # EA capability IDs this solution delivers
 authors: [<solution architect>]
@@ -88,7 +89,7 @@ Cross-cutting NFRs as ISO 25010 quality attribute scenarios (6-part + measure) t
 *whole solution* must meet — performance, availability, security, scalability. Reuse the
 PRD quality-driver form; these often drive the integration and technology choices.
 
-## 8. Security — threat model (mandatory)
+## 8. Security & privacy — threat model + DPIA (mandatory)
 Threat-model the **end-to-end** solution, with extra attention to the integration points
 and trust boundaries between systems. Use **STRIDE** per element/flow and map to
 **OWASP Top 10:2025** (https://owasp.org/Top10/2025/); sign off with `security-reviewed: true`.
@@ -99,6 +100,19 @@ and trust boundaries between systems. Use **STRIDE** per element/flow and map to
 
 > Cross-system flows are the highest-risk surface; model A03 Software Supply Chain Failures
 > for third-party/SaaS dependencies. A significant residual risk becomes an ADR.
+
+### Privacy & data protection (DPIA)
+**Mandatory where personal/regulated data crosses the solution** (often across systems and
+borders) — else set `privacy-reviewed: n/a`. Assess personal-data categories, lawful basis,
+**cross-border data flows and residency**, retention, and safeguards per the applicable
+regime (GDPR/UK-GDPR, CCPA, HIPAA, PCI-DSS, …). Full method in `references/privacy.md`.
+
+| Data category | Sensitivity | Lawful basis | Crosses boundary | Residency | Retention | Safeguard |
+|---|---|---|---|---|---|---|
+| <e.g. customer record> | PII | <contract> | <Sys A → SaaS B> | <EU only> | <36 mo> | <pseudonymised, DPA signed> |
+
+> Data minimisation and purpose limitation are solution constraints. A significant residual
+> privacy risk becomes an ADR. Sign off with `privacy-reviewed: true`.
 
 ## 9. FinOps — cost estimate (mandatory before build)
 Estimate the solution's cloud/infra cost across all systems **before** building. Use the

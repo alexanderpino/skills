@@ -6,6 +6,7 @@ version: 0.1.0                # semver of the AD itself
 updated: <YYYY-MM-DD>
 entity-of-interest: <system / product / service name>
 level: software              # enterprise | solution | software — altitude of this AD's EoI
+source: designed             # designed (To-Be) | recovered (As-Is, reverse-engineered from existing code — methods.md §3)
 conforms-to:
   - ISO/IEC/IEEE 42010:2022   # architecture description (required content)
   - ISO/IEC 25010:2023        # product quality model (quality characteristics)

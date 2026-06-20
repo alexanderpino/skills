@@ -1,0 +1,24 @@
+openapi: 3.1.0
+info:
+  title: LinkShort API — keys
+  version: 1.0.0
+paths:
+  /api/keys:
+    post:
+      summary: Generate an API key (F.01)
+      responses:
+        '201':
+          description: Key created; value shown once
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string, description: shown exactly once }
+  /api/keys/{id}:
+    delete:
+      summary: Revoke an API key (F.02)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Revoked }

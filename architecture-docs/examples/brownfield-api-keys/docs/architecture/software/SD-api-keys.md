@@ -5,6 +5,8 @@ status: current
 level: software
 updated: 2026-06-20
 owners: [team-platform]
+source: recovered
+api-spec: ../contracts/openapi.yaml
 satisfies: [F.01, F.02, Q.01]
 related-adrs: [ADR-0001]
 realizes-views: [V-COM-keys]

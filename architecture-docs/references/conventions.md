@@ -88,6 +88,10 @@ validate and filter it. Bold = required on every doc; the rest apply where relev
 | `realizes-views` | list of `V-*` | HLD/SD |
 | `realizes-capabilities` | list of capability IDs | SAD |
 | `security-reviewed` / `cost-reviewed` | boolean | HLD/SAD |
+| `privacy-reviewed` | `true` \| `false` \| `n/a` | HLD/SAD |
+| `source` | `designed` \| `recovered`/`traced` | AD/HLD/SD/SAD (As-Is vs To-Be) |
+| `derivation` | `forward` \| `recovered` | ADR (retroactive vs decided-now) |
+| `api-spec` | path to OpenAPI/AsyncAPI/proto/SDL | SD |
 | `derived-from-rfc` | `RFC-NNNN` | ADR |
 | `resulting-adr` | `ADR-NNNN` | RFC |
 | `format` | `house` \| `default` | user stories |

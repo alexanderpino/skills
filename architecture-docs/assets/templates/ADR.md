@@ -4,6 +4,7 @@ title: <short noun phrase, e.g. Use a file-based event bus>
 status: proposed        # proposed | accepted | rejected | deprecated | superseded
 level: software         # enterprise | solution | software — the altitude of the decision
 date: <YYYY-MM-DD>      # decided / last status change
+derivation: forward     # forward (decided now) | recovered (retroactive ADR reconstructed from existing code — methods.md §8)
 owner: <accountable person/team>
 deciders: [<who>]       # optional; the Architecture Board for significant decisions
 derived-from-rfc:       # optional: RFC-NNNN this decision came from (governance.md)

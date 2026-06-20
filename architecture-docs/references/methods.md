@@ -15,6 +15,7 @@ reflect the real system and the real decisions — not guesses dressed up as fac
 8. Recovering and making decisions
 9. Recognising patterns, styles & smells
 10. Evidence discipline — derive, then ask, then assume (visibly)
+11. Evaluating an existing architecture (ATAM-lite)
 
 ---
 
@@ -271,3 +272,39 @@ The order matters, and it's what separates an architect from a guesser:
 
 Never fabricate a stakeholder, a driver, or a number to make a template look complete.
 A conformant-but-false document is worse than an honest, partial one.
+
+---
+
+## 11. Evaluating an existing architecture (ATAM-lite)
+
+Documenting a system tells you *what it is*; **evaluating** it tells you *whether it's any
+good for what it must do*. This is a distinct, high-value output for **existing software** —
+before a migration, an acquisition/due-diligence, or a "should we keep investing in this?"
+call. It is **not** the ISO conformance checklist (that audits whether the *docs* are
+complete); it judges the *architecture*. Artifact: `architecture-evaluation.md`.
+
+Use a lightweight **ATAM** (SEI; Bass, Clements & Kazman). The steps that matter:
+
+1. **Set the yardstick.** Reuse the prioritised quality-attribute scenarios (`Q.xx` utility
+   tree, §7). You can't evaluate "good" without naming the qualities that matter and their
+   measures. If they don't exist, derive them first (§7).
+2. **Recover the approaches.** For each scenario, find the tactic the architecture actually
+   uses (caching, replication, a queue, layering) — from the design and code (§3, §9).
+3. **Probe for the four findings:**
+   - **Risk** — a decision/gap that threatens a quality goal.
+   - **Non-risk** — a decision confirmed sound (record it; it's evidence, not filler).
+   - **Sensitivity point** — a measure that hinges critically on one element.
+   - **Trade-off point** — one decision that helps quality A and hurts quality B (the
+     highest-value findings; this is where ADRs concentrate).
+4. **Cluster risks into themes** — themes drive the roadmap, not individual risks.
+5. **Recommend** — each significant risk becomes a proposed **ADR** or a debt entry; the set
+   feeds a `transition-architecture.md` if the system is headed for change.
+6. **Make it continuous.** Turn the top scenarios into **fitness functions** (evolutionary
+   architecture — Ford, Parsons & Kua): automated checks (a cycle test for maintainability, a
+   latency-budget test for performance, an `arch_lint`/ArchUnit rule) so the qualities are
+   verified every build, not assessed once. A fitness function is the executable form of a
+   `Q.xx` scenario's *means of verification*.
+
+Keep it proportional: a one-page evaluation of the three scenarios that matter beats a
+40-page report nobody reads. Grounding and the wider scenario-based family (SAAM, CBAM for the
+cost dimension) are in `references/standards.md`.
