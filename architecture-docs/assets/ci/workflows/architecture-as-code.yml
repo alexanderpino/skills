@@ -1,0 +1,76 @@
+# Architecture-as-Code CI. Copy to .github/workflows/architecture-as-code.yml
+# The `validate` job is the gate and runs with zero external dependencies
+# (arch_lint.py is pure stdlib). Optional jobs are best-effort.
+name: architecture-as-code
+on:
+  pull_request:
+    paths: ["docs/architecture/**", "src/**", "**/*.tf", "**/*.dsl"]
+  push:
+    branches: [main, master]
+
+jobs:
+  validate:
+    name: Validate architecture docs (gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install PyYAML (optional; arch_lint has a stdlib fallback)
+        run: pip install pyyaml || true
+      - name: arch_lint — front-matter, ISO 42010 conformance, drift, links
+        run: python tools/arch_lint.py all --root docs/architecture --src src
+
+  spectral:
+    name: Spectral front-matter lint (optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install pyyaml || true
+      - name: Emit front-matter bundle
+        run: python tools/arch_lint.py all --root docs/architecture --emit-frontmatter build/frontmatter.yaml
+      - name: Spectral lint
+        run: npx -y @stoplight/spectral-cli lint build/frontmatter.yaml --ruleset .spectral.yaml
+
+  markdown:
+    name: Markdown lint + link check (optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx -y markdownlint-cli2 "docs/architecture/**/*.md"
+      - run: npx -y markdown-link-check -q docs/architecture/**/*.md
+
+  diagrams:
+    name: Render C4 from Structurizr DSL (optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: hashFiles('docs/architecture/diagrams/workspace.dsl') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export views
+        uses: aidmax/structurizr-cli-action@v1
+        with:
+          action: export
+          workspace: docs/architecture/diagrams/workspace.dsl
+          format: mermaid
+          output: docs/architecture/diagrams/exports
+
+  cost:
+    name: FinOps cost diff (Infracost, optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: hashFiles('**/*.tf') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+      - run: infracost breakdown --path . --format json --out-file /tmp/ic.json
+      - uses: infracost/actions/comment@v3
+        with:
+          path: /tmp/ic.json
+          behavior: update

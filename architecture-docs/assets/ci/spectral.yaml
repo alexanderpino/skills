@@ -1,0 +1,71 @@
+# Spectral ruleset for architecture-docs front-matter.
+# Copy to your repo root as `.spectral.yaml`.
+#
+# Spectral lints YAML/JSON, not Markdown directly, so first extract front-matter:
+#   python tools/arch_lint.py all --root docs/architecture --emit-frontmatter build/frontmatter.yaml
+#   npx @stoplight/spectral-cli lint build/frontmatter.yaml --ruleset .spectral.yaml
+#
+# The emitted file is a YAML list of front-matter records (each with a `_path`).
+# arch_lint.py is the primary validator; Spectral is an optional complement for teams
+# that already run it (e.g. on OpenAPI specs) and want one linting surface.
+
+rules:
+  arch-id-required:
+    description: Every architecture document must declare a stable id.
+    given: "$[*]"
+    severity: error
+    then:
+      field: id
+      function: truthy
+
+  arch-title-required:
+    description: Every architecture document must declare a title.
+    given: "$[*]"
+    severity: error
+    then:
+      field: title
+      function: truthy
+
+  arch-status-enum:
+    description: status must be a known lifecycle value.
+    given: "$[*].status"
+    severity: error
+    then:
+      function: enumeration
+      functionOptions:
+        values:
+          - draft
+          - in-review
+          - current
+          - accepted
+          - proposed
+          - rejected
+          - deprecated
+          - superseded
+          - withdrawn
+
+  arch-level-enum:
+    description: level must be one of the three altitudes (or 'all').
+    given: "$[*].level"
+    severity: error
+    then:
+      function: enumeration
+      functionOptions:
+        values: [enterprise, solution, software, all]
+
+  arch-updated-isodate:
+    description: date fields should be ISO 8601 (YYYY-MM-DD).
+    given: "$[*].updated"
+    severity: warn
+    then:
+      function: pattern
+      functionOptions:
+        match: "^\\d{4}-\\d{2}-\\d{2}$"
+
+  arch-date-isodate:
+    given: "$[*].date"
+    severity: warn
+    then:
+      function: pattern
+      functionOptions:
+        match: "^\\d{4}-\\d{2}-\\d{2}$"
