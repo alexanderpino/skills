@@ -156,9 +156,9 @@ in the **Microsoft Azure Architecture Center** ("Cloud Design Patterns") and
 **microservices.io** (Chris Richardson); the messaging entries in **Enterprise
 Integration Patterns** (Hohpe & Woolf). **Each selection is an ADR** whose driver is the
 `Q.xx` it serves — and **every tactic buys one quality at the cost of another**
-(a circuit breaker trades availability for added latency/complexity; caching trades
-performance for staleness). Record the quality you *gave up*, not only the one you
-bought (ATAM trade-off point, `methods.md` §11).
+(a circuit breaker buys fault tolerance at the cost of complexity and fail-fast
+rejections; caching buys performance at the cost of staleness). Record the quality you
+*gave up*, not only the one you bought (ATAM trade-off point, `methods.md` §11).
 
 **Tactic → ISO/IEC 25010:2023 characteristic** (names per `standards.md`):
 
@@ -269,7 +269,7 @@ originating author. Consolidated so it's auditable (full mapping in `standards.m
 | Messaging / integration patterns (§3) | *Enterprise Integration Patterns* | Hohpe & Woolf |
 | Evolutionary architecture, fitness functions (§4) | *Building Evolutionary Architectures* | **Thoughtworks** — Ford, Parsons & Kua |
 | Architecture runway, intentional vs emergent (§4) | **SAFe** (Architectural Runway); Continuous Architecture | **Scaled Agile, Inc.**; Erder, Pureur & Woods |
-| Strangler Fig, Anti-Corruption Layer (§§1, 3) | martinfowler.com; *DDD* (Evans) | Fowler; Evans (see `migration.md`) |
+| Strangler Fig (§3), Anti-Corruption Layer (§§1, 3) | martinfowler.com; *DDD* (Evans) | Fowler; Evans (see `migration.md`) |
 
 When a claim and a team's mandated standard disagree, **conform to the team's** (the
 skill's standing rule, `standards.md`); record the divergence in an ADR.
