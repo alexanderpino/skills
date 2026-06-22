@@ -1,6 +1,6 @@
 # Worked example — architecting from *given* requirements (existing software)
 
-A complete, **lint-clean** demonstration that the `architecture-docs` skill can produce the
+A complete, **lint-clean** demonstration that the `principal-architect` skill can produce the
 required architecture documents when you are *handed* functional requirements, an epic, and
 user-story acceptance criteria for **existing software** — the common brownfield case.
 

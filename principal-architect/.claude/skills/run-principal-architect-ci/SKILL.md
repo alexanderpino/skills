@@ -1,7 +1,7 @@
 ---
-name: run-architecture-docs-ci
+name: run-principal-architect-ci
 description: >-
-  Run, test, and smoke-check the architecture-docs CI tooling — the
+  Run, test, and smoke-check the principal-architect CI tooling — the
   Architecture-as-Code validator (arch_lint.py) and house-style detector
   (detect_doc_conventions.py) shipped under assets/ci/. Use to validate a
   docs/architecture tree, lint ISO/IEC/IEEE 42010 conformance, check ADR/RFC
@@ -9,9 +9,9 @@ description: >-
   violations. No app/GUI — these are Python CLIs.
 ---
 
-# run-architecture-docs-ci
+# run-principal-architect-ci
 
-The `architecture-docs` skill ships a CI bundle at `assets/ci/` — two
+The `principal-architect` skill ships a CI bundle at `assets/ci/` — two
 **pure-stdlib Python 3 CLIs** (no app, no GUI, no server):
 
 - `assets/ci/tools/arch_lint.py` — the **gate**: validates a `docs/architecture`
@@ -26,8 +26,8 @@ it builds throwaway fixture docs trees in a temp dir and asserts the validator
 catches each seeded violation, and (3) round-trips the house-style detector.
 A linter that never fails is worthless, so the driver verifies both directions.
 
-> Paths below are relative to `architecture-docs/` (the unit root). The driver
-> lives at `.claude/skills/run-architecture-docs-ci/driver.sh`.
+> Paths below are relative to `principal-architect/` (the unit root). The driver
+> lives at `.claude/skills/run-principal-architect-ci/driver.sh`.
 
 ## Prerequisites
 
@@ -40,10 +40,10 @@ python3 --version          # 3.8+; tested on 3.11.15
 
 ## Run (agent path) — the smoke driver
 
-From the unit root (`architecture-docs/`):
+From the unit root (`principal-architect/`):
 
 ```bash
-bash .claude/skills/run-architecture-docs-ci/driver.sh
+bash .claude/skills/run-principal-architect-ci/driver.sh
 ```
 
 Prints a per-assertion `PASS`/`FAIL` log and ends with `DRIVER OK` (exit 0) or

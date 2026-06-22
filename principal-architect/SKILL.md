@@ -1,5 +1,5 @@
 ---
-name: architecture-docs
+name: principal-architect
 description: >-
   Master architecture & business-analysis skill (enterprise/solution/software). Consult and
   maintain architecture docs as a gate around planning and code changes: use BEFORE a plan or

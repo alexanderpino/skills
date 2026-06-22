@@ -13,7 +13,7 @@ no packaging or build step.
 | [`game-engine-guru`](game-engine-guru/) | Game engine architecture | Definitive AAA game-engine-development master skill to 2026 production standards: engine architecture, rendering (Adaptive GBuffer, OpenPBR), ECS, job/fiber systems, memory allocators, physics, animation, audio, networking, asset pipelines, editor tooling, profiling, console, and modern C++23/26. Routes material/BRDF math to `physically-based-rendering`. |
 | [`physically-based-rendering`](physically-based-rendering/) | Graphics / rendering | Expert knowledge of physically based rendering (PBR) and photorealistic image synthesis across offline path tracing and real-time rasterization. |
 | [`book-writer`](book-writer/) | Book Writing | Write full-length fiction and non-fiction books through a reusable author persona, with the full apparatus of a real book (figures, citations, footnotes, TOC, index) and a research/fact-check workflow. |
-| [`architecture-docs`](architecture-docs/) | Architecture & business analysis | Master enterprise/solution/software architecture skill: consult and maintain living architecture docs (PRD/HLD/SD/SAD/AD, ADRs, user stories) as a gate around planning and code changes. Conforms to ISO/IEC/IEEE 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42, with STRIDE/OWASP threat models, FinOps estimates, and Architecture-as-Code CI. |
+| [`principal-architect`](principal-architect/) | Architecture & business analysis | Master enterprise/solution/software architecture skill: consult and maintain living architecture docs (PRD/HLD/SD/SAD/AD, ADRs, user stories) as a gate around planning and code changes. Conforms to ISO/IEC/IEEE 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42, with STRIDE/OWASP threat models, FinOps estimates, and Architecture-as-Code CI. |
 
 More skills will be added over time — each one is independent, so you can
 install only the ones you need.
@@ -28,7 +28,7 @@ which installs a skill straight into the agent that's running:
 npx skills add github:alexanderpino/skills/game-engine-guru
 npx skills add github:alexanderpino/skills/physically-based-rendering
 npx skills add github:alexanderpino/skills/book-writer
-npx skills add github:alexanderpino/skills/architecture-docs
+npx skills add github:alexanderpino/skills/principal-architect
 ```
 
 You can also install from a local checkout:
@@ -66,7 +66,7 @@ skills/
 │   ├── SKILL.md                       # router + core mental model
 │   ├── references/                    # load-on-demand deep dives
 │   └── templates/                     # scaffolding (LaTeX, scripts)
-└── architecture-docs/                 # unpacked, reviewable skill
+└── principal-architect/                 # unpacked, reviewable skill
     ├── SKILL.md                       # router + core mental model
     ├── references/                    # load-on-demand deep dives
     └── assets/                        # templates (PRD/HLD/SD/ADR…) + CI tooling

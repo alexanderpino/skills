@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-arch_lint.py — Architecture-as-Code validator for the architecture-docs skill.
+arch_lint.py — Architecture-as-Code validator for the principal-architect skill.
 
 Pure standard library (Python 3.8+). No third-party dependencies required;
 uses PyYAML for front-matter parsing if available, otherwise a built-in parser.

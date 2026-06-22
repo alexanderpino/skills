@@ -1,4 +1,4 @@
-# Spectral ruleset for architecture-docs front-matter.
+# Spectral ruleset for principal-architect front-matter.
 # Copy to your repo root as `.spectral.yaml`.
 #
 # Spectral lints YAML/JSON, not Markdown directly, so first extract front-matter:

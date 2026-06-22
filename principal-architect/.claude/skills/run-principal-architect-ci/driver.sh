@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# driver.sh — smoke test for the architecture-docs CI tooling (arch_lint.py +
+# driver.sh — smoke test for the principal-architect CI tooling (arch_lint.py +
 # detect_doc_conventions.py). It does NOT lint this repo; it builds throwaway
 # fixture docs trees in a temp dir and proves the validator:
 #   1. PASSES (exit 0) on a conformant ISO/IEC/IEEE 42010 docs tree,
@@ -7,14 +7,14 @@
 #      a validator that never fails is worthless), catching the seeded errors,
 #   3. and that the house-style detector emits a profile arch_lint can enforce.
 #
-# Usage (paths relative to architecture-docs/, the unit root):
-#   bash .claude/skills/run-architecture-docs-ci/driver.sh
+# Usage (paths relative to principal-architect/, the unit root):
+#   bash .claude/skills/run-principal-architect-ci/driver.sh
 # Exit 0 = all assertions held; non-zero = the tooling regressed.
 set -u
 
 # Resolve the tools relative to this script, so it runs from anywhere.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-UNIT="$(cd "$HERE/../../.." && pwd)"          # architecture-docs/
+UNIT="$(cd "$HERE/../../.." && pwd)"          # principal-architect/
 TOOLS="$UNIT/assets/ci/tools"
 LINT="$TOOLS/arch_lint.py"
 DETECT="$TOOLS/detect_doc_conventions.py"
