@@ -11,8 +11,8 @@ no packaging or build step.
 | Skill | Area | What it does |
 | --- | --- | --- |
 | [`game-engine-guru`](game-engine-guru/) | Game engine architecture | Definitive AAA game-engine-development master skill to 2026 production standards: engine architecture, rendering (Adaptive GBuffer, OpenPBR), ECS, job/fiber systems, memory allocators, physics, animation, audio, networking, asset pipelines, editor tooling, profiling, console, and modern C++23/26. Routes material/BRDF math to `physically-based-rendering`. |
-| [`physically-based-rendering`](rendering/) | Graphics / rendering | Expert knowledge of physically based rendering (PBR) and photorealistic image synthesis across offline path tracing and real-time rasterization. |
-| [`book-writer`](writing/) | Writing | Write full-length fiction and non-fiction books through a reusable author persona, with the full apparatus of a real book (figures, citations, footnotes, TOC, index) and a research/fact-check workflow. |
+| [`physically-based-rendering`](physically-based-rendering/) | Graphics / rendering | Expert knowledge of physically based rendering (PBR) and photorealistic image synthesis across offline path tracing and real-time rasterization. |
+| [`book-writer`](book-writer/) | Book Writing | Write full-length fiction and non-fiction books through a reusable author persona, with the full apparatus of a real book (figures, citations, footnotes, TOC, index) and a research/fact-check workflow. |
 | [`architecture-docs`](architecture-docs/) | Architecture & business analysis | Master enterprise/solution/software architecture skill: consult and maintain living architecture docs (PRD/HLD/SD/SAD/AD, ADRs, user stories) as a gate around planning and code changes. Conforms to ISO/IEC/IEEE 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42, with STRIDE/OWASP threat models, FinOps estimates, and Architecture-as-Code CI. |
 
 More skills will be added over time — each one is independent, so you can
@@ -26,8 +26,8 @@ which installs a skill straight into the agent that's running:
 ```bash
 # Install a skill by pointing at its directory in this repo
 npx skills add github:alexanderpino/skills/game-engine-guru
-npx skills add github:alexanderpino/skills/rendering/physically-based-rendering
-npx skills add github:alexanderpino/skills/writing/book-writer
+npx skills add github:alexanderpino/skills/physically-based-rendering
+npx skills add github:alexanderpino/skills/book-writer
 npx skills add github:alexanderpino/skills/architecture-docs
 ```
 
@@ -35,14 +35,14 @@ You can also install from a local checkout:
 
 ```bash
 git clone https://github.com/alexanderpino/skills.git
-npx skills add ./skills/rendering/physically-based-rendering
+npx skills add ./skills/physically-based-rendering
 ```
 
 Prefer to do it manually? Point your skill loader — or just your assistant — at
 the unpacked skill directory:
 
 - **Claude / Agent Skills:** point a skill loader at the unpacked directory
-  (e.g. `rendering/physically-based-rendering/`), which holds the `SKILL.md` and
+  (e.g. `physically-based-rendering/`), which holds the `SKILL.md` and
   its `references/`.
 - **Any assistant:** open the skill's `SKILL.md`. It's a router — read it first
   for the core mental model, then open the reference file it points you to.
@@ -55,23 +55,21 @@ directly.
 
 ```
 skills/
-├── game-engine-guru/                      # unpacked, reviewable skill
-│   ├── SKILL.md                           # router + core mental model
-│   ├── references/                        # load-on-demand deep dives
-│   └── assets/                            # copy-paste scaffolds (C++, C#, Python, HLSL)
-├── rendering/
-│   └── physically-based-rendering/        # unpacked, reviewable skill
-│       ├── SKILL.md                       # router + core mental model
-│       └── references/                    # load-on-demand deep dives
-├── writing/
-│   └── book-writer/                       # unpacked, reviewable skill
-│       ├── SKILL.md                       # router + core mental model
-│       ├── references/                    # load-on-demand deep dives
-│       └── templates/                     # scaffolding (LaTeX, scripts)
-└── architecture-docs/                     # unpacked, reviewable skill
-    ├── SKILL.md                           # router + core mental model
-    ├── references/                        # load-on-demand deep dives
-    └── assets/                            # templates (PRD/HLD/SD/ADR…) + CI tooling
+├── game-engine-guru/                  # unpacked, reviewable skill
+│   ├── SKILL.md                       # router + core mental model
+│   ├── references/                    # load-on-demand deep dives
+│   └── assets/                        # copy-paste scaffolds (C++, C#, Python, HLSL)
+├── physically-based-rendering/        # unpacked, reviewable skill
+│   ├── SKILL.md                       # router + core mental model
+│   └── references/                    # load-on-demand deep dives
+├── book-writer/                       # unpacked, reviewable skill
+│   ├── SKILL.md                       # router + core mental model
+│   ├── references/                    # load-on-demand deep dives
+│   └── templates/                     # scaffolding (LaTeX, scripts)
+└── architecture-docs/                 # unpacked, reviewable skill
+    ├── SKILL.md                       # router + core mental model
+    ├── references/                    # load-on-demand deep dives
+    └── assets/                        # templates (PRD/HLD/SD/ADR…) + CI tooling
 ```
 
 ## Maintaining
