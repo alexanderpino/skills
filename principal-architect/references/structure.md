@@ -243,9 +243,10 @@ architecture description:**
   and **Service Layer** is a common pattern. **CQRS** (Greg Young) is detailed in §3.
 - **SOLID** — code-altitude; its architectural payload is in §2 (DIP → Dependency
   Rule + component principles).
-- **Data-oriented design** (SoA, cache locality, ECS) — an implementation/performance
-- **Data-oriented design** (Structure of Arrays (SoA), cache locality, ECS) — an implementation/performance
-  tactic* behind a `Q.xx` scenario, or a recognised *style* (`methods.md` §9).
+- **Data-oriented design** (Structure of Arrays (SoA), cache locality, ECS) — an
+  implementation/performance technique owned by the `game-engine-guru` skill; here it
+  is at most a *performance tactic* behind a `Q.xx` scenario, or a recognised *style*
+  (`methods.md` §9).
 - **Scrum / Kanban / SAFe ceremonies** — team process; only the *architecture stance*
   (§4) is in scope.
 
@@ -264,7 +265,8 @@ originating author. Consolidated so it's auditable (full mapping in `standards.m
 | Architectural tactics & quality scenarios (§3) | *Software Architecture in Practice*, 4th ed. (**SEI** Series); ATAM | **SEI / CMU**; Bass, Clements, Kazman |
 | Component cohesion/coupling principles, Dependency Rule (§2) | *Clean Architecture*; *Agile Software Development* (REP/CCP/CRP, ADP/SDP/SAP) | Robert C. Martin |
 | Hexagonal / Ports & Adapters (§2) | "Hexagonal Architecture" | Alistair Cockburn |
-| Cloud/distributed patterns — circuit breaker, bulkhead, retry, CQRS, event sourcing, strangler (§§2–3) | **Cloud Design Patterns**, Azure Well-Architected Framework | **Microsoft Azure Architecture Center** |
+| Cloud/distributed patterns — circuit breaker, bulkhead, retry, strangler (§§2–3) | **Cloud Design Patterns**, Azure Well-Architected Framework | **Microsoft Azure Architecture Center** |
+| CQRS, Event Sourcing (§3) | originated the patterns; documented in Azure Cloud Design Patterns | **Greg Young**; Microsoft |
 | Saga (orchestration/choreography), transactional outbox, microservice decomposition (§3) | **microservices.io** pattern language; *Microservices Patterns* | Chris Richardson |
 | Messaging / integration patterns (§3) | *Enterprise Integration Patterns* | Hohpe & Woolf |
 | Evolutionary architecture, fitness functions (§4) | *Building Evolutionary Architectures* | **Thoughtworks** — Ford, Parsons & Kua |
