@@ -217,6 +217,10 @@ rather than pretending.
 scenario, each rated for business value and architectural difficulty. The high-value
 / high-difficulty scenarios are where design effort and ADRs concentrate.
 
+Once a scenario is set, **choose the tactic that meets it** from the forward catalogue
+in `references/structure.md` §3 (tactic → ISO 25010 quality), and record the trade-off
+it makes as an ADR — this is the design-time twin of the recovery step in §11.
+
 ---
 
 ## 8. Recovering and making decisions
@@ -246,8 +250,11 @@ need a pros/cons comparison (`references/standards.md`).
 ## 9. Recognising patterns, styles & smells
 
 - **Styles/patterns**: infer from structure — layering, pipeline/dataflow, facade,
-  event-driven, ECS, modular monolith, microservices. Name the style in the HLD
-  "solution strategy"; if you're *adopting* one, that's an ADR.
+  event-driven, ECS/data-oriented, modular monolith, microservices. Name the style in
+  the HLD "solution strategy"; if you're *adopting* one, that's an ADR. **To *choose*
+  a structure or pattern (not just recognise one) — finding boundaries via strategic
+  DDD, selecting a structuring style, and the tactic-per-quality catalogue with their
+  trade-offs — see `references/structure.md`.**
 - **Smells → anti-patterns** (record in "Known issues / debt", tag the quality they
   threaten): god object / mega-service (maintainability, performance), cyclic
   dependency (maintainability), dense undecomposed structure (modifiability),

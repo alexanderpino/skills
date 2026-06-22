@@ -24,7 +24,8 @@ treat it as significant if it touches any of:
 6. **Cross-cutting mechanism** — concurrency model, error-handling strategy,
    communication style (shared memory vs files vs network), build/deployment shape.
 7. **Pattern or style** — adopts or drops an architectural style or pattern
-   (e.g. facade, modular monolith, pipeline) across more than one component.
+   (e.g. facade, modular monolith, pipeline) across more than one component. *Choosing*
+   one (with its trade-offs) is in `references/structure.md`.
 
 If a change hits **none** of these, it is local or trivial — document lightly or
 not at all (see the proportional-rigour table in SKILL.md).
