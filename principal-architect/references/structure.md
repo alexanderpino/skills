@@ -244,7 +244,7 @@ architecture description:**
 - **SOLID** — code-altitude; its architectural payload is in §2 (DIP → Dependency
   Rule + component principles).
 - **Data-oriented design** (SoA, cache locality, ECS) — an implementation/performance
-  technique owned by the `game-engine-guru` skill; here it is at most a *performance
+- **Data-oriented design** (Structure of Arrays (SoA), cache locality, ECS) — an implementation/performance
   tactic* behind a `Q.xx` scenario, or a recognised *style* (`methods.md` §9).
 - **Scrum / Kanban / SAFe ceremonies** — team process; only the *architecture stance*
   (§4) is in scope.
