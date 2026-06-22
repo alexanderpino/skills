@@ -87,7 +87,10 @@ Keep the *role* specific (not "user"), the *goal* solution-free, and the *benefi
 **3 C's** (Ron Jeffries): the story is a **Card** (placeholder), a **Conversation** (the real
 detail), and a **Confirmation** (the acceptance criteria). The card is not the whole spec.
 
-**Splitting** big stories (keep each valuable and testable): by workflow step, by business
+This delivery-time *vertical slicing* (a thin increment cutting through all layers) is the
+process twin of the architectural Vertical Slice style in `references/structure.md` §2 —
+keep the two senses distinct. **Splitting** big stories (keep each valuable and testable):
+by workflow step, by business
 rule/variation, by data type/parameter, by happy-path vs edge-case, by operation (CRUD), or
 spike-out-the-unknown. Never split into technical layers (UI/API/DB) — that breaks "Valuable".
 

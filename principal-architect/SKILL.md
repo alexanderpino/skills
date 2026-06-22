@@ -361,6 +361,12 @@ manifest in the index README). Condensed:
 - `references/methods.md` — **how a master architect derives the content**: mindset,
   picking the altitude, reverse-engineering a codebase, eliciting stakeholders/drivers,
   quality scenarios, recovering/making decisions, derive-then-ask-then-assume.
+- `references/structure.md` — **how to choose the shape**: finding boundaries (strategic
+  DDD — subdomains, bounded contexts, context maps), selecting a structuring style
+  (layered/hexagonal/clean/vertical-slice/modular-monolith/microservices) with the
+  component-dependency principles, and a forward **tactic→ISO 25010 quality** catalogue
+  (cloud/distributed patterns, EIP) — each with its trade-offs. Companion to `methods.md`;
+  the architectural home for DDD/SOLID/patterns (code-altitude ones stay pointers).
 - `references/reverse-engineering.md` — **legacy code-to-architecture at scale**: the SAR
   discipline (reflexion models, Ducasse & Pollet, SEI), AST tooling (Tree-sitter,
   Structurizr, CodeQL, jQAssistant), LLM-assisted/GraphRAG, polyglot pipeline. Read for any
