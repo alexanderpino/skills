@@ -16,6 +16,7 @@ reflect the real system and the real decisions — not guesses dressed up as fac
 9. Recognising patterns, styles & smells
 10. Evidence discipline — derive, then ask, then assume (visibly)
 11. Evaluating an existing architecture (ATAM-lite)
+12. Gap analysis — current state vs target, at any altitude
 
 ---
 
@@ -315,3 +316,48 @@ Use a lightweight **ATAM** (SEI; Bass, Clements & Kazman). The steps that matter
 Keep it proportional: a one-page evaluation of the three scenarios that matter beats a
 40-page report nobody reads. Grounding and the wider scenario-based family (SAAM, CBAM for the
 cost dimension) are in `references/standards.md`.
+
+---
+
+## 12. Gap analysis — current state vs target, at any altitude
+
+Gap analysis is one technique, not several: **establish the current state from evidence,
+establish the target from the drivers, name the deltas, classify and prioritise them, then
+route each delta to a closure mechanism.** It is the connective tissue between *describing*
+a system and *changing* it — every roadmap, migration, and remediation plan is the output of
+a gap analysis, explicit or not. The skill applies it at each altitude through an existing
+artifact; this section names the shared move and points to its homes so you recognise it as
+*one* discipline.
+
+The four steps, regardless of altitude:
+
+1. **Current state** — derive it, don't assume it. Capabilities and landscape from the estate
+   (§4), the As-Is design from archaeology and runtime tracing (§3, `reverse-engineering.md`,
+   `migration.md`), conformance from the audit, qualities from how the system actually behaves
+   under its `Q.xx` scenarios (§7, §11).
+2. **Target state** — derive it from the drivers, not from fashion. The capability/landscape
+   target (TOGAF Phase B–D), the To-Be design, the required content of a standard, the quality
+   measures the system must hit. No driver behind a target = no target; cut it.
+3. **Name & classify the deltas** — for each gap state *kind* and *direction*: **missing**
+   (target has it, current doesn't), **surplus** (current has it, target doesn't → retire),
+   **deficient** (exists but below the measure), **divergent** (exists but wrong shape). Size
+   each by effort and by the driver/quality it blocks; flag one-way-door gaps (§1 reversibility).
+4. **Prioritise & route to closure** — feed gaps to the mechanism that owns them: a **roadmap**
+   work package (enterprise), a **transition state** with rollback (migration), an **ADR** for a
+   gap that needs a decision, a **backlog** item (`F.xx`/`US-NNN`) for functional gaps, a
+   **fitness function** so a closed gap can't silently reopen (§11). Themes drive the roadmap,
+   not individual gaps.
+
+Where each instance lives — use these, don't reinvent them:
+
+| Altitude / question | Current → Target | Artifact |
+|---|---|---|
+| **Enterprise** — capabilities, landscape, technology | baseline → target → gap → roadmap | `enterprise-architecture.md` §4–7, capability map; method in §4 |
+| **Migration** — modernise an existing system | As-Is → interim → To-Be (7 R's) | `transition-architecture.md`, `references/migration.md` |
+| **ISO 42010 conformance** — are the *docs* complete? | required content → present content | `conformance-checklist.md` (✅/⚠️/❌); this *is* the gap-analysis step |
+| **Architecture health** — is the *architecture* good? | `Q.xx` scenarios → actual behaviour | `architecture-evaluation.md` (ATAM-lite, §11) |
+| **Requirements** — given inputs vs needed spec | given backlog → INVEST stories | `references/business-analysis.md` §0 (fill only genuine gaps) |
+
+Two rules carry over from the rest of the skill: a gap you can't yet close is recorded as a
+**visible assumption or gap** (§10), never hidden; and gap analysis earns its keep only when a
+real delta exists — don't manufacture a baseline→target table for a change that has neither.

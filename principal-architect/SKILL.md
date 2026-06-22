@@ -360,7 +360,8 @@ manifest in the index README). Condensed:
   README manifest. Read before initialising docs.
 - `references/methods.md` — **how a master architect derives the content**: mindset,
   picking the altitude, reverse-engineering a codebase, eliciting stakeholders/drivers,
-  quality scenarios, recovering/making decisions, derive-then-ask-then-assume.
+  quality scenarios, recovering/making decisions, derive-then-ask-then-assume, and
+  gap analysis (current→target→delta→closure) as one discipline across all altitudes.
 - `references/structure.md` — **how to choose the shape**: finding boundaries (strategic
   DDD — subdomains, bounded contexts, context maps), selecting a structuring style
   (layered/hexagonal/clean/vertical-slice/modular-monolith/microservices) with the
