@@ -239,8 +239,8 @@ architecture description:**
   vocabulary for the implementer.
 - **Patterns of Enterprise Application Architecture** (Fowler, PoEAA) — Repository,
   Unit of Work, Data Mapper, Active Record are tactical/code. The *style-level* ones
-  do surface here: **Transaction Script vs Domain Model** is a §2 structuring choice;
-  **Service Layer** and **CQRS** appear above.
+  do surface here: **Transaction Script vs Domain Model** is a §2 structuring choice,
+  and **Service Layer** is a common pattern. **CQRS** (Greg Young) is detailed in §3.
 - **SOLID** — code-altitude; its architectural payload is in §2 (DIP → Dependency
   Rule + component principles).
 - **Data-oriented design** (SoA, cache locality, ECS) — an implementation/performance
