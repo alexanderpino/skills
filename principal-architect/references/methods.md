@@ -125,7 +125,10 @@ Express baseline → target → **gap**; the gaps drive the roadmap.
 3. Score each against the cross-cutting NFRs (ISO 25010) and the principles; surface
    the integration and data-ownership consequences.
 4. **Build-vs-buy**: weigh total cost, fit, lock-in, control, and time-to-value — not
-   just licence price. Record as an ADR (`level: solution`).
+   just licence price. For a package/COTS option, run a **Fit-Gap analysis** — map each
+   `F.xx`/`Q.xx` requirement to the product's capability (**fit · partial · gap**) and resolve
+   each gap by *configuration · customization · workaround · process change*; a large
+   customization tail is itself a finding. Record as an ADR (`level: solution`). See §12.
 5. Choose technologies with rationale (this is where vendor/product selection legitimately
    happens, unlike enterprise Phase D).
 
@@ -348,15 +351,49 @@ The four steps, regardless of altitude:
    **fitness function** so a closed gap can't silently reopen (§11). Themes drive the roadmap,
    not individual gaps.
 
+### Named instruments — use the standard one for the altitude
+
+The four steps above are the shared shape; the recognised standards each supply a concrete
+**instrument** for steps 3–4. Reach for the named one rather than an ad-hoc table:
+
+- **TOGAF Gap Analysis Matrix** *(enterprise / migration; TOGAF ADM Phases B–E)* — the formal
+  instrument for landscape and capability gaps. Baseline building blocks (ABBs/SBBs) on the
+  **rows**, target building blocks on the **columns**, plus an **"Eliminated"** column and a
+  **"New"** row. Each cell resolves to *retained*, *eliminated* (an intentional removal — a gap),
+  or *new* (a target with no baseline source — a gap to **develop or procure**). The point is
+  that it forces every baseline block to be accounted for, so accidental omissions surface:
+
+  |  | Target: B1 | Target: B2 | **Eliminated** |
+  |---|---|---|---|
+  | Baseline: A1 | retained | | |
+  | Baseline: A2 | | | removed (gap) |
+  | **New** | | gap → build/buy B2 | |
+
+  Each non-empty "Eliminated"/"New" cell becomes a roadmap work package (`enterprise-architecture.md`
+  §7) or a migration transition state (`transition-architecture.md`).
+
+- **Fit-Gap analysis** *(solution; build-vs-buy / COTS & package selection)* — the standard
+  instrument when the target is a product, not a design. Map each requirement (`F.xx`/`Q.xx`)
+  against the candidate package's capability → **fit · partial · gap**, then resolve each gap by
+  *configuration · customization · workaround · process change*, and weigh the residual cost into
+  the build-vs-buy ADR (§4, `level: solution`). A large customization tail is itself the finding.
+
+- **BABOK Strategy Analysis** *(requirements)* — current state → future state → assess gaps →
+  **change strategy with transition states** (IIBA). This is the BA framing behind the
+  requirements row below; transition states map to the same migration mechanism.
+
+Both the TOGAF Matrix and Fit-Gap are documented in `references/standards.md`.
+
 Where each instance lives — use these, don't reinvent them:
 
-| Altitude / question | Current → Target | Artifact |
+| Altitude / question | Current → Target | Instrument & artifact |
 |---|---|---|
-| **Enterprise** — capabilities, landscape, technology | baseline → target → gap → roadmap | `enterprise-architecture.md` §4–7, capability map; method in §4 |
-| **Migration** — modernise an existing system | As-Is → interim → To-Be (7 R's) | `transition-architecture.md`, `references/migration.md` |
+| **Enterprise** — capabilities, landscape, technology | baseline → target → gap → roadmap | **TOGAF Gap Analysis Matrix** → `enterprise-architecture.md` §4–7, capability map; method in §4 |
+| **Solution** — build vs buy, package/COTS selection | requirements → product capability | **Fit-Gap analysis** → `SAD.md` option analysis + `level: solution` ADR; method in §4 |
+| **Migration** — modernise an existing system | As-Is → interim → To-Be (7 R's) | gap matrix per transition → `transition-architecture.md`, `references/migration.md` |
 | **ISO 42010 conformance** — are the *docs* complete? | required content → present content | `conformance-checklist.md` (✅/⚠️/❌); this *is* the gap-analysis step |
 | **Architecture health** — is the *architecture* good? | `Q.xx` scenarios → actual behaviour | `architecture-evaluation.md` (ATAM-lite, §11) |
-| **Requirements** — given inputs vs needed spec | given backlog → INVEST stories | `references/business-analysis.md` §0 (fill only genuine gaps) |
+| **Requirements** — given inputs vs needed spec | given backlog → INVEST stories | **BABOK Strategy Analysis** → `references/business-analysis.md` §0 (fill only genuine gaps) |
 
 Two rules carry over from the rest of the skill: a gap you can't yet close is recorded as a
 **visible assumption or gap** (§10), never hidden; and gap analysis earns its keep only when a
