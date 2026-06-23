@@ -26,6 +26,14 @@ through a set of distinct reasoning lenses, and treats every cell as a small
 forced move. The point of the grid is structured surprise — and then a ruthless
 filter so only the cells that are *both new and defensible* survive.
 
+Nearly every invention is an **existing idea relocated into a new context** — a
+mechanism lifted out of the domain that birthed it and dropped onto a new object
+(natural selection was Malthus's economics applied to biology; the GUI desktop
+was the office metaphor applied to a file system). The matrix manufactures those
+relocations deliberately instead of waiting for one to occur to you. So it is
+goal-agnostic by design: it carries no answers of its own, only the moves that
+collide ideas you already have into ones you don't.
+
 The output is **2–4 crystallized insights**, not a wall of cells. The matrix is
 scaffolding; the user sees the building.
 
@@ -93,7 +101,8 @@ Compact lens catalog (full versions in the reference file):
 |---|---|
 | **Inversion** | What would guarantee the opposite outcome? Flip the goal. |
 | **First principles** | Strip to fundamentals — rebuild ignoring how it's "done." |
-| **Cross-domain transfer** | Import a mechanism from a distant field (biology, markets, physics, music). |
+| **Cross-domain transfer** | Import a mechanism from another field — *near* (adjacent subfield) or *far* — onto this object. The skill's primary engine. |
+| **Enabling shift (why now)** | Which idea, once dismissed as impractical, does a recent change in cost/capability now make viable? |
 | **Scale shift** | What changes at 100× bigger, 1/100th, or a different time horizon? |
 | **Constraint play** | Remove a fixed limit — or *add* a brutal one. What becomes possible? |
 | **Second-order** | Consequences of the consequences. Who adapts, and how? |

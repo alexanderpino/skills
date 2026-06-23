@@ -51,19 +51,73 @@ people" isn't fundamental enough to surprise. Push until it almost feels absurd.
 
 ## Cross-domain transfer
 
-**Forcing question:** Where else does a structurally similar problem get solved,
-and what mechanism do they use that we don't?
+**Forcing question:** Where else does a structurally similar problem already get
+solved, and what *specific mechanism* do they use that this domain doesn't?
 
-Import a working mechanism from a distant field — immune systems, market pricing,
-error-correcting codes, ecological succession, jazz improvisation, supply chains,
-evolutionary selection. Distant is better than near; near gives obvious analogies.
+This is the skill's primary engine of invention. Most new ideas are old ideas
+relocated: an existing mechanism lifted out of the context that birthed it and
+dropped onto a new object. Natural selection was Malthus's population economics
+applied to biology; the spreadsheet was the paper ledger plus automatic
+recalculation; string theory was the physics of a vibrating string applied to the
+ontology of particles. The transfer *is* the invention.
+
+Run **both ranges** — do not privilege one:
+
+- **Far transfer** — a distant field (immune systems, market pricing,
+  error-correcting codes, ecological succession, thermodynamics, jazz). Yields
+  surprise; risks decorative analogy.
+- **Near transfer** — an *adjacent subfield* of the same discipline. Easy to
+  dismiss as obvious, but a large share of real inventions are near transfers:
+  importing a mechanism from one corner of a field to another corner that never
+  used it. Ask explicitly: *what mechanism from a neighboring subfield has no one
+  yet applied to this exact object?*
+
+**Donor checklist** — when no donor comes to mind, don't leave the transfer to
+whichever analogy happens to surface. Scan these high-yield source domains and ask
+"what does *their* solution to a structurally similar problem look like?":
+
+> virtual memory / paging / caching · compression & codecs · databases & indexing
+> · compilers & translation · markets & pricing · biology & evolution · immune
+> systems · control theory & feedback · epidemiology · logistics & supply chains ·
+> error-correcting codes · thermodynamics & entropy · insurance & risk pooling
 
 **Mini-example:** Anchor "content moderation at scale." Transfer from epidemiology:
 moderation as *contact tracing* of a viral claim, not *quarantine* of individual
 posts. Reframes the unit of intervention from post to propagation path.
 
 **Failure mode:** Decorative analogy ("it's like a garden, you tend it"). The
-transfer must carry a *specific mechanism* you can act on, not a vibe.
+transfer must carry a *specific, actionable mechanism*, not a vibe — it survives
+the question "what exactly do I now do differently?"
+
+---
+
+## Enabling shift (why now)
+
+**Forcing question:** Which good idea here was correctly dismissed as impractical —
+and what has recently changed that would now make it viable?
+
+Many inventions are not new ideas but old, *shelved* ones reactivated by a change
+in substrate: a cost that collapsed, a constraint that lifted, a capability that
+arrived, a scale that crossed a threshold. The idea was always right; it was
+waiting for its enabling condition. This lens hunts the gap between "known but
+impractical" and "now possible" — it's how a paper from twenty years ago becomes a
+product today.
+
+Run it as a **second pass** over the matrix: for any cell that scored high on
+novelty but got set aside as unrealistic, ask what single recent change would flip
+it to viable. If one has, that cell is no longer a provocation — it's the insight.
+Pairs naturally with Cross-domain (the relocated mechanism that *used* to be too
+expensive in its new home) and with Constraint play (the limit that just lifted).
+
+**Mini-example:** Anchor "one-on-one tutoring for everyone." Long known to work,
+long dismissed as unaffordable — one expert per student. Enabling shift: a
+capability that drives the marginal cost of a competent tutor toward zero
+reactivates the whole idea. The bottleneck was never pedagogy; it was the cost of
+expert attention, and that is exactly what changed.
+
+**Failure mode:** Hand-waving the enabler ("technology will improve"). Name the
+*specific* capability or cost change, and check that it has actually arrived or is
+clearly arriving — not merely that it could someday.
 
 ---
 
@@ -245,15 +299,18 @@ genuinely *different layer* — a precondition, not a paraphrase.
 
 Favor these; mix in others as the anchors suggest. Always include at least one
 lens that attacks framing (Reframe / Substrate / First principles) — that's where
-the deepest insight usually hides.
+the deepest insight usually hides. When the goal is **invention** (a new design,
+mechanism, or "next step"), make Cross-domain a default column and add Enabling
+shift as the second pass — together they are the recombination core: an existing
+idea relocated, plus the condition that now makes the relocation pay.
 
 | Insight type | Strong lenses |
 |---|---|
 | **Causal** (why X happens) | Substrate, Inversion, Second-order, Temporal, First principles |
-| **Design** (how to build) | Constraint play, Cross-domain, First principles, Edge case, Adversarial |
+| **Design** (how to build) | Cross-domain, Constraint play, Enabling shift, First principles, Edge case |
 | **Strategic** (what to do) | Second-order, Adversarial, Stakeholder inversion, Scale shift, Temporal |
 | **Conceptual** (how to understand) | Reframe the unit, Substrate, Cross-domain, First principles, Temporal |
-| **Predictive** (what happens next) | Second-order, Scale shift, Adversarial, Temporal, Stakeholder inversion |
+| **Predictive** (what happens next) | Second-order, Enabling shift, Scale shift, Adversarial, Temporal |
 
 If a chosen lens produces only dead cells across every anchor, swap it out rather
 than forcing it. A lens that doesn't fit *this* problem is just adding noise.
