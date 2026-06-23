@@ -99,12 +99,13 @@ Compact lens catalog (full versions in the reference file):
 
 | Lens | Forcing question |
 |---|---|
+| **Essence** | Strip the label — what is this thing *actually*, underneath the word for it? Run early; it primes the rest. |
 | **Inversion** | What would guarantee the opposite outcome? Flip the goal. |
 | **First principles** | Strip to fundamentals — rebuild ignoring how it's "done." |
 | **Cross-domain transfer** | Import a mechanism from another field — *near* (adjacent subfield) or *far* — onto this object. The skill's primary engine. |
 | **Enabling shift (why now)** | Which idea, once dismissed as impractical, does a recent change in cost/capability now make viable? |
 | **Scale shift** | What changes at 100× bigger, 1/100th, or a different time horizon? |
-| **Constraint play** | Remove a fixed limit — or *add* a brutal one. What becomes possible? |
+| **Constraint play** | The pure *"what if?"* — remove a fixed limit, or *add* a brutal one. What becomes possible? |
 | **Second-order** | Consequences of the consequences. Who adapts, and how? |
 | **Adversarial** | How would a hostile party exploit or break this? |
 | **Reframe the unit** | Change the basic object: individual→system, event→process, noun→verb. |
