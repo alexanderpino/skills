@@ -173,23 +173,44 @@ change*, the point where the nature of the thing flips.
 
 ## Constraint play
 
-**Forcing question:** What becomes possible if a fixed limit vanished? And
-separately: what if a brutal new constraint were imposed?
+**Forcing question:** What becomes possible if a fixed limit vanished — and if it
+*can't* vanish, is the limit itself the problem to go solve?
 
-Two moves in one. **Removal — the pure "what if?":** take a constraint everyone
-treats as fixed (budget, latency, headcount, a law of the domain), wave it away
-entirely, and ask what the ideal or "impossible" version looks like. That version
-usually reveals what you actually want, stripped of what you'd merely settled for.
+Three moves.
+
+**Removal — the pure "what if?":** take a constraint everyone treats as fixed
+(budget, latency, headcount, a law of the domain), wave it away entirely, and ask
+what the ideal or "impossible" version looks like. That version usually reveals
+what you actually want, stripped of what you'd merely settled for.
+
+**Constraint-as-target — attack the wall, find the door:** sometimes the
+constraint you removed isn't a law to respect but *the problem statement itself*.
+Don't snap back to reality — interrogate the wall. Two doors recur: (1) the
+constraint forbids *less than you think* — pin down precisely what the law actually
+rules out, and the goal often lives in the gap between its exact statement and your
+loose paraphrase; (2) the *goal behind* wanting the constraint gone can be reached
+by another route, leaving the law intact. Pairs with Essence ("what does this limit
+*actually* forbid?") and First principles.
+
 **Addition:** impose an absurd limit (one sentence, $0, one day, no screens) —
 forced scarcity is a classic generator of elegance.
 
-**Mini-example:** Anchor "customer support." Remove the constraint that humans
-answer → self-resolving products. Add the constraint "you may never reply" →
-forces every answer into the product itself, which is the same destination
-reached from the opposite direction. (Convergence!)
+**Mini-example (removal → target):** "What if we could travel faster than light?"
+Special relativity forbids *local* superluminal motion and signalling — but not
+space itself contracting or expanding arbitrarily fast. So the wall ("nothing
+exceeds *c*") forbids *less* than the paraphrase: a warp metric that contracts
+space ahead and expands it behind moves no atom faster than light locally yet
+closes the distance superluminally. The constraint *became* the problem, and its
+exact statement held the door. (Whether it's *buildable* — the exotic-energy bill —
+is a separate question: High novelty, contested validity, so it's a Provocation,
+not a settled insight. The reasoning move is real; the engineering is open.)
 
-**Failure mode:** Choosing a constraint that's genuinely physical and immovable.
-Pick constraints that are *assumed* fixed, not actually fixed.
+**Failure mode:** Treating "it's a physical law" as a reason to *stop*. Physical
+constraints are often the highest-value walls to interrogate, because your loose
+statement of a law almost always forbids more than the law does. The real failure
+is the opposite — hand-waving that ignores what the constraint *precisely* says
+("FTL, because wormholes," with no mechanism). Name exactly what's forbidden, then
+look for the gap.
 
 ---
 

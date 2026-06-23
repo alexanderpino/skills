@@ -105,7 +105,7 @@ Compact lens catalog (full versions in the reference file):
 | **Cross-domain transfer** | Import a mechanism from another field — *near* (adjacent subfield) or *far* — onto this object. The skill's primary engine. |
 | **Enabling shift (why now)** | Which idea, once dismissed as impractical, does a recent change in cost/capability now make viable? |
 | **Scale shift** | What changes at 100× bigger, 1/100th, or a different time horizon? |
-| **Constraint play** | The pure *"what if?"* — remove a fixed limit, or *add* a brutal one. What becomes possible? |
+| **Constraint play** | The pure *"what if?"* — remove a limit, treat the wall *as* the problem to solve, or *add* a brutal one. |
 | **Second-order** | Consequences of the consequences. Who adapts, and how? |
 | **Adversarial** | How would a hostile party exploit or break this? |
 | **Reframe the unit** | Change the basic object: individual→system, event→process, noun→verb. |
