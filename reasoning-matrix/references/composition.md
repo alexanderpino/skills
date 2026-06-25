@@ -1,13 +1,18 @@
-# Composing Matrices (advanced)
+# Chaining Matrices (advanced)
 
-A reasoning matrix is a *transformation*: it maps a question to a set of insights.
-Transformations compose — and the faithful analog of matrix multiplication is
-exactly that composition, not anything numeric. This is what turns the method
-from one-shot analysis into recursion: you interrogate your own conclusions
-instead of stopping at them. Reach for it when one matrix's output is itself a
-question worth attacking.
+A reasoning matrix maps a question to a set of insights — and you can feed those
+insights into another matrix. That's what turns the method from one-shot analysis
+into recursion: you interrogate your own conclusions instead of stopping at them.
+Reach for it when one matrix's output is itself a question worth attacking.
 
-## Main form: composition by contraction (A then B)
+(One framing note, since the skill is built on a grid: the *grid itself* is a real
+Cartesian product — anchors × lenses. The chaining below is genuine function
+composition. But don't push the "matrix multiplication" analogy past those two
+honest footholds into numeric multiplication of cells — by this skill's own
+Validity bar, that dressing is decorative, the exact failure mode the Cross-domain
+lens warns against. Keep what's earned; drop the rest.)
+
+## Main form: chaining by contraction (A then B)
 
 Feed the **kept insights of matrix A in as the anchors of matrix B**. The
 intermediate insights are the shared axis — and, crucially, they're *contracted
@@ -35,11 +40,11 @@ like present real ones.* Make that an anchor of a **strategic** matrix:
 The strategic insights that fall out are ones M1 could not produce, because M1's
 job was diagnosis, not action. That's composition doing real work.
 
-**Two rules that keep composition honest:**
+**Two rules that keep chaining honest:**
 
-- **It's non-commutative.** A-then-B ≠ B-then-A, exactly as with real matrices.
-  Diagnose-then-decide and decide-then-diagnose land in different places. Order is
-  a deliberate modeling choice, not a detail — pick it on purpose and say why.
+- **Order matters.** A-then-B ≠ B-then-A. Diagnose-then-decide and
+  decide-then-diagnose land in different places. Order is a deliberate modeling
+  choice, not a detail — pick it on purpose and say why.
 - **Contract, don't stack.** The intermediate axis must *disappear*. If you keep
   every M1 cell and cross it with every M2 cell, you haven't composed — you've
   built a tensor that explodes combinatorially (every decomposition × every other
@@ -57,7 +62,7 @@ job was diagnosis, not action. That's composition doing real work.
 
 ## Light form: composing lenses (the inner move)
 
-You can also multiply *within* one matrix by fusing two lenses into a single move:
+You can also work *within* one matrix by fusing two lenses into a single move:
 
 - Temporal × Adversarial → "how would a *future* adversary exploit this?"
 - Scale shift × Stakeholder inversion → "at 100×, what does the ignored party live?"
@@ -66,19 +71,17 @@ You can also multiply *within* one matrix by fusing two lenses into a single mov
 Fused lenses generate genuinely new columns for free and reach cells neither lens
 finds alone. Use sparingly — two well-chosen fusions beat a grid of forced ones.
 
-## Convergence is already a product
+## Cross-matrix convergence is the strongest signal
 
-When two independently-run matrices score the *same* cells high, that's an
-elementwise (Hadamard) agreement — and it's strong evidence, much harder to fake
-than agreement inside a single grid. You need no new machinery: it's the
-cross-cell triangulation of Phase 5, applied across matrices instead of within
-one. Treat cross-matrix convergence as the most trustworthy signal the method
-produces.
+When two *independently run* matrices land high on the same cell, that agreement
+is much harder to fake than agreement inside a single grid — two different paths
+arrived at the same place. You need no new machinery: it's the cross-cell
+triangulation of Phase 5, applied across matrices instead of within one. Treat
+cross-matrix convergence as the most trustworthy signal the method produces.
 
 ## What not to build
 
-Do not literally multiply prose cells — score×score, or splicing two cells' text
-together as if that were a product. There's no clean semantics under it; it's the
-decorative analogy this method explicitly warns against. If a "multiplication"
-doesn't correspond to either composition-by-contraction or lens-fusion, it's
-sugar, not structure — drop it.
+Don't splice two cells' text together, or multiply their scores, as if that were a
+"product." There's no clean meaning under it — it's the decorative analogy the
+Cross-domain lens explicitly warns against. If a move doesn't correspond to either
+chaining-by-contraction or lens-fusion, it's sugar, not structure — drop it.

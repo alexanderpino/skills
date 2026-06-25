@@ -166,3 +166,73 @@ would be skipped if they'd pointed at separate levers):
   insights already triangulated on one structure, naming the core variable and a
   portable rule of thumb was a sharpening of the synthesis, not a new claim — and
   the rule carries its own falsifier, so it isn't fortune-cookie advice.
+
+---
+
+# A second run that *fails* — and why that's the method working
+
+The example above lands three insights, which can leave the impression that the
+matrix always pays out. It doesn't, and a method whose only virtue is honesty has
+to show its own null result. Here is a run that correctly concludes **the default
+was right** and returns nothing better.
+
+## Phase 1 — Frame and name the default
+
+**Inquiry:** Why do passwords have to be changed every 90 days at my company?
+
+**Insight type:** Causal.
+
+**Default answer:** "It's a legacy security policy. Forced rotation was once
+standard advice, but modern guidance (NIST 800-63B) actively recommends *against*
+mandatory periodic rotation — it pushes users toward weaker, incrementing
+passwords. The honest answer is: it's cargo-cult compliance that current evidence
+no longer supports." This is correct, well-supported, and complete.
+
+**Gate check:** ...and that's a problem for the matrix. The default already fully
+answers the question, including *why it's wrong*. By the default-first gate, this
+should stop here. But suppose we don't notice, and build anyway — watch what the
+filter does.
+
+## Phases 2–4 — Build, populate, filter
+
+Anchors: the policy, the user, the attacker, the compliance auditor. Lenses:
+Inversion, Adversarial, Second-order, Substrate, Temporal.
+
+The grid fills, but every live cell collapses under Phase 4's probes:
+
+- *Policy × Second-order:* "Rotation makes users pick `Summer2024!` → `Summer2025!`"
+  — **Reversal test fails as novelty**: this is the default *restated*, not past
+  it. → CONFIRMATION.
+- *Attacker × Adversarial:* "A leaked hash is exploited within hours, long before
+  90 days" — true, but again **the default already says rotation is ineffective**.
+  → CONFIRMATION.
+- *Substrate × policy:* "The policy survives because auditors check for it" —
+  plausible (it's why legacy policies persist), but **no named falsifier** that
+  distinguishes it from generic institutional inertia, and zero novelty over
+  "cargo-cult compliance." → NOISE.
+- *Temporal × user:* "From the future, all knowledge-factor auth looks quaint next
+  to passkeys" — **Mechanism check**: true but it answers a *different* question
+  (what replaces passwords), not *why this company rotates them*. Off-target. → NOISE.
+
+No cell clears High novelty × High validity. The few valid cells are all
+Confirmations of the default; the few novel-sounding cells fail the reversal or
+falsifier probe.
+
+## Phase 5–6 — Synthesize / deliver
+
+**Nothing to crystallize.** The honest output is: *"The default answer is the
+answer — forced 90-day rotation is outdated, evidence-discouraged compliance
+theater. The matrix found no deeper structure, because there isn't one to find
+here: this is a settled question, not an open one."*
+
+## What this null run demonstrates
+
+- **The gate exists for exactly this.** A well-specified question with a known,
+  satisfying answer is where the matrix burns cost for nothing. Naming the default
+  in Phase 1 *is* the test — when it's already complete, stop.
+- **A null result is a success, not a failure of the method.** A matrix that
+  *always* produces three shiny insights is a bullshit generator; one that can
+  return "the obvious answer wins" is trustworthy precisely because it can say no.
+- **The probes did their job.** Every tempting cell was caught — by the reversal
+  test (it was the default restated) or the falsifier check (unfalsifiable
+  inertia). That's the Validity machinery earning its place.

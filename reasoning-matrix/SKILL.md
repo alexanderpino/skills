@@ -70,6 +70,15 @@ light; escalate only if the light grid keeps landing on the default.
 Run these in order. Phases 1, 4, and 5 are where quality is won or lost — do not
 rush them to get to a full grid.
 
+> **Gate before you build (the default-first check).** The very first move is
+> Phase 1's step 3: write the conventional, linear answer in one or two lines.
+> Then judge it. If that answer already satisfies the question, *stop and return
+> it* — the matrix is wasted ceremony on a question that didn't need it. Build the
+> grid only once the linear answer is on the page and visibly *unsatisfying*. This
+> is not a brake on out-of-the-box thinking; it's its precondition. You cannot
+> reliably get past the obvious answer until you've named it — everything looks
+> non-linear until you write down the line you're trying to leave.
+
 ### Phase 1 — Frame and name the default
 
 Three moves, briefly:
@@ -134,6 +143,40 @@ Rate each non-empty cell on two independent axes, Low / Med / High:
 
 - **Novelty** — how far does it depart from the Phase 1 default?
 - **Validity** — does it survive a first round of scrutiny? Is it plausibly true?
+
+The two axes are independent on purpose, and the filter's job is **not** to tame
+the wild cells — it's to keep the cells that are *both* wild and true and route
+the rest honestly. A bold, non-linear move with real validity is the whole point;
+a bold move with no validity isn't trash, it's a Provocation (kept, labeled). The
+probes below exist to stop *vacuous* novelty from masquerading as insight, never
+to push you back toward the safe linear answer.
+
+**Probe Validity — don't just rate it.** Self-scored validity is the softest
+joint in the method: the same judgment that generated a clever-sounding cell will
+happily rate it High. Run these three cheap checks first; they're mechanical
+enough to catch yourself:
+
+- **Reversal test** (the vacuous-profundity killer): state the cell's opposite. If
+  the opposite sounds *equally* profound, the cell asserts nothing testable — cap
+  Validity at Low. ("Complexity is the default physics of writing code" passes:
+  its opposite is plainly false. "Great teams are built on trust" fails: the
+  mirror sounds just as wise.)
+- **Mechanism in one sentence:** can you say *why* it's true without hand-waving?
+  No nameable mechanism → Med at best.
+- **Named falsifier:** can you state a concrete observation that would prove it
+  false? If nothing could, it isn't valid-but-unproven, it's *unfalsifiable* —
+  that's a Provocation, not an Insight.
+
+Then sharpen Validity with the test that fits the insight type (the mirror of the
+per-lens failure modes in `references/operators.md`):
+
+| Insight type | Validity test — the cell must survive it |
+|---|---|
+| **Causal** | Name a confound that would produce the same effect *without* your mechanism. If one fits, validity drops. |
+| **Design** | Name how the built thing fails in practice. Can't find a failure mode because it's vague? That's a vagueness tell, not a strength. |
+| **Strategic** | Run Adversarial on your *own* move: name who adapts and defeats it. |
+| **Conceptual** | Does it *pay rent* — change what you'd expect or do? A reframing that changes no prediction is a relabel. |
+| **Predictive** | What's the base rate, and what does the null/default predict instead? A claim that doesn't beat the null isn't predictive. |
 
 Then place each cell in the quadrant:
 
@@ -269,15 +312,21 @@ This is the shape every run should produce: a small number of insights that
 genuinely move past the default, each traceable to the cells that generated it
 and each honest about how it might fail.
 
-## Composing matrices (advanced)
+## Chaining matrices (advanced)
 
-A reasoning matrix is a *transformation* — it maps a question to insights, and
-transformations compose. Feeding the kept insights of one matrix in as the
-anchors of the next (escalating causal → strategic → design) is the faithful
-analog of matrix multiplication, and it's what turns the method from one-shot
-analysis into recursion. Reach for it when one matrix's output is itself a
-question worth attacking. The full treatment — composition by contraction,
-lens-fusion, cross-matrix convergence, and the traps to avoid — is in
+Feeding the kept insights of one matrix in as the anchors of the next (escalating
+causal → strategic → design) turns the method from one-shot analysis into
+recursion: you interrogate your own conclusions instead of stopping at them.
+Reach for it when one matrix's output is itself a question worth attacking. Two
+disciplines keep a chain honest and are worth stating plainly:
+
+- **Order matters.** Diagnose-then-decide lands somewhere different from
+  decide-then-diagnose. Pick the order deliberately and say why.
+- **Contract, don't stack.** Only the *kept insights* of matrix A become anchors
+  of B; everything else is dropped. Crossing every A-cell with every B-cell isn't
+  chaining, it's a combinatorial noise factory. This is the one trap that sinks it.
+
+The full treatment — including lens-fusion and cross-matrix convergence — is in
 `references/composition.md`.
 
 ## Reference files
