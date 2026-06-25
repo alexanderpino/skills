@@ -162,6 +162,28 @@ insights**, each stated as:
 - **What it rests on** — the cells/reasoning supporting it.
 - **How it could be wrong** — the condition that would break it, or a test.
 
+**Then distill — but only when the insights genuinely converge.** A convergence
+*is* a core variable: when two or three insights triangulate on the same
+underlying structure, name that structure as the single lever — the one thing
+that, if it moved, would move everything else — and state one **reusable rule of
+thumb**: a portable, context-free heuristic the user can carry to the *next*
+problem, not just this one. (In the team-scaling example, the core variable is
+"synchronized context as a perishable resource"; the rule of thumb is "when a
+group slows down, suspect a decaying shared stock before you blame the links
+between people.") This is the skill's own relocation move applied to its own
+output — it lifts the finding out of this question so it travels.
+
+Two guards, or distillation becomes an anti-pattern:
+
+- **The rule of thumb obeys the Validity axis.** It must be falsifiable and carry
+  its own *"...unless"* — a heuristic that asserts nothing testable is
+  fortune-cookie noise, exactly what Phase 4 exists to kill.
+- **Don't force a single lever onto genuinely plural insights.** If the surviving
+  insights point at two or three *distinct* levers rather than one, say so and
+  give a rule of thumb per lever. A false "core variable" that collapses real
+  multiplicity is worse than none. Distillation is optional; skip it when the
+  insights don't converge.
+
 ### Phase 6 — Stress test, then deliver
 
 For each candidate insight, steelman the opposite and ask what would falsify it.
@@ -177,6 +199,11 @@ ALWAYS deliver in this order:
 ```
 ## Insights
 [2–4 crystallized insights, each with the four-part structure. This is the answer.]
+
+## Distilled   (only when the insights converge on one lever)
+[the core variable — the single dominant lever — and one reusable, falsifiable
+rule of thumb the user can carry to the next problem. Omit entirely if the
+insights are genuinely plural.]
 
 ## Provocations worth probing   (only if any survived Phase 4)
 [high-novelty / unproven cells, clearly marked as unproven]
@@ -200,6 +227,10 @@ reasoning is fully inspectable]
   cross-cell convergence meaningful.
 - **Generic anchors.** "People / process / technology" produces a matrix of
   platitudes. Anchors must be load-bearing and specific.
+- **False distillation.** Collapsing genuinely plural insights into one "core
+  variable" that isn't really there, or offering a rule of thumb that asserts
+  nothing testable. Distill only on real convergence; the rule of thumb must be
+  falsifiable.
 
 ## Compact worked example
 

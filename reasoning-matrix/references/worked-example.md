@@ -133,6 +133,24 @@ earned Insight status yet.
 
 ---
 
+## Distillation
+
+The three surviving insights converge cleanly, so distillation is warranted (it
+would be skipped if they'd pointed at separate levers):
+
+- **Core variable:** *synchronized shared context* — a perishable stock that
+  every added person both consumes and threatens. Insights 1 and 2 are two faces
+  of it; Insight 3 is what happens when it fragments. Move this one variable and
+  the others move.
+- **Rule of thumb:** *When a group slows as it grows, suspect a decaying shared
+  stock before you blame the links between people — and fix it with cheaper
+  re-sync, not fewer connections. Unless* the team already has excellent durable
+  artifacts and still slows, in which case the cause really is raw link-count and
+  this heuristic fails (the same falsifier as Insight 1, which is why it's safe to
+  carry forward).
+
+---
+
 ## What this example demonstrates
 
 - The **default** did real work: it's why "integration work" scored only
@@ -144,3 +162,7 @@ earned Insight status yet.
   is what separates this from a generator of plausible-sounding nonsense.
 - The output a user actually reads is the three insights — the grid is shown for
   inspectability but lives below the answer.
+- **Distillation rode on the convergence**, not on top of it: because three
+  insights already triangulated on one structure, naming the core variable and a
+  portable rule of thumb was a sharpening of the synthesis, not a new claim — and
+  the rule carries its own falsifier, so it isn't fortune-cookie advice.
