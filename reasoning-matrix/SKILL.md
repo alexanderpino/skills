@@ -178,6 +178,30 @@ per-lens failure modes in `references/operators.md`):
 | **Conceptual** | Does it *pay rent* — change what you'd expect or do? A reframing that changes no prediction is a relabel. |
 | **Predictive** | What's the base rate, and what does the null/default predict instead? A claim that doesn't beat the null isn't predictive. |
 
+**Ground the recall-dependent cells before you score them.** Some cells rest on a
+*factual* claim about the world, not just a reasoning move — and the model's
+parametric memory of that fact may be lossy, stale, or confidently wrong. Scoring
+such a cell High on Validity from memory is the method's blind spot: it launders
+a half-remembered fact into a "validated insight." Flag any cell whose validity
+turns on an empirical claim and **verify it with research/web search before
+rating** — or, if you can't, cap its Validity and label it *ungrounded*. The
+high-risk lenses:
+
+- **Enabling shift (why now)** — inherently about a *recent* change in
+  cost/capability. This is the most recency-sensitive cell in the whole grid;
+  recall is least trustworthy here. Confirm the enabler actually arrived.
+- **Cross-domain transfer** — the claim "field X solves this with mechanism M"
+  must be *true of field X*, not a plausible-sounding guess about it.
+- **Predictive** — base rates are facts, not vibes. Look them up.
+- **Adversarial** — "an attacker would do Z" rests on whether Z is a real,
+  current technique.
+
+This is what keeps a less knowledge-saturated model honest: it can't *recall* as
+much, so it must *ground* what it reasons over — and a grounded, cited claim beats
+a confidently-remembered one. When grounding isn't available (no tools, offline),
+say so and treat these cells as Provocations, not Insights. See the deep-research
+skill for the fan-out-and-verify pattern when a cell needs real sourcing.
+
 Then place each cell in the quadrant:
 
 - **High novelty × High validity → INSIGHT.** Keep. These feed Phase 5.

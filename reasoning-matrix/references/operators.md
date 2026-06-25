@@ -120,6 +120,12 @@ posts. Reframes the unit of intervention from post to propagation path.
 transfer must carry a *specific, actionable mechanism*, not a vibe — it survives
 the question "what exactly do I now do differently?"
 
+> **Recall-dependent — ground it.** The transfer asserts a fact about the donor
+> field ("epidemiology does contact tracing like *this*"). If that fact is a
+> half-remembered guess, the whole cell is built on sand. Confirm the donor
+> mechanism is real before scoring Validity — recall feels authoritative here and
+> is often wrong in the details that matter.
+
 ---
 
 ## Enabling shift (why now)
@@ -149,6 +155,12 @@ expert attention, and that is exactly what changed.
 **Failure mode:** Hand-waving the enabler ("technology will improve"). Name the
 *specific* capability or cost change, and check that it has actually arrived or is
 clearly arriving — not merely that it could someday.
+
+> **Recall-dependent — ground it.** This is the most recency-sensitive lens in the
+> catalog: its whole claim is "something *recently* changed," and a model's
+> parametric memory of "recent" is exactly what goes stale. Verify the enabler with
+> a search before scoring the cell's Validity (Phase 4); if you can't, it's a
+> Provocation, not an Insight.
 
 ---
 
@@ -369,3 +381,10 @@ idea relocated, plus the condition that now makes the relocation pay.
 
 If a chosen lens produces only dead cells across every anchor, swap it out rather
 than forcing it. A lens that doesn't fit *this* problem is just adding noise.
+
+**Recall-dependent lenses need grounding.** Enabling shift, Cross-domain,
+Predictive, and Adversarial each rest on a *fact about the world*, not just a
+reasoning move — so their cells must be verified against sources before Phase 4
+scores them, never trusted to memory. This is precisely where a model that recalls
+less wins by grounding more: see the "Ground the recall-dependent cells" step in
+SKILL.md Phase 4.
