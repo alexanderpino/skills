@@ -184,7 +184,11 @@ parametric memory of that fact may be lossy, stale, or confidently wrong. Scorin
 such a cell High on Validity from memory is the method's blind spot: it launders
 a half-remembered fact into a "validated insight." Flag any cell whose validity
 turns on an empirical claim and **verify it with research/web search before
-rating** — or, if you can't, cap its Validity and label it *ungrounded*. The
+rating** — or, if you can't, cap its Validity and label it *ungrounded*. Treat
+this as a hard gate: **a recall-dependent cell may not hold a High on memory
+alone.** Either an external check confirms it or it's capped — because
+introspection is precisely the instrument this blind spot blinds, and a signal
+from outside the model is the only thing that reliably clears it. The
 high-risk lenses:
 
 - **Enabling shift (why now)** — inherently about a *recent* change in
@@ -201,6 +205,36 @@ much, so it must *ground* what it reasons over — and a grounded, cited claim b
 a confidently-remembered one. When grounding isn't available (no tools, offline),
 say so and treat these cells as Provocations, not Insights. See the deep-research
 skill for the fan-out-and-verify pattern when a cell needs real sourcing.
+
+**Scrub self-preference before you commit a High (the demotion pass).**
+Self-scored Validity is the softest joint in the method, and it fails in one
+predictable direction: the same judgment that generated a clever cell rates its
+*own* cleverness generously — the more fluent the cell, the stronger the pull.
+You cannot fix this by re-rating. A second look from the same seat inherits the
+same fondness, and an *unconstrained* "reconsider" pass is actively dangerous —
+it can talk itself into promoting noise it now finds appealing, which is how
+naive self-critique makes an answer worse than the first guess. So make the
+second pass **adversarial and one-directional**:
+
+- Take every cell you're about to mark High validity — the INSIGHTs, plus any
+  High CONFIRMATION feeding a synthesis — and switch seats. Stop defending it;
+  try to *break* it. Argue it's wrong, trivial, or a relabel, as a skeptic who
+  didn't write it would.
+- The pass may only **lower** a score, never raise one. A cell that survives a
+  real attempt to break it keeps its High; one that wobbles drops to Med or
+  becomes a Provocation. Nothing is promoted on reconsideration. This asymmetry
+  *is* the safeguard: the pass's only possible error is being too strict, which
+  costs you a candidate, not your credibility — so unlike an open self-critique
+  loop, it can never introduce a false positive.
+- If the strongest attack you'd mount is one you already ran (reversal /
+  mechanism / falsifier), you're done — those *are* the break attempts. The
+  demotion pass is for the cells that passed those and *still* feel too good:
+  the ones your own fluency is most likely shielding.
+
+This runs even on a light grid — it's just switching stance on the two-to-six
+cells you kept, not new machinery. And it can't be waived on the strength of "I
+scored honestly the first time": honesty was never the failure mode here —
+fluency is. A well-made cell reads as valid because it reads well.
 
 Then place each cell in the quadrant:
 
@@ -284,6 +318,11 @@ reasoning is fully inspectable]
 
 - **Vacuous profundity.** Cells that sound deep but assert nothing testable.
   The Validity axis exists to kill these — apply it honestly.
+- **Committing a High you never tried to break.** Self-scored Validity inherits
+  the writer's fondness for their own cleverness, and that pull grows with how
+  fluent the cell reads. Every High must survive the demotion pass — an
+  adversarial, one-directional second look that can only lower a score — before
+  it counts as an Insight.
 - **Skipping the default.** Without Phase 1's baseline, every cell scores High
   novelty and the filter becomes meaningless. This is the most common failure.
 - **Filling every cell.** Manufactured noise. Empty cells are honest.
