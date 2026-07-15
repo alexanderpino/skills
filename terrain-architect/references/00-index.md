@@ -90,8 +90,11 @@ are compositions. The recipe is the answer:
 | Plateaus, mesas, buttes | Hard caprock layer in `K` + fluvial erosion (`11`) |
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
-| Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`) |
+| Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
+| Spits, tombolos, barrier islands, bay bars | Longshore drift + deposition + sheltering (`12`) |
+| Marine terraces | Wave-cut platform loop across a sea-level / uplift history (`12`) |
+| Rias (drowned valleys) | Fluvial valley network + sea-level rise (`03`, `12`) |
 | Natural arches, hoodoos | Differential erosion of layered rock; needs a **non-heightfield representation** (`11`) |
 | Karst terrain | Dissolution of a soluble layer; caves need volume (`11`) |
 
@@ -153,7 +156,9 @@ are compositions. The recipe is the answer:
 | Glacier flow & erosion | P | Argudo et al. 2020, *Simulation, Modeling and Authoring of Glaciers*, ACM TOG 39(6) |
 | Snow / avalanche | P | Cordonnier et al. 2018, *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*, CGF 37(2) |
 | Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
-| Longshore transport | F | CERC formula (coastal engineering), not graphics |
+| Longshore transport | F | CERC formula (coastal engineering), not graphics. Drives spits/tombolos/barriers (`12`) |
+| Marine terrace / wave-cut platform | F | Coastal notch loop across a sea-level/uplift history (`12`). A look, not a sim. |
+| Shoreface / submarine equilibrium profile | F | Dean profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
 | Landslide / slump / debris flow / mudflow / rockfall | F | No canonical graphics paper for the terrain-gen versions |
 | Soil creep | P | = hillslope diffusion, `D·∇²h`. See Culling 1960, *Analytical Theory of Erosion*, J. Geology 68 |
 
@@ -205,6 +210,8 @@ are compositions. The recipe is the answer:
 | Chunked LOD | P | Ulrich 2002, SIGGRAPH course notes |
 | CDLOD | P | Strugar 2009, J. Graphics Tools 14(4) |
 | Virtual texturing / sparse virtual textures | F | Barrett 2008 (GDC), Mittring 2008 (SIGGRAPH course) — talks, not papers |
+| Satmap / colour-map compositing | F | Composite of material albedos by masks (`08`). Not a field the sim produces; **no directional light baked in.** |
+| Normal / AO map encoding (BC5 reconstruct-Z, BC4, ORM pack) | F | Export packing (`08`); baking maths in `06` |
 | Normal map mipping (variance) | P | Toksvig 2005, JGT 10(3) |
 | LEAN mapping | P | Olano & Baker 2010, I3D |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |

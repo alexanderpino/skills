@@ -5,7 +5,8 @@ result that looks fine in a hillshade and is structurally broken. The whole poin
 is that a handful of cheap, quantitative checks catch things that no amount of looking will.
 
 Contents: [Validation suite](#validation-suite) · [The five checks](#the-five-checks) ·
-[Failure catalogue](#failure-catalogue) · [Review checklist](#review-checklist)
+[Visual review modes](#visual-review-modes) · [Failure catalogue](#failure-catalogue) ·
+[Review checklist](#review-checklist)
 
 ## Validation suite
 
@@ -136,6 +137,48 @@ like noise zoomed out has no macro structure — it needs `02`.
 **The bilinear filter test:** zoom in until you can see individual cells. If you see the
 diamond-shaped bilinear interpolation pattern, your export resolution is below your detail
 frequency and you're storing noise you can't represent.
+
+## Visual review modes
+
+The five checks are quantitative — each catches a *specific* bug. This is the complementary
+palette: the render modes you flip between to judge a heightfield by eye. The discipline is
+**match the view to the artefact**. No single view is sufficient, and the most common review
+mistake is signing off from one pretty hero shot — which hides exactly the defects a plan view
+or a raking light would show.
+
+Everything here renders one of the `06`/`08` fields; none of it modifies the terrain. Bake all
+of it from **R32F** (`08`) — a review render off the quantised R16 shows you the quantisation,
+not the terrain.
+
+| Mode | Renders | Reads / catches | Blind to |
+|---|---|---|---|
+| **Greyscale height** | `height`, per-view normalised | Absolute range, clipping, sea level, gross blunders | Shape — the eye can't read relief off a flat ramp; a canyon and a shallow dip look identical. Overlay contour lines to recover it |
+| **Hillshade** | Lambert of the normal vs a low sun | Relief, drainage texture, the overall read | Anything parallel to the sun; a single azimuth hides ridges aligned with it |
+| **Sun sweep** | hillshade animated through 360° of azimuth | Grid-aligned artefacts, terracing, D8 stripes — they *strobe* as the light rotates | — the single highest-value qualitative check |
+| **Slope shade** | `atan(slope)` on a ramp | Steepness directly; pairs with the slope histogram (check 2); cliffs and repose faces | Convex vs concave — slope is unsigned |
+| **Normal RGB** | `normal` as RGB (or aspect as hue) | Faceting, quantisation combs, lighting seams between tiles — the "normals view" | Macro shape; it's a derivative, all high-frequency |
+| **Curvature** | profile/plan curvature, *diverging* ramp centred at 0 | Ridge vs valley structure, deposition zones, mask inputs; speckle = quantisation (`06`) | Absolute height and slope |
+| **AO** | long-radius horizon AO (`06`) | Macro relief — valleys darken, peaks catch light; concentric rings = R16 (`08`) | Fine detail at large radius |
+| **Flow / wetness overlay** | `log(A)` or TWI over hillshade | Connectivity, channel network, where water lingers (check 1) | — |
+| **Diff / A–B** | two fields subtracted, diverging ramp | Before/after erosion; monolithic vs tiled; CPU vs GPU — must match where the invariants say it must | — |
+| **False-colour clip** | height with out-of-range flagged | NaN/Inf (flag magenta), below sea, above cap — *before* they spread | Everything else |
+
+**Top (plan) view vs hero (perspective) view — use both, deliberately.**
+
+- **Plan / orthographic (straight down)** is for *structure*: drainage connectivity, mask
+  layout, scatter distribution, tiling seams, whether the network is actually dendritic. Every
+  seam and every masking error is visible from directly above and nearly invisible in
+  perspective. This is where you catch that the graph is *wrong*.
+- **Hero / perspective (grazing camera, low sun)** is for *silhouette and read*: does it look
+  like a place, does the LOD hold, do distant mountains keep their height (`08`), does terracing
+  show under raking light. This is where you catch that the graph is *ugly* — and where a client
+  signs off. A hero shot alone will pass a terrain whose rivers stop mid-map, because at a
+  grazing angle you never see the drainage.
+
+The rule: **plan view to verify it's correct, hero view to verify it's convincing, and never
+substitute one for the other.** A rotating sun over a plan-view hillshade plus one `log(A)`
+render catches more real defects in thirty seconds than any amount of turntable-ing the hero
+shot.
 
 ## Failure catalogue
 

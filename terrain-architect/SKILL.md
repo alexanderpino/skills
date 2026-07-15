@@ -181,7 +181,8 @@ invisible at runtime and catastrophic in output.
 **6. Specify verification before implementation.** Terrain is judged by eye, which makes it
 uniquely prone to plausible-looking wrongness. Demand at least: a flow accumulation
 visualisation (rivers must reach the sea, not stop), a slope histogram (should peak near the
-repose angle after thermal, not at 0° or 90°), and a hillshade at two zoom levels. See
+repose angle after thermal, not at 0° or 90°), and a hillshade at two zoom levels — plus the
+render-mode palette for review by eye (plan vs hero view, normals, slope shade, sun sweep). See
 `references/09-verification.md`.
 
 ## Routing
@@ -199,11 +200,11 @@ the constants matter and are easy to get subtly wrong.
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps |
-| `references/09-verification.md` | Validation suite, diagnostics, failure catalogue, review checklist |
+| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
+| `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
 | `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst, overhangs — and when the heightfield is the wrong representation |
-| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; coastal erosion, cliff retreat, beaches |
+| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; coastal & marine erosion, cliff retreat, wave-cut platforms, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base |
 | `references/13-climate-ecosystem.md` | Lapse rate, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |

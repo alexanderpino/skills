@@ -2,7 +2,8 @@
 
 Contents: [The field contract](#the-field-contract) · [Precision](#precision) ·
 [Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
-[Splatmaps](#splatmaps) · [Emitters](#emitters)
+[Splatmaps](#splatmaps) · [Satmap](#satmap-albedo--colour-map) ·
+[Normal & AO maps](#optimised-normal--ao-maps) · [Emitters](#emitters)
 
 ## The field contract
 
@@ -14,8 +15,9 @@ of this boundary.
 | `height` | metres, absolute | R32F working / R16 export | Sea level = 0 |
 | `waterSurface` | metres | R32F | Lakes + sea; `NaN` or a mask where dry |
 | `sandDepth` / `sedimentDepth` | metres | R16 | Layer thickness above bedrock |
-| `normal` | unit vector | RG8 or RG16 (reconstruct Z) | Baked from R32F, always |
-| `ao` | [0,1] | R8 | Baked from R32F |
+| `normal` | unit vector | RG8/BC5 (reconstruct Z) | Baked from R32F, always — see Normal & AO maps |
+| `ao` | [0,1] | R8/BC4 | Baked from R32F |
+| `albedo` (satmap) | linear RGB | RGB8 / BC7 | Composited from masks — see Satmap. **No directional light baked in.** |
 | `masks[i]` | [0,1] | R8 per channel | Must partition — see `06` |
 | `flowAccum` (`A`) | m² | R32F | Log-scaled for storage if needed |
 | `scatter[i]` | positions + attrs | Point list | World-space |
@@ -197,6 +199,83 @@ mask sum, which reads as inexplicable blotchy lighting.
 
 **Resolution.** Splatmaps are usually 1/2 or 1/4 the heightmap resolution. They're
 pixel-centred while the heightmap is vertex-centred (see above) — mind the offset.
+
+## Satmap (albedo / colour map)
+
+The top-down **basecolour** texture — what World Machine calls a colour map and Gaea a satmap.
+It is not a field the simulation produces; it is *composited* from the fields, for engines or
+previews that want a single baked albedo instead of a live material blend. Same derivation order
+as masks (`06`): `height → analysis → masks → albedo`.
+
+```
+albedo = Σ_i  mask[i] * materialAlbedo[i]              # composite by the SAME masks as the splatmap
+       * (0.85 + 0.15 * macroNoise)                     # low-freq colour variation, or it reads flat
+       * lerp(1, cavity, cavityStrength)                # curvature darkens crevices (06, 11)
+albedo = lerp(albedo, altitudeTint(height), tintAmt)    # optional: cool/desaturate with elevation
+```
+
+**The cardinal rule: no directional light in the albedo.** A satmap with a hillshade or
+sun-cast shadows baked in is wrong the instant the engine relights it — you get shadows crossed
+with shadows and it cannot be undone. Albedo is view- and light-independent. The *only*
+shading-like terms allowed are the direction-independent ones — **ambient occlusion and
+cavity** (`06`) — and even those belong in their own channel where the engine can choose to
+apply them, not multiplied irreversibly into the colour. If you must bake AO in for a flat
+preview, keep an AO-free master.
+
+**It must agree with the splatmap.** The satmap and the splatmap are two encodings of the same
+material decision — composite both from the identical `06` masks, or the low-res satmap and the
+runtime material blend will disagree and the terrain will visibly change colour as the camera
+approaches and the engine crossfades from baked to blended.
+
+**Resolution & streaming.** Satmaps are large and are the usual reason a terrain needs virtual
+texturing / a megatexture (`00`: Barrett 2008, Mittring 2008 — GDC/SIGGRAPH talks, F-tier).
+Author per tile and stream; do not ship one 32k texture. Cheaper: store only the low-freq macro
+colour and blend a tiled high-freq detail albedo in the shader, which keeps the stored satmap
+small and the near-field crisp.
+
+## Optimised normal & AO maps
+
+The baking *maths* is in `06` (Sobel normals, horizon AO). This is the *export* side — encoding,
+compression, and whether to bake at all.
+
+**Often you should not bake a base normal map.** Terrain doesn't deform, so the surface normal
+is a pure function of the height you already ship — derive it in the shader from the heightmap
+and spend the texture budget on a **tangent-space detail** normal instead. Bake a stored normal
+map when the height is decimated for LOD (so the fine normal outlives the coarse geometry — the
+whole point of normal-mapped LOD, see [LOD](#lod)) or when the consumer can't sample height in
+the shading path.
+
+**Normal encoding — two channels, reconstruct Z:**
+
+```
+store (n.x, n.y);   n.z = sqrt(max(0, 1 - n.x² - n.y²))   # z is always +ve for a heightfield normal
+```
+
+- Compress with **BC5** (two-channel RG, built for exactly this). **Never BC1/DXT1** — 5:6:5
+  colour compression bands normals visibly and there's no third channel to spare anyway.
+- A terrain *base* normal baked from the heightfield is effectively **world/object-space** (the
+  surface has no independent tangent frame); detail and decal normals are **tangent-space**.
+  Don't mix the two conventions in one map.
+
+**AO — one channel.** BC4 (single-channel), or pack it into a spare channel of another map: the
+**ORM** convention (**O**cclusion / **R**oughness / **M**etallic in RGB) is standard and lets one
+BC7 texture carry three. Keep AO **out of the albedo** (see Satmap). For directional occlusion,
+bake a **bent normal** alongside — the average unoccluded direction — and the shader gets both an
+AO term and a shifted diffuse direction from one extra map.
+
+**The two rules that carry over from `06`/`08`:**
+
+- **Bake from R32F.** A normal or AO map baked off quantised R16 facets and rings — the failure
+  catalogue's "faceted normals / ringed AO". Non-negotiable.
+- **Mip with variance preservation.** A box-mipped normal map loses variance and distant terrain
+  goes flat and shiny ("wet plastic", see [LOD](#lod)). Use **Toksvig** or **LEAN/LEADR** (`00`)
+  to push the lost normal variance into the roughness channel — which is exactly why the ORM pack
+  is convenient: roughness rides alongside the normal that feeds it.
+
+**Resolution.** A baked normal/AO map only needs to match the frequency of detail it is
+*carrying*. If the shader derives base normals from height and the baked map is only detail, it
+can be lower-resolution and tiled. If it's the sole normal source for a decimated LOD, it must
+match the pre-decimation height frequency or the detail is thrown away twice.
 
 ## Emitters
 

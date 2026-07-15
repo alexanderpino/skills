@@ -1,10 +1,14 @@
-# Glacial & Coastal
+# Glacial, Coastal & Marine
 
 Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#mass-balance) ·
 [Glen's flow law & SIA](#glens-flow-law--the-shallow-ice-approximation) ·
 [Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) ·
 [Coastal: be honest](#coastal-be-honest) · [Wave exposure](#wave-exposure) ·
-[Cliff retreat & beaches](#cliff-retreat--beaches)
+[Cliff retreat & beaches](#cliff-retreat--beaches) ·
+[Marine: the honest frame](#marine-the-honest-frame) ·
+[Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
+[Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
+[Wave base & the submarine profile](#wave-base--the-submarine-profile)
 
 ## Glacial: why it matters
 
@@ -191,3 +195,98 @@ cannot exist in a heightfield. A sea *stack* can (it's just an isolated column),
 naturally where a hard bed survives while the softer rock around it retreats — so it requires
 spatially varying hardness. With uniform rock you get a straight cliff and nothing else, which
 is the usual reason a coastal graph looks boring.
+
+## Marine: the honest frame
+
+"Oceanic erosion" sounds like the sea grinding down the seabed. It mostly doesn't. Wave energy
+does work in a narrow band **at and just below sea level**; below **wave base** (~½ the
+wavelength — tens of metres for ordinary swell) the water barely stirs the bottom and the seabed
+is **depositional**, not erosional. So marine processes in a terrain graph are three things, none
+of them "carve the abyss":
+
+1. **The shoreline band** — cliff retreat and wave-cut platform, the `notch → collapse → deposit`
+   loop above.
+2. **Longshore redistribution** — moving the freed sediment *along* the coast.
+3. **Marine deposition** — deltas, beaches, spits, and the smooth equilibrium profile of the
+   shoreface.
+
+Same honesty as coastal: **no canonical graphics paper** (`00`, F-tier). What follows is a look
+built from the same fetch/exposure sweep, not physics — say so.
+
+## Longshore drift & depositional landforms
+
+Cliff retreat frees a sediment budget (the `beach` term above). Waves approaching the shore at an
+angle drive that sediment *along* the coast — longshore (littoral) drift. The transport rate is
+classically CERC-shaped:
+
+```
+Q_long ∝ sin(2 * (waveAngle − shorelineNormal))       # CERC / littoral drift; peaks near 45° approach
+```
+
+Route the freed budget downdrift along the shoreline and deposit it where the coast turns away
+from the flow or shelters (low `exposure`). What falls out:
+
+| Landform | Where it deposits |
+|---|---|
+| **Spit** | Sediment carried past a change in coast direction, building into open water |
+| **Recurved spit / hook** | A spit whose tip curls landward where refracted waves wrap in |
+| **Tombolo** | A spit that reaches an offshore island and ties it to the mainland |
+| **Bay-mouth bar** | A spit grown across a bay, sealing a lagoon behind it |
+| **Barrier island** | An offshore sediment ridge parallel to a low, sediment-rich coast |
+| **Cuspate foreland** | Deposition where two opposing drift directions meet |
+
+All **L-tier** — compositions of drift + deposition + sheltering, not algorithms. `00` carries the
+caveat: CERC is coastal engineering, the graphics version is authored. The one quantity worth
+actually computing is the drift *direction* from the wave-approach angle relative to the local
+shoreline normal — that asymmetry is what makes spits point the right way instead of being
+symmetric blobs.
+
+## Marine terraces
+
+Run the shoreline loop (notch → collapse → deposit) not at one sea level but across a **sea-level
+or uplift history**. Each stillstand planes a bench at its own level; tectonic uplift (or a
+sea-level fall) then lifts that bench clear, and the next stillstand cuts a new one below it. The
+result is a **flight of marine terraces** — a staircase of old wave-cut platforms climbing inland,
+the signature of an uplifting coast (the Californian and New Zealand coasts are the textbook
+cases).
+
+```
+for stand in seaLevelHistory:            # each (level, duration)
+    repeat ∝ stand.duration:  coastalStep(h, stand.level, exposure)
+    h += upliftField * dt                # tectonics between stands lifts the finished bench
+```
+
+The single-stand case is the wave-cut platform above; the *sequence* is how you author an
+uplifted coast — one stand for one clean terrace, several for the staircase. Do **not** fill the
+flat benches in `03`; like glacial overdeepenings they are real, deliberate flats.
+
+## Deltas, estuaries, rias
+
+Where a river (`03`, `04`) meets the sea it drops its load — fluvial transport capacity collapses
+in standing water. This is **deposition-dominant hydraulic erosion at a base level** (`00`, L-tier
+"Deltas, alluvial fans"): keep the erosion model running with sea level as the base and let
+sediment accumulate at the mouth. Delta *shape* is a competition — river supply vs wave
+redistribution (above) vs tide — so the same longshore machinery decides whether you get a
+bird's-foot delta (river wins) or a smooth arcuate one (waves win).
+
+The drowned cases are the marine counterpart to the glacial **fjord** above:
+
+- **Ria** — a river valley drowned by sea-level rise. A dendritic, branching inlet (it's a flooded
+  *fluvial* network), where a fjord is U-shaped and straight (a flooded *glacial* one). Same
+  operation as the fjord — valley plus sea-level rise — applied to a different valley.
+- **Estuary** — the tidal, brackish reach of a drowned river mouth. For a heightfield it's just the
+  flooded lower valley via the sea-level flood fill of `03`, never a bare height threshold.
+
+## Wave base & the submarine profile
+
+The reason not to model the seabed as eroded: below **wave base** the sea does not carve. Two
+practical consequences:
+
+- **Don't run cliff-retreat erosion below wave base.** Gate the `band` term above to a few metres
+  around sea level; deeper than that, waves don't reach the bottom and any erosion you apply is
+  fiction that flattens bathymetry you wanted to keep.
+- **Shape the nearshore as an equilibrium profile, not a carved one.** The shoreface settles into a
+  smooth concave-up curve (depth ∝ distance^~⅔ — the Dean profile, coastal engineering, F-tier,
+  not graphics). Author it as a graded ramp from shoreline to shelf break, then let deposition
+  (deltas, longshore) modify it. This reads correctly and costs nothing; trying to *erode* a seabed
+  into shape does not.
