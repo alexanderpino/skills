@@ -29,6 +29,7 @@ Produce `backlog.json` entries per the contract. Each item must be:
   interfaces are frozen. Cross-cutting decisions belong to you, not to Scouts; a Scout
   proposing a feature never gets to unilaterally invent a new subsystem or break an
   existing data layout.
+- **Fast-tracking** — if an item is trivial (e.g., spelling fix, simple typo, single-line config change), flag it with `"fast_track": true` to skip the Scout/Plan-Review phases and send it straight to implementation.
 
 If a `principal-architect` skill is installed, follow it as canonical for how to reason
 about structure; this spec only defines your position in the pipeline.

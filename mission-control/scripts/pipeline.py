@@ -25,6 +25,7 @@ Commands:
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -32,7 +33,7 @@ from pathlib import Path
 
 # state -> allowed next states
 TRANSITIONS = {
-    "backlog": ["researching"],
+    "backlog": ["researching", "approved"],
     "researching": ["plan-review"],
     "plan-review": ["orchestrator-approval", "approved", "researching", "blocked"],
     "orchestrator-approval": ["approved", "researching", "blocked"],
@@ -67,6 +68,20 @@ BLAST_ORDER = ["low", "medium", "high", "critical"]
 
 def now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def load_llm_json(path):
+    """Robustly parse JSON written by LLMs, stripping markdown blocks."""
+    text = path.read_text(encoding="utf-8").strip()
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^```\s*$', '', text, flags=re.MULTILINE)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find('{'), text.rfind('}')
+        if start != -1 and end != -1:
+            return json.loads(text[start:end+1])
+        raise
 
 
 class State:
@@ -142,6 +157,18 @@ def cmd_init(args):
     if (root / "mission.json").exists():
         die(f"{root} already initialized — use 'status' to resume")
     (root / "evidence").mkdir(parents=True, exist_ok=True)
+    
+    # Auto-detect repo oracle
+    b_cmd, t_cmd = None, None
+    if Path("package.json").exists():
+        b_cmd, t_cmd = "npm run build --if-present", "npm test"
+    elif Path("Cargo.toml").exists():
+        b_cmd, t_cmd = "cargo build", "cargo test"
+    elif Path("CMakeLists.txt").exists():
+        b_cmd, t_cmd = "cmake -B build && cmake --build build", "ctest --test-dir build"
+    elif Path("pytest.ini").exists() or Path("requirements.txt").exists():
+        t_cmd = "pytest"
+
     st = State(root)
     st.save("mission", {
         "goal": args.goal or "TODO: set the mission goal",
@@ -152,7 +179,7 @@ def cmd_init(args):
         "concurrency": {"implementers": 2, "scouts": 2},
         "lease_ttl_minutes": 90,
         "bounce_limit": 3,
-        "repo_oracle": {"build": None, "test": None, "lint": None},
+        "repo_oracle": {"build": b_cmd, "test": t_cmd, "lint": None},
         "gates": {"orchestrator_approval_min_blast": "high",
                   "code_review_min_blast": "medium"},
     })
@@ -173,7 +200,8 @@ def cmd_add_item(args):
         "id": args.id, "title": args.title,
         "priority": args.priority,
         "depends_on": args.depends_on or [],
-        "ui": args.ui, "constraints": args.constraint or [],
+        "ui": args.ui, "fast_track": args.fast_track,
+        "constraints": args.constraint or [],
         "origin": args.origin, "status": "open",
     })
     st.save("backlog", backlog)
@@ -194,13 +222,15 @@ def cmd_claim(args):
     if unmet:
         die(f"{args.id} has unmet dependencies: {', '.join(unmet)}")
     entry["status"] = "claimed"
-    queue["items"].append({"id": args.id, "state": "researching",
+    
+    nxt = "approved" if entry.get("fast_track") else "researching"
+    queue["items"].append({"id": args.id, "state": nxt,
                            "ui": entry.get("ui", False),
-                           "history": [{"state": "researching", "at": now()}]})
+                           "history": [{"state": nxt, "at": now()}]})
     st.evidence_dir(args.id).mkdir(parents=True, exist_ok=True)
     st.save("backlog", backlog)
     st.save("queue", queue)
-    print(f"{args.id}: backlog -> researching "
+    print(f"{args.id}: backlog -> {nxt} "
           f"(evidence dir: {st.evidence_dir(args.id)})")
 
 
@@ -213,10 +243,14 @@ def cmd_transition(args):
         die(f"illegal transition {cur} -> {nxt} "
             f"(legal: {', '.join(TRANSITIONS.get(cur, [])) or 'none'})")
     is_bounce = (cur, nxt) in BOUNCES
-    if not is_bounce and nxt != "blocked" and cur in FORWARD_EVIDENCE:
+    # Evidence is required leaving any gated state, whether the outcome is a
+    # forward transition or a bounce — a bounce is exactly the gate's verdict
+    # file recording why it failed. Only a pure escalation straight to
+    # 'blocked' (nothing decided yet) is exempt.
+    if nxt != "blocked" and cur in FORWARD_EVIDENCE:
         ev = st.evidence_dir(args.id) / FORWARD_EVIDENCE[cur]
         if not ev.exists():
-            die(f"forward transition {cur} -> {nxt} requires evidence file "
+            die(f"transition {cur} -> {nxt} requires evidence file "
                 f"{ev} — the gate must write its artifact first")
     forced_block = None
     if is_bounce:
@@ -230,7 +264,13 @@ def cmd_transition(args):
             nxt = "blocked"
     if nxt != "blocked":
         hdr = research_header(st, args.id)
-        blast = hdr.get("blast_radius", "high")  # unknown -> treat as high
+        backlog = st.load("backlog")
+        entry = next((b for b in backlog["items"] if b["id"] == args.id), None)
+        fast_track = bool(entry and entry.get("fast_track"))
+        # fast_track items have no research.md (Scout/Plan-Review skipped by
+        # design), so default them to low blast instead of the conservative
+        # 'high' used for genuinely unknown items.
+        blast = hdr.get("blast_radius", "low" if fast_track else "high")
         gates = mission["gates"]
         if cur == "plan-review" and nxt == "approved":
             if BLAST_ORDER.index(blast) >= BLAST_ORDER.index(
@@ -485,16 +525,23 @@ def cmd_agenda(args):
 def cmd_audit(args):
     st = State(args.root)
     queue, mission = st.load("queue"), st.load("mission")
+    backlog = st.load("backlog")
     gates = mission["gates"]
     holes = 0
     for it in queue["items"]:
         if it["state"] != "done":
             continue
         ev = st.evidence_dir(it["id"])
+        entry = next((b for b in backlog["items"] if b["id"] == it["id"]), None)
+        fast_track = bool(entry and entry.get("fast_track"))
         hdr = research_header(st, it["id"])
-        blast = hdr.get("blast_radius", "high")
-        chain = ["research.md", "plan-review.json"]
-        if BLAST_ORDER.index(blast) >= BLAST_ORDER.index(
+        # fast_track items never go through Scout/Plan-Review, so there is no
+        # research.md to read blast_radius from; treat them as low blast —
+        # that's the whole premise of fast-tracking — unless a doc happens to
+        # exist anyway (e.g. it was later un-fast-tracked).
+        blast = hdr.get("blast_radius", "low" if fast_track else "high")
+        chain = [] if fast_track else ["research.md", "plan-review.json"]
+        if not fast_track and BLAST_ORDER.index(blast) >= BLAST_ORDER.index(
                 gates["orchestrator_approval_min_blast"]):
             chain.append("approval.json")
         chain += ["handoff.md", "verify.json"]
@@ -508,13 +555,23 @@ def cmd_audit(args):
                 holes += 1
                 continue
             if f == "verify.json":
-                v = json.loads(p.read_text())
+                try:
+                    v = load_llm_json(p)
+                except Exception as e:
+                    print(f"HOLE {it['id']}: verify.json invalid JSON - {e}")
+                    holes += 1
+                    continue
                 if v.get("verdict") != "green":
                     print(f"HOLE {it['id']}: verify verdict is "
                           f"{v.get('verdict')}, item marked done anyway")
                     holes += 1
             if f == "code-review.json":
-                v = json.loads(p.read_text())
+                try:
+                    v = load_llm_json(p)
+                except Exception as e:
+                    print(f"HOLE {it['id']}: code-review.json invalid JSON - {e}")
+                    holes += 1
+                    continue
                 if v.get("verdict") != "approve":
                     print(f"HOLE {it['id']}: review verdict is "
                           f"{v.get('verdict')}, item marked done anyway")
@@ -546,6 +603,7 @@ def main():
     s.add_argument("--depends-on", nargs="*")
     s.add_argument("--constraint", action="append")
     s.add_argument("--ui", action="store_true")
+    s.add_argument("--fast-track", action="store_true")
     s.add_argument("--origin", default="architect")
     s.set_defaults(fn=cmd_add_item)
 

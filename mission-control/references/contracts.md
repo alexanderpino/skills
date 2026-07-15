@@ -11,6 +11,7 @@ can find them without guessing.
 
 ```
 backlog ─► researching ─► plan-review ─► [orchestrator-approval] ─► approved
+backlog ─► approved (if fast_track)
 approved ─► building ─► verifying ─► [code-review] ─► done
 ```
 
@@ -76,6 +77,7 @@ At least one terminal condition must be non-null/true. `repo_oracle.build` and
   "priority": 3,
   "depends_on": ["MC-004"],
   "ui": false,
+  "fast_track": false,
   "constraints": [
     "structural constraints from the Architect, one per line",
     "e.g. no new subsystems; TransformComponent layout is frozen"
