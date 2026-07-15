@@ -203,10 +203,11 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 
 ## Authoring & world composition
 
-- **Galin, E., Guérin, E., Peytavie, A., Cordonnier, G., Benes, B., Gain, J. & Digne, J. (2019).**
-  *A Review of Digital Terrain Modeling.* Computer Graphics Forum 38(2) (Eurographics 2019 STAR).
-  — **The survey.** Maps procedural, simulation, and example-based terrain methods and how they
-  compose. Read first when choosing an architecture for a whole multi-biome world (`13`).
+- **Galin, E., Guérin, E., Peytavie, A., Cordonnier, G., Cani, M.-P., Benes, B. & Gain, J.
+  (2019).** *A Review of Digital Terrain Modeling.* Computer Graphics Forum 38(2), 553–577
+  (Eurographics 2019 STAR). — **The survey.** Maps procedural, simulation, and example-based
+  terrain methods and how they compose. Read first when choosing an architecture for a whole
+  multi-biome world (`13`).
 - **Génevaux, J.-D., Galin, É., Peytavie, A., Guérin, É., Briquet, C., Grosbellet, F. & Beneš, B.
   (2015).** *Terrain Modelling from Feature Primitives.* Computer Graphics Forum 34(6). — A
   construction tree of feature primitives (peaks, ridges, rivers, cliffs) composited into terrain.
@@ -315,7 +316,7 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Sklar, L.S. & Dietrich, W.E. (2004).** *A mechanistic model for river incision into bedrock by
   saltating bed load.* Water Resources Research 40(6). — The saltation–abrasion incision model —
   the physics under the stream-power erodibility `K` (`04`).
-- **Genevaux, J.-D., Galin, É., Guérin, É., Peytavie, A. & Beneš, B. (2013).** *Terrain Generation
+- **Génevaux, J.-D., Galin, É., Guérin, É., Peytavie, A. & Beneš, B. (2013).** *Terrain Generation
   Using Procedural Models Based on Hydrology.* ACM TOG 32(4), SIGGRAPH '13. — Author terrain from
   its river network first, then raise the relief around it. The graphics reference for
   river-driven terrain (`03`).
@@ -333,9 +334,9 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   Flüsse.* Zeitschrift für Bauwesen 25. — **Downstream fining**, `D = D0·e^(−αx)`. Boulders at the
   source, rounded pebbles then sand downstream.
 - **Shields, A. (1936).** *Anwendung der Ähnlichkeitsmechanik und der Turbulenzforschung auf die
-  Geschiebebewegung.* Preußische Versuchsanstalt für Wasserbau und Schiffbau, Berlin. — **Critical
-  shear stress for incipient motion.** Which grains move at a given flow; the water twin of
-  Bagnold's wind threshold (`05`).
+  Geschiebebewegung.* Mitteilungen der Preußischen Versuchsanstalt für Wasserbau und Schiffbau,
+  Heft 26, Berlin (doctoral thesis). — **Critical shear stress for incipient motion.** Which grains
+  move at a given flow; the water twin of Bagnold's wind threshold (`05`).
 - **Meyer-Peter, E. & Müller, R. (1948).** *Formulas for bed-load transport.* Proc. 2nd Meeting
   IAHR, Stockholm, 39–64. — **The canonical bedload transport formula**, `q_b ∝ (τ*−τ*_c)^1.5`.
 - **Parker, G. (1990).** *Surface-based bedload transport relation for gravel rivers.* Journal of

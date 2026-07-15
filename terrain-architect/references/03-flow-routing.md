@@ -315,7 +315,7 @@ power, `04`); lower down it reworks its own *sediment* (transport-limited — de
 incision physics for the bedrock reach is stream power; for the actual abrasion mechanism it's
 **Sklar & Dietrich (2004)** (saltating bedload) and **Whipple (2004)** (bedrock rivers in active
 orogens). To author a whole terrain *from* its river network instead of eroding into noise, the
-graphics reference is **Genevaux et al. (2013)** — build the drainage tree first, then raise the
+graphics reference is **Génevaux et al. (2013)** — build the drainage tree first, then raise the
 terrain around it.
 
 ## Meandering & bank erosion
