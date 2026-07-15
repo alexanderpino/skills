@@ -36,6 +36,35 @@ designing or reviewing the substrate, read `references/14-graph-runtime.md`; for
 land on the GPU and what can run per-frame versus amortised versus baked,
 `references/15-gpu-realtime.md`.
 
+**Detail is recursive — but only where the process is scale-free.** Terrain is (multi)fractal,
+so many techniques are *meant* to be applied at more than one scale, and the mental model is a
+**cascade**: generate the macro, then apply the *same kind* of operator again at the next scale
+down, and again. This is not a trick — it is what several nodes already are. FBM is one noise
+function summed across octaves (`01`). A scatter of boulders can carry its own scatter of cobbles
+carrying pebbles (`07`), which is the grain cascade of `04` made geometric. Domain warp warps a
+warp (`01`). A drainage network branches self-similarly (Horton–Strahler, `03`). Amplification
+adds a finer band of detail onto a coarse terrain (Guérin et al. 2017, `01`). When someone asks
+for "more detail", the first question is *at which scale*, and the answer is usually another pass
+of a scale-free operator, not a bigger single pass.
+
+The trap is assuming **every** operator is scale-free. **Physical erosion is not.** It carries
+real length scales — grain size, transport distance, the discharge that sets channel size — so
+"run erosion again, finer, for detail" is not the same as running it once at high resolution:
+drainage area is global, and a droplet's reach is a fixed number of cells (`04`, `08`).
+Re-applying a scale-bound process as if it were noise is exactly the defect the
+resolution-consistency test catches (`09`): *if the mountains move when you change resolution, a
+length scale was written in cells instead of metres.* So the rule is two-sided:
+
+- **Scale-free — recurse freely.** Noise / FBM / warp (`01`), hierarchical scatter (`07`),
+  curvature and analysis masks (`06`), LOD pyramids (`08`). Same operator, new
+  frequency / amplitude / spacing per level. And because terrain is *multifractal* (Musgrave,
+  `01`), vary the amplitude by locale — rough mountains, smooth plains — rather than stamping a
+  uniform octave everywhere.
+- **Scale-bound — apply once, at the right scale.** Hydraulic and stream-power erosion, flow
+  routing, glacier and coastal sims. Choose the backbone by world extent (design procedure below),
+  run it at the largest resolution you can hold globally (`08`), then add *scale-free* detail
+  (noise, thermal, scatter) on top — never a second global erosion pass masquerading as detail.
+
 ## Six things people call "an algorithm"
 
 Terrain discussions collapse these constantly, and nearly every bad reference table in
