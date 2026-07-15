@@ -1,9 +1,9 @@
 # Hydraulic Erosion
 
 Contents: [Attribution correction](#attribution-correction-read-first) · [Choosing](#choosing-a-backbone) ·
-[Pipe model](#pipe-model-mei-et-al-2007) · [Št'ava extensions](#stava-et-al-2008-extensions) ·
-[Droplet](#droplet--particle-erosion) · [Stream power](#stream-power-the-important-one) ·
-[Parameters](#parameter-reference)
+[Pipe model](#pipe-model-mei-et-al-2007) · [Št'ava extensions](#štava-et-al-2008-extensions) ·
+[Droplet](#droplet--particle-erosion) · [Stream power](#stream-power--the-important-one) ·
+[Knickpoints & waterfalls](#knickpoints--waterfalls) · [Parameters](#parameter-reference)
 
 ## Attribution correction (read first)
 
@@ -275,6 +275,48 @@ and reads as obviously synthetic. In practice you can substitute a thermal erosi
 distance downstream). It must be concave. Plot `log(S)` vs `log(A)` for channel cells — it
 must be a straight line of slope `−m/n ≈ −0.5`. This is a direct, cheap, quantitative check
 that the implementation is correct, and it will catch an error that eyeballing never will.
+
+## Knickpoints & waterfalls
+
+A waterfall is a **knickpoint** — a step in the river's long profile where it departs from the
+smooth concave equilibrium (the long-profile check in `09`). There is **no graphics "waterfall
+algorithm"**; the mechanism is stream-power incision and the geomorphology is well constrained.
+You author a waterfall by creating the *cause* of the step, not by stamping the step:
+
+| Origin | Mechanism | Comes from |
+|---|---|---|
+| **Lithology contrast** | A hard bed resists while the soft rock below is stripped; the step pins on the caprock | Spatial `K` from layered lithology (`11`) |
+| **Base-level fall** | The outlet drops (sea-level fall, uplift pulse, stream capture) and a step propagates upstream | Sea level (`03`), uplift (`02`) |
+| **Hanging valley** | A tributary is left perched above a trunk that incised — or was glaciated — faster | Glacial trunk/tributary (`12`), or `K` contrast |
+
+**How a knickpoint moves.** In the detachment-limited stream-power model with `n = 1` the
+incision equation is a kinematic wave, so a step travels *upstream* at a celerity set by
+discharge — it does not diffuse away, it migrates, preserving its height:
+
+```
+# Knickpoint celerity, n=1 stream power — the kinematic-wave speed of
+#   ∂h/∂t = U − K·A^m·(∂h/∂x)   (Rosenbloom & Anderson 1994; Whipple & Tucker 1999)
+C_kp(A) = K * pow(A, m)                  # metres/yr upstream — larger rivers retreat faster
+
+retreatKnickpoints(channel, K, A, m, Δt):
+    for kp in knickpoints(channel):      # cells where |dS/dx| spikes above the concave trend
+        advance kp upstream by C_kp(A[kp]) * Δt along its channel
+        # the face (the fall) is preserved; it only drops when two knickpoints merge
+        # or it reaches a hard bed, where it stalls and the waterfall persists
+```
+
+**The consequence for a graph.** The Braun–Willett solve above already *produces* knickpoints
+wherever `K` jumps — the `h[i] = max(h[i], h[r])` guard is exactly what preserves the step. So to
+get a durable waterfall, give the erosion a **hard bed across the channel** (`11`); to get a
+*migrating* one, drop the base level and let the solver run. What you must **not** do is carve a
+vertical cliff into the height field and hope: with uniform `K` the next erosion pass relaxes it
+into a rapid, because nothing pins it. Big rivers (high `A`) consume knickpoints fast — which is
+why trunk streams have rapids and small tributaries keep their falls (Crosby & Whipple 2006
+mapped 236 of them doing exactly this; Berlin & Anderson 2007 model the retreat).
+
+Waterfalls also sit on the heightfield boundary (`11`): the undercut **plunge pool** and the
+overhanging lip of a mature fall are voids a heightfield can't hold — you get the drop, not the
+overhang.
 
 ## Parameter reference
 

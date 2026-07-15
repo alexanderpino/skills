@@ -3,7 +3,8 @@
 Contents: [Order of operations](#order-of-operations) · [Depression handling](#depression-handling-mandatory) ·
 [D8](#d8-ocallaghan--mark-1984) · [D∞](#d-tarboton-1997) · [MFD](#mfd-freeman-1991) ·
 [Accumulation](#flow-accumulation) · [Stack ordering](#stack-ordering-braun--willett) ·
-[Lakes](#lakes) · [Sea level](#sea-level) · [Choosing](#choosing)
+[Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) · [Sea level](#sea-level) ·
+[Choosing](#choosing)
 
 ## Order of operations
 
@@ -247,6 +248,67 @@ lakeSurface = filledDem                          // flat, by construction
 Keep both DEMs. Route flow on the filled one; render and analyse on the original one with a
 water surface at `filledDem`. Substituting the filled DEM for the terrain is the mistake that
 makes every basin in the map a flat plate.
+
+**Mountain lakes are a landform, not a new algorithm.** Every mountain lake is a filled (or
+deliberately unfilled) depression whose surface is the flat spill plane above — the algorithm is
+already here. What varies is *what dammed the basin*, all **L-tier** compositions (`00`):
+
+| Lake | Basin cause | Where |
+|---|---|---|
+| **Tarn** | Glacial cirque overdeepening | `12` (Argudo 2020) |
+| **Paternoster chain** | A staircase of glacial steps down a trough — a lake *cascade* | `12` + the lake graph below |
+| **Ribbon lake** | A long overdeepened glacial trough | `12` |
+| **Moraine-dammed** | A terminal/lateral moraine impounds the valley | `12` (track the moraine sediment field) |
+| **Landslide / rockfall-dammed** | A slump blocks the valley, often short-lived | `11` hillslope failure |
+| **Crater / caldera lake** | A volcanic or impact basin | `02`/`11` primitive + a no-fill mask |
+
+They share one computation: **the lake surface is a horizontal plane at the spill elevation**,
+and a chain of connected basins spills one into the next — exactly the lake-graph / minimum-
+spanning-tree cascade of Cordonnier et al. (2016) above. The overdeepened and crater cases are
+genuine closed basins: **do not fill them** (`12`, `11`) — mask them so the fill node skips them,
+or the lakes vanish.
+
+## Channel morphology (mountain rivers)
+
+Flow routing tells you *where* the rivers are; this is *what a river looks like* running down a
+mountain. A steep mountain channel is not a shrunk lowland river — its reach type is set by slope
+and drainage, and that governs width, roughness, and whether you draw whitewater at all.
+
+**Reach classification by slope (Montgomery & Buffington 1997).** The canonical mountain-channel
+taxonomy — cite it rather than inventing thresholds:
+
+```
+reachType(S, A):                         # S = channel slope, A = drainage area
+    if S > 0.08:  return CASCADE         # continuous whitewater over boulders — steepest
+    if S > 0.03:  return STEP_POOL       # rhythmic steps and plunge pools
+    if S > 0.015: return PLANE_BED       # straight, featureless gravel
+    if S > 0.001: return POOL_RIFFLE     # alternating bars — where meandering begins
+    return DUNE_RIPPLE                   # lowland sand bed
+```
+
+The number that matters for *look*: cascade and step-pool reaches are where a mountain river
+reads as whitewater, and they sit above the slope at which meandering (Howard & Knutson 1984,
+`00`) can happen at all — a steep channel is straight because it *can't* meander.
+
+**Channel width from hydraulic geometry (Leopold & Maddock 1953).** Width scales with the square
+root of discharge, and discharge scales with drainage area:
+
+```
+Q     = k_q * pow(A, 0.7)                # discharge from drainage area (basin exponent ~0.7–1)
+width = k_w * sqrt(Q)                    # Leopold & Maddock hydraulic geometry, w ∝ Q^~0.5
+depth = k_d * pow(Q, 0.4)
+```
+
+Use `width` to burn the channel into the height field, or to stamp the river mask (`06`) at a
+realistic, downstream-widening size — a constant-width river is an instant tell.
+
+**Bedrock vs alluvial.** High in the range the river cuts *rock* (detachment-limited — stream
+power, `04`); lower down it reworks its own *sediment* (transport-limited — deposition). The
+incision physics for the bedrock reach is stream power; for the actual abrasion mechanism it's
+**Sklar & Dietrich (2004)** (saltating bedload) and **Whipple (2004)** (bedrock rivers in active
+orogens). To author a whole terrain *from* its river network instead of eroding into noise, the
+graphics reference is **Genevaux et al. (2013)** — build the drainage tree first, then raise the
+terrain around it.
 
 ## Sea level
 

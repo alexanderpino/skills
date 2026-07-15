@@ -205,3 +205,36 @@ karstSurface(h, solubleMask):
 That last note is the interesting one: karst is the exception to the mandatory depression
 handling in `03`. In karst, sinks are real. Fill them and you've destroyed the landform. Mark
 them with a mask so the fill node skips them.
+
+### Tower & cone karst
+
+The dramatic karst *mountains* — the towers of Guilin and Halong Bay (**fenglin**), the cone
+clusters of the wet tropics (**fengcong**) — are dissolution in thick, pure limestone under a
+high water table. The mechanism is **differential vertical lowering to a base level**: corrosion
+concentrates at the water table, so the soluble surface is planed down toward it while the most
+massive, least-fractured rock survives as near-vertical towers standing out of a flat, alluviated
+plain.
+
+```
+towerKarst(h, solubleMask, waterTable):
+    # Towers survive where the rock is massive (low fracture density); everything
+    # else dissolves down toward the water table (Ford & Williams 2007).
+    fracture   = fbm(p * freq)                        # 01/07 — low fracture = massive = future tower
+    resistance = smoothstep(hi, lo, fracture) * solubleMask
+    lower      = (1 - resistance) * max(0, h - waterTable)
+    h -= rate * lower                                  # massive columns barely lower → towers
+    # The inter-tower plain alluviates to a flat base level, giving the steep tower/plain contact:
+    h  = max(h, waterTable)  where not resistance
+```
+
+Two honesty notes, both straight from the central claim of this file:
+
+- **Base level is the master parameter**, exactly as ELA is for glaciers (`12`). Lower the water
+  table and the towers grow taller and steeper; raise it and they drown to a plain. You author
+  tower karst by choosing the base level, not by sculpting towers.
+- **A heightfield gets the towers but not the truth.** Mature tower karst is undercut, cave-
+  riddled, and overhanging — the voids the heightfield forbids (see *When the heightfield fails*
+  above). You get the steep-tower-and-flat-plain silhouette; for the notched bases and through-
+  caves you need Peytavie's Arches or a volume. There is **no canonical graphics paper for tower-
+  karst surface morphology** — the cave network is Paris et al. (2021), the surface is the
+  composition above grounded in **Ford & Williams (2007)**.

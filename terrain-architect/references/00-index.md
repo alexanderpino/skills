@@ -87,6 +87,8 @@ are compositions. The recipe is the answer:
 | Ring islands, atolls | Volcanic cone + subsidence + coral ring mask + wave erosion (`12`) |
 | Mountain ranges, ridge networks | Uplift field + stream power (`02`, `04`) — **not** ridged noise |
 | Valley networks | Flow routing + fluvial incision (`03`, `04`) |
+| Waterfalls | Knickpoint pinned on a hard bed, base-level fall, or hanging valley (`04`, `11`, `12`) |
+| Mountain lakes (tarn, paternoster, ribbon) | Glacial / landslide / crater basin, left unfilled (`03`, `12`) |
 | Plateaus, mesas, buttes | Hard caprock layer in `K` + fluvial erosion (`11`) |
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
@@ -97,6 +99,7 @@ are compositions. The recipe is the answer:
 | Rias (drowned valleys) | Fluvial valley network + sea-level rise (`03`, `12`) |
 | Natural arches, hoodoos | Differential erosion of layered rock; needs a **non-heightfield representation** (`11`) |
 | Karst terrain | Dissolution of a soluble layer; caves need volume (`11`) |
+| Tower / cone karst (fenglin, fengcong) | Dissolution + differential vertical lowering to a base level (`11`) |
 
 ## 3. Composition & filtering → `10-primitives-ops-filters.md`
 
@@ -137,6 +140,8 @@ are compositions. The recipe is the answer:
 | Topographic wetness index | P | Beven & Kirkby 1979, Hydrological Sciences Bulletin 24(1) |
 | River meandering / migration | P | Howard & Knutson 1984, Water Resources Research 20(11) |
 | River widening / depth estimation | F | Hydraulic geometry scaling (`w ∝ Q^0.5`, Leopold & Maddock 1953) |
+| Channel-reach morphology (cascade / step-pool / pool-riffle) | P | Montgomery & Buffington 1997, GSA Bulletin 109(5) (`03`) |
+| Hydrology-based terrain (river network first) | P | Genevaux et al. 2013, ACM TOG 32(4), SIGGRAPH '13 (`03`) |
 | Flood fill / sea level | F | — |
 
 ## 5. Erosion → `04`, `05`, `12`
@@ -148,6 +153,8 @@ are compositions. The recipe is the answer:
 | Droplet / particle hydraulic erosion | F | **Beyer 2015**, TU München bachelor thesis, after Musgrave et al. 1989. **No canonical paper.** Popularised by Sebastian Lague. |
 | Grid hydraulic erosion (origin) | P | Musgrave, Kolb & Mace 1989, SIGGRAPH |
 | Stream-power erosion | P | **Braun & Willett 2013** (the O(N) implicit solver — *the paper that matters*) + Cordonnier et al. 2016 (the terrain application) |
+| Knickpoint / waterfall retreat | P | Whipple & Tucker 1999; Crosby & Whipple 2006; Berlin & Anderson 2007. **No graphics "waterfall" algorithm** — it's a knickpoint (`04`). |
+| Bedrock river incision (saltation–abrasion) | P | Sklar & Dietrich 2004; Whipple 2004 — the physics under stream power in steep channels (`03`, `04`) |
 | Shallow-water erosion | P | Beneš et al. 2006, *Hydraulic Erosion*, CAVW 17(3–4) |
 | Thermal erosion / talus-angle | P | Musgrave et al. 1989 |
 | Talus fast approximation | P | Olsen 2004, tech report, Univ. of Southern Denmark |
@@ -156,9 +163,9 @@ are compositions. The recipe is the answer:
 | Glacier flow & erosion | P | Argudo et al. 2020, *Simulation, Modeling and Authoring of Glaciers*, ACM TOG 39(6) |
 | Snow / avalanche | P | Cordonnier et al. 2018, *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*, CGF 37(2) |
 | Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
-| Longshore transport | F | CERC formula (coastal engineering), not graphics. Drives spits/tombolos/barriers (`12`) |
+| Longshore transport | F | CERC formula; measured basis Komar & Inman 1970 (coastal engineering, not graphics). Drives spits/tombolos/barriers (`12`) |
 | Marine terrace / wave-cut platform | F | Coastal notch loop across a sea-level/uplift history (`12`). A look, not a sim. |
-| Shoreface / submarine equilibrium profile | F | Dean profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
+| Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
 | Landslide / slump / debris flow / mudflow / rockfall | F | No canonical graphics paper for the terrain-gen versions |
 | Soil creep | P | = hillslope diffusion, `D·∇²h`. See Culling 1960, *Analytical Theory of Erosion*, J. Geology 68 |
 
@@ -212,6 +219,7 @@ are compositions. The recipe is the answer:
 | Virtual texturing / sparse virtual textures | F | Barrett 2008 (GDC), Mittring 2008 (SIGGRAPH course) — talks, not papers |
 | Satmap / colour-map compositing | F | Composite of material albedos by masks (`08`). Not a field the sim produces; **no directional light baked in.** |
 | Normal / AO map encoding (BC5 reconstruct-Z, BC4, ORM pack) | F | Export packing (`08`); baking maths in `06` |
+| Unit-vector (normal) encoding — reconstruct-Z, octahedral | P | Cigolle et al. 2014, JCGT 3(2) — the survey of schemes (`08`) |
 | Normal map mipping (variance) | P | Toksvig 2005, JGT 10(3) |
 | LEAN mapping | P | Olano & Baker 2010, I3D |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |

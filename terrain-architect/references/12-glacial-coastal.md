@@ -223,6 +223,9 @@ classically CERC-shaped:
 Q_long ∝ sin(2 * (waveAngle − shorelineNormal))       # CERC / littoral drift; peaks near 45° approach
 ```
 
+The `sin(2·angle)` dependence is the measured basis of the CERC formula (**Komar & Inman 1970**,
+*Longshore sand transport on beaches*, JGR 75(30)) — coastal engineering, not graphics.
+
 Route the freed budget downdrift along the shoreline and deposit it where the coast turns away
 from the flow or shelters (low `exposure`). What falls out:
 
@@ -286,7 +289,7 @@ practical consequences:
   around sea level; deeper than that, waves don't reach the bottom and any erosion you apply is
   fiction that flattens bathymetry you wanted to keep.
 - **Shape the nearshore as an equilibrium profile, not a carved one.** The shoreface settles into a
-  smooth concave-up curve (depth ∝ distance^~⅔ — the Dean profile, coastal engineering, F-tier,
-  not graphics). Author it as a graded ramp from shoreline to shelf break, then let deposition
-  (deltas, longshore) modify it. This reads correctly and costs nothing; trying to *erode* a seabed
-  into shape does not.
+  smooth concave-up curve — depth ∝ distance^⅔, the **Dean (1991)** equilibrium beach profile
+  (coastal engineering, not graphics). Author it as a graded ramp from shoreline to shelf break,
+  then let deposition (deltas, longshore) modify it. This reads correctly and costs nothing;
+  trying to *erode* a seabed into shape does not.

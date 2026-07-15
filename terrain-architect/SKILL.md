@@ -195,15 +195,15 @@ the constants matter and are easy to get subtly wrong.
 | `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification. **Consult before attributing anything.** |
 | `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
 | `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults |
-| `references/03-flow-routing.md` | Depression fill/breach, D8, D∞, MFD, accumulation, lakes, sea level |
-| `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier) |
+| `references/03-flow-routing.md` | Depression fill/breach, D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers), sea level |
+| `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls |
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter |
 | `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
-| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst, overhangs — and when the heightfield is the wrong representation |
+| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), overhangs — and when the heightfield is the wrong representation |
 | `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; coastal & marine erosion, cliff retreat, wave-cut platforms, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base |
 | `references/13-climate-ecosystem.md` | Lapse rate, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |

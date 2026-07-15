@@ -245,7 +245,8 @@ map when the height is decimated for LOD (so the fine normal outlives the coarse
 whole point of normal-mapped LOD, see [LOD](#lod)) or when the consumer can't sample height in
 the shading path.
 
-**Normal encoding — two channels, reconstruct Z:**
+**Normal encoding — two channels, reconstruct Z** (the survey of schemes is Cigolle et al. 2014,
+*A Survey of Efficient Representations for Independent Unit Vectors*, JCGT 3(2) — `00`):
 
 ```
 store (n.x, n.y);   n.z = sqrt(max(0, 1 - n.x² - n.y²))   # z is always +ve for a heightfield normal
@@ -253,6 +254,9 @@ store (n.x, n.y);   n.z = sqrt(max(0, 1 - n.x² - n.y²))   # z is always +ve fo
 
 - Compress with **BC5** (two-channel RG, built for exactly this). **Never BC1/DXT1** — 5:6:5
   colour compression bands normals visibly and there's no third channel to spare anyway.
+- If you need a full sphere of directions (object-space, or detail normals that tilt past
+  horizontal), **octahedral** encoding (Cigolle et al. 2014) packs a unit vector into two
+  channels with near-uniform error — the standard modern choice above bare reconstruct-Z.
 - A terrain *base* normal baked from the heightfield is effectively **world/object-space** (the
   surface has no independent tangent frame); detail and decal normals are **tangent-space**.
   Don't mix the two conventions in one map.

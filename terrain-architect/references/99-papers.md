@@ -56,6 +56,17 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Geomorphology 180–181, 170–179. — **The paper that matters for stream power.** The O(N)
   stack ordering + unconditionally stable implicit solver. Known in the geoscience community
   as the basis of FastScape.
+- **Whipple, K.X. & Tucker, G.E. (1999).** *Dynamics of the stream-power river incision model:
+  Implications for height limits of mountain ranges, landscape response timescales, and research
+  needs.* Journal of Geophysical Research 104(B8), 17661–17674. — The reference for stream-power
+  incision dynamics and knickpoint behaviour (`04`).
+- **Crosby, B.T. & Whipple, K.X. (2006).** *Knickpoint initiation and distribution within fluvial
+  networks: 236 waterfalls in the Waipaoa River, North Island, New Zealand.* Geomorphology
+  82(1–2), 16–38. — Where waterfalls come from and how they propagate through a network. The
+  empirical anchor for "a waterfall is a knickpoint" (`04`).
+- **Berlin, M.M. & Anderson, R.S. (2007).** *Modeling of knickpoint retreat on the Roan Plateau,
+  western Colorado.* Journal of Geophysical Research 112(F3). — A quantitative knickpoint-retreat
+  model (`04`).
 
 ## Hydraulic erosion
 
@@ -156,6 +167,10 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Variance-preserving normal mips. Prevents distant terrain going flat and shiny.
 - **Olano, M. & Baker, D. (2010).** *LEAN Mapping.* I3D 2010. — The more principled successor
   to Toksvig; pushes normal variance into roughness properly.
+- **Cigolle, Z.H., Donow, S., Evangelakos, D., Mara, M., McGuire, M. & Meyer, Q. (2014).** *A
+  Survey of Efficient Representations for Independent Unit Vectors.* Journal of Computer Graphics
+  Techniques 3(2), 1–30. — Normal-vector encodings: reconstruct-Z, octahedral, and their error.
+  The reference for packing normal maps (`08`).
 
 ## Noise (additional)
 
@@ -196,6 +211,10 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   voids: arches, overhangs, caves.
 - **Paris, A., Guérin, É., Peytavie, A., Collon, P. & Galin, E. (2021).** *Synthesizing
   Geologically Coherent Cave Networks.* Computer Graphics Forum. — Karst cave networks.
+- **Ford, D. & Williams, P. (2007).** *Karst Hydrogeology and Geomorphology.* Wiley. — The standard
+  karst reference. Tower (fenglin) and cone (fengcong) karst as differential dissolution and
+  vertical lowering to a base level (`11`). No graphics paper exists for tower-karst surface
+  morphology; cite this for the mechanism.
 - **Stora, D., Agliati, P.-O., Cani, M.-P., Neyret, F. & Gascuel, J.-D. (1999).** *Animating Lava
   Flows.* Graphics Interface '99.
 - **Culling, W.E.H. (1960).** *Analytical Theory of Erosion.* Journal of Geology 68(3). —
@@ -215,6 +234,16 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Division, ASCE 88. — The Bruun rule. **Coastal engineering, not terrain generation.** Cited
   here because there *is* no graphics paper for coastal erosion, and saying so is the honest
   answer (`12`).
+- **Komar, P.D. & Inman, D.L. (1970).** *Longshore sand transport on beaches.* Journal of
+  Geophysical Research 75(30), 5914–5927. — The measured basis of the CERC longshore-transport
+  formula (the `sin 2α` dependence). Drives spits, tombolos, and barrier islands (`12`). Coastal
+  engineering, not graphics.
+- **Dean, R.G. (1991).** *Equilibrium beach profiles: characteristics and applications.* Journal of
+  Coastal Research 7(1), 53–84. — The `depth ∝ distance^⅔` shoreface profile. Author the nearshore
+  as an equilibrium ramp; do not erode a seabed into shape (`12`).
+- **Rosenbloom, N.A. & Anderson, R.S. (1994).** *Hillslope and channel evolution in a marine
+  terraced landscape, Santa Cruz, California.* Journal of Geophysical Research 99(B7),
+  14013–14029. — Marine terraces, and the knickpoint-celerity result `C = K·A^m` used in `04`.
 
 ## Climate & ecosystems
 
@@ -247,6 +276,20 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   discharge. Use for river widening.
 - **Beneš, B., Těšínský, V., Hornyš, J. & Bhatia, S.K. (2006).** *Hydraulic Erosion.* Computer
   Animation and Virtual Worlds 17(3–4). — Shallow-water erosion.
+- **Montgomery, D.R. & Buffington, J.M. (1997).** *Channel-reach morphology in mountain drainage
+  basins.* GSA Bulletin 109(5), 596–611. — **The mountain-channel classification**: cascade /
+  step-pool / plane-bed / pool-riffle / dune-ripple by slope. What a river flowing down a mountain
+  actually looks like (`03`).
+- **Whipple, K.X. (2004).** *Bedrock rivers and the geomorphology of active orogens.* Annual Review
+  of Earth and Planetary Sciences 32, 151–185. — Bedrock channels in mountains; the detachment-
+  limited regime behind stream power (`03`, `04`).
+- **Sklar, L.S. & Dietrich, W.E. (2004).** *A mechanistic model for river incision into bedrock by
+  saltating bed load.* Water Resources Research 40(6). — The saltation–abrasion incision model —
+  the physics under the stream-power erodibility `K` (`04`).
+- **Genevaux, J.-D., Galin, É., Guérin, É., Peytavie, A. & Beneš, B. (2013).** *Terrain Generation
+  Using Procedural Models Based on Hydrology.* ACM TOG 32(4), SIGGRAPH '13. — Author terrain from
+  its river network first, then raise the relief around it. The graphics reference for
+  river-driven terrain (`03`).
 
 ## Analysis (additional)
 
