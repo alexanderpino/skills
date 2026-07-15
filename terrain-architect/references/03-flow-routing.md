@@ -4,6 +4,7 @@ Contents: [Order of operations](#order-of-operations) · [Depression handling](#
 [D8](#d8-ocallaghan--mark-1984) · [D∞](#d-tarboton-1997) · [MFD](#mfd-freeman-1991) ·
 [Accumulation](#flow-accumulation) · [Stack ordering](#stack-ordering-braun--willett) ·
 [Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) ·
+[Meandering & bank erosion](#meandering--bank-erosion) ·
 [Water sources & discharge](#water-sources--discharge) · [Sea level](#sea-level) · [Choosing](#choosing)
 
 ## Order of operations
@@ -309,6 +310,63 @@ incision physics for the bedrock reach is stream power; for the actual abrasion 
 orogens). To author a whole terrain *from* its river network instead of eroding into noise, the
 graphics reference is **Genevaux et al. (2013)** — build the drainage tree first, then raise the
 terrain around it.
+
+## Meandering & bank erosion
+
+First, the correction that the question usually needs: a river does **not** erode its banks with
+waves. Coastal and marine erosion are *wave*-driven (`12`); a river migrates by **flow
+curvature**. The outer, concave bank of a bend is the **cut bank** (erosion); the inner, convex
+bank is the **point bar** (deposition). That erode-one-side / deposit-the-other asymmetry is the
+same *shape* of process as headland-retreat-versus-bay-fill on a coast — but the driver is
+curvature, not fetch, and conflating the two is a process error (`00`).
+
+Meandering lives at the **low-slope end** of the channel-morphology spectrum above (pool-riffle
+and gentler) — a steep channel is straight because it can't meander. So it runs on the floodplain,
+after the valley exists, on a **centreline representation** (a polyline), not on the height field
+directly — an agent model like scatter (`07`), not a per-cell sim.
+
+```
+meanderStep(centreline, Δt):
+    resample(centreline, ds)                          # keep node spacing ~uniform
+    for node i:  C[i] = curvature(centreline, i)      # signed, 1/radius
+
+    # Near-bank excess velocity drives migration. The KEY detail (Ikeda, Parker & Sawai 1981;
+    # Howard & Knutson 1984): it depends on UPSTREAM curvature, exponentially lagged — not on
+    # local curvature alone.
+    for node i:
+        u_b[i] = Σ_{k≥0} C[i-k] * exp(-k * ds / L_adj)     # L_adj ≈ several channel widths
+        move node i along its outward normal by E * u_b[i] * Δt    # E = bank erodibility
+
+    # Neck cutoff → oxbow lake
+    for non-adjacent pair (i, j) with |p_i − p_j| < cutoffDist:
+        abandon the loop between i and j
+        spawn oxbowLake(loop)                          # abandoned channel arc → a lake (Lakes above)
+
+    burnChannel(h, centreline, width)                  # width from hydraulic geometry (above)
+    depositPointBars(h, centreline, C)                 # inner banks aggrade; outer banks are cut
+```
+
+**What each detail buys:**
+- **Upstream weighting is the whole thing.** Migration driven by *local* curvature alone grows
+  symmetric, stationary bends. The exponential upstream lag (Ikeda–Parker–Sawai 1981) is what
+  skews meanders downstream and lets them sharpen and overturn — the characteristic look. Drop it
+  and you get sine waves, not meanders.
+- **Neck cutoff makes oxbow lakes.** When a loop nearly closes on itself the river short-circuits
+  across the neck, and the abandoned arc becomes an **oxbow lake** — a floodplain lake and a lake
+  type for the Lakes table above (it silts up into a meander scar over time). Cutoff is not
+  decoration: without it meanders grow forever and self-intersect.
+- **The migrated swath is the floodplain.** Sweeping the channel back and forth plants **scroll
+  bars** (the ridges of successive point bars) and builds a flat alluvial floodplain — which is
+  where a meander belt reads as a meander belt from directly above (`09` plan view).
+
+**Order.** This is a post-erosion, floodplain-scale process: it needs a low-gradient valley to run
+in (from `04`) and it edits a centreline plus a shallow channel/floodplain in the height field.
+Run it *after* the main erosion, and re-derive analysis (`06`) downstream of it like any other
+height write.
+
+**Tier.** The migration physics is P-tier (Ikeda–Parker–Sawai 1981; Howard & Knutson 1984); the
+terrain realisation — burning the channel, scroll bars, oxbow fill — is the honest F-tier "look"
+layered on top.
 
 ## Water sources & discharge
 

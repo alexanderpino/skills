@@ -264,6 +264,10 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   island sinks and coral grows up to keep pace with sea level. Confirmed a century later by
   drilling to volcanic basement at Enewetak. Cite it for *why* atolls form (`12`); it is not a
   graphics method.
+- **Gilbert, G.K. (1890).** *Lake Bonneville.* USGS Monograph 1. — The foundational study of
+  **lacustrine shorelines**: wave-cut lake terraces from a lake-level history, and the
+  topset/foreset/bottomset **Gilbert delta**. The freshwater analogue of the marine coastal suite
+  (`12`). Not graphics — cite it for the mechanism.
 
 ## Climate & ecosystems
 
@@ -289,8 +293,13 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 
 - **Strahler, A.N. (1957).** *Quantitative analysis of watershed geomorphology.* Transactions,
   AGU 38(6). — Stream ordering. (Horton 1945 is the predecessor.)
+- **Ikeda, S., Parker, G. & Sawai, K. (1981).** *Bend theory of river meanders. Part 1. Linear
+  development.* Journal of Fluid Mechanics 112, 363–377. — **The meander-migration model.** Bank
+  migration rate ∝ near-bank excess velocity, driven by *upstream-weighted* curvature. The reason
+  meanders skew downstream and overturn instead of staying symmetric (`03`).
 - **Howard, A.D. & Knutson, T.R. (1984).** *Sufficient conditions for river meandering: A
-  simulation approach.* Water Resources Research 20(11). — Meander migration.
+  simulation approach.* Water Resources Research 20(11). — Meander migration with the upstream
+  curvature weighting; the simulation form used for terrain (`03`).
 - **Leopold, L.B. & Maddock, T. (1953).** *The hydraulic geometry of stream channels and some
   physiographic implications.* USGS Professional Paper 252. — Channel width/depth scaling with
   discharge. Use for river widening.

@@ -5,6 +5,7 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) ·
 [Coastal: be honest](#coastal-be-honest) · [Wave exposure](#wave-exposure) ·
 [Cliff retreat & beaches](#cliff-retreat--beaches) ·
+[Lacustrine (lake) shores](#lacustrine-lake-shores) ·
 [Marine: the honest frame](#marine-the-honest-frame) ·
 [Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
@@ -196,6 +197,33 @@ cannot exist in a heightfield. A sea *stack* can (it's just an isolated column),
 naturally where a hard bed survives while the softer rock around it retreats — so it requires
 spatially varying hardness. With uniform rock you get a straight cliff and nothing else, which
 is the usual reason a coastal graph looks boring.
+
+## Lacustrine (lake) shores
+
+The coastal loop is **water-body-agnostic**. A large lake has fetch, waves, and a shoreline, so
+`coastalStep` runs unchanged with `waterSurface = lakeLevel` and the `fetch` sweep taken over the
+lake instead of the ocean (`isOcean → isWater`). The mountain lakes of `03` are not just flat
+plates — given enough fetch they erode their own shores. What you get:
+
+- **A wave-cut bench at lake level** — the lacustrine wave-cut platform, planed at the lake
+  surface exactly as the marine one is planed at sea level.
+- **Lake terraces from a lake-LEVEL history** — the freshwater twin of *Marine terraces* below.
+  Run the loop across a sequence of lake stands; each stand planes a bench, then the level drops
+  (outlet incision, a drying climate) and strands the bench above the modern shore. The
+  foundational study is **Gilbert 1890** (*Lake Bonneville*, USGS Monograph 1); the Bonneville and
+  Provo shorelines ringing the Utah basins are the type example — and they are *horizontal* (a
+  dead-flat contour wrapping the topography), which is the tell that a bench is an old shoreline
+  and not a structural bed (`11`).
+- **Beaches, spits, and bay bars** from lake longshore drift (small lakes have too little fetch —
+  skip it; a tarn is a mirror, not a wave machine).
+- **Deltas prograding into the lake** where a river enters — the classic **Gilbert delta**
+  (topset / foreset / bottomset beds), named for the same G.K. Gilbert. The lake case of the delta
+  recipe in *Deltas, estuaries, rias* below.
+
+**Lake level is not authored free-hand** — it is the spill elevation from depression handling
+(`03`). Lower the outlet and the whole shoreline suite drops, leaving the terrace flight above:
+the same *notch → collapse → deposit across a level history* machinery as marine terraces, pointed
+at an inland basin instead of the sea.
 
 ## Marine: the honest frame
 
