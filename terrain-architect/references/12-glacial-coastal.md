@@ -8,7 +8,8 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Marine: the honest frame](#marine-the-honest-frame) ·
 [Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
-[Wave base & the submarine profile](#wave-base--the-submarine-profile)
+[Wave base & the submarine profile](#wave-base--the-submarine-profile) ·
+[Coral reefs & atolls](#coral-reefs--atolls)
 
 ## Glacial: why it matters
 
@@ -293,3 +294,56 @@ practical consequences:
   (coastal engineering, not graphics). Author it as a graded ramp from shoreline to shelf break,
   then let deposition (deltas, longshore) modify it. This reads correctly and costs nothing;
   trying to *erode* a seabed into shape does not.
+
+## Coral reefs & atolls
+
+An atoll is the one marine landform that is **built up, not carved**. It is Darwin's subsidence
+sequence (**Darwin 1842**, *The Structure and Distribution of Coral Reefs* — confirmed a century
+later by drilling to volcanic basement at Enewetak): a volcanic island subsides while reef-
+building coral grows *upward* to stay in the sunlit shallows, so the reef outlives the island
+that seeded it.
+
+```
+volcano → fringing reef → barrier reef + lagoon → atoll (ring, no island)
+          reef hugs shore   island subsides,        island gone; the reef ring
+                            a lagoon opens behind    keeps pace with sea level
+```
+
+The mechanism is a race between subsidence and coral accretion — cheap to model as a height
+update:
+
+```
+reefStep(h, seaLevel, subsidence, Δt):
+    # 1. The volcanic edifice sinks
+    h -= subsidence * Δt                                   # the whole island subsides
+
+    # 2. Coral grows upward toward the light — only in the photic zone, faster in moving water
+    depth  = seaLevel - h
+    growth = coralRate * inPhotic(depth) * waveEnergy(exposure)    # exposure/fetch from above
+    #   inPhotic(depth): ~1 just below the surface, → 0 below ~50 m and above the waterline
+    h += growth * Δt
+    h  = min(h, seaLevel + reefCrestHeight)               # coral can't grow into the air
+
+    # 3. Lagoon fill: dead coral + carbonate sand accumulate to a shallow flat floor
+    inLagoon = enclosedBy(reefRing) and depth > lagoonDepth
+    h += lagoonFill * inLagoon * Δt
+```
+
+**What each detail buys:**
+- **The photic-zone gate is what pins the crest at sea level.** Coral grows only where light
+  reaches — a few metres down to ~50 m. Too deep and growth stops, so the reef can only ever
+  *catch up* to the surface as the island sinks, never overshoot. That is the whole trick.
+- **Wave-energy weighting (`12` exposure).** Reefs build fastest on the windward, wave-washed
+  rim, so a real atoll ring is *asymmetric* — wider and shallower to windward, often breached to
+  leeward. Uniform growth gives a suspiciously perfect ring.
+- **The lagoon is a flat, not a bowl.** Do not let flow routing (`03`) treat it as a pit to
+  drain — it is a closed marine basin at sea level, the same skip-the-fill case as a crater lake.
+
+**Fringing vs barrier vs atoll is one parameter: cumulative subsidence.** A little → fringing
+reef; more → the lagoon opens to a barrier reef; enough to drown the island → atoll. You author
+the stage by choosing how far the edifice has sunk, exactly as ELA authors a glacier and the
+water table authors tower karst (`11`).
+
+**Tier.** No graphics paper — atolls are **L-tier**, a composition of a volcanic primitive
+(`02`/`11`), subsidence, photic-zone coral accretion, and wave exposure. The subsidence theory is
+Darwin 1842; the recipe above is the honest way to realise it in a heightfield.

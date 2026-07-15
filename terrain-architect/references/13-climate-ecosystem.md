@@ -3,7 +3,8 @@
 Contents: [Why climate is in the graph](#why-climate-is-in-the-graph) · [Temperature](#temperature) ·
 [Orographic precipitation](#orographic-precipitation-smith--barstad-2004) · [Rain shadow](#the-rain-shadow-result) ·
 [Snow & avalanches](#snow--avalanches-cordonnier-et-al-2018) · [Moisture](#moisture--soil-water) ·
-[Biomes](#biome-classification) · [Ecosystem simulation](#ecosystem-simulation-deussen-et-al-1998)
+[Biomes](#biome-classification) · [Ecosystem simulation](#ecosystem-simulation-deussen-et-al-1998) ·
+[Multi-biome worlds](#multi-biome-worlds-regional-composition)
 
 ## Why climate is in the graph
 
@@ -228,3 +229,69 @@ fixed number of outer iterations rather than a convergence criterion.
 **Output.** An ecosystem sim's product is a `PointSet` with species, size and age — it *replaces*
 the scatter node's density mask rather than feeding it. That's a graph-shape change, not a node
 swap, so decide before building `07`.
+
+## Multi-biome worlds (regional composition)
+
+"Build me Hyrule / Middle-earth" — one map with a snowy massif, a desert, a swamp, a volcano, a
+forest — is the most common large request and the most common way to get it wrong. The wrong way
+is to **generate each region separately and mask the terrains together**. It fails the same way
+every time: seams at every boundary, rivers that die at the biome edge, a coastline unrelated to
+the drainage, materials that change on a line no water would respect. Independent per-region
+terrains do not share a hydrology, and a shared hydrology is what makes a world read as one place.
+
+**The rule: one substrate, one hydrology; masks vary parameters — not geometry.**
+
+```
+1. ONE macro layer for the whole world (02)
+   - Author the coastline and mountain ranges as uplift (splines / painted U, 02). For a named
+     map (Middle-earth) these are CONSTRAINTS you match, not noise you accept.
+   - Lay the regions out as a PARTITION: Voronoi over authored centres, painted, or derived
+     from climate (below). This is your world map / region graph.
+
+2. ONE global hydrology + erosion pass (03, 04)
+   - Depression handling, flow routing, and the erosion backbone run ONCE over the whole domain,
+     so drainage is coherent: rivers cross regions, divides sit where uplift + climate put them,
+     the coastline falls out of the drainage (02).
+
+3. Regions modulate PARAMETERS of that shared pass, through masks (06):
+     regionMask[i] ─▶ K, erosion backbone     (arid → aeolian 05; wet → fluvial 04)
+                   ─▶ precip, temperature      (13 → the biome, via Whittaker)
+                   ─▶ material / splat         (06)
+                   ─▶ scatter / ecosystem      (07, 13)
+                   ─▶ region-local detail      (biome-specific noise / stamps INSIDE the mask)
+
+4. Biomes are then mostly EMERGENT, not painted:
+     climate (13) + material + ecosystem give biome(T, precip). Paint a region mask to FORCE a
+     biome where a story demands one; let climate produce the rest.
+```
+
+**Two ways to drive the region layout — you usually blend them:**
+
+- **Climate-first (emergent).** Let temperature and precipitation fall out of latitude, elevation,
+  and the orographic rain shadow (above), then read biomes off the Whittaker LUT. This gives a
+  *geographically honest* world for free — deserts in the rain shadow, jungle on the windward
+  coast, tundra up high. Mordor reads right precisely because it sits in a rain shadow.
+- **Authored-first (art-directed).** A game world (Hyrule) has a designer's map: named regions in
+  fixed places for gameplay, not climate. Paint the partition and force each region's
+  climate/material/erosion parameters. The substrate and hydrology stay global and shared — that
+  is what keeps a *designed* layout coherent instead of looking assembled.
+
+**Ecotones are mandatory** (the biome-boundary note above): never snap region masks to hard
+edges. The masks must partition to 1 (`06`) and blend over a band, perturbed with noise. A hard
+biome line across a hillside is the single most obvious tell that a world was built from parts.
+
+**Per-region erosion backbone.** A desert and a rainforest are not the same erosion. Within the
+one global pass, let the mask pick the process: high fluvial `K` and drainage density in the wet
+region (`04`), aeolian dunes in the arid one (`05`), frost-shattering thermal up high (`05`/`13`),
+coastal in the littoral band (`12`). The *height field* stays global and continuous; only the
+*process weights* change across the mask — which is the whole discipline in one sentence.
+
+**References.** The map of this design space is the survey **Galin et al. 2019**, *A Review of
+Digital Terrain Modeling* (CGF 38(2)) — read it before committing an architecture for a world. For
+composing terrain from named feature primitives (peaks, ridges, rivers, cliffs placed on a map),
+**Génevaux et al. 2015**, *Terrain Modelling from Feature Primitives* (CGF 34(6)); for
+example-based authoring of the *distributions* of world elements ("scatter this region like that
+one"), **Emilien et al. 2015**, *WorldBrush* (ACM TOG 34(4)); for sketch-to-terrain of a region,
+**Guérin et al. 2017** (`00`). None of these is "the multi-biome algorithm" — there isn't one. A
+world is a composition, and the discipline is keeping the substrate and hydrology global while the
+masks do the regional work.

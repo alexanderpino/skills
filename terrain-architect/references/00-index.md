@@ -76,6 +76,9 @@ of what's reliable here.
 | Lava flow | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
 | Volcanic cones, calderas, craters, crater fields | F | Primitive + noise + erosion. No paper. |
 | Rock hardness layers / lithology | F | A material field feeding erodibility `K`. See Št'ava 2008 for the layered coupling. |
+| Feature-primitive terrain authoring | P | Génevaux et al. 2015, CGF 34(6) — construction tree of peaks/ridges/rivers/cliffs (`13`) |
+| Example-based world / element authoring | P | Emilien et al. 2015, *WorldBrush*, ACM TOG 34(4) (`13`) |
+| Digital terrain modelling — the survey | P | Galin et al. 2019, CGF 38(2). Read first when architecting a whole world (`13`) |
 
 **L-tier — landforms, not algorithms.** No implementation and no paper exists for these. They
 are compositions. The recipe is the answer:
@@ -84,7 +87,7 @@ are compositions. The recipe is the answer:
 |---|---|
 | Continents, islands | Low-freq noise + shelf remap + sea level after erosion (`02`) |
 | Archipelagos | Islands + Poisson-distributed centres (`07`) |
-| Ring islands, atolls | Volcanic cone + subsidence + coral ring mask + wave erosion (`12`) |
+| Ring islands, atolls | Volcanic edifice + subsidence + photic-zone coral accretion + wave exposure — Darwin's subsidence sequence (`12`) |
 | Mountain ranges, ridge networks | Uplift field + stream power (`02`, `04`) — **not** ridged noise |
 | Valley networks | Flow routing + fluvial incision (`03`, `04`) |
 | Waterfalls | Knickpoint pinned on a hard bed, base-level fall, or hanging valley (`04`, `11`, `12`) |
@@ -142,6 +145,7 @@ are compositions. The recipe is the answer:
 | River widening / depth estimation | F | Hydraulic geometry scaling (`w ∝ Q^0.5`, Leopold & Maddock 1953) |
 | Channel-reach morphology (cascade / step-pool / pool-riffle) | P | Montgomery & Buffington 1997, GSA Bulletin 109(5) (`03`) |
 | Hydrology-based terrain (river network first) | P | Genevaux et al. 2013, ACM TOG 32(4), SIGGRAPH '13 (`03`) |
+| Water sources & discharge routing (`Q` vs area) | P | Springs / inflows as source terms (Št'ava 2008); route `Q`, stream power on `Q^m` (`03`, `04`) |
 | Flood fill / sea level | F | — |
 
 ## 5. Erosion → `04`, `05`, `12`
@@ -235,6 +239,7 @@ are compositions. The recipe is the answer:
 | Wind fields | F | For terrain, an authored or noise field. Real CFD is out of scope. |
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
+| Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
 
 ---

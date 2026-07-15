@@ -201,6 +201,21 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - Diffusion-based terrain generation and terrain super-resolution: **no verified reference
   here.** This area post-dates what this file can vouch for. Search before citing.
 
+## Authoring & world composition
+
+- **Galin, E., Guérin, E., Peytavie, A., Cordonnier, G., Benes, B., Gain, J. & Digne, J. (2019).**
+  *A Review of Digital Terrain Modeling.* Computer Graphics Forum 38(2) (Eurographics 2019 STAR).
+  — **The survey.** Maps procedural, simulation, and example-based terrain methods and how they
+  compose. Read first when choosing an architecture for a whole multi-biome world (`13`).
+- **Génevaux, J.-D., Galin, É., Peytavie, A., Guérin, É., Briquet, C., Grosbellet, F. & Beneš, B.
+  (2015).** *Terrain Modelling from Feature Primitives.* Computer Graphics Forum 34(6). — A
+  construction tree of feature primitives (peaks, ridges, rivers, cliffs) composited into terrain.
+  The authoring model for placing named features on a map (`13`).
+- **Emilien, A., Vimont, U., Cani, M.-P., Poulin, P. & Beneš, B. (2015).** *WorldBrush:
+  Interactive Example-based Synthesis of Procedural Virtual Worlds.* ACM TOG 34(4), SIGGRAPH '15.
+  — Example-based authoring of the *distributions* of world elements: paint a region "like this
+  one" (`13`).
+
 ## Geological formation
 
 - **Beneš, B. & Forsbach, R. (2001).** *Layered Data Representation for Visual Simulation of
@@ -244,6 +259,11 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Rosenbloom, N.A. & Anderson, R.S. (1994).** *Hillslope and channel evolution in a marine
   terraced landscape, Santa Cruz, California.* Journal of Geophysical Research 99(B7),
   14013–14029. — Marine terraces, and the knickpoint-celerity result `C = K·A^m` used in `04`.
+- **Darwin, C. (1842).** *The Structure and Distribution of Coral Reefs.* Smith, Elder & Co. —
+  **The subsidence theory of atolls**: volcano → fringing reef → barrier reef → atoll, as the
+  island sinks and coral grows up to keep pace with sea level. Confirmed a century later by
+  drilling to volcanic basement at Enewetak. Cite it for *why* atolls form (`12`); it is not a
+  graphics method.
 
 ## Climate & ecosystems
 

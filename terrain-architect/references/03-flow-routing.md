@@ -3,8 +3,8 @@
 Contents: [Order of operations](#order-of-operations) · [Depression handling](#depression-handling-mandatory) ·
 [D8](#d8-ocallaghan--mark-1984) · [D∞](#d-tarboton-1997) · [MFD](#mfd-freeman-1991) ·
 [Accumulation](#flow-accumulation) · [Stack ordering](#stack-ordering-braun--willett) ·
-[Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) · [Sea level](#sea-level) ·
-[Choosing](#choosing)
+[Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) ·
+[Water sources & discharge](#water-sources--discharge) · [Sea level](#sea-level) · [Choosing](#choosing)
 
 ## Order of operations
 
@@ -309,6 +309,47 @@ incision physics for the bedrock reach is stream power; for the actual abrasion 
 orogens). To author a whole terrain *from* its river network instead of eroding into noise, the
 graphics reference is **Genevaux et al. (2013)** — build the drainage tree first, then raise the
 terrain around it.
+
+## Water sources & discharge
+
+Everything above routes *drainage area* `A` and treats rain as uniform — every cell contributes
+its own area and nothing more. That's the right default, and it's a proxy that breaks the moment
+you have a spring, a river entering from off-map, or non-uniform rainfall. The fix is to route
+**discharge `Q`** (m³/s, or m³ per timestep) instead of bare area:
+
+```
+Q[c] = localRain[c] * cellArea            # distributed source — the precip field from 13
+     + pointSource[c]                     # springs, authored inflows (m³/s injected at c)
+# accumulate Q downstream with the SAME stack as A (above) — sources just seed the accumulation
+```
+
+Under uniform rain with no sources, `Q ∝ A` and nothing changes. With sources or an orographic
+precip field (`13`), `Q` and `A` diverge — and **`Q` is the physically correct driver**: stream
+power becomes `∂h/∂t = U − K·Q^m·S^n`, and wetness (`06`) and river width (above) scale with `Q`,
+not `A`. This is the one change that lets a big river cross a dry region without pretending the
+desert it flows through fed it — the Nile and the Colorado are exactly this.
+
+**Kinds of source, and where each comes from:**
+
+| Source | How to place it | Notes |
+|---|---|---|
+| **Distributed rain** | `localRain = precip` per cell (`13`) | The default; orographic (`13`) makes it spatial |
+| **Boundary inflow** (river entering off-map) | Inject `Q_in` at an edge cell | Real water arriving — conserve it; label the edge a source, not base level |
+| **Spring** | Point `Q` where the water table meets the surface | Emerges at permeable-over-impermeable **lithology contacts** (`11`), **fault** lines (`02`), or the base of a slope (high TWI, `06`) |
+| **Karst resurgence** | Point `Q` where an underground stream returns | The exit of a sink (`11`) — the water that vanished into a doline reappears here |
+| **Oasis / desert spring** | Point `Q` in a depression over an aquifer | A local water + vegetation source in an otherwise dry `Q` field; drives a green mask (`13`) |
+| **Glacial / snowmelt** | Seasonal `Q` below the snow line | Couple to the snow field (`13`); it's why alpine rivers peak in summer |
+
+**The authoring rule.** A spring is not a bump in the height field — it is a **source term in the
+flow field**. Place it as discharge and let routing and erosion carve the valley below it, and the
+stream is coherent with the rest of the drainage. Stamp a riverbed into the height instead and you
+get a channel that ignores the hydrology and stops where you stopped drawing (the
+spline-before-erosion caveat in `10`). Authored sources are the Št'ava (2008) extension (`04`):
+springs and entering rivers as explicit inputs to the sim, not decoration.
+
+**Sinks** are the mirror image — a cell that *removes* water: a doline swallowing a stream (`11`),
+or an endorheic basin that only evaporates (the Dead Sea, the Aral). Mark them so depression
+handling leaves them unfilled and accumulation terminates there instead of forcing an outlet.
 
 ## Sea level
 
