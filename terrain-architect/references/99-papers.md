@@ -38,19 +38,20 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Imaging*, PhD thesis, Yale.
 - **Quilez, I.** *Domain warping.* iquilezles.org/articles/warp — The `fbm(p + fbm(p + fbm(p)))`
   construction.
-- **Bridson, R., Houriham, J. & Nordenstam, M. (2007).** *Curl-Noise for Procedural Fluid Flow.*
+- **Bridson, R., Hourihan, J. & Nordenstam, M. (2007).** *Curl-Noise for Procedural Fluid Flow.*
   ACM TOG 26(3), SIGGRAPH '07. — Divergence-free noise.
 
 ## Tectonics & landscape evolution
 
-- **Cordonnier, G., Galin, E., Gain, J., Benes, B., Guérin, E., Peytavie, A. & Cani, M.-P.
-  (2016).** *Large Scale Terrain Generation from Tectonic Uplift and Fluvial Erosion.*
-  Computer Graphics Forum 35(2) (Eurographics 2016). — Tectonic uplift + stream power +
-  lake-graph local-minima handling. **This is the "2015 tectonics" paper and the "2016 stream
-  power" paper — they are one and the same.**
 - **Cordonnier, G., Braun, J., Cani, M.-P., Benes, B., Galin, E., Peytavie, A. & Guérin, E.
+  (2016).** *Large Scale Terrain Generation from Tectonic Uplift and Fluvial Erosion.*
+  Computer Graphics Forum 35(2), 165–175 (Eurographics 2016). — Tectonic uplift + stream power +
+  lake-graph local-minima handling. **This is the "2015 tectonics" paper and the "2016 stream
+  power" paper — they are one and the same.** (Jean Braun is a co-author — the same Braun as the
+  solver below, which is why the paper builds on it.)
+- **Cordonnier, G., Galin, E., Gain, J., Benes, B., Guérin, E., Peytavie, A. & Cani, M.-P.
   (2017).** *Authoring Landscapes by Combining Ecosystem and Terrain Erosion Simulation.*
-  ACM TOG 36(4), SIGGRAPH '17. — The follow-up; couples vegetation to erosion.
+  ACM TOG 36(4), article 134, SIGGRAPH '17. — The follow-up; couples vegetation to erosion.
 - **Braun, J. & Willett, S.D. (2013).** *A very efficient O(N), implicit and parallel method to
   solve the stream power equation governing fluvial incision and landscape evolution.*
   Geomorphology 180–181, 170–179. — **The paper that matters for stream power.** The O(N)
@@ -104,7 +105,7 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 ## Flow routing
 
 - **O'Callaghan, J.F. & Mark, D.M. (1984).** *The extraction of drainage networks from digital
-  elevation data.* Computer Vision, Graphics and Image Processing 28(3), 323–344. — D8.
+  elevation data.* Computer Vision, Graphics and Image Processing 28(3), 328–344. — D8.
 - **Tarboton, D.G. (1997).** *A new method for the determination of flow directions and upslope
   areas in grid digital elevation models.* Water Resources Research 33(2), 309–319. — D∞.
   The 8-facet construction.
@@ -305,7 +306,7 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   physiographic implications.* USGS Professional Paper 252. — Channel width/depth scaling with
   discharge. Use for river widening.
 - **Beneš, B., Těšínský, V., Hornyš, J. & Bhatia, S.K. (2006).** *Hydraulic Erosion.* Computer
-  Animation and Virtual Worlds 17(3–4). — Shallow-water erosion.
+  Animation and Virtual Worlds 17(2), 99–108. — Shallow-water erosion.
 - **Montgomery, D.R. & Buffington, J.M. (1997).** *Channel-reach morphology in mountain drainage
   basins.* GSA Bulletin 109(5), 596–611. — **The mountain-channel classification**: cascade /
   step-pool / plane-bed / pool-riffle / dune-ripple by slope. What a river flowing down a mountain
@@ -381,7 +382,7 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
 - **Ulrich, T. (2002).** *Rendering Massive Terrains using Chunked Level of Detail Control.*
   SIGGRAPH 2002 course notes. — Course notes, not a paper.
 - **Strugar, F. (2009).** *Continuous Distance-Dependent Level of Detail for Rendering
-  Heightmaps.* Journal of Graphics Tools 14(4). — CDLOD.
+  Heightmaps.* Journal of Graphics, GPU, and Game Tools 14(4). — CDLOD.
 - Virtual texturing: **Barrett, S. (2008)**, *Sparse Virtual Textures* (GDC) and **Mittring, M.
   (2008)**, *Advanced Virtual Texture Topics* (SIGGRAPH course). Talks, not papers — cite as such.
 

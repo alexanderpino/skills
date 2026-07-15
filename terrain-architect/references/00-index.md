@@ -166,7 +166,7 @@ are compositions. The recipe is the answer:
 | Incipient motion / critical shear (which grains move) | P | Shields 1936 (`04`); wind analogue = Bagnold threshold (`05`) |
 | Bedload transport (gravel / pebbles) | P | Meyer-Peter & Müller 1948; Parker 1990 (gravel-bed, surface-based) (`04`) |
 | Downstream fining (boulders → pebbles → sand) | P | Sternberg 1875, `D = D0·e^(−αx)` — abrasion + selective sorting (`04`) |
-| Shallow-water erosion | P | Beneš et al. 2006, *Hydraulic Erosion*, CAVW 17(3–4) |
+| Shallow-water erosion | P | Beneš et al. 2006, *Hydraulic Erosion*, CAVW 17(2) |
 | Thermal erosion / talus-angle | P | Musgrave et al. 1989 |
 | Talus fast approximation | P | Olsen 2004, tech report, Univ. of Southern Denmark |
 | Wind erosion physics | P | Bagnold 1941, *The Physics of Blown Sand and Desert Dunes* — physics, **not implementable as written** |
