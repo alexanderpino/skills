@@ -1,0 +1,272 @@
+# Flow Routing
+
+Contents: [Order of operations](#order-of-operations) · [Depression handling](#depression-handling-mandatory) ·
+[D8](#d8-ocallaghan--mark-1984) · [D∞](#d-tarboton-1997) · [MFD](#mfd-freeman-1991) ·
+[Accumulation](#flow-accumulation) · [Stack ordering](#stack-ordering-braun--willett) ·
+[Lakes](#lakes) · [Sea level](#sea-level) · [Choosing](#choosing)
+
+## Order of operations
+
+```
+height → depression handling → flow direction → flow accumulation → drainage area A
+                     ↑                                                      ↓
+              MANDATORY                                      stream power (04), wetness (06)
+```
+
+**Skipping depression handling is the most common defect in terrain graphs.** Symptoms:
+drainage area map looks like scattered confetti instead of a branching network; rivers appear
+then stop mid-slope; stream power erosion carves disconnected pits. Any DEM produced by noise
+has thousands of pits — a pit is any cell with no lower neighbour, and noise generates them
+everywhere.
+
+## Depression handling (mandatory)
+
+Two philosophies. Choose deliberately.
+
+### Filling — Priority-Flood (Barnes, Lehman & Mulla 2014)
+
+Raises pits to their spill elevation. Optimal, O(n) with the right queue, and trivially
+correct.
+
+```
+priorityFlood(dem):
+    open = priority_queue()                  // min-heap keyed by elevation
+    closed = boolean grid, all false
+
+    for each cell c on the domain edge:
+        open.push(c, dem[c]); closed[c] = true
+
+    while open not empty:
+        c = open.pop()                       // lowest remaining
+        for n in neighbours(c):
+            if closed[n]: continue
+            dem[n] = max(dem[n], dem[c])     // fill to spill level
+            closed[n] = true
+            open.push(n, dem[n])
+```
+
+**The epsilon variant.** Plain filling produces perfectly flat lakes, and a flat surface has no
+flow direction — routing across it is undefined and D8 will make an arbitrary choice, giving
+you a parallel-lines artefact across every filled basin. Fix:
+
+```
+dem[n] = max(dem[n], nextafter(dem[c], INFINITY))   // or dem[c] + eps
+```
+
+with `eps` around 1e-5 m. This creates an imperceptible gradient toward the spill point so
+flow routes correctly across the filled area. **Use the epsilon variant by default.**
+
+### Breaching (Lindsay 2016)
+
+Carves a channel *out* of the pit to a lower cell rather than raising the pit. Geomorphically
+far more plausible — real pits are usually artefacts of a missing channel, not real basins —
+and it doesn't destroy the terrain inside the depression.
+
+```
+breach(dem, maxDepth, maxLength):
+    for each pit p (ascending elevation):
+        find least-cost path from p to a cell lower than p
+            cost of a path = total material to remove
+            bounded by maxLength
+        if path found and depth needed <= maxDepth:
+            carve dem along path, monotonically descending
+        else:
+            fill p with priority-flood                // fallback for genuine basins
+```
+
+**Hybrid is the right default for terrain generation:** breach shallow pits (they're noise
+artefacts), fill deep ones (they're real basins that should become lakes). Threshold around
+`maxDepth = 5–20 m` depending on your vertical scale.
+
+If you fill everything, you lose all your lakes — the basins that *should* hold water get
+raised to their rims. If you breach everything, you carve absurd canyons out of legitimate
+craters and calderas.
+
+### Cordonnier's approach
+
+Cordonnier et al. (2016) handle local minima inside the erosion loop rather than as a
+preprocess, by building a **lake graph**: each depression becomes a node, edges are the
+spill-over passes between them, and a minimum spanning tree over that graph gives the
+correct flow routing through the filled basins in O(n log n). This is more elegant and
+handles the case where erosion *creates* new pits during the simulation — which it does. If
+you're implementing stream power at scale, do this rather than re-running priority-flood
+every timestep.
+
+## D8 (O'Callaghan & Mark 1984)
+
+All flow from a cell goes to the single steepest downslope neighbour.
+
+```
+d8(dem, c):
+    best = -INF; receiver = NONE
+    for n in 8 neighbours:
+        d = (n is diagonal) ? cellSize * SQRT2 : cellSize
+        s = (dem[c] - dem[n]) / d                 // slope, note the distance weighting
+        if s > best: best = s; receiver = n
+    return receiver                                // NONE if best <= 0 → c is a pit
+```
+
+**The distance weighting is not optional.** Dividing by the diagonal distance is what makes
+D8 pick correctly; using raw height differences biases every flow path toward the diagonals,
+and you get a drainage network at 45°.
+
+**Limitation.** D8 can only express 8 directions, so on a planar hillslope every cell picks
+the same neighbour and flow collects into parallel lines. This is the classic D8 artefact and
+it's why D8 is bad for *dispersive* flow (hillslopes, alluvial fans) and fine for *convergent*
+flow (channels, once flow has already collected). It is still the right choice for extracting
+a discrete channel network, because a channel network *should* be single-thread.
+
+## D∞ (Tarboton 1997)
+
+Flow direction is a continuous angle; flow is proportioned between the two neighbours that
+bracket that angle. Eliminates D8's directional bias.
+
+The domain around a cell is divided into 8 triangular facets. Each facet is defined by the
+centre `e0`, a cardinal neighbour `e1` (at distance `d1 = cellSize`), and a diagonal neighbour
+`e2` (at distance `d2 = cellSize` from `e1`).
+
+```
+facetSlope(e0, e1, e2, d1, d2):
+    s1 = (e0 - e1) / d1                       // slope along the cardinal edge
+    s2 = (e1 - e2) / d2                       // slope along the transverse edge
+    r  = atan2(s2, s1)                        // direction within the facet
+    s  = sqrt(s1*s1 + s2*s2)                  // magnitude
+
+    if r < 0:                                 // direction falls outside facet, toward e1 side
+        r = 0
+        s = s1
+    if r > atan2(d2, d1):                     // = π/4 for square cells; outside toward e2 side
+        r = atan2(d2, d1)
+        s = (e0 - e2) / sqrt(d1*d1 + d2*d2)
+    return (r, s)
+
+dinf(dem, c):
+    best_s = 0; best_r = 0; best_facet = NONE
+    for each of the 8 facets f:
+        (r, s) = facetSlope(...)
+        if s > best_s: best_s = s; best_r = r; best_facet = f
+    if best_facet == NONE: return PIT
+
+    // proportion flow between the facet's two neighbours
+    alpha = PI / 4
+    p_cardinal = (alpha - best_r) / alpha
+    p_diagonal = best_r / alpha
+    return (best_facet, p_cardinal, p_diagonal)
+```
+
+Note `s2` is measured from `e1` to `e2`, not from `e0` — this is the detail that gets
+misimplemented most often, and it silently produces slightly wrong directions everywhere.
+
+## MFD (Freeman 1991)
+
+Flow is split among *all* downslope neighbours, weighted by slope to a power.
+
+```
+mfd(dem, c, p = 1.1):
+    total = 0; w[8]
+    for i, n in enumerate(8 neighbours):
+        d = (n is diagonal) ? cellSize * SQRT2 : cellSize
+        s = (dem[c] - dem[n]) / d
+        w[i] = (s > 0) ? pow(s, p) : 0
+        total += w[i]
+    if total == 0: return PIT
+    return w / total                          // fractions, sum to 1
+```
+
+**`p = 1.1` is Freeman's calibrated value** — not 1.0, not 2.0. The exponent controls
+convergence: `p → 0` spreads flow evenly regardless of slope (pure dispersion), `p → ∞`
+converges to D8. Freeman fitted 1.1 against measured hillslope hydrology.
+
+Quinn et al. (1991) is the sibling variant with `p = 1` plus contour-length weighting
+(cardinal neighbours weighted 0.5, diagonals 0.354) — slightly better on hillslopes, and
+worth knowing the two are usually cited interchangeably but are not the same.
+
+**MFD's weakness** is the mirror of D8's: it never lets flow fully converge, so channels stay
+diffuse and rivers look like broad damp smears rather than lines. The standard fix is a
+**hybrid**: MFD where `A` is small (hillslope), D8 or D∞ where `A` exceeds a channelisation
+threshold. This costs almost nothing and is what most good terrain tools do.
+
+## Flow accumulation
+
+Drainage area `A` at a cell = its own area plus everything routed into it.
+
+```
+accumulate(dem, dirs):
+    order = cells sorted by elevation, DESCENDING
+    // or: topological order of the flow graph — cheaper and correct even on flats
+    A = cellArea for every cell                 // ← in m², NOT a count of 1
+
+    for c in order:
+        for (receiver, fraction) in dirs[c]:
+            A[receiver] += A[c] * fraction
+    return A
+```
+
+**Report `A` in m², not cell counts.** A count is resolution-dependent, so every downstream
+threshold ("channel starts at A > 1000") silently means something different at a different
+resolution. `A_cell = cellSize²`.
+
+Sorting by descending elevation is correct only if the DEM is depression-free and every cell's
+receiver is strictly lower. After epsilon-filling this holds. Otherwise use a topological sort
+of the flow DAG (Kahn's algorithm on in-degree), which is O(n) and robust.
+
+## Stack ordering (Braun & Willett)
+
+For stream power (`04`) you need cells in an order where every cell's receiver is processed
+*before* it. Braun & Willett (2013) build this in O(n) without a sort:
+
+```
+buildStack(receivers):
+    // 1. invert receivers → donors list
+    donors = [[] for each cell]
+    for c in all cells:
+        if receivers[c] != c: donors[receivers[c]].append(c)
+
+    // 2. depth-first from every base-level cell (receiver == self)
+    stack = []
+    for c where receivers[c] == c:
+        dfs_push(c)                             // appends c, then recurses into donors[c]
+    return stack                                // base levels first, headwaters last
+```
+
+Traverse `stack` forward and every node's receiver is already updated. Traverse it backward
+and every node's donors are already updated (that's how you accumulate `A` in O(n) too).
+This single data structure serves accumulation and the implicit erosion solve.
+
+## Lakes
+
+Once you have filled depressions with the epsilon variant, you know the lakes: they are the
+cells whose filled elevation exceeds their original elevation.
+
+```
+lakeDepth = filledDem - originalDem              // > 0 inside lakes
+lakeMask  = lakeDepth > 0
+lakeSurface = filledDem                          // flat, by construction
+```
+
+Keep both DEMs. Route flow on the filled one; render and analyse on the original one with a
+water surface at `filledDem`. Substituting the filled DEM for the terrain is the mistake that
+makes every basin in the map a flat plate.
+
+## Sea level
+
+Set it **after** erosion, not before. Sea level before erosion means erosion cuts to the wrong
+base level and the drainage network is calibrated to a coastline you're about to move.
+
+```
+oceanMask = floodFillFromDomainEdge(dem <= seaLevel)
+```
+
+Use a flood fill from the edge, not a plain `dem <= seaLevel` threshold — otherwise every
+inland depression below sea level becomes "ocean", including basins that are legitimately
+below sea level and dry (Death Valley, the Dead Sea, the Qattara Depression).
+
+## Choosing
+
+| Need | Method |
+|---|---|
+| Channel network extraction, river polylines | D8 (after epsilon fill) |
+| Drainage area for stream power | D∞ or MFD-hybrid — D8's parallel-lines artefact prints straight into the eroded terrain |
+| Wetness index, moisture masks for vegetation | MFD — dispersion is the physically right behaviour on hillslopes |
+| Cheapest thing that works | D8 + epsilon fill |
+| Best quality per cost | D∞ + hybrid breach/fill |

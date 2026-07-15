@@ -1,0 +1,244 @@
+# Algorithm Index
+
+The skill's map of its own knowledge. Every row carries a **provenance tier**, because the
+failure mode this file exists to prevent is *confident fabrication of a citation*.
+
+## Provenance tiers
+
+| Tier | Meaning | How to talk about it |
+|---|---|---|
+| **P** | **Paper.** Peer-reviewed source, verified to actually contain the algorithm attributed to it. | Cite it directly. |
+| **F** | **Folklore.** Universal practice with no canonical paper. A blog post, a thesis, a repo, or nothing. | Say "no canonical paper; standard practice is…". Naming Quilez or a repo is fine — just don't dress it as peer review. |
+| **L** | **Landform, not algorithm.** An *outcome*. Produced by composing other nodes. | "There is no X algorithm. X emerges from A + B + C." Then give the recipe. |
+| **N** | **Node, not algorithm.** A UI surface over one or more operators, usually a tool's branding. | Name the underlying algorithm. |
+| **?** | **Claimed but unverified.** Plausible, commonly repeated, not confirmed. | **Do not cite.** Say it needs checking, and search if you can. |
+
+**The rule that makes this work: never upgrade a tier to satisfy a question.** If someone asks
+for the paper on sea-stack formation, the correct answer is that there isn't one — not a
+plausible-looking guess. An L-tier row answered with a citation is the exact defect this skill
+was built to stop, and it is the defect in most terrain-algorithm reference tables in
+circulation.
+
+If a question lands on `?`, say so and offer to search. Being usefully uncertain beats being
+confidently wrong; a fabricated citation costs the reader a day.
+
+---
+
+## 1. Noise & procedural synthesis → `01-noise.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Value noise | F | No canonical paper |
+| Perlin noise | P | Perlin 1985, *An Image Synthesizer*, SIGGRAPH |
+| Improved Perlin | P | Perlin 2002, *Improving Noise*, ACM TOG 21(3) |
+| Simplex noise | P | Perlin 2001/2002; **Gustavson 2005** is the readable derivation, not the origin |
+| OpenSimplex2 | F | KdotJPG, public-domain repo. No paper. |
+| Worley noise | P | Worley 1996, *A Cellular Texture Basis Function*, SIGGRAPH |
+| Voronoi | P | Voronoi 1908 — the **tessellation**, a maths paper. Not a noise paper. Don't cite it for a noise node. |
+| Gabor noise | P | Lagae et al. 2009, *Procedural Noise using Sparse Gabor Convolution*, ACM TOG 28(3) |
+| Wavelet noise | P | Cook & DeRose 2005, *Wavelet Noise*, ACM TOG 24(3) |
+| Sparse convolution noise | P | Lewis 1989, *Algorithms for Solid Noise Synthesis*, SIGGRAPH |
+| Spectral synthesis | P | Voss, in Peitgen & Saupe (eds.) 1988, *The Science of Fractal Images* |
+| Midpoint displacement / diamond-square | P | Fournier, Fussell & Carpenter 1982, CACM 25(6) |
+| FBM | P | Mandelbrot & Van Ness 1968; Mandelbrot 1982, *The Fractal Geometry of Nature* |
+| Ridged multifractal | P | Musgrave 1993 (thesis); Ebert et al., *Texturing & Modeling*, Musgrave's chapters |
+| Hybrid multifractal | P | Musgrave, as above |
+| Heterogeneous multifractal | P | Musgrave, as above |
+| Domain warping | F | Quilez, iquilezles.org. Widely used, no paper. |
+| Vector warping | F | No canonical paper |
+| Curl noise | P | Bridson et al. 2007, *Curl-Noise for Procedural Fluid Flow*, SIGGRAPH |
+| Noise survey (read this) | P | Lagae et al. 2010, *A Survey of Procedural Noise Functions*, CGF 29(8) |
+
+**Learned / example-based** — verify before citing; this area moves fast and post-dates much
+of what's reliable here.
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Example-based terrain synthesis | P | Zhou, Sun, Turk & Rehg 2007, *Terrain Synthesis from Digital Elevation Models*, IEEE TVCG 13(4) |
+| Sketch/example authoring with cGANs | P | Guérin et al. 2017, *Interactive Example-Based Terrain Authoring with Conditional GANs*, ACM TOG 36(6) |
+| Terrain amplification | P | Guérin et al. 2017, as above |
+| Diffusion-based terrain generation | ? | Recent; no verified canonical reference here. **Search before citing.** |
+| Terrain super-resolution | ? | Several candidates, none verified here. **Search.** |
+| Neural terrain generation (general) | ? | Too broad to have a canonical paper. Ask what specifically. |
+
+## 2. Macro & geological formation → `02-macro-tectonics.md`, `11-geological.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Tectonic uplift + fluvial erosion | P | **Cordonnier et al. 2016**, CGF 35(2). *This is the "2015 tectonics" paper and the "2016 stream power" paper — one paper, not two.* |
+| Ecosystem + erosion authoring | P | Cordonnier et al. 2017, ACM TOG 36(4) |
+| Plate partitioning / boundary classification | F | Voronoi + velocity vectors. No canonical paper for the graphics version. |
+| Fault displacement / fault networks | F | No canonical paper |
+| Folding | F | Coordinate warp of the stratum field. No paper. |
+| Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
+| Layered terrain with overhangs/arches | P | Peytavie et al. 2009, *Arches: a Framework for Modeling Complex Terrains*, CGF 28(2) |
+| Cave networks / karst dissolution | P | Paris et al. 2021, *Synthesizing Geologically Coherent Cave Networks*, CGF |
+| Lava flow | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
+| Volcanic cones, calderas, craters, crater fields | F | Primitive + noise + erosion. No paper. |
+| Rock hardness layers / lithology | F | A material field feeding erodibility `K`. See Št'ava 2008 for the layered coupling. |
+
+**L-tier — landforms, not algorithms.** No implementation and no paper exists for these. They
+are compositions. The recipe is the answer:
+
+| Landform | Composition |
+|---|---|
+| Continents, islands | Low-freq noise + shelf remap + sea level after erosion (`02`) |
+| Archipelagos | Islands + Poisson-distributed centres (`07`) |
+| Ring islands, atolls | Volcanic cone + subsidence + coral ring mask + wave erosion (`12`) |
+| Mountain ranges, ridge networks | Uplift field + stream power (`02`, `04`) — **not** ridged noise |
+| Valley networks | Flow routing + fluvial incision (`03`, `04`) |
+| Plateaus, mesas, buttes | Hard caprock layer in `K` + fluvial erosion (`11`) |
+| Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
+| Fjords | Glacial erosion + sea-level rise (`12`) |
+| Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`) |
+| Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
+| Natural arches, hoodoos | Differential erosion of layered rock; needs a **non-heightfield representation** (`11`) |
+| Karst terrain | Dissolution of a soluble layer; caves need volume (`11`) |
+
+## 3. Composition & filtering → `10-primitives-ops-filters.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Add/Sub/Mul/Div/Min/Max/Lerp/Clamp/Invert/Threshold/Switch | F | Operators. No papers. Real gotchas — see `10`. |
+| Smooth min / max | F | Quilez. No paper. |
+| Normalise | F | **Reviewed as a defect by default** — destroys world units, breaks tiling (`10`) |
+| Histogram equalisation | F | Standard image processing |
+| Curve remapping / quantisation | F | — |
+| Box / Gaussian blur | F | Separable. Wrong default for terrain (`10`). |
+| Median filter | F | Tukey 1977, *Exploratory Data Analysis* — the book, not an algorithm paper |
+| Bilateral filter | P | Tomasi & Manduchi 1998, *Bilateral Filtering for Gray and Color Images*, ICCV |
+| Guided filter | P | He, Sun & Tang 2010, *Guided Image Filtering*, ECCV |
+| Anisotropic diffusion | P | Perona & Malik 1990, IEEE PAMI 12(7) |
+| Morphological dilation/erosion/opening/closing | P | Serra 1982, *Image Analysis and Mathematical Morphology* |
+| Distance transform | P | Felzenszwalb & Huttenlocher 2012, *Distance Transforms of Sampled Functions*, Theory of Computing 8; also Danielsson 1980, Meijster 2000 |
+| Signed distance fields | P | Frisken et al. 2000, *Adaptively Sampled Distance Fields*, SIGGRAPH |
+| Laplacian / edge detection / band-pass | F | Standard image processing |
+| Bicubic / Lanczos reconstruction | F | Standard signal processing |
+| Twist / Bend / Shear / Fold | F | Coordinate warps. No papers. (`10`) |
+
+## 4. Hydrology → `03-flow-routing.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| D8 flow routing | P | O'Callaghan & Mark 1984, CVGIP 28(3) |
+| D∞ flow routing | P | Tarboton 1997, Water Resources Research 33(2) |
+| MFD | P | **Freeman 1991**, Computers & Geosciences 17(3) — `p = 1.1` |
+| MFD (contour-length variant) | P | Quinn et al. 1991, Hydrological Processes 5(1) — `p = 1`. **Not the same as Freeman.** |
+| Priority-Flood / depression filling | P | Barnes, Lehman & Mulla 2014, Computers & Geosciences 62 |
+| Depression filling (alternative) | P | Planchon & Darboux 2002, Catena 46(2–3) |
+| Depression breaching / hybrid | P | Lindsay 2016, Hydrological Processes 30(6) |
+| Lake graph / minima contraction in-loop | P | Cordonnier et al. 2016 |
+| O(N) stack ordering | P | Braun & Willett 2013, Geomorphology 180–181 |
+| Stream ordering | P | Strahler 1957, Trans. AGU 38(6); Horton 1945 |
+| Flow accumulation / drainage area / watershed labelling | P | Barnes et al. 2014 (labelling); accumulation itself is F |
+| Topographic wetness index | P | Beven & Kirkby 1979, Hydrological Sciences Bulletin 24(1) |
+| River meandering / migration | P | Howard & Knutson 1984, Water Resources Research 20(11) |
+| River widening / depth estimation | F | Hydraulic geometry scaling (`w ∝ Q^0.5`, Leopold & Maddock 1953) |
+| Flood fill / sea level | F | — |
+
+## 5. Erosion → `04`, `05`, `12`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Virtual-pipe hydraulic erosion | P | **Mei, Decaudin & Hu 2007** — *this is the pipe/grid model, NOT particle* |
+| Pipe + slippage + layers | P | **Št'ava et al. 2008** — *also a pipe model; an extension of Mei, not a different family* |
+| Droplet / particle hydraulic erosion | F | **Beyer 2015**, TU München bachelor thesis, after Musgrave et al. 1989. **No canonical paper.** Popularised by Sebastian Lague. |
+| Grid hydraulic erosion (origin) | P | Musgrave, Kolb & Mace 1989, SIGGRAPH |
+| Stream-power erosion | P | **Braun & Willett 2013** (the O(N) implicit solver — *the paper that matters*) + Cordonnier et al. 2016 (the terrain application) |
+| Shallow-water erosion | P | Beneš et al. 2006, *Hydraulic Erosion*, CAVW 17(3–4) |
+| Thermal erosion / talus-angle | P | Musgrave et al. 1989 |
+| Talus fast approximation | P | Olsen 2004, tech report, Univ. of Southern Denmark |
+| Wind erosion physics | P | Bagnold 1941, *The Physics of Blown Sand and Desert Dunes* — physics, **not implementable as written** |
+| Dune formation (implementable) | P | **Werner 1995**, Geology 23(12) — the slab CA. Under-cited relative to usefulness. |
+| Glacier flow & erosion | P | Argudo et al. 2020, *Simulation, Modeling and Authoring of Glaciers*, ACM TOG 39(6) |
+| Snow / avalanche | P | Cordonnier et al. 2018, *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*, CGF 37(2) |
+| Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
+| Longshore transport | F | CERC formula (coastal engineering), not graphics |
+| Landslide / slump / debris flow / mudflow / rockfall | F | No canonical graphics paper for the terrain-gen versions |
+| Soil creep | P | = hillslope diffusion, `D·∇²h`. See Culling 1960, *Analytical Theory of Erosion*, J. Geology 68 |
+
+## 6. Terrain analysis → `06-analysis-masks.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Slope / aspect | P | Horn 1981, Proc. IEEE 69(1) |
+| Curvature (profile, plan) | P | Zevenbergen & Thorne 1987, ESPL 12(1) |
+| Mean / Gaussian curvature | P | Differential geometry — no terrain-specific paper needed |
+| Laplacian, convexity, concavity | F | — |
+| Horizon angle / occlusion | P | **Timonen & Westerholm 2010**, *Scalable Height Field Self-Shadowing*, CGF 29(2) — O(1)/cell sweep |
+| HBAO | P | Bavoil et al. 2008, SIGGRAPH talks. **Screen-space weighting; not the correct integral for a baked terrain AO map** (`06`) |
+| Sky-view factor | P | Zakšek, Oštir & Kokalj 2011, Remote Sensing 3(2) |
+| Terrain ruggedness index | P | Riley, DeGloria & Elliot 1999, Intermountain J. Sciences 5 |
+| Topographic position index | F | Weiss 2001 (ESRI poster) — widely used, not peer-reviewed |
+| Ridge / valley / peak / pit / saddle detection | F | Morse theory in principle; in practice curvature thresholds |
+| Prominence / isolation | F | Definitions from mountaineering, computed by flood fill |
+| Roughness, local relief | F | — |
+
+## 7. Population → `07-scatter.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Poisson-disk sampling | P | **Bridson 2007**, SIGGRAPH sketches. Two pages. |
+| Best-candidate | P | Mitchell 1991, SIGGRAPH |
+| Blue-noise / void-and-cluster tiles | P | Ulichney 1993, SPIE 1913 |
+| Sample elimination | P | Yuksel 2015, CGF 34(2) |
+| Maximal Poisson-disk (parallel) | P | Ebeida et al. 2011, ACM TOG 30(4) |
+| Parallel Poisson-disk | P | Wei 2008, ACM TOG 27(3) |
+| Jittered / stratified sampling | F | — |
+| Clustered / parent-child point processes | P | Neyman–Scott / Matérn cluster processes (spatial statistics) |
+| Ecosystem simulation | P | **Deussen et al. 1998**, *Realistic Modeling and Rendering of Plant Ecosystems*, SIGGRAPH |
+| Plant community distributions | P | Lane & Prusinkiewicz 2002, Graphics Interface |
+| Multi-scale plant ecosystems | P | Makowski et al. 2019, ACM TOG 38(4) |
+| Plants interacting with environment | P | Měch & Prusinkiewicz 1996, SIGGRAPH |
+| Constraint-based placement (slope/height/aspect/material) | F | — |
+
+## 8. Conversion & runtime → `08-output-contract.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Marching squares / cubes | P | Lorensen & Cline 1987, SIGGRAPH |
+| Dual contouring | P | Ju, Losasso, Schaefer & Warren 2002, ACM TOG 21(3) |
+| Mesh simplification / quadric error metrics | P | Garland & Heckbert 1997, SIGGRAPH |
+| Geometry clipmaps | P | Losasso & Hoppe 2004, ACM TOG 23(3) |
+| ROAM | P | Duchaineau et al. 1997, IEEE Visualization |
+| BDAM | P | Cignoni et al. 2003, CGF 22(3) |
+| Chunked LOD | P | Ulrich 2002, SIGGRAPH course notes |
+| CDLOD | P | Strugar 2009, J. Graphics Tools 14(4) |
+| Virtual texturing / sparse virtual textures | F | Barrett 2008 (GDC), Mittring 2008 (SIGGRAPH course) — talks, not papers |
+| Normal map mipping (variance) | P | Toksvig 2005, JGT 10(3) |
+| LEAN mapping | P | Olano & Baker 2010, I3D |
+| Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |
+| Quadtree terrain, chunked heightfield, streaming, crack prevention, seam stitching | F | Engineering practice. No papers. (`08`) |
+
+## 9. Climate → `13-climate-ecosystem.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Orographic rainfall / rain shadow | P | **Smith & Barstad 2004**, *A Linear Theory of Orographic Precipitation*, J. Atmos. Sci. 61 |
+| Elevation lapse rate | P | Standard atmospheric physics — 6.5 °C/km environmental |
+| Latitude temperature, seasonality, continentality | F | — |
+| Wind fields | F | For terrain, an authored or noise field. Real CFD is out of scope. |
+| Snow line, permafrost, aridity index | F | Threshold definitions |
+| Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
+| Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
+
+---
+
+## Node types (N-tier) — not algorithms
+
+Commercial tools brand nodes. The brand is not the algorithm, and the mapping is usually
+undocumented. **Do not claim to know what a specific tool's node does internally** unless it
+is publicly documented — that's an unsupported claim about a proprietary product.
+
+| You'll hear | It's really |
+|---|---|
+| "Erosion" node (any tool) | Some hydraulic model — pipe, droplet, or bespoke. Ask which. |
+| "Wizard" / "Erosion2" / branded presets | A parameter preset over an unpublished implementation. Unknowable from outside. |
+| "Fractal Terrace" | Terrace (`10`) with noise-perturbed levels |
+| "Sediment" | Deposition output of an erosion node (`04`) |
+| "Flow" / "Wear" / "Deposits" | Analysis outputs of an erosion sim, not separate algorithms |
+| "Combine" / "Chokepoint" / "Sanctuary" | Tool-specific composites |
+
+When someone asks "how does Gaea's Erosion node work" — the honest answer is that it isn't
+documented, here's what the *family* of algorithms it plausibly belongs to does, and here's how
+to tell from the output which one it is (`09`).
