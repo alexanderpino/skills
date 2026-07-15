@@ -93,8 +93,10 @@ are compositions. The recipe is the answer:
 | Waterfalls | Knickpoint pinned on a hard bed, base-level fall, or hanging valley (`04`, `11`, `12`) |
 | Mountain lakes (tarn, paternoster, ribbon) | Glacial / landslide / crater basin, left unfilled (`03`, `12`) |
 | Oxbow lakes, meander scrolls, floodplains | Meander migration + neck cutoff on a low-slope reach (`03`) |
+| Gravel bars, pebble beaches, boulder gardens | Bedload deposition where competence drops; scatter clasts by grain size (`04`, `07`) |
 | Plateaus, mesas, buttes | Hard caprock layer in `K` + fluvial erosion (`11`) |
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
+| Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
 | Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
@@ -160,6 +162,10 @@ are compositions. The recipe is the answer:
 | Stream-power erosion | P | **Braun & Willett 2013** (the O(N) implicit solver — *the paper that matters*) + Cordonnier et al. 2016 (the terrain application) |
 | Knickpoint / waterfall retreat | P | Whipple & Tucker 1999; Crosby & Whipple 2006; Berlin & Anderson 2007. **No graphics "waterfall" algorithm** — it's a knickpoint (`04`). |
 | Bedrock river incision (saltation–abrasion) | P | Sklar & Dietrich 2004; Whipple 2004 — the physics under stream power in steep channels (`03`, `04`) |
+| Grain-size classification (Wentworth φ scale) | P | Wentworth 1922; Udden 1914 (`04`) |
+| Incipient motion / critical shear (which grains move) | P | Shields 1936 (`04`); wind analogue = Bagnold threshold (`05`) |
+| Bedload transport (gravel / pebbles) | P | Meyer-Peter & Müller 1948; Parker 1990 (gravel-bed, surface-based) (`04`) |
+| Downstream fining (boulders → pebbles → sand) | P | Sternberg 1875, `D = D0·e^(−αx)` — abrasion + selective sorting (`04`) |
 | Shallow-water erosion | P | Beneš et al. 2006, *Hydraulic Erosion*, CAVW 17(3–4) |
 | Thermal erosion / talus-angle | P | Musgrave et al. 1989 |
 | Talus fast approximation | P | Olsen 2004, tech report, Univ. of Southern Denmark |
@@ -210,6 +216,7 @@ are compositions. The recipe is the answer:
 | Multi-scale plant ecosystems | P | Makowski et al. 2019, ACM TOG 38(4) |
 | Plants interacting with environment | P | Měch & Prusinkiewicz 1996, SIGGRAPH |
 | Constraint-based placement (slope/height/aspect/material) | F | — |
+| Clast scatter (boulders / cobbles / pebbles), imbrication | F | Grain-size field (`04`) drives size & density in scatter (`07`); pebbles dip upstream |
 
 ## 8. Conversion & runtime → `08-output-contract.md`
 

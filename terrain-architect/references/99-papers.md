@@ -320,6 +320,31 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   its river network first, then raise the relief around it. The graphics reference for
   river-driven terrain (`03`).
 
+## Sediment & bedload
+
+The physics of grain size, transport, and gravel bars — old, canonical, and the grounding for
+boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
+
+- **Udden, J.A. (1914).** *Mechanical composition of clastic sediments.* GSA Bulletin 25. — The
+  φ grade scale, refined by Wentworth.
+- **Wentworth, C.K. (1922).** *A scale of grade and class terms for clastic sediments.* Journal of
+  Geology 30(5), 377–392. — **The grain-size classification** (boulder / cobble / pebble / … ).
+- **Sternberg, H. (1875).** *Untersuchungen über Längen- und Querprofil geschiebeführender
+  Flüsse.* Zeitschrift für Bauwesen 25. — **Downstream fining**, `D = D0·e^(−αx)`. Boulders at the
+  source, rounded pebbles then sand downstream.
+- **Shields, A. (1936).** *Anwendung der Ähnlichkeitsmechanik und der Turbulenzforschung auf die
+  Geschiebebewegung.* Preußische Versuchsanstalt für Wasserbau und Schiffbau, Berlin. — **Critical
+  shear stress for incipient motion.** Which grains move at a given flow; the water twin of
+  Bagnold's wind threshold (`05`).
+- **Meyer-Peter, E. & Müller, R. (1948).** *Formulas for bed-load transport.* Proc. 2nd Meeting
+  IAHR, Stockholm, 39–64. — **The canonical bedload transport formula**, `q_b ∝ (τ*−τ*_c)^1.5`.
+- **Parker, G. (1990).** *Surface-based bedload transport relation for gravel rivers.* Journal of
+  Hydraulic Research 28(4), 417–436. — The modern gravel-bed relation; surface armour and grain
+  hiding.
+- **Leopold, L.B., Wolman, M.G. & Miller, J.P. (1964).** *Fluvial Processes in Geomorphology.*
+  Freeman. — The classic text: competence, bars, sorting, imbrication. General grounding for the
+  gravel-bar and pebble-beach material.
+
 ## Analysis (additional)
 
 - **Zakšek, K., Oštir, K. & Kokalj, Ž. (2011).** *Sky-View Factor as a Relief Visualization

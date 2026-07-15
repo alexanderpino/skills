@@ -199,10 +199,10 @@ the constants matter and are easy to get subtly wrong.
 | `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
 | `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults |
 | `references/03-flow-routing.md` | Depression fill/breach, D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers), meandering & bank erosion (oxbows), water sources & discharge, sea level |
-| `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls |
+| `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls, grain size / bedload / gravel bars (pebbles & clasts) |
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
-| `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter |
+| `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
 | `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |

@@ -291,6 +291,13 @@ The number that matters for *look*: cascade and step-pool reaches are where a mo
 reads as whitewater, and they sit above the slope at which meandering (Howard & Knutson 1984,
 `00`) can happen at all — a steep channel is straight because it *can't* meander.
 
+**Whitewater is caused, not carved.** The foam in an Ardèche rapid is aerated turbulent flow — a
+fluid-rendering job for the engine, not a heightfield feature. The terrain graph's job is the
+*cause*: a steep bedrock gradient (cascade/step-pool), boulders and bedrock ledges that constrict
+and step the channel (`04` clasts), and tributary debris fans pinching it. Build those and the
+whitewater follows in the sim; try to put the foam in the height field and you have misplaced the
+boundary between terrain and engine (`08`).
+
 **Channel width from hydraulic geometry (Leopold & Maddock 1953).** Width scales with the square
 root of discharge, and discharge scales with drainage area:
 
@@ -367,6 +374,14 @@ height write.
 **Tier.** The migration physics is P-tier (Ikeda–Parker–Sawai 1981; Howard & Knutson 1984); the
 terrain realisation — burning the channel, scroll bars, oxbow fill — is the honest F-tier "look"
 layered on top.
+
+**Entrenched (incised) meanders.** When a meandering river is uplifted (`02`) it can keep its
+sinuous pattern while cutting *down* into bedrock — a deep, winding **gorge** (the Ardèche, the
+Goosenecks of the San Juan). Author it in that order: grow the meander belt on a low-gradient
+surface *first*, then incise it with uplift + stream power (`04`). Meandering a river that is
+already in a canyon is backwards — walls of rock cannot migrate. A neck that is cut off *as* it
+incises leaves a **natural arch** across the abandoned neck (the Pont d'Arc), which is a void the
+heightfield can't hold — see the representation warning in `11`.
 
 ## Water sources & discharge
 

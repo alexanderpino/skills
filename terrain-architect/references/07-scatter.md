@@ -2,7 +2,7 @@
 
 Contents: [Bridson](#poisson-disk-bridson-2007) · [Variable density](#variable-density--the-terrain-case) ·
 [Blue noise alternatives](#blue-noise-alternatives) · [Tiling scatter](#tiling-scatter) ·
-[Rule-based](#rule-based-scatter)
+[Rule-based](#rule-based-scatter) · [Clasts (rocks & pebbles)](#clasts-rocks-cobbles-pebbles)
 
 ## Poisson disk (Bridson 2007)
 
@@ -214,3 +214,29 @@ for each sample p:
   blue noise reads as *too* even, which is its own kind of artificial.
 - **Sink into the ground.** Offset each instance down by a few cm so the base isn't floating
   on any slope. Cheaper than the alternative of everyone noticing.
+
+## Clasts (rocks, cobbles, pebbles)
+
+Scattering rock is still scattering — but the size and placement come from the **grain-size (D50)
+field** (`04`), not from `random()`. That field already says boulders in the steep headwaters and
+rapids, cobbles in the bends, pebbles on the pool beaches; the scatter just realises it.
+
+```
+for each sample p:      # Ulichney tiles for a pebble beach (very high count); Bridson for boulders
+    D50 = grainSize(p)                          # the 04 caliber field
+    if D50 < pebbleThreshold and not onBar(p): reject     # pebbles only where bedload deposits
+    size  = drawFromDistribution(D50)           # a spread around D50, not a constant
+    round = roundness(distanceDownstream(p))    # angular near the source → rounded far (Sternberg, 04)
+    tilt  = imbricate(flowDir(p))               # dip UPSTREAM (04), NOT aligned to the ground normal
+```
+
+Two rules specific to river clasts:
+
+- **Pebble beaches are extreme-count ground cover, not props.** A gravel bar is thousands of
+  clasts per square metre — use Ulichney tiles or an instanced scatter shader, never per-object
+  Poisson. Model the *bar surface* as a material (`06`) and scatter representative clasts on top;
+  the "millions of pebbles" are a texture-plus-instancing problem, not a million transforms.
+- **Orientation carries the process.** Imbrication (upstream dip) and long-axis alignment to flow
+  are what make a bar read as water-laid instead of a dumped rubble pile — the same "variation
+  from the environment, not from `random()`" rule as vegetation above. Fully normal-aligned
+  pebbles (`alignFactor = 1`) are right for a *scree* slope (`05` talus), wrong for a river bar.

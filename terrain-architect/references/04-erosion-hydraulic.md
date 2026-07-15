@@ -3,7 +3,8 @@
 Contents: [Attribution correction](#attribution-correction-read-first) · [Choosing](#choosing-a-backbone) ·
 [Pipe model](#pipe-model-mei-et-al-2007) · [Št'ava extensions](#štava-et-al-2008-extensions) ·
 [Droplet](#droplet--particle-erosion) · [Stream power](#stream-power--the-important-one) ·
-[Knickpoints & waterfalls](#knickpoints--waterfalls) · [Parameters](#parameter-reference)
+[Knickpoints & waterfalls](#knickpoints--waterfalls) ·
+[Grain size & bedload](#grain-size-bedload--gravel-bars) · [Parameters](#parameter-reference)
 
 ## Attribution correction (read first)
 
@@ -317,6 +318,85 @@ mapped 236 of them doing exactly this; Berlin & Anderson 2007 model the retreat)
 Waterfalls also sit on the heightfield boundary (`11`): the undercut **plunge pool** and the
 overhanging lip of a mature fall are voids a heightfield can't hold — you get the drop, not the
 overhang.
+
+## Grain size, bedload & gravel bars
+
+Every model above tracks sediment as a single depth field in metres — a grey mud with no grain
+size. That's fine until the brief is a river like the Ardèche: **boulders in the rapids, cobbles
+in the bends, pebble beaches in the pools.** Those are not decoration — they are the visible record
+of *which grains the flow could move where*, and they need one extra field, **caliber** (the
+grain-size distribution), plus three pieces of well-established sediment physics.
+
+**Grains have a size class (Wentworth 1922; Udden 1914).** The φ scale, coarse to fine:
+
+```
+boulder > cobble > pebble > granule > sand > silt > clay       # φ = -log2(D_mm)
+#  >256mm   64–256   4–64     2–4      1/16–2
+```
+
+Track at least a representative **D50** (median grain diameter) field, not one undifferentiated
+"sediment".
+
+**Which grains move — critical shear stress (Shields 1936).** A grain sits still until the bed
+shear stress exceeds a threshold that scales with its size:
+
+```
+τ      = ρ g d_water S                     # bed shear stress from flow depth and slope
+τ_c(D) = θ_c (ρ_s − ρ) g D                 # Shields: critical shear ∝ grain diameter, θ_c ≈ 0.045
+inMotion(D) = τ > τ_c(D)                   # a big clast needs a big flood
+```
+
+This is the *water* twin of Bagnold's threshold friction velocity for wind (`05`) — same idea,
+same shape. Its consequence is **selective transport**: at flood peak everything moves; as the
+flood wanes `τ` falls and the coarsest fraction drops first, then finer. Sorting is not authored —
+it falls out of a threshold that depends on size.
+
+**How much moves — bedload transport (Meyer-Peter & Müller 1948).** The canonical gravel formula:
+
+```
+q_b ∝ (τ* − τ*_c)^1.5                       # τ* = Shields stress; zero below threshold
+```
+
+Pebbles and cobbles travel as **bedload** — rolling and saltating along the bed — a different
+transport mode from the suspended load the pipe/droplet capacity terms model. For a gravel-bed
+river (Parker 1990 is the modern surface-based relation) bedload *is* the sediment budget.
+
+**Where the coarse stuff ends up — downstream fining (Sternberg 1875).** Grain size decays
+exponentially downstream, from abrasion (clasts rounding as they tumble — angular block → rounded
+pebble) plus selective sorting:
+
+```
+D(x) = D0 * exp(-α x)                       # α ≈ 1e-3–1e-2 /km; boulders near source, sand far away
+```
+
+So the caliber field is high in the steep headwaters and at cliff bases (rockfall feed), low far
+downstream — which is why the Ardèche has boulders in its upper rapids and rounded pebbles on its
+lower beaches, not the reverse.
+
+**The deposits — gravel bars and pebble beaches — are where competence drops.** Bedload settles
+wherever `τ` falls below `τ_c` for its size: the **inner bank of a bend** (the point bar — tie to
+meandering, `03`), **channel-margin slackwater**, **pool tails below a rapid**, and behind
+constrictions. In a gorge that alternates pools and rapids, the pebble beaches are the pool
+deposits on the inside of the entrenched bends. Two finishing details:
+
+- **Imbrication.** Water-laid pebbles do not lie flat — they stack like tilted books, dipping
+  *upstream*, the stable position against the current. Carry it into the clast scatter (`07`) as
+  an orientation, or a gravel bar reads as a random rubble pile.
+- **Armouring.** A gravel bed winnows its fines and leaves a coarse surface layer (the armour or
+  pavement) one grain thick over finer material (Parker 1990). It's why a riverbed is cobbles on
+  top and sand underneath — a `06` material distinction, not a height one.
+
+**In the graph.** Derive a **D50 field** from local competence (`τ` from slope × discharge — `Q`
+from *Water sources & discharge*, `03`), fine it downstream by Sternberg, and use it two ways: as a
+**material/splat input** (`06`) for the bed texture, and as the **density-and-size driver for
+discrete clast scatter** (`07`) — boulders where D50 is boulder-scale, pebble beaches where it's
+pebble-scale. You never simulate a million pebbles; you simulate the *field* and scatter instances
+that obey it.
+
+**Tier.** The physics is P-tier, old and solid — Shields 1936, Meyer-Peter & Müller 1948, Sternberg
+1875, Wentworth 1922 (overview: Leopold, Wolman & Miller 1964). There is **no graphics paper for
+"pebble beaches"**; the terrain realisation — a caliber field feeding materials and scatter — is the
+honest F-tier composition on top of P-tier sediment mechanics.
 
 ## Parameter reference
 
