@@ -29,14 +29,18 @@ not the same — the gap between "the paper exists" and "the number is right" is
 
 - **Citations** — author, venue, volume, and pages verified against primary sources for the
   references added and audited to date. Never add a citation you have not looked up.
-- **Numbers & equations** — a first pass has confirmed the load-bearing formulae and constants
-  against sources: the SIA velocity/diffusivity (`12`), Glen's `A` (Cuffey & Paterson 2010), Shields
-  `θc ≈ 0.045` (`04`), Bagnold's `u*³` law and threshold (`05`), Hulme's lava thickness and levée
-  relations (`19`), stream-power `m/n ≈ 0.5` (`04`), the crater simple↔complex transition and its
-  `~1/g` scaling (`11`), basalt eruption/solidus temperatures (`19`), and the Wentworth / USDA
-  grain-and-soil boundaries (`04`, `18`). **The remaining parameter-table values are
-  order-of-magnitude starting points** — tune them against each family's verification checks (`09`)
-  and re-check any figure against its source before publication-critical use.
+- **Numbers & equations** — the load-bearing formulae and constants have been verified against
+  primary sources: the SIA velocity and `H^(n+2)` flux-diffusivity (`12`), Glen's `A` (Cuffey &
+  Paterson 2010), Shields `θc ≈ 0.045` (`04`), Bagnold's `u*³` law and threshold (`05`), Werner and
+  repose-angle values (`05`), Freeman's MFD `p = 1.1` (`03`), Leopold & Maddock's *downstream*
+  hydraulic-geometry exponents `w∝Q^0.5, d∝Q^0.4` (`03`), stream-power `m/n ≈ 0.5` (`04`), Hulme's
+  lava thickness and levée relations (`19`), the crater depth/diameter `≈0.2`, rim `≈0.04D`,
+  simple↔complex transition and its `~1/g` scaling (`11`), basalt eruption/solidus temperatures
+  (`19`), environmental/adiabatic lapse rates (`13`), and the Wentworth / USDA grain-and-soil
+  boundaries (`04`, `18`). Every one checked in this pass held (a few gained a precision fix or a
+  clarified label). **The remaining parameter-table values are order-of-magnitude starting points**
+  — tune them against each family's verification checks (`09`) and re-check any figure against its
+  source before publication-critical use.
 
 This is deliberately honest, not reassuring. Errors *have* surfaced and been fixed by exactly this
 process — a reversed crater transition, a Braun/Gain author swap, an `H⁴`-vs-`H⁵` flux slip — so

@@ -324,9 +324,13 @@ root of discharge, and discharge scales with drainage area:
 
 ```
 Q     = k_q * pow(A, 0.7)                # discharge from drainage area (basin exponent ~0.7–1)
-width = k_w * sqrt(Q)                    # Leopold & Maddock hydraulic geometry, w ∝ Q^~0.5
-depth = k_d * pow(Q, 0.4)
+width = k_w * sqrt(Q)                    # DOWNSTREAM hydraulic geometry: w ∝ Q^0.5
+depth = k_d * pow(Q, 0.4)                #   depth ∝ Q^0.4, velocity ∝ Q^0.1 (exponents sum to 1)
 ```
+
+These are Leopold & Maddock's **downstream** exponents (how a river grows heading downstream, the
+terrain case) — *not* the at-a-station exponents (how one cross-section responds to a flood, where
+width ∝ Q^~0.26). Use the downstream set for widening a river along its length.
 
 Use `width` to burn the channel into the height field, or to stamp the river mask (`06`) at a
 realistic, downstream-widening size — a constant-width river is an instant tell. And feed the
