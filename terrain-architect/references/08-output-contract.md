@@ -2,7 +2,7 @@
 
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
 [Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
-[Splatmaps](#splatmaps) · [Satmap](#satmap-albedo--colour-map) ·
+[Splatmaps](#splatmaps) · [Satmap & colour map](#satmap--colour-map) ·
 [Normal & AO maps](#optimised-normal--ao-maps) · [Emitters](#emitters)
 
 ## The field contract
@@ -17,7 +17,7 @@ of this boundary.
 | `sandDepth` / `sedimentDepth` | metres | R16 | Layer thickness above bedrock |
 | `normal` | unit vector | RG8/BC5 (reconstruct Z) | Baked from R32F, always — see Normal & AO maps |
 | `ao` | [0,1] | R8/BC4 | Baked from R32F |
-| `albedo` (satmap) | linear RGB | RGB8 / BC7 | Composited from masks — see Satmap. **No directional light baked in.** |
+| `albedo` (colour map) | linear RGB | RGB8 / BC7 | Composited from masks — see Satmap & colour map. **No directional light baked in.** |
 | `masks[i]` | [0,1] | R8 per channel | Must partition — see `06` |
 | `flowAccum` (`A`) | m² | R32F | Log-scaled for storage if needed |
 | `scatter[i]` | positions + attrs | Point list | World-space |
@@ -260,21 +260,36 @@ mask sum, which reads as inexplicable blotchy lighting.
 **Resolution.** Splatmaps are usually 1/2 or 1/4 the heightmap resolution. They're
 pixel-centred while the heightmap is vertex-centred (see above) — mind the offset.
 
-## Satmap (albedo / colour map)
+## Satmap & colour map
 
-The top-down **basecolour** texture — what World Machine calls a colour map and Gaea a satmap.
-It is not a field the simulation produces; it is *composited* from the fields, for engines or
-previews that want a single baked albedo instead of a live material blend. Same derivation order
-as masks (`06`): `height → analysis → masks → albedo`.
+Two different things travel under these names, and conflating them is exactly the N-tier slip this
+skill warns about (`00`):
+
+- **SatMap — the gradient (an *input*).** Gaea's *SatMap* is a **colour gradient: a 1D LUT indexed
+  by a scalar field**, altitude by default (you can drive it with any mask). The library "satmaps"
+  are gradients sampled from real satellite / DEM imagery — which is where the name comes from. It
+  is an **authoring operator**, not an output: it *turns a field into colour*. The **2D** case is a
+  LUT indexed by *two* fields — the Whittaker biome diagram (`13`) is precisely a
+  `(temperature, precip) → colour` 2D satmap.
+- **Colour map / albedo — the result.** The top-down **basecolour** texture (World Machine's
+  *colour map*) that an engine actually samples. It is *composited* from the fields, and a gradient
+  is one of the operators you build it with.
+
+The gradient is a `curve` / LUT (`10`), so it inherits that node's one real trap: **height is
+Gaussian-ish, not uniform** (`01`), so a gradient applied to raw altitude bunches most of its
+colours into the mid-band and starves the peaks and troughs. Histogram-match the field, or remap
+against a measured range, *before* the LUT (`10`).
+
+Composite the albedo from the same masks as the splatmap (`06`): `height → analysis → masks → albedo`.
 
 ```
 albedo = Σ_i  mask[i] * materialAlbedo[i]              # composite by the SAME masks as the splatmap
        * (0.85 + 0.15 * macroNoise)                     # low-freq colour variation, or it reads flat
        * lerp(1, cavity, cavityStrength)                # curvature darkens crevices (06, 11)
-albedo = lerp(albedo, altitudeTint(height), tintAmt)    # optional: cool/desaturate with elevation
+albedo = lerp(albedo, satmap1D(height), tintAmt)        # a 1D altitude gradient (a "satmap") as a tint
 ```
 
-**The cardinal rule: no directional light in the albedo.** A satmap with a hillshade or
+**The cardinal rule: no directional light in the albedo.** A colour map with a hillshade or
 sun-cast shadows baked in is wrong the instant the engine relights it — you get shadows crossed
 with shadows and it cannot be undone. Albedo is view- and light-independent. The *only*
 shading-like terms allowed are the direction-independent ones — **ambient occlusion and
@@ -282,15 +297,15 @@ cavity** (`06`) — and even those belong in their own channel where the engine 
 apply them, not multiplied irreversibly into the colour. If you must bake AO in for a flat
 preview, keep an AO-free master.
 
-**It must agree with the splatmap.** The satmap and the splatmap are two encodings of the same
-material decision — composite both from the identical `06` masks, or the low-res satmap and the
+**It must agree with the splatmap.** The colour map and the splatmap are two encodings of the same
+material decision — composite both from the identical `06` masks, or the low-res colour map and the
 runtime material blend will disagree and the terrain will visibly change colour as the camera
 approaches and the engine crossfades from baked to blended.
 
-**Resolution & streaming.** Satmaps are large and are the usual reason a terrain needs virtual
+**Resolution & streaming.** Colour maps are large and are the usual reason a terrain needs virtual
 texturing / a megatexture (`00`: Barrett 2008, Mittring 2008 — GDC/SIGGRAPH talks, F-tier).
 Author per tile and stream; do not ship one 32k texture. Cheaper: store only the low-freq macro
-colour and blend a tiled high-freq detail albedo in the shader, which keeps the stored satmap
+colour and blend a tiled high-freq detail albedo in the shader, which keeps the stored colour map
 small and the near-field crisp.
 
 ## Optimised normal & AO maps

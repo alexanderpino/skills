@@ -237,7 +237,7 @@ are compositions. The recipe is the answer:
 | Chunked LOD | P | Ulrich 2002, SIGGRAPH course notes |
 | CDLOD | P | Strugar 2009, J. Graphics Tools 14(4) |
 | Virtual texturing / sparse virtual textures | F | Barrett 2008 (GDC), Mittring 2008 (SIGGRAPH course) — talks, not papers |
-| Satmap / colour-map compositing | F | Composite of material albedos by masks (`08`). Not a field the sim produces; **no directional light baked in.** |
+| SatMap gradient (1D/2D colour LUT) & colour-map compositing | F | SatMap = a colour gradient indexed by a field (Gaea, `10` curve/LUT); the colour map = the composited albedo (`08`). No directional light baked in. |
 | Normal / AO map encoding (BC5 reconstruct-Z, BC4, ORM pack) | F | Export packing (`08`); baking maths in `06` |
 | Unit-vector (normal) encoding — reconstruct-Z, octahedral | P | Cigolle et al. 2014, JCGT 3(2) — the survey of schemes (`08`) |
 | Normal map mipping (variance) | P | Toksvig 2005, JGT 10(3) |
