@@ -41,6 +41,12 @@ not the same — the gap between "the paper exists" and "the number is right" is
   clarified label). **The remaining parameter-table values are order-of-magnitude starting points**
   — tune them against each family's verification checks (`09`) and re-check any figure against its
   source before publication-critical use.
+- **Dimensional consistency** — the load-bearing equations have been unit-checked and are
+  dimensionally sound (stream power `K·A^m·S^n` → m/yr with `[K]=yr⁻¹` at m=½; Shields → Pa; Bagnold
+  `q` → kg/m/s; SIA velocity → m/s and flux-diffusivity → m²/s; lava cooling → K). The check *found*
+  and fixed a real imprecision — the lava Bingham flux is per-unit-width `[m²/s]`, so it needs the
+  explicit flux→thickness conversion `ΔL = q·Δt/cellSize` (`19`), exactly as the pipe model does
+  (`04`). Units analysis is a code-free error detector and is worth running on any equation added.
 
 This is deliberately honest, not reassuring. Errors *have* surfaced and been fixed by exactly this
 process — a reversed crater transition, a Braun/Gain author swap, an `H⁴`-vs-`H⁵` flux slip — so

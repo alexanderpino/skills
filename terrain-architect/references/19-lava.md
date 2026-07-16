@@ -65,10 +65,11 @@ lavaStep(bed, L, T, Δt):                      # double-buffer, like every grid 
     for each cell with L > 0, neighbour n:
         Δh = (bed + L) − (bed_n + L_n)                 # surface head, like the pipe model
         if Δh ≤ 0: continue
-        τ  = ρ g L · Δh / dist                          # driving stress
+        τ  = ρ g L · Δh / dist                          # driving stress τ = ρgL·sinθ [Pa]
         if τ ≤ τ_y(T): continue                         # BELOW YIELD: no flow — the whole point
-        q  = k · (τ − τ_y(T)) · L² / η(T)               # Bingham sheet flux; stiffens as T falls
-        move q·Δt from cell to n  (cap so L stays ≥ 0 — the pipe model's scaling lesson, 04)
+        q  = k · (τ − τ_y(T)) · L² / η(T)               # Bingham flux PER UNIT WIDTH [m²/s]; k ~ O(1), dimensionless
+        ΔL = q · Δt / cellSize                          # flux → thickness [m] (the pipe model's step, 04)
+        move ΔL from cell to n  (cap so L stays ≥ 0)
 
     # 3. Cooling — radiation dominates, crust insulates (FLOWGO's heat budget)
     crust = crustFraction(age, strainRate)              # 0 = incandescent, 1 = fully crusted
