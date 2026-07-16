@@ -5,6 +5,7 @@ Contents: [Why climate is in the graph](#why-climate-is-in-the-graph) · [Temper
 [Orographic precipitation](#orographic-precipitation-smith--barstad-2004) · [Rain shadow](#the-rain-shadow-result) ·
 [Snow & avalanches](#snow--avalanches-cordonnier-et-al-2018) · [Moisture](#moisture--soil-water) ·
 [Biomes](#biome-classification) · [Ecosystem simulation](#ecosystem-simulation-deussen-et-al-1998) ·
+[Fire & burned land](#fire--burned-land) ·
 [Multi-biome worlds](#multi-biome-worlds-regional-composition)
 
 ## Why climate is in the graph
@@ -268,6 +269,55 @@ fixed number of outer iterations rather than a convergence criterion.
 **Output.** An ecosystem sim's product is a `PointSet` with species, size and age — it *replaces*
 the scatter node's density mask rather than feeding it. That's a graph-shape change, not a node
 swap, so decide before building `07`.
+
+## Fire & burned land
+
+**Burned land is a disturbance state, not a landform** — it writes to *materials and foliage*,
+barely to height. Get the scope right and it is cheap; get it wrong and you end up simulating
+combustion for a black texture. Three parts, one of which is not just texture:
+
+**1. The burn scar's shape — spread is slope- and wind-driven.** The canonical spread model is
+**Rothermel 1972** (USDA Forest Service Research Paper INT-115 — the model still inside every
+operational fire-behaviour system): spread rate through a fuel bed accelerates **upslope and
+downwind**. For terrain you don't need the full fuel physics — a front march over a fuel field
+gives the scar its recognisable anatomy:
+
+```
+burnScar(fuel, windField, h, ignition):        # fuel = vegetation density (ecosystem/07)
+    front = {ignition}
+    while front and fuel remains:
+        spread rate ∝ fuel * (1 + a·max(0, upslope)) * (1 + b·downwind(windField, 13))
+        advance the front (CA or level set); consume fuel; record burnSeverity
+    # anatomy that falls out: scars ELONGATE downwind and uphill, run up drainages,
+    # finger along fuel corridors, and leave UNBURNED ISLANDS where fuel or wind failed
+```
+
+Severity is a **mosaic**, not a bool — crown-fire kill at the core, scorch at the margins,
+unburned islands inside — and the mosaic is the visible signature of a real burn.
+
+**2. What it writes — materials and foliage (your instinct, made concrete).**
+- **Materials (`18`, `08`):** char and ash by severity — blackened albedo over scorched mineral
+  soil, an ash dusting that behaves as a *transient* cover (it blows and washes away within
+  seasons, `08` stack). A still-smouldering edge can borrow the `08` emissive channel at low
+  intensity; active flame is the engine's job, not the terrain's (the whitewater rule, `03`).
+- **Foliage (`07`, ecosystem above):** by severity — remove canopy but leave **standing snags**
+  (dead trunks: the same tree scatter, swapped model, no leaves) in high-severity zones; scorch
+  survivors at margins. Then **succession is free**: the burn simply resets the ecosystem sim's
+  local state, and recolonisation (grass → shrub → pioneer trees) falls out of the competition
+  loop already above — a burn scar *ages* without any new machinery.
+
+**3. The part that is not texture: the erosion response.** Fire is a *hydro-geomorphic event*
+(**Shakesby & Doerr 2006**, Earth-Science Reviews 74 — the review): vegetation loss plus
+fire-induced **soil water repellency** boosts runoff and strips the protection term the skill
+already models — `K_effective *= (1 − vegetationCover · stabilisation)` (Cordonnier 2017, above)
+with `vegetationCover` zeroed by the burn. The first wet season after a fire does years of erosion
+in months: rilling on the slopes, and **post-fire debris flows** from the burned basins (`05`
+runout, fed by the failure model's now-unprotected soil). If the brief says "years after the
+fire", the scar should be *gullied*, not just black.
+
+**Tier.** Spread: P (Rothermel 1972). Post-fire response: P (Shakesby & Doerr 2006). The burned
+*look* — char, snags, mosaic — is an L-tier composition of materials + scatter + the ecosystem
+reset; no graphics paper, none needed.
 
 ## Multi-biome worlds (regional composition)
 

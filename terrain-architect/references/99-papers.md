@@ -355,6 +355,14 @@ is below.
 - **Sherman, C.A. (1978).** *A Mass-Consistent Model for Wind Fields over Complex Terrain.* Journal
   of Applied Meteorology 17(3), 312–319. — MATHEW: adjust an interpolated wind field in a weighted
   least-squares sense to satisfy continuity. The divergence-cleanup step for terrain wind (`13`).
+- **Rothermel, R.C. (1972).** *A Mathematical Model for Predicting Fire Spread in Wildland Fuels.*
+  USDA Forest Service Research Paper INT-115, Ogden, 40 pp. — **The fire-spread model** (still the
+  core of operational fire-behaviour systems): spread accelerates upslope and downwind. The shape
+  of a burn scar (`13`).
+- **Shakesby, R.A. & Doerr, S.H. (2006).** *Wildfire as a hydrological and geomorphological agent.*
+  Earth-Science Reviews 74, 269–307. — **The post-fire geomorphology review**: soil water
+  repellency, runoff amplification, post-fire erosion and debris flows. Why a burn scar gullies in
+  its first wet season (`13`, `05`).
 - **Deussen, O., Hanrahan, P., Lintermann, B., Měch, R., Pharr, M. & Prusinkiewicz, P. (1998).**
   *Realistic Modeling and Rendering of Plant Ecosystems.* SIGGRAPH '98. — **The ecosystem
   reference.** Iterative competition and self-thinning.

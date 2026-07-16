@@ -40,6 +40,7 @@ The surface-material classes a generator needs, with where each property table a
 | **Snow / firn / ice** | seasonal snow, firn, glacier ice, sea ice | Transient/fluid stack role (`08`); accumulates & melts (`13`); flows (`12`) |
 | **Water** | river, lake, sea | Fluid layer — swimmable, dynamic surface, tides (`08`, `03`, `12`) |
 | **Crusts & evaporites** | salt flat, biological soil crust, desert varnish, coral | Thin surface layers; salt from endorheic evaporation (`16` playa); coral builds reefs (`12`) |
+| **Char & ash (burned)** | charred soil, ash dusting, snag litter | A disturbance state, by burn severity (`13`); ash is a *transient* cover — blows and washes away; burned soil is water-repellent → erosion spike (`13`, `05`) |
 | **Volcanic** | fresh basalt (pahoehoe / ʻaʻā / block — Macdonald 1953), tephra / ash, obsidian | Low `K` when fresh; ash mantles like snow (`11`); dark albedo; surface texture by flow type (`11`) |
 | **Molten lava** | flows, lakes, lava-world "seas" | The one material that **changes stack role**: a fluid layer (`08`) that freezes into new bedrock (`11`, Hulme 1974 rheology); carries `T`; emissive crust cracks (`08`) |
 

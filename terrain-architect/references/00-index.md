@@ -275,6 +275,9 @@ are compositions. The recipe is the answer:
 | Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — see the `SKILL.md` doctrine (`11`, `16`) |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
 | Wetlands (swamp, marsh, bog) | L | High TWI + flat + impermeable substrate → mask + peat/mud + thin water layer (`13`, `18`) |
+| Fire spread (slope- and wind-driven front) | P | Rothermel 1972, USDA Forest Service Res. Pap. INT-115 (`13`) |
+| Post-fire erosion response (repellency, debris flows) | P | Shakesby & Doerr 2006, Earth-Science Reviews 74 (`13`, `05`) |
+| Burned land (char, snags, severity mosaic, succession) | L | Disturbance state: materials + scatter + ecosystem reset (`13`, `18`) |
 
 ## 10. Arid & desert → `16-arid-desert.md`
 
