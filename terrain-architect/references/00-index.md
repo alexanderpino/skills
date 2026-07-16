@@ -76,6 +76,9 @@ of what's reliable here.
 | Lava flow | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
 | Volcanic cones, calderas, craters, crater fields | F | Primitive + noise + erosion. No paper. |
 | Rock hardness layers / lithology | F | A material field feeding erodibility `K`. See Št'ava 2008 for the layered coupling. |
+| Soil / regolith production function | P | Heimsath, Dietrich, Nishiizumi & Finkel 1997, Nature 388 — exponential decline with soil depth (`11`) |
+| Volcano edifice classification & dimensions | P | Pike & Clow 1981, USGS OFR 81-1038 — shield/strato/cinder/caldera (`11`) |
+| Impact crater morphology (simple/complex, ejecta) | P | Melosh 1989; Pike 1977 — depth/diameter, central-peak transition (`11`) |
 | Feature-primitive terrain authoring | P | Génevaux et al. 2015, CGF 34(6) — construction tree of peaks/ridges/rivers/cliffs (`13`) |
 | Example-based world / element authoring | P | Emilien et al. 2015, *WorldBrush*, ACM TOG 34(4) (`13`) |
 | Digital terrain modelling — the survey | P | Galin et al. 2019, CGF 38(2). Read first when architecting a whole world (`13`) |
@@ -250,7 +253,31 @@ are compositions. The recipe is the answer:
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
+| Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — see the `SKILL.md` doctrine (`11`, `16`) |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
+
+## 10. Arid & desert → `16-arid-desert.md`
+
+| Algorithm / landform | Tier | Source |
+|---|---|---|
+| Desert geomorphology (overview) | P | Cooke, Warren & Goudie 1993, *Desert Geomorphology* (UCL Press) |
+| Yardang (wind abrasion) | P | Ward & Greeley 1984, GSA Bulletin 95(7) |
+| Bornhardt / inselberg | F | Twidale 1982, *Granite Landforms* — differential subsurface weathering + stripping (L-tier landform) |
+| Alluvial fan / bajada | P | Blair & McPherson 1994, JSR A64; Bull 1977, Prog. Phys. Geog. 1 |
+| Playa (endorheic basin floor) | L | An unfilled `03` sink; evaporite flat |
+| Desert pavement | P | McFadden, Wells & Jercinovich 1987, Geology 15 — born-at-top, not a lag |
+| Loess / sand sheets | F | Aeolian deposition (the deposition side of `05`) |
+
+## 11. Periglacial & permafrost → `17-periglacial.md`
+
+| Algorithm / landform | Tier | Source |
+|---|---|---|
+| Periglacial geomorphology (overview) | P | French 2018, *The Periglacial Environment* (4th ed.); Washburn 1979, *Geocryology* |
+| Sorted patterned ground (self-organization) | P | Kessler & Werner 2003, Science 299 — the same Werner as the dune model (`05`) |
+| Solifluction | P | Matsuoka 2001, Earth-Science Reviews 55 |
+| Rock glacier | P | Wahrhaftig & Cox 1959, GSA Bulletin 70 |
+| Thermokarst, pingos | F | Ground-ice collapse / heave (French 2018) |
+| Blockfield (felsenmeer) | F | In-place frost shattering; angular clast scatter (`07`) |
 
 ---
 

@@ -386,6 +386,51 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
 - Virtual texturing: **Barrett, S. (2008)**, *Sparse Virtual Textures* (GDC) and **Mittring, M.
   (2008)**, *Advanced Virtual Texture Topics* (SIGGRAPH course). Talks, not papers — cite as such.
 
+## Weathering, arid, periglacial & planetary
+
+- **Heimsath, A.M., Dietrich, W.E., Nishiizumi, K. & Finkel, R.C. (1997).** *The soil production
+  function and landscape equilibrium.* Nature 388(6640), 358–361. — Soil production declines
+  exponentially with soil depth, from cosmogenic ¹⁰Be/²⁶Al. The regolith the erosion pipeline
+  consumes (`11`).
+- **Cooke, R.U., Warren, A. & Goudie, A.S. (1993).** *Desert Geomorphology.* UCL Press, London,
+  526 pp. — The desert-landforms text (`16`).
+- **Ward, A.W. & Greeley, R. (1984).** *Evolution of the yardangs at Rogers Lake, California.* GSA
+  Bulletin 95(7), 829–837. — Yardang form (teardrop 1:4) and its wind-tunnel evolution (`16`).
+- **Blair, T.C. & McPherson, J.G. (1994).** *Alluvial fans and their natural distinction from rivers
+  based on morphology, hydraulic processes, sedimentary processes, and facies assemblages.* Journal
+  of Sedimentary Research A64(3), 450–489. — Fans as debris-flow / sheetflood landforms, distinct
+  from rivers (`16`).
+- **Bull, W.B. (1977).** *The alluvial-fan environment.* Progress in Physical Geography 1(2),
+  222–270. — Fan processes and morphology (`16`).
+- **McFadden, L.D., Wells, S.G. & Jercinovich, M.J. (1987).** *Influences of eolian and pedogenic
+  processes on the origin and evolution of desert pavements.* Geology 15(6), 504–508. — Desert
+  pavement is born at the surface over accreting dust, **not** a deflation lag (`16`).
+- **Twidale, C.R. (1982).** *Granite Landforms.* Elsevier, Amsterdam. — Bornhardts and inselbergs by
+  differential subsurface weathering and stripping of the regolith (`16`).
+- **Kessler, M.A. & Werner, B.T. (2003).** *Self-Organization of Sorted Patterned Ground.* Science
+  299(5605), 380–383. — Stone circles / polygons / stripes from freeze–thaw feedbacks; slope selects
+  the form. The **same Werner** as the dune model (`05`, `17`).
+- **Matsuoka, N. (2001).** *Solifluction rates, processes and landforms: a global review.*
+  Earth-Science Reviews 55(1–2), 107–134. — Solifluction as frost-gated slope diffusion (`17`).
+- **Wahrhaftig, C. & Cox, A. (1959).** *Rock glaciers in the Alaska Range.* GSA Bulletin 70(4),
+  383–436. — The founding rock-glacier study (`17`).
+- **French, H.M. (2018).** *The Periglacial Environment* (4th ed.). Wiley, Chichester. — The
+  periglacial text (`17`).
+- **Washburn, A.L. (1979).** *Geocryology: A Survey of Periglacial Processes and Environments.*
+  Edward Arnold, London. — The other periglacial reference (`17`).
+- **Pike, R.J. & Clow, G.D. (1981).** *Revised classification of terrestrial volcanoes and catalog of
+  topographic dimensions.* USGS Open-File Report 81-1038. — Edifice height / flank width / summit
+  dimensions for 697 volcanoes (`11`).
+- **Melosh, H.J. (1989).** *Impact Cratering: A Geologic Process.* Oxford Monographs on Geology and
+  Geophysics 11, Oxford University Press. — The impact-cratering reference: crater mechanics, ejecta,
+  and gravity scaling (`11`, `SKILL.md`).
+- **Pike, R.J. (1977).** *Size-dependence in the shape of fresh impact craters on the Moon.* In Roddy,
+  Pepin & Merrill (eds), *Impact and Explosion Cratering*, Pergamon, pp. 489–509. — Simple→complex
+  transition; depth/diameter and rim-height ratios (`11`).
+- **Kok, J.F., Parteli, E.J.R., Michaels, T.I. & Bou Karam, D. (2012).** *The physics of wind-blown
+  sand and dust.* Reports on Progress in Physics 75(10), 106901. — Aeolian saltation and dunes on
+  Earth, Mars, Venus, and Titan; the reference for wind-blown sand off-Earth (`16`, `SKILL.md`).
+
 ## Reading order
 
 If someone is implementing from scratch and asks what to read first:

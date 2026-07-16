@@ -65,6 +65,27 @@ length scale was written in cells instead of metres.* So the rule is two-sided:
   run it at the largest resolution you can hold globally (`08`), then add *scale-free* detail
   (noise, thermal, scatter) on top — never a second global erosion pass masquerading as detail.
 
+**Off-Earth: mind the gravity and the missing water.** The regime is set by two knobs — *is there
+liquid water*, and *what is the gravity* — and changing them reweights the whole graph. Earth's
+terrain is fluvially dominated because it has abundant water; the Moon and (mostly) Mars are not.
+
+- **No liquid water → no fluvial backbone.** On an airless or dry world the erosion chapter (`04`)
+  largely switches off and the surface is dominated by **impact cratering** (`11`) plus, where there
+  is an atmosphere, **aeolian** processes (`05`, `16`) and mass wasting. Drainage networks, deltas,
+  and coastlines are Earth (and ancient-Mars) features — don't stamp them on the Moon.
+- **Gravity rescales the physics.** Impact-crater size scales with gravity (Melosh 1989 π-scaling —
+  the same impact energy makes a *bigger* crater at lower g); saltation and dune size shift with
+  gravity and air density (**Kok et al. 2012**, *The physics of wind-blown sand and dust* — the
+  reference for sand on Mars, Venus, and Titan). The **repose angle is nearly gravity-independent**,
+  a useful invariant: talus still stands at ~34° on Mars. Slopes, dune wavelengths, and crater
+  depths tuned for Earth are wrong elsewhere.
+
+The rule: **pick the dominant agent from the world, not from habit.** An Earth graph reaches for
+noise-then-erosion; a lunar graph for cratering-then-regolith-gardening; a Martian graph blends
+ancient fluvial relics under a dominant aeolian-and-impact overprint. The `04`/`05`/`11`/`16`
+machinery is the same — only the *weights and constants* change, which is the multi-scale
+doctrine's sibling: same operators, different regime.
+
 ## Six things people call "an algorithm"
 
 Terrain discussions collapse these constantly, and nearly every bad reference table in
@@ -240,6 +261,8 @@ the constants matter and are easy to get subtly wrong.
 | `references/13-climate-ecosystem.md` | Lapse rate, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; multi-biome worlds / regional composition (Hyrule, Middle-earth) |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |
+| `references/16-arid-desert.md` | Arid/desert landforms: yardangs, inselbergs/bornhardts, alluvial fans & bajadas, playas, desert pavement, wadis, loess & sand sheets |
+| `references/17-periglacial.md` | Periglacial/permafrost: patterned ground, solifluction, rock glaciers, thermokarst, pingos, blockfields |
 | `references/99-papers.md` | Bibliography with attribution notes |
 
 ## Invariants

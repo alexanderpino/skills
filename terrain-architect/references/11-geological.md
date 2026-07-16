@@ -3,7 +3,8 @@
 Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terracing](#terracing) ·
 [Folding](#folding) · [Lithology & erodibility](#lithology--erodibility) ·
 [Outcrops, mesas, badlands](#outcrops-mesas-badlands) · [When the heightfield fails](#when-the-heightfield-fails) ·
-[Karst & caves](#karst--caves)
+[Karst & caves](#karst--caves) · [Weathering & soil production](#weathering--soil-production) ·
+[Volcanic landforms](#volcanic-landforms) · [Impact craters](#impact-craters)
 
 ## The central claim
 
@@ -238,3 +239,90 @@ Two honesty notes, both straight from the central claim of this file:
   caves you need Peytavie's Arches or a volume. There is **no canonical graphics paper for tower-
   karst surface morphology** — the cave network is Paris et al. (2021), the surface is the
   composition above grounded in **Ford & Williams (2007)**.
+
+## Weathering & soil production
+
+The erosion models take erodibility `K` and regolith depth as *given*. Where does the regolith come
+from? **Bedrock weathers into soil at a rate that falls exponentially as the soil above it
+thickens** — the **soil production function** (**Heimsath, Dietrich, Nishiizumi & Finkel 1997**,
+*The soil production function and landscape equilibrium*, Nature 388, measured with cosmogenic
+¹⁰Be/²⁶Al):
+
+```
+soilProduction(soilDepth):
+    return P0 * exp(-soilDepth / h_star)     # P0 ~ 0.05–0.3 mm/yr on bare rock; h_star ~ 0.3–0.5 m
+```
+
+Why it matters for terrain:
+
+- **Bare rock weathers fastest; thick soil insulates the rock beneath it.** A freshly stripped
+  ridge (thin soil) produces regolith fast; a stable footslope (thick soil) produces almost none.
+  This closes a loop: erosion thins soil → speeds production → limits how bare a slope can get.
+- **It is the field that feeds `K` and vegetation.** Regolith depth *is* the erodible layer
+  (Št'ava's regolith/bedrock split, `04`); it gates rooting and the material masks (`06`). Track it
+  as `∂(soil)/∂t = production − erosion` (in rock-equivalent thickness) and soil comes out thick in
+  hollows and thin on noses — which is both correct and the reason hollows are green and noses rocky.
+
+This is the **production** side of the regolith the whole erosion pipeline consumes, and most
+graphs simply assume regolith exists. Adding it is one exponential, and it makes every
+soil-depth-driven mask physical instead of painted.
+
+## Volcanic landforms
+
+The catalogue lists "volcanic cones, calderas, craters" as **F/L-tier** — primitive + noise +
+erosion. What the primitive must get right is the **edifice shape**, which is set by eruption style;
+the dimensions are catalogued in **Pike & Clow 1981** (*Revised classification of terrestrial
+volcanoes and catalog of topographic dimensions*, USGS Open-File Report 81-1038 — height, flank
+width, and summit-depression size for 697 volcanoes).
+
+| Edifice | Shape | Flank slope | Built by |
+|---|---|---|---|
+| **Shield** | Broad, low dome | 2–10° | Fluid basaltic lava flows (Stora 1999) |
+| **Stratovolcano** | Steep cone, concave-up | 20–35° | Alternating lava + tephra; steepens to the summit |
+| **Cinder/scoria cone** | Small steep cone | ~30–33° | Ballistic tephra — a pile at the repose angle (`05`) |
+| **Caldera** | Collapse basin | — | Roof collapse after a large eruption — a closed depression |
+| **Lava dome** | Bulbous mound | steep | Viscous lava piling at the vent |
+
+```
+volcano(style):
+    base = cone/dome primitive (10) with the flank slope from the table (Pike & Clow 1981)
+    if stratovolcano: profile is CONCAVE-UP (steep summit, gentle base) — not a straight cone
+    summitCrater/caldera = inverted cone at the top (closed basin — mask it from the 03 fill)
+    lava flows (Stora 1999) run down channels; a tephra mantle (05 aeolian deposit) thins outward
+    then fluvial erosion (04) cuts radial BARRANCOS — deep radial gullies
+```
+
+The detail that ages a volcano: **radial barrancos** — fluvial erosion of an unconsolidated cone
+cuts deep radial gullies, so a young cone is smooth and an old one is deeply rilled. Run erosion
+(`04`) on the cone and they fall out; a perfectly smooth cone reads as brand new.
+
+## Impact craters
+
+Only a "crater" primitive exists today, but real craters have a well-constrained morphology that
+**changes with size** (**Melosh 1989**, *Impact Cratering: A Geologic Process*, Oxford Univ. Press;
+**Pike 1977**, *Size-dependence in the shape of fresh impact craters on the Moon*). Two regimes,
+with a transition around **~15 km on Earth, ~10–20 km on the Moon**:
+
+- **Simple crater** (small): a bowl. Raised, overturned **rim**; **ejecta blanket** draping outward
+  ~1 crater radius and thinning roughly as `r⁻³`; depth ≈ 1/5 of diameter.
+- **Complex crater** (large): shallower, with a **central peak** (rebound uplift), **terraced walls**
+  (slumped rim), and a flat floor. Depth-to-diameter *decreases* with size (Pike 1977).
+
+```
+crater(D):
+    R = D/2
+    profile(r):                                   # radial
+        if r < R:  bowl (paraboloid) to depth d(D)          # d/D ~0.2 simple, less if complex
+        else:      rim uplift + ejecta * (r/R)^-3           # ejecta thins outward
+    if D > D_complex:                             # ~15 km Earth / ~10–20 km Moon (Pike 1977)
+        add centralPeak (rebound) near r = 0
+        terrace the inner walls (slump blocks)
+        flatten the floor; the crater is shallower
+    rimCrest ~ 0.04·D above the surroundings (Pike 1977 ratios)
+    secondary craters + rays: scatter (07) smaller craters + high-albedo radial streaks
+```
+
+Melosh's ejecta scaling and Pike's depth/diameter and rim-height ratios are the numbers to hit. A
+crater that is a plain Gaussian dimple — no raised rim, no ejecta, no central peak at size — reads
+as a golf divot, not an impact. Crater size also scales with **gravity** (Melosh's π-group scaling),
+which matters off-Earth — see the planetary doctrine in `SKILL.md`.
