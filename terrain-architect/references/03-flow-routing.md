@@ -329,7 +329,10 @@ depth = k_d * pow(Q, 0.4)
 ```
 
 Use `width` to burn the channel into the height field, or to stamp the river mask (`06`) at a
-realistic, downstream-widening size — a constant-width river is an instant tell.
+realistic, downstream-widening size — a constant-width river is an instant tell. And feed the
+relations the **channel-forming discharge** — the *bankfull flood* (roughly the 1–2-year event) —
+not the mean flow: channels are shaped by their floods, and a mean-flow `Q` under-sizes every
+river.
 
 **Braided vs meandering — the third planform.** The classic classification is **Leopold & Wolman
 1957** (*River channel patterns: braided, meandering, and straight*, USGS Professional Paper 282-B):

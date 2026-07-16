@@ -123,9 +123,24 @@ convergent hollows** (high `A_specific`, high slope) — not on ridges. That is 
 ```
 landslide(h, failureMask):
     scar   = evacuate soil/regolith (11) down to a failure plane inside failureMask
-    runout = route the mass down steepest descent (03), depositing where slope < ~tan(10°)
+    runout = route the mass down steepest descent (03), stopping by a rule below
     run thermal (above) on scar + deposit                # both relax to repose
 ```
+
+**How far it goes — the stop rules.** "Deposit where it flattens" is the crude default; two
+grounded rules replace it:
+
+- **Angle of reach (Fahrböschung — Corominas 1996).** The line from scar crown to deposit toe dips
+  at a reach angle `α`, so the runout length is simply `L = H / tan(α)` for fall height `H` — and
+  **`α` shrinks as volume grows** (mobility increases with size, measured across 204 landslides):
+  rockfalls ~30–45°, small slides ~20–30°, large debris flows and rock avalanches well under 10°.
+  One empirical number, P-tier, and it makes big failures dramatically longer than small ones —
+  which is the visible difference between a scree chute and a valley-crossing rock avalanche.
+- **Voellmy two-parameter friction (Voellmy 1955** — the rheology under RAMMS-class runout
+  models): deceleration = `μ g cosθ` (Coulomb) `+ g v²/ξ` (turbulent drag). Integrate `v` along
+  the steepest-descent path; the mass stops where `v` reaches 0. `μ ≈ 0.05–0.3` (lower = more
+  mobile), `ξ ≈ 100–1000 m/s²`. Use this when the path matters (bends, run-up on the far valley
+  wall — which the reach angle can't do); use the reach angle when only the footprint matters.
 
 - A **shallow landslide** evacuates the *regolith* (the `11` soil layer — bedrock stays), leaving a
   spoon-shaped scar and a lobate deposit at the slope base. In the layer stack it is a transfer

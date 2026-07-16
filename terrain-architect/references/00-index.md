@@ -191,6 +191,7 @@ are compositions. The recipe is the answer:
 | Shallow landslide susceptibility (wetness-coupled) | P | **Montgomery & Dietrich 1994**, WRR 30 — the SHALSTAB model; steep + convergent + wet fails (`05`) |
 | Debris flows | P | Iverson 1997, Rev. Geophys. 35(3) — the physics, **not implementable as written** (like Bagnold); terrain realisation is F (`05`) |
 | Landslide runout / rockfall / slump (terrain realisation) | F | Scar + steepest-descent runout + thermal relaxation — no canonical graphics paper (`05`) |
+| Runout stop rules (angle of reach; Voellmy friction) | P | Corominas 1996, Can. Geotech. J. 33(2) — `L = H/tan(α)`, volume-dependent; Voellmy 1955 (`05`) |
 | Soil creep | P | = hillslope diffusion, `D·∇²h`. See Culling 1960, *Analytical Theory of Erosion*, J. Geology 68 |
 
 ## 6. Terrain analysis → `06-analysis-masks.md`
@@ -267,7 +268,7 @@ are compositions. The recipe is the answer:
 | Orographic rainfall / rain shadow | P | **Smith & Barstad 2004**, *A Linear Theory of Orographic Precipitation*, J. Atmos. Sci. 61 |
 | Elevation lapse rate | P | Standard atmospheric physics — 6.5 °C/km environmental |
 | Latitude temperature, seasonality, continentality | F | — |
-| Wind fields | F | For terrain, an authored or noise field. Real CFD is out of scope. |
+| Wind fields (terrain-adjusted) | F | Authored base + crest speed-up (Jackson & Hunt 1975), lee shelter (`05` shadow), channelling, mass-consistent cleanup (Sherman 1978) (`13`). Real CFD out of scope. |
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |

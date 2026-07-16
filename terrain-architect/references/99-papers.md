@@ -111,6 +111,12 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Iverson, R.M. (1997).** *The physics of debris flows.* Reviews of Geophysics 35(3), 245–296. —
   The debris-flow physics reference: solid–fluid mixture mechanics. Like Bagnold, cite it for
   *why*, not *how* — it is not implementable as written (`05`).
+- **Corominas, J. (1996).** *The angle of reach as a mobility index for small and large landslides.*
+  Canadian Geotechnical Journal 33(2), 260–271. — The **runout stop rule**: `L = H/tan(α)`, with the
+  reach angle shrinking as volume grows (204 landslides). Big failures run far; small ones don't (`05`).
+- **Voellmy, A. (1955).** *Über die Zerstörungskraft von Lawinen.* Schweizerische Bauzeitung 73. —
+  The **two-parameter runout friction** (Coulomb `μ` + turbulent `v²/ξ` drag) under RAMMS-class
+  avalanche and debris-flow models (`05`).
 
 ## Flow routing
 
@@ -343,6 +349,12 @@ is below.
 
 - **Smith, R.B. & Barstad, I. (2004).** *A Linear Theory of Orographic Precipitation.* Journal of
   the Atmospheric Sciences 61(12), 1377–1391. — **The orographic precipitation reference.**
+- **Jackson, P.S. & Hunt, J.C.R. (1975).** *Turbulent wind flow over a low hill.* Quarterly Journal
+  of the Royal Meteorological Society 101, 929–955. — The **crest speed-up** theory: fractional
+  wind speed-up over a hill scales with its slope. The anchor for terrain-adjusted wind (`13`).
+- **Sherman, C.A. (1978).** *A Mass-Consistent Model for Wind Fields over Complex Terrain.* Journal
+  of Applied Meteorology 17(3), 312–319. — MATHEW: adjust an interpolated wind field in a weighted
+  least-squares sense to satisfy continuity. The divergence-cleanup step for terrain wind (`13`).
 - **Deussen, O., Hanrahan, P., Lintermann, B., Měch, R., Pharr, M. & Prusinkiewicz, P. (1998).**
   *Realistic Modeling and Rendering of Plant Ecosystems.* SIGGRAPH '98. — **The ecosystem
   reference.** Iterative competition and self-thinning.

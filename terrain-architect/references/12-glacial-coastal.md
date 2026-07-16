@@ -67,21 +67,64 @@ with `ρ_ice ≈ 917 kg/m³`. Then ice thickness evolves by mass conservation:
 ∂H/∂t = -∇·(ū H) + b(z)
 ```
 
-**The `H^(n+1)` is the whole character of the model.** With `n = 3` that's `H⁴` — flux scales
-with thickness to the fourth power. Thick ice flows enormously faster than thin ice, so
-glaciers self-organise into fast trunk streams in valleys and near-stationary ice on the
+**The `H^(n+1)` is the whole character of the model.** With `n = 3` the depth-averaged *velocity*
+scales as `H⁴` — and the ice *flux* `ū·H` as `H⁵`. Thick ice flows enormously faster than thin
+ice, so glaciers self-organise into fast trunk streams in valleys and near-stationary ice on the
 interfluves. That's why glaciers carve valleys and leave arêtes between them.
 
 **Numerics:**
 - **This is a diffusion equation and it is stiff.** Explicit timestepping needs
-  `Δt < cellSize² / (2·D_max)` where `D` is the effective diffusivity `∝ H^(n+1)|∇s|^(n-1)` —
-  which blows up under thick ice. Use an implicit or semi-implicit solve, or subcycle
-  adaptively. If someone reports "my glacier sim explodes where the ice is thick", this is it.
+  `Δt < cellSize² / (2·D_max)` where `D` is the effective diffusivity of the *flux*,
+  `D = (2A/(n+2))·(ρg)^n · H^(n+2) · |∇s|^(n−1)` — which blows up under thick ice. Use an
+  implicit or semi-implicit solve, or subcycle adaptively (`15` prefers subcycling on GPU). If
+  someone reports "my glacier sim explodes where the ice is thick", this is it.
 - **Compute `∇s` on the surface, not the bedrock.** This is the coupling that makes ice flow
   downhill along the *ice* surface, which can differ from the bedrock slope. Getting it wrong
   gives ice that flows uphill out of overdeepenings — which real glaciers do, and a bedrock-slope
   implementation cannot.
 - Guard `H → 0` at the margins; the exponents make the terms singular.
+
+**The step loop** — the implementable form, in the `04`/`19` pattern (double-buffered):
+
+```
+glacierStep(bed, H, Δt):
+    # 1. Mass balance (climate, 13): accumulate above the ELA, melt below
+    s  = bed + H
+    H += clamp(β * (s − ELA), −∞, bMax) * Δt ;  H = max(H, 0)
+    melt = the negative part → a WATER SOURCE for 03's discharge (the coupled loop, below)
+
+    # 2. SIA diffusivity on the ICE SURFACE gradient (numerics above)
+    D  = (2A/(n+2)) * (ρ_ice g)^n * H^(n+2) * |∇s|^(n−1)      # zero where H ≈ 0
+
+    # 3. Ice transport — adaptive explicit subcycling (stable Δt' = 0.25 cellSize² / max(D))
+    repeat until Δt consumed:  H += ∇·(D ∇s) * Δt'
+
+    # 4. Erosion at the bed
+    u_b  = f * ū                                # sliding fraction; 0 where cold-based
+    bed -= K_g * |u_b|^l * Δt                    # + plucking where steep & fractured
+    # eroded volume → a moraine/sediment field at margins and terminus (the mass budget)
+```
+
+**The coupled fluvial–glacial loop.** "Glacial runs alongside fluvial" (the Legal Order's 6b) has
+a concrete shape: an outer loop where `glacierStep` erodes under the ice, the mass-balance melt
+feeds `03`'s discharge as a source term (proglacial rivers are melt-fed — it's why they surge in
+summer, `03`), and the fluvial backbone (`04`) erodes the ice-free terrain. Timesteps differ by
+orders of magnitude — ice wants years, stream power tolerates millennia (`04`) — so run the fluvial
+solve every N glacier steps, not in lockstep.
+
+**Glacier parameter reference** (order-of-magnitude starts; tune against the U-valley/ELA checks):
+
+| Parameter | Start | Notes |
+|---|---|---|
+| `A` (Glen) | ~2.4×10⁻²⁴ Pa⁻³ s⁻¹ at 0 °C | Strongly temperature-dependent; colder ice is stiffer |
+| `n` | 3 | Glen's exponent |
+| `ρ_ice` | 917 kg/m³ | |
+| `β` (mass balance) | 0.005–0.01 /yr | m of ice per m of elevation |
+| `bMax` | ~0.5–2 m/yr | Accumulation cap — precipitation is finite (couple to `13`) |
+| `ELA` | **the master parameter** | Author its *history*, not the ice |
+| `f` (sliding fraction) | ~0.5 | 0 where cold-based (no erosion) |
+| `K_g`, `l` (abrasion) | ~1e-4, l ≈ 1 | `05`-style erosion constant |
+| `Δt` | years–decades | With subcycling from the CFL above |
 
 ## Glacial erosion
 
@@ -166,6 +209,11 @@ exposure(p):
 This is structurally the same sweep as horizon AO (`06`) — and it can use the same
 Timonen & Westerholm O(1) machinery. Exposed headlands get high fetch, sheltered bays get low.
 That asymmetry drives everything.
+
+One refinement the sweep misses: real waves **refract** — shoaling bends crests toward shallow
+water, *focusing* energy onto headlands and spreading it in bays, which sharpens the same
+asymmetry. Fold it in as an exposure multiplier from coastline convexity (shore-plan curvature,
+`06`) rather than simulating waves.
 
 ## Cliff retreat & beaches
 

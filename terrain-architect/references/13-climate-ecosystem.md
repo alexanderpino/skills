@@ -1,6 +1,7 @@
 # Climate & Ecosystem
 
 Contents: [Why climate is in the graph](#why-climate-is-in-the-graph) · [Temperature](#temperature) ·
+[Wind fields](#wind-fields) ·
 [Orographic precipitation](#orographic-precipitation-smith--barstad-2004) · [Rain shadow](#the-rain-shadow-result) ·
 [Snow & avalanches](#snow--avalanches-cordonnier-et-al-2018) · [Moisture](#moisture--soil-water) ·
 [Biomes](#biome-classification) · [Ecosystem simulation](#ecosystem-simulation-deussen-et-al-1998) ·
@@ -47,6 +48,37 @@ and it's one of those details that makes a landscape read as real without anyone
 
 **Snow line** = the elevation where `T = 0`. **Permafrost** = where the *annual mean* stays
 below 0. Both are thresholds on this field, not separate algorithms.
+
+## Wind fields
+
+Wind is consumed by **four** systems — dunes (`05`), orographic precipitation (below), snow drift
+and cornices (below), wave fetch (`12`) — so it deserves better than a constant vector, and real
+CFD remains out of scope. The middle ground is a **terrain-adjusted wind field**: author the
+regional wind (direction + speed, possibly a seasonal rose), then let the terrain modulate it.
+
+```
+windField(h, baseDir, baseSpeed):
+    for each cell p:
+        # 1. Speed-up over windward slopes and crests — Jackson & Hunt 1975:
+        #    fractional speed-up scales with the hill's slope (Δu/u ∝ h/L), peaking at the crest
+        s = 1 + k_su * max(0, upwindSlope(h, p, baseDir))       # cap; k_su gives ~1.5–2× at steep crests
+        # 2. Lee shelter — Werner's dune shadow zone (05), at landscape scale
+        if inShadowZone(h, p, baseDir, ~15°): s *= shelter       # ~0.2–0.5
+        # 3. Channelling: rotate toward the valley axis where relief confines the flow
+        dir = blend(baseDir, valleyAxis(p), confinement(p))      # confinement from relief across-flow
+        wind[p] = s * baseSpeed * dir
+    # 4. Optional cleanup: adjust to zero divergence — the "mass-consistent" wind-model family
+    #    (Sherman 1978, MATHEW): least-squares project onto a divergence-free field, or build the
+    #    field from a potential in the first place (curl, 01). Without it, wind piles up nowhere.
+```
+
+Every ingredient is machinery the skill already has: the upwind-slope term is the `dot(windDir, ∇h)`
+of the orographic march below, the shadow zone is Werner's (`05`), and the sweep costs are the
+`06`/`12` horizon machinery. What the consumers gain: dunes align to *deflected* wind (valley-floor
+dune fields point along the valley, not the regional wind), cornices form on the *actual* lee,
+fetch responds to channelled winds down a fjord, and precipitation sees the speed-up. **Tier:** the
+recipe is F — a look built from two P-tier anchors (Jackson & Hunt 1975 for the crest speed-up;
+Sherman 1978 for mass-consistency). Real boundary-layer CFD stays out of scope, and say so.
 
 ## Orographic precipitation (Smith & Barstad 2004)
 
