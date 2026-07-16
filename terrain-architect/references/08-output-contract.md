@@ -71,6 +71,26 @@ a tide can't move the shoreline. Ship `solidTop` as the collision/mesh height, `
 melt. Each is already a field in the contract; the discipline is to keep them *separate* fields
 through to the emitter.
 
+**Baking a layer in is a real option — for solid covers — and it is *not* just albedo.** Keeping a
+layer live is for what *changes* (tides, seasonal snow, flowing water); a *static* solid cover — a
+perpetual snowcap, established soil, a fixed sand sheet — can be **baked into the terrain** to save
+the engine the work. But baking snow is not painting the albedo white; it commits the layer's
+**whole stack contribution**:
+
+- **Geometry** — add the layer's thickness to `solidTop`. Baked snow *raises and reshapes* the
+  ground: it fills hollows, rounds ridges, and settles at its own repose (`13`), so the surface is a
+  different shape than the bare rock underneath. Snow drawn as flat white albedo on the rock's own
+  geometry is the classic fake — it ignores that snow accumulates, drifts, and thickens.
+- **Material** — the splat/material becomes snow / soil / sand where baked (`06`), which drives
+  friction, footstep sound, and particles — not only colour.
+- **Derived maps** — re-bake **normals and AO from the post-bake height** (precision, below); baked
+  snow lit with the rock's normals reads wrong.
+
+So the satmap (colour) is *one output* of a bake, not the bake itself — a bake touches height,
+material, normals, AO, and physics, the whole contract. And the asymmetry holds: **solid covers
+(snow, soil, sand) can bake; water should not** — bake the sea in and you get the wall you can't
+swim in. Bake only what is genuinely static; keep live whatever melts, migrates, or flows.
+
 **Solid vs fluid vs transient** — the three layer kinds and what each obeys:
 
 - **Solid covers** (soil `11`, sand `05`) move slowly by erosion/deposition and are part of the
