@@ -112,6 +112,7 @@ are compositions. The recipe is the answer:
 | Karst terrain | Dissolution of a soluble layer; caves need volume (`11`) |
 | Tower / cone karst (fenglin, fengcong) | Dissolution + differential vertical lowering to a base level (`11`) |
 | Lava fields, lava lakes, lava worlds (Mustafar) | Stacked levéed flows; ponded fluid lava in closed basins; fluid layer = lava (`08`, `11`, `13`) |
+| Fissure eruptions, flood basalts (traps) | Line-source flows along a rift/fault (`02`) + stacking → basalt plateau; dissection → stepped traps (`11`) |
 
 ## 3. Composition & filtering → `10-primitives-ops-filters.md`
 

@@ -320,6 +320,16 @@ lavaFlow(h, vent, supply, yieldStress):
     #   block    (most viscous)         = smooth-faced angular blocks
 ```
 
+**Sources: vents and fissures.** Lava issues from a **point source** (a volcano's vent — the
+edifices above) or a **line source**: a *fissure* along a rift or fault (`02` — a fault is a crack,
+and eruptive fissures follow them), the "curtain of fire" that feeds Iceland- and Hawaiʻi-style
+eruptions. This is the same source-term pattern as water (`03`): vent : fissure :: spring :
+boundary inflow. A fissure feeds many lobes at once across its whole length, so it builds **broad
+flow fields with no cone** — and at the largest scale, stacked fissure-fed flows build **flood
+basalts** (the Deccan and Columbia River traps): a basalt *plateau*, hundreds of flows thick, whose
+later fluvial dissection gives the stepped "trap" landscape via the caprock/mesa machinery above.
+L-tier — a composition of the flow node along a `02` fault line, stacked.
+
 What falls out: a **lava field** is stacked, overlapping flow lobes with levéed channels — a
 composition of this one node, run per eruption pulse, exactly the scale-recursion pattern. A
 **lava lake** is ponded lava in a pit crater — a *fluid surface at a level in a closed basin*, the
