@@ -220,6 +220,7 @@ order before you check the maths.
   1  Macro / tectonics        uplift field U, base relief          → 02
   2  Base shape               primitives, large-scale noise        → 01
   3  Detail noise             FBM / ridged / warp                  → 01
+  3b Volcanic (if volcanic)   edifices, lava flows & fields        → 11, 19
   4  Depression handling      fill or breach (MANDATORY)           → 03
   5  Flow routing             D8 / D∞ / MFD → drainage area A      → 03
   6  Fluvial erosion          stream power / pipe / droplet        → 04
@@ -326,6 +327,7 @@ the constants matter and are easy to get subtly wrong.
 | `references/16-arid-desert.md` | Arid/desert landforms: yardangs, inselbergs/bornhardts, alluvial fans & bajadas, playas, desert pavement, wadis, loess & sand sheets |
 | `references/17-periglacial.md` | Periglacial/permafrost: patterned ground, solifluction, rock glaciers, thermokarst, pingos, blockfields |
 | `references/18-materials.md` | Surface-material palette: rock families, soil (USDA texture), sand, gravel, mud, vegetation cover, snow/ice, water, crusts, volcanic — and the property bundle each carries |
+| `references/19-lava.md` | **Lava simulation.** Bingham rheology, the grid CA with temperature (Miyamoto & Sasaki / MAGFLOW-style), cooling & crust insulation, FLOWGO channel model, pahoehoe/ʻaʻā, lava-specific verification, parameters |
 | `references/99-papers.md` | Bibliography with attribution notes |
 
 ## Invariants

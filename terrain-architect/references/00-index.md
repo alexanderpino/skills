@@ -308,6 +308,19 @@ are compositions. The recipe is the answer:
 | Grain-size classes (boulder → clay) | P | Wentworth 1922 (`04`) |
 | Repose angles per material | P | `05` (Olsen 2004; Bagnold 1941 for sand) |
 
+## 13. Lava simulation → `19-lava.md`
+
+| Algorithm | Tier | Source |
+|---|---|---|
+| Lava rheology (Bingham, yield stress → levées, thickness) | P | Hulme 1974, GJRAS 39(2) (`11`, `19`) |
+| Lava flow CA (grid, Monte Carlo anisotropy fix) | P | Miyamoto & Sasaki 1997, Computers & Geosciences 23(3) |
+| Physics-based lava CA (Bingham Navier–Stokes flux) | P | MAGFLOW, INGV Catania — Bull. Volcanol. 2008 (Etna 2004); CUDA port in Annals of Geophysics |
+| Channel thermo-rheological model (where a flow stops) | P | Harris & Rowland 2001, *FLOWGO*, Bull. Volcanol. 63 |
+| Pahoehoe ↔ ʻaʻā transition (~5–10 m³/s) | P | Rowland & Walker 1990, Bull. Volcanol. 52 |
+| SPH lava animation | P | Stora et al. 1999, Graphics Interface |
+| Lava surface classification | P | Macdonald 1953, AJS 251(3) |
+| Emissive crust material | F | crackMask × blackbody(T) — the sim's own `T`/crust fields (`08`, `19`) |
+
 ---
 
 ## Node types (N-tier) — not algorithms

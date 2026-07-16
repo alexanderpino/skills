@@ -298,6 +298,9 @@ cuts deep radial gullies, so a young cone is smooth and an old one is deeply ril
 
 ### Lava flows, fields & lakes
 
+**The full simulation treatment — rheology, the grid CA, cooling & crust, FLOWGO, verification,
+parameters — is `19-lava.md`.** This section is the landform context.
+
 Lava is the one material that **changes stack role**: it arrives as a *fluid* layer (`08`) and
 freezes into *new bedrock* (fresh basalt, low `K`). The graphics simulation is **Stora et al. 1999**
 (`00`); the morphology physics is **Hulme 1974** (*The Interpretation of Lava Flow Morphology*,

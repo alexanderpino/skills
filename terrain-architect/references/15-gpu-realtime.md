@@ -18,7 +18,7 @@ realtime.
 |---|---|---|---|
 | **T0 per-frame** | µs–low ms, every frame | LOCAL per-cell work, fixed small neighbourhoods | Noise & FBM (`01`), all operators/remaps (`10`), small blurs, slope/normals (`06`), analytic primitives |
 | **T1 interactive** | 10–200 ms, on edit | NEIGHBOURHOOD work, bounded iteration, converging sims | Thermal (`05`), pipe erosion at working res (`04`), guided filter (`10`), Werner dunes (`05`), scatter (`07`), most analysis (`06`) |
-| **T2 amortised** | spread over many frames | Long-running sims with checkpointable state | Droplet at scale (`04`), ecosystem sim (`13`), glacier SIA (`12`), pipe at full res |
+| **T2 amortised** | spread over many frames | Long-running sims with checkpointable state | Droplet at scale (`04`), ecosystem sim (`13`), glacier SIA (`12`), lava CA (`19`), pipe at full res |
 | **T3 baked** | offline, cached | GLOBAL data flow | Flow accumulation & everything downstream of it (`03`), stream power (`04`), full-domain AO at large radius (`06`), orographic precipitation (`13`) |
 
 The line that matters is **T2/T3**: T2 is slow-but-local (tileable, streamable, resumable),

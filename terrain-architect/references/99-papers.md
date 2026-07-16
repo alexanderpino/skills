@@ -286,6 +286,22 @@ is below.
 - **Macdonald, G.A. (1953).** *Pahoehoe, aa, and block lava.* American Journal of Science 251(3),
   169–191. — The surface-texture classification: ropey pahoehoe, clinkery ʻaʻā, angular block —
   a material distinction (`11`, `18`).
+- **Rowland, S.K. & Walker, G.P.L. (1990).** *Pahoehoe and aa in Hawaii: volumetric flow rate
+  controls the lava structure.* Bulletin of Volcanology 52, 615–628. — The transition is a **flow-
+  rate threshold** (~5–10 m³/s): pahoehoe below, ʻaʻā above. Expose the eruption rate; the surface
+  style falls out (`19`).
+- **Miyamoto, H. & Sasaki, S. (1997).** *Simulating lava flows by an improved cellular automata
+  method.* Computers & Geosciences 23(3), 283–292. — The gridded lava CA, with the **Monte Carlo
+  neighbour selection** that removes square-lattice anisotropy (`19`).
+- **Harris, A.J.L. & Rowland, S.K. (2001).** *FLOWGO: a kinematic thermo-rheological model for lava
+  flowing in a channel.* Bulletin of Volcanology 63, 20–44. — March a control volume down a
+  channel, evolving heat budget and rheology until it stops; validated against Mauna Loa, Kīlauea,
+  and Etna flow lengths. The model for *authored* flows along a spline (`19`).
+- **MAGFLOW** (INGV Catania — Vicari, Del Negro and colleagues). *Simulations of the 2004 lava flow
+  at Etna volcano using the MAGFLOW cellular automata model.* Bulletin of Volcanology (2008), DOI
+  10.1007/s00445-007-0168-8. — CA whose evolution function derives from a steady-state
+  Navier–Stokes solution for a **Bingham** fluid + simplified heat transfer; run operationally at
+  Etna; GPU-ported (*Porting and optimizing MAGFLOW on CUDA*, Annals of Geophysics) (`19`, `15`).
 - **Culling, W.E.H. (1960).** *Analytical Theory of Erosion.* Journal of Geology 68(3). —
   Hillslope diffusion / soil creep as `D·∇²h`. The origin of the diffusion term in `04`.
 
