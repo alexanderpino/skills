@@ -301,7 +301,8 @@ cuts deep radial gullies, so a young cone is smooth and an old one is deeply ril
 Only a "crater" primitive exists today, but real craters have a well-constrained morphology that
 **changes with size** (**Melosh 1989**, *Impact Cratering: A Geologic Process*, Oxford Univ. Press;
 **Pike 1977**, *Size-dependence in the shape of fresh impact craters on the Moon*). Two regimes,
-with a transition around **~15 km on Earth, ~10–20 km on the Moon**:
+with a transition around **~3 km on Earth and ~15 km on the Moon** — the transition diameter
+scales as **~1/g** (Melosh 1989), so it is *smaller* where gravity is stronger:
 
 - **Simple crater** (small): a bowl. Raised, overturned **rim**; **ejecta blanket** draping outward
   ~1 crater radius and thinning roughly as `r⁻³`; depth ≈ 1/5 of diameter.
@@ -314,7 +315,7 @@ crater(D):
     profile(r):                                   # radial
         if r < R:  bowl (paraboloid) to depth d(D)          # d/D ~0.2 simple, less if complex
         else:      rim uplift + ejecta * (r/R)^-3           # ejecta thins outward
-    if D > D_complex:                             # ~15 km Earth / ~10–20 km Moon (Pike 1977)
+    if D > D_complex:                             # ~3 km Earth / ~15 km Moon — scales ~1/g (Pike 1977; Melosh 1989)
         add centralPeak (rebound) near r = 0
         terrace the inner walls (slump blocks)
         flatten the floor; the crater is shallower

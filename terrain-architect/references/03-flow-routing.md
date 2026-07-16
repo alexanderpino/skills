@@ -260,7 +260,7 @@ already here. What varies is *what dammed the basin*, all **L-tier** composition
 | **Paternoster chain** | A staircase of glacial steps down a trough — a lake *cascade* | `12` + the lake graph below |
 | **Ribbon lake** | A long overdeepened glacial trough | `12` |
 | **Moraine-dammed** | A terminal/lateral moraine impounds the valley | `12` (track the moraine sediment field) |
-| **Landslide / rockfall-dammed** | A slump blocks the valley, often short-lived | `11` hillslope failure |
+| **Landslide / rockfall-dammed** | A slump blocks the valley, often short-lived | Mass wasting — catalogued F-tier only (`00`); no recipe in this skill |
 | **Crater / caldera lake** | A volcanic or impact basin | `02`/`11` primitive + a no-fill mask |
 
 They share one computation: **the lake surface is a horizontal plane at the spill elevation**,

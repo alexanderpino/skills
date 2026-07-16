@@ -290,7 +290,8 @@ fbm(p, octaves, lacunarity=2.0, gain=0.5):
 
 ## Ridged multifractal
 
-Musgrave (1989). The naive version:
+Musgrave — the 1993 Yale thesis and his *Texturing & Modeling* chapters (`00`; the 1989 SIGGRAPH
+paper is the erosion one, not this). The naive version:
 
 ```
 ridged(p, octaves, lacunarity=2.0, gain=0.5):
@@ -330,7 +331,8 @@ wrong there; use finite differences on the final heightfield instead.
 
 ## Hybrid multifractal
 
-Musgrave (1989). The reason to reach for it: FBM has the same roughness everywhere, which
+Musgrave — same provenance as ridged, above (1993 thesis / *Texturing & Modeling*, `00`). The
+reason to reach for it: FBM has the same roughness everywhere, which
 reads as artificial across a large map. Hybrid multifractal multiplies each octave by the
 accumulated value so far, so low areas stay smooth (plains) and high areas get rough
 (mountains) — the correlation you actually see in real topography.
