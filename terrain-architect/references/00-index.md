@@ -242,6 +242,10 @@ are compositions. The recipe is the answer:
 | Unit-vector (normal) encoding — reconstruct-Z, octahedral | P | Cigolle et al. 2014, JCGT 3(2) — the survey of schemes (`08`) |
 | Normal map mipping (variance) | P | Toksvig 2005, JGT 10(3) |
 | LEAN mapping | P | Olano & Baker 2010, I3D |
+| Normal-map blending (RNM / UDN / whiteout) | F | Barré-Brisebois & Hill 2012, *Blending in Detail* — combine base + detail normals (`08`) |
+| Height-based splat blending | F | Mishkinis 2013 — per-material depth maps for natural transitions (`08`) |
+| Triplanar texturing | F | Geiss 2007, *GPU Gems 3* ch. 1 — tiling on steep slopes without UV stretch (`08`, `11`) |
+| Stochastic / by-example tiling | P | Heitz & Neyret 2018, I3D — hide tiling repeats without ghosting (`08`) |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |
 | Quadtree terrain, chunked heightfield, streaming, crack prevention, seam stitching | F | Engineering practice. No papers. (`08`) |
 

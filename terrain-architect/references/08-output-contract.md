@@ -3,7 +3,8 @@
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
 [Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
 [Splatmaps](#splatmaps) · [Satmap & colour map](#satmap--colour-map) ·
-[Normal & AO maps](#optimised-normal--ao-maps) · [Emitters](#emitters)
+[Normal & AO maps](#optimised-normal--ao-maps) ·
+[Compositing with the splatmap](#compositing-with-the-splatmap) · [Emitters](#emitters)
 
 ## The field contract
 
@@ -355,6 +356,73 @@ AO term and a shifted diffuse direction from one extra map.
 *carrying*. If the shader derives base normals from height and the baked map is only detail, it
 can be lower-resolution and tiled. If it's the sole normal source for a decimated LOD, it must
 match the pre-decimation height frequency or the detail is thrown away twice.
+
+## Compositing with the splatmap
+
+The maps above come at **two frequencies**, and the splat material system's whole job is to combine
+them. Get it wrong and the terrain either tiles visibly or turns to mush at every material boundary.
+
+- **Per-material tiling set** — each material (rock, grass, sand, snow) is a *repeating* texture set:
+  albedo, tangent-space normal, AO/cavity, roughness, and often a **height** channel. Authored
+  assets, sampled at high frequency in world UV.
+- **Terrain-wide macro maps** — the colour map, the base normal (from the heightfield, `06`), and the
+  horizon AO (`06`): one low-frequency layer over the whole terrain.
+
+The splatmap **blends the tiling set**; the macro maps **modulate** it. Channel by channel:
+
+**Albedo.** Blend per-material tiling albedos by splat weight, modulate by the macro colour map, and
+fade to the macro map at distance to hide the tiling:
+```
+albedo = Σ_i  splat[i] * tile(materialAlbedo[i], worldUV * tileScale[i])
+albedo = lerp(albedo, macroColourMap, distanceFade)      # detail near, colour map far
+```
+
+**Normal.** Two combinations, and the order matters. First blend the per-material *detail* normals
+across the splat (height-weighted, below — a plain lerp-and-normalise flattens strong detail). Then
+combine the blended detail (tangent space) with the terrain **base** normal, and the correct operator
+is **Reoriented Normal Mapping** (Barré-Brisebois & Hill 2012, *Blending in Detail*): reorient the
+detail so it follows the base surface. Cheaper approximations, rising in quality:
+partial-derivative → **UDN** → **whiteout** → RNM (nearest ground truth). **Never** average two normal
+*vectors* linearly and call it done — that is the flat, plastic tell.
+
+**AO.** Multiply **macro** occlusion (large-scale horizon AO from the heightfield, `06`) by **micro**
+occlusion (per-material cavity/AO from the tiling set):
+```
+ao = macroAO(horizon, 06) * Σ_i splat[i] * tile(materialAO[i], tiledUV)
+```
+Macro darkens valleys and cliff bases; micro darkens the pits in the rock. Different scales, both
+needed — using only one is the usual "flat" (no macro) or "dirty" (no micro) tell. For directional
+occlusion bake a **bent normal** alongside (see Normal & AO maps above).
+
+**Height-blending the splat (the transition).** A linear splat blend gives a soft 50/50 crossfade —
+mud. Give each material a **height** channel and let the more prominent one win the boundary
+(**Mishkinis 2013**, *Advanced Terrain Texture Splatting*): sand runs into the cracks between stones
+and the stone tops stay bare, instead of a grey halfway mix.
+```
+h_i       = tile(materialHeight[i], tiledUV) + splat[i]
+w_i       = max(0, h_i − (max_j h_j − transition))       # only near-top materials contribute
+weight[i] = w_i / Σ w                                     # renormalise → sharp, natural seams
+```
+
+**Steep slopes → triplanar.** UV-mapped tiling stretches into smears on a cliff. Project the material
+along the three world axes and blend the samples by the surface normal (**triplanar mapping** — Geiss
+2007, *GPU Gems 3* ch. 1), applied to albedo *and* normal (mind the per-axis normal swizzle). Gate it
+by a slope selector (`06`), or blend it in by slope.
+
+**Hiding the repeat.** A tiling material repeats visibly at grazing angles. Break it with **stochastic
+/ by-example tiling** — the histogram-preserving blend of **Heitz & Neyret 2018** samples the tile at
+randomised offsets and blends *without* the ghosting naive random tiling causes. Cheaper folklore: two
+octaves of the same tile at different scales, multiplied.
+
+**What the graph owes the shader.** Partitioned splat weights (`06` — must sum to 1), the per-material
+assignment, and the macro maps baked from **R32F** (precision above). The shader does the blend, but
+the colour map, splatmap, and material blend are three views of *one* material decision — composite
+them from the **same `06` masks** or they drift apart as the camera closes in.
+
+**Tier.** Stochastic tiling (Heitz & Neyret 2018) is P-tier; RNM (Barré-Brisebois & Hill 2012),
+triplanar (Geiss 2007), and height-blend (Mishkinis 2013) are documented practice (F, real named
+sources); macro×micro AO and distance fade are F-tier shader folklore. None of it is a terrain
+*algorithm* — it is the **consumption contract** for the maps the graph emits.
 
 ## Emitters
 

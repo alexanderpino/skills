@@ -172,6 +172,20 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Survey of Efficient Representations for Independent Unit Vectors.* Journal of Computer Graphics
   Techniques 3(2), 1–30. — Normal-vector encodings: reconstruct-Z, octahedral, and their error.
   The reference for packing normal maps (`08`).
+- **Barré-Brisebois, C. & Hill, S. (2012).** *Blending in Detail.* blog.selfshadow.com/publications/
+  blending-in-detail/. — **Reoriented Normal Mapping (RNM)**: reorient a detail normal to follow the
+  base normal — the correct way to combine a terrain base normal with a material detail normal (`08`).
+  Blog post, not peer-reviewed.
+- **Mishkinis, A. (2013).** *Advanced Terrain Texture Splatting.* GameDev.net. — **Height-based splat
+  blending**: per-material depth maps let the more prominent material win the boundary, so sand fills
+  the cracks and stone tops stay bare (`08`). Article, not peer-reviewed.
+- **Geiss, R. (2007).** *Generating Complex Procedural Terrains Using the GPU.* In *GPU Gems 3*,
+  ch. 1, NVIDIA / Addison-Wesley. — GPU procedural terrain (marching cubes) and **triplanar
+  texturing** for steep slopes (`08`, `11`). Book chapter.
+- **Heitz, E. & Neyret, F. (2018).** *High-Performance By-Example Noise using a Histogram-Preserving
+  Blending Operator.* Proceedings of the ACM on Computer Graphics and Interactive Techniques 1(2),
+  article 31 (I3D 2018). — **Stochastic / by-example tiling**: hide the repeat of a tiling material
+  without the ghosting of naive random tiling (`08`).
 
 ## Noise (additional)
 
