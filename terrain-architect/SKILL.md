@@ -19,6 +19,38 @@ Unreal, Unity, and glTF are all downstream emitters of the same fields. Never le
 import format leak upstream into the graph — the moment a node reasons in "R16 units" or
 "Unreal's 0–512 landscape scale", the graph stops being portable and starts being wrong.
 
+**The surface is a stack of layers, not one height.** That single "height" is a convenience — a
+realistic surface is an *ordered stack* over the bedrock, and the top number is just wherever the
+stack ends. From the bottom up:
+
+```
+  snow            ← transient: accumulates and MELTS (13); a seasonal overlay
+  water           ← fluid: you move THROUGH it, not on it; surface is DYNAMIC (tides 12, waves/flow 03/04, lake level 03)
+  ── the solid surface: collision / walkable ──
+  sand / sediment ← solid cover: dunes migrate (05), deltas/bars/beaches deposit (04, 12)
+  soil / regolith ← solid cover: produced by weathering (11), consumed by erosion (04)
+  bedrock         ← the base; the only layer always present
+```
+
+Each layer is a **thickness field in metres** — the field contract in `08` already names
+`sandDepth` and `waterSurface`, and snow lives in `13` — never one baked number that has forgotten
+what it's made of. Three *kinds* of layer, and the distinction is exactly what the engine needs:
+
+- **Solid cover** (soil, sand) rests on rock, is part of the **collision surface**, and moves only
+  slowly, by erosion and deposition (`04`, `05`, `11`).
+- **Fluid** (water) is the one layer you move *through*, not on — it has a depth you can swim in and
+  a surface that is **dynamic**: tides raise and lower it (`12`), waves and flow ripple it, a lake
+  sits at its spill level (`03`). Emit it as a *separate* surface plus a depth field; fold it into
+  the solid collision height and the sea becomes a wall you can't swim in and a tide can't move.
+- **Transient** (snow) accumulates where it's cold and **melts** where it's warm (`13` degree-day),
+  laid *over* everything and slid off steep ground by its own thermal pass.
+
+So "the heightfield is the source of truth" means the *solid* stack; water and snow are truthful
+too, as their own layers on top. A graph that collapses them into one number can't tell the engine
+what to walk on, what to swim in, or what will be gone by summer. When the stack needs **voids**
+(overhangs, sea caves) rather than stacked thicknesses, the per-column material stack of `11`
+(Peytavie's Arches) replaces the field stack.
+
 **Every landform is a claim about a process.** When a user asks for "realistic mountains",
 they are asking for a process history: uplift produced relief, fluvial incision carved the
 valley network, hillslope diffusion relaxed the ridges. Noise alone never produces this,

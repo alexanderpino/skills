@@ -1,7 +1,7 @@
 # Output Contract
 
-Contents: [The field contract](#the-field-contract) · [Precision](#precision) ·
-[Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
+Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
+[Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
 [Splatmaps](#splatmaps) · [Satmap](#satmap-albedo--colour-map) ·
 [Normal & AO maps](#optimised-normal--ao-maps) · [Emitters](#emitters)
 
@@ -45,6 +45,46 @@ conventionally *vertex-centred* (so `N` samples span `N−1` cells) but a textur
 *pixel-centred* (so `N` texels span `N` cells). Terrain heightmaps are vertex-centred; masks
 and splatmaps are pixel-centred. **They are not the same grid**, and the half-texel offset
 between them is a real and commonly-shipped bug.
+
+## The layer stack
+
+The fields above are not independent textures — they are an **ordered stack over the bedrock** (the
+doctrine in `SKILL.md`), and *which surface you mean* depends on which layers you count. Three
+surfaces come out of the one stack, and an engine needs all three kept apart:
+
+| Surface | = | Used for |
+|---|---|---|
+| **Solid / collision** | bedrock + soil + sand (the solid covers) | Walking, physics, where things rest |
+| **Water** | `waterSurface` (sea, lakes) | The water plane, buoyancy, swimming |
+| **Rendered** | solid + water where wet + snow where cold | The final look |
+
+```
+solidTop   = bedrock + soilDepth + sandDepth         # collision — the walkable surface
+waterDepth = max(0, waterSurface − solidTop)          # >0 where submerged; buoyancy / swim here
+snowTop    = solidTop + snowDepth                      # 13; melts, so it is seasonal
+```
+
+**Emit each layer, not a flattened height.** The classic bug is baking water into the terrain
+height so the "sea" is solid ground at sea level — now nothing can swim, boats rest on a wall, and
+a tide can't move the shoreline. Ship `solidTop` as the collision/mesh height, `waterSurface` as a
+**separate animated surface** carrying a depth field, and `snowDepth` as an overlay the engine can
+melt. Each is already a field in the contract; the discipline is to keep them *separate* fields
+through to the emitter.
+
+**Solid vs fluid vs transient** — the three layer kinds and what each obeys:
+
+- **Solid covers** (soil `11`, sand `05`) move slowly by erosion/deposition and are part of the
+  collision surface. They follow the layered erosion model (Št'ava 2008, `04`; Beneš & Forsbach
+  2001, `11`): erosion eats the cover before the bedrock, which is what gives rock-above-scree.
+- **Fluid** (water) has a dynamic surface — tides (`12`), waves and flow (`03`, `04`), lake spill
+  level (`03`) — and a depth you traverse. It is never part of the collision height.
+- **Transient** (snow `13`) accumulates and melts on top of everything, sliding off steep ground by
+  its own thermal pass.
+
+When the stack needs **voids** — overhangs, sea caves, arches — rather than stacked thicknesses, the
+field stack is the wrong representation: switch to the per-column material stack of `11` (Peytavie's
+Arches 2009) or a volume. That is a representation decision, and it is made here, at the contract,
+not discovered later in the engine.
 
 ## Precision
 

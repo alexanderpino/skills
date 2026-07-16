@@ -10,7 +10,7 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
 [Wave base & the submarine profile](#wave-base--the-submarine-profile) ·
-[Coral reefs & atolls](#coral-reefs--atolls)
+[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Coral reefs & atolls](#coral-reefs--atolls)
 
 ## Glacial: why it matters
 
@@ -322,6 +322,37 @@ practical consequences:
   (coastal engineering, not graphics). Author it as a graded ramp from shoreline to shelf break,
   then let deposition (deltas, longshore) modify it. This reads correctly and costs nothing;
   trying to *erode* a seabed into shape does not.
+
+## Tides & the intertidal zone
+
+Sea level is not a constant — it **oscillates** with the tide, and the band swept between high and
+low water is the **intertidal zone**, one of the most distinctive coastal strips. This is the clean
+example of the doctrine that water is a **fluid layer with a moving surface** (`08` layer stack),
+not solid ground: the geometry underneath doesn't change, the *water* rises and falls over it. For
+terrain the tide is an **authored oscillation of the water plane**, not a simulation — the astronomy
+(the gravitational pull of Moon and Sun) is a look here.
+
+```
+waterSurface(t) = meanSeaLevel + 0.5 * tidalRange * tidalCurve(t)    # tidalCurve ∈ [−1,1], ~semidiurnal
+intertidalWidth = tidalRange / tan(shoreSlope)                       # wide on flat coasts, narrow on steep
+intertidalMask  = solidTop in [meanSeaLevel − 0.5*range, meanSeaLevel + 0.5*range]
+```
+
+What falls out of the range and the shore slope:
+
+- **Tidal flats** — a large range over a gentle shore exposes broad flats of mud/sand at low water
+  (a near-flat depositional surface just below high tide). A steep shore gives a narrow intertidal
+  band; a flat shore gives a wide one — the width is `range / slope`.
+- **The intertidal is a material/ecology band, not a new height.** Mark `intertidalMask` (`06`) for
+  wet-sand, mud, and salt-marsh materials and scatter (`07`); the geometry is the same shoreface —
+  only the water moves across it, drowning the flat and draining it twice a day.
+- **Tides drive the water layer's dynamics.** A boat floats, the flat drowns and dries on a cycle,
+  and none of it touches the solid collision height (`08`) — which is exactly why water must be
+  emitted as its own dynamic surface, not baked into the terrain.
+
+Honest tier: **F-tier**, a look. Real tides are astronomy; for terrain you author the range and the
+curve, and the geomorphic products — tidal flats, salt marshes, the intertidal zone — are
+compositions on top of the shoreface.
 
 ## Coral reefs & atolls
 

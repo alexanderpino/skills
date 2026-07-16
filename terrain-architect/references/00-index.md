@@ -182,6 +182,7 @@ are compositions. The recipe is the answer:
 | Lacustrine (lake) shore erosion / lake terraces | F | The coastal loop at lake level; lake-level history → shoreline terraces. Gilbert 1890 (Lake Bonneville) (`12`) |
 | Gilbert (lacustrine) delta | P | Gilbert 1890 — topset/foreset/bottomset delta prograding into standing water (`12`) |
 | Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
+| Tides / intertidal zone / tidal flats | F | Authored oscillation of the water plane; astronomy, a look. Water is a dynamic layer (`08`, `12`) |
 | Landslide / slump / debris flow / mudflow / rockfall | F | No canonical graphics paper for the terrain-gen versions |
 | Soil creep | P | = hillslope diffusion, `D·∇²h`. See Culling 1960, *Analytical Theory of Erosion*, J. Geology 68 |
 
@@ -227,6 +228,7 @@ are compositions. The recipe is the answer:
 |---|---|---|
 | Marching squares / cubes | P | Lorensen & Cline 1987, SIGGRAPH |
 | Dual contouring | P | Ju, Losasso, Schaefer & Warren 2002, ACM TOG 21(3) |
+| Layered surface stack (solid / fluid / transient) | P | Beneš & Forsbach 2001; Št'ava 2008; Peytavie 2009 — soil/sand/water/snow over bedrock, emitted as separate layers (`08`, `11`) |
 | Mesh simplification / quadric error metrics | P | Garland & Heckbert 1997, SIGGRAPH |
 | Geometry clipmaps | P | Losasso & Hoppe 2004, ACM TOG 23(3) |
 | ROAM | P | Duchaineau et al. 1997, IEEE Visualization |
