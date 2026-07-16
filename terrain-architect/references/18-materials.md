@@ -17,7 +17,7 @@ the pipeline:
 | Repose angle | how steeply it stands (thermal) | `05` |
 | Cohesion / permeability | slumping; how it holds vs sheds water | `05`, `13` moisture |
 | Grain size / roundness | bedload, scree, sand, mud | `04` |
-| Appearance (albedo family, roughness, jointing) | the synthesised texture | `08` |
+| Appearance (albedo family, roughness, jointing, emission) | the synthesised texture; glow for molten materials | `08` |
 | Stack role (solid cover / fluid / transient) | walk / swim / melt | `08` layer stack |
 
 Define a material and you must define *all of these, consistently*. Sand that erodes like sand but
@@ -40,7 +40,8 @@ The surface-material classes a generator needs, with where each property table a
 | **Snow / firn / ice** | seasonal snow, firn, glacier ice, sea ice | Transient/fluid stack role (`08`); accumulates & melts (`13`); flows (`12`) |
 | **Water** | river, lake, sea | Fluid layer — swimmable, dynamic surface, tides (`08`, `03`, `12`) |
 | **Crusts & evaporites** | salt flat, biological soil crust, desert varnish, coral | Thin surface layers; salt from endorheic evaporation (`16` playa); coral builds reefs (`12`) |
-| **Volcanic** | fresh basalt (pahoehoe / aa), tephra / ash, obsidian | Low `K` when fresh; ash mantles like snow (`11`); dark albedo |
+| **Volcanic** | fresh basalt (pahoehoe / ʻaʻā / block — Macdonald 1953), tephra / ash, obsidian | Low `K` when fresh; ash mantles like snow (`11`); dark albedo; surface texture by flow type (`11`) |
+| **Molten lava** | flows, lakes, lava-world "seas" | The one material that **changes stack role**: a fluid layer (`08`) that freezes into new bedrock (`11`, Hulme 1974 rheology); carries `T`; emissive crust cracks (`08`) |
 
 Grain-size classes (boulder → clay) are the Wentworth scale (`04`); the soil-texture classes (the 12
 sand/silt/clay mixtures) are the **USDA soil texture triangle** (Soil Survey Manual, USDA Handbook

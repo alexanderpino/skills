@@ -380,7 +380,34 @@ ao/cavity = horizonAO(height) (06)                   # micro-occlusion in the pi
 albedo    = baseColour * (1 - k*cavity) * weather(curvature, 06) * colourNoise
 roughness = lerp(smooth, rough, exposure)            # rougher where exposed, smoother in cavities / wet
 metallic  = 0                                        # terrain rock is a dielectric
+emissive  = crackMask * blackbody(T)                 # 0 for cold materials — see below
 ```
+
+**Emissive — the incandescent-crack channel.** Molten and cooling materials (a lava lake's crust,
+fresh flow margins, a Mustafar-style lava world, `11`) need one more PBR channel: **emission**. The
+recipe reuses machinery already here:
+
+```
+crackMask = worley_F2minusF1(p) thresholded          # 01 — the crack pattern IS the cell-boundary noise
+T         = T_melt * exp(-age/τ) * nearCrack(p)      # hot in the cracks, cooling with crust age
+emissive  = crackMask * blackbodyRamp(T)             # 1D gradient: dull red → orange → yellow-white
+```
+
+- **The crack pattern is Worley `F2−F1`** (`01`) — the same cell-boundary noise the skill already
+  uses for jointing and mud cracks; on a lava crust the plates are the cooled cells and the glow
+  lives in the boundaries. Advect/stretch the cells along the flow direction (`01` warp) and the
+  plates read as rafted crust, not static tiles.
+- **The colour ramp is physics, not taste**: incandescence follows a blackbody sequence — dull red
+  (~700 °C) → orange (~1000 °C) → yellow-white (~1200 °C). It is exactly a 1D satmap (above): a
+  gradient indexed by temperature. Drive `T` down with crust age and distance from the crack and
+  the crust self-organises into dark plates with bright seams.
+- **Emission is separate from albedo** — the no-light-in-albedo rule holds. The crust's *albedo*
+  stays near-black basalt; the glow goes in the emissive channel where the engine can bloom and
+  light with it. Baking the glow into the colour map gives a crust that neither glows nor darkens
+  correctly.
+- Emission belongs in the **material property bundle** (`18`): molten materials carry `T` the same
+  way rock carries `K` — one field, many consumers (height stops flowing below yield `11`, material
+  emits above ~600 °C).
 
 The **cellular / Voronoi** term (Worley 1996, `01`) is what makes rock read as rock — jointed blocks
 and cracks, not smooth lumps; **Gabor** noise (Lagae 2009, `01`) gives the anisotropic bedding of

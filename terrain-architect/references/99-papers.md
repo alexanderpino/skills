@@ -277,7 +277,15 @@ is below.
   vertical lowering to a base level (`11`). No graphics paper exists for tower-karst surface
   morphology; cite this for the mechanism.
 - **Stora, D., Agliati, P.-O., Cani, M.-P., Neyret, F. & Gascuel, J.-D. (1999).** *Animating Lava
-  Flows.* Graphics Interface '99.
+  Flows.* Graphics Interface '99. — The graphics lava simulation (SPH, temperature-coupled
+  viscosity).
+- **Hulme, G. (1974).** *The Interpretation of Lava Flow Morphology.* Geophysical Journal of the
+  Royal Astronomical Society 39(2), 361–383. — **Lava as a Bingham (yield-stress) fluid**: the yield
+  stress sets flow thickness and predicts levées. Why lava flows have steep snouts and channels
+  instead of spreading like water (`11`).
+- **Macdonald, G.A. (1953).** *Pahoehoe, aa, and block lava.* American Journal of Science 251(3),
+  169–191. — The surface-texture classification: ropey pahoehoe, clinkery ʻaʻā, angular block —
+  a material distinction (`11`, `18`).
 - **Culling, W.E.H. (1960).** *Analytical Theory of Erosion.* Journal of Geology 68(3). —
   Hillslope diffusion / soil creep as `D·∇²h`. The origin of the diffusion term in `04`.
 

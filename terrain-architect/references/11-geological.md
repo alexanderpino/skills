@@ -296,6 +296,43 @@ The detail that ages a volcano: **radial barrancos** — fluvial erosion of an u
 cuts deep radial gullies, so a young cone is smooth and an old one is deeply rilled. Run erosion
 (`04`) on the cone and they fall out; a perfectly smooth cone reads as brand new.
 
+### Lava flows, fields & lakes
+
+Lava is the one material that **changes stack role**: it arrives as a *fluid* layer (`08`) and
+freezes into *new bedrock* (fresh basalt, low `K`). The graphics simulation is **Stora et al. 1999**
+(`00`); the morphology physics is **Hulme 1974** (*The Interpretation of Lava Flow Morphology*,
+GJRAS 39): lava is a **Bingham fluid — it has a yield stress** — and that one property explains the
+landforms. A Newtonian fluid would spread into a thin sheet; a yield-stress fluid stops when the
+driving stress drops below yield, so flows have **steep snouts, finite thickness, and levées**.
+
+```
+lavaFlow(h, vent, supply, yieldStress):
+    while supply:
+        route a pulse down steepest descent (03) from the vent
+        stop where driving stress < yield:  τ = ρ g t sinθ < τ_y      # Hulme 1974
+        thickness t ≈ τ_y / (ρ g sinθ)              # THICKER on gentle slopes — inverse of water
+        deposit more at the pulse margins → LEVÉES; later pulses channelise between them
+        if crusted (old surface): tube-fed — the flow extends far with little heat loss
+        h += deposit                                 # freezes into new bedrock: low K (above)
+    surface texture from viscosity & strain rate     # Macdonald 1953 → the 18 material:
+    #   pahoehoe (fluid, slow strain)  = smooth, ropey sheets
+    #   ʻaʻā     (viscous, fast strain) = clinkery rubble over a molten core
+    #   block    (most viscous)         = smooth-faced angular blocks
+```
+
+What falls out: a **lava field** is stacked, overlapping flow lobes with levéed channels — a
+composition of this one node, run per eruption pulse, exactly the scale-recursion pattern. A
+**lava lake** is ponded lava in a pit crater — a *fluid surface at a level in a closed basin*, the
+same spill-plane machinery as a water lake (`03`), on the no-fill list, with a crusted surface of
+dark plates and incandescent cracks (the `08` emissive material below).
+
+**Lava worlds (the Mustafar brief).** A planet-scale lava landscape is the multi-biome composition
+(`13`) plus the layer stack (`08`) with the **fluid layer's fluid swapped**: "sea level" becomes
+*lava level*, coasts become lava shores, rivers are lava routed by `03` at Bingham rheology
+(levéed, thick, slow), lakes are lava lakes — and the whole `12` shoreline machinery reads across
+once you substitute the fluid. Tier: the rheology is P (Hulme 1974), the world is an L-tier
+composition; there is no "lava planet paper" and none is needed.
+
 ## Impact craters
 
 Only a "crater" primitive exists today, but real craters have a well-constrained morphology that

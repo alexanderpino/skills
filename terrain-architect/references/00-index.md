@@ -73,7 +73,9 @@ of what's reliable here.
 | Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
 | Layered terrain with overhangs/arches | P | Peytavie et al. 2009, *Arches: a Framework for Modeling Complex Terrains*, CGF 28(2) |
 | Cave networks / karst dissolution | P | Paris et al. 2021, *Synthesizing Geologically Coherent Cave Networks*, CGF |
-| Lava flow | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
+| Lava flow (animation) | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
+| Lava flow morphology (levées, snouts, thickness) | P | Hulme 1974, GJRAS 39(2) — Bingham yield-stress rheology (`11`) |
+| Pahoehoe / ʻaʻā / block lava | P | Macdonald 1953, American Journal of Science 251(3) — surface-texture classification (`11`, `18`) |
 | Volcanic cones, calderas, craters, crater fields | F | Primitive + noise + erosion. No paper. |
 | Rock hardness layers / lithology | F | A material field feeding erodibility `K`. See Št'ava 2008 for the layered coupling. |
 | Soil / regolith production function | P | Heimsath, Dietrich, Nishiizumi & Finkel 1997, Nature 388 — exponential decline with soil depth (`11`) |
@@ -109,6 +111,7 @@ are compositions. The recipe is the answer:
 | Natural arches, hoodoos | Differential erosion of layered rock; needs a **non-heightfield representation** (`11`) |
 | Karst terrain | Dissolution of a soluble layer; caves need volume (`11`) |
 | Tower / cone karst (fenglin, fengcong) | Dissolution + differential vertical lowering to a base level (`11`) |
+| Lava fields, lava lakes, lava worlds (Mustafar) | Stacked levéed flows; ponded fluid lava in closed basins; fluid layer = lava (`08`, `11`, `13`) |
 
 ## 3. Composition & filtering → `10-primitives-ops-filters.md`
 
@@ -252,6 +255,7 @@ are compositions. The recipe is the answer:
 | Procedural material synthesis (the "rock" texture) | N | Substance/Gaea material nodes over `01` noise; derive PBR like terrain maps (`06`, `08`) |
 | Texture synthesis by example | P | Efros & Leung 1999; Wei & Levoy 2000; Lefebvre & Hoppe 2006 (`08`) |
 | Learned material from a photo (SVBRDF) | ? | Deschaintre et al. 2018 — verify; moving fast (`08`) |
+| Emissive material channel (incandescent cracks) | F | crackMask (Worley F2−F1, `01`) × blackbody temperature ramp (`08`) |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |
 | Quadtree terrain, chunked heightfield, streaming, crack prevention, seam stitching | F | Engineering practice. No papers. (`08`) |
 
