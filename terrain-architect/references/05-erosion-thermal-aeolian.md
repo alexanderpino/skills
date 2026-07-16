@@ -1,7 +1,8 @@
 # Thermal & Aeolian Erosion
 
 Contents: [Thermal](#thermal-erosion-musgrave-et-al-1989) · [Repose angles](#repose-angles) ·
-[Talus](#talus--scree-olsen-2004) · [Aeolian overview](#aeolian-erosion) ·
+[Talus](#talus--scree-olsen-2004) · [Mass wasting](#mass-wasting-landslides--debris-flows) ·
+[Aeolian overview](#aeolian-erosion) ·
 [Bagnold physics](#bagnold-1941--the-physics) · [Werner dunes](#werner-1995--the-implementable-model)
 
 ## Thermal erosion (Musgrave et al. 1989)
@@ -93,6 +94,53 @@ screeSource = cliffMask * weatheringRate      # cliffMask = slope > ~55°
 h += dilate(screeSource, radius)              # deposit at the base
 run thermal with talusAngle = 37°
 ```
+
+## Mass wasting: landslides & debris flows
+
+Thermal is the *slow* hillslope process (grain-by-grain creep to repose). Mass wasting is the
+*episodic* one — a slope fails all at once — and it is where the big mountain scars, debris fans,
+and dammed lakes (`03`) come from. Two implementable pieces:
+
+**Where slopes fail — wetness-coupled infinite-slope stability (Montgomery & Dietrich 1994).** The
+canonical shallow-landslide model (the basis of SHALSTAB) couples the topographic wetness machinery
+(`03`/`06`) to the standard infinite-slope criterion: a slope fails where it is **steep** and
+**wet**, and the drainage area `A` is what makes it wet.
+
+```
+failureMask(slope, A, soilDepth):
+    # cohesionless infinite slope: fails when driving stress exceeds friction
+    wet = min(1, K_w * A_specific / sin(slope))      # relative saturation ∝ a/sinθ (TOPOG/TWI, 06)
+    FS  = (1 - wet * ρw/ρs) * tan(φ) / tan(slope)    # factor of safety; φ ≈ internal friction ≈ repose
+    return FS < 1                                     # unconditionally unstable where slope ≥ φ
+```
+
+The topographic result is exactly what you see in real ranges: failures concentrate in **steep,
+convergent hollows** (high `A_specific`, high slope) — not on ridges. That is why the mask needs
+`A` from `03`, not slope alone.
+
+**What a failure does — slide, then flow.**
+
+```
+landslide(h, failureMask):
+    scar   = evacuate soil/regolith (11) down to a failure plane inside failureMask
+    runout = route the mass down steepest descent (03), depositing where slope < ~tan(10°)
+    run thermal (above) on scar + deposit                # both relax to repose
+```
+
+- A **shallow landslide** evacuates the *regolith* (the `11` soil layer — bedrock stays), leaving a
+  spoon-shaped scar and a lobate deposit at the slope base. In the layer stack it is a transfer
+  within the solid cover, and it is why the mass budget (`SKILL.md`) matters: scar volume = deposit
+  volume.
+- A **debris flow** is the wet, mobile case — the physics is **Iverson 1997** (*The physics of
+  debris flows*, Rev. Geophys. 35): a solid–fluid mixture, not a landslide and not a river. For
+  terrain, the honest realisation is a *look*: route the failed mass down the channel network
+  (`03`), scouring the gully, and deposit it as **levéed lobes on the fan** below (`16` alluvial
+  fans — debris-flow fans are the steep ones). Rounded levées flanking the runout path are the tell.
+- **Rockfall** is the dry, steep end-member — the scree source above already models it.
+
+**Tier.** The susceptibility model is **P-tier** (Montgomery & Dietrich 1994); the debris-flow
+physics is **P-tier** (Iverson 1997) but *not implementable as written* — like Bagnold, cite it for
+*why*; the terrain realisation (scar + runout + thermal) is **F-tier**, no canonical graphics paper.
 
 ## Aeolian erosion
 

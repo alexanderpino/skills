@@ -246,7 +246,9 @@ this is the answer.
 
 ## Masks → materials
 
-Derivation order: `height → analysis → masks → materials → scatter`.
+Derivation order: `height → analysis → masks → materials → scatter`. And what each mask *selects*
+is a material in the full sense of `18` — a property bundle (erodibility, repose, permeability,
+appearance, stack role), not just a splat colour.
 
 ```
 snowMask   = smoothstep(snowLine - w, snowLine + w, height)

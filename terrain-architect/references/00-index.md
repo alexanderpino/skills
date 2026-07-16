@@ -148,6 +148,7 @@ are compositions. The recipe is the answer:
 | Flow accumulation / drainage area / watershed labelling | P | Barnes et al. 2014 (labelling); accumulation itself is F |
 | Topographic wetness index | P | Beven & Kirkby 1979, Hydrological Sciences Bulletin 24(1) |
 | River meandering, bank erosion, oxbow cutoff | P | Ikeda, Parker & Sawai 1981 (bend theory — curvature-driven migration); Howard & Knutson 1984 (`03`) |
+| Channel patterns — braided / meandering / straight | P | Leopold & Wolman 1957, USGS Professional Paper 282-B (`03`) |
 | River widening / depth estimation | F | Hydraulic geometry scaling (`w ∝ Q^0.5`, Leopold & Maddock 1953) |
 | Channel-reach morphology (cascade / step-pool / pool-riffle) | P | Montgomery & Buffington 1997, GSA Bulletin 109(5) (`03`) |
 | Hydrology-based terrain (river network first) | P | Génevaux et al. 2013, ACM TOG 32(4), SIGGRAPH '13 (`03`) |
@@ -183,7 +184,9 @@ are compositions. The recipe is the answer:
 | Gilbert (lacustrine) delta | P | Gilbert 1890 — topset/foreset/bottomset delta prograding into standing water (`12`) |
 | Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
 | Tides / intertidal zone / tidal flats | F | Authored oscillation of the water plane; astronomy, a look. Water is a dynamic layer (`08`, `12`) |
-| Landslide / slump / debris flow / mudflow / rockfall | F | No canonical graphics paper for the terrain-gen versions |
+| Shallow landslide susceptibility (wetness-coupled) | P | **Montgomery & Dietrich 1994**, WRR 30 — the SHALSTAB model; steep + convergent + wet fails (`05`) |
+| Debris flows | P | Iverson 1997, Rev. Geophys. 35(3) — the physics, **not implementable as written** (like Bagnold); terrain realisation is F (`05`) |
+| Landslide runout / rockfall / slump (terrain realisation) | F | Scar + steepest-descent runout + thermal relaxation — no canonical graphics paper (`05`) |
 | Soil creep | P | = hillslope diffusion, `D·∇²h`. See Culling 1960, *Analytical Theory of Erosion*, J. Geology 68 |
 
 ## 6. Terrain analysis → `06-analysis-masks.md`
@@ -265,6 +268,7 @@ are compositions. The recipe is the answer:
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
 | Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — see the `SKILL.md` doctrine (`11`, `16`) |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
+| Wetlands (swamp, marsh, bog) | L | High TWI + flat + impermeable substrate → mask + peat/mud + thin water layer (`13`, `18`) |
 
 ## 10. Arid & desert → `16-arid-desert.md`
 

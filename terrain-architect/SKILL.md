@@ -1,6 +1,6 @@
 ---
 name: terrain-architect
-description: Principal-level terrain generation expertise — the algorithms and the substrate layer for building terrain tools (Gaea/World Machine-class, or partly/fully realtime). Knows terrain algorithms at pseudocode level (noise families, FBM, domain warp, tectonic uplift, pipe/droplet/stream-power erosion, thermal, dunes, glacial, coastal, flow routing, depression filling, terrain analysis, climate, ecosystems, scatter), verifies paper attributions instead of guessing, and architects terrain graphs and graph runtimes — parameterised nodes, typed fields, caching, dirty propagation, preview pyramids, GPU patterns, realtime tiers. Use for any mention of terrain generation, heightmaps, procedural landscapes, erosion, rivers, splatmaps, terrain LOD/tiling, building a terrain tool or node graph or evaluation engine, GPU or realtime terrain. Also for diagnosing wrong terrain (seams, terracing, stalled rivers) and which-paper questions. Advises and specifies; need not write the code.
+description: Principal-level terrain generation expertise — the algorithms and the substrate layer for building terrain tools (Gaea/World Machine-class, or partly/fully realtime). Knows terrain algorithms at pseudocode level with verified citations — noise families, FBM, domain warp, tectonic uplift, pipe/droplet/stream-power erosion, thermal, mass wasting, dunes, glacial, coastal & marine (waves, tides, atolls), rivers (meanders, braids, waterfalls, grain size & pebble bars), lakes, karst, desert & periglacial landforms, volcanoes, impact craters & off-Earth regimes, flow routing, depression filling, terrain analysis & mask selectors, climate, biomes & multi-biome worlds, ecosystems, scatter, soil & surface materials, the layered surface stack (rock/soil/sand/water/snow), splatmaps, colour maps/satmaps, albedo/normal/AO synthesis & compositing — and architects terrain graphs and graph runtimes: parameterised nodes, typed fields, caching, dirty propagation, preview pyramids, GPU patterns, realtime tiers. Use for any mention of terrain generation, heightmaps, procedural landscapes, erosion, rivers, biomes, terrain materials or texturing, splatmaps, terrain LOD/tiling, building a terrain tool or node graph or evaluation engine, GPU or realtime terrain. Also for diagnosing wrong terrain (seams, terracing, stalled rivers) and which-paper questions. Advises and specifies; need not write the code.
 ---
 
 # Terrain Architect
@@ -223,9 +223,12 @@ order before you check the maths.
   4  Depression handling      fill or breach (MANDATORY)           → 03
   5  Flow routing             D8 / D∞ / MFD → drainage area A      → 03
   6  Fluvial erosion          stream power / pipe / droplet        → 04
-  7  Hillslope erosion        thermal / talus                      → 05
+  6b Glacial (if glaciated)   SIA ice flow, ALONGSIDE fluvial      → 12
+  7  Hillslope erosion        thermal / talus / mass wasting       → 05
   8  Aeolian                  wind / dunes (if arid)               → 05
   9  Water surfaces           lakes, sea level                     → 03
+  9b Coastal & marine         waves, tides, terraces, reefs        → 12
+  9c Floodplain rivers        meandering, oxbows, braids           → 03
  10  Analysis                 slope, curvature, flow, AO, wetness  → 06
  11  Masks → materials        derive from analysis, never before   → 06
  12  Scatter                  Poisson / blue noise from density    → 07
@@ -242,6 +245,12 @@ The laws that actually bite:
   slope will paint snow onto the walls of valleys that erosion has since cut.
 - **Thermal after hydraulic.** Hydraulic erosion over-steepens; thermal relaxes to the
   repose angle. Run thermal first and hydraulic will just re-steepen everything.
+- **The optional regimes slot by what they need to exist.** Glacial runs *alongside* fluvial —
+  both carve the same relief and a glaciated landscape has both (`12`). Coastal and marine run
+  only *after* sea level exists (9b), lake shores after lake levels (`03`, `12`). Meandering is a
+  floodplain process and comes after the valley-scale height writes (9c). Karst is not a step at
+  all — it is fluvial/dissolution erosion *gated by a soluble lithology* (`11`). And analysis
+  (step 10) still comes after **all** of them.
 - **Erosion is not tile-local.** Sediment crosses tile boundaries. Any erosion run
   per-tile without an apron produces visible seams that no amount of blending will hide.
   See `references/08-output-contract.md`.
@@ -301,9 +310,9 @@ the constants matter and are easy to get subtly wrong.
 | `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification. **Consult before attributing anything.** |
 | `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
 | `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults |
-| `references/03-flow-routing.md` | Depression fill/breach, D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers), meandering & bank erosion (oxbows), water sources & discharge, sea level |
+| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), water sources & discharge, sea level |
 | `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls, grain size / bedload / gravel bars (pebbles & clasts) |
-| `references/05-erosion-thermal-aeolian.md` | Thermal/talus, wind transport, Werner dune model |
+| `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
 | `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |

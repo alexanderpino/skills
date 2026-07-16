@@ -102,6 +102,16 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   differential deposition probability. Produces barchan/transverse/linear/star dunes from wind
   regime alone. Under-cited relative to its usefulness.
 
+## Mass wasting
+
+- **Montgomery, D.R. & Dietrich, W.E. (1994).** *A physically based model for the topographic
+  control on shallow landsliding.* Water Resources Research 30(4), 1153–1171. — **The
+  shallow-landslide susceptibility model** (basis of SHALSTAB): wetness from drainage area coupled
+  to infinite-slope stability. Failures concentrate in steep, convergent, wet hollows (`05`).
+- **Iverson, R.M. (1997).** *The physics of debris flows.* Reviews of Geophysics 35(3), 245–296. —
+  The debris-flow physics reference: solid–fluid mixture mechanics. Like Bagnold, cite it for
+  *why*, not *how* — it is not implementable as written (`05`).
+
 ## Flow routing
 
 - **O'Callaghan, J.F. & Mark, D.M. (1984).** *The extraction of drainage networks from digital
@@ -339,6 +349,9 @@ is below.
 - **Leopold, L.B. & Maddock, T. (1953).** *The hydraulic geometry of stream channels and some
   physiographic implications.* USGS Professional Paper 252. — Channel width/depth scaling with
   discharge. Use for river widening.
+- **Leopold, L.B. & Wolman, M.G. (1957).** *River channel patterns: Braided, meandering, and
+  straight.* USGS Professional Paper 282-B. — The planform classification; braiding starts as a
+  central bar of stalled coarse bedload (`03`).
 - **Beneš, B., Těšínský, V., Hornyš, J. & Bhatia, S.K. (2006).** *Hydraulic Erosion.* Computer
   Animation and Virtual Worlds 17(2), 99–108. — Shallow-water erosion.
 - **Montgomery, D.R. & Buffington, J.M. (1997).** *Channel-reach morphology in mountain drainage

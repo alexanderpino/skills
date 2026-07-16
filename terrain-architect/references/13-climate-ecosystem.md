@@ -150,6 +150,13 @@ soilMoisture = normalize(TWI) * precipFactor * (1 - drainageFactor(permeability)
 `permeability` comes from the material field (`11`) — sand drains, clay holds. Add distance to
 water bodies if you have them.
 
+**Wetlands (swamps, marshes, bogs)** are where this machinery saturates, and they are a **mask,
+not a height**: flat ground + high TWI + an impermeable or frozen substrate (clay `18`, permafrost
+`17`) → the water table sits at or above the surface. Realise it as a wetland mask driving peat/mud
+material (`18`), a thin standing-water layer (`08` stack), and its own vegetation community
+(`07`/ecosystem below). Salt marsh is the tidal case (`12` intertidal). L-tier — a composition of
+the moisture machinery above, no new algorithm.
+
 **Evapotranspiration** and the rest of the water balance: `F`-tier, no canonical source worth
 citing for terrain purposes. A threshold on temperature and moisture is as much as any terrain
 graph has ever needed.

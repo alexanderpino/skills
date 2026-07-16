@@ -94,6 +94,27 @@ handles the case where erosion *creates* new pits during the simulation — whic
 you're implementing stream power at scale, do this rather than re-running priority-flood
 every timestep.
 
+### The no-fill list: legitimate closed basins
+
+"Depression handling is mandatory" has exceptions, and they have multiplied as the skill grew —
+this is the canonical list. Each of these is a **real** closed basin: mask it so the fill/breach
+node skips it (route flow *on the filled DEM*, render the original — the Lakes rule below), or the
+fill erases the landform.
+
+| Closed basin | Made by | See |
+|---|---|---|
+| Karst sinkholes / dolines | Dissolution; drainage goes underground | `11` |
+| Glacial overdeepenings, cirque/tarn basins | Ice eroding below its outlet | `12` |
+| Craters, calderas | Impact / volcanic collapse | `11` |
+| Playas (endorheic basins) | No outlet at all — evaporation is the exit | `16` |
+| Thermokarst pits, thaw lakes | Ground-ice melt collapse | `17` |
+| Oxbow lakes | Meander neck cutoff | `03` meandering |
+| Lagoons behind bay bars | Longshore deposition seals a bay | `12` |
+
+Everything *not* on this list — the thousands of pits any noise or erosion output contains — is an
+artefact and must be filled or breached. The review question (`09`) is therefore two-sided: *is
+depression handling present*, **and** *are the legitimate basins masked out of it?*
+
 ## D8 (O'Callaghan & Mark 1984)
 
 All flow from a cell goes to the single steepest downslope neighbour.
@@ -260,7 +281,7 @@ already here. What varies is *what dammed the basin*, all **L-tier** composition
 | **Paternoster chain** | A staircase of glacial steps down a trough — a lake *cascade* | `12` + the lake graph below |
 | **Ribbon lake** | A long overdeepened glacial trough | `12` |
 | **Moraine-dammed** | A terminal/lateral moraine impounds the valley | `12` (track the moraine sediment field) |
-| **Landslide / rockfall-dammed** | A slump blocks the valley, often short-lived | Mass wasting — catalogued F-tier only (`00`); no recipe in this skill |
+| **Landslide / rockfall-dammed** | A slump blocks the valley, often short-lived | `05` mass wasting |
 | **Crater / caldera lake** | A volcanic or impact basin | `02`/`11` primitive + a no-fill mask |
 
 They share one computation: **the lake surface is a horizontal plane at the spill elevation**,
@@ -309,6 +330,18 @@ depth = k_d * pow(Q, 0.4)
 
 Use `width` to burn the channel into the height field, or to stamp the river mask (`06`) at a
 realistic, downstream-widening size — a constant-width river is an instant tell.
+
+**Braided vs meandering — the third planform.** The classic classification is **Leopold & Wolman
+1957** (*River channel patterns: braided, meandering, and straight*, USGS Professional Paper 282-B):
+a river **braids** — splits into multiple threads around mid-channel bars — where slope is high for
+its discharge, bedload is heavy, and banks are erodible; it **meanders** (above) on gentler slopes
+with cohesive banks. Braiding starts as a **central bar**: the coarsest bedload (`04`) stalls
+mid-channel, flow splits around it, the split channels widen and deposit new bars, and the pattern
+multiplies. For terrain, a braided reach is a *wide, flat, gravel-floored corridor* (a `06` material
+band) stamped with a multi-thread channel pattern — anastomosing threads and lens-shaped bars —
+rather than a single incised line; glacial outwash plains (`12`) and alluvial-fan surfaces (`16`)
+are the type settings. Author the corridor from the routing (`03`) and the threads as a look; a
+braid's individual channels shift every flood and carry no long-term memory worth simulating.
 
 **Bedrock vs alluvial.** High in the range the river cuts *rock* (detachment-limited — stream
 power, `04`); lower down it reworks its own *sediment* (transport-limited — deposition). The
