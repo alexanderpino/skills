@@ -3,7 +3,7 @@
 Contents: [Ordering rule](#ordering-rule) · [Slope & aspect](#slope--aspect) ·
 [Curvature](#curvature-zevenbergen--thorne-1987) · [Horizon AO](#horizon-based-ambient-occlusion) ·
 [Wetness](#wetness-index-beven--kirkby-1979) · [Normals](#normals) ·
-[Masks → materials](#masks--materials)
+[Selectors](#selectors--masks-from-the-analysis-fields) · [Masks → materials](#masks--materials)
 
 ## Ordering rule
 
@@ -204,6 +204,45 @@ Horn's slope above.
 **Bake normals from R32F, always.** This is the single clearest case for the precision rule:
 a normal map derived from an R16 heightfield across a large vertical range shows visible
 faceting on every gentle slope, because the derivative of a staircase is a comb.
+
+## Selectors — masks from the analysis fields
+
+The workhorse node of any terrain graph: take an analysis field (height, slope, aspect, curvature,
+wetness) and turn it into a **`MaskField` in [0,1]** that *any* downstream node can consume. "Select
+everything above 2000 m", "select slopes over 30°", "select convex ridges" — each is a one-line
+remap, and the output feeds the four mask roles in `SKILL.md`'s mask semantics (effect / process /
+material / boundary). This is the graph's main composition mechanism, so it has to be built right.
+
+```
+heightSel(h, lo, hi, w)  = smoothstep(lo-w, lo+w, h) * (1 - smoothstep(hi-w, hi+w, h))   # a height band
+slopeSel(s, lo, hi, w)   = smoothstep(lo-w, lo+w, s) * (1 - smoothstep(hi-w, hi+w, s))   # s = tan, not degrees
+aspectSel(a, dir, width) = smoothstep(cos(width), 1, dot(aspectVec(a), dir))             # faces a direction
+curveSel(c, lo, hi, w)   = smoothstep(lo-w, lo+w, c) ...        # profile/plan curvature: ridges vs hollows
+```
+
+Four rules make a selector correct rather than an obvious tell:
+
+- **Thresholds carry world units, never [0,1].** "Above 2000 m" is `2000`, in metres — not `0.6` of
+  a normalised height. The moment a selector reasons in a normalised range it breaks when the
+  terrain's min/max change (the `normalize` defect, `10`), and it stops tiling. Slope thresholds are
+  `tan` (`slope > tan(30°)`), and **slope is resolution-dependent** (above), so state the resolution
+  beside any slope selector or it won't transfer.
+- **Soft edges, always.** A hard `h > 2000` gives a mathematically perfect contour that nothing in
+  nature has. Use `smoothstep` over a band `w`, and **noise-perturb the threshold** —
+  `smoothstep(t-w, t+w, field + noiseAmp*fbm(p))` — the single cheapest step from "procedural" to
+  "photographed" (same rule as *Masks → materials*, below).
+- **Compose with min/max = AND/OR.** `A AND B = A*B` (or `min`); `A OR B = max(A,B)`; `NOT A = 1−A`.
+  "Grass on gentle, wet, low ground" is `slopeSel * wetSel * heightSel`. Use smooth `min`/`max`
+  (`10`) when the combined mask itself drives geometry, so the mask has no crease lines.
+- **Selectors are `06`, so they run after the last height write.** A slope selector computed before
+  erosion selects slopes that no longer exist (the ordering rule at the top). The one exception is a
+  selector used as an *input* to erosion (slope-dependent `K`) — name it so nobody wires it into the
+  material graph by accident.
+
+**N-tier caveat.** "Select Height", "Selective", "Slope", "Convexity" and friends in Gaea / World
+Machine / Houdini are all exactly this — a threshold-and-smoothstep over one analysis field. The
+node is branding; the algorithm is one line. When someone asks what a tool's selector "really does",
+this is the answer.
 
 ## Masks → materials
 

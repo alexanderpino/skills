@@ -194,6 +194,7 @@ are compositions. The recipe is the answer:
 | Curvature (profile, plan) | P | Zevenbergen & Thorne 1987, ESPL 12(1) |
 | Mean / Gaussian curvature | P | Differential geometry — no terrain-specific paper needed |
 | Laplacian, convexity, concavity | F | — |
+| Selectors — masks from height/slope/aspect/curvature | F | Threshold + smoothstep over an analysis field → reusable `MaskField` (`06`) |
 | Horizon angle / occlusion | P | **Timonen & Westerholm 2010**, *Scalable Height Field Self-Shadowing*, CGF 29(2) — O(1)/cell sweep |
 | HBAO | P | Bavoil et al. 2008, SIGGRAPH talks. **Screen-space weighting; not the correct integral for a baked terrain AO map** (`06`) |
 | Sky-view factor | P | Zakšek, Oštir & Kokalj 2011, Remote Sensing 3(2) |
