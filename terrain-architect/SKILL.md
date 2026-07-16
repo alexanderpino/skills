@@ -57,6 +57,27 @@ valley network, hillslope diffusion relaxed the ridges. Noise alone never produc
 because noise has no memory of water. If the request implies drainage — valleys, ridgelines
 that branch, alluvial fans — then noise is the *initial condition*, not the answer.
 
+**Landscape is a balance of building up and wearing down — and mass is conserved between them.**
+Every process in this skill does one of two things. It **builds** relief and material — tectonic
+uplift (`02`), volcanism and impact (`11`), and every kind of **deposition**: deltas and alluvial
+fans (`04`, `16`), dunes (`05`), moraines (`12`), loess (`16`), reefs (`12`), point bars and gravel
+(`04`), soil production (`11`). Or it **wears down** — fluvial, thermal, aeolian, glacial, and
+coastal erosion, weathering and dissolution (`04`, `05`, `11`, `12`). A landform is wherever the two
+balance: a mountain is uplift fought to a standstill by incision (`02`, the equilibrium
+`U = K·A^m·S^n`); an alluvial fan is a mountain's erosion piled where the slope breaks (`16`); a
+delta is a river's load dropped at the sea (`12`). This is why "add more detail" is rarely "add more
+noise" — realism comes from letting a *building* process and a *wearing* process run to equilibrium,
+which is the whole reason erosion beats a noise stack (`04`).
+
+The coupling is **mass**: what erodes here must deposit *somewhere* — erosion and deposition are one
+budget, not two unrelated nodes. The eroded ridge fills the valley below it; the retreating cliff
+builds the beach downdrift (`12`); the deflated playa becomes loess downwind (`16`); the excavated
+crater is its own ejecta blanket (`11`). Track the budget and the landscape is *closed*; ignore it
+and sediment appears from nowhere and vanishes into nothing — exactly what the mass-conservation
+check catches (`09`, "the single most under-used terrain assertion"). **Source and sink are the same
+story told from two ends:** when a graph only erodes, ask where the sediment went; when it only
+deposits, ask where it came from.
+
 **A node is a pure, parameterised function; parameters are data.** This skill also covers the
 substrate under a terrain tool — the graph runtime a Gaea/World Machine-class product stands
 on. There, the doctrine is: every node is a pure function of (parameters, inputs, context);
