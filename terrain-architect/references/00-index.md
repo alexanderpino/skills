@@ -289,6 +289,16 @@ are compositions. The recipe is the answer:
 | Thermokarst, pingos | F | Ground-ice collapse / heave (French 2018) |
 | Blockfield (felsenmeer) | F | In-place frost shattering; angular clast scatter (`07`) |
 
+## 12. Surface materials → `18-materials.md`
+
+| Topic | Tier | Source |
+|---|---|---|
+| Material as a property bundle (K, repose, permeability, appearance, stack role) | — | Doctrine (`18`, `SKILL.md`) — not a texture ID |
+| Rock families (igneous / sedimentary / metamorphic) | — | Standard geology; `K` per lithology in `11`, appearance in `08` |
+| Soil texture classes (sand/silt/clay → 12 classes) | P | USDA soil texture triangle, Soil Survey Manual (Handbook 18) |
+| Grain-size classes (boulder → clay) | P | Wentworth 1922 (`04`) |
+| Repose angles per material | P | `05` (Olsen 2004; Bagnold 1941 for sand) |
+
 ---
 
 ## Node types (N-tier) — not algorithms

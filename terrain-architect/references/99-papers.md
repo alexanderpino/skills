@@ -426,6 +426,9 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   function and landscape equilibrium.* Nature 388(6640), 358–361. — Soil production declines
   exponentially with soil depth, from cosmogenic ¹⁰Be/²⁶Al. The regolith the erosion pipeline
   consumes (`11`).
+- **USDA (2017).** *Soil Survey Manual* (Agriculture Handbook 18), Soil Science Division Staff. —
+  The **soil texture triangle**: 12 classes from sand / silt / clay proportions (sand 2–0.05 mm, silt
+  0.05–0.002 mm, clay <0.002 mm; triangle adopted 1951). The soil material palette (`18`).
 - **Cooke, R.U., Warren, A. & Goudie, A.S. (1993).** *Desert Geomorphology.* UCL Press, London,
   526 pp. — The desert-landforms text (`16`).
 - **Ward, A.W. & Greeley, R. (1984).** *Evolution of the yardangs at Rogers Lake, California.* GSA
