@@ -246,6 +246,9 @@ are compositions. The recipe is the answer:
 | Height-based splat blending | F | Mishkinis 2013 — per-material depth maps for natural transitions (`08`) |
 | Triplanar texturing | F | Geiss 2007, *GPU Gems 3* ch. 1 — tiling on steep slopes without UV stretch (`08`, `11`) |
 | Stochastic / by-example tiling | P | Heitz & Neyret 2018, I3D — hide tiling repeats without ghosting (`08`) |
+| Procedural material synthesis (the "rock" texture) | N | Substance/Gaea material nodes over `01` noise; derive PBR like terrain maps (`06`, `08`) |
+| Texture synthesis by example | P | Efros & Leung 1999; Wei & Levoy 2000; Lefebvre & Hoppe 2006 (`08`) |
+| Learned material from a photo (SVBRDF) | ? | Deschaintre et al. 2018 — verify; moving fast (`08`) |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |
 | Quadtree terrain, chunked heightfield, streaming, crack prevention, seam stitching | F | Engineering practice. No papers. (`08`) |
 

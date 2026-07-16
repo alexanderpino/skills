@@ -216,6 +216,26 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - Diffusion-based terrain generation and terrain super-resolution: **no verified reference
   here.** This area post-dates what this file can vouch for. Search before citing.
 
+## Texture & material synthesis
+
+Generating the *material* appearance (the "rock" texture and its PBR channels), as opposed to the
+terrain shape (`08` synthesising a material). The pure-procedural route is N-tier tool practice
+(Substance Designer / Gaea material nodes) built on the `01` noise primitives; the by-example route
+is below.
+
+- **Efros, A.A. & Leung, T.K. (1999).** *Texture Synthesis by Non-parametric Sampling.* ICCV 1999. —
+  The Markov-random-field, grow-pixel-by-pixel classic; the root of by-example synthesis (`08`).
+- **Wei, L.-Y. & Levoy, M. (2000).** *Fast Texture Synthesis using Tree-structured Vector
+  Quantization.* SIGGRAPH 2000, 479–488. — Two orders of magnitude faster; deterministic search (`08`).
+- **Lefebvre, S. & Hoppe, H. (2006).** *Appearance-space Texture Synthesis.* ACM TOG 25(3),
+  541–548 (SIGGRAPH '06). — Appearance vectors + dimensionality reduction; parallel, real-time (`08`).
+- **Deschaintre, V., Aittala, M., Durand, F., Drettakis, G. & Bousseau, A. (2018).** *Single-Image
+  SVBRDF Capture with a Rendering-Aware Deep Network.* ACM TOG 37(4) (SIGGRAPH '18), article 128. —
+  Learned recovery of a full PBR set (albedo / normal / specular / roughness) from one flash photo.
+  Verify before leaning on it; the field moves fast (`00`, `08`).
+- **Heitz, E. & Neyret, F. (2018)** — see *Rendering & output* above; the histogram-preserving blend
+  is also how you *tile* a synthesised or scanned material without ghosting.
+
 ## Authoring & world composition
 
 - **Galin, E., Guérin, E., Peytavie, A., Cordonnier, G., Cani, M.-P., Benes, B. & Gain, J.

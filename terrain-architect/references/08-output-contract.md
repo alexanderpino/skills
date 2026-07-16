@@ -3,7 +3,7 @@
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
 [Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
 [Splatmaps](#splatmaps) · [Satmap & colour map](#satmap--colour-map) ·
-[Normal & AO maps](#optimised-normal--ao-maps) ·
+[Normal & AO maps](#optimised-normal--ao-maps) · [Synthesising a material](#synthesising-a-material) ·
 [Compositing with the splatmap](#compositing-with-the-splatmap) · [Emitters](#emitters)
 
 ## The field contract
@@ -356,6 +356,57 @@ AO term and a shifted diffuse direction from one extra map.
 *carrying*. If the shader derives base normals from height and the baked map is only detail, it
 can be lower-resolution and tiled. If it's the sole normal source for a decimated LOD, it must
 match the pre-decimation height frequency or the detail is thrown away twice.
+
+## Synthesising a material
+
+The compositing recipe below blends per-material tiling sets — but where does the "rock" set (its
+albedo, normal, roughness, AO, height) *come from*? Two routes, and the key realisation is that the
+first one is **this skill at a finer scale**.
+
+**A material is a tiny tiling heightfield.** A rock texture is a few-centimetre relief field, and its
+PBR channels come out of that relief by exactly the derivations terrain uses (`06`) — the
+scale-recursion doctrine (`SKILL.md`) made literal:
+
+```
+pattern = FBM (01)                                   # the rough base
+        + Worley/Voronoi cells (01)                  # jointing, blocks, cracks — the "rock" tell
+        + high-freq grain (01)
+        warped by domain warp (01)                   # break the lattice
+        relaxed by a little thermal/erosion (05/04)  # rounded and weathered, not raw noise
+# then derive the PBR set from the pattern-as-height, the SAME way terrain derives its maps:
+height    = pattern                                  # for the splat height-blend (compositing, below)
+normal    = sobel(height) (06)                       # tangent-space detail normal
+ao/cavity = horizonAO(height) (06)                   # micro-occlusion in the pits
+albedo    = baseColour * (1 - k*cavity) * weather(curvature, 06) * colourNoise
+roughness = lerp(smooth, rough, exposure)            # rougher where exposed, smoother in cavities / wet
+metallic  = 0                                        # terrain rock is a dielectric
+```
+
+The **cellular / Voronoi** term (Worley 1996, `01`) is what makes rock read as rock — jointed blocks
+and cracks, not smooth lumps; **Gabor** noise (Lagae 2009, `01`) gives the anisotropic bedding of
+sandstone or schist. And the weathering is the same **curvature / slope / AO selectors** (`06`) you
+use on terrain, now at cm scale: dust and darkening in the cavities (concave), wear and lighter
+colour on the exposed edges (convex). That is the whole trick — **a material is terrain's own
+operators (`01`, `04`/`05`, `06`) run at a finer scale and derived into PBR channels**, which is the
+scale-recursion doctrine (`SKILL.md`) applied to appearance.
+
+**Tileable, or it seams.** Synthesise on a torus (periodic noise, or offset-and-blend the edges) so
+the material repeats without a visible seam — the same world-space discipline as `01`, at tile scale.
+
+**By-example, when you have a scan or photo.** The other route is to *synthesise from an exemplar*
+instead of authoring a noise graph — grow a large, non-repeating texture from a small sample. The
+lineage: **Efros & Leung 1999** (non-parametric, pixel-by-pixel), **Wei & Levoy 2000** (fast,
+tree-structured VQ), **Lefebvre & Hoppe 2006** (appearance-space, parallel); and to *tile* a scanned
+material without ghosting, **Heitz & Neyret 2018** (compositing, below). To go straight from a single
+flash photo to a full PBR set (albedo / normal / roughness / specular), the learned route is
+**Deschaintre et al. 2018** — verify before leaning on it; this area moves fast (the learned-methods
+caveat in `00`).
+
+**Tier.** Pure-procedural material authoring is **N-tier tool practice** — Substance Designer, Gaea's
+material nodes, Quixel Mixer are noise graphs producing PBR channels, built on the `01` primitives;
+no single paper. By-example synthesis is **P-tier** (Efros & Leung 1999; Wei & Levoy 2000; Lefebvre &
+Hoppe 2006; Heitz & Neyret 2018); the learned photo→material route is verify-first (Deschaintre et
+al. 2018).
 
 ## Compositing with the splatmap
 
