@@ -318,6 +318,9 @@ is below.
   SIA-based flow, erosion, authoring.
 - **Glen, J.W. (1955).** *The creep of polycrystalline ice.* Proc. Royal Society A 228. — Glen's
   flow law, `ε̇ = A·τⁿ`, n=3. The physics under every glacier model.
+- **Cuffey, K.M. & Paterson, W.S.B. (2010).** *The Physics of Glaciers* (4th ed.). Academic Press /
+  Elsevier, 704 pp. — The glaciology text; the source of the recommended rate-factor value
+  `A ≈ 2.4×10⁻²⁴ Pa⁻³ s⁻¹` at 0 °C and its Arrhenius temperature dependence (`12`).
 - **Cordonnier, G., Ecormier, P., Galin, E., Gain, J., Benes, B. & Cani, M.-P. (2018).**
   *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches.* Computer
   Graphics Forum 37(2) (Eurographics 2018).

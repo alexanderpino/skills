@@ -22,6 +22,28 @@ circulation.
 If a question lands on `?`, say so and offer to search. Being usefully uncertain beats being
 confidently wrong; a fabricated citation costs the reader a day.
 
+## Verification status
+
+The tier says *what kind* of source a claim has; this says *how far it has been checked*. They are
+not the same — the gap between "the paper exists" and "the number is right" is where errors hide.
+
+- **Citations** — author, venue, volume, and pages verified against primary sources for the
+  references added and audited to date. Never add a citation you have not looked up.
+- **Numbers & equations** — a first pass has confirmed the load-bearing formulae and constants
+  against sources: the SIA velocity/diffusivity (`12`), Glen's `A` (Cuffey & Paterson 2010), Shields
+  `θc ≈ 0.045` (`04`), Bagnold's `u*³` law and threshold (`05`), Hulme's lava thickness and levée
+  relations (`19`), stream-power `m/n ≈ 0.5` (`04`), the crater simple↔complex transition and its
+  `~1/g` scaling (`11`), basalt eruption/solidus temperatures (`19`), and the Wentworth / USDA
+  grain-and-soil boundaries (`04`, `18`). **The remaining parameter-table values are
+  order-of-magnitude starting points** — tune them against each family's verification checks (`09`)
+  and re-check any figure against its source before publication-critical use.
+
+This is deliberately honest, not reassuring. Errors *have* surfaced and been fixed by exactly this
+process — a reversed crater transition, a Braun/Gain author swap, an `H⁴`-vs-`H⁵` flux slip — so
+assume more remain until the pseudocode is implemented and the numbers independently reviewed. The
+skill is most useful when the reader knows which claims are anchored and which are informed
+estimates.
+
 ---
 
 ## 1. Noise & procedural synthesis → `01-noise.md`

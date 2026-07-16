@@ -26,7 +26,8 @@ load-bearing:
 
 ```
 Bingham:   flows only where  τ > τ_y ;   above yield, strain rate ∝ (τ − τ_y) / η
-Thickness: t ≈ τ_y / (ρ g sinθ)          # Hulme 1974 — thicker on GENTLE slopes (inverse of water)
+Thickness: t ≈ τ_y / (ρ g sinθ)          # Hulme 1974: Y = t·ρg·sinθ — thicker on GENTLE slopes (inverse of water)
+Levée:     τ_y ≈ 2 ρ g w sin²θ            # Hulme 1974 — back out yield strength from observed levée width w
 Viscosity: η(T) = η_0 · exp(−b · (T − T_erupt))     # rises steeply as it cools
 Yield:     τ_y(T) rises as T falls        # cooling both stiffens and strengthens
 ```
@@ -153,7 +154,7 @@ Order-of-magnitude starting points; tune against the verification table, not by 
 | Parameter | Basalt (Hawaiʻi/Etna-style) | Notes |
 |---|---|---|
 | `T_erupt` | ~1100–1200 °C | Silicic lavas erupt cooler and stiffer |
-| `T_solidus` (stop) | ~800–1000 °C | Freeze threshold for step 4 |
+| `T_solidus` (stop) | ~980–1000 °C (basalt) | Freeze threshold for step 4; flows stall a little above it as yield strength climbs |
 | `η` at eruption | ~10²–10³ Pa·s | Rises orders of magnitude as T falls |
 | `τ_y` | ~10²–10⁴ Pa | Hulme measured up to 10⁴–10⁶ Pa on cooler/silicic flows |
 | `ρ` | ~2600 kg/m³ | |

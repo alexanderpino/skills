@@ -116,7 +116,7 @@ solve every N glacier steps, not in lockstep.
 
 | Parameter | Start | Notes |
 |---|---|---|
-| `A` (Glen) | ~2.4×10⁻²⁴ Pa⁻³ s⁻¹ at 0 °C | Strongly temperature-dependent; colder ice is stiffer |
+| `A` (Glen) | ~2.4×10⁻²⁴ Pa⁻³ s⁻¹ at 0 °C | The Cuffey & Paterson 2010 recommended value; Arrhenius `A₀·exp(−Q/RT)`, colder ice stiffer |
 | `n` | 3 | Glen's exponent |
 | `ρ_ice` | 917 kg/m³ | |
 | `β` (mass balance) | 0.005–0.01 /yr | m of ice per m of elevation |
