@@ -990,7 +990,7 @@ is the thing to get right.
 
 ## Screen worlds — fictional planets as recombined Earth archetypes
 
-`13`'s fictional-world doctrine (Hyrule, Middle-earth) applied to a single alien *locale*. A film's
+Chapter 13's fictional-world doctrine (Hyrule, Middle-earth) applied to a single alien locale. A film's
 planet — or lost island — is never new physics: it is **Earth archetypes in costume**, and the
 **filming location names the archetype**: a production designer scouts the real place whose *process* already reads as
 the story's world, and a terrain graph does the identical composition, changing only the **set
