@@ -50,7 +50,7 @@ uplift field (02) → base + detail noise (01) → depression fill (03) → flow
 The non-mountain archetypes (waterfalls, deserts, karst, coasts, reefs, salt flats) don't diff
 from a range — they **switch the dominant agent** (aeolian, dissolution, wave, deposition) while
 the order and the invariants hold. Same machine, different weights. And the **off-Earth**
-archetypes (Group K) change the *regime itself*: no liquid water switches the fluvial backbone
+archetypes (Group L) change the *regime itself*: no liquid water switches the fluvial backbone
 (`03`/`04`) **off** and lets impact cratering dominate, and gravity rescales craters and dunes —
 the planetary doctrine in `SKILL.md`, built out.
 
@@ -682,9 +682,23 @@ levees and floodbasins. The Okavango variant routes the river into an **endorhei
 TWI + flat + a thin dynamic water layer). Deposition-dominant — the river's *load* dropped on the
 floodplain.
 
+**The Amazon variant — the flood pulse is the landscape-builder.** On a basin this flat (the lower
+river falls only a few cm per km) the organizing agent is not the channel but the **seasonal water
+surface**. The annual **flood pulse** raises river level by ~10 m and inundates a forest belt tens
+of km wide, then drains it — and that pulse, not relief, partitions the land into **terra firme**
+(never flooded, upland), **várzea** (seasonally flooded by sediment-rich *whitewater*), and **igapó**
+(flooded by *blackwater*). The three are an **ecosystem mosaic keyed to inundation depth and
+duration** (`13`, `07`), not to height. Model it as a **thin dynamic water layer with a seasonal
+level** (`08`) over near-zero relief, and read the biome bands off flood depth/duration exactly as
+`13`'s wetlands read off TWI — here the flood pulse supplies the water regime the ecosystem sorts on.
+This is why "the Amazon" is two problems: the *channel* geomorphology above (meanders, oxbows), and
+this *floodbasin* mosaic, which is mostly a water-surface and ecosystem story.
+
 **The tells.** Tight meanders with oxbow lakes and scroll-bar ridges on a flat floodplain; natural
 levees standing above backswamps; for Okavango, a fan of distributary channels dissolving into
-reed-and-water wetland with *no outlet to the sea*; braided reaches where slope or sediment rises.
+reed-and-water wetland with *no outlet to the sea*; braided reaches where slope or sediment rises;
+for the Amazon, a flooded-forest belt that expands and contracts by tens of km each year — the
+biome bands (terra firme / várzea / igapó) follow inundation, not contours.
 
 **Watch for.** Meanders on a *steep* slope — meandering is a *low-gradient floodplain* process
 (Legal Order 9c, after the valley is cut). The wetland needs the *closed/flat + thin water layer*
@@ -692,7 +706,8 @@ reed-and-water wetland with *no outlet to the sea*; braided reaches where slope 
 
 **Verify.** Sinuosity high on the low-slope reach; oxbows/scrolls present; the Okavango basin closed
 (endorheic — flow terminates in the wetland); water modelled as a thin dynamic layer over near-flat
-ground.
+ground; for the Amazon, the biome mosaic tracks a *seasonal water level* (dynamic layer, `08`), not
+fixed height — the terra firme / várzea / igapó bands shift with the pulse.
 
 **Tier.** L — `03` meandering/oxbows + overbank deposition + `02`/`03` endorheic basin (Okavango) +
 `13` wetland.
@@ -810,7 +825,72 @@ budget (`09` mass check: wall retreat ↔ talus volume); no dissolution features
 joint-gated incision & rockfall + `07`/`13` perched ecosystem. No canonical paper — the
 composition is the answer.
 
-## Group K — Off-Earth
+## Group K — Anthropogenic (the cultivated & engineered surface)
+
+*The file's turn from a natural process to a human one. Everything above is "every landform is a
+claim about a process" (`SKILL.md`) with a *natural* process; people are a geomorphic agent too —
+they cut, fill, pond and dam — and the results obey the same field logic (contours, repose, water
+layers, masks), which is why they belong in this skill rather than beside it. One entry today;
+polders and reclaimed land, open-pit mines and quarries, cut-and-fill road grading, and dammed
+reservoirs are the obvious neighbours as the category grows.*
+
+### 25. Agricultural terraces — rice-paddy & dry-stone
+*Rice: Banaue & the Cordilleras (Philippines) · Longji/Longsheng & Yuanyang (China) · Bali's subak ·
+Tegallalang. Dry-stone: Inca Moray & Písac · the Douro & Cinque Terre vineyards*
+
+**Claim.** The file's first **anthropogenic** landform — a hillside re-cut by people into a stair of
+level benches. Every landform before this is a claim about a *natural* process; this is a claim
+about a *human* one, and it obeys the same field logic: each terrace is a **flat bench at a constant
+elevation** (a level set of the height field), its riser held at the material's repose, the flight
+of them following the hill's **contours**. Wet-rice paddies pond each bench to a thin sheet —
+turning the staircase into a cascade of mirrors; dry-stone terraces (vineyards, Inca beds) are the
+same geometry without the water.
+
+**Composition.**
+- **Contours are the generator.** Terrace edges trace **iso-height lines** of the underlying slope
+  (`06` — a contour *is* the level set of the height field), so the plan pattern is the hill's own
+  topology. Steeper hill → narrower, more numerous benches (bench width ∝ 1/slope at a fixed riser
+  height).
+- **Cut-and-fill to a bench.** Each terrace is graded flat (a local `flatten` to a chosen datum,
+  `10`), balancing cut against fill along the contour; the riser is a retaining wall (dry stone) or
+  a packed-earth bund standing at the soil's repose (`05`).
+- **Wet variant — water is the point.** Rice paddies hold a **thin dynamic water layer** (`08`) at
+  each bench level, fed top-down and spilling bench to bench: a staircase of tiny closed basins
+  (`03`), each ponded to its own spill level. Bali's subak even *schedules* the flow — the terrace
+  is a hydrology as much as a landform.
+- **Gated by slope and water (a process mask).** Terracing appears only in a slope band — too flat
+  needs none, too steep won't hold — and, for rice, only where water can be routed (`06` slope mask
+  ∩ a water-access mask). Outside the mask the hill is untouched; the sharp edge of a terraced zone
+  against wild slope is a tell.
+- **It is erosion control, i.e. the inverse of `04`.** Terraces exist to *stop* the natural process:
+  they cut slope length and pond runoff, collapsing the hillslope's erosive power. Abandoned, they
+  fail from the top down — riser blowouts, gullying through breaches — and the hill reclaims them; a
+  maintenance/decay signature worth modelling if the brief is "old" or "ruined".
+
+**The tells.** Nested, roughly-parallel level lines wrapping the hill's contours — bending around
+every spur and re-entrant and *converging* where the slope steepens; benches flat, risers steep and
+regular; for paddies, a stack of still water sheets brimming to their bunds and catching the sky;
+a hard boundary where terracing stops and unmodified slope begins; keyed to a settlement and a water
+source, not scattered.
+
+**Watch for.** Drawing terraces as evenly-spaced *horizontal stripes* — they follow **contours**, so
+parallel stripes read as corduroy, not agriculture; the convergence at spurs is the whole look. And
+paddies need the **per-bench water level** (`08` dynamic layer over a `03` staircase of spill
+basins), not a texture — dry the water and you have drawn dry-stone terraces (right for a vineyard,
+wrong for Banaue).
+
+**Verify.** Terrace edges coincide with iso-height contours of the base slope (they *are* level
+sets); bench count and width scale with local slope; the terraced zone is bounded by a slope (and
+water-access) mask, not the whole hill; paddy water sits level within each bench and steps down
+bench to bench.
+
+**Tier.** L — `06` contours (level sets) + slope/water process mask + `05` repose risers + `08`
+per-bench water layer + a cut-and-fill `flatten` (`10`). No paper — a construction method, the
+**anthropogenic sibling** of the natural terraces already in the file: river terraces (`03`), marine
+terraces (`12`), travertine rimstone (entry 22). Those are cut or built *by a process*; these are
+cut *by people to a plan*.
+
+## Group L — Off-Earth
 
 *The skill's off-Earth doctrine (`SKILL.md`) as worked assemblies. Two knobs reset the whole graph:
 **is there liquid water**, and **what is the gravity**. No water switches the fluvial backbone
@@ -819,7 +899,7 @@ unifying reading — **crater density is a clock**: a saturated surface is ancie
 young, a crater-free one actively resurfaced. Per-crater morphology lives in `11`; these entries
 build whole *surfaces*.*
 
-### 25. Cratered highlands — lunar-type
+### 26. Cratered highlands — lunar-type
 *The Moon's highlands · Mercury · Callisto · any ancient airless surface*
 
 **Claim.** The "Moon with different-sized craters." A surface with no water and no atmosphere
@@ -863,7 +943,7 @@ accumulation; regolith thickest on the oldest terrain.
 **Tier.** L — `11` per-crater morphology (Melosh/Pike, P) + F-tier SFD stamping & superposition +
 `05` diffusion-as-gardening (Culling) + repose-angle invariant (`SKILL`).
 
-### 26. Volcanic plains — lunar maria-type
+### 27. Volcanic plains — lunar maria-type
 *Lunar maria · Mercury's smooth plains · flood-basalt analogues off-Earth*
 
 **Claim.** Vast dark low-lying **flood-basalt plains** that flooded and buried the older cratered
@@ -871,7 +951,7 @@ basins — so they are *younger* and carry **far fewer craters**, plus wrinkle r
 mare/highland split is the Moon's fundamental dichotomy, and it is a **crater-density (age)**
 contrast, not merely an albedo one.
 
-**Diff from entry 25.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
+**Diff from entry 27.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
 `11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 17) → **reset the crater clock**:
 the mare surface starts nearly crater-free and accumulates only the later, sparser population (same
 SFD, far fewer stamps). Add **wrinkle ridges** (compressional buckles — low sinuous ridges, F) and
@@ -889,10 +969,10 @@ on a world with no water.
 check); ghost craters where basalt is thin; ridges compressional, rilles volcanic/tectonic; plains
 flat and low.
 
-**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 25) + wrinkle
+**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 27) + wrinkle
 ridges / rilles (F/`19`/`02`).
 
-### 27. The blended relict world — Mars-type
+### 28. The blended relict world — Mars-type
 *Mars · ancient-wet worlds generally*
 
 **Claim.** The doctrine's hard case (`SKILL`): a world that *had* water and lost it. Ancient
@@ -909,7 +989,7 @@ Earth-style drainage beneath a live desert-and-cratering surface.
   huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
 - **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
   scaling (bigger dunes, transverse aeolian ridges, dust); mantling and exhumation.
-- **Impact overprint:** a crater population (entry 25) with the transition diameter scaled to Mars'
+- **Impact overprint:** a crater population (entry 27) with the transition diameter scaled to Mars'
   `g ≈ 0.38` → **bigger** craters (`11`).
 - **Polar layered deposits:** ice + dust layering at the poles, paced by *orbital* (obliquity)
   cycles — climate strata, not seasonal snow (F).
@@ -988,7 +1068,7 @@ entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) 
 a Saharan oasis (12) is 9's wind machinery run as *source*: a deflation basin floored at the water
 table, its exported sand banked downwind as the dunes. The rule is Chapter 13's: read the two
 archetypes, run **one substrate and one hydrology**, and let the regimes overprint in Legal Order —
-never blend two finished terrains. Off-world the same rule holds in *time*: Mars (27) is five
+never blend two finished terrains. Off-world the same rule holds in *time*: Mars (28) is five
 archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,
 then craters — each overprinting the last on one shared surface, which is why the relative-age order
 is the thing to get right.
@@ -1039,12 +1119,12 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   Dune Turn in Episode I, and Sluuce Canyon — plus the ark ambush in Raiders; the wider podrace
   canyons are digital, from the American-Southwest vocabulary, with Death Valley plates in 1977)* —
   one real gorge serving three fictional locales is the screen-worlds thesis in a single site: the
-  archetype is constant, only the dressing changes. And it is the fictional case of entry 27's
+  archetype is constant, only the dressing changes. And it is the fictional case of entry 28's
   **relict-fluvial rule**: a deep dendritic canyon system on a waterless world *is a fossil* — it
   claims a wet past, exactly like a Martian valley network. Compose it dry: an entrenched-meander
   gorge (entry 13, goosenecks for a racing line) + slot narrows (Further archetypes, `16` wadi) +
   caprock steps and dry falls — relict knickpoints (entry 4) with no plunge pool — then **switch
-  the water off** and overprint with aeolian sand and rockfall (`05`, `16`, entry 27's relative-age
+  the water off** and overprint with aeolian sand and rockfall (`05`, `16`, entry 28's relative-age
   order). A canyon carved by *nothing* is the tell that breaks the fiction; a canyon carved by
   vanished water is Mars, and reads true.
 
@@ -1055,7 +1135,7 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   (chott + gorge + dunes), chosen again fifty years later because the *processes* read instantly:
   rock country means shelter, sand sea means exposure. The worm's wake is set dressing on entry 9's
   dunes; Wadi Rum has also played Mars itself (The Martian) — the red jebel desert *is* the
-  relict-fluvial look of entry 27 to a camera.
+  relict-fluvial look of entry 28 to a camera.
 - **Crait** *(The Last Jedi, filmed at Salar de Uyuni, Bolivia)* — the rare case where the film's
   conceit **is the material stack**: entry 22's evaporite playa — a white salt crust (`18`) over
   red substrate — and every shot of a speeder skid scraping white to reveal red is the layer
