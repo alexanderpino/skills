@@ -118,7 +118,10 @@ of what's reliable here.
 | Digital terrain modelling — the survey | P | Galin et al. 2019, CGF 38(2). Read first when architecting a whole world (`13`) |
 
 **L-tier — landforms, not algorithms.** No implementation and no paper exists for these. They
-are compositions. The recipe is the answer:
+are compositions. The recipe is the answer. This table is *one landform each*; for whole
+recognisable places (the Alps, the Grand Canyon, a Namib erg, Niagara & Victoria Falls) assembled
+end-to-end as regime settings over the Legal Order, see the **archetype blueprints** in
+`20-archetypes.md`.
 
 | Landform | Composition |
 |---|---|
