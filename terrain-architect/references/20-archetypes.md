@@ -981,7 +981,7 @@ Most real wonders are *two* of these overprinted: a fjord is a glaciated orogen 
 Ha Long Bay is tower karst (14) drowned like a fjord; Kilimanjaro is a stratovolcano (15) wearing
 entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) in its side-streams;
 a Saharan oasis (12) is 9's wind machinery run as *source*: a deflation basin floored at the water
-table, its exported sand banked downwind as the dunes. The rule is `13`'s: read the two
+table, its exported sand banked downwind as the dunes. The rule is Chapter 13's: read the two
 archetypes, run **one substrate and one hydrology**, and let the regimes overprint in Legal Order —
 never blend two finished terrains. Off-world the same rule holds in *time*: Mars (27) is five
 archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,
