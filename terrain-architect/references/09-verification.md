@@ -141,7 +141,7 @@ frequency and you're storing noise you can't represent.
 ## Two province-scale curves
 
 The five checks validate a *simulation*. These two validate a *claimed landscape* — they are the
-quantitative core of the archetype signatures in `20`.
+quantitative core of the archetype signatures in 20-archetypes.md.
 
 ### Hypsometric (area–altitude) curve
 
