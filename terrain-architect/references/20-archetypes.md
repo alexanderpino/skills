@@ -1011,8 +1011,8 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   material and foliage layers, not the heightfield.
 - **Tatooine** *(filmed in Tunisia — Chott el Djerid, the Nefta/Tozeur dunes, and Maguer Gorge at
   Sidi Bouhlel — plus Death Valley in 1977)* — a **desert composite**, and a worked "combine": an **erg** (entry
-  9) for the dune seas + a **chott / sabkha salt flat** (entry 22) for the homestead pan + a **wadi /
-  slot canyon** (`16`, Further archetypes) for the canyon chase. Three archetypes already in this
+  9) for the dune seas + a **chott / sabkha salt flat** (entry 22) for the homestead pan + a **wadi** (16) /
+  **slot canyon** (Further archetypes) for the canyon chase. Three archetypes already in this
   file, one substrate, one (dry) hydrology — exactly the combining rule.
 - **Pandora's Hallelujah Mountains** *(not filmed but modelled — on Zhangjiajie's pillar forest)* —
   the CG case proves the same rule: the designers reached for entry 24's joint-gated pillars, then
