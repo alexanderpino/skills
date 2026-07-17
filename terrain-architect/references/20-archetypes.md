@@ -26,7 +26,7 @@ relax because the subject is famous.
 looks like" is the plausible-looking wrongness the skill is built to catch. The signatures lean on
 `09`'s tools: the **slope histogram** (does it peak at the repose angle, or at the steeper
 landslide threshold?), the **hypsometric (area–altitude) curve** (convex = youthful, sigmoid =
-mature, concave = old — a one-glance maturity read, after Strahler's hypsometric analysis),
+mature, concave = old — a one-glance maturity read; Strahler 1952, a `09` check),
 **drainage continuity** (rivers reach base level, don't stop), and the **cross-valley profile**
 (V = fluvial, U = glacial).
 
@@ -38,8 +38,8 @@ the *process* that fills between the constraints.
 
 ## The baseline — a generic eroded range
 
-Every mountain archetype below is a **diff from this**, so the file is regimes, not twenty copies
-of the pipeline:
+Every mountain archetype below is a **diff from this**, so the file is regimes, not a stack of
+near-identical pipelines:
 
 ```
 uplift field (02) → base + detail noise (01) → depression fill (03) → flow routing (03)
@@ -88,7 +88,8 @@ hypsometric curve mature.
 moraine/fan deposition.
 
 ### 2. Himalayan-type — active, uplift-dominated, extreme relief
-*Himalaya · Karakoram · the high Andes*
+*Himalaya · Karakoram · (subduction cousin: the high Andes — same uplift-dominated regime, a
+different plate boundary)*
 
 **Claim.** The fastest-uplift collisional orogen; uplift ≫ erosion, so relief is extreme and
 slopes sit at the *landslide threshold*; the monsoon slams one flank (orographic) and leaves an
@@ -118,7 +119,7 @@ convex (youthful — little area removed yet).
 `13` orographic asymmetry + `12` high-altitude glacial.
 
 ### 3. Appalachian-type — old, decayed, drainage-inherited
-*Appalachians · Scottish Highlands · Urals · Great Dividing Range (AU)*
+*Appalachians · Scottish Highlands · Urals*
 
 **Claim.** An ancient orogen whose uplift *ceased*; hundreds of Myr of erosion wore it to
 subdued, rounded relief; the drainage is *inherited* — it predates the present topography and cuts
@@ -302,8 +303,9 @@ thin. The underlying bedrock/fluvial relief is subdued and mostly buried. Off-Ea
 CA, gravity/air-density-shifted (Kok et al. 2012).
 
 **The tells.** Dune *type* matches the wind rose (unidirectional → barchan; bidirectional → linear;
-multidirectional → fixed star dune, tallest); slip faces at the sand repose angle (~34°, `05`); wet
-interdune pans where the water table nears the surface (Sossusvlei's dead vlei).
+multidirectional → fixed star dune, tallest); slip faces at the sand repose angle (~33°, range
+30–35° — `05`'s numbers); wet interdune pans where the water table nears the surface (Sossusvlei's
+dead vlei).
 
 **Watch for.** Stamping dune *shapes* as noise — dunes are a *process*, and their type is
 *diagnostic of the wind*. A field of random bumps is the classic tell. A slip face steeper than
@@ -521,13 +523,14 @@ ice + `19` lava + `05` lahars.
 
 **Claim.** A large eruption empties the magma chamber and the roof **collapses** into a broad
 circular basin (a caldera, far larger than a vent crater); it fills with water (Crater Lake) or
-floods from the sea (Santorini), often with a resurgent cone/island in the middle (Wizard Island,
-Nea Kameni).
+floods from the sea (Santorini), often with a **post-collapse vent cone** as an island in the
+middle (Wizard Island, Nea Kameni). (*Resurgence* proper — structural re-uplift of the caldera
+floor — is a distinct feature of the largest calderas; don't use the word for a cone.)
 
 **Composition.** Build the pre-collapse edifice (`11`, entry 15) → subtract a **collapse caldera**
 (a broad, steep-walled circular depression, `11`) → fill: a closed lake kept unfilled by the
-no-fill list at a set level (`03`), or breach to sea level (Santorini) → optional resurgent vent
-(a small edifice) on the floor → wave-cut shore on the caldera walls (`12` lacustrine).
+no-fill list at a set level (`03`), or breach to sea level (Santorini) → optional post-collapse
+vent cone (a small edifice) on the floor → wave-cut shore on the caldera walls (`12` lacustrine).
 
 **The tells.** A large circular basin with steep inner walls, far wider than any summit crater; a
 flat water surface inside; sometimes a central island; exposed caldera-wall stratigraphy; if
@@ -538,13 +541,13 @@ marine, a flooded ring with a gap (Santorini's lagoon).
 level* (`03`), not a fluvial pond.
 
 **Verify.** Basin diameter ≫ a crater's, walls steep and near-circular; water level flat and
-closed; any resurgent cone sits on the caldera floor.
+closed; any post-collapse cone sits on the caldera floor.
 
 **Tier.** L — `11` edifice + collapse caldera + `03` closed lake/level + `12` shore + optional
-resurgent vent.
+post-collapse vent.
 
 ### 17. Columnar basalt & rift volcanism — Giant's Causeway & Iceland-type
-*Giant's Causeway / Antrim · Iceland · Deccan / Columbia River basalts · Devils Tower*
+*Giant's Causeway / Antrim · Iceland · Deccan / Columbia River basalts*
 
 **Claim.** Fluid basalt erupts from **fissures** (not a cone) as vast flat sheets (flood basalt,
 "traps"); as a thick flow cools it contracts into **polygonal columns**; stacked flows plus later
@@ -553,7 +556,8 @@ sub-glacial eruptions combine.
 
 **Composition.** Line-source / fissure flows along a rift or fault (`02`) → stacked levéed sheets
 (`11`/`19`) → *columnar jointing* as a **material/mesh detail** (like hoodoos, the columns are
-sub-cell geometry, not a heightfield feature) → dissection of the stack → stepped traps (`11`).
+sub-cell geometry, not a heightfield feature; and jointing is a *cooling* phenomenon, not a basalt
+exclusive — Devils Tower is a columnar-jointed phonolite *intrusion*, no flood basalt in sight) → dissection of the stack → stepped traps (`11`).
 Iceland adds an active rift graben (`02`), sub-glacial eruptions → flat-topped **tuyas**, and
 braided outwash sandur (`03`).
 
@@ -604,7 +608,8 @@ walls carry hanging falls; planform follows glacial troughs, not a dendritic riv
 ## Group H — Coastal & marine
 
 ### 19. Sea cliffs & stacks — Twelve Apostles & Cliffs of Moher-type
-*Twelve Apostles (Vic) · Cliffs of Moher · Étretat · Old Man of Hoy · Nā Pali*
+*Twelve Apostles (Vic) · Cliffs of Moher · Étretat · Old Man of Hoy · Durdle Door & the Jurassic
+Coast*
 
 **Claim.** Waves attack a rocky coast; a **wave-cut notch** undercuts the cliff, it retreats
 leaving a **wave-cut platform** at its foot, and differential hardness/joints leave the sequence
@@ -639,8 +644,11 @@ subsides → an **atoll** (a ring of reef around a lagoon) once the island sinks
 **Composition.** A volcanic edifice (`11`) that **subsides** through time (`02`) while **coral
 accretes in the photic zone** and is shaped by **wave exposure** (`12` reefs & atolls, Darwin) →
 fringing → barrier → atoll depending on how far subsidence has gone → a shallow lagoon (closed
-basin) inside the ring, with passes where fresh water / wave energy break it. The Great Barrier
-Reef sits at the *barrier* (shelf-edge) stage; Maldives/Bikini at the atoll stage.
+basin) inside the ring, with passes where fresh water / wave energy break it. Bora Bora is the
+textbook Darwin mid-stage (barrier ring, shrinking volcanic core); Maldives/Bikini the atoll
+end-state. The Great Barrier Reef is the *shelf* variant — same photic-zone accretion on a
+subsiding surface, but the surface is a continental margin, not a volcano, so it has the barrier
+geometry without the Darwin cone-to-atoll sequence.
 
 **The tells.** A ring or line of reef with a steep seaward drop and a shallow flat lagoon inside;
 sand cays (motu) on the rim; the reef *keeps pace with sea level*; a central island only at the
@@ -818,10 +826,11 @@ Earth-style drainage beneath a live desert-and-cratering surface.
   **not** a fluvial canyon (`02`); **Olympus Mons** is a shield edifice (`11`, Pike & Clow) grown
   huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
 - **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
-  scaling (bigger dunes, TARs, dust); mantling and exhumation.
+  scaling (bigger dunes, transverse aeolian ridges, dust); mantling and exhumation.
 - **Impact overprint:** a crater population (entry 23) with the transition diameter scaled to Mars'
   `g ≈ 0.38` → **bigger** craters (`11`).
-- **Polar layered deposits:** ice + dust seasonal layering at the poles (F).
+- **Polar layered deposits:** ice + dust layering at the poles, paced by *orbital* (obliquity)
+  cycles — climate strata, not seasonal snow (F).
 
 **Regime knobs.** `g ≈ 0.38` → bigger craters, taller volcanoes, bigger/taller dunes; thin dry
 atmosphere → aeolian **active**, fluvial **ancient only**. Set both and the same nodes produce Mars
@@ -884,7 +893,8 @@ Same discipline, briefer — each still a composition, not an algorithm:
 Most real wonders are *two* of these overprinted: a fjord is a glaciated orogen (1) drowned (18);
 Ha Long Bay is tower karst (14) drowned like a fjord; Kilimanjaro is a stratovolcano (15) wearing
 entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) in its side-streams;
-a Saharan oasis (12) is an erg (9) deflated down to its water table. The rule is `13`'s: read the two
+a Saharan oasis (12) is 9's wind machinery run as *source*: a deflation basin floored at the water
+table, its exported sand banked downwind as the dunes. The rule is `13`'s: read the two
 archetypes, run **one substrate and one hydrology**, and let the regimes overprint in Legal Order —
 never blend two finished terrains. Off-world the same rule holds in *time*: Mars (25) is five
 archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,

@@ -242,6 +242,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | HBAO | P | Bavoil et al. 2008, SIGGRAPH talks. **Screen-space weighting; not the correct integral for a baked terrain AO map** (`06`) |
 | Sky-view factor | P | Zakšek, Oštir & Kokalj 2011, Remote Sensing 3(2) |
 | Terrain ruggedness index | P | Riley, DeGloria & Elliot 1999, Intermountain J. Sciences 5 |
+| Hypsometric (area–altitude) curve | P | Strahler 1952, *Hypsometric (Area-Altitude) Analysis of Erosional Topography*, GSA Bulletin 63 — the maturity diagnostic (`09`, `20`) |
 | Topographic position index | F | Weiss 2001 (ESRI poster) — widely used, not peer-reviewed |
 | Ridge / valley / peak / pit / saddle detection | F | Morse theory in principle; in practice curvature thresholds |
 | Prominence / isolation | F | Definitions from mountaineering, computed by flood fill |
