@@ -951,7 +951,7 @@ basins — so they are *younger* and carry **far fewer craters**, plus wrinkle r
 mare/highland split is the Moon's fundamental dichotomy, and it is a **crater-density (age)**
 contrast, not merely an albedo one.
 
-**Diff from entry 27.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
+**Diff from entry 26.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
 `11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 17) → **reset the crater clock**:
 the mare surface starts nearly crater-free and accumulates only the later, sparser population (same
 SFD, far fewer stamps). Add **wrinkle ridges** (compressional buckles — low sinuous ridges, F) and
@@ -969,7 +969,7 @@ on a world with no water.
 check); ghost craters where basalt is thin; ridges compressional, rilles volcanic/tectonic; plains
 flat and low.
 
-**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 27) + wrinkle
+**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 26) + wrinkle
 ridges / rilles (F/`19`/`02`).
 
 ### 28. The blended relict world — Mars-type
@@ -989,7 +989,7 @@ Earth-style drainage beneath a live desert-and-cratering surface.
   huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
 - **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
   scaling (bigger dunes, transverse aeolian ridges, dust); mantling and exhumation.
-- **Impact overprint:** a crater population (entry 27) with the transition diameter scaled to Mars'
+- **Impact overprint:** a crater population (entry 26) with the transition diameter scaled to Mars'
   `g ≈ 0.38` → **bigger** craters (`11`).
 - **Polar layered deposits:** ice + dust layering at the poles, paced by *orbital* (obliquity)
   cycles — climate strata, not seasonal snow (F).
