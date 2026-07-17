@@ -890,3 +890,34 @@ never blend two finished terrains. Off-world the same rule holds in *time*: Mars
 archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,
 then craters — each overprinting the last on one shared surface, which is why the relative-age order
 is the thing to get right.
+
+## Screen worlds — fictional planets as recombined Earth archetypes
+
+`13`'s fictional-world doctrine (Hyrule, Middle-earth) applied to a single alien *locale*. A film's
+planet is never new physics — it is **Earth archetypes in costume**, and the **filming location
+names the archetype**: a production designer scouts the real place whose *process* already reads as
+the story's world, and a terrain graph does the identical composition, changing only the **set
+dressing** — materials, sky/light, and the scatter of props (`06`/`08`, `07`). So "make an ice
+planet / a desert planet" is not a new recipe; it is *decompose the fiction into the archetypes
+above, then re-dress.* There is no "Hoth algorithm" for the same reason there is no atoll one.
+
+- **Hoth** *(filmed at Finse & the Hardangerjøkulen glacier, Norway)* — an **ice-sheet world**: the
+  glacial machinery of entry 18 with **sea level off and the ice cap on**. Ice sheet + valley
+  glaciers + crevasse fields, **nunataks** (rock islands piercing the ice), wind-scoured **sastrugi**
+  (aeolian on snow), and periglacial ground where rock is bare (`12` glacier flow/erosion, `13` snow
+  & avalanche, `17` blockfields). Hoth is the *un-drowned, still-glaciated* parent of the Fjordland
+  entry — same ice, no sea.
+- **Endor** *(filmed in the Californian coast redwoods; the speeder chase at Cheatham Grove)* — the
+  lesson that some famous "places" are an **ecosystem, not a landform**. Gentle relief carries a
+  giant-conifer **ecosystem** (`13` competition sim, `07` Deussen scatter) — the *biome* is the
+  subject, the height almost incidental. Like the rainbow-strata note, this one lives in the
+  material and foliage layers, not the heightfield.
+- **Tatooine** *(filmed in Tunisia — Chott el Djerid, the Nefta/Tozeur dunes, the Sidi Bouhlel gorge
+  — plus Death Valley in 1977)* — a **desert composite**, and a worked "combine": an **erg** (entry
+  9) for the dune seas + a **chott / sabkha salt flat** (entry 22) for the homestead pan + a **wadi /
+  slot canyon** (`16`, Further archetypes) for the canyon chase. Three archetypes already in this
+  file, one substrate, one (dry) hydrology — exactly the combining rule.
+
+**The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
+read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;
+they change the palette and the scatter.
