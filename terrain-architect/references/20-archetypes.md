@@ -50,7 +50,7 @@ uplift field (02) → base + detail noise (01) → depression fill (03) → flow
 The non-mountain archetypes (waterfalls, deserts, karst, coasts, reefs, salt flats) don't diff
 from a range — they **switch the dominant agent** (aeolian, dissolution, wave, deposition) while
 the order and the invariants hold. Same machine, different weights. And the **off-Earth**
-archetypes (Group J) change the *regime itself*: no liquid water switches the fluvial backbone
+archetypes (Group K) change the *regime itself*: no liquid water switches the fluvial backbone
 (`03`/`04`) **off** and lets impact cratering dominate, and gravity rescales craters and dunes —
 the planetary doctrine in `SKILL.md`, built out.
 
@@ -728,7 +728,89 @@ deposition CA + `03` source (travertine).
 
 ---
 
-## Group J — Off-Earth
+## Group J — Geothermal & stone forests
+
+### 23. Geothermal field — Yellowstone-type
+*Yellowstone · Rotorua–Taupō (NZ) · Iceland's Geysir & hverir · El Tatio (Chile)*
+
+**Claim.** Shallow magmatic heat drives groundwater convection inside a volcanic system: geysers,
+hot springs, mud pots and fumaroles cluster along fractures; silica-saturated water builds
+**sinter** aprons and cones around alkaline springs; the vivid colours are **microbial mats zoned
+by temperature** (Grand Prismatic's rings); and at Yellowstone the whole field sits inside a
+supervolcano caldera whose floor carries **true resurgent domes** — the structural re-uplift that
+entry 16 warns is *not* what a post-collapse cone is.
+
+**Composition.** A caldera substrate (entry 16 at supervolcano scale, `11`) → hydrothermal
+features placed along **fracture/fault gates** (`02` faults + `11` — springs are where the
+plumbing reaches the surface, not a random scatter) → **deposition, not erosion**, builds the
+landforms: sinter (silica) aprons, terraces and geyser cones by the same self-building rimstone
+logic as entry 22's travertine — and where the bedrock is carbonate (Mammoth), it *is* entry 22's
+travertine, stacked into terraced pools. Mud pots where acid alteration turns rock to clay
+(`18` material change); **hydrothermal explosion craters** as occasional small `11` craters.
+Colour is a **material story** (`06`/`08`): a temperature field around each vent drives an
+albedo ramp — blue (hot, sterile) → yellow → orange → brown (cooler mats) — the biological
+sibling of `08`'s blackbody ramp. Runoff channels braid across the sinter aprons (`03` at
+micro-scale).
+
+**The tells.** Features strung along lines (the fracture gates), not sprinkled; gently-sloped
+white sinter aprons with scalloped terracelets; concentric colour rings around hot pools, hue
+keyed to water temperature; steaming ground and bleached, altered rock; dead bleached trees at
+apron edges (silica kills the roots — the scatter layer tells the story too); a caldera rim on
+the skyline.
+
+**Watch for.** Scattering geysers randomly — hydrothermal features are *plumbing outlets* and
+line up along faults; and carving the terraces — sinter and travertine are **depositional**
+(entry 22's rule): they build up and outward, and an eroded-looking terrace reads wrong. Active
+eruption columns and steam are the engine's job (`03`'s whitewater rule); the terrain owns the
+cones, aprons, pools and palette.
+
+**Verify.** Feature positions correlate with the fracture/fault mask; sinter aprons slope gently
+away from vents (deposition profile); colour rings concentric and monotone in temperature; the
+`09` mass check reads *accretion* near vents (mass added over time, sourced from solution, like
+entry 22).
+
+**Tier.** L — entry 16 caldera + `02`/`11` fracture gating + entry 22's deposition CA (silica /
+carbonate) + `06`/`08` temperature-driven material palette. The hydrothermal system itself is
+geology (Old Faithful's plumbing), not a graphics algorithm — model its *surface products*.
+
+### 24. Sandstone pillar forest — Zhangjiajie-type
+*Zhangjiajie / Wulingyuan (the "Avatar mountains") · Meteora (conglomerate cousin)*
+
+**Claim.** A thick, flat-lying, well-cemented **quartz sandstone** plateau cut by two near-
+orthogonal vertical **joint sets** is dissected along the joints — streams, frost and rockfall
+eat the joint corridors into deep slots and leave a *forest of freestanding rectangular pillars*,
+hundreds of metres tall, their flat tops accordant with the old plateau surface and crowned with
+pines. **Not karst**: quartz sandstone doesn't dissolve — this is mechanical, joint-controlled
+erosion, which is why it earns an entry beside tower karst rather than inside it.
+
+**Composition.** `11` strata — one thick resistant sandstone bed over a weaker base → an
+**orthogonal joint fabric** (`02` jointing, two azimuth sets ~90° apart) as the process mask →
+fluvial + frost erosion **gated to the joint corridors** (`04` + `05`, the process-mask pattern
+from `SKILL.md`) widens the corridors downward → basal sapping in the weak underlayer + rockfall
+(`05` mass wasting) keeps walls vertical and fells whole pillars (fresh scars, talus aprons) →
+pillar tops keep soil and trees (`07`/`13` — the perched-ecosystem look). Meteora is the same
+geometry from massive conglomerate, carved by a river system rather than a joint grid.
+
+**The tells.** Pillar cross-sections quadrangular and *aligned* — plan-view edges follow the two
+joint azimuths; tops accordant (one former surface); walls sheer with horizontal bedding visible;
+slot corridors between pillars, floored with talus; trees on top of bare-walled pillars; fog
+between pillars is the postcard, but the geometry is the tell.
+
+**Watch for.** Building it as tower karst (14) — fenglin towers rise *rounded* from a dissolved
+plain at base level; Zhangjiajie pillars are *rectangular*, joint-aligned, and stand in deep
+dendritic ravines with no common basal plain. And random pillar placement — the joint grid is the
+generator; pillars without a shared fabric read as noise columns. Overhangs and felled-pillar
+arches need `11`'s non-heightfield stack.
+
+**Verify.** Plan-view pillar edges cluster on two azimuths (the joint sets); summit heights
+accordant with the remnant plateau; wall verticality maintained by an active rockfall/talus
+budget (`09` mass check: wall retreat ↔ talus volume); no dissolution features (contrast 14).
+
+**Tier.** L — `11` resistant strata + `02` orthogonal jointing (process mask) + `04`/`05`
+joint-gated incision & rockfall + `07`/`13` perched ecosystem. No canonical paper — the
+composition is the answer.
+
+## Group K — Off-Earth
 
 *The skill's off-Earth doctrine (`SKILL.md`) as worked assemblies. Two knobs reset the whole graph:
 **is there liquid water**, and **what is the gravity**. No water switches the fluvial backbone
@@ -737,7 +819,7 @@ unifying reading — **crater density is a clock**: a saturated surface is ancie
 young, a crater-free one actively resurfaced. Per-crater morphology lives in `11`; these entries
 build whole *surfaces*.*
 
-### 23. Cratered highlands — lunar-type
+### 25. Cratered highlands — lunar-type
 *The Moon's highlands · Mercury · Callisto · any ancient airless surface*
 
 **Claim.** The "Moon with different-sized craters." A surface with no water and no atmosphere
@@ -781,7 +863,7 @@ accumulation; regolith thickest on the oldest terrain.
 **Tier.** L — `11` per-crater morphology (Melosh/Pike, P) + F-tier SFD stamping & superposition +
 `05` diffusion-as-gardening (Culling) + repose-angle invariant (`SKILL`).
 
-### 24. Volcanic plains — lunar maria-type
+### 26. Volcanic plains — lunar maria-type
 *Lunar maria · Mercury's smooth plains · flood-basalt analogues off-Earth*
 
 **Claim.** Vast dark low-lying **flood-basalt plains** that flooded and buried the older cratered
@@ -789,7 +871,7 @@ basins — so they are *younger* and carry **far fewer craters**, plus wrinkle r
 mare/highland split is the Moon's fundamental dichotomy, and it is a **crater-density (age)**
 contrast, not merely an albedo one.
 
-**Diff from entry 23.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
+**Diff from entry 25.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
 `11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 17) → **reset the crater clock**:
 the mare surface starts nearly crater-free and accumulates only the later, sparser population (same
 SFD, far fewer stamps). Add **wrinkle ridges** (compressional buckles — low sinuous ridges, F) and
@@ -807,10 +889,10 @@ on a world with no water.
 check); ghost craters where basalt is thin; ridges compressional, rilles volcanic/tectonic; plains
 flat and low.
 
-**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 23) + wrinkle
+**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 25) + wrinkle
 ridges / rilles (F/`19`/`02`).
 
-### 25. The blended relict world — Mars-type
+### 27. The blended relict world — Mars-type
 *Mars · ancient-wet worlds generally*
 
 **Claim.** The doctrine's hard case (`SKILL`): a world that *had* water and lost it. Ancient
@@ -827,7 +909,7 @@ Earth-style drainage beneath a live desert-and-cratering surface.
   huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
 - **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
   scaling (bigger dunes, transverse aeolian ridges, dust); mantling and exhumation.
-- **Impact overprint:** a crater population (entry 23) with the transition diameter scaled to Mars'
+- **Impact overprint:** a crater population (entry 25) with the transition diameter scaled to Mars'
   `g ≈ 0.38` → **bigger** craters (`11`).
 - **Polar layered deposits:** ice + dust layering at the poles, paced by *orbital* (obliquity)
   cycles — climate strata, not seasonal snow (F).
@@ -896,7 +978,7 @@ entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) 
 a Saharan oasis (12) is 9's wind machinery run as *source*: a deflation basin floored at the water
 table, its exported sand banked downwind as the dunes. The rule is `13`'s: read the two
 archetypes, run **one substrate and one hydrology**, and let the regimes overprint in Legal Order —
-never blend two finished terrains. Off-world the same rule holds in *time*: Mars (25) is five
+never blend two finished terrains. Off-world the same rule holds in *time*: Mars (27) is five
 archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,
 then craters — each overprinting the last on one shared surface, which is why the relative-age order
 is the thing to get right.
@@ -927,6 +1009,11 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   9) for the dune seas + a **chott / sabkha salt flat** (entry 22) for the homestead pan + a **wadi /
   slot canyon** (`16`, Further archetypes) for the canyon chase. Three archetypes already in this
   file, one substrate, one (dry) hydrology — exactly the combining rule.
+
+- **Pandora's Hallelujah Mountains** *(not filmed but modelled — on Zhangjiajie's pillar forest)* —
+  the CG case proves the same rule: the designers reached for entry 24's joint-gated pillars, then
+  applied exactly one impossible edit (cut the pillars free and float them). The terrain is Earth;
+  the fiction is one constraint deleted.
 
 **The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
 read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;
