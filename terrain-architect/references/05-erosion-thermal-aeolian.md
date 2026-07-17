@@ -12,25 +12,25 @@ way to make hydraulic erosion output look right.
 
 ```
 thermalStep(h, talusAngle, c):
-    talus = tan(talusAngle) * cellSize          # ← max legal height difference between neighbours
     Δ = zeros_like(h)                            # double-buffer: accumulate, then apply
 
     for each cell i:
-        dMax = 0;  dTotal = 0;  steep = []
+        maxExcess = 0;  dTotal = 0;  steep = []
         for n in 8 neighbours:
             d = h[i] - h[n]
             dist = (n is diagonal) ? cellSize * SQRT2 : cellSize
             dLimit = tan(talusAngle) * dist      # per-neighbour, distance-correct
             if d > dLimit:
-                steep.append((n, d))
+                steep.append((n, d, dLimit))
                 dTotal += d
-                dMax = max(dMax, d)
+                maxExcess = max(maxExcess, d - dLimit)   # excess over that neighbour's OWN limit
 
         if dTotal == 0: continue
-        moved = c * (dMax - talus) / 2           # c ≈ 0.5; the /2 keeps it stable
-        Δ[i] -= moved
-        for (n, d) in steep:
-            Δ[n] += moved * (d / dTotal)         # distribute proportionally to excess
+        moved = c * maxExcess / 2                # c ≈ 0.5; the /2 keeps the steepest pair stable
+        for (n, d, dLimit) in steep:
+            give = min(moved * d / dTotal, (d - dLimit) / 2)   # per-pair clamp — see below
+            Δ[i] -= give
+            Δ[n] += give
 
     h += Δ
 ```
@@ -43,8 +43,19 @@ thermalStep(h, talusAngle, c):
   neighbour.
 - **Double-buffer.** In-place updates make the result order-dependent. This is the classic
   source of "my thermal erosion looks different when I enable multithreading".
-- **`moved = c·(dMax − talus)/2`.** The `/2` is a stability factor — without it, moving the
-  full excess overshoots and the surface oscillates. `c ∈ [0.3, 0.7]`.
+- **`moved = c·maxExcess/2`, and the excess must be measured against the *right* limit.** The
+  `/2` is a stability factor — without it, moving the full excess overshoots and the surface
+  oscillates. `c ∈ [0.3, 0.7]`. And the excess is `d − dLimit` for that neighbour, not
+  `d − talus` with a single cardinal limit: mixing a diagonal's `d` with the cardinal limit is
+  the same distance bug as above, hiding in the volume term.
+- **The per-pair clamp, or why `min(share, (d − dLimit)/2)` is there.** Sizing the total from
+  the single steepest neighbour and splitting it `d/dTotal` is an abstraction (Olsen 2004's
+  fast form), not physics — with several severely over-steepened neighbours the split can hand
+  one pair more than its own excess while starving another, which on rough meshes shows up as
+  micro-oscillation that never quite converges. Clamping each transfer to half *that pair's*
+  excess makes every pair individually non-inverting, so the step is stable regardless of how
+  many neighbours are steep — the convergence claim below then holds unconditionally. The cost
+  is one `min`.
 - **Iterations.** 20–100 passes, and it converges — running more does nothing once every
   slope is at or under repose. That convergence is a useful property: you can run it to a
   fixed point and the result is deterministic and resolution-independent.

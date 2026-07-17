@@ -200,9 +200,17 @@ mfd(dem, c, p = 1.1):
 convergence: `p → 0` spreads flow evenly regardless of slope (pure dispersion), `p → ∞`
 converges to D8. Freeman fitted 1.1 against measured hillslope hydrology.
 
-Quinn et al. (1991) is the sibling variant with `p = 1` plus contour-length weighting
-(cardinal neighbours weighted 0.5, diagonals 0.354) — slightly better on hillslopes, and
-worth knowing the two are usually cited interchangeably but are not the same.
+Quinn et al. (1991) is the sibling variant with `p = 1` plus contour-length weighting —
+slightly better on hillslopes, and worth knowing the two are usually cited interchangeably but
+are not the same. To turn the code above into Quinn, *two* changes, not one:
+
+```
+w[i] = L * s                                  // p = 1  AND  the contour length multiplies in:
+L    = (n is diagonal) ? 0.354 * cellSize : 0.5 * cellSize
+```
+
+Setting `p = 1` alone is neither Freeman nor Quinn: the contour length `L` is a *factor in the
+weight*, not a substitute for the exponent, and without it diagonals are over-weighted by ~40%.
 
 **MFD's weakness** is the mirror of D8's: it never lets flow fully converge, so channels stay
 diffuse and rivers look like broad damp smears rather than lines. The standard fix is a
