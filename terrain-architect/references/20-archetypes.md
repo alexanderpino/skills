@@ -1009,8 +1009,8 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   giant-conifer **ecosystem** (`13` competition sim, `07` Deussen scatter) — the *biome* is the
   subject, the height almost incidental. Like the rainbow-strata note, this one lives in the
   material and foliage layers, not the heightfield.
-- **Tatooine** *(filmed in Tunisia — Chott el Djerid, the Nefta/Tozeur dunes, the Sidi Bouhlel gorge
-  — plus Death Valley in 1977)* — a **desert composite**, and a worked "combine": an **erg** (entry
+- **Tatooine** *(filmed in Tunisia — Chott el Djerid, the Nefta/Tozeur dunes, and Maguer Gorge at
+  Sidi Bouhlel — plus Death Valley in 1977)* — a **desert composite**, and a worked "combine": an **erg** (entry
   9) for the dune seas + a **chott / sabkha salt flat** (entry 22) for the homestead pan + a **wadi /
   slot canyon** (`16`, Further archetypes) for the canyon chase. Three archetypes already in this
   file, one substrate, one (dry) hydrology — exactly the combining rule.
@@ -1028,9 +1028,13 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   building Skull Island must still run **one substrate and one hydrology** under both looks — karst
   lithology on the coast, basalt shield inland — or the seam will show exactly where the film hides
   its cut. The monsters are scatter.
-- **Beggar's Canyon, Tatooine** *(the womp-rat run and podrace gorges; on screen the canyon
-  material is the Sidi Bouhlel gorge, Tunisia, with Death Valley plates — the podrace canyons are
-  digital, built from the American-Southwest canyon vocabulary)* — the fictional case of entry 27's
+- **Beggar's Canyon, Tatooine** *(the womp-rat run and podrace gorges; the canyon on screen is
+  **Maguer Gorge** at Jebel Sidi Bouhlel near Tozeur — "Star Wars Canyon", a Campanian-age layered
+  gorge that played THREE Tatooine places: the Jundland Wastes in Episode IV, the podrace's Canyon
+  Dune Turn in Episode I, and Sluuce Canyon — plus the ark ambush in Raiders; the wider podrace
+  canyons are digital, from the American-Southwest vocabulary, with Death Valley plates in 1977)* —
+  one real gorge serving three fictional locales is the screen-worlds thesis in a single site: the
+  archetype is constant, only the dressing changes. And it is the fictional case of entry 27's
   **relict-fluvial rule**: a deep dendritic canyon system on a waterless world *is a fossil* — it
   claims a wet past, exactly like a Martian valley network. Compose it dry: an entrenched-meander
   gorge (entry 13, goosenecks for a racing line) + slot narrows (Further archetypes, `16` wadi) +
