@@ -148,6 +148,8 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Tower / cone karst (fenglin, fengcong) | Dissolution + differential vertical lowering to a base level (`11`) |
 | Lava fields, lava lakes, lava worlds (Mustafar) | Stacked levéed flows; ponded fluid lava in closed basins; fluid layer = lava (`08`, `11`, `13`) |
 | Agricultural terraces (rice paddy, dry-stone) — *anthropogenic* | Contour level-sets + cut-and-fill benches + per-bench water layer; the file's first human-made landform, blueprint in `20` |
+| Field-mosaic farmland (large grids, small bocage) — *anthropogenic* | Pattern+material overprint on gentle terrain; lithology→soil→land use (terroir: vines on limestone vs sandstone); blueprint in `20` |
+| Miniature-scale world (insect / Smurf / Bikini Bottom) | Scale regime, not a landform: surface tension > gravity, grains as boulders, biology as relief, rain-splash micro-erosion; blueprint in `20` |
 | Fissure eruptions, flood basalts (traps) | Line-source flows along a rift/fault (`02`) + stacking → basalt plateau; dissection → stepped traps (`11`) |
 | Geothermal field (geysers, sinter, hot springs) | Fracture-gated vents + sinter/travertine *deposition* + temperature-zoned microbial palette — blueprint in `20` |
 | Sandstone pillar forest (Zhangjiajie, Meteora) | Resistant strata + orthogonal joints as process mask + joint-gated incision — *not* karst; blueprint in `20` |

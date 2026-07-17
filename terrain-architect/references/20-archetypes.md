@@ -890,6 +890,66 @@ per-bench water layer + a cut-and-fill `flatten` (`10`). No paper — a construc
 terraces (`12`), travertine rimstone (entry 22). Those are cut or built *by a process*; these are
 cut *by people to a plan*.
 
+### 26. Field-mosaic farmland — large & small
+*Large: the US Township-and-Range grid · High Plains center-pivot circles · the Canadian Prairies ·
+Dutch polder fields. Small: English & Norman bocage · Cotswold strip fields · the vineyard mosaics
+of Burgundy & the Mosel*
+
+**Claim.** Cultivated *gentle* ground — what terraces (entry 25) are to slopes, field mosaics are to
+plains. Farmland barely rewrites height; like Endor and the rainbow-strata note it is mostly a
+**pattern-and-materials** story (fields, boundaries, crops, soil colour) over subtle natural relief —
+but not *zero* height: hedge banks, terrace **lynchets**, ridge-and-furrow corrugation, drainage
+ditches and land-grading are real micro-relief. Two scales, and the scale *is* a tell: **large**
+fields are a geometry imposed *on* the land; **small** fields are a patchwork read *off* it.
+
+**Composition.**
+- **The base is gentle natural terrain** — a till plain, loess, a river terrace, a low plateau, a
+  floodplain (`03`, `13`). Farmland makes no relief; it *dresses* whatever soft relief the natural
+  pipeline left, so run the natural graph first and overprint.
+- **Large / industrial — geometry over the land.** A survey grid (the Township-and-Range mile
+  checkerboard) or a machine constraint (the center-pivot **circle**) tiles the surface regardless
+  of its texture; drainage is engineered — the natural `03` network erased for straight tile-drains
+  and ditches — and the land is often graded *flatter* to serve it. Reads as: large, rectilinear or
+  circular, machine-scaled, indifferent to micro-terrain.
+- **Small / smallholder — pattern off the land.** Small irregular fields follow slope, soil and
+  water: contour strips, ridge-and-furrow, lynchets (soil crept downslope against a boundary over
+  centuries), bounded by **hedgerows / bocage / dry-stone walls**. The field pattern is an *analysis
+  mask made visible* — boundaries trace the terrain's own breaks (slope, wetness, lithology), so the
+  mosaic is fine-grained and keyed to the ground.
+- **Lithology is the hidden author — "terroir".** The rock under the soil sets **soil + drainage +
+  relief**, which sets land use, which sets the pattern (`11` → `18` soil → `03` drainage → `13`
+  land-use mask). **Limestone / chalk** (Burgundy's Côte d'Or, Champagne, the Cotswolds): well-
+  drained, alkaline, thin soils, rounded relief with **dry valleys** (karst — surface water vanishes,
+  so fields and villages cluster at springs and scarp-foot lines); the classic **vineyard /
+  sheep-pasture** signature, walls and houses the same pale stone. **Sandstone** has two faces: a
+  *hard* sandstone caps scarps and carries acid, sandy, infertile soil → heath, forest, rough grazing
+  (thin, wooded pattern); a *soft* sandstone weathers to a warm arable loam → mixed farming. So
+  "vineyard on limestone vs sandstone" is a real fork — the vine reads the drainage and warmth of its
+  bedrock, and the field pattern, wall stone and crop change with the rock beneath.
+
+**The tells.** Large: a grid or a field of circles, edges ignoring the land's grain, ruler-straight
+ditches. Small: an irregular quilt whose seams follow contours, streams and soil lines, hedged or
+walled, with lynchet steps and ridge-and-furrow. Across both: boundary, wall and building **stone
+matches the local rock**, and a lithology contact often shows as a **land-use line** — vines or
+pasture on the limestone, woodland on the sandstone — with no change in height, only in what grows.
+
+**Watch for.** Painting farmland as *height* — it is ~90% a **materials/pattern overprint** (`06`
+masks + `08` splat/satmap), not a heightfield edit; carve real relief for it and it reads wrong.
+The two inverted tells: large-field geometry that *bends to follow* the terrain (it shouldn't — the
+grid ignores the land), and small-field patchwork that is *regular* (it shouldn't — it follows the
+land). And the terroir line is a land-use/material boundary on a **lithology mask** (`11`), not a
+cliff.
+
+**Verify.** Field pattern is a mask overprint with near-zero height change (only lynchets /
+ridge-furrow / ditches perturb relief); large fields tile *independent* of terrain grain, small
+fields *correlate* with slope/wetness/soil; land-use boundaries coincide with lithology/soil
+contacts (`11`, `18`), not with elevation; wall and building material tracks the local rock.
+
+**Tier.** L — gentle natural base (`03`, `13`) + `06`/`08` pattern-and-material overprint +
+`11`→`18`→`03` lithology-driven land use (terroir) + micro-relief (lynchets, ridge-and-furrow,
+ditches, `10`). The cultivated-*plain* sibling of entry 25's terraces: terraces re-cut *slopes*,
+field mosaics dress *gentle ground*; both are human masks over a natural substrate.
+
 ## Group L — Off-Earth
 
 *The skill's off-Earth doctrine (`SKILL.md`) as worked assemblies. Two knobs reset the whole graph:
@@ -899,7 +959,7 @@ unifying reading — **crater density is a clock**: a saturated surface is ancie
 young, a crater-free one actively resurfaced. Per-crater morphology lives in `11`; these entries
 build whole *surfaces*.*
 
-### 26. Cratered highlands — lunar-type
+### 27. Cratered highlands — lunar-type
 *The Moon's highlands · Mercury · Callisto · any ancient airless surface*
 
 **Claim.** The "Moon with different-sized craters." A surface with no water and no atmosphere
@@ -943,7 +1003,7 @@ accumulation; regolith thickest on the oldest terrain.
 **Tier.** L — `11` per-crater morphology (Melosh/Pike, P) + F-tier SFD stamping & superposition +
 `05` diffusion-as-gardening (Culling) + repose-angle invariant (`SKILL`).
 
-### 27. Volcanic plains — lunar maria-type
+### 28. Volcanic plains — lunar maria-type
 *Lunar maria · Mercury's smooth plains · flood-basalt analogues off-Earth*
 
 **Claim.** Vast dark low-lying **flood-basalt plains** that flooded and buried the older cratered
@@ -951,7 +1011,7 @@ basins — so they are *younger* and carry **far fewer craters**, plus wrinkle r
 mare/highland split is the Moon's fundamental dichotomy, and it is a **crater-density (age)**
 contrast, not merely an albedo one.
 
-**Diff from entry 26.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
+**Diff from entry 27.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
 `11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 17) → **reset the crater clock**:
 the mare surface starts nearly crater-free and accumulates only the later, sparser population (same
 SFD, far fewer stamps). Add **wrinkle ridges** (compressional buckles — low sinuous ridges, F) and
@@ -969,10 +1029,10 @@ on a world with no water.
 check); ghost craters where basalt is thin; ridges compressional, rilles volcanic/tectonic; plains
 flat and low.
 
-**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 26) + wrinkle
+**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 27) + wrinkle
 ridges / rilles (F/`19`/`02`).
 
-### 28. The blended relict world — Mars-type
+### 29. The blended relict world — Mars-type
 *Mars · ancient-wet worlds generally*
 
 **Claim.** The doctrine's hard case (`SKILL`): a world that *had* water and lost it. Ancient
@@ -989,7 +1049,7 @@ Earth-style drainage beneath a live desert-and-cratering surface.
   huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
 - **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
   scaling (bigger dunes, transverse aeolian ridges, dust); mantling and exhumation.
-- **Impact overprint:** a crater population (entry 26) with the transition diameter scaled to Mars'
+- **Impact overprint:** a crater population (entry 27) with the transition diameter scaled to Mars'
   `g ≈ 0.38` → **bigger** craters (`11`).
 - **Polar layered deposits:** ice + dust layering at the poles, paced by *orbital* (obliquity)
   cycles — climate strata, not seasonal snow (F).
@@ -1068,7 +1128,7 @@ entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) 
 a Saharan oasis (12) is 9's wind machinery run as *source*: a deflation basin floored at the water
 table, its exported sand banked downwind as the dunes. The rule is Chapter 13's: read the two
 archetypes, run **one substrate and one hydrology**, and let the regimes overprint in Legal Order —
-never blend two finished terrains. Off-world the same rule holds in *time*: Mars (28) is five
+never blend two finished terrains. Off-world the same rule holds in *time*: Mars (29) is five
 archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,
 then craters — each overprinting the last on one shared surface, which is why the relative-age order
 is the thing to get right.
@@ -1119,12 +1179,12 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   Dune Turn in Episode I, and Sluuce Canyon — plus the ark ambush in Raiders; the wider podrace
   canyons are digital, from the American-Southwest vocabulary, with Death Valley plates in 1977)* —
   one real gorge serving three fictional locales is the screen-worlds thesis in a single site: the
-  archetype is constant, only the dressing changes. And it is the fictional case of entry 28's
+  archetype is constant, only the dressing changes. And it is the fictional case of entry 29's
   **relict-fluvial rule**: a deep dendritic canyon system on a waterless world *is a fossil* — it
   claims a wet past, exactly like a Martian valley network. Compose it dry: an entrenched-meander
   gorge (entry 13, goosenecks for a racing line) + slot narrows (Further archetypes, `16` wadi) +
   caprock steps and dry falls — relict knickpoints (entry 4) with no plunge pool — then **switch
-  the water off** and overprint with aeolian sand and rockfall (`05`, `16`, entry 28's relative-age
+  the water off** and overprint with aeolian sand and rockfall (`05`, `16`, entry 29's relative-age
   order). A canyon carved by *nothing* is the tell that breaks the fiction; a canyon carved by
   vanished water is Mars, and reads true.
 
@@ -1135,7 +1195,7 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   (chott + gorge + dunes), chosen again fifty years later because the *processes* read instantly:
   rock country means shelter, sand sea means exposure. The worm's wake is set dressing on entry 9's
   dunes; Wadi Rum has also played Mars itself (The Martian) — the red jebel desert *is* the
-  relict-fluvial look of entry 28 to a camera.
+  relict-fluvial look of entry 29 to a camera.
 - **Crait** *(The Last Jedi, filmed at Salar de Uyuni, Bolivia)* — the rare case where the film's
   conceit **is the material stack**: entry 22's evaporite playa — a white salt crust (`18`) over
   red substrate — and every shot of a speeder skid scraping white to reveal red is the layer
@@ -1162,3 +1222,50 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
 **The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
 read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;
 they change the palette and the scatter.
+
+## Worlds at another scale — the miniature POV
+
+*A world seen by an insect, a Smurf, or from SpongeBob's Bikini Bottom. This is the sibling of the
+off-Earth group: not a new landform but a **regime knob turned**, and the knob is **scale**. It is
+the cell-size doctrine (`SKILL.md`, "derive the cell size") and "detail is recursive — but only
+where the process is scale-free" taken to their limit — because at `cellSize` of millimetres,
+**different physics dominates**, and the heightfield's assumptions quietly break.*
+
+**Why it isn't just "zoom in".** Shrinking a mountain gives a *toy*, not a bug's world, because the
+mountain's processes are **scale-bound** (`SKILL.md`): fluvial incision, tectonics and glaciers
+carry real length scales and don't recur at millimetre size. Run the *small-scale* processes
+instead and the world reads true:
+
+- **Surface tension beats gravity.** At mm scale the dominant fluid force flips — a dewdrop is not a
+  puddle but a **bulging lens with a curved meniscus** that beads and rolls; water climbs by
+  capillarity; a "lake" has a skin an insect walks on. Model water as a **cohesive, meniscus-bounded
+  blob**, not the thin flat sheet of `08`. (The same "which force wins" regime-swap as off-Earth
+  gravity — here it's surface tension vs gravity, not g vs water.)
+- **The continuum breaks — grains are boulders.** Sand stops being a smooth `05` field and becomes
+  **individual clasts** the size of the viewer; "soil" is a jumble of pebble-boulders with caves
+  between them. This is `07` scatter and the `11` material-stack (voids, overhangs everywhere)
+  *replacing* the heightfield — a bug's ground is more cave than surface.
+- **Biology is the macro-structure.** With no tectonics at this scale, the "mountains" are
+  **organisms**: moss is a forest canopy, a leaf is a plain, bark is a canyon system, a root is a
+  buttress, a mushroom is a tower (the Smurf case exactly — a village at fungal scale, forest-floor
+  as terrain). Build the relief from an ecosystem (`13`, `07`), not from `02`/`04`.
+- **Micro-erosion is a real process, and it's fast.** Rain-splash cratering (each drop an impact,
+  `11` at mm scale), rill initiation on a mud bank, mud-crack polygons on a drying puddle
+  (desiccation, the material sibling of `05` thermal), dew and frost heave. These *are* the bug's
+  geomorphology — and they run in minutes, not millennia.
+
+**The stylised cases fold in as before (a real regime + one edit).**
+- **Bikini Bottom (SpongeBob)** — a **benthic / seafloor** world at human-town scale: subaqueous
+  sand **ripples** (`05`'s dune machinery, run under water — the current is the wind), a coral bed
+  (`12` reef, entry 20), kelp as forest (`13`/`07`), everything under a permanent water column with
+  no free surface to walk on (`08` water as the medium, not a layer). The edit is the cartoon flatten
+  plus a town; the substrate is a real reef-and-ripple seafloor.
+- **A Smurf village / A Bug's Life / Honey-I-Shrunk-the-Kids** — the insect-POV regime above,
+  art-directed: run moss-forest, grain-boulders, meniscus-water and rain-splash micro-erosion, then
+  stylise. The convincing ones (Pixar's *A Bug's Life*, *Arrietty*) get the **physics** right — dew
+  beads, translucency, grain scale — before the styling; the toy ones just shrink props.
+
+**The through-line, restated for scale:** *pick the process from the scale, not from habit* — the
+sibling of the off-Earth rule "pick the dominant agent from the world". A believable tiny world is
+run with surface tension, granular mechanics, and biology-as-relief; a mountain shrunk to a
+thumbnail is the tell that someone confused *zoom* with *regime*.
