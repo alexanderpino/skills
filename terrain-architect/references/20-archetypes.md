@@ -49,7 +49,10 @@ uplift field (02) → base + detail noise (01) → depression fill (03) → flow
 
 The non-mountain archetypes (waterfalls, deserts, karst, coasts, reefs, salt flats) don't diff
 from a range — they **switch the dominant agent** (aeolian, dissolution, wave, deposition) while
-the order and the invariants hold. Same machine, different weights.
+the order and the invariants hold. Same machine, different weights. And the **off-Earth**
+archetypes (Group J) change the *regime itself*: no liquid water switches the fluvial backbone
+(`03`/`04`) **off** and lets impact cratering dominate, and gravity rescales craters and dunes —
+the planetary doctrine in `SKILL.md`, built out.
 
 ---
 
@@ -635,6 +638,143 @@ deposition CA + `03` source (travertine).
 
 ---
 
+## Group J — Off-Earth
+
+*The skill's off-Earth doctrine (`SKILL.md`) as worked assemblies. Two knobs reset the whole graph:
+**is there liquid water**, and **what is the gravity**. No water switches the fluvial backbone
+(`03`/`04`) OFF and lets **impact cratering** dominate; gravity rescales craters and dunes. The
+unifying reading — **crater density is a clock**: a saturated surface is ancient, a sparse one
+young, a crater-free one actively resurfaced. Per-crater morphology lives in `11`; these entries
+build whole *surfaces*.*
+
+### 21. Cratered highlands — lunar-type
+*The Moon's highlands · Mercury · Callisto · any ancient airless surface*
+
+**Claim.** The "Moon with different-sized craters." A surface with no water and no atmosphere
+records **every impact it ever received**: craters of all sizes superimposed, older ones softened
+and buried by younger ones and by micrometeorite gardening, until it reaches **saturation** — new
+craters erase old ones as fast as they arrive. The size mix is not random; it is a **production
+function**.
+
+**Composition — this *replaces* the erosion backbone, it doesn't sit after it.**
+- **Sample crater diameters from a size-frequency distribution:** `N(>D) ∝ D^(−b)`, a power law —
+  many small, few large. (The planetary "production function"; the standard references are the
+  Neukum and Hartmann–Neukum chronology functions — **verify before citing formally**. The graphics
+  stamping is F.)
+- **Stamp each crater with `11`'s size-dependent morphology:** bowl → central peak + terraces →
+  peak-ring / multi-ring basin as `D` grows, the transition scaling **~1/g** (Melosh 1989, Pike
+  1977, `11`). Each stamp is subtract-bowl + raise-rim + drape-ejecta (`11`), plus secondary chains
+  and **rays** (`07` scatter + high-albedo streaks — rays are a *material*, not a height, feature).
+- **Superpose in time order:** later craters cut earlier ones; accumulate many to saturate. Basins
+  first (they set the macro), small craters last (the fine texture).
+- **Degrade by gardening, which *is* diffusion:** micrometeorite churn softens relief exactly like
+  hillslope creep — the same `D·∇²h` (`05`, Culling 1960) but driven by impacts, not water. Old
+  craters go soft and rimless, fresh ones stay crisp. This also builds the **regolith**: an
+  impact-comminuted cover (contrast `11`'s Heimsath *chemical* soil production) thickening with
+  surface-exposure age.
+- **Dry mass wasting only:** talus at the repose angle, which is **~gravity-independent** (`SKILL`
+  doctrine — ~34° on the Moon too). No fluvial, no glacial, no coastal.
+
+**The tells.** A power-law size mix (the eye reads "mostly small with a few big ones," not one
+size); craters-on-craters with a clear *relative age* (crisp overlapping soft); ejecta blankets,
+secondary chains and bright rays from the fresh ones; basins with peak rings; a soft,
+regolith-mantled inter-crater surface; **no drainage network anywhere**.
+
+**Watch for.** Craters as a Poisson scatter of one size — the SFD (many small, few large) *is* the
+look, and superposition + degradation are the age story. And a fluvial pass sneaking in: on an
+airless world, Legal Order steps 4–9 are OFF; cratering + gardening are the whole "erosion."
+
+**Verify.** Crater size-frequency plots as a power law; overlapping craters show consistent
+relative-age softening; morphology matches size (bowl/peak/ring at the right `D`, `11`); zero flow
+accumulation; regolith thickest on the oldest terrain.
+
+**Tier.** L — `11` per-crater morphology (Melosh/Pike, P) + F-tier SFD stamping & superposition +
+`05` diffusion-as-gardening (Culling) + repose-angle invariant (`SKILL`).
+
+### 22. Volcanic plains — lunar maria-type
+*Lunar maria · Mercury's smooth plains · flood-basalt analogues off-Earth*
+
+**Claim.** Vast dark low-lying **flood-basalt plains** that flooded and buried the older cratered
+basins — so they are *younger* and carry **far fewer craters**, plus wrinkle ridges and rilles. The
+mare/highland split is the Moon's fundamental dichotomy, and it is a **crater-density (age)**
+contrast, not merely an albedo one.
+
+**Diff from entry 21.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
+`11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 15) → **reset the crater clock**:
+the mare surface starts nearly crater-free and accumulates only the later, sparser population (same
+SFD, far fewer stamps). Add **wrinkle ridges** (compressional buckles — low sinuous ridges, F) and
+**rilles** (sinuous = collapsed lava tubes/channels, `19`; straight = graben, `02`).
+
+**The tells.** Smooth dark plains embaying and drowning the cratered highlands (partly-buried
+"ghost craters" show through); a sharp crater-density drop at the highland/mare contact; wrinkle
+ridges snaking across the plain; sinuous rilles; a flat low datum.
+
+**Watch for.** Giving the maria the *same* crater density as the highlands — the whole point is the
+age contrast. And treating rilles as rivers — they are lava channels/tubes or graben (`19`/`02`),
+on a world with no water.
+
+**Verify.** Mare crater density markedly lower than adjacent highlands (the age contrast is the
+check); ghost craters where basalt is thin; ridges compressional, rilles volcanic/tectonic; plains
+flat and low.
+
+**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 21) + wrinkle
+ridges / rilles (F/`19`/`02`).
+
+### 23. The blended relict world — Mars-type
+*Mars · ancient-wet worlds generally*
+
+**Claim.** The doctrine's hard case (`SKILL`): a world that *had* water and lost it. Ancient
+**fluvial relics** — valley networks, outflow channels, deltas (Jezero) — sit **under a dominant
+aeolian-and-impact overprint**, and low gravity makes everything bigger. You are layering a dead
+Earth-style drainage beneath a live desert-and-cratering surface.
+
+**Composition — a layered history, oldest to youngest.**
+- **Old fluvial substrate, now relict:** run a *muted* `03`/`04` pass to carve valley networks and a
+  delta or two, then **stop it** — the water is gone; these are eroded remnants, not active
+  channels. Outflow channels / chaos = ancient catastrophic floods (`03` at extreme discharge, F).
+- **Tectonic-volcanic macro:** **Valles Marineris** is a *rift graben* (extension over Tharsis),
+  **not** a fluvial canyon (`02`); **Olympus Mons** is a shield edifice (`11`, Pike & Clow) grown
+  huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
+- **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
+  scaling (bigger dunes, TARs, dust); mantling and exhumation.
+- **Impact overprint:** a crater population (entry 21) with the transition diameter scaled to Mars'
+  `g ≈ 0.38` → **bigger** craters (`11`).
+- **Polar layered deposits:** ice + dust seasonal layering at the poles (F).
+
+**Regime knobs.** `g ≈ 0.38` → bigger craters, taller volcanoes, bigger/taller dunes; thin dry
+atmosphere → aeolian **active**, fluvial **ancient only**. Set both and the same nodes produce Mars
+instead of Earth.
+
+**The tells.** Dendritic valley networks that are *degraded and dry*, not flowing; a delta debouching
+into an empty crater (Jezero); a continent-long rift canyon (Valles Marineris) unrelated to the
+drainage; an improbably broad, low-sloped giant volcano; dunes and dust mantling everything; big
+craters.
+
+**Watch for.** Making the valleys *active* rivers — they are relics; the live agents are wind +
+impact (pick the dominant agent from the world, not habit — `SKILL`). And modelling Valles Marineris
+as a river-cut canyon — it is tectonic.
+
+**Verify.** Fluvial features present but degraded/dry (no current flow accumulation to a sea); dunes
+and craters overprint the valleys (correct relative age); crater/dune sizes reflect Mars gravity
+(`11`, Kok 2012); the giant shield's flank slope still matches its type despite the size.
+
+**Tier.** L — muted `03`/`04` relict fluvial + `02` rift + `11` scaled edifice & craters + `05` /
+Kok aeolian + polar layers (F). The `SKILL` doctrine paragraph, built.
+
+**Other worlds (compact).** Same discipline, exotic regimes:
+
+- **Titan — fluvial, but not water.** The one other body with an *active* fluvial cycle: **methane**
+  rain carves dendritic networks and fills polar seas. Run `03`/`04` with a different fluid, add
+  equatorial **organic-sand** dunes (Werner + Kok 2012 — dense atmosphere + low `g` → long
+  longitudinal dunes) and hydrocarbon lakes as closed basins (`03`). Dominant agent = fluvial again
+  — the lesson that "fluvial" is about a *liquid*, not about water.
+- **Europa — a young ice shell, almost no craters.** Tidal resurfacing keeps it crater-*poor*, so by
+  the crater-clock it is **young**: chaos terrain, double ridges and banded lineae, not erosional
+  relief. Cryotectonic / cryovolcanic — the inverse of the lunar highlands.
+- **Io — resurfaced so fast there are *zero* impact craters.** Relentless tidal volcanism erases
+  them: paterae (volcanic depressions), extensive lava flows and fields (`19`), and tall *tectonic*
+  mountains. The volcanic extreme of the crater-clock (density ≈ 0 → age ≈ now).
+
 ## Further archetypes (compact)
 
 Same discipline, briefer — each still a composition, not an algorithm:
@@ -663,4 +803,7 @@ Most real wonders are *two* of these overprinted: a fjord is a glaciated orogen 
 Ha Long Bay is tower karst (12) drowned like a fjord; Kilimanjaro is a stratovolcano (13) wearing
 entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) in its side-streams.
 The rule is `13`'s: read the two archetypes, run **one substrate and one hydrology**, and let the
-regimes overprint in Legal Order — never blend two finished terrains.
+regimes overprint in Legal Order — never blend two finished terrains. Off-world the same rule
+holds in *time*: Mars (23) is five archetypes layered oldest-to-youngest — relict fluvial, then
+rift, then giant shield, then dunes, then craters — each overprinting the last on one shared
+surface, which is why the relative-age order is the thing to get right.

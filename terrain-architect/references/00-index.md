@@ -307,7 +307,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
-| Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — see the `SKILL.md` doctrine (`11`, `16`) |
+| Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — `SKILL.md` doctrine (`11`, `16`); worked blueprints (lunar highlands & maria, Mars, Titan/Europa/Io) in `20` Group J |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
 | Wetlands (swamp, marsh, bog) | L | High TWI + flat + impermeable substrate → mask + peat/mud + thin water layer (`13`, `18`) |
 | Fire spread (slope- and wind-driven front) | P | Rothermel 1972, USDA Forest Service Res. Pap. INT-115 (`13`) |
