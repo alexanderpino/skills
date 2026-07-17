@@ -27,8 +27,16 @@ gradient(h, i, j):
     return (dzdx, dzdy)
 
 slope  = sqrt(dzdx² + dzdy²)                 # tan(angle) — rise over run
-aspect = atan2(dzdy, dzdx)                   # radians; compass-convert if the artist expects it
+aspect = atan2(-dzdy, -dzdx)                 # DOWNSLOPE direction, radians; compass-convert for the artist
 ```
+
+**Aspect points downslope — mind the sign.** The raw gradient `atan2(dzdy, dzdx)` points
+*uphill*; "aspect" in GIS, geomorphology, and every consumer in this skill means the direction of
+steepest *descent* — the way the slope faces, the way water leaves. Hence the negations. Use the
+uphill form by accident and every orientation-driven mask flips 180°: snow accumulates on the
+sunny side, the rain shadow lands on the windward flank, and nothing looks wrong enough to catch
+by eye. With this convention, `aspectVec(a) = (cos a, sin a)` is the facing direction and
+`dot(aspectVec, dir)` reads directly as "faces `dir`" (the selector below).
 
 **Keep slope as `tan`, not degrees.** Every comparison downstream (`slope > tan(35°)`) is
 then a cheap float compare, and it composes with the repose-angle table in `05` directly.
@@ -282,10 +290,12 @@ riverMask  = smoothstep(A_channel * 0.5, A_channel, A)           # A from 03, in
   you specified. Either build them as an explicit priority stack (snow beats rock beats
   grass — each subsequent mask multiplied by `(1 − Σ previous)`), or normalise explicitly and
   know that you did.
-- **Aspect matters and is cheap.** `northness = -cos(aspect)` in the northern hemisphere.
-  Snow lingers on north faces, vegetation differs between north and south slopes. One term,
-  large payoff, and it's the kind of thing that makes people say the terrain "feels real"
-  without knowing why.
+- **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)` — with the
+  downslope aspect above and `y` = north, that is `sin(aspect)`: +1 facing north, −1 facing
+  south. Snow lingers on north faces (northern hemisphere), vegetation differs between north
+  and south slopes. One term, large payoff, and it's the kind of thing that makes people say
+  the terrain "feels real" without knowing why. (This is where the uphill-aspect sign bug
+  bites: it silently negates `northness` and moves the snow to the sunny side.)
 - **Use `deposition`, not just slope, for sediment materials.** If your erosion model tracks
   where it deposited (all three in `04` can), that field is far better than any slope-based
   proxy — it puts sand where sand actually went.

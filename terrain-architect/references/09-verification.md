@@ -5,8 +5,8 @@ result that looks fine in a hillshade and is structurally broken. The whole poin
 is that a handful of cheap, quantitative checks catch things that no amount of looking will.
 
 Contents: [Validation suite](#validation-suite) · [The five checks](#the-five-checks) ·
-[Visual review modes](#visual-review-modes) · [Failure catalogue](#failure-catalogue) ·
-[Review checklist](#review-checklist)
+[Two province-scale curves](#two-province-scale-curves) · [Visual review modes](#visual-review-modes) ·
+[Failure catalogue](#failure-catalogue) · [Review checklist](#review-checklist)
 
 ## Validation suite
 
@@ -137,6 +137,38 @@ like noise zoomed out has no macro structure — it needs `02`.
 **The bilinear filter test:** zoom in until you can see individual cells. If you see the
 diamond-shaped bilinear interpolation pattern, your export resolution is below your detail
 frequency and you're storing noise you can't represent.
+
+## Two province-scale curves
+
+The five checks validate a *simulation*. These two validate a *claimed landscape* — they are the
+quantitative core of the archetype signatures in 20-archetypes.md.
+
+### Hypsometric (area–altitude) curve
+
+Plot the fraction of area above each elevation, both axes normalised (**Strahler 1952**,
+*Hypsometric (area-altitude) analysis of erosional topography*, GSA Bulletin 63) — a one-glance
+read of a landscape's **maturity**, i.e. how much mass erosion has removed:
+
+- **Convex** (most area high) — youthful: uplift-dominated, little removed. Right for a
+  Himalayan-type brief; wrong for "ancient worn mountains".
+- **Sigmoid** — mature, near equilibrium (Alpine-type).
+- **Concave** (most area low) — old age: most mass gone (Appalachian-type, shields).
+
+**Diagnoses:** a brief and a curve that disagree — "young dramatic peaks" with a concave curve, or
+"old rolling hills" with a convex one — mean the uplift/erosion balance is mis-tuned, whatever the
+hillshade looks like.
+
+### Cross-valley profile
+
+Sample elevation along transects perpendicular to a valley axis.
+
+**Must show:** the shape the process history claims. **V** = fluvial incision; **U** (flat floor,
+steep walls) = glacial trough (`12`); a flat-floored V with terraces = incision into fill (`03`).
+
+**Diagnoses:** the canonical discriminator when a brief says "glaciated" — V-profiles everywhere
+mean the ice pass never ran or was overwritten (order bug: fluvial re-run *after* glacial at full
+strength). U-profiles in an unglaciated temperate brief mean over-smoothed valley floors
+(deposition or filtering too aggressive).
 
 ## Visual review modes
 

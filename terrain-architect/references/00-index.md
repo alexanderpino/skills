@@ -118,7 +118,10 @@ of what's reliable here.
 | Digital terrain modelling — the survey | P | Galin et al. 2019, CGF 38(2). Read first when architecting a whole world (`13`) |
 
 **L-tier — landforms, not algorithms.** No implementation and no paper exists for these. They
-are compositions. The recipe is the answer:
+are compositions. The recipe is the answer. This table is *one landform each*; for whole
+recognisable places (the Alps, the Grand Canyon, a Namib erg, Niagara & Victoria Falls) assembled
+end-to-end as regime settings over the Legal Order, see the **archetype blueprints** in
+`20-archetypes.md`.
 
 | Landform | Composition |
 |---|---|
@@ -133,7 +136,7 @@ are compositions. The recipe is the answer:
 | Gravel bars, pebble beaches, boulder gardens | Bedload deposition where competence drops; scatter clasts by grain size (`04`, `07`) |
 | Plateaus, mesas, buttes | Hard caprock layer in `K` + fluvial erosion (`11`) |
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
-| Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) |
+| Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) — full blueprint in `20` |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
 | Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
@@ -145,6 +148,8 @@ are compositions. The recipe is the answer:
 | Tower / cone karst (fenglin, fengcong) | Dissolution + differential vertical lowering to a base level (`11`) |
 | Lava fields, lava lakes, lava worlds (Mustafar) | Stacked levéed flows; ponded fluid lava in closed basins; fluid layer = lava (`08`, `11`, `13`) |
 | Fissure eruptions, flood basalts (traps) | Line-source flows along a rift/fault (`02`) + stacking → basalt plateau; dissection → stepped traps (`11`) |
+| Geothermal field (geysers, sinter, hot springs) | Fracture-gated vents + sinter/travertine *deposition* + temperature-zoned microbial palette — blueprint in `20` |
+| Sandstone pillar forest (Zhangjiajie, Meteora) | Resistant strata + orthogonal joints as process mask + joint-gated incision — *not* karst; blueprint in `20` |
 
 ## 3. Composition & filtering → `10-primitives-ops-filters.md`
 
@@ -239,6 +244,7 @@ are compositions. The recipe is the answer:
 | HBAO | P | Bavoil et al. 2008, SIGGRAPH talks. **Screen-space weighting; not the correct integral for a baked terrain AO map** (`06`) |
 | Sky-view factor | P | Zakšek, Oštir & Kokalj 2011, Remote Sensing 3(2) |
 | Terrain ruggedness index | P | Riley, DeGloria & Elliot 1999, Intermountain J. Sciences 5 |
+| Hypsometric (area–altitude) curve | P | Strahler 1952, *Hypsometric (Area-Altitude) Analysis of Erosional Topography*, GSA Bulletin 63 — the maturity diagnostic (`09`, `20`) |
 | Topographic position index | F | Weiss 2001 (ESRI poster) — widely used, not peer-reviewed |
 | Ridge / valley / peak / pit / saddle detection | F | Morse theory in principle; in practice curvature thresholds |
 | Prominence / isolation | F | Definitions from mountaineering, computed by flood fill |
@@ -304,7 +310,7 @@ are compositions. The recipe is the answer:
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
-| Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — see the `SKILL.md` doctrine (`11`, `16`) |
+| Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — `SKILL.md` doctrine (`11`, `16`); worked blueprints (lunar highlands & maria, Mars, Titan/Europa/Io) in `20` Group J |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
 | Wetlands (swamp, marsh, bog) | L | High TWI + flat + impermeable substrate → mask + peat/mud + thin water layer (`13`, `18`) |
 | Fire spread (slope- and wind-driven front) | P | Rothermel 1972, USDA Forest Service Res. Pap. INT-115 (`13`) |
@@ -320,6 +326,7 @@ are compositions. The recipe is the answer:
 | Bornhardt / inselberg | F | Twidale 1982, *Granite Landforms* — differential subsurface weathering + stripping (L-tier landform) |
 | Alluvial fan / bajada | P | Blair & McPherson 1994, JSR A64; Bull 1977, Prog. Phys. Geog. 1 |
 | Playa (endorheic basin floor) | L | An unfilled `03` sink; evaporite flat |
+| Oasis (deflation / fault-line / artesian) | L | Deflation basin floored *at the water table* + endorheic sabkha + groundwater-gated palms; blueprint (`20`) |
 | Desert pavement | P | McFadden, Wells & Jercinovich 1987, Geology 15 — born-at-top, not a lag |
 | Loess / sand sheets | F | Aeolian deposition (the deposition side of `05`) |
 

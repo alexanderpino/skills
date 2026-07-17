@@ -44,7 +44,9 @@ single map, a constant plus a linear latitude gradient is plenty.
 
 Add **aspect**: south-facing slopes (northern hemisphere) receive more insolation. A few °C of
 difference, and it's the reason the snow and treeline are visibly higher on sunny slopes than
-shaded ones. `T += insolationAmp * northness` where `northness = -cos(aspect)` (`06`). Cheap,
+shaded ones. `T -= insolationAmp * northness` where `northness = dot(aspectVec, north)` — +1 on
+north faces (`06`'s downslope-aspect convention), which must therefore *cool* in the northern
+hemisphere; flip the sign south of the equator. Cheap,
 and it's one of those details that makes a landscape read as real without anyone noticing why.
 
 **Snow line** = the elevation where `T = 0`. **Permafrost** = where the *annual mean* stays
