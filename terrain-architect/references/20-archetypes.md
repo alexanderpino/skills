@@ -962,6 +962,11 @@ Same discipline, briefer — each still a composition, not an algorithm:
   the steep flank into knife-edged fluted ridges with amphitheatre-headed valleys; wave trimming at
   the base only (`12`). The look people mislabel a "sea-cliff" — the fluting is *fluvial*, which is
   why it doesn't belong in entry 19.
+- **Sandstone jebel desert** *(Wadi Rum — Lawrence of Arabia country)* — massive sandstone
+  tower-massifs (jebels) on a hard basement plinth (`11` strata + `16` inselberg logic), rising
+  sheer from red sand sheets: rounded slickrock domes on top, vertical joint-controlled walls,
+  narrow siq fissures, talus at the base. The sand *is* the jebels' own waste (`09` mass budget) —
+  weathered grain by grain, banked against the very towers it came from (`05`, `16`).
 - **Braided outwash** *(Iceland sandur, Southern Alps NZ, Brahmaputra)* — high sediment + variable
   discharge + low cohesion → braid bars (`03` braided, Leopold & Wolman 1957); the depositional
   export of a glaciated / high-uplift range.
@@ -1042,6 +1047,37 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   the water off** and overprint with aeolian sand and rockfall (`05`, `16`, entry 27's relative-age
   order). A canyon carved by *nothing* is the tell that breaks the fiction; a canyon carved by
   vanished water is Mars, and reads true.
+
+- **Arrakis** *(Dune 2021/2024, filmed at Wadi Rum, Jordan, and the Liwa erg, Abu Dhabi)* — the
+  desert planet is **two archetypes cut together**: the **sandstone jebel desert** (Further
+  archetypes) for sietch country — towers to hide a civilisation in, walls to stage scale against —
+  and the **erg** (entry 9) for the open sand where nothing stands. The same pairing Tatooine used
+  (chott + gorge + dunes), chosen again fifty years later because the *processes* read instantly:
+  rock country means shelter, sand sea means exposure. The worm's wake is set dressing on entry 9's
+  dunes; Wadi Rum has also played Mars itself (The Martian) — the red jebel desert *is* the
+  relict-fluvial look of entry 27 to a camera.
+- **Crait** *(The Last Jedi, filmed at Salar de Uyuni, Bolivia)* — the rare case where the film's
+  conceit **is the material stack**: entry 22's evaporite playa — a white salt crust (`18`) over
+  red substrate — and every shot of a speeder skid scraping white to reveal red is the layer
+  diagram of `08` rendered as drama. Nothing needed inventing: the terrain department's job was
+  entry 22 plus one albedo swap underneath.
+- **Interstellar's planets** *(both filmed in Iceland)* — one island plays two alien worlds,
+  chosen by process: **Mann's frozen world** is the Svínafellsjökull glacier — crevasse fields
+  and ice-fall chaos, entry 18's machinery with the sea nowhere in sight — and **Miller's ocean
+  world** is a black-sand **braided outwash plain** (Further archetypes) under ankle-deep water:
+  a sandur is the flattest large surface erosion ever builds, so flooding it centimetres deep
+  makes an ocean with no shore in any direction. The wave is a set piece; the *shorelessness* is
+  the sandur's real property, and it is why the location works.
+- **Monument Valley** *(Stagecoach, The Searchers, Once Upon a Time in the West, Back to the
+  Future III, Forrest Gump's stop on US-163)* — the **inverse case**, and the proof the section's
+  thesis runs both directions: not a fiction decomposed onto Earth archetypes, but a real
+  archetype so legible it became fictional shorthand — "the West" itself, though Ford's Texas is
+  actually the Navajo Nation on the Utah–Arizona line. Terrain-wise it needs no decomposition: it
+  **is entry 7's end-member** — the plateau almost wholly consumed, leaving the mesa → butte →
+  spire remnant series standing on an open plain, each butte repeating the same three-layer
+  anatomy (thin hard cap, cliff-forming sandstone, slope-forming shale). Cameras keep returning
+  for the same reason the entry's Verify block works: the process history is readable at a
+  glance, from horseback or a car window.
 
 **The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
 read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;
