@@ -957,6 +957,11 @@ Same discipline, briefer — each still a composition, not an algorithm:
   field where it overhangs.
 - **Inselberg / monolith** *(Uluru, Devils Marbles, Sugarloaf)* — a resistant residual dome/bornhardt
   left by differential subsurface weathering + stripping (`16` bornhardt).
+- **Fluted volcanic ridges (pali)** *(Nā Pali, the Ko'olau above Kualoa, Tahiti/Moorea)* — a young
+  basalt shield flank (`11`) under extreme orographic rainfall (`13`): dense parallel gullies incise
+  the steep flank into knife-edged fluted ridges with amphitheatre-headed valleys; wave trimming at
+  the base only (`12`). The look people mislabel a "sea-cliff" — the fluting is *fluvial*, which is
+  why it doesn't belong in entry 19.
 - **Braided outwash** *(Iceland sandur, Southern Alps NZ, Brahmaputra)* — high sediment + variable
   discharge + low cohesion → braid bars (`03` braided, Leopold & Wolman 1957); the depositional
   export of a glaciated / high-uplift range.
@@ -986,8 +991,8 @@ is the thing to get right.
 ## Screen worlds — fictional planets as recombined Earth archetypes
 
 `13`'s fictional-world doctrine (Hyrule, Middle-earth) applied to a single alien *locale*. A film's
-planet is never new physics — it is **Earth archetypes in costume**, and the **filming location
-names the archetype**: a production designer scouts the real place whose *process* already reads as
+planet — or lost island — is never new physics: it is **Earth archetypes in costume**, and the
+**filming location names the archetype**: a production designer scouts the real place whose *process* already reads as
 the story's world, and a terrain graph does the identical composition, changing only the **set
 dressing** — materials, sky/light, and the scatter of props (`06`/`08`, `07`). So "make an ice
 planet / a desert planet" is not a new recipe; it is *decompose the fiction into the archetypes
@@ -1009,11 +1014,30 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   9) for the dune seas + a **chott / sabkha salt flat** (entry 22) for the homestead pan + a **wadi /
   slot canyon** (`16`, Further archetypes) for the canyon chase. Three archetypes already in this
   file, one substrate, one (dry) hydrology — exactly the combining rule.
-
 - **Pandora's Hallelujah Mountains** *(not filmed but modelled — on Zhangjiajie's pillar forest)* —
   the CG case proves the same rule: the designers reached for entry 24's joint-gated pillars, then
   applied exactly one impossible edit (cut the pillars free and float them). The terrain is Earth;
   the fiction is one constraint deleted.
+- **Skull Island** *(Kong: Skull Island 2017, filmed in Vietnam — Ha Long Bay and the Tràng An /
+  Tam Cốc karst of Ninh Bình — and on O'ahu at Kualoa, under the fluted Ko'olau ridges; Peter
+  Jackson's 2005 island was soundstage + CG, the 1933 original matte paintings)* — a composite of
+  **two archetypes an ocean apart**: drowned **tower karst** (entry 14 — Ha Long Bay is already its
+  exemplar) for the fanged coastline, and **fluted volcanic ridges** (Further archetypes, the pali)
+  for the interior walls, wrapped in a storm coast (entry 19) and a jungle **ecosystem** (`13`,
+  `07`). Only a film can composite two continents by cutting between locations; a terrain graph
+  building Skull Island must still run **one substrate and one hydrology** under both looks — karst
+  lithology on the coast, basalt shield inland — or the seam will show exactly where the film hides
+  its cut. The monsters are scatter.
+- **Beggar's Canyon, Tatooine** *(the womp-rat run and podrace gorges; on screen the canyon
+  material is the Sidi Bouhlel gorge, Tunisia, with Death Valley plates — the podrace canyons are
+  digital, built from the American-Southwest canyon vocabulary)* — the fictional case of entry 27's
+  **relict-fluvial rule**: a deep dendritic canyon system on a waterless world *is a fossil* — it
+  claims a wet past, exactly like a Martian valley network. Compose it dry: an entrenched-meander
+  gorge (entry 13, goosenecks for a racing line) + slot narrows (Further archetypes, `16` wadi) +
+  caprock steps and dry falls — relict knickpoints (entry 4) with no plunge pool — then **switch
+  the water off** and overprint with aeolian sand and rockfall (`05`, `16`, entry 27's relative-age
+  order). A canyon carved by *nothing* is the tell that breaks the fiction; a canyon carved by
+  vanished water is Mars, and reads true.
 
 **The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
 read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;
