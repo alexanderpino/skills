@@ -136,7 +136,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Gravel bars, pebble beaches, boulder gardens | Bedload deposition where competence drops; scatter clasts by grain size (`04`, `07`) |
 | Plateaus, mesas, buttes | Hard caprock layer in `K` + fluvial erosion (`11`) |
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
-| Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) |
+| Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) — full blueprint in `20` |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
 | Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
@@ -323,6 +323,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Bornhardt / inselberg | F | Twidale 1982, *Granite Landforms* — differential subsurface weathering + stripping (L-tier landform) |
 | Alluvial fan / bajada | P | Blair & McPherson 1994, JSR A64; Bull 1977, Prog. Phys. Geog. 1 |
 | Playa (endorheic basin floor) | L | An unfilled `03` sink; evaporite flat |
+| Oasis (deflation / fault-line / artesian) | L | Deflation basin floored *at the water table* + endorheic sabkha + groundwater-gated palms; blueprint (`20`) |
 | Desert pavement | P | McFadden, Wells & Jercinovich 1987, Geology 15 — born-at-top, not a lag |
 | Loess / sand sheets | F | Aeolian deposition (the deposition side of `05`) |
 

@@ -327,7 +327,7 @@ sink (`09` mass check).
 **Diff from a collisional range.** Uplift is **extensional horst-and-graben** (`02` fault blocks),
 not a collisional dome; drainage is **endorheic** — the no-fill list keeps the basins closed
 (`03`); deposition is fan-dominated (`16`, Blair & McPherson 1994) plus evaporites (`16` playa,
-entry 20). Arid climate → bare sharp fans and a salt playa.
+entry 22). Arid climate → bare sharp fans and a salt playa.
 
 **The tells.** A repeating range–basin–range corrugation; triangular fan facets debouching from
 every range-front canyon and merging into a bajada; a flat white salt playa at each basin's low
@@ -370,11 +370,93 @@ overhangs present only if a volume / material-stack representation is used.
 **Tier.** L — `11` soft strata + hard cap (non-heightfield for overhangs) + `05`/`04` rapid
 dissection. Cappadocia: + `19` tuff/ignimbrite.
 
+### 12. Desert oasis — Saharan-type
+*Siwa · Bahariya, Kharga & the Egyptian depressions · Qattara · (type: any deflation, fault-line or
+artesian oasis)*
+
+**Claim.** A green, watered hollow in a hyper-arid desert — not a rainfall feature but a
+**groundwater** one. Wind deflates a closed basin *down to the water table* (damp sand resists, so
+the table is the floor wind cannot cut below); where the table meets the surface there are springs,
+a salt lake / **sabkha** at the sump, and a palm grove ringing the fresh margin — all fed by
+**fossil groundwater** from a regional aquifer, under a bare plateau.
+
+**Diff from the erg (entry 9) and the fault-block playa (entry 10).** The basin is cut by
+**aeolian deflation** (`05`/`16`), not faulting — and its depth is **base-levelled by the water
+table**: deflation stops where the ground is damp. The deflated sand piles **downwind as dunes**
+(entry 9's Werner machinery, `05` — the mass the basin lost). The floor is an **endorheic** sink
+(`03` no-fill), so evaporation concentrates an evaporite **sabkha** at the low point (`16` playa /
+`18` crust, cf. entry 22). The **water table intersecting the surface** drives everything: springs,
+and a **palm grove** as an ecosystem *gated by water-table depth and salinity* (`13`/`07`), not
+painted. A bounding **escarpment** drops from a caprock plateau (`11`); the hamada above is bare,
+with desert pavement and yardangs (`16`).
+
+**The tells.** A closed depression floored at a *flat* water-table datum, below a plateau
+escarpment; concentric zoning at the sump — open brine, salt crust, then a green fringe where the
+table is shallow but fresh; deflation dunes banked downwind; a bare pavement/yardang plateau around
+it. The water is the whole story — there may be no local rain at all.
+
+**Watch for.** Modelling an oasis as a *rainfall/fluvial* feature — it is **groundwater-fed**, and
+the water table does double duty: the *base level of deflation* (why the basin stopped sinking) and
+the *source of the springs*. And the basin must be **closed** (`03`), or the salt never accumulates
+and it is not a sabkha.
+
+**Verify.** Basin closed (deflation/flow terminates at the sump, nothing drains out); floor sits at
+a flat water-table level (deflation base-levelled, not a random pit); salinity and vegetation zoned
+concentrically by table depth; deflated volume ≈ downwind dune volume (`09` mass check); surrounding
+plateau bare (pavement, yardangs).
+
+**Tier.** L — `05`/`16` deflation to the water table + `03` endorheic basin + `16` sabkha / `18`
+crust + `13` groundwater-gated ecosystem + `11` bounding escarpment.
+
 ---
 
 ## Group E — Karst
 
-### 12. Tower karst — Guilin & Ha Long Bay-type
+### 13. Entrenched-meander karst gorge — Ardèche-type
+*Gorges de l'Ardèche & the Pont d'Arc · Verdon · the goosenecks of the San Juan (canyon cousin)*
+
+**Claim.** A river's meanders, inherited from a former low-relief surface, are **entrenched** deep
+into a limestone plateau by uplift and bedrock incision — keeping the snaking planform while cutting
+a sheer gorge; where an incising meander breaches its own neck it abandons a loop and leaves a
+**natural arch** (the Pont d'Arc); the plateau is **karst** — caves, sinks, resurgent springs and
+almost no surface drainage.
+
+**Composition.**
+- **Inherited meanders** — establish the sinuous planform on a low-gradient surface (`03`
+  meandering, Ikeda et al. / Howard & Knutson). This is the *fossil* pattern the gorge will keep.
+- **Uplift + bedrock incision** — `02` uplift (or a base-level fall) drives vertical **bedrock
+  incision** (`04`, Sklar & Dietrich / stream power) *down* faster than the loops migrate sideways →
+  **entrenched meanders**: a deep, sheer gorge that still goosenecks. (The `00` L-row "entrenched /
+  incised meanders → in karst → the Ardèche", built out.)
+- **Karst lithology** (`11`) — soluble limestone stands in vertical walls and dissolves: caves (a
+  **volume**, `11` Paris et al. 2021), sinkholes, blind valleys, and **spring resurgences** in the
+  walls; the *causse* plateau above carries little surface flow — its drainage is underground.
+- **Neck cutoff through rock → natural arch** — where two loops nearly meet, the incising river cuts
+  through the narrow rock neck; the through-cut leaves a **natural bridge** (Pont d'Arc) and the
+  bypassed loop becomes an **abandoned dry meander**. The arch needs the **non-heightfield
+  representation** (`11`) — a heightfield cannot hold a span with a void beneath it.
+
+**The tells.** A gorge that *meanders* in tight goosenecks — the tell that it is inherited and
+entrenched, not a straight fault/joint slot; near-vertical limestone walls; a natural arch at a
+breached neck with an abandoned dry loop beside it; caves and springs in the walls; a dry karst
+plateau above (sinks, no rivers).
+
+**Watch for.** Making the meanders with a *floodplain* process — floodplain meandering (Legal Order
+9c) is lateral migration on soft sediment; **entrenched** meanders are a fossil planform incised
+*vertically into bedrock*, so the walls are rock, not cutbanks. And the Pont d'Arc is a **rock**
+neck cutoff (`11` non-heightfield arch), not an oxbow (entry 21's floodplain lake) — the same cutoff
+idea, through stone, leaving a bridge instead of a lake.
+
+**Verify.** Gorge planform sinuous (inherited meanders), not straight; walls vertical in the
+limestone; a breached neck shows an arch + an adjacent abandoned dry loop; the plateau shows karst
+drainage (sinks/springs) and low surface flow accumulation; caves only if a volume representation is
+used.
+
+**Tier.** L — `03` inherited meanders + `02` uplift + `04` bedrock incision + `11` karst/limestone
+(caves = volume) + `11` natural arch (non-heightfield). The `00` "entrenched meanders → Ardèche /
+Pont d'Arc" row, built.
+
+### 14. Tower karst — Guilin & Ha Long Bay-type
 *Guilin / Li River (fenglin) · Ha Long Bay · Phang Nga · Guizhou (fengcong)*
 
 **Claim.** Thick, pure limestone in a warm wet climate dissolves along joints; vertical corrosion
@@ -406,7 +488,7 @@ subsurface (springs/sinks); the drowned variant is the same geometry below sea l
 
 ## Group F — Volcanic
 
-### 13. Stratovolcano — Fuji & Kilimanjaro-type
+### 15. Stratovolcano — Fuji & Kilimanjaro-type
 *Mt Fuji · Kilimanjaro · Rainier · Mayon · Cotopaxi*
 
 **Claim.** Repeated eruptions build a steep **conical edifice** of interlayered lava and ash;
@@ -434,7 +516,7 @@ caldera at top; glacial only above the snowline.
 **Tier.** L — `11` edifice (Pike & Clow, P) + `03` radial drainage + `04` barrancas + `12` summit
 ice + `19` lava + `05` lahars.
 
-### 14. Caldera lake — Crater Lake & Santorini-type
+### 16. Caldera lake — Crater Lake & Santorini-type
 *Crater Lake · Santorini · Ngorongoro · Toba*
 
 **Claim.** A large eruption empties the magma chamber and the roof **collapses** into a broad
@@ -442,7 +524,7 @@ circular basin (a caldera, far larger than a vent crater); it fills with water (
 floods from the sea (Santorini), often with a resurgent cone/island in the middle (Wizard Island,
 Nea Kameni).
 
-**Composition.** Build the pre-collapse edifice (`11`, entry 13) → subtract a **collapse caldera**
+**Composition.** Build the pre-collapse edifice (`11`, entry 15) → subtract a **collapse caldera**
 (a broad, steep-walled circular depression, `11`) → fill: a closed lake kept unfilled by the
 no-fill list at a set level (`03`), or breach to sea level (Santorini) → optional resurgent vent
 (a small edifice) on the floor → wave-cut shore on the caldera walls (`12` lacustrine).
@@ -461,7 +543,7 @@ closed; any resurgent cone sits on the caldera floor.
 **Tier.** L — `11` edifice + collapse caldera + `03` closed lake/level + `12` shore + optional
 resurgent vent.
 
-### 15. Columnar basalt & rift volcanism — Giant's Causeway & Iceland-type
+### 17. Columnar basalt & rift volcanism — Giant's Causeway & Iceland-type
 *Giant's Causeway / Antrim · Iceland · Deccan / Columbia River basalts · Devils Tower*
 
 **Claim.** Fluid basalt erupts from **fissures** (not a cone) as vast flat sheets (flood basalt,
@@ -492,7 +574,7 @@ present; columns only in a material/mesh layer; tuyas flat-topped where ice-conf
 
 ## Group G — Glacial & polar coasts
 
-### 16. Fjordland — Norwegian & Fiordland-type
+### 18. Fjordland — Norwegian & Fiordland-type
 *Norway · Milford Sound / Fiordland (NZ) · Patagonia · Greenland · SE Alaska*
 
 **Claim.** Glaciers over-deepened valleys **below** sea level; when the ice left and the sea rose,
@@ -521,7 +603,7 @@ walls carry hanging falls; planform follows glacial troughs, not a dendritic riv
 
 ## Group H — Coastal & marine
 
-### 17. Sea cliffs & stacks — Twelve Apostles & Cliffs of Moher-type
+### 19. Sea cliffs & stacks — Twelve Apostles & Cliffs of Moher-type
 *Twelve Apostles (Vic) · Cliffs of Moher · Étretat · Old Man of Hoy · Nā Pali*
 
 **Claim.** Waves attack a rocky coast; a **wave-cut notch** undercuts the cliff, it retreats
@@ -547,7 +629,7 @@ forms present; debris appears as downdrift deposition (mass closed).
 
 **Tier.** L — `12` wave erosion / cliff retreat + hardness variation + `12` longshore deposition.
 
-### 18. Coral reef & atoll — Great Barrier Reef & Maldives-type
+### 20. Coral reef & atoll — Great Barrier Reef & Maldives-type
 *Great Barrier Reef · Maldives · Bora Bora · Bikini*
 
 **Claim.** Reef-building coral grows up toward the light in warm shallow seas; **Darwin's
@@ -578,7 +660,7 @@ fresh water inhibit coral.
 
 ## Group I — Rivers & depositional wonders
 
-### 19. Inland delta & meander wetland — Okavango & Amazon-type
+### 21. Inland delta & meander wetland — Okavango & Amazon-type
 *Okavango Delta · Amazon floodplain · Pantanal · lower Mississippi*
 
 **Claim.** A large river on a very low gradient either spreads into a closed basin and evaporates
@@ -607,7 +689,7 @@ ground.
 **Tier.** L — `03` meandering/oxbows + overbank deposition + `02`/`03` endorheic basin (Okavango) +
 `13` wetland.
 
-### 20. Salt flat & mineral terraces — Uyuni & Pamukkale-type
+### 22. Salt flat & mineral terraces — Uyuni & Pamukkale-type
 *Salar de Uyuni · Bonneville salt flats · Danakil · Pamukkale / Huanglong travertine*
 
 **Claim.** Two "chemical" beauties. An **evaporite playa** (Uyuni, Bonneville) — a closed basin
@@ -647,7 +729,7 @@ unifying reading — **crater density is a clock**: a saturated surface is ancie
 young, a crater-free one actively resurfaced. Per-crater morphology lives in `11`; these entries
 build whole *surfaces*.*
 
-### 21. Cratered highlands — lunar-type
+### 23. Cratered highlands — lunar-type
 *The Moon's highlands · Mercury · Callisto · any ancient airless surface*
 
 **Claim.** The "Moon with different-sized craters." A surface with no water and no atmosphere
@@ -691,7 +773,7 @@ accumulation; regolith thickest on the oldest terrain.
 **Tier.** L — `11` per-crater morphology (Melosh/Pike, P) + F-tier SFD stamping & superposition +
 `05` diffusion-as-gardening (Culling) + repose-angle invariant (`SKILL`).
 
-### 22. Volcanic plains — lunar maria-type
+### 24. Volcanic plains — lunar maria-type
 *Lunar maria · Mercury's smooth plains · flood-basalt analogues off-Earth*
 
 **Claim.** Vast dark low-lying **flood-basalt plains** that flooded and buried the older cratered
@@ -699,8 +781,8 @@ basins — so they are *younger* and carry **far fewer craters**, plus wrinkle r
 mare/highland split is the Moon's fundamental dichotomy, and it is a **crater-density (age)**
 contrast, not merely an albedo one.
 
-**Diff from entry 21.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
-`11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 15) → **reset the crater clock**:
+**Diff from entry 23.** Flood the low basins with fissure-fed basalt sheets (`02` line source +
+`11`/`19` stacked sheets — the Giant's-Causeway machinery of entry 17) → **reset the crater clock**:
 the mare surface starts nearly crater-free and accumulates only the later, sparser population (same
 SFD, far fewer stamps). Add **wrinkle ridges** (compressional buckles — low sinuous ridges, F) and
 **rilles** (sinuous = collapsed lava tubes/channels, `19`; straight = graben, `02`).
@@ -717,10 +799,10 @@ on a world with no water.
 check); ghost craters where basalt is thin; ridges compressional, rilles volcanic/tectonic; plains
 flat and low.
 
-**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 21) + wrinkle
+**Tier.** L — `02` fissure/basin flood + `11`/`19` basalt sheets + reset SFD (entry 23) + wrinkle
 ridges / rilles (F/`19`/`02`).
 
-### 23. The blended relict world — Mars-type
+### 25. The blended relict world — Mars-type
 *Mars · ancient-wet worlds generally*
 
 **Claim.** The doctrine's hard case (`SKILL`): a world that *had* water and lost it. Ancient
@@ -737,7 +819,7 @@ Earth-style drainage beneath a live desert-and-cratering surface.
   huge by low gravity + a stationary hotspot — scale the edifice up, keep the shield's gentle flank.
 - **Dominant aeolian overprint:** Werner dunes (`05`) with **Kok et al. 2012** gravity/air-density
   scaling (bigger dunes, TARs, dust); mantling and exhumation.
-- **Impact overprint:** a crater population (entry 21) with the transition diameter scaled to Mars'
+- **Impact overprint:** a crater population (entry 23) with the transition diameter scaled to Mars'
   `g ≈ 0.38` → **bigger** craters (`11`).
 - **Polar layered deposits:** ice + dust seasonal layering at the poles (F).
 
@@ -799,11 +881,12 @@ Same discipline, briefer — each still a composition, not an algorithm:
 
 ## Combining archetypes
 
-Most real wonders are *two* of these overprinted: a fjord is a glaciated orogen (1) drowned (16);
-Ha Long Bay is tower karst (12) drowned like a fjord; Kilimanjaro is a stratovolcano (13) wearing
-entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) in its side-streams.
-The rule is `13`'s: read the two archetypes, run **one substrate and one hydrology**, and let the
-regimes overprint in Legal Order — never blend two finished terrains. Off-world the same rule
-holds in *time*: Mars (23) is five archetypes layered oldest-to-youngest — relict fluvial, then
-rift, then giant shield, then dunes, then craters — each overprinting the last on one shared
-surface, which is why the relative-age order is the thing to get right.
+Most real wonders are *two* of these overprinted: a fjord is a glaciated orogen (1) drowned (18);
+Ha Long Bay is tower karst (14) drowned like a fjord; Kilimanjaro is a stratovolcano (15) wearing
+entry 1's summit ice; the Grand Canyon (7) grows caprock-plunge knickpoints (4) in its side-streams;
+a Saharan oasis (12) is an erg (9) deflated down to its water table. The rule is `13`'s: read the two
+archetypes, run **one substrate and one hydrology**, and let the regimes overprint in Legal Order —
+never blend two finished terrains. Off-world the same rule holds in *time*: Mars (25) is five
+archetypes layered oldest-to-youngest — relict fluvial, then rift, then giant shield, then dunes,
+then craters — each overprinting the last on one shared surface, which is why the relative-age order
+is the thing to get right.
