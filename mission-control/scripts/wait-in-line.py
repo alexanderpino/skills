@@ -40,7 +40,7 @@ if os.name == "nt":
 
     def try_lock(fh):
         try:
-            fh.seek(0)
+            fh.seek(1024)
             msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
             return True
         except OSError:
