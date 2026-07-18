@@ -137,7 +137,10 @@ and you get a drainage network at 45°.
 the same neighbour and flow collects into parallel lines. This is the classic D8 artefact and
 it's why D8 is bad for *dispersive* flow (hillslopes, alluvial fans) and fine for *convergent*
 flow (channels, once flow has already collected). It is still the right choice for extracting
-a discrete channel network, because a channel network *should* be single-thread.
+a discrete channel network, because a channel network *should* be single-thread. The artefact
+is one of a family — a discrete stencil printing through the physics — catalogued with its
+siblings (thermal, 4-pipe, noise lattices) and the tests that catch each in `09`'s
+grid-anisotropy table.
 
 ## D∞ (Tarboton 1997)
 

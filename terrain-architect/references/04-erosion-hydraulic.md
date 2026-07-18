@@ -115,6 +115,16 @@ step(Δt):
   globally — the spike is almost always one bad cell.
 - **Double-buffer everything.** In-place neighbour updates make the result depend on traversal
   order, which makes it non-deterministic under threading.
+- **The 4-pipe stencil is anisotropic.** Water can only leave a cell along the cardinals —
+  *stronger* axis-locking than D8's 45° bias (`03`), which at least has diagonals. Flow down a
+  diagonally-oriented slope staircases, and carved channels drift toward axis alignment over
+  long runs. The cone test (`09`) makes it loud: water spreading from a central source goes
+  plus/diamond-shaped instead of radial, and the erosion pattern follows. The fix is the
+  **8-pipe variant** with a per-pipe length — `l = cellSize` cardinal, `cellSize·√2` diagonal
+  in the `Δh/l` flux term — the same distance correction D8 (`03`) and thermal erosion (`05`)
+  require; the velocity field then sums all 8 fluxes componentwise (diagonal fluxes project
+  onto x/y with a `1/√2` factor). If you stay with 4 pipes for cost, know the artefact and
+  review under a sun sweep (`09`) — the grid-anisotropy family table there lists its siblings.
 
 ## Št'ava et al. (2008) extensions
 
