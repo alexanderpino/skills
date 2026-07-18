@@ -156,7 +156,9 @@ Repeat until a terminal condition fires. Each cycle:
    reason from memory of what the queues held last cycle. `status` also flags
    actionable conditions for you: `UNBLOCK CANDIDATE` (a blocked item's dependency is
    now done — transition it back), `MERGE PENDING` (a done item's branch was never
-   merged), and open `AGENDA` notes. Act on these before spawning anything new;
+   merged), `RESHAPE CANDIDATE` (an approved item keeps losing lease collisions —
+   throughput is leaking through the backlog's shape; see mid-mission re-shaping
+   below), and open `AGENDA` notes. Act on these before spawning anything new;
    they're finished work and standing intent sitting idle.
 
    The agenda is your intent journal, and it has one hard rule: **if `status` can
@@ -177,8 +179,15 @@ Repeat until a terminal condition fires. Each cycle:
    maximize-throughput mode, break priority ties toward the item that unblocks the
    most dependents (`depends_on` fan-out) — a skeleton item researched early widens
    every later cycle.
-3. **Gate incoming docs.** For each doc a Scout returns: spawn a Plan Reviewer.
-   On sign-off, check blast-radius:
+3. **Gate incoming docs.** When a doc arrives, first check its header for
+   `splittable: true` (maximize mode only) — this must be decided *before* spawning
+   a Plan Reviewer, while the item is still `researching`, so a review is never
+   paid for a doc about to be re-scoped. Accept → route to the Architect (see
+   mid-mission re-shaping below): the item stays in `researching`, its doc is
+   narrowed to the skeleton, the parts become new backlog items behind it.
+   Decline → proceed normally; the doc covers the whole item by contract, so a
+   declined proposal costs nothing. Then, for each (remaining) doc: spawn a Plan
+   Reviewer. On sign-off, check blast-radius:
    - `low` / `medium` → transition straight to `approved`. Reviewer sign-off suffices.
    - `high` / `critical` → *you* read the doc and approve or bounce, with written
      reasons in the evidence directory. You are the expensive gate; tiering exists so
@@ -186,7 +195,9 @@ Repeat until a terminal condition fires. Each cycle:
 4. **Feed the build side.** For each idle implementer slot and each `approved` item:
    acquire leases for the item's touch-list via `pipeline.py lease`. If any path is
    already leased, skip the item this cycle (never queue two writers on one file —
-   the ledger is the collision-prevention mechanism, not hope). Then create the
+   the ledger is the collision-prevention mechanism, not hope). The failed `lease`
+   call records the collision itself; recurring losses surface as
+   `RESHAPE CANDIDATE` in `status`, so don't track contention by hand. Then create the
    item's isolated worktree: `pipeline.py worktree-add <id>`. Leases stop two agents
    *editing* one file, but only build isolation stops item A's half-finished diff
    breaking item B's compile — every implementer works, builds, and is verified
@@ -213,12 +224,35 @@ Repeat until a terminal condition fires. Each cycle:
    `pipeline.py transition <id> blocked --blocked-on <new-item>` — which releases its
    leases and lets `status` detect the unblock automatically later. Deny requests
    that are really just scope creep — the doc's acceptance criteria define done, not
-   the implementer's ambitions.
+   the implementer's ambitions. In maximize mode, check each granted item for the
+   skeleton property before setting its priority: if blocked or upcoming items
+   would land behind it, it jumps the queue (the `depends_on` fan-out rule from
+   step 2) rather than being appended at default priority.
 7. **Check terminal conditions and budget.** Log a one-line cycle summary to
    `evidence/orchestrator.log`. Pass `--tokens <n>` on transitions when you know a
    role's spend — `pipeline.py metrics` then yields per-item cost, bounce counts, and
    time-per-state, which is exactly the telemetry `skill-coach` (if installed) needs
    for decay detection and for tuning the junior/senior routing threshold empirically.
+
+**Mid-mission re-shaping (maximize mode):** the throughput decision is not one-shot.
+The pipeline keeps learning — research reveals internal structure, collisions reveal
+serialization the original decomposition hid — and the same shaping the Architect
+did at Phase 1 can be reapplied at any stage and any granularity: reordering the
+remaining tranche, or splitting a single item into skeleton + parts. Exactly three
+signals license a re-shape, and only these:
+
+- `RESHAPE CANDIDATE` from `status` — an approved item repeatedly losing lease
+  collisions while implementer slots idle;
+- an **accepted split proposal** from a Scout (step 3);
+- a **bounce pattern** whose recorded reasons point at the decomposition itself
+  rather than any single doc.
+
+On a signal, re-spawn the Architect with the signal named in its brief. Its scope is
+the **open backlog only** — items in flight or done are immutable history — and the
+reshaped tranche is gated exactly as in Phase 1. Never re-shape speculatively: an
+idle moment is not a signal, and a mission that keeps re-planning itself spends its
+budget on churn instead of work. If you cannot name the triggering evidence in the
+Architect's brief, there is no re-shape to do.
 
 **UI slices:** if an item carries a `ui: true` flag and a `design-replication` skill
 is installed, the Designer role applies — see `references/roles.md#designer`. It is a
@@ -266,7 +300,9 @@ declaring the mission complete, and offer the report to the user.
 - **Backlog exhausted, goal unmet:** re-spawn the Architect with the evidence trail so
   far to propose the next backlog tranche; gate it as in Phase 1.
 - **Two items genuinely need the same file:** serialize by priority; never split a
-  file's ownership.
+  file's ownership. If the same collision recurs (`RESHAPE CANDIDATE`), the fix is
+  upstream: re-shape the open backlog so sibling touch-lists are disjoint —
+  serializing forever is throughput leaking through the backlog's shape.
 - **Queue starving because review bounces everything:** don't lower the bar — read the
   bounce reasons; the fix is usually upstream (Architect constraints too vague, Scout
   briefs missing context).

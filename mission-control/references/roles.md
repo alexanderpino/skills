@@ -49,6 +49,20 @@ When re-invoked mid-mission (backlog exhausted, goal unmet), read the evidence t
 completed items first — the next tranche must build on what actually happened, not on
 the original plan.
 
+When re-invoked mid-mission to **re-shape** (the Orchestrator's brief will name the
+signal: a `RESHAPE CANDIDATE` contention flag, an accepted split proposal, or a
+bounce pattern pointing at decomposition rather than any single doc), the rules are:
+
+- **Open backlog items only.** Items in flight or done are immutable history — you
+  reorganize what hasn't started, never what has.
+- **Accepted split:** narrow the original backlog entry to the skeleton, and add the
+  parts as new items with `origin: split:<original-id>` and `depends_on` the
+  skeleton, touch-lists disjoint per the Scout's proposal (verify, don't assume).
+- **Evidence-triggered, never speculative.** If the brief cannot name the signal
+  that prompted the re-shape, decline it. A mission that keeps re-planning itself
+  spends its budget on churn; the same "stay close to the task's natural
+  decomposition" bar applies to the re-shape as applied to the original backlog.
+
 **Do not:** research implementation details, estimate line-level diffs, or approve your
 own backlog.
 
@@ -87,9 +101,18 @@ Acceptance criteria must be mechanically checkable — each one is something the
 Verifier can run or diff, not a vibe. "Parsing handles empty input (test:
 `test_parse_empty`)" is a criterion; "code is clean" is not.
 
+**Split proposal (maximize-throughput missions only).** If your research reveals the
+item decomposes into a small skeleton (interfaces, scaffolding, a frozen layout)
+plus parts whose predicted touch-lists are *disjoint*, you may set
+`splittable: true` in the header and add a `# Split proposal` section per the
+contract: the skeleton, the parts, each part's touch-list. This is a proposal, not
+a decision — structure belongs to the Architect; you are reporting a parallelism
+opportunity you were closest to seeing. Still write the full doc for the whole
+item, so a declined proposal costs the pipeline nothing.
+
 **Do not:** write production code, make cross-cutting structural decisions (escalate
-to the Orchestrator for Architect routing instead), or pad the doc — the implementer
-reads all of it.
+to the Orchestrator for Architect routing instead — a split *proposal* is allowed,
+a split *decision* is not), or pad the doc — the implementer reads all of it.
 
 ---
 
