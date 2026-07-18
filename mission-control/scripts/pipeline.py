@@ -21,6 +21,8 @@ Commands:
   worktree-remove  remove an item's worktree after its branch is merged
   metrics          per-item cost data: state durations, bounces, tokens
   agenda           orchestrator intent journal: add / resolve / list notes
+  investigate      user-issue triage side channel: open an investigation, close
+                   it with an evidence-gated disposition (fix/architect/no-action)
   audit            verify the evidence chain for every done item
 """
 
@@ -94,6 +96,7 @@ class State:
             "queue": self.root / "queue.json",
             "ledger": self.root / "ledger.json",
             "agenda": self.root / "agenda.json",
+            "investigations": self.root / "investigations.json",
             "evidence": self.root / "evidence",
             "worktrees": self.root / "worktrees",
         }
@@ -177,7 +180,7 @@ def cmd_init(args):
         "terminal_conditions": {"backlog_drained": True,
                                 "max_items_completed": None,
                                 "token_budget": None, "deadline": None},
-        "concurrency": {"implementers": 2, "scouts": 2},
+        "concurrency": {"implementers": 2, "scouts": 2, "investigators": 1},
         "throughput": {"maximize": False, "decided_by": "user", "reason": None},
         "lease_ttl_minutes": 90,
         "bounce_limit": 3,
@@ -189,6 +192,7 @@ def cmd_init(args):
     st.save("queue", {"items": []})
     st.save("ledger", {"leases": [], "contention": []})
     st.save("agenda", {"next_id": 1, "notes": []})
+    st.save("investigations", {"items": []})
     print(f"initialized {root} — edit mission.json (goal, repo_oracle, "
           f"terminal_conditions, throughput) before starting the loop")
 
@@ -474,6 +478,15 @@ def cmd_status(args):
         if it["state"] == "done" and it.get("worktree"):
             print(f"MERGE PENDING: {it['id']} is done but branch "
                   f"mc/{it['id']} is unmerged — merge, then worktree-remove")
+    for i in _load_investigations(st)["items"]:
+        if i["state"] != "open":
+            continue
+        if (st.evidence_dir(i["id"]) / "diagnosis.md").exists():
+            print(f"DIAGNOSIS READY: {i['id']} — read "
+                  f"evidence/{i['id']}/diagnosis.md, then disposition it "
+                  f"(investigate close)")
+        else:
+            print(f"INVESTIGATION OPEN: {i['id']} — {i['issue']}")
     open_notes = [x for x in _load_agenda(st)["notes"] if not x["resolved"]]
     for x in open_notes:
         when = f" [when: {x['when']}]" if x.get("when") else ""
@@ -550,6 +563,66 @@ def cmd_agenda(args):
             print(f"[{mark}] #{x['n']} {x['text']}{when}")
 
 
+def _load_investigations(st):
+    # missions initialized before the triage channel existed lack the file
+    if not st.paths["investigations"].exists():
+        return {"items": []}
+    return st.load("investigations")
+
+
+def cmd_investigate(args):
+    st = State(args.root)
+    inv = _load_investigations(st)
+    if args.action == "open":
+        if not args.issue:
+            die("investigate open requires the issue text")
+        if any(i["id"] == args.id for i in inv["items"]):
+            die(f"investigation id exists: {args.id}")
+        inv["items"].append({"id": args.id, "issue": args.issue,
+                             "opened": now(), "state": "open",
+                             "disposition": None})
+        st.evidence_dir(args.id).mkdir(parents=True, exist_ok=True)
+        st.save("investigations", inv)
+        print(f"{args.id}: open — spawn the Investigator; its report goes to "
+              f"{st.evidence_dir(args.id) / 'diagnosis.md'}")
+        return
+    # close
+    entry = next((i for i in inv["items"] if i["id"] == args.id), None)
+    if entry is None:
+        die(f"unknown investigation: {args.id}")
+    if entry["state"] != "open":
+        die(f"{args.id} is already closed")
+    report = st.evidence_dir(args.id) / "diagnosis.md"
+    if not report.exists():
+        die(f"closing {args.id} requires {report} — the Investigator must "
+            f"write its report first")
+    if not args.disposition:
+        die("investigate close requires --disposition fix|architect|no-action")
+    if args.disposition == "fix":
+        if not args.item:
+            die("disposition 'fix' requires --item naming the backlog "
+                "entry(ies) created from the diagnosis — add-item first, "
+                "then close")
+        backlog = st.load("backlog")
+        missing = [i for i in args.item
+                   if not any(b["id"] == i for b in backlog["items"])]
+        if missing:
+            die(f"disposition 'fix' names backlog items that don't exist: "
+                f"{', '.join(missing)}")
+    elif not args.note:
+        die(f"disposition '{args.disposition}' requires --note with the "
+            f"reasoning — this gate must show its work")
+    entry["state"] = "closed"
+    entry["disposition"] = {"kind": args.disposition,
+                            "items": args.item or [],
+                            "note": args.note, "at": now()}
+    st.save("investigations", inv)
+    msg = f"{args.id}: closed ({args.disposition})"
+    if args.item:
+        msg += f" -> {', '.join(args.item)}"
+    print(msg)
+
+
 def cmd_audit(args):
     st = State(args.root)
     queue, mission = st.load("queue"), st.load("mission")
@@ -611,8 +684,27 @@ def cmd_audit(args):
             print(f"HOLE {it['id']}: done but worktree/branch never merged "
                   f"and removed")
             holes += 1
+    investigations = _load_investigations(st)["items"]
+    still_open = 0
+    for i in investigations:
+        if i["state"] != "closed":
+            still_open += 1
+            continue
+        if not (st.evidence_dir(i["id"]) / "diagnosis.md").exists():
+            print(f"HOLE {i['id']}: closed investigation missing diagnosis.md")
+            holes += 1
+        disp = i.get("disposition") or {}
+        for linked in disp.get("items", []):
+            if not any(b["id"] == linked for b in backlog["items"]):
+                print(f"HOLE {i['id']}: disposition names missing backlog "
+                      f"item {linked}")
+                holes += 1
     total = sum(1 for i in queue["items"] if i["state"] == "done")
-    print(f"audit: {total} done item(s), {holes} hole(s)")
+    print(f"audit: {total} done item(s), {len(investigations)} "
+          f"investigation(s), {holes} hole(s)")
+    if still_open:
+        print(f"note: {still_open} investigation(s) still open — not holes, "
+              f"but the mission is not complete while they are")
     sys.exit(1 if holes else 0)
 
 
@@ -667,6 +759,18 @@ def main():
     s.add_argument("--when", help="free-text trigger hint (add)")
     s.add_argument("--all", action="store_true", help="include resolved (list)")
     s.set_defaults(fn=cmd_agenda)
+
+    s = sub.add_parser("investigate")
+    s.add_argument("action", choices=["open", "close"])
+    s.add_argument("id")
+    s.add_argument("issue", nargs="?",
+                   help="symptom as the user stated it (open)")
+    s.add_argument("--disposition", choices=["fix", "architect", "no-action"])
+    s.add_argument("--item", action="append",
+                   help="backlog item created from the diagnosis "
+                        "(fix; repeatable)")
+    s.add_argument("--note", help="disposition reasoning (architect/no-action)")
+    s.set_defaults(fn=cmd_investigate)
 
     s = sub.add_parser("reclaim"); s.set_defaults(fn=cmd_reclaim)
     s = sub.add_parser("status"); s.set_defaults(fn=cmd_status)

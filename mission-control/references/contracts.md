@@ -50,7 +50,7 @@ fails.
     "token_budget": null,
     "deadline": null
   },
-  "concurrency": { "implementers": 2, "scouts": 2 },
+  "concurrency": { "implementers": 2, "scouts": 2, "investigators": 1 },
   "throughput": { "maximize": false, "decided_by": "user", "reason": null },
   "lease_ttl_minutes": 90,
   "bounce_limit": 3,
@@ -89,7 +89,7 @@ evidence requirements.
     "structural constraints from the Architect, one per line",
     "e.g. no new subsystems; TransformComponent layout is frozen"
   ],
-  "origin": "architect | escalation:<item-id> | split:<item-id> | user",
+  "origin": "architect | escalation:<item-id> | split:<item-id> | investigation:<inv-id> | user",
   "status": "open | claimed | done"
 }
 ```
@@ -259,6 +259,96 @@ mid-mission user directives, scheduled follow-ups. `when` is a free-text trigger
 not machine-evaluated — the Orchestrator reads and judges. Resolved notes keep their
 resolution note so the trail shows what was decided; audit does not walk the agenda.
 
+## Investigations (investigations.json)
+
+The triage side channel for mid-mission user issues. Investigations live outside the
+item queue — they precede backlog creation (the root cause is unknown, and the issue
+may not become work at all) — with a deliberately tiny lifecycle:
+
+```
+open ─► closed
+```
+
+`investigate open` creates the entry and its evidence directory; `investigate close`
+is the Orchestrator's disposition gate and refuses to run until
+`evidence/<inv-id>/diagnosis.md` exists. There is no intermediate state: "report on
+disk while still open" *is* the awaiting-disposition condition, and `status` flags it
+as `DIAGNOSIS READY`.
+
+```json
+{
+  "items": [
+    { "id": "INV-001",
+      "issue": "user: query results duplicated after MC-012 merged",
+      "opened": "ISO-8601",
+      "state": "open | closed",
+      "disposition": {
+        "kind": "fix | architect | no-action",
+        "items": ["MC-031"],
+        "note": "reasoning, or null when kind is fix",
+        "at": "ISO-8601"
+      }
+    }
+  ]
+}
+```
+
+Disposition rules, enforced by `pipeline.py`:
+
+- `fix` requires `items`: the backlog entries created from the diagnosis (with
+  `origin: "investigation:<inv-id>"`), which must already exist — `add-item` first,
+  then close. The fix flows through the normal gates; a diagnosed bug earns no
+  shortcut past them (though a trivial root cause may warrant `fast_track` on the
+  item, same as any other trivial item).
+- `architect` requires `note` naming the structural evidence — the closed diagnosis
+  becomes a licensed re-shape signal and the note seeds the Architect's brief.
+- `no-action` requires `note` with the reasoning (`no-defect`, `cannot-reproduce`,
+  out of scope). The Orchestrator's gate must show its work either way.
+
+Investigations are pipeline state, so the agenda's hard rule applies: never mirror
+an open investigation into an agenda note — `status` computes it.
+
+## Diagnosis report — `evidence/<inv-id>/diagnosis.md`
+
+Markdown with a YAML header, written by the Investigator. The header carries the
+verdict and routing hints; the body is both the Orchestrator's gate-read and the
+answer relayed to the user.
+
+```markdown
+---
+investigation: INV-001
+verdict: root-cause-found | no-defect | cannot-reproduce
+root_cause_items: []              # pipeline items implicated, e.g. [MC-012]
+recommended_disposition: fix | architect | no-action
+fix_hints:                        # only when recommending fix; omit otherwise
+  complexity: low | medium | high
+  blast_radius: low | medium | high | critical
+  touch_list:
+    - src/ecs/query.cpp
+---
+
+# Symptom
+The issue as the user stated it, restated precisely.
+
+# Reproduction
+How the symptom was reproduced (commands, inputs, observed output), or why it
+could not be.
+
+# Root cause
+The defect and its location (file:line), distinguished from the proximate
+symptom site. If a pipeline item introduced it, name the item and the evidence.
+
+# Recommended disposition
+One of fix / architect / no-action, with the reasoning the Orchestrator will
+audit before closing.
+```
+
+`verdict` is what the investigation found; `recommended_disposition` is what to do
+about it — they are separate fields because they can diverge (`root-cause-found` in
+a third-party dependency may still recommend `no-action`). `fix_hints` seed the
+backlog item's routing fields but do not replace the Scout: unless the item is
+fast-tracked, a research doc is still written and still gated.
+
 ## Ledger entries (ledger.json)
 
 ```json
@@ -290,3 +380,7 @@ For every `done` item the audit requires, in order: backlog entry → `research.
 `verify.json` (green) → `code-review.json` (approve) iff blast ≥ medium. Missing or
 failing links are reported by item id. The chain is cheap precisely because every gate
 already wrote its evidence when it ran — audit reads, it never re-investigates.
+
+Closed investigations are audited too: `diagnosis.md` must exist, and a `fix`
+disposition must name backlog items that exist. Open investigations are not holes —
+they are live work — but a mission is not complete while one is open.
