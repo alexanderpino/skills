@@ -163,6 +163,11 @@ criteria define done — not more, not less.
   worktree path in your brief (branch `mc/<item-id>`), never in the main tree.
   Leases prevent edit collisions; the worktree prevents your half-finished diff from
   breaking another item's build. Commit your work to the branch before handoff.
+- **Shared-tool discipline.** The worktree isolates your edits and builds, not
+  machine-shared state: every worktree's `git` hits the same `.git` common dir, and
+  cmake/package managers share global caches. Run such commands through the
+  `wait-in-line.py` wrapper named in your brief (`wait-in-line.py git fetch origin`)
+  so concurrent implementers queue on a named mutex instead of colliding.
 - **Gap escalation.** If the doc is wrong or incomplete in a way you cannot bridge
   without design judgment above your grade, escalate to the Orchestrator with the
   specific gap. You may *request* new research; only the Orchestrator grants it.

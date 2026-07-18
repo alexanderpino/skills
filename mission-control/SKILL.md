@@ -201,8 +201,13 @@ Repeat until a terminal condition fires. Each cycle:
    item's isolated worktree: `pipeline.py worktree-add <id>`. Leases stop two agents
    *editing* one file, but only build isolation stops item A's half-finished diff
    breaking item B's compile — every implementer works, builds, and is verified
-   inside its own worktree (branch `mc/<id>`), never in the main tree. Route by
-   complexity:
+   inside its own worktree (branch `mc/<id>`), never in the main tree. Worktrees do
+   not isolate machine-shared state: every worktree's `git` hits the same `.git`
+   common dir, and tools like cmake and package managers share global caches — two
+   such calls racing produce lock errors and corrupted caches. Implementer briefs
+   must instruct wrapping those commands in `scripts/wait-in-line.py`
+   (`wait-in-line.py git fetch origin`), which queues callers on a named mutex so
+   same-named calls run one at a time. Route by complexity:
    `low` → junior implementer, everything else → senior. When the complexity flag is
    uncertain, default senior: junior-on-hard produces plausible-wrong code plus a
    harder review, while senior-on-easy is only mildly wasteful. The cost is asymmetric;
@@ -315,3 +320,8 @@ declaring the mission complete, and offer the report to the user.
 - `references/contracts.md` — artifact schemas: research doc, evidence records,
   ledger entries, queue states and legal transitions. Read once at mission start.
 - `scripts/pipeline.py` — state machine CLI. `--help` lists commands.
+- `scripts/wait-in-line.py` — named-mutex command wrapper
+  (`wait-in-line.py cmake <args>`); serializes tools that share machine state
+  (git, cmake, package managers) across concurrent implementers. Lock name
+  defaults to the command's basename; `--name` widens/narrows scope,
+  `--timeout` bounds the wait.
