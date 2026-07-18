@@ -415,3 +415,66 @@ is publicly documented — that's an unsupported claim about a proprietary produ
 When someone asks "how does Gaea's Erosion node work" — the honest answer is that it isn't
 documented, here's what the *family* of algorithms it plausibly belongs to does, and here's how
 to tell from the output which one it is (`09`).
+
+## The tool-node crosswalk
+
+A fuller map from the **branded nodes** you meet in Gaea, World Machine and Houdini to the
+**algorithm family** underneath and the reference that covers it. This is the practical companion to
+"The terrain graph" in `SKILL.md`: it turns "which node do I reach for / what is this node really"
+into a routing decision. The node names are *examples*, not exhaustive, and mix tools deliberately —
+the point is the family, not the brand. **Internals stay proprietary:** this maps a node to *what
+family it must belong to*, and `09` tells you how to read the output to confirm which member. Never
+upgrade a crosswalk row into a claim about a specific paper inside a closed-source node.
+
+**Generators**
+
+| Branded node (examples) | Family | Ref |
+|---|---|---|
+| Perlin, Simplex, Voronoi / Cellular, Ridged, Billow, Worley | Noise / FBM / multifractal | `01` |
+| Mountain, Terrain, Ridge, Dunes, Canyon, Crater, Island | Primitive + noise, or a landform composition | `01`, `10`, `20` |
+| Constant, Gradient, Radial, Shape, Line, Draw / Spline | Primitives & SDF | `10` |
+| File / Import, DEM, Heightmap in | An input field — evaluate in world space, never tile-local | `08` |
+
+**Erosion & natural process**
+
+| Branded node (examples) | Family | Ref |
+|---|---|---|
+| Erosion, Erosion2, Wizard, Hydro, Channeled Erosion, `erode` | Hydraulic — pipe or droplet (ask which; `09` reads it off the output) | `04` |
+| Thermal, Thermal2, Slump, Debris, Talus | Thermal / mass wasting to the repose angle | `05` |
+| Wind, Sand | Aeolian transport / dunes | `05`, `16` |
+| Rivers, Lakes, Sea, Coast | Flow routing + fluvial / coastal | `03`, `12` |
+| Snow, Glacier | Snow accumulation / SIA glacial | `13`, `12` |
+| Sediment, Deposits, Wear, Flow, Fluvial (as *outputs*) | **Not separate algorithms** — analysis outputs of one erosion sim | `04`, `06` |
+
+**Analysis & selectors**
+
+| Branded node (examples) | Family | Ref |
+|---|---|---|
+| Slope, Angle | Slope (Horn 1981) | `06` |
+| Curvature, Convexity, Concavity | Curvature (Zevenbergen & Thorne 1987) | `06` |
+| Height / Select Height, Selective, Range, Clamp-select | Threshold + smoothstep selector → `MaskField` | `06` |
+| Flow, FlowMap, Wetness | Flow accumulation / topographic wetness index | `03`, `06` |
+| Occlusion, AO, Sky, Cavity | Horizon AO / sky-view factor | `06` |
+
+**Combiners, remaps & filters** — *where graphs quietly break*
+
+| Branded node (examples) | Family | Ref |
+|---|---|---|
+| Combine, Blend, Mixer, Merge, Layers | Operators — add / blend / smin / smax (**never bare max/mul**) | `10` |
+| Clamp, Curve, Adjust, Autolevel, Transform | Remap / histogram | `10` |
+| Warp, Shear, Fold, Twist | Coordinate warps | `10` |
+| Blur, Sharpen, Median, Denoise | Filters (prefer bilateral / guided over Gaussian) | `10` |
+
+**Scatter & output**
+
+| Branded node (examples) | Family | Ref |
+|---|---|---|
+| Scatter, Distribute, Populate | Poisson-disk / blue-noise / density-driven | `07` |
+| SatMap, Colorizer, CLUTer, Tint | Colour LUT indexed by a field | `08`, `10` |
+| Texture, Splat, Mask export | Splatmap from `06` masks | `08` |
+| Build, Export, Mesh, Unreal / Unity out | Tiling / LOD / quantise — **last, and once** | `08` |
+
+**The two rules that keep this honest:** (1) a branded node maps to a *family*, never a claimed
+internal — say "pipe or droplet, and here's how to tell" (`09`), not "it's Mei 2007". (2) The
+combiners are where graphs silently fail — `normalize`, bare `max`, and `mul`-as-mask are the defects
+`10` catalogues; a crosswalk that sends you to `10` for every "Combine" node is doing its job.

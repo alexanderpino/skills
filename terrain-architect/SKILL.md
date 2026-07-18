@@ -178,6 +178,39 @@ defect this skill exists to prevent. Consult the index before attributing anythi
 When a question lands on `?`, say so and offer to search. Usefully uncertain beats confidently
 wrong.
 
+## The terrain graph
+
+Everything in this skill is nodes in a graph, so state the model once. A terrain tool — Gaea,
+World Machine, Houdini's heightfield SOPs, or one you build (`14`) — is a **directed acyclic graph
+of pure nodes over a small set of world-space fields.** Strip the branding and all three are the same
+machine:
+
+- **A node is a typed field-transform** — a pure function from (parameters, input fields, context)
+  to output fields (`14`). "Erosion", "Combine", "Select Slope" are UI names for this; the algorithm
+  underneath is what `00` catalogues, and *the name is not the algorithm* (the six-things table
+  above).
+- **An edge is a world-space field**, carrying a named type and unit — `height:m`, `A:m²`,
+  `slope:tan`, a `MaskField` in [0,1] (Field types, below). Type and unit errors between nodes are
+  invisible at runtime and catastrophic in output; name them on every edge.
+- **The graph is a DAG evaluated to a heightfield** plus its companion layers — water, sediment,
+  snow (the layer stack in the Doctrine). The order is not free: it obeys the Legal Order (below).
+
+Nodes combine in exactly **three ways**, and confusing them is a defect class:
+
+1. **Chain** — one node writes height, the next reads it. This is the Legal Order: uplift → noise →
+   route → erode → analyse. Sequential height writes, ordered by what each process needs to exist.
+2. **Blend** — combine two fields through a mask or a smooth operator: `blend(base, height, mask)`,
+   `smin(a, b, k)` (`10`). This is how detail, regions and materials are layered — *not* bare `max`
+   (creases) or `mul` (scales absolute elevation, not relief; `10`).
+3. **Parameterise** — one substrate, with masks *varying a process's parameters* per region (`06`,
+   `13`). A multi-biome world is one graph whose `K`, uplift and climate fields differ by locale —
+   **never two finished terrains blended together** (`13`, `20`).
+
+Where the knowledge lives: the **operators** that combine nodes and their pitfalls are `10`; the
+**substrate** that runs the graph (typed ports, caching, tiling, preview) is `14`; **worked
+assemblies** of whole graphs are the archetype blueprints in `20`; and the map from a tool's branded
+node to the algorithm under it is the **tool-node crosswalk** in `00`.
+
 ## Field types
 
 Every graph edge carries a typed field. Name the type and the unit; type errors between nodes
@@ -315,7 +348,7 @@ the constants matter and are easy to get subtly wrong.
 
 | Reference | Covers |
 |---|---|
-| `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification. **Consult before attributing anything.** |
+| `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification & the **tool-node crosswalk** (Gaea / World Machine / Houdini branded node → algorithm family → reference). **Consult before attributing anything.** |
 | `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
 | `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults, isostasy & flexure (Airy/flexural, glacial & erosional rebound) |
 | `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), river terraces (strath/fill), avulsion & delta lobes, water sources & discharge, sea level |
