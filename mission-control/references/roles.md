@@ -24,6 +24,17 @@ Produce `backlog.json` entries per the contract. Each item must be:
   an item touches, it's too big; split it.
 - **Prioritized** — dependency order first, then value. An item whose output another
   item consumes goes first.
+- **Throughput-shaped (conditional)** — when the mission records
+  `throughput.maximize: true`, additionally organize for parallelism: put
+  skeleton/structure items first (interfaces, scaffolding, frozen data layouts)
+  whose completion unlocks many items at once, and cut sibling items so their
+  predicted touch-lists are disjoint — overlapping touch-lists serialize on the
+  ownership ledger no matter how many implementers exist. This reshapes
+  decomposition and ordering only: stay as close to the task's natural
+  decomposition as parallelism allows, never invent items to fill slots, and never
+  trade acceptance-criteria rigor or the final result for width. If the goal is an
+  inherent dependency chain, say so in the backlog notes rather than forcing a
+  parallel shape that isn't there.
 - **Constraint-carrying** — record the structural decisions Scouts must respect:
   which subsystems exist, which may not be created, which data layouts / public
   interfaces are frozen. Cross-cutting decisions belong to you, not to Scouts; a Scout

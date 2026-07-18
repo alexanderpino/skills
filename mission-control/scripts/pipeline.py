@@ -177,6 +177,7 @@ def cmd_init(args):
                                 "max_items_completed": None,
                                 "token_budget": None, "deadline": None},
         "concurrency": {"implementers": 2, "scouts": 2},
+        "throughput": {"maximize": False, "decided_by": "user", "reason": None},
         "lease_ttl_minutes": 90,
         "bounce_limit": 3,
         "repo_oracle": {"build": b_cmd, "test": t_cmd, "lint": None},
@@ -188,7 +189,7 @@ def cmd_init(args):
     st.save("ledger", {"leases": []})
     st.save("agenda", {"next_id": 1, "notes": []})
     print(f"initialized {root} — edit mission.json (goal, repo_oracle, "
-          f"terminal_conditions) before starting the loop")
+          f"terminal_conditions, throughput) before starting the loop")
 
 
 def cmd_add_item(args):
@@ -430,6 +431,9 @@ def cmd_status(args):
         by_state.setdefault(it["state"], []).append(it["id"])
     open_items = [i for i in backlog["items"] if i["status"] == "open"]
     print(f"goal: {mission['goal']}")
+    tp = mission.get("throughput") or {}
+    if tp.get("maximize"):
+        print(f"throughput: maximize (decided by {tp.get('decided_by', 'user')})")
     print(f"backlog open: {len(open_items)} "
           f"({', '.join(i['id'] for i in sorted(open_items, key=lambda x: x['priority'])[:5])}"
           f"{'…' if len(open_items) > 5 else ''})")

@@ -107,9 +107,25 @@ Before spawning anything, pin down with the user (or from their prompt):
    backlog empty + queues drained, N items completed, token/time budget, or explicit
    user stop. Record in `mission.json`. A pipeline whose only invariant is "keep the
    queue filled" has no stop and therefore no budget — never run one.
-3. **Concurrency limits** — max simultaneous implementers (default 2; each needs
-   disjoint leases), max scouts (default 2).
-4. **Repo ground truth** — build command, test command, lint command. These are the
+3. **Throughput posture** — ask the user directly: *"Should I organize this mission
+   to maximize throughput?"* Maximizing means the Architect may reorganize the
+   decomposition for parallelism: front-loading skeleton/structure items
+   (interfaces, scaffolding, frozen data layouts) whose completion unlocks many
+   items to build concurrently, and cutting sibling items so their touch-lists are
+   disjoint. It never means weakening a gate — quality bars and the final result
+   are invariant; only decomposition and ordering may change, and they stay as
+   close to the task's natural shape as parallelism allows. In fully autonomous
+   mode (the user asked for autonomy, or isn't available to answer), decide
+   yourself: prefer maximize when the goal splits into loosely coupled items and
+   the concurrency budget exceeds one implementer; prefer natural order when the
+   work is an inherent dependency chain, or the repo oracle is shaky enough that
+   wide parallel failure would be expensive to unwind. Record the choice, who made
+   it, and (if you decided) the reasoning in `mission.json` under `throughput`.
+4. **Concurrency limits** — max simultaneous implementers (default 2; each needs
+   disjoint leases), max scouts (default 2). When throughput is maximized, raise
+   these to the widest the ledger can keep disjoint — parallelism is the point,
+   but one writer per file remains absolute.
+5. **Repo ground truth** — build command, test command, lint command. These are the
    Verifier's oracle; if they don't exist, that's the first backlog item, because
    without an oracle the whole build side is faith-based.
 
@@ -119,6 +135,13 @@ Spawn the **Architect** (see `references/roles.md#architect`) with the goal. It
 produces the initial backlog: coherently bounded items, prioritized, each with the
 structural constraints Scouts must respect. If a `principal-architect` skill is
 installed, the Architect must follow it as canonical.
+
+If `mission.json` records `throughput.maximize: true`, say so in the Architect's
+brief: the backlog must be throughput-shaped per `references/roles.md#architect` —
+skeleton/structure first so the widest set of items becomes buildable in parallel
+behind it, sibling touch-lists disjoint. The decomposition stays as close to the
+original task as possible; reorganize only where it buys real parallelism, and never
+manufacture filler items to keep slots busy — the governing principle still holds.
 
 The Architect's backlog is itself gated: present it to the user for a one-time
 sign-off before the loop starts (or, in fully autonomous mode, have the Plan Reviewer
@@ -150,7 +173,10 @@ Repeat until a terminal condition fires. Each cycle:
    obsolete — a stale agenda misleads exactly like a stale queue.
 2. **Feed the plan side.** If `approved` count < concurrency limit × 2 and backlog has
    items, spawn Scouts (up to the scout limit) on the highest-priority unclaimed
-   backlog items. One item per Scout — single-tasking keeps docs coherent.
+   backlog items. One item per Scout — single-tasking keeps docs coherent. In
+   maximize-throughput mode, break priority ties toward the item that unblocks the
+   most dependents (`depends_on` fan-out) — a skeleton item researched early widens
+   every later cycle.
 3. **Gate incoming docs.** For each doc a Scout returns: spawn a Plan Reviewer.
    On sign-off, check blast-radius:
    - `low` / `medium` → transition straight to `approved`. Reviewer sign-off suffices.

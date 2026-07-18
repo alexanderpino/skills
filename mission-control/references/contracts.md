@@ -51,6 +51,7 @@ fails.
     "deadline": null
   },
   "concurrency": { "implementers": 2, "scouts": 2 },
+  "throughput": { "maximize": false, "decided_by": "user", "reason": null },
   "lease_ttl_minutes": 90,
   "bounce_limit": 3,
   "repo_oracle": {
@@ -67,6 +68,12 @@ fails.
 
 At least one terminal condition must be non-null/true. `repo_oracle.build` and
 `repo_oracle.test` are mandatory before any item may enter `building`.
+
+`throughput.decided_by` is `"user"` when the Orchestrator asked and the user
+answered, `"orchestrator"` when running autonomously — in which case `reason` is
+mandatory (one line: why maximize was or wasn't chosen). The flag licenses the
+Architect's throughput-shaping only; it never changes gate tiers, bounce limits, or
+evidence requirements.
 
 ## Backlog item (entries in backlog.json)
 
