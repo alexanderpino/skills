@@ -28,6 +28,7 @@ signal); 124 if --timeout expired waiting for the lock; 127 command not found.
 import argparse
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -135,7 +136,7 @@ def main():
         try:
             fh.seek(0)
             fh.truncate()
-            fh.write("pid %d: %s\n" % (os.getpid(), " ".join(command)))
+            fh.write("pid %d: %s\n" % (os.getpid(), shlex.join(command)))
             fh.flush()
         except OSError:
             pass  # holder info is diagnostic only
