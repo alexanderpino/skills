@@ -57,8 +57,9 @@ else:
 
 
 def lock_path(name):
+    user = os.environ.get("USER") or os.environ.get("USERNAME") or "shared"
     lock_dir = os.environ.get("WAIT_IN_LINE_LOCK_DIR") or os.path.join(
-        tempfile.gettempdir(), "wait-in-line"
+        tempfile.gettempdir(), f"wait-in-line-{user}"
     )
     os.makedirs(lock_dir, exist_ok=True)
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name) or "default"
