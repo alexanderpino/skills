@@ -134,3 +134,73 @@ Coastlines are an **erosion output, not an input**. A coastline authored by thre
 has fractal wiggle but no relationship to the drainage — rivers will meet the sea at arbitrary
 points instead of in estuaries. If coastline quality matters, set sea level *after* erosion and
 let the drainage network define where the estuaries are.
+
+## Isostasy & flexure
+
+Everything else in this file *adds or removes load*: uplift builds crust, erosion (`04`) strips it,
+ice (`12`) piles on and melts off. **Isostasy is the vertical response to that load** — the crust
+floats on a denser mantle, so it sinks under a load and rebounds when the load goes. Leave it out and
+a range just erodes downward; put it in and the range *rises as it erodes*, which is the real
+long-term behaviour and reshapes the whole profile.
+
+**Airy (local) — the cheap baseline.** Each column floats independently; a topographic load of height
+`h` presses a root of depth `r` into the mantle (Turcotte & Schubert 2014; Watts 2001):
+
+```
+r = ρc · h / (ρm − ρc)          # ρc ≈ 2700–2800, ρm ≈ 3300 kg/m³  →  r ≈ 5–6 · h
+```
+
+A per-cell multiply, no neighbour coupling — nearly free, but wrong at short wavelengths: a narrow
+load doesn't sink as if it were infinitely wide, because the plate has strength.
+
+**Flexural — the plate is stiff.** The lithosphere behaves as a thin elastic plate over an inviscid
+mantle, so a load deflects it over a *region*, not one column (Watts 2001; Turcotte & Schubert 2014):
+
+```
+D · ∇⁴w + (ρm − ρinfill) · g · w = q(x,y)     # w = deflection (down +), q = load [Pa]
+D = E · Te³ / [12(1 − ν²)]                      # flexural rigidity [N·m]
+```
+
+with `E ≈ 70–100 GPa` (Young's modulus), `ν ≈ 0.25` (Poisson), and `Te` the **effective elastic
+thickness** — the one knob that matters, from a few km (weak, hot lithosphere) to tens of km (old,
+cold). The response width is the flexural parameter `α = [4D / ((ρm − ρinfill)·g)]^¼`. The practical
+way to solve it over a heightfield is **in the Fourier domain**, where `∇⁴` is a multiply:
+
+```
+q = ρc · g · h ;  Q = FFT2(q)
+W = Q / (D · k⁴ + (ρm − ρinfill) · g)          # k = radial wavenumber; the plate transfer function
+w = IFFT2(W) ;  h_isostatic = h − w             # subside under loads, rebound at deficits
+```
+
+This convolves the load with the plate's response kernel — long wavelengths compensate almost fully
+(the Airy limit), short ones ride on the plate's stiffness, and `Te` sets where the crossover sits.
+
+**Erosional rebound — why peaks can rise as a range wears down.** Erosion removes *mean* load, so the
+range rebounds by ~`ρc/ρm ≈ 0.8` of the mean thickness stripped. Carve deep valleys but leave the
+summits, and the summits go *up* with zero tectonic uplift — **Molnar & England 1990**'s chicken-or-
+egg caution: measured peak uplift is not by itself proof of tectonic uplift. Couple it to the erosion
+pass (`04`):
+
+```
+rebound = (ρc/ρm) · smoothOver(α, erodedThickness)     # spread over the flexural width α
+h += rebound
+```
+
+**Glacial isostatic adjustment (rebound) — the mantle is viscous, so it lags.** Under an ice load the
+crust sinks; when the ice melts it rebounds over *millennia*, because the mantle flows on a relaxation
+timescale (Peltier 1974; Peltier 2004). Model it as exponential relaxation toward the new equilibrium,
+fastest at long wavelengths:
+
+```
+τ(λ) = 4π·η / (ρm · g · λ)                      # η ≈ 10²¹ Pa·s mantle viscosity; long λ relax first
+w(t+Δt) = w_eq + (w(t) − w_eq) · exp(−Δt/τ)
+```
+
+This is what strands raised beaches and tilts old shorelines around formerly glaciated coasts
+(Fennoscandia, Hudson Bay) — the same lifted-shoreline signature the marine-terrace loop reads
+(`12`), here driven by rebound rather than tectonics.
+
+**Tier.** Airy and flexural isostasy and the GIA relaxation are standard geophysics, P-tier
+(Turcotte & Schubert 2014; Watts 2001; Peltier 1974, 2004); erosional-unloading rebound is Molnar &
+England 1990 (P). The spectral flexure solve is the standard F-tier implementation of that P-tier
+equation — no separate paper, it's just where you compute `∇⁴` cheaply.

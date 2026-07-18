@@ -220,7 +220,7 @@ order before you check the maths.
   1  Macro / tectonics        uplift field U, base relief          → 02
   2  Base shape               primitives, large-scale noise        → 01
   3  Detail noise             FBM / ridged / warp                  → 01
-  3b Volcanic (if volcanic)   edifices, lava flows & fields        → 11, 19
+  3b Volcanic (if volcanic)   edifices, lava, tephra/PDCs/caldera  → 11, 19
   4  Depression handling      fill or breach (MANDATORY)           → 03
   5  Flow routing             D8 / D∞ / MFD → drainage area A      → 03
   6  Fluvial erosion          stream power / pipe / droplet        → 04
@@ -229,7 +229,7 @@ order before you check the maths.
   8  Aeolian                  wind / dunes (if arid)               → 05
   9  Water surfaces           lakes, sea level                     → 03
   9b Coastal & marine         waves, tides, terraces, reefs        → 12
-  9c Floodplain rivers        meandering, oxbows, braids           → 03
+  9c Floodplain rivers        meandering, oxbows, braids, terraces, avulsion → 03
  10  Analysis                 slope, curvature, flow, AO, wetness  → 06
  11  Masks → materials        derive from analysis, never before   → 06
  12  Scatter                  Poisson / blue noise from density    → 07
@@ -252,6 +252,10 @@ The laws that actually bite:
   floodplain process and comes after the valley-scale height writes (9c). Karst is not a step at
   all — it is fluvial/dissolution erosion *gated by a soluble lithology* (`11`). And analysis
   (step 10) still comes after **all** of them.
+- **Isostasy is a feedback, not a step.** Loading and unloading — uplift, erosion, ice — make the
+  crust sink and rebound, so isostasy couples to the *whole* loop; run it as a slow response
+  alongside erosion (6), not as a one-shot node. On a range it *raises the peaks as the valleys
+  incise* (`02`, Molnar & England 1990); around former ice it strands raised shorelines (`12`).
 - **Erosion is not tile-local.** Sediment crosses tile boundaries. Any erosion run
   per-tile without an apron produces visible seams that no amount of blending will hide.
   See `references/08-output-contract.md`.
@@ -313,17 +317,17 @@ the constants matter and are easy to get subtly wrong.
 |---|---|
 | `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification. **Consult before attributing anything.** |
 | `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
-| `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults |
-| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), water sources & discharge, sea level |
+| `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults, isostasy & flexure (Airy/flexural, glacial & erosional rebound) |
+| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), river terraces (strath/fill), avulsion & delta lobes, water sources & discharge, sea level |
 | `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls, grain size / bedload / gravel bars (pebbles & clasts) |
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
+| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, planetary/spherical domains (cube-sphere, HEALPix, seam routing), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
-| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), weathering & soil production, volcanic landforms & lava (flows, fields, lakes, lava worlds), impact craters, overhangs — and when the heightfield is the wrong representation |
-| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; coastal & marine erosion, cliff retreat, wave-cut platforms, lacustrine (lake) shores, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base, coral reefs & atolls |
+| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), weathering & soil production, volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), impact craters, overhangs — and when the heightfield is the wrong representation |
+| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; glacial outburst floods & megafloods (jökulhlaups, Channeled Scabland); coastal & marine erosion, cliff retreat, wave-cut platforms, lacustrine (lake) shores, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base, coral reefs & atolls, coral as ecosystem (growth forms, zonation, spur-and-groove); seafloor age–depth subsidence, seamounts/guyots, submarine canyons & turbidity currents |
 | `references/13-climate-ecosystem.md` | Lapse rate, terrain-adjusted wind fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; fire & burned land (spread, severity mosaic, post-fire erosion); multi-biome worlds / regional composition (Hyrule, Middle-earth) |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |

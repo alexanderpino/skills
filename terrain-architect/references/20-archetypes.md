@@ -1119,6 +1119,17 @@ Same discipline, briefer — each still a composition, not an algorithm:
   archetype people forget: near-zero uplift on ancient rock → very low relief, old/deranged drainage,
   thin soil over scoured bedrock (`02` uplift-off + long erosion). Every world needs its calm
   interior.
+- **Channeled scabland / megaflood tract** *(Columbia Plateau, Washington; Icelandic jökulhlaup
+  sandurs)* — a catastrophic outburst flood (`12`) routed over jointed bedrock: anastomosing dry
+  **coulees**, **cataracts** and plunge pools (Dry Falls), **giant current ripples** and streamlined
+  **loess islands**, all sized to a flood hundreds of metres deep. The tell is **scale mismatch** —
+  landforms far too big for any current stream. On a dry world the same suite with the water switched
+  off is a fossil megaflood (entry 29, Beggar's Canyon).
+- **Seamount chain & guyot** *(Hawaiian–Emperor chain, Pacific guyots)* — the deep-sea sibling of
+  entry 20's atoll: an **age-progressive** line of hotspot volcanoes (`02`/`11`) subsiding on the
+  **√age** curve (`12`), each wave-truncated flat and carried down as a **guyot**; the youngest still
+  emergent, the oldest long drowned. Darwin's subsidence sequence continued past the reef, and a
+  bathymetry archetype for a planet whose seafloor is visible terrain.
 
 ## Combining archetypes
 

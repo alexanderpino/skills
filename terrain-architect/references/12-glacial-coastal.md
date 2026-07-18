@@ -3,6 +3,7 @@
 Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#mass-balance) ·
 [Glen's flow law & SIA](#glens-flow-law--the-shallow-ice-approximation) ·
 [Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) ·
+[Outburst floods & megafloods](#glacial-outburst-floods--megafloods) ·
 [Coastal: be honest](#coastal-be-honest) · [Wave exposure](#wave-exposure) ·
 [Cliff retreat & beaches](#cliff-retreat--beaches) ·
 [Lacustrine (lake) shores](#lacustrine-lake-shores) ·
@@ -10,7 +11,8 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
 [Wave base & the submarine profile](#wave-base--the-submarine-profile) ·
-[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Coral reefs & atolls](#coral-reefs--atolls)
+[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Coral reefs & atolls](#coral-reefs--atolls) ·
+[Seafloor, ridges & submarine processes](#seafloor-ridges--submarine-processes)
 
 ## Glacial: why it matters
 
@@ -170,6 +172,63 @@ the second exception (after karst, `11`) to the mandatory-fill rule in `03`. Gla
 *creates* depressions, which is why glaciated terrain is full of lakes and fluvial terrain
 isn't. If your fill node runs after glacial erosion with no mask, you have erased the most
 recognisable signature of the process.
+
+## Glacial outburst floods & megafloods
+
+The largest freshwater floods in Earth's history were not rain — they were **water released
+catastrophically from behind or beneath ice**. Two source mechanisms, one landform signature:
+
+- **Jökulhlaup (subglacial outburst)** — meltwater or a subglacial lake escapes through a tunnel in
+  the ice, and the tunnel **enlarges by frictional melting as flow rises, in a runaway feedback**
+  (Nye 1976): more discharge melts a wider tunnel, which carries more discharge. The hydrograph is the
+  tell — a **slow exponential rise over days, then an abrupt cutoff** as the lake empties and the
+  tunnel creeps shut:
+  ```
+  dS/dt = m/ρ_ice − creepClosure(S, p_ice − p_water)     # melt-open minus Glen-law closure
+  Q     = (S/n) · R_h^(2/3) · √(hydraulicGradient)        # Manning; grows as the tunnel S grows
+  # lake mass balance closes the loop: dV_lake/dt = Q_in − Q,  a runaway until V_lake → 0
+  ```
+  Nye 1976; extended by Clarke 1982, 2003; Icelandic type locality Björnsson 2003. Walder & Costa
+  1996 note that *non-tunnel* drainage (an ice dam failing bodily) gives a **higher, sharper** peak
+  than tunnel drainage.
+- **Glacial-lake-outburst flood (ice-dam failure)** — an ice-dammed lake fails and empties in days.
+  Glacial Lake Missoula doing exactly this is the **Channeled Scabland** source (Bretz 1923, 1969 —
+  the once-ridiculed "outrageous hypothesis", later vindicated; Baker 1973; Baker & Nummedal 1978).
+
+Route the released hydrograph over the DEM as an **extreme-discharge flood** (`03` routing, `04`
+erosion at very high shear stress) and the **megaflood landform suite** falls out — all L-tier
+composition targets, not algorithms:
+
+| Landform | How it forms |
+|---|---|
+| **Scabland** | Basalt stripped of its loess/soil cover where shear stress exceeds threshold; anastomosing scoured channels |
+| **Coulee** | A large flood-cut canyon, often now dry (Grand Coulee) |
+| **Giant current ripples** | Gravel dunes, wavelength ~20–200 m, transverse to flow — bedforms scaled to flood *depth*, not to a normal river |
+| **Streamlined residual island** | A teardrop hill of pre-flood loess, blunt upstream and tapered downstream, left where shear stayed below threshold |
+| **Cataract & plunge pool** | A recessional knickpoint (Dry Falls) with a deep scour basin — a waterfall (`04`) at megaflood scale |
+| **Loess island** | An uneroded silt upland isolated between scoured tracts |
+
+```
+megaflood(h, hydrograph):
+    for Q in hydrograph:                              # the Nye / Missoula release curve
+        route Q over the DEM (shallow water; 03)
+        τ = ρ_water · g · depth · slope               # bed shear stress
+        if τ > τ_c(material):  h -= K_e·(τ − τ_c)·Δt  # strip loess → scabland; cut coulees
+        deposit gravel where velocity drops (eddies, expansions) → giant-ripple field
+        retreat knickpoints headward at scarps        → cataracts / Dry Falls (04)
+    # cells that never exceed τ_c survive as streamlined loess islands
+```
+
+**Watch for** treating these as ordinary river valleys — the diagnostic is **scale mismatch**: ripples
+and bars sized to a flood hundreds of metres deep, dry coulees far too big for any current stream, and
+cataracts with no river above them. On a dry world (Mars' outflow channels, `20` entry 29; Beggar's
+Canyon) the *same* suite with the water switched off is the signature of a vanished catastrophic
+flood.
+
+**Tier.** The jökulhlaup tunnel-enlargement physics and hydrograph are P (Nye 1976; Clarke 1982,
+2003; Walder & Costa 1996; Björnsson 2003); the Missoula-flood interpretation of the Scabland is P
+(Bretz 1923, 1969; Baker 1973). The individual megaflood landforms are L compositions over
+extreme-discharge `03`/`04`.
 
 ## Coastal: be honest
 
@@ -454,3 +513,135 @@ water table authors tower karst (`11`).
 **Tier.** No graphics paper — atolls are **L-tier**, a composition of a volcanic primitive
 (`02`/`11`), subsidence, photic-zone coral accretion, and wave exposure. The subsidence theory is
 Darwin 1842; the recipe above is the honest way to realise it in a heightfield.
+
+### Coral as an ecosystem — growth forms & zonation
+
+`reefStep` above treats the reef as an **accreting height** — right for the atoll's *shape*, but a
+real reef surface is a **living cover**, and it is placed like one: the marine sibling of the
+vegetation ecosystem in `13`/`07`. Coral really is a kind of foliage — a benthic community whose
+**growth forms zone by light and wave energy**, which is exactly the constraint-based scatter of `07`
+driven by masks from `06`. Two environmental drivers set everything:
+
+- **Light falls off with depth** (Beer–Lambert), and coral growth saturates with it (a
+  photosynthesis–irradiance curve):
+  ```
+  I(z) = I₀ · exp(−K_d · z)          # K_d ≈ 0.03–0.06 /m clear water, 0.1–0.2 /m turbid
+  growth ∝ tanh(I(z) / I_k)          # saturates above I_k; → 0 near the compensation depth
+  ```
+  This is the same photic gate that pins `reefStep`'s crest at sea level — here it also selects
+  *form*. **Graus & Macintyre 1976** (*Science*) showed by computer simulation that light alone
+  controls colony growth form.
+- **Wave energy** falls off with depth too (near-bed orbital velocity, linear wave theory) and rises
+  on the exposed rim — the `12` exposure/fetch sweep is the cheap proxy. **Chappell 1980** ties coral
+  morphology to the *combination* of light and mechanical wave stress.
+
+Growth form is then a **lookup on (light, energy)** — the reef-zonation pattern (Done 1982, 1983):
+
+| Zone | Light | Wave energy | Dominant form |
+|---|---|---|---|
+| Reef crest / very shallow | high | high | robust branching, encrusting, low massive |
+| Reef flat / back-reef | high | low–moderate | massive, hemispherical, digitate |
+| Upper fore-reef | high | moderate | tabular / table corals, arborescent |
+| Mid–deep fore-reef | moderate → low | low | foliose, plate/laminar (maximise light capture) |
+| Near photic limit | low | low | thin plate → encrusting; growth → 0 |
+
+Within a form, **flow sets branch openness** — the accretive-growth models of **Kaandorp et al. 1996**
+(*Phys. Rev. Lett.*), **Merks et al. 2003** (*J. Theor. Biol.*) and **Kaandorp & Kübler 2001** show it
+as a diffusion-versus-flow competition (a Péclet number `Pe = U·L/D`): strong flow → compact, thick
+colonies; weak flow → open, thin branches.
+
+```
+coralCover(cell):
+    if cell.depth ≤ 0 or cell.depth > photicDepth: return none       # subaerial or aphotic → no coral
+    L = tanh(I(cell.depth) / I_k)                                     # light mask (06)
+    E = exposure(cell)                                               # wave-energy mask (12 fetch sweep)
+    density = L · gaussian(E, E_opt, E_σ) · hardSubstrate(cell)       # colonies/m²; peaks at mid energy
+    form    = lookupForm(L, E)                                       # the zonation table above
+    openness = clamp(1 − Pe(cell)/Pe_ref, 0, 1)                      # low flow → open branching
+    instances = poissonDisk(cell, density, r = colonyRadius(form))   # 07 scatter
+    orient branching/tabular colonies into the swell (a 07 direction field)
+```
+
+**Spur-and-groove** — the ribbed fore-reef of shore-normal coral ridges (spurs) and sand-floored
+grooves — is the reef's most distinctive meso-texture, and it self-organises with the **grooves
+pointed into the dominant swell** (Shinn 1963; Storlazzi et al. 2003; **Duce et al. 2016**, who found
+groove length and orientation track wave exposure across thousands of grooves). Realise it as a
+ridge–valley mask on the fore-reef band (`06` curvature) oriented by swell direction, modulating both
+the reef height and the `coralCover` density.
+
+**Tier.** Growth-form-controlled-by-light is P (Graus & Macintyre 1976; Chappell 1980); the
+accretive-growth morphogenesis is P (Kaandorp et al. 1996; Merks et al. 2003; Kaandorp & Kübler
+2001); zonation is P (Done 1982, 1983); spur-and-groove is P (Shinn 1963; Duce et al. 2016). Placing
+the community as density-and-form scatter over `06` masks is the F/L realisation — coral as the
+seafloor's foliage layer (`07`), not a new algorithm.
+
+## Seafloor, ridges & submarine processes
+
+The atoll that keeps subsiding past the photic zone doesn't stop — it drowns, and its dead flat top
+sinks into deep water as a **guyot**. That is the hand-off from the shallow marine story to the deep
+one: the ocean floor is terrain too, and it has its own shape-makers. Three matter.
+
+**1. Ridge age–depth subsidence — why ocean basins deepen away from the ridge.** New seafloor is born
+hot at a mid-ocean ridge and *sinks as it cools and contracts* with age, following a **√age** law
+(half-space cooling; **Parsons & Sclater 1977**):
+
+```
+d(t) = d₀ + C · √t          # t = crustal age [Myr];  d₀ ≈ 2500 m, C ≈ 350 m/√Myr  (valid t ≲ 70 Myr)
+```
+
+For old crust the curve flattens to a plateau (~5–6 km); the **plate model** GDH1 (**Stein & Stein
+1992**) captures both regimes. In a graph this is a **remap of a seafloor-age field to depth** — not
+an erosion pass — and it is the correct way to get the ridge-crest-to-abyssal-plain profile that the
+margin note in `02` only sketched. The ridge itself is a `02` divergent boundary; the age field grows
+outward from it.
+
+**2. Hotspot tracks, seamounts & guyots.** A stationary mantle hotspot under a moving plate builds an
+**age-progressive chain** of volcanoes (Wilson 1963; Morgan 1971 — the mantle-plume hypothesis, still
+actively debated, so attribute it as a hypothesis, not settled fact). Each edifice ages and subsides
+on the same √age curve as it rides away from the source; an emergent volcano truncated flat by waves
+and then carried down becomes a **flat-topped guyot** (**Hess 1946**). This is the same `11`-edifice +
+subsidence machinery as Darwin's atoll sequence — a guyot is what an atoll becomes when subsidence
+outruns coral.
+
+```
+for edifice i along the plate-motion line:
+    age_i = distanceFromHotspot_i / plateSpeed         # plateSpeed ~ 0.05–0.10 m/yr
+    build cone (11);  crest -= subsidence(age_i)        # the same √age subsidence
+    if crest ever rose above sea level: planeFlatAtWaveBase → guyot (Hess 1946)
+```
+
+**3. Submarine canyons & turbidity currents — the one real deep-water sim.** Below wave base the sea
+does not carve (the honesty frame above) — *except* where a **turbidity current** runs: a dense,
+sediment-laden underflow that races down the continental slope, cuts submarine canyons, and builds
+deep-sea fans. It is a **gravity/density current**, the underwater sibling of the fluvial machinery,
+and it has a real layer-averaged model (**Parker, Fukushima & Pantin 1986**; review: **Meiburg &
+Kneller 2010**). The three conserved quantities are water, suspended sediment, and momentum:
+
+```
+d(U·h)/dx    = e_w · U                        # entrains ambient water (the current grows downslope)
+d(U·h·C)/dx  = v_s · (E_s − r₀·C)             # picks sediment up / drops it at the bed
+d(U²·h)/dx   = R·g·C·h·S − drag               # driven by excess density × slope
+#   U = velocity, h = thickness, C = concentration, R = submerged specific gravity, S = slope
+#   Ri = R·g·C·h / U²   (bulk Richardson number)
+```
+
+The paper's result is **autosuspension**: when the current entrains more bed sediment than it drops,
+`C` and `U` grow downslope — a self-accelerating runaway, and exactly why a turbidity current can run
+hundreds of km and carve a canyon. The deposit it leaves fines upward as the flow wanes — the **Bouma
+sequence** (Bouma 1962; Middleton 1993).
+
+```
+turbidityRun(h, path):                                 # path = steepest descent below the shelf break
+    U, C, thick = ignite()
+    for step ds along path:
+        Ri = R·g·C·thick / U²
+        integrate the three equations (RK4) → update U, C, thick
+        net = v_s·(E_s − r₀·C)
+        if net < 0:  h -= erode(U)      → carves the submarine CANYON
+        else:        h += deposit(net)  → builds the FAN lobe; stamp a Bouma bed
+```
+
+**Tier.** Age–depth subsidence is P (Parsons & Sclater 1977; Stein & Stein 1992). The hotspot/plume
+origin of chains is a P-tier *hypothesis* (Wilson 1963; Morgan 1971); guyot truncation is Hess 1946
+(P). The turbidity-current model is P (Parker, Fukushima & Pantin 1986; Meiburg & Kneller 2010);
+seamounts, guyots, canyons and fans as *landforms* are L compositions over it.

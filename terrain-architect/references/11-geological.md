@@ -346,6 +346,74 @@ dark plates and incandescent cracks (the `08` emissive material below).
 once you substitute the fluid. Tier: the rheology is P (Hulme 1974), the world is an L-tier
 composition; there is no "lava planet paper" and none is needed.
 
+### Explosive volcanism — tephra, PDCs & calderas
+
+The lava sections above are **effusive** — magma flows out. **Explosive** eruptions fragment it and
+throw it, building (and destroying) different landforms. Three processes, three families:
+
+**Tephra fallout — an ash blanket that mantles the terrain.** Fragmented ash and lapilli rise in a
+plume, drift downwind, and settle, draping the topography like snow (the "tephra mantle" of the cone
+recipe above). Deposit thickness **thins roughly exponentially with distance** from the vent
+(**Pyle 1989**):
+
+```
+T(r) = T₀ · exp(−k · r)             # r = distance from vent; k = thinning coefficient
+                                     # stretch r downwind (an ellipse, not a circle) for wind
+```
+
+The full physics is an **advection–diffusion–sedimentation** transport of each grain-size class —
+wind advects, turbulence diffuses, gravity settles at a size-dependent terminal velocity (Suzuki
+1983; Armienti et al. 1988; the widely-used TEPHRA2 analytic form is Bonadonna et al. 2005). For a
+heightfield the exponential (or power-law) drape above is enough: a **deposition** field added to
+height plus a material (`18` ash), thickest near the vent and downwind. Ash mantles *everything*,
+slopes included, and is then reworked by `04`/`05` — a young ashfall is smooth, an old one gullied.
+
+**Pyroclastic density currents (PDCs) — the ground-hugging flows.** A collapsing column or dome sheds
+a hot, dense mixture of gas and particles that runs downslope as a gravity current, following valleys
+and overrunning low ridges. The cheap, robust runout model is the **energy cone / energy line**
+(Sheridan 1979; **Malin & Sheridan 1982**, *Science*): the flow reaches any point where an "energy
+line" dropping from the collapse height at a fixed slope stays above the ground:
+
+```
+μ = H/L = tan φ                      # Heim coefficient; large PDCs μ ≈ 0.1–0.3
+z_EL(x) = z_vent + H_c − μ · x       # energy line from collapse height H_c
+inundated where z_EL(x,y) > z_topo(x,y);  local speed v = √(2g · (z_EL − z_topo))
+```
+
+That is a distance-field sweep from the vent (`06`) gated by topography — cheap, deterministic, and it
+captures the defining behaviour that PDCs **pond in valleys and are blocked by ridges**. The physical
+tier up is a **depth-averaged granular flow** with Coulomb basal friction (Savage–Hutter; TITAN2D,
+**Patra et al. 2005**) — the same shallow-water family as the pipe model (`04`); the dilute turbulent
+alternative is Dade & Huppert 1996. The deposit is an **ignimbrite** sheet (Branney & Kokelaar 2002),
+a low-`K` welded tuff that later erodes into the hoodoos and tuff towers of archetype 11 (Cappadocia).
+
+**Caldera collapse — the volcano falls into its own emptied chamber.** A large eruption drains the
+magma chamber; the unsupported roof founders along ring faults, dropping a **piston** of crust and
+leaving a broad collapse basin far larger than any vent crater. First-order subsidence is mass
+conservation (Roche & Druitt 2001; Geshi et al. 2002; Cole et al. 2005; Acocella 2007):
+
+```
+s = V_erupted / A_caldera           # floor drop = erupted volume / caldera area
+                                     # coherent piston favoured when roof aspect R/h_roof ≳ 1
+calderaCollapse(h, centre, R, s, w):
+    for cell:
+        d = dist(cell, centre)
+        if d < R − w:  h -= s                       # inside the ring fault: piston floor drops
+        elif d < R:    h -= s · (R − d)/w           # the ring-fault scarp wall
+    # then: fill with a lake (03, no-fill), raise a resurgent dome, or flood with later lava
+```
+
+This grounds the "Caldera — collapse basin" row above and the Crater Lake / Santorini archetype (`20`,
+entry 16): a caldera is **not** a big impact crater — it is a *collapse* structure, so stamping a
+scaled-up impact bowl gets the shape wrong (no raised rim, no central peak; a flat foundered floor
+ringed by fault scarps).
+
+**Tier.** Pyle's thinning law and the advection–diffusion tephra models are P (Pyle 1989; Suzuki
+1983; Armienti et al. 1988; Bonadonna et al. 2005); the energy-cone PDC model is P (Sheridan 1979;
+Malin & Sheridan 1982) with the granular sim P (Patra et al. 2005); caldera-collapse scaling is P
+(Roche & Druitt 2001; Cole et al. 2005). The heightfield realisations — drape, sweep, piston stamp —
+are the F-tier looks over those P-tier physics.
+
 ## Impact craters
 
 Only a "crater" primitive exists today, but real craters have a well-constrained morphology that

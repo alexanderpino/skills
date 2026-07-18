@@ -116,6 +116,12 @@ of what's reliable here.
 | Feature-primitive terrain authoring | P | Génevaux et al. 2015, CGF 34(6) — construction tree of peaks/ridges/rivers/cliffs (`13`) |
 | Example-based world / element authoring | P | Emilien et al. 2015, *WorldBrush*, ACM TOG 34(4) (`13`) |
 | Digital terrain modelling — the survey | P | Galin et al. 2019, CGF 38(2). Read first when architecting a whole world (`13`) |
+| Isostasy — Airy (local) & flexural (elastic plate) | P | Turcotte & Schubert 2014; Watts 2001 — `D∇⁴w+Δρgw=q`; spectral solve (`02`) |
+| Glacial isostatic adjustment (postglacial rebound) | P | Peltier 1974; Peltier 2004 — viscous mantle relaxation, raised shorelines (`02`, `12`) |
+| Erosional isostasy (unloading rebound) | P | Molnar & England 1990 — peaks rise as valleys incise; the chicken-or-egg caution (`02`) |
+| Tephra fallout (exponential thinning; advection–diffusion) | P | Pyle 1989; Suzuki 1983; Armienti et al. 1988; Bonadonna et al. 2005 (TEPHRA2) (`11`) |
+| Pyroclastic density currents (energy cone; granular flow) | P | Sheridan 1979; Malin & Sheridan 1982; Patra et al. 2005 (TITAN2D); Dade & Huppert 1996 (`11`) |
+| Caldera collapse (piston subsidence) | P | Roche & Druitt 2001; Geshi et al. 2002; Cole et al. 2005; Acocella 2007 (`11`) |
 
 **L-tier — landforms, not algorithms.** No implementation and no paper exists for these. They
 are compositions. The recipe is the answer. This table is *one landform each*; for whole
@@ -153,6 +159,12 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Fissure eruptions, flood basalts (traps) | Line-source flows along a rift/fault (`02`) + stacking → basalt plateau; dissection → stepped traps (`11`) |
 | Geothermal field (geysers, sinter, hot springs) | Fracture-gated vents + sinter/travertine *deposition* + temperature-zoned microbial palette — blueprint in `20` |
 | Sandstone pillar forest (Zhangjiajie, Meteora) | Resistant strata + orthogonal joints as process mask + joint-gated incision — *not* karst; blueprint in `20` |
+| River terraces (strath / fill) | Alternating lateral planation and incision across a base-level / climate / sediment history (`03`) |
+| Delta lobes (stacked, switching) | Repeated avulsion near the delta apex across the delta cycle (`03`) |
+| Guyot (drowned flat-topped seamount) | Volcanic edifice + wave truncation + age–depth subsidence past the photic zone (`11`, `12`) |
+| Seamount / hotspot chain | Age-progressive edifices (`11`) subsiding along a plate-motion line over a fixed hotspot (`02`, `12`) |
+| Submarine canyon, turbidite fan | Turbidity-current erosion then deposition below wave base (`12`) |
+| Channeled scabland, coulees, giant current ripples | Extreme-discharge megaflood over jointed bedrock — outburst source (`12`) routed by `03`/`04` |
 
 ## 3. Composition & filtering → `10-primitives-ops-filters.md`
 
@@ -197,6 +209,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Channel-reach morphology (cascade / step-pool / pool-riffle) | P | Montgomery & Buffington 1997, GSA Bulletin 109(5) (`03`) |
 | Hydrology-based terrain (river network first) | P | Génevaux et al. 2013, ACM TOG 32(4), SIGGRAPH '13 (`03`) |
 | Water sources & discharge routing (`Q` vs area) | P | Springs / inflows as source terms (Št'ava 2008); route `Q`, stream power on `Q^m` (`03`, `04`) |
+| River terraces (strath / fill; cover-limited incision) | P | Hancock & Anderson 2002 (numerical model); Bull 1990, 1991; Merritts, Vincent & Wohl 1994; Pazzaglia & Brandon 2001; autogenic caveat Limaye & Lamb 2016 (`03`) |
+| River avulsion & superelevation criterion | P | Slingerland & Smith 2004; Mohrig et al. 2000; Jerolmack & Mohrig 2007; cellular Jerolmack & Paola 2007; 3-D stochastic Mackey & Bridge 1995 (`03`) |
+| Delta-lobe switching (the delta cycle) | L | Coleman 1988; Roberts 1997 — a composition over repeated avulsion (`03`) |
+| Glacial outburst flood (jökulhlaup) / megaflood | P | Nye 1976; Clarke 1982, 2003; Walder & Costa 1996; Björnsson 2003; Baker 1973; Bretz 1923, 1969 (`12`, `03`/`04`) |
 | Flood fill / sea level | F | — |
 
 ## 5. Erosion → `04`, `05`, `12`
@@ -228,6 +244,9 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Gilbert (lacustrine) delta | P | Gilbert 1890 — topset/foreset/bottomset delta prograding into standing water (`12`) |
 | Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
 | Tides / intertidal zone / tidal flats | F | Authored oscillation of the water plane; astronomy, a look. Water is a dynamic layer (`08`, `12`) |
+| Seafloor age–depth subsidence (ridge → abyssal plain) | P | Parsons & Sclater 1977 (√age half-space); Stein & Stein 1992 (GDH1 plate model) (`12`) |
+| Hotspot track / seamount / guyot | P (age progression) / P-hypothesis (plume) | Wilson 1963; Morgan 1971; Hess 1946 (guyot truncation) (`11`, `12`) |
+| Turbidity currents (self-accelerating; layer-averaged) | P | Parker, Fukushima & Pantin 1986; Middleton 1993; Meiburg & Kneller 2010; Bouma 1962 (sequence) (`12`) |
 | Shallow landslide susceptibility (wetness-coupled) | P | **Montgomery & Dietrich 1994**, WRR 30 — the SHALSTAB model; steep + convergent + wet fails (`05`) |
 | Debris flows | P | Iverson 1997, Rev. Geophys. 35(3) — the physics, **not implementable as written** (like Bagnold); terrain realisation is F (`05`) |
 | Landslide runout / rockfall / slump (terrain realisation) | F | Scar + steepest-descent runout + thermal relaxation — no canonical graphics paper (`05`) |
@@ -271,6 +290,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Plants interacting with environment | P | Měch & Prusinkiewicz 1996, SIGGRAPH |
 | Constraint-based placement (slope/height/aspect/material) | F | — |
 | Clast scatter (boulders / cobbles / pebbles), imbrication | F | Grain-size field (`04`) drives size & density in scatter (`07`); pebbles dip upstream |
+| Coral growth-form & zonation (light + wave energy) | P | Graus & Macintyre 1976; Chappell 1980; Done 1982, 1983 — form as scatter/ecosystem (`12`, `07`) |
+| Coral accretive-growth morphogenesis (Péclet / Laplacian) | P | Kaandorp et al. 1996, 2005; Merks et al. 2003; Kaandorp & Kübler 2001 (`12`) |
+| Spur-and-groove reef morphology | P | Shinn 1963; Storlazzi et al. 2003; Duce et al. 2016 (`12`) |
+| Reef zonation / motu / sand cays | L | Composition over Done 1982/1983 zonation (`12`) |
 
 ## 8. Conversion & runtime → `08-output-contract.md`
 
@@ -300,6 +323,11 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Learned material from a photo (SVBRDF) | ? | Deschaintre et al. 2018 — verify; moving fast (`08`) |
 | Emissive material channel (incandescent cracks) | F | crackMask (Worley F2−F1, `01`) × blackbody temperature ramp (`08`) |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |
+| Cube-sphere grid (equidistant / equiangular) | P | Chan & O'Neill 1975 (QSC / COBE); Sadourny 1972; Ronchi et al. 1996 (equiangular) (`08`) |
+| Geodesic / HEALPix spherical grid | P | Górski et al. 2005 (HEALPix); icosahedral geodesic — no seams (`08`) |
+| Map-projection distortion (scale factor `h`) | P | Snyder 1987 — divide gradients by `h` or erosion biases (`08`) |
+| Flow routing on a spherical / DGGS grid | P | Liao et al. 2020 (hex); Liao et al. 2025 (ISEA equal-area) (`08`, `03`) |
+| Cube-face-seam flow routing | F | Halo cells + per-face rotation tables; no canonical paper (`08`) |
 | Quadtree terrain, chunked heightfield, streaming, crack prevention, seam stitching | F | Engineering practice. No papers. (`08`) |
 
 ## 9. Climate → `13-climate-ecosystem.md`

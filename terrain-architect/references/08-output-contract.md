@@ -211,6 +211,61 @@ not "the same value computed twice". Two different evaluation paths that should 
 answer will differ in the last bit, and at a silhouette that's a visible pinhole. Compute the
 edge once and copy, or make the evaluation bit-identical by construction.
 
+## Planetary / spherical domains
+
+Everything above assumes a **flat, rectangular heightfield** — the right default, and wrong the moment
+the domain is a whole planet. You cannot wrap one rectangular grid around a sphere without a
+singularity (the lat–long "pole pinch": cells shrink to zero area and the timestep dies at the poles).
+Two grid families solve it, and the choice is the planetary version of the tiling decision above.
+
+**Cube-sphere — six faces, six flat grids.** Project the sphere onto a cube and grid each face; a
+point on face +X at face-local `(a,b)` maps to the sphere by normalising:
+
+```
+p = normalize(1, a, b)                          # gnomonic (equidistant) cube-sphere
+```
+
+The plain (equidistant) version bunches cells toward face centres — a **corner-to-centre area ratio of
+~5.2**. The **equiangular** variant (Ronchi et al. 1996) grids each face in *angle* (`a = tan ξ`,
+`ξ ∈ [−π/4, π/4]`), which nearly uniformises cell area (ratio ~2) at the cost of a `tan`/`atan` per
+lookup. Origin of the quadrilateralized spherical cube: Chan & O'Neill 1975 (the COBE grid); the
+finite-difference lineage is Sadourny 1972. The **six faces are six of the tiles above** and the
+**twelve cube edges are the seams** — the Seams problem again, now with a *rotation* between faces.
+
+**Geodesic / HEALPix — no faces, no seams.** Tile the sphere with hexagons and twelve pentagons
+(icosahedral geodesic), or with the equal-area pixels of **HEALPix** (`N_pix = 12·N_side²`, every
+pixel exactly equal-area; Górski et al. 2005). These have **no face seams** and near-uniform cells —
+why climate and cosmology grids use them — at the cost of a non-rectangular neighbour structure (a
+cell has 6 neighbours, sometimes 5).
+
+**Distortion is the load-bearing correction.** A fixed-resolution grid sampled through any projection
+carries a per-cell **scale factor `h`** (Snyder 1987): true ground distance is `Δground = Δpixel / h`.
+Every metre-denominated operator — slope, flow routing, erosion transport distance — **must divide
+gradients by `h`**, or it biases flow toward the high-distortion regions and the world-unit invariants
+of `SKILL.md` break on the sphere exactly as they break under `normalize` (`10`).
+
+**Flow routing across the seams.** D8/D∞ (`03`) run unchanged *inside* a face; the only hard part is
+neighbour lookup at a face edge or corner, and it is **F-tier engineering** — there is no canonical
+paper for cube-face-seam flow routing:
+
+```
+neighbors(face f, i, j):
+    for (di,dj) in D8:
+        if in-range: yield (f, i+di, j+dj)                  # interior — trivial
+        else:        yield remap(SEAM_TABLE[f][edge], rot)  # crossed an edge → rotate onto neighbour face
+    # cube corners are 3-valent: the 8 corners have only 7 neighbours — special-case them
+flowDir(cell): steepest descent over neighbors(), with Δs = h · arcDistance   # metric-corrected
+```
+
+Depression handling (`03`) then runs on the resulting global graph unchanged. To avoid seams
+entirely, route on a **hex/HEALPix DGGS** instead — there is real published flow-routing work on those
+grids (Liao et al. 2020, 2025), whereas the cube-seam handling stays folklore.
+
+**Tier.** The cube-sphere and equiangular mappings are P (Chan & O'Neill 1975; Sadourny 1972; Ronchi
+et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors are P (Snyder 1987);
+DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
+plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
+
 ## LOD
 
 **Do not decimate a heightfield with a box filter.** Averaging heights removes peaks and fills
