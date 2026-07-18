@@ -6,10 +6,13 @@ description: >-
   backlog, Scouts research and produce implementation docs, gated by plan review and
   blast-radius-tiered approval, then Implementers (senior/junior routed by complexity)
   execute against a file-ownership ledger, gated by a mechanical Verifier and a
-  judgment-level Code Reviewer. Use this skill whenever the user wants to orchestrate,
+  judgment-level Code Reviewer. A triage side channel routes mid-mission user issues
+  to a read-only Investigator for root-cause diagnosis, so a bug report never stalls
+  the command loop. Use this skill whenever the user wants to orchestrate,
   coordinate, or run a pipeline of agents/subagents; keep an implementation queue fed;
   spawn researchers, scouts, implementers, or reviewers; run a long autonomous coding
-  loop against a goal; or mentions "command and control", "orchestrator", "agent
+  loop against a goal; throw an issue or bug at a running mission for root-cause
+  analysis; or mentions "command and control", "orchestrator", "agent
   pipeline", "keep the queue filled", or delegating a large feature/refactor to a team
   of agents. Also use it to resume, audit, or inspect a previously started pipeline
   (mission-control state directory present in the repo).
@@ -86,6 +89,7 @@ This creates:
 ├── queue.json          # item states: research → review → approved → building → verify → code-review → done
 ├── ledger.json         # file-ownership leases (path → item id)
 ├── agenda.json         # orchestrator intent journal — non-derivable notes only
+├── investigations.json # mid-mission user-issue triage: open issues and dispositions
 └── evidence/           # one directory per item: docs, sign-offs, verifier output, review verdicts
 ```
 
@@ -122,7 +126,10 @@ Before spawning anything, pin down with the user (or from their prompt):
    wide parallel failure would be expensive to unwind. Record the choice, who made
    it, and (if you decided) the reasoning in `mission.json` under `throughput`.
 4. **Concurrency limits** — max simultaneous implementers (default 2; each needs
-   disjoint leases), max scouts (default 2). When throughput is maximized, raise
+   disjoint leases), max scouts (default 2), max investigators (default 1 — a
+   dedicated slot for the user-issue triage channel, deliberately not shared with
+   Scouts so user issues neither starve the plan side nor wait behind it). When
+   throughput is maximized, raise
    these to the widest the ledger can keep disjoint — parallelism is the point,
    but one writer per file remains absolute.
 5. **Repo ground truth** — build command, test command, lint command. These are the
@@ -158,7 +165,9 @@ Repeat until a terminal condition fires. Each cycle:
    now done — transition it back), `MERGE PENDING` (a done item's branch was never
    merged), `RESHAPE CANDIDATE` (an approved item keeps losing lease collisions —
    throughput is leaking through the backlog's shape; see mid-mission re-shaping
-   below), and open `AGENDA` notes. Act on these before spawning anything new;
+   below), `DIAGNOSIS READY` (an Investigator's report is on disk awaiting your
+   disposition — see mid-mission user issues below), and open `AGENDA` notes. Act
+   on these before spawning anything new;
    they're finished work and standing intent sitting idle.
 
    The agenda is your intent journal, and it has one hard rule: **if `status` can
@@ -243,14 +252,17 @@ Repeat until a terminal condition fires. Each cycle:
 The pipeline keeps learning — research reveals internal structure, collisions reveal
 serialization the original decomposition hid — and the same shaping the Architect
 did at Phase 1 can be reapplied at any stage and any granularity: reordering the
-remaining tranche, or splitting a single item into skeleton + parts. Exactly three
+remaining tranche, or splitting a single item into skeleton + parts. Exactly four
 signals license a re-shape, and only these:
 
 - `RESHAPE CANDIDATE` from `status` — an approved item repeatedly losing lease
   collisions while implementer slots idle;
 - an **accepted split proposal** from a Scout (step 3);
 - a **bounce pattern** whose recorded reasons point at the decomposition itself
-  rather than any single doc.
+  rather than any single doc;
+- a **closed investigation dispositioned `architect`** — a user-reported issue whose
+  diagnosis traces the root cause to the structure or decomposition itself (see
+  mid-mission user issues below).
 
 On a signal, re-spawn the Architect with the signal named in its brief. Its scope is
 the **open backlog only** — items in flight or done are immutable history — and the
@@ -258,6 +270,42 @@ reshaped tranche is gated exactly as in Phase 1. Never re-shape speculatively: a
 idle moment is not a signal, and a mission that keeps re-planning itself spends its
 budget on churn instead of work. If you cannot name the triggering evidence in the
 Architect's brief, there is no re-shape to do.
+
+**Mid-mission user issues (triage side channel):** users throw issues at running
+missions — a bug report, a regression, a "why is X doing that?" — and the worst
+response is diving into the codebase yourself: the command loop stalls, and your
+context fills with one issue's stack traces while five agents wait on routing
+decisions. You are the Orchestrator; the same discipline that keeps you out of
+production code keeps you out of root-causing. The routing rule is mechanical, not
+a judgment call:
+
+- **Answerable from pipeline state on disk** — `status` output, evidence
+  directories, the agenda, `mission.json` — answer directly and move on. No spawn,
+  no state. "Why is MC-007 blocked?" is a read of the queue, not an investigation.
+- **Anything that requires opening source files, reproducing behavior, or
+  root-causing** — open an investigation and delegate:
+  `pipeline.py investigate open INV-001 "<symptom as the user stated it>"`, spawn
+  the **Investigator** (see `references/roles.md#investigator`) with the symptom,
+  the evidence directory, mission context, and any in-flight items you suspect are
+  related — then return to the loop. Investigations are pipeline state, so the
+  agenda rule applies: no agenda note, `status` computes it.
+
+When the report lands, `status` flags `DIAGNOSIS READY`. Reading the diagnosis is
+your gate — the same posture as high-blast approval — and it closes with exactly one
+disposition (`pipeline.py investigate close`, evidence-checked):
+
+- **fix** — create the backlog item(s) first (`add-item --origin
+  investigation:INV-001`, `fast_track` if the root cause is trivial), then close
+  naming them with `--item`. The fix flows through the normal gates; a diagnosed
+  bug earns no shortcut past them.
+- **architect** — the root cause is structural: close with `--note` naming the
+  evidence, then re-spawn the Architect. This is the fourth licensed re-shape
+  signal above.
+- **no-action** — no defect, cannot reproduce, or out of mission scope: close with
+  the reasoning in `--note`.
+
+Whatever the disposition, relay the diagnosis to the user in your own summary — the
+report file is the pipeline's evidence, but the answer belongs to them.
 
 **UI slices:** if an item carries a `ui: true` flag and a `design-replication` skill
 is installed, the Designer role applies — see `references/roles.md#designer`. It is a
@@ -300,6 +348,12 @@ declaring the mission complete, and offer the report to the user.
 - **User gives a mid-mission directive** ("hold renderer work", "prioritize X"):
   record it in the agenda immediately, before acting on it — a directive that lives
   only in your context dies with your context.
+- **User reports a bug or asks a deep question mid-mission:** run the triage test
+  (mid-mission user issues, above). Answerable from state on disk → answer inline;
+  anything needing code-reading or reproduction → `investigate open`, spawn the
+  Investigator, keep the loop running. Never root-cause it yourself — the command
+  loop is your artifact, and an open investigation survives a crash where a
+  half-finished personal investigation does not.
 - **Verifier flaky (tests fail without the diff):** the oracle itself is broken —
   halt the build side, surface to the user. Never weaken the gate to keep throughput.
 - **Backlog exhausted, goal unmet:** re-spawn the Architect with the evidence trail so
@@ -315,8 +369,9 @@ declaring the mission complete, and offer the report to the user.
 ## Reference files
 
 - `references/roles.md` — full role specs: Architect, Scout, Plan Reviewer,
-  Implementer (senior/junior), Verifier, Code Reviewer, Designer. Read the relevant
-  section before spawning each role; paste it into the subagent brief.
+  Implementer (senior/junior), Verifier, Code Reviewer, Investigator, Designer.
+  Read the relevant section before spawning each role; paste it into the subagent
+  brief.
 - `references/contracts.md` — artifact schemas: research doc, evidence records,
   ledger entries, queue states and legal transitions. Read once at mission start.
 - `scripts/pipeline.py` — state machine CLI. `--help` lists commands.

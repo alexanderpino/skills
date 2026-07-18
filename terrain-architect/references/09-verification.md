@@ -20,7 +20,7 @@ cheap — these are a dozen lines of setup each.
 |---|---|
 | **Flat plane** | Division by zero in slope/TWI; erosion that creates relief from nothing; NaN from `atan2(0,0)` |
 | **Constant slope** | Flow routing that doesn't route; D8 diagonal bias; erosion that doesn't incise |
-| **Cone** | Radial symmetry — output must stay radially symmetric. Catches the thermal per-neighbour distance bug (`05`) instantly: you get a plus shape. |
+| **Cone** | Radial symmetry — output must stay radially symmetric. Catches the thermal per-neighbour distance bug (`05`) and the pipe model's 4-pipe anisotropy (`04`) instantly: you get a plus shape. |
 | **Inverted cone** | A single pit. Depression handling must resolve it. |
 | **Ridge / valley** | Sign conventions in curvature and aspect |
 | **Step** | Edge-preserving filters (bilateral, guided) must keep it; Gaussian must not |
@@ -226,6 +226,7 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Faceted normals / ringed AO | Baked from quantised height | Bake from R32F (`06`, `08`) |
 | Speckled curvature mask | 2nd derivative of noisy/quantised field | Pre-smooth σ≈1 cell; compute from R32F (`06`) |
 | Pipe erosion → NaN spikes | Missing outflow scaling factor `K` | Add step 3 of the pipe model (`04`) |
+| Pipe erosion → channels align to grid axes | 4-pipe von Neumann stencil | 8-pipe variant with per-pipe length (`04`) |
 | Droplet erosion → 1px scratches | Eroding point-wise instead of with a brush | Erode with disc radius 2–4 (`04`) |
 | Droplet erosion → mushy, silted | Depositing with a brush instead of point-wise | Deposit bilinear to 4 cells (`04`) |
 | Terrain grows tumours / spikes uphill | Droplet speed sign convention | `speed = sqrt(speed² + (−Δh)·g)` (`04`) |
@@ -253,6 +254,39 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Hybrid multifractal → isolated absurd spikes | Missing `min(weight, 1)` | Clamp the weight (`01`) |
 | Creases along grid lines under lighting | Original Perlin cubic fade | Use quintic `6t⁵−15t⁴+10t³` (`01`) |
 | Mask outlines the noise lattice | Thresholding gradient noise near 0 | Threshold FBM, or offset from 0 (`01`) |
+
+### The grid-anisotropy family
+
+Many rows above are one disease: **a discrete stencil printing its directions through the
+physics**. Every grid algorithm quantises direction — to 8 neighbours, to 4 pipes, to lattice
+axes — and wherever the physics should be isotropic, that quantisation leaks into the output as
+stripes, staircases, and plus-shapes. The instances are scattered across the skill because each
+lives with its algorithm; this table is the family reunion, for when the symptom is "directional
+artefacts" and the mechanism could be any of them.
+
+| Instance | Where | Symptom | Fix | Test |
+|---|---|---|---|---|
+| D8 single-receiver routing | `03` | Parallel straight lines on hillslopes; TWI stripes | D∞/MFD for dispersive quantities; D8 only for channel extraction | Constant slope; `log(A)` render |
+| Missing √2 weighting in D8 | `03` | Entire drainage network biased to 45° | Divide slope by `cellSize·√2` on diagonals | Constant slope |
+| Thermal talus limit not per-neighbour | `05` | Plus-shaped collapse on cones | `dLimit = tan(α)·dist_n` per neighbour | Cone |
+| Pipe model's 4-pipe stencil | `04` | Channels staircase and align to axes; plus-shaped ponding | 8-pipe variant with per-pipe length | Cone |
+| Depression fill without epsilon | `03` | Fan of parallel lines radiating from filled basins | `nextafter`/epsilon fill | Basin with a spill point; `log(A)` |
+| Diamond-square | `01` | Faint ridges along grid axes (anisotropic variance) | Don't use it | Sun sweep |
+| 3D noise on an axis-aligned plane | `01` | Diagonal banding | Lattice-rotated variant (`noise3_ImproveXY`) | Sun sweep |
+| Lava CA neighbour selection | `19` | Flow lobes align to the lattice | Monte Carlo neighbour selection (Miyamoto & Sasaki) | Cone (radial vent) |
+
+The cures are three, and knowing which applies is most of the diagnosis: **distance-correct the
+stencil** (the √2 family: D8, thermal, 8-pipe), **spread across more directions** (MFD/D∞,
+8 pipes over 4), or **randomise the choice** (Monte Carlo neighbour selection, epsilon
+tie-breaking). The universal detector is the sun sweep (visual review modes above) — every
+member of this family strobes as the light azimuth rotates — and the universal producers of a
+clean baseline are the cone and constant-slope synthetic inputs, whose correct outputs have no
+preferred direction at all.
+
+The contrast case worth knowing: **droplet erosion is largely immune** — positions are
+continuous and gradients bilinear, so there is no stencil to print through. If a droplet result
+shows grid-aligned structure, the anisotropy came in with the height field (usually the noise,
+`01`), not the simulation.
 
 ## Review checklist
 
