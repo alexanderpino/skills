@@ -107,9 +107,25 @@ Before spawning anything, pin down with the user (or from their prompt):
    backlog empty + queues drained, N items completed, token/time budget, or explicit
    user stop. Record in `mission.json`. A pipeline whose only invariant is "keep the
    queue filled" has no stop and therefore no budget — never run one.
-3. **Concurrency limits** — max simultaneous implementers (default 2; each needs
-   disjoint leases), max scouts (default 2).
-4. **Repo ground truth** — build command, test command, lint command. These are the
+3. **Throughput posture** — ask the user directly: *"Should I organize this mission
+   to maximize throughput?"* Maximizing means the Architect may reorganize the
+   decomposition for parallelism: front-loading skeleton/structure items
+   (interfaces, scaffolding, frozen data layouts) whose completion unlocks many
+   items to build concurrently, and cutting sibling items so their touch-lists are
+   disjoint. It never means weakening a gate — quality bars and the final result
+   are invariant; only decomposition and ordering may change, and they stay as
+   close to the task's natural shape as parallelism allows. In fully autonomous
+   mode (the user asked for autonomy, or isn't available to answer), decide
+   yourself: prefer maximize when the goal splits into loosely coupled items and
+   the concurrency budget exceeds one implementer; prefer natural order when the
+   work is an inherent dependency chain, or the repo oracle is shaky enough that
+   wide parallel failure would be expensive to unwind. Record the choice, who made
+   it, and (if you decided) the reasoning in `mission.json` under `throughput`.
+4. **Concurrency limits** — max simultaneous implementers (default 2; each needs
+   disjoint leases), max scouts (default 2). When throughput is maximized, raise
+   these to the widest the ledger can keep disjoint — parallelism is the point,
+   but one writer per file remains absolute.
+5. **Repo ground truth** — build command, test command, lint command. These are the
    Verifier's oracle; if they don't exist, that's the first backlog item, because
    without an oracle the whole build side is faith-based.
 
@@ -119,6 +135,13 @@ Spawn the **Architect** (see `references/roles.md#architect`) with the goal. It
 produces the initial backlog: coherently bounded items, prioritized, each with the
 structural constraints Scouts must respect. If a `principal-architect` skill is
 installed, the Architect must follow it as canonical.
+
+If `mission.json` records `throughput.maximize: true`, say so in the Architect's
+brief: the backlog must be throughput-shaped per `references/roles.md#architect` —
+skeleton/structure first so the widest set of items becomes buildable in parallel
+behind it, sibling touch-lists disjoint. The decomposition stays as close to the
+original task as possible; reorganize only where it buys real parallelism, and never
+manufacture filler items to keep slots busy — the governing principle still holds.
 
 The Architect's backlog is itself gated: present it to the user for a one-time
 sign-off before the loop starts (or, in fully autonomous mode, have the Plan Reviewer
@@ -133,7 +156,9 @@ Repeat until a terminal condition fires. Each cycle:
    reason from memory of what the queues held last cycle. `status` also flags
    actionable conditions for you: `UNBLOCK CANDIDATE` (a blocked item's dependency is
    now done — transition it back), `MERGE PENDING` (a done item's branch was never
-   merged), and open `AGENDA` notes. Act on these before spawning anything new;
+   merged), `RESHAPE CANDIDATE` (an approved item keeps losing lease collisions —
+   throughput is leaking through the backlog's shape; see mid-mission re-shaping
+   below), and open `AGENDA` notes. Act on these before spawning anything new;
    they're finished work and standing intent sitting idle.
 
    The agenda is your intent journal, and it has one hard rule: **if `status` can
@@ -150,9 +175,19 @@ Repeat until a terminal condition fires. Each cycle:
    obsolete — a stale agenda misleads exactly like a stale queue.
 2. **Feed the plan side.** If `approved` count < concurrency limit × 2 and backlog has
    items, spawn Scouts (up to the scout limit) on the highest-priority unclaimed
-   backlog items. One item per Scout — single-tasking keeps docs coherent.
-3. **Gate incoming docs.** For each doc a Scout returns: spawn a Plan Reviewer.
-   On sign-off, check blast-radius:
+   backlog items. One item per Scout — single-tasking keeps docs coherent. In
+   maximize-throughput mode, break priority ties toward the item that unblocks the
+   most dependents (`depends_on` fan-out) — a skeleton item researched early widens
+   every later cycle.
+3. **Gate incoming docs.** When a doc arrives, first check its header for
+   `splittable: true` (maximize mode only) — this must be decided *before* spawning
+   a Plan Reviewer, while the item is still `researching`, so a review is never
+   paid for a doc about to be re-scoped. Accept → route to the Architect (see
+   mid-mission re-shaping below): the item stays in `researching`, its doc is
+   narrowed to the skeleton, the parts become new backlog items behind it.
+   Decline → proceed normally; the doc covers the whole item by contract, so a
+   declined proposal costs nothing. Then, for each (remaining) doc: spawn a Plan
+   Reviewer. On sign-off, check blast-radius:
    - `low` / `medium` → transition straight to `approved`. Reviewer sign-off suffices.
    - `high` / `critical` → *you* read the doc and approve or bounce, with written
      reasons in the evidence directory. You are the expensive gate; tiering exists so
@@ -160,7 +195,9 @@ Repeat until a terminal condition fires. Each cycle:
 4. **Feed the build side.** For each idle implementer slot and each `approved` item:
    acquire leases for the item's touch-list via `pipeline.py lease`. If any path is
    already leased, skip the item this cycle (never queue two writers on one file —
-   the ledger is the collision-prevention mechanism, not hope). Then create the
+   the ledger is the collision-prevention mechanism, not hope). The failed `lease`
+   call records the collision itself; recurring losses surface as
+   `RESHAPE CANDIDATE` in `status`, so don't track contention by hand. Then create the
    item's isolated worktree: `pipeline.py worktree-add <id>`. Leases stop two agents
    *editing* one file, but only build isolation stops item A's half-finished diff
    breaking item B's compile — every implementer works, builds, and is verified
@@ -187,12 +224,35 @@ Repeat until a terminal condition fires. Each cycle:
    `pipeline.py transition <id> blocked --blocked-on <new-item>` — which releases its
    leases and lets `status` detect the unblock automatically later. Deny requests
    that are really just scope creep — the doc's acceptance criteria define done, not
-   the implementer's ambitions.
+   the implementer's ambitions. In maximize mode, check each granted item for the
+   skeleton property before setting its priority: if blocked or upcoming items
+   would land behind it, it jumps the queue (the `depends_on` fan-out rule from
+   step 2) rather than being appended at default priority.
 7. **Check terminal conditions and budget.** Log a one-line cycle summary to
    `evidence/orchestrator.log`. Pass `--tokens <n>` on transitions when you know a
    role's spend — `pipeline.py metrics` then yields per-item cost, bounce counts, and
    time-per-state, which is exactly the telemetry `skill-coach` (if installed) needs
    for decay detection and for tuning the junior/senior routing threshold empirically.
+
+**Mid-mission re-shaping (maximize mode):** the throughput decision is not one-shot.
+The pipeline keeps learning — research reveals internal structure, collisions reveal
+serialization the original decomposition hid — and the same shaping the Architect
+did at Phase 1 can be reapplied at any stage and any granularity: reordering the
+remaining tranche, or splitting a single item into skeleton + parts. Exactly three
+signals license a re-shape, and only these:
+
+- `RESHAPE CANDIDATE` from `status` — an approved item repeatedly losing lease
+  collisions while implementer slots idle;
+- an **accepted split proposal** from a Scout (step 3);
+- a **bounce pattern** whose recorded reasons point at the decomposition itself
+  rather than any single doc.
+
+On a signal, re-spawn the Architect with the signal named in its brief. Its scope is
+the **open backlog only** — items in flight or done are immutable history — and the
+reshaped tranche is gated exactly as in Phase 1. Never re-shape speculatively: an
+idle moment is not a signal, and a mission that keeps re-planning itself spends its
+budget on churn instead of work. If you cannot name the triggering evidence in the
+Architect's brief, there is no re-shape to do.
 
 **UI slices:** if an item carries a `ui: true` flag and a `design-replication` skill
 is installed, the Designer role applies — see `references/roles.md#designer`. It is a
@@ -240,7 +300,9 @@ declaring the mission complete, and offer the report to the user.
 - **Backlog exhausted, goal unmet:** re-spawn the Architect with the evidence trail so
   far to propose the next backlog tranche; gate it as in Phase 1.
 - **Two items genuinely need the same file:** serialize by priority; never split a
-  file's ownership.
+  file's ownership. If the same collision recurs (`RESHAPE CANDIDATE`), the fix is
+  upstream: re-shape the open backlog so sibling touch-lists are disjoint —
+  serializing forever is throughput leaking through the backlog's shape.
 - **Queue starving because review bounces everything:** don't lower the bar — read the
   bounce reasons; the fix is usually upstream (Architect constraints too vague, Scout
   briefs missing context).

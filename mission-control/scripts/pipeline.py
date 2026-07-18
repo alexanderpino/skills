@@ -13,7 +13,8 @@ Commands:
   add-item         append a backlog item
   claim            backlog item -> researching
   transition       move an item between states (evidence-checked, bounce-capped)
-  lease            acquire file leases for an item (collision-checked)
+  lease            acquire file leases for an item (collision-checked; lost
+                   collisions are recorded as contention for reshape detection)
   release          release an item's leases
   reclaim          release expired leases and bounce their items to 'approved'
   worktree-add     create an isolated git worktree + branch mc/<id> for an item
@@ -177,6 +178,7 @@ def cmd_init(args):
                                 "max_items_completed": None,
                                 "token_budget": None, "deadline": None},
         "concurrency": {"implementers": 2, "scouts": 2},
+        "throughput": {"maximize": False, "decided_by": "user", "reason": None},
         "lease_ttl_minutes": 90,
         "bounce_limit": 3,
         "repo_oracle": {"build": b_cmd, "test": t_cmd, "lint": None},
@@ -185,10 +187,10 @@ def cmd_init(args):
     })
     st.save("backlog", {"items": []})
     st.save("queue", {"items": []})
-    st.save("ledger", {"leases": []})
+    st.save("ledger", {"leases": [], "contention": []})
     st.save("agenda", {"next_id": 1, "notes": []})
     print(f"initialized {root} — edit mission.json (goal, repo_oracle, "
-          f"terminal_conditions) before starting the loop")
+          f"terminal_conditions, throughput) before starting the loop")
 
 
 def cmd_add_item(args):
@@ -333,6 +335,12 @@ def cmd_lease(args):
         for p, l in clashes:
             print(f"conflict: {p} vs {l['path']} (held by {l['item']})",
                   file=sys.stderr)
+        # record the loss: recurring contention on one item is the throughput
+        # signal 'status' surfaces as RESHAPE CANDIDATE
+        ledger.setdefault("contention", []).append(
+            {"item": args.id, "at": now(),
+             "held_by": sorted({l["item"] for _, l in clashes})})
+        st.save("ledger", ledger)
         sys.exit(2)  # distinct code: skip item this cycle, don't fail loop
     ttl = st.load("mission")["lease_ttl_minutes"]
     for p in paths:
@@ -340,6 +348,9 @@ def cmd_lease(args):
                    for l in ledger["leases"]):
             ledger["leases"].append({"path": p, "item": args.id,
                                      "acquired": now(), "ttl_minutes": ttl})
+    # a successful acquire resolves the item's contention history
+    ledger["contention"] = [c for c in ledger.get("contention", [])
+                            if c["item"] != args.id]
     st.save("ledger", ledger)
     print(f"{args.id}: leased {len(paths)} path(s)")
 
@@ -348,6 +359,9 @@ def _release(st, item_id, quiet=False):
     ledger = st.load("ledger")
     before = len(ledger["leases"])
     ledger["leases"] = [l for l in ledger["leases"] if l["item"] != item_id]
+    # an item leaving the build side is no longer contending
+    ledger["contention"] = [c for c in ledger.get("contention", [])
+                            if c["item"] != item_id]
     st.save("ledger", ledger)
     if not quiet:
         print(f"{item_id}: released {before - len(ledger['leases'])} lease(s)")
@@ -430,6 +444,9 @@ def cmd_status(args):
         by_state.setdefault(it["state"], []).append(it["id"])
     open_items = [i for i in backlog["items"] if i["status"] == "open"]
     print(f"goal: {mission['goal']}")
+    tp = mission.get("throughput") or {}
+    if tp.get("maximize"):
+        print(f"throughput: maximize (decided by {tp.get('decided_by', 'user')})")
     print(f"backlog open: {len(open_items)} "
           f"({', '.join(i['id'] for i in sorted(open_items, key=lambda x: x['priority'])[:5])}"
           f"{'…' if len(open_items) > 5 else ''})")
@@ -438,6 +455,17 @@ def cmd_status(args):
             print(f"  {state:>22}: {', '.join(by_state[state])}")
     print(f"leases held: {len(ledger['leases'])} across "
           f"{len({l['item'] for l in ledger['leases']})} item(s)")
+    by_contender = {}
+    for c in ledger.get("contention", []):
+        by_contender.setdefault(c["item"], []).append(c)
+    for iid, events in sorted(by_contender.items()):
+        # one lost collision is an accident; a repeat means the backlog's
+        # shape is serializing work the concurrency budget could parallelize
+        if len(events) >= 2:
+            held = sorted({h for c in events for h in c.get("held_by", [])})
+            print(f"RESHAPE CANDIDATE: {iid} lost {len(events)} lease "
+                  f"collisions (vs {', '.join(held)}) — consider re-spawning "
+                  f"the Architect over the open backlog")
     done_ids = set(by_state.get("done", []))
     for it in queue["items"]:
         if it["state"] == "blocked" and it.get("blocked_on") in done_ids:

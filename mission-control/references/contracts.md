@@ -51,6 +51,7 @@ fails.
     "deadline": null
   },
   "concurrency": { "implementers": 2, "scouts": 2 },
+  "throughput": { "maximize": false, "decided_by": "user", "reason": null },
   "lease_ttl_minutes": 90,
   "bounce_limit": 3,
   "repo_oracle": {
@@ -68,6 +69,12 @@ fails.
 At least one terminal condition must be non-null/true. `repo_oracle.build` and
 `repo_oracle.test` are mandatory before any item may enter `building`.
 
+`throughput.decided_by` is `"user"` when the Orchestrator asked and the user
+answered, `"orchestrator"` when running autonomously — in which case `reason` is
+mandatory (one line: why maximize was or wasn't chosen). The flag licenses the
+Architect's throughput-shaping only; it never changes gate tiers, bounce limits, or
+evidence requirements.
+
 ## Backlog item (entries in backlog.json)
 
 ```json
@@ -82,7 +89,7 @@ At least one terminal condition must be non-null/true. `repo_oracle.build` and
     "structural constraints from the Architect, one per line",
     "e.g. no new subsystems; TransformComponent layout is frozen"
   ],
-  "origin": "architect | escalation:<item-id> | user",
+  "origin": "architect | escalation:<item-id> | split:<item-id> | user",
   "status": "open | claimed | done"
 }
 ```
@@ -101,6 +108,7 @@ touch_list:
   - src/ecs/query.cpp
   - src/ecs/query.h
 ui: false
+splittable: false
 ---
 
 # Problem
@@ -120,10 +128,25 @@ Each criterion mechanically checkable, numbered, with its check:
 
 # Risks & unknowns
 Honest list. An empty section on a medium+ item is itself a review flag.
+
+# Split proposal
+(only when the header says splittable: true; omit the section otherwise)
+The skeleton (interfaces/scaffolding to land first) and the parallel parts
+behind it, each part with its predicted touch-list — the proposal is only
+valid if those touch-lists are disjoint. Advisory: the Scout proposes, the
+Orchestrator routes, the Architect decides.
 ```
 
 `touch_list` becomes the implementer's lease verbatim. Criteria the Verifier cannot
 execute or diff are a Plan Reviewer bounce.
+
+`splittable` is optional (default false) and meaningful only on maximize-throughput
+missions. The doc must still cover the *whole* item — a split proposal is a rider,
+not a substitute, so declining it costs nothing. Timing matters: the flag is acted
+on when the doc arrives, while the item is still `researching` and before a Plan
+Reviewer is spawned. On acceptance no state surgery is needed — the item stays in
+`researching`, its doc is narrowed to the skeleton scope, and the Architect adds
+the part-items with `origin: "split:<item-id>"` and `depends_on` the skeleton.
 
 ## Plan sign-off — `evidence/<id>/plan-review.json`
 
@@ -243,6 +266,9 @@ resolution note so the trail shows what was decided; audit does not walk the age
   "leases": [
     { "path": "src/ecs/query.cpp", "item": "MC-007",
       "acquired": "ISO-8601", "ttl_minutes": 90 }
+  ],
+  "contention": [
+    { "item": "MC-009", "at": "ISO-8601", "held_by": ["MC-007"] }
   ]
 }
 ```
@@ -250,6 +276,12 @@ resolution note so the trail shows what was decided; audit does not walk the age
 One writer per path, no exceptions. Directory leases are allowed (`src/ecs/`) and
 conflict with any path beneath them. Expired leases are reclaimable by the
 Orchestrator only, after bouncing the holding item to `approved`.
+
+`contention` is maintained by `pipeline.py` alone: every collision-rejected `lease`
+call appends an event; a successful acquire (or the item leaving the build side)
+clears that item's events. Two or more events on one item make `status` print a
+`RESHAPE CANDIDATE` flag — the mechanical signal that the backlog's shape, not bad
+luck, is serializing the queue. The Orchestrator never edits this list by hand.
 
 ## Audit chain
 
