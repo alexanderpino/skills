@@ -1,0 +1,155 @@
+{
+  "skill_name": "terrain-architect",
+  "description": "Capability evals for the terrain-architect skill, across four answer-quality axes: attribution & tier discipline, diagnosis, design/ordering, and trap-resistance. The fifth axis (triggering) lives in trigger-evals.json. Passing bar: >=0.85 mean pass rate with-skill, and a clear positive delta over baseline on the attribution and trap-resistance axes (where the skill's provenance discipline is the whole point).",
+  "evals": [
+    {
+      "id": 1,
+      "axis": "attribution",
+      "prompt": "What's the canonical peer-reviewed paper for droplet (particle) hydraulic erosion? Give me the citation.",
+      "expected_output": "There is NO canonical peer-reviewed paper. Droplet/particle erosion descends from Musgrave et al. 1989 and reaches its modern form in Beyer's 2015 TU Munchen bachelor thesis; popularised by Sebastian Lague. Answer states this honestly rather than inventing a journal citation.",
+      "files": [],
+      "expectations": [
+        "States there is no canonical peer-reviewed paper for droplet/particle erosion",
+        "Attributes it to Beyer 2015 (thesis) and/or Musgrave et al. 1989 as the ancestor",
+        "Does NOT fabricate a fake journal/conference paper with authors and venue",
+        "Frames it as F-tier / folklore rather than P-tier"
+      ]
+    },
+    {
+      "id": 2,
+      "axis": "attribution",
+      "prompt": "Give me the algorithm and the paper for procedurally generating a coral atoll.",
+      "expected_output": "There is no atoll algorithm (L-tier landform). An atoll is a composition: a volcanic edifice + subsidence + photic-zone coral accretion + wave exposure (Darwin's 1842 subsidence sequence). Darwin 1842 is cited for the THEORY, not as a graphics algorithm.",
+      "files": [],
+      "expectations": [
+        "States there is no atoll algorithm and that an atoll is an L-tier landform / composition",
+        "Gives the composition: volcanic edifice + subsidence + photic-zone coral accretion + wave exposure",
+        "Cites Darwin 1842 for the subsidence theory, not as an implementable algorithm",
+        "Does not fabricate an 'atoll generation' paper"
+      ]
+    },
+    {
+      "id": 3,
+      "axis": "attribution",
+      "prompt": "Which paper should I cite for the stream-power erosion solver that makes large-scale terrain tractable?",
+      "expected_output": "Braun & Willett 2013 is the O(N) implicit solver that matters; Cordonnier et al. 2016 is the terrain-generation application built on it. Citing only Cordonnier misses the solver.",
+      "files": [],
+      "expectations": [
+        "Names Braun & Willett 2013 as the O(N) implicit solver",
+        "Notes Cordonnier et al. 2016 is the application that builds on it",
+        "Does not conflate the two into a single wrong citation"
+      ]
+    },
+    {
+      "id": 4,
+      "axis": "diagnosis",
+      "prompt": "My procedural rivers appear and then stop partway down the slope, and my drainage-area map looks like scattered confetti instead of a branching network. What's wrong and what's the minimal fix?",
+      "expected_output": "Missing depression handling before flow routing. Every pit swallows accumulation. Fix: insert an epsilon priority-flood (or breach) pass before flow routing. Answer follows symptom -> mechanism -> minimal fix.",
+      "files": [],
+      "expectations": [
+        "Diagnoses missing depression handling / unfilled pits before flow routing",
+        "The fix is an epsilon priority-flood (or breach) BEFORE flow routing",
+        "Answer is a minimal fix (add/move one step), not a graph rewrite",
+        "Structured as symptom -> mechanism -> fix"
+      ]
+    },
+    {
+      "id": 5,
+      "axis": "diagnosis",
+      "prompt": "I'm getting hard visible seams between my terrain tiles. The noise looks discontinuous right at the tile borders.",
+      "expected_output": "Noise is being evaluated in tile-local (u,v) coordinates instead of world space, so each tile has a different pattern. Fix: evaluate noise in world coordinates.",
+      "files": [],
+      "expectations": [
+        "Identifies noise evaluated in tile-local coordinates instead of world space",
+        "Fix is to evaluate noise in world-space coordinates",
+        "May mention the seed/world-coordinate contract"
+      ]
+    },
+    {
+      "id": 6,
+      "axis": "diagnosis",
+      "prompt": "After I run erosion, gentle slopes show contour-like stair-stepping / terracing that wasn't there before. It only shows up on the flat areas.",
+      "expected_output": "R16 quantisation applied too early: the vertical step becomes a visible terrace on gentle slopes, and derivatives become staircases. Fix: work in R32F and quantise only at export (compute normals/AO before quantising).",
+      "files": [],
+      "expectations": [
+        "Diagnoses R16 / premature quantisation (precision), not an erosion bug",
+        "Fix is to work in R32F and quantise only at export",
+        "Does not misattribute it to the erosion algorithm itself"
+      ]
+    },
+    {
+      "id": 7,
+      "axis": "design",
+      "prompt": "I'm building a 200 km x 200 km continent at roughly 30 m/pixel and I want realistic eroded mountains with proper drainage. Which erosion backbone should I choose and why?",
+      "expected_output": "Stream power (Braun-Willett implicit) + thermal, because the extent is > 50 km. Only stream power is unconditionally stable at geological timescale and produces correct drainage networks. Droplet/pipe are for smaller extents.",
+      "files": [],
+      "expectations": [
+        "Chooses stream power (Braun-Willett) as the backbone for a >50 km extent",
+        "Explains it is the stable/correct choice at large scale (drainage networks, stability)",
+        "Does NOT recommend droplet or pipe hydraulic as the primary backbone at this extent",
+        "May add thermal erosion alongside and scale-free detail on top"
+      ]
+    },
+    {
+      "id": 8,
+      "axis": "design",
+      "prompt": "Put these terrain graph steps in the correct order and explain the two ordering rules that matter most: thermal erosion, flow routing, depression filling, hydraulic/stream-power erosion, slope+curvature analysis.",
+      "expected_output": "Order: depression filling -> flow routing -> hydraulic/stream-power erosion -> thermal erosion -> analysis. Key rules: depression handling must precede flow routing; thermal must follow hydraulic; analysis must run after the last height write.",
+      "files": [],
+      "expectations": [
+        "Depression filling comes before flow routing",
+        "Thermal erosion comes after hydraulic/stream-power erosion",
+        "Analysis (slope/curvature) comes last, after the final height write",
+        "Explains at least the depression-before-routing and thermal-after-hydraulic rules"
+      ]
+    },
+    {
+      "id": 9,
+      "axis": "design",
+      "prompt": "Should drainage area for my erosion be stored in cell counts or in square metres? Does it matter?",
+      "expected_output": "Square metres. Cell counts break the moment resolution changes; area in m² keeps parameters resolution-invariant. This is a units invariant.",
+      "files": [],
+      "expectations": [
+        "Answers square metres (m^2), not cell counts",
+        "Explains cell counts break under a resolution change / are not resolution-invariant"
+      ]
+    },
+    {
+      "id": 10,
+      "axis": "trap-resistance",
+      "prompt": "What's the hoodoo algorithm? I need to generate hoodoos (those capped rock spires).",
+      "expected_output": "There is no hoodoo algorithm (L-tier). Hoodoos emerge from differential erosion of layered rock with a hard caprock over softer rock; where they overhang, a heightfield can't represent them (needs a non-heightfield / material-stack representation).",
+      "files": [],
+      "expectations": [
+        "States there is no hoodoo algorithm; it is an L-tier landform / composition",
+        "Gives the composition: differential erosion of layered rock + hard caprock over soft rock",
+        "Notes the heightfield representation limit where hoodoos overhang",
+        "Does not fabricate a 'hoodoo generation' paper or node"
+      ]
+    },
+    {
+      "id": 11,
+      "axis": "trap-resistance",
+      "prompt": "To keep my values clean I normalize my heightfield to [0,1] after every node in the graph. Is that a problem?",
+      "expected_output": "Yes - normalize destroys world-space units (metre-denominated params downstream become meaningless) and makes the graph non-composable (depends on this evaluation's global min/max), which guarantees tile seams. Use it only at export, or use an explicit remap with known constants.",
+      "files": [],
+      "expectations": [
+        "Flags normalize as a defect: it destroys world-space units",
+        "Notes it breaks composability/tiling (depends on global min/max) -> seams",
+        "Recommends normalizing only at export, or using an explicit remap(known_min, known_max)"
+      ]
+    },
+    {
+      "id": 12,
+      "axis": "trap-resistance",
+      "prompt": "I gave my erosion node an effect mask so it only affects my chosen region. It blends the eroded result back inside the mask. Is that the right kind of mask for restricting erosion to a region?",
+      "expected_output": "No - an effect mask still runs erosion everywhere and only blends the result inside the mask, so sediment transported out of the region is lost (mass not conserved) and the mask boundary develops a discontinuity. To restrict where erosion runs, use a process mask that gates the simulation itself.",
+      "files": [],
+      "expectations": [
+        "Distinguishes effect mask (blends result) from process mask (gates the simulation)",
+        "Notes the effect-mask problem: erosion still runs everywhere -> mass not conserved / boundary discontinuity",
+        "Recommends a process mask to actually restrict where erosion runs"
+      ]
+    }
+  ]
+}
