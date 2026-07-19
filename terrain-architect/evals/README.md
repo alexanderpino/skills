@@ -43,6 +43,34 @@ file transform), so grading reads the answer text against the `expectations` —
 LLM-graded rubric, not a script. Keep the expectations objective enough that two graders
 would agree.
 
+## Validation (iteration 1)
+
+Ran the 6 most discriminating evals (attribution ids 1–3 + trap-resistance ids 10–12)
+with-skill vs a no-skill baseline on the same strong model, grading each `expectations`
+list per-expectation (binary):
+
+| Eval | with-skill | baseline | Δ |
+|---|---|---|---|
+| 1 — droplet-erosion citation | 1.00 | 1.00 | 0 |
+| 2 — atoll "algorithm" | 1.00 | 0.75 | +0.25 |
+| 3 — stream-power solver cite | 1.00 | 0.67 | +0.33 |
+| 10 — hoodoo "algorithm" | 1.00 | 0.75 | +0.25 |
+| 11 — normalize defect | 1.00 | 0.67 | +0.33 |
+| 12 — effect-vs-process mask | 1.00 | 1.00 | 0 |
+| **mean** | **1.00** | **0.81** | **+0.19** |
+
+The baseline is a strong generalist and already gets the well-known facts right (the
+droplet-erosion lineage, the effect-vs-process mask distinction). The skill's measurable
+lift is exactly on the disciplines it exists to enforce: **explicit tier framing** ("there
+is no atoll/hoodoo *algorithm* — it's an L-tier composition", evals 2 & 10), **citation
+completeness** (pairing Braun & Willett 2013 with Cordonnier 2016, eval 3), the
+**Peytavie-Arches representation warning** for overhanging hoodoos (eval 10), and the
+**precise tiling-seam mechanism** behind the normalize defect (eval 11). Result: `1.00`
+with-skill (above the `0.85` bar) with a clear positive delta on the attribution and
+trap-resistance axes, as specified. The honest read is that the skill's value here is
+*discipline and completeness*, not rescuing a weak model — which is the right thing for a
+principal-level reference to do.
+
 ## Maintenance
 
 When a new process family is added to the skill, add at least one attribution eval (does
