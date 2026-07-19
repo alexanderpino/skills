@@ -202,6 +202,16 @@ defect this skill exists to prevent. Consult the index before attributing anythi
 When a question lands on `?`, say so and offer to search. Usefully uncertain beats confidently
 wrong.
 
+**The frontier — verify before citing.** A few areas move faster than any static reference can track,
+so treat them as `?` by default even when a name comes to mind. **Learned / ML terrain synthesis** is
+the main one: GAN and now **diffusion** authoring, DEM super-resolution, and neural-implicit
+representations are *real and advancing* — `00` carries the verified anchors (Guérin 2017, GATA 2019,
+Lochner 2023, Terrain Diffusion Network 2024) — but new work arrives constantly and much is
+preprint-only with unstable metadata. Also frontier: learned **SVBRDF / material-from-photo** and
+diffusion **texture super-resolution** (`08`). The rule for all of them: cite only what you can confirm
+against the primary source *now*, keep the `P`/`?` boundary firm, and re-check before any
+publication-critical use. This is the one part of the skill with a shelf life; when in doubt, search.
+
 ## The terrain graph
 
 Everything in this skill is nodes in a graph, so state the model once. A terrain tool — Gaea,
@@ -380,19 +390,19 @@ the constants matter and are easy to get subtly wrong.
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, planetary/spherical domains (cube-sphere, HEALPix, seam routing), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
+| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, planetary/spherical domains (cube-sphere, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
-| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), weathering & soil production, volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), impact craters, overhangs — and when the heightfield is the wrong representation |
+| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), weathering & soil production, volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |
 | `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; glacial outburst floods & megafloods (jökulhlaups, Channeled Scabland); coastal & marine erosion, cliff retreat, wave-cut platforms, lacustrine (lake) shores, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base, coral reefs & atolls, coral as ecosystem (growth forms, zonation, spur-and-groove); seafloor age–depth subsidence, seamounts/guyots, submarine canyons & turbidity currents |
-| `references/13-climate-ecosystem.md` | Lapse rate, terrain-adjusted wind fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; fire & burned land (spread, severity mosaic, post-fire erosion); multi-biome worlds / regional composition (Hyrule, Middle-earth) |
+| `references/13-climate-ecosystem.md` | Lapse rate, terrain-adjusted wind fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; biogenic landforms (peat/bog growth, stromatolites, nebkha, bioturbation mounds); fire & burned land (spread, severity mosaic, post-fire erosion); multi-biome worlds / regional composition (Hyrule, Middle-earth) |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |
 | `references/16-arid-desert.md` | Arid/desert landforms: yardangs, inselbergs/bornhardts, alluvial fans & bajadas, playas, desert pavement, wadis, loess & sand sheets |
 | `references/17-periglacial.md` | Periglacial/permafrost: patterned ground, solifluction, rock glaciers, thermokarst, pingos, blockfields |
 | `references/18-materials.md` | Surface-material palette: rock families, soil (USDA texture), sand, gravel, mud, vegetation cover, snow/ice, water, crusts, volcanic — and the property bundle each carries |
 | `references/19-lava.md` | **Lava simulation.** Bingham rheology, the grid CA with temperature (Miyamoto & Sasaki / MAGFLOW-style), cooling & crust insulation, FLOWGO channel model, pahoehoe/ʻaʻā, lava-specific verification, parameters |
-| `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Himalaya, Grand Canyon, Namib, Death Valley, Saharan oasis, Guilin karst, Ardèche gorge, Niagara & Victoria Falls, Yellowstone geysers, Zhangjiajie pillars, fjords, sea stacks, atolls, salt flats, Amazon flooded forest…) as regime settings over the Legal Order — the *province* altitude between one-landform (`00`) and one-world (`13`). **Anthropogenic** (Group K): rice-paddy & dry-stone terraces, field-mosaic farmland (large grids & small bocage, lithology/terroir) — the first human-made landforms. **Off-Earth too** (Group L): lunar cratered highlands & maria, Mars, Titan/Europa/Io — the planetary doctrine built out. Plus **screen worlds** — Hoth, Endor, Tatooine & Beggar's Canyon, Pandora, Skull Island, Arrakis, Crait, Interstellar's planets, Monument Valley's West — decomposed into their Earth filming-location archetypes, and **miniature-scale worlds** (insect / Smurf / Bikini Bottom) as a scale-regime shift. Adapt-don't-paste; each carries a verification signature |
+| `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Himalaya, Grand Canyon, Namib, Death Valley, Saharan oasis, Guilin karst, Ardèche gorge, Niagara & Victoria Falls, Yellowstone geysers, Zhangjiajie pillars, fjords, sea stacks, atolls, salt flats, Amazon flooded forest…) as regime settings over the Legal Order — the *province* altitude between one-landform (`00`) and one-world (`13`). **Anthropogenic** (Group K): rice-paddy & dry-stone terraces, field-mosaic farmland (large grids & small bocage, lithology/terroir), and engineered earthworks — dams/reservoirs, mines & spoil, cut-and-fill grading, levees & canals — the human-made surface. **Off-Earth too** (Group L): lunar cratered highlands & maria, Mars, Titan/Europa/Io — the planetary doctrine built out. Plus **screen worlds** — Hoth, Endor, Tatooine & Beggar's Canyon, Pandora, Skull Island, Arrakis, Crait, Interstellar's planets, Monument Valley's West — decomposed into their Earth filming-location archetypes, and **miniature-scale worlds** (insect / Smurf / Bikini Bottom) as a scale-regime shift. Adapt-don't-paste; each carries a verification signature |
 | `references/99-papers.md` | Bibliography with attribution notes |
 
 ## Invariants

@@ -950,6 +950,51 @@ contacts (`11`, `18`), not with elevation; wall and building material tracks the
 ditches, `10`). The cultivated-*plain* sibling of entry 25's terraces: terraces re-cut *slopes*,
 field mosaics dress *gentle ground*; both are human masks over a natural substrate.
 
+### Earthworks — dams, mines & engineered ground *(compact)*
+
+The cultivated surface (25, 26) has an engineered sibling: ground **moved by machines**, now the
+dominant geomorphic agent on Earth by volume (Hooke 2000; Haff 2010 frames technology as a sediment-
+transport process alongside rivers and hillslopes; Tarolli & Sofia 2016 is the review of human
+topographic signatures in high-resolution DEMs). Mostly **L-tier** compositions — flat benches,
+prisms and cones at a design angle — with two entries that carry a real quantitative model.
+
+- **Reservoir & dammed river** *(any large dam)* — a dam turns a river into a settling basin. Inflow
+  drops its load at the reservoir head as a **prograding delta**, fining toward the dam; the fraction
+  trapped is the **trap efficiency** `TE(C/I)` keyed to the capacity-to-inflow ratio (Brune 1953 —
+  `TE→0` for a tiny reservoir, `→ ~95–100%` once `C/I ≳ 0.5`; reference handbook Morris & Fan 1998).
+  A fluctuating pool planes **bathtub-ring shorelines** — horizontal benches, the lacustrine terrace
+  loop (`12`) at an authored level history. *Below* the dam runs **"hungry water"** (Kondolf 1997):
+  sediment-starved release incises and coarsens the bed to an armour lag — the Exner budget (`04`)
+  with upstream supply set to zero. The failure case is a **dam-break**: the dry-bed shallow-water
+  solution (Ritter 1892) sends a wavefront downstream at `2·√(g·h₀)` with depth `4⁄9·h₀` at the dam
+  site — an engineered megaflood, routed and eroded exactly like the natural outburst floods of `12`.
+- **Mine & spoil** *(open-pit, mountaintop-removal)* — the **excavation** is nested benches: flat
+  treads, risers battered at the design angle, an inverse terraced cone (the negative of a
+  stratovolcano). The **waste** is its mass budget (`09`): spoil heaps, tailings and headwater
+  **valley fills** (Palmer et al. 2010) deposited as cones/wedges relaxed to the **angle of repose**
+  (`05` thermal) — bury the drainage line and the stream is gone. Cut and fill are one budget; a pit
+  implies a pile.
+- **Engineered ground** *(urban grading, road prisms, canals, levees)* — graded planar **benches**
+  and slopes cut and filled to a **design surface**, tied to natural ground by batter slopes at a
+  fixed angle. The governing rule is the **cut-and-fill balance** — excavated volume = placed volume
+  (times a bulking factor) for a site that neither imports nor exports earth; solve for the datum that
+  balances them. Levees, embankments and canals are prisms extruded along a polyline (`10` spline +
+  SDF), spoil banked alongside the cut. All **L-tier** geometry over the volume-balance identity.
+
+**Watch for** treating these as natural landforms — the tells are **unnatural planarity and constant
+angles**: dead-flat benches, slopes at exactly the design grade, drainage that stops at a fill, and
+delta/shoreline geometry pinned to authored pool levels rather than the natural base level. The mass
+budget is strict: a cut is a fill somewhere, a trapped delta is a starved reach downstream.
+
+**Verify.** Benches are dead-flat and slopes sit at a single design angle (a spike in the slope
+histogram, `09`, not a repose-angle spread); reservoir shorelines are horizontal at authored pool
+levels; the cut and fill volumes balance; below a dam the bed incises and coarsens. Naturalistic
+scatter of slope angles = the earthworks look eroded, which is wrong.
+
+**Tier.** L compositions over the Legal Order, with two P-tier quantitative hooks — Brune 1953 (trap
+efficiency) and Ritter 1892 (dam-break wave) — plus the cut-fill and repose identities. Umbrella:
+Hooke 2000; Haff 2010; Tarolli & Sofia 2016; Goudie, *The Human Impact*.
+
 ## Group L — Off-Earth
 
 *The skill's off-Earth doctrine (`SKILL.md`) as worked assemblies. Two knobs reset the whole graph:

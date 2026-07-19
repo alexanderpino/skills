@@ -261,8 +261,27 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Guérin, É., Digne, J., Galin, E., Peytavie, A., Wolf, C., Benes, B. & Martinez, B. (2017).**
   *Interactive Example-Based Terrain Authoring with Conditional Generative Adversarial Networks.*
   ACM TOG 36(6), SIGGRAPH Asia '17. — Sketch-to-terrain and amplification.
-- Diffusion-based terrain generation and terrain super-resolution: **no verified reference
-  here.** This area post-dates what this file can vouch for. Search before citing.
+- **Zhao, Y., Liu, H., Borovikov, I., Beirami, A., Sanjabi, M. & Zaman, K. (2019).** *Multi-theme
+  Generative Adversarial Terrain Amplification* (GATA). ACM TOG 38(6), art. 200, SIGGRAPH Asia '19. —
+  Learned amplification of low-res terrain to high-res with selectable themes. The principal
+  learned-amplification reference after Guérin 2017.
+- **Lochner, J., Gain, J., Perche, S., Peytavie, A., Galin, E. & Guérin, É. (2023).** *Interactive
+  Authoring of Terrain using Diffusion Models.* Computer Graphics Forum 42(7), Pacific Graphics '23. —
+  The safe canonical **diffusion** terrain-authoring cite; user-guided synthesis competitive with cGANs.
+- **Hu, Z., Hu, Y., Mo, L., Pan, B. & Wang, Y. (2024).** *Terrain Diffusion Network: Climatic-Aware
+  Terrain Generation with Geological Sketch Guidance.* AAAI 2024, 38(11), 12565–12573. — Diffusion with
+  geological-sketch and climatic control.
+- **Demiray, B.Z., Sit, M. & Demir, I. (2021).** *D-SRGAN: DEM Super-Resolution with Generative
+  Adversarial Networks.* SN Computer Science 2(1), 48. — Neural DEM super-resolution; beats
+  interpolation baselines but can hallucinate high-frequency detail — verify against ground truth.
+- **Feng, H., Xu, L. & De Floriani, L. (2024).** *ImplicitTerrain: a Continuous Surface Model for
+  Terrain Data Analysis.* CVPR 2024 Workshop (arXiv:2406.00227). — SIREN-based implicit representation
+  for analysis/compression — **not** a generator; don't cite it as one.
+- **The moving frontier (verify before citing).** Sketch/style tools (StyleDEM), latent joint
+  geometry+texture (TerraFusion), GNN-based example sketching, and neural-implicit *generation* are real
+  and active but carry incomplete metadata or preprint-only status. This area moves fast — confirm
+  venue and authors against the primary source, and keep the `?` boundary firm (`SKILL.md` frontier
+  note; `00`).
 
 ## Texture & material synthesis
 
@@ -693,6 +712,26 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   system-based flow routing datasets in the Amazon and Yukon basins.* Earth System Science Data 17,
   2035–2062. — Flow routing on an icosahedral equal-area (ISEA) DGGS (`08`, `03`).
 
+### DEM & sensor realism
+
+- **Hutchinson, M.F. (1989).** *A new procedure for gridding elevation and stream line data with
+  automatic removal of spurious pits.* Journal of Hydrology 106(3–4), 211–232. — ANUDEM; drainage-
+  enforced interpolation that removes pits during gridding (`08`, `03`).
+- **Reuter, H.I., Nelson, A. & Jarvis, A. (2007).** *An evaluation of void-filling interpolation
+  methods for SRTM data.* International Journal of Geographical Information Science 21(9), 983–1008. —
+  Void-fill by void size × terrain; basis of the CGIAR-CSI hole-filled SRTM (`08`).
+- **Axelsson, P. (2000).** *DEM generation from laser scanner data using adaptive TIN models.*
+  International Archives of Photogrammetry and Remote Sensing XXXIII(B4), 110–117. — Progressive-
+  densification TIN — the bare-earth lidar filter (`08`).
+- **Zhang, K., Chen, S.-C., Whitman, D., Shyu, M.-L., Yan, J. & Zhang, C. (2003).** *A progressive
+  morphological filter for removing nonground measurements from airborne LIDAR data.* IEEE TGRS
+  41(4), 872–882. — Growing-window morphological bare-earth filter (`08`).
+- **Hanssen, R.F. (2001).** *Radar Interferometry: Data Interpretation and Error Analysis.* Kluwer,
+  Dordrecht. — The InSAR reference; the geometry behind radar layover, foreshortening and shadow (`08`).
+- **Fisher, P.F. & Tate, N.J. (2006).** *Causes and consequences of error in digital elevation
+  models.* Progress in Physical Geography 30(4), 467–489. — DEM error as a **spatially autocorrelated**
+  random field, not white noise; the model to synthesise realistic DEM error (`08`).
+
 ## Weathering, arid, periglacial & planetary
 
 - **Heimsath, A.M., Dietrich, W.E., Nishiizumi, K. & Finkel, R.C. (1997).** *The soil production
@@ -740,6 +779,58 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
 - **Kok, J.F., Parteli, E.J.R., Michaels, T.I. & Bou Karam, D. (2012).** *The physics of wind-blown
   sand and dust.* Reports on Progress in Physics 75(10), 106901. — Aeolian saltation and dunes on
   Earth, Mars, Venus, and Titan; the reference for wind-blown sand off-Earth (`16`, `SKILL.md`).
+- **Goudie, A.S. (1973).** *Duricrusts in Tropical and Subtropical Landscapes.* Clarendon Press,
+  Oxford, 174 pp. — The duricrust reference: calcrete, silcrete and ferricrete as resistant near-
+  surface caps — a low-`K` horizon (`11`).
+- **Nash, D.J. & McLaren, S.J. (eds) (2007).** *Geochemical Sediments and Landscapes.* Blackwell,
+  Oxford (RGS-IBG Book Series). — Duricrusts and other surface cements as landscape components (`11`).
+- **Pain, C.F. & Ollier, C.D. (1995).** *Inversion of relief — a component of landscape evolution.*
+  Geomorphology 12(2), 151–165. — **Relief inversion**: a capped former valley becomes a ridge; the
+  inverted-channel landform, an Earth and Mars analogue (`11`).
+
+## Biogenic landforms
+
+- **Clymo, R.S. (1984).** *The limits to peat bog growth.* Philosophical Transactions of the Royal
+  Society B 303(1117), 605–654. — The acrotelm/catotelm peat-growth model; self-limiting height
+  `M_max = p/α` — the raised bog's domed profile (`13`).
+- **Grotzinger, J.P. & Knoll, A.H. (1999).** *Stromatolites in Precambrian carbonates.* Annual Review
+  of Earth and Planetary Sciences 27, 313–358. — Microbial layered carbonate buildups (`13`).
+- **Tengberg, A. & Chen, D. (1998).** *A comparative analysis of nebkhas in central Tunisia and
+  northern Burkina Faso.* Geomorphology 22(2), 181–192. — Vegetation-anchored sand mounds (`13`, `16`).
+- **Tarnita, C.E., Bonachela, J.A., Sheffer, E. et al. (2017).** *A theoretical foundation for
+  multi-scale regular vegetation patterns.* Nature 541(7637), 398–401. — Regular termite-mound spacing
+  from inter-colony competition; the mechanism, not a closed-form spacing law (`13`).
+- **Darwin, C. (1881).** *The Formation of Vegetable Mould, through the Action of Worms.* John Murray,
+  London. — The founding work on soil bioturbation / turnover (as a hillslope diffusivity) (`13`).
+
+## Anthropogenic & engineered landforms
+
+Humans are now the dominant geomorphic agent on Earth by volume; these ground the engineered surface
+(`20`, Group K).
+
+- **Hooke, R.LeB. (2000).** *On the history of humans as geomorphic agents.* Geology 28(9), 843–846.
+  — The quantification that humans move more earth than rivers (`20`).
+- **Haff, P.K. (2010).** *Hillslopes, rivers, plows, and trucks: mass transport on Earth's surface by
+  natural and technological processes.* Earth Surface Processes and Landforms 35(10), 1157–1166. —
+  Technology as a sediment-transport process alongside rivers and hillslopes (`20`).
+- **Tarolli, P. & Sofia, G. (2016).** *Human topographic signatures and derived geomorphic processes
+  across landscapes.* Geomorphology 255, 140–161. — Human topographic signatures in high-resolution
+  DEMs; the umbrella review for anthropogeomorphology (`20`).
+- **Goudie, A.S. (2013).** *The Human Impact on the Natural Environment: Past, Present, and Future*
+  (7th ed.). Wiley-Blackwell. — The standard text; the anthropogeomorphology chapter (`20`).
+- **Brune, G.M. (1953).** *Trap efficiency of reservoirs.* Transactions, AGU 34(3), 407–418. — The
+  **trap-efficiency** curve keyed to capacity/inflow — how much sediment a reservoir retains (`20`, `12`).
+- **Morris, G.L. & Fan, J. (1998).** *Reservoir Sedimentation Handbook.* McGraw-Hill, New York,
+  805 pp. — The reference handbook for reservoir delta deposition and drawdown (`20`).
+- **Kondolf, G.M. (1997).** *Hungry water: effects of dams and gravel mining on river channels.*
+  Environmental Management 21(4), 533–551. — Sediment-starved incision and bed coarsening below a dam
+  (`20`, `04`).
+- **Ritter, A. (1892).** *Die Fortpflanzung der Wasserwellen.* Zeitschrift des Vereines Deutscher
+  Ingenieure 36(33), 947–954. — The **dam-break** dry-bed shallow-water solution; wavefront speed
+  `2√(g·h₀)` (`20`).
+- **Palmer, M.A., Bernhardt, E.S., Schlesinger, W.H. et al. (2010).** *Mountaintop mining
+  consequences.* Science 327(5962), 148–149. — Valley fills bury headwater streams; the spoil side of
+  the mining mass budget (`20`).
 
 ## Reading order
 

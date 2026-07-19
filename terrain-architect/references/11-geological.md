@@ -4,6 +4,7 @@ Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terra
 [Folding](#folding) · [Lithology & erodibility](#lithology--erodibility) ·
 [Outcrops, mesas, badlands](#outcrops-mesas-badlands) · [When the heightfield fails](#when-the-heightfield-fails) ·
 [Karst & caves](#karst--caves) · [Weathering & soil production](#weathering--soil-production) ·
+[Duricrust & relief inversion](#duricrust--relief-inversion) ·
 [Volcanic landforms](#volcanic-landforms) · [Impact craters](#impact-craters)
 
 ## The central claim
@@ -266,6 +267,49 @@ Why it matters for terrain:
 This is the **production** side of the regolith the whole erosion pipeline consumes, and most
 graphs simply assume regolith exists. Adding it is one exponential, and it makes every
 soil-depth-driven mask physical instead of painted.
+
+## Duricrust & relief inversion
+
+Weathering doesn't only *strip* rock — it can **cement** the near-surface into a resistant crust.
+**Duricrusts** (Goudie 1973; Nash & McLaren 2007) are these hardened caps: **calcrete/caliche**
+(CaCO₃), **silcrete** (silica), and **ferricrete/laterite** (iron and aluminium oxides), precipitated
+at or near the surface in seasonally wet–dry climates. Geomorphically a duricrust is nothing new to
+the engine — it is a **low-erodibility caprock**, the same `K` machinery as the mesa/plateau caprock
+above:
+
+```
+K[cell] = K_soft
+capMask   = surface within the duricrust horizon
+K[capMask] = K_dur          # K_dur ~ 0.01–0.1 · K_soft — a hard lid over soft ground
+```
+
+The payoff is **relief inversion** (Pain & Ollier 1995) — one of the most counter-intuitive real
+landforms, and a favourite Mars analogue. A **valley floor** acquires the resistant fill: cemented
+channel gravels, a duricrust grown on the damp low ground, or a **lava flow** ponded in the valley
+(`19`). Drainage then shifts, and the *soft* surroundings erode faster than the capped former-low —
+until the **valley becomes a ridge**. A sinuous **inverted channel** stands where a river once ran.
+
+```
+inversion:
+    carve a valley / channel network into the substrate (03 flow routing)
+    fill the channel cells with a resistant cap:  K[channel] = K_dur     # the low ground is now hard
+    run erosion (04 stream power + 05 hillslope) to steady state
+    # soft interfluves lower past the old valley depth; the cap holds → the low is now the high
+```
+
+Two parameters decide it: the **contrast** `K_soft / K_dur` (≳10 for a clean inversion) and whether
+the **total erosion depth exceeds the original valley relief** — cut less and you protect a valley,
+cut more and it stands proud. It is the caprock/mesa story with the cap laid in a *valley* instead of
+on a *plateau*.
+
+**Verify.** The inverted channel is a **sinuous ridge whose planform is a drainage network** (it
+meanders, branches, carries tributaries) — not a structural or fault ridge; and it sits on a resistant
+cap over softer rock in the `K`/material field, not on a bare height bump. A straight, unbranched
+"inverted" ridge is the tell that it was drawn, not eroded.
+
+**Tier.** Duricrust is a **material / `K`-field** input (Goudie 1973; Nash & McLaren 2007) — no new
+mechanism, just a resistant horizon. Relief inversion is **L** — that cap plus differential erosion
+(Pain & Ollier 1995), `04`/`05` over an `11` `K` field.
 
 ## Volcanic landforms
 

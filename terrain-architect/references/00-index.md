@@ -89,9 +89,11 @@ of what's reliable here.
 | Example-based terrain synthesis | P | Zhou, Sun, Turk & Rehg 2007, *Terrain Synthesis from Digital Elevation Models*, IEEE TVCG 13(4) |
 | Sketch/example authoring with cGANs | P | Guérin et al. 2017, *Interactive Example-Based Terrain Authoring with Conditional GANs*, ACM TOG 36(6) |
 | Terrain amplification | P | Guérin et al. 2017, as above |
-| Diffusion-based terrain generation | ? | Recent; no verified canonical reference here. **Search before citing.** |
-| Terrain super-resolution | ? | Several candidates, none verified here. **Search.** |
-| Neural terrain generation (general) | ? | Too broad to have a canonical paper. Ask what specifically. |
+| Diffusion-based terrain generation | P | **Was `?`, now real:** Lochner et al. 2023, *Interactive Authoring of Terrain using Diffusion Models*, CGF 42(7); Hu et al. 2024, *Terrain Diffusion Network*, AAAI 38(11) |
+| GAN terrain generation & amplification | P | Guérin et al. 2017 (cGAN authoring/amplification); Zhao et al. 2019, *Multi-theme Generative Adversarial Terrain Amplification* (GATA), ACM TOG 38(6) |
+| DEM super-resolution (neural) | P | Demiray, Sit & Demir 2021, *D-SRGAN*, SN Computer Science 2(1) — can hallucinate high-frequency detail; verify against ground truth |
+| Neural-implicit terrain (representation) | P | Feng, Xu & De Floriani 2024, *ImplicitTerrain*, CVPR Workshop — analysis/compression, **not** a generator |
+| Neural terrain authoring — the moving frontier | ? | Sketch/style tools (StyleDEM), latent joint geometry+texture (TerraFusion), GNN sketching — real work but metadata-incomplete or preprint-only; **verify venue & authors before citing** (`SKILL.md` frontier note) |
 
 ## 2. Macro & geological formation → `02-macro-tectonics.md`, `11-geological.md`
 
@@ -122,6 +124,11 @@ of what's reliable here.
 | Tephra fallout (exponential thinning; advection–diffusion) | P | Pyle 1989; Suzuki 1983; Armienti et al. 1988; Bonadonna et al. 2005 (TEPHRA2) (`11`) |
 | Pyroclastic density currents (energy cone; granular flow) | P | Sheridan 1979; Malin & Sheridan 1982; Patra et al. 2005 (TITAN2D); Dade & Huppert 1996 (`11`) |
 | Caldera collapse (piston subsidence) | P | Roche & Druitt 2001; Geshi et al. 2002; Cole et al. 2005; Acocella 2007 (`11`) |
+| Duricrust (calcrete / silcrete / ferricrete) as a resistant cap | material/`K` | Goudie 1973; Nash & McLaren 2007 — a low-`K` horizon (`11`) |
+| Relief inversion (inverted topography / channels) | L | Pain & Ollier 1995 — valley-fill cap + differential erosion (`11`) |
+| Reservoir sedimentation (trap efficiency) | P | Brune 1953; Morris & Fan 1998 — delta + drawdown benches (`20`, `12`) |
+| Dam-break flood wave | P | Ritter 1892 — dry-bed shallow-water, front at `2√(g·h₀)` (`20`) |
+| Anthropogeomorphology (humans as geomorphic agent) | P | Hooke 2000; Haff 2010; Tarolli & Sofia 2016; Goudie, *The Human Impact* (`20`) |
 
 **L-tier — landforms, not algorithms.** No implementation and no paper exists for these. They
 are compositions. The recipe is the answer. This table is *one landform each*; for whole
@@ -165,6 +172,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Seamount / hotspot chain | Age-progressive edifices (`11`) subsiding along a plate-motion line over a fixed hotspot (`02`, `12`) |
 | Submarine canyon, turbidite fan | Turbidity-current erosion then deposition below wave base (`12`) |
 | Channeled scabland, coulees, giant current ripples | Extreme-discharge megaflood over jointed bedrock — outburst source (`12`) routed by `03`/`04` |
+| Inverted relief (inverted channels, capped former valleys) | Resistant valley-fill cap (duricrust / lava / cemented gravel) + differential erosion (`11`) |
+| Reservoir delta & bathtub shorelines — *anthropogenic* | Dam traps the inflow load (Brune) → head delta + horizontal drawdown benches (`20`) |
+| Mine benches, spoil heaps, valley fills — *anthropogenic* | Cut to design benches; waste piled to the repose angle; drainage buried (`20`, `05`) |
+| Engineered ground (grading, levees, canals) — *anthropogenic* | Cut-and-fill to a design surface; prisms extruded along polylines (`20`, `10`) |
 
 ## 3. Composition & filtering → `10-primitives-ops-filters.md`
 
@@ -328,6 +339,11 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Map-projection distortion (scale factor `h`) | P | Snyder 1987 — divide gradients by `h` or erosion biases (`08`) |
 | Flow routing on a spherical / DGGS grid | P | Liao et al. 2020 (hex); Liao et al. 2025 (ISEA equal-area) (`08`, `03`) |
 | Cube-face-seam flow routing | F | Halo cells + per-face rotation tables; no canonical paper (`08`) |
+| DEM hydrological enforcement / pit removal | P | Hutchinson 1989 (ANUDEM); priority-flood + stream burning (`08`, `03`) |
+| SRTM void filling (delta-surface) | P | Reuter, Nelson & Jarvis 2007 (`08`) |
+| Lidar bare-earth filtering | P | Axelsson 2000 (adaptive TIN); Zhang et al. 2003 (morphological) (`08`) |
+| DEM error field (spatially autocorrelated) | P | Fisher & Tate 2006 (`08`) |
+| SAR layover/foreshortening/shadow; DEM striping & quantisation | F | Sensor geometry / product-validation practice (`08`) |
 | Quadtree terrain, chunked heightfield, streaming, crack prevention, seam stitching | F | Engineering practice. No papers. (`08`) |
 
 ## 9. Climate → `13-climate-ecosystem.md`
@@ -344,6 +360,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — `SKILL.md` doctrine (`11`, `16`); worked blueprints (lunar highlands & maria, Mars, Titan/Europa/Io) in `20` Group J |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
 | Wetlands (swamp, marsh, bog) | L | High TWI + flat + impermeable substrate → mask + peat/mud + thin water layer (`13`, `18`) |
+| Peat / bog accumulation (self-limiting growth) | P | Clymo 1984 — acrotelm/catotelm, `M_max = p/α`, domed profile (`13`) |
+| Microbialites / stromatolites | L | Grotzinger & Knoll 1999 — photic-gated layered accretion (`13`) |
+| Nebkha / vegetation-anchored dunes | L | Tengberg & Chen 1998 — cover raises the aeolian threshold (`13`, `05`, `16`) |
+| Bioturbation mounds (termite / Mima / earthworm) | L / ? | Tarnita et al. 2017 (spacing mechanism `?`); Darwin 1881 (soil turnover as diffusivity) (`13`) |
 | Fire spread (slope- and wind-driven front) | P | Rothermel 1972, USDA Forest Service Res. Pap. INT-115 (`13`) |
 | Post-fire erosion response (repellency, debris flows) | P | Shakesby & Doerr 2006, Earth-Science Reviews 74 (`13`, `05`) |
 | Burned land (char, snags, severity mosaic, succession) | L | Disturbance state: materials + scatter + ecosystem reset (`13`, `18`) |

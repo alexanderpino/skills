@@ -5,7 +5,7 @@ Contents: [Why climate is in the graph](#why-climate-is-in-the-graph) · [Temper
 [Orographic precipitation](#orographic-precipitation-smith--barstad-2004) · [Rain shadow](#the-rain-shadow-result) ·
 [Snow & avalanches](#snow--avalanches-cordonnier-et-al-2018) · [Moisture](#moisture--soil-water) ·
 [Biomes](#biome-classification) · [Ecosystem simulation](#ecosystem-simulation-deussen-et-al-1998) ·
-[Fire & burned land](#fire--burned-land) ·
+[Biogenic landforms](#biogenic-landforms--life-as-a-geomorphic-agent) · [Fire & burned land](#fire--burned-land) ·
 [Multi-biome worlds](#multi-biome-worlds-regional-composition)
 
 ## Why climate is in the graph
@@ -271,6 +271,45 @@ fixed number of outer iterations rather than a convergence criterion.
 **Output.** An ecosystem sim's product is a `PointSet` with species, size and age — it *replaces*
 the scatter node's density mask rather than feeding it. That's a graph-shape change, not a node
 swap, so decide before building `07`.
+
+## Biogenic landforms — life as a geomorphic agent
+
+The ecosystem sim above places *vegetation on* terrain. Sometimes life **is** the terrain: organisms
+build, trap and cement relief directly. Coral is the marine case (`12`); here are the rest, from a real
+growth model to rule-based buildups.
+
+- **Peat & bogs — the one with a growth law.** Peat accumulates where waterlogging stops decay, and its
+  height is **self-limiting** (Clymo 1984): a thin aerobic **acrotelm** feeds mass `p` to the thick
+  anaerobic **catotelm**, which decays slowly at rate `α`. Catotelm mass per area obeys
+  ```
+  dM/dt = p − α·M     →     M(t) = (p/α)·(1 − e^(−α·t)),   M_max = p/α
+  surfaceHeight = z_mineral + M/ρ_b            # ρ_b = peat bulk density
+  ```
+  so a bog **domes toward an asymptote**, not linearly — the raised bog's convex profile *is* this
+  equation. Gate `p` by wetness (`06` TWI) and it grows in waterlogged hollows and stalls on drained
+  slopes. P-tier — a genuine accumulation model, the terrestrial sibling of coral's `reefStep`.
+- **Microbialites / stromatolites** *(Grotzinger & Knoll 1999)* — layered microbial carbonate mounds in
+  shallow sunlit water. No tidy ODE; realise them as **accretionary layered domes** (scatter nuclei on a
+  shallow substrate, grow by light-gated accretion with wavy laminae) — the same photic gate as coral,
+  one rung simpler. L / material: a laminated carbonate cap that can double as a local resistant unit
+  (`11`).
+- **Nebkha / coppice dunes** *(Tengberg & Chen 1998)* — vegetation-anchored sand mounds: a shrub raises
+  the shear threshold, traps saltating sand (`05`), and a mound grows around it, capped by plant height
+  and elongated downwind. The general rule is that **vegetation cover stabilises dunes** — the same
+  `K_effective *= (1 − cover)` coupling, applied to the aeolian threshold — so cover fraction decides a
+  stable nebkha field vs. mobile barchans (`16`). L.
+- **Bioturbation mounds** *(termite & Mima mounds; Darwin 1881 on earthworms)* — animals move soil. Two
+  modes: **regularly-spaced mounds** — termite (and the debated Mima) fields self-organise to a near-
+  hexagonal spacing by inter-colony competition (Tarnita et al. 2017), realised as **inhibition scatter**
+  (Poisson-disk / Lloyd relaxation, `07`) with a cone raised per colony; and **diffuse soil turnover** —
+  earthworm/ant mixing as an added hillslope **diffusivity** `D_bio` on the creep term (`05`, Culling),
+  smoothing micro-relief. The mounds are L; the analytic spacing law is `?` (a competition rule, not a
+  closed form) and Mima-mound genesis is genuinely debated — say so.
+
+**Tier.** Peat is P (Clymo 1984, a growth ODE); stromatolites, nebkha and bioturbation mounds are L
+compositions (Grotzinger & Knoll 1999; Tengberg & Chen 1998; Tarnita et al. 2017; Darwin 1881), the
+termite/Mima *spacing* honestly `?`. All couple into the ecosystem/erosion loop above rather than
+standing apart from it.
 
 ## Fire & burned land
 

@@ -270,6 +270,53 @@ et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors a
 DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
 plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
 
+## DEM & sensor realism
+
+A synthetic heightfield is *too clean* to be a real DEM. Real elevation data is **measured**, and
+measurement leaves fingerprints — sensor geometry, processing steps, and a spatially-structured error
+field. Two reasons to care: **matching real survey data** (author a heightfield that reads as SRTM or
+lidar), and **consuming it** (a graph fed a real DEM must undo the artefacts before routing). The one
+review reference is Fisher & Tate 2006; the rest are per-artefact.
+
+**Correcting a real DEM (before it enters the graph).**
+- **Hydrological enforcement / pit removal** — real DEMs are full of spurious pits (noise, bridges,
+  vegetation) that wreck flow routing (`03`). Remove them by **priority-flood** fill with an epsilon
+  gradient (`03`), or during interpolation (Hutchinson 1989, ANUDEM), which enforces monotone drainage
+  to mapped outlets. **Stream burning** lowers cells under a known channel network by 5–20 m so
+  accumulation converges onto it — do it *before* the fill so the channels win.
+- **Void filling** — SRTM and photogrammetric DEMs have holes (radar shadow, cloud). The **delta-surface**
+  method (Reuter et al. 2007) fills a void from an auxiliary DEM snapped to the SRTM datum: interpolate
+  the boundary bias `Δ = z_srtm − z_aux` across the void, add it back to `z_aux` — auxiliary *texture*,
+  SRTM *level*, no patch seam. Pick the interpolator by void size × terrain (spline in dissected relief,
+  kriging/IDW on flats).
+- **Bare-earth filtering (lidar)** — raw lidar is first-return (canopy, buildings); the bare-earth DEM is
+  the ground beneath. Progressive-densification TIN (Axelsson 2000) or a **growing-window morphological
+  opening** (Zhang et al. 2003): a cell is non-ground if it stands above the opened surface by more than
+  a slope-scaled threshold `dhₜ = dh₀ + s·Δw·c`, the window growing to catch bushes → cars → buildings
+  without shaving real relief.
+
+**Synthesising realism (make a clean heightfield read as measured).**
+- **Correlated error, not white noise.** Real DEM error is a **spatially-autocorrelated random field**
+  (Fisher & Tate 2006): `z_obs = z_true + e`, `e ~ GRF(bias, σ, ρ(h))` with e.g. `ρ(h)=exp(−h/a)`, range
+  `a` of tens–hundreds of metres. Synthesise by filtering white noise with a Gaussian of `σ = a/cellSize`,
+  then rescale to the target RMSE. Per-cell independent noise looks *gritty* and fake; the autocorrelation
+  range is what sells it.
+- **Quantisation & posting.** Round to the vertical step (`z_q = round(z/q)·q`, `q≈1 m` for SRTM →
+  contour-like stair-stepping on gentle slopes, the same terracing as the R16 precision trap above), and
+  resample to the real ground sample distance (30 m / 90 m) to lock in blocky ridgelines.
+- **Sensor geometry (SAR).** Side-looking radar warps slopes by look angle `θ`: **foreshortening** where
+  the foreslope faces the sensor, **layover** (order reversed, elevation ambiguous) where slope toward the
+  sensor `≥ θ`, and **shadow** (a data void) where the backslope tilts past `90°−θ`; add multiplicative
+  Gamma **speckle**. These are the tells that a heightfield came off a radar mission (Hanssen 2001).
+- **Striping.** SRTM/ASTER carry near-periodic banding (~hundreds of m wavelength, ~1–2 m amplitude) and
+  isolated mosaic-seam pits — a sinusoid along the track plus a few spikes.
+
+**Tier.** Hydro-enforcement (Hutchinson 1989), void-fill (Reuter et al. 2007), lidar filtering (Axelsson
+2000; Zhang et al. 2003) and the error-field model (Fisher & Tate 2006) are P; SAR layover/shadow geometry
+and quantisation/striping are F (textbook geometry / product-validation practice, no canonical paper). All
+are `08` data-contract operations, not terrain *processes* — they change what the field *is measured as*,
+never what the land *did*.
+
 ## LOD
 
 **Do not decimate a heightfield with a box filter.** Averaging heights removes peaks and fills
