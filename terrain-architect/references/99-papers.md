@@ -629,12 +629,19 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   Technique.* Remote Sensing 3(2).
 - **Riley, S.J., DeGloria, S.D. & Elliot, R. (1999).** *A terrain ruggedness index that
   quantifies topographic heterogeneity.* Intermountain Journal of Sciences 5(1–4).
+- **Weiss, A. (2001).** *Topographic Position and Landforms Analysis.* Poster, ESRI User
+  Conference, San Diego. — The **topographic position index** (TPI): elevation minus its
+  neighbourhood mean, at multiple radii, to classify ridge/slope/valley positions. Widely
+  used, **not peer-reviewed** — an F-tier convenience, cite it as such (`06`).
 - **Felzenszwalb, P.F. & Huttenlocher, D.P. (2012).** *Distance Transforms of Sampled
   Functions.* Theory of Computing 8. — O(n) exact Euclidean distance transform. (Danielsson
   1980 and Meijster et al. 2000 are the alternatives.)
 
 ## Filtering
 
+- **Tukey, J.W. (1977).** *Exploratory Data Analysis.* Addison-Wesley. — Origin of the
+  **median filter** (running median), the despike tool for salt-and-pepper outliers. A book,
+  not an algorithm paper — cite it as the source of the idea, not a method paper (`10`).
 - **Tomasi, C. & Manduchi, R. (1998).** *Bilateral Filtering for Gray and Color Images.* ICCV '98.
 - **He, K., Sun, J. & Tang, X. (2010).** *Guided Image Filtering.* ECCV 2010; extended in IEEE
   PAMI 35(6), 2013. — **Better than bilateral for terrain**: O(1) per cell, no gradient reversal.
