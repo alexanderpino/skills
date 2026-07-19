@@ -5,7 +5,9 @@ result that looks fine in a hillshade and is structurally broken. The whole poin
 is that a handful of cheap, quantitative checks catch things that no amount of looking will.
 
 Contents: [Validation suite](#validation-suite) · [The five checks](#the-five-checks) ·
-[Two province-scale curves](#two-province-scale-curves) · [Visual review modes](#visual-review-modes) ·
+[Two province-scale curves](#two-province-scale-curves) ·
+[Checks for the extended families](#checks-for-the-extended-families) ·
+[Visual review modes](#visual-review-modes) ·
 [Failure catalogue](#failure-catalogue) · [Review checklist](#review-checklist)
 
 ## Validation suite
@@ -34,6 +36,14 @@ cheap — these are a dozen lines of setup each.
 | **Extreme height range** (0–20 km) | Precision. R16 terracing shows up here and nowhere else. |
 | **One-pixel spike** | Median/despike; erosion stability; capacity singularities |
 | **One-pixel pit** | Depression handling; the `?` case where breach and fill disagree |
+| **Radial vent (point source)** | Tephra fallout and PDC energy cone must stay radially symmetric on flat ground; a plus/star shape = lattice anisotropy in the fallout or flow (`11`) |
+| **Ice-dammed lake + conduit** | Jökulhlaup hydrograph — slow exponential rise then abrupt cutoff; a slow symmetric bump = the tunnel-enlargement feedback is missing (`12`) |
+| **Linear seafloor-age ramp** | Age→depth remap: depth monotonic in √age, flattening for old crust; no erosion applied below wave base (`12`) |
+| **Superelevated channel belt** | Avulsion fires at superelevation `SE≈1`, not before and not never; the new course is steepest-descent *off* the ridge (`03`) |
+| **Oscillating sediment supply** | River terraces — one tread stranded per cut-and-fill cycle; treads horizontal and parallel (`03`) |
+| **Linear depth ramp (photic)** | Coral zonation bands by depth; density → 0 above the waterline and below the compensation depth (`12`) |
+| **Point load on a plate** | Isostatic flexure matches the analytic response kernel; long-wavelength loads approach the Airy limit (`02`) |
+| **Sphere / cube-face seam** | Planetary grid: height and `A` continuous across a cube-face seam; no pole pinch; erosion neighbourhoods cross the seam (`08`) |
 
 **Invariants to assert.** These are machine-checkable and they belong in CI, not in an artist's
 eyeballs:
@@ -170,6 +180,30 @@ mean the ice pass never ran or was overwritten (order bug: fluvial re-run *after
 strength). U-profiles in an unglaciated temperate brief mean over-smoothed valley floors
 (deposition or filtering too aggressive).
 
+## Checks for the extended families
+
+The five checks and two curves validate the fluvial / thermal / glacial backbone. The families that
+run around it each carry their own decisive measurement — the analogue of the slope–area plot: cheap,
+quantitative, and loud on the one wrongness that a hero shot hides.
+
+| Family | Measure | Right looks like / diagnosis |
+|---|---|---|
+| **Tephra fallout** (`11`) | `log(thickness)` vs distance from vent | A straight line, slope `−k` (Pyle exponential thinning). Curvature or a flat blanket = not draping / no distance decay |
+| **Pyroclastic density current** (`11`) | Inundation boundary vs the `H/L` energy line | Flow stops where the energy line meets the ground; **ponds in valleys, blocked by ridges**. Climbing a ridge it shouldn't = the topographic gate is off |
+| **Caldera** (`11`) | Cross-section of the depression | Flat foundered floor ringed by fault scarps — **no raised rim, no central peak**. Rim+peak = an impact crater was stamped instead of a collapse |
+| **Turbidity current** (`12`) | `C`, `U` along the run; Richardson number | Under autosuspension `C` and `U` **grow** downslope then wane; the deposit **fines upward** (Bouma). Instant death on a slope = no bed entrainment |
+| **Seafloor age–depth** (`12`) | Depth vs √age | `d ≈ d₀ + C·√age` within tolerance, flattening for old crust. A uniform-depth abyss = the law was never applied |
+| **Isostasy** (`02`) | Deflection vs the load convolution; peak vs mean elevation through erosion | Deflection = load ⊛ the flexural kernel; as valleys incise the **mean drops but peaks rise** (`ρc/ρm`). Peaks sinking with erosion = rebound missing |
+| **River terraces** (`03`) | Elevation of a tread along the valley | **Horizontal**, parallel to the other treads — a level bevel, not a downstream-sloping surface. Sloping treads = cut without a base level |
+| **Avulsion** (`03`) | Superelevation `SE` at the avulsion step | `SE ≈ 1` when it fires (one channel depth above the floodplain). Firing at `SE≪1`, or never, = the setup threshold is wrong |
+| **Coral cover** (`12`) | Growth-form / density vs depth & wave energy | Zonation **monotone** — branching/encrusting on the high-energy crest, massive on the flat, plate/foliose deep; cover **stops** above water and below the photic depth |
+| **Planetary grid** (`08`) | `A` and height across a cube-face seam; cell-area ratio | Continuous across the seam (metric-corrected `Δs`); resolution-consistent; no pole pinch. A drainage discontinuity at a face edge = seam routing missing |
+
+The pattern is the file's thesis applied to each new family: **find the one measurement that makes the
+bug loud.** A tephra blanket that ignores distance, a caldera with a central peak, terraces that slope
+downstream, coral on the abyssal plain — each looks plausible in a hero shot and each is caught in a
+single plot or cross-section.
+
 ## Visual review modes
 
 The five checks are quantitative — each catches a *specific* bug. This is the complementary
@@ -254,6 +288,17 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Hybrid multifractal → isolated absurd spikes | Missing `min(weight, 1)` | Clamp the weight (`01`) |
 | Creases along grid lines under lighting | Original Perlin cubic fade | Use quintic `6t⁵−15t⁴+10t³` (`01`) |
 | Mask outlines the noise lattice | Thresholding gradient noise near 0 | Threshold FBM, or offset from 0 (`01`) |
+| Ash blanket has uniform thickness / ignores topography | No distance-thinning; drape not applied | `T = T₀·exp(−k·r)`, stretched downwind (`11`) |
+| PDC climbs over ridges it should be blocked by | Energy line not gated by topography | Inundate only where `z_EL > z_topo` (`11`) |
+| Caldera has a raised rim and a central peak | Stamped an impact crater, not a collapse | Piston subsidence `s = V/A`; flat floor, ring scarp (`11`) |
+| Jökulhlaup peak is a slow symmetric bump | No tunnel-enlargement feedback | Runaway conduit `dS/dt`, abrupt cutoff at lake-empty (`12`) |
+| Abyssal plain is a flat, uniform depth | Age→depth law never applied | Remap seafloor age to `d₀+C·√age` (`12`) |
+| Turbidity current dies on entering a slope | No bed entrainment / autosuspension | 3-equation model with the `E_s` term (`12`) |
+| River terraces slope downstream / aren't parallel | Treads not cut at a base level | Bevel each strath at the current base level — horizontal (`03`) |
+| Avulsion fires every step, or never | Superelevation threshold missing / wrong | Require `SE≳1` (one channel depth) + a flood trigger (`03`) |
+| Coral covers deep / aphotic seabed | No photic gate on placement | `density × inPhotic(depth)`; stop below compensation (`12`) |
+| Range erodes straight down; peaks never rise | Isostatic rebound not coupled to erosion | Add flexural / erosional rebound alongside erosion (`02`) |
+| Seams or a pole pinch on a planet | Lat-long grid, or tile-local coords on a sphere | Cube-sphere / HEALPix + metric-corrected `Δs`; seam routing (`08`) |
 
 ### The grid-anisotropy family
 
@@ -311,6 +356,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Masks partition to 1?
 - [ ] Every hard threshold noise-perturbed?
 - [ ] Vertex- vs pixel-centring documented and consistent?
+- [ ] If an extended family is in play (explosive volcanism, seafloor/turbidity, isostasy, terraces, avulsion, coral, planetary grid), has its check from *Checks for the extended families* been run?
 
 **Report findings as: symptom → mechanism → minimal fix.** A graph with one misordered node
 needs one node moved, not a rewrite. Minimal diffs are reviewable; rewrites are not.

@@ -487,6 +487,10 @@ terraces form **autogenically** — a laterally migrating bedrock river cuts and
 no external forcing at all. A terrace flight is *a* history, not necessarily *the* history; don't
 over-interpret one.
 
+**Verify.** Each tread is **horizontal** and parallel to the others — a level bevel, one per
+cut-and-fill cycle; a tread that slopes downstream was cut without a base level (`09`, *Checks for the
+extended families*).
+
 ## Avulsion, crevasse splays & delta lobes
 
 Meandering (above) moves a channel *continuously*; **avulsion** moves it *discontinuously* — the
@@ -537,6 +541,10 @@ then avulses near the apex and starts a new lobe, abandoning the old one to wave
 reworking. The Mississippi has done this through six Holocene lobes on a ~1000–1500 yr cadence
 (Coleman 1988; Roberts 1997) — the **delta cycle**, and the reason a delta is a *fan of stacked
 lobes*, not one static triangle. It is the coastal sibling of the alluvial-fan avulsion in `16`.
+
+**Verify.** Superelevation `SE ≈ 1` at the step the channel avulses (about one channel depth above its
+floodplain), and the new course is steepest-descent *off* the ridge — firing at `SE≪1`, or never, is
+a broken threshold (`09`, *Checks for the extended families*).
 
 **Tier.** The superelevation criterion and avulsion timescale are P (Mohrig et al. 2000; Jerolmack &
 Mohrig 2007); the cellular and stochastic realisations are P (Jerolmack & Paola 2007; Mackey &

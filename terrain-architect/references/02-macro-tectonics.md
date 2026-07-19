@@ -200,6 +200,11 @@ This is what strands raised beaches and tilts old shorelines around formerly gla
 (Fennoscandia, Hudson Bay) — the same lifted-shoreline signature the marine-terrace loop reads
 (`12`), here driven by rebound rather than tectonics.
 
+**Verify.** Deflection equals the load convolved with the flexural kernel, approaching the Airy
+limit at long wavelengths; and through an erosion run the *mean* elevation drops while the peaks
+*rise* by ~`ρc/ρm` — peaks that sink as valleys incise mean rebound is missing (`09`,
+*Checks for the extended families*).
+
 **Tier.** Airy and flexural isostasy and the GIA relaxation are standard geophysics, P-tier
 (Turcotte & Schubert 2014; Watts 2001; Peltier 1974, 2004); erosional-unloading rebound is Molnar &
 England 1990 (P). The spectral flexure solve is the standard F-tier implementation of that P-tier

@@ -408,6 +408,10 @@ entry 16): a caldera is **not** a big impact crater — it is a *collapse* struc
 scaled-up impact bowl gets the shape wrong (no raised rim, no central peak; a flat foundered floor
 ringed by fault scarps).
 
+**Verify.** `log(tephra thickness)` is linear in distance from the vent (slope `−k`); the PDC stops
+where the `H/L` energy line meets the ground and *ponds in valleys*; the caldera is a flat foundered
+floor ringed by scarps, **not** a rimmed-and-peaked crater (`09`, *Checks for the extended families*).
+
 **Tier.** Pyle's thinning law and the advection–diffusion tephra models are P (Pyle 1989; Suzuki
 1983; Armienti et al. 1988; Bonadonna et al. 2005); the energy-cone PDC model is P (Sheridan 1979;
 Malin & Sheridan 1982) with the granular sim P (Patra et al. 2005); caldera-collapse scaling is P

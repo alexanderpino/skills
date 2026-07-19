@@ -225,6 +225,11 @@ cataracts with no river above them. On a dry world (Mars' outflow channels, `20`
 Canyon) the *same* suite with the water switched off is the signature of a vanished catastrophic
 flood.
 
+**Verify.** The outburst hydrograph rises exponentially then cuts off abruptly (not a slow symmetric
+bump), and every landform is scaled to a flood hundreds of metres deep — dry coulees, giant ripples,
+streamlined loess islands; **scale mismatch is the signature** (`09`, *Checks for the extended
+families*).
+
 **Tier.** The jökulhlaup tunnel-enlargement physics and hydrograph are P (Nye 1976; Clarke 1982,
 2003; Walder & Costa 1996; Björnsson 2003); the Missoula-flood interpretation of the Scabland is P
 (Bretz 1923, 1969; Baker 1973). The individual megaflood landforms are L compositions over
@@ -569,6 +574,11 @@ groove length and orientation track wave exposure across thousands of grooves). 
 ridge–valley mask on the fore-reef band (`06` curvature) oriented by swell direction, modulating both
 the reef height and the `coralCover` density.
 
+**Verify.** Growth-form zonation is **monotone** with depth and wave energy (branching/encrusting on
+the high-energy crest → massive on the flat → plate/foliose deep), and cover **stops** above the
+waterline and below the compensation depth — coral on the abyssal plain means the photic gate is off
+(`09`, *Checks for the extended families*).
+
 **Tier.** Growth-form-controlled-by-light is P (Graus & Macintyre 1976; Chappell 1980); the
 accretive-growth morphogenesis is P (Kaandorp et al. 1996; Merks et al. 2003; Kaandorp & Kübler
 2001); zonation is P (Done 1982, 1983); spur-and-groove is P (Shinn 1963; Duce et al. 2016). Placing
@@ -640,6 +650,11 @@ turbidityRun(h, path):                                 # path = steepest descent
         if net < 0:  h -= erode(U)      → carves the submarine CANYON
         else:        h += deposit(net)  → builds the FAN lobe; stamp a Bouma bed
 ```
+
+**Verify.** Seafloor depth tracks `d₀ + C·√age` (flattening for old crust); the turbidity current
+self-accelerates then wanes, leaving a deposit that **fines upward** (Bouma) — a flat uniform abyss or
+a current that dies on the slope is a missing law or missing entrainment (`09`, *Checks for the
+extended families*).
 
 **Tier.** Age–depth subsidence is P (Parsons & Sclater 1977; Stein & Stein 1992). The hotspot/plume
 origin of chains is a P-tier *hypothesis* (Wilson 1963; Morgan 1971); guyot truncation is Hess 1946

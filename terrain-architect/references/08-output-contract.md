@@ -261,6 +261,10 @@ Depression handling (`03`) then runs on the resulting global graph unchanged. To
 entirely, route on a **hex/HEALPix DGGS** instead — there is real published flow-routing work on those
 grids (Liao et al. 2020, 2025), whereas the cube-seam handling stays folklore.
 
+**Verify.** Height and `A` are continuous across a cube-face seam and resolution-consistent; there is
+no pole pinch; and gradients are divided by the scale factor `h` so erosion doesn't bias toward
+high-distortion cells (`09`, *Checks for the extended families*).
+
 **Tier.** The cube-sphere and equiangular mappings are P (Chan & O'Neill 1975; Sadourny 1972; Ronchi
 et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors are P (Snyder 1987);
 DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
