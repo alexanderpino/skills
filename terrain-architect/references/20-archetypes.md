@@ -1175,6 +1175,15 @@ Same discipline, briefer — each still a composition, not an algorithm:
   **√age** curve (`12`), each wave-truncated flat and carried down as a **guyot**; the youngest still
   emergent, the oldest long drowned. Darwin's subsidence sequence continued past the reef, and a
   bathymetry archetype for a planet whose seafloor is visible terrain.
+- **Desiccated sea basin** *(the Aralkum — the exposed floor of the dried Aral Sea; the Bonneville
+  Salt Flats on the bed of Pleistocene Lake Bonneville)* — a former sea/lake floor laid bare. Start
+  from the **shelf → slope → abyssal** profile with relict submarine canyons and guyots (`12`),
+  remove the water, and floor the basin with an **evaporite crust** (`18`, entry 22) crazed by
+  **desiccation mud-cracks** (a Worley F2−F1 pattern, `01`). Then aeolian erosion (`05`/`16`) blows
+  the soft marine muds into dunes and leaves the resistant beds as **yardangs** (`16`, Ward &
+  Greeley). The tell is a mirror-flat salt plain studded with wind-carved ridges over a *bathymetric
+  ghost*. **Tier L.** *(This is the honest geology behind the "exposed ocean bed" look; Mad Max:
+  Fury Road itself was shot in the Namib erg — entry 9 — not a dried sea.)*
 
 ## Combining archetypes
 
@@ -1274,6 +1283,54 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   anatomy (thin hard cap, cliff-forming sandstone, slope-forming shale). Cameras keep returning
   for the same reason the entry's Verify block works: the process history is readable at a
   glance, from horseback or a car window.
+- **Avatar: The Way of Water** *(the reef world modelled on Raja Ampat / Palawan — drowned tower
+  karst)* — entry 14's **drowned tower karst** (Ha Long Bay's mechanism) taken to a reef sea:
+  limestone towers left by vertical dissolution to an old water table (`11`), then drowned by
+  sea-level rise (`03`/`12`). Two edits separate it from Skull Island. **Wave-cut notches** at the
+  waterline undercut each pillar into a top-heavy **mushroom** — a true overhang, so it needs the
+  *Arches* non-heightfield representation (`11`, Peytavie 2009), not a heightfield. And **coral
+  accretes as rings** around every tower (`12` photic-zone `reefStep`, the fringing stage of entry
+  20). Same karst; the notch and the reef are the dressing. **Tier L.**
+- **Prometheus / Death Stranding** *(the Icelandic highlands — Dettifoss, the Vatnajökull margins)* —
+  **subglacial volcanism** as a whole landscape: entry 17's Iceland end-member built out. Basalt
+  erupts under a thick ice mask (`19`) and quenches in meltwater instead of spreading, stacking into
+  **tuyas** — flat-topped table mountains with steep **ice-confined quench flanks** (hyaloclastite /
+  palagonite; *not* thermally-relaxed slopes) under a subaerial lava cap. Then a **jökulhlaup**
+  (`12` outburst) routes catastrophically over the plains (`03`), cutting anastomosing **scabland**
+  canyons (`12` megaflood), and the milled debris is **black basaltic sand** (`18`), not quartz — the
+  signature dark beaches and mudflats. **Tier L** — `17` tuyas + `12` jökulhlaup + `18` sediment.
+- **Up / The Lost World** *(Angel Falls & the Roraima tepuis — the Gran Sabana of entry 8)* —
+  Paradise Falls *is* entry 8's **tepui**, worth two added mechanisms: incision follows an
+  **orthogonal joint/fault network** (weak-`K` lines, `02`) so the quartzite is quarried into
+  rectangular vertical-walled blocks with basal talus (`05`) — the joint-gated logic of the
+  Zhangjiajie pillars (entry 24); and because the caprock is too resistant to incise, the summit
+  lowers by **pseudo-karst dissolution** (`11`), sinkholes punching through the block to feed the
+  sheer-drop waterfalls. Flat summits carry **isolated, contained ecosystems** (`13`). **Tier L.**
+- **Blade Runner 2049's trash mesas** *(concept-designed, not a location — the honest case of an
+  invented "geology")* — a **geological-scale landfill** eroded into badlands, the file's most
+  extreme anthropogenic archetype (Group K). **Stack** compacted refuse as Voronoi terraces of cubes
+  and walls (*deliberately not fractal noise*), then set the stratigraphy (`11`) by erodibility:
+  rust (soft, high `K`), compressed plastic (low `K`, near-impermeable), scrap metal (hard).
+  Near-zero permeability + **acid precipitation** (`13`) drives **stream-power badlands** (`04`) that
+  wash out the soft layers and pond **toxic lakes** in the unfilled sinks (`03`), all mantled in
+  aeolian dust and smog (`05`). The tell: *stratified* mesas whose "beds" are manufactured.
+  **Tier L** — the landfill-badlands extension of Group K.
+- **Nevarro** *(The Mandalorian — a basalt quarry dressed with CG)* — a **fissure flood-basalt
+  plain**, entry 17's traps at rest: line-source eruptions along faults (`02` as *emission* lines,
+  not weakness lines) stack levéed **Bingham** lobes (`19`) into a stepped plateau with **no fluvial
+  dissection**. The look is the **emissive-crust** recipe (`08`): an F2−F1 Worley pattern (`01`) for
+  the cooling-plate cracks, a temperature ramp mapped into the fissures for the glow. **Tier L** —
+  entry 17 + `08`/`19` emissive crust.
+- **Mordor** *(Mount Ngauruhoe / Tongariro as Mount Doom, beside the real Rangipo rain-shadow desert
+  on the volcanic plateau's lee)* — a **rain-shadow volcanic basin**, a clean worked combine. A
+  convergent orogen (`02`) rings the basin — make the ramparts *unnaturally angular* only if the
+  story demands it, and know it is a **stylization** (real collision ranges are arcuate, not
+  rectangular). The **orographic rain shadow** (`13`, Smith & Barstad) does the work: a strong
+  prevailing wind dumps rain on the *outer* flanks (heavily incised by stream power, `04`) and
+  starves the interior, leaving the inner walls steep, jagged and water-untouched. A central
+  **stratovolcano** (`11`, entry 15) mantles the plain with a wind-dispersed **tephra** blanket
+  (`11` exponential thinning) and feeds **Bingham lava lakes** (`19`). The tell: a dead, ash-choked
+  basin whose walls are asymmetric — green and gullied outside, bare and sheer inside. **Tier L.**
 
 **The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
 read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;
