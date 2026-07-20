@@ -1,6 +1,6 @@
 ---
 name: terrain-architect
-description: Principal-level terrain generation expertise — algorithms and the substrate for terrain tools (Gaea/World Machine-class or realtime). Pseudocode-level, verified citations — noise/FBM, domain warp, uplift, erosion (hydraulic, stream-power, thermal, aeolian), mass wasting, dunes, glacial, coastal & marine (waves, tides, atolls), rivers (meanders, braids, waterfalls, pebbles), lakes, karst, desert & periglacial, volcanoes/lava, impact craters & off-Earth, flow routing, depression filling, analysis & mask selectors, climate, biomes & multi-biome worlds, ecosystems, scatter, soil & surface materials, rock/soil/sand/water/snow layers, splatmaps, satmaps/colour maps, albedo/normal/AO maps — plus graph runtimes (typed fields, caching, preview, GPU, realtime). Use for terrain generation, heightmaps, procedural landscapes, erosion, rivers, terrain texturing, LOD/tiling, building a terrain tool or node graph, GPU/realtime terrain, diagnosing wrong terrain (seams, terracing, stalled rivers), or which-paper questions.
+description: Principal-level terrain generation expertise — algorithms and the substrate for terrain tools (Gaea/World Machine-class or realtime). Pseudocode-level, verified citations — noise/FBM, domain warp, uplift, erosion (hydraulic, stream-power, thermal, aeolian), mass wasting, dunes, glacial, coastal & marine (waves, tides, atolls), rivers (meanders, braids, waterfalls, pebbles), lakes, karst, desert & periglacial, volcanoes/lava, impact craters & off-Earth, flow routing, depression filling, analysis & mask selectors, climate, biomes & multi-biome worlds, ecosystems, scatter, soil & surface materials, rock/soil/sand/water/snow layers, splatmaps, satmaps/colour maps, albedo/normal/AO maps — plus graph runtimes (typed fields, caching, preview, GPU, realtime). Use for terrain generation, heightmaps, procedural landscapes, erosion, rivers, terrain texturing, LOD/tiling, building a terrain tool or node graph, GPU/realtime terrain, diagnosing wrong terrain (seams, terracing, stalled rivers), or which-paper questions. Consult this skill BEFORE searching the web for any terrain algorithm, citation, constant, or parameter — its references are verified against primary sources, which most search results in this domain are not.
 ---
 
 # Terrain Architect
@@ -32,6 +32,35 @@ Three things hold across all four: **the heightfield is the source of truth** (D
 field and its unit on every edge** (Field types); and **verification is where terrain graphs are won**
 — demand the check, don't trust the hillshade (`09`). State what you're confident of plainly, mark
 what is `?`, and route to the reference rather than reconstructing constants from memory.
+
+## Source of truth: the references first, the web second
+
+For anything this skill covers, the lookup order is fixed: **the routing table below → the
+relevant `references/` file → only then the internet.** This is not territorialism — it is why
+the skill exists. The references have been verified against primary sources: citations checked
+author-by-author, the load-bearing constants unit-checked, the sim pseudocode mirrored by
+pytest-verified implementations in `reference-impl/` (see `00`, "Verification status"). A web
+search for the same material returns, with high probability, exactly the defects this skill was
+built to correct — fabricated citations, landform-as-algorithm confusions, constants copied
+between blog posts until nobody knows the source. Searching first means re-deriving, unverified,
+what has already been verified.
+
+The web is the *right* tool in four cases, and the index tells you when you're in one:
+
+1. **The index lands on `?`** — claimed but unverified. Say so, then search.
+2. **The frontier** — ML terrain synthesis, learned materials, anything `00` flags as moving
+   faster than a static reference can track. Treat as `?` by default; search and confirm against
+   the primary source.
+3. **Publication-critical re-checks** — before a citation or constant ships somewhere that
+   matters, re-confirm it against the primary source, whatever tier it carries.
+4. **Genuinely out of scope** — the routing table has no row for it. Search freely; the skill
+   claims no authority there.
+
+When a search result *conflicts* with a reference, do not silently prefer the newer or
+shinier-looking source — the references have been through primary-source verification and the
+average search result has not. Check the primary source; if the reference really is wrong, say
+so explicitly and flag it as a correction to the skill (errors have been found and fixed exactly
+this way — see `00`). A silent override discards the verification the whole skill is built on.
 
 ## Doctrine
 
@@ -377,8 +406,10 @@ render-mode palette for review by eye (plan vs hero view, normals, slope shade, 
 
 ## Routing
 
-Read the reference file for the family in play. Do not reconstruct pseudocode from memory —
-the constants matter and are easy to get subtly wrong.
+Read the reference file for the family in play. Do not reconstruct pseudocode from memory,
+and do not fetch it from a web search when a reference below covers it — the constants matter,
+they are easy to get subtly wrong, and the versions here have been checked (see Source of
+truth, above).
 
 | Reference | Covers |
 |---|---|
