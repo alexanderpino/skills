@@ -587,6 +587,9 @@ seafloor's foliage layer (`07`), not a new algorithm.
 
 ## Seafloor, ridges & submarine processes
 
+*Runnable reference: `reference-impl/analytic.py` (age–depth `d₀+C√age`, GDH1), verified by
+`tests/test_analytic.py` — matches the law and flattens for old crust (`09`).*
+
 The atoll that keeps subsiding past the photic zone doesn't stop — it drowns, and its dead flat top
 sinks into deep water as a **guyot**. That is the hand-off from the shallow marine story to the deep
 one: the ocean floor is terrain too, and it has its own shape-makers. Three matter.

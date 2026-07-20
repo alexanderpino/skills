@@ -137,6 +137,10 @@ let the drainage network define where the estuaries are.
 
 ## Isostasy & flexure
 
+*Runnable reference: `reference-impl/isostasy.py`, verified by `tests/test_isostasy.py` — the FFT
+flexure solver checked against exact single-mode response, the Airy limit, and the analytic
+line-load kernel (`09`).*
+
 Everything else in this file *adds or removes load*: uplift builds crust, erosion (`04`) strips it,
 ice (`12`) piles on and melts off. **Isostasy is the vertical response to that load** — the crust
 floats on a denser mantle, so it sinks under a load and rebounds when the load goes. Leave it out and

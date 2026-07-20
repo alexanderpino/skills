@@ -54,6 +54,13 @@ assume more remain until the pseudocode is implemented and the numbers independe
 skill is most useful when the reader knows which claims are anchored and which are informed
 estimates.
 
+**Runnable reference implementations** of the core sims — droplet/pipe/thermal/stream-power erosion,
+flow routing & depression fill, hillslope diffusion, dunes, isostatic flexure, and the analytic
+families (tephra, age–depth, PDC, avulsion) — live in `reference-impl/` (numpy, pytest-verified
+against the `09` checks, cross-validating vs Landlab/RichDEM/pysheds). See its README for the
+module → oracle → library map. This is how the pseudocode becomes *executable and checkable* rather
+than merely asserted.
+
 ---
 
 ## 1. Noise & procedural synthesis → `01-noise.md`

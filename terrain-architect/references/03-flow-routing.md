@@ -24,6 +24,10 @@ everywhere.
 
 ## Depression handling (mandatory)
 
+*Runnable reference: `reference-impl/flow.py` (priority-flood fill, D8/MFD routing, accumulation),
+verified by `tests/test_flow.py` — no interior pit remains; drainage area is conserved; MFD is less
+grid-biased than D8 on a cone (`09`). Cross-validates against RichDEM / pysheds when installed.*
+
 Two philosophies. Choose deliberately.
 
 ### Filling — Priority-Flood (Barnes, Lehman & Mulla 2014)
@@ -497,6 +501,9 @@ Meandering (above) moves a channel *continuously*; **avulsion** moves it *discon
 river abandons its course for a new one across the floodplain. It is what builds distributary
 networks, switches delta lobes, and litters a floodplain with relict channel ridges. Canonical
 review: **Slingerland & Smith 2004**.
+
+*Runnable reference: `reference-impl/analytic.py` (superelevation criterion), verified by
+`tests/test_analytic.py` — the avulsion fires at `SE≈1` with a trigger, and not otherwise (`09`).*
 
 Avulsion needs **setup and trigger** — both, not either:
 

@@ -7,6 +7,10 @@ Contents: [Thermal](#thermal-erosion-musgrave-et-al-1989) · [Repose angles](#re
 
 ## Thermal erosion (Musgrave et al. 1989)
 
+*Runnable reference: `reference-impl/erosion_thermal.py`, verified by `tests/test_thermal.py` —
+converges below the repose angle; the per-neighbour distance correction cuts the plus-shaped grid
+artefact; double-buffered and deterministic (`09`).*
+
 Material on a slope steeper than the repose angle collapses. Cheap, robust, and the fastest
 way to make hydraulic erosion output look right.
 
@@ -208,6 +212,9 @@ You will not integrate this over a heightfield. Use it to justify parameter choi
 tell the user why a linear wind-strength slider feels wrong.
 
 ## Werner (1995) — the implementable model
+
+*Runnable reference: `reference-impl/dunes.py`, verified by `tests/test_dunes.py` — slabs conserved
+exactly; the `p_sand > p_bare` instability sweeps ground bare between dunes; deterministic (`09`).*
 
 *Eolian dunes: computer simulations and attractor interpretation.* A cellular automaton with
 sand "slabs". This is what to actually build. It is remarkably short and it produces barchans,

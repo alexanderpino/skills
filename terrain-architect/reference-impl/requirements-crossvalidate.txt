@@ -1,0 +1,5 @@
+# Optional: enables the cross-validation tests (tests/test_crossvalidate.py), which
+# diff these reference implementations against mature, independently-tested libraries.
+# Absent -> those tests skip cleanly; the core numpy-only suite still runs green.
+richdem
+pysheds

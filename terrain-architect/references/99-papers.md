@@ -832,6 +832,25 @@ Humans are now the dominant geomorphic agent on Earth by volume; these ground th
   consequences.* Science 327(5962), 148–149. — Valley fills bury headwater streams; the spoil side of
   the mining mass budget (`20`).
 
+## Reference implementations
+
+Runnable, pytest-verified Python mirrors of the simulation pseudocode live in
+`terrain-architect/reference-impl/` (numpy-only, each checked against its `09` oracle). For
+production work, prefer the mature, independently-tested libraries below over reimplementing the
+geoscience backbone — the reference impls cross-validate against them.
+
+- **Hobley, D.E.J., Adams, J.M., Nudurupati, S.S., Hutton, E.W.H., Gasparini, N.M.,
+  Istanbulluoglu, E. & Tucker, G.E. (2017).** *Creative computing with Landlab: an open-source
+  toolkit for building, coupling, and exploring two-dimensional numerical models of Earth-surface
+  dynamics.* Earth Surface Dynamics 5, 21–46. — The CSDMS toolkit: stream power, flow routing,
+  diffusion, priority-flood depression handling — all tested.
+- **fastscapelib / FastScape** — the maintained implementations of the O(N) stream-power solver of
+  **Braun & Willett 2013** (above); `fastscape` is the xarray-based Python package.
+- **Barnes, R. (2016).** *RichDEM: Terrain Analysis Software.* github.com/r-barnes/richdem — the
+  canonical priority-flood depression filling and flow accumulation (Barnes et al. 2014, above).
+- **Bartos, M. (2020).** *pysheds: simple and fast watershed delineation in Python.*
+  DOI 10.5281/zenodo.3822494 — D8 flow direction, accumulation, catchment delineation.
+
 ## Reading order
 
 If someone is implementing from scratch and asks what to read first:

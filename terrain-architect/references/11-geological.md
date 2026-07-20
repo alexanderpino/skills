@@ -392,6 +392,10 @@ composition; there is no "lava planet paper" and none is needed.
 
 ### Explosive volcanism — tephra, PDCs & calderas
 
+*Runnable reference: `reference-impl/analytic.py` (tephra exponential thinning; PDC energy cone),
+verified by `tests/test_analytic.py` — log-thickness linear in distance; runout `= Hc/μ`, blocked by
+a ridge (`09`).*
+
 The lava sections above are **effusive** — magma flows out. **Explosive** eruptions fragment it and
 throw it, building (and destroying) different landforms. Three processes, three families:
 
