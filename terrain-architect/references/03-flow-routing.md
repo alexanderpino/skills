@@ -427,6 +427,32 @@ in (from `04`) and it edits a centreline plus a shallow channel/floodplain in th
 Run it *after* the main erosion, and re-derive analysis (`06`) downstream of it like any other
 height write.
 
+**Carving the channel — `burnChannel`.** The placeholder above is an SDF carve: distance to the
+spline sets a cross-section, feathered into the floodplain so there is no trench rim.
+
+```
+burnChannel(h, centreline, halfWidth, depth, bankWidth):
+    for each cell p:
+        # 1. signed distance to the thalweg (polyline = min over segments, sdSegment 10)
+        d = sdPolyline(p, centreline)                       # metres from the centreline, ≥ 0
+        # 2. cross-section: distance → bed. thalwegElev is the long profile, ARC-LENGTH
+        #    interpolated along the spline so the bed slopes downstream (not undulating)
+        t   = clamp(d / halfWidth, 0, 1)                    # 0 at thalweg → 1 at the bank
+        bed = thalwegElev(p) + depth * t**2                 # parabola (U: t**1.5; flat floor: smoothstep(t))
+        # 3. feather past the bank so no hard rim
+        w   = 1 - smoothstep(halfWidth, halfWidth + bankWidth, d)
+        # 4. CARVE ONLY (never raise): lower h toward bed by the mask weight
+        h[p] -= w * max(0, h[p] - bed)
+```
+
+$$\text{bed}(d)=z_{\text{thalweg}}+\text{depth}\cdot\bigl(\text{clamp}(d/\text{halfWidth},0,1)\bigr)^2,\qquad w(d)=1-\text{smoothstep}(\text{halfWidth},\;\text{halfWidth}+\text{bankWidth},\;d)$$
+
+The load-bearing details: the **profile is a function of the SDF** (parabola, U, or flat-bottomed),
+so the channel has a cross-section instead of a stamped groove; **`thalwegElev` interpolated by arc
+length**, or the bed undulates and water pools in the dips; the **`smoothstep` feather** kills the
+hard rim a raw `min` would leave (`10`); and step 4 *subtracts*, so the channel only ever cuts down,
+never bumps terrain up. Emit the water as a layer at `thalwegElev + fillDepth` (`08`), never into `h`.
+
 **Tier.** The migration physics is P-tier (Ikeda–Parker–Sawai 1981; Howard & Knutson 1984); the
 terrain realisation — burning the channel, scroll bars, oxbow fill — is the honest F-tier "look"
 layered on top.

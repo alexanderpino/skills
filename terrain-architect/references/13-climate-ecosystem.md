@@ -83,6 +83,44 @@ fetch responds to channelled winds down a fjord, and precipitation sees the spee
 recipe is F — a look built from two P-tier anchors (Jackson & Hunt 1975 for the crest speed-up;
 Sherman 1978 for mass-consistency). Real boundary-layer CFD stays out of scope, and say so.
 
+### Mass-consistent adjustment (Sherman 1978, MATHEW)
+
+Step 4 deserves its math, because "wind piles up nowhere" is a real defect: the terrain-adjusted
+field $\vec{u}_0$ has spurious sources and sinks the terrain never put there. MATHEW is the fix —
+find the field $\vec{u}$ closest to $\vec{u}_0$ (weighted least squares) that is also
+divergence-free. Minimising
+
+$$J = \int \tfrac{1}{2}\,\alpha^2\,\lVert \vec{u}-\vec{u}_0 \rVert^2 \, dA \quad\text{subject to}\quad \nabla\cdot\vec{u}=0$$
+
+with a Lagrange multiplier $\lambda$ gives $\vec{u} = \vec{u}_0 - \nabla\lambda$ (the weight
+$\alpha^2$ is absorbed into $\lambda$); imposing continuity turns it into a **Poisson equation** —
+the Helmholtz–Hodge projection that strips the curl-free part:
+
+$$\nabla\cdot\vec{u}=0 \;\Longrightarrow\; \nabla^2\lambda = \nabla\cdot\vec{u}_0$$
+
+```
+massConsistentWind(u0, v0, cellSize):
+    # 1. divergence of the terrain-adjusted field (central differences)
+    div = (u0[i,j+1] - u0[i,j-1] + v0[i+1,j] - v0[i-1,j]) / (2*cellSize)
+    # 2. solve ∇²λ = div  for the scalar potential λ
+    #    FFT (periodic): λ̂ = −div̂ / k²   (k from 02's wavenumber grid; set λ̂(0)=0)
+    #    bounded domain: Jacobi/multigrid — open edge → λ=0 (Dirichlet, flow exits);
+    #                    solid ridge → ∂λ/∂n=0 (Neumann, no normal flow)
+    λ = solvePoisson(div, cellSize, bc)
+    # 3. subtract the divergent part
+    u = u0 - (λ[i,j+1] - λ[i,j-1]) / (2*cellSize)
+    v = v0 - (λ[i+1,j] - λ[i-1,j]) / (2*cellSize)
+    return u, v          # ∇·(u,v) ≈ 0 : streamlines wrap terrain instead of piling into it
+```
+
+Anisotropic precision moduli ($\alpha_1\neq\alpha_2$, horizontal vs vertical) make step 2 an
+*anisotropic* Poisson — MATHEW's actual form. Still **F-tier**: it enforces continuity, not
+momentum. Verify by re-checking $\nabla\cdot\vec{u}\to 0$ and that no streamline dead-ends into a
+slope.
+
+*Runnable reference: `reference-impl/winds.py`, verified by `tests/test_winds.py` — the corrected
+field's divergence drops by orders of magnitude (`09`).*
+
 ## Orographic precipitation (Smith & Barstad 2004)
 
 *A Linear Theory of Orographic Precipitation*, J. Atmos. Sci. 61. The canonical model, a linear

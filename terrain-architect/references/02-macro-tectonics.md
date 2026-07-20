@@ -179,6 +179,29 @@ w = IFFT2(W) ;  h_isostatic = h − w             # subside under loads, rebound
 This convolves the load with the plate's response kernel — long wavelengths compensate almost fully
 (the Airy limit), short ones ride on the plate's stiffness, and `Te` sets where the crossover sits.
 
+**Building the wavenumber grid `k`.** This is where the FFT solve is most often quietly wrong — a
+`linspace(0, k_max)` ramp instead of the signed, Nyquist-wrapped frequencies. Use `fftfreq`, which
+returns $[0,1,\dots,\tfrac{N}{2}-1,-\tfrac{N}{2},\dots,-1]/(N\Delta x)$, matching the FFT's own mode
+ordering; the **angular** wavenumber is $2\pi$ times that:
+
+$$k_x = 2\pi\,f_x,\quad f_x=\mathrm{fftfreq}(N_x,\Delta x),\qquad k=\sqrt{k_x^2+k_y^2}$$
+
+```
+# Δx, Δy = cell size in METRES;  Nx, Ny = grid dimensions
+ky = 2π * fftfreq(Ny, d=Δy)        # rad/m, length Ny
+kx = 2π * fftfreq(Nx, d=Δx)        # rad/m, length Nx
+KX, KY = meshgrid(kx, ky)          # shape (Ny, Nx)
+k  = sqrt(KX**2 + KY**2)           # radial wavenumber; k[0,0] = 0 (the DC / domain mean)
+```
+
+Two scales decide whether the solve is physical: the **fundamental** wavenumber $2\pi/L$ (with
+$L=N\Delta x$ the physical domain length) must resolve the flexural wavelength — the domain has to
+exceed a few $\alpha$, which is often *hundreds of km*, or the response wraps; and the **Nyquist**
+wavenumber $\pi/\Delta x$ (two cells per wavelength) is the shortest resolvable. No $k=0$ guard is
+needed: the denominator there is $D\cdot 0 + (\rho_m-\rho_{\text{infill}})g$, finite — the
+domain-mean load subsides uniformly (the Airy limit). **The same grid drives the mass-consistent
+wind Poisson solve (`13`).** (The grid and solver are runnable in `reference-impl/isostasy.py`.)
+
 **Erosional rebound — why peaks can rise as a range wears down.** Erosion removes *mean* load, so the
 range rebounds by ~`ρc/ρm ≈ 0.8` of the mean thickness stripped. Carve deep valleys but leave the
 summits, and the summits go *up* with zero tectonic uplift — **Molnar & England 1990**'s chicken-or-

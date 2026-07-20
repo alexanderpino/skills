@@ -168,6 +168,37 @@ grounded rules replace it:
   fans — debris-flow fans are the steep ones). Rounded levées flanking the runout path are the tell.
 - **Rockfall** is the dry, steep end-member — the scree source above already models it.
 
+**Integrating the Voellmy runout.** Step the mass down the steepest-descent path **in space, not
+time** — the work–energy form drops the timestep entirely. With $\frac{dv}{dt}=v\frac{dv}{dx}$, the
+Voellmy law $\frac{dv}{dt}=g\sin\theta-\mu g\cos\theta-\frac{g\,v^2}{\xi}$ becomes
+$\frac{d}{dx}\!\left(\tfrac12 v^2\right)=a$, so each cell step $\Delta x$ updates $v^2$ directly:
+
+$$v_{n+1}^2 = v_n^2 + 2\,\Delta x\left(g\sin\theta_n-\mu g\cos\theta_n-\frac{g\,v_n^2}{\xi}\right)$$
+
+```
+voellmyRunout(start, h, μ, ξ, cellSize, g=9.81, v0=0):
+    p = start;  v = v0                             # v0 from the scarp drop, or 0
+    track = [p]
+    while True:
+        n = steepestDescentReceiver(h, p)          # the D8 receiver (03)
+        if n is None: break                        # pit/flat → material rests
+        Δx = dist(p, n) * cellSize                  # cellSize or √2·cellSize (diagonal)
+        θ  = atan2(h[p] - h[n], Δx)                 # slope along THIS step (θ<0 = uphill)
+        a  = g*sin(θ) - μ*g*cos(θ) - g*v*v/ξ        # drive − Coulomb − turbulent
+        v2 = v*v + 2*a*Δx                           # v·dv/dx = a  →  v²_next = v² + 2·a·Δx
+        if v2 <= 0: deposit(n); break               # decelerated to rest → the runout toe
+        v = sqrt(v2);  p = n;  track.append(p)
+    return track
+```
+
+An **uphill step** ($\theta<0$) makes $\sin\theta$ negative, so the flow decelerates climbing an
+opposing wall and can stop partway up — the run-up the reach angle can't reproduce. Verify total
+path length against $L=H/\tan\alpha$ (Corominas, above). A single steepest-descent path is **F-tier**;
+a spreading debris lobe wants the depth-averaged solver (Iverson).
+
+*Runnable reference: `reference-impl/runout.py`, verified by `tests/test_runout.py` — runout length
+on a constant ramp matches `L = H/tan(α)` (`09`).*
+
 **Tier.** The susceptibility model is **P-tier** (Montgomery & Dietrich 1994); the debris-flow
 physics is **P-tier** (Iverson 1997) but *not implementable as written* — like Bagnold, cite it for
 *why*; the terrain realisation (scar + runout + thermal) is **F-tier**, no canonical graphics paper.

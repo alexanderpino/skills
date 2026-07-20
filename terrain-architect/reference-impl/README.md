@@ -12,7 +12,7 @@ claims in the references are executable rather than merely asserted.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 37 tests, numpy-only, deterministic
+pytest -q                            # 43 tests, numpy-only, deterministic
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds).
 pip install -r requirements-crossvalidate.txt
@@ -41,6 +41,8 @@ against an independent library.
 | `erosion_pipe.py` — virtual-pipe water | `04` Mei et al. 2007 | depth ≥ 0 (step-3 scaling) & finite on steep terrain; water conserved; 8-pipe more radial than 4-pipe |
 | `erosion_streampower.py` — stream power | `04` Braun & Willett 2013; Cordonnier 2016 | **slope–area exponent = −m/n** at steady state |
 | `dunes.py` — Werner slab CA | `05` Werner 1995 | slabs conserved; instability (`p_sand>p_bare`) sweeps ground bare; deterministic |
+| `winds.py` — mass-consistent wind | `13` Sherman 1978 | corrected field's divergence → 0 (Helmholtz–Hodge projection); solenoidal field passes through |
+| `runout.py` — Voellmy runout | `05` Voellmy 1955 | runout length on a ramp matches `L = H/tan(α)`; more friction → shorter |
 
 ## Deliberately not reimplemented here
 
