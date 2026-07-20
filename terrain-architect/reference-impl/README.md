@@ -18,7 +18,7 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 48 pass; 2 optional cross-checks skip
+pytest -q                            # 49 pass; 2 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds).
 pip install -r requirements-crossvalidate.txt

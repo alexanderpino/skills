@@ -7,6 +7,19 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_skill_frontmatter_contract():
+    lines = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "---"
+    end = lines.index("---", 1)
+    assert lines[1] == "name: terrain-architect"
+    assert lines[2] == "description: >-"
+    description_lines = lines[3:end]
+    assert description_lines
+    assert all(line.startswith("  ") for line in description_lines)
+    description = " ".join(line.strip() for line in description_lines)
+    assert 1 <= len(description) <= 1024
+
+
 def test_eval_integrity():
     subprocess.run(
         [sys.executable, str(SKILL_ROOT / "evals" / "validate.py")],

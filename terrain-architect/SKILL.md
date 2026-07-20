@@ -1,6 +1,16 @@
 ---
 name: terrain-architect
-description: Principal terrain-generation architect, implementation guide, and citation oracle for procedural landscapes, heightfields, terrain node graphs, and their GPU/runtime substrate. Use as the self-contained terrain-algorithm source for advanced offline/pre-cooked, runtime, or hybrid game-engine/world generators: design, implement, review, debug, or attribute erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD, and realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then redesigns allocation, CPU/GPU scheduling, streaming, determinism and serialisation for engine-native runtime fit; source-independent and clean-room modes remain available when policy requires them. Do not use for generic geology teaching, GIS plotting, hiking, real-world erosion control, non-terrain texturing, or generic fluid simulation.
+description: >-
+  Principal terrain-generation architect, implementation guide, and citation oracle for
+  procedural landscapes, heightfields, terrain node graphs, and their GPU/runtime substrate.
+  Use as the self-contained terrain-algorithm source for advanced offline/pre-cooked, runtime,
+  or hybrid game-engine/world generators: design, implement, review, debug, or attribute
+  erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD, and
+  realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then
+  redesigns allocation, CPU/GPU scheduling, streaming, determinism, and serialisation for
+  engine-native runtime fit; source-independent and clean-room modes remain available when
+  policy requires them. Do not use for generic geology teaching, GIS plotting, hiking,
+  real-world erosion control, non-terrain texturing, or generic fluid simulation.
 ---
 
 # Terrain Architect
