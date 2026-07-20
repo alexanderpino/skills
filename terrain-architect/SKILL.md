@@ -9,6 +9,30 @@ You are the principal on terrain graphs. Your job is not to type the erosion loo
 make sure the graph is *legal*, the units are coherent, and the algorithm chosen actually
 produces the landform the user is describing.
 
+## Operating as the terrain authority
+
+Every terrain question is one of four kinds; triage first, because the answer discipline differs:
+
+1. **Attribute / explain** ("what's the paper for X", "how does Gaea's Erosion node work") → answer
+   from `00` with its **provenance tier**. Cite P directly; for F say "no canonical paper, standard
+   practice is…"; for L give the *composition*, not an algorithm; for a branded node give the
+   *family* via the crosswalk (`00`), never a claimed internal. **Never upgrade a tier to satisfy the
+   question** — a fabricated citation is the one defect this skill exists to prevent. On `?`, say so
+   and offer to search.
+2. **Design** ("build me eroded mountains / a delta / a planet") → run the **Design procedure** below:
+   extract the landform claim, derive cell size, choose the erosion backbone by extent, fix units and
+   the seed contract, write the DAG, and **specify verification before implementation**.
+3. **Review / fix** ("why do my rivers stop / seams / terracing") → **symptom → mechanism → minimal
+   fix** from `09`'s failure catalogue; check the Legal Order before the maths; move one node, don't
+   rewrite the graph.
+4. **Substrate** ("design the node engine / GPU placement") → `14`/`15`: the node model, typed ports,
+   caching, and the tiling and preview contracts.
+
+Three things hold across all four: **the heightfield is the source of truth** (Doctrine); **name the
+field and its unit on every edge** (Field types); and **verification is where terrain graphs are won**
+— demand the check, don't trust the hillshade (`09`). State what you're confident of plainly, mark
+what is `?`, and route to the reference rather than reconstructing constants from memory.
+
 ## Doctrine
 
 **The heightfield is the source of truth; the engine is just an emitter.**
@@ -178,6 +202,49 @@ defect this skill exists to prevent. Consult the index before attributing anythi
 When a question lands on `?`, say so and offer to search. Usefully uncertain beats confidently
 wrong.
 
+**The frontier — verify before citing.** A few areas move faster than any static reference can track,
+so treat them as `?` by default even when a name comes to mind. **Learned / ML terrain synthesis** is
+the main one: GAN and now **diffusion** authoring, DEM super-resolution, and neural-implicit
+representations are *real and advancing* — `00` carries the verified anchors (Guérin 2017, GATA 2019,
+Lochner 2023, Terrain Diffusion Network 2024) — but new work arrives constantly and much is
+preprint-only with unstable metadata. Also frontier: learned **SVBRDF / material-from-photo** and
+diffusion **texture super-resolution** (`08`). The rule for all of them: cite only what you can confirm
+against the primary source *now*, keep the `P`/`?` boundary firm, and re-check before any
+publication-critical use. This is the one part of the skill with a shelf life; when in doubt, search.
+
+## The terrain graph
+
+Everything in this skill is nodes in a graph, so state the model once. A terrain tool — Gaea,
+World Machine, Houdini's heightfield SOPs, or one you build (`14`) — is a **directed acyclic graph
+of pure nodes over a small set of world-space fields.** Strip the branding and all three are the same
+machine:
+
+- **A node is a typed field-transform** — a pure function from (parameters, input fields, context)
+  to output fields (`14`). "Erosion", "Combine", "Select Slope" are UI names for this; the algorithm
+  underneath is what `00` catalogues, and *the name is not the algorithm* (the six-things table
+  above).
+- **An edge is a world-space field**, carrying a named type and unit — `height:m`, `A:m²`,
+  `slope:tan`, a `MaskField` in [0,1] (Field types, below). Type and unit errors between nodes are
+  invisible at runtime and catastrophic in output; name them on every edge.
+- **The graph is a DAG evaluated to a heightfield** plus its companion layers — water, sediment,
+  snow (the layer stack in the Doctrine). The order is not free: it obeys the Legal Order (below).
+
+Nodes combine in exactly **three ways**, and confusing them is a defect class:
+
+1. **Chain** — one node writes height, the next reads it. This is the Legal Order: uplift → noise →
+   route → erode → analyse. Sequential height writes, ordered by what each process needs to exist.
+2. **Blend** — combine two fields through a mask or a smooth operator: `blend(base, height, mask)`,
+   `smin(a, b, k)` (`10`). This is how detail, regions and materials are layered — *not* bare `max`
+   (creases) or `mul` (scales absolute elevation, not relief; `10`).
+3. **Parameterise** — one substrate, with masks *varying a process's parameters* per region (`06`,
+   `13`). A multi-biome world is one graph whose `K`, uplift and climate fields differ by locale —
+   **never two finished terrains blended together** (`13`, `20`).
+
+Where the knowledge lives: the **operators** that combine nodes and their pitfalls are `10`; the
+**substrate** that runs the graph (typed ports, caching, tiling, preview) is `14`; **worked
+assemblies** of whole graphs are the archetype blueprints in `20`; and the map from a tool's branded
+node to the algorithm under it is the **tool-node crosswalk** in `00`.
+
 ## Field types
 
 Every graph edge carries a typed field. Name the type and the unit; type errors between nodes
@@ -220,7 +287,7 @@ order before you check the maths.
   1  Macro / tectonics        uplift field U, base relief          → 02
   2  Base shape               primitives, large-scale noise        → 01
   3  Detail noise             FBM / ridged / warp                  → 01
-  3b Volcanic (if volcanic)   edifices, lava flows & fields        → 11, 19
+  3b Volcanic (if volcanic)   edifices, lava, tephra/PDCs/caldera  → 11, 19
   4  Depression handling      fill or breach (MANDATORY)           → 03
   5  Flow routing             D8 / D∞ / MFD → drainage area A      → 03
   6  Fluvial erosion          stream power / pipe / droplet        → 04
@@ -229,7 +296,7 @@ order before you check the maths.
   8  Aeolian                  wind / dunes (if arid)               → 05
   9  Water surfaces           lakes, sea level                     → 03
   9b Coastal & marine         waves, tides, terraces, reefs        → 12
-  9c Floodplain rivers        meandering, oxbows, braids           → 03
+  9c Floodplain rivers        meandering, oxbows, braids, terraces, avulsion → 03
  10  Analysis                 slope, curvature, flow, AO, wetness  → 06
  11  Masks → materials        derive from analysis, never before   → 06
  12  Scatter                  Poisson / blue noise from density    → 07
@@ -252,6 +319,10 @@ The laws that actually bite:
   floodplain process and comes after the valley-scale height writes (9c). Karst is not a step at
   all — it is fluvial/dissolution erosion *gated by a soluble lithology* (`11`). And analysis
   (step 10) still comes after **all** of them.
+- **Isostasy is a feedback, not a step.** Loading and unloading — uplift, erosion, ice — make the
+  crust sink and rebound, so isostasy couples to the *whole* loop; run it as a slow response
+  alongside erosion (6), not as a one-shot node. On a range it *raises the peaks as the valleys
+  incise* (`02`, Molnar & England 1990); around former ice it strands raised shorelines (`12`).
 - **Erosion is not tile-local.** Sediment crosses tile boundaries. Any erosion run
   per-tile without an apron produces visible seams that no amount of blending will hide.
   See `references/08-output-contract.md`.
@@ -311,28 +382,29 @@ the constants matter and are easy to get subtly wrong.
 
 | Reference | Covers |
 |---|---|
-| `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification. **Consult before attributing anything.** |
+| `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification & the **tool-node crosswalk** (Gaea / World Machine / Houdini branded node → algorithm family → reference). **Consult before attributing anything.** |
 | `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
-| `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults |
-| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), water sources & discharge, sea level |
+| `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults, isostasy & flexure (Airy/flexural, glacial & erosional rebound) |
+| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), river terraces (strath/fill), avulsion & delta lobes, water sources & discharge, sea level |
 | `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls, grain size / bedload / gravel bars (pebbles & clasts) |
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport, Werner dune model |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
+| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, planetary/spherical domains (cube-sphere, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
-| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), weathering & soil production, volcanic landforms & lava (flows, fields, lakes, lava worlds), impact craters, overhangs — and when the heightfield is the wrong representation |
-| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; coastal & marine erosion, cliff retreat, wave-cut platforms, lacustrine (lake) shores, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base, coral reefs & atolls |
-| `references/13-climate-ecosystem.md` | Lapse rate, terrain-adjusted wind fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; fire & burned land (spread, severity mosaic, post-fire erosion); multi-biome worlds / regional composition (Hyrule, Middle-earth) |
+| `references/11-geological.md` | Strata, terracing, folding, lithology, outcrops, karst (incl. tower/cone karst), weathering & soil production, volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |
+| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; glacial outburst floods & megafloods (jökulhlaups, Channeled Scabland); coastal & marine erosion, cliff retreat, wave-cut platforms, lacustrine (lake) shores, longshore drift, spits/tombolos/barriers, marine terraces, deltas/rias, wave base, coral reefs & atolls, coral as ecosystem (growth forms, zonation, spur-and-groove); seafloor age–depth subsidence, seamounts/guyots, submarine canyons & turbidity currents |
+| `references/13-climate-ecosystem.md` | Lapse rate, terrain-adjusted wind fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; biogenic landforms (peat/bog growth, stromatolites, nebkha, bioturbation mounds); fire & burned land (spread, severity mosaic, post-fire erosion); multi-biome worlds / regional composition (Hyrule, Middle-earth) |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |
 | `references/16-arid-desert.md` | Arid/desert landforms: yardangs, inselbergs/bornhardts, alluvial fans & bajadas, playas, desert pavement, wadis, loess & sand sheets |
 | `references/17-periglacial.md` | Periglacial/permafrost: patterned ground, solifluction, rock glaciers, thermokarst, pingos, blockfields |
 | `references/18-materials.md` | Surface-material palette: rock families, soil (USDA texture), sand, gravel, mud, vegetation cover, snow/ice, water, crusts, volcanic — and the property bundle each carries |
 | `references/19-lava.md` | **Lava simulation.** Bingham rheology, the grid CA with temperature (Miyamoto & Sasaki / MAGFLOW-style), cooling & crust insulation, FLOWGO channel model, pahoehoe/ʻaʻā, lava-specific verification, parameters |
-| `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Himalaya, Grand Canyon, Namib, Death Valley, Saharan oasis, Guilin karst, Ardèche gorge, Niagara & Victoria Falls, Yellowstone geysers, Zhangjiajie pillars, fjords, sea stacks, atolls, salt flats, Amazon flooded forest…) as regime settings over the Legal Order — the *province* altitude between one-landform (`00`) and one-world (`13`). **Anthropogenic** (Group K): rice-paddy & dry-stone terraces, field-mosaic farmland (large grids & small bocage, lithology/terroir) — the first human-made landforms. **Off-Earth too** (Group L): lunar cratered highlands & maria, Mars, Titan/Europa/Io — the planetary doctrine built out. Plus **screen worlds** — Hoth, Endor, Tatooine & Beggar's Canyon, Pandora, Skull Island, Arrakis, Crait, Interstellar's planets, Monument Valley's West — decomposed into their Earth filming-location archetypes, and **miniature-scale worlds** (insect / Smurf / Bikini Bottom) as a scale-regime shift. Adapt-don't-paste; each carries a verification signature |
+| `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Himalaya, Grand Canyon, Namib, Death Valley, Saharan oasis, Guilin karst, Ardèche gorge, Niagara & Victoria Falls, Yellowstone geysers, Zhangjiajie pillars, fjords, sea stacks, atolls, salt flats, Amazon flooded forest…) as regime settings over the Legal Order — the *province* altitude between one-landform (`00`) and one-world (`13`). **Anthropogenic** (Group K): rice-paddy & dry-stone terraces, field-mosaic farmland (large grids & small bocage, lithology/terroir), and engineered earthworks — dams/reservoirs, mines & spoil, cut-and-fill grading, levees & canals — the human-made surface. **Off-Earth too** (Group L): lunar cratered highlands & maria, Mars, Titan/Europa/Io — the planetary doctrine built out. Plus **screen worlds** — Hoth, Endor, Tatooine & Beggar's Canyon, Pandora, Skull Island, Arrakis, Crait, Interstellar's planets, Monument Valley's West — decomposed into their Earth filming-location archetypes, and **miniature-scale worlds** (insect / Smurf / Bikini Bottom) as a scale-regime shift. Adapt-don't-paste; each carries a verification signature |
 | `references/99-papers.md` | Bibliography with attribution notes |
+| `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (droplet/pipe/thermal/stream-power erosion, flow routing, diffusion, dunes, isostatic flexure, mass-consistent wind, Voellmy runout, tephra/age-depth/PDC/avulsion), each checked against its `09` oracle; cross-validates vs Landlab/RichDEM/pysheds. Don't reimplement the geoscience backbone for production — those libraries have it, verified |
 
 ## Invariants
 

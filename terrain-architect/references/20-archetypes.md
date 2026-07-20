@@ -950,6 +950,51 @@ contacts (`11`, `18`), not with elevation; wall and building material tracks the
 ditches, `10`). The cultivated-*plain* sibling of entry 25's terraces: terraces re-cut *slopes*,
 field mosaics dress *gentle ground*; both are human masks over a natural substrate.
 
+### Earthworks — dams, mines & engineered ground *(compact)*
+
+The cultivated surface (25, 26) has an engineered sibling: ground **moved by machines**, now the
+dominant geomorphic agent on Earth by volume (Hooke 2000; Haff 2010 frames technology as a sediment-
+transport process alongside rivers and hillslopes; Tarolli & Sofia 2016 is the review of human
+topographic signatures in high-resolution DEMs). Mostly **L-tier** compositions — flat benches,
+prisms and cones at a design angle — with two entries that carry a real quantitative model.
+
+- **Reservoir & dammed river** *(any large dam)* — a dam turns a river into a settling basin. Inflow
+  drops its load at the reservoir head as a **prograding delta**, fining toward the dam; the fraction
+  trapped is the **trap efficiency** `TE(C/I)` keyed to the capacity-to-inflow ratio (Brune 1953 —
+  `TE→0` for a tiny reservoir, `→ ~95–100%` once `C/I ≳ 0.5`; reference handbook Morris & Fan 1998).
+  A fluctuating pool planes **bathtub-ring shorelines** — horizontal benches, the lacustrine terrace
+  loop (`12`) at an authored level history. *Below* the dam runs **"hungry water"** (Kondolf 1997):
+  sediment-starved release incises and coarsens the bed to an armour lag — the Exner budget (`04`)
+  with upstream supply set to zero. The failure case is a **dam-break**: the dry-bed shallow-water
+  solution (Ritter 1892) sends a wavefront downstream at `2·√(g·h₀)` with depth `4⁄9·h₀` at the dam
+  site — an engineered megaflood, routed and eroded exactly like the natural outburst floods of `12`.
+- **Mine & spoil** *(open-pit, mountaintop-removal)* — the **excavation** is nested benches: flat
+  treads, risers battered at the design angle, an inverse terraced cone (the negative of a
+  stratovolcano). The **waste** is its mass budget (`09`): spoil heaps, tailings and headwater
+  **valley fills** (Palmer et al. 2010) deposited as cones/wedges relaxed to the **angle of repose**
+  (`05` thermal) — bury the drainage line and the stream is gone. Cut and fill are one budget; a pit
+  implies a pile.
+- **Engineered ground** *(urban grading, road prisms, canals, levees)* — graded planar **benches**
+  and slopes cut and filled to a **design surface**, tied to natural ground by batter slopes at a
+  fixed angle. The governing rule is the **cut-and-fill balance** — excavated volume = placed volume
+  (times a bulking factor) for a site that neither imports nor exports earth; solve for the datum that
+  balances them. Levees, embankments and canals are prisms extruded along a polyline (`10` spline +
+  SDF), spoil banked alongside the cut. All **L-tier** geometry over the volume-balance identity.
+
+**Watch for** treating these as natural landforms — the tells are **unnatural planarity and constant
+angles**: dead-flat benches, slopes at exactly the design grade, drainage that stops at a fill, and
+delta/shoreline geometry pinned to authored pool levels rather than the natural base level. The mass
+budget is strict: a cut is a fill somewhere, a trapped delta is a starved reach downstream.
+
+**Verify.** Benches are dead-flat and slopes sit at a single design angle (a spike in the slope
+histogram, `09`, not a repose-angle spread); reservoir shorelines are horizontal at authored pool
+levels; the cut and fill volumes balance; below a dam the bed incises and coarsens. Naturalistic
+scatter of slope angles = the earthworks look eroded, which is wrong.
+
+**Tier.** L compositions over the Legal Order, with two P-tier quantitative hooks — Brune 1953 (trap
+efficiency) and Ritter 1892 (dam-break wave) — plus the cut-fill and repose identities. Umbrella:
+Hooke 2000; Haff 2010; Tarolli & Sofia 2016; Goudie, *The Human Impact*.
+
 ## Group L — Off-Earth
 
 *The skill's off-Earth doctrine (`SKILL.md`) as worked assemblies. Two knobs reset the whole graph:
@@ -1119,6 +1164,26 @@ Same discipline, briefer — each still a composition, not an algorithm:
   archetype people forget: near-zero uplift on ancient rock → very low relief, old/deranged drainage,
   thin soil over scoured bedrock (`02` uplift-off + long erosion). Every world needs its calm
   interior.
+- **Channeled scabland / megaflood tract** *(Columbia Plateau, Washington; Icelandic jökulhlaup
+  sandurs)* — a catastrophic outburst flood (`12`) routed over jointed bedrock: anastomosing dry
+  **coulees**, **cataracts** and plunge pools (Dry Falls), **giant current ripples** and streamlined
+  **loess islands**, all sized to a flood hundreds of metres deep. The tell is **scale mismatch** —
+  landforms far too big for any current stream. On a dry world the same suite with the water switched
+  off is a fossil megaflood (entry 29, Beggar's Canyon).
+- **Seamount chain & guyot** *(Hawaiian–Emperor chain, Pacific guyots)* — the deep-sea sibling of
+  entry 20's atoll: an **age-progressive** line of hotspot volcanoes (`02`/`11`) subsiding on the
+  **√age** curve (`12`), each wave-truncated flat and carried down as a **guyot**; the youngest still
+  emergent, the oldest long drowned. Darwin's subsidence sequence continued past the reef, and a
+  bathymetry archetype for a planet whose seafloor is visible terrain.
+- **Desiccated sea basin** *(the Aralkum — the exposed floor of the dried Aral Sea; the Bonneville
+  Salt Flats on the bed of Pleistocene Lake Bonneville)* — a former sea/lake floor laid bare. Start
+  from the **shelf → slope → abyssal** profile with relict submarine canyons and guyots (`12`),
+  remove the water, and floor the basin with an **evaporite crust** (`18`, entry 22) crazed by
+  **desiccation mud-cracks** (a Worley F2−F1 pattern, `01`). Then aeolian erosion (`05`/`16`) blows
+  the soft marine muds into dunes and leaves the resistant beds as **yardangs** (`16`, Ward &
+  Greeley). The tell is a mirror-flat salt plain studded with wind-carved ridges over a *bathymetric
+  ghost*. **Tier L.** *(This is the honest geology behind the "exposed ocean bed" look; Mad Max:
+  Fury Road itself was shot in the Namib erg — entry 9 — not a dried sea.)*
 
 ## Combining archetypes
 
@@ -1218,6 +1283,54 @@ above, then re-dress.* There is no "Hoth algorithm" for the same reason there is
   anatomy (thin hard cap, cliff-forming sandstone, slope-forming shale). Cameras keep returning
   for the same reason the entry's Verify block works: the process history is readable at a
   glance, from horseback or a car window.
+- **Avatar: The Way of Water** *(the reef world modelled on Raja Ampat / Palawan — drowned tower
+  karst)* — entry 14's **drowned tower karst** (Ha Long Bay's mechanism) taken to a reef sea:
+  limestone towers left by vertical dissolution to an old water table (`11`), then drowned by
+  sea-level rise (`03`/`12`). Two edits separate it from Skull Island. **Wave-cut notches** at the
+  waterline undercut each pillar into a top-heavy **mushroom** — a true overhang, so it needs the
+  *Arches* non-heightfield representation (`11`, Peytavie 2009), not a heightfield. And **coral
+  accretes as rings** around every tower (`12` photic-zone `reefStep`, the fringing stage of entry
+  20). Same karst; the notch and the reef are the dressing. **Tier L.**
+- **Prometheus / Death Stranding** *(the Icelandic highlands — Dettifoss, the Vatnajökull margins)* —
+  **subglacial volcanism** as a whole landscape: entry 17's Iceland end-member built out. Basalt
+  erupts under a thick ice mask (`19`) and quenches in meltwater instead of spreading, stacking into
+  **tuyas** — flat-topped table mountains with steep **ice-confined quench flanks** (hyaloclastite /
+  palagonite; *not* thermally-relaxed slopes) under a subaerial lava cap. Then a **jökulhlaup**
+  (`12` outburst) routes catastrophically over the plains (`03`), cutting anastomosing **scabland**
+  canyons (`12` megaflood), and the milled debris is **black basaltic sand** (`18`), not quartz — the
+  signature dark beaches and mudflats. **Tier L** — `17` tuyas + `12` jökulhlaup + `18` sediment.
+- **Up / The Lost World** *(Angel Falls & the Roraima tepuis — the Gran Sabana of entry 8)* —
+  Paradise Falls *is* entry 8's **tepui**, worth two added mechanisms: incision follows an
+  **orthogonal joint/fault network** (weak-`K` lines, `02`) so the quartzite is quarried into
+  rectangular vertical-walled blocks with basal talus (`05`) — the joint-gated logic of the
+  Zhangjiajie pillars (entry 24); and because the caprock is too resistant to incise, the summit
+  lowers by **pseudo-karst dissolution** (`11`), sinkholes punching through the block to feed the
+  sheer-drop waterfalls. Flat summits carry **isolated, contained ecosystems** (`13`). **Tier L.**
+- **Blade Runner 2049's trash mesas** *(concept-designed, not a location — the honest case of an
+  invented "geology")* — a **geological-scale landfill** eroded into badlands, the file's most
+  extreme anthropogenic archetype (Group K). **Stack** compacted refuse as Voronoi terraces of cubes
+  and walls (*deliberately not fractal noise*), then set the stratigraphy (`11`) by erodibility:
+  rust (soft, high `K`), compressed plastic (low `K`, near-impermeable), scrap metal (hard).
+  Near-zero permeability + **acid precipitation** (`13`) drives **stream-power badlands** (`04`) that
+  wash out the soft layers and pond **toxic lakes** in the unfilled sinks (`03`), all mantled in
+  aeolian dust and smog (`05`). The tell: *stratified* mesas whose "beds" are manufactured.
+  **Tier L** — the landfill-badlands extension of Group K.
+- **Nevarro** *(The Mandalorian — a basalt quarry dressed with CG)* — a **fissure flood-basalt
+  plain**, entry 17's traps at rest: line-source eruptions along faults (`02` as *emission* lines,
+  not weakness lines) stack levéed **Bingham** lobes (`19`) into a stepped plateau with **no fluvial
+  dissection**. The look is the **emissive-crust** recipe (`08`): an F2−F1 Worley pattern (`01`) for
+  the cooling-plate cracks, a temperature ramp mapped into the fissures for the glow. **Tier L** —
+  entry 17 + `08`/`19` emissive crust.
+- **Mordor** *(Mount Ngauruhoe / Tongariro as Mount Doom, beside the real Rangipo rain-shadow desert
+  on the volcanic plateau's lee)* — a **rain-shadow volcanic basin**, a clean worked combine. A
+  convergent orogen (`02`) rings the basin — make the ramparts *unnaturally angular* only if the
+  story demands it, and know it is a **stylization** (real collision ranges are arcuate, not
+  rectangular). The **orographic rain shadow** (`13`, Smith & Barstad) does the work: a strong
+  prevailing wind dumps rain on the *outer* flanks (heavily incised by stream power, `04`) and
+  starves the interior, leaving the inner walls steep, jagged and water-untouched. A central
+  **stratovolcano** (`11`, entry 15) mantles the plain with a wind-dispersed **tephra** blanket
+  (`11` exponential thinning) and feeds **Bingham lava lakes** (`19`). The tell: a dead, ash-choked
+  basin whose walls are asymmetric — green and gullied outside, bare and sheer inside. **Tier L.**
 
 **The through-line:** the alien-ness is set dressing; the *landforms* are Earth, chosen by process to
 read as the story's world — which is the whole skill. Twin suns and a sarlacc don't change the graph;

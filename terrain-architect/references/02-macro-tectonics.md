@@ -134,3 +134,105 @@ Coastlines are an **erosion output, not an input**. A coastline authored by thre
 has fractal wiggle but no relationship to the drainage — rivers will meet the sea at arbitrary
 points instead of in estuaries. If coastline quality matters, set sea level *after* erosion and
 let the drainage network define where the estuaries are.
+
+## Isostasy & flexure
+
+*Runnable reference: `reference-impl/isostasy.py`, verified by `tests/test_isostasy.py` — the FFT
+flexure solver checked against exact single-mode response, the Airy limit, and the analytic
+line-load kernel (`09`).*
+
+Everything else in this file *adds or removes load*: uplift builds crust, erosion (`04`) strips it,
+ice (`12`) piles on and melts off. **Isostasy is the vertical response to that load** — the crust
+floats on a denser mantle, so it sinks under a load and rebounds when the load goes. Leave it out and
+a range just erodes downward; put it in and the range *rises as it erodes*, which is the real
+long-term behaviour and reshapes the whole profile.
+
+**Airy (local) — the cheap baseline.** Each column floats independently; a topographic load of height
+`h` presses a root of depth `r` into the mantle (Turcotte & Schubert 2014; Watts 2001):
+
+```
+r = ρc · h / (ρm − ρc)          # ρc ≈ 2700–2800, ρm ≈ 3300 kg/m³  →  r ≈ 5–6 · h
+```
+
+A per-cell multiply, no neighbour coupling — nearly free, but wrong at short wavelengths: a narrow
+load doesn't sink as if it were infinitely wide, because the plate has strength.
+
+**Flexural — the plate is stiff.** The lithosphere behaves as a thin elastic plate over an inviscid
+mantle, so a load deflects it over a *region*, not one column (Watts 2001; Turcotte & Schubert 2014):
+
+```
+D · ∇⁴w + (ρm − ρinfill) · g · w = q(x,y)     # w = deflection (down +), q = load [Pa]
+D = E · Te³ / [12(1 − ν²)]                      # flexural rigidity [N·m]
+```
+
+with `E ≈ 70–100 GPa` (Young's modulus), `ν ≈ 0.25` (Poisson), and `Te` the **effective elastic
+thickness** — the one knob that matters, from a few km (weak, hot lithosphere) to tens of km (old,
+cold). The response width is the flexural parameter `α = [4D / ((ρm − ρinfill)·g)]^¼`. The practical
+way to solve it over a heightfield is **in the Fourier domain**, where `∇⁴` is a multiply:
+
+```
+q = ρc · g · h ;  Q = FFT2(q)
+W = Q / (D · k⁴ + (ρm − ρinfill) · g)          # k = radial wavenumber; the plate transfer function
+w = IFFT2(W) ;  h_isostatic = h − w             # subside under loads, rebound at deficits
+```
+
+This convolves the load with the plate's response kernel — long wavelengths compensate almost fully
+(the Airy limit), short ones ride on the plate's stiffness, and `Te` sets where the crossover sits.
+
+**Building the wavenumber grid `k`.** This is where the FFT solve is most often quietly wrong — a
+`linspace(0, k_max)` ramp instead of the signed, Nyquist-wrapped frequencies. Use `fftfreq`, which
+returns $[0,1,\dots,\tfrac{N}{2}-1,-\tfrac{N}{2},\dots,-1]/(N\Delta x)$, matching the FFT's own mode
+ordering; the **angular** wavenumber is $2\pi$ times that:
+
+$$k_x = 2\pi\,f_x,\quad f_x=\mathrm{fftfreq}(N_x,\Delta x),\qquad k=\sqrt{k_x^2+k_y^2}$$
+
+```
+# Δx, Δy = cell size in METRES;  Nx, Ny = grid dimensions
+ky = 2π * fftfreq(Ny, d=Δy)        # rad/m, length Ny
+kx = 2π * fftfreq(Nx, d=Δx)        # rad/m, length Nx
+KX, KY = meshgrid(kx, ky)          # shape (Ny, Nx)
+k  = sqrt(KX**2 + KY**2)           # radial wavenumber; k[0,0] = 0 (the DC / domain mean)
+```
+
+Two scales decide whether the solve is physical: the **fundamental** wavenumber $2\pi/L$ (with
+$L=N\Delta x$ the physical domain length) must resolve the flexural wavelength — the domain has to
+exceed a few $\alpha$, which is often *hundreds of km*, or the response wraps; and the **Nyquist**
+wavenumber $\pi/\Delta x$ (two cells per wavelength) is the shortest resolvable. No $k=0$ guard is
+needed: the denominator there is $D\cdot 0 + (\rho_m-\rho_{\text{infill}})g$, finite — the
+domain-mean load subsides uniformly (the Airy limit). **The same grid drives the mass-consistent
+wind Poisson solve (`13`).** (The grid and solver are runnable in `reference-impl/isostasy.py`.)
+
+**Erosional rebound — why peaks can rise as a range wears down.** Erosion removes *mean* load, so the
+range rebounds by ~`ρc/ρm ≈ 0.8` of the mean thickness stripped. Carve deep valleys but leave the
+summits, and the summits go *up* with zero tectonic uplift — **Molnar & England 1990**'s chicken-or-
+egg caution: measured peak uplift is not by itself proof of tectonic uplift. Couple it to the erosion
+pass (`04`):
+
+```
+rebound = (ρc/ρm) · smoothOver(α, erodedThickness)     # spread over the flexural width α
+h += rebound
+```
+
+**Glacial isostatic adjustment (rebound) — the mantle is viscous, so it lags.** Under an ice load the
+crust sinks; when the ice melts it rebounds over *millennia*, because the mantle flows on a relaxation
+timescale (Peltier 1974; Peltier 2004). Model it as exponential relaxation toward the new equilibrium,
+fastest at long wavelengths:
+
+```
+τ(λ) = 4π·η / (ρm · g · λ)                      # η ≈ 10²¹ Pa·s mantle viscosity; long λ relax first
+w(t+Δt) = w_eq + (w(t) − w_eq) · exp(−Δt/τ)
+```
+
+This is what strands raised beaches and tilts old shorelines around formerly glaciated coasts
+(Fennoscandia, Hudson Bay) — the same lifted-shoreline signature the marine-terrace loop reads
+(`12`), here driven by rebound rather than tectonics.
+
+**Verify.** Deflection equals the load convolved with the flexural kernel, approaching the Airy
+limit at long wavelengths; and through an erosion run the *mean* elevation drops while the peaks
+*rise* by ~`ρc/ρm` — peaks that sink as valleys incise mean rebound is missing (`09`,
+*Checks for the extended families*).
+
+**Tier.** Airy and flexural isostasy and the GIA relaxation are standard geophysics, P-tier
+(Turcotte & Schubert 2014; Watts 2001; Peltier 1974, 2004); erosional-unloading rebound is Molnar &
+England 1990 (P). The spectral flexure solve is the standard F-tier implementation of that P-tier
+equation — no separate paper, it's just where you compute `∇⁴` cheaply.

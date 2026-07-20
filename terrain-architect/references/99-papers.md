@@ -69,6 +69,38 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   western Colorado.* Journal of Geophysical Research 112(F3). — A quantitative knickpoint-retreat
   model (`04`).
 
+### Isostasy, flexure & seafloor tectonics
+
+- **Turcotte, D.L. & Schubert, G. (2014).** *Geodynamics* (3rd ed.). Cambridge University Press,
+  623 pp. — Standard text for Airy isostasy (root `r = ρc·h/(ρm−ρc)`) and thin-elastic-plate flexure
+  (`D∇⁴w + Δρ·g·w = q`); the grounding for the isostasy section (`02`).
+- **Watts, A.B. (2001).** *Isostasy and Flexure of the Lithosphere.* Cambridge University Press,
+  458 pp. — The flexure reference: flexural rigidity `D = E·Te³/[12(1−ν²)]`, effective elastic
+  thickness `Te`, and the flexural response kernel solved by convolution (`02`).
+- **Peltier, W.R. (1974).** *The impulse response of a Maxwell Earth.* Reviews of Geophysics and
+  Space Physics 12(4), 649–669. — Viscoelastic (Maxwell) Earth response; the basis of glacial
+  isostatic adjustment as a lagged relaxation (`02`, `12`).
+- **Peltier, W.R. (2004).** *Global glacial isostasy and the surface of the ice-age Earth: the
+  ICE-5G (VM2) model and GRACE.* Annual Review of Earth and Planetary Sciences 32, 111–149. —
+  The modern GIA ice-history + mantle-viscosity model; raised/tilted post-glacial shorelines (`02`).
+- **Molnar, P. & England, P. (1990).** *Late Cenozoic uplift of mountain ranges and global climate
+  change: chicken or egg?* Nature 346(6279), 29–34. — **Erosional isostasy**: incision unloads a
+  range and the summits rebound by ~`ρc/ρm`, so peak uplift is not by itself proof of tectonic
+  uplift (`02`).
+- **Parsons, B. & Sclater, J.G. (1977).** *An analysis of the variation of ocean floor bathymetry
+  and heat flow with age.* Journal of Geophysical Research 82(5), 803–827. — The **√age**
+  ridge-flank subsidence law (`d = d₀ + C·√t`, `d₀ ≈ 2500 m`, `C ≈ 350 m/√Myr`) (`12`).
+- **Stein, C.A. & Stein, S. (1992).** *A model for the global variation in oceanic depth and heat
+  flow with lithospheric age.* Nature 359(6391), 123–129. — GDH1 plate model; the flattening of old
+  seafloor the half-space law misses (`12`).
+- **Wilson, J.T. (1963).** *A possible origin of the Hawaiian Islands.* Canadian Journal of Physics
+  41(6), 863–870. — The **hotspot** hypothesis: an age-progressive volcanic chain over a fixed
+  source (`11`, `12`). A hypothesis, still debated — attribute as such.
+- **Morgan, W.J. (1971).** *Convection plumes in the lower mantle.* Nature 230(5288), 42–43. — The
+  mantle-plume mechanism proposed for hotspots (`12`).
+- **Hess, H.H. (1946).** *Drowned ancient islands of the Pacific Basin.* American Journal of Science
+  244(11), 772–791. — **Guyots**: wave-truncated seamounts carried down by subsidence (`12`).
+
 ## Hydraulic erosion
 
 - **Musgrave, F.K., Kolb, C.E. & Mace, R.S. (1989).** *The Synthesis and Rendering of Eroded
@@ -229,8 +261,27 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Guérin, É., Digne, J., Galin, E., Peytavie, A., Wolf, C., Benes, B. & Martinez, B. (2017).**
   *Interactive Example-Based Terrain Authoring with Conditional Generative Adversarial Networks.*
   ACM TOG 36(6), SIGGRAPH Asia '17. — Sketch-to-terrain and amplification.
-- Diffusion-based terrain generation and terrain super-resolution: **no verified reference
-  here.** This area post-dates what this file can vouch for. Search before citing.
+- **Zhao, Y., Liu, H., Borovikov, I., Beirami, A., Sanjabi, M. & Zaman, K. (2019).** *Multi-theme
+  Generative Adversarial Terrain Amplification* (GATA). ACM TOG 38(6), art. 200, SIGGRAPH Asia '19. —
+  Learned amplification of low-res terrain to high-res with selectable themes. The principal
+  learned-amplification reference after Guérin 2017.
+- **Lochner, J., Gain, J., Perche, S., Peytavie, A., Galin, E. & Guérin, É. (2023).** *Interactive
+  Authoring of Terrain using Diffusion Models.* Computer Graphics Forum 42(7), Pacific Graphics '23. —
+  The safe canonical **diffusion** terrain-authoring cite; user-guided synthesis competitive with cGANs.
+- **Hu, Z., Hu, Y., Mo, L., Pan, B. & Wang, Y. (2024).** *Terrain Diffusion Network: Climatic-Aware
+  Terrain Generation with Geological Sketch Guidance.* AAAI 2024, 38(11), 12565–12573. — Diffusion with
+  geological-sketch and climatic control.
+- **Demiray, B.Z., Sit, M. & Demir, I. (2021).** *D-SRGAN: DEM Super-Resolution with Generative
+  Adversarial Networks.* SN Computer Science 2(1), 48. — Neural DEM super-resolution; beats
+  interpolation baselines but can hallucinate high-frequency detail — verify against ground truth.
+- **Feng, H., Xu, L. & De Floriani, L. (2024).** *ImplicitTerrain: a Continuous Surface Model for
+  Terrain Data Analysis.* CVPR 2024 Workshop (arXiv:2406.00227). — SIREN-based implicit representation
+  for analysis/compression — **not** a generator; don't cite it as one.
+- **The moving frontier (verify before citing).** Sketch/style tools (StyleDEM), latent joint
+  geometry+texture (TerraFusion), GNN-based example sketching, and neural-implicit *generation* are real
+  and active but carry incomplete metadata or preprint-only status. This area moves fast — confirm
+  venue and authors against the primary source, and keep the `?` boundary firm (`SKILL.md` frontier
+  note; `00`).
 
 ## Texture & material synthesis
 
@@ -311,6 +362,47 @@ is below.
 - **Culling, W.E.H. (1960).** *Analytical Theory of Erosion.* Journal of Geology 68(3). —
   Hillslope diffusion / soil creep as `D·∇²h`. The origin of the diffusion term in `04`.
 
+### Explosive volcanism (tephra, PDCs, calderas)
+
+- **Pyle, D.M. (1989).** *The thickness, volume and grainsize of tephra fall deposits.* Bulletin of
+  Volcanology 51(1), 1–15. — **Exponential thinning** of an ashfall with distance, `T = T₀·exp(−k·r)`;
+  the drape model for a tephra blanket (`11`).
+- **Suzuki, T. (1983).** *A theoretical model for dispersion of tephra.* In Shimozuru & Yokoyama
+  (eds), *Arc Volcanism: Physics and Tectonics*, Terra Scientific (TERRAPUB), Tokyo, pp. 95–113. —
+  First numerical advection–diffusion tephra-dispersal model (a book chapter, not a journal paper) (`11`).
+- **Armienti, P., Macedonio, G. & Pareschi, M.T. (1988).** *A numerical model for simulation of
+  tephra transport and deposition: applications to May 18, 1980, Mount St. Helens eruption.* JGR
+  93(B6), 6463–6476. — Advection–diffusion–sedimentation of ash by grain class (`11`).
+- **Bonadonna, C., Connor, C.B., Houghton, B.F., Connor, L., Byrne, M., Laing, A. & Hincks, T.K.
+  (2005).** *Probabilistic modeling of tephra dispersal.* JGR 110, B03203. — The TEPHRA2 analytic
+  advection–diffusion–sedimentation form (`11`).
+- **Sheridan, M.F. (1979).** *Emplacement of pyroclastic flows: a review.* In *Ash-Flow Tuffs*, GSA
+  Special Paper 180, 125–136. — Origin of the **energy-line / energy-cone** runout construction (`11`).
+- **Malin, M.C. & Sheridan, M.F. (1982).** *Computer-Assisted Mapping of Pyroclastic Surges.*
+  Science 217(4560), 637–640. — The **energy-cone** hazard-mapping model: runout where the `H/L`
+  energy line clears the topography (`11`). (In *Science*, not JGR.)
+- **Dade, W.B. & Huppert, H.E. (1996).** *Emplacement of the Taupo ignimbrite by a dilute turbulent
+  flow.* Nature 381, 509–512. — The dilute turbulent-gravity-current (box-model) alternative for
+  PDC runout (`11`).
+- **Branney, M.J. & Kokelaar, P. (2002).** *Pyroclastic Density Currents and the Sedimentation of
+  Ignimbrites.* Geological Society of London Memoir 27, 143 pp. — Ignimbrite emplacement; the welded
+  tuff that later erodes into hoodoos/tuff towers (`11`, `20`).
+- **Patra, A.K., Bauer, A.C., Nichita, C.C., Pitman, E.B., Sheridan, M.F. et al. (2005).** *Parallel
+  adaptive numerical simulation of dry avalanches over natural terrain* (TITAN2D). Journal of
+  Volcanology and Geothermal Research 139(1–2), 1–21. — Depth-averaged (Savage–Hutter) granular flow
+  with Coulomb friction; the physical tier above the energy cone (`11`).
+- **Roche, O. & Druitt, T.H. (2001).** *Onset of caldera collapse during ignimbrite eruptions.*
+  Earth and Planetary Science Letters 191(3–4), 191–202. — Roof force balance; coherent piston
+  collapse when roof aspect `R/h ≳ 1` (`11`).
+- **Geshi, N., Shimano, T., Chiba, T. & Nakada, S. (2002).** *Caldera collapse during the 2000
+  eruption of Miyakejima Volcano, Japan.* Bulletin of Volcanology 64(1), 55–68. — Observed
+  incremental piston subsidence tracking withdrawn volume (`11`).
+- **Cole, J.W., Milner, D.M. & Spinks, K.D. (2005).** *Calderas and caldera structures: a review.*
+  Earth-Science Reviews 69(1–2), 1–26. — Caldera types and ring-fault structure (`11`).
+- **Acocella, V. (2007).** *Understanding caldera structure and development: an overview of analogue
+  models compared to natural calderas.* Earth-Science Reviews 85(3–4), 125–160. — Analogue-model
+  synthesis of collapse geometry (`11`).
+
 ## Glacial & coastal
 
 - **Argudo, O., Galin, E., Peytavie, A., Paris, A. & Guérin, É. (2020).** *Simulation, Modeling
@@ -347,6 +439,74 @@ is below.
   **lacustrine shorelines**: wave-cut lake terraces from a lake-level history, and the
   topset/foreset/bottomset **Gilbert delta**. The freshwater analogue of the marine coastal suite
   (`12`). Not graphics — cite it for the mechanism.
+
+### Glacial outburst floods & megafloods
+
+- **Nye, J.F. (1976).** *Water flow in glaciers: jökulhlaups, tunnels and veins.* Journal of
+  Glaciology 17(76), 181–207. — The **tunnel-enlargement runaway**: a subglacial conduit melts wider
+  as discharge rises, giving the exponential-rise / abrupt-cutoff outburst hydrograph (`12`).
+- **Clarke, G.K.C. (1982).** *Glacier outburst floods from "Hazard Lake", Yukon, and the problem of
+  flood magnitude prediction.* Journal of Glaciology 28(98), 3–21. — Nye theory extended with
+  reservoir/temperature effects (`12`).
+- **Clarke, G.K.C. (2003).** *Hydraulics of subglacial outburst floods: new insights from the
+  Spring–Hutter formulation.* Journal of Glaciology 49(165), 299–313. — The modern jökulhlaup model (`12`).
+- **Walder, J.S. & Costa, J.E. (1996).** *Outburst floods from glacier-dammed lakes: the effect of
+  mode of lake drainage on flood magnitude.* Earth Surface Processes and Landforms 21(8), 701–723. —
+  Tunnel drainage vs bodily ice-dam failure; the latter peaks higher and sharper (`12`).
+- **Björnsson, H. (2003).** *Subglacial lakes and jökulhlaups in Iceland.* Global and Planetary
+  Change 35(3–4), 255–271. — The Icelandic type locality (`12`).
+- **Bretz, J H. (1923).** *The Channeled Scabland of the Columbia Plateau.* Journal of Geology
+  31(8), 617–649. — The founding (long-ridiculed, later vindicated) megaflood interpretation (`12`).
+- **Bretz, J H. (1969).** *The Lake Missoula floods and the Channeled Scabland.* Journal of Geology
+  77(5), 505–543. — The mature statement of the flood hypothesis (`12`).
+- **Baker, V.R. (1973).** *Paleohydrology and Sedimentology of Lake Missoula Flooding in Eastern
+  Washington.* GSA Special Paper 144, 79 pp. — The quantitative paleohydrology: scabland, coulees,
+  giant current ripples, streamlined residual islands (`12`).
+- **Baker, V.R. & Nummedal, D. (eds) (1978).** *The Channeled Scabland.* NASA Planetary Geology
+  Program, 186 pp. — Field guidebook to the megaflood landforms (formally published, not
+  journal-refereed) (`12`).
+
+### Turbidity currents & submarine deposits
+
+- **Parker, G., Fukushima, Y. & Pantin, H.M. (1986).** *Self-accelerating turbidity currents.*
+  Journal of Fluid Mechanics 171, 145–181. — The layer-averaged 3-/4-equation model and
+  **autosuspension**; the underwater sibling of the fluvial machinery (`12`).
+- **Middleton, G.V. (1993).** *Sediment deposition from turbidity currents.* Annual Review of Earth
+  and Planetary Sciences 21, 89–114. — Deposition mechanics and the fining-upward record (`12`).
+- **Meiburg, E. & Kneller, B. (2010).** *Turbidity currents and their deposits.* Annual Review of
+  Fluid Mechanics 42, 135–156. — The modern review; submarine canyons and fans (`12`).
+- **Bouma, A.H. (1962).** *Sedimentology of Some Flysch Deposits.* Elsevier, 168 pp. — The **Bouma
+  sequence** (Ta–Te): the vertical structure a waning turbidity current leaves (`12`).
+
+### Coral as ecosystem (growth form, zonation, spur-and-groove)
+
+- **Graus, R.R. & Macintyre, I.G. (1976).** *Light control of growth form in colonial reef corals:
+  computer simulation.* Science 193(4256), 895–897. — Light alone selects colony growth form, by
+  simulation; the driver behind depth-zoned coral morphology (`12`, `07`). (In *Science*.)
+- **Chappell, J. (1980).** *Coral morphology, diversity and reef growth.* Nature 286, 249–252. —
+  Coral form as a function of **light and mechanical wave stress** together (`12`).
+- **Done, T.J. (1982).** *Patterns in the distribution of coral communities across the central Great
+  Barrier Reef.* Coral Reefs 1(2), 95–107. — Coral **zonation** across the reef profile (`12`).
+- **Done, T.J. (1983).** *Coral zonation: its nature and significance.* In Barnes (ed.),
+  *Perspectives on Coral Reefs*, 107–147. — The zonation synthesis (`12`).
+- **Kaandorp, J.A., Lowe, C.P., Frenkel, D. & Sloot, P.M.A. (1996).** *Effect of nutrient diffusion
+  and flow on coral morphology.* Physical Review Letters 77(11), 2328–2331. — Accretive growth as a
+  diffusion-vs-flow (Péclet) competition: open branches vs compact colonies (`12`).
+- **Merks, R.M.H., Hoekstra, A.G., Kaandorp, J.A. & Sloot, P.M.A. (2003).** *Models of coral growth:
+  spontaneous branching, compactification and the Laplacian growth assumption.* Journal of
+  Theoretical Biology 224(2), 153–166. — Branching morphogenesis (`12`).
+- **Kaandorp, J.A. & Kübler, J.E. (2001).** *The Algorithmic Beauty of Seaweeds, Sponges and
+  Corals.* Springer. — The accretive-growth reference for benthic form (`12`).
+- **Kaandorp, J.A. et al. (2005).** *Morphogenesis of the branching reef coral Madracis mirabilis.*
+  Proceedings of the Royal Society B 272(1559), 127–133. — Validated single-species growth model (`12`).
+- **Shinn, E.A. (1963).** *Spur and groove formation on the Florida Reef Tract.* Journal of
+  Sedimentary Petrology 33(2), 291–303. — The classic **spur-and-groove** description (`12`).
+- **Storlazzi, C.D., Logan, J.B. & Field, M.E. (2003).** *Quantitative morphology of a fringing reef
+  tract from high-resolution laser bathymetry: southern Molokai, Hawaii.* GSA Bulletin 115(11),
+  1344–1355. — Wave control on reef morphology (`12`).
+- **Duce, S., Vila-Concejo, A., Hamylton, S.M. et al. (2016).** *A morphometric assessment and
+  classification of coral reef spur and groove morphology.* Geomorphology 265, 68–83. — Groove length
+  and orientation track wave exposure across thousands of grooves (`12`).
 
 ## Climate & ecosystems
 
@@ -416,6 +576,47 @@ is below.
   its river network first, then raise the relief around it. The graphics reference for
   river-driven terrain (`03`).
 
+### River terraces
+
+- **Bull, W.B. (1990).** *Stream-terrace genesis: implications for soil development.* Geomorphology
+  3(3–4), 351–367. — The strath-vs-fill terrace distinction and the base-level/threshold framing (`03`).
+- **Bull, W.B. (1991).** *Geomorphic Responses to Climatic Change.* Oxford University Press, 326 pp.
+  — Climate-driven aggradation/degradation cycles; complex response (`03`).
+- **Merritts, D.J., Vincent, K.R. & Wohl, E.E. (1994).** *Long river profiles, tectonism, and
+  eustasy: a guide to interpreting fluvial terraces.* JGR 99(B7), 14031–14050. — Straths record
+  steady vertical incision via lateral channel wandering (`03`).
+- **Pazzaglia, F.J. & Brandon, M.T. (2001).** *A fluvial record of long-term steady-state uplift and
+  erosion across the Cascadia forearc high.* American Journal of Science 301(4–5), 385–431. — The
+  steady-state incision + strath-genesis model (`03`).
+- **Hancock, G.S. & Anderson, R.S. (2002).** *Numerical modeling of fluvial strath-terrace formation
+  in response to oscillating climate.* GSA Bulletin 114(9), 1131–1142. — **The numerical model**:
+  cover-limited bedrock incision + lateral erosion under oscillating supply; the terrace-loop
+  algorithm (`03`).
+- **Limaye, A.B.S. & Lamb, M.P. (2016).** *Numerical model predictions of autogenic fluvial terraces
+  and comparison to climate change expectations.* JGR: Earth Surface 121(3), 512–544. — Terraces can
+  form **autogenically**, with no external forcing; the caution against over-reading a terrace flight (`03`).
+
+### River avulsion & delta lobes
+
+- **Slingerland, R. & Smith, N.D. (2004).** *River avulsions and their deposits.* Annual Review of
+  Earth and Planetary Sciences 32, 257–285. — The canonical review; the **setup vs trigger**
+  distinction (`03`).
+- **Mohrig, D., Heller, P.L., Paola, C. & Lyons, W.J. (2000).** *Interpreting avulsion process from
+  ancient alluvial sequences.* GSA Bulletin 112(12), 1787–1803. — The ~one-channel-depth
+  **superelevation** threshold in the rock record (`03`).
+- **Jerolmack, D.J. & Mohrig, D. (2007).** *Conditions for branching in depositional rivers.*
+  Geology 35(5), 463–466. — The avulsion timescale (`T_A ≈ depth / aggradation rate`) and the
+  single-thread-vs-branching criterion (`03`).
+- **Jerolmack, D.J. & Paola, C. (2007).** *Complexity in a cellular model of river avulsion.*
+  Geomorphology 91(3–4), 259–270. — A cellular, heightfield-native avulsion model (`03`).
+- **Mackey, S.D. & Bridge, J.S. (1995).** *Three-dimensional model of alluvial stratigraphy: theory
+  and applications.* Journal of Sedimentary Research 65B(1), 7–31. — 3-D stochastic avulsion with
+  slope-ratio + flood-stage rules (`03`).
+- **Coleman, J.M. (1988).** *Dynamic changes and processes in the Mississippi River delta.* GSA
+  Bulletin 100(7), 999–1015. — Delta-lobe switching timescales (`03`).
+- **Roberts, H.H. (1997).** *Dynamic changes of the Holocene Mississippi River delta plain: the
+  delta cycle.* Journal of Coastal Research 13(3), 605–627. — The six-lobe **delta cycle** (`03`).
+
 ## Sediment & bedload
 
 The physics of grain size, transport, and gravel bars — old, canonical, and the grounding for
@@ -447,12 +648,19 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   Technique.* Remote Sensing 3(2).
 - **Riley, S.J., DeGloria, S.D. & Elliot, R. (1999).** *A terrain ruggedness index that
   quantifies topographic heterogeneity.* Intermountain Journal of Sciences 5(1–4).
+- **Weiss, A. (2001).** *Topographic Position and Landforms Analysis.* Poster, ESRI User
+  Conference, San Diego. — The **topographic position index** (TPI): elevation minus its
+  neighbourhood mean, at multiple radii, to classify ridge/slope/valley positions. Widely
+  used, **not peer-reviewed** — an F-tier convenience, cite it as such (`06`).
 - **Felzenszwalb, P.F. & Huttenlocher, D.P. (2012).** *Distance Transforms of Sampled
   Functions.* Theory of Computing 8. — O(n) exact Euclidean distance transform. (Danielsson
   1980 and Meijster et al. 2000 are the alternatives.)
 
 ## Filtering
 
+- **Tukey, J.W. (1977).** *Exploratory Data Analysis.* Addison-Wesley. — Origin of the
+  **median filter** (running median), the despike tool for salt-and-pepper outliers. A book,
+  not an algorithm paper — cite it as the source of the idea, not a method paper (`10`).
 - **Tomasi, C. & Manduchi, R. (1998).** *Bilateral Filtering for Gray and Color Images.* ICCV '98.
 - **He, K., Sun, J. & Tang, X. (2010).** *Guided Image Filtering.* ECCV 2010; extended in IEEE
   PAMI 35(6), 2013. — **Better than bilateral for terrain**: O(1) per cell, no gradient reversal.
@@ -479,6 +687,50 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   Heightmaps.* Journal of Graphics, GPU, and Game Tools 14(4). — CDLOD.
 - Virtual texturing: **Barrett, S. (2008)**, *Sparse Virtual Textures* (GDC) and **Mittring, M.
   (2008)**, *Advanced Virtual Texture Topics* (SIGGRAPH course). Talks, not papers — cite as such.
+
+### Planetary / spherical domains
+
+- **Chan, F.K. & O'Neill, E.M. (1975).** *Feasibility Study of a Quadrilateralized Spherical Cube
+  Earth Data Base.* Computer Sciences Corp., EPRF Technical Report 2-75. — The **quadrilateralized
+  spherical cube** (later the COBE quad-sphere); origin of the cube-sphere grid (`08`).
+- **Sadourny, R. (1972).** *Conservative finite-difference approximations of the primitive equations
+  on quasi-uniform spherical grids.* Monthly Weather Review 100(2), 136–144. — The cube-based
+  quasi-uniform grid; precursor of the modern cubed sphere (`08`).
+- **Ronchi, C., Iacono, R. & Paolucci, P.S. (1996).** *The "Cubed Sphere": a new method for the
+  solution of partial differential equations in spherical geometry.* Journal of Computational
+  Physics 124(1), 93–114. — The **equiangular** gnomonic cubed sphere; near-uniform cell area (`08`).
+- **Górski, K.M., Hivon, E., Banday, A.J. et al. (2005).** *HEALPix: a framework for high-resolution
+  discretization and fast analysis of data distributed on the sphere.* The Astrophysical Journal
+  622(2), 759–771. — The equal-area, iso-latitude spherical pixelisation; a seam-free alternative (`08`).
+- **Snyder, J.P. (1987).** *Map Projections — A Working Manual.* USGS Professional Paper 1395,
+  383 pp. — Projection scale factors and distortion; divide gradients by the scale factor `h` or
+  erosion biases toward high-distortion regions (`08`).
+- **Liao, C., Tesfa, T., Duan, Z. & Leung, L.R. (2020).** *Watershed delineation on a hexagonal mesh
+  grid.* Environmental Modelling & Software 128, 104702. — HexWatershed: mesh-independent flow
+  routing on a hexagonal DGGS — seam-free spherical hydrology (`08`, `03`).
+- **Liao, C., Engwirda, D., Cooper, M.G., Li, M. & Fang, Y. (2025).** *Discrete global grid
+  system-based flow routing datasets in the Amazon and Yukon basins.* Earth System Science Data 17,
+  2035–2062. — Flow routing on an icosahedral equal-area (ISEA) DGGS (`08`, `03`).
+
+### DEM & sensor realism
+
+- **Hutchinson, M.F. (1989).** *A new procedure for gridding elevation and stream line data with
+  automatic removal of spurious pits.* Journal of Hydrology 106(3–4), 211–232. — ANUDEM; drainage-
+  enforced interpolation that removes pits during gridding (`08`, `03`).
+- **Reuter, H.I., Nelson, A. & Jarvis, A. (2007).** *An evaluation of void-filling interpolation
+  methods for SRTM data.* International Journal of Geographical Information Science 21(9), 983–1008. —
+  Void-fill by void size × terrain; basis of the CGIAR-CSI hole-filled SRTM (`08`).
+- **Axelsson, P. (2000).** *DEM generation from laser scanner data using adaptive TIN models.*
+  International Archives of Photogrammetry and Remote Sensing XXXIII(B4), 110–117. — Progressive-
+  densification TIN — the bare-earth lidar filter (`08`).
+- **Zhang, K., Chen, S.-C., Whitman, D., Shyu, M.-L., Yan, J. & Zhang, C. (2003).** *A progressive
+  morphological filter for removing nonground measurements from airborne LIDAR data.* IEEE TGRS
+  41(4), 872–882. — Growing-window morphological bare-earth filter (`08`).
+- **Hanssen, R.F. (2001).** *Radar Interferometry: Data Interpretation and Error Analysis.* Kluwer,
+  Dordrecht. — The InSAR reference; the geometry behind radar layover, foreshortening and shadow (`08`).
+- **Fisher, P.F. & Tate, N.J. (2006).** *Causes and consequences of error in digital elevation
+  models.* Progress in Physical Geography 30(4), 467–489. — DEM error as a **spatially autocorrelated**
+  random field, not white noise; the model to synthesise realistic DEM error (`08`).
 
 ## Weathering, arid, periglacial & planetary
 
@@ -527,6 +779,77 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
 - **Kok, J.F., Parteli, E.J.R., Michaels, T.I. & Bou Karam, D. (2012).** *The physics of wind-blown
   sand and dust.* Reports on Progress in Physics 75(10), 106901. — Aeolian saltation and dunes on
   Earth, Mars, Venus, and Titan; the reference for wind-blown sand off-Earth (`16`, `SKILL.md`).
+- **Goudie, A.S. (1973).** *Duricrusts in Tropical and Subtropical Landscapes.* Clarendon Press,
+  Oxford, 174 pp. — The duricrust reference: calcrete, silcrete and ferricrete as resistant near-
+  surface caps — a low-`K` horizon (`11`).
+- **Nash, D.J. & McLaren, S.J. (eds) (2007).** *Geochemical Sediments and Landscapes.* Blackwell,
+  Oxford (RGS-IBG Book Series). — Duricrusts and other surface cements as landscape components (`11`).
+- **Pain, C.F. & Ollier, C.D. (1995).** *Inversion of relief — a component of landscape evolution.*
+  Geomorphology 12(2), 151–165. — **Relief inversion**: a capped former valley becomes a ridge; the
+  inverted-channel landform, an Earth and Mars analogue (`11`).
+
+## Biogenic landforms
+
+- **Clymo, R.S. (1984).** *The limits to peat bog growth.* Philosophical Transactions of the Royal
+  Society B 303(1117), 605–654. — The acrotelm/catotelm peat-growth model; self-limiting height
+  `M_max = p/α` — the raised bog's domed profile (`13`).
+- **Grotzinger, J.P. & Knoll, A.H. (1999).** *Stromatolites in Precambrian carbonates.* Annual Review
+  of Earth and Planetary Sciences 27, 313–358. — Microbial layered carbonate buildups (`13`).
+- **Tengberg, A. & Chen, D. (1998).** *A comparative analysis of nebkhas in central Tunisia and
+  northern Burkina Faso.* Geomorphology 22(2), 181–192. — Vegetation-anchored sand mounds (`13`, `16`).
+- **Tarnita, C.E., Bonachela, J.A., Sheffer, E. et al. (2017).** *A theoretical foundation for
+  multi-scale regular vegetation patterns.* Nature 541(7637), 398–401. — Regular termite-mound spacing
+  from inter-colony competition; the mechanism, not a closed-form spacing law (`13`).
+- **Darwin, C. (1881).** *The Formation of Vegetable Mould, through the Action of Worms.* John Murray,
+  London. — The founding work on soil bioturbation / turnover (as a hillslope diffusivity) (`13`).
+
+## Anthropogenic & engineered landforms
+
+Humans are now the dominant geomorphic agent on Earth by volume; these ground the engineered surface
+(`20`, Group K).
+
+- **Hooke, R.LeB. (2000).** *On the history of humans as geomorphic agents.* Geology 28(9), 843–846.
+  — The quantification that humans move more earth than rivers (`20`).
+- **Haff, P.K. (2010).** *Hillslopes, rivers, plows, and trucks: mass transport on Earth's surface by
+  natural and technological processes.* Earth Surface Processes and Landforms 35(10), 1157–1166. —
+  Technology as a sediment-transport process alongside rivers and hillslopes (`20`).
+- **Tarolli, P. & Sofia, G. (2016).** *Human topographic signatures and derived geomorphic processes
+  across landscapes.* Geomorphology 255, 140–161. — Human topographic signatures in high-resolution
+  DEMs; the umbrella review for anthropogeomorphology (`20`).
+- **Goudie, A.S. (2013).** *The Human Impact on the Natural Environment: Past, Present, and Future*
+  (7th ed.). Wiley-Blackwell. — The standard text; the anthropogeomorphology chapter (`20`).
+- **Brune, G.M. (1953).** *Trap efficiency of reservoirs.* Transactions, AGU 34(3), 407–418. — The
+  **trap-efficiency** curve keyed to capacity/inflow — how much sediment a reservoir retains (`20`, `12`).
+- **Morris, G.L. & Fan, J. (1998).** *Reservoir Sedimentation Handbook.* McGraw-Hill, New York,
+  805 pp. — The reference handbook for reservoir delta deposition and drawdown (`20`).
+- **Kondolf, G.M. (1997).** *Hungry water: effects of dams and gravel mining on river channels.*
+  Environmental Management 21(4), 533–551. — Sediment-starved incision and bed coarsening below a dam
+  (`20`, `04`).
+- **Ritter, A. (1892).** *Die Fortpflanzung der Wasserwellen.* Zeitschrift des Vereines Deutscher
+  Ingenieure 36(33), 947–954. — The **dam-break** dry-bed shallow-water solution; wavefront speed
+  `2√(g·h₀)` (`20`).
+- **Palmer, M.A., Bernhardt, E.S., Schlesinger, W.H. et al. (2010).** *Mountaintop mining
+  consequences.* Science 327(5962), 148–149. — Valley fills bury headwater streams; the spoil side of
+  the mining mass budget (`20`).
+
+## Reference implementations
+
+Runnable, pytest-verified Python mirrors of the simulation pseudocode live in
+`terrain-architect/reference-impl/` (numpy-only, each checked against its `09` oracle). For
+production work, prefer the mature, independently-tested libraries below over reimplementing the
+geoscience backbone — the reference impls cross-validate against them.
+
+- **Hobley, D.E.J., Adams, J.M., Nudurupati, S.S., Hutton, E.W.H., Gasparini, N.M.,
+  Istanbulluoglu, E. & Tucker, G.E. (2017).** *Creative computing with Landlab: an open-source
+  toolkit for building, coupling, and exploring two-dimensional numerical models of Earth-surface
+  dynamics.* Earth Surface Dynamics 5, 21–46. — The CSDMS toolkit: stream power, flow routing,
+  diffusion, priority-flood depression handling — all tested.
+- **fastscapelib / FastScape** — the maintained implementations of the O(N) stream-power solver of
+  **Braun & Willett 2013** (above); `fastscape` is the xarray-based Python package.
+- **Barnes, R. (2016).** *RichDEM: Terrain Analysis Software.* github.com/r-barnes/richdem — the
+  canonical priority-flood depression filling and flow accumulation (Barnes et al. 2014, above).
+- **Bartos, M. (2020).** *pysheds: simple and fast watershed delineation in Python.*
+  DOI 10.5281/zenodo.3822494 — D8 flow direction, accumulation, catchment delineation.
 
 ## Reading order
 

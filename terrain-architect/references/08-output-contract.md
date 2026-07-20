@@ -211,6 +211,112 @@ not "the same value computed twice". Two different evaluation paths that should 
 answer will differ in the last bit, and at a silhouette that's a visible pinhole. Compute the
 edge once and copy, or make the evaluation bit-identical by construction.
 
+## Planetary / spherical domains
+
+Everything above assumes a **flat, rectangular heightfield** — the right default, and wrong the moment
+the domain is a whole planet. You cannot wrap one rectangular grid around a sphere without a
+singularity (the lat–long "pole pinch": cells shrink to zero area and the timestep dies at the poles).
+Two grid families solve it, and the choice is the planetary version of the tiling decision above.
+
+**Cube-sphere — six faces, six flat grids.** Project the sphere onto a cube and grid each face; a
+point on face +X at face-local `(a,b)` maps to the sphere by normalising:
+
+```
+p = normalize(1, a, b)                          # gnomonic (equidistant) cube-sphere
+```
+
+The plain (equidistant) version bunches cells toward face centres — a **corner-to-centre area ratio of
+~5.2**. The **equiangular** variant (Ronchi et al. 1996) grids each face in *angle* (`a = tan ξ`,
+`ξ ∈ [−π/4, π/4]`), which nearly uniformises cell area (ratio ~2) at the cost of a `tan`/`atan` per
+lookup. Origin of the quadrilateralized spherical cube: Chan & O'Neill 1975 (the COBE grid); the
+finite-difference lineage is Sadourny 1972. The **six faces are six of the tiles above** and the
+**twelve cube edges are the seams** — the Seams problem again, now with a *rotation* between faces.
+
+**Geodesic / HEALPix — no faces, no seams.** Tile the sphere with hexagons and twelve pentagons
+(icosahedral geodesic), or with the equal-area pixels of **HEALPix** (`N_pix = 12·N_side²`, every
+pixel exactly equal-area; Górski et al. 2005). These have **no face seams** and near-uniform cells —
+why climate and cosmology grids use them — at the cost of a non-rectangular neighbour structure (a
+cell has 6 neighbours, sometimes 5).
+
+**Distortion is the load-bearing correction.** A fixed-resolution grid sampled through any projection
+carries a per-cell **scale factor `h`** (Snyder 1987): true ground distance is `Δground = Δpixel / h`.
+Every metre-denominated operator — slope, flow routing, erosion transport distance — **must divide
+gradients by `h`**, or it biases flow toward the high-distortion regions and the world-unit invariants
+of `SKILL.md` break on the sphere exactly as they break under `normalize` (`10`).
+
+**Flow routing across the seams.** D8/D∞ (`03`) run unchanged *inside* a face; the only hard part is
+neighbour lookup at a face edge or corner, and it is **F-tier engineering** — there is no canonical
+paper for cube-face-seam flow routing:
+
+```
+neighbors(face f, i, j):
+    for (di,dj) in D8:
+        if in-range: yield (f, i+di, j+dj)                  # interior — trivial
+        else:        yield remap(SEAM_TABLE[f][edge], rot)  # crossed an edge → rotate onto neighbour face
+    # cube corners are 3-valent: the 8 corners have only 7 neighbours — special-case them
+flowDir(cell): steepest descent over neighbors(), with Δs = h · arcDistance   # metric-corrected
+```
+
+Depression handling (`03`) then runs on the resulting global graph unchanged. To avoid seams
+entirely, route on a **hex/HEALPix DGGS** instead — there is real published flow-routing work on those
+grids (Liao et al. 2020, 2025), whereas the cube-seam handling stays folklore.
+
+**Verify.** Height and `A` are continuous across a cube-face seam and resolution-consistent; there is
+no pole pinch; and gradients are divided by the scale factor `h` so erosion doesn't bias toward
+high-distortion cells (`09`, *Checks for the extended families*).
+
+**Tier.** The cube-sphere and equiangular mappings are P (Chan & O'Neill 1975; Sadourny 1972; Ronchi
+et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors are P (Snyder 1987);
+DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
+plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
+
+## DEM & sensor realism
+
+A synthetic heightfield is *too clean* to be a real DEM. Real elevation data is **measured**, and
+measurement leaves fingerprints — sensor geometry, processing steps, and a spatially-structured error
+field. Two reasons to care: **matching real survey data** (author a heightfield that reads as SRTM or
+lidar), and **consuming it** (a graph fed a real DEM must undo the artefacts before routing). The one
+review reference is Fisher & Tate 2006; the rest are per-artefact.
+
+**Correcting a real DEM (before it enters the graph).**
+- **Hydrological enforcement / pit removal** — real DEMs are full of spurious pits (noise, bridges,
+  vegetation) that wreck flow routing (`03`). Remove them by **priority-flood** fill with an epsilon
+  gradient (`03`), or during interpolation (Hutchinson 1989, ANUDEM), which enforces monotone drainage
+  to mapped outlets. **Stream burning** lowers cells under a known channel network by 5–20 m so
+  accumulation converges onto it — do it *before* the fill so the channels win.
+- **Void filling** — SRTM and photogrammetric DEMs have holes (radar shadow, cloud). The **delta-surface**
+  method (Reuter et al. 2007) fills a void from an auxiliary DEM snapped to the SRTM datum: interpolate
+  the boundary bias `Δ = z_srtm − z_aux` across the void, add it back to `z_aux` — auxiliary *texture*,
+  SRTM *level*, no patch seam. Pick the interpolator by void size × terrain (spline in dissected relief,
+  kriging/IDW on flats).
+- **Bare-earth filtering (lidar)** — raw lidar is first-return (canopy, buildings); the bare-earth DEM is
+  the ground beneath. Progressive-densification TIN (Axelsson 2000) or a **growing-window morphological
+  opening** (Zhang et al. 2003): a cell is non-ground if it stands above the opened surface by more than
+  a slope-scaled threshold `dhₜ = dh₀ + s·Δw·c`, the window growing to catch bushes → cars → buildings
+  without shaving real relief.
+
+**Synthesising realism (make a clean heightfield read as measured).**
+- **Correlated error, not white noise.** Real DEM error is a **spatially-autocorrelated random field**
+  (Fisher & Tate 2006): `z_obs = z_true + e`, `e ~ GRF(bias, σ, ρ(h))` with e.g. `ρ(h)=exp(−h/a)`, range
+  `a` of tens–hundreds of metres. Synthesise by filtering white noise with a Gaussian of `σ = a/cellSize`,
+  then rescale to the target RMSE. Per-cell independent noise looks *gritty* and fake; the autocorrelation
+  range is what sells it.
+- **Quantisation & posting.** Round to the vertical step (`z_q = round(z/q)·q`, `q≈1 m` for SRTM →
+  contour-like stair-stepping on gentle slopes, the same terracing as the R16 precision trap above), and
+  resample to the real ground sample distance (30 m / 90 m) to lock in blocky ridgelines.
+- **Sensor geometry (SAR).** Side-looking radar warps slopes by look angle `θ`: **foreshortening** where
+  the foreslope faces the sensor, **layover** (order reversed, elevation ambiguous) where slope toward the
+  sensor `≥ θ`, and **shadow** (a data void) where the backslope tilts past `90°−θ`; add multiplicative
+  Gamma **speckle**. These are the tells that a heightfield came off a radar mission (Hanssen 2001).
+- **Striping.** SRTM/ASTER carry near-periodic banding (~hundreds of m wavelength, ~1–2 m amplitude) and
+  isolated mosaic-seam pits — a sinusoid along the track plus a few spikes.
+
+**Tier.** Hydro-enforcement (Hutchinson 1989), void-fill (Reuter et al. 2007), lidar filtering (Axelsson
+2000; Zhang et al. 2003) and the error-field model (Fisher & Tate 2006) are P; SAR layover/shadow geometry
+and quantisation/striping are F (textbook geometry / product-validation practice, no canonical paper). All
+are `08` data-contract operations, not terrain *processes* — they change what the field *is measured as*,
+never what the land *did*.
+
 ## LOD
 
 **Do not decimate a heightfield with a box filter.** Averaging heights removes peaks and fills

@@ -52,6 +52,10 @@ not valleys, because each droplet's lifetime covers a few hundred metres. Stream
 
 ## Pipe model (Mei et al. 2007)
 
+*Runnable reference: `reference-impl/erosion_pipe.py` (the water solver — where the NaN failure
+lives), verified by `tests/test_pipe.py` — depth stays ≥ 0 via the step-3 scaling; 8-pipe is more
+radial than 4-pipe (`09`).*
+
 State per cell: terrain height `b`, water depth `d`, suspended sediment `s`, outflow flux
 `f = (fL, fR, fT, fB)`, velocity `v`.
 
@@ -142,6 +146,10 @@ What it adds over Mei, and why each matters:
 
 ## Droplet / particle erosion
 
+*Runnable reference: `reference-impl/erosion_droplet.py`, verified by `tests/test_droplet.py` —
+deterministic; volume conserved (erode-brush + deposit-bilinear + drop-leftover); gullies are random,
+not grid-aligned (`09`).*
+
 Beyer (2015), after Musgrave et al. (1989). Simulate N independent droplets.
 
 ```
@@ -205,6 +213,10 @@ droplet(map, x, y):
   mentions lakes, this is the wrong backbone.
 
 ## Stream power — the important one
+
+*Runnable reference: `reference-impl/erosion_streampower.py` (Braun–Willett implicit), verified by
+`tests/test_streampower.py` — the decisive check: the steady-state slope–area exponent comes out at
+−m/n (`09`).*
 
 This is the ★★★★★ row, and the reason is not the equation. The equation is one line:
 

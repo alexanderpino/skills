@@ -1,0 +1,22 @@
+[
+  {"query": "my procedurally generated rivers keep terminating in the middle of the map before they reach the coast, how do i fix the flow so they actually run to the sea", "should_trigger": true},
+  {"query": "whats the right way to get U-shaped glacial valleys instead of V-shaped ones in my heightmap generator", "should_trigger": true},
+  {"query": "im designing a node graph for a Gaea/World Machine style terrain tool - how should the erosion node and the flow-routing node interact, and what order do they go in", "should_trigger": true},
+  {"query": "which paper do i cite for stream power erosion and is there a fast solver for it", "should_trigger": true},
+  {"query": "need to make a realistic 500km alien planet in Houdini heightfields, no liquid water, low gravity - what processes actually matter for that", "should_trigger": true},
+  {"query": "how do i add erosion detail to my noise-based mountains so they look like real eroded terrain and not just fractal noise", "should_trigger": true},
+  {"query": "getting hard seams between terrain tiles after i run erosion per-tile, whats going on", "should_trigger": true},
+  {"query": "how do coral atolls form and how would i build one procedurally with a lagoon in the middle", "should_trigger": true},
+  {"query": "what causes the terracing / stair-stepping artifacts on the gentle slopes of my exported heightmap", "should_trigger": true},
+  {"query": "read this GeoTIFF DEM of the Alps into python and plot a hillshade with matplotlib", "should_trigger": false},
+  {"query": "im texturing a rock cliff face in Substance Painter, how do i make the moss look natural in the crevices", "should_trigger": false},
+  {"query": "plan me a 3-day hiking route up Mount Rainier with about 2700m of elevation gain and campsites", "should_trigger": false},
+  {"query": "whats a good erosion-control planting scheme for the slope in my actual backyard, its washing out when it rains", "should_trigger": false},
+  {"query": "explain how tectonic plate subduction works for my geology exam next week", "should_trigger": false},
+  {"query": "how do i model water flow through a network of pipes for a plumbing simulation, pressure and flow rate", "should_trigger": false},
+  {"query": "generate a normal map from this photo of a brick wall for my game material", "should_trigger": false},
+  {"query": "im writing a fantasy novel and want to describe an eroded canyon landscape vividly, give me some evocative prose", "should_trigger": false},
+  {"query": "set up a Perlin noise function in GLSL for an animated water caustics shader", "should_trigger": false},
+  {"query": "what are the best real-world hiking trails that go through glacial cirques and aretes in the Alps", "should_trigger": false},
+  {"query": "help me pick a GPU for running large fluid simulations in Houdini, is 24GB VRAM enough", "should_trigger": false}
+]

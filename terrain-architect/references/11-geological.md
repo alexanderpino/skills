@@ -4,6 +4,7 @@ Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terra
 [Folding](#folding) · [Lithology & erodibility](#lithology--erodibility) ·
 [Outcrops, mesas, badlands](#outcrops-mesas-badlands) · [When the heightfield fails](#when-the-heightfield-fails) ·
 [Karst & caves](#karst--caves) · [Weathering & soil production](#weathering--soil-production) ·
+[Duricrust & relief inversion](#duricrust--relief-inversion) ·
 [Volcanic landforms](#volcanic-landforms) · [Impact craters](#impact-craters)
 
 ## The central claim
@@ -267,6 +268,49 @@ This is the **production** side of the regolith the whole erosion pipeline consu
 graphs simply assume regolith exists. Adding it is one exponential, and it makes every
 soil-depth-driven mask physical instead of painted.
 
+## Duricrust & relief inversion
+
+Weathering doesn't only *strip* rock — it can **cement** the near-surface into a resistant crust.
+**Duricrusts** (Goudie 1973; Nash & McLaren 2007) are these hardened caps: **calcrete/caliche**
+(CaCO₃), **silcrete** (silica), and **ferricrete/laterite** (iron and aluminium oxides), precipitated
+at or near the surface in seasonally wet–dry climates. Geomorphically a duricrust is nothing new to
+the engine — it is a **low-erodibility caprock**, the same `K` machinery as the mesa/plateau caprock
+above:
+
+```
+K[cell] = K_soft
+capMask   = surface within the duricrust horizon
+K[capMask] = K_dur          # K_dur ~ 0.01–0.1 · K_soft — a hard lid over soft ground
+```
+
+The payoff is **relief inversion** (Pain & Ollier 1995) — one of the most counter-intuitive real
+landforms, and a favourite Mars analogue. A **valley floor** acquires the resistant fill: cemented
+channel gravels, a duricrust grown on the damp low ground, or a **lava flow** ponded in the valley
+(`19`). Drainage then shifts, and the *soft* surroundings erode faster than the capped former-low —
+until the **valley becomes a ridge**. A sinuous **inverted channel** stands where a river once ran.
+
+```
+inversion:
+    carve a valley / channel network into the substrate (03 flow routing)
+    fill the channel cells with a resistant cap:  K[channel] = K_dur     # the low ground is now hard
+    run erosion (04 stream power + 05 hillslope) to steady state
+    # soft interfluves lower past the old valley depth; the cap holds → the low is now the high
+```
+
+Two parameters decide it: the **contrast** `K_soft / K_dur` (≳10 for a clean inversion) and whether
+the **total erosion depth exceeds the original valley relief** — cut less and you protect a valley,
+cut more and it stands proud. It is the caprock/mesa story with the cap laid in a *valley* instead of
+on a *plateau*.
+
+**Verify.** The inverted channel is a **sinuous ridge whose planform is a drainage network** (it
+meanders, branches, carries tributaries) — not a structural or fault ridge; and it sits on a resistant
+cap over softer rock in the `K`/material field, not on a bare height bump. A straight, unbranched
+"inverted" ridge is the tell that it was drawn, not eroded.
+
+**Tier.** Duricrust is a **material / `K`-field** input (Goudie 1973; Nash & McLaren 2007) — no new
+mechanism, just a resistant horizon. Relief inversion is **L** — that cap plus differential erosion
+(Pain & Ollier 1995), `04`/`05` over an `11` `K` field.
+
 ## Volcanic landforms
 
 The catalogue lists "volcanic cones, calderas, craters" as **F/L-tier** — primitive + noise +
@@ -345,6 +389,82 @@ dark plates and incandescent cracks (the `08` emissive material below).
 (levéed, thick, slow), lakes are lava lakes — and the whole `12` shoreline machinery reads across
 once you substitute the fluid. Tier: the rheology is P (Hulme 1974), the world is an L-tier
 composition; there is no "lava planet paper" and none is needed.
+
+### Explosive volcanism — tephra, PDCs & calderas
+
+*Runnable reference: `reference-impl/analytic.py` (tephra exponential thinning; PDC energy cone),
+verified by `tests/test_analytic.py` — log-thickness linear in distance; runout `= Hc/μ`, blocked by
+a ridge (`09`).*
+
+The lava sections above are **effusive** — magma flows out. **Explosive** eruptions fragment it and
+throw it, building (and destroying) different landforms. Three processes, three families:
+
+**Tephra fallout — an ash blanket that mantles the terrain.** Fragmented ash and lapilli rise in a
+plume, drift downwind, and settle, draping the topography like snow (the "tephra mantle" of the cone
+recipe above). Deposit thickness **thins roughly exponentially with distance** from the vent
+(**Pyle 1989**):
+
+```
+T(r) = T₀ · exp(−k · r)             # r = distance from vent; k = thinning coefficient
+                                     # stretch r downwind (an ellipse, not a circle) for wind
+```
+
+The full physics is an **advection–diffusion–sedimentation** transport of each grain-size class —
+wind advects, turbulence diffuses, gravity settles at a size-dependent terminal velocity (Suzuki
+1983; Armienti et al. 1988; the widely-used TEPHRA2 analytic form is Bonadonna et al. 2005). For a
+heightfield the exponential (or power-law) drape above is enough: a **deposition** field added to
+height plus a material (`18` ash), thickest near the vent and downwind. Ash mantles *everything*,
+slopes included, and is then reworked by `04`/`05` — a young ashfall is smooth, an old one gullied.
+
+**Pyroclastic density currents (PDCs) — the ground-hugging flows.** A collapsing column or dome sheds
+a hot, dense mixture of gas and particles that runs downslope as a gravity current, following valleys
+and overrunning low ridges. The cheap, robust runout model is the **energy cone / energy line**
+(Sheridan 1979; **Malin & Sheridan 1982**, *Science*): the flow reaches any point where an "energy
+line" dropping from the collapse height at a fixed slope stays above the ground:
+
+```
+μ = H/L = tan φ                      # Heim coefficient; large PDCs μ ≈ 0.1–0.3
+z_EL(x) = z_vent + H_c − μ · x       # energy line from collapse height H_c
+inundated where z_EL(x,y) > z_topo(x,y);  local speed v = √(2g · (z_EL − z_topo))
+```
+
+That is a distance-field sweep from the vent (`06`) gated by topography — cheap, deterministic, and it
+captures the defining behaviour that PDCs **pond in valleys and are blocked by ridges**. The physical
+tier up is a **depth-averaged granular flow** with Coulomb basal friction (Savage–Hutter; TITAN2D,
+**Patra et al. 2005**) — the same shallow-water family as the pipe model (`04`); the dilute turbulent
+alternative is Dade & Huppert 1996. The deposit is an **ignimbrite** sheet (Branney & Kokelaar 2002),
+a low-`K` welded tuff that later erodes into the hoodoos and tuff towers of archetype 11 (Cappadocia).
+
+**Caldera collapse — the volcano falls into its own emptied chamber.** A large eruption drains the
+magma chamber; the unsupported roof founders along ring faults, dropping a **piston** of crust and
+leaving a broad collapse basin far larger than any vent crater. First-order subsidence is mass
+conservation (Roche & Druitt 2001; Geshi et al. 2002; Cole et al. 2005; Acocella 2007):
+
+```
+s = V_erupted / A_caldera           # floor drop = erupted volume / caldera area
+                                     # coherent piston favoured when roof aspect R/h_roof ≳ 1
+calderaCollapse(h, centre, R, s, w):
+    for cell:
+        d = dist(cell, centre)
+        if d < R − w:  h -= s                       # inside the ring fault: piston floor drops
+        elif d < R:    h -= s · (R − d)/w           # the ring-fault scarp wall
+    # then: fill with a lake (03, no-fill), raise a resurgent dome, or flood with later lava
+```
+
+This grounds the "Caldera — collapse basin" row above and the Crater Lake / Santorini archetype (`20`,
+entry 16): a caldera is **not** a big impact crater — it is a *collapse* structure, so stamping a
+scaled-up impact bowl gets the shape wrong (no raised rim, no central peak; a flat foundered floor
+ringed by fault scarps).
+
+**Verify.** `log(tephra thickness)` is linear in distance from the vent (slope `−k`); the PDC stops
+where the `H/L` energy line meets the ground and *ponds in valleys*; the caldera is a flat foundered
+floor ringed by scarps, **not** a rimmed-and-peaked crater (`09`, *Checks for the extended families*).
+
+**Tier.** Pyle's thinning law and the advection–diffusion tephra models are P (Pyle 1989; Suzuki
+1983; Armienti et al. 1988; Bonadonna et al. 2005); the energy-cone PDC model is P (Sheridan 1979;
+Malin & Sheridan 1982) with the granular sim P (Patra et al. 2005); caldera-collapse scaling is P
+(Roche & Druitt 2001; Cole et al. 2005). The heightfield realisations — drape, sweep, piston stamp —
+are the F-tier looks over those P-tier physics.
 
 ## Impact craters
 

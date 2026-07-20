@@ -7,6 +7,10 @@ Contents: [Thermal](#thermal-erosion-musgrave-et-al-1989) · [Repose angles](#re
 
 ## Thermal erosion (Musgrave et al. 1989)
 
+*Runnable reference: `reference-impl/erosion_thermal.py`, verified by `tests/test_thermal.py` —
+converges below the repose angle; the per-neighbour distance correction cuts the plus-shaped grid
+artefact; double-buffered and deterministic (`09`).*
+
 Material on a slope steeper than the repose angle collapses. Cheap, robust, and the fastest
 way to make hydraulic erosion output look right.
 
@@ -164,6 +168,43 @@ grounded rules replace it:
   fans — debris-flow fans are the steep ones). Rounded levées flanking the runout path are the tell.
 - **Rockfall** is the dry, steep end-member — the scree source above already models it.
 
+**Integrating the Voellmy runout.** Step the mass down the path **in space, not time** — the
+work–energy form drops the timestep entirely. With $\frac{dv}{dt}=v\frac{dv}{ds}$ (arc length $s$),
+the Voellmy law $\frac{dv}{dt}=g\sin\theta-\mu g\cos\theta-\frac{g\,v^2}{\xi}$ becomes
+$\frac{d}{ds}\!\left(\tfrac12 v^2\right)=a$, so each step updates $v^2$ over the **along-slope path
+length** $\Delta s=\sqrt{\Delta x_{\text{horiz}}^2+\Delta h^2}$ — *not* the horizontal cell step, or
+friction work is under-counted by $\cos\theta$:
+
+$$v_{n+1}^2 = v_n^2 + 2\,\Delta s\left(g\sin\theta_n-\mu g\cos\theta_n-\frac{g\,v_n^2}{\xi}\right),\qquad \Delta s=\frac{\Delta x_{\text{horiz}}}{\cos\theta}$$
+
+```
+voellmyRunout(h, start, μ, ξ, cellSize, g=9.81, v0=0, dir=downslope):
+    p = start;  v = v0;  track = [p]                # v0 from the scarp drop, or 0
+    while p in bounds:
+        # next cell: steepest-descent neighbour if any lies downhill, else COAST straight
+        # on momentum — this carries the mass across a flat and partway up an opposing wall
+        # (the run-up the reach angle can't reproduce). Stopping at a flat under-runs L.
+        n, dir = steepestDescentElseMomentum(h, p, dir)     # 03 receiver, or keep dir
+        horiz  = dist(p, n) * cellSize              # map step: cellSize or √2·cellSize
+        Δh     = h[p] - h[n]                         # >0 downhill, <0 climbing
+        θ      = atan2(Δh, horiz)
+        Δs     = hypot(horiz, Δh)                    # ALONG-SLOPE path length — the integration step
+        a      = g*sin(θ) - μ*g*cos(θ) - g*v*v/ξ     # drive − Coulomb − turbulent
+        v2     = v*v + 2*a*Δs                        # d(½v²)/ds = a  →  v²_next = v² + 2·a·Δs
+        if v2 <= 0: deposit(p); break                # decelerated to rest → the runout toe
+        v = sqrt(v2);  p = n;  track.append(p)
+    return track
+```
+
+An **uphill step** ($\theta<0$) makes $\sin\theta$ negative, so the flow decelerates climbing an
+opposing wall and can stop partway up — the run-up the reach angle can't reproduce. In the
+pure-Coulomb limit ($\xi\to\infty$) this reproduces $L=H/\tan\alpha$ with $\tan\alpha=\mu$ (Corominas,
+above) — the verification to run. A single steepest-descent path is **F-tier**;
+a spreading debris lobe wants the depth-averaged solver (Iverson).
+
+*Runnable reference: `reference-impl/runout.py`, verified by `tests/test_runout.py` — runout length
+on a constant ramp matches `L = H/tan(α)` (`09`).*
+
 **Tier.** The susceptibility model is **P-tier** (Montgomery & Dietrich 1994); the debris-flow
 physics is **P-tier** (Iverson 1997) but *not implementable as written* — like Bagnold, cite it for
 *why*; the terrain realisation (scar + runout + thermal) is **F-tier**, no canonical graphics paper.
@@ -208,6 +249,9 @@ You will not integrate this over a heightfield. Use it to justify parameter choi
 tell the user why a linear wind-strength slider feels wrong.
 
 ## Werner (1995) — the implementable model
+
+*Runnable reference: `reference-impl/dunes.py`, verified by `tests/test_dunes.py` — slabs conserved
+exactly; the `p_sand > p_bare` instability sweeps ground bare between dunes; deterministic (`09`).*
 
 *Eolian dunes: computer simulations and attractor interpretation.* A cellular automaton with
 sand "slabs". This is what to actually build. It is remarkably short and it produces barchans,

@@ -5,6 +5,7 @@ Contents: [Order of operations](#order-of-operations) · [Depression handling](#
 [Accumulation](#flow-accumulation) · [Stack ordering](#stack-ordering-braun--willett) ·
 [Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) ·
 [Meandering & bank erosion](#meandering--bank-erosion) ·
+[River terraces](#river-terraces) · [Avulsion, crevasse splays & delta lobes](#avulsion-crevasse-splays--delta-lobes) ·
 [Water sources & discharge](#water-sources--discharge) · [Sea level](#sea-level) · [Choosing](#choosing)
 
 ## Order of operations
@@ -22,6 +23,10 @@ has thousands of pits — a pit is any cell with no lower neighbour, and noise g
 everywhere.
 
 ## Depression handling (mandatory)
+
+*Runnable reference: `reference-impl/flow.py` (priority-flood fill, D8/MFD routing, accumulation),
+verified by `tests/test_flow.py` — no interior pit remains; drainage area is conserved; MFD is less
+grid-biased than D8 on a cone (`09`). Cross-validates against RichDEM / pysheds when installed.*
 
 Two philosophies. Choose deliberately.
 
@@ -422,6 +427,32 @@ in (from `04`) and it edits a centreline plus a shallow channel/floodplain in th
 Run it *after* the main erosion, and re-derive analysis (`06`) downstream of it like any other
 height write.
 
+**Carving the channel — `burnChannel`.** The placeholder above is an SDF carve: distance to the
+spline sets a cross-section, feathered into the floodplain so there is no trench rim.
+
+```
+burnChannel(h, centreline, halfWidth, depth, bankWidth):
+    for each cell p:
+        # 1. signed distance to the thalweg (polyline = min over segments, sdSegment 10)
+        d = sdPolyline(p, centreline)                       # metres from the centreline, ≥ 0
+        # 2. cross-section: distance → bed. thalwegElev is the long profile, ARC-LENGTH
+        #    interpolated along the spline so the bed slopes downstream (not undulating)
+        t   = clamp(d / halfWidth, 0, 1)                    # 0 at thalweg → 1 at the bank
+        bed = thalwegElev(p) + depth * t**2                 # parabola (U: t**1.5; flat floor: smoothstep(t))
+        # 3. feather past the bank so no hard rim
+        w   = 1 - smoothstep(halfWidth, halfWidth + bankWidth, d)
+        # 4. CARVE ONLY (never raise): lower h toward bed by the mask weight
+        h[p] -= w * max(0, h[p] - bed)
+```
+
+$$\text{bed}(d)=z_{\text{thalweg}}+\text{depth}\cdot\bigl(\text{clamp}(d/\text{halfWidth},0,1)\bigr)^2,\qquad w(d)=1-\text{smoothstep}(\text{halfWidth},\;\text{halfWidth}+\text{bankWidth},\;d)$$
+
+The load-bearing details: the **profile is a function of the SDF** (parabola, U, or flat-bottomed),
+so the channel has a cross-section instead of a stamped groove; **`thalwegElev` interpolated by arc
+length**, or the bed undulates and water pools in the dips; the **`smoothstep` feather** kills the
+hard rim a raw `min` would leave (`10`); and step 4 *subtracts*, so the channel only ever cuts down,
+never bumps terrain up. Emit the water as a layer at `thalwegElev + fillDepth` (`08`), never into `h`.
+
 **Tier.** The migration physics is P-tier (Ikeda–Parker–Sawai 1981; Howard & Knutson 1984); the
 terrain realisation — burning the channel, scroll bars, oxbow fill — is the honest F-tier "look"
 layered on top.
@@ -433,6 +464,124 @@ surface *first*, then incise it with uplift + stream power (`04`). Meandering a 
 already in a canyon is backwards — walls of rock cannot migrate. A neck that is cut off *as* it
 incises leaves a **natural arch** across the abandoned neck (the Pont d'Arc), which is a void the
 heightfield can't hold — see the representation warning in `11`.
+
+## River terraces
+
+A terrace is a **fossil valley floor stranded above the modern one** — the clearest single record
+that a valley's history was not steady. You don't stamp it; it *falls out* of alternating **lateral
+planation** and **vertical incision** (Bull 1990). Two kinds:
+
+- **Strath (bedrock) terrace** — a rock bench under a thin alluvial veneer, bevelled while the river
+  cut *sideways* and not *down*, then abandoned when incision resumed (Merritts, Vincent & Wohl 1994;
+  Pazzaglia & Brandon 2001).
+- **Fill (cut-and-fill) terrace** — the valley aggrades with sediment, then the river re-incises into
+  its own fill, leaving the old fill surface as a bench (Bull 1991).
+
+The switch between cutting sideways and cutting down is the **alluvial cover effect** (`04`, Sklar &
+Dietrich 2004): bedrock incision is gated by how much sediment armours the bed. Write it as a cover
+factor on the stream-power law:
+
+```
+∂h/∂t = U − K·A^m·S^n · f_c              # f_c = cover factor ∈ [0,1] (04)
+f_c   = clamp(1 − alluvialDepth / H_ref, 0, 1)
+```
+
+- **Supply high** (a glacial or pluvial pulse fills the valley) → bed buried → `f_c → 0` → vertical
+  incision stalls → the river planes laterally and cuts a **strath**.
+- **Supply drops, or base level falls / uplift lifts the reach** (`02`) → bed re-exposed → `f_c → 1`
+  → the river incises and **abandons the bevel as a terrace**.
+
+A bench becomes a terrace once it stands more than ~one channel depth above the active bed. Run the
+loop across an oscillating supply/discharge history and each cycle strands one tread — a **flight of
+terraces** climbing the valley side, the fluvial twin of the marine and lacustrine terrace
+staircases (`12`).
+
+```
+terraceStep(h, alluv, A, S, Δt):
+    alluv += (supply(t) − transportCapacity(S)) / (W·(1−λ)) · Δt   # Exner; valley fill/scour
+    f_c    = clamp(1 − alluv/H_ref, 0, 1)
+    if f_c < ε:  widenValley(reach, E_lat·Δt)       # buried bed → bevel a strath at this level
+    else:        h -= K·A^m·S^n·f_c·Δt               # exposed bed → incise
+    h_reach += U·Δt                                  # uplift / base-level fall (02)
+    tag as terrace where (strathLevel − channelBed) > channelDepth
+```
+
+**Provenance.** The strath/fill distinction and the climate-cycle framing are Bull 1990, 1991 (L —
+concept, not code); strath genesis by lateral planation is Merritts, Vincent & Wohl 1994 and
+Pazzaglia & Brandon 2001 (P, field studies). The **numerical model with an actual algorithm** is
+**Hancock & Anderson 2002** (cover-limited bedrock incision + lateral valley-wall erosion under
+oscillating climate) — the loop above is its shape.
+
+**Watch for** reading every terrace as a climate or base-level signal. **Limaye & Lamb 2016** show
+terraces form **autogenically** — a laterally migrating bedrock river cuts and abandons straths with
+no external forcing at all. A terrace flight is *a* history, not necessarily *the* history; don't
+over-interpret one.
+
+**Verify.** Each tread is **horizontal** and parallel to the others — a level bevel, one per
+cut-and-fill cycle; a tread that slopes downstream was cut without a base level (`09`, *Checks for the
+extended families*).
+
+## Avulsion, crevasse splays & delta lobes
+
+Meandering (above) moves a channel *continuously*; **avulsion** moves it *discontinuously* — the
+river abandons its course for a new one across the floodplain. It is what builds distributary
+networks, switches delta lobes, and litters a floodplain with relict channel ridges. Canonical
+review: **Slingerland & Smith 2004**.
+
+*Runnable reference: `reference-impl/analytic.py` (superelevation criterion), verified by
+`tests/test_analytic.py` — the avulsion fires at `SE≈1` with a trigger, and not otherwise (`09`).*
+
+Avulsion needs **setup and trigger** — both, not either:
+
+- **Setup** is slow. The channel belt aggrades its own bed and levees until it sits *above* its
+  floodplain — a **superelevation** of about one channel depth (Mohrig et al. 2000):
+  ```
+  SE = (channelBeltElev − floodplainElev) / channelDepth        # avulsion likely when SE ≳ 1
+  ```
+  A superelevated channel is a river perched on a ridge of its own sediment, with a steeper path to
+  base level *off* the ridge than *along* it — primed to jump.
+- **Trigger** is a discrete event once setup exists: a flood overtopping the levee, an ice or log
+  jam, a crevasse breach. No trigger, no avulsion, however superelevated.
+
+The **avulsion timescale** is the time to aggrade one channel depth (Jerolmack & Mohrig 2007):
+
+```
+T_A ≈ channelDepth / aggradationRate
+```
+
+and whether a river stays single-thread or **branches** into a distributary network is a competition
+between lateral migration and aggradation — aggradation fast relative to bank erosion → frequent
+avulsion → branching (Jerolmack & Mohrig 2007).
+
+```
+avulsionStep(h, path, Δt):
+    aggrade(path, aggradationRate·Δt)                 # bed + levees rise → builds SE
+    depositOverbank(near(path))                       # floodplain rises, but slower
+    SE = (beltElev(path) − floodplainElev) / channelDepth
+    if SE ≥ 1 and floodEvent(t) overtops levee:       # setup + trigger, both required
+        breach  = steepestDescentOffTheRidge(h, path)
+        newPath = routeSteepestDescent(h, breach → baseLevel)      # the 03 router, off the ridge
+        if capturesMostFlow(newPath): path = newPath  # full avulsion; old belt → relict ridge
+        else:                         stampCrevasseSplay(breach)   # partial: a splay lobe only
+```
+
+The cellular, heightfield-native realisation is **Jerolmack & Paola 2007**; the 3-D stochastic
+stratigraphic model (slope-ratio + flood-stage avulsion rules) is **Mackey & Bridge 1995**.
+
+**At the coast this is delta-lobe switching.** A delta builds a lobe until its channel is
+superelevated and its path to the sea is longer than a fresh route across the delta plain; the river
+then avulses near the apex and starts a new lobe, abandoning the old one to wave and subsidence
+reworking. The Mississippi has done this through six Holocene lobes on a ~1000–1500 yr cadence
+(Coleman 1988; Roberts 1997) — the **delta cycle**, and the reason a delta is a *fan of stacked
+lobes*, not one static triangle. It is the coastal sibling of the alluvial-fan avulsion in `16`.
+
+**Verify.** Superelevation `SE ≈ 1` at the step the channel avulses (about one channel depth above its
+floodplain), and the new course is steepest-descent *off* the ridge — firing at `SE≪1`, or never, is
+a broken threshold (`09`, *Checks for the extended families*).
+
+**Tier.** The superelevation criterion and avulsion timescale are P (Mohrig et al. 2000; Jerolmack &
+Mohrig 2007); the cellular and stochastic realisations are P (Jerolmack & Paola 2007; Mackey &
+Bridge 1995); the delta-lobe *sequence* is L — a composition (Coleman 1988; Roberts 1997).
 
 ## Water sources & discharge
 
