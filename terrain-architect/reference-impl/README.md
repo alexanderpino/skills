@@ -7,12 +7,18 @@ every module ships a test that asserts the *exact oracle* the skill's verificati
 so a reader can **run the skill's own algorithms and watch `09`'s checks pass**, and so the
 claims in the references are executable rather than merely asserted.
 
+This repository currently provides no separate licence grant for these files. Treat them as
+executable evidence, not code that may automatically be copied into a product. Engine
+implementations consume the neutral pseudocode, grounding decisions and oracles from the
+references; any reuse of repository code requires an applicable project licence or explicit
+permission.
+
 ## Run
 
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 43 tests, numpy-only, deterministic
+pytest -q                            # 48 pass; 2 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds).
 pip install -r requirements-crossvalidate.txt
@@ -44,18 +50,18 @@ against an independent library.
 | `winds.py` — mass-consistent wind | `13` Sherman 1978 | corrected field's divergence → 0 (Helmholtz–Hodge projection); solenoidal field passes through |
 | `runout.py` — Voellmy runout | `05` Voellmy 1955 | runout length on a ramp matches `L = H/tan(α)`; more friction → shorter |
 
-## Deliberately not reimplemented here
+## Coverage boundary and production paths
 
-- **The geoscience backbone is already tested in mature libraries** — use those for
-  production, don't reinvent them: **Landlab** (Hobley et al. 2017, *Earth Surf. Dynam.* 5,
-  21–46), **fastscapelib / FastScape** (Braun & Willett 2013), **RichDEM** (Barnes 2016/2017),
-  **pysheds** (Bartos 2020). The modules here are the pedagogical, `09`-checked mirror of the
-  pseudocode, and they cross-validate against these libraries when installed.
-- **D-infinity** (Tarboton 1997) — use RichDEM/pysheds; the D8/MFD pair here already shows the
-  single-receiver-artefact vs dispersive contrast.
+- **These modules are executable specifications, not production dependencies.** Port the
+  paper-derived contracts and `09` oracles into the engine's own C++, Rust, C#, HLSL or compute
+  stack. Landlab, fastscapelib, RichDEM and pysheds are useful independent comparison targets when
+  project policy permits test-only dependencies; only RichDEM and pysheds are wired here.
+- **D-infinity** (Tarboton 1997) — implement from the paper when needed. The D8/MFD pair here
+  demonstrates the single-receiver-artefact vs dispersive contrast and supplies shared fixtures.
 - **The pipe sediment/erosion coupling** — the water solver (where the documented NaN failure
-  lives) is the verified core; the transport-capacity + semi-Lagrangian advection layer is best
-  taken from a GPU implementation (the model was designed for one).
+  lives) is the verified core; implement the transport-capacity + semi-Lagrangian advection layer
+  from `04` and validate mass conservation before moving it to the GPU.
 - **"Look, not a sim" processes** (coastal cliff/longshore, tides), the full MAGFLOW lava CA,
   the transient SIA glacier, and learned/ML synthesis are **excluded** — they have no decisive
-  deterministic oracle, so they stay as pseudocode in the references rather than ship unverified.
+  deterministic oracle, so they stay as paper-derived pseudocode and verification requirements
+  rather than being presented here as complete code.

@@ -259,7 +259,10 @@ That is the whole thing. Three lines, unconditionally stable, O(N), and it produ
 dendritic drainage network from a flat plate with constant uplift. `Δt` can be 1000 years or
 more. A 4k map reaches equilibrium in a few hundred steps — seconds, not hours.
 
-**For `n ≠ 1`** the implicit equation is nonlinear and needs Newton–Raphson per node:
+**For `n ≠ 1`** the implicit equation is nonlinear. fastscapelib uses guarded Newton–Raphson;
+Landlab uses bracketed Brent root finding. Both are valid pre-grounded choices (`22`); the closed
+form above is valid only for `n = 1`, and mature implementations restrict nonlinear solves to
+single-flow routing. A guarded Newton form is:
 
 ```
         # solve  h - h_old - U*Δt + K*Δt*A^m*((h - h_r)/d)^n = 0  for h
@@ -272,8 +275,15 @@ more. A 4k map reaches equilibrium in a few hundred steps — seconds, not hours
         h[i] = h_new
 ```
 
-Converges in 2–5 iterations. Use `n = 1` unless you have a reason; `n` in [1, 2] is the
+Usually converges in 2–5 iterations with a valid initial bracket/guess and guards against
+non-positive elevation differences. Use `n = 1` unless you have a reason; `n` in [1, 2] is the
 plausible range and the visual difference is subtle.
+
+**The depression guard belongs inside the erosion solver too.** Priority-filling before routing is
+not sufficient: erosion can recreate a pit. Never update below the already-updated receiver or
+into a flooded/lake node. fastscapelib clamps to `receiverHeight + epsilon` and counts
+corrections; Landlab suppresses erosion at flooded/reversed-flow nodes. Expose the correction
+count as a diagnostic and assert it does not grow without bound.
 
 **What Cordonnier et al. (2016) add:**
 
@@ -288,8 +298,11 @@ plausible range and the visual difference is subtle.
 ∂h/∂t = U − K·A^m·S^n + D·∇²h
 ```
 
-`D` is hillslope diffusivity, ~0.01–0.1 m²/yr. Solve the Laplacian term with a simple
-explicit pass or ADI; it's stiff only if `D·Δt/cellSize²` exceeds ~0.25, so subcycle it.
+`D` is hillslope diffusivity, ~0.01–0.1 m²/yr. An explicit pass is the simplest scalar truth;
+Landlab uses a conservative production prefactor of `0.15` rather than relying on the textbook
+`0.25` limit. For geological bakes, fastscapelib's ADI path demonstrates the unconditionally
+stable production alternative. Declare the boundary policy—its ADI implementation is
+Dirichlet-only at raster borders.
 **Do not skip the diffusion term.** Stream power without it produces knife-edge interfluves
 and reads as obviously synthetic. In practice you can substitute a thermal erosion pass
 (`05`) for the diffusion, which is cheaper and gives you the repose-angle behaviour too.

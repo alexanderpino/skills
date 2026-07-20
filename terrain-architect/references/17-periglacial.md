@@ -3,7 +3,7 @@
 Contents: [The periglacial frame](#the-periglacial-frame) ·
 [Patterned ground](#patterned-ground-kessler--werner-2003) · [Solifluction](#solifluction) ·
 [Rock glaciers](#rock-glaciers) · [Thermokarst & pingos](#thermokarst--pingos) ·
-[Blockfields](#blockfields)
+[Blockfields](#blockfields) · [Implementation contract](#implementation-contract)
 
 ## The periglacial frame
 
@@ -90,3 +90,25 @@ high-altitude surfaces. A **scatter (`07`) + material (`06`)** result on low-slo
 terrain: dense **angular** clasts — *not* rounded, because there was no fluvial transport to round
 them (contrast the river clasts of `04`, where `roundness` grows downstream). They are shattered in
 place by freeze–thaw and feed the rock glaciers above.
+
+## Implementation contract
+
+| Process | Fields and units | Locality / tier | CPU/GPU placement | Decisive oracle |
+|---|---|---|---|---|
+| Patterned ground | stone/soil fractions `[0,1]`, slope `tan`, frost cycles/year | bounded NEIGHBOURHOOD CA, T1/T2 | ping-pong compute or deterministic CPU tiles with halo | fractions stay bounded/conserved; flat ground forms circles/polygons and slope stretches them downslope |
+| Solifluction | soil thickness `m`, moisture `[0,1]`, frost cycles/year, flux `m²/yr` | NEIGHBOURHOOD transport, T1/T2 | gather-form GPU flux or double-buffered CPU | no motion when moisture or frost is zero; mass conserved; lobes move downslope and remain non-negative |
+| Rock glacier | debris/ice thickness `m`, velocity `m/yr`, repose `tan` | long-range NEIGHBOURHOOD/T2; GLOBAL if full SIA catchment | amortised GPU/CPU thickness flow; bake large catchments | volume conserved except declared source/melt; velocity is downslope; front converges near debris repose |
+| Thermokarst | ice content `[0,1]`, melt depth `m`, height `m` | LOCAL/T0/T1 with basin update after | per-cell compute; hydrological basin rebuild is T3 | subsidence volume equals melted ground ice; no negative layer; resulting thaw lake remains a declared closed basin |
+| Pingo | groundwater/ice-core state, uplift `m` | LOCAL/T0/T1 | analytic primitive + material/layer update | uplift is zero without freezing water; collapse preserves a rim and produces the declared depression volume |
+| Blockfield | cold/stability mask, angular clast `PointSet` | LOCAL scatter, T0/T1 | deterministic GPU/CPU scatter | points obey minimum spacing and masks; clasts remain angular and do not acquire downstream-rounding state |
+
+**Runtime policy.** Patterned ground, thermokarst detail, pingos and blockfield scatter can run per
+chunk with world-space seeds and declared halos. Rock-glacier flow and any hydrological response to
+new thaw basins run over a persistent region or bake; they are not independent tile effects.
+Seasonal state may vary, but the permafrost/ground-ice inventory is a thickness field whose mass
+cannot reset when a chunk unloads.
+
+**Failure signatures:** polygons do not become stripes on slopes → slope coupling missing;
+solifluction moves dry/unfrozen soil → gate missing; rock glacier gains volume → source budget
+broken; thermokarst pit is filled away → legitimate-basin mask lost; blockfield clasts round with
+distance → fluvial material logic leaked into in-place frost shatter.

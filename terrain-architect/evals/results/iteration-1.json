@@ -1,0 +1,27 @@
+{
+  "run_id": "iteration-1",
+  "date": "2026-07-19",
+  "status": "historical-non-reproducible",
+  "scope": [1, 2, 3, 10, 11, 12],
+  "provenance": {
+    "model": null,
+    "harness_revision": null,
+    "transcripts_retained": false,
+    "grader_outputs_retained": false,
+    "reproducible_from_repository": false
+  },
+  "results": [
+    {"eval_id": 1, "with_skill_passed": 4, "with_skill_total": 4, "baseline_passed": 4, "baseline_total": 4},
+    {"eval_id": 2, "with_skill_passed": 4, "with_skill_total": 4, "baseline_passed": 3, "baseline_total": 4},
+    {"eval_id": 3, "with_skill_passed": 3, "with_skill_total": 3, "baseline_passed": 2, "baseline_total": 3},
+    {"eval_id": 10, "with_skill_passed": 4, "with_skill_total": 4, "baseline_passed": 3, "baseline_total": 4},
+    {"eval_id": 11, "with_skill_passed": 3, "with_skill_total": 3, "baseline_passed": 2, "baseline_total": 3},
+    {"eval_id": 12, "with_skill_passed": 3, "with_skill_total": 3, "baseline_passed": 3, "baseline_total": 3}
+  ],
+  "summary": {
+    "with_skill_passed": 21,
+    "with_skill_total": 21,
+    "baseline_passed": 17,
+    "baseline_total": 21
+  }
+}

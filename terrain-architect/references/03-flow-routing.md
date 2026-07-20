@@ -60,8 +60,12 @@ you a parallel-lines artefact across every filled basin. Fix:
 dem[n] = max(dem[n], nextafter(dem[c], INFINITY))   // or dem[c] + eps
 ```
 
-with `eps` around 1e-5 m. This creates an imperceptible gradient toward the spill point so
-flow routes correctly across the filled area. **Use the epsilon variant by default.**
+Mature implementations (RichDEM, Landlab; pinned in `22`) use `nextafter`: the smallest
+representable increment. A fixed `eps` around `1e-5 m` is an explicit game-world policy when a
+stable world-unit gradient is preferable across CPU/GPU and export paths; it is not part of the
+Barnes algorithm. Whichever policy is chosen, serialise it and report precision exhaustion. This
+creates an imperceptible gradient toward the spill point so flow routes correctly across the
+filled area. **Use the epsilon variant by default.**
 
 ### Breaching (Lindsay 2016)
 
@@ -91,7 +95,9 @@ craters and calderas.
 
 ### Cordonnier's approach
 
-Cordonnier et al. (2016) handle local minima inside the erosion loop rather than as a
+Cordonnier et al. (2016) couple local-minima handling to terrain generation; the general
+basin-graph/MST routing algorithm is **Cordonnier, Bovy & Braun (2019)**. It handles minima inside
+the erosion loop rather than as a
 preprocess, by building a **lake graph**: each depression becomes a node, edges are the
 spill-over passes between them, and a minimum spanning tree over that graph gives the
 correct flow routing through the filled basins in O(n log n). This is more elegant and
@@ -204,7 +210,8 @@ mfd(dem, c, p = 1.1):
     return w / total                          // fractions, sum to 1
 ```
 
-**`p = 1.1` is Freeman's calibrated value** — not 1.0, not 2.0. The exponent controls
+**`p = 1.1` is Freeman's calibrated value**, while mature libraries also expose `p = 1` as a
+plain configurable case. The exponent controls
 convergence: `p → 0` spreads flow evenly regardless of slope (pure dispersion), `p → ∞`
 converges to D8. Freeman fitted 1.1 against measured hillslope hydrology.
 
@@ -302,7 +309,7 @@ already here. What varies is *what dammed the basin*, all **L-tier** composition
 
 They share one computation: **the lake surface is a horizontal plane at the spill elevation**,
 and a chain of connected basins spills one into the next — exactly the lake-graph / minimum-
-spanning-tree cascade of Cordonnier et al. (2016) above. The overdeepened and crater cases are
+spanning-tree cascade of Cordonnier, Bovy & Braun (2019) above. The overdeepened and crater cases are
 genuine closed basins: **do not fill them** (`12`, `11`) — mask them so the fill node skips them,
 or the lakes vanish.
 

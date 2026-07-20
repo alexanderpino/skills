@@ -57,6 +57,10 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Geomorphology 180–181, 170–179. — **The paper that matters for stream power.** The O(N)
   stack ordering + unconditionally stable implicit solver. Known in the geoscience community
   as the basis of FastScape.
+- **Cordonnier, G., Bovy, B. & Braun, J. (2019).** *A versatile, linear complexity algorithm for
+  flow routing in topographies with depressions.* Earth Surface Dynamics 7(2), 549–562. —
+  Basin graph + minimum-spanning-tree depression routing. This is the specific general routing
+  source; do not conflate it with the 2016 terrain-generation application.
 - **Whipple, K.X. & Tucker, G.E. (1999).** *Dynamics of the stream-power river incision model:
   Implications for height limits of mountain ranges, landscape response timescales, and research
   needs.* Journal of Geophysical Research 104(B8), 17661–17674. — The reference for stream-power
@@ -835,25 +839,30 @@ Humans are now the dominant geomorphic agent on Earth by volume; these ground th
 ## Reference implementations
 
 Runnable, pytest-verified Python mirrors of the simulation pseudocode live in
-`terrain-architect/reference-impl/` (numpy-only, each checked against its `09` oracle). For
-production work, prefer the mature, independently-tested libraries below over reimplementing the
-geoscience backbone — the reference impls cross-validate against them.
+`terrain-architect/reference-impl/` (numpy-only, each checked against its `09` oracle). They are
+executable evidence, not an implied code licence; consume the neutral contracts in the references
+unless the repository grants reuse permission. The mature libraries below are already distilled
+in `22`; they are not required runtime dependencies. The shipped optional cross-validation tests
+currently cover RichDEM and pysheds only.
 
 - **Hobley, D.E.J., Adams, J.M., Nudurupati, S.S., Hutton, E.W.H., Gasparini, N.M.,
   Istanbulluoglu, E. & Tucker, G.E. (2017).** *Creative computing with Landlab: an open-source
   toolkit for building, coupling, and exploring two-dimensional numerical models of Earth-surface
   dynamics.* Earth Surface Dynamics 5, 21–46. — The CSDMS toolkit: stream power, flow routing,
-  diffusion, priority-flood depression handling — all tested.
+  diffusion, priority-flood depression handling — all tested. **MIT**, pinned grounding in `22`.
 - **fastscapelib / FastScape** — the maintained implementations of the O(N) stream-power solver of
   **Braun & Willett 2013** (above); `fastscape` is the xarray-based Python package.
+  **GPL-3.0-only**, pinned grounding in `22`.
 - **Barnes, R. (2016).** *RichDEM: Terrain Analysis Software.* github.com/r-barnes/richdem — the
   canonical priority-flood depression filling and flow accumulation (Barnes et al. 2014, above).
+  **GPL-3.0-only**, pinned grounding in `22`.
 - **Bartos, M. (2020).** *pysheds: simple and fast watershed delineation in Python.*
   DOI 10.5281/zenodo.3822494 — D8 flow direction, accumulation, catchment delineation.
+  **GPL-3.0-only**, pinned grounding in `22`.
 
 ## Reading order
 
-If someone is implementing from scratch and asks what to read first:
+For maintainers extending the pre-grounding ledger, verify in this order:
 
 1. **Braun & Willett 2013** — if the map is large. It is the highest-leverage paper here; the
    solver is three lines and it makes the difference between hours and seconds.

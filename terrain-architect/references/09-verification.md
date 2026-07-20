@@ -59,6 +59,7 @@ eyeballs:
 | **CPU/GPU tolerance** | Same graph both paths, diff within tolerance. Establish the tolerance; don't discover it. |
 | **Long-run stability** | 10× the intended iteration count. Should converge or plateau, not drift or explode. |
 | **Resolution consistency** | Same world extent at 1k/2k/4k. Large-scale structure must match; only detail should differ. **If the mountains move, a parameter is in cells instead of metres** (`SKILL.md` invariants). |
+| **No erosion-created pits** | After each stream-power step, every non-base-level node remains at or above its receiver; flooded nodes are unchanged. Count clamp/correction events and fail if they grow persistently (`04`, `22`). |
 
 The resolution-consistency test deserves emphasis: it is the cheapest possible detector of the
 most pervasive defect in terrain graphs. Run it first.

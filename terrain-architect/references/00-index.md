@@ -58,7 +58,7 @@ estimates.
 flow routing & depression fill, hillslope diffusion, dunes, isostatic flexure, mass-consistent wind
 (Sherman), Voellmy runout, and the analytic families (tephra, age–depth, PDC, avulsion) — live in
 `reference-impl/` (numpy, pytest-verified
-against the `09` checks, cross-validating vs Landlab/RichDEM/pysheds). See its README for the
+against the `09` checks, with optional RichDEM/pysheds cross-validation for flow operations). See its README for the
 module → oracle → library map. This is how the pseudocode becomes *executable and checkable* rather
 than merely asserted.
 
@@ -217,7 +217,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Priority-Flood / depression filling | P | Barnes, Lehman & Mulla 2014, Computers & Geosciences 62 |
 | Depression filling (alternative) | P | Planchon & Darboux 2002, Catena 46(2–3) |
 | Depression breaching / hybrid | P | Lindsay 2016, Hydrological Processes 30(6) |
-| Lake graph / minima contraction in-loop | P | Cordonnier et al. 2016 |
+| Lake graph / minima contraction in-loop | P | Cordonnier, Bovy & Braun 2019; coupled terrain application in Cordonnier et al. 2016 |
 | O(N) stack ordering | P | Braun & Willett 2013, Geomorphology 180–181 |
 | Stream ordering | P | Strahler 1957, Trans. AGU 38(6); Horton 1945 |
 | Flow accumulation / drainage area / watershed labelling | P | Barnes et al. 2014 (labelling); accumulation itself is F |
@@ -422,6 +422,27 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | SPH lava animation | P | Stora et al. 1999, Graphics Interface |
 | Lava surface classification | P | Macdonald 1953, AJS 251(3) |
 | Emissive crust material | F | crackMask × blackbody(T) — the sim's own `T`/crust fields (`08`, `19`) |
+
+## 14. Owned / clean-room implementation → `21-clean-room-implementation.md`
+
+| Concern | Tier | Source |
+|---|---|---|
+| Reference-informed engine-native implementation | Engineering mode | Papers and approved open source ground neutral pseudocode; redesign the runtime for the engine |
+| Dependency-free implementation | Engineering property | Ship owned engine code even when approved source was consulted |
+| Source-independent implementation | Engineering mode | Implementer uses papers/specifications and `09` oracles, not an existing codebase |
+| Formally separated clean-room implementation | Legal-process mode | Specification author and implementer are separated; counsel defines the boundary |
+| Independent verification | Engineering mode | Closed-form solutions, invariants and signatures from `09`; optional libraries are test-only comparison targets |
+| License/provenance record | Engineering control | Record papers, code consulted, data/assets, patents checked, test fixtures and implementation authorship |
+
+## 15. Complete generator delivery → `22-open-source-grounding.md`, `23-generator-blueprint.md`
+
+| Concern | Tier | Source |
+|---|---|---|
+| Pre-grounded algorithm behavior | Engineering evidence | `22` records upstream revision, licence, source symbols, adopted decisions and deviations |
+| Offline / pre-cooked generator | Architecture | `23` assembles GLOBAL high-quality terrain, analysis, materials, scatter, LOD and export |
+| Runtime generator | Architecture | `23` maps LOCAL/NEIGHBOURHOOD work to frame-budgeted CPU/GPU execution |
+| Hybrid generator | Architecture | `23` bakes the global process history and synthesises deterministic local detail at runtime |
+| Implementation completeness | Engineering gate | Every node has fields/units, locality, precision, boundaries, determinism, oracle and version |
 
 ---
 

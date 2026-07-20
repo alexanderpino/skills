@@ -150,6 +150,145 @@
         "Notes the effect-mask problem: erosion still runs everywhere -> mass not conserved / boundary discontinuity",
         "Recommends a process mask to actually restrict where erosion runs"
       ]
+    },
+    {
+      "id": 13,
+      "axis": "design",
+      "prompt": "Design the high-level terrain graph for a Grand Canyon-like province. I do not want a canyon stamp; I want the process history that makes the result defensible.",
+      "expected_output": "Treat the named place as an archetype to adapt, not paste. Build a layered plateau with a resistant cap, establish regional uplift/base-level fall, route drainage after depression handling, run stream-power incision at province scale, relax hillslopes, then analyse/materialise. State world units and verify with connected drainage, concave long profiles, horizontal terrace/strath levels where present, and a mature hypsometric signature.",
+      "files": [],
+      "expectations": [
+        "Treats the Grand Canyon as an archetype/process regime rather than a stamp or standalone algorithm",
+        "Uses plateau/lithology plus uplift or base-level fall and stream-power incision as the causal backbone",
+        "Keeps depression handling and routing before fluvial incision and analysis after the final height write",
+        "Specifies at least two terrain-specific verification signatures"
+      ]
+    },
+    {
+      "id": 14,
+      "axis": "design",
+      "prompt": "I'm designing the runtime for a terrain node editor. How should cache keys and previews handle a global stream-power node versus a local noise node?",
+      "expected_output": "Cache pure nodes by parameters, input content hashes, context, resolution/extent and seed. Noise is local and tile/preview safe in world coordinates. Stream power is global because drainage depends on the whole domain; it cannot be previewed as independent tiles and needs an explicit reduced-resolution global policy. Dirty propagation follows dependency hashes.",
+      "files": [],
+      "expectations": [
+        "Defines content-addressed cache keys from parameters, inputs, context and resolution/extent",
+        "Classifies world-coordinate noise as local/tile-safe",
+        "Classifies stream power or drainage as global and rejects independent per-tile evaluation",
+        "Requires an explicit preview scaling policy and dependency-based invalidation"
+      ]
+    },
+    {
+      "id": 15,
+      "axis": "trap-resistance",
+      "prompt": "I need the exact paper and internal algorithm used by Gaea's current Erosion2 node. Which published method is it?",
+      "expected_output": "Do not claim a proprietary internal. Classify the branded node as N-tier and map it only to a plausible hydraulic family using public documentation or output diagnostics. Cite papers for the family, not as proof of Gaea's implementation.",
+      "files": [],
+      "expectations": [
+        "Refuses to claim knowledge of an undocumented proprietary implementation",
+        "Classifies the branded node as N-tier / a node rather than an algorithm",
+        "Maps only to an algorithm family and explains that output diagnostics or public documentation are needed",
+        "Does not present Mei, Beyer, Musgrave or another source as proof of Gaea's internal implementation"
+      ]
+    },
+    {
+      "id": 16,
+      "axis": "design",
+      "prompt": "Where should terrain material and splatmap generation sit in my graph, and what should drive rock, soil, sand and wetness?",
+      "expected_output": "Generate materials after the last height-changing process and after analysis. Drive them from world-space fields such as slope, curvature, lithology, sediment/soil depth, drainage/wetness and climate, using soft masks that partition coherently. Keep albedo free of directional light and bake normals/AO from R32F before export quantisation.",
+      "files": [],
+      "expectations": [
+        "Places analysis and material derivation after the final height write",
+        "Uses physical/analysis fields rather than height colour alone to drive materials",
+        "Requires coherent soft masks or weights rather than unrelated hard thresholds",
+        "Keeps directional lighting out of albedo and derives normals/AO before quantisation"
+      ]
+    },
+    {
+      "id": 17,
+      "axis": "design",
+      "prompt": "I am generating a dry, low-gravity moon with no atmosphere or liquid water. Should I still use hydraulic erosion as the terrain backbone?",
+      "expected_output": "No. Pick the dominant agent from the world: impact cratering and regolith/mass wasting dominate; there is no fluvial backbone without liquid water, and no aeolian process without an atmosphere. Gravity rescales crater dimensions while repose angle is approximately invariant. Verify crater statistics and avoid terrestrial drainage signatures.",
+      "files": [],
+      "expectations": [
+        "Rejects hydraulic/fluvial erosion as the backbone when liquid water is absent",
+        "Uses impact cratering plus regolith or mass wasting as the dominant process history",
+        "Rejects aeolian erosion because the prompt also removes the atmosphere",
+        "Notes at least one gravity-dependent scaling or planetary verification signature"
+      ]
+    },
+    {
+      "id": 18,
+      "axis": "diagnosis",
+      "prompt": "My cube-sphere planet looks continuous in height, but rivers stop or jump direction at cube-face borders. What is the mechanism and minimal fix?",
+      "expected_output": "The height seam is stitched but the flow neighbourhood and face orientation are not. Route across halo cells with explicit per-face coordinate/flow-direction rotation and metric-corrected distances. Verify drainage area and flow direction across a synthetic face seam.",
+      "files": [],
+      "expectations": [
+        "Diagnoses missing cross-face flow neighbourhood/orientation handling rather than a height stitching problem",
+        "Requires halo or neighbour access across cube faces with explicit rotation tables",
+        "Requires metric-corrected distances or cell geometry",
+        "Specifies a cross-face drainage continuity check"
+      ]
+    },
+    {
+      "id": 19,
+      "axis": "implementation",
+      "prompt": "Our game engine cannot use a GIS/geoscience library as its runtime, but approved open-source implementations may inform our design. Plan an engine-native C++/compute implementation of priority-flood, flow accumulation and stream-power erosion.",
+      "expected_output": "Use a reference-informed engine-native mode unless policy requires source independence or separated clean-room work; counsel owns the legal conclusion. Consume the skill's pre-grounded Barnes/D8/MFD/Braun-Willett and approved-library decisions rather than sending the team to inspect upstream code. Produce an implementation packet with fields/units, update order, edge cases, boundaries, determinism and runtime-fit requirements. Build scalar CPU truth, verify it with independent oracles and recorded reference comparisons, then redesign allocation, jobs, GPU resources, streaming, cancellation and serialisation for the engine.",
+      "files": [],
+      "expectations": [
+        "Uses reference-informed engine-native as the default while preserving source-independent and separated clean-room modes when required",
+        "Uses the skill's pre-grounded paper/open-source decisions and does not redirect the user to inspect upstream libraries",
+        "Requires field units, boundaries, determinism, update order, CPU/GPU mapping, runtime fit and provenance to be recorded",
+        "Builds deterministic scalar CPU truth before optimized or GPU implementations",
+        "Uses analytic, invariant and synthetic oracles plus explicit reference-library comparisons",
+        "Redesigns allocation, scheduling, GPU resources, streaming, cancellation and serialisation instead of porting the library architecture"
+      ]
+    },
+    {
+      "id": 20,
+      "axis": "implementation",
+      "prompt": "Architect an advanced terrain generator that supports high-quality pre-cooked worlds and deterministic runtime terrain chunks. Give me the terrain-algorithm product plan, not a reading list.",
+      "expected_output": "Choose a hybrid architecture: cook global process history such as uplift/lithology, depression handling, routing, drainage, stream-power erosion, climate and coarse materials; generate scale-free local detail, bounded local erosion, refined materials and scatter at runtime. Use one typed field DAG and seed/version contract across both modes. Classify nodes by locality/realtime tier, specify aprons/cancellation/resource pools/publication, preserve global topology during refinement, and deliver scalar oracles plus offline/runtime/hybrid acceptance gates.",
+      "files": [],
+      "expectations": [
+        "Chooses and explains an offline/runtime/hybrid architecture rather than leaving delivery mode undecided",
+        "Places global hydrology, drainage and geological-timescale erosion in a bake or declared asynchronous global domain",
+        "Restricts runtime work to deterministic local/bounded refinement unless a hydrological domain is explicitly available",
+        "Uses one typed field, seed, cache and version contract across cooked and runtime paths",
+        "Covers runtime aprons, cancellation, resource lifetime, atomic publication and persistence overlays",
+        "Requires algorithm-specific oracles and separate offline, runtime and hybrid acceptance evidence",
+        "Provides a concrete product plan without redirecting the user to external terrain-algorithm research"
+      ]
+    },
+    {
+      "id": 21,
+      "axis": "implementation",
+      "prompt": "Lock down production choices for depression filling, D8 accumulation, nonlinear stream power and hillslope diffusion in an engine-native terrain core. Use the skill's pre-grounded decisions, not generic textbook answers.",
+      "expected_output": "Declare nextafter as the mature Priority-Flood epsilon behavior or a deliberate serialized world-unit epsilon; choose and version a fixed D8 tie order; use O(N) indegree/donor-stack accumulation rather than argsort. Keep the n=1 Braun-Willett closed form, use bracketed Brent or guarded Newton for n!=1 with single-flow routing, and prevent erosion below receivers/flooded nodes. Keep explicit diffusion as scalar truth with a conservative stability policy and use ADI for long geological bakes when appropriate.",
+      "files": [],
+      "expectations": [
+        "Distinguishes nextafter machine-precision fill from a deliberate serialized world-unit epsilon",
+        "Requires an explicit versioned D8 tie order and O(N) indegree or donor-stack accumulation",
+        "Uses the closed form only for n=1 and names guarded Newton or bracketed Brent for nonlinear n",
+        "Restricts or separately verifies nonlinear multiple-flow routing",
+        "Prevents stream power from eroding below receivers or into flooded nodes and exposes correction diagnostics",
+        "Keeps explicit diffusion as an oracle/bounded runtime path while naming conservative stability and ADI for long bakes"
+      ]
+    },
+    {
+      "id": 22,
+      "axis": "implementation",
+      "prompt": "Add arid, periglacial and material systems to a hybrid game terrain generator. State what runs per chunk, what must stay regional/global, and how each family is verified.",
+      "expected_output": "Run pavement/loess breakup, patterned ground, thermokarst detail, pingos, blockfield scatter and material synthesis as local or bounded-neighbourhood work with stable world seeds and halos. Keep fans/wadis/playas, rock-glacier catchment flow and hydrological response as baked or declared regional/global work. Carry material identity as a physical property bundle plus conserved layer thicknesses. Verify desert source/sink budgets, freeze/moisture gates and mass conservation, basin persistence, material-weight partition, non-negative layers and CPU/GPU determinism.",
+      "files": [],
+      "expectations": [
+        "Classifies local runtime arid/periglacial detail separately from regional/global hydrology and transport",
+        "Keeps fans, wadis, playas and large rock-glacier flow in a bake or declared regional domain",
+        "Requires world-space seeds, halos and persistent ground/layer state across chunk unloads",
+        "Models materials as coherent physical bundles and conserved layer thicknesses rather than texture IDs",
+        "Specifies decisive arid and periglacial process oracles including gates and source/sink conservation",
+        "Requires material weights to partition, layer depths to remain non-negative and physical/appearance versions to invalidate correctly"
+      ]
     }
   ]
 }

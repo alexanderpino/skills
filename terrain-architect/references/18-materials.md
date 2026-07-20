@@ -2,7 +2,8 @@
 
 Contents: [A material is a property bundle](#a-material-is-a-property-bundle) ·
 [The palette](#the-palette) · [Rock is a family](#rock-is-a-family) ·
-[One field, many consumers](#one-field-many-consumers)
+[One field, many consumers](#one-field-many-consumers) ·
+[Implementation contract](#implementation-contract)
 
 ## A material is a property bundle
 
@@ -72,3 +73,43 @@ mask stack takes it for splat and colour (`06`), appearance synthesises from it 
 takes the stack role and physics. Keep the slices consistent and a "sandy" region erodes, holds
 water, looks, and walks like sand *everywhere*. Let them drift — a colour here, a `K` there — and you
 get the classic incoherent terrain where the ground *looks* like one thing and *behaves* like another.
+
+## Implementation contract
+
+**Field layout.** Keep stable material identity separate from derived blend weights:
+
+```text
+MaterialDesc:
+  stableId, stackRole
+  erodibilityK, reposeTan, cohesion, permeability
+  grainMinM, grainMaxM, densityKgM3
+  albedoFamily, roughnessRange, normalFamily, emissivePolicy
+
+MaterialField: stableId or compact mixture indices
+MaterialWeights: per-cell soft weights, sum = 1
+LayerField: bedrock + soilDepth:m + sandDepth:m + waterDepth:m + snowDepth:m
+```
+
+| Operation | Locality / tier | CPU/GPU placement | Oracle |
+|---|---|---|---|
+| Lithology/material lookup | LOCAL, T0 | constant/structured buffer lookup on CPU/GPU | same stable ID yields the same physical bundle on every backend |
+| Analysis-driven weights | LOCAL or small NEIGHBOURHOOD, T0/T1 | compute after final geometry/analysis | finite weights in `[0,1]`, partition sums to 1 within tolerance |
+| Layer erosion/deposition | NEIGHBOURHOOD, process tier | same staged transport pass as `04`/`05` | layer thickness never negative; source/sink mass closes |
+| Climate/season overlay | LOCAL/T0 or amortised T1 | runtime compute over persistent base material | removing snow/wetness restores the unchanged base identity |
+| Texture/map synthesis | LOCAL/T0/T1 | GPU-native LUT/noise/triplanar synthesis | albedo contains no directional lighting; normals are unit length; output is resolution-consistent |
+| Physics/collision export | LOCAL, publish stage | CPU packing or GPU readback as engine requires | solid/fluid/transient stack role agrees with walk/swim/melt behavior |
+
+Use structure-of-arrays or compact GPU tables rather than branching on large material objects per
+cell. Version `MaterialDesc` independently from texture assets: changing `K`, repose or
+permeability changes terrain behavior and invalidates process caches even when albedo is unchanged.
+Material IDs survive palette reorder and serialisation.
+
+**Runtime policy.** Base lithology and durable deposited layers are persistent/global truth.
+Runtime may synthesize appearance, wetness, snow and local disturbance from them, but chunk unload
+cannot regenerate away consumed soil or deposited sediment. Publish collision, material weights
+and visible layers atomically with the refined height.
+
+**Failure signatures:** weights do not sum to one → seams/energy gain in blends; sand appearance
+with rock repose → property bundle split; water folded into collision height → unswimmable sea;
+normal/AO baked after R16 quantisation → combs/rings; a texture-only material change alters erosion
+cache → physical and appearance versions coupled incorrectly.

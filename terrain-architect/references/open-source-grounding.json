@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "inspected_at": "2026-07-20",
+  "entries": [
+    {
+      "id": "landlab",
+      "repository": "https://github.com/landlab/landlab",
+      "revision": "0b0ef08647bf7b3dd6575c813ae432dcde70aded",
+      "license": {"spdx": "MIT", "path": "LICENSE.md"},
+      "source_locations": [
+        "src/landlab/components/lake_fill/lake_fill_barnes.py:LakeMapperBarnes",
+        "src/landlab/components/flow_accum/flow_accum_bw.py:_DrainageStack",
+        "src/landlab/components/stream_power/fastscape_stream_power.py:FastscapeEroder",
+        "src/landlab/components/stream_power/cfuncs.pyx:brent_method_erode_fixed_threshold",
+        "src/landlab/components/diffusion/diffusion.py:LinearDiffuser"
+      ],
+      "adopted_behavior": [
+        "Barnes fill may remain flat or receive a machine-precision drainage gradient",
+        "Production accumulation uses Braun-Willett donor arrays and a drainage stack",
+        "Linear stream power uses the closed form; nonlinear n uses a bracketed Brent solve",
+        "Flooded and reversed-flow nodes are guarded against erosion",
+        "Explicit diffusion uses a conservative empirical stability prefactor of 0.15"
+      ],
+      "known_deviations": [
+        "The skill's fixed 1e-5 metre epsilon is an engine-scale policy, not Landlab's machine-precision default",
+        "The scalar reference diffusion oracle uses the textbook bound rather than Landlab's 0.15 production margin"
+      ],
+      "engine_translation": "Use iterative owned stacks, fixed field buffers and explicit boundary flags; replace Python objects and SciPy roots with engine-native arrays and a bounded bracketed solver."
+    },
+    {
+      "id": "richdem",
+      "repository": "https://github.com/r-barnes/richdem",
+      "revision": "9a1c97bb2529e386451a7dd54768b8b74bb4d620",
+      "license": {"spdx": "GPL-3.0-only", "path": "LICENSE.txt"},
+      "source_locations": [
+        "include/richdem/depressions/Barnes2014.hpp:PriorityFloodEpsilon_Barnes2014",
+        "include/richdem/methods/d8_methods.hpp:d8_flow_accum",
+        "include/richdem/methods/dinf_methods.hpp:where_do_i_flow"
+      ],
+      "adopted_behavior": [
+        "Priority-Flood plus epsilon uses nextafter rather than an arbitrary fixed increment",
+        "Perimeter cells establish the open/base-level boundary",
+        "D8 accumulation uses O(N) indegree/Kahn traversal",
+        "D-infinity snaps near-exact cardinal angles to one receiver within 1e-6 radians to prevent cycles"
+      ],
+      "known_deviations": [
+        "The skill exposes a world-unit epsilon because game vertical scales need an explicit reproducible policy",
+        "The readable numpy accumulator uses argsort and is not the production O(N) path"
+      ],
+      "engine_translation": "Implement queue storage in persistent engine memory, encode nextafter or the declared world epsilon explicitly, and use iterative indegree traversal suitable for jobs or compute."
+    },
+    {
+      "id": "pysheds",
+      "repository": "https://github.com/pysheds/pysheds",
+      "revision": "1949ce1d2e13e76e62f850861912cb4323361fcb",
+      "license": {"spdx": "GPL-3.0-only", "path": "LICENSE"},
+      "source_locations": [
+        "pysheds/_sgrid.py:_d8_flowdir_numba",
+        "pysheds/_sgrid.py:_dinf_flowdir_numba",
+        "pysheds/_sgrid.py:_mfd_flowdir_numba",
+        "pysheds/sgrid.py:accumulation"
+      ],
+      "adopted_behavior": [
+        "D8 uses a fixed N-NE-E-SE-S-SW-W-NW order with strict greater-than tie breaking",
+        "Flats and pits are explicit sentinel states",
+        "MFD weights downslope receivers by slope power and normalises the weights",
+        "The documented pipeline fills depressions and resolves flats before direction and accumulation"
+      ],
+      "known_deviations": [
+        "Tie order is implementation policy and differs from the skill's readable numpy neighbour order",
+        "The existing optional correlation test omits pysheds resolve_flats and is not a full pipeline equivalence test"
+      ],
+      "engine_translation": "Choose and serialise one tie order, represent pit/flat states explicitly, and run fill-resolve-route-accumulate as separately versioned engine passes."
+    },
+    {
+      "id": "fastscapelib",
+      "repository": "https://github.com/fastscape-lem/fastscapelib",
+      "revision": "b85cc6b1341241cbe4a1d3458ed7e3fa5a857f48",
+      "license": {"spdx": "GPL-3.0-only", "path": "LICENSE"},
+      "source_locations": [
+        "include/fastscapelib/flow/sink_resolver.hpp:pflood_sink_resolver",
+        "include/fastscapelib/flow/sink_resolver.hpp:mst_sink_resolver",
+        "include/fastscapelib/flow/flow_router.hpp:single_flow_router",
+        "include/fastscapelib/eroders/spl.hpp:spl_eroder::erode",
+        "include/fastscapelib/eroders/diffusion_adi.hpp:diffusion_adi_eroder"
+      ],
+      "adopted_behavior": [
+        "Sink resolution exposes priority-flood and Cordonnier-2019 MST carve/basic alternatives",
+        "Flow routing builds receiver/donor structures with bottom-up traversal indices",
+        "Linear stream power matches the Braun-Willett closed form",
+        "Nonlinear stream power uses guarded Newton iteration and single-flow routing",
+        "Stream-power updates clamp against flooded receiver elevation",
+        "Production geological diffusion may use unconditionally stable ADI"
+      ],
+      "known_deviations": [
+        "The skill's scalar stream-power oracle implements only the linear n=1 case",
+        "The skill's scalar diffusion oracle is explicit and CFL-limited rather than ADI",
+        "The MST depression algorithm is specifically Cordonnier et al. 2019, not the 2016 terrain application"
+      ],
+      "engine_translation": "Keep the O(N) owned receiver stack, expose n=1 as the fast deterministic path, use a bounded nonlinear solve only when required, and map ADI to engine tridiagonal jobs or keep explicit diffusion for bounded runtime steps."
+    },
+    {
+      "id": "opensimplex2",
+      "repository": "https://github.com/KdotJPG/OpenSimplex2",
+      "revision": "4cd120d35bfc27096698de90d1bcbf4f9d359a3b",
+      "license": {"spdx": "CC0-1.0", "path": "LICENSE"},
+      "source_locations": [
+        "java/OpenSimplex2.java:noise2",
+        "java/OpenSimplex2.java:noise3_ImproveXY",
+        "java/OpenSimplex2.java:grad"
+      ],
+      "adopted_behavior": [
+        "Axis-aligned 3D sampling uses an orthonormal lattice-rotated variant",
+        "Seed hashing is integer based and avoids a 256-entry permutation period",
+        "OpenSimplex2 uses a 128-entry 2D gradient table and its own normalisation"
+      ],
+      "known_deviations": [
+        "Generic Gustavson simplex pseudocode with an 8-gradient set and scale 70 is not OpenSimplex2 proper",
+        "OpenSimplex2 is F-tier source-grounded practice rather than a peer-reviewed algorithm paper"
+      ],
+      "engine_translation": "Use engine-native integer hashing and constants from the neutral specification, expose rotated 3D variants explicitly, and verify continuity, range and directional spectra."
+    },
+    {
+      "id": "fastnoiselite",
+      "repository": "https://github.com/Auburn/FastNoiseLite",
+      "revision": "785f37a9ad76e283586a379675085f2063ae03f7",
+      "license": {"spdx": "MIT", "path": "LICENSE"},
+      "source_locations": [
+        "Cpp/FastNoiseLite.h:NoiseType",
+        "Cpp/FastNoiseLite.h:SingleSimplex",
+        "Cpp/FastNoiseLite.h:SingleOpenSimplex2",
+        "Cpp/FastNoiseLite.h:DomainWarpType"
+      ],
+      "adopted_behavior": [
+        "Noise, fractal and domain-warp policies compose instead of duplicating each algorithm",
+        "Cellular distance and return modes are explicit first-class choices",
+        "Two-dimensional and three-dimensional OpenSimplex2-labelled paths use different algorithms and constants"
+      ],
+      "known_deviations": [
+        "FastNoiseLite's 2D OpenSimplex2 dispatch is classic simplex rather than KdotJPG's A2-star implementation",
+        "Empirical output normalisers are implementation-specific and must not be mixed between variants"
+      ],
+      "engine_translation": "Preserve the compositional API shape, generate CPU/GPU variants from one constant set, and version the exact noise variant because equal UI names do not imply equal output."
+    },
+    {
+      "id": "seblague-hydraulic-erosion",
+      "repository": "https://github.com/SebLague/Hydraulic-Erosion",
+      "revision": "f245576d204978e3186f41c8abbd75c326c6857e",
+      "license": {"spdx": "MIT", "path": "LICENSE"},
+      "source_locations": [
+        "Assets/Scripts/Erosion.cs:InitializeBrushIndices",
+        "Assets/Scripts/Erosion.cs:Erode",
+        "Assets/Scripts/ComputeShaders/Erosion.compute:Erode"
+      ],
+      "adopted_behavior": [
+        "Droplet direction blends inertia with the local gradient",
+        "Capacity depends on downhill delta, speed and water",
+        "Erosion uses a radius brush while deposition is bilinear and point-local",
+        "A reusable translation-invariant brush can be precomputed and uploaded"
+      ],
+      "known_deviations": [
+        "CPU and GPU paths use different boundary stopping policies",
+        "The GPU path performs overlapping droplet writes without atomics and is not deterministic",
+        "This is a popular MIT implementation after Beyer rather than a canonical peer-reviewed droplet paper"
+      ],
+      "engine_translation": "Use the brush and capacity behavior but redesign GPU writes with batching, deterministic accumulation or explicitly documented nondeterminism; keep CPU/GPU boundary policy identical."
+    },
+    {
+      "id": "unity-terrain-erosion-gpu",
+      "repository": "https://github.com/bshishov/UnityTerrainErosionGPU",
+      "revision": "0e59f7c42b5ccbc8bc637b7a6435c3af648bc8b6",
+      "license": {"spdx": "MIT", "path": "LICENSE"},
+      "source_locations": [
+        "Assets/Shaders/Erosion.compute:FluxComputation",
+        "Assets/Shaders/Erosion.compute:ErosionDeposition",
+        "Assets/Shaders/Erosion.compute:ThermalErosion"
+      ],
+      "adopted_behavior": [
+        "Virtual-pipe flux is scaled so one step cannot export more water than a cell owns",
+        "The sediment-capacity path includes the Stava shallow-water lmax ramp",
+        "The GPU pipeline is staged across flux, velocity, erosion/deposition and transport passes"
+      ],
+      "known_deviations": [
+        "The implementation uses four pipes rather than the skill's eight-direction production recommendation",
+        "Its thermal pass is four-neighbour and self-documents an incorrect uniform cell-size assumption for non-square cells",
+        "The hardness-softening extension is implementation-specific"
+      ],
+      "engine_translation": "Keep staged GPU resources and the outflow scale, upgrade to distance-correct eight-direction stencils where radial quality matters, and use the skill's stricter thermal oracle instead of inheriting the known cell-size defect."
+    },
+    {
+      "id": "tph-poisson",
+      "repository": "https://github.com/thinks/tph_poisson",
+      "revision": "e436117bfc00d8f64c4391f0bae28ff6da0b309f",
+      "license": {"spdx": "MIT", "path": "LICENSE"},
+      "source_locations": [
+        "include/thinks/tph_poisson.h:tph_poisson_args",
+        "include/thinks/tph_poisson.h:tph_poisson_rand_annulus_sample",
+        "include/thinks/tph_poisson.h:tph_poisson_vec_erase_swap"
+      ],
+      "adopted_behavior": [
+        "Acceleration grid cell size is 0.999 times radius divided by sqrt(dimensions)",
+        "Default candidate attempts are 30",
+        "Active-list removal is O(1) swap-with-last",
+        "Candidates are generated in the annulus from r to 2r with deterministic seeded sampling"
+      ],
+      "known_deviations": [
+        "The 0.999 numerical margin is an implementation hardening beyond the paper's ideal r/sqrt(n)",
+        "Runtime hierarchical scatter still requires world-region ownership and stable chunk boundary policy"
+      ],
+      "engine_translation": "Use fixed allocator or GPU buffers, stable region-seeded active lists and shared-border ownership; verify minimum distance and blue-noise spectra."
+    }
+  ]
+}

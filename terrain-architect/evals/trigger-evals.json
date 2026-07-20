@@ -8,6 +8,14 @@
   {"query": "getting hard seams between terrain tiles after i run erosion per-tile, whats going on", "should_trigger": true},
   {"query": "how do coral atolls form and how would i build one procedurally with a lagoon in the middle", "should_trigger": true},
   {"query": "what causes the terracing / stair-stepping artifacts on the gentle slopes of my exported heightmap", "should_trigger": true},
+  {"query": "design a terrain graph that recreates the Grand Canyon as a process history rather than just stamping canyon-shaped noise", "should_trigger": true},
+  {"query": "help me build a Tatooine-style terrain from real desert analogues with believable mesas, dunes, and dry channels", "should_trigger": true},
+  {"query": "architect the cache keys, typed ports, preview policy, and global-node scheduling for a procedural terrain node engine", "should_trigger": true},
+  {"query": "derive terrain splatmaps and rock soil sand materials from slope curvature wetness and sediment after erosion", "should_trigger": true},
+  {"query": "which lava flow model should i use for a temperature-aware procedural volcanic terrain and how do i verify it", "should_trigger": true},
+  {"query": "my Unity planet terrain has drainage discontinuities at cube face seams and changes shape between LOD levels", "should_trigger": true},
+  {"query": "our console game cannot ship GPL terrain dependencies, help us implement flow routing and erosion from papers as owned C++ and compute shader code", "should_trigger": true},
+  {"query": "build the full terrain algorithm architecture for an advanced world generator that supports both pre-cooked maps and deterministic runtime chunks", "should_trigger": true},
   {"query": "read this GeoTIFF DEM of the Alps into python and plot a hillshade with matplotlib", "should_trigger": false},
   {"query": "im texturing a rock cliff face in Substance Painter, how do i make the moss look natural in the crevices", "should_trigger": false},
   {"query": "plan me a 3-day hiking route up Mount Rainier with about 2700m of elevation gain and campsites", "should_trigger": false},
@@ -18,5 +26,10 @@
   {"query": "im writing a fantasy novel and want to describe an eroded canyon landscape vividly, give me some evocative prose", "should_trigger": false},
   {"query": "set up a Perlin noise function in GLSL for an animated water caustics shader", "should_trigger": false},
   {"query": "what are the best real-world hiking trails that go through glacial cirques and aretes in the Alps", "should_trigger": false},
-  {"query": "help me pick a GPU for running large fluid simulations in Houdini, is 24GB VRAM enough", "should_trigger": false}
+  {"query": "help me pick a GPU for running large fluid simulations in Houdini, is 24GB VRAM enough", "should_trigger": false},
+  {"query": "design a generic visual programming node editor with undo redo and plugin support for an audio application", "should_trigger": false},
+  {"query": "explain why the Grand Canyon has exposed rock layers for a middle school geology lesson", "should_trigger": false},
+  {"query": "make a PBR lava material in Substance Designer for a static prop, including glowing cracks", "should_trigger": false},
+  {"query": "write a travel guide comparing the scenery of Monument Valley and Death Valley", "should_trigger": false},
+  {"query": "compare the MIT Apache and GPL licenses for a generic JSON parsing library", "should_trigger": false}
 ]

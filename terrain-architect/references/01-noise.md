@@ -127,9 +127,12 @@ the lattice so the sampling plane cuts it obliquely.
 **If you sample 3D noise on an axis-aligned plane, you must use a lattice-rotated variant, or
 you will get visible diagonal banding.** This catches people constantly.
 
-Don't reimplement OpenSimplex2 from memory — the lattice and gradient tables are long and the
-reference implementation (public domain) is short. Specify "use the reference OpenSimplex2
-implementation, `noise2` or `noise3_ImproveXY`" and move on.
+The Simplex pseudocode above is **not** OpenSimplex2. The pinned CC0 source (`22`) confirms that
+OpenSimplex2 proper uses its own lattice construction, a 128-entry 2D gradient table, integer seed
+hash and normalisation—not the 8-gradient/`70.0` Gustavson contract above. The skill's adopted
+engine contract is already recorded in `22`: implement that neutral variant directly and validate
+range, continuity, directional spectrum and rotated-lattice behavior. Do not mix constants across
+the textbook, KdotJPG and FastNoiseLite variants.
 
 ## Value noise
 

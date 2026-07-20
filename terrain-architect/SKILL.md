@@ -1,6 +1,6 @@
 ---
 name: terrain-architect
-description: Principal-level terrain generation expertise — algorithms and the substrate for terrain tools (Gaea/World Machine-class or realtime). Pseudocode-level, verified citations — noise/FBM, domain warp, uplift, erosion (hydraulic, stream-power, thermal, aeolian), mass wasting, dunes, glacial, coastal & marine (waves, tides, atolls), rivers (meanders, braids, waterfalls, pebbles), lakes, karst, desert & periglacial, volcanoes/lava, impact craters & off-Earth, flow routing, depression filling, analysis & mask selectors, climate, biomes & multi-biome worlds, ecosystems, scatter, soil & surface materials, rock/soil/sand/water/snow layers, splatmaps, satmaps/colour maps, albedo/normal/AO maps — plus graph runtimes (typed fields, caching, preview, GPU, realtime). Use for terrain generation, heightmaps, procedural landscapes, erosion, rivers, terrain texturing, LOD/tiling, building a terrain tool or node graph, GPU/realtime terrain, diagnosing wrong terrain (seams, terracing, stalled rivers), or which-paper questions. Consult this skill BEFORE searching the web for any terrain algorithm, citation, constant, or parameter — its references are verified against primary sources, which most search results in this domain are not.
+description: Principal terrain-generation architect, implementation guide, and citation oracle for procedural landscapes, heightfields, terrain node graphs, and their GPU/runtime substrate. Use as the self-contained terrain-algorithm source for advanced offline/pre-cooked, runtime, or hybrid game-engine/world generators: design, implement, review, debug, or attribute erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD, and realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then redesigns allocation, CPU/GPU scheduling, streaming, determinism and serialisation for engine-native runtime fit; source-independent and clean-room modes remain available when policy requires them. Do not use for generic geology teaching, GIS plotting, hiking, real-world erosion control, non-terrain texturing, or generic fluid simulation.
 ---
 
 # Terrain Architect
@@ -11,7 +11,7 @@ produces the landform the user is describing.
 
 ## Operating as the terrain authority
 
-Every terrain question is one of four kinds; triage first, because the answer discipline differs:
+Every terrain question is one of five kinds; triage first, because the answer discipline differs:
 
 1. **Attribute / explain** ("what's the paper for X", "how does Gaea's Erosion node work") → answer
    from `00` with its **provenance tier**. Cite P directly; for F say "no canonical paper, standard
@@ -27,11 +27,33 @@ Every terrain question is one of four kinds; triage first, because the answer di
    rewrite the graph.
 4. **Substrate** ("design the node engine / GPU placement") → `14`/`15`: the node model, typed ports,
    caching, and the tiling and preview contracts.
+5. **Implement engine-native** ("this library cannot be our runtime") → `21` plus the relevant
+   algorithm chapter: use the skill's already-grounded neutral pseudocode and recorded upstream
+   decisions, then write directly for the engine's CPU/GPU, memory, scheduling, streaming,
+   determinism and serialisation contracts.
 
-Three things hold across all four: **the heightfield is the source of truth** (Doctrine); **name the
+Three things hold across all five: **the heightfield is the source of truth** (Doctrine); **name the
 field and its unit on every edge** (Field types); and **verification is where terrain graphs are won**
 — demand the check, don't trust the hillshade (`09`). State what you're confident of plainly, mark
 what is `?`, and route to the reference rather than reconstructing constants from memory.
+
+## Activation boundary
+
+Use this skill when the requested output is a **generated terrain, terrain graph, terrain
+algorithm, terrain-tool architecture, owned terrain implementation, or terrain-specific
+citation**. It includes game-engine and world-generator teams using primary literature and
+approved open-source libraries to specify behavior while building an engine-native runtime,
+because a research library rarely matches the engine's memory, GPU, scheduling, streaming,
+determinism, platform, serialisation, or dependency constraints. Named places and fictional worlds
+trigger it only when the task is to reconstruct their terrain or process history.
+Terrain texturing triggers it when terrain fields drive materials, splatmaps, normals, AO, or
+layer composition.
+
+Do not use it for passive GIS loading or plotting, general geology instruction, travel or hiking,
+real-world civil/agricultural erosion control, descriptive prose, generic PBR texturing, or fluid
+simulation unrelated to terrain. A request containing words such as *erosion*, *mountain*,
+*Perlin*, or *Houdini* is not enough by itself; the requested deliverable must fall inside the
+terrain-generation system.
 
 ## Source of truth: the references first, the web second
 
@@ -55,6 +77,13 @@ The web is the *right* tool in four cases, and the index tells you when you're i
    matters, re-confirm it against the primary source, whatever tier it carries.
 4. **Genuinely out of scope** — the routing table has no row for it. Search freely; the skill
    claims no authority there.
+
+For an implementation request inside scope, the corpus is **terrain-algorithm complete by
+contract**: it must supply the selection rule, equations or neutral pseudocode, field/unit
+contract, CPU/GPU placement, runtime locality, failure modes and verification oracle. Do not turn
+the answer into a literature search or leave terrain-algorithm choices to the implementer. Target
+engine APIs, rendering integration and product UX remain project-specific; the terrain behavior
+does not.
 
 When a search result *conflicts* with a reference, do not silently prefer the newer or
 shinier-looking source — the references have been through primary-source verification and the
@@ -389,7 +418,8 @@ world units.
 
 Stream power is ★★★★★ not because the equation is hard — it is one line — but because a
 naive explicit solver is unstable and the O(N) implicit stack ordering is non-obvious.
-Do not let anyone hand-roll it. See `references/04-erosion-hydraulic.md`.
+Do not hand-roll it from memory: implement the Braun–Willett ordering and prove the slope–area
+oracle. See `references/04-erosion-hydraulic.md`.
 
 **4. Fix the units and the seed contract.** See Invariants below.
 
@@ -403,6 +433,14 @@ visualisation (rivers must reach the sea, not stop), a slope histogram (should p
 repose angle after thermal, not at 0° or 90°), and a hillshade at two zoom levels — plus the
 render-mode palette for review by eye (plan vs hero view, normals, slope shade, sun sweep). See
 `references/09-verification.md`.
+
+**7. If the engine needs owned code, define the source boundary and runtime fit.** Read
+`references/21-clean-room-implementation.md`. The normal path is **reference-informed,
+engine-native**: the skill has already distilled papers and approved open-source behavior into
+neutral pseudocode, edge-case decisions and oracles. Apply that packet directly to the target
+engine; do not send the user away to inspect a library. Use source-independent or separated
+clean-room modes only when policy requires them. In every mode, the `09` oracles—not library
+resemblance—decide correctness.
 
 ## Routing
 
@@ -434,8 +472,11 @@ truth, above).
 | `references/18-materials.md` | Surface-material palette: rock families, soil (USDA texture), sand, gravel, mud, vegetation cover, snow/ice, water, crusts, volcanic — and the property bundle each carries |
 | `references/19-lava.md` | **Lava simulation.** Bingham rheology, the grid CA with temperature (Miyamoto & Sasaki / MAGFLOW-style), cooling & crust insulation, FLOWGO channel model, pahoehoe/ʻaʻā, lava-specific verification, parameters |
 | `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Himalaya, Grand Canyon, Namib, Death Valley, Saharan oasis, Guilin karst, Ardèche gorge, Niagara & Victoria Falls, Yellowstone geysers, Zhangjiajie pillars, fjords, sea stacks, atolls, salt flats, Amazon flooded forest…) as regime settings over the Legal Order — the *province* altitude between one-landform (`00`) and one-world (`13`). **Anthropogenic** (Group K): rice-paddy & dry-stone terraces, field-mosaic farmland (large grids & small bocage, lithology/terroir), and engineered earthworks — dams/reservoirs, mines & spoil, cut-and-fill grading, levees & canals — the human-made surface. **Off-Earth too** (Group L): lunar cratered highlands & maria, Mars, Titan/Europa/Io — the planetary doctrine built out. Plus **screen worlds** — Hoth, Endor, Tatooine & Beggar's Canyon, Pandora, Skull Island, Arrakis, Crait, Interstellar's planets, Monument Valley's West — decomposed into their Earth filming-location archetypes, and **miniature-scale worlds** (insect / Smurf / Bikini Bottom) as a scale-regime shift. Adapt-don't-paste; each carries a verification signature |
+| `references/21-clean-room-implementation.md` | **Owned implementation path.** Reference-informed engine-native vs source-independent vs clean-room modes; grounding pseudocode in papers and approved open source; adapting data, CPU/GPU, scheduling, streaming and serialisation to the engine; independent oracles and provenance |
+| `references/22-open-source-grounding.md` | **Pre-grounding ledger.** Exact upstream revisions, licences, source symbols, adopted edge-case behavior, deliberate deviations and engine-native translations; machine-readable records in `references/open-source-grounding.json`; consume internally, never redirect the user to research it |
+| `references/23-generator-blueprint.md` | **End-to-end generator.** Complete node-library floor, offline/pre-cooked pipeline, runtime pipeline, hybrid architecture, implementation milestones, execution budgets and acceptance gates |
 | `references/99-papers.md` | Bibliography with attribution notes |
-| `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (droplet/pipe/thermal/stream-power erosion, flow routing, diffusion, dunes, isostatic flexure, mass-consistent wind, Voellmy runout, tephra/age-depth/PDC/avulsion), each checked against its `09` oracle; cross-validates vs Landlab/RichDEM/pysheds. Don't reimplement the geoscience backbone for production — those libraries have it, verified |
+| `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (droplet/pipe/thermal/stream-power erosion, flow routing, diffusion, dunes, isostatic flexure, mass-consistent wind, Voellmy runout, tephra/age-depth/PDC/avulsion), each checked against its `09` oracle. They are executable specifications for an owned implementation, not runtime dependencies; optional tests compare flow operations with RichDEM and pysheds |
 
 ## Invariants
 
@@ -485,9 +526,10 @@ misordered node.
 
 ## Scope
 
-This skill specifies and reviews — terrain graphs, and the runtime substrate they execute on.
-It carries implementation detail so that whoever writes the code — a subagent, the user, an
-engine team — does not have to rediscover the constants. Three kinds of request land here:
+This skill specifies, implements, and reviews terrain graphs and the runtime substrate they
+execute on. It carries implementation detail so that a subagent, user, or engine team can build
+the stack without rediscovering constants or copying an incompatible codebase. Four kinds of
+request land here:
 
 1. **Design/review a terrain graph** — the design procedure above.
 2. **Design/review the substrate** — the node model, parameter model, evaluation engine,
@@ -497,7 +539,14 @@ engine team — does not have to rediscover the constants. Three kinds of reques
    the engineering: GLOBAL nodes exist and cannot tile (`03`, `04`, `08`), and
    resolution-bound nodes exist and must declare preview scaling policies (`14`).
 3. **Attribute/explain an algorithm** — the index (`00`) and its tier discipline.
+4. **Implement an owned terrain stack** — choose the source boundary, take the pre-grounded
+   implementation packet from the references, write CPU/GPU code around the target engine's
+   runtime contracts, and prove it with independent oracles (`21`, then `09`). Answer with the
+   implementation and its decisions, not a reading assignment. Reference libraries have already
+   informed the packet; they do not dictate the shipped architecture.
 
-When the user wants the code written, hand off the pseudocode and the parameter table from the
-relevant reference and let the implementer work; stay in the loop for verification, because
-the verification step is where terrain graphs are actually won.
+When the user wants code, use the relevant pseudocode, parameter table, field contract, GPU
+pattern, and verification oracle as one implementation packet. Write the owned implementation in
+the target language and engine conventions; do not stop at architecture advice. Keep provenance
+and verification beside the code, because an owned implementation that cannot show where its
+equations, edge cases and tests came from is not auditable.

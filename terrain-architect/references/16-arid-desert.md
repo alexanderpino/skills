@@ -2,7 +2,8 @@
 
 Contents: [The arid frame](#the-arid-frame) · [Yardangs](#yardangs-wind-abrasion) ·
 [Inselbergs & bornhardts](#inselbergs--bornhardts) · [Alluvial fans & bajadas](#alluvial-fans--bajadas) ·
-[Playas](#playas) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits)
+[Playas](#playas) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits) ·
+[Implementation contract](#implementation-contract)
 
 ## The arid frame
 
@@ -133,3 +134,24 @@ being blown *out* from between them.
   wind-blown silt that blankets terrain downwind of a source, draping relief like snow — a
   thickness field added over the existing height, thickest on upwind-facing slopes and thinning
   downwind, smoothing and rounding the landscape (the aeolian counterpart of a snow mantle, `13`).
+
+## Implementation contract
+
+| Process | Fields and units | Locality / tier | CPU/GPU placement | Decisive oracle |
+|---|---|---|---|---|
+| Yardang abrasion | `height:m`, `wind:unit-vector+m/s`, `softness:[0,1]`, sediment thickness `m` | directional NEIGHBOURHOOD, T1/T2; bake for long fetch | GPU directional exposure sweep + ping-pong abrasion; scalar CPU truth | ridges align with wind; mature width:length approaches 1:4; removal is strongest near the base |
+| Inselberg weather/strip | `height:m`, `fracture:[0,1]`, regolith `m`, base level `m` | NEIGHBOURHOOD plus regional base level, T2/T3 | CPU/GPU weathering and transport passes; regional base level is baked | low-fracture cores remain high; uniform fracture produces no isolated residual |
+| Fan/bajada deposition | `sedimentFlux:m³/s`, channel curves, height/sediment `m` | channel-network GLOBAL, T3 bake | CPU graph traversal or staged GPU raster deposition after routing | deposit mass matches supplied load; thickness decays downfan; repeated avulsion creates distinct lobes |
+| Playa | basin IDs, spill level `m`, water/salt/sediment thickness `m` | hydrological GLOBAL, T3 bake | CPU basin graph; runtime only updates shallow water/material state | basin has no outflow, floor is level within tolerance, salts/sediment accumulate rather than disappear |
+| Pavement / loess | stability/age masks, clast `PointSet`, loess thickness `m` | LOCAL/NEIGHBOURHOOD, T0/T1 | GPU masks + deterministic scatter; directional loess gather | clasts stay on old low-erosion surfaces; minimum spacing holds; loess thins downwind and conserves deposited mass |
+| Wadi transmission loss | discharge `m³/s`, permeability, channel graph | drainage GLOBAL, T3 or declared watershed job | CPU receiver stack; material/detail may refine at runtime | discharge may decrease along a reach but never becomes negative; channels still terminate at the declared sink |
+
+**Boundary and determinism.** Wind fetch uses an explicit upwind boundary; endorheic basins are
+marked before generic fill/breach; every avulsion and scatter decision derives from the root seed.
+All transport uses double buffering or staged deltas. A runtime chunk may add pavement, loess
+breakup and local abrasion only when its apron covers the declared fetch; basin topology, fans and
+wadi discharge remain baked/global fields.
+
+**Failure signatures:** yardangs cross the wind → exposure field wrong; plus-shaped abrasion →
+stencil anisotropy; fans create sediment → source/sink budget broken; a river exits a playa →
+closed-basin mask lost; pavement appears on active fans → stability/age gate missing.

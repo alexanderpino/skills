@@ -4,14 +4,15 @@ A measurable definition of "authority" for this skill: not "does it sound expert
 but "does it hold the disciplines the skill exists to enforce". Every eval is
 objectively checkable, so a regression shows up as a dropped pass, not a vibe.
 
-## The five axes
+## The six axes
 
 | Axis | File | What it proves |
 |---|---|---|
 | **Attribution & tier discipline** | `evals.json` (ids 1–3) | Cites the right source, refuses to fabricate, marks P/F/L/? honestly. This is the skill's founding purpose — a fabricated citation is the one defect it exists to prevent. |
-| **Diagnosis** | `evals.json` (ids 4–6) | Turns a symptom into mechanism → minimal fix from the failure catalogue (`09`), one node moved not a rewrite. |
-| **Design / ordering** | `evals.json` (ids 7–9) | Picks the erosion backbone by extent, orders the Legal Order, reasons in world units. |
-| **Trap-resistance** | `evals.json` (ids 10–12) | Refuses landform-as-algorithm ("the hoodoo algorithm"), catches the `normalize` defect and the effect-vs-process mask confusion. |
+| **Diagnosis** | `evals.json` (ids 4–6, 18) | Turns a symptom into mechanism → minimal fix from the failure catalogue (`09`), including planetary seam failures. |
+| **Design / ordering** | `evals.json` (ids 7–9, 13–14, 16–17) | Covers scale-based erosion, Legal Order, named archetypes, runtime substrate, materials, and planetary regimes. |
+| **Trap-resistance** | `evals.json` (ids 10–12, 15) | Refuses landform-as-algorithm and proprietary-internal fabrication; catches `normalize` and mask-semantics defects. |
+| **Owned implementation** | `evals.json` (ids 19–22) | Converts pre-grounded behavior, field contracts and independent oracles into engine-owned CPU/GPU code; covers the complete generator, grounding decisions, and long-tail regime runtime contracts. |
 | **Triggering** | `trigger-evals.json` | Fires on real terrain-generation prompts and stays quiet on near-misses (DEM plotting, texturing, hiking, geology homework). |
 
 ## Passing bar
@@ -27,8 +28,15 @@ objectively checkable, so a regression shows up as a dropped pass, not a vibe.
 
 ## How to run
 
-Via the **skill-creator** skill's harness (it provides the executor, grader, aggregation
-and viewer):
+First run the repository-local structural check:
+
+`python evals/validate.py`
+
+It validates schemas, IDs, expectation coverage, trigger balance, historical-result arithmetic,
+and the links between recorded results and eval definitions. It does not invoke or grade a model.
+
+Model execution uses the external **skill-creator** harness (it provides the executor, grader,
+aggregation and viewer):
 
 1. **Capability evals** — for each eval in `evals.json`, run one subagent *with* the skill
    and one *baseline* (no skill), save transcripts, then grade each `expectations` list
@@ -43,7 +51,7 @@ file transform), so grading reads the answer text against the `expectations` —
 LLM-graded rubric, not a script. Keep the expectations objective enough that two graders
 would agree.
 
-## Validation (iteration 1)
+## Historical validation (iteration 1, non-reproducible)
 
 Ran the 6 most discriminating evals (attribution ids 1–3 + trap-resistance ids 10–12)
 with-skill vs a no-skill baseline on the same strong model, grading each `expectations`
@@ -58,6 +66,13 @@ list per-expectation (binary):
 | 11 — normalize defect | 1.00 | 0.67 | +0.33 |
 | 12 — effect-vs-process mask | 1.00 | 1.00 | 0 |
 | **mean** | **1.00** | **0.81** | **+0.19** |
+
+The machine-readable record is `results/iteration-1.json`. The original model identifier,
+transcripts, and grader logs were not retained, so this is **historical evidence, not a
+reproducible current benchmark**. Preserve it as a record of the run, but do not use it to claim
+that a later model or skill revision still achieves these scores. A current release claim
+requires a new run with the model identifier, harness revision, transcripts, and per-expectation
+grader output retained together.
 
 The baseline is a strong generalist and already gets the well-known facts right (the
 droplet-erosion lineage, the effect-vs-process mask distinction). The skill's measurable
@@ -75,5 +90,7 @@ principal-level reference to do.
 
 When a new process family is added to the skill, add at least one attribution eval (does
 it cite the new work at the right tier?) and, if it introduces a failure mode, one
-diagnosis eval. That keeps the "coverage matrix" in the plan honest: every family has a
-check that would catch its regression.
+diagnosis eval. Any new implementation path also needs an owned-implementation expectation
+covering provenance and an independent oracle. That keeps the "coverage matrix" in the plan
+honest: every family has a check that would catch its regression. Run `python evals/validate.py` and the
+`reference-impl` pytest suite before changing any verification claim.
