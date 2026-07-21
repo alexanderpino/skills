@@ -25,10 +25,10 @@ section below is a consequence of one of them:
 1. **The domain closes on itself, and the terrain is a field on that closed surface.** There is no
    rectangular grid without a singularity; the grid decision is `08`'s cube-sphere-vs-HEALPix call, and
    everything that runs on it inherits seams and per-cell distortion. The height field is a function on
-   the sphere `S²`, so it must be **continuous (ideally C¹) everywhere on the real surface** — the two
-   **poles**, the **±180° meridian**, the **cube-face edges**, and the **equator** are all *coordinate
-   artifacts, not boundaries*. The sphere itself has no special points; a crease at any of them is a bug,
-   not a feature.
+   the sphere `S²`, so it must be **continuous (ideally C¹) everywhere on the real surface**. The two
+   **poles**, the **±180° meridian**, and the **cube-face edges** are *chart artifacts*; the **equator**
+   is not even that — just a latitude line, a seam only if you wrongly split the sphere there. **None is a
+   boundary**; the sphere has no special points, and a crease at any of them is a bug, not a feature.
 2. **Direction is not constant.** "Down" is toward the centre, "north" rotates over the surface, and a
    straight line is a great circle. Plate motion, wind deflection (Coriolis), and sea level all depend
    on where you are on the sphere — they cannot be baked as global constants.
@@ -184,9 +184,10 @@ seam handled. The full I/O treatment — scale factor, pole rows, the resample r
 
 ## Scale, precision, LOD, streaming
 
-A planet is ~6371 km; a 32-bit float has ~7 significant digits, so at planetary radius **float32 gives
-metre-to-decametre precision** — vertices jitter and z-fights. This is the same floating-origin problem
-`08` flags, now unavoidable:
+A planet is ~6371 km; a 32-bit float has a 24-bit mantissa (~7 significant digits), so at Earth's radius
+the representable step (ULP) is already **~0.5 m**, and compounded transform and normal-derivation error
+pushes visible **vertex jitter and z-fighting into the metre range**. This is the same floating-origin
+problem `08` flags, now unavoidable:
 
 - **Compute per-patch in a local frame.** Translate each rendered patch to a local origin (camera-
   relative or patch-relative) and do the fine work in float32 there; keep the global position in
@@ -294,7 +295,7 @@ Ship a planet only when every row holds:
 
 - [ ] **Grid chosen and seam-clean.** Cube-sphere or HEALPix per `08`; height and `A` continuous across
       every seam, **through both poles, and across the equator** (no hemisphere-join crease); no pole
-      pinch; gradients divided by the scale factor `h`.
+      pinch; slopes and areas metric-corrected for the projection scale factor `h` (`08`).
 - [ ] **Plates rotate.** Motion is Euler-pole rotation (small circles about the pole; spreading
       rate ∝ sin(distance)), boundary type from relative velocity; the uplift field feeds the standard
       erosion backbone (`02`, `04`).
