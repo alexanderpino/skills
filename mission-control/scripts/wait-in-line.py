@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a command under a named machine-wide mutex.
+"""Deprecated: run a command under a named machine-wide mutex.
 
 Parallel implementers each work in their own worktree, but some tools still
 share machine-level state: every worktree's `git` hits the same .git common
@@ -20,6 +20,10 @@ two different commands that fight over the same cache a shared name.
 Locks are lock files under $WAIT_IN_LINE_LOCK_DIR (default: <tmpdir>/
 wait-in-line), held via OS advisory locking (fcntl.flock / msvcrt.locking),
 so a killed process releases its lock automatically — no stale-lock cleanup.
+
+Mission Control builds now use ``pipeline.py sandbox`` with private source,
+build, and cache storage.  This wrapper remains only for legacy host-side
+operations; Git still performs its own ref locking.
 
 Exit status: the wrapped command's own exit code (128+signal if it died on a
 signal); 124 if --timeout expired waiting for the lock; 127 command not found.
@@ -77,6 +81,12 @@ def holder_info(path):
 
 
 def main():
+    print(
+        "[wait-in-line] DEPRECATED: use 'pipeline.py sandbox' for builds; "
+        "this wrapper remains only for legacy host-side shared tools",
+        file=sys.stderr,
+        flush=True,
+    )
     parser = argparse.ArgumentParser(
         prog="wait-in-line.py",
         description="Run a command under a named machine-wide mutex.",

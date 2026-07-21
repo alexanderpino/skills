@@ -1,382 +1,342 @@
 ---
 name: mission-control
 description: >-
-  Command-and-control orchestrator for autonomous multi-agent development pipelines.
-  Runs a continuous plan→build loop: an Architect decomposes goals into a prioritized
-  backlog, Scouts research and produce implementation docs, gated by plan review and
-  blast-radius-tiered approval, then Implementers (senior/junior routed by complexity)
-  execute against a file-ownership ledger, gated by a mechanical Verifier and a
-  judgment-level Code Reviewer. A triage side channel routes mid-mission user issues
-  to a read-only Investigator for root-cause diagnosis, so a bug report never stalls
-  the command loop. Use this skill whenever the user wants to orchestrate,
-  coordinate, or run a pipeline of agents/subagents; keep an implementation queue fed;
-  spawn researchers, scouts, implementers, or reviewers; run a long autonomous coding
-  loop against a goal; throw an issue or bug at a running mission for root-cause
-  analysis; or mentions "command and control", "orchestrator", "agent
-  pipeline", "keep the queue filled", or delegating a large feature/refactor to a team
-  of agents. Also use it to resume, audit, or inspect a previously started pipeline
-  (mission-control state directory present in the repo).
+  Durable command-and-control orchestration for middle-large and large
+  repository changes executed by several agents. Uses canonical SQLite/WAL
+  state, semantic leases, private build sandboxes, evidence-gated transitions,
+  automated merge coordination, and crash recovery. Use when the user asks for
+  a sustained multi-agent implementation mission, maximum-throughput
+  decomposition, or resumption/audit of an existing .mission-control state.
+  Do not use for small fixes, ordinary one-agent coding, or lightweight
+  delegation where this lifecycle would add more ceremony than safety.
 ---
 
 # Mission Control
 
-A command-and-control orchestrator that turns one high-level goal into a continuously
-flowing pipeline of research, review, implementation, and verification — with evidence
-at every gate.
+Mission Control turns one large goal into a continuously routed
+plan → build → merge pipeline. Valuable work should not starve, but filling
+slots with make-work is never a goal. The backlog defines work; queue states are
+derived execution state; no change publishes without a sealed evidence chain.
 
-**Governing principle:** the pipeline is never starved while valuable work exists, and
-nothing merges without a traceable evidence chain. "Always filled" is not the invariant —
-a queue stuffed with make-work is worse than an idle one. The backlog is the source of
-truth; the queues are just its moving parts.
+**You are the Orchestrator.** Route agents and enforce gates. Do not implement
+production code or resolve merge conflicts yourself: impartial routing is your
+job.
 
-**You (the model reading this) are the Orchestrator.** You route, gate, and spawn.
-You do not write production code yourself — the moment you start implementing, you've
-lost the ability to judge impartially. Your oracle discipline: cheap gates first,
-expensive judgment last, evidence written to disk at every transition.
+## Suitable missions
 
-## The pipeline at a glance
+Use this skill when all or most are true:
 
-```
+- the change is middle-large or large and has several independently leasable
+  slices;
+- agents need durable handoffs, budgets, crash recovery, and isolated builds;
+- parallel throughput matters enough to justify architecture, plan, code, and
+  merge gates;
+- `.mission-control/` already exists and must be resumed or audited.
+
+Do not use it for a routine fix, short investigation, non-code coordination, or
+work one capable agent can safely complete.
+
+## Lifecycle
+
+```text
 GOAL
- └─► ARCHITECT ──► backlog items (prioritized, constraint-bounded)
-        │
-        ▼
-     SCOUT ──► research doc (approach, acceptance criteria,
-        │       complexity, blast-radius, touch-list)
-        ▼
-  PLAN REVIEWER ──► sign-off or bounce (plan quality)
-        │
-        ▼
-  ORCHESTRATOR APPROVAL ── only if blast-radius ≥ high
-        │
-        ▼
-  APPROVED QUEUE ◄── implementers auto-pull from here
-        │
-        ▼
-  IMPLEMENTER (senior default / junior if complexity=low)
-        │            └─ holds file lease from ownership ledger
-        ▼
-  VERIFIER ──► mechanical oracle: compiles, tests green, diff in scope
-        │
-        ▼
-  CODE REVIEWER ── only if blast-radius ≥ medium; judgment gate
-        │
-        ▼
-  DONE ──► lease released, evidence sealed, backlog updated
+  └─ ARCHITECT ─ backlog
+       └─ SCOUT ─ research.md + semantic touch targets
+            └─ PLAN REVIEWER ─ plan-review.json
+                 └─ ORCHESTRATOR APPROVAL (high/critical only)
+                      └─ APPROVED
+                           └─ IMPLEMENTER ─ committed branch + handoff.md
+                                └─ VERIFIER ─ sandbox.json + verify.json
+                                     └─ CODE REVIEWER (medium+ only)
+                                          └─ MERGE PENDING
+                                               ├─ clean mechanical merge
+                                               └─ MERGE AGENT (conflicts only)
+                                                    └─ post-merge sandbox
+                                                         └─ CAS publish ─ DONE
 ```
 
-Two verification chains, symmetric by design: the plan side gates *documents*
-(reviewer + tiered approval), the build side gates *code* (verifier + tiered review).
-Never conflate them — one blesses intent, the other blesses execution.
+Plan gates bless intent. Build gates bless the implementation. Merge gates
+bless the integrated result. Never substitute evidence from one chain for
+another.
 
-## Setup: state lives on disk, not in your context
+## Durable state
 
-A long autonomous loop that holds its state in an agent's context dies on the first
-crash or compaction. All pipeline state is files, so any fresh session can resume.
-
-On first run, initialize the state directory in the target repo:
+Initialize in the target repository:
 
 ```bash
-python scripts/pipeline.py init --root .mission-control
+python scripts/pipeline.py --root .mission-control init --goal "..."
+python scripts/pipeline.py --root .mission-control configure --json '{...}'
 ```
 
-This creates:
+The state directory contains:
 
-```
+```text
 .mission-control/
-├── mission.json        # goal, budget, terminal conditions, config
-├── backlog.json        # prioritized backlog (Architect-owned)
-├── queue.json          # item states: research → review → approved → building → verify → code-review → done
-├── ledger.json         # file-ownership leases (path → item id)
-├── agenda.json         # orchestrator intent journal — non-derivable notes only
-├── investigations.json # mid-mission user-issue triage: open issues and dispositions
-└── evidence/           # one directory per item: docs, sign-offs, verifier output, review verdicts
+├── state.db                 # canonical SQLite state, WAL journal
+├── mission.json             # read-only compatibility export
+├── backlog.json             # read-only compatibility export
+├── queue.json               # read-only compatibility export
+├── ledger.json              # read-only compatibility export
+├── agenda.json              # read-only compatibility export
+├── investigations.json      # read-only compatibility export
+├── evidence/<id>/           # gate, semantic, sandbox, and merge evidence
+├── worktrees/<id>/          # implementer worktrees
+├── sandboxes/<id>/          # private source/build/cache/package storage
+└── integration/<id>/        # private merge clones
 ```
 
-Use `pipeline.py` for every state transition rather than editing JSON by hand — it
-enforces legal transitions, stamps timestamps, and refuses transitions that lack the
-required evidence file. That refusal is a feature: it makes the audit trail
-structurally impossible to skip. Run `python scripts/pipeline.py --help` for commands.
+`state.db` is the only state source after initialization or migration. Never
+edit JSON snapshots to drive the pipeline. Export explicitly:
 
-If `.mission-control/` already exists when this skill triggers, you are *resuming*:
-run `pipeline.py status`, read `mission.json`, and pick up from queue state. Do not
-re-initialize.
+```bash
+python scripts/pipeline.py --root .mission-control export-json
+```
 
-## Phase 0 — Mission definition
+The exporter detects edits to prior snapshots; `--force` is an explicit
+discard of those edits. Legacy JSON-only state migrates automatically, or with
+`migrate-state`. Migration first copies all six files to
+`migration-backup/legacy-json-v1/`; it is idempotent.
 
-Before spawning anything, pin down with the user (or from their prompt):
+All item rows carry optimistic versions. Commands use short transactions and
+compare-and-swap, so unrelated item commands can proceed concurrently without
+lost updates. Lease sets are acquired atomically.
 
-1. **Goal** — one paragraph. What done looks like.
-2. **Budget & terminal conditions** — the loop must have a stop. At minimum one of:
-   backlog empty + queues drained, N items completed, token/time budget, or explicit
-   user stop. Record in `mission.json`. A pipeline whose only invariant is "keep the
-   queue filled" has no stop and therefore no budget — never run one.
-3. **Throughput posture** — ask the user directly: *"Should I organize this mission
-   to maximize throughput?"* Maximizing means the Architect may reorganize the
-   decomposition for parallelism: front-loading skeleton/structure items
-   (interfaces, scaffolding, frozen data layouts) whose completion unlocks many
-   items to build concurrently, and cutting sibling items so their touch-lists are
-   disjoint. It never means weakening a gate — quality bars and the final result
-   are invariant; only decomposition and ordering may change, and they stay as
-   close to the task's natural shape as parallelism allows. In fully autonomous
-   mode (the user asked for autonomy, or isn't available to answer), decide
-   yourself: prefer maximize when the goal splits into loosely coupled items and
-   the concurrency budget exceeds one implementer; prefer natural order when the
-   work is an inherent dependency chain, or the repo oracle is shaky enough that
-   wide parallel failure would be expensive to unwind. Record the choice, who made
-   it, and (if you decided) the reasoning in `mission.json` under `throughput`.
-4. **Concurrency limits** — max simultaneous implementers (default 2; each needs
-   disjoint leases), max scouts (default 2), max investigators (default 1 — a
-   dedicated slot for the user-issue triage channel, deliberately not shared with
-   Scouts so user issues neither starve the plan side nor wait behind it). When
-   throughput is maximized, raise
-   these to the widest the ledger can keep disjoint — parallelism is the point,
-   but one writer per file remains absolute.
-5. **Repo ground truth** — build command, test command, lint command. These are the
-   Verifier's oracle; if they don't exist, that's the first backlog item, because
-   without an oracle the whole build side is faith-based.
+If state already exists, resume instead of initializing:
 
-## Phase 1 — Architecture front gate
+```bash
+python scripts/pipeline.py --root .mission-control status
+```
 
-Spawn the **Architect** (see `references/roles.md#architect`) with the goal. It
-produces the initial backlog: coherently bounded items, prioritized, each with the
-structural constraints Scouts must respect. If a `principal-architect` skill is
-installed, the Architect must follow it as canonical.
+## Phase 0: define the mission
 
-If `mission.json` records `throughput.maximize: true`, say so in the Architect's
-brief: the backlog must be throughput-shaped per `references/roles.md#architect` —
-skeleton/structure first so the widest set of items becomes buildable in parallel
-behind it, sibling touch-lists disjoint. The decomposition stays as close to the
-original task as possible; reorganize only where it buys real parallelism, and never
-manufacture filler items to keep slots busy — the governing principle still holds.
+Record:
 
-The Architect's backlog is itself gated: present it to the user for a one-time
-sign-off before the loop starts (or, in fully autonomous mode, have the Plan Reviewer
-audit it). An ungated self-decomposing orchestrator manufactures work — this gate is
-what prevents that.
+1. **Goal** — one paragraph defining done.
+2. **Terminal condition** — drained backlog, completed-item cap, token budget,
+   deadline, or a combination.
+3. **Throughput posture** — ask whether to maximize throughput. In autonomous
+   mode, maximize only when the work has real parallel slices and the repo
+   oracle is reliable. Record decision maker and reasoning.
+4. **Concurrency limits** — implementers 2, scouts 2, investigators 1 by
+   default. Raise implementer width only when semantic targets can remain
+   disjoint.
+5. **Repo oracle** — build and test commands are mandatory before building;
+   lint is optional.
+6. **Execution policy** — prefer Docker or Podman with a pinned image. Native
+   execution is an explicit degraded fallback and is always labeled as such.
+7. **Merge target** — default is the symbolic current branch; configure
+   `merge.target_ref` when detached or when another integration ref is desired.
 
-## Phase 2 — The loop
+## Phase 1: architecture gate
 
-Repeat until a terminal condition fires. Each cycle:
+Spawn the Architect using `references/roles.md`. It produces prioritized,
+constraint-carrying backlog items. If throughput is maximized, front-load
+interfaces/scaffolding that unlock siblings and keep sibling predicted semantic
+targets disjoint. Never manufacture filler.
 
-1. **Read queue state and agenda** (`pipeline.py status` — it prints both). Never
-   reason from memory of what the queues held last cycle. `status` also flags
-   actionable conditions for you: `UNBLOCK CANDIDATE` (a blocked item's dependency is
-   now done — transition it back), `MERGE PENDING` (a done item's branch was never
-   merged), `RESHAPE CANDIDATE` (an approved item keeps losing lease collisions —
-   throughput is leaking through the backlog's shape; see mid-mission re-shaping
-   below), `DIAGNOSIS READY` (an Investigator's report is on disk awaiting your
-   disposition — see mid-mission user issues below), and open `AGENDA` notes. Act
-   on these before spawning anything new;
-   they're finished work and standing intent sitting idle.
+Gate the initial backlog with the user, or with a Plan Reviewer in fully
+autonomous mode. An ungated self-decomposing pipeline can invent work.
 
-   The agenda is your intent journal, and it has one hard rule: **if `status` can
-   compute it, it must not be written down anywhere else.** Queue positions, idle
-   slots, and unblock conditions are derived views — duplicating them into a
-   hand-maintained list creates a second source of truth that will drift, and drift
-   in the command layer is the worst place to have it. The agenda holds only what is
-   *not* reconstructible from state: deferred decisions ("if MC-014 bounces once
-   more, the Architect constraint is too vague — re-spawn"), user directives given
-   mid-mission ("pause anything touching the renderer until Thursday"), and scheduled
-   follow-ups ("run reclaim next cycle"). Add with
-   `pipeline.py agenda add "<text>" [--when "<trigger>"]`, close with
-   `agenda resolve --n <N> --note "<what happened>"` the moment a note is acted on or
-   obsolete — a stale agenda misleads exactly like a stale queue.
-2. **Feed the plan side.** If `approved` count < concurrency limit × 2 and backlog has
-   items, spawn Scouts (up to the scout limit) on the highest-priority unclaimed
-   backlog items. One item per Scout — single-tasking keeps docs coherent. In
-   maximize-throughput mode, break priority ties toward the item that unblocks the
-   most dependents (`depends_on` fan-out) — a skeleton item researched early widens
-   every later cycle.
-3. **Gate incoming docs.** When a doc arrives, first check its header for
-   `splittable: true` (maximize mode only) — this must be decided *before* spawning
-   a Plan Reviewer, while the item is still `researching`, so a review is never
-   paid for a doc about to be re-scoped. Accept → route to the Architect (see
-   mid-mission re-shaping below): the item stays in `researching`, its doc is
-   narrowed to the skeleton, the parts become new backlog items behind it.
-   Decline → proceed normally; the doc covers the whole item by contract, so a
-   declined proposal costs nothing. Then, for each (remaining) doc: spawn a Plan
-   Reviewer. On sign-off, check blast-radius:
-   - `low` / `medium` → transition straight to `approved`. Reviewer sign-off suffices.
-   - `high` / `critical` → *you* read the doc and approve or bounce, with written
-     reasons in the evidence directory. You are the expensive gate; tiering exists so
-     you're only paid for when the blast justifies it.
-4. **Feed the build side.** For each idle implementer slot and each `approved` item:
-   acquire leases for the item's touch-list via `pipeline.py lease`. If any path is
-   already leased, skip the item this cycle (never queue two writers on one file —
-   the ledger is the collision-prevention mechanism, not hope). The failed `lease`
-   call records the collision itself; recurring losses surface as
-   `RESHAPE CANDIDATE` in `status`, so don't track contention by hand. Then create the
-   item's isolated worktree: `pipeline.py worktree-add <id>`. Leases stop two agents
-   *editing* one file, but only build isolation stops item A's half-finished diff
-   breaking item B's compile — every implementer works, builds, and is verified
-   inside its own worktree (branch `mc/<id>`), never in the main tree. Worktrees do
-   not isolate machine-shared state: every worktree's `git` hits the same `.git`
-   common dir, and tools like cmake and package managers share global caches — two
-   such calls racing produce lock errors and corrupted caches. Implementer briefs
-   must instruct wrapping those commands in `scripts/wait-in-line.py`
-   (`wait-in-line.py git fetch origin`), which queues callers on a named mutex so
-   same-named calls run one at a time. Route by complexity:
-   `low` → junior implementer, everything else → senior. When the complexity flag is
-   uncertain, default senior: junior-on-hard produces plausible-wrong code plus a
-   harder review, while senior-on-easy is only mildly wasteful. The cost is asymmetric;
-   bias accordingly.
-5. **Gate outgoing code.** Implementer done → spawn the Verifier (mechanical oracle
-   first — never pay a judgment reviewer to read code that doesn't compile). Verifier
-   green → if blast-radius ≥ `medium`, spawn the Code Reviewer; else mark done.
-   On `done`: merge the item's branch into the main line (`git merge mc/<id>`), then
-   `pipeline.py worktree-remove <id>` — an unmerged done item is an audit hole. Any
-   gate failure → bounce back to the implementer with the evidence attached. A junior
-   that fails twice on the same item is promoted: reassign to a senior rather than
-   letting it grind. Bounces are also capped structurally: `pipeline.py` forces an
-   item to `blocked` at the configured `bounce_limit` (default 3), because a
-   chronically bouncing item almost always means the research doc is wrong — the fix
-   is upstream, and the cap forces that diagnosis instead of burning budget invisibly.
-6. **Handle escalations.** Implementers may *request* new research when they hit a
-   genuine gap; only you grant it. Granting means: create a backlog item, then park
-   the blocked item with the link recorded —
-   `pipeline.py transition <id> blocked --blocked-on <new-item>` — which releases its
-   leases and lets `status` detect the unblock automatically later. Deny requests
-   that are really just scope creep — the doc's acceptance criteria define done, not
-   the implementer's ambitions. In maximize mode, check each granted item for the
-   skeleton property before setting its priority: if blocked or upcoming items
-   would land behind it, it jumps the queue (the `depends_on` fan-out rule from
-   step 2) rather than being appended at default priority.
-7. **Check terminal conditions and budget.** Log a one-line cycle summary to
-   `evidence/orchestrator.log`. Pass `--tokens <n>` on transitions when you know a
-   role's spend — `pipeline.py metrics` then yields per-item cost, bounce counts, and
-   time-per-state, which is exactly the telemetry `skill-coach` (if installed) needs
-   for decay detection and for tuning the junior/senior routing threshold empirically.
+## Phase 2: continuous routing loop
 
-**Mid-mission re-shaping (maximize mode):** the throughput decision is not one-shot.
-The pipeline keeps learning — research reveals internal structure, collisions reveal
-serialization the original decomposition hid — and the same shaping the Architect
-did at Phase 1 can be reapplied at any stage and any granularity: reordering the
-remaining tranche, or splitting a single item into skeleton + parts. Exactly four
-signals license a re-shape, and only these:
+At the start of every cycle run `status`. Act first on:
 
-- `RESHAPE CANDIDATE` from `status` — an approved item repeatedly losing lease
-  collisions while implementer slots idle;
-- an **accepted split proposal** from a Scout (step 3);
-- a **bounce pattern** whose recorded reasons point at the decomposition itself
-  rather than any single doc;
-- a **closed investigation dispositioned `architect`** — a user-reported issue whose
-  diagnosis traces the root cause to the structure or decomposition itself (see
-  mid-mission user issues below).
+- `UNBLOCK CANDIDATE`;
+- `MERGE CANDIDATE` or `MERGE RESOLUTION`;
+- repeated semantic contention;
+- `DIAGNOSIS READY`;
+- unresolved agenda notes.
 
-On a signal, re-spawn the Architect with the signal named in its brief. Its scope is
-the **open backlog only** — items in flight or done are immutable history — and the
-reshaped tranche is gated exactly as in Phase 1. Never re-shape speculatively: an
-idle moment is not a signal, and a mission that keeps re-planning itself spends its
-budget on churn instead of work. If you cannot name the triggering evidence in the
-Architect's brief, there is no re-shape to do.
+### Feed the plan side
 
-**Mid-mission user issues (triage side channel):** users throw issues at running
-missions — a bug report, a regression, a "why is X doing that?" — and the worst
-response is diving into the codebase yourself: the command loop stalls, and your
-context fills with one issue's stack traces while five agents wait on routing
-decisions. You are the Orchestrator; the same discipline that keeps you out of
-production code keeps you out of root-causing. The routing rule is mechanical, not
-a judgment call:
+When approved depth is below roughly twice implementer capacity, claim the
+highest-value unclaimed items and spawn Scouts up to the configured limit.
+One Scout owns one research document.
 
-- **Answerable from pipeline state on disk** — `status` output, evidence
-  directories, the agenda, `mission.json` — answer directly and move on. No spawn,
-  no state. "Why is MC-007 blocked?" is a read of the queue, not an investigation.
-- **Anything that requires opening source files, reproducing behavior, or
-  root-causing** — open an investigation and delegate:
-  `pipeline.py investigate open INV-001 "<symptom as the user stated it>"`, spawn
-  the **Investigator** (see `references/roles.md#investigator`) with the symptom,
-  the evidence directory, mission context, and any in-flight items you suspect are
-  related — then return to the loop. Investigations are pipeline state, so the
-  agenda rule applies: no agenda note, `status` computes it.
+Before plan review, handle a Scout's `splittable: true` proposal. Only an
+accepted proposal or another documented reshape signal returns work to the
+Architect. Then run Plan Review. Signed low/medium plans become approved;
+high/critical plans require written Orchestrator approval.
 
-When the report lands, `status` flags `DIAGNOSIS READY`. Reading the diagnosis is
-your gate — the same posture as high-blast approval — and it closes with exactly one
-disposition (`pipeline.py investigate close`, evidence-checked):
+### Acquire semantic leases
 
-- **fix** — create the backlog item(s) first (`add-item --origin
-  investigation:INV-001`, `fast_track` if the root cause is trivial), then close
-  naming them with `--item`. The fix flows through the normal gates; a diagnosed
-  bug earns no shortcut past them.
-- **architect** — the root cause is structural: close with `--note` naming the
-  evidence, then re-spawn the Architect. This is the fourth licensed re-shape
-  signal above.
-- **no-action** — no defect, cannot reproduce, or out of mission scope: close with
-  the reasoning in `--note`.
+Leases are hierarchical targets:
 
-Whatever the disposition, relay the diagnosis to the user in your own summary — the
-report file is the pipeline's evidence, but the answer belongs to them.
+- `file`: a file or directory subtree;
+- `symbol`: a Python class/function/async function, including parent/child
+  hierarchy;
+- `synthetic`: imports, globals, or module-member structure.
 
-**UI slices:** if an item carries a `ui: true` flag and a `design-replication` skill
-is installed, the Designer role applies — see `references/roles.md#designer`. It is a
-wrapper over that skill, not a new agent type; its render-compare visual diff becomes
-the Verifier for the visual portion of the slice.
+Examples:
+
+```bash
+python scripts/pipeline.py --root .mission-control lease MC-7 \
+  --symbol src/query.py::Query.execute
+python scripts/pipeline.py --root .mission-control lease MC-8 \
+  --synthetic src/query.py::imports
+python scripts/pipeline.py --root .mission-control lease MC-9 \
+  --path generated/schema.json
+```
+
+The Python adapter uses `ast` and stable structural anchors. Unsupported,
+generated, unparsable, renamed-file, comment-only, and otherwise unmappable
+changes require a file lease. Sibling symbols can run concurrently; the same
+symbol and parent/child symbols cannot. A file lease conflicts with every
+semantic target beneath it. Never weaken a fallback to gain throughput.
+
+Create a worktree only after acquiring every research target:
+
+```bash
+python scripts/pipeline.py --root .mission-control worktree-add MC-7
+python scripts/pipeline.py --root .mission-control transition MC-7 building
+```
+
+### Build and verify privately
+
+Implementers edit and commit only in their worktree. Build/test commands run
+through the sandbox lifecycle:
+
+```bash
+python scripts/pipeline.py --root .mission-control sandbox prepare MC-7
+python scripts/pipeline.py --root .mission-control sandbox run MC-7
+```
+
+The sandbox exports the commit into private source storage; it never mounts the
+shared `.git` directory. Source, build, cache, and package directories are
+separate. Container defaults disable networking, drop capabilities, prevent
+privilege gain, limit resources, use private temporary storage, and make the
+container root read-only.
+
+Native mode retains private storage but cannot isolate the kernel, process,
+credentials, or network. Its warning and `degraded_isolation: true` evidence
+must never be suppressed. `wait-in-line.py` is deprecated; it exists only for
+legacy host-side commands and warns on every invocation.
+
+Before verification the CLI computes a semantic diff between the worktree base
+and implementation commit. Every changed target must be covered by the lease
+snapshot. Verifier evidence must seal passing sandbox evidence. Medium+ changes
+then receive Code Review.
+
+### Merge; never complete manually
+
+Compatibility `ready-to-merge` maps to `merge-pending`. It does not bypass the
+new lifecycle:
+
+```bash
+python scripts/pipeline.py --root .mission-control merge prepare MC-7
+python scripts/pipeline.py --root .mission-control merge status MC-7
+python scripts/pipeline.py --root .mission-control merge finalize MC-7
+```
+
+`merge prepare` clones privately, integrates the implementation, validates the
+result against semantic leases, and writes merge evidence.
+
+- Clean mechanical merges advance to post-merge verification.
+- Text conflicts between disjoint Python sibling symbols may be combined
+  mechanically, but still require Merge Agent output and Code Reviewer
+  approval.
+- Same-symbol, parent/child, file-fallback, or other overlapping semantic
+  histories are invariants: the Merge Agent must not guess. Serialize, retry
+  from a new base, or reshape the remaining backlog.
+- Other resolvable conflicts go to the Merge Agent. Only
+  `resolution_commit` and the embedded code-review record may complete the
+  sealed conflict analysis.
+
+`merge finalize` recomputes scope, runs the full sandbox against the integrated
+commit, and publishes with `git update-ref <ref> <new> <expected-old>`. A CAS
+loss returns the item to `merge-pending`; retry integration against the new
+head. A failed post-merge sandbox does not publish and creates a reviewed
+resolution task.
+
+`complete` is deprecated. It can finalize only an already prepared
+`post-merge-verifying` item; it never performs or bypasses merge preparation.
+Only successful CAS publication marks queue and backlog done, removes the
+worktree/branch, and releases leases.
+
+### Escalations, budgets, and terminal conditions
+
+Block an item when research is genuinely missing:
+
+```bash
+python scripts/pipeline.py --root .mission-control transition MC-7 blocked \
+  --blocked-on MC-22 --note "..."
+```
+
+Blocking releases leases. Plan-side blocks return to research; build-side
+blocks may return to approved; merge-side blocks return to merge-pending.
+Bounce caps force chronic failures upstream rather than burning budget.
+
+Pass known token spend with `transition --tokens N`; inspect `metrics`.
+Count/token/deadline stops reject new claims, leases, worktrees, and build
+starts while allowing in-flight gates and merges to finish safely.
+
+## Reshaping
+
+Only these signals license re-invoking the Architect over open backlog:
+
+1. repeated semantic lease contention;
+2. an accepted Scout split proposal;
+3. bounce evidence pointing at decomposition;
+4. a closed investigation dispositioned `architect`.
+
+In-flight and done history is immutable. Reorganize only where it buys genuine
+parallelism.
+
+## Mid-mission user issues
+
+Answer questions derivable from state directly. Anything requiring source
+reading or reproduction becomes an investigation:
+
+```bash
+python scripts/pipeline.py --root .mission-control investigate open INV-1 "..."
+```
+
+The read-only Investigator writes `diagnosis.md`. The Orchestrator closes it as
+`fix`, `architect`, or `no-action`. Fix items still pass ordinary gates.
+Investigations are derived state; do not duplicate them in the agenda.
+
+## Agenda discipline
+
+Agenda notes hold only non-derivable intent: user directives, deferred
+decisions, and scheduled follow-ups. Never record queue positions, free slots,
+merge candidates, or unblock conditions; `status` computes those.
 
 ## Spawning discipline
 
-Every subagent prompt is a self-contained brief — subagents share nothing with you but
-what you write. Each brief must contain: the role spec (paste the relevant section of
-`references/roles.md`), the item's evidence directory path, the artifact contract it
-must satisfy (`references/contracts.md`), the repo's build/test commands where
-relevant, and an explicit statement of what it must *not* do (Scouts don't write code;
-Implementers don't expand scope; Reviewers don't fix, they verdict). Where the
-platform lacks subagents, execute the roles yourself sequentially, one role per
-context-disciplined pass, still writing every artifact to disk — the gates matter more
-than the parallelism.
+Every brief must include:
 
-## Audit
+- the exact role section from `references/roles.md`;
+- the relevant contract from `references/contracts.md`;
+- the evidence directory and item ID;
+- worktree/sandbox paths and repo oracle where applicable;
+- explicit prohibitions (for example Scout: no code; Reviewer: verdict, do not
+  fix; Merge Agent: no invariant override).
 
-Audit is a property, not a role. Because every transition demanded evidence, auditing
-is reading:
+Each role owns one artifact. Gates matter even when roles must run
+sequentially.
+
+## Audit and recovery
+
+Run before declaring the mission complete:
 
 ```bash
-python scripts/pipeline.py audit
+python scripts/pipeline.py --root .mission-control audit
 ```
 
-This verifies the chain for every `done` item: backlog entry → research doc → plan
-sign-off → (approval if high blast) → diff → verifier evidence → (review verdict if
-medium+). Any hole is reported with the item id and the missing link. Run it before
-declaring the mission complete, and offer the report to the user.
+Audit verifies backlog/queue completion, artifact schemas and sealed hashes,
+research and review gates, committed semantic scope, sandbox logs and hashes,
+merge analysis/resolution, post-merge verification, ref ancestry, and cleanup.
+It also audits closed investigations and reports open ones as holes.
 
-## Failure playbook
+After a crash, run `status`; SQLite/WAL and queue history recover the world.
+`reclaim` returns stale build-side items to approved while preserving
+worktrees. Merge-side leases remain held: finish, explicitly block, or inspect
+and retry. Never delete unmerged work implicitly.
 
-- **Crash / new session:** `pipeline.py status` recovers the world state; the
-  `AGENDA` lines in its output recover *your* state — deferred decisions and user
-  directives a fresh session cannot reconstruct from the queues. Read both, then
-  resume Phase 2. Items stuck in `building` with stale leases (> configured TTL):
-  bounce to `approved`, release leases.
-- **User gives a mid-mission directive** ("hold renderer work", "prioritize X"):
-  record it in the agenda immediately, before acting on it — a directive that lives
-  only in your context dies with your context.
-- **User reports a bug or asks a deep question mid-mission:** run the triage test
-  (mid-mission user issues, above). Answerable from state on disk → answer inline;
-  anything needing code-reading or reproduction → `investigate open`, spawn the
-  Investigator, keep the loop running. Never root-cause it yourself — the command
-  loop is your artifact, and an open investigation survives a crash where a
-  half-finished personal investigation does not.
-- **Verifier flaky (tests fail without the diff):** the oracle itself is broken —
-  halt the build side, surface to the user. Never weaken the gate to keep throughput.
-- **Backlog exhausted, goal unmet:** re-spawn the Architect with the evidence trail so
-  far to propose the next backlog tranche; gate it as in Phase 1.
-- **Two items genuinely need the same file:** serialize by priority; never split a
-  file's ownership. If the same collision recurs (`RESHAPE CANDIDATE`), the fix is
-  upstream: re-shape the open backlog so sibling touch-lists are disjoint —
-  serializing forever is throughput leaking through the backlog's shape.
-- **Queue starving because review bounces everything:** don't lower the bar — read the
-  bounce reasons; the fix is usually upstream (Architect constraints too vague, Scout
-  briefs missing context).
+## References
 
-## Reference files
-
-- `references/roles.md` — full role specs: Architect, Scout, Plan Reviewer,
-  Implementer (senior/junior), Verifier, Code Reviewer, Investigator, Designer.
-  Read the relevant section before spawning each role; paste it into the subagent
-  brief.
-- `references/contracts.md` — artifact schemas: research doc, evidence records,
-  ledger entries, queue states and legal transitions. Read once at mission start.
-- `scripts/pipeline.py` — state machine CLI. `--help` lists commands.
-- `scripts/wait-in-line.py` — named-mutex command wrapper
-  (`wait-in-line.py cmake <args>`); serializes tools that share machine state
-  (git, cmake, package managers) across concurrent implementers. Lock name
-  defaults to the command's basename; `--name` widens/narrows scope,
-  `--timeout` bounds the wait.
+- `references/contracts.md` — state, target, artifact, and transition schemas.
+- `references/roles.md` — Architect, Scout, Plan Reviewer, Implementer,
+  Verifier, Code Reviewer, Merge Agent, Investigator, and Designer briefs.
+- `scripts/pipeline.py` — composition entrypoint; `--help` lists commands.
+- `scripts/wait-in-line.py` — deprecated legacy mutex wrapper.
