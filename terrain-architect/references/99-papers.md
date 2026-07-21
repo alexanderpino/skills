@@ -159,6 +159,11 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Hesp, P.A. (1981).** *The formation of shadow dunes.* Journal of Sedimentary Petrology 51(1),
   101–112. — The tapering **sand shadow** in the lee of a single obstacle; the small-obstacle end of
   the shadow-zone capture, kin to the nebkha (`05`, `13`, `16`).
+- **Qian, G., Dong, Z., Luo, W. & Lu, J. (2011).** *Mean airflow patterns upwind of topographic
+  obstacles and their implications for the formation of echo dunes: a wind tunnel simulation of the
+  effects of windward slope.* Journal of Geophysical Research: Earth Surface 116, F04026. — Quantifies
+  the windward-angle gate: the boundary layer separates into an upwind reverse eddy above **~60°** (the
+  echo-dune regime); gentler faces give climbing dunes (`05`, `16`).
 - **Pye, K. & Tsoar, H. (2009).** *Aeolian Sand and Sand Dunes.* Springer, Berlin (1st ed. Unwin
   Hyman, London, 1990). — The synthesis of aeolian bedforms, including the topographically-controlled
   (anchored) dune family — echo, climbing, falling and lee dunes (`05`).

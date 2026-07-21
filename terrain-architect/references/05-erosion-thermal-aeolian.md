@@ -343,16 +343,17 @@ sand behind a crest (above), and the `sandDepth` mask already gates where slabs 
 control is **how steep the windward face is**, because that decides whether the sand stops *in front
 of*, climbs *over*, or falls *behind* the obstacle (Tsoar 1983, wind-tunnel echo and climbing dunes).
 
-- **Echo dune — deposited upwind of a steep face.** When the windward slope is steeper than the flow
-  can follow (roughly ≳ the flow-separation angle), the wind separates into a fixed reverse vortex
-  *ahead* of the obstacle; grains drop in that stalled zone, building a ridge parallel to the cliff
-  and **separated from it by a near-bare corridor** whose width scales with obstacle height. It is the
-  upwind stagnation the mass-consistent solve (`13`) already implies, made visible: streamlines that
-  cannot climb the face pile their load in front of it.
-- **Climbing dune — mantled on the windward slope.** Below the separation angle the sand-laden wind
-  flows up and over, and sand **mantles the windward face**, thinning up-slope as the crest speed-up
-  (`13`, Jackson & Hunt) holds the finest grains in transport. A climbing dune banks *onto* the hill;
-  an echo dune stands *off* it.
+- **Echo dune — deposited upwind of a steep face.** When the windward slope is steep — above
+  **~60°**, where the boundary layer separates into a fixed reverse eddy (Qian et al. 2011, wind
+  tunnel, stoss slopes 35–90°) — grains drop in that stalled zone *ahead* of the obstacle, building a
+  ridge parallel to the cliff and **separated from it by a near-bare corridor** whose width scales with
+  obstacle height. It is the upwind stagnation the mass-consistent solve (`13`) already implies, made
+  visible: streamlines that cannot climb the face pile their load in front of it.
+- **Climbing dune — mantled on the windward slope.** On a gentler face — **≲50°** (Tsoar 1983), below
+  the separation threshold — the sand-laden wind flows up and over, and sand **mantles the windward
+  face**, thinning up-slope as the crest speed-up (`13`, Jackson & Hunt) holds the finest grains in
+  transport. (The 50–60° band is transitional.) A climbing dune banks *onto* the hill; an echo dune
+  stands *off* it.
 - **Falling dune — cascaded into the lee.** Sand that crosses the crest drops into the wind shadow
   behind the obstacle and cascades down the lee slope — **Werner's shadow zone at hillslope scale** —
   a lee-side tongue pointing downwind, often fed through a gap or col.
@@ -373,16 +374,17 @@ angle selects the form:
 anchoredDunes(h, sand, windField, obstacleMask):
     for each obstacle cell reached by a transport path:
         θ_w = windwardSlope(h, windField)              # 13 upwind gradient, at the face
-        if θ_w > θ_separate:  deposit UPWIND   (echo)  — reverse-vortex zone ahead of the face
-        else:                 climb the face (climbing) — sand mantles, thinning upslope
+        if θ_w > θ_separate:  deposit UPWIND   (echo)  — reverse eddy ahead of the face; θ_separate ≈ 60°
+        else:                 climb the face (climbing) — sand mantles, thinning upslope (≲50°)
         deposit in the lee shadow zone         (falling) — Werner shadow (above), at hill scale
     # sand ramp = the above + colluvium (05) + 16 fan fill, banked and mostly relict (not a live dune)
 ```
 
 **Tier.** The forms are **L** — there is no anchored-dune algorithm; they compose from `13` + the
 shadow zone. The airflow/bedform behaviour that grounds the windward-angle gate is **P**: Tsoar 1983
-(echo/climbing, the windward-inclination control), Hesp 1981 (shadow dunes), Lancaster & Tchakerian
-1996 (sand ramps); Pye & Tsoar 2009 is the synthesis. **The tell:** an echo dune stands off the cliff
+and Qian et al. 2011 (echo/climbing — the windward-inclination control and the ~60° separation
+threshold), Hesp 1981 (shadow dunes), Lancaster & Tchakerian 1996 (sand ramps); Pye & Tsoar 2009 is
+the synthesis. **The tell:** an echo dune stands off the cliff
 behind a bare strip, a climbing dune mantles the windward face, a falling dune tongues into the lee —
 put the sand on the wrong side and the wind direction reads as reversed. Slabs stay conserved
 (Werner).
