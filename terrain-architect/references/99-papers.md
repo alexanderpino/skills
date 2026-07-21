@@ -572,6 +572,12 @@ is below.
   SIGGRAPH '19.
 - **Whittaker, R.H. (1975).** *Communities and Ecosystems* (2nd ed.). — The biome diagram:
   biome as a function of temperature and precipitation. A 2D LUT.
+- **Holdridge, L.R. (1947).** *Determination of world plant formations from simple climatic data.*
+  Science 105(2727), 367–368. — The **life-zone** system: vegetation formation from biotemperature and
+  precipitation (`13`).
+- **Holdridge, L.R. (1967).** *Life Zone Ecology* (rev. ed.). Tropical Science Center, San José, Costa
+  Rica, 206 pp. — The full triangular chart with explicit **altitudinal belts** (basal → nival)
+  parallel to the latitudinal zones; the reference for named vegetation belts up a mountain (`13`).
 - **Peel, M.C., Finlayson, B.L. & McMahon, T.A. (2007).** *Updated world map of the
   Köppen-Geiger climate classification.* Hydrology and Earth System Sciences 11. — The modern
   Köppen map.

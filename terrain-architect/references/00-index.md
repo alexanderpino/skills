@@ -367,6 +367,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Wind fields (terrain-adjusted) | F | Authored base + crest speed-up (Jackson & Hunt 1975), lee shelter (`05` shadow), channelling, mass-consistent cleanup (Sherman 1978) (`13`). Real CFD out of scope. |
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
+| Altitudinal life zones (explicit elevation belts) | P | Holdridge 1947 (Science 105(2727)), 1967 (*Life Zone Ecology*) — biotemperature + precip + PET; named montane→alpine→nival belts up a mountain (`13`) |
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
 | Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — `SKILL.md` doctrine (`11`, `16`); worked blueprints (lunar highlands & maria, Mars, Titan/Europa/Io) in `20` Group J |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
