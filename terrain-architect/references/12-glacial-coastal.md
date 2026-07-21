@@ -173,6 +173,63 @@ the second exception (after karst, `11`) to the mandatory-fill rule in `03`. Gla
 isn't. If your fill node runs after glacial erosion with no mask, you have erased the most
 recognisable signature of the process.
 
+## Glacial deposition
+
+Erosion (above) carves the valleys; the material it removes has to go somewhere, and where it lands is
+the **diagnostic** half of a glacial landscape. A U-valley in cross-section can be mistaken for a big
+fluvial one — but nothing except ice leaves **drumlins, eskers and erratics**, so the deposits, not
+the troughs, are what say "ice was here". They all draw on one budget: the volume eroded by
+`glacierStep` (above) *is* the sediment supply, so `Σ deposited = Σ eroded` — the same
+mass-conservation discipline as fluvial (`SKILL.md`). Don't let a deposition node mint sediment the
+ice never excavated. Two families, split by whether **water sorted the load**.
+
+**Ice-laid (till — unsorted, dumped directly by the ice):**
+
+| Landform | Recipe |
+|---|---|
+| **Moraine** (already noted) | The eroded load released at the ice margin: **terminal** at the snout, **lateral** on the flanks, **medial** where two glaciers merge, **ground** under the sole. A terminal moraine dams a proglacial lake (`03` — a real basin). |
+| **Drumlin** | Streamlined till hill, **blunt up-ice, tapered down-ice**, in swarms under fast ice. Author the *form*, not the genesis (below): streamline a till field along the ice-flow vector, sized by Clark et al. 2009. |
+| **Till plain / ground moraine** | The low-relief till sheet smeared under the sole — a thickness blanket that mutes the underlying relief, not a feature in its own right. |
+| **Erratic** | A boulder carried far from source and dropped. Pure `07` scatter of **out-of-lithology** clasts (`11` material tag ≠ local bedrock) — the cheapest, most legible ice fingerprint there is. |
+
+**Meltwater-laid (glaciofluvial — sorted, kin to the outburst floods below):**
+
+| Landform | Recipe |
+|---|---|
+| **Esker** | A sinuous sand-and-gravel ridge — the cast of a subglacial meltwater tunnel. Route it, but *not* on the bed (see the Shreve callout). |
+| **Kame** | An ice-contact stratified mound — a delta or fan built against or on top of stagnant ice, left standing when the ice melts out. |
+| **Kettle** | A pit where a buried ice block melted out. **A closed basin — it joins the `03` no-fill list** (with overdeepenings and karst); it usually holds a pond. Kame-and-kettle country is hummocky ice-stagnation terrain. |
+| **Outwash plain / sandur** | Braided meltwater deposits fanning beyond the terminus — the `03` braided-river / `16` fan process driven by the mass-balance melt discharge, fining downstream. |
+| **Tunnel valley** | A large subglacial meltwater channel, cut then often part-infilled; kin to the esker and the jökulhlaup below. Frequently overdeepened → a lake chain (another `03` no-fill case). Genesis debated — steady vs outburst drainage (Kehew et al. 2012). |
+
+**The esker routing insight (Shreve 1985).** An esker is a river deposit, but it does *not* obey the
+bed's topography — so a heightfield router (`03`) run on the bed places it wrong. In a water-filled
+subglacial tunnel the water pressure ≈ the ice overburden, so flow follows the gradient of the
+**hydraulic potential** φ = ρ_i·g·s + (ρ_w − ρ_i)·g·b, where `s` is the ice surface and `b` the bed.
+Because ρ_i ≈ 11·(ρ_w − ρ_i), the **ice-surface slope outweighs the bed by ~11×**: route on
+`(11·s + b)`, essentially the ice surface. The visible consequence, and the tell that sells it, is
+that eskers **run uphill over the bed and cross divides at low passes**, trending with ice flow rather
+than down the local slope. A router on the bare bed pools them in hollows — exactly wrong.
+
+**Drumlin genesis is unresolved — so don't claim it (`?`).** Whether drumlins form by a deforming
+bed, a subglacial instability, or catastrophic meltwater floods is a genuine, decades-old debate with
+no winner. The honest move is the skill's standard one: author the **form** — blunt-up-ice till ridges
+aligned to the ice-flow field, elongation ~2–4 and length 250–1000 m, obeying Clark et al. 2009's
+`E_max ≈ L^(1/3)` limit — and make **no mechanism claim**. Anyone selling a "drumlin algorithm" with a
+physical story is backing one side of an open argument.
+
+**Alignment is machinery you already have.** Drumlins and eskers both trend with **ice flow**, exactly
+as dunes trend with wind (`05`): the SIA surface gradient `∇s` (above) is a ready-made direction field
+that orients both. And their closed basins — kettles, tunnel valleys — join overdeepenings and fjords
+on the `03` no-fill list; a fill node run after glaciation with no mask erases them.
+
+**Tier.** All **L** compositions over the erosion budget, with three anchors: **Shreve 1985** (esker
+tunnel routing, **P**), **Clark et al. 2009** (drumlin morphometry & scaling, **P**), **Kehew et al.
+2012** (tunnel valleys, **P** review); drumlin *genesis* is **?**. The synthesis reference for the
+whole suite is **Benn & Evans 2010**, *Glaciers and Glaciation*. **The tell:** deposits align to ice
+flow, erratics sit on foreign bedrock, and the deposited volume balances the eroded troughs — reverse
+the flow direction and the drumlins point the wrong way.
+
 ## Glacial outburst floods & megafloods
 
 The largest freshwater floods in Earth's history were not rain — they were **water released

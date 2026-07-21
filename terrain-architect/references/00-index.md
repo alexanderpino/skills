@@ -161,6 +161,12 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
 | Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) — full blueprint in `20` |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
+| Drumlins, till plains | Streamlined & sheet till under ice; author the form aligned to ice flow, genesis unresolved (Clark 2009) (`12`) |
+| Eskers | Sorted fill of subglacial meltwater tunnels; route on the ice-surface potential, not the bed (Shreve 1985) (`12`) |
+| Kames & kettle holes (kame-and-kettle) | Ice-contact stratified mounds + melt-out pits (closed basins) (`12`) |
+| Outwash plain / sandur | Braided meltwater deposition beyond the terminus (`03`, `12`, `16`) |
+| Glacial erratics | Scatter of out-of-lithology boulders — the ice fingerprint (`07`, `12`) |
+| Tunnel valleys | Subglacial meltwater channels, often overdeepened → lake chains (`12`) |
 | Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
 | Spits, tombolos, barrier islands, bay bars | Longshore drift + deposition + sheltering (`12`) |
@@ -258,6 +264,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Dune formation (implementable) | P | **Werner 1995**, Geology 23(12) — the slab CA. Under-cited relative to usefulness. |
 | Glacier flow & erosion | P | Argudo et al. 2020, *Simulation, Modeling and Authoring of Glaciers*, ACM TOG 39(6) |
 | Snow / avalanche | P | Cordonnier et al. 2018, *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*, CGF 37(2) |
+| Esker (subglacial tunnel deposit) | P | Shreve 1985, GSA Bull 96 — route on the ice-surface hydraulic potential, not the bed (`12`) |
+| Drumlin form & scaling | P (form) / ? (genesis) | Clark et al. 2009, QSR 28 — `E_max ≈ L^(1/3)`; genesis (deforming bed / instability / meltwater) unresolved (`12`) |
+| Tunnel valleys | P (review) | Kehew et al. 2012, ESR 113 — subglacial meltwater channels, formation debated (`12`) |
+| Glacial depositional suite (moraine, kame, kettle, sandur, till) | L | Compositions over the ice-erosion budget; synthesis Benn & Evans 2010 (`12`) |
 | Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
 | Longshore transport | F | CERC formula; measured basis Komar & Inman 1970 (coastal engineering, not graphics). Drives spits/tombolos/barriers (`12`) |
 | Marine terrace / wave-cut platform | F | Coastal notch loop across a sea-level/uplift history (`12`). A look, not a sim. |

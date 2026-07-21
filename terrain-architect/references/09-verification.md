@@ -341,7 +341,7 @@ For reviewing an existing graph. Ordered by expected yield.
 
 - [ ] Depression handling present, and before flow routing?
 - [ ] Is it the epsilon variant?
-- [ ] Legitimate closed basins masked out of the fill? (the no-fill list in `03`: karst, glacial overdeepenings, craters, playas, thermokarst, oxbows, lagoons)
+- [ ] Legitimate closed basins masked out of the fill? (the no-fill list in `03`: karst, glacial overdeepenings, kettle holes, craters, playas, thermokarst, oxbows, lagoons)
 - [ ] All analysis nodes downstream of the last height write?
 - [ ] Noise evaluated in world space?
 - [ ] Erosion backbone matched to world extent? (droplet <2 km, pipe 2–50, stream power >50)

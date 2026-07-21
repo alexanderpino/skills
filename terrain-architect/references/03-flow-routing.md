@@ -116,6 +116,7 @@ fill erases the landform.
 |---|---|---|
 | Karst sinkholes / dolines | Dissolution; drainage goes underground | `11` |
 | Glacial overdeepenings, cirque/tarn basins | Ice eroding below its outlet | `12` |
+| Kettle holes, overdeepened tunnel valleys | Buried-ice melt-out / subglacial meltwater erosion | `12` |
 | Craters, calderas | Impact / volcanic collapse | `11` |
 | Playas (endorheic basins) | No outlet at all — evaporation is the exit | `16` |
 | Thermokarst pits, thaw lakes | Ground-ice melt collapse | `17` |

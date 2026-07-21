@@ -450,6 +450,20 @@ is below.
 - **Cordonnier, G., Ecormier, P., Galin, E., Gain, J., Benes, B. & Cani, M.-P. (2018).**
   *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches.* Computer
   Graphics Forum 37(2) (Eurographics 2018).
+- **Benn, D.I. & Evans, D.J.A. (2010).** *Glaciers and Glaciation* (2nd ed.). Hodder Education,
+  London, 802 pp. — The standard glacial-geomorphology text; the synthesis reference for the whole
+  **glacial depositional suite** — moraines, drumlins, eskers, kames, kettles, sandur, till (`12`).
+- **Shreve, R.L. (1985).** *Esker characteristics in terms of glacier physics, Katahdin esker system,
+  Maine.* GSA Bulletin 96(5), 639–646. — Eskers are casts of subglacial water-filled tunnels; the flow
+  follows the **hydraulic potential**, dominated ~11× by the ice-surface gradient, so eskers cross
+  divides and climb the bed. Route on the ice surface, not the bed (`12`).
+- **Clark, C.D., Hughes, A.L.C., Greenwood, S.L., Spagnolo, M. & Ng, F.S.L. (2009).** *Size and shape
+  characteristics of drumlins, derived from a large sample, and associated scaling laws.* Quaternary
+  Science Reviews 28(7–8), 677–692. — Drumlin **morphometry**: 250–1000 m long, elongation ~2–4, with
+  a maximum-elongation limit `E_max ≈ L^(1/3)`. Author the form from this; genesis stays open (`12`).
+- **Kehew, A.E., Piotrowski, J.A. & Jørgensen, F. (2012).** *Tunnel valleys: concepts and
+  controversies — a review.* Earth-Science Reviews 113(1–2), 33–58. — The review of subglacial
+  **tunnel valleys** and the still-open steady-vs-outburst debate over how they form (`12`).
 - **Bruun, P. (1962).** *Sea-level rise as a cause of shore erosion.* J. Waterways & Harbors
   Division, ASCE 88. — The Bruun rule. **Coastal engineering, not terrain generation.** Cited
   here because there *is* no graphics paper for coastal erosion, and saying so is the honest
