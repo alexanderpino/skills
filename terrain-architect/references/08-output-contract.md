@@ -270,6 +270,11 @@ et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors a
 DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
 plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
 
+This section is the **grid substrate**; the processes that run *on* a whole globe — Euler-pole
+tectonics, the latitude climate bands, geoid sea level, sphere noise, planet-scale LOD and the
+alien-world regimes — are consolidated in `references/25-planetary-spherical.md`, which routes back
+here for everything above.
+
 ## DEM & sensor realism
 
 A synthetic heightfield is *too clean* to be a real DEM. Real elevation data is **measured**, and

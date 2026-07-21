@@ -25,7 +25,12 @@ should be replaced with a cheaper large-scale mask.
 
 ## Plate simulation
 
-Practical version. Full geodynamics is not required and not useful at game scales.
+Practical version. Full geodynamics is not required and not useful at game scales. This whole section
+is **planar** — plates carry a 2D velocity vector. On a **whole sphere** the kinematics change: a plate
+moves as a *rigid rotation about an Euler pole*, not a translation (transform faults trace small circles
+about the pole; spreading rate ∝ sin of the angular distance from it). That is a different chapter —
+`references/25-planetary-spherical.md` (McKenzie & Parker 1967; graphics realization Cortial et al.
+2019). Use the planar model below for a flat patch, the spherical one for a globe.
 
 ```
 1. Seed P plate centres (P ≈ 8–20 for a continent-scale map).

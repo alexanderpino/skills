@@ -52,6 +52,15 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Cordonnier, G., Galin, E., Gain, J., Benes, B., Guérin, E., Peytavie, A. & Cani, M.-P.
   (2017).** *Authoring Landscapes by Combining Ecosystem and Terrain Erosion Simulation.*
   ACM TOG 36(4), article 134, SIGGRAPH '17. — The follow-up; couples vegetation to erosion.
+- **Cortial, Y., Peytavie, A., Galin, E. & Guérin, E. (2019).** *Procedural Tectonic Planets.*
+  Computer Graphics Forum 38(2), Eurographics 2019. — Whole-**planet** terrain from approximated
+  plate subduction/collision under user-controlled plate motion; continents, ridges, arcs, then
+  amplified. The graphics anchor for spherical tectonics (`25`).
+- **McKenzie, D.P. & Parker, R.L. (1967).** *The North Pacific: an example of tectonics on a
+  sphere.* Nature 216, 1276–1280. — The founding "paving-stone" result: rigid plates move as
+  rotations about an **Euler pole**; independently **Morgan, W.J. (1968)**, *Rises, trenches, great
+  faults, and crustal blocks*, JGR 73(6), 1959–1982. Transform faults follow small circles about
+  the pole; spreading rate ∝ sin(angular distance from it) (`25`).
 - **Braun, J. & Willett, S.D. (2013).** *A very efficient O(N), implicit and parallel method to
   solve the stream power equation governing fluvial incision and landscape evolution.*
   Geomorphology 180–181, 170–179. — **The paper that matters for stream power.** The O(N)

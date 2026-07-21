@@ -110,6 +110,8 @@ of what's reliable here.
 | Tectonic uplift + fluvial erosion | P | **Cordonnier et al. 2016**, CGF 35(2). *This is the "2015 tectonics" paper and the "2016 stream power" paper — one paper, not two.* |
 | Ecosystem + erosion authoring | P | Cordonnier et al. 2017, ACM TOG 36(4) |
 | Plate partitioning / boundary classification | F | Voronoi + velocity vectors. No canonical paper for the graphics version. |
+| Plate tectonics on a sphere (Euler-pole rotation) | P | McKenzie & Parker 1967 (*tectonics on a sphere*, Nature 216); Morgan 1968 — rigid rotation about an Euler pole (`25`) |
+| Procedural whole-planet tectonics | P | Cortial, Peytavie, Galin & Guérin 2019, *Procedural Tectonic Planets*, CGF 38(2), Eurographics (`25`) |
 | Fault displacement / fault networks | F | No canonical paper |
 | Folding | F | Coordinate warp of the stratum field. No paper. |
 | Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
@@ -471,6 +473,29 @@ world extent, representation, mesher, biome model, generation authorship — set
 **The trap this section prevents:** the *parameter* named "erosion" is a noise axis, not the erosion
 of `04`/`05` — it moves no sediment and conserves no mass. And a runtime voxel world cannot produce
 real drainage networks; if the brief needs them, that is a **hybrid** bake (`23`), not this paradigm.
+
+## 17. Planetary & spherical worlds → `25-planetary-spherical.md`
+
+The **whole-globe altitude** — a *consolidating* chapter. The spherical grid/seam/distortion substrate
+lives in `08` and is **not** duplicated; `25` owns what changes above it and routes the rest. Mixed
+tier, honest about which is which.
+
+| Component | Tier | Source |
+|---|---|---|
+| Spherical grid, seams, distortion `h`, DGGS flow | P (F for cube-seam) | Already in `08` — cube-sphere/HEALPix/Snyder/Liao |
+| Plate tectonics on a sphere (Euler-pole rotation) | P | McKenzie & Parker 1967; Morgan 1968 — rigid rotation, transform faults on small circles, spreading rate ∝ sin(distance) |
+| Procedural whole-planet tectonics (graphics) | P | Cortial, Peytavie, Galin & Guérin 2019, *Procedural Tectonic Planets*, CGF 38(2) (Eurographics) |
+| Global circulation & latitude climate bands | P physics / F realization | Three-cell model + Coriolis (Hadley 1735); terrain use is authored bands feeding `13`'s orographic model |
+| Ocean gyres / boundary currents / coastal upwelling deserts | P physics / F realization | Ekman/Sverdrup/Stommel; the Namib–Atacama mechanism (`12`, `13`) |
+| Sea level as geoid / oblate-spheroid equipotential | P geodesy | Earth `f ≈ 1/298`; flood-fill on potential, not radius (`03`) |
+| 3D/4D noise on the sphere (no pole seam) | F | Sample 3D noise at surface points; standard practice, no paper (`01`) |
+| Planet-scale precision, per-face LOD, streaming | F | Floating origin (Thorne 2005); quadtree-per-face + horizon culling (`08`, `23`) |
+| Alien-world regimes (gravity/water; tidally-locked) | doctrine / L | `SKILL.md` off-Earth doctrine; worked worlds in `20` Group L |
+
+**The traps this section prevents:** plate motion is a **rotation** about an Euler pole, not a
+translation (straight-line plates read as wrong at a glance); the circulation **bands are physics, not
+decoration** (a desert on the equator or rainforest at 30° is visibly wrong); and "sea level" is an
+**equipotential**, not a constant radius.
 
 ---
 

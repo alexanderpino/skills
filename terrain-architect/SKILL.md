@@ -415,7 +415,10 @@ a regime setting over the Legal Order, to *adapt*, not paste. If instead the req
 `(seed, coord)` — it is a *different paradigm*, not a graph to erode: the heightfield-truth,
 process-history, and mandatory-flow-routing doctrines are deliberately suspended. Go to
 `references/24-voxel-streaming-generation.md` and read its doctrine ledger before applying anything
-below.
+below. If the request is a **whole planet or spherical globe** — an Earth-like or alien world, not a
+flat patch — start from `references/25-planetary-spherical.md`: it owns the globe altitude (Euler-pole
+tectonics, latitude climate bands, geoid sea level, planet-scale LOD) and routes the grid/seam
+substrate to `references/08-output-contract.md`.
 
 **2. Derive the cell size and state it.** `cellSize = extent / resolution`. Nearly every
 parameter downstream is in units of cellSize — talus thresholds, erosion rates, scatter
@@ -491,6 +494,7 @@ truth, above).
 | `references/22-open-source-grounding.md` | **Pre-grounding ledger.** Exact upstream revisions, licences, source symbols, adopted edge-case behavior, deliberate deviations and engine-native translations; machine-readable records in `references/open-source-grounding.json`; consume internally, never redirect the user to research it |
 | `references/23-generator-blueprint.md` | **End-to-end generator.** Complete node-library floor, offline/pre-cooked pipeline, runtime pipeline, hybrid architecture, implementation milestones, execution budgets and acceptance gates |
 | `references/24-voxel-streaming-generation.md` | **Voxel/streaming chunk worlds — the Minecraft-*family* paradigm.** Chunked, seeded, streamed, editable voxel worlds — Minecraft is the documented exemplar; Creativerse, Luanti (Minetest), Terasology, Vintage Story and smooth-voxel cousins are the family. Representation (2D-map or 3D density/SDF), multi-noise biomes, spline-into-density shape, the proto-chunk stage pipeline, aquifers, greedy-vs-smooth meshing — placed on the *axes* members vary along. The *doctrine ledger* of which `SKILL.md` invariants this regime deliberately suspends (heightfield-truth, process-history, mandatory flow routing) and what local noise substitutes. F/N-tier; sources are documented/open generators, dev talks and reverse-engineering, not papers — never a closed clone's guessed internals |
+| `references/25-planetary-spherical.md` | **Whole-planet / spherical worlds.** The consolidating "globe" altitude: tectonics as Euler-pole rotation (small circles about the pole; Cortial et al. 2019; McKenzie & Parker 1967), global circulation & the latitude climate bands that place deserts at ~30° and rainforest at 0°, sea level as a geoid/oblate-spheroid equipotential, 3D/4D noise on the sphere, planet-scale precision/LOD/streaming, and the alien-world regime knobs. **Routes to `08`** for the grid/seam/distortion substrate (does not duplicate it) and `20` Group L for specific worlds |
 | `references/99-papers.md` | Bibliography with attribution notes |
 | `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (droplet/pipe/thermal/stream-power erosion, flow routing, diffusion, dunes, isostatic flexure, mass-consistent wind, Voellmy runout, tephra/age-depth/PDC/avulsion), each checked against its `09` oracle. They are executable specifications for an owned implementation, not runtime dependencies; optional tests compare flow operations with RichDEM and pysheds |
 
