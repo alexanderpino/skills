@@ -22,9 +22,13 @@ Contents: [The planetary frame](#the-planetary-frame) · [The grid is already de
 A planet is not "a bigger heightfield". Three things change the moment the domain is a globe, and every
 section below is a consequence of one of them:
 
-1. **The domain closes on itself and has no distortion-free 2D map.** There is no rectangular grid
-   without a singularity; the grid decision is `08`'s cube-sphere-vs-HEALPix call, and everything that
-   runs on it inherits seams and per-cell distortion.
+1. **The domain closes on itself, and the terrain is a field on that closed surface.** There is no
+   rectangular grid without a singularity; the grid decision is `08`'s cube-sphere-vs-HEALPix call, and
+   everything that runs on it inherits seams and per-cell distortion. The height field is a function on
+   the sphere `S²`, so it must be **continuous (ideally C¹) everywhere on the real surface** — the two
+   **poles**, the **±180° meridian**, the **cube-face edges**, and the **equator** are all *coordinate
+   artifacts, not boundaries*. The sphere itself has no special points; a crease at any of them is a bug,
+   not a feature.
 2. **Direction is not constant.** "Down" is toward the centre, "north" rotates over the surface, and a
    straight line is a great circle. Plate motion, wind deflection (Coriolis), and sea level all depend
    on where you are on the sphere — they cannot be baked as global constants.
@@ -164,6 +168,13 @@ with time as the fourth axis. This is folklore — **F**, no canonical paper —
 correct practice, and it is why planet renderers *generate* on 3D/4D noise rather than on an
 equirectangular map.
 
+Sampling the **3D surface point** is what buys continuity *everywhere on `S²` for free* — no pole, no
+±180° seam, and crucially **no equator**. The classic way to break equatorial continuity is to generate
+the two hemispheres separately (a north heightmap and a south heightmap), or to mirror one onto the
+other — both leave a crease along the equator, and mirroring also makes an unrealistically symmetric
+planet. The equator is not a boundary; do not build one there. If you want hemisphere symmetry, flip the
+*climate forcing sign* across the equator (the insolation flip in `13`), never the terrain itself.
+
 This bans equirectangular as a **generation/simulation grid**, not as a format. Equirectangular (plate
 carrée) is the **standard planetary interchange and delivery raster** — real DEMs (Mars MOLA, Moon LOLA,
 Earth SRTM/GEBCO) ship that way, and "generate a planet heightmap" usually means *deliver an
@@ -233,8 +244,12 @@ This chapter consolidates; it does not duplicate. Build each layer from its home
 
 The flat `09` oracles still apply *inside a face*; the planetary additions are:
 
-- **Seam continuity (the `08` check).** Height and drainage area `A` are continuous and
-  resolution-consistent across every cube-face seam; no pole pinch.
+- **Continuity everywhere on `S²` (the `08` check, generalised).** Height and drainage area `A` are
+  continuous and resolution-consistent across every cube-face seam and the ±180° meridian;
+  **single-valued and continuous *through* each pole** (every longitude agrees at the point, and the
+  field passes over it — meridian λ continues as λ+180° — without a kink); and **no crease along the
+  equator** (the tell-tale of hemisphere-separate generation). No pole pinch. Walk a great circle over
+  each pole, and a meridian across the equator, and diff — a spike localises the seam.
 - **Distortion neutrality.** Gradients divided by `h`; erosion and drainage do not bias toward
   high-distortion faces/regions (histogram drainage density per face — it should not spike where cells
   are largest).
@@ -278,7 +293,8 @@ alone never produces this".
 Ship a planet only when every row holds:
 
 - [ ] **Grid chosen and seam-clean.** Cube-sphere or HEALPix per `08`; height and `A` continuous across
-      seams; no pole pinch; gradients divided by the scale factor `h`.
+      every seam, **through both poles, and across the equator** (no hemisphere-join crease); no pole
+      pinch; gradients divided by the scale factor `h`.
 - [ ] **Plates rotate.** Motion is Euler-pole rotation (small circles about the pole; spreading
       rate ∝ sin(distance)), boundary type from relative velocity; the uplift field feeds the standard
       erosion backbone (`02`, `04`).
