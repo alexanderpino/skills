@@ -1,7 +1,7 @@
 # Arid & Desert Landforms
 
 Contents: [The arid frame](#the-arid-frame) · [Yardangs](#yardangs-wind-abrasion) ·
-[Inselbergs & bornhardts](#inselbergs--bornhardts) · [Alluvial fans & bajadas](#alluvial-fans--bajadas) ·
+[Inselbergs & bornhardts](#inselbergs--bornhardts) · [Alluvial fans & bajadas](#alluvial-fans--bajadas) · [Pediments](#pediments) ·
 [Playas](#playas) · [Evaporite crusts & salterns](#evaporite-crusts--salterns) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits) ·
 [Implementation contract](#implementation-contract)
 
@@ -89,6 +89,19 @@ size** (Blair & McPherson), and **avulsion** — the feeder channel periodically
 lobe — is what makes a fan a *fan* rather than a single incised gully. Coalesce several fans along a
 front and you have a bajada.
 
+## Pediments
+
+A **pediment** is the erosional twin of the fan: a gently sloping (**~0.5–7°**) **bedrock** surface cut
+across the mountain front, carrying only a **thin, mobile alluvial veneer** (sediment in transit, not a
+constructional body), and meeting the range at a sharp **piedmont angle** (Dohrenwend 1994). Same
+wedge-shaped piedmont profile as a bajada — **opposite genesis.** The tell is what sits *under* the
+thin cover: **bedrock** (pediment) versus **thick sediment** (fan/bajada). It forms by **scarp retreat
+and lateral planation** — sheetflood and episodic flow bevel the rock as the range face recedes — so
+build it as **differential lowering / backwearing of the bedrock** behind a retreating front (`11` base
+level), then drape a thin `07` clast veneer, *not* as a deposited wedge. **Tier P** (Dohrenwend 1994).
+The tell in the output: a bedrock ramp that **truncates** structure, rather than a sediment pile that
+buries it.
+
 ## Playas
 
 The floor of an **endorheic** (internally drained) basin — a dead-flat clay/salt pan that floods
@@ -175,6 +188,11 @@ being blown *out* from between them.
   the lee, and **sand ramps** — thick composite aeolian + colluvial + fluvial aprons banked against a
   range front (Lancaster & Tchakerian 1996). The full mechanism and the windward-angle gate live in
   `05` (anchored dunes); here it is a `16` deposit keyed to a mountain front, close kin to the bajada.
+- **Lunette — the playa's own dune.** A crescentic **source-bordering** ridge on the **downwind (lee)
+  margin of a playa/pan**, built from **clay pellets, silt and gypsum deflated off the dry floor**
+  (Bowler 1973) — not clean quartz sand, so it reads as a low, cohesive, source-tied ridge rather than a
+  free migrating dune. Place it only on the lee side of a deflating playa cell; its clay-vs-sand
+  stratigraphy records the basin's wet/dry history.
 
 ## Implementation contract
 

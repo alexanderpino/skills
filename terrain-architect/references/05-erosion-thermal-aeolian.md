@@ -319,6 +319,14 @@ inShadowZone(h, p, windDir):
 So a wind direction that varies over the iterations (cycling between two modes, say) gives you
 linear dunes for free. Expose the wind regime, not the dune type.
 
+**Bedform hierarchy — ripples, dunes, draa (Wilson 1972).** Werner's dunes are one order of a **size
+hierarchy**: wind ripples (~0.1–1 m spacing) ride on **dunes** (~10–1000 m), which in a big sand sea
+ride on **draa** — mega-dunes ~1–3 km apart and hundreds of metres high. Each order correlates with
+grain size, and the diagnostic is **superimposition**: smaller dunes on the flanks of a draa make a
+**compound** (same-type) or **complex** (mixed-type) mega-bedform. You don't get draa from one Werner
+pass — run the model at **two scales** (a coarse, slow draa field with a fine dune field riding it),
+which is why a Namib-type erg (`20`) reads as dunes-on-dunes, not a single wavelength.
+
 **Sand availability mask.** Werner assumes an infinite sand sheet. For terrain, gate it: sand
 only exists where a mask says so (low elevation, low slope, downwind of a source). Slabs that
 land outside the mask are lost.
@@ -388,3 +396,13 @@ the synthesis. **The tell:** an echo dune stands off the cliff
 behind a bare strip, a climbing dune mantles the windward face, a falling dune tongues into the lee —
 put the sand on the wrong side and the wind direction reads as reversed. Slabs stay conserved
 (Werner).
+
+**Vegetation can anchor a dune too — parabolics & blowouts.** Swap the fixed obstacle for **plant
+cover** and you get the other anchored family. A **blowout** is an erosional deflation hollow bitten
+into a vegetated dune where the cover breaks (Hesp 2002); it seeds a **parabolic dune** — a U-shape
+whose **arms trail *upwind*, pinned by vegetation, while the bare nose migrates downwind** (the mirror
+image of a barchan, whose horns point downwind). It is the same cover-vs-transport switch as the nebkha
+(`13`, and the `sandDepth` availability mask above): cover below threshold releases sand, cover above
+holds the arms. The parabolic geometry itself is textbook-standard but has **no single canonical
+paper** — author the form (anchored arms + advancing nose) and cite Hesp 2002 for the blowout that
+starts it.

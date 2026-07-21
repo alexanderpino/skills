@@ -167,6 +167,15 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Pye, K. & Tsoar, H. (2009).** *Aeolian Sand and Sand Dunes.* Springer, Berlin (1st ed. Unwin
   Hyman, London, 1990). — The synthesis of aeolian bedforms, including the topographically-controlled
   (anchored) dune family — echo, climbing, falling and lee dunes (`05`).
+- **Wilson, I.G. (1972).** *Aeolian bedforms — their development and origins.* Sedimentology 19(3–4),
+  173–210. — The **bedform size hierarchy**: ripples → dunes → draa, and compound/complex mega-dunes by
+  superimposition (`05`).
+- **Bowler, J.M. (1973).** *Clay dunes: their occurrence, formation and environmental significance.*
+  Earth-Science Reviews 9(4), 315–338. — **Lunettes**: source-bordering clay/gypsum-pellet ridges on the
+  lee margin of a deflating playa (`16`, `05`).
+- **Hesp, P.A. (2002).** *Foredunes and blowouts: initiation, geomorphology and dynamics.* Geomorphology
+  48(1–3), 245–268. — **Blowouts** as deflation hollows in vegetated sand; the seed of a parabolic dune
+  (`05`, `13`).
 
 ## Mass wasting
 
@@ -836,6 +845,9 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   from rivers (`16`).
 - **Bull, W.B. (1977).** *The alluvial-fan environment.* Progress in Physical Geography 1(2),
   222–270. — Fan processes and morphology (`16`).
+- **Dohrenwend, J.C. (1994).** *Pediments in arid environments.* In A.D. Abrahams & A.J. Parsons (eds),
+  *Geomorphology of Desert Environments*, pp. 321–353. Chapman & Hall, London. — The **pediment**: a
+  bedrock erosion surface at the mountain front, distinct from the depositional fan (`16`).
 - **McFadden, L.D., Wells, S.G. & Jercinovich, M.J. (1987).** *Influences of eolian and pedogenic
   processes on the origin and evolution of desert pavements.* Geology 15(6), 504–508. — Desert
   pavement is born at the surface over accreting dust, **not** a deflation lag (`16`).
