@@ -254,7 +254,7 @@ The flat `09` oracles still apply *inside a face*; the planetary additions are:
 - **Distortion neutrality.** Gradients divided by `h`; erosion and drainage do not bias toward
   high-distortion faces/regions (histogram drainage density per face — it should not spike where cells
   are largest).
-- **Hypsometry is bimodal for an Earth-like world.** The area–altitude curve (Strahler 1952; `09`, `06`)
+- **Hypsometry is bimodal for an Earth-like world.** The area–altitude curve (Strahler 1952; `09`, `20`)
   has two modes — continents and abyssal plains — not the single mode of a noise planet. A unimodal
   hypsometry means you have a lumpy ball, not continents-and-oceans.
 - **Climate bands are in the right place.** Deserts cluster near ±30°, wettest near the equator, ice
