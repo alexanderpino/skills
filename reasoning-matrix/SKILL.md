@@ -42,6 +42,31 @@ collide ideas you already have into ones you don't.
 The output is **2–4 crystallized insights**, not a wall of cells. The matrix is
 scaffolding; the user sees the building.
 
+## Why this works on the model running it
+
+This skill is executed by an LLM, and it is engineered for one. On an open
+question, a model's first answer is its highest-probability completion — the
+center of a well-worn groove — and "thinking harder" inside that groove produces
+the same answer with more words. The method's whole purpose is to trigger
+reasoning paths that unprompted generation would never take, and each of its
+devices maps directly onto that:
+
+- **The named default is your own attractor, externalized.** Writing it down
+  (Phase 1) converts the groove from the path you're silently sliding along into
+  an object you can measure distance from. Novelty = distance from your own
+  most-probable output.
+- **Each cell is a context with no cached completion.** The bare question has
+  been answered ten thousand times in training; "this anchor × Inversion" hasn't.
+  The unfamiliar conditioning forces computation where retrieval would otherwise
+  serve — the rubber-duck effect above, stated mechanically.
+- **Terse cells are load-bearing, not style.** The longer you generate inside one
+  cell, the more fluency drags the text back toward the groove. One line keeps
+  each move a jump rather than a slide.
+- **The pull never disappears — watch for re-capture.** The attractor reasserts
+  itself at synthesis, when wild cells get smoothed into familiar phrasing. An
+  insight that ends up being the default wearing new vocabulary was re-captured,
+  not discovered; Phase 6 checks for exactly this.
+
 ## When the matrix earns its cost
 
 Use it for questions where the conventional answer exists and is unsatisfying —
@@ -327,6 +352,10 @@ this one attacks the *synthesis*. In particular, check each convergence's
 provenance — did the converging cells really come from different reasoning
 moves? Two lenses that are secretly the same move landing on the same cell isn't
 triangulation, it's one path counted twice, and the "insight" is unsupported.
+Then re-check each survivor against the Phase 1 default one last time: synthesis
+is where the default's pull quietly reasserts itself, smoothing wild cells back
+into familiar phrasing (attractor re-capture). An insight that has drifted into
+being the default in new vocabulary is dropped or sent back.
 Drop any that collapse. Surviving insights are the deliverable. Lead with them.
 The matrix itself goes *below* the insights (or in a collapsed/secondary section)
 — the user wants the building, not the scaffold, but the scaffold should remain
