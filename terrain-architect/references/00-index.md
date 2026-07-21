@@ -347,6 +347,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Cube-sphere grid (equidistant / equiangular) | P | Chan & O'Neill 1975 (QSC / COBE); Sadourny 1972; Ronchi et al. 1996 (equiangular) (`08`) |
 | Geodesic / HEALPix spherical grid | P | Górski et al. 2005 (HEALPix); icosahedral geodesic — no seams (`08`) |
 | Map-projection distortion (scale factor `h`) | P | Snyder 1987 — divide gradients by `h` or erosion biases (`08`) |
+| Equirectangular / plate carrée (planetary interchange & delivery) | P (proj.) / F (resample) | Snyder 1987 — the lat-long DEM lingua franca (MOLA/LOLA/SRTM/GEBCO); an I/O format, **not** a sim grid — generate on cube-sphere/HEALPix, resample out with `cosφ` weighting (`08`, `25`) |
 | Flow routing on a spherical / DGGS grid | P | Liao et al. 2020 (hex); Liao et al. 2025 (ISEA equal-area) (`08`, `03`) |
 | Cube-face-seam flow routing | F | Halo cells + per-face rotation tables; no canonical paper (`08`) |
 | DEM hydrological enforcement / pit removal | P | Hutchinson 1989 (ANUDEM); priority-flood + stream burning (`08`, `03`) |

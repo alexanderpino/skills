@@ -153,15 +153,23 @@ On the flat pipeline "sea level" is a constant height and flood-fill is trivial.
 
 ## Noise on the sphere
 
-Do **not** sample a 2D noise map and wrap it — it pinches at the poles and seams at the ±180° meridian,
-the noise-domain twin of the pole-pinch grid problem. Instead **evaluate 3D noise at the surface point on
-the unit sphere** (`p = radius·normalize(...)`, feed `p` to 3D Perlin/Simplex/OpenSimplex), so the field
-is seamless and pole-free by construction — `01` already carries the 3D noise and the lattice-rotation
-caveat (a plane through 3D noise bands; the sphere avoids that but watch axis-aligned sampling near
-faces). FBM, ridged, and domain warp all compose on the sphere by warping the 3D sample point. For an
-*animated* planet (evolving continents, weather), use **4D noise** with time as the fourth axis. This is
-folklore — **F**, no canonical paper — but it is the standard and correct practice, and it is the reason
-planet renderers reach for 3D/4D noise rather than equirectangular textures.
+Do **not** *generate* by sampling a 2D lat–long noise map and wrapping it — it pinches at the poles and
+seams at the ±180° meridian, the noise-domain twin of the pole-pinch grid problem. Instead **evaluate 3D
+noise at the surface point on the unit sphere** (`p = radius·normalize(...)`, feed `p` to 3D
+Perlin/Simplex/OpenSimplex), so the field is seamless and pole-free by construction — `01` already
+carries the 3D noise and the lattice-rotation caveat (a plane through 3D noise bands; the sphere avoids
+that but watch axis-aligned sampling near faces). FBM, ridged, and domain warp all compose on the sphere
+by warping the 3D sample point. For an *animated* planet (evolving continents, weather), use **4D noise**
+with time as the fourth axis. This is folklore — **F**, no canonical paper — but it is the standard and
+correct practice, and it is why planet renderers *generate* on 3D/4D noise rather than on an
+equirectangular map.
+
+This bans equirectangular as a **generation/simulation grid**, not as a format. Equirectangular (plate
+carrée) is the **standard planetary interchange and delivery raster** — real DEMs (Mars MOLA, Moon LOLA,
+Earth SRTM/GEBCO) ship that way, and "generate a planet heightmap" usually means *deliver an
+equirectangular one*. So the pipeline is: generate/simulate on the equal-area grid, then **resample to
+equirectangular for output** (and resample imports the other way), with `cosφ` weighting and the ±180°
+seam handled. The full I/O treatment — scale factor, pole rows, the resample rule — is in `08`.
 
 ## Scale, precision, LOD, streaming
 
@@ -216,6 +224,7 @@ This chapter consolidates; it does not duplicate. Build each layer from its home
 | Impact cratering, lithology, volcanism (dominant off-world) | `11`, `19` |
 | Age-depth ocean-floor subsidence, coasts, reefs | `12` |
 | 3D/4D noise on the sphere; FBM/ridged/warp | `01` |
+| Equirectangular / real-DEM (MOLA, LOLA, SRTM, GEBCO) import & delivery — resample to/from the working grid | `08` |
 | LOD (quadtree per face, CDLOD), floating-origin precision, streaming | `08`, `23` |
 | Specific worlds — lunar, Mars, icy moons | `20` Group L |
 | Regime selection (gravity / water) | `SKILL.md` doctrine |

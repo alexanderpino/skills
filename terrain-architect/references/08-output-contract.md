@@ -270,6 +270,29 @@ et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors a
 DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
 plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
 
+**Equirectangular (plate carrée) — the interchange format, not a working grid.** The lat–long raster
+(longitude→x, latitude→y, linearly; the *equidistant cylindrical* projection, Snyder 1987) is the
+**lingua franca of planetary data**: real DEMs ship in it — Mars **MOLA**, the Moon's **LOLA**, Earth's
+global **SRTM** and **GEBCO** bathymetry — and virtually every DCC tool and engine imports a planet's
+displacement as one equirectangular map. So you will read and write it constantly, and "generate a
+planet heightmap" almost always means *deliver an equirectangular one*. What you must **not** do is
+*simulate* on it: it is exactly the lat–long grid the pole-pinch warning above is about — cell area
+shrinks as `cosφ` toward the poles (any latitude-dependent timestep dies, and half the pixels are wasted
+oversampling the poles), and the ±180° meridian is a seam. Its scale factor along a parallel is
+`h = 1/cosφ`, so east–west ground distance per pixel is `R·cosφ·Δλ`; weight every area, statistic, and
+erosion rate by `cosφ` or the poles dominate. The rule is the planetary form of "export last, and only
+once":
+
+```
+import  : equirectangular DEM  → resample →  cube-sphere / HEALPix   (your working grid)
+generate: simulate on the equal-area grid   (no pole pinch, correct rates)
+deliver : working grid → resample → equirectangular   (accept pole oversampling)
+```
+
+Pole rows are a single point smeared across the full width — never interpolate *across* them, and wrap,
+don't clamp, at ±180°. The projection and its scale factor are **P** (Snyder 1987); the
+resample-to/from-equirectangular delivery step is **F** engineering.
+
 This section is the **grid substrate**; the processes that run *on* a whole globe — Euler-pole
 tectonics, the latitude climate bands, geoid sea level, sphere noise, planet-scale LOD and the
 alien-world regimes — are consolidated in `references/25-planetary-spherical.md`, which routes back
