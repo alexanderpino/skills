@@ -52,6 +52,15 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Cordonnier, G., Galin, E., Gain, J., Benes, B., Guérin, E., Peytavie, A. & Cani, M.-P.
   (2017).** *Authoring Landscapes by Combining Ecosystem and Terrain Erosion Simulation.*
   ACM TOG 36(4), article 134, SIGGRAPH '17. — The follow-up; couples vegetation to erosion.
+- **Cortial, Y., Peytavie, A., Galin, E. & Guérin, E. (2019).** *Procedural Tectonic Planets.*
+  Computer Graphics Forum 38(2), Eurographics 2019. — Whole-**planet** terrain from approximated
+  plate subduction/collision under user-controlled plate motion; continents, ridges, arcs, then
+  amplified. The graphics anchor for spherical tectonics (`25`).
+- **McKenzie, D.P. & Parker, R.L. (1967).** *The North Pacific: an example of tectonics on a
+  sphere.* Nature 216, 1276–1280. — The founding "paving-stone" result: rigid plates move as
+  rotations about an **Euler pole**; independently **Morgan, W.J. (1968)**, *Rises, trenches, great
+  faults, and crustal blocks*, JGR 73(6), 1959–1982. Transform faults follow small circles about
+  the pole; spreading rate ∝ sin(angular distance from it) (`25`).
 - **Braun, J. & Willett, S.D. (2013).** *A very efficient O(N), implicit and parallel method to
   solve the stream power equation governing fluvial incision and landscape evolution.*
   Geomorphology 180–181, 170–179. — **The paper that matters for stream power.** The O(N)
@@ -110,9 +119,14 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Musgrave, F.K., Kolb, C.E. & Mace, R.S. (1989).** *The Synthesis and Rendering of Eroded
   Fractal Terrains.* SIGGRAPH '89. — The origin of both thermal erosion and grid-based
   hydraulic erosion in graphics. Everything downstream traces here.
+- **O'Brien, J.F. & Hodgins, J.K. (1995).** *Dynamic Simulation of Splashing Fluids.* Proc.
+  Computer Animation '95, 198–205. — The origin of the **virtual-pipe height-field water model**: a
+  fluid surface as height columns, each coupled to its eight neighbours by a pipe that moves water on
+  the head difference. Not an erosion paper; Mei 2007 applies this pipe abstraction to erosion. The
+  lineage runs O'Brien & Hodgins → Mei → Št'ava.
 - **Mei, X., Decaudin, P. & Hu, B.-G. (2007).** *Fast Hydraulic Erosion Simulation and
-  Visualization on GPU.* Pacific Graphics 2007. — **The virtual pipe model.** Grid-based, not
-  particle-based. The 8-step formulation with the outflow scaling factor.
+  Visualization on GPU.* Pacific Graphics 2007. — **The virtual pipe model applied to erosion.**
+  Grid-based, not particle-based. The 8-step formulation with the outflow scaling factor.
 - **Št'ava, O., Beneš, B., Brisbin, M. & Křivánek, J. (2008).** *Interactive Terrain Modeling
   Using Hydraulic Erosion.* SCA 2008. — Extends Mei: sediment slippage, material layers,
   boundary conditions, `lmax` shallow-water capacity ramp. Also a pipe model.

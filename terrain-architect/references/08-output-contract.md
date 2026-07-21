@@ -239,10 +239,14 @@ why climate and cosmology grids use them — at the cost of a non-rectangular ne
 cell has 6 neighbours, sometimes 5).
 
 **Distortion is the load-bearing correction.** A fixed-resolution grid sampled through any projection
-carries a per-cell **scale factor `h`** (Snyder 1987): true ground distance is `Δground = Δpixel / h`.
-Every metre-denominated operator — slope, flow routing, erosion transport distance — **must divide
-gradients by `h`**, or it biases flow toward the high-distortion regions and the world-unit invariants
-of `SKILL.md` break on the sphere exactly as they break under `normalize` (`10`).
+carries a per-cell **scale factor `h`** (Snyder 1987): true ground distance is `Δground = Δpixel / h`
+(for the plate-carrée parallel, `h = 1/cosφ`, so cells are east–west compressed toward the poles). Every
+metre-denominated operator — slope, flow routing, erosion transport distance — must use that **true** run
+`Δground`: a slope read off the raster is therefore **multiplied by `h`** (the true run is *shorter* near
+the poles, so real slopes there are steeper than the map shows), while cell **areas** and drainage area
+go the other way — true area `= map area · cosφ = map area / h`. Get the direction wrong and erosion
+biases toward or away from the high-distortion regions, and the world-unit invariants of `SKILL.md` break
+on the sphere exactly as they break under `normalize` (`10`).
 
 **Flow routing across the seams.** D8/D∞ (`03`) run unchanged *inside* a face; the only hard part is
 neighbour lookup at a face edge or corner, and it is **F-tier engineering** — there is no canonical
@@ -254,7 +258,7 @@ neighbors(face f, i, j):
         if in-range: yield (f, i+di, j+dj)                  # interior — trivial
         else:        yield remap(SEAM_TABLE[f][edge], rot)  # crossed an edge → rotate onto neighbour face
     # cube corners are 3-valent: the 8 corners have only 7 neighbours — special-case them
-flowDir(cell): steepest descent over neighbors(), with Δs = h · arcDistance   # metric-corrected
+flowDir(cell): steepest descent over neighbors(), with Δs = arcDistance   # true great-circle metres between centres = the metric-corrected run
 ```
 
 Depression handling (`03`) then runs on the resulting global graph unchanged. To avoid seams
@@ -262,13 +266,43 @@ entirely, route on a **hex/HEALPix DGGS** instead — there is real published fl
 grids (Liao et al. 2020, 2025), whereas the cube-seam handling stays folklore.
 
 **Verify.** Height and `A` are continuous across a cube-face seam and resolution-consistent; there is
-no pole pinch; and gradients are divided by the scale factor `h` so erosion doesn't bias toward
-high-distortion cells (`09`, *Checks for the extended families*).
+no pole pinch; and slopes use the true ground run (a raster slope multiplied by `h`, cell areas by
+`cosφ`) so erosion doesn't bias toward or away from high-distortion cells (`09`, *Checks for the
+extended families*).
 
 **Tier.** The cube-sphere and equiangular mappings are P (Chan & O'Neill 1975; Sadourny 1972; Ronchi
 et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors are P (Snyder 1987);
 DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
 plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
+
+**Equirectangular (plate carrée) — the interchange format, not a working grid.** The lat–long raster
+(longitude→x, latitude→y, linearly; the *equidistant cylindrical* projection, Snyder 1987) is the
+**lingua franca of planetary data**: real DEMs ship in it — Mars **MOLA**, the Moon's **LOLA**, Earth's
+global **SRTM** and **GEBCO** bathymetry — and virtually every DCC tool and engine imports a planet's
+displacement as one equirectangular map. So you will read and write it constantly, and "generate a
+planet heightmap" almost always means *deliver an equirectangular one*. What you must **not** do is
+*simulate* on it: it is exactly the lat–long grid the pole-pinch warning above is about — cell area
+shrinks as `cosφ` toward the poles (any latitude-dependent timestep dies, and half the pixels are wasted
+oversampling the poles), and the ±180° meridian is a seam. Its scale factor along a parallel is
+`h = 1/cosφ`, so east–west ground distance per pixel is `R·cosφ·Δλ`; weight every **area** and
+area-integrated statistic by `cosφ` (and correct east–west **slopes** the other way, by `1/cosφ`) or the
+poles dominate. The rule is the planetary form of "export last, and only
+once":
+
+```
+import  : equirectangular DEM  → resample →  cube-sphere / HEALPix   (your working grid)
+generate: simulate on the equal-area grid   (no pole pinch, correct rates)
+deliver : working grid → resample → equirectangular   (accept pole oversampling)
+```
+
+Pole rows are a single point smeared across the full width — never interpolate *across* them, and wrap,
+don't clamp, at ±180°. The projection and its scale factor are **P** (Snyder 1987); the
+resample-to/from-equirectangular delivery step is **F** engineering.
+
+This section is the **grid substrate**; the processes that run *on* a whole globe — Euler-pole
+tectonics, the latitude climate bands, geoid sea level, sphere noise, planet-scale LOD and the
+alien-world regimes — are consolidated in `references/25-planetary-spherical.md`, which routes back
+here for everything above.
 
 ## DEM & sensor realism
 

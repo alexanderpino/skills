@@ -42,6 +42,12 @@ T(z, lat) = T_sea(lat) - Γ * z
 `T_sea(lat)` ≈ 30 °C at the equator falling to −20 °C at the poles, roughly cosine. For a
 single map, a constant plus a linear latitude gradient is plenty.
 
+This is the *local* climate model, and it takes the base temperature and wind **direction** as inputs.
+On a **whole planet** those inputs have a global structure — the three-cell circulation (trade winds,
+westerlies, polar easterlies), the ITCZ, and the subtropical highs that put deserts at ~30° — which
+should *drive* this model rather than be assumed. That global forcing is `references/25-planetary-spherical.md`;
+feed its banded wind and latitude precipitation field into the orographic pass below.
+
 Add **aspect**: south-facing slopes (northern hemisphere) receive more insolation. A few °C of
 difference, and it's the reason the snow and treeline are visibly higher on sunny slopes than
 shaded ones. `T -= insolationAmp * northness` where `northness = dot(aspectVec, north)` — +1 on

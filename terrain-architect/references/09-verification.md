@@ -300,6 +300,7 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Coral covers deep / aphotic seabed | No photic gate on placement | `density × inPhotic(depth)`; stop below compensation (`12`) |
 | Range erodes straight down; peaks never rise | Isostatic rebound not coupled to erosion | Add flexural / erosional rebound alongside erosion (`02`) |
 | Seams or a pole pinch on a planet | Lat-long grid, or tile-local coords on a sphere | Cube-sphere / HEALPix + metric-corrected `Δs`; seam routing (`08`) |
+| Crease along the equator on a planet | Two hemispheres generated separately, or N mirrored to S | Generate one field on the whole `S²` (sample the 3D surface point); the equator is not a boundary (`25`) |
 
 ### The grid-anisotropy family
 

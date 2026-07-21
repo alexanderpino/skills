@@ -137,6 +137,13 @@ If runtime hydrology is required, declare the hydrological domain: loaded waters
 region, planet face or coarse global graph. Persist boundary inflow/outflow and drainage area so
 chunks do not invent isolated rivers.
 
+The extreme of the runtime mode — an infinite, lazily-streamed **voxel** world that generates each
+chunk from `(seed, coord)` with **no** global process at all (the Minecraft-style paradigm) — takes
+the opposite bargain: it drops drainage and process history entirely and buys plausibility back with
+local noise, splines and per-block density. Its full assembly, and the ledger of which core doctrines
+it suspends, is `references/24-voxel-streaming-generation.md`. When a brief wants *both* an infinite
+voxel world *and* real drainage, that is the **hybrid** pipeline below, not the pure per-chunk mode.
+
 ## Hybrid pipeline
 
 The standard advanced architecture separates **process history** from **local expression**:

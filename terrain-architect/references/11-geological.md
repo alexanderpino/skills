@@ -177,7 +177,9 @@ is not reversible cheaply:
 **Peytavie's Arches** is the right middle ground and it's under-used: it keeps the
 column-based structure (so erosion, flow routing, and analysis mostly still work) but permits
 voids. If the brief is "cliffs with a few arches", this is the answer, not a full voxel
-terrain.
+terrain. A *full* voxel terrain — an infinite, streamed, block world where the density function
+*is* the source of truth — is its own paradigm with its own doctrine trade-offs; see
+`references/24-voxel-streaming-generation.md`.
 
 If someone asks for arches in a heightfield pipeline, the honest answer is that the
 representation forbids it — and then offer the two ways out. Agreeing to try is worse than

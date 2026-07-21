@@ -110,6 +110,8 @@ of what's reliable here.
 | Tectonic uplift + fluvial erosion | P | **Cordonnier et al. 2016**, CGF 35(2). *This is the "2015 tectonics" paper and the "2016 stream power" paper — one paper, not two.* |
 | Ecosystem + erosion authoring | P | Cordonnier et al. 2017, ACM TOG 36(4) |
 | Plate partitioning / boundary classification | F | Voronoi + velocity vectors. No canonical paper for the graphics version. |
+| Plate tectonics on a sphere (Euler-pole rotation) | P | McKenzie & Parker 1967 (*tectonics on a sphere*, Nature 216); Morgan 1968 — rigid rotation about an Euler pole (`25`) |
+| Procedural whole-planet tectonics | P | Cortial, Peytavie, Galin & Guérin 2019, *Procedural Tectonic Planets*, CGF 38(2), Eurographics (`25`) |
 | Fault displacement / fault networks | F | No canonical paper |
 | Folding | F | Coordinate warp of the stratum field. No paper. |
 | Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
@@ -238,7 +240,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 
 | Algorithm | Tier | Source |
 |---|---|---|
-| Virtual-pipe hydraulic erosion | P | **Mei, Decaudin & Hu 2007** — *this is the pipe/grid model, NOT particle* |
+| Virtual-pipe hydraulic erosion | P | **Mei, Decaudin & Hu 2007** — *this is the pipe/grid model, NOT particle*; the pipe *abstraction* is older (O'Brien & Hodgins 1995, splashing fluids) — Mei makes it an erosion model |
 | Pipe + slippage + layers | P | **Št'ava et al. 2008** — *also a pipe model; an extension of Mei, not a different family* |
 | Droplet / particle hydraulic erosion | F | **Beyer 2015**, TU München bachelor thesis, after Musgrave et al. 1989. **No canonical paper.** Popularised by Sebastian Lague. |
 | Grid hydraulic erosion (origin) | P | Musgrave, Kolb & Mace 1989, SIGGRAPH |
@@ -345,6 +347,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Cube-sphere grid (equidistant / equiangular) | P | Chan & O'Neill 1975 (QSC / COBE); Sadourny 1972; Ronchi et al. 1996 (equiangular) (`08`) |
 | Geodesic / HEALPix spherical grid | P | Górski et al. 2005 (HEALPix); icosahedral geodesic — no seams (`08`) |
 | Map-projection distortion (scale factor `h`) | P | Snyder 1987 — divide gradients by `h` or erosion biases (`08`) |
+| Equirectangular / plate carrée (planetary interchange & delivery) | P (proj.) / F (resample) | Snyder 1987 — the lat-long DEM lingua franca (MOLA/LOLA/SRTM/GEBCO); an I/O format, **not** a sim grid — generate on cube-sphere/HEALPix, resample out with `cosφ` weighting (`08`, `25`) |
 | Flow routing on a spherical / DGGS grid | P | Liao et al. 2020 (hex); Liao et al. 2025 (ISEA equal-area) (`08`, `03`) |
 | Cube-face-seam flow routing | F | Halo cells + per-face rotation tables; no canonical paper (`08`) |
 | DEM hydrological enforcement / pit removal | P | Hutchinson 1989 (ANUDEM); priority-flood + stream burning (`08`, `03`) |
@@ -443,6 +446,57 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Runtime generator | Architecture | `23` maps LOCAL/NEIGHBOURHOOD work to frame-budgeted CPU/GPU execution |
 | Hybrid generator | Architecture | `23` bakes the global process history and synthesises deterministic local detail at runtime |
 | Implementation completeness | Engineering gate | Every node has fields/units, locality, precision, boundaries, determinism, oracle and version |
+
+## 16. Voxel & streaming (chunk) generation → `24-voxel-streaming-generation.md`
+
+A **family** paradigm — chunked, seeded, streamed, editable voxel worlds. **Minecraft is the
+documented exemplar** (public datapack worldgen format, Cubiomes-reverse-engineered); the *family*
+also includes cubic-voxel siblings (Creativerse, Luanti/Minetest, Terasology, Vintage Story) and
+smooth-voxel cousins (Astroneer, No Man's Sky-style). **F/N-tier throughout; no papers.** It
+deliberately suspends the heightfield-truth, process-history and mandatory-flow-routing doctrines and
+substitutes local noise. Sources: documented/open generators (Minecraft's format, Luanti and
+Terasology source), developer talks (Kniberg), reverse-engineering (Cubiomes) — **never a closed
+clone's guessed internals** (N-tier discipline).
+
+The rows below are **Minecraft's instantiation** (the best-documented); members vary along axes —
+world extent, representation, mesher, biome model, generation authorship — set out in `24`.
+
+| Component (Minecraft's instance) | Tier | Source |
+|---|---|---|
+| Density-function terrain (3D scalar; `d>0` solid) | F | Game noise-router / `noise_settings` datapack format; sampled on a coarse lattice + trilinearly interpolated (`01`, `15`) |
+| Multi-noise biome (6-parameter climate space) | F | Game `multi_noise` biome source; temperature/humidity biome-only, continentalness/erosion/weirdness/depth drive shape (`13`) |
+| Spline shape (climate → offset/factor → density) | F | Kniberg (Mojang) design talks — a developer source, not a paper |
+| Proto-chunk stage pipeline & determinism | F | Engineering practice; seam-ownership = `08`/`23`; reverse-engineered by Cubiomes |
+| Noise caves (cheese/spaghetti/noodle) + aquifers | F | Local noise water-tables, decoupled from drainage — **not** karst dissolution (`11`) |
+| Meshing — greedy cubic vs smooth (MC/dual-contour/Transvoxel) | F | Lysenko "0fps" (cubic); smooth cousins mesh the same field differently (`08`) |
+| Legacy 2D biome cascade (pre-1.18 GenLayer zoom; many clones) | F | Layered zoom + biome-blended 2D height noise |
+
+**The trap this section prevents:** the *parameter* named "erosion" is a noise axis, not the erosion
+of `04`/`05` — it moves no sediment and conserves no mass. And a runtime voxel world cannot produce
+real drainage networks; if the brief needs them, that is a **hybrid** bake (`23`), not this paradigm.
+
+## 17. Planetary & spherical worlds → `25-planetary-spherical.md`
+
+The **whole-globe altitude** — a *consolidating* chapter. The spherical grid/seam/distortion substrate
+lives in `08` and is **not** duplicated; `25` owns what changes above it and routes the rest. Mixed
+tier, honest about which is which.
+
+| Component | Tier | Source |
+|---|---|---|
+| Spherical grid, seams, distortion `h`, DGGS flow | P (F for cube-seam) | Already in `08` — cube-sphere/HEALPix/Snyder/Liao |
+| Plate tectonics on a sphere (Euler-pole rotation) | P | McKenzie & Parker 1967; Morgan 1968 — rigid rotation, transform faults on small circles, spreading rate ∝ sin(distance) |
+| Procedural whole-planet tectonics (graphics) | P | Cortial, Peytavie, Galin & Guérin 2019, *Procedural Tectonic Planets*, CGF 38(2) (Eurographics) |
+| Global circulation & latitude climate bands | P physics / F realization | Three-cell model + Coriolis (Hadley 1735); terrain use is authored bands feeding `13`'s orographic model |
+| Ocean gyres / boundary currents / coastal upwelling deserts | P physics / F realization | Ekman/Sverdrup/Stommel; the Namib–Atacama mechanism (`12`, `13`) |
+| Sea level as geoid / oblate-spheroid equipotential | P geodesy | Earth `f ≈ 1/298`; flood-fill on potential, not radius (`03`) |
+| 3D/4D noise on the sphere (no pole seam) | F | Sample 3D noise at surface points; standard practice, no paper (`01`) |
+| Planet-scale precision, per-face LOD, streaming | F | Floating origin (Thorne 2005); quadtree-per-face + horizon culling (`08`, `23`) |
+| Alien-world regimes (gravity/water; tidally-locked) | doctrine / L | `SKILL.md` off-Earth doctrine; worked worlds in `20` Group L |
+
+**The traps this section prevents:** plate motion is a **rotation** about an Euler pole, not a
+translation (straight-line plates read as wrong at a glance); the circulation **bands are physics, not
+decoration** (a desert on the equator or rainforest at 30° is visibly wrong); and "sea level" is an
+**equipotential**, not a constant radius.
 
 ---
 

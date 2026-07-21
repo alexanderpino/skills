@@ -1002,7 +1002,9 @@ Hooke 2000; Haff 2010; Tarolli & Sofia 2016; Goudie, *The Human Impact*.
 (`03`/`04`) OFF and lets **impact cratering** dominate; gravity rescales craters and dunes. The
 unifying reading — **crater density is a clock**: a saturated surface is ancient, a sparse one
 young, a crater-free one actively resurfaced. Per-crater morphology lives in `11`; these entries
-build whole *surfaces*.*
+build whole *surfaces*. For the whole *globe* — spherical grid, Euler-pole tectonics, global
+circulation, planet-scale LOD, and how these regime knobs reset a planet-wide graph — see
+`references/25-planetary-spherical.md`; these entries are the surface archetypes it assembles.*
 
 ### 27. Cratered highlands — lunar-type
 *The Moon's highlands · Mercury · Callisto · any ancient airless surface*
