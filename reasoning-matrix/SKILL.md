@@ -84,9 +84,12 @@ default, decompose, populate, filter, synthesize, stress-test) are always run �
 what scales is their visible footprint:
 
 - **Light run** (a focused question, one clear insight type): a **3×4** grid,
-  scoring done in your head, and only the kept cells shown. Skip the full scoring
-  table; still name the default and still deliver the crystallized insights. This
-  is the common case.
+  scoring done in your head, and **the grid stays internal** — render no table,
+  no scaffold section, no filtering narration. Deliver the insights (still
+  naming the default), and at most add one line offering to show the workings.
+  Ceremony the user declined is a cost, not a proof of rigor — the richer your
+  cells, the stronger the temptation to display them; resist it. This is the
+  common case.
 - **Full run** (a genuinely thorny, multi-stakeholder question): the complete
   4–7 × 5–8 grid with the explicit scored table and, if warranted, composition
   across matrices (`references/composition.md`).
@@ -237,7 +240,11 @@ parametric memory of that fact may be lossy, stale, or confidently wrong. Scorin
 such a cell High on Validity from memory is the method's blind spot: it launders
 a half-remembered fact into a "validated insight." Flag any cell whose validity
 turns on an empirical claim and **verify it with research/web search before
-rating** — or, if you can't, cap its Validity and label it *ungrounded*. Treat
+rating** — or, if you can't, cap its Validity and label it *ungrounded*.
+Grounding is only as strong as its source: a claim "confirmed" by an SEO
+glossary page or a vendor's marketing blog is not grounded, it's laundered.
+Prefer primary and reputable secondary sources; when only weak ones exist, say
+so and cap Validity accordingly. Treat
 this as a hard gate: **a recall-dependent cell may not hold a High on memory
 alone.** Either an external check confirms it or it's capped — because
 introspection is precisely the instrument this blind spot blinds, and a signal
@@ -363,7 +370,11 @@ inspectable.
 
 ## Output structure
 
-ALWAYS deliver in this order:
+This four-section template is for **full runs**. On a light run, deliver only
+the insights (with the named default woven in) — omit the matrix section
+entirely and offer it on request instead.
+
+For full runs, ALWAYS deliver in this order:
 
 ```
 ## Insights
