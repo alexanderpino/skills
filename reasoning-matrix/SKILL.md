@@ -486,17 +486,10 @@ and each honest about how it might fail.
 Feeding the kept insights of one matrix in as the anchors of the next (escalating
 causal → strategic → design) turns the method from one-shot analysis into
 recursion: you interrogate your own conclusions instead of stopping at them.
-Reach for it when one matrix's output is itself a question worth attacking. Two
-disciplines keep a chain honest and are worth stating plainly:
-
-- **Order matters.** Diagnose-then-decide lands somewhere different from
-  decide-then-diagnose. Pick the order deliberately and say why.
-- **Contract, don't stack.** Only the *kept insights* of matrix A become anchors
-  of B; everything else is dropped. Crossing every A-cell with every B-cell isn't
-  chaining, it's a combinatorial noise factory. This is the one trap that sinks it.
-
-The full treatment — including lens-fusion and cross-matrix convergence — is in
-`references/composition.md`.
+Reach for it when one matrix's output is itself a question worth attacking — and
+before chaining, read `references/composition.md` for the two disciplines that
+keep a chain honest (deliberate ordering; contract, don't stack), plus
+lens-fusion and cross-matrix convergence.
 
 ## Reference files
 
