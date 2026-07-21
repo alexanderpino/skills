@@ -517,6 +517,16 @@ is below.
   on a prograding muddy coast (`12`).
 - **Otvos, E.G. (2000).** *Beach ridges — definitions and significance.* Geomorphology 32(1–2), 83–108.
   — The chenier-vs-beach-ridge distinction: substrate (mud beneath the ridges) is the discriminator (`12`).
+- **Hesp, P.A. (1989).** *A review of biological and geomorphological processes involved in the
+  initiation and development of incipient foredunes.* Proceedings of the Royal Society of Edinburgh,
+  Section B 96, 181–201. — **Foredunes**: four incipient types set by the pioneer-vegetation pattern (`12`).
+- **Baas, A.C.W. (2002).** *Chaos, fractals and self-organization in coastal geomorphology: simulating
+  dune landscapes in vegetated environments.* Geomorphology 48(1–3), 309–328. — **DECAL**: Werner's slab
+  CA plus a burial-responsive vegetation field — the implementable model for vegetated coastal dunes,
+  foredunes, blowouts and parabolics (`12`, `05`).
+- **Durán, O. & Moore, L.J. (2013).** *Vegetation controls on the maximum size of coastal dunes.* PNAS
+  110(43), 17217–17222. — A coastal dune's **maximum height is set by vegetation, not wind**: a
+  growth-rate-vs-sand-supply balance (`12`).
 - **Rosenbloom, N.A. & Anderson, R.S. (1994).** *Hillslope and channel evolution in a marine
   terraced landscape, Santa Cruz, California.* Journal of Geophysical Research 99(B7),
   14013–14029. — Marine terraces, and the knickpoint-celerity result `C = K·A^m` used in `04`.

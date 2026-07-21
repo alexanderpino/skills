@@ -271,6 +271,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Dune formation (implementable) | P | **Werner 1995**, Geology 23(12) — the slab CA. Under-cited relative to usefulness. |
 | Dune size hierarchy / draa (mega-dunes) | P | Wilson 1972, Sedimentology 19 — ripple/dune/draa orders; compound & complex by superimposition (`05`) |
 | Parabolic dunes & blowouts (vegetation-anchored) | P (blowout) / F (parabolic form) | Hesp 2002, Geomorphology 48 — blowout initiation; arms trail upwind, no canonical parabolic paper (`05`, `13`) |
+| Coastal / vegetated dunes (foredune, dune belt) | P | Baas 2002 (Geomorphology 48, DECAL model); Hesp 1989/2002; Durán & Moore 2013 (PNAS 110) — beach-fed, onshore wind, vegetation-capped (`12`, `05`) |
 | Glacier flow & erosion | P | Argudo et al. 2020, *Simulation, Modeling and Authoring of Glaciers*, ACM TOG 39(6) |
 | Snow / avalanche | P | Cordonnier et al. 2018, *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*, CGF 37(2) |
 | Esker (subglacial tunnel deposit) | P | Shreve 1985, GSA Bull 96 — route on the ice-surface hydraulic potential, not the bed (`12`) |

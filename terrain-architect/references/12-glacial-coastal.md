@@ -8,7 +8,7 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Cliff retreat & beaches](#cliff-retreat--beaches) ·
 [Lacustrine (lake) shores](#lacustrine-lake-shores) ·
 [Marine: the honest frame](#marine-the-honest-frame) ·
-[Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
+[Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) · [Coastal dunes & foredunes](#coastal-dunes--foredunes) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
 [Wave base & the submarine profile](#wave-base--the-submarine-profile) ·
 [Tides & the intertidal zone](#tides--the-intertidal-zone) · [Biogenic muddy coasts](#biogenic-muddy-coasts--mangroves--cheniers) · [Coral reefs & atolls](#coral-reefs--atolls) ·
@@ -441,6 +441,47 @@ caveat: CERC is coastal engineering, the graphics version is authored. The one q
 actually computing is the drift *direction* from the wave-approach angle relative to the local
 shoreline normal — that asymmetry is what makes spits point the right way instead of being
 symmetric blobs.
+
+## Coastal dunes & foredunes
+
+A **coastal dune** is what onshore wind does with a sandy beach — the humid-coast cousin of the desert
+erg, and the defining landform of the Dutch, Danish and Atlantic sandy shores (and the crest of every
+barrier island, above). Three things make it a *different* problem from a Namib dune (`05`): the **sand
+source is the beach** (marine sand kept supplied by longshore drift, above — not deflated off a basin
+floor), the **wind is onshore**, and **vegetation is a first-class control**, not the rare gate it is
+in the desert. Marram / *Ammophila* grass grows up *through* burial and traps saltating sand, so the
+plants build the dune and the dune feeds the plants — a biotic feedback the desert model lacks.
+
+**The sequence.** Dry backshore sand → onshore wind → sand caught by pioneer plants on the upper beach
+→ an **incipient foredune** → an established **foredune ridge** running *parallel to the shore* → a
+**dune belt** landward, breaking into **blowouts and parabolic dunes** (`05`) where the cover fails or
+supply is high. Which incipient form appears is set by the *vegetation pattern*, not the wind:
+scattered plants make shadow-dune hummocks, continuous pioneer cover makes a laterally-continuous
+ridge — **Hesp 1989** distinguishes four incipient-foredune types on exactly that basis.
+
+**The implementable model — DECAL (Baas 2002).** Werner's bare-sand slab CA (`05`) has no plants, so it
+cannot make a foredune. The coastal analogue is **Baas 2002's DECAL**: the same slab transport plus a
+**vegetation field that grows under moderate burial, dies under erosion or too-deep burial, and locally
+raises the deposition probability**. That one feedback self-organises foredunes, blowouts, parabolic
+dunes and nebkhas out of the plant–sand coupling — it is "Werner for a vegetated coast", reusing the
+shadow-zone and availability-mask machinery you already have (`05`) under the onshore wind field (`13`).
+
+**What caps the height (Durán & Moore 2013).** A foredune does not grow without limit: its **maximum
+size is set by vegetation, not wind** — the dune rises until plant growth can no longer keep pace with
+the burial rate, so height is a **growth-rate-vs-sand-supply balance**. Expose vegetation vigour and
+sand supply and the dune ceiling falls out instead of being authored.
+
+**The Dutch coast as a composite.** The classic North Sea stack is these pieces in a row: a wide
+dissipative **beach** (above) → a **foredune ridge** and **dune belt** (here) → behind them the
+**Wadden barrier islands** and **tidal flats** (above) → and, reclaimed inland, **polders and dikes**
+(the anthropogenic surface, `20`). Every rung was already in the skill; the coastal dune was the
+missing one.
+
+**Tier.** All **L** as generated landforms — beach sand budget + onshore wind + a vegetation feedback —
+grounded by **P** sources: Hesp 1989, 2002 (foredune initiation and form), Baas 2002 (the DECAL
+vegetated-dune model), Durán & Moore 2013 (vegetation sets the size ceiling). **The tell:** the dunes
+run *parallel* to the shore, *anchored* by vegetation, fronted by the beach that feeds them — kill the
+vegetation feedback and you get bare migrating desert dunes, which is the wrong coast.
 
 ## Marine terraces
 

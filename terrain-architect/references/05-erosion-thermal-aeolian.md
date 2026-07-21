@@ -405,4 +405,5 @@ image of a barchan, whose horns point downwind). It is the same cover-vs-transpo
 (`13`, and the `sandDepth` availability mask above): cover below threshold releases sand, cover above
 holds the arms. The parabolic geometry itself is textbook-standard but has **no single canonical
 paper** — author the form (anchored arms + advancing nose) and cite Hesp 2002 for the blowout that
-starts it.
+starts it. The full **coastal foredune / dune-belt** system — beach-fed, vegetation-built — and its
+implementable DECAL model are worked in `12` (coastal dunes & foredunes).
