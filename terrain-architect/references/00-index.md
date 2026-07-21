@@ -114,15 +114,22 @@ of what's reliable here.
 | Procedural whole-planet tectonics | P | Cortial, Peytavie, Galin & Guérin 2019, *Procedural Tectonic Planets*, CGF 38(2), Eurographics (`25`) |
 | Fault displacement / fault networks | F | No canonical paper |
 | Folding | F | Coordinate warp of the stratum field. No paper. |
+| Salt tectonics / diapirism (domes, walls, withdrawal minibasins, crestal grabens) | P | Hudec & Jackson 2007, ESR 82; Jackson & Hudec 2017 (Cambridge) — driver (buoyancy vs differential loading) `?` (`11`) |
+| Salt glacier (namakier) | P | Talbot & Rogers 1980 (Science 208); Talbot & Pohjola 2009, ESR 97 — flows only when wetted, arid-only (`11`) |
+| Mud volcano / mud diapir | P | Kopf 2002 (Rev. Geophys. 40); Mazzini & Etiope 2017, ESR 168 — gryphons/salses/mud flows (`11`) |
 | Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
 | Layered terrain with overhangs/arches | P | Peytavie et al. 2009, *Arches: a Framework for Modeling Complex Terrains*, CGF 28(2) |
 | Cave networks / karst dissolution | P | Paris et al. 2021, *Synthesizing Geologically Coherent Cave Networks*, CGF |
+| Karst closed-depression ladder (doline → uvala → polje) + cenote + karren | P (L for uvala def.) | Ford & Williams 2007 — sink-size ladder, cenote = sink to water table, karren = micro-solution texture (`11`, `03`) |
 | Lava flow (animation) | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
 | Lava flow morphology (levées, snouts, thickness) | P | Hulme 1974, GJRAS 39(2) — Bingham yield-stress rheology (`11`) |
 | Pahoehoe / ʻaʻā / block lava | P | Macdonald 1953, American Journal of Science 251(3) — surface-texture classification (`11`, `18`) |
 | Volcanic cones, calderas, craters, crater fields | F | Primitive + noise + erosion. No paper. |
 | Rock hardness layers / lithology | F | A material field feeding erodibility `K`. See Št'ava 2008 for the layered coupling. |
 | Soil / regolith production function | P | Heimsath, Dietrich, Nishiizumi & Finkel 1997, Nature 388 — exponential decline with soil depth (`11`) |
+| Tors | P | Linton 1955 (Geographical Journal 121); Palmer & Neilson 1962 — joint-controlled deep-weathering residual (`11`, `16`) |
+| Tafoni / honeycomb (cavernous weathering) | P (form) / L (single cause) | Mustoe 1982; Rodriguez-Navarro et al. 1999; Turkington & Phillips 2004 — salt + case-hardening self-organising hollowing (`11`) |
+| Exfoliation / sheeting joints & domes | P | Martel 2006 (GRL 33) — surface-parallel stress × curvature; Gilbert 1904; Bradley 1963 (`11`, `06`) |
 | Volcano edifice classification & dimensions | P | Pike & Clow 1981, USGS OFR 81-1038 — shield/strato/cinder/caldera (`11`) |
 | Impact crater morphology (simple/complex, ejecta) | P | Melosh 1989; Pike 1977 — depth/diameter, central-peak transition (`11`) |
 | Feature-primitive terrain authoring | P | Génevaux et al. 2015, CGF 34(6) — construction tree of peaks/ridges/rivers/cliffs (`13`) |
@@ -161,6 +168,12 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Canyons, badlands | High uplift + high `K` contrast + stream power (`04`, `11`) |
 | Entrenched / incised meanders, river gorges | Meander belt (`03`) + uplift (`02`) + bedrock incision (`04`); in karst → the Ardèche / Pont d'Arc (`11`) — full blueprint in `20` |
 | Fjords | Glacial erosion + sea-level rise (`12`) |
+| Drumlins, till plains | Streamlined & sheet till under ice; author the form aligned to ice flow, genesis unresolved (Clark 2009) (`12`) |
+| Eskers | Sorted fill of subglacial meltwater tunnels; route on the ice-surface potential, not the bed (Shreve 1985) (`12`) |
+| Kames & kettle holes (kame-and-kettle) | Ice-contact stratified mounds + melt-out pits (closed basins) (`12`) |
+| Outwash plain / sandur | Braided meltwater deposition beyond the terminus (`03`, `12`, `16`) |
+| Glacial erratics | Scatter of out-of-lithology boulders — the ice fingerprint (`07`, `12`) |
+| Tunnel valleys | Subglacial meltwater channels, often overdeepened → lake chains (`12`) |
 | Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
 | Spits, tombolos, barrier islands, bay bars | Longshore drift + deposition + sheltering (`12`) |
@@ -256,9 +269,18 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Talus fast approximation | P | Olsen 2004, tech report, Univ. of Southern Denmark |
 | Wind erosion physics | P | Bagnold 1941, *The Physics of Blown Sand and Desert Dunes* — physics, **not implementable as written** |
 | Dune formation (implementable) | P | **Werner 1995**, Geology 23(12) — the slab CA. Under-cited relative to usefulness. |
+| Dune size hierarchy / draa (mega-dunes) | P | Wilson 1972, Sedimentology 19 — ripple/dune/draa orders; compound & complex by superimposition (`05`) |
+| Parabolic dunes & blowouts (vegetation-anchored) | P (blowout) / F (parabolic form) | Hesp 2002, Geomorphology 48 — blowout initiation; arms trail upwind, no canonical parabolic paper (`05`, `13`) |
+| Coastal / vegetated dunes (foredune, dune belt) | P | Baas 2002 (Geomorphology 48, DECAL model); Hesp 1989/2002; Durán & Moore 2013 (PNAS 110) — beach-fed, onshore wind, vegetation-capped (`12`, `05`) |
 | Glacier flow & erosion | P | Argudo et al. 2020, *Simulation, Modeling and Authoring of Glaciers*, ACM TOG 39(6) |
 | Snow / avalanche | P | Cordonnier et al. 2018, *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*, CGF 37(2) |
+| Esker (subglacial tunnel deposit) | P | Shreve 1985, GSA Bull 96 — route on the ice-surface hydraulic potential, not the bed (`12`) |
+| Drumlin form & scaling | P (form) / ? (genesis) | Clark et al. 2009, QSR 28 — `E_max ≈ L^(1/3)`; genesis (deforming bed / instability / meltwater) unresolved (`12`) |
+| Tunnel valleys | P (review) | Kehew et al. 2012, ESR 113 — subglacial meltwater channels, formation debated (`12`) |
+| Glacial depositional suite (moraine, kame, kettle, sandur, till) | L | Compositions over the ice-erosion budget; synthesis Benn & Evans 2010 (`12`) |
 | Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
+| Mangrove coast (biogenic muddy progradation) | P | Woodroffe 1992; Furukawa et al. 1997; Alongi 2008 — traps mud, damps waves, keeps pace with sea level (`12`) |
+| Chenier / chenier plain | P | Otvos & Price 1979; Augustinus 1989 — coarse ridges on mud, marking mud-supply lulls (`12`) |
 | Longshore transport | F | CERC formula; measured basis Komar & Inman 1970 (coastal engineering, not graphics). Drives spits/tombolos/barriers (`12`) |
 | Marine terrace / wave-cut platform | F | Coastal notch loop across a sea-level/uplift history (`12`). A look, not a sim. |
 | Lacustrine (lake) shore erosion / lake terraces | F | The coastal loop at lake level; lake-level history → shoreline terraces. Gilbert 1890 (Lake Bonneville) (`12`) |
@@ -367,6 +389,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Wind fields (terrain-adjusted) | F | Authored base + crest speed-up (Jackson & Hunt 1975), lee shelter (`05` shadow), channelling, mass-consistent cleanup (Sherman 1978) (`13`). Real CFD out of scope. |
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
+| Altitudinal life zones (explicit elevation belts) | P | Holdridge 1947 (Science 105(2727)), 1967 (*Life Zone Ecology*) — biotemperature + precip + PET; named montane→alpine→nival belts up a mountain (`13`) |
 | Multi-biome / regional composition (Hyrule, Middle-earth) | L | One global substrate + hydrology; masks vary parameters, not geometry (`13`). Survey: Galin et al. 2019. |
 | Off-Earth regime (no water, low gravity) | L | Cratering + aeolian dominate; gravity rescales craters & dunes. Melosh 1989; Kok et al. 2012 — `SKILL.md` doctrine (`11`, `16`); worked blueprints (lunar highlands & maria, Mars, Titan/Europa/Io) in `20` Group J |
 | Evaporation / evapotranspiration / soil moisture | F | For terrain, use TWI (`06`) as the proxy |
@@ -387,10 +410,17 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Yardang (wind abrasion) | P | Ward & Greeley 1984, GSA Bulletin 95(7) |
 | Bornhardt / inselberg | F | Twidale 1982, *Granite Landforms* — differential subsurface weathering + stripping (L-tier landform) |
 | Alluvial fan / bajada | P | Blair & McPherson 1994, JSR A64; Bull 1977, Prog. Phys. Geog. 1 |
+| Pediment (bedrock piedmont) | P | Dohrenwend 1994 (Geomorphology of Desert Environments) — erosional bedrock surface, sharp piedmont angle; the fan's opposite (`16`) |
+| Lunette / clay dune | P | Bowler 1973, ESR 9 — source-bordering ridge on the playa lee, clay-pellet, records deflation (`16`, `05`) |
 | Playa (endorheic basin floor) | L | An unfilled `03` sink; evaporite flat |
 | Oasis (deflation / fault-line / artesian) | L | Deflation basin floored *at the water table* + endorheic sabkha + groundwater-gated palms; blueprint (`20`) |
 | Desert pavement | P | McFadden, Wells & Jercinovich 1987, Geology 15 — born-at-top, not a lag |
 | Loess / sand sheets | F | Aeolian deposition (the deposition side of `05`) |
+| Evaporite zonation & salt-crust (tepee) polygons | P | Warren 2016; Eugster & Hardie 1978; Kinsman 1969 (sabkha); Lokier 2012 (crust polygons) — carbonate→gypsum→halite→bittern by salinity (`16`) |
+| Saltern pink/red colour (biogenic) | P (mechanism) / L (hue) | Oren & Rodríguez-Valera 2001; Oren 2005 — *Dunaliella* β-carotene + haloarchaeal bacterioruberin, salinity-zoned (`16`, `18`) |
+| Obstacle dunes — echo / climbing / falling | P (echo/climbing) / L (family) | Tsoar 1983, *Eolian Sediments & Processes* (Dev. Sedimentology 38) + Qian et al. 2011, JGR-ES 116 (~60° separation threshold) — windward-angle control; lee capture + synthesis Pye & Tsoar 2009 (`05`, `16`) |
+| Sand ramp (aeolian–colluvial–fluvial apron) | P | Lancaster & Tchakerian 1996, Geomorphology 17 — composite deposit banked on a range front, mostly relict (`05`, `16`) |
+| Shadow dune (aerodynamic lee of an obstacle) | P | Hesp 1981, J. Sed. Petrol. 51(1); vegetation-anchored = nebkha (`13`, `05`) |
 
 ## 11. Periglacial & permafrost → `17-periglacial.md`
 

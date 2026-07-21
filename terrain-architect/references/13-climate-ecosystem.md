@@ -84,7 +84,8 @@ windField(h, baseDir, baseSpeed):
 Every ingredient is machinery the skill already has: the upwind-slope term is the `dot(windDir, ∇h)`
 of the orographic march below, the shadow zone is Werner's (`05`), and the sweep costs are the
 `06`/`12` horizon machinery. What the consumers gain: dunes align to *deflected* wind (valley-floor
-dune fields point along the valley, not the regional wind), cornices form on the *actual* lee,
+dune fields point along the valley, not the regional wind) and bank against obstacles as **anchored
+dunes** — echo, climbing, falling, sand ramps (`05`, `16`); cornices form on the *actual* lee,
 fetch responds to channelled winds down a fjord, and precipitation sees the speed-up. **Tier:** the
 recipe is F — a look built from two P-tier anchors (Jackson & Hunt 1975 for the crest speed-up;
 Sherman 1978 for mass-consistency). Real boundary-layer CFD stays out of scope, and say so.
@@ -242,7 +243,7 @@ graph has ever needed.
 
 ## Biome classification
 
-Two real references, and both are lookup tables rather than algorithms:
+Three real references, and all are lookup tables rather than algorithms:
 
 - **Whittaker's biome diagram** (Whittaker 1975): biome as a function of mean annual
   temperature and precipitation. A 2D lookup. This is the one to use — it's exactly a
@@ -250,6 +251,16 @@ Two real references, and both are lookup tables rather than algorithms:
 - **Köppen–Geiger** (Köppen 1900; **Peel et al. 2007** for the modern gridded map): a decision
   tree on temperature and precipitation *seasonality*. More precise, needs monthly data, more
   than a terrain graph usually has.
+- **Holdridge life zones** (Holdridge 1947, 1967): the same idea with **altitude as a first-class
+  axis**. Life zone from **biotemperature** (mean temperature with everything below 0 °C and above
+  30 °C clipped out, so frost months don't count toward growth), annual precipitation and a PET
+  ratio, arranged on a triangular chart whose rows are explicit **altitudinal belts** — basal →
+  premontane → montane → subalpine → alpine → nival — running parallel to the latitudinal zones.
+  Reach for this over Whittaker when you want the vegetation *belts up a single mountain* named and
+  stacked (montane forest → treeline → alpine tundra → bare nival) rather than emerging implicitly
+  from the lapse rate. Biotemperature is what encodes "cold months grow nothing", so a summit lands
+  in the alpine/nival belt by construction — the reason a baobab can't spawn on a peak even if some
+  authored species-weight forgot to gate on temperature.
 
 ```
 biome(T, precip) = whittakerLUT[T, precip]

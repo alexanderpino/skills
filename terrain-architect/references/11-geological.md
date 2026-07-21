@@ -1,10 +1,10 @@
 # Geological Formation
 
 Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terracing](#terracing) ·
-[Folding](#folding) · [Lithology & erodibility](#lithology--erodibility) ·
+[Folding](#folding) · [Salt & mud diapirism](#salt--mud-diapirism) · [Lithology & erodibility](#lithology--erodibility) ·
 [Outcrops, mesas, badlands](#outcrops-mesas-badlands) · [When the heightfield fails](#when-the-heightfield-fails) ·
 [Karst & caves](#karst--caves) · [Weathering & soil production](#weathering--soil-production) ·
-[Duricrust & relief inversion](#duricrust--relief-inversion) ·
+[Weathering microforms](#weathering-microforms) · [Duricrust & relief inversion](#duricrust--relief-inversion) ·
 [Volcanic landforms](#volcanic-landforms) · [Impact craters](#impact-craters)
 
 ## The central claim
@@ -114,6 +114,56 @@ material-field approach.
 
 No canonical paper. It's structural geology applied as a warp.
 
+## Salt & mud diapirism
+
+Fold beds (above) and they stay put; **salt** doesn't. Rock salt is mechanically weak and **flows as a
+viscous fluid** at geological strain rates, so where a salt layer is buried under denser cover it
+rises, dragging the structural column with it. Gas-charged, overpressured **mud** does the same. One
+**diapir engine** — low-density material piercing denser overburden — drives both; only the rheology
+and the surface products differ (Hudec & Jackson 2007; Kopf 2002).
+
+**What drives the rise — and the honest caveat.** The textbook story is a **density inversion**:
+halite sits near ~2200 kg/m³ and barely compacts, while clastic sediment densifies with burial and
+overtakes it below ~1 km, making a buoyant, Rayleigh–Taylor-unstable layer. But Hudec & Jackson 2007
+argue the *dominant* driver in real basins is usually **differential loading** — an uneven overburden
+squeezing salt out from under thick loads toward thin ones — not pure buoyancy. Treat buoyancy as one
+mode, load asymmetry as the commoner one, and **don't claim a single mechanism** (`?` on the driver).
+
+**Salt structures** (Jackson & Hudec 2017) — all deformations of the `11` stratal/material stack, not
+heightfield sculpting:
+
+| Structure | What it is |
+|---|---|
+| **Salt dome / stock** | A subcircular pillar of salt punched up through the cover — the classic piercement; its roof arches, then faults. |
+| **Salt wall** | The elongate, ridge-like diapir — a linear salt ridge, often along a basement fault. |
+| **Rim syncline / withdrawal minibasin** | The cover **sags into the volume the salt vacated** as it flows away — a depression flanking or between diapirs (a real `03` closed basin if it outlasts the fill). |
+| **Crestal collapse graben** | As salt withdraws from under the roof, the crest **stretches and drops a graben** — an extensional fault trench right over the dome. |
+
+Where the roof overhangs (salt canopies spread laterally at the top), you are out of heightfield
+territory — see *When the heightfield fails*, below.
+
+**Namakier (salt glacier).** Where a diapir reaches the surface, salt **extrudes at the crest and
+flows downslope under gravity**, looking uncannily like ice — lobate sheets, flow foliation, even
+"streams" (Talbot & Pohjola 2009). Two rules make it right: it **flows only when wetted** — plastic in
+the rainy season, near-rigid the rest of the year, so model advance as intermittent and rain-triggered
+(Talbot & Rogers 1980) — and it survives **only in arid climates**, because halite dissolves in rain as
+fast as it emerges elsewhere (gate on the `13` aridity mask). Mechanically it's the glacier/lava
+viscous-spread machinery (`12` SIA-like, `19`) with a salt rheology and a climate gate.
+
+**Mud volcano.** Gas-charged, overpressured mud is low-density and rises the same way, erupting mud,
+water and (mostly methane) gas (Kopf 2002). Forms range from a metre-high **gryphon** to edifices
+**kilometres across and hundreds of metres high**, with bubbling **salses** (mud pools), a summit
+**caldera/collapse crater**, and radial **mud flows** (Mazzini & Etiope 2017). The driver is pore-fluid
+overpressure (rapid burial + tectonic squeezing + gas generation), so bias placement to **compressional
+settings — accretionary prisms and fold-thrust belts** (`02`). Build it as a small edifice (`11`)
+erupting a Bingham mud flow (`19` rheology, low yield stress) instead of lava.
+
+**Tier.** Salt structures and the namakier are **P** (Hudec & Jackson 2007; Jackson & Hudec 2017;
+Talbot & Rogers 1980; Talbot & Pohjola 2009); mud volcanoes **P** (Kopf 2002; Mazzini & Etiope 2017);
+the **driver** (pure buoyancy vs differential loading) is **?**. **The tell:** rim synclines and
+crestal grabens *around and over* a dome (not just the dome itself), namakiers only in deserts, mud
+volcanoes in compressional belts.
+
 ## Lithology & erodibility
 
 `K` is the single most useful material property, and it's a scalar.
@@ -210,6 +260,16 @@ That last note is the interesting one: karst is the exception to the mandatory d
 handling in `03`. In karst, sinks are real. Fill them and you've destroyed the landform. Mark
 them with a mask so the fill node skips them.
 
+**The closed-depression size ladder, and one surface texture** (Ford & Williams 2007). The `03`
+sink vocabulary has more rungs than "doline": a **doline** (single closed depression) coalesces into
+an **uvala** (a compound, multi-centred depression — the classical "merged dolines" definition; the
+term is contested in the modern literature, so treat that as the working one), and the largest,
+flat-floored closed basin is the **polje**. A **cenote** is a doline that has **collapsed to the water
+table** — a water-filled sinkhole (the Yucatán case), i.e. a `03` sink whose floor is a lake surface.
+Distinct from all of these, **karren** (lapiés) is not a landform but the **micro-solution texture** —
+flutes, runnels, grikes, pits — on bare soluble rock; realise it as a `06`/`18` surface-material
+overlay, not a heightfield feature.
+
 ### Tower & cone karst
 
 The dramatic karst *mountains* — the towers of Guilin and Halong Bay (**fenglin**), the cone
@@ -269,6 +329,43 @@ Why it matters for terrain:
 This is the **production** side of the regolith the whole erosion pipeline consumes, and most
 graphs simply assume regolith exists. Adding it is one exponential, and it makes every
 soil-depth-driven mask physical instead of painted.
+
+## Weathering microforms
+
+Weathering is a *rate* (above); it also carves distinctive **forms** at outcrop scale, and three of
+them fall straight out of fields the skill already has — fracture density (`11`/`07`), curvature (`06`)
+and a salt/moisture mask (`13`/`18`).
+
+- **Tors** — residual rock knobs and stacks on hilltops: the **same two-stage deep-weathering-then-
+  stripping** story as the bornhardt (`16`), but joint-controlled and at outcrop scale (Linton 1955).
+  Subsurface rotting eats along joints — **widely-spaced joints leave big corestones that survive,
+  closely-spaced rock rots to regolith** — so strip the regolith and the sound cores stand up as tors.
+  It is the bornhardt recipe keyed to the **fracture-density field**: low fracture → tor, high fracture
+  → stripped ground around it. In cold climates the final exhumation is **frost shattering +
+  solifluction** rather than fluvial stripping, leaving a **clitter/blockfield apron** downslope (`17`
+  — Palmer & Neilson 1962); scatter that debris (`07`) to sell it.
+- **Tafoni & honeycomb (cavernous weathering)** — cavities hollowed into a rock face, **salt-driven**:
+  salt crystallising from evaporating spray or wicked groundwater granular-disintegrates the rock
+  (Mustoe 1982; Rodriguez-Navarro et al. 1999). Two things make the look: a **case-hardened outer
+  rind** resists while the softer interior excavates once breached, so pits **self-deepen and
+  back-weather** rather than widen evenly — a self-organising instability (Turkington & Phillips 2004)
+  — and they favour **shaded, sheltered, coastal or arid-saline faces** where salt cycles between
+  crystallisation and deliquescence. Implement as a **hollowing that accelerates with existing cavity
+  depth**, gated by a salt/moisture mask and aspect/insolation (`06`/`13`) — not a uniform erode.
+- **Exfoliation / sheeting joints & domes** — curved, surface-parallel fractures that **peel rock in
+  slabs and reinforce domes** (Half Dome, Sugarloaf). They open where **surface-parallel compression
+  times surface curvature beats the gravitational overburden**, so sheeting is strongest under
+  **convex** surfaces (domes, ridges, noses) and suppressed in hollows (Martel 2006; the
+  unloading/topography link from Gilbert 1904 and Bradley 1963). Directly implementable from the `06`
+  curvature field: `sheetingPotential ≈ σ_parallel · curvature − ρg·cosθ`, gate on positive (convex)
+  curvature, then spall slabs parallel to the surface. It is an **active** process — erosion strips
+  overburden, confining stress releases, new sheets open — so a granite dome keeps its onion-skin look
+  as it lowers, not just as inherited structure.
+
+**Tier.** All **P**: tors (Linton 1955; Palmer & Neilson 1962), tafoni/honeycomb (Mustoe 1982;
+Rodriguez-Navarro et al. 1999; Turkington & Phillips 2004), sheeting (Gilbert 1904; Bradley 1963;
+Martel 2006). The specific *cause* of a given tafoni field (salt vs case-hardening vs biogenic) is
+still argued — author the form, not the single cause.
 
 ## Duricrust & relief inversion
 

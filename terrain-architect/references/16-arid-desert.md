@@ -1,8 +1,8 @@
 # Arid & Desert Landforms
 
 Contents: [The arid frame](#the-arid-frame) · [Yardangs](#yardangs-wind-abrasion) ·
-[Inselbergs & bornhardts](#inselbergs--bornhardts) · [Alluvial fans & bajadas](#alluvial-fans--bajadas) ·
-[Playas](#playas) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits) ·
+[Inselbergs & bornhardts](#inselbergs--bornhardts) · [Alluvial fans & bajadas](#alluvial-fans--bajadas) · [Pediments](#pediments) ·
+[Playas](#playas) · [Evaporite crusts & salterns](#evaporite-crusts--salterns) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits) ·
 [Implementation contract](#implementation-contract)
 
 ## The arid frame
@@ -64,7 +64,8 @@ inselberg(h, fractureField, baseLevel):
 
 This is the same "differential lowering to a base level" pattern as tower karst (`11`) and
 marine/lake terraces (`12`) — **base level is the master parameter**. With uniform rock you get a
-bevelled plain and no inselbergs; you need the fracture/hardness field.
+bevelled plain and no inselbergs; you need the fracture/hardness field. The **same recipe at outcrop
+scale**, keyed to joint spacing, makes **tors** (`11` weathering microforms).
 
 ## Alluvial fans & bajadas
 
@@ -88,6 +89,19 @@ size** (Blair & McPherson), and **avulsion** — the feeder channel periodically
 lobe — is what makes a fan a *fan* rather than a single incised gully. Coalesce several fans along a
 front and you have a bajada.
 
+## Pediments
+
+A **pediment** is the erosional twin of the fan: a gently sloping (**~0.5–7°**) **bedrock** surface cut
+across the mountain front, carrying only a **thin, mobile alluvial veneer** (sediment in transit, not a
+constructional body), and meeting the range at a sharp **piedmont angle** (Dohrenwend 1994). Same
+wedge-shaped piedmont profile as a bajada — **opposite genesis.** The tell is what sits *under* the
+thin cover: **bedrock** (pediment) versus **thick sediment** (fan/bajada). It forms by **scarp retreat
+and lateral planation** — sheetflood and episodic flow bevel the rock as the range face recedes — so
+build it as **differential lowering / backwearing of the bedrock** behind a retreating front (`11` base
+level), then drape a thin `07` clast veneer, *not* as a deposited wedge. **Tier P** (Dohrenwend 1994).
+The tell in the output: a bedrock ramp that **truncates** structure, rather than a sediment pile that
+buries it.
+
 ## Playas
 
 The floor of an **endorheic** (internally drained) basin — a dead-flat clay/salt pan that floods
@@ -104,6 +118,40 @@ playa: an endorheic basin floor (03 sink, left UNFILLED)
 
 Do **not** breach or fill a playa basin in `03` (like karst and crater lakes, it is a genuine
 closed basin). Mark it; drainage should terminate there, not route through it.
+
+## Evaporite crusts & salterns
+
+A playa (above) is the *dry* end of a closed salt basin; keep standing brine in it — a **salina**, a
+coastal **solar saltern**, a supratidal **sabkha** — and evaporite chemistry paints it. As brine
+concentrates it precipitates minerals **in order of increasing solubility**: carbonate first, then
+**gypsum** (~130–150 g/L), then **halite** (~300–350 g/L), then the very soluble Mg–K "bittern" salts
+(Warren 2016; Eugster & Hardie 1978). So a concentrating basin maps **mineralogy to salinity**, i.e. to
+distance from the inflow: an outer carbonate/gypsum belt grading inward to a white halite pan. Three
+settings differ by *where* the salt grows — a **sabkha** grows evaporites *displacively within the
+sediment* (nodular "chicken-wire" gypsum), a **salina** grows *bottom crystals* under standing brine,
+a continental **playa/salar** dries to an efflorescent surface crust (Kinsman 1969; Warren 2016).
+
+**Surface texture.** A subaerial **halite crust buckles into polygons with upturned "tepee" thrust
+ridges** — desiccation, thermal cycling and crystallisation pressure heave it, and ridges re-nucleate
+over the same lows across crust generations (Lokier 2012). A `06`/`18` displacement texture, not a
+heightfield landform — the arid cousin of mudflat desiccation cracks.
+
+**Why a saltern goes pink — and why it's a *material*, not a mineral, colour.** Pure halite and gypsum
+are white to clear; the electric pink of the Camargue *salins*, Great Salt Lake's north arm or the San
+Francisco Bay ponds is **biogenic pigment in the brine**. At NaCl saturation the red comes from the
+**bacterioruberin** carotenoids of halophilic **Archaea** plus the **β-carotene** of the alga
+***Dunaliella salina***, which packs >10% of its dry weight as β-carotene under salt-and-light stress
+(Oren & Rodríguez-Valera 2001; Oren 2005). Because it tracks salinity, the colour is **concentric
+zoning**, not a flat tint: green/brown concentrator ponds → orange as *Dunaliella* stresses →
+**pink/red crystalliser** at saturation. Treat it as an `18` material/biofilm property keyed to a
+salinity field, layered over the white salt — the same "colour is a material property" rule as desert
+varnish (desert pavement, below) or Yellowstone's microbial mats (`20`).
+
+**Tier.** Evaporite mineral zonation, sabkha/salina/playa morphology and the salt-crust polygons are
+**P** (Warren 2016; Eugster & Hardie 1978; Kinsman 1969; Lokier 2012); the pink is **P** for the
+mechanism (Oren & Rodríguez-Valera 2001; Oren 2005), **L** for exact per-pond hues. **The tell:**
+colour banded by salinity, not painted uniform — white where the brine is fresh or the crust dry, red
+only at saturation.
 
 ## Desert pavement
 
@@ -134,6 +182,17 @@ being blown *out* from between them.
   wind-blown silt that blankets terrain downwind of a source, draping relief like snow — a
   thickness field added over the existing height, thickest on upwind-facing slopes and thinning
   downwind, smoothing and rounding the landscape (the aeolian counterpart of a snow mantle, `13`).
+- **Obstacle dunes — sand banked against topography.** Where the sand-transporting wind meets a
+  fixed obstacle it drops **anchored** dunes instead of migrating ones: **echo** dunes upwind of a
+  steep face, **climbing** dunes mantling a gentle windward slope, **falling** dunes cascading into
+  the lee, and **sand ramps** — thick composite aeolian + colluvial + fluvial aprons banked against a
+  range front (Lancaster & Tchakerian 1996). The full mechanism and the windward-angle gate live in
+  `05` (anchored dunes); here it is a `16` deposit keyed to a mountain front, close kin to the bajada.
+- **Lunette — the playa's own dune.** A crescentic **source-bordering** ridge on the **downwind (lee)
+  margin of a playa/pan**, built from **clay pellets, silt and gypsum deflated off the dry floor**
+  (Bowler 1973) — not clean quartz sand, so it reads as a low, cohesive, source-tied ridge rather than a
+  free migrating dune. Place it only on the lee side of a deflating playa cell; its clay-vs-sand
+  stratigraphy records the basin's wet/dry history.
 
 ## Implementation contract
 
@@ -145,6 +204,7 @@ being blown *out* from between them.
 | Playa | basin IDs, spill level `m`, water/salt/sediment thickness `m` | hydrological GLOBAL, T3 bake | CPU basin graph; runtime only updates shallow water/material state | basin has no outflow, floor is level within tolerance, salts/sediment accumulate rather than disappear |
 | Pavement / loess | stability/age masks, clast `PointSet`, loess thickness `m` | LOCAL/NEIGHBOURHOOD, T0/T1 | GPU masks + deterministic scatter; directional loess gather | clasts stay on old low-erosion surfaces; minimum spacing holds; loess thins downwind and conserves deposited mass |
 | Wadi transmission loss | discharge `m³/s`, permeability, channel graph | drainage GLOBAL, T3 or declared watershed job | CPU receiver stack; material/detail may refine at runtime | discharge may decrease along a reach but never becomes negative; channels still terminate at the declared sink |
+| Obstacle dune / sand ramp | `sandDepth:m`, steered `wind:m/s` (`13`), obstacle mask, windward angle `θ` | aeolian NEIGHBOURHOOD keyed to a baked obstacle+wind field, T2/T3 | GPU Werner slabs (`05`) gated by a baked obstacle/wind field; ramp fill baked | echo deposit sits upwind of the face behind a bare corridor; climbing sand mantles the windward slope, falling sand only in the lee; slabs conserved |
 
 **Boundary and determinism.** Wind fetch uses an explicit upwind boundary; endorheic basins are
 marked before generic fill/breach; every avulsion and scatter decision derives from the root seed.
@@ -154,4 +214,5 @@ wadi discharge remain baked/global fields.
 
 **Failure signatures:** yardangs cross the wind → exposure field wrong; plus-shaped abrasion →
 stencil anisotropy; fans create sediment → source/sink budget broken; a river exits a playa →
-closed-basin mask lost; pavement appears on active fans → stability/age gate missing.
+closed-basin mask lost; pavement appears on active fans → stability/age gate missing; a falling
+dune on the windward side → wind direction or the lee shadow test reversed.

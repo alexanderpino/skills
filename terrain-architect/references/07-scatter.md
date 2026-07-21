@@ -4,6 +4,13 @@ Contents: [Bridson](#poisson-disk-bridson-2007) · [Variable density](#variable-
 [Blue noise alternatives](#blue-noise-alternatives) · [Tiling scatter](#tiling-scatter) ·
 [Rule-based](#rule-based-scatter) · [Clasts (rocks & pebbles)](#clasts-rocks-cobbles-pebbles)
 
+**Scope — placement, not plant geometry.** This chapter (with the ecosystem sim in `13`) decides
+*where* each instance goes and *what* it is — species, size, orientation, age, and how it responds to
+height, moisture and biome. It does **not** model the asset's own geometry: the trunk/branch/leaf
+mesh, the boulder's shape. That is an art-pipeline concern (L-systems, SpeedTree-class tools,
+photogrammetry); the skill hands those systems a `PointSet` and trusts the meshes to exist. Placement
+and plant *form* are separate problems — this is the placement one.
+
 ## Poisson disk (Bridson 2007)
 
 *Fast Poisson Disk Sampling in Arbitrary Dimensions.* O(N), and short enough that there's no

@@ -3,7 +3,8 @@
 Contents: [Thermal](#thermal-erosion-musgrave-et-al-1989) · [Repose angles](#repose-angles) ·
 [Talus](#talus--scree-olsen-2004) · [Mass wasting](#mass-wasting-landslides--debris-flows) ·
 [Aeolian overview](#aeolian-erosion) ·
-[Bagnold physics](#bagnold-1941--the-physics) · [Werner dunes](#werner-1995--the-implementable-model)
+[Bagnold physics](#bagnold-1941--the-physics) · [Werner dunes](#werner-1995--the-implementable-model) ·
+[Anchored dunes](#anchored-dunes--when-sand-meets-an-obstacle)
 
 ## Thermal erosion (Musgrave et al. 1989)
 
@@ -318,6 +319,14 @@ inShadowZone(h, p, windDir):
 So a wind direction that varies over the iterations (cycling between two modes, say) gives you
 linear dunes for free. Expose the wind regime, not the dune type.
 
+**Bedform hierarchy — ripples, dunes, draa (Wilson 1972).** Werner's dunes are one order of a **size
+hierarchy**: wind ripples (~0.1–1 m spacing) ride on **dunes** (~10–1000 m), which in a big sand sea
+ride on **draa** — mega-dunes ~1–3 km apart and hundreds of metres high. Each order correlates with
+grain size, and the diagnostic is **superimposition**: smaller dunes on the flanks of a draa make a
+**compound** (same-type) or **complex** (mixed-type) mega-bedform. You don't get draa from one Werner
+pass — run the model at **two scales** (a coarse, slow draa field with a fine dune field riding it),
+which is why a Namib-type erg (`20`) reads as dunes-on-dunes, not a single wavelength.
+
 **Sand availability mask.** Werner assumes an infinite sand sheet. For terrain, gate it: sand
 only exists where a mask says so (low elevation, low slope, downwind of a source). Slabs that
 land outside the mask are lost.
@@ -329,3 +338,72 @@ within a batch, or accumulate with atomics as with droplets (`04`).
 **Coupling to the rest of the graph.** Dunes are a surface layer, not bedrock. Keep them in a
 separate `sandDepth` field added to `h` at the end, so that (a) the dune material mask is free,
 and (b) hydraulic erosion in a later wet-phase can strip them correctly.
+
+## Anchored dunes — when sand meets an obstacle
+
+Werner (above) makes **free** dunes — barchans, transverse, linear, star — that self-organise on an
+open sheet and *migrate*. Put a fixed obstacle in the transport path (a scarp, a hill, a mountain
+front, a boulder, a bush) and the steered wind field (`13`) plus Werner's shadow zone pin the sand
+*to the topography* instead: **anchored** (topographically controlled) dunes. This is the "wind
+guided around a hill, dropping its sand against it" case, and it needs no new machinery — the wind
+field already speeds up over crests and separates in the lee (`13`), the shadow zone already captures
+sand behind a crest (above), and the `sandDepth` mask already gates where slabs survive. The one new
+control is **how steep the windward face is**, because that decides whether the sand stops *in front
+of*, climbs *over*, or falls *behind* the obstacle (Tsoar 1983, wind-tunnel echo and climbing dunes).
+
+- **Echo dune — deposited upwind of a steep face.** When the windward slope is steep — above
+  **~60°**, where the boundary layer separates into a fixed reverse eddy (Qian et al. 2011, wind
+  tunnel, stoss slopes 35–90°) — grains drop in that stalled zone *ahead* of the obstacle, building a
+  ridge parallel to the cliff and **separated from it by a near-bare corridor** whose width scales with
+  obstacle height. It is the upwind stagnation the mass-consistent solve (`13`) already implies, made
+  visible: streamlines that cannot climb the face pile their load in front of it.
+- **Climbing dune — mantled on the windward slope.** On a gentler face — **≲50°** (Tsoar 1983), below
+  the separation threshold — the sand-laden wind flows up and over, and sand **mantles the windward
+  face**, thinning up-slope as the crest speed-up (`13`, Jackson & Hunt) holds the finest grains in
+  transport. (The 50–60° band is transitional.) A climbing dune banks *onto* the hill; an echo dune
+  stands *off* it.
+- **Falling dune — cascaded into the lee.** Sand that crosses the crest drops into the wind shadow
+  behind the obstacle and cascades down the lee slope — **Werner's shadow zone at hillslope scale** —
+  a lee-side tongue pointing downwind, often fed through a gap or col.
+- **Sand ramp — the composite apron.** A thick wedge of aeolian sand **plus** colluvium/talus (above)
+  and fluvial debris (`16` fans) banked against a range front, usually relict. Its size and *mixed
+  provenance* are what separate it from a climbing/falling dune (Lancaster & Tchakerian 1996): it is a
+  `16` bajada-scale deposit with an aeolian fraction, not a live bedform, and reads as a paleoclimate
+  archive rather than a moving dune.
+- **Shadow dune / nabkha — the small-obstacle tail.** A single boulder or bush sheds a tapering
+  **sand shadow** in its lee (Hesp 1981); anchored by vegetation it is a **nebkha** (`13`, Tengberg &
+  Chen 1998). The same shadow-zone capture, one obstacle wide.
+
+**Implementation.** Reuse the pipeline — steer the wind (`13`), run Werner with the `sandDepth` mask,
+and add an **obstacle mask** (terrain the slabs cannot climb: high, steep bedrock) whose windward-face
+angle selects the form:
+
+```
+anchoredDunes(h, sand, windField, obstacleMask):
+    for each obstacle cell reached by a transport path:
+        θ_w = windwardSlope(h, windField)              # 13 upwind gradient, at the face
+        if θ_w > θ_separate:  deposit UPWIND   (echo)  — reverse eddy ahead of the face; θ_separate ≈ 60°
+        else:                 climb the face (climbing) — sand mantles, thinning upslope (≲50°)
+        deposit in the lee shadow zone         (falling) — Werner shadow (above), at hill scale
+    # sand ramp = the above + colluvium (05) + 16 fan fill, banked and mostly relict (not a live dune)
+```
+
+**Tier.** The forms are **L** — there is no anchored-dune algorithm; they compose from `13` + the
+shadow zone. The airflow/bedform behaviour that grounds the windward-angle gate is **P**: Tsoar 1983
+and Qian et al. 2011 (echo/climbing — the windward-inclination control and the ~60° separation
+threshold), Hesp 1981 (shadow dunes), Lancaster & Tchakerian 1996 (sand ramps); Pye & Tsoar 2009 is
+the synthesis. **The tell:** an echo dune stands off the cliff
+behind a bare strip, a climbing dune mantles the windward face, a falling dune tongues into the lee —
+put the sand on the wrong side and the wind direction reads as reversed. Slabs stay conserved
+(Werner).
+
+**Vegetation can anchor a dune too — parabolics & blowouts.** Swap the fixed obstacle for **plant
+cover** and you get the other anchored family. A **blowout** is an erosional deflation hollow bitten
+into a vegetated dune where the cover breaks (Hesp 2002); it seeds a **parabolic dune** — a U-shape
+whose **arms trail *upwind*, pinned by vegetation, while the bare nose migrates downwind** (the mirror
+image of a barchan, whose horns point downwind). It is the same cover-vs-transport switch as the nebkha
+(`13`, and the `sandDepth` availability mask above): cover below threshold releases sand, cover above
+holds the arms. The parabolic geometry itself is textbook-standard but has **no single canonical
+paper** — author the form (anchored arms + advancing nose) and cite Hesp 2002 for the blowout that
+starts it. The full **coastal foredune / dune-belt** system — beach-fed, vegetation-built — and its
+implementable DECAL model are worked in `12` (coastal dunes & foredunes).

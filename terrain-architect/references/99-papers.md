@@ -151,6 +151,31 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Geology 23(12), 1107–1110. — **The implementable dune model.** Slab CA with shadow zone and
   differential deposition probability. Produces barchan/transverse/linear/star dunes from wind
   regime alone. Under-cited relative to its usefulness.
+- **Tsoar, H. (1983).** *Wind tunnel modeling of echo and climbing dunes.* In M.E. Brookfield &
+  T.S. Ahlbrandt (eds), *Eolian Sediments and Processes*, Developments in Sedimentology 38, Elsevier,
+  Amsterdam, pp. 247–259. — **Anchored (obstacle) dunes.** The windward-slope angle sets whether sand
+  is trapped upwind (echo), mantles the face (climbing), or falls into the lee — the gate `05` branches
+  on (`05`, `16`).
+- **Hesp, P.A. (1981).** *The formation of shadow dunes.* Journal of Sedimentary Petrology 51(1),
+  101–112. — The tapering **sand shadow** in the lee of a single obstacle; the small-obstacle end of
+  the shadow-zone capture, kin to the nebkha (`05`, `13`, `16`).
+- **Qian, G., Dong, Z., Luo, W. & Lu, J. (2011).** *Mean airflow patterns upwind of topographic
+  obstacles and their implications for the formation of echo dunes: a wind tunnel simulation of the
+  effects of windward slope.* Journal of Geophysical Research: Earth Surface 116, F04026. — Quantifies
+  the windward-angle gate: the boundary layer separates into an upwind reverse eddy above **~60°** (the
+  echo-dune regime); gentler faces give climbing dunes (`05`, `16`).
+- **Pye, K. & Tsoar, H. (2009).** *Aeolian Sand and Sand Dunes.* Springer, Berlin (1st ed. Unwin
+  Hyman, London, 1990). — The synthesis of aeolian bedforms, including the topographically-controlled
+  (anchored) dune family — echo, climbing, falling and lee dunes (`05`).
+- **Wilson, I.G. (1972).** *Aeolian bedforms — their development and origins.* Sedimentology 19(3–4),
+  173–210. — The **bedform size hierarchy**: ripples → dunes → draa, and compound/complex mega-dunes by
+  superimposition (`05`).
+- **Bowler, J.M. (1973).** *Clay dunes: their occurrence, formation and environmental significance.*
+  Earth-Science Reviews 9(4), 315–338. — **Lunettes**: source-bordering clay/gypsum-pellet ridges on the
+  lee margin of a deflating playa (`16`, `05`).
+- **Hesp, P.A. (2002).** *Foredunes and blowouts: initiation, geomorphology and dynamics.* Geomorphology
+  48(1–3), 245–268. — **Blowouts** as deflation hollows in vegetated sand; the seed of a parabolic dune
+  (`05`, `13`).
 
 ## Mass wasting
 
@@ -351,6 +376,21 @@ is below.
   karst reference. Tower (fenglin) and cone (fengcong) karst as differential dissolution and
   vertical lowering to a base level (`11`). No graphics paper exists for tower-karst surface
   morphology; cite this for the mechanism.
+- **Hudec, M.R. & Jackson, M.P.A. (2007).** *Terra infirma: understanding salt tectonics.*
+  Earth-Science Reviews 82(1–2), 1–28. — Salt as a viscous fluid, and the argument that **differential
+  loading**, not pure buoyancy, usually drives diapirs. The salt-tectonics review (`11`).
+- **Jackson, M.P.A. & Hudec, M.R. (2017).** *Salt Tectonics: Principles and Practice.* Cambridge
+  University Press, 498 pp. — The textbook: domes, salt walls, withdrawal minibasins, crestal collapse
+  grabens (`11`).
+- **Talbot, C.J. & Rogers, E.A. (1980).** *Seasonal movements in a salt glacier in Iran.* Science
+  208(4442), 395–397. — Namakiers **flow only when wetted** — seasonal, rain-triggered advance (`11`).
+- **Talbot, C.J. & Pohjola, V. (2009).** *Subaerial salt extrusions in Iran as analogues of ice
+  sheets, streams and glaciers.* Earth-Science Reviews 97(1–4), 155–183. — The canonical **namakier**
+  (salt-glacier) morphology paper; arid-only, since halite dissolves in rain (`11`, `12`).
+- **Kopf, A.J. (2002).** *Significance of mud volcanism.* Reviews of Geophysics 40(2), 1005. — The
+  mud-volcanism review: overpressure-driven rise, gas seepage, compressional settings (`11`).
+- **Mazzini, A. & Etiope, G. (2017).** *Mud volcanism: an updated review.* Earth-Science Reviews 168,
+  81–112. — Mud-volcano forms — gryphons, salses, calderas, radial flows — and their gas drivers (`11`).
 - **Stora, D., Agliati, P.-O., Cani, M.-P., Neyret, F. & Gascuel, J.-D. (1999).** *Animating Lava
   Flows.* Graphics Interface '99. — The graphics lava simulation (SPH, temperature-coupled
   viscosity).
@@ -434,6 +474,20 @@ is below.
 - **Cordonnier, G., Ecormier, P., Galin, E., Gain, J., Benes, B. & Cani, M.-P. (2018).**
   *Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches.* Computer
   Graphics Forum 37(2) (Eurographics 2018).
+- **Benn, D.I. & Evans, D.J.A. (2010).** *Glaciers and Glaciation* (2nd ed.). Hodder Education,
+  London, 802 pp. — The standard glacial-geomorphology text; the synthesis reference for the whole
+  **glacial depositional suite** — moraines, drumlins, eskers, kames, kettles, sandur, till (`12`).
+- **Shreve, R.L. (1985).** *Esker characteristics in terms of glacier physics, Katahdin esker system,
+  Maine.* GSA Bulletin 96(5), 639–646. — Eskers are casts of subglacial water-filled tunnels; the flow
+  follows the **hydraulic potential**, dominated ~11× by the ice-surface gradient, so eskers cross
+  divides and climb the bed. Route on the ice surface, not the bed (`12`).
+- **Clark, C.D., Hughes, A.L.C., Greenwood, S.L., Spagnolo, M. & Ng, F.S.L. (2009).** *Size and shape
+  characteristics of drumlins, derived from a large sample, and associated scaling laws.* Quaternary
+  Science Reviews 28(7–8), 677–692. — Drumlin **morphometry**: 250–1000 m long, elongation ~2–4, with
+  a maximum-elongation limit `E_max ≈ L^(1/3)`. Author the form from this; genesis stays open (`12`).
+- **Kehew, A.E., Piotrowski, J.A. & Jørgensen, F. (2012).** *Tunnel valleys: concepts and
+  controversies — a review.* Earth-Science Reviews 113(1–2), 33–58. — The review of subglacial
+  **tunnel valleys** and the still-open steady-vs-outburst debate over how they form (`12`).
 - **Bruun, P. (1962).** *Sea-level rise as a cause of shore erosion.* J. Waterways & Harbors
   Division, ASCE 88. — The Bruun rule. **Coastal engineering, not terrain generation.** Cited
   here because there *is* no graphics paper for coastal erosion, and saying so is the honest
@@ -445,6 +499,34 @@ is below.
 - **Dean, R.G. (1991).** *Equilibrium beach profiles: characteristics and applications.* Journal of
   Coastal Research 7(1), 53–84. — The `depth ∝ distance^⅔` shoreface profile. Author the nearshore
   as an equilibrium ramp; do not erode a seabed into shape (`12`).
+- **Woodroffe, C.D. (1992).** *Mangrove sediments and geomorphology.* In A.I. Robertson & D.M. Alongi
+  (eds), *Tropical Mangrove Ecosystems*, Coastal and Estuarine Studies 41, pp. 7–41. American
+  Geophysical Union. — **Mangroves as a geomorphic agent**: trapping mud, building intertidal flats,
+  prograding tropical muddy shorelines (`12`).
+- **Furukawa, K., Wolanski, E. & Mueller, H. (1997).** *Currents and sediment transport in mangrove
+  forests.* Estuarine, Coastal and Shelf Science 44(3), 301–310. — Canopy/root drag traps ~80% of the
+  suspended sediment a spring tide carries in; ~0.1 cm/yr accretion (`12`).
+- **Alongi, D.M. (2008).** *Mangrove forests: resilience, protection from tsunamis, and responses to
+  global climate change.* Estuarine, Coastal and Shelf Science 76(1), 1–13. — Mangrove soils **keep
+  pace with sea-level rise** via mineral + organic surface-elevation gain (`12`).
+- **Otvos, E.G. & Price, W.A. (1979).** *Problems of chenier genesis and terminology — an overview.*
+  Marine Geology 31(3–4), 251–263. — **Cheniers**: coarse sand/shell ridges resting on mudflat, marking
+  lulls in mud supply (`12`).
+- **Augustinus, P.G.E.F. (1989).** *Cheniers and chenier plains: a general introduction.* Marine
+  Geology 90(4), 219–229. — Chenier-plain formation as episodic wave reworking during mud-supply lulls
+  on a prograding muddy coast (`12`).
+- **Otvos, E.G. (2000).** *Beach ridges — definitions and significance.* Geomorphology 32(1–2), 83–108.
+  — The chenier-vs-beach-ridge distinction: substrate (mud beneath the ridges) is the discriminator (`12`).
+- **Hesp, P.A. (1989).** *A review of biological and geomorphological processes involved in the
+  initiation and development of incipient foredunes.* Proceedings of the Royal Society of Edinburgh,
+  Section B 96, 181–201. — **Foredunes**: four incipient types set by the pioneer-vegetation pattern (`12`).
+- **Baas, A.C.W. (2002).** *Chaos, fractals and self-organization in coastal geomorphology: simulating
+  dune landscapes in vegetated environments.* Geomorphology 48(1–3), 309–328. — **DECAL**: Werner's slab
+  CA plus a burial-responsive vegetation field — the implementable model for vegetated coastal dunes,
+  foredunes, blowouts and parabolics (`12`, `05`).
+- **Durán, O. & Moore, L.J. (2013).** *Vegetation controls on the maximum size of coastal dunes.* PNAS
+  110(43), 17217–17222. — A coastal dune's **maximum height is set by vegetation, not wind**: a
+  growth-rate-vs-sand-supply balance (`12`).
 - **Rosenbloom, N.A. & Anderson, R.S. (1994).** *Hillslope and channel evolution in a marine
   terraced landscape, Santa Cruz, California.* Journal of Geophysical Research 99(B7),
   14013–14029. — Marine terraces, and the knickpoint-celerity result `C = K·A^m` used in `04`.
@@ -556,6 +638,12 @@ is below.
   SIGGRAPH '19.
 - **Whittaker, R.H. (1975).** *Communities and Ecosystems* (2nd ed.). — The biome diagram:
   biome as a function of temperature and precipitation. A 2D LUT.
+- **Holdridge, L.R. (1947).** *Determination of world plant formations from simple climatic data.*
+  Science 105(2727), 367–368. — The **life-zone** system: vegetation formation from biotemperature and
+  precipitation (`13`).
+- **Holdridge, L.R. (1967).** *Life Zone Ecology* (rev. ed.). Tropical Science Center, San José, Costa
+  Rica, 206 pp. — The full triangular chart with explicit **altitudinal belts** (basal → nival)
+  parallel to the latitudinal zones; the reference for named vegetation belts up a mountain (`13`).
 - **Peel, M.C., Finlayson, B.L. & McMahon, T.A. (2007).** *Updated world map of the
   Köppen-Geiger climate classification.* Hydrology and Earth System Sciences 11. — The modern
   Köppen map.
@@ -761,19 +849,57 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   0.05–0.002 mm, clay <0.002 mm; triangle adopted 1951). The soil material palette (`18`).
 - **Cooke, R.U., Warren, A. & Goudie, A.S. (1993).** *Desert Geomorphology.* UCL Press, London,
   526 pp. — The desert-landforms text (`16`).
+- **Warren, J.K. (2016).** *Evaporites: A Geological Compendium* (2nd ed.). Springer, Cham, 1813 pp. —
+  The evaporite reference: the concentration/precipitation sequence (carbonate → gypsum → halite →
+  bittern) and sabkha/salina/playa settings (`16`).
+- **Eugster, H.P. & Hardie, L.A. (1978).** *Saline lakes.* In A. Lerman (ed.), *Lakes: Chemistry,
+  Geology, Physics*, ch. 8, pp. 237–293. Springer, New York. — Brine evolution and mineral zonation in
+  closed-basin saline lakes (`16`).
+- **Kinsman, D.J.J. (1969).** *Modes of formation, sedimentary associations, and diagnostic features
+  of shallow-water and supratidal evaporites.* AAPG Bulletin 53(4), 830–840. — The **sabkha**: nodular
+  evaporites growing displacively within supratidal sediment (`16`).
+- **Lokier, S.W. (2012).** *Development and evolution of subaerial halite crust morphologies in a
+  coastal sabkha setting.* Journal of Arid Environments 79, 32–47. — Halite-crust **tepee/thrust
+  polygons** by desiccation, thermal cycling and crystallisation pressure (`16`).
 - **Ward, A.W. & Greeley, R. (1984).** *Evolution of the yardangs at Rogers Lake, California.* GSA
   Bulletin 95(7), 829–837. — Yardang form (teardrop 1:4) and its wind-tunnel evolution (`16`).
+- **Lancaster, N. & Tchakerian, V.P. (1996).** *Geomorphology and sediments of sand ramps in the
+  Mojave Desert.* Geomorphology 17(1–3), 151–166. — **Sand ramps**: composite aeolian + colluvial +
+  fluvial aprons banked against range fronts; their size and mixed provenance separate them from
+  climbing/falling dunes, and they read as paleoclimate archives (`16`, `05`).
 - **Blair, T.C. & McPherson, J.G. (1994).** *Alluvial fans and their natural distinction from rivers
   based on morphology, hydraulic processes, sedimentary processes, and facies assemblages.* Journal
   of Sedimentary Research A64(3), 450–489. — Fans as debris-flow / sheetflood landforms, distinct
   from rivers (`16`).
 - **Bull, W.B. (1977).** *The alluvial-fan environment.* Progress in Physical Geography 1(2),
   222–270. — Fan processes and morphology (`16`).
+- **Dohrenwend, J.C. (1994).** *Pediments in arid environments.* In A.D. Abrahams & A.J. Parsons (eds),
+  *Geomorphology of Desert Environments*, pp. 321–353. Chapman & Hall, London. — The **pediment**: a
+  bedrock erosion surface at the mountain front, distinct from the depositional fan (`16`).
 - **McFadden, L.D., Wells, S.G. & Jercinovich, M.J. (1987).** *Influences of eolian and pedogenic
   processes on the origin and evolution of desert pavements.* Geology 15(6), 504–508. — Desert
   pavement is born at the surface over accreting dust, **not** a deflation lag (`16`).
 - **Twidale, C.R. (1982).** *Granite Landforms.* Elsevier, Amsterdam. — Bornhardts and inselbergs by
   differential subsurface weathering and stripping of the regolith (`16`).
+- **Linton, D.L. (1955).** *The problem of tors.* The Geographical Journal 121(4), 470–487. — **Tors**
+  as a two-stage deep-weathering-then-stripping residual, controlled by joint spacing (`11`).
+- **Palmer, J. & Neilson, R.A. (1962).** *The origin of granite tors on Dartmoor, Devonshire.*
+  Proceedings of the Yorkshire Geological Society 33(3), 315–339. — The **periglacial** tor pathway:
+  frost shattering + solifluction stripping, leaving a clitter/blockfield apron (`11`, `17`).
+- **Mustoe, G.E. (1982).** *The origin of honeycomb weathering.* GSA Bulletin 93(2), 108–115. —
+  **Tafoni/honeycomb** as salt-crystallisation granular disintegration behind a case-hardened rind (`11`).
+- **Rodriguez-Navarro, C., Doehne, E. & Sebastian, E. (1999).** *Origins of honeycomb weathering: the
+  role of salts and wind.* GSA Bulletin 111(8), 1250–1255. — Salt and wind as the honeycomb drivers (`11`).
+- **Turkington, A.V. & Phillips, J.D. (2004).** *Cavernous weathering, dynamical instability and
+  self-organization.* Earth Surface Processes and Landforms 29(6), 665–675. — Why cavities **self-deepen**:
+  a case-hardened rind + depth-accelerating hollowing is a self-organising instability (`11`).
+- **Gilbert, G.K. (1904).** *Domes and dome structure of the high Sierra.* GSA Bulletin 15(1), 29–36.
+  — The classic description of **exfoliation/sheeting** domes (`11`).
+- **Bradley, W.C. (1963).** *Large-scale exfoliation in massive sandstones of the Colorado Plateau.*
+  GSA Bulletin 74(5), 519–528. — Sheeting as **unloading** parallel to the topographic surface (`11`).
+- **Martel, S.J. (2006).** *Effect of topographic curvature on near-surface stresses and application to
+  sheeting joints.* Geophysical Research Letters 33(1), L01308. — The mechanism: surface-parallel stress
+  × curvature vs overburden opens sheeting under **convex** surfaces — an implementable equation (`11`).
 - **Kessler, M.A. & Werner, B.T. (2003).** *Self-Organization of Sorted Patterned Ground.* Science
   299(5605), 380–383. — Stone circles / polygons / stripes from freeze–thaw feedbacks; slope selects
   the form. The **same Werner** as the dune model (`05`, `17`).
@@ -813,6 +939,11 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   `M_max = p/α` — the raised bog's domed profile (`13`).
 - **Grotzinger, J.P. & Knoll, A.H. (1999).** *Stromatolites in Precambrian carbonates.* Annual Review
   of Earth and Planetary Sciences 27, 313–358. — Microbial layered carbonate buildups (`13`).
+- **Oren, A. & Rodríguez-Valera, F. (2001).** *The contribution of halophilic Bacteria to the red
+  coloration of saltern crystallizer ponds.* FEMS Microbiology Ecology 36(2–3), 123–130. — Why a
+  crystalliser pond is red: haloarchaeal bacterioruberin + *Dunaliella* β-carotene at NaCl saturation (`16`).
+- **Oren, A. (2005).** *A hundred years of Dunaliella research: 1905–2005.* Saline Systems 1, art. 2. —
+  *Dunaliella salina* accumulating >10% dry weight as β-carotene under salt-and-light stress (`16`).
 - **Tengberg, A. & Chen, D. (1998).** *A comparative analysis of nebkhas in central Tunisia and
   northern Burkina Faso.* Geomorphology 22(2), 181–192. — Vegetation-anchored sand mounds (`13`, `16`).
 - **Tarnita, C.E., Bonachela, J.A., Sheffer, E. et al. (2017).** *A theoretical foundation for

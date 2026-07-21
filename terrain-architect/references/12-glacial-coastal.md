@@ -2,16 +2,16 @@
 
 Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#mass-balance) ·
 [Glen's flow law & SIA](#glens-flow-law--the-shallow-ice-approximation) ·
-[Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) ·
+[Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) · [Glacial deposition](#glacial-deposition) ·
 [Outburst floods & megafloods](#glacial-outburst-floods--megafloods) ·
 [Coastal: be honest](#coastal-be-honest) · [Wave exposure](#wave-exposure) ·
 [Cliff retreat & beaches](#cliff-retreat--beaches) ·
 [Lacustrine (lake) shores](#lacustrine-lake-shores) ·
 [Marine: the honest frame](#marine-the-honest-frame) ·
-[Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
+[Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) · [Coastal dunes & foredunes](#coastal-dunes--foredunes) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
 [Wave base & the submarine profile](#wave-base--the-submarine-profile) ·
-[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Coral reefs & atolls](#coral-reefs--atolls) ·
+[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Biogenic muddy coasts](#biogenic-muddy-coasts--mangroves--cheniers) · [Coral reefs & atolls](#coral-reefs--atolls) ·
 [Seafloor, ridges & submarine processes](#seafloor-ridges--submarine-processes)
 
 ## Glacial: why it matters
@@ -172,6 +172,63 @@ the second exception (after karst, `11`) to the mandatory-fill rule in `03`. Gla
 *creates* depressions, which is why glaciated terrain is full of lakes and fluvial terrain
 isn't. If your fill node runs after glacial erosion with no mask, you have erased the most
 recognisable signature of the process.
+
+## Glacial deposition
+
+Erosion (above) carves the valleys; the material it removes has to go somewhere, and where it lands is
+the **diagnostic** half of a glacial landscape. A U-valley in cross-section can be mistaken for a big
+fluvial one — but nothing except ice leaves **drumlins, eskers and erratics**, so the deposits, not
+the troughs, are what say "ice was here". They all draw on one budget: the volume eroded by
+`glacierStep` (above) *is* the sediment supply, so `Σ deposited = Σ eroded` — the same
+mass-conservation discipline as fluvial (`SKILL.md`). Don't let a deposition node mint sediment the
+ice never excavated. Two families, split by whether **water sorted the load**.
+
+**Ice-laid (till — unsorted, dumped directly by the ice):**
+
+| Landform | Recipe |
+|---|---|
+| **Moraine** (already noted) | The eroded load released at the ice margin: **terminal** at the snout, **lateral** on the flanks, **medial** where two glaciers merge, **ground** under the sole. A terminal moraine dams a proglacial lake (`03` — a real basin). |
+| **Drumlin** | Streamlined till hill, **blunt up-ice, tapered down-ice**, in swarms under fast ice. Author the *form*, not the genesis (below): streamline a till field along the ice-flow vector, sized by Clark et al. 2009. |
+| **Till plain / ground moraine** | The low-relief till sheet smeared under the sole — a thickness blanket that mutes the underlying relief, not a feature in its own right. |
+| **Erratic** | A boulder carried far from source and dropped. Pure `07` scatter of **out-of-lithology** clasts (`11` material tag ≠ local bedrock) — the cheapest, most legible ice fingerprint there is. |
+
+**Meltwater-laid (glaciofluvial — sorted, kin to the outburst floods below):**
+
+| Landform | Recipe |
+|---|---|
+| **Esker** | A sinuous sand-and-gravel ridge — the cast of a subglacial meltwater tunnel. Route it, but *not* on the bed (see the Shreve callout). |
+| **Kame** | An ice-contact stratified mound — a delta or fan built against or on top of stagnant ice, left standing when the ice melts out. |
+| **Kettle** | A pit where a buried ice block melted out. **A closed basin — it joins the `03` no-fill list** (with overdeepenings and karst); it usually holds a pond. Kame-and-kettle country is hummocky ice-stagnation terrain. |
+| **Outwash plain / sandur** | Braided meltwater deposits fanning beyond the terminus — the `03` braided-river / `16` fan process driven by the mass-balance melt discharge, fining downstream. |
+| **Tunnel valley** | A large subglacial meltwater channel, cut then often part-infilled; kin to the esker and the jökulhlaup below. Frequently overdeepened → a lake chain (another `03` no-fill case). Genesis debated — steady vs outburst drainage (Kehew et al. 2012). |
+
+**The esker routing insight (Shreve 1985).** An esker is a river deposit, but it does *not* obey the
+bed's topography — so a heightfield router (`03`) run on the bed places it wrong. In a water-filled
+subglacial tunnel the water pressure ≈ the ice overburden, so flow follows the gradient of the
+**hydraulic potential** φ = ρ_i·g·s + (ρ_w − ρ_i)·g·b, where `s` is the ice surface and `b` the bed.
+Because ρ_i ≈ 11·(ρ_w − ρ_i), the **ice-surface slope outweighs the bed by ~11×**: route on
+`(11·s + b)`, essentially the ice surface. The visible consequence, and the tell that sells it, is
+that eskers **run uphill over the bed and cross divides at low passes**, trending with ice flow rather
+than down the local slope. A router on the bare bed pools them in hollows — exactly wrong.
+
+**Drumlin genesis is unresolved — so don't claim it (`?`).** Whether drumlins form by a deforming
+bed, a subglacial instability, or catastrophic meltwater floods is a genuine, decades-old debate with
+no winner. The honest move is the skill's standard one: author the **form** — blunt-up-ice till ridges
+aligned to the ice-flow field, elongation ~2–4 and length 250–1000 m, obeying Clark et al. 2009's
+`E_max ≈ L^(1/3)` limit — and make **no mechanism claim**. Anyone selling a "drumlin algorithm" with a
+physical story is backing one side of an open argument.
+
+**Alignment is machinery you already have.** Drumlins and eskers both trend with **ice flow**, exactly
+as dunes trend with wind (`05`): the SIA surface gradient `∇s` (above) is a ready-made direction field
+that orients both. And their closed basins — kettles, tunnel valleys — join overdeepenings and fjords
+on the `03` no-fill list; a fill node run after glaciation with no mask erases them.
+
+**Tier.** All **L** compositions over the erosion budget, with three anchors: **Shreve 1985** (esker
+tunnel routing, **P**), **Clark et al. 2009** (drumlin morphometry & scaling, **P**), **Kehew et al.
+2012** (tunnel valleys, **P** review); drumlin *genesis* is **?**. The synthesis reference for the
+whole suite is **Benn & Evans 2010**, *Glaciers and Glaciation*. **The tell:** deposits align to ice
+flow, erratics sit on foreign bedrock, and the deposited volume balances the eroded troughs — reverse
+the flow direction and the drumlins point the wrong way.
 
 ## Glacial outburst floods & megafloods
 
@@ -385,6 +442,47 @@ actually computing is the drift *direction* from the wave-approach angle relativ
 shoreline normal — that asymmetry is what makes spits point the right way instead of being
 symmetric blobs.
 
+## Coastal dunes & foredunes
+
+A **coastal dune** is what onshore wind does with a sandy beach — the humid-coast cousin of the desert
+erg, and the defining landform of the Dutch, Danish and Atlantic sandy shores (and the crest of every
+barrier island, above). Three things make it a *different* problem from a Namib dune (`05`): the **sand
+source is the beach** (marine sand kept supplied by longshore drift, above — not deflated off a basin
+floor), the **wind is onshore**, and **vegetation is a first-class control**, not the rare gate it is
+in the desert. Marram / *Ammophila* grass grows up *through* burial and traps saltating sand, so the
+plants build the dune and the dune feeds the plants — a biotic feedback the desert model lacks.
+
+**The sequence.** Dry backshore sand → onshore wind → sand caught by pioneer plants on the upper beach
+→ an **incipient foredune** → an established **foredune ridge** running *parallel to the shore* → a
+**dune belt** landward, breaking into **blowouts and parabolic dunes** (`05`) where the cover fails or
+supply is high. Which incipient form appears is set by the *vegetation pattern*, not the wind:
+scattered plants make shadow-dune hummocks, continuous pioneer cover makes a laterally-continuous
+ridge — **Hesp 1989** distinguishes four incipient-foredune types on exactly that basis.
+
+**The implementable model — DECAL (Baas 2002).** Werner's bare-sand slab CA (`05`) has no plants, so it
+cannot make a foredune. The coastal analogue is **Baas 2002's DECAL**: the same slab transport plus a
+**vegetation field that grows under moderate burial, dies under erosion or too-deep burial, and locally
+raises the deposition probability**. That one feedback self-organises foredunes, blowouts, parabolic
+dunes and nebkhas out of the plant–sand coupling — it is "Werner for a vegetated coast", reusing the
+shadow-zone and availability-mask machinery you already have (`05`) under the onshore wind field (`13`).
+
+**What caps the height (Durán & Moore 2013).** A foredune does not grow without limit: its **maximum
+size is set by vegetation, not wind** — the dune rises until plant growth can no longer keep pace with
+the burial rate, so height is a **growth-rate-vs-sand-supply balance**. Expose vegetation vigour and
+sand supply and the dune ceiling falls out instead of being authored.
+
+**The Dutch coast as a composite.** The classic North Sea stack is these pieces in a row: a wide
+dissipative **beach** (above) → a **foredune ridge** and **dune belt** (here) → behind them the
+**Wadden barrier islands** (above) and **tidal flats** (below) → and, reclaimed inland, **polders and dikes**
+(the anthropogenic surface, `20`). Every rung was already in the skill; the coastal dune was the
+missing one.
+
+**Tier.** All **L** as generated landforms — beach sand budget + onshore wind + a vegetation feedback —
+grounded by **P** sources: Hesp 1989, 2002 (foredune initiation and form), Baas 2002 (the DECAL
+vegetated-dune model), Durán & Moore 2013 (vegetation sets the size ceiling). **The tell:** the dunes
+run *parallel* to the shore, *anchored* by vegetation, fronted by the beach that feeds them — kill the
+vegetation feedback and you get bare migrating desert dunes, which is the wrong coast.
+
 ## Marine terraces
 
 Run the shoreline loop (notch → collapse → deposit) not at one sea level but across a **sea-level
@@ -465,6 +563,38 @@ What falls out of the range and the shore slope:
 Honest tier: **F-tier**, a look. Real tides are astronomy; for terrain you author the range and the
 curve, and the geomorphic products — tidal flats, salt marshes, the intertidal zone — are
 compositions on top of the shoreface.
+
+## Biogenic muddy coasts — mangroves & cheniers
+
+The intertidal section above is the *physical* muddy coast; two features make it a **biological** one,
+and both are progradation engines.
+
+**Mangroves** are the tropical intertidal counterpart of the salt marsh (above): a **biogenic
+geomorphic agent**, not just vegetation on a shore. Prop-roots and canopy impede the tidal flow, so
+fine cohesive mud flocculates and settles — a mangrove forest **traps ~80% of the suspended sediment**
+a spring flood tide carries in and raises the bed ~0.1 cm/yr (Furukawa, Wolanski & Mueller 1997) —
+while the same drag **damps waves and currents**, so the forest builds intertidal mudflats and
+**progrades a tropical muddy shoreline** (Woodroffe 1992). Surface elevation is held by **both** mineral
+sedimentation and **belowground root/peat accumulation**, which is how mangrove soils **keep pace with
+sea-level rise** — the control on whether the coast progrades, holds or drowns (Alongi 2008). Implement
+it as a biogenic mask on tropical intertidal cells (`13` biome + `06` intertidalMask) that (a) raises
+fine-sediment deposition, (b) attenuates incident wave energy (`12` wave exposure), and (c) adds an
+organic elevation term — the mangrove counterpart of the marsh, kin to the nebkha's
+vegetation-traps-sediment logic (`13`).
+
+**Cheniers** are the coarse punctuation on such a coast: **isolated sand or shell ridges resting on,
+and separated by, mudflat** (Otvos & Price 1979). The diagnostic is exactly that — a coarse ridge on a
+**muddy** substrate — and it forms when a **lull in mud supply** lets episodic wave reworking winnow and
+pile the coarse fraction into a beach ridge; renewed mud supply then buries its flanks and pushes the
+shoreline seaward again (Augustinus 1989). So each ridge is a **former shoreline and a pause**, and a
+**chenier plain** (alternating ridges and mudflats) is a stratigraphic record of episodic progradation.
+Build it as mud progradation (mangrove / tidal flat) **stamped with coarse longshore ridges** (`12`
+longshore) during supply lulls. **The tell** that it's a chenier and not a beach-ridge strand plain is
+the substrate: mud beneath and between the ridges, not a continuous sand body (Otvos 2000).
+
+**Tier.** Both **P**: mangroves (Woodroffe 1992; Furukawa et al. 1997; Alongi 2008), cheniers (Otvos &
+Price 1979; Augustinus 1989). As *generated* landforms both are **L** — compositions over the shoreface,
+sediment supply and a biogenic/longshore mask — grounded by those P sources.
 
 ## Coral reefs & atolls
 
