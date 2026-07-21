@@ -84,7 +84,8 @@ windField(h, baseDir, baseSpeed):
 Every ingredient is machinery the skill already has: the upwind-slope term is the `dot(windDir, ∇h)`
 of the orographic march below, the shadow zone is Werner's (`05`), and the sweep costs are the
 `06`/`12` horizon machinery. What the consumers gain: dunes align to *deflected* wind (valley-floor
-dune fields point along the valley, not the regional wind), cornices form on the *actual* lee,
+dune fields point along the valley, not the regional wind) and bank against obstacles as **anchored
+dunes** — echo, climbing, falling, sand ramps (`05`, `16`); cornices form on the *actual* lee,
 fetch responds to channelled winds down a fjord, and precipitation sees the speed-up. **Tier:** the
 recipe is F — a look built from two P-tier anchors (Jackson & Hunt 1975 for the crest speed-up;
 Sherman 1978 for mass-consistency). Real boundary-layer CFD stays out of scope, and say so.

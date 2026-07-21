@@ -134,6 +134,12 @@ being blown *out* from between them.
   wind-blown silt that blankets terrain downwind of a source, draping relief like snow — a
   thickness field added over the existing height, thickest on upwind-facing slopes and thinning
   downwind, smoothing and rounding the landscape (the aeolian counterpart of a snow mantle, `13`).
+- **Obstacle dunes — sand banked against topography.** Where the sand-transporting wind meets a
+  fixed obstacle it drops **anchored** dunes instead of migrating ones: **echo** dunes upwind of a
+  steep face, **climbing** dunes mantling a gentle windward slope, **falling** dunes cascading into
+  the lee, and **sand ramps** — thick composite aeolian + colluvial + fluvial aprons banked against a
+  range front (Lancaster & Tchakerian 1996). The full mechanism and the windward-angle gate live in
+  `05` (anchored dunes); here it is a `16` deposit keyed to a mountain front, close kin to the bajada.
 
 ## Implementation contract
 
@@ -145,6 +151,7 @@ being blown *out* from between them.
 | Playa | basin IDs, spill level `m`, water/salt/sediment thickness `m` | hydrological GLOBAL, T3 bake | CPU basin graph; runtime only updates shallow water/material state | basin has no outflow, floor is level within tolerance, salts/sediment accumulate rather than disappear |
 | Pavement / loess | stability/age masks, clast `PointSet`, loess thickness `m` | LOCAL/NEIGHBOURHOOD, T0/T1 | GPU masks + deterministic scatter; directional loess gather | clasts stay on old low-erosion surfaces; minimum spacing holds; loess thins downwind and conserves deposited mass |
 | Wadi transmission loss | discharge `m³/s`, permeability, channel graph | drainage GLOBAL, T3 or declared watershed job | CPU receiver stack; material/detail may refine at runtime | discharge may decrease along a reach but never becomes negative; channels still terminate at the declared sink |
+| Obstacle dune / sand ramp | `sandDepth:m`, steered `wind:m/s` (`13`), obstacle mask, windward angle `θ` | aeolian NEIGHBOURHOOD keyed to a baked obstacle+wind field, T2/T3 | GPU Werner slabs (`05`) gated by a baked obstacle/wind field; ramp fill baked | echo deposit sits upwind of the face behind a bare corridor; climbing sand mantles the windward slope, falling sand only in the lee; slabs conserved |
 
 **Boundary and determinism.** Wind fetch uses an explicit upwind boundary; endorheic basins are
 marked before generic fill/breach; every avulsion and scatter decision derives from the root seed.
@@ -154,4 +161,5 @@ wadi discharge remain baked/global fields.
 
 **Failure signatures:** yardangs cross the wind → exposure field wrong; plus-shaped abrasion →
 stencil anisotropy; fans create sediment → source/sink budget broken; a river exits a playa →
-closed-basin mask lost; pavement appears on active fans → stability/age gate missing.
+closed-basin mask lost; pavement appears on active fans → stability/age gate missing; a falling
+dune on the windward side → wind direction or the lee shadow test reversed.

@@ -151,6 +151,17 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   Geology 23(12), 1107–1110. — **The implementable dune model.** Slab CA with shadow zone and
   differential deposition probability. Produces barchan/transverse/linear/star dunes from wind
   regime alone. Under-cited relative to its usefulness.
+- **Tsoar, H. (1983).** *Wind tunnel modeling of echo and climbing dunes.* In M.E. Brookfield &
+  T.S. Ahlbrandt (eds), *Eolian Sediments and Processes*, Developments in Sedimentology 38, Elsevier,
+  Amsterdam, pp. 247–259. — **Anchored (obstacle) dunes.** The windward-slope angle sets whether sand
+  is trapped upwind (echo), mantles the face (climbing), or falls into the lee — the gate `05` branches
+  on (`05`, `16`).
+- **Hesp, P.A. (1981).** *The formation of shadow dunes.* Journal of Sedimentary Petrology 51(1),
+  101–112. — The tapering **sand shadow** in the lee of a single obstacle; the small-obstacle end of
+  the shadow-zone capture, kin to the nebkha (`05`, `13`, `16`).
+- **Pye, K. & Tsoar, H. (2009).** *Aeolian Sand and Sand Dunes.* Springer, Berlin (1st ed. Unwin
+  Hyman, London, 1990). — The synthesis of aeolian bedforms, including the topographically-controlled
+  (anchored) dune family — echo, climbing, falling and lee dunes (`05`).
 
 ## Mass wasting
 
@@ -763,6 +774,10 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   526 pp. — The desert-landforms text (`16`).
 - **Ward, A.W. & Greeley, R. (1984).** *Evolution of the yardangs at Rogers Lake, California.* GSA
   Bulletin 95(7), 829–837. — Yardang form (teardrop 1:4) and its wind-tunnel evolution (`16`).
+- **Lancaster, N. & Tchakerian, V.P. (1996).** *Geomorphology and sediments of sand ramps in the
+  Mojave Desert.* Geomorphology 17(1–3), 151–166. — **Sand ramps**: composite aeolian + colluvial +
+  fluvial aprons banked against range fronts; their size and mixed provenance separate them from
+  climbing/falling dunes, and they read as paleoclimate archives (`16`, `05`).
 - **Blair, T.C. & McPherson, J.G. (1994).** *Alluvial fans and their natural distinction from rivers
   based on morphology, hydraulic processes, sedimentary processes, and facies assemblages.* Journal
   of Sedimentary Research A64(3), 450–489. — Fans as debris-flow / sheetflood landforms, distinct

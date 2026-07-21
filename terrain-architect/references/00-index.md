@@ -391,6 +391,9 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Oasis (deflation / fault-line / artesian) | L | Deflation basin floored *at the water table* + endorheic sabkha + groundwater-gated palms; blueprint (`20`) |
 | Desert pavement | P | McFadden, Wells & Jercinovich 1987, Geology 15 — born-at-top, not a lag |
 | Loess / sand sheets | F | Aeolian deposition (the deposition side of `05`) |
+| Obstacle dunes — echo / climbing / falling | P (echo/climbing) / L (family) | Tsoar 1983, *Eolian Sediments & Processes* (Dev. Sedimentology 38) — windward-angle control; lee capture + synthesis Pye & Tsoar 2009 (`05`, `16`) |
+| Sand ramp (aeolian–colluvial–fluvial apron) | P | Lancaster & Tchakerian 1996, Geomorphology 17 — composite deposit banked on a range front, mostly relict (`05`, `16`) |
+| Shadow dune (aerodynamic lee of an obstacle) | P | Hesp 1981, J. Sed. Petrol. 51(1); vegetation-anchored = nebkha (`13`, `05`) |
 
 ## 11. Periglacial & permafrost → `17-periglacial.md`
 
