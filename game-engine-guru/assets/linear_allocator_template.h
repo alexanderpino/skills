@@ -37,6 +37,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <type_traits>
 
 #include <engine/core/EngineError.h>  // enum class EngineError
@@ -54,6 +55,9 @@ namespace engine::memory {
 class LinearAllocator
 {
 public:
+    using TaggedAllocationHook =
+        void (*)(void* allocation, std::size_t size, const char* tag) noexcept;
+
     /**
      * @brief Opaque checkpoint for nested-scope reclamation.
      *
@@ -63,7 +67,9 @@ public:
      */
     struct Marker
     {
+        const LinearAllocator* owner;
         std::size_t offset;
+        std::uint64_t epoch;
     };
     static_assert(std::is_trivially_copyable_v<Marker>,
                   "Marker must be trivially copyable to survive across job boundaries.");
@@ -72,14 +78,29 @@ public:
      * @brief Construct over an externally-owned buffer.
      * @param buffer   Start of the writable byte range. Must remain valid for the
      *                 lifetime of this allocator. Not owned.
-     * @param capacity Size in bytes of `buffer`. Must be > 0.
+     * @param capacity Size in bytes of `buffer`. A null buffer or zero capacity
+     *                 creates an inert allocator whose allocations fail.
+     * @param taggedAllocationHook Optional debug observer; the default no-op
+     *                 keeps ENGINE_MEMORY_DEBUG builds self-contained.
      *
      * The allocator performs no internal malloc/new. Typical wiring: reserve a
      * 2 MiB VirtualAlloc / mmap page, pass (ptr, size) here.
      */
-    constexpr LinearAllocator(std::byte* buffer, std::size_t capacity) noexcept
-        : m_buffer{buffer}, m_capacity{capacity}, m_offset{0}
+    constexpr LinearAllocator(
+        std::byte* buffer,
+        std::size_t capacity,
+        TaggedAllocationHook taggedAllocationHook = nullptr) noexcept
+        : m_buffer{buffer},
+          m_capacity{capacity},
+          m_offset{0},
+          m_markerEpoch{1}
+#if defined(ENGINE_MEMORY_DEBUG) && ENGINE_MEMORY_DEBUG
+        , m_taggedAllocationHook{taggedAllocationHook}
+#endif
     {
+#if !defined(ENGINE_MEMORY_DEBUG) || !ENGINE_MEMORY_DEBUG
+        (void)taggedAllocationHook;
+#endif
     }
 
     LinearAllocator(const LinearAllocator&)            = delete;
@@ -87,13 +108,20 @@ public:
     LinearAllocator(LinearAllocator&&)                 = delete;
     LinearAllocator& operator=(LinearAllocator&&)      = delete;
 
+    /// @return true when the allocator has a nonempty backing range.
+    [[nodiscard]] bool IsValid() const noexcept
+    {
+        return m_buffer != nullptr && m_capacity != 0u;
+    }
+
     /**
      * @brief Allocate `size` bytes aligned to `align`.
      * @param size  Number of bytes to reserve.
      * @param align Alignment in bytes. Must be a power of two and >= 1.
      * @return Pointer to the reserved bytes, or EngineError::OutOfMemory when the
      *         remaining capacity is insufficient, or EngineError::InvalidArgument
-     *         when `align` is not a power of two.
+     *         when `size` is zero, the allocator is inert, or `align` is not a
+     *         power of two.
      *
      * @note The returned memory is uninitialized. Callers must construct objects
      *       in place via placement-new if they need non-trivial initialization.
@@ -101,25 +129,41 @@ public:
     [[nodiscard]] std::expected<void*, core::EngineError>
     Allocate(std::size_t size, std::size_t align) noexcept
     {
-        if (align == 0u || (align & (align - 1u)) != 0u) [[unlikely]]
+        if (m_buffer == nullptr || m_capacity == 0u || size == 0u ||
+            align == 0u || (align & (align - 1u)) != 0u) [[unlikely]]
         {
             return std::unexpected(core::EngineError::InvalidArgument);
         }
 
-        const std::size_t current = reinterpret_cast<std::uintptr_t>(m_buffer) + m_offset;
-        const std::size_t aligned = (current + (align - 1u)) & ~(align - 1u);
-        const std::size_t padding = aligned - current;
+        const auto base = reinterpret_cast<std::uintptr_t>(m_buffer);
+        constexpr auto maxAddress = std::numeric_limits<std::uintptr_t>::max();
+        if (m_offset > m_capacity || base > maxAddress - m_offset) [[unlikely]]
+        {
+            return std::unexpected(core::EngineError::OutOfMemory);
+        }
+        const auto current = base + m_offset;
+        if (current > maxAddress - (align - 1u)) [[unlikely]]
+        {
+            return std::unexpected(core::EngineError::OutOfMemory);
+        }
+        const auto aligned = (current + (align - 1u)) &
+                             ~static_cast<std::uintptr_t>(align - 1u);
+        const auto paddingAddress = aligned - current;
+        if (paddingAddress > std::numeric_limits<std::size_t>::max()) [[unlikely]]
+        {
+            return std::unexpected(core::EngineError::OutOfMemory);
+        }
+        const auto padding = static_cast<std::size_t>(paddingAddress);
 
-        // Overflow-safe capacity check: compute required bytes in two adds.
         if (padding > m_capacity - m_offset) [[unlikely]]
         {
             return std::unexpected(core::EngineError::OutOfMemory);
         }
-        const std::size_t newOffset = m_offset + padding + size;
-        if (size > m_capacity - m_offset - padding || newOffset < m_offset) [[unlikely]]
+        if (size > m_capacity - m_offset - padding) [[unlikely]]
         {
             return std::unexpected(core::EngineError::OutOfMemory);
         }
+        const std::size_t newOffset = m_offset + padding + size;
 
         void* p  = m_buffer + m_offset + padding;
         m_offset = newOffset;
@@ -146,26 +190,40 @@ public:
 #endif
 
     /// @return Snapshot of the current bump offset, usable with Rewind.
-    [[nodiscard]] Marker GetMarker() const noexcept { return Marker{m_offset}; }
+    [[nodiscard]] Marker GetMarker() const noexcept
+    {
+        return Marker{this, m_offset, m_markerEpoch};
+    }
 
     /**
      * @brief Rewind to a previously captured marker.
      * @param m Marker obtained from GetMarker() on this same instance.
      *
-     * All allocations made after `m` become invalid. Calling Rewind with a
-     * marker whose offset exceeds the current offset is a programmer error; it
-     * is ignored here (the guard below). Wire a `DEV_ASSERT(m.offset <= m_offset, …)`
-     * at this boundary in engine builds — omitted from the template to keep it
-     * dependency-free (only <engine/core/EngineError.h>).
+     * All allocations made after `m` become invalid. A marker from another
+     * allocator, from before Reset(), or beyond the current offset is rejected.
+     * Markers invalidated by a rewind must not be reused after the arena grows
+     * again; markers are linear capabilities, not reusable bookmarks.
+     * @return true when the marker was accepted.
      */
-    void Rewind(Marker m) noexcept
+    [[nodiscard]] bool Rewind(Marker m) noexcept
     {
-        // DEV_ASSERT(m.offset <= m_offset, "Rewind past current offset");
-        if (m.offset <= m_offset) { m_offset = m.offset; }
+        // DEV_ASSERT(m.owner == this && m.epoch == m_markerEpoch &&
+        //            m.offset <= m_offset, "invalid allocator marker");
+        if (m.owner != this || m.epoch != m_markerEpoch || m.offset > m_offset)
+        {
+            return false;
+        }
+        m_offset = m.offset;
+        return true;
     }
 
     /// @brief Reset the allocator to an empty state. Typically called at end-of-frame.
-    void Reset() noexcept { m_offset = 0u; }
+    void Reset() noexcept
+    {
+        m_offset = 0u;
+        ++m_markerEpoch;
+        if (m_markerEpoch == 0u) { m_markerEpoch = 1u; }
+    }
 
     /// @return Bytes currently allocated (including alignment padding).
     [[nodiscard]] std::size_t BytesUsed() const noexcept { return m_offset; }
@@ -178,14 +236,23 @@ public:
 
 private:
 #if defined(ENGINE_MEMORY_DEBUG) && ENGINE_MEMORY_DEBUG
-    /// Debug hook wired by the memory tracker. Never inlined to keep the hot
-    /// Allocate path free of diagnostic overhead in release builds.
-    void OnTaggedAllocation(void* p, std::size_t size, const char* tag) noexcept;
+    void OnTaggedAllocation(void* p, std::size_t size, const char* tag) noexcept
+    {
+        if (m_taggedAllocationHook != nullptr)
+        {
+            m_taggedAllocationHook(p, size, tag);
+        }
+    }
+
 #endif
 
     std::byte*  m_buffer;   ///< Non-owning pointer to the backing slab.
     std::size_t m_capacity; ///< Total bytes in m_buffer.
     std::size_t m_offset;   ///< Bytes consumed so far (monotonic until Rewind/Reset).
+    std::uint64_t m_markerEpoch; ///< Invalidates markers across Reset().
+#if defined(ENGINE_MEMORY_DEBUG) && ENGINE_MEMORY_DEBUG
+    TaggedAllocationHook m_taggedAllocationHook;
+#endif
 };
 
 /**
@@ -197,7 +264,9 @@ private:
  * @code
  * auto& a = GetScratchAllocator();
  * ScopedMarker _{a};
- * auto* tmp = *a.Allocate(4096, 16);
+ * auto tmp = a.Allocate(4096, 16);
+ * if (!tmp) return std::unexpected(tmp.error());
+ * auto* bytes = static_cast<std::byte*>(*tmp);
  * // tmp is automatically reclaimed at scope exit.
  * @endcode
  */
@@ -206,7 +275,7 @@ class ScopedMarker
 public:
     explicit ScopedMarker(LinearAllocator& a) noexcept
         : m_alloc{a}, m_marker{a.GetMarker()} {}
-    ~ScopedMarker() noexcept { m_alloc.Rewind(m_marker); }
+    ~ScopedMarker() noexcept { (void)m_alloc.Rewind(m_marker); }
 
     ScopedMarker(const ScopedMarker&)            = delete;
     ScopedMarker& operator=(const ScopedMarker&) = delete;

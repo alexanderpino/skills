@@ -32,6 +32,40 @@ DCC (Maya/Blender/Substance/Houdini)
 
 **Content-addressed storage is non-negotiable.** The key for every cooked artifact is `BLAKE3(source_bytes || importer_version || cooker_version || platform_id || options_hash)`. Two workstations cooking the same asset produce the same hash and can share cache entries over S3/Azure Blob/local NAS. Without this, the build farm has nothing to distribute.
 
+### Local DDC eviction
+
+The shared DDC is the durable cache; the workstation DDC is a bounded read-through cache on local NVMe. Without eviction, a full multi-platform checkout grows into terabytes and eventually competes with source trees, page files, IDE indexes, and build intermediates.
+
+Configure each workstation with both a **maximum DDC size** and a **minimum free-space reserve**. Derive the effective budget from the tighter constraint. Use hysteresis rather than deleting one blob whenever one blob arrives:
+
+- Start background collection when local DDC usage crosses the **high watermark** (default: 90% of its effective budget) or the volume falls below its free-space reserve.
+- Evict least-recently-used blobs until usage reaches the **low watermark** (default: 75%). The 15% gap prevents continuous delete/refetch oscillation.
+- Record access time in the DDC index; do not trust filesystem `atime`, which is commonly disabled or coalesced. Batch metadata updates so a cache hit does not become a synchronous database write.
+- Pin blobs used by active cook jobs, current editor sessions, in-progress package assembly, and the current build. Never delete temporary writes; finish or discard them through crash recovery first.
+- Give newly cooked or downloaded blobs a configurable minimum residency age. This protects the active working set when a large branch switch crosses the high watermark.
+
+```text
+// BACKGROUND LRU GC — runs on a low-priority I/O worker, never the cook hot path.
+effectiveBudget = min(configuredMaxBytes,
+                      max(0, volumeCapacity - reservedFreeBytes))
+
+if ddcBytes > 0.90 * effectiveBudget or volumeFreeBytes < reservedFreeBytes:
+    targetBytes = 0.75 * effectiveBudget
+    for blob in index.orderBy(lastAccessAscending):
+        if ddcBytes <= targetBytes and volumeFreeBytes >= reservedFreeBytes:
+            break
+        emergencyLowDisk = volumeFreeBytes < reservedFreeBytes
+        if blob.isPinned or blob.isTemporary:
+            continue
+        if blob.age < minimumResidencyAge and not emergencyLowDisk:
+            continue
+        atomicallyRemoveIndexEntryAndBlob(blob)
+        ddcBytes -= blob.size
+        volumeFreeBytes += blob.size   // estimated; periodically refresh from the volume
+```
+
+Run normal cleanup in bounded batches during idle time with low I/O priority. Only an emergency low-disk condition may preempt foreground work. Export hit rate, bytes evicted, eviction age, refetch bytes, and “evicted then requested again” counts; if refetch churn rises, increase the budget or minimum residency instead of hiding the problem with more build-farm traffic.
+
 **Dependency graph is a DAG.** Materials reference textures, meshes reference skeletons, levels reference everything. Build the graph at import time, validate for cycles (cycles = design bug), topologically sort, cook in parallel within each topological layer. The cooker's inner loop looks like:
 
 ```cpp
@@ -88,13 +122,13 @@ Block compression is mandatory. Uncompressed textures waste bandwidth and VRAM; 
 
 Meshes have four products off a single source: render LODs, collision proxies, meshlet clusters, and nav-mesh input. Cook all four in one pass.
 
-**Meshlet generation:** use [meshoptimizer](https://github.com/zeux/meshoptimizer). Target 64-124 triangles/cluster (matches Mesh Shader / Nanite wave sizes). Each cluster carries its own bounding sphere + normal cone for cluster-level culling. Cluster data layout:
+**Meshlet generation:** use [meshoptimizer](https://github.com/zeux/meshoptimizer). Target **64 vertices / 124 triangles** per meshlet — the meshoptimizer default and NVIDIA mesh-shader sweet spot (HW caps at 64 verts / 126 prims; 124 keeps the triangle count a multiple of 4 for packing). This is the mesh-shader *rasterization* unit; Nanite-style software **clusters** instead group **~128 triangles** (see `RENDERING_AND_GRAPHICS.md` §Virtual Geometry) — keep the two numbers straight. Each cluster carries its own bounding sphere + normal cone for cluster-level culling. Cluster data layout:
 
 ```cpp
 struct Meshlet {
     uint32_t vertex_offset;
     uint32_t triangle_offset;
-    uint8_t  vertex_count;
+    uint8_t  vertex_count;    // <= 64
     uint8_t  triangle_count;  // <= 124
     float    bounds_center[3];
     float    bounds_radius;
@@ -125,24 +159,50 @@ file.hlsl
                                                └── .glsl (GLES 3.x legacy)
 ```
 
-**Permutation management is the hardest part.** A modern PBR shader easily has 2^20 permutations (skinned/static, decal/no, shadow-receiver/caster, 4-layer blend variants...). Two strategies:
+**Permutation management is the hardest part.** Twenty independent binary defines produce `2^20 = 1,048,576` candidates before material, pass, platform, and quality variants are counted. Never compile the Cartesian product.
 
-1. **Static permutations** — compile every combination, store in PSO cache. Fast runtime, explosion of cook time and disk.
-2. **Dynamic branches** — `[branch]` / uniform-control-flow, single shader, predicated. Slower GPU, fast cook.
+Use a constrained permutation manifest:
 
-Rule of thumb: permute on features that change VGPR pressure or register allocation (shadow map count, layer count). Branch on toggles that are uniform per-draw (debug visualizers, feature flags).
+1. **Static permutations** are reserved for changes that materially alter resource declarations, render-target formats, shader stage topology, loop bounds, wave/workgroup behavior, or measured register/LDS pressure.
+2. **Dynamic branches** are required for minor visual toggles that are coherent per draw/material and leave the resource interface unchanged: optional tinting, small BRDF modifiers, visualization modes, and low-cost feature flags. A uniform branch is cheaper than multiplying the ship set and every downstream PSO.
+3. Encode mutual exclusion and implication rules (`TRANSMISSION -> FORWARD_PASS`, `UNLIT -> !CLEARCOAT`) before enumeration. Canonicalize equivalent define sets to one key.
+4. Generate the ship allowlist from cooked-content usage plus an explicit runtime whitelist for variants created procedurally or by downloadable content. Do not rely only on editor play traces.
 
-**PSO caching:** serialize compiled pipeline state objects to disk. DX12: `ID3D12PipelineLibrary`. Vulkan: `VK_EXT_pipeline_cache`. On ship, pre-warm by replaying a recorded PSO list on first boot to avoid shader-stutter. This is the difference between "smooth" and "TLOU-PC at launch."
+**Fallback and stripping are ship-cook invariants:**
+
+- Every optional static feature declares a supported fallback permutation. If the target lacks a feature or the requested variant was stripped, selection must resolve to that fallback—not compile at runtime, return a null PSO, or silently choose an unrelated material.
+- Tag editor visualization, instrumentation, shader-development, validation, and debug permutations explicitly. The ship cook strips all of them and fails if a shipping asset references one.
+- Strip target-incompatible and content-unreachable permutations before shader compilation and PSO creation. Keep only the allowlist, required fallbacks, and the runtime/DLC whitelist.
+- Treat a newly added static boolean as an architecture change: report how many shader binaries and PSOs it adds per target. Force dynamic branching unless captures demonstrate that the branch cost exceeds the compile-time, disk, memory, and PSO-cache cost of another dimension.
+
+```text
+candidates = solveConstraints(shaderFeatureSchema, targetCapabilities)
+requests   = cookedContentUsage union runtimeWhitelist
+reachable  = candidates intersect requests
+fallbacks  = fallbackClosureForTarget(requests, candidates)
+shipSet    = (reachable union fallbacks)
+             minus editorOnly
+             minus debugOnly
+
+for requestedVariant in requests:
+    selected = requestedVariant if requestedVariant in shipSet
+               else resolveFallbackForTarget(requestedVariant)
+    assert selected in shipSet
+```
+
+Emit a cook report containing candidate, stripped, fallback-only, and final counts by shader family and target. Gate regressions in CI; a permutation count that doubles needs an explicit performance justification.
+
+**PSO caching:** persist platform-appropriate pipeline data after the permutation set is pruned. DX12 uses `ID3D12PipelineLibrary`; Vulkan uses core `VkPipelineCache` and platform pipeline-library features where available. Seed or warm known PSOs under controlled loading screens, and never assume a cache blob is portable across driver or device identities.
 
 ---
 
 ## GPU Decompression
 
-**DirectStorage 1.2 + GDeflate** on PC/Xbox delivers NVMe → VRAM with decompression on the GPU. Throughput targets: 5-14 GB/s effective. The CPU is out of the loop.
+**DirectStorage on Windows PC** supports GPU decompression with GDeflate; DirectStorage 1.4 also adds a Zstandard path. Actual throughput depends on storage, queueing, codec, GPU contention, and asset layout. Xbox uses its platform I/O stack and dedicated decompression hardware rather than the PC GPU-GDeflate path.
 
 Implementation gates:
 - Asset must be GDeflate-compressed at cook time (RTX IO tooling or `gdeflate_compress`).
-- Read via `IDStorageFactory::OpenFile` → `EnqueueRequest` → GPU decompression → upload to committed resource.
+- Read through the DirectStorage queue into an appropriate destination resource; avoid describing the final copy/layout transition as a generic "upload."
 - Memory layout of cooked asset must match the layout expected on GPU (no CPU-side swizzle).
 
 PS5 has an equivalent (Kraken + hardware decompressor on I/O complex). Switch 2 (NVIDIA silicon, NVN2) exposes GPU-side decompression; on the original Switch (no HW decompressor) fall back to zstd on CPU with a dedicated streaming thread. (The skill's baseline is Switch 2 — see `CROSS_PLATFORM_AND_CONSOLE.md`.)
@@ -166,7 +226,7 @@ Audio is cheap to store, expensive to misconfigure. Loudness discipline matters 
 | **Opus**  | Default for VO and ambience; best quality/bitrate in 2026   |
 | AT9 / MP3 | Platform-specific legacy                                    |
 
-**LUFS normalization during cook** — measure integrated loudness (EBU R128 / ITU-R BS.1770 algorithm) and store it in metadata so runtime can apply gain without re-analysis. Target **games, not broadcast**: roughly **-16 to -18 LUFS** for the interactive mix is typical (and follow each platform's loudness cert guidance, e.g. ASWG-R001-style targets); **-23 LUFS is the EBU broadcast target, not a game default** — don't ship it for gameplay. Mixing engineers set relative levels, the cooker handles absolute.
+**LUFS normalization during cook** — measure integrated loudness (ITU-R BS.1770, the algorithm shared by EBU R128) and store it in metadata so runtime can apply gain without re-analysis. Loudness targets are **platform- and genre-dependent**, so honor the target platform's guidance rather than a single number. Sony's **ASWG-R001** — the recommendation from Sony Computer Entertainment's Audio Standards Working Group, built on BS.1770 — sets **-23 LUFS (±2 LU)**, the *same* integrated target as EBU R128 broadcast; the common claim that "-23 LUFS is broadcast-only, never a game default" is a myth (ASWG-R001 is a game-audio standard at exactly that level). Many action titles nonetheless mix hotter (roughly **-16 to -18 LUFS**) for impact. Pick one target per platform and be consistent; mixing engineers set relative levels, the cooker handles absolute.
 
 **Ambisonics:** B-format (4-channel W/X/Y/Z) at cook, decode to HRTF / speaker array at runtime. Higher-order ambisonics (HOA3 = 16ch) for VR/critical scenes only — 4x the memory.
 

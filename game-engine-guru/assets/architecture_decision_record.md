@@ -100,6 +100,11 @@ can confirm the chosen option is actually better than the near-misses.)
 
 # Worked example
 
+> **FICTIONAL EXAMPLE — NOT PROFILER EVIDENCE.** Every project name, date,
+> platform result, capture path, team constraint, and metric below is invented
+> solely to demonstrate how to fill out the template. Replace all of it with
+> reproducible measurements and real artifacts before using this ADR.
+
 ## ADR-0001: Adopt archetype-based ECS over OOP hierarchy
 
 ### Status
@@ -217,6 +222,10 @@ to implement and retrofit. Rejected because iteration performance on our
 reference scene was 1.8x slower than archetype chunks, and our simulation is
 iteration-bound. Sparse sets also complicate the deterministic replay story
 because iteration order depends on insertion history.
+
+This rejects a sparse-set-only world model. A hybrid may still place cold or
+high-churn components in sparse sets if deterministic snapshots iterate them in
+stable entity order; see `references/ECS_AND_DATA_ORIENTED.md`.
 
 #### Alternative C: Data-driven scripting VM (Lua-like) as the entity model
 

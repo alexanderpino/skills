@@ -26,10 +26,10 @@ Reference document for AAA-grade realtime rendering. Audience: senior graphics e
 
 ## Deferred vs Forward+ vs Adaptive Architecture
 
-The rigid deferred/forward dichotomy is dead. Every shipping AAA renderer in 2026 utilizes a hybrid approach: **Visibility-buffer** for dense opaque geometry, **Adaptive GBuffers** for modular material evaluation, and **Clustered Forward+** for transparents, hair, and VR.
+High-end renderers increasingly combine visibility buffers, deferred or adaptive material storage, and Clustered Forward+, but conventional deferred and forward pipelines remain valid. Select per pass and platform from measured geometry, material, bandwidth, MSAA, and tooling constraints.
 
 **Adaptive GBuffer (Variable Bitstream):**
-The legacy fixed-layout G-buffer (e.g., BaseColor, Normal, Roughness) has been superseded by the Adaptive GBuffer (pioneered by UE 5.7 Substrate). Instead of fixed render targets, material data is stored as a variable bitstream. 
+Adaptive material storage, including UE Substrate's production path, can encode variable closure payloads instead of a single fixed G-buffer layout.
 - **Dynamic Allocation:** A simple single-layer material (Slab) uses minimal bits. Complex layered closures (e.g., clearcoat over metallic with fuzz) expand the bitstream dynamically per-pixel.
 - **Tile Classification:** A compute pass classifies tiles by material complexity, allowing the deferred lighting pass to optimize branching and unpack only the required data.
 - **Visibility Buffer Resolve:** For Nanite-style dense geometry, the visibility buffer (R32 cluster ID | triangle ID) is resolved into the Adaptive GBuffer in a compute pass, ensuring zero overdraw during complex material evaluation.
@@ -37,15 +37,16 @@ The legacy fixed-layout G-buffer (e.g., BaseColor, Normal, Roughness) has been s
 **Legacy Fallback (Blendable/Compact G-buffer):**
 For low-end hardware or Switch 2, a compact legacy G-buffer (3x RT8, ~24 bpp effective) is used as a fallback, trading complex layered closures for static performance predictability.
 
-**Clustered Forward+ froxel grid:** 16x16 tile x 32 depth slices, logarithmic Z distribution:
+**Clustered Forward+ froxel grid:** 16×16-pixel screen tiles × 32 depth slices, logarithmic Z distribution. The grid dimensions are `ceil(W/16) × ceil(H/16) × 32`, so the froxel count scales with resolution — at 1920×1080 that is 120×68×32 ≈ 261k clusters, **not** a fixed 8192 (16 and 16 are the tile *size* in pixels, not the tile *count*).
 
 ```cpp
 // slice = log2(depth/near) / log2(far/near) * numSlices
 float k = numSlices / std::log2(farZ / nearZ);
-uint32_t slice = uint32_t(std::log2(depth / nearZ) * k);
+int   s = int(std::log2(depth / nearZ) * k);
+uint32_t slice = uint32_t(std::clamp(s, 0, int(numSlices) - 1)); // clamp: depth < near or > far
 ```
 
-Light lists packed as uint32 bitmasks — 256 lights per view = 8x uint32 per cluster. With 16x16x32 = 8192 clusters, that's 256 KB for the light index grid. Negligible.
+Light lists packed as uint32 bitmasks — 256 lights per view = 8× uint32 (32 B) per cluster. At 1080p that is ~261k clusters × 32 B ≈ **8 MB** for the light index grid (a fixed 8192-cluster grid would be only 256 KB, but that undercounts a real screen by ~32×). Still cheap relative to the frame's other buffers.
 
 **When to pick what:**
 - Visibility buffer + material resolve: opaque geometry, >100k instances, Nanite-style
@@ -73,9 +74,9 @@ On mobile TBDR (Apple Silicon, Adreno, Mali) deferred is a trap — the tile cac
 **API notes.** D3D12/Vulkan/Metal NDC z is already `[0,1]`, the natural fit. Set viewport `minDepth/maxDepth` accordingly. Legacy OpenGL clip-space z is `[-1,1]` (wastes a bit and half the range) — call `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)` before relying on reverse-Z.
 
 **Engine-wide ripple effects** — every depth consumer must adopt the reversed convention or it breaks subtly:
-- **HZB / occlusion culling:** "closest" is now the **largest** depth → build the Hi-Z pyramid with `max` reduction, not `min` (see `FRAME_GRAPH_AND_GPU_DRIVEN.md` §Two-Phase Occlusion). Getting the operator backwards either culls visible geometry or culls nothing — assert it in a unit test against a known-occluder scene.
+- **HZB / occlusion culling:** "closest" is now the **largest** depth, but a *conservative* occlusion HZB must store the **farthest** occluder so it never culls a visible object — and in reverse-Z the farthest surface is the **smallest** depth. So build the Hi-Z pyramid with **`min` reduction**, the mirror of standard-Z's `max` (see `FRAME_GRAPH_AND_GPU_DRIVEN.md` §Two-Phase Occlusion for build/test pseudocode). Getting the operator backwards either culls visible geometry or culls nothing — assert it in a unit test against a known-occluder scene.
 - **Depth bias / slope-scaled bias:** signs flip relative to standard-Z.
-- **Depth linearization:** the reconstruction `linearZ = near*far / (far + depth*(near-far))` changes form; centralize it in one shader include so every pass (SSAO, SSR, fog, decals, froxel-slice mapping) uses the same convention.
+- **Depth linearization:** the reconstruction changes form. **Finite-far reverse-Z:** `linearZ = near*far / (near + depth*(far - near))`. **Infinite-far reverse-Z** (`far → ∞`, the open-world default): it collapses to `linearZ = near / depth`. Note the standard-Z form `near*far / (far + depth*(near-far))` is *wrong* under reverse-Z — that mismatch is exactly the sign error to avoid. Centralize it in one shader include so every pass (SSAO, SSR, fog, decals, froxel-slice mapping) uses the same convention.
 - **Anything reading the depth buffer** — SSAO/GTAO, SSR HiZ march, deferred decals, volumetric froxel depth slicing, particle soft-blend — must use the reversed comparison and linearization. A single pass left on standard-Z produces a class of "works near the camera, wrong in the distance" bugs.
 
 ---
@@ -98,9 +99,9 @@ Constant buffers, structured-buffer elements, and push/root constants are read b
 
 ## PBR Material Model & OpenPBR
 
-> **Scope split — read this first.** This section covers the *engine-integration* side of PBR: how closures are packed into the Adaptive GBuffer, resolved from the visibility buffer, and evaluated in the deferred/forward lighting pass. The **shading math itself** — the rendering equation, microfacet theory (GGX NDF, Smith height-correlated masking-shadowing, Fresnel/Schlick/F82-tint), diffuse/sheen models, energy conservation & multi-scattering compensation (Kulla-Conty / Fdez-Agüera), split-sum IBL and the BRDF integration LUT, LTC area lights, OpenPBR 1.1.1 slab layering and coat-darkening physics, energy/BRDF LUTs, and SSS/transmission/IOR — **is owned by the `physically-based-rendering` skill. Load it before deriving, debugging, or implementing any BSDF math.** Do not reconstruct those equations from this summary.
+> **Scope split — read this first.** This section covers PBR engine integration. The shading math itself is owned by the `physically-based-rendering` skill; read it before deriving, debugging, or implementing BSDF math.
 
-The 2026 standard dictates a shift away from hardcoded shading models (e.g., "Default Lit" vs "Clear Coat") toward **Modular BSDF Closures** and strict alignment with the **OpenPBR 1.1.1** specification (supported by Epic, Unity, and Adobe).
+Modern authoring increasingly favors modular BSDF closures. Use **OpenPBR 1.1** as an interchange vocabulary where it fits; do not assume its exact parameterization is the optimal runtime representation for every engine.
 
 **Modular BSDFs (Substrate-style Slabs):**
 Materials are authored and evaluated as a series of layered "Slabs" and "Operators" (blend, add, multiply). A single slab encompasses parameterized responses natively supporting **Mean Free Path (MFP)** for subsurface scattering, **F90 (glancing reflectivity)**, and procedural **Glints/Fuzz** without requiring secondary G-buffer passes.
@@ -142,12 +143,15 @@ No single GI solution wins. Tier by platform and content:
 
 ```cpp
 struct Reservoir {
-    uint32_t lightIdx;
-    float   wSum;    // sum of weights
-    float   W;       // 1/pdf at selected sample
-    uint32_t M;      // samples seen
+    uint32_t lightIdx;  // selected sample y
+    float    wSum;      // running sum of RIS weights w_i = pHat(x_i) / p(x_i)
+    float    W;         // unbiased contribution weight for the selected sample
+    uint32_t M;         // candidate samples seen
 };
-// Update: with prob w/(wSum+w) replace sample
+// Stream insert (weighted reservoir sampling):
+//   wSum += w; ++M; if (rand() < w / wSum) lightIdx = candidate;  // w/wSum == w/(oldSum+w)
+// Finalize the contribution weight (it is NOT simply 1/pdf):
+//   W = wSum / (M * pHat(lightIdx));   // == (1 / pHat) * (wSum / M)
 ```
 
 Decision rule: if ray budget > 1 spp and BVH build fits in 2 ms/frame, use RT + ReSTIR. Otherwise SDF+DDGI. Never ship VXGI on new platforms — memory cost doesn't amortize.
@@ -162,12 +166,13 @@ Decision rule: if ray budget > 1 spp and BVH build fits in 2 ms/frame, use RT + 
 
 ```cpp
 float lambda = 0.75f;
-float uni = near + (far - near) * (i / N);
-float log_ = near * std::pow(far / near, i / N);
+float f = float(i) / float(N);                 // float ratio; int i/N would truncate to 0
+float uni  = near + (far - near) * f;
+float log_ = near * std::pow(far / near, f);
 splits[i] = lambda * log_ + (1.0f - lambda) * uni;
 ```
 
-2048^2 per cascade = 64 MB at D32F. Stabilize by snapping to texel grid to eliminate shimmer.
+2048² at D32F = 16 MB per cascade → 64 MB for all four. Stabilize by snapping to texel grid to eliminate shimmer.
 
 **PCSS:** blocker search 16 taps in a Poisson disk, penumbra = (receiver - blocker) / blocker * lightSize. Filter with 32-64 taps. Cost ~1 ms at 1080p — replace with RT shadows on capable platforms.
 
@@ -187,12 +192,13 @@ splits[i] = lambda * log_ + (1.0f - lambda) * uni;
 
 **Clustered forward+** already covered. Key detail: light culling in compute (one threadgroup per cluster, parallel sphere-vs-frustum test). 256 lights culled in ~0.2 ms.
 
-**Area lights via LTC (Heitz 2016):** linearly transformed cosines, 64x64 LUT of 4x4 matrices (tabulated by NoV, roughness). Closed-form polygonal integration. Works for rect/disk/line lights.
+**Area lights via LTC (Heitz 2016):** linearly transformed cosines. The clamped-cosine distribution is warped by a **3×3** transform `M` (evaluation uses its inverse `Minv`); by construction the matrix has only **four** non-trivial coefficients (the others are 0 or normalized to 1), so they pack into a single 64×64 RGBA LUT tabulated by (NoV, roughness). A **second** 64×64 LUT stores the BRDF **magnitude/norm** and the **Fresnel + geometric** term. Closed-form polygonal integration. Works for rect/disk/line lights.
 
 ```hlsl
-// LTC evaluation for a quad light
-float3x3 Minv = SampleLTC(NoV, roughness);
-float3 L = LTC_Evaluate(N, V, pos, Minv, quadPoints);
+// LTC evaluation for a quad light — Minv is 3x3, rebuilt from the 4 stored coefficients
+float3x3 Minv = SampleLTC(NoV, roughness);       // LUT 1: 4 matrix coefficients
+float2   mag  = SampleLTC_Mag(NoV, roughness);   // LUT 2: magnitude + Fresnel term
+float3 L = LTC_Evaluate(N, V, pos, Minv, quadPoints) * mag.x;
 ```
 
 Cost: ~50 ALU per light per pixel. Cheap. Replaces punctual-approximation hacks entirely.
@@ -219,9 +225,11 @@ struct Meshlet {
     float  errorLOD;       // screen-space error at this LOD
     float  parentErrorLOD; // error of parent (coarser) meshlet
     uint32_t vertexOffset, triangleOffset;
-    uint8_t  vertexCount, triangleCount;  // <=64 / <=128
+    uint8_t  vertexCount, triangleCount;  // Nanite cluster: <=128 verts, <=128 tris
 };
 ```
+
+> **Meshlet vs cluster caps — keep them straight.** The mesh-shader *authoring* unit in `ASSET_PIPELINE_AND_COOKER.md` caps meshlets at **64 vertices / 124 triangles** (the meshoptimizer + NVIDIA hardware sweet spot). Nanite's software LOD-DAG **clusters** instead group **~128 triangles**; when rasterized through the HW mesh-shader path they stay within its 256-vertex / 256-primitive limits. The two numbers describe different pipeline stages, not a contradiction.
 
 **Runtime:** GPU-driven. Persistent thread compute pass walks BVH, evaluates screen-space error per cluster, emits visible meshlets to an indirect draw buffer. Mesh shader (SM 6.5 / VK_EXT_mesh_shader) rasterizes, writes visibility buffer (R32 cluster ID | triangle ID).
 
@@ -233,7 +241,7 @@ Eliminates false occlusion from camera motion without popping.
 
 **Visibility buffer resolve:** material shading in a compute pass, one dispatch per material ID. Reconstruct attributes via barycentric interpolation from cluster index buffer. Avoids overdraw entirely — every pixel shades exactly once.
 
-DirectX 12 Work Graphs (SM 6.9) and Mesh Nodes are mandatory for the absolute fast path in 2026, allowing the GPU to spawn pipelines without CPU intervention. Fallback for SM 6.5: Mesh Shaders. Fallback for SM 6.0: classic VS/PS with GPU-culled indirect draws, ~2x slower but functional. Switch 2 supports mesh shaders; older mobile does not — author a traditional LOD chain for those.
+DirectX 12 compute Work Graphs are an optional Shader Model 6.8 path for irregular GPU-generated workloads. Mesh Nodes require the Shader Model 6.9 preview path and an opt-in Agility SDK. Keep SM 6.5 Mesh Shaders and SM 6.0 classic VS/PS with indirect draws as fallbacks. Profile representative content on each target.
 
 ---
 
@@ -328,9 +336,9 @@ buffer<uint> aliveIndicesA, aliveIndicesB, deadIndices;
 
 ## Neural Rendering
 
-**Production floor (2026) — table stakes, not optional:**
-- **Neural denoising / Ray Reconstruction.** DLSS Ray Reconstruction and the FSR 4 neural path are the production floor for any RT denoiser. The neural denoiser folds into the upscaler (see [Post-Processing Chain](#post-processing-chain) §5) and replaces separate hand-tuned SVGF/ReLAX passes for RT GI, reflections, and shadows. A denoiser pipeline that *cannot* run a neural path is behind the floor. Provide an `INeuralBackend` (DirectML / CoreML / console ML), stream model weights as cooked assets, and batch inference — never hardwire a classical-only denoiser.
-- **DLSS 4 / FSR 4 / XeSS 2:** neural upscalers, production-hardened.
+**Shipping options in 2026:**
+- **Neural denoising / Ray Reconstruction.** Use DLSS Ray Reconstruction and other vendor paths on supported hardware when image-quality and latency testing justify them. Retain classical denoisers such as ReLAX/ReBLUR/SVGF for unsupported platforms and as a diagnostic baseline.
+- **DLSS 4 / FSR 4 / XeSS 2:** integrate through vendor-specific capability and quality tiers; do not imply feature parity across GPU vendors or consoles.
 - **NVIDIA NTC (Neural Texture Compression):** 4-8x smaller than BC7 at comparable quality. Decoder inline in shader (~20 cycles per sample). Use for albedo/normal on distant LODs.
 
 **2027 production trajectory — design for it, gate it behind capability + fallback:**
@@ -341,7 +349,7 @@ buffer<uint> aliveIndicesA, aliveIndicesB, deadIndices;
 - NeRF / Gaussian-splat level-of-detail — interesting for background props and photogrammetry, not a primary-geometry path yet.
 - Neural BRDFs — research only; authoring and LOD are unsolved.
 
-Disclaimer: outside the production-floor items above, the neural rendering hype curve runs ahead of QA. Ship what your QA team can repro-test, gate everything else behind a capability query with a working classical fallback, and defer true R&D to feature branches. "Neural" is not an architecture — it is a tool with an `INeuralBackend` seam; the *seam* is mandatory now, even where a given model is not.
+Ship only what QA can reproduce, gate neural features behind capabilities and validated fallbacks, and add an `INeuralBackend` seam when concrete roadmap features need one.
 
 ---
 
@@ -360,12 +368,12 @@ uint bin = uint(t * 254.0) + 1;  // bin 0 = black pixels
 
 **HDR output:** HDR10 (BT.2020, PQ EOTF, 1000 nit typical mastering), Dolby Vision dynamic metadata (MaxCLL/MaxFALL per scene). Tonemap in scene-referred linear, convert to PQ, output 10-bit. Do NOT tonemap twice. Respect `SDR whitepoint` UI slider (typically 100-300 nits paper-white).
 
-**Color grading LUT:** 33x33x33 3D LUT in LogC or ACEScc space (log-encoded). Apply before tonemap curve. Artists author in Resolve/Nuke and export .cube. Runtime storage: 33^3 * 4 bytes RGBA16F = 144 KB.
+**Color grading LUT:** 33x33x33 3D LUT in LogC or ACEScc space (log-encoded). Apply before tonemap curve. Artists author in Resolve/Nuke and export .cube. Runtime storage: RGBA16F is **8 bytes/texel**, so 33³ × 8 B = 287,496 B ≈ 281 KiB (~288 KB). (An RGBA8 LUT would halve that to ~144 KB, but banding in log space usually forces 16F.)
 
 ---
 
 ## See Also
 
-- **`physically-based-rendering` skill** — authoritative for all material/BRDF/BSDF math: rendering equation, GGX/Smith/Fresnel/F82, energy conservation & multi-scatter compensation, split-sum IBL, LTC area lights, OpenPBR 1.1.1 slabs, energy/BRDF LUTs, SSS/transmission/IOR, MaterialX, and path-tracing vs. real-time trade-offs. Load it whenever a rendering task crosses from engine integration into shading correctness.
+- **`physically-based-rendering` skill** — authoritative for material/BRDF/BSDF math, OpenPBR 1.1, color management, and path-tracing trade-offs.
 - `CROSS_PLATFORM_AND_CONSOLE.md` — HAL/GAL design, platform-specific backends, shader cross-compilation
 - `PERFORMANCE_AND_PROFILING.md` — frame budgets, GPU-driven pipeline optimization, profiler integration

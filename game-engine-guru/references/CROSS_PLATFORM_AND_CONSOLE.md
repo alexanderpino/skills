@@ -81,9 +81,10 @@ VkQueue transferQueue;  // BAR uploads, avoids stalling gfx
 ```cpp
 VkTimelineSemaphoreSubmitInfo ts{};
 ts.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-uint64_t signalValue = frameIdx + FRAMES_IN_FLIGHT;
+uint64_t signalValue = ++queueTimelineValue; // persistent, globally monotonic
 ts.pSignalSemaphoreValues = &signalValue;
-// Wait on CPU: vkWaitSemaphores with value = frameIdx
+// Save signalValue as this submission/frame's completion value.
+// Wait on CPU with vkWaitSemaphores(completionValue) before reusing its resources.
 ```
 
 **Memory:** VMA (Vulkan Memory Allocator) is the right answer. Fight it only if you have a specific reason. Custom pools for: render targets (lazy-allocated on TBDR), streaming textures, uniform rings.
@@ -104,7 +105,7 @@ RWStructuredBuffer<Foo> buf = ResourceDescriptorHeap[pushConst.bufIdx];
 
 Root sig specifies `CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | SAMPLER_HEAP_DIRECTLY_INDEXED`. One shader-visible descriptor heap per frame in flight (~1M descriptors, ~32 MB). Push constants (root CBV / 32-bit constants) carry handles.
 
-**Enhanced barriers (D3D12 Agility SDK):** replace legacy `D3D12_RESOURCE_BARRIER` with `D3D12_BARRIER_GROUP`. Explicit access + sync + layout, matches Vulkan model. Elimitates split-barrier wrangling.
+**Enhanced barriers (D3D12 Agility SDK):** replace legacy `D3D12_RESOURCE_BARRIER` with `D3D12_BARRIER_GROUP`. Explicit access + sync + layout, matches Vulkan model. Eliminates split-barrier wrangling.
 
 ```cpp
 D3D12_TEXTURE_BARRIER tb {
@@ -176,13 +177,13 @@ id<MTLBuffer> argBuf = [device newBufferWithLength:enc.encodedLength ...];
 
 ## Console: Xbox Series X|S
 
-**Hardware (Series X):** AMD RDNA2, 52 CUs @ 1.825 GHz, 12.15 TFLOPS. 16 GB GDDR6 split: 10 GB @ 560 GB/s (GPU-optimal) + 6 GB @ 336 GB/s (CPU-optimal). SSD 2.4 GB/s raw, ~4.8 GB/s with hardware GDeflate.
+**Hardware (Series X):** AMD RDNA2, 52 CUs @ 1.825 GHz, 12.15 TFLOPS. 16 GB GDDR6 split: 10 GB @ 560 GB/s (GPU-optimal) + 6 GB @ 336 GB/s (standard). SSD throughput is 2.4 GB/s raw and approximately 4.8 GB/s for compressed data through the dedicated hardware decompression block.
 
 **Series S:** 20 CUs @ 1.565 GHz, 4 TFLOPS. 10 GB total. Target 1440p internal, upscale to 4K. The Series S is the floor for current-gen — design content with 2x VRAM differential to Series X in mind.
 
 **API:** DX12-X (Xbox GDK variant). Same shader compiler (DXC), same root signature model as PC DX12, plus console-only extensions (`D3D12XBOX_*`).
 
-**DirectStorage with GDeflate:** `DSTORAGE_REQUEST_DESTINATION_TEXTURE_REGION` streams compressed texture directly to VRAM. Decompression on GPU. Saves CPU cycles, avoids staging buffer. 4.8 GB/s sustained.
+**Xbox storage path:** use GDK DirectStorage with the console's dedicated decompression hardware and BCPack-aware content pipeline. Do not model this as the Windows PC GPU-GDeflate path.
 
 **Smart Delivery:** single SKU, platform-specific binaries + assets auto-delivered. Maintain Series X and Series S asset tiers in build pipeline.
 
@@ -194,9 +195,9 @@ id<MTLBuffer> argBuf = [device newBufferWithLength:enc.encodedLength ...];
 
 ## Console: Switch 2
 
-**Hardware (public/leaked as of 2026):** custom NVIDIA chip, Ampere-class mobile GPU (~1-1.5 TFLOPS docked, ~500 GF handheld), LPDDR5 memory. DLSS integration at silicon level.
+**Hardware:** a custom NVIDIA processor with RT and Tensor Cores, DLSS support, and separate handheld/docked power modes. Use current Nintendo developer documentation for exact clocks, available memory, reservations, and performance limits; public theoretical figures are not frame-budget guarantees.
 
-**GPU architecture:** technically IMR (immediate mode) like desktop NVIDIA, *not* TBDR. But with mobile power envelope, it behaves closer to TBDR-equivalent in terms of bandwidth sensitivity. Treat bandwidth as precious — the LPDDR5 bus is the bottleneck, not compute.
+**GPU architecture:** IMR (immediate mode), not TBDR. Its mobile power envelope and LPDDR5X bandwidth still require aggressive bandwidth and residency management.
 
 **ASTC compression:** 4x4 (8 bpp) through 12x12 (0.89 bpp). Use 6x6 or 8x8 as default for albedo, 4x4 for normals, 12x12 for distant LOD backgrounds. Never ship uncompressed textures.
 

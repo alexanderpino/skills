@@ -17,22 +17,22 @@ Reference document for the threading spine of the engine — Pillar 4. Audience:
 
 ---
 
-## Design Goals & Why Fibers
+## Design Goals & When to Use Fibers
 
-The target is **hundreds of thousands of tasks per frame** with sub-microsecond scheduling overhead, scaling linearly to the core count of a PS5 (8 cores / 16 threads) up to a 16-core desktop. Two non-negotiables drive the design:
+Set task count and scheduling overhead from the frame DAG and measured granularity. A good scheduler scales across the supported core topologies without assuming linear speedup. Two baseline constraints drive the design:
 
 1. **No OS thread per task.** `std::thread`/`std::async` cost thousands of cycles to spawn and rely on the OS scheduler — useless at this granularity. You spawn N worker threads *once* and feed them tiny jobs.
-2. **A job must be able to wait on its children without blocking its worker.** This is what fibers buy you: when a job waits on a dependency, its execution context (stack + registers) is *parked* as a fiber, and the worker immediately picks up other work. A blocked OS thread is dead weight; a parked fiber is free.
+2. **Dependency waits must not block a worker.** Prefer continuations or stackless coroutines for new asynchronous code. Fibers are valuable when synchronous call stacks must suspend: a waiting fiber parks and the worker runs other work.
 
-Naughty Dog's "Parallelizing the Naughty Dog Engine Using Fibers" (Christian Gyrling, GDC 2015) is still the reference architecture. id Tech and Frostbite use the same shape.
+Naughty Dog's "Parallelizing the Naughty Dog Engine Using Fibers" (Christian Gyrling, GDC 2015) is an important fiber design reference, not proof that every engine should adopt the same scheduler.
 
-**Fiber = user-space stack + context switch (~200 cycles)** vs. OS thread switch (~3,000–10,000 cycles). Downsides you must design around: fibers are harder to profile (a job migrates across worker threads), thread-local storage is treacherous (TLS belongs to the *thread*, not the fiber — never cache `thread_id` across a wait), and each fiber needs a pre-allocated stack (e.g. a pool of 128 fibers × 512 KB + a few large-stack fibers).
+Fiber and OS context-switch costs vary by ABI, security features, stack handling, and hardware; benchmark the real implementation. Fibers complicate profiling, thread-local state, sanitizer integration, migration, and stack sizing, so adopt them only when suspension semantics justify that cost.
 
 ---
 
 ## Worker Threads & Affinity
 
-- **One worker thread per hardware thread**, minus reservations. Typical: `workers = hw_concurrency - 2` (reserve one for the main/OS thread, one for the dedicated audio thread which must never miss its callback deadline).
+- **Worker count is topology- and workload-dependent.** Start near available physical cores, reserve dedicated real-time/platform threads, and tune for SMT and heterogeneous cores. Do not derive console policy from `std::thread::hardware_concurrency()`.
 - **Pin workers to cores** where the platform allows (consoles: yes, mandatory and reliable; desktop: soft affinity, the OS may override). Pinning keeps per-core caches warm and makes profiling legible.
 - **The main thread is a worker too** — it runs jobs while waiting at sync points instead of spinning idle.
 - **Heterogeneous cores** (mobile big.LITTLE, desktop P/E cores): tag jobs that are latency-critical to prefer P-cores; let throughput jobs land anywhere. Don't pin a frame-critical job to an E-core.
@@ -47,21 +47,34 @@ Each worker owns a **double-ended queue** (Chase-Lev style, lock-free):
 - **Thieves** steal from the *top* (FIFO — oldest job, most likely to have its own children and spread work).
 
 ```cpp
-// Owner side: push/pop bottom, no atomics on the common path (relaxed + fence).
-void push(Job* j)      { deque[bottom & MASK] = j; std::atomic_thread_fence(release); bottom++; }
-Job* pop() {            // returns null if empty; resolves race with thief at last element
-    bottom--; std::atomic_thread_fence(seq_cst);
-    /* compare bottom vs top, CAS on the contended last element */
+// top and bottom are atomic indices. Slots remain valid until no thief can
+// observe their generation; production code must also implement safe growth.
+void push(Job* j) {
+    const size_t b = bottom.load(std::memory_order_relaxed);
+    slots[b & MASK].store(j, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
+    bottom.store(b + 1, std::memory_order_relaxed);
+}
+Job* pop() {
+    // Follow the published Chase-Lev algorithm exactly, including restoring
+    // bottom and resolving the final-item race with a CAS on top.
+    /* full implementation intentionally omitted */
 }
 // Thief side: steal from top via CAS on `top`.
 Job* steal() {
-    size_t t = top.load(acquire);
-    std::atomic_thread_fence(seq_cst);
-    if (t < bottom) { Job* j = deque[t & MASK];
-        if (top.compare_exchange_strong(t, t+1)) return j; }
+    size_t t = top.load(std::memory_order_acquire);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    const size_t b = bottom.load(std::memory_order_acquire);
+    if (t < b) {
+        Job* j = slots[t & MASK].load(std::memory_order_relaxed);
+        if (top.compare_exchange_strong(t, t + 1,
+                std::memory_order_seq_cst, std::memory_order_relaxed)) return j;
+    }
     return nullptr;     // empty or lost the race
 }
 ```
+
+Do not reconstruct the omitted `pop`/resize/reclamation paths from this sketch. Reuse a reviewed implementation or the published algorithm and prove it with TSAN, stress tests, and weak-memory targets.
 
 **Victim selection:** random victim is good enough and avoids convoying; bias toward a NUMA-local or same-cluster victim on big machines. A worker that finds its own deque empty steals; if all steals fail, it backs off (spin → pause → short sleep) rather than burning a core.
 
@@ -72,11 +85,18 @@ Job* steal() {
 A **job** is a function pointer + a small payload (fits in a cache line — copy the data in, don't chase pointers). Dependencies are expressed with **atomic counters**, not by storing parent/child pointers everywhere.
 
 ```cpp
-struct Job {
-    void (*fn)(void* data);
-    alignas(16) std::byte data[CACHE_LINE - sizeof(fn) - sizeof(void*)];
-    Counter* decrementOnComplete;   // signaled when this job finishes
+inline constexpr std::size_t CACHE_LINE = 64;   // 128 on Apple M-series; size to target
+
+// Both pointers go first so the payload starts 16-aligned and the whole struct
+// is exactly one line. Putting `data` between them (with alignas(16)) would pad
+// fn up to offset 16 and push the trailing pointer past 64 B — 80 B in practice.
+struct alignas(CACHE_LINE) Job {
+    void    (*fn)(void* data);       // 8 B
+    Counter*  decrementOnComplete;   // 8 B — signaled when this job finishes
+    std::byte data[CACHE_LINE - 2 * sizeof(void*)];   // 48 B payload, 16-aligned
 };
+static_assert(sizeof(Job)  == CACHE_LINE);
+static_assert(alignof(Job) == CACHE_LINE);
 
 // A Counter holds the number of outstanding jobs in a group.
 // Waiting on a counter == waiting for all jobs that decrement it.

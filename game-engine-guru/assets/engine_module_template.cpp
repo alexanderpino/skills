@@ -18,6 +18,7 @@
 #include <cstring>
 #include <new>          // std::launder, placement new (not operator new)
 #include <numbers>
+#include <limits>
 
 #include <engine/ecs/Archetype.h>
 #include <engine/ecs/View.h>
@@ -35,12 +36,6 @@ constinit FooModule g_fooModule{};
 /// 64 KiB = 2048 * 32B = room for 2048 FooComponents plus headroom.
 constexpr std::size_t kFooPersistentBytes = 64u * 1024u;
 
-/// Aligns `x` up to a power-of-two `a`. Precondition: a is a power of two.
-[[nodiscard]] constexpr std::size_t AlignUp(std::size_t x, std::size_t a) noexcept
-{
-    return (x + (a - 1u)) & ~(a - 1u);
-}
-
 } // namespace
 
 FooModule* GetFooModule() noexcept { return &g_fooModule; }
@@ -50,39 +45,67 @@ FooModule::Init(ecs::World& world) noexcept
 {
     ZoneScoped;
 
-    if (m_initialized) [[unlikely]]
+    if (m_initialized || m_systemRegistered || m_componentRegistered) [[unlikely]]
     {
         core::LogError("FooModule::Init called twice");
         return std::unexpected(core::EngineError::AlreadyInitialized);
     }
-
-    // Reserve a persistent slab for the module's private tables.
-    // Never call `new` or `malloc`; the persistent allocator owns engine-lifetime memory.
-    auto slab = memory::g_persistentAllocator->Allocate(kFooPersistentBytes, alignof(std::max_align_t));
-    if (!slab) [[unlikely]]
+    if (m_persistent == nullptr && memory::g_persistentAllocator == nullptr) [[unlikely]]
     {
-        return std::unexpected(slab.error()); // EngineError::OutOfMemory
+        return std::unexpected(core::EngineError::InvalidState);
     }
 
-    m_persistent      = static_cast<std::byte*>(*slab);
-    m_persistentBytes = kFooPersistentBytes;
-    std::memset(m_persistent, 0, m_persistentBytes);
-
-    // Register the system with the world's scheduler. World::RegisterSystem
-    // is expected to return std::expected; propagate errors verbatim.
-    if (auto r = world.RegisterSystem<FooSystem>(); !r) [[unlikely]]
-    {
-        return std::unexpected(r.error());
-    }
-
-    // Register the component type so archetypes can include it.
+    // Do all fallible registrations before consuming arena memory. Each step is
+    // rolled back on failure so callers may safely retry Init().
     if (auto r = world.RegisterComponent<FooComponent>(); !r) [[unlikely]]
     {
         return std::unexpected(r.error());
     }
 
+    if (auto r = world.RegisterSystem<FooSystem>(); !r) [[unlikely]]
+    {
+        if (auto rollback = world.UnregisterComponent<FooComponent>(); !rollback)
+        {
+            m_world = &world;
+            m_componentRegistered = true;
+            return std::unexpected(rollback.error());
+        }
+        return std::unexpected(r.error());
+    }
+
+    // A monotonic persistent arena cannot individually free this module's slab.
+    // Reserve it once and reuse it across Shutdown()/Init() cycles.
+    if (m_persistent == nullptr)
+    {
+        auto slab = memory::g_persistentAllocator->Allocate(
+            kFooPersistentBytes, alignof(std::max_align_t));
+        if (!slab) [[unlikely]]
+        {
+            if (auto rollback = world.UnregisterSystem<FooSystem>(); !rollback)
+            {
+                m_world = &world;
+                m_systemRegistered = true;
+                m_componentRegistered = true;
+                return std::unexpected(rollback.error());
+            }
+            if (auto rollback = world.UnregisterComponent<FooComponent>(); !rollback)
+            {
+                m_world = &world;
+                m_componentRegistered = true;
+                return std::unexpected(rollback.error());
+            }
+            return std::unexpected(slab.error());
+        }
+        m_persistent      = static_cast<std::byte*>(*slab);
+        m_persistentBytes = kFooPersistentBytes;
+    }
+
+    std::memset(m_persistent, 0, m_persistentBytes);
+
     m_world       = &world;
     m_liveCount   = 0;
+    m_systemRegistered = true;
+    m_componentRegistered = true;
     m_initialized = true;
     return {};
 }
@@ -97,9 +120,27 @@ FooModule::Tick(float dt) noexcept
         return std::unexpected(core::EngineError::InvalidState);
     }
 
+    if (!std::isfinite(dt) || dt < 0.0f) [[unlikely]]
+    {
+        return std::unexpected(core::EngineError::InvalidArgument);
+    }
+
     // Per-frame scratch example: build a transient dirty list in frame memory.
     // The frame allocator is reset by the Kernel at end-of-frame, so no free is required.
     const std::size_t maxDirty = m_liveCount;
+    if (maxDirty == 0u)
+    {
+        return {};
+    }
+    if (memory::g_frameAllocator == nullptr) [[unlikely]]
+    {
+        return std::unexpected(core::EngineError::InvalidState);
+    }
+    if (maxDirty > std::numeric_limits<std::size_t>::max() / sizeof(FooHandle))
+        [[unlikely]]
+    {
+        return std::unexpected(core::EngineError::OutOfMemory);
+    }
     auto scratch = memory::g_frameAllocator->Allocate(
         maxDirty * sizeof(FooHandle), alignof(FooHandle));
     if (!scratch) [[unlikely]]
@@ -121,16 +162,32 @@ FooModule::Shutdown() noexcept
 {
     ZoneScoped;
 
-    if (!m_initialized)
+    if (!m_initialized && !m_systemRegistered && !m_componentRegistered)
     {
         // Idempotent: return success if already shut down.
         return {};
     }
 
-    // Persistent allocator is bulk-reset by the Kernel at engine teardown.
-    // We null our view of it and let the Kernel reclaim the whole arena.
-    m_persistent      = nullptr;
-    m_persistentBytes = 0;
+    if (m_systemRegistered)
+    {
+        if (auto r = m_world->UnregisterSystem<FooSystem>(); !r) [[unlikely]]
+        {
+            return std::unexpected(r.error());
+        }
+        m_systemRegistered = false;
+    }
+
+    if (m_componentRegistered)
+    {
+        if (auto r = m_world->UnregisterComponent<FooComponent>(); !r) [[unlikely]]
+        {
+            return std::unexpected(r.error());
+        }
+        m_componentRegistered = false;
+    }
+
+    // Retain the monotonic-arena slab for a later Init(). The Kernel owns and
+    // bulk-resets it only after this module object can no longer be reinitialized.
     m_world           = nullptr;
     m_liveCount       = 0;
     m_initialized     = false;
@@ -144,6 +201,12 @@ FooModule::Shutdown() noexcept
 void FooSystem::Update(ecs::World& world, float dt) noexcept
 {
     ZoneScoped;
+
+    if (!std::isfinite(dt) || dt < 0.0f) [[unlikely]]
+    {
+        core::LogError("FooSystem::Update rejected invalid delta time");
+        return;
+    }
 
     // SoA iteration: request contiguous arrays of FooComponent across all archetypes
     // that contain it. `view.ForEachChunk` passes cache-friendly spans to the lambda.
@@ -159,12 +222,26 @@ void FooSystem::Update(ecs::World& world, float dt) noexcept
         // Writes are confined to this chunk; no aliasing with other systems.
         for (FooComponent& c : chunk)
         {
+            if (!std::isfinite(c.phase))
+            {
+                c.phase = 0.0f;
+                c.flags |= FooFlag_Dirty;
+                continue;
+            }
+
             const bool active = (c.flags & FooFlag_Active) != 0u;
             const float step  = active ? (c.strength * dt) : 0.0f;
 
             float p = c.phase + step;
-            // fmodf is faster than fmod for single-precision; keep phase in [0, 2pi).
-            if (p >= kTwoPi) { p = std::fmod(p, kTwoPi); }
+            if (!std::isfinite(p))
+            {
+                p = 0.0f;
+            }
+            else
+            {
+                p = std::fmod(p, kTwoPi);
+                if (p < 0.0f) { p += kTwoPi; }
+            }
 
             c.phase = p;
             c.flags |= FooFlag_Dirty;

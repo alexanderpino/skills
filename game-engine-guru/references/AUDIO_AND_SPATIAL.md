@@ -44,7 +44,7 @@ struct AudioEngine {
 
 **HRTF.** Head-Related Transfer Function. Per-ear impulse response measured (or simulated) as a function of azimuth/elevation. Convolve the mono source with left/right HRIR and you get binaural output. Use for headphone output. Partitioned convolution (Gardner 1995): 128-sample first block, larger blocks later — amortizes FFT cost across frames.
 
-Budget: 256 concurrent HRTF voices on a modern console. Standard HRTF dataset is MIT KEMAR or IRCAM LISTEN. Personalized HRTF measurement exists (Apple AirPods, PlayStation Tempest) but you still ship a generic default.
+Budget HRTF voices separately from the total voice pool. A title might render 16-64 high-priority binaural voices and virtualize or pan the rest, but the correct count depends on filter length, partitioning, platform DSP, and the audio frame budget.
 
 **Ambisonics.** Sound field encoded as spherical harmonics. First-order (FOA, 4 channels) for ambient beds. Third-order (3OA, 16 channels) for precise positioning of non-point sources. Rotate the field with the listener's head orientation (cheap — block-diagonal rotation matrix). Decode to HRTF virtual speakers at output.
 
@@ -53,7 +53,12 @@ Budget: 256 concurrent HRTF voices on a modern console. Standard HRTF dataset is
 - Log: `gain = dmin / d` past `dmin`, clamped at `dmax` — physically accurate, long tail
 - Inverse (curve-based): sound designer authors curve, engine evaluates — ship this
 
-**Doppler.** Velocity projected on listener-source axis drives pitch shift: `f' = f * (c + vL) / (c + vS)` with `c = 343 m/s`. Cap shift at [0.5, 2.0] to avoid "bee noise" when objects graze the listener. Disable for UI sounds, menu music, and narrative VO.
+**Doppler.** Project both velocities onto a single axis and pitch-shift. Fix the convention explicitly or you will invert it: let `u = normalize(source_pos − listener_pos)` (the **listener→source** axis). Project *both* velocities onto that same `u`:
+
+- `vL = dot(listener_velocity, u)` — listener velocity along listener→source
+- `vS = dot(source_velocity,   u)` — source velocity along listener→source
+
+Then `f' = f * (c + vL) / (c + vS)` with `c = 343 m/s`. With this convention, *closing the gap raises pitch*: a listener moving toward the source gives `vL > 0` (numerator up); a source moving toward the listener moves opposite `u`, so `vS < 0` (denominator down). Both push `f'` up, as expected. Clamp the denominator away from zero (guard `c + vS`) before dividing, then cap the final shift at [0.5, 2.0] to avoid "bee noise" when objects graze the listener. Disable for UI sounds, menu music, and narrative VO.
 
 ---
 
@@ -92,7 +97,7 @@ Per-material properties, stored in the same material DB used by rendering and ph
 
 ## 5. Voice Management
 
-**Voice pool.** 256 concurrent voices is a reasonable AAA target (48kHz, 16 channels of HRTF + ambience + music + UI). Pre-allocate in persistent tier. Zero heap traffic during play.
+**Voice pool.** A preallocated pool around 256 voices is a plausible starting point, not a standard. Establish separate budgets for active decode, DSP, HRTF, ambience, music, UI, and virtual voices from target-platform profiling.
 
 **Priority stealing.** When the pool is full and a new voice is requested:
 1. Score every active voice: `score = importance - distance_attenuation_dB - age_seconds * 0.5`
@@ -102,6 +107,24 @@ Per-material properties, stored in the same material DB used by rendering and ph
 Importance is authored per-asset (dialogue=10, weapon fire=8, footstep=3, ambient leaf=1).
 
 **Virtualization.** Voices below the audibility threshold (gain < -60 dB) are suspended, not stolen. Keep their playback position ticking; when they become audible again, resume. Essential for long ambient loops and looping emitters.
+
+```text
+// Pseudocode: voice lifecycle — Active ⇄ Virtual, plus steal on pool-full request.
+score(v) = v.importance - v.attenuation_dB - v.age_seconds * 0.5
+
+request_voice(new):
+    if have_free_slot(): return start(new, take_free_slot())
+    worst = argmin(active_voices, key=score)
+    if score(new) > score(worst):
+        fade_out(worst, 20ms); recycle(worst); return start(new, worst.slot)
+    return DROP(new)                         // not worth a slot
+
+tick_voice(v):                               // once per mix block
+    if v.state == Active  and v.gain_dB <  -60: v.state = Virtual   // suspend decode/DSP
+    if v.state == Virtual and v.gain_dB >= -60 and have_free_or_stealable():
+        v.state = Active                     // resume at the position that kept ticking
+    if v.state == Virtual: advance_position(v)   // clock only, zero decode/DSP cost
+```
 
 **Fade on steal.** 20ms linear ramp to zero before reusing the voice slot. Zero clicks, zero pops. Non-negotiable.
 

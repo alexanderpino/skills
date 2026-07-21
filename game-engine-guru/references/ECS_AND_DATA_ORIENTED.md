@@ -1,10 +1,11 @@
 # ECS & Data-Oriented Design
 
-Reference document for the entity model — Pillar 5 and the data-oriented spine (Pillar 1). Audience: senior gameplay/engine engineers. This file is the implementation-level deep dive behind the authoritative rules in `SKILL.md` §"ECS Architecture Rules". Read those rules first; this file explains *how* to build the storage and query machinery that makes them hold.
+Reference document for the entity model and data-oriented world storage. Audience: senior gameplay/engine engineers. This file is the implementation-level deep dive behind `SKILL.md` §"Archetype ECS Defaults".
 
 ## Table of Contents
 
 - Why Archetypes
+- Hybrid Archetype + Sparse-Set Storage
 - Chunk Storage Layout
 - The Archetype Graph (structural changes)
 - Entities, Handles & Generations
@@ -33,6 +34,93 @@ The archetype model pays a **cost on structural change** (adding/removing a comp
 
 ---
 
+## Hybrid Archetype + Sparse-Set Storage
+
+A production hybrid uses archetype chunks and sparse sets in the **same world**, with one authoritative storage policy per component type. It is not two copies of the component and it is not an excuse to choose storage ad hoc at each call site.
+
+| Put the component in... | When the measured workload looks like... |
+|-------------------------|-------------------------------------------|
+| **Archetype column** | Read with other hot components across many entities; composition is stable; linear iteration and SIMD dominate |
+| **Sparse set** | Rare/optional, cold or large; frequently added/removed; accessed primarily by entity or editor/tool workflows |
+| **External specialized store** | Variable-size payloads, graphs, physics SDK objects, audio voices, or GPU-owned data represented in ECS by a handle |
+
+Do not move `Transform`, `Velocity`, or another frame-wide stream into a sparse set merely because insertion is convenient. Do not place a 4 KB inventory blob inline in every chunk merely because its owner is an entity. Measure bytes scanned, join hit rate, structural moves, random lookups, and mutation frequency.
+
+### Storage and lifetime invariants
+
+- Register an immutable `StoragePolicy` for each component type when the world schema is built: `Archetype`, `SparseSet`, or `ExternalHandle`. Changing the policy is an offline schema migration, not a runtime operation.
+- The entity slot table remains the authority for `{index, generation, alive}`. Sparse membership must validate the generation, not just reuse `entity.index`; otherwise a destroyed entity's component can attach to a new entity that reuses the slot.
+- Destroying an entity removes every sparse component it owns before the slot generation advances. Maintain a compact per-entity sparse-membership mask/list so destruction does not scan every sparse pool.
+- Sparse dense indices, archetype rows, and chunk addresses are unstable implementation details. Never serialize, replicate, or expose them as gameplay identity.
+
+```cpp
+// Illustrative sparse-set shape. Production storage also tracks page versions,
+// allocator ownership, and a per-entity membership list for destruction.
+template<class T>
+struct SparseSet {
+    struct SparseEntry { uint32_t dense; uint32_t generation; };
+    std::vector<SparseEntry> sparse;   // indexed by Entity.index; Invalid if absent
+    std::vector<Entity>      entities; // dense, swap-removed
+    std::vector<T>           values;   // same order as entities
+
+    T* try_get(Entity e) noexcept {
+        if (e.index >= sparse.size()) return nullptr;
+        const SparseEntry s = sparse[e.index];
+        if (s.dense == Invalid || s.generation != e.generation) return nullptr;
+        if (s.dense >= entities.size() || s.dense >= values.size()) return nullptr;
+        return entities[s.dense] == e ? &values[s.dense] : nullptr;
+    }
+};
+```
+
+### Hybrid query planning
+
+A hybrid query must choose a **driving store**; blindly scanning every archetype row and probing a rare sparse component destroys the cache advantage the archetype bought.
+
+- Drive from matching archetype chunks when required archetype columns are the smaller/selective side or when most rows also contain the sparse component.
+- Drive from the smallest required sparse set when that component is rare. For each dense sparse entity, validate the entity slot and resolve required archetype columns through the entity-location table.
+- Cache the query plan and cardinality estimates. Re-plan at a safe point when archetype or sparse-set populations change materially.
+- Optional sparse components are membership probes. Keep the branch outside vectorized inner loops when possible by partitioning matches or running a second sparse-driven pass.
+
+```text
+// HYBRID QUERY PSEUDOCODE — one authoritative store per component type.
+plan(requiredArchetype, requiredSparse):
+    chunkRows  = estimateRows(matchingArchetypes(requiredArchetype))
+    sparseLead = smallestByPopulation(requiredSparse)
+
+    if sparseLead exists and costOfSparseDrive(sparseLead) < costOfChunkScan(chunkRows):
+        return SparseDriven(sparseLead)
+    return ArchetypeDriven(matchingArchetypes(requiredArchetype))
+
+execute(SparseDriven lead):
+    for entity in lead.denseEntities:
+        if not world.isAlive(entity): continue
+        location = world.location(entity)
+        if location.archetype lacks requiredArchetype: continue
+        if any required sparse set lacks entity: continue
+        invoke(entity, archetypeColumns(location), sparseValues(entity))
+
+execute(ArchetypeDriven chunks):
+    for chunk in chunks:
+        for row in chunk.rows:
+            entity = chunk.entities[row]
+            if any required sparse set lacks entity: continue
+            invoke(entity, chunk.columns(row), sparseValues(entity))
+```
+
+### Mutation, scheduling, and change detection
+
+Route both storage models through the ECB. Sparse insertion/removal does not move an archetype row, but immediate swap-removal still invalidates a sparse iteration and makes parallel ordering nondeterministic.
+
+- Play archetype moves and sparse mutations at the same exclusive structural barrier. Apply commands in deterministic system/worker/record order.
+- Scheduler conflicts remain component-based: a sparse `Inventory` write conflicts with every `Inventory` read/write regardless of its physical store. Partition parallel sparse iteration by non-overlapping dense pages.
+- Archetype columns use per-chunk change versions. Sparse sets use per-page versions for scans and optional per-entry versions when precise replication or editor invalidation justifies the bytes.
+- Deterministic snapshots and state hashes iterate sparse entries in stable entity order, not swap-remove dense order.
+
+**Decision rule:** start with archetype storage for demonstrated hot joins and sparse storage for demonstrated cold/volatile components. Move a type only from profiler evidence and ship the migration as a versioned schema change. A hybrid is successful when it reduces bytes scanned and bytes moved—not when it maximizes the number of storage abstractions.
+
+---
+
 ## Chunk Storage Layout
 
 An archetype's entities are stored in fixed-size **chunks** (16 KB is the typical sweet spot — fits comfortably in L1/L2 working sets and amortizes per-chunk overhead). Within a chunk, each component type gets its own tightly-packed sub-array (SoA):
@@ -47,7 +135,8 @@ Chunk (16 KB):
 │ Velocity[]   v0 v1 v2 ... vN                                │
 │ Mesh[]       m0 m1 m2 ... mN                                │
 └───────────────────────────────────────────────────────────┘
-capacity N = (chunkSize - header) / sum(sizeof(component))
+capacity N ≈ (chunkSize - header - alignment padding)
+             / (sizeof(Entity) + sum(sizeof(component)))
 ```
 
 - **Components are plain data** — `static_assert(std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>)` at registration (SKILL.md ECS rule 1). This is what makes "move entity = memcpy columns" legal.
@@ -119,7 +208,7 @@ ecb.AddComponent(entity, Burning{ duration });
 ecb.DestroyEntity(deadEntity);
 ecb.CreateEntity(bulletArchetype, spawnData);
 
-// At a system-boundary sync point on the main thread — apply:
+// At an exclusive system-boundary sync point — apply:
 ecb.Playback(world);   // now the structural changes happen, in recorded order
 ```
 
@@ -136,8 +225,9 @@ Skip work on data that didn't change (SKILL.md ECS rule 7). Maintain a **monoton
 
 ```cpp
 // A system that writes Position bumps the chunk's Position version to the global tick.
-// A downstream system filters Changed<Position> → skip chunks whose
-// Position version < the consumer's last-seen version.
+// A downstream system filters Changed<Position> → process only chunks whose
+// Position version is newer than what it last saw (version > lastSeen), i.e.
+// skip chunks whose Position version <= the consumer's last-seen version.
 if (chunk.version<Position>() <= consumer.lastSeen) continue;   // whole chunk skipped
 ```
 
@@ -154,19 +244,41 @@ Systems are stateless transformations (SKILL.md ECS rule 3); the scheduler runs 
 - **Access declaration:** each system declares the components it reads vs. writes (derived from its query types: `const T` = read, `T&` = write).
 - **Conflict rule:** two systems can run in parallel unless one **writes** a component the other reads or writes (read-read is fine). This is a read-write dependency graph over component types → scheduled on the job system (`JOB_SYSTEM_AND_FIBERS.md`).
 - **Intra-system parallelism:** a single system's chunk loop is a `parallel_for` over matching chunks — each job owns disjoint chunks, so no synchronization inside the system.
-- **Structural changes are the sync point:** ECB playback happens between system batches, on the main thread, where no system is iterating. That's the one place the archetype layout is allowed to change.
+- **Structural changes are the sync point:** ECB playback happens between system batches at an exclusive barrier where no system is iterating. The playback job need not be the main thread; exclusivity and deterministic ordering are the requirements.
 - Determinism: with the same data, the same access graph yields the same schedule; ECB merge order is fixed. Combined with the job system's deterministic mode, the whole simulation is replayable.
+
+```text
+// Pseudocode: derive the conflict DAG from declared access, then run ready jobs.
+// access(sys) = { reads:set<Comp>, writes:set<Comp> }  (from const/non-const query types)
+conflict(a, b):                        // read-read never conflicts
+    return (a.writes ∩ (b.reads ∪ b.writes)) ≠ ∅
+        or (b.writes ∩ (a.reads ∪ a.writes)) ≠ ∅
+
+build_dag(systems):                    // registration order breaks ties → deterministic
+    for i in 0..N-1: for j in i+1..N-1:
+        if conflict(systems[i], systems[j]): add_edge(i -> j)   // earlier registration first
+
+schedule(dag):
+    for s in systems: indeg[s] = incoming_edges(s)
+    ready = { s : indeg[s] == 0 }      // no unmet dependency → schedulable now
+    while ready or in_flight:
+        for s in drain(ready): run_job(s)      // s's chunk loop is itself a parallel_for
+    on_complete(s):                    // fires when s's parallel_for finishes
+        for t in successors(s):
+            if --indeg[t] == 0: ready.add(t)
+    // barrier after the graph drains: ECB playback here (the structural-change sync point)
+```
 
 ---
 
 ## GameplayECS vs. VisualECS
 
-SKILL.md Pillar 5 splits the ECS in two — design them differently:
+At large visual scale, separate CPU gameplay state from GPU-owned instance data:
 
 - **GameplayECS (CPU-resident).** Complex logic, structural changes, relationships, the archetype machinery above. Sized for thousands–hundreds-of-thousands of gameplay entities. Optimized for flexible queries and change detection.
 - **VisualECS (GPU-resident, in VRAM).** Millions of visual-only entities (instances, foliage, debris) whose data lives in GPU buffers and is consumed by GPU-driven culling/draw (`FRAME_GRAPH_AND_GPU_DRIVEN.md`). Don't run gameplay queries over these — they're a flat, GPU-owned instance stream. The bridge is one-way: gameplay writes spawn/despawn/transform deltas into the persistent instance buffer; the GPU never writes back into GameplayECS.
 
-Keeping these separate is what lets the engine scale from Pong to a 15-billion-instance open world (SKILL.md §Scalability) without paying gameplay-ECS overhead per blade of grass.
+Keeping these separate avoids paying gameplay-ECS overhead per visual-only instance while preserving handles for the subset promoted into gameplay.
 
 ---
 
@@ -174,14 +286,14 @@ Keeping these separate is what lets the engine scale from Pong to a 15-billion-i
 
 - **Singletons are components on a singleton entity** for *gameplay* state (`world.GetSingleton<InputState>()`) — fine. But **core engine systems (`IGraphicsDevice`, `IJobSystem`) must never live in the ECS** (SKILL.md ECS rule 6); inject them, don't smuggle them in as components.
 - **Relationships/hierarchy:** store parent as a component (`Parent{ Entity }`) and maintain child lists separately; or use a dedicated relationship store (Flecs-style). Don't rebuild a pointer-chasing scene graph — that's the OOP god-object the ECS exists to kill.
-- **Forbidden** (SKILL.md): components with methods/virtuals/non-trivial ctors; mutating structure mid-iteration; `std::unordered_map<Entity, T>` as "component" storage in a hot path (cache-hostile — use a real archetype/sparse column); storing `shared_ptr` in components.
+- **Forbidden:** virtual ownership graphs in hot components; unregistered non-trivial lifecycle; mutating structure mid-iteration; ad hoc `std::unordered_map<Entity, T>` component storage; owning `shared_ptr` churn in frame-wide component streams.
 - **Right-sizing:** a tiny game doesn't need GPU VisualECS or change-version machinery active — these tick at ~0 when unused (zero-overhead principle). Don't force the full apparatus on content that doesn't need it.
 
 ---
 
 ## See Also
 
-- `SKILL.md` §"ECS Architecture Rules (authoritative)" — the 7 rules this file implements
+- `SKILL.md` §"Archetype ECS Defaults" — the defaults this file implements and qualifies
 - `JOB_SYSTEM_AND_FIBERS.md` — the scheduler systems run on; `parallel_for` over chunks
 - `FRAME_GRAPH_AND_GPU_DRIVEN.md` — VisualECS feeds GPU-driven culling; change detection drives instance re-upload
 - `CPP23_26_AND_MODERN_PATTERNS.md` — `Handle<T>`/generations, concepts for component constraints, EASTL containers

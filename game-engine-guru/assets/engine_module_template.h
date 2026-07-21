@@ -107,7 +107,8 @@ public:
 
     /**
      * @brief Release all module-owned resources. Idempotent; safe to call twice.
-     * @return Ok on success; EngineError::InvalidState if already shut down.
+     * @return Ok on success, including when already shut down; otherwise the
+     *         first scheduler/component-unregistration error.
      */
     [[nodiscard]] std::expected<void, core::EngineError>
     Shutdown() noexcept;
@@ -115,14 +116,18 @@ public:
     /// @return True if Init() has completed successfully and Shutdown() has not been called.
     [[nodiscard]] bool IsInitialized() const noexcept { return m_initialized; }
 
-    /// @return Count of live FooHandles currently managed by this module.
+    /// @return Count of live FooHandles, or zero before Init/after Shutdown.
     [[nodiscard]] std::size_t LiveHandleCount() const noexcept { return m_liveCount; }
 
 private:
     bool           m_initialized {false};
+    bool           m_systemRegistered {false};
+    bool           m_componentRegistered {false};
     std::size_t    m_liveCount   {0};
     ecs::World*    m_world       {nullptr}; ///< Non-owning. Cleared in Shutdown().
-    std::byte*     m_persistent  {nullptr}; ///< Persistent arena slab owned by this module.
+    // Reserved once from the Kernel arena and retained across Shutdown()/Init()
+    // cycles because a monotonic persistent allocator cannot free this slab.
+    std::byte*     m_persistent  {nullptr}; ///< Non-owning view; Kernel owns storage.
     std::size_t    m_persistentBytes {0};
 };
 
@@ -153,7 +158,8 @@ public:
     [[nodiscard]] std::string_view Name() const noexcept override { return "FooSystem"; }
 };
 
-/// Global accessor for the module singleton. Returns nullptr until Kernel initializes modules.
+/// Global accessor for stable singleton storage. Always non-null; call
+/// IsInitialized() before using lifecycle-dependent state.
 [[nodiscard]] FooModule* GetFooModule() noexcept;
 
 } // namespace engine::foo

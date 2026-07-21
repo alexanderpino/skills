@@ -41,12 +41,16 @@
 //     - descriptorBindingPartiallyBound                  : REQUIRED
 //     - descriptorBindingVariableDescriptorCount         : RECOMMENDED
 //   Pipeline layout:
-//     set 0 binding 0 : unbounded array of combined image samplers (matches
+//     set 0 binding 0 : unbounded array of sampled images (matches
 //                       ResourceDescriptorHeap textures)
 //     set 0 binding 1 : unbounded array of samplers (SamplerDescriptorHeap)
-//     set 0 binding 2 : unbounded array of SSBOs (for structured buffers)
+//     set 0 binding 2 : MaterialParams buffer array
+//     set 0 binding 3 : InstanceData buffer array
+//     set 0 binding 4 : MeshVertex buffer array
+//     set 0 binding 5 : per-frame uniform buffer
 //   Push constants: the 16-byte PushConstants struct from shader_interop_template.h.
-//   Compile with DXC: -T ps_6_6 -spirv -fvk-use-dx-layout -fspv-target-env=vulkan1.3
+//   Compile with DXC: -D SI_VULKAN=1 -T ps_6_6 -spirv -fvk-use-dx-layout -Zpr
+//                     -fspv-target-env=vulkan1.3
 //
 // -----------------------------------------------------------------------------
 // Metal equivalence
@@ -67,8 +71,19 @@
 
 #include "shader_interop_template.h"
 
+#if defined(SI_VULKAN)
+[[vk::push_constant]]
+ConstantBuffer<PushConstants> g_PC;
+[[vk::binding(0, 0)]] Texture2D<float4>                 g_Textures[];
+[[vk::binding(1, 0)]] SamplerState                      g_Samplers[];
+[[vk::binding(2, 0)]] StructuredBuffer<MaterialParams>  g_MaterialBuffers[];
+[[vk::binding(3, 0)]] StructuredBuffer<InstanceData>    g_InstanceBuffers[];
+[[vk::binding(4, 0)]] StructuredBuffer<MeshVertex>      g_MeshVertexBuffers[];
+[[vk::binding(5, 0)]] ConstantBuffer<PerFrameCB>         g_Frame;
+#else
 ConstantBuffer<PushConstants> g_PC    : register(b0);
 ConstantBuffer<PerFrameCB>    g_Frame : register(b1);
+#endif
 
 // MeshVertex (the vertex-pulling layout) is also defined in the shared header,
 // under packed rules — see its "Vertex layouts (packed)" section.
@@ -99,14 +114,23 @@ struct VSOutput
 VSOutput VSMain(VSInput input)
 {
     // Pull instance transform from the bindless instance buffer.
+#if defined(SI_VULKAN)
+    StructuredBuffer<InstanceData> instances =
+        g_InstanceBuffers[NonUniformResourceIndex(kInstanceBufferSlot)];
+#else
     StructuredBuffer<InstanceData> instances =
         ResourceDescriptorHeap[kInstanceBufferSlot];
+#endif
     InstanceData inst = instances[g_PC.InstanceIndex];
 
     // Pull the mesh vertex buffer via NonUniformResourceIndex because the
     // MeshIndex can differ across waves (instanced draws over multiple meshes).
-    StructuredBuffer<MeshVertex> mesh =
-        ResourceDescriptorHeap[NonUniformResourceIndex(kMeshVertexSlotBase + g_PC.MeshIndex)];
+    const uint meshIndex = NonUniformResourceIndex(kMeshVertexSlotBase + g_PC.MeshIndex);
+#if defined(SI_VULKAN)
+    StructuredBuffer<MeshVertex> mesh = g_MeshVertexBuffers[meshIndex];
+#else
+    StructuredBuffer<MeshVertex> mesh = ResourceDescriptorHeap[meshIndex];
+#endif
     MeshVertex v = mesh[input.VertexID];
 
     float4 worldPos = mul(inst.World, float4(v.Position, 1.0f));
@@ -115,9 +139,12 @@ VSOutput VSMain(VSInput input)
     o.Position      = mul(g_Frame.ViewProj, worldPos);
     o.WorldPos      = worldPos.xyz;
     o.WorldNormal   = normalize(mul((float3x3)inst.WorldIT, v.Normal));
+    // Reflection (negative determinant) flips tangent-space handedness.
+    const float orientationSign =
+        determinant((float3x3)inst.World) < 0.0f ? -1.0f : 1.0f;
     o.WorldTangent  = float4(
         normalize(mul((float3x3)inst.World, v.Tangent.xyz)),
-        v.Tangent.w);
+        v.Tangent.w * orientationSign);
     o.UV0           = v.UV0;
     o.MaterialIndex = g_PC.MaterialIndex;
     return o;
@@ -153,18 +180,32 @@ float4 PSMain(VSOutput input) : SV_Target0
     // Material lookup: nointerpolation so MaterialIndex is uniform per triangle,
     // but NonUniformResourceIndex is still legal and required across wave lanes
     // of different primitives within a draw (draw-indirect, mesh shaders).
-    StructuredBuffer<MaterialParams> materials =
-        ResourceDescriptorHeap[kMaterialBufferSlot];
+    const uint materialBufferIndex = NonUniformResourceIndex(kMaterialBufferSlot);
+#if defined(SI_VULKAN)
+    StructuredBuffer<MaterialParams> materials = g_MaterialBuffers[materialBufferIndex];
+#else
+    StructuredBuffer<MaterialParams> materials = ResourceDescriptorHeap[materialBufferIndex];
+#endif
     MaterialParams mat = materials[NonUniformResourceIndex(input.MaterialIndex)];
 
     // Texture fetches: every index goes through NonUniformResourceIndex because
     // the wave can contain lanes from different materials.
+#if defined(SI_VULKAN)
+    Texture2D<float4> albedoTex   = g_Textures[NonUniformResourceIndex(mat.AlbedoTex)];
+    Texture2D<float4> normalTex   = g_Textures[NonUniformResourceIndex(mat.NormalTex)];
+    Texture2D<float4> ormTex      = g_Textures[NonUniformResourceIndex(mat.OrmTex)];
+    Texture2D<float4> emissiveTex = g_Textures[NonUniformResourceIndex(mat.EmissiveTex)];
+    SamplerState samp             = g_Samplers[NonUniformResourceIndex(kLinearWrapSampler)];
+#else
     Texture2D albedoTex   = ResourceDescriptorHeap[NonUniformResourceIndex(mat.AlbedoTex)];
     Texture2D normalTex   = ResourceDescriptorHeap[NonUniformResourceIndex(mat.NormalTex)];
     Texture2D ormTex      = ResourceDescriptorHeap[NonUniformResourceIndex(mat.OrmTex)];
     Texture2D emissiveTex = ResourceDescriptorHeap[NonUniformResourceIndex(mat.EmissiveTex)];
     SamplerState samp     = SamplerDescriptorHeap[kLinearWrapSampler];
+#endif
 
+    // AlbedoTex must use an sRGB SRV/image format, so Sample returns linear
+    // RGB. BaseColor is uploaded in linear space; alpha remains linear.
     float4 albedo = albedoTex.Sample(samp, input.UV0) * mat.BaseColor;
     // Alpha-test clip gate; masked materials should define ALPHA_MASKED=1.
 #if defined(ALPHA_MASKED) && ALPHA_MASKED

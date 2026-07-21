@@ -33,18 +33,59 @@ Hard numbers. Miss by 10% and you ship 50 fps with stutters.
 
 **120 Hz target: 8.33 ms** — halve all of the above, or render at lower internal resolution and upscale. 120 Hz is realistic only at 1080p-internal with DLSS/FSR Quality for most AAA content.
 
-**CPU/GPU overlap model:** frame N CPU runs concurrently with frame N-1 GPU. `FRAMES_IN_FLIGHT = 2` is standard; 3 reduces stutter susceptibility at +1 frame input latency. Higher than 3 is a crime against input feel.
+**CPU/GPU overlap model:** frame N CPU commonly runs concurrently with frame N-1 GPU. Keep 2-3 reusable frame-resource sets so command allocators and transient uploads are not overwritten while the GPU uses them. Resource count is not the same as present-queue depth: three resource sets do not inherently add latency if pacing prevents the CPU from queuing three completed frames.
 
 ```cpp
 // Ring buffer indexing
-uint32_t frameIdx = g_frameCounter % FRAMES_IN_FLIGHT;
-WaitForFenceValue(frameFences[frameIdx]);  // GPU frame N-2 done
-auto& cmdBuf = cmdBufs[frameIdx];
+uint32_t ringIdx = g_frameCounter % FRAMES_IN_FLIGHT;
+WaitForFenceValue(frameFences[ringIdx]);  // GPU frame N-FRAMES_IN_FLIGHT done
+auto& cmdBuf = cmdBufs[ringIdx];
 // ... record frame N ...
-Submit(cmdBuf, frameFences[frameIdx] = ++fenceValue);
+Submit(cmdBuf, frameFences[ringIdx] = ++fenceValue);
 ```
 
-Stutter diagnosis rule: if `frameTime` spikes but `gpu_busy_time` is flat, it's CPU or present. If both spike, it's GPU. If `frameTime` is fine but input feels laggy, your FRAMES_IN_FLIGHT is too high.
+### Input-to-presentation latency pipeline
+
+Measure latency from the device event timestamp, not from `BeginFrame`:
+
+```text
+device/OS timestamp
+    -> input event queue
+    -> just-in-time tick snapshot
+    -> authoritative simulation tick
+    -> render extraction and command recording
+    -> GPU execution
+    -> present queue
+    -> display scanout
+```
+
+Poll or receive device events continuously into a timestamped queue. **Sample just in time:** wait for the reusable frame slot and perform pacing first, then build the input snapshot immediately before each simulation tick begins. Sampling at the top of the frame—before a fence wait, swapchain throttle, or job join—ages input while the CPU is blocked and adds latency without improving determinism.
+
+```cpp
+// PSEUDOCODE — fixed-tick simulation with late input sampling.
+FrameContext& frame = WaitForReusableFrameContext(); // blocking happens before sampling
+WaitForFramePacingDeadline();
+
+while (simulation.HasDueTick()) {
+    const TimePoint cutoff = simulation.NextTickDeadline();
+    const InputSnapshot input =
+        inputEvents.ConsumeThrough(cutoff);           // timestamp-ordered, immutable
+    simulation.Tick(input);                          // input belongs to exactly this tick
+}
+
+RenderState view = simulation.ExtractInterpolatedState();
+RecordAndSubmit(frame, view);
+```
+
+Catch-up ticks consume events through their own historical cutoff; never apply one newly sampled state retroactively to every missed tick. Keep camera/view late-latching separate from authoritative gameplay input: VR head pose or a local camera transform may be refreshed near command submission, but gameplay state changes still enter through a deterministic tick boundary.
+
+`FRAMES_IN_FLIGHT` controls resource reuse; the **maximum queued frame latency** controls responsiveness. Cap the CPU/present queue independently with the platform's waitable swapchain, maximum-frame-latency API, or equivalent fence policy:
+
+- Latency mode: allow at most one completed frame waiting for presentation where the platform permits.
+- Throughput mode: allow two only when captures show the extra queue depth prevents starvation and the latency trade-off is acceptable.
+- Do not queue a third completed frame merely because three frame-resource sets exist. Each additional queued frame costs roughly one refresh interval: 16.67 ms at 60 Hz, 8.33 ms at 120 Hz.
+
+Instrument `device_event -> tick`, `tick -> submit`, `submit -> GPU start`, `GPU end -> present`, and `present -> scanout` separately. If `frameTime` spikes while `gpu_busy_time` is flat, investigate CPU or present stalls. If frame time is stable but controls feel delayed, inspect event age at tick start and actual present-queue depth before reducing resource buffering blindly.
 
 ---
 
@@ -66,7 +107,7 @@ struct Archetype {
 ```
 
 **SIMD intrinsics:** baseline by target.
-- x86-64: SSE4.2 floor, AVX2 standard, AVX-512 opt-in (check `cpuid`)
+- x86-64: choose the shipping baseline per platform; dispatch AVX2/AVX-512 by CPUID and benchmark by microarchitecture. Do not apply legacy Intel downclock assumptions to all Zen 4/5 systems.
 - ARM64: NEON mandatory, SVE2 on modern mobile / Grace / Apple
 - Console: PS5/XSX = AVX2 available
 
@@ -75,7 +116,7 @@ Write `<simd.h>`-style wrapper types once. Don't scatter intrinsics through game
 ```cpp
 // Portable 4-wide float
 struct f32x4 {
-    #if defined(__AVX2__)
+    #if defined(__SSE2__)
     __m128 v;
     #elif defined(__ARM_NEON)
     float32x4_t v;
@@ -91,8 +132,8 @@ struct f32x4 {
 **constexpr / consteval:** push everything that can move to compile time there. Reflection data, shader permutation tables, material parameter tables. C++23 `consteval` for strictly-compile-time; C++26 reflection (when available, guarded) will eliminate most hand-rolled codegen.
 
 ```cpp
-#if defined(__cpp_reflection) && __cpp_reflection >= 202506L
-    // C++26 reflection path (P2996; real FTM is __cpp_reflection)
+#if defined(__cpp_impl_reflection) && __cpp_impl_reflection >= 202506L
+    // C++26 language reflection path (P2996)
 #else
     // C++23 macro + consteval fallback
 #endif
@@ -224,7 +265,14 @@ struct alignas(64) PaddedAtomic {
 **RAII scope macros:**
 
 ```cpp
-#define PROFILE_SCOPE(name) ProfileScope _ps_##__LINE__(name, __FILE__, __LINE__)
+// Two-level indirection is mandatory: token-pasting (##) suppresses expansion of
+// its operands, so `_ps_##__LINE__` would paste the literal text `__LINE__` every
+// time (yielding `_ps___LINE__` and a redefinition on the second use in a scope).
+// The inner macro pastes; the outer macro forces __LINE__ to expand first.
+#define PROFILE_CONCAT_(a, b) a##b
+#define PROFILE_CONCAT(a, b)  PROFILE_CONCAT_(a, b)
+#define PROFILE_SCOPE(name) \
+    ProfileScope PROFILE_CONCAT(_ps_, __LINE__)(name, __FILE__, __LINE__)
 
 struct ProfileScope {
     const char* name;

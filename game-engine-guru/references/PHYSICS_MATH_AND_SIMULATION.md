@@ -18,7 +18,7 @@
 
 Math is the pilot light of the engine. Every frame touches it millions of times. Miss the SIMD lane width and you pay for it forever. Build it once, build it right, and never call into scalar fallbacks on hot paths.
 
-**Targets.** SSE4.2 baseline on x64 (PS5, XSX, Windows, Steam Deck). AVX2 dispatched at runtime for desktop Windows/Linux. NEON for Switch 2 (ARMv8.2-A), iOS, Android, macOS. SVE-128/256 for future ARM server targets (cloud streaming). Do NOT use AVX-512 on consumer code paths — downclock penalties dwarf the wins.
+**Targets.** Select the x64 baseline per shipping platform and dispatch AVX2/AVX-512 by CPUID plus measured benefit. NEON is the ARM64 baseline; gate SVE by runtime vector length. Legacy Intel AVX-512 downclock behavior is microarchitecture-specific and does not justify a blanket consumer ban.
 
 **Type design.** `Vec4`, `Mat4`, `Quat` wrap a `__m128` / `float32x4_t` / native fallback via a `Simd4f` alias. Use `deducing this` (C++23) to eliminate const/non-const overload duplication:
 
@@ -28,33 +28,72 @@ struct alignas(16) Vec4 {
 
     template <class Self>
     auto&& operator[](this Self&& self, std::size_t i) noexcept {
-        return reinterpret_cast<std::copy_cvref_t<Self, float>*>(&self.v)[i];
+        // Propagate const from the explicit object parameter. std::copy_cvref_t
+        // is not part of the C++23 standard library; this conditional is the
+        // portable equivalent for the const/non-const case we need here.
+        using Elem = std::conditional_t<
+            std::is_const_v<std::remove_reference_t<Self>>, const float, float>;
+        return reinterpret_cast<Elem*>(&self.v)[i];
     }
 
     [[nodiscard]] std::expected<Vec4, MathError>
     normalized() const noexcept {
         const float len2 = dot(*this, *this);
         if (len2 < 1e-30f) [[unlikely]] return std::unexpected(MathError::DegenerateVector);
-        return *this * rsqrt_nr(len2); // Newton-Raphson refined rsqrt
+        return *this * rsqrt_nr(len2); // approximate; NOT for deterministic sim (§9)
     }
 };
+
+// Approximate reciprocal square root: hardware estimate + one Newton-Raphson
+// refinement. This is the RENDER / general-math path — ~1-2 ULP after refining,
+// but NOT bit-reproducible across vendors because the seed table differs.
+// Deterministic simulation must use a strict sqrt/division path instead (§9).
+inline float rsqrt_nr(float x) noexcept {
+#if defined(__SSE__)
+    float y = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(x))); // ~12-bit seed estimate
+    y = y * (1.5f - 0.5f * x * y * y);                    // one NR step: y ≈ 1/√x
+    return y;
+#elif defined(__ARM_NEON)
+    const float32x2_t vx = vdup_n_f32(x);
+    float32x2_t vy = vrsqrte_f32(vx);
+    vy = vmul_f32(vy, vrsqrts_f32(vmul_f32(vx, vy), vy)); // one NR step
+    return vget_lane_f32(vy, 0);
+#else
+    return 1.0f / std::sqrt(x);                            // scalar platform fallback
+#endif
+}
 ```
 
 **Half-precision (fp16).** Use `__fp16` / `_Float16` for GPU interop and packed vertex data. Half a meter of position error at 1km is fine for distant vegetation but unacceptable for sim. Keep fp16 on the mesh pipeline, fp32 on the CPU sim. Convert at upload time with `F16C` intrinsics (`_mm_cvtps_ph` / `_mm_cvtph_ps`). Cost: one instruction per four floats.
 
-**Fixed-point (Q16.16).** Non-negotiable for deterministic netcode (fighting games, RTS lockstep, rollback). Use `int32_t` with explicit saturation. Provide `Fixed16_16` type with full operator set. Never mix fp32 and fixed in the same sim tick — cross-compile bit mismatches are catastrophic. Benchmark: ~1.1x slower than float mul on x64, but it's the same on every platform.
+**Fixed-point (Q16.16).** A strong option for cross-architecture lockstep when its range and precision fit. Integer/fixed simulation is not required for every rollback design; same-platform or carefully controlled floating-point simulation can be deterministic within a declared support matrix. Use explicit saturation and test overflow boundaries.
 
 ```cpp
 struct Fixed16_16 {
     int32_t raw;
     static constexpr int32_t kShift = 16;
+
+    // Wrapping multiply: fast, but silently overflows when the true Q31.16
+    // result exceeds int32. Use only where inputs are provably in range.
     constexpr Fixed16_16 operator*(Fixed16_16 r) const noexcept {
         return { static_cast<int32_t>((static_cast<int64_t>(raw) * r.raw) >> kShift) };
+    }
+
+    // Saturating multiply: clamps to [INT32_MIN, INT32_MAX] instead of wrapping.
+    // Lockstep determinism needs a defined overflow result — a silent wrap
+    // desyncs peers. The 64-bit product cannot itself overflow (|raw| < 2^31,
+    // so |product| < 2^62), and the >>16 of a negative value is an arithmetic
+    // shift (guaranteed since C++20). Clamp after the shift.
+    constexpr Fixed16_16 mul_sat(Fixed16_16 r) const noexcept {
+        const int64_t p = (static_cast<int64_t>(raw) * r.raw) >> kShift;
+        constexpr int64_t lo = std::numeric_limits<int32_t>::min();
+        constexpr int64_t hi = std::numeric_limits<int32_t>::max();
+        return { static_cast<int32_t>(p < lo ? lo : (p > hi ? hi : p)) };
     }
 };
 ```
 
-**mdspan for tensors.** C++23 `std::mdspan` for jacobian matrices in the physics solver. Lets you ship contiguous storage with strided views at zero cost — codegen is identical to hand-rolled index math on Clang 17+.
+**mdspan for tensors.** Use `std::mdspan` for contiguous storage with strided views when `__cpp_lib_mdspan` is available; otherwise keep an equivalent engine view. Verify code generation on each compiler rather than assuming parity.
 
 **C++26 gates.** Linalg (`<linalg>`) and SIMD (`<simd>`) are horizon features. Gate with `__cpp_lib_linalg` / `__cpp_lib_simd` and keep the hand-rolled fallback. Don't bet the engine on them yet.
 
@@ -106,9 +145,9 @@ inline uint32_t cull_aabb_x4(const AABB* __restrict aabbs,
 
 ## 4. Physics Engine Integration
 
-**Jolt (Horizon, BG3).** Best-in-class for AAA. Broad-phase uses quad-tree per body layer (moving vs static). Constraint solver is island-parallel. Determinism flag forces ordered island solve and disables FMA. API is exception-free and returns error codes — clean fit for `std::expected` wrapping.
+**Jolt.** A strong CPU rigid-body default with an island-parallel solver and broad-phase body layers. Jolt provides `JPH_CROSS_PLATFORM_DETERMINISTIC` and determinism diagnostics, but applications must still use the documented build flags and verify every supported architecture/compiler pair with replay hashes.
 
-**PhysX 5.** GPU rigid body (PGS on CUDA), soft bodies, particles. Cross-platform support has regressed post-Omniverse focus; Switch 2 support via NVIDIA's own port only. Use for PhysX-specific features (vehicles, articulations) or legacy pipelines.
+**PhysX 5.** GPU rigid bodies use a CUDA TGS path; PhysX also provides soft bodies, particles, vehicles, and articulations. Platform availability and licensing are SDK-specific—verify them rather than inferring support from the public PC distribution.
 
 **Havok.** Historical gold standard. Licensing cost is real. Use on shipped franchises with existing content pipelines — don't start here in 2026.
 
@@ -120,7 +159,7 @@ inline uint32_t cull_aabb_x4(const AABB* __restrict aabbs,
 
 **Broad-phase.** Sweep-and-prune for low-churn scenes (buildings, statics). DBVT for high-churn (ragdolls, VFX). Output is candidate pairs into a frame-scratch `std::span<PairIndex>`.
 
-**Narrow-phase.** GJK for convex-convex distance and contact; EPA for penetration depth (minimum translation vector). SAT for box-box (5-10x faster than GJK/EPA on pure OBBs). Sphere-X pairs are analytic — never invoke GJK.
+**Narrow-phase.** GJK for convex-convex distance and contact; EPA for penetration depth (minimum translation vector). SAT for box-box (5-10x faster than GJK/EPA on pure OBBs). Sphere-X pairs are analytic — never invoke GJK. Production GJK/EPA is **delegated to the physics SDK** (Jolt/PhysX, §4), not hand-rolled here: the hard part is numerical robustness (degenerate/near-flat simplices, EPA polytope expansion termination, contact-point caching), which the SDK has already hardened. This file specifies the pipeline shape, not a from-scratch solver — so no incomplete GJK/EPA sketch is given.
 
 **Contact manifold.** After narrow-phase, generate contact points via face-face clip (Sutherland-Hodgman), reduce to 4 points max (deepest + 3 maximizing area). Persistent manifold across frames via warm-starting: cache λ (Lagrange multiplier) per contact, re-apply as initial guess next tick. Solver convergence doubles.
 
@@ -203,11 +242,13 @@ while (game_running) {
 
 **Floating point strictness.** Compile sim TU's with `-ffp-contract=off` / `/fp:strict` on Clang/MSVC. Disable FMA explicitly (`-mno-fma`) on any code path that must bit-match across x64 and ARM — FMA rounds once, separate mul+add rounds twice. Different results. Every platform, every time.
 
+**Reciprocal estimates.** Hardware `rcp`/`rsqrt` estimate instructions may start from vendor-specific seed bits. A fixed Newton-Raphson count does not make them cross-architecture bit-identical. Deterministic simulation must use a software-defined seed/iteration sequence or a verified strict `sqrt`/division path; keep approximate SIMD helpers out of deterministic state updates.
+
 **Transcendentals.** `sinf`, `cosf`, `expf` vary between libc implementations (glibc vs Windows CRT vs Bionic vs Switch SDK). Ship your own polynomial approximations in the sim. Degree-7 minimax polynomials are sufficient for all game purposes and are bit-identical by construction.
 
 **Verification.** Run the sim on every target platform in CI against a reference trace (seed + input log). Hash the world state every 60 frames (xxhash3 over contiguous component arrays). Mismatch = determinism bug. Caught early is caught cheap.
 
-**RNG.** PCG32 or xoshiro256**. Never use `std::mt19937` — its state is too large and its implementations vary. Seed per-subsystem, never share a global RNG with rendering.
+**RNG.** Prefer a small explicitly specified generator such as PCG32 or xoshiro256**. `std::mt19937` itself is standardized, but its large state is often undesirable and standard-library distribution mappings are not portable. Own the distribution algorithms when bit identity matters.
 
 ---
 

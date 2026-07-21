@@ -1,13 +1,13 @@
 # Testing, Error Handling, and Build
 
-Exceptions are banned in AAA engines. Asserts are tiered. Tests are mandatory. Coverage is measured. Sanitizers run every PR. If a change isn't tested, it doesn't exist.
+Define error policy per binary and ABI boundary. Tier assertions, test risky behavior, measure coverage without worshipping it, and run sanitizers on supported configurations.
 
 ## Table of Contents
 - [Error Handling Philosophy](#error-handling-philosophy)
 - [Assertion Tiers](#assertion-tiers)
 - [Crash Reporting](#crash-reporting)
 - [Graceful Degradation](#graceful-degradation)
-- [TDD Workflow](#tdd-workflow)
+- [Test-First and Characterization Workflow](#test-first-and-characterization-workflow)
 - [GoogleTest Patterns](#googletest-patterns)
 - [Code Coverage](#code-coverage)
 - [Degenerate Input Testing](#degenerate-input-testing)
@@ -24,14 +24,14 @@ Exceptions are banned in AAA engines. Asserts are tiered. Tests are mandatory. C
 
 ## Error Handling Philosophy
 
-**Exceptions are off.** `-fno-exceptions` / `/EHs-c-` is set engine-wide. Reasons:
+**Choose an exception policy per binary and ABI boundary.** Performance-critical shipping runtime code commonly uses `-fno-exceptions` or the platform-supported MSVC equivalent; editor tools, third-party libraries, and language boundaries may retain exceptions. Do not disable exceptions across code that depends on an unsupported exceptions-off standard-library configuration.
 
 1. Unwinding cost is unpredictable; frame-time jitter kills.
 2. `throw` across DLL boundaries is undefined or platform-specific.
 3. Console toolchains historically mishandle EH tables (Switch prior to SDK 18, PS5 older Clang).
 4. The "happy path" branch prediction assumption is false in error-heavy code like asset loading.
 
-Replace with `std::expected<T, E>` (C++23). Every fallible API returns a value or a typed error. `[[nodiscard]]` is mandatory.
+For expected runtime failures, prefer `std::expected<T, E>` where available and an equivalent project result type elsewhere. Mark results `[[nodiscard]]` when ignoring them is a bug.
 
 ```cpp
 enum class LoadError : uint8_t {
@@ -70,7 +70,7 @@ Three tiers, three budgets, three audiences.
   #define DEV_ASSERT(cond, ...) \
     do { if (!(cond)) { \
         detail::report_dev_assert(#cond, __FILE__, __LINE__, \
-                                  std::stacktrace::current()); \
+                                  detail::capture_stack() __VA_OPT__(,) __VA_ARGS__); \
         ENGINE_DEBUGBREAK(); \
     }} while(0)
 #else
@@ -82,16 +82,14 @@ Three tiers, three budgets, three audiences.
 #define SHIP_ASSERT(cond, ...) \
     do { if (!(cond)) { \
         detail::report_ship_assert(#cond, __FILE__, __LINE__, \
-                                   std::stacktrace::current(), \
-                                   __VA_ARGS__); \
+                                   detail::capture_stack() __VA_OPT__(,) __VA_ARGS__); \
     }} while(0)
 
 // Tier 3: always on. Crashes with minidump. For unrecoverable corruption.
 #define FATAL_ASSERT(cond, ...) \
     do { if (!(cond)) { \
         detail::report_fatal_assert(#cond, __FILE__, __LINE__, \
-                                    std::stacktrace::current(), \
-                                    __VA_ARGS__); \
+                                    detail::capture_stack() __VA_OPT__(,) __VA_ARGS__); \
         detail::write_minidump(); \
         std::abort(); \
     }} while(0)
@@ -103,7 +101,17 @@ Use SHIP_ASSERT where graceful degradation is possible but the state is unexpect
 
 Use FATAL_ASSERT where continuing would corrupt save data, leak security, or crash deterministically in three frames — "descriptor heap overflow," "allocator double-free detected."
 
-**`<stacktrace>` from C++23** is the single best addition to error handling in a decade. Capture on assert, ship it with the telemetry payload. No more "call stack: [optimized out]".
+Assertion expressions must be side-effect free. `DEV_ASSERT` does not evaluate its condition in shipping builds, and `SHIP_ASSERT` is telemetry—not control flow. Validate untrusted input and safety preconditions with an explicit branch that returns an error or selects a fallback:
+
+```cpp
+if (index >= values.size()) {
+    SHIP_ASSERT(false, "index {} >= {}", index, values.size());
+    return std::unexpected(LookupError::OutOfRange);
+}
+return values[index];
+```
+
+Implement `detail::capture_stack()` in the crash platform layer. Use `<stacktrace>` only when `__cpp_lib_stacktrace` and the shipping standard library support it; otherwise use DbgHelp, libunwind/backtrace, Crashpad, or the console SDK. Preserve build IDs and symbols for offline symbolication.
 
 ---
 
@@ -170,13 +178,13 @@ Null backends are production code, tested, shipped in dev builds. They're how yo
 
 ---
 
-## TDD Workflow
+## Test-First and Characterization Workflow
 
-**Red → Green → Refactor.** Standard. In engine work specifically:
+**Red → Green → Refactor** is effective for pure logic and new APIs. Existing engines, GPU behavior, content pipelines, and performance work often start with characterization, replay, integration, or benchmark tests instead:
 
-1. **Red** — write the failing test against the API you wish existed. Don't look at the existing implementation.
-2. **Green** — smallest change to make it pass. Ugly is fine. Globals are fine temporarily.
-3. **Refactor** — clean up without changing behavior. Tests guard you.
+1. **Specify** — encode the intended behavior or current regression with the smallest useful test.
+2. **Implement** — make the behavior pass without weakening the assertion.
+3. **Refactor** — improve structure while the relevant test layers remain green.
 
 **Testable engine code:**
 
@@ -244,18 +252,12 @@ INSTANTIATE_TEST_SUITE_P(UnormSweep, QuantizeTest,
     ::testing::Range(0, 101, 1));
 ```
 
-**Typed tests** for templates:
+**Shared contract tests** need an allocator-specific factory; do not assume linear, pool, stack, and TLSF allocators share a constructor:
 
 ```cpp
-template <typename T> class AllocatorTest : public ::testing::Test {};
-using AllocatorTypes = ::testing::Types<
-    LinearAllocator, StackAllocator, PoolAllocator<64>, TLSFAllocator>;
-TYPED_TEST_SUITE(AllocatorTest, AllocatorTypes);
-
-TYPED_TEST(AllocatorTest, AllocatedPointersAreAligned) {
-    // Engine allocators are non-owning: caller supplies the backing slab.
-    alignas(256) static std::array<std::byte, 1024 * 1024> backing{};
-    TypeParam a(backing.data(), backing.size());
+TEST(LinearAllocator, AllocatedPointersAreAligned) {
+    alignas(256) std::array<std::byte, 1024 * 1024> backing{};
+    LinearAllocator a(backing.data(), backing.size());
     for (size_t align : {8, 16, 32, 64, 128, 256}) {
         auto r = a.Allocate(128, align);   // std::expected<void*, EngineError>
         ASSERT_TRUE(r.has_value());
@@ -269,8 +271,7 @@ TYPED_TEST(AllocatorTest, AllocatedPointersAreAligned) {
 ```cpp
 class EcsTest : public ::testing::Test {
 protected:
-    World world;
-    void SetUp() override { world = World{}; }
+    World world{}; // a new fixture—and therefore a new World—for every test
 };
 
 TEST_F(EcsTest, AddRemoveComponentChangesArchetype) {
@@ -287,8 +288,23 @@ TEST_F(EcsTest, AddRemoveComponentChangesArchetype) {
 TEST(HandleDeath, DereferencingStaleHandleFatals) {
     Registry r;
     auto h = r.create();
-    r.destroy(h);
-    ASSERT_DEATH({ r.resolve(h); }, "stale handle");
+    ASSERT_TRUE(h.has_value());
+    ASSERT_TRUE(r.destroy(*h).has_value());
+    ASSERT_DEATH({ (void)r.resolve_or_fatal(*h); }, "stale handle");
+}
+```
+
+Keep the test contract aligned with the API: if `resolve()` is fallible and returns `expected`, test the error instead. A death test is appropriate only for a separately documented `resolve_or_fatal()` convenience:
+
+```cpp
+TEST(Handle, ResolveStaleReturnsError) {
+    Registry r;
+    auto h = r.create();
+    ASSERT_TRUE(h.has_value());
+    ASSERT_TRUE(r.destroy(*h).has_value());
+    auto value = r.resolve(*h);
+    ASSERT_FALSE(value.has_value());
+    EXPECT_EQ(value.error(), HandleError::Stale);
 }
 ```
 
@@ -296,17 +312,14 @@ TEST(HandleDeath, DereferencingStaleHandleFatals) {
 
 ## Code Coverage
 
-**Targets:**
-- 85% line coverage for pure / math / data-structure code.
-- 80% for systems with I/O or GPU dependencies.
-- 70% minimum for any production code; below that blocks merge.
+**Targets:** Set thresholds per subsystem risk and testability. Pure math can justify high line/branch coverage; GPU, platform, and I/O systems need stronger integration, replay, validation-layer, and failure-injection evidence. A global percentage must not block useful code while missing critical behaviors.
 
 **Tooling:**
 - Clang/GCC: `--coverage` → `llvm-cov gcov` / `lcov`.
 - MSVC: OpenCppCoverage or Visual Studio's built-in instrumentation.
 - Reporting: Codecov/Coveralls SaaS, or self-hosted `lcov` + `genhtml` for on-prem.
 
-**CI gates:** coverage *delta* must not regress. Raw 80% with a 5% drop is worse than raw 78% with a 0.1% drop.
+**CI gates:** review coverage regressions and require explicit justification. Gate critical packages more strictly than generated, platform-shim, or integration-heavy code.
 
 **Exclusions** (via `.codecov.yml` or source pragmas):
 - Platform-specific shims (`platform/ps5/*.cpp`) run only in console CI.
@@ -320,7 +333,7 @@ coverage:
   status:
     project:
       default:
-        target: 80%
+        target: auto
         threshold: 0.5%   # allow 0.5% drop before failing
   ignore:
     - "third_party/**"
@@ -355,13 +368,13 @@ TEST(Vec3, NormalizeOfZeroReturnsError) {
     EXPECT_EQ(r.error(), MathError::DegenerateInput);
 }
 
-TEST(Allocator, ZeroSizeRequestReturnsValidPointer) {
-    // Zero size returns a valid, distinct pointer (success, not an error).
+TEST(Allocator, ZeroSizeRequestIsRejected) {
+    // This allocator's documented policy is explicit rejection.
     alignas(16) std::array<std::byte, 1024> backing{};
     LinearAllocator a(backing.data(), backing.size());
     auto r = a.Allocate(0, 16);
-    ASSERT_TRUE(r.has_value());
-    EXPECT_NE(*r, nullptr);
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), EngineError::InvalidArgument);
 }
 ```
 
@@ -441,24 +454,30 @@ Determinism is a feature. Design it in.
 **Replay-based testing:**
 
 ```cpp
+// PSEUDOCODE — REPLAY RECORDING/PLAYBACK: serialization APIs are engine-specific.
 // Record
 Replay r;
 r.seed(0xDEADBEEF);
+constexpr auto fixed_dt = std::chrono::duration<double>(1.0 / 60.0);
 for (int i = 0; i < 1000; ++i) {
-    r.capture_input(pad.sample());
-    world.tick(16.67f / 1000.f);
+    const auto input = pad.sample();
+    r.capture_frame({input, fixed_dt});
+    world.inject_input(input);
+    world.tick(fixed_dt);
 }
-r.save("replay.bin");
+r.set_expected_final_hash(world.state_hash());
+ASSERT_TRUE(r.save("replay.bin").has_value());
 
 // Replay
-Replay r = Replay::load("replay.bin");
+auto loaded = Replay::load("replay.bin");
+ASSERT_TRUE(loaded.has_value());
 World w;
-w.seed(r.seed());
-for (auto& frame : r.frames()) {
+w.seed(loaded->seed());
+for (const auto& frame : loaded->frames()) {
     w.inject_input(frame.input);
     w.tick(frame.dt);
 }
-FATAL_ASSERT(w.state_hash() == r.expected_final_hash());
+EXPECT_EQ(w.state_hash(), loaded->expected_final_hash());
 ```
 
 **Cross-platform bit-exact verification** — same replay on PS5 / XSX / PC should produce identical state hashes. Floating-point determinism requires: `/fp:strict` (MSVC) or `-ffp-model=strict` (Clang), no `--fast-math`, identical SIMD paths (no AVX-only shortcuts), fixed libm (don't use platform-specific `sinf`). Expensive but worth it for gameplay simulation, replays, and rollback netcode.
@@ -467,7 +486,7 @@ FATAL_ASSERT(w.state_hash() == r.expected_final_hash());
 
 ## Sanitizer Strategy
 
-Run every PR. Different sanitizers catch different bugs; none is optional.
+Run every supported sanitizer configuration regularly. Support varies by compiler, OS, SDK, architecture, and third-party binary; an unavailable sanitizer needs a documented alternative (validation layers, page heap, hardware watchpoints, or a supported host build), not a pretend green job.
 
 | Sanitizer | Catches                                              | When                         |
 |-----------|------------------------------------------------------|------------------------------|
@@ -476,20 +495,24 @@ Run every PR. Different sanitizers catch different bugs; none is optional.
 | **TSAN**  | Data races, deadlocks                                | Nightly, threaded subsystems |
 | **MSAN**  | Reads of uninitialized memory (Linux/Clang only)     | Nightly where supported      |
 
-**Build flags** (Clang):
+**Build flags** (Clang/GCC host build; ASAN and TSAN are separate processes):
 ```
 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all
+# separate TSAN build:
+-fsanitize=thread -fno-omit-frame-pointer
 ```
 
 **Suppression files** — every suppression must have an attached bug ID and owner. Unchecked suppressions rot. Audit quarterly.
 
 ```
 # asan_suppressions.txt
-leak:third_party/fmod/.*       # BUG-1234, fmod known leak, fixed in 2.03
-race:third_party/imgui/.*      # BUG-1250, investigating
+interceptor_via_lib:fmod       # BUG-1234, owner: audio, remove after 2.03
+
+# tsan_suppressions.txt
+race:third_party_imgui_symbol  # BUG-1250, owner: tools
 ```
 
-**TSAN caveats:** doesn't play well with some kernel drivers, custom page faults, coroutines with stack switching. Mark bespoke sync primitives with annotations (`__tsan_acquire`, `__tsan_release`) or TSAN won't understand them and will false-positive.
+Point each runtime at its own file (`ASAN_OPTIONS=suppressions=...`, `TSAN_OPTIONS=suppressions=...`) and verify the syntax against that runtime version. LeakSanitizer uses its own suppression categories. **TSAN caveats:** it does not compose with ASAN in one binary and can conflict with kernel drivers, custom page faults, or stack switching. Mark bespoke synchronization with the compiler runtime's supported annotations and keep a non-suppressed regression test.
 
 ---
 
@@ -542,7 +565,7 @@ target_include_directories(engine.core PUBLIC include)
 target_compile_features(engine.core PUBLIC cxx_std_23)
 target_compile_options(engine.core PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX /permissive- /EHs-c- /Zc:preprocessor>
-    $<$<CXX_COMPILER_ID:Clang,GCC>:-Wall -Wextra -Werror -fno-exceptions -fno-rtti>)
+    $<$<CXX_COMPILER_ID:Clang,AppleClang,GNU>:-Wall -Wextra -Werror -fno-exceptions -fno-rtti>)
 target_link_libraries(engine.core PUBLIC fmt::fmt eastl::eastl)
 ```
 
@@ -584,20 +607,31 @@ target_link_libraries(engine.core PUBLIC fmt::fmt eastl::eastl)
 **Shader compilation in the build:**
 
 ```cmake
-function(compile_shader STAGE HLSL ENTRY OUT)
+function(compile_shader PROFILE HLSL ENTRY OUT)
+    get_filename_component(OUT_DIR "${OUT}" DIRECTORY)
     add_custom_command(
-        OUTPUT ${OUT}
-        COMMAND ${DXC_PATH}
-                -T ${STAGE}_6_6
-                -E ${ENTRY}
-                -Fo ${OUT}
-                -Zi -Qembed_debug
-                ${HLSL}
-        DEPENDS ${HLSL}
-        COMMAND_EXPAND_LISTS
-        VERBATIM)
+        OUTPUT "${OUT}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUT_DIR}"
+        COMMAND "${DXC_PATH}"
+                -T "${PROFILE}"
+                -E "${ENTRY}"
+                -Fo "${OUT}"
+                -Zpr                 # row-major storage, matching shared CPU structs
+                -Ges -WX
+                "$<$<CONFIG:Debug>:-Zi;-Qembed_debug>"
+                "${HLSL}"
+        DEPENDS "${HLSL}" "${CMAKE_SOURCE_DIR}/assets/shader_interop_template.h"
+        COMMAND_EXPAND_LISTS VERBATIM
+        COMMENT "DXC ${PROFILE} ${ENTRY}: ${HLSL}")
 endfunction()
+
+compile_shader("vs_6_6" "${CMAKE_SOURCE_DIR}/assets/bindless_shader_template.hlsl"
+               "VSMain" "${CMAKE_BINARY_DIR}/shaders/bindless.vs.dxil")
+compile_shader("ps_6_6" "${CMAKE_SOURCE_DIR}/assets/bindless_shader_template.hlsl"
+               "PSMain" "${CMAKE_BINARY_DIR}/shaders/bindless.ps.dxil")
 ```
+
+For Vulkan, invoke a second explicit command with `-spirv -fspv-target-env=vulkan1.3 -fvk-use-dx-layout -Zpr` and a distinct `.spv` output. Add transitive shader includes to `DEPENDS` (or use a DXC depfile supported by the pinned version), generate each stage as its own output, and never let DXIL and SPIR-V commands race on one path. The shared header, explicit HLSL `row_major`, CPU upload convention, DXC `-Zpr`, and Vulkan layout flags must all agree; test a known asymmetric matrix so an accidental transpose is visible.
 
 **CI/CD pipeline** (generic, platform-appropriate variants):
 1. Lint (clang-format check, clang-tidy changed-files).

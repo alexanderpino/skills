@@ -63,7 +63,7 @@ Motion matching (Ubisoft La Forge, EA Frostbite) replaces hand-authored blend tr
 
 **Query.** Every 10-15 frames (not every frame — overkill), build the desired feature vector from user input + gameplay, then nearest-neighbor search the pose database. KD-tree with L2 distance weights tuned per feature (trajectory weighted ~3x foot position).
 
-**Inertialization.** No cross-fade. Use damped spring blend on the delta between old and new pose — half-life 0.15s, critically damped. Second derivative is continuous, so you get no pop, no slide, no double-blend artifacts. This is the unlock that makes motion matching work.
+**Inertialization.** Use a damped blend on position and velocity deltas between old and new poses. Matching velocity gives C1 continuity and avoids visible pops; it does not imply continuous acceleration.
 
 ```cpp
 struct Inertializer {
@@ -91,6 +91,28 @@ struct Inertializer {
 Pick the solver that matches the problem. Don't reach for full-body IK when two-bone analytic ships.
 
 **Two-bone analytic.** Law of cosines. 40 cycles on x64. Use for legs, arms, finger grips. Constrained to the plane of the pole vector; pole must be set or you get arbitrary rotation.
+
+```text
+// Pseudocode: two-bone analytic IK, chain root -> joint -> end.
+// l1=|root..joint|, l2=|joint..end|; target T and pole point P in root space.
+solve_two_bone(root, currentJoint, l1, l2, T, P, cachedBendNormal):
+    targetVector = T - root
+    rawDistance = length(targetVector)
+    if rawDistance < eps:
+        targetDirection = safe_normalize(currentJoint - root, fallbackForward)
+    else:
+        targetDirection = targetVector / rawDistance
+    d = clamp(rawDistance, abs(l1 - l2) + eps, l1 + l2 - eps)
+    reachableTarget = root + targetDirection * d
+    // interior (knee/elbow) angle; clamp cosine to kill FP drift outside [-1,1] -> NaN acos
+    kneeAngle     = acos(clamp((l1*l1 + l2*l2 - d*d) / (2*l1*l2), -1, 1))
+    shoulderAngle = acos(clamp((l1*l1 + d*d - l2*l2) / (2*l1*d), -1, 1))
+    axis = cross(targetDirection, P - root)           // bend plane normal
+    if length(axis) < eps: axis = cachedBendNormal
+    axis = safe_normalize(axis, any_perp(targetDirection))
+    rotate root by shoulderAngle about axis, aim root->joint toward reachableTarget
+    rotate joint by (π - kneeAngle) about axis        // then FK the end effector onto T
+```
 
 **CCD.** Cyclic coordinate descent. Iterative, O(joints × iterations). Cheap per iteration (~10 cycles), typically converges in 4-8 iterations. Use for short chains (tail, tentacle) where root lock is acceptable.
 
@@ -120,7 +142,7 @@ Pick the solver that matches the problem. Don't reach for full-body IK when two-
 
 **Cloth (XPBD).** Constraints: distance (edges), bending (dihedral or hinge), collision (body capsules). 10-20 iterations for a shirt, 40+ for a cape with self-collision. GPU dispatch per character, compute shader 64-thread groups. Budget: 0.4ms per character on GPU.
 
-**Strand hair.** TressFX 5 / HairWorks-style. 10k-80k strands per head. Each strand simulated as a chain (10-20 control points) with FTL (Follow-The-Leader) constraints — unconditionally stable, no drift. Rendered as triangle strips or curves (DXR 1.1 primitives on PC/console).
+**Strand hair.** TressFX/HairWorks-style strands can be simulated as short chains with FTL-style constraints. Render with triangle/ribbon geometry or platform-specific curve/linear-swept-sphere ray-tracing extensions where available; DXR 1.1 itself did not add curve primitives.
 
 **Marschner shading.** Three lobes — R (primary reflection), TT (transmission), TRT (secondary highlight). Dual-scattering approximation for multi-bounce. Cost: 1.2x standard skin shader. Ship it on hero characters.
 
@@ -146,7 +168,7 @@ Pick the solver that matches the problem. Don't reach for full-body IK when two-
 
 **Linear Blend Skinning (LBS).** Four bone influences per vertex is standard. Weight sum = 1. Fast, cache-friendly, GPU-native. Artifact: candy-wrapper at twisting joints.
 
-**Dual quaternion skinning.** Eliminates candy-wrapper. 1.3x LBS cost. Use on characters with tight twist joints (upper arm, forearm). Store DQ palette instead of Mat4 palette — 8 floats/bone instead of 12 (and faster).
+**Dual quaternion skinning.** Reduces candy-wrapper artifacts at higher per-vertex ALU cost than LBS. Its 8-float palette can reduce palette bandwidth relative to a 12-float affine matrix; benchmark the complete pass.
 
 **Compute shader skinning.** 64-thread groups, one thread per vertex. Output to a vertex buffer bound for subsequent passes (shadow pass, main pass). Essential for ray tracing — BLAS rebuild/refit needs skinned positions in buffer memory, not in the vertex stage.
 
@@ -165,7 +187,7 @@ void SkinCS(uint3 tid : SV_DispatchThreadID) {
 }
 ```
 
-**ML corrective deformers.** Small MLP (2 hidden layers × 64 units) driven by joint angles outputs per-vertex corrective offsets. Trained offline against simulation/sculpt ground-truth. **Must be evaluated asynchronously on the NPU pipeline via `INeuralBackend`**, syncing with the GPU skinning pass via timeline semaphores, rather than consuming the GPU's general Compute Unit (CU) budget. Fixes LBS artifacts that even DQS misses (muscle bulge, shoulder compression).
+**ML corrective deformers.** Train a compact model against simulation or sculpted ground truth and evaluate it through a capability-gated backend. GPU compute is the broadly available shipping path; NPU offload is optional where hardware, synchronization, and latency measurements justify it.
 
 ---
 
@@ -175,24 +197,56 @@ Raw 30Hz motion capture at 200 bones: 200 bones × (4+3) floats × 4 bytes × 30
 
 **ACL (Animation Compression Library, Nicholas Frechette).** Open-source, battle-tested (Uncharted 4, The Last of Us Part II, hundreds of ships). Use it. Don't write your own.
 
-**Smallest-three quaternion.** Store the three smallest components and reconstruct the largest from unit-length constraint. Encode index of the largest in 2 bits. Per-component 16-bit quantization → 50 bits per quat vs 128. Reconstruction is one sqrt.
+**Smallest-three quaternion.** Store the three smallest components and reconstruct the largest from the unit-length constraint. Encode the index of the largest in 2 bits. Per stored component 16-bit quantization → **2 + 3×16 = 50 bits** per quat vs 128. Reconstruction is one sqrt.
 
 ```cpp
-struct QuantQuat {
-    uint64_t packed; // 2 bits idx + 3 × ~20 bits components + flag
-};
+// Smallest-three: 2-bit index of the largest (dropped) component + three 16-bit
+// components = 50 bits total. The three stored components each lie in
+// [-1/√2, +1/√2] (the largest has magnitude ≥ 1/2, so it is never stored).
+// Canonicalize the sign so the dropped component is non-negative; it is then
+// reconstructed as +sqrt(1 - a² - b² - c²). Bit layout in the low 50 bits:
+//   [1:0] idx | [17:2] a | [33:18] b | [49:34] c
+inline constexpr float kInvSqrt2 = 0.70710678118654752f;
+inline constexpr float kQuatMax  = float((1u << 16) - 1); // 65535, the 16-bit span
+
+struct QuantQuat { uint64_t packed; };   // only the low 50 bits are used
+
+// map [-1/√2, +1/√2] -> [0, 65535]
+inline uint16_t quant_component(float v) noexcept {
+    const float n = (v + kInvSqrt2) / (2.0f * kInvSqrt2);
+    const float c = n < 0.f ? 0.f : (n > 1.f ? 1.f : n);
+    return static_cast<uint16_t>(c * kQuatMax + 0.5f);
+}
+// inverse map [0, 65535] -> [-1/√2, +1/√2]
+inline float dequant_component(uint16_t u) noexcept {
+    return (static_cast<float>(u) / kQuatMax) * (2.0f * kInvSqrt2) - kInvSqrt2;
+}
+
+inline QuantQuat pack(Quat q) noexcept {
+    const float c[4] = { q.x, q.y, q.z, q.w };
+    uint32_t idx = 0;                                   // largest-magnitude component
+    for (uint32_t i = 1; i < 4; ++i)
+        if (std::fabs(c[i]) > std::fabs(c[idx])) idx = i;
+    const float s = c[idx] < 0.f ? -1.f : 1.f;          // make dropped component ≥ 0
+    const uint16_t a = quant_component(s * c[(idx + 1) & 3]);
+    const uint16_t b = quant_component(s * c[(idx + 2) & 3]);
+    const uint16_t d = quant_component(s * c[(idx + 3) & 3]);
+    return { uint64_t(idx) | (uint64_t(a) << 2)
+           | (uint64_t(b) << 18) | (uint64_t(d) << 34) };
+}
 
 inline Quat unpack(QuantQuat q) noexcept {
-    const uint32_t idx = q.packed & 0x3;
-    // decode three 20-bit signed fixed-point in range [-1/√2, 1/√2]
-    float a, b, c; /* ... */
+    const uint32_t idx = uint32_t(q.packed & 0x3);
+    const float a = dequant_component(uint16_t((q.packed >> 2)  & 0xFFFF));
+    const float b = dequant_component(uint16_t((q.packed >> 18) & 0xFFFF));
+    const float c = dequant_component(uint16_t((q.packed >> 34) & 0xFFFF));
     const float d2 = 1.f - (a*a + b*b + c*c);
-    const float d = d2 > 0.f ? std::sqrt(d2) : 0.f;
+    const float d  = d2 > 0.f ? std::sqrt(d2) : 0.f;    // reconstructed largest, ≥ 0
     std::array<float, 4> xyzw{};
     xyzw[(idx + 1) & 3] = a;
     xyzw[(idx + 2) & 3] = b;
     xyzw[(idx + 3) & 3] = c;
-    xyzw[idx] = d;
+    xyzw[idx]           = d;
     return Quat{xyzw[0], xyzw[1], xyzw[2], xyzw[3]};
 }
 ```

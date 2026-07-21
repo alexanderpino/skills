@@ -19,7 +19,17 @@
 
 ## C++23 — Production Standard
 
-C++23 is what ships. Everything here is in MSVC 19.38+, Clang 17+, GCC 13+, and — critically — in the current PS5 SDK Clang, GDK MSVC, and Switch NVN/Clang toolchains. Use it freely.
+C++23 is the preferred source-language level, but compiler and standard-library support are separate capability axes. Gate every non-core facility with its feature-test macro and the actual shipping SDK:
+
+| Facility | Practical minimums / caveats |
+|----------|------------------------------|
+| `std::expected` | Broadly available in current desktop libraries; verify console SDK library |
+| deducing `this` | Clang 18+, GCC 14+, recent MSVC |
+| `std::mdspan` | GCC 14+, libc++ 17+, recent MSVC; gate with `__cpp_lib_mdspan` |
+| `<stacktrace>` | Available in libstdc++ and MSVC STL with implementation/link caveats; not a portable libc++ assumption |
+| multidimensional `operator[]` | Gate with `__cpp_multidimensional_subscript` |
+
+Keep engine fallbacks for every facility required by a lagging platform SDK.
 
 ### `std::expected<T, E>` — error handling backbone
 
@@ -73,44 +83,90 @@ Use for: fluent builders, container method chaining, policy-based design, `opera
 ### Multidimensional subscript `operator[](a, b, c)`
 
 ```cpp
+enum class GridError { InvalidExtent, SizeOverflow, OutOfBounds };
+
 class Grid3D {
     std::vector<float> data_;
-    size_t nx_, ny_, nz_;
+    std::size_t nx_{}, ny_{}, nz_{};
+
+    Grid3D(std::size_t nx, std::size_t ny, std::size_t nz, std::size_t count)
+        : data_(count), nx_(nx), ny_(ny), nz_(nz) {}
 public:
-    constexpr float& operator[](size_t x, size_t y, size_t z) noexcept {
+    Grid3D(const Grid3D&) = delete;
+    Grid3D& operator=(const Grid3D&) = delete;
+    Grid3D(Grid3D&&) noexcept = default;
+    Grid3D& operator=(Grid3D&&) noexcept = default;
+
+    [[nodiscard]] static std::expected<Grid3D, GridError>
+    create(std::size_t nx, std::size_t ny, std::size_t nz) {
+        if (nx == 0 || ny == 0 || nz == 0)
+            return std::unexpected(GridError::InvalidExtent);
+        if (ny > std::numeric_limits<std::size_t>::max() / nx)
+            return std::unexpected(GridError::SizeOverflow);
+        const auto plane = nx * ny;
+        if (nz > std::numeric_limits<std::size_t>::max() / plane)
+            return std::unexpected(GridError::SizeOverflow);
+        return Grid3D(nx, ny, nz, plane * nz);
+    }
+
+    // Unchecked hot-path access: the caller must establish the bounds invariant.
+    float& operator[](std::size_t x, std::size_t y, std::size_t z) noexcept {
         return data_[x + nx_ * (y + ny_ * z)];
     }
-    constexpr float  operator[](size_t x, size_t y, size_t z) const noexcept {
-        return data_[x + nx_ * (y + ny_ * z)];
+
+    [[nodiscard]] std::expected<std::reference_wrapper<float>, GridError>
+    at(std::size_t x, std::size_t y, std::size_t z) noexcept {
+        if (x >= nx_ || y >= ny_ || z >= nz_)
+            return std::unexpected(GridError::OutOfBounds);
+        return std::ref((*this)[x, y, z]);
     }
 };
-Grid3D g(...);
-g[4, 5, 6] = 1.0f;   // natural; no more g(4,5,6) or g[4][5][6]
+
+auto grid = Grid3D::create(32, 32, 32);
+if (!grid) return std::unexpected(grid.error());
+auto cell = grid->at(4, 5, 6);
+if (!cell) return std::unexpected(cell.error());
+cell->get() = 1.0f;
 ```
 
 Use for: voxel grids, 3D LUTs, matrix views, texture tile access.
 
-### `std::mdspan` — bounds-safe multi-dim views
+### `std::mdspan` — non-owning multi-dim views
 
-Non-owning view over N-dim data. Customizable layout (row-major, col-major, strided, tiled). Free in release, bounds-checked in debug with custom accessors.
+`std::mdspan` is customizable for row-major, column-major, and strided layouts, but **does not perform bounds checking by default**. Validate extents at the API boundary; use a project checked accessor if every individual access must be diagnosed.
 
 ```cpp
-void blur3x3(std::mdspan<float, std::extents<size_t, std::dynamic_extent, std::dynamic_extent>> img) {
-    const auto h = img.extent(0), w = img.extent(1);
-    for (size_t y = 1; y + 1 < h; ++y)
-    for (size_t x = 1; x + 1 < w; ++x) {
-        float s = 0;
-        for (int dy = -1; dy <= 1; ++dy)
-        for (int dx = -1; dx <= 1; ++dx)
-            s += img[y + dy, x + dx];
-        img[y, x] = s / 9.f;
+using Extents2D = std::dextents<std::size_t, 2>;
+using ImageView = std::mdspan<float, Extents2D, std::layout_right>;
+using ConstImageView = std::mdspan<const float, Extents2D, std::layout_right>;
+
+enum class BlurError { ExtentMismatch, ImageTooSmall };
+
+[[nodiscard]] std::expected<void, BlurError>
+blur3x3(ConstImageView src, ImageView dst) noexcept {
+    const auto h = src.extent(0);
+    const auto w = src.extent(1);
+    if (dst.extent(0) != h || dst.extent(1) != w)
+        return std::unexpected(BlurError::ExtentMismatch);
+    if (h < 3 || w < 3)
+        return std::unexpected(BlurError::ImageTooSmall);
+
+    for (std::size_t y = 1; y < h - 1; ++y)
+    for (std::size_t x = 1; x < w - 1; ++x) {
+        float sum = 0.0f;
+        for (std::size_t yy = y - 1; yy <= y + 1; ++yy)
+        for (std::size_t xx = x - 1; xx <= x + 1; ++xx)
+            sum += src[yy, xx];
+        dst[y, x] = sum / 9.0f;
     }
+    return {};
 }
 ```
 
-### `<stacktrace>` — first-class crash reporter integration
+### `<stacktrace>` — optional crash reporter integration
 
 ```cpp
+#if defined(__cpp_lib_stacktrace) && __cpp_lib_stacktrace >= 202011L
 void report_assert_failure(const char* cond, const char* file, int line) {
     auto st = std::stacktrace::current(/*skip*/1);
     crash_report::submit({
@@ -120,25 +176,37 @@ void report_assert_failure(const char* cond, const char* file, int line) {
         .stack     = std::to_string(st),
     });
 }
+#else
+// Route through the platform crash layer (DbgHelp, backtrace/unwind,
+// Crashpad, or the console SDK) and symbolize out of process.
+#endif
 ```
 
-Zero dependencies on platform PDB magic for the capture — you still need symbol servers to symbolicate after ingest, but capture is standard.
+Stack capture still requires platform unwinding support, and useful reports require matching symbols and build IDs. Never make `<stacktrace>` the only crash path.
 
 ### `if consteval` and extended constexpr
 
 ```cpp
-constexpr float fast_sqrt(float x) noexcept {
+constexpr float portable_sqrt(float x) noexcept {
     if consteval {
-        // compile-time path: use a slow-but-exact Newton iteration
-        return compile_time_newton_sqrt(x);
+        if (x < 0.0f) return std::numeric_limits<float>::quiet_NaN();
+        if (x == 0.0f) return 0.0f;
+        float guess = x >= 1.0f ? x : 1.0f;
+        for (int i = 0; i < 32; ++i)
+            guess = 0.5f * (guess + x / guess);
+        return guess;
     } else {
-        // runtime: hardware intrinsic
-        return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(x)));
+        // Portable runtime path; the implementation may select a hardware sqrt.
+        return std::sqrt(x);
     }
 }
 ```
 
-C++23 adds `<cmath>` constexpr for most functions — bake LUTs and curves at compile time instead of on first boot.
+Most `<cmath>` overloads are not required to be `constexpr` until C++26. In a C++23 baseline, use a bounded compile-time algorithm such as the one above, generate tables at build time, or gate the C++26 library path with its actual library feature-test macro.
+
+### `constexpr` containers
+
+`constexpr std::vector` and `std::string` are C++20 library features and are available in the C++23 baseline where the library implements them. Allocations generally cannot escape constant evaluation into persistent runtime objects; use generated arrays or fixed-capacity containers when that is required.
 
 ---
 
@@ -151,8 +219,8 @@ C++23 adds `<cmath>` constexpr for most functions — bake LUTs and curves at co
 The single most impactful feature coming. Replaces hand-written `ComponentTraits`, serialization visitors, RPC descriptors. Until it ships on all target SDKs, the engine uses a codegen tool (Python + libclang) that emits equivalent templates — the *shape* of `ComponentTraits` stays identical, so adopting reflection later is a mechanical swap.
 
 ```cpp
-#if defined(__cpp_reflection) && __cpp_reflection >= 202506L
-// C++26 path (P2996): reflect directly on the type. FTM is __cpp_reflection.
+// PSEUDOCODE — illustrative P2996-era syntax. The adopted spelling, header,
+// feature-test macro, and compiler support must be checked in the target SDK.
 template<class T> struct ComponentTraits {
     static constexpr std::string_view name = [:name_of(^^T):];
     static constexpr auto fields = []{
@@ -161,35 +229,44 @@ template<class T> struct ComponentTraits {
         }, nonstatic_data_members_of(^^T));
     }();
 };
-#else
-// C++23 fallback: codegen emits explicit specializations
-// (see tools/gen_reflection.py; run as CMake pre-build step)
-template<class T> struct ComponentTraits;        // primary = undefined
-// specializations generated per reflected type in *.generated.hpp
-#endif
 ```
 
-Both branches expose the identical API (`name`, `fields`). Downstream code — property inspector, serializer, network marshaller — is written once against that API and doesn't care which branch compiled.
+The production C++23 interface is ordinary, compile-ready C++ and is filled by generated specializations:
+
+```cpp
+template<class T> struct ComponentTraits;        // primary = undefined
+// tools/gen_reflection.py emits specializations into *.generated.hpp
+```
+
+Do not invent a feature-test macro in production code. Add the real macro only after the shipping compiler publishes one. Both implementations must expose the identical API (`name`, `fields`).
 
 ### Contracts
 
 ```cpp
-#if defined(__cpp_contracts)   // P2900 contracts (FTM __cpp_contracts); pre/post are
-                               // function-contract specifiers, NOT the contract_assert statement
-float safe_divide(float a, float b)
+// PSEUDOCODE — C++26 contract spelling/evaluation semantics remain toolchain
+// gated. Never make a contract the only runtime validation for untrusted input.
+float divide_assuming_valid(float a, float b)
     pre(b != 0.0f)
     post(r: std::isfinite(r))
 {
     return a / b;
 }
-#else
-float safe_divide(float a, float b) noexcept {
-    DEV_ASSERT(b != 0.0f, "division by zero");
-    float r = a / b;
-    DEV_ASSERT(std::isfinite(r), "non-finite result");
-    return r;
+```
+
+The C++23 fallback is safe even when development assertions compile out:
+
+```cpp
+enum class MathError { DivisionByZero, NonFiniteResult };
+
+[[nodiscard]] std::expected<float, MathError>
+safe_divide(float a, float b) noexcept {
+    if (b == 0.0f)
+        return std::unexpected(MathError::DivisionByZero);
+    const float result = a / b;
+    if (!std::isfinite(result))
+        return std::unexpected(MathError::NonFiniteResult);
+    return result;
 }
-#endif
 ```
 
 Contract violation handlers integrate with the crash reporter the same way asserts do. Contracts don't replace asserts — they add a declarative layer the compiler can exploit for optimization and static analysis.
@@ -200,6 +277,7 @@ Pattern matching (P2688/P2392, `inspect`) was **not adopted into C++26** — it 
 
 ```cpp
 #if defined(__cpp_pattern_matching)   // hypothetical — no such macro exists yet (post-C++26)
+// PSEUDOCODE — speculative syntax; this branch is intentionally non-production.
 auto describe(const Shape& s) -> std::string {
     return inspect (s) {
         <Circle>    [r]          => std::format("circle r={}", r);
@@ -243,31 +321,36 @@ auto h = jobs.schedule(JobPriority::IO, []{ return load_file("a.bin"); })
 #endif
 ```
 
-### constexpr Containers
-
-`std::vector`, `std::string` in constant expressions. Usable for compile-time string-table construction, test-data builders, build-time level validation. C++23 fallback: `std::array` + hand-rolled `constexpr_vector<T, N>`.
-
 ---
 
 ## EASTL & Container Strategy
 
-`std::` containers have two critical defects for AAA:
+`std::` containers have trade-offs that matter in some engine runtimes:
 
 1. **Allocator model is baked into the type.** `std::vector<T, A>` and `std::vector<T, B>` are different types. Moving across allocator boundaries requires element-wise copy. Engine code needs stateful allocators that compare equal structurally — `std::` forbids this cleanly.
-2. **Exception guarantees.** `std::vector::push_back` requires strong exception safety; even with `-fno-exceptions`, some implementations emit dead EH tables. Size bloat.
+2. **Exception and ABI policy.** Standard-library behavior in exceptions-off builds is implementation-specific, particularly with MSVC STL. Measure binary impact and avoid relying on unsupported library modes.
 
-Solution: **EASTL** (or a homegrown equivalent — Unreal's `TArray`, Frostbite's `eastl`-derived containers).
+Choose EASTL, a project-owned equivalent, `std::pmr`, or standard containers per module. Do not introduce a second container ecosystem without a demonstrated allocator, ABI, determinism, or binary-size need.
 
 ```cpp
 #include <EASTL/vector.h>
 #include <EASTL/hash_map.h>
+#include <EASTL/functional.h>
 
-using eastl::vector;
-using eastl::hash_map;
+// EASTL hash_map parameters are Key, T, Hash, Predicate, Allocator.
+using FrameEntities = eastl::vector<Entity, FrameAllocator>;
+using AssetLookup = eastl::hash_map<
+    AssetId,
+    Asset*,
+    AssetIdHash,
+    eastl::equal_to<AssetId>,
+    ScratchAllocator>;
 
-vector<Entity, FrameAllocator> per_frame_entities;   // resets every frame
-hash_map<AssetId, Asset*, ScratchAllocator> lookup;  // thread-local scratch
+FrameEntities per_frame_entities{FrameAllocator{frame_arena}};
+AssetLookup lookup{ScratchAllocator{scratch_arena}};
 ```
+
+Custom allocators must implement the allocator interface required by the pinned EASTL version (including its copy/equality/name/alignment behavior). Do not pass an allocator in the `Hash` position or assume a standard-library allocator satisfies EASTL unchanged.
 
 Engine aliases (thin wrappers or `using`) live in `core/containers.h`. Migration path from `std::`:
 1. Introduce `engine::vector = eastl::vector` alongside existing `std::vector` usage.
@@ -287,7 +370,7 @@ Move work from boot to compile. Builds are slow once; boots are slow forever.
 
 ```cpp
 constexpr uint64_t fnv1a_64(std::string_view s) noexcept {
-    uint64_t h = 1469598103934665603ull;
+    uint64_t h = 14695981039346656037ull;
     for (char c : s) { h ^= uint8_t(c); h *= 1099511628211ull; }
     return h;
 }
@@ -307,6 +390,8 @@ For stronger hashes (collision-resistant event IDs, asset GUIDs) use constexpr x
 **LUT generation:**
 
 ```cpp
+// PSEUDOCODE for a C++26 constexpr-cmath path. std::pow is not guaranteed
+// constexpr in the C++23 baseline.
 constexpr auto build_srgb_to_linear() {
     std::array<float, 256> t{};
     for (size_t i = 0; i < 256; ++i) {
@@ -318,6 +403,8 @@ constexpr auto build_srgb_to_linear() {
 }
 inline constexpr auto SRGB_LUT = build_srgb_to_linear();
 ```
+
+For C++23 production, run the same formula in a checked build-time generator and emit a `constexpr std::array<float, 256>` header (plus generator version/input hash), or provide and test a project constexpr `pow` implementation. Do not label a `std::pow` call C++23 compile-time computation.
 
 **Frozen maps for type registration:** `frozen::unordered_map` or a hand-rolled `constexpr` perfect-hash — zero runtime construction.
 
@@ -383,8 +470,10 @@ concept Serializable = requires(const T& v, BinaryWriter& w, BinaryReader& r) {
     { deserialize(r) } -> std::same_as<std::expected<T, SerializeError>>;
 };
 
-// Terse syntax — prefer for simple cases:
-auto sum(std::integral auto... xs) { return (xs + ...); }
+// Unary folds require a nonempty pack; state that contract explicitly.
+auto sum(std::integral auto first, std::integral auto... rest) {
+    return (first + ... + rest);
+}
 
 // Requires clause — preferred when constraints are compound:
 template<class T> requires Component<T> && Serializable<T>
@@ -397,36 +486,61 @@ Concepts matter most in templated code humans read. The compile-error delta betw
 
 ## Coroutines for Async
 
-C++20 coroutines, mature by C++23. Custom promise types let us frame-bind, pool allocate, and prioritize.
+C++20 coroutines are usable in a C++23 engine, but the language does not supply ownership, scheduling, cancellation, or error propagation. A coroutine frame must outlive every queued resume and must not come from a frame arena that resets while the operation is suspended.
 
 ```cpp
-struct FrameTask {
+// PSEUDOCODE — abbreviated scheduler/promise protocol, not a drop-in task type.
+class AsyncTask {
+public:
     struct promise_type {
-        FrameTask get_return_object() { return FrameTask{this}; }
-        std::suspend_never initial_suspend() noexcept { return {}; }
-        FinalAwaiter       final_suspend()   noexcept { return {}; }
-        void return_void() noexcept {}
-        void unhandled_exception() noexcept { FATAL_ASSERT(false, "throw in coro"); }
+        std::expected<void, AsyncError> result{};
+        Scheduler* owner{};
 
-        // Frame-affine scheduling: resume on owning frame's scheduler.
-        void* operator new(size_t n) { return FrameAllocator::instance().alloc(n); }
-        void  operator delete(void* p, size_t) noexcept { /* reset at frame end */ }
+        AsyncTask get_return_object();             // wraps handle_from_promise(*this)
+        std::suspend_always initial_suspend() noexcept;
+        RetireAtSchedulerBarrier final_suspend() noexcept;
+        void return_value(std::expected<void, AsyncError> r) noexcept {
+            result = std::move(r);
+        }
+        void unhandled_exception() noexcept { std::terminate(); } // exceptions-off invariant
+
+        // Long-lived coroutine pool, never the per-frame allocator.
+        void* operator new(std::size_t n);
+        void operator delete(void* p, std::size_t n) noexcept;
     };
-    ...
+
+private:
+    std::coroutine_handle<promise_type> handle_; // owned until start()
+
+public:
+    ~AsyncTask(); // destroys only an unstarted frame still owned by this object
+    void start(Scheduler& scheduler) &&; // transfers the handle to scheduler
 };
 
-FrameTask load_level(std::string_view name) {
+AsyncTask load_level(std::string name) {
     auto manifest = co_await read_file_async(name);
-    if (!manifest) { log_error("manifest load failed"); co_return; }
+    if (!manifest)
+        co_return std::unexpected(map_async_error(manifest.error()));
 
     auto parsed = co_await parse_async(*manifest);
+    if (!parsed)
+        co_return std::unexpected(map_async_error(parsed.error()));
+
     auto meshes = co_await load_meshes(parsed->mesh_refs);
-    co_await upload_to_gpu(std::move(meshes));
+    if (!meshes)
+        co_return std::unexpected(map_async_error(meshes.error()));
+
+    auto uploaded = co_await upload_to_gpu(std::move(*meshes));
+    if (!uploaded)
+        co_return std::unexpected(map_async_error(uploaded.error()));
 
     co_await scene_ready_barrier();
     emit_event("LevelLoaded"_id);
+    co_return std::expected<void, AsyncError>{};
 }
 ```
+
+The scheduler becomes the sole frame owner at `start()`. A queued resume holds that ownership; cancellation marks the promise and still resumes or retires it through the scheduler. `final_suspend` publishes the result to the awaiting parent/supervisor and queues destruction at a scheduler safe point. Never self-destroy in `return_void`, never retain a second owning handle, and never fire-and-forget without a supervisor that consumes the error.
 
 Use cases:
 - **Async I/O** — wait on file reads without thread-pool overhead.
@@ -462,7 +576,7 @@ void render_system(World* world, IRenderBackend* backend) noexcept;
 
 **4. `Handle<Tag>` — generational index for gameplay references.**
 
-The workhorse. A `Handle<Entity>` or `Handle<Texture2D>` is a 64-bit POD: `{ uint32_t index; uint32_t generation; }`. Resolves through a registry; stale handles detect automatically.
+The workhorse. A `Handle<Entity>` or `Handle<Texture2D>` is a 64-bit POD: `{ uint32_t index; uint32_t generation; }`. The fixed-capacity reference registry below has stable element addresses, reserves index zero for null, reports exhaustion, and permanently retires a slot before its generation can wrap.
 
 ```cpp
 template<class Tag>
@@ -473,41 +587,65 @@ struct Handle {
     friend auto operator<=>(Handle, Handle) = default;
 };
 
-template<class T, class Tag>
+enum class HandleError { Null, OutOfRange, Stale, Destroyed, Full };
+
+template<class T, class Tag, std::size_t Capacity>
+requires std::is_nothrow_destructible_v<T>
 class Registry {
-    struct Slot { uint32_t generation; T value; bool alive; };
-    std::vector<Slot> slots_;
-    std::vector<uint32_t> free_;
+    struct Slot {
+        std::uint32_t generation{1};
+        std::optional<T> value;
+        bool retired{false};
+    };
+    std::array<Slot, Capacity + 1> slots_{}; // slot 0 is permanently null
+    std::array<std::uint32_t, Capacity> free_{};
+    std::size_t free_count_{Capacity};
+
 public:
-    Handle<Tag> create(T v) {
-        uint32_t idx;
-        if (!free_.empty()) { idx = free_.back(); free_.pop_back(); }
-        else { idx = slots_.size(); slots_.push_back({1, {}, false}); }
-        slots_[idx].value = std::move(v);
-        slots_[idx].alive = true;
-        return { idx, slots_[idx].generation };
+    Registry() noexcept {
+        for (std::size_t i = 0; i < Capacity; ++i)
+            free_[i] = static_cast<std::uint32_t>(Capacity - i);
     }
-    void destroy(Handle<Tag> h) {
-        if (!valid(h)) return;
-        slots_[h.index].alive = false;
-        ++slots_[h.index].generation;    // invalidates outstanding handles
-        free_.push_back(h.index);
+
+    template<class... Args>
+    requires std::is_nothrow_constructible_v<T, Args...>
+    [[nodiscard]] std::expected<Handle<Tag>, HandleError>
+    create(Args&&... args) noexcept {
+        if (free_count_ == 0)
+            return std::unexpected(HandleError::Full);
+        const auto index = free_[--free_count_];
+        Slot& slot = slots_[index];
+        slot.value.emplace(std::forward<Args>(args)...);
+        return Handle<Tag>{index, slot.generation};
     }
-    std::expected<T*, HandleError> resolve(Handle<Tag> h) noexcept {
+
+    [[nodiscard]] std::expected<void, HandleError>
+    destroy(Handle<Tag> h) noexcept {
+        auto value = resolve(h);
+        if (!value) return std::unexpected(value.error());
+        Slot& slot = slots_[h.index];
+        slot.value.reset();
+        if (slot.generation == std::numeric_limits<std::uint32_t>::max()) {
+            slot.retired = true; // do not wrap and resurrect an ancient handle
+        } else {
+            ++slot.generation;
+            free_[free_count_++] = h.index;
+        }
+        return {};
+    }
+
+    [[nodiscard]] std::expected<T*, HandleError>
+    resolve(Handle<Tag> h) noexcept {
+        if (h.index == 0)                              return std::unexpected(HandleError::Null);
         if (h.index >= slots_.size())                   return std::unexpected(HandleError::OutOfRange);
         if (slots_[h.index].generation != h.generation) return std::unexpected(HandleError::Stale);
-        if (!slots_[h.index].alive)                     return std::unexpected(HandleError::Destroyed);
-        return &slots_[h.index].value;
-    }
-    bool valid(Handle<Tag> h) const noexcept {
-        return h.index < slots_.size()
-            && slots_[h.index].generation == h.generation
-            && slots_[h.index].alive;
+        if (!slots_[h.index].value)                     return std::unexpected(HandleError::Destroyed);
+        return std::addressof(*slots_[h.index].value);
     }
 };
 ```
 
-Handles survive serialization, hot-reload, save/load. They're the default reference for any cross-system gameplay link.
+Pointers returned by this fixed-capacity registry remain stable until that slot is destroyed; they must not escape a synchronization interval in which destruction can occur. Handles can be serialized only with the registry identity and slot/generation state, or remapped from stable GUIDs on load. A bare runtime handle does not automatically survive save/load or process restart.
 
 **5. `StrongID<Tag>` — phantom-typed identifier.**
 Not a pointer at all — a wrapper around a stable ID (hash, GUID, 64-bit integer). Tag prevents mixing.

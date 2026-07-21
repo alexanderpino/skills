@@ -20,21 +20,88 @@ The editor is a consumer of the engine, not a peer. Every editor feature that re
 **The editor is the top-layer consumer of the engine.** The engine is a shared library (engine.dll / libengine.so / engine.dylib); the editor links against a C ABI shim. This forces the runtime to be re-entrant, pure, and serializable — which is exactly what you want for ship builds, too.
 
 ```cpp
-// engine_c_api.h — stable across editor/runtime, C linkage, no exceptions
+// engine_c_api.h — valid C11 and C++; exported implementations catch all C++
+// exceptions and translate them to EngineStatus.
+#include <stddef.h>
+#include <stdint.h>
+
+#if defined(_WIN32)
+#  if defined(ENGINE_CORE_BUILD)
+#    define ENGINE_API __declspec(dllexport)
+#  else
+#    define ENGINE_API __declspec(dllimport)
+#  endif
+#  define ENGINE_CALL __cdecl
+#else
+#  define ENGINE_API __attribute__((visibility("default")))
+#  define ENGINE_CALL
+#endif
+#ifdef __cplusplus
 extern "C" {
-    typedef struct EngineHandle EngineHandle;
-    typedef struct WorldHandle  WorldHandle;
+#endif
 
-    // Returns nullptr on failure, error in out-param.
-    EngineHandle* engine_create(const EngineConfig* cfg, EngineError* err);
-    void          engine_destroy(EngineHandle*);
+typedef struct EngineHandle EngineHandle;
+typedef struct WorldHandle WorldHandle;
+typedef uint32_t EngineStatus; // fixed-width ABI; constants, not a C enum
+enum {
+    ENGINE_API_VERSION = 1u,
+    ENGINE_OK = 0u,
+    ENGINE_INVALID_ARGUMENT = 1u,
+    ENGINE_ABI_MISMATCH = 2u,
+    ENGINE_INTERNAL_ERROR = 3u
+};
 
-    WorldHandle*  engine_create_world(EngineHandle*, const char* name);
-    int32_t       world_tick(WorldHandle*, float dt);   // 0 = ok, <0 = error code
+typedef struct EngineConfig {
+    uint32_t struct_size; // caller sets sizeof(EngineConfig)
+    uint32_t api_version;
+    uint32_t flags;
+    uint32_t reserved;
+} EngineConfig;
+
+ENGINE_API EngineStatus ENGINE_CALL engine_create(
+    const EngineConfig* config, EngineHandle** out_engine);
+ENGINE_API EngineStatus ENGINE_CALL engine_destroy(EngineHandle* engine);
+// UTF-8 bytes; name_length excludes any trailing NUL.
+ENGINE_API EngineStatus ENGINE_CALL engine_create_world(
+    EngineHandle* engine, const char* name, size_t name_length,
+    WorldHandle** out_world);
+ENGINE_API EngineStatus ENGINE_CALL world_tick(WorldHandle* world, float dt);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
+```
+
+No `std::string`, references, templates, exceptions, compiler-dependent enums, RAII types, or virtual methods cross the boundary. Every out handle is set to null before work begins; destroy functions accept null; ownership is documented per function. Version and size every extensible struct, pin calling convention/export visibility, define string encoding and lengths, and test the public header with both a C and C++ compiler.
+
+```cpp
+// PSEUDOCODE implementation pattern. ENGINE_C_ABI_SHIM_EXCEPTIONS is fixed per
+// shim binary; preprocessor removal keeps try/catch out of -fno-exceptions builds.
+extern "C" ENGINE_API EngineStatus ENGINE_CALL
+engine_create(const EngineConfig* config, EngineHandle** out_engine) noexcept {
+    if (out_engine == nullptr) return ENGINE_INVALID_ARGUMENT;
+    *out_engine = nullptr;
+    if (config == nullptr || config->struct_size < sizeof(EngineConfig) ||
+        config->api_version != ENGINE_API_VERSION)
+        return ENGINE_ABI_MISMATCH;
+#if ENGINE_C_ABI_SHIM_EXCEPTIONS
+    try {
+        return create_engine_internal(*config, *out_engine);
+    } catch (...) {
+        report_current_exception();
+        *out_engine = nullptr;
+        return ENGINE_INTERNAL_ERROR;
+    }
+#else
+    static_assert(noexcept(create_engine_internal(*config, *out_engine)));
+    return create_engine_internal(*config, *out_engine);
+#endif
 }
 ```
 
-No `std::string` across the boundary, no RAII types, no virtual methods. POD and opaque pointers only. This is Frostbite, id Tech, and RE Engine orthodoxy — and it's why those editors can be rewritten without touching the engine.
+Compile an exception-enabled shim only when it must contain throwing third-party
+boundaries. Otherwise keep the entire C ABI path `noexcept`; do not paste an
+unconditional `try`/`catch` into an exceptions-disabled target.
 
 **Language split:**
 - Engine / runtime — C++23.
@@ -53,8 +120,8 @@ public sealed class EntityViewModel : INotifyPropertyChanged {
         get => _position;
         set {
             if (_position == value) return;
+            _bridge.SetPosition(_id, value);  // may fail; local state is unchanged
             _position = value;
-            _bridge.SetPosition(_id, value);  // marshalled to C ABI
             OnPropertyChanged();
         }
     }
@@ -130,6 +197,8 @@ The editor walks `fields`, dispatches on field type → widget:
 Command pattern, two stacks, serializable commands. This is non-negotiable for any editor your team will use for more than a week.
 
 ```cpp
+// PSEUDOCODE — UNDO/REDO: FallibleHistory is fixed-capacity or explicitly
+// fallible; reserve_one() never mutates command state.
 class ICommand {
 public:
     virtual ~ICommand() = default;
@@ -140,22 +209,69 @@ public:
 };
 
 class UndoStack {
-    std::vector<std::unique_ptr<ICommand>> undo_;
-    std::vector<std::unique_ptr<ICommand>> redo_;
+    FallibleHistory<std::unique_ptr<ICommand>> undo_;
+    FallibleHistory<std::unique_ptr<ICommand>> redo_;
 public:
     std::expected<void, EditError> push(std::unique_ptr<ICommand> cmd) {
-        auto r = cmd->execute();
-        if (!r) return r;
-        redo_.clear();                    // branching invalidates redo
-        undo_.push_back(std::move(cmd));
+        if (!cmd) return std::unexpected(EditError::InvalidCommand);
+        if (!undo_.reserve_one()) return std::unexpected(EditError::HistoryFull);
+        if (auto r = cmd->execute(); !r) return r;
+        redo_.clear();
+        undo_.push_reserved(std::move(cmd));
         return {};
     }
-    std::expected<void, EditError> undo();
-    std::expected<void, EditError> redo();
+    std::expected<void, EditError> undo() {
+        if (undo_.empty()) return std::unexpected(EditError::EmptyHistory);
+        if (!redo_.reserve_one()) return std::unexpected(EditError::HistoryFull);
+        auto& cmd = undo_.back();
+        if (auto r = cmd->undo(); !r) return r; // stacks unchanged on failure
+        redo_.push_reserved(std::move(cmd));
+        undo_.pop_back();
+        return {};
+    }
+    std::expected<void, EditError> redo() {
+        if (redo_.empty()) return std::unexpected(EditError::EmptyHistory);
+        if (!undo_.reserve_one()) return std::unexpected(EditError::HistoryFull);
+        auto& cmd = redo_.back();
+        if (auto r = cmd->execute(); !r) return r;
+        undo_.push_reserved(std::move(cmd));
+        redo_.pop_back();
+        return {};
+    }
 };
 ```
 
-**Transaction grouping:** drag operations generate hundreds of incremental commands; wrap them in a `CompoundCommand` that executes/undoes atomically. Start the transaction on mouse down, commit on mouse up.
+**Transaction grouping:** drag operations generate hundreds of incremental commands; wrap them in a `CompoundCommand`. Its `execute()` applies children in order and, on failure, undoes already-applied children in reverse. Its `undo()` reverses children and, on failure, re-executes those already undone. If compensation itself fails, poison the history, stop accepting edits, and reload the last consistent snapshot—do not pretend the transaction was atomic. Start on mouse down, commit one command on mouse up, and discard a no-op transaction.
+
+```cpp
+// PSEUDOCODE — TRANSACTIONAL UNDO/REDO: compensation failure poisons history.
+expected<void, EditError> CompoundCommand::execute() {
+    size_t applied = 0;
+    for (; applied < children.size(); ++applied) {
+        if (auto r = children[applied]->execute(); !r) {
+            while (applied != 0)
+                if (auto rollback = children[--applied]->undo(); !rollback)
+                    return unexpected(EditError::HistoryPoisoned);
+            return unexpected(r.error());
+        }
+    }
+    return {};
+}
+
+expected<void, EditError> CompoundCommand::undo() {
+    size_t remaining = children.size();
+    while (remaining != 0) {
+        if (auto r = children[remaining - 1]->undo(); !r) {
+            for (size_t i = remaining; i < children.size(); ++i)
+                if (auto restore = children[i]->execute(); !restore)
+                    return unexpected(EditError::HistoryPoisoned);
+            return unexpected(r.error());
+        }
+        --remaining;
+    }
+    return {};
+}
+```
 
 **Serializable commands** are the foundation of collaborative editing — stream the command bytes to other clients, they replay deterministically. Google Docs for level design. Requires: every command references entities by stable GUID, not pointer.
 
@@ -178,7 +294,7 @@ Instance in World:
     - Bulb.PointLight.intensity = 400     // this lamp is dimmer
 ```
 
-**Override storage is a delta:** list of `(entity_path, field_path, value)` tuples. Everything not overridden follows the template. When the template changes, non-overridden fields update automatically — this is the whole point.
+**Override storage is a delta:** list of `(stable_node_guid, stable_component_type_id, stable_field_id, value)` tuples. Display names and hierarchy paths are metadata, not identity: renaming or reparenting an entity must not orphan overrides. Everything not overridden follows the template.
 
 **Nested prefabs:** prefab A contains prefab B. Changes to B propagate to A and to all instances of A. Enforce depth limit (typical: 8) to catch infinite recursion authored by accident.
 
@@ -189,13 +305,29 @@ Instance in World:
   "$schema_version": 3,
   "prefab_ref": "guid:7a2c-...",
   "overrides": [
-    { "path": "Root/Transform.position", "value": [10, 0, 5] },
-    { "path": "Bulb/PointLight.intensity", "value": 400 }
+    { "node": "guid:root-...", "component": "transform/v1", "field": "position", "value": [10, 0, 5] },
+    { "node": "guid:bulb-...", "component": "point-light/v2", "field": "intensity_lm", "value": 400 }
   ]
 }
 ```
 
-Write a migration per schema version bump; run on load. Never delete a migration — old saves outlive your patience.
+Write a deterministic `vN -> vN+1` migration for each bump. Preserve unknown fields, migrate a copy, validate stable IDs and value types, then atomically publish the new document; retain the original on any error. Never key migrations on localized/display names and never delete a migration—old saves outlive your patience.
+
+```cpp
+// PSEUDOCODE — PREFAB MIGRATION: JSON/value API abbreviated.
+expected<Document, MigrationError> migrate(Document input) {
+    while (input.version < kCurrentVersion) {
+        auto step = migration_for(input.version);
+        if (!step) return unexpected(MigrationError::UnsupportedVersion);
+        auto next = step(input);              // must not mutate input on failure
+        if (!next || next->version != input.version + 1)
+            return unexpected(MigrationError::InvalidStep);
+        input = std::move(*next);
+    }
+    if (!validate_prefab(input)) return unexpected(MigrationError::InvalidDocument);
+    return input; // caller writes temp + fsync + atomic rename
+}
+```
 
 ---
 
@@ -217,11 +349,31 @@ void World::tick(float dt) noexcept {
 
 **ECS structural changes** (entity create/destroy, component add/remove) reshape archetype memory. Running them concurrent with a system iterating that archetype is undefined behavior. Deferred command buffers are the solution — every AAA ECS (Flecs, EnTT's group mode, Unity DOTS) does this.
 
-**Hot-reload via snapshot+diff:**
+**Hot-reload via immutable publication and deferred retirement:**
 1. On asset change, editor cooks the new payload.
 2. Runtime receives manifest `{asset_guid, new_payload_ref}`.
-3. At the next barrier, runtime serializes current state referencing the asset, swaps the asset pointer, deserializes.
-4. Handles keyed on GUID see the new data seamlessly.
+3. Load and validate an immutable replacement without touching the live slot.
+4. At the next barrier, atomically publish the new version for the GUID. Readers acquire one version for the entire job; they never reload the slot mid-job.
+5. Retire the old CPU version after all reader references/epochs drain. Retire its GPU resources only after the last submitted fence that can reference them completes.
+6. If load, validation, state migration, or publication fails, keep the old version live and report the error.
+
+```cpp
+// PSEUDOCODE — HOT-RELOAD PUBLICATION/RETIREMENT: queue APIs are abbreviated.
+struct AssetSlot {
+    std::atomic<std::shared_ptr<const AssetVersion>> current;
+};
+
+auto acquire(const AssetSlot& slot) {
+    return slot.current.load(std::memory_order_acquire);
+}
+
+void publish(AssetSlot& slot, std::shared_ptr<const AssetVersion> replacement,
+             GpuRetirementQueue& retire) {
+    auto old = slot.current.exchange(std::move(replacement),
+                                     std::memory_order_acq_rel);
+    retire.after_last_use_fence(std::move(old)); // queue also holds CPU lifetime
+}
+```
 
 For code hot-reload (gameplay DLL), unload → recompile → reload, restore state via serialization boundary. Live++ or a home-grown equivalent for native code; C# AssemblyLoadContext for managed. Not free — architect the code/data boundary so runtime state lives in data and code is pure behavior.
 
@@ -279,21 +431,56 @@ def cook_level(level_guid: str, platforms: list[TargetPlatform]) -> int:
 **Code generation:** reflection tables (pre-C++26), network serialization boilerplate (RPC descriptors), component registration. A Python pass over parsed headers (via libclang) emits `.generated.cpp` files that the build compiles. This replaces UnrealHeaderTool for bespoke engines. Once C++26 static reflection lands in ship toolchains, delete these generators — until then, they're mandatory.
 
 ```python
-# gen_reflection.py — run as a CMake custom command pre-build
+# PSEUDOCODE emission core; AST discovery/annotation policy is omitted.
 import clang.cindex
+import json
+import os
 from pathlib import Path
+import tempfile
 
-def emit_traits(cls: clang.cindex.Cursor, out: Path) -> None:
-    with out.open("w") as f:
-        f.write(f"template<> struct ComponentTraits<{cls.spelling}> {{\n")
-        f.write(f'    static constexpr std::string_view name = "{cls.spelling}";\n')
-        f.write( "    static constexpr auto fields = std::tuple{\n")
-        for field in cls.get_children():
-            if field.kind == clang.cindex.CursorKind.FIELD_DECL:
-                f.write(f'        Field{{"{field.spelling}", '
-                        f'&{cls.spelling}::{field.spelling}}},\n')
-        f.write( "    };\n};\n")
+def qualified_name(cursor: clang.cindex.Cursor) -> str:
+    parts: list[str] = []
+    while cursor and cursor.kind != clang.cindex.CursorKind.TRANSLATION_UNIT:
+        if cursor.spelling:
+            parts.append(cursor.spelling)
+        cursor = cursor.semantic_parent
+    return "::".join(reversed(parts))
+
+def emit_traits(classes: list[clang.cindex.Cursor], out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(dir=out.parent, prefix=out.name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write("// generated; do not edit\n#pragma once\n")
+            f.write("#include <string_view>\n#include <tuple>\n")
+            for cls in sorted(classes, key=qualified_name):
+                qname = qualified_name(cls)
+                if not qname:
+                    raise ValueError("reflected class has no qualified name")
+                f.write(f"template<> struct ComponentTraits<{qname}> {{\n")
+                f.write(f"  static constexpr std::string_view name = {json.dumps(qname)};\n")
+                f.write("  static constexpr auto fields = std::tuple{\n")
+                seen: set[str] = set()
+                for field in cls.get_children():
+                    if field.kind != clang.cindex.CursorKind.FIELD_DECL:
+                        continue
+                    if field.is_bitfield():
+                        raise ValueError(f"bit-field is not reflectable: {qname}::{field.spelling}")
+                    if field.spelling in seen:
+                        raise ValueError(f"duplicate reflected field: {qname}::{field.spelling}")
+                    seen.add(field.spelling)
+                    f.write(f"    Field{{{json.dumps(field.spelling)}, "
+                            f"&{qname}::{field.spelling}}},\n")
+                f.write("  };\n};\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_name, out)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
 ```
+
+The omitted discovery pass must fail on libclang diagnostics, select only explicitly reflected definitions from project headers, reject private/inaccessible or anonymous members, deduplicate canonical declarations/USRs, and list every parsed header plus the generator binary/version as build dependencies. Generate one file once and replace it atomically; never reopen the same output with `"w"` for each class.
 
 ---
 

@@ -1,1 +1,3 @@
 terrain-architect-workspace/
+__pycache__/
+*.py[cod]

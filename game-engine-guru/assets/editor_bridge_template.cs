@@ -4,15 +4,23 @@
 // C# 12 / .NET 8 scaffold for the editor-side bridge into the native engine.
 // Responsibilities:
 //   * P/Invoke into the engine's C ABI (engine_core.dll / libengine_core.so).
-//   * SafeHandle-wrapped native lifetimes (World, Entity).
+//   * SafeHandle-wrapped owning World lifetime; EntityId is a non-owning value.
 //   * MVVM primitives (ViewModelBase, RelayCommand) for the editor shell.
 //   * Undo/Redo command stack driving native edits.
 //   * Reflection-driven PropertyInspector that emits per-type editor widgets.
 //
+// Project requirements (this file is intentionally not a project scaffold):
+//   <TargetFramework>net8.0</TargetFramework>
+//   <LangVersion>12.0</LangVersion>
+//   <Nullable>enable</Nullable>
+//   <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+// LibraryImport uses the .NET SDK's built-in source generator; no NuGet package
+// or WPF project is required for the ICommand interface used below.
+//
 // Design rules:
 //   * Never marshal exceptions across the C ABI. Native errors are surfaced as
 //     EngineError codes translated to EngineException on the managed side.
-//   * SafeHandle guarantees release even under Thread.Abort / process teardown.
+//   * SafeHandle guarantees a constrained-execution release attempt during finalization.
 //   * No static mutable state; the editor wires a single EngineSession per window.
 // -----------------------------------------------------------------------------
 
@@ -80,18 +88,35 @@ internal static partial class NativeMethods
     /// <summary>Spawns an entity in the world and returns its opaque 64-bit id.</summary>
     [LibraryImport(Lib, EntryPoint = "engine_entity_spawn")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-    internal static partial EngineError engine_entity_spawn(IntPtr world, out ulong outEntityId);
+    internal static partial EngineError engine_entity_spawn(WorldHandle world, out ulong outEntityId);
 
     /// <summary>Copies `byteCount` bytes from `data` into the component of type `componentTypeId`
     /// on the entity. Component must exist; use engine_component_add first if not.</summary>
     [LibraryImport(Lib, EntryPoint = "engine_component_set")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     internal static unsafe partial EngineError engine_component_set(
-        IntPtr world,
+        WorldHandle world,
         ulong entityId,
         uint componentTypeId,
         void* data,
         nuint byteCount);
+
+    /// <summary>Returns the native ABI contract for one generated component type.</summary>
+    [LibraryImport(Lib, EntryPoint = "engine_component_get_abi")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+    internal static partial EngineError engine_component_get_abi(
+        uint componentTypeId,
+        out NativeComponentAbi outAbi);
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 8)]
+internal struct NativeComponentAbi
+{
+    internal uint ComponentTypeId;
+    internal uint AbiVersion;
+    internal nuint Size;
+    internal nuint Alignment;
+    internal ulong LayoutHash;
 }
 
 // =============================================================================
@@ -101,26 +126,34 @@ internal static partial class NativeMethods
 /// <summary>RAII wrapper for an engine World handle.</summary>
 public sealed class WorldHandle : SafeHandle
 {
-    public WorldHandle() : base(IntPtr.Zero, ownsHandle: true) { }
+    private WorldHandle() : base(IntPtr.Zero, ownsHandle: true) { }
 
-    public override bool IsInvalid => handle == IntPtr.Zero;
+    public override bool IsInvalid =>
+        handle == IntPtr.Zero || handle == new IntPtr(-1);
 
     public static WorldHandle Create()
     {
         var err = NativeMethods.engine_world_create(out var raw);
-        EngineException.ThrowIfError(err, nameof(NativeMethods.engine_world_create));
+        if (err != EngineError.Ok)
+        {
+            if (raw != IntPtr.Zero && raw != new IntPtr(-1))
+                _ = NativeMethods.engine_world_destroy(raw);
+            EngineException.ThrowIfError(err, nameof(NativeMethods.engine_world_create));
+        }
+        if (raw == IntPtr.Zero || raw == new IntPtr(-1))
+            throw new EngineException(
+                EngineError.InvalidHandle,
+                "engine_world_create returned success with an invalid handle");
         var h = new WorldHandle();
         h.SetHandle(raw);
         return h;
     }
 
-    internal IntPtr Raw => handle;
-
     protected override bool ReleaseHandle()
     {
         // ReleaseHandle runs on the finalizer thread; never throw.
-        _ = NativeMethods.engine_world_destroy(handle);
-        return true;
+        if (IsInvalid) return true;
+        return NativeMethods.engine_world_destroy(handle) == EngineError.Ok;
     }
 }
 
@@ -209,16 +242,18 @@ public sealed class UndoRedoStack
 
     public void Undo()
     {
-        if (!_undo.TryPop(out var cmd)) return;
+        if (!_undo.TryPeek(out var cmd)) return;
         cmd.Undo();
+        _undo.Pop();
         _redo.Push(cmd);
         HistoryChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Redo()
     {
-        if (!_redo.TryPop(out var cmd)) return;
+        if (!_redo.TryPeek(out var cmd)) return;
         cmd.Execute();
+        _redo.Pop();
         _undo.Push(cmd);
         HistoryChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -273,8 +308,9 @@ public static class PropertyInspector
             var attr = p.GetCustomAttribute<InspectorAttribute>();
             if (attr?.Hidden == true) continue;
             if (p.GetIndexParameters().Length > 0) continue; // skip indexers
+            if (p.GetMethod?.IsPublic != true) continue;     // require a readable public property
 
-            var readOnly = attr?.ReadOnly == true || !p.CanWrite;
+            var readOnly = attr?.ReadOnly == true || p.SetMethod?.IsPublic != true;
             var widget   = ClassifyWidget(p.PropertyType);
             var name     = attr?.DisplayName ?? p.Name;
 
@@ -283,7 +319,18 @@ public static class PropertyInspector
                 Type: p.PropertyType,
                 Widget: widget,
                 Getter: () => p.GetValue(target),
-                Setter: v => { if (!readOnly) p.SetValue(target, v); },
+                Setter: v =>
+                {
+                    if (readOnly)
+                        throw new InvalidOperationException($"{type.Name}.{p.Name} is read-only");
+                    if (v is null && p.PropertyType.IsValueType &&
+                        Nullable.GetUnderlyingType(p.PropertyType) is null)
+                        throw new ArgumentException($"{p.Name} does not accept null", nameof(v));
+                    if (v is not null && !p.PropertyType.IsInstanceOfType(v))
+                        throw new ArgumentException(
+                            $"{p.Name} requires {p.PropertyType.FullName}", nameof(v));
+                    p.SetValue(target, v);
+                },
                 ReadOnly: readOnly));
         }
 
@@ -330,21 +377,80 @@ public sealed class EngineSession : IDisposable
 
     public EntityId Spawn()
     {
-        var err = NativeMethods.engine_entity_spawn(World.Raw, out var id);
+        ObjectDisposedException.ThrowIf(World.IsClosed, World);
+        var err = NativeMethods.engine_entity_spawn(World, out var id);
         EngineException.ThrowIfError(err, nameof(NativeMethods.engine_entity_spawn));
+        if (id == 0)
+            throw new EngineException(
+                EngineError.InvalidHandle,
+                "engine_entity_spawn returned success with a null entity id");
         return new EntityId(id);
     }
 
     public unsafe void SetComponent<T>(EntityId entity, uint componentTypeId, in T data)
         where T : unmanaged
     {
-        fixed (T* p = &data)
-        {
-            var err = NativeMethods.engine_component_set(
-                World.Raw, entity.Value, componentTypeId, p, (nuint)sizeof(T));
-            EngineException.ThrowIfError(err, nameof(NativeMethods.engine_component_set));
-        }
+        ObjectDisposedException.ThrowIf(World.IsClosed, World);
+        if (World.IsInvalid)
+            throw new InvalidOperationException("World handle is invalid");
+        if (!entity.IsValid)
+            throw new ArgumentException("Entity id must be nonzero", nameof(entity));
+        if (componentTypeId == 0)
+            throw new ArgumentOutOfRangeException(nameof(componentTypeId));
+
+        ComponentAbi<T>.Validate(componentTypeId);
+        T copy = data;
+        var err = NativeMethods.engine_component_set(
+            World, entity.Value, componentTypeId, &copy, (nuint)sizeof(T));
+        EngineException.ThrowIfError(err, nameof(NativeMethods.engine_component_set));
     }
 
     public void Dispose() => World.Dispose();
+}
+
+[AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+public sealed class EngineComponentAbiAttribute(
+    uint componentTypeId,
+    int nativeSize,
+    int nativeAlignment,
+    uint abiVersion,
+    ulong layoutHash) : Attribute
+{
+    public uint ComponentTypeId { get; } = componentTypeId;
+    public int NativeSize { get; } = nativeSize;
+    public int NativeAlignment { get; } = nativeAlignment;
+    public uint AbiVersion { get; } = abiVersion;
+    public ulong LayoutHash { get; } = layoutHash;
+}
+
+internal static class ComponentAbi<T> where T : unmanaged
+{
+    internal static void Validate(uint componentTypeId)
+    {
+        var abi = typeof(T).GetCustomAttribute<EngineComponentAbiAttribute>()
+            ?? throw new InvalidOperationException(
+                $"{typeof(T).FullName} must declare EngineComponentAbiAttribute");
+        var structLayout = typeof(T).StructLayoutAttribute;
+        var layout = structLayout?.Value ?? LayoutKind.Auto;
+        if (layout is not (LayoutKind.Sequential or LayoutKind.Explicit) ||
+            structLayout is null || structLayout.Pack == 0)
+            throw new InvalidOperationException(
+                $"{typeof(T).FullName} must declare StructLayout with an explicit Pack");
+        if (abi.ComponentTypeId != componentTypeId)
+            throw new InvalidOperationException(
+                $"{typeof(T).FullName} component type id does not match the native call");
+
+        var err = NativeMethods.engine_component_get_abi(componentTypeId, out var native);
+        EngineException.ThrowIfError(err, nameof(NativeMethods.engine_component_get_abi));
+        if (abi.AbiVersion == 0 || abi.LayoutHash == 0 ||
+            native.ComponentTypeId != abi.ComponentTypeId ||
+            native.AbiVersion != abi.AbiVersion ||
+            native.Size != (nuint)abi.NativeSize ||
+            native.Alignment != (nuint)abi.NativeAlignment ||
+            native.LayoutHash != abi.LayoutHash ||
+            abi.NativeSize != Unsafe.SizeOf<T>() ||
+            Marshal.SizeOf<T>() != Unsafe.SizeOf<T>())
+            throw new InvalidOperationException(
+                $"{typeof(T).FullName} has incompatible native ABI metadata");
+    }
 }
