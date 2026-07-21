@@ -207,6 +207,22 @@ a bold move with no validity isn't trash, it's a Provocation (kept, labeled). Th
 probes below exist to stop *vacuous* novelty from masquerading as insight, never
 to push you back toward the safe linear answer.
 
+A cell written as a *question* is scored on the claim it implies — convert it
+first ("what if X?" → "X is true/possible/the real cause"), because Validity has
+no meaning for an unanswered question.
+
+**The filter stack, mapped.** Five skeptical layers follow; that sounds like
+ceremony until you see that each catches a failure the others structurally
+cannot. Run each once, in this order — a check already passed is not re-run:
+
+| Layer | Runs on | Uniquely catches |
+|---|---|---|
+| Three probes (reversal / mechanism / falsifier) | every live cell | vacuous profundity, hand-waving, unfalsifiable claims |
+| Insight-type validity test | cells passing the probes | the failure mode specific to causal/design/strategic/conceptual/predictive claims |
+| Grounding gate | recall-dependent cells | confidently misremembered facts |
+| Demotion pass | cells about to be marked High | your fondness for your own fluent cells |
+| Phase 6 stress test | the synthesized insights | fake convergence, attractor re-capture, insights that collapse when steelmanned |
+
 **Probe Validity — don't just rate it.** Self-scored validity is the softest
 joint in the method: the same judgment that generated a clever-sounding cell will
 happily rate it High. Run these three cheap checks first; they're mechanical
@@ -300,7 +316,9 @@ Then place each cell in the quadrant:
 
 - **High novelty × High validity → INSIGHT.** Keep. These feed Phase 5.
 - **High novelty × Low validity → PROVOCATION.** Flag separately. Do not present
-  as truth; present as "worth probing." Honest about its status.
+  as truth; present as "worth probing" — and attach the *cheapest test that would
+  settle it*, so the user can act on it. A Provocation without its experiment is
+  just a shrug.
 - **Low novelty × High validity → CONFIRMATION.** Discard for insight purposes
   (it's just the default restated), but note if it anchors a synthesis.
 - **Low × Low → NOISE.** Discard silently.
