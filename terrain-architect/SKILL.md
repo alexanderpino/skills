@@ -410,7 +410,12 @@ substrate and hydrology with masks varying parameters per region, not separate t
 together. See `references/13-climate-ecosystem.md`. If the request names a *recognisable
 landscape* — the Alps, the Grand Canyon, a Namib-style erg, a Niagara-style waterfall — start from
 the matching **archetype blueprint** in `references/20-archetypes.md`: a worked assembly stated as
-a regime setting over the Legal Order, to *adapt*, not paste.
+a regime setting over the Legal Order, to *adapt*, not paste. If instead the request is an
+**infinite, lazily-streamed block/voxel world** — a "Minecraft-like", generated per chunk from
+`(seed, coord)` — it is a *different paradigm*, not a graph to erode: the heightfield-truth,
+process-history, and mandatory-flow-routing doctrines are deliberately suspended. Go to
+`references/24-voxel-streaming-generation.md` and read its doctrine ledger before applying anything
+below.
 
 **2. Derive the cell size and state it.** `cellSize = extent / resolution`. Nearly every
 parameter downstream is in units of cellSize — talus thresholds, erosion rates, scatter
@@ -485,6 +490,7 @@ truth, above).
 | `references/21-clean-room-implementation.md` | **Owned implementation path.** Reference-informed engine-native vs source-independent vs clean-room modes; grounding pseudocode in papers and approved open source; adapting data, CPU/GPU, scheduling, streaming and serialisation to the engine; independent oracles and provenance |
 | `references/22-open-source-grounding.md` | **Pre-grounding ledger.** Exact upstream revisions, licences, source symbols, adopted edge-case behavior, deliberate deviations and engine-native translations; machine-readable records in `references/open-source-grounding.json`; consume internally, never redirect the user to research it |
 | `references/23-generator-blueprint.md` | **End-to-end generator.** Complete node-library floor, offline/pre-cooked pipeline, runtime pipeline, hybrid architecture, implementation milestones, execution budgets and acceptance gates |
+| `references/24-voxel-streaming-generation.md` | **The Minecraft-style paradigm.** Infinite, lazily-streamed voxel worlds generated per-chunk from `(seed, coord)`: the density-function representation, multi-noise biomes, spline-into-density shape, the proto-chunk stage pipeline, aquifers, greedy meshing. The *doctrine ledger* of which `SKILL.md` invariants this regime deliberately suspends (heightfield-truth, process-history, mandatory flow routing) and what local noise substitutes. F/N-tier; sources are the game's worldgen format, dev talks and reverse-engineering, not papers |
 | `references/99-papers.md` | Bibliography with attribution notes |
 | `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (droplet/pipe/thermal/stream-power erosion, flow routing, diffusion, dunes, isostatic flexure, mass-consistent wind, Voellmy runout, tephra/age-depth/PDC/avulsion), each checked against its `09` oracle. They are executable specifications for an owned implementation, not runtime dependencies; optional tests compare flow operations with RichDEM and pysheds |
 

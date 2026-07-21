@@ -444,6 +444,28 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Hybrid generator | Architecture | `23` bakes the global process history and synthesises deterministic local detail at runtime |
 | Implementation completeness | Engineering gate | Every node has fields/units, locality, precision, boundaries, determinism, oracle and version |
 
+## 16. Voxel & streaming (chunk) generation → `24-voxel-streaming-generation.md`
+
+The **Minecraft-style paradigm** — infinite, lazily-streamed voxel worlds generated per chunk from
+`(seed, coord)`. **F/N-tier throughout; no papers.** It deliberately suspends the heightfield-truth,
+process-history and mandatory-flow-routing doctrines and substitutes local noise. Sources are the
+game's datapack worldgen format, developer talks (Kniberg) and reverse-engineering (Cubiomes), never
+peer review.
+
+| Component | Tier | Source |
+|---|---|---|
+| Density-function terrain (3D scalar; `d>0` solid) | F | Game noise-router / `noise_settings` datapack format; sampled on a coarse lattice + trilinearly interpolated (`01`, `15`) |
+| Multi-noise biome (6-parameter climate space) | F | Game `multi_noise` biome source; temperature/humidity biome-only, continentalness/erosion/weirdness/depth drive shape (`13`) |
+| Spline shape (climate → offset/factor → density) | F | Kniberg (Mojang) design talks — a developer source, not a paper |
+| Proto-chunk stage pipeline & determinism | F | Engineering practice; seam-ownership = `08`/`23`; reverse-engineered by Cubiomes |
+| Noise caves (cheese/spaghetti/noodle) + aquifers | F | Local noise water-tables, decoupled from drainage — **not** karst dissolution (`11`) |
+| Greedy (cubic) meshing | F | Lysenko "0fps" write-ups; smooth alternative = dual contouring / Transvoxel (`08`) |
+| Legacy 2D biome cascade (pre-1.18 GenLayer zoom) | F | Layered zoom + biome-blended 2D height noise |
+
+**The trap this section prevents:** the *parameter* named "erosion" is a noise axis, not the erosion
+of `04`/`05` — it moves no sediment and conserves no mass. And a runtime voxel world cannot produce
+real drainage networks; if the brief needs them, that is a **hybrid** bake (`23`), not this paradigm.
+
 ---
 
 ## Node types (N-tier) — not algorithms
