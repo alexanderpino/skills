@@ -499,6 +499,24 @@ is below.
 - **Dean, R.G. (1991).** *Equilibrium beach profiles: characteristics and applications.* Journal of
   Coastal Research 7(1), 53–84. — The `depth ∝ distance^⅔` shoreface profile. Author the nearshore
   as an equilibrium ramp; do not erode a seabed into shape (`12`).
+- **Woodroffe, C.D. (1992).** *Mangrove sediments and geomorphology.* In A.I. Robertson & D.M. Alongi
+  (eds), *Tropical Mangrove Ecosystems*, Coastal and Estuarine Studies 41, pp. 7–41. American
+  Geophysical Union. — **Mangroves as a geomorphic agent**: trapping mud, building intertidal flats,
+  prograding tropical muddy shorelines (`12`).
+- **Furukawa, K., Wolanski, E. & Mueller, H. (1997).** *Currents and sediment transport in mangrove
+  forests.* Estuarine, Coastal and Shelf Science 44(3), 301–310. — Canopy/root drag traps ~80% of the
+  suspended sediment a spring tide carries in; ~0.1 cm/yr accretion (`12`).
+- **Alongi, D.M. (2008).** *Mangrove forests: resilience, protection from tsunamis, and responses to
+  global climate change.* Estuarine, Coastal and Shelf Science 76(1), 1–13. — Mangrove soils **keep
+  pace with sea-level rise** via mineral + organic surface-elevation gain (`12`).
+- **Otvos, E.G. & Price, W.A. (1979).** *Problems of chenier genesis and terminology — an overview.*
+  Marine Geology 31(3–4), 251–263. — **Cheniers**: coarse sand/shell ridges resting on mudflat, marking
+  lulls in mud supply (`12`).
+- **Augustinus, P.G.E.F. (1989).** *Cheniers and chenier plains: a general introduction.* Marine
+  Geology 90(4), 219–229. — Chenier-plain formation as episodic wave reworking during mud-supply lulls
+  on a prograding muddy coast (`12`).
+- **Otvos, E.G. (2000).** *Beach ridges — definitions and significance.* Geomorphology 32(1–2), 83–108.
+  — The chenier-vs-beach-ridge distinction: substrate (mud beneath the ridges) is the discriminator (`12`).
 - **Rosenbloom, N.A. & Anderson, R.S. (1994).** *Hillslope and channel evolution in a marine
   terraced landscape, Santa Cruz, California.* Journal of Geophysical Research 99(B7),
   14013–14029. — Marine terraces, and the knickpoint-celerity result `C = K·A^m` used in `04`.

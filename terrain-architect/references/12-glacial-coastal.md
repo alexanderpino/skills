@@ -2,7 +2,7 @@
 
 Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#mass-balance) ·
 [Glen's flow law & SIA](#glens-flow-law--the-shallow-ice-approximation) ·
-[Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) ·
+[Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) · [Glacial deposition](#glacial-deposition) ·
 [Outburst floods & megafloods](#glacial-outburst-floods--megafloods) ·
 [Coastal: be honest](#coastal-be-honest) · [Wave exposure](#wave-exposure) ·
 [Cliff retreat & beaches](#cliff-retreat--beaches) ·
@@ -11,7 +11,7 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Longshore drift & depositional landforms](#longshore-drift--depositional-landforms) ·
 [Marine terraces](#marine-terraces) · [Deltas, estuaries, rias](#deltas-estuaries-rias) ·
 [Wave base & the submarine profile](#wave-base--the-submarine-profile) ·
-[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Coral reefs & atolls](#coral-reefs--atolls) ·
+[Tides & the intertidal zone](#tides--the-intertidal-zone) · [Biogenic muddy coasts](#biogenic-muddy-coasts--mangroves--cheniers) · [Coral reefs & atolls](#coral-reefs--atolls) ·
 [Seafloor, ridges & submarine processes](#seafloor-ridges--submarine-processes)
 
 ## Glacial: why it matters
@@ -522,6 +522,38 @@ What falls out of the range and the shore slope:
 Honest tier: **F-tier**, a look. Real tides are astronomy; for terrain you author the range and the
 curve, and the geomorphic products — tidal flats, salt marshes, the intertidal zone — are
 compositions on top of the shoreface.
+
+## Biogenic muddy coasts — mangroves & cheniers
+
+The intertidal section above is the *physical* muddy coast; two features make it a **biological** one,
+and both are progradation engines.
+
+**Mangroves** are the tropical intertidal counterpart of the salt marsh (above): a **biogenic
+geomorphic agent**, not just vegetation on a shore. Prop-roots and canopy impede the tidal flow, so
+fine cohesive mud flocculates and settles — a mangrove forest **traps ~80% of the suspended sediment**
+a spring flood tide carries in and raises the bed ~0.1 cm/yr (Furukawa, Wolanski & Mueller 1997) —
+while the same drag **damps waves and currents**, so the forest builds intertidal mudflats and
+**progrades a tropical muddy shoreline** (Woodroffe 1992). Surface elevation is held by **both** mineral
+sedimentation and **belowground root/peat accumulation**, which is how mangrove soils **keep pace with
+sea-level rise** — the control on whether the coast progrades, holds or drowns (Alongi 2008). Implement
+it as a biogenic mask on tropical intertidal cells (`13` biome + `06` intertidalMask) that (a) raises
+fine-sediment deposition, (b) attenuates incident wave energy (`12` wave exposure), and (c) adds an
+organic elevation term — the mangrove counterpart of the marsh, kin to the nebkha's
+vegetation-traps-sediment logic (`13`).
+
+**Cheniers** are the coarse punctuation on such a coast: **isolated sand or shell ridges resting on,
+and separated by, mudflat** (Otvos & Price 1979). The diagnostic is exactly that — a coarse ridge on a
+**muddy** substrate — and it forms when a **lull in mud supply** lets episodic wave reworking winnow and
+pile the coarse fraction into a beach ridge; renewed mud supply then buries its flanks and pushes the
+shoreline seaward again (Augustinus 1989). So each ridge is a **former shoreline and a pause**, and a
+**chenier plain** (alternating ridges and mudflats) is a stratigraphic record of episodic progradation.
+Build it as mud progradation (mangrove / tidal flat) **stamped with coarse longshore ridges** (`12`
+longshore) during supply lulls. **The tell** that it's a chenier and not a beach-ridge strand plain is
+the substrate: mud beneath and between the ridges, not a continuous sand body (Otvos 2000).
+
+**Tier.** Both **P**: mangroves (Woodroffe 1992; Furukawa et al. 1997; Alongi 2008), cheniers (Otvos &
+Price 1979; Augustinus 1989). As *generated* landforms both are **L** — compositions over the shoreface,
+sediment supply and a biogenic/longshore mask — grounded by those P sources.
 
 ## Coral reefs & atolls
 

@@ -278,6 +278,8 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Tunnel valleys | P (review) | Kehew et al. 2012, ESR 113 — subglacial meltwater channels, formation debated (`12`) |
 | Glacial depositional suite (moraine, kame, kettle, sandur, till) | L | Compositions over the ice-erosion budget; synthesis Benn & Evans 2010 (`12`) |
 | Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
+| Mangrove coast (biogenic muddy progradation) | P | Woodroffe 1992; Furukawa et al. 1997; Alongi 2008 — traps mud, damps waves, keeps pace with sea level (`12`) |
+| Chenier / chenier plain | P | Otvos & Price 1979; Augustinus 1989 — coarse ridges on mud, marking mud-supply lulls (`12`) |
 | Longshore transport | F | CERC formula; measured basis Komar & Inman 1970 (coastal engineering, not graphics). Drives spits/tombolos/barriers (`12`) |
 | Marine terrace / wave-cut platform | F | Coastal notch loop across a sea-level/uplift history (`12`). A look, not a sim. |
 | Lacustrine (lake) shore erosion / lake terraces | F | The coastal loop at lake level; lake-level history → shoreline terraces. Gilbert 1890 (Lake Bonneville) (`12`) |
