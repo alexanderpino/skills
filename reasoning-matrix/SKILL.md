@@ -146,6 +146,11 @@ Four moves, briefly:
   usually hidden assumptions, mechanisms, and points of tension — note that the
   worked examples' anchors ("the moment of writing," "shared context," "what
   'good' means") are all mechanisms or assumptions, never categories.
+  For *process-shaped* problems, decompose by **events** instead of parts: walk
+  the timeline of what actually happens and anchor on the transitions. And treat
+  **hotspots** — the points where accounts of the process disagree or go vague —
+  as premium anchors: disagreement marks load-bearing structure the same way a
+  narration stumble does.
 - **Columns = lenses.** Choose **5–8 reasoning lenses** from the catalog below.
   Don't use all of them; pick the ones suited to the insight type. See
   `references/operators.md` for the full catalog, a guiding question per lens,
@@ -161,7 +166,7 @@ Compact lens catalog (full versions in the reference file):
 | **Cross-domain transfer** | Import a mechanism from another field — *near* (adjacent subfield) or *far* — onto this object. The skill's primary engine. |
 | **Enabling shift (why now)** | Which idea, once dismissed as impractical, does a recent change in cost/capability now make viable? |
 | **Scale shift** | What changes at 100× bigger, 1/100th, or a different time horizon? |
-| **Constraint play** | The pure *"what if?"* — remove a limit, treat the wall *as* the problem to solve, or *add* a brutal one. |
+| **Constraint play** | The pure *"what if?"* — remove a limit, treat the wall *as* the problem to solve, *add* a brutal one, or refuse a trade-off by separating its demands. |
 | **Second-order** | Consequences of the consequences. Who adapts, and how? |
 | **Adversarial** | How would a hostile party exploit or break this? |
 | **Reframe the unit** | Change the basic object: individual→system, event→process, noun→verb. |
@@ -189,6 +194,14 @@ cells is a success. Forcing every cell to say something is how you manufacture
 noise. (An empty cell is one where the lens genuinely produces no move — not one
 you suppressed for sounding too wild; that distinction is the whole discipline of
 this phase.)
+
+**Escalation — populate independently.** In a single context, later cells are
+anchored by earlier ones: every cell shares one attractor state, so some
+cross-lens "agreement" is contamination, not convergence. When the stakes
+justify it, populate each lens in a separate subagent context — each given the
+inquiry and the named default, none shown the other columns — then compare.
+Independence is what converts agreement into evidence (see
+`references/composition.md`).
 
 Render the populated grid as a markdown table (anchors as rows, lenses as
 columns) so the user can see the raw move-space before the filter.

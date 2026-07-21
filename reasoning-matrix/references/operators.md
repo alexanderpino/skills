@@ -26,6 +26,13 @@ Inversion finds insight by examining the negative space. "How do I succeed" is
 crowded; "what would guarantee failure, and am I doing any of it" is often empty
 and revealing. Flipping a goal exposes assumptions hiding inside it.
 
+**Stance upgrade — the pre-mortem.** Don't just ask what *would* cause failure;
+declare it: "it is two years from now and this has failed — what killed it?"
+Treating the failure as accomplished fact (prospective hindsight) reliably
+surfaces causes the hypothetical framing doesn't — certainty is a different
+conditioning context than possibility. The mirror works too: "it succeeded
+wildly — what made it?"
+
 **Mini-example:** Anchor "user onboarding." Don't ask how to improve retention;
 ask what would guarantee users leave on day one. The list (confusion, no early
 win, friction before value) *is* the retention strategy, inverted into something
@@ -117,6 +124,12 @@ whichever analogy happens to surface. Scan these high-yield source domains and a
 > systems · control theory & feedback · epidemiology · logistics & supply chains ·
 > error-correcting codes · thermodynamics & entropy · insurance & risk pooling
 
+When your donor choices feel predictable, pick one from this list *blind* —
+commit to a row before evaluating fit, then force the connection. Injected
+randomness is a cheap way off your own beaten path: most blind picks die in
+Phase 4, but the survivors are transfers deliberate choice would never have
+attempted.
+
 **Mini-example:** Anchor "content moderation at scale." Transfer from epidemiology:
 moderation as *contact tracing* of a viral claim, not *quarantine* of individual
 posts. Reframes the unit of intervention from post to propagation path.
@@ -193,12 +206,14 @@ change*, the point where the nature of the thing flips.
 **Forcing question:** What becomes possible if a fixed limit vanished — and if it
 *can't* vanish, is the limit itself the problem to go solve?
 
-Three moves.
+Four moves.
 
 **Removal — the pure "what if?":** take a constraint everyone treats as fixed
 (budget, latency, headcount, a law of the domain), wave it away entirely, and ask
 what the ideal or "impossible" version looks like. That version usually reveals
-what you actually want, stripped of what you'd merely settled for.
+what you actually want, stripped of what you'd merely settled for. The sharpest
+form is the *ideal final result*: the function is delivered and the mechanism
+doesn't exist ("the document is signed and there is no signing step").
 
 **Constraint-as-target — attack the wall, find the door:** sometimes the
 constraint you removed isn't a law to respect but *the problem statement itself*.
@@ -211,6 +226,13 @@ by another route, leaving the law intact. Pairs with Essence ("what does this li
 
 **Addition:** impose an absurd limit (one sentence, $0, one day, no screens) —
 forced scarcity is a classic generator of elegance.
+
+**Contradiction — refuse the trade-off:** find the tension everyone treats as
+physics — improving X necessarily worsens Y — and decline to trade. Separate the
+demands instead: in *time* (X at one moment, Y at another), in *space* (X here,
+Y there), by *condition* (X for these cases, Y for those), or by *scale* (X at
+the part, Y at the whole). A trade-off accepted as fundamental is usually a
+design choice wearing a law's clothing.
 
 **Mini-example (removal → target):** "What if we could travel faster than light?"
 Special relativity forbids *local* superluminal motion and signalling — but not

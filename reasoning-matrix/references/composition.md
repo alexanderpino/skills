@@ -79,6 +79,14 @@ arrived at the same place. You need no new machinery: it's the cross-cell
 triangulation of Phase 5, applied across matrices instead of within one. Treat
 cross-matrix convergence as the most trustworthy signal the method produces.
 
+The same logic scales down into a single matrix. Cells populated in one context
+contaminate each other — later cells are anchored by earlier ones, because the
+whole grid shares one attractor state. For high-stakes runs, populate each lens
+in a separate subagent context: give each the inquiry and the named default,
+show none of them the other columns, and only then compare. Independence is what
+converts agreement into evidence — the same reason forecasting panels collect
+estimates *before* discussion, not after.
+
 ## What not to build
 
 Don't splice two cells' text together, or multiply their scores, as if that were a
