@@ -95,8 +95,10 @@ what scales is their visible footprint:
   across matrices (`references/composition.md`).
 
 Whatever the size, the output the user reads is the 2–4 insights — the grid is
-shown below for inspectability, never as the answer itself. When in doubt, run
-light; escalate only if the light grid keeps landing on the default.
+never the answer itself: on a full run it appears below the insights for
+inspectability; on a light run it stays internal and is offered on request. When
+in doubt, run light; escalate only if the light grid keeps landing on the
+default.
 
 ## The method: six phases
 
@@ -203,8 +205,9 @@ inquiry and the named default, none shown the other columns — then compare.
 Independence is what converts agreement into evidence (see
 `references/composition.md`).
 
-Render the populated grid as a markdown table (anchors as rows, lenses as
-columns) so the user can see the raw move-space before the filter.
+On a full run, render the populated grid as a markdown table (anchors as rows,
+lenses as columns) so the user can see the raw move-space before the filter. On
+a light run, keep it internal — populate just as honestly, show nothing.
 
 ### Phase 4 — Score and filter
 
@@ -289,11 +292,10 @@ high-risk lenses:
 - **Adversarial** — "an attacker would do Z" rests on whether Z is a real,
   current technique.
 
-This is what keeps a less knowledge-saturated model honest: it can't *recall* as
-much, so it must *ground* what it reasons over — and a grounded, cited claim beats
-a confidently-remembered one. When grounding isn't available (no tools, offline),
-say so and treat these cells as Provocations, not Insights. See the deep-research
-skill for the fan-out-and-verify pattern when a cell needs real sourcing.
+A grounded, cited claim beats a confidently-remembered one. When grounding isn't
+available (no tools, offline), say so and treat these cells as Provocations, not
+Insights; when a cell needs real sourcing, the deep-research skill's
+fan-out-and-verify pattern applies.
 
 **Scrub self-preference before you commit a High (the demotion pass).**
 Self-scored Validity is the softest joint in the method, and it fails in one
@@ -394,7 +396,8 @@ Then re-check each survivor against the Phase 1 default one last time: synthesis
 is where the default's pull quietly reasserts itself, smoothing wild cells back
 into familiar phrasing (attractor re-capture). An insight that has drifted into
 being the default in new vocabulary is dropped or sent back.
-Drop any that collapse. Surviving insights are the deliverable. Lead with them.
+Whatever collapses under any of these attacks is cut; the surviving insights are
+the deliverable. Lead with them.
 The matrix itself goes *below* the insights (or in a collapsed/secondary section)
 — the user wants the building, not the scaffold, but the scaffold should remain
 inspectable.
@@ -449,7 +452,8 @@ Provocations, then the matrix.
   product. Don't make the user mine the matrix themselves.
 - **Lens monoculture.** Using five lenses that are secretly the same move
   (all variants of "what if it were bigger"). Diversity of lens is what makes
-  cross-cell convergence meaningful.
+  cross-cell convergence meaningful — two same-move lenses agreeing is one path
+  counted twice, the fake triangulation Phase 6 hunts.
 - **Generic anchors.** "People / process / technology" produces a matrix of
   platitudes. Anchors must be load-bearing and specific.
 - **False distillation.** Collapsing genuinely plural insights into one "core
@@ -509,8 +513,9 @@ lens-fusion and cross-matrix convergence.
 - `references/operators.md` — full lens catalog: a forcing question and mini-example
   for each lens, plus which lenses to favor per insight type. Read it when
   selecting lenses in Phase 2 or when a lens isn't producing live cells.
-- `references/worked-example.md` — one complete end-to-end run (full grid, scoring,
-  synthesis) on a non-trivial question. Read it for a model of the full workflow.
+- `references/worked-example.md` — two end-to-end runs: a full run (grid, scoring,
+  synthesis, distillation) on a non-trivial question, and a null run where the
+  default wins. Read it for a model of the full workflow — and of stopping honestly.
 - `references/composition.md` — chaining matrices (A→B), fusing lenses, and
   cross-matrix convergence. Read it when one matrix's output is a question worth
   attacking, or when escalating causal → strategic → design across stages.
