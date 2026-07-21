@@ -13,7 +13,11 @@ The common taxonomy pairs "Hydraulic (Particle)" with Mei et al. 2007 and "Hydra
 implementers to the wrong paper.**
 
 - **Mei, Decaudin & Hu (2007), "Fast Hydraulic Erosion Simulation and Visualization on GPU"**
-  is a **grid/pipe model**, not a particle model. It is the canonical virtual-pipe reference.
+  is a **grid/pipe model**, not a particle model. It is the canonical virtual-pipe *erosion*
+  reference — though the virtual-pipe abstraction itself (a fluid surface as height columns, each
+  coupled to its neighbours by a pipe driven by the head difference) predates it: **O'Brien &
+  Hodgins 1995**, *Dynamic Simulation of Splashing Fluids*. Mei is where that pipe model becomes an
+  erosion model; the lineage is O'Brien & Hodgins → Mei → Št'ava.
 - **Št'ava, Beneš, Brisbin & Křivánek (2008), "Interactive Terrain Modeling Using Hydraulic
   Erosion"** is *also* a pipe model — it extends Mei with sediment slippage, multiple material
   layers, and boundary handling. It is a superset, not a different family.

@@ -240,7 +240,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 
 | Algorithm | Tier | Source |
 |---|---|---|
-| Virtual-pipe hydraulic erosion | P | **Mei, Decaudin & Hu 2007** — *this is the pipe/grid model, NOT particle* |
+| Virtual-pipe hydraulic erosion | P | **Mei, Decaudin & Hu 2007** — *this is the pipe/grid model, NOT particle*; the pipe *abstraction* is older (O'Brien & Hodgins 1995, splashing fluids) — Mei makes it an erosion model |
 | Pipe + slippage + layers | P | **Št'ava et al. 2008** — *also a pipe model; an extension of Mei, not a different family* |
 | Droplet / particle hydraulic erosion | F | **Beyer 2015**, TU München bachelor thesis, after Musgrave et al. 1989. **No canonical paper.** Popularised by Sebastian Lague. |
 | Grid hydraulic erosion (origin) | P | Musgrave, Kolb & Mace 1989, SIGGRAPH |
