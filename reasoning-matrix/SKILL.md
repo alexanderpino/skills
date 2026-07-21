@@ -5,7 +5,8 @@ description: >-
   building a reasoning matrix — systematically crossing the building blocks of a
   problem against a curated set of reasoning lenses, then filtering the results
   for novelty AND validity so what survives is both new and true. Use this
-  whenever the user wants to think outside the box, find a fresh angle, break out
+  whenever the user wants to think outside the box, get a helicopter view of a
+  problem, find a fresh angle, break out
   of conventional framing, generate hypotheses, surface hidden structure, chain
   or compose one analysis into the next, attack a problem that "feels stuck," or
   asks for deep brainstorming, lateral thinking,
@@ -75,7 +76,7 @@ Run these in order. Phases 1, 4, and 5 are where quality is won or lost — do n
 rush them to get to a full grid.
 
 > **Gate before you build (the default-first check).** The very first move is
-> Phase 1's step 3: write the conventional, linear answer in one or two lines.
+> Phase 1's step 4: write the conventional, linear answer in one or two lines.
 > Then judge it. If that answer already satisfies the question, *stop and return
 > it* — the matrix is wasted ceremony on a question that didn't need it. Build the
 > grid only once the linear answer is on the page and visibly *unsatisfying*. This
@@ -85,13 +86,20 @@ rush them to get to a full grid.
 
 ### Phase 1 — Frame and name the default
 
-Three moves, briefly:
+Four moves, briefly:
 
 1. **State the inquiry** in one sharp sentence. Vague input yields vague cells.
-2. **Name the insight type** sought: causal (why), design (how to build),
+2. **Check the altitude** — the helicopter move. Before accepting the question,
+   climb one level: what larger system is this problem embedded in, and is the
+   stated problem a *symptom* of one better solved a level up? ("Why does our
+   onboarding lose users" may really be "why does the product need onboarding at
+   all.") If the higher question is the truer one, renegotiate the inquiry — say
+   so explicitly — and matrix *that*. Anchors decomposed at the wrong altitude
+   produce a beautiful grid that polishes a sub-problem.
+3. **Name the insight type** sought: causal (why), design (how to build),
    strategic (what to do), conceptual (how to understand), or predictive (what
    happens next). This drives lens selection in Phase 2.
-3. **Write the default answer** — the conventional, competent take any informed
+4. **Write the default answer** — the conventional, competent take any informed
    person would give. This is the baseline. *Novelty is measured against it.*
    Without a named default, everything looks fresh and nothing actually is. This
    step is non-negotiable; it's what keeps the matrix honest.
@@ -141,10 +149,18 @@ For each (anchor × lens) cell, write **one terse candidate move** — an
 observation, a question, a reframing. One line each. Speed over polish here; the
 filter comes next.
 
+**Generate unguarded.** While populating, novelty is the only goal — do not run
+Phase 4's skepticism mid-generation. The heavy filter exists downstream precisely
+so this phase can be free: wildness is cheap to produce and cheap to check, but a
+bold cell you self-censor here never gets its chance to be scored. The cell that
+feels slightly embarrassing to write is often the one that survives.
+
 Be honest about empty cells. Not every intersection yields something — mark dead
 or trivial cells with `—` and move on. A grid that's 40% empty but has six live
 cells is a success. Forcing every cell to say something is how you manufacture
-noise.
+noise. (An empty cell is one where the lens genuinely produces no move — not one
+you suppressed for sounding too wild; that distinction is the whole discipline of
+this phase.)
 
 Render the populated grid as a markdown table (anchors as rows, lenses as
 columns) so the user can see the raw move-space before the filter.
@@ -352,6 +368,11 @@ Provocations, then the matrix.
   it counts as an Insight.
 - **Skipping the default.** Without Phase 1's baseline, every cell scores High
   novelty and the filter becomes meaningless. This is the most common failure.
+- **Matrixing the wrong altitude.** Accepting the question as posed without the
+  helicopter check. A perfect grid on a sub-problem polishes a symptom.
+- **Filtering while generating.** Running Phase 4's skepticism inside Phase 3
+  kills bold cells before they're ever scored. Generation is unguarded by
+  design; judgment is a separate, later seat.
 - **Filling every cell.** Manufactured noise. Empty cells are honest.
 - **Presenting the grid as the answer.** The grid is process; insights are
   product. Don't make the user mine the matrix themselves.
