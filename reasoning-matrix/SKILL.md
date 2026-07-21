@@ -23,8 +23,12 @@ Most "thinking harder" produces more of the obvious answer at higher volume. A
 reasoning matrix avoids that by forcing combinations a linear train of thought
 would never reach: it decomposes the subject into anchors, runs each anchor
 through a set of distinct reasoning lenses, and treats every cell as a small
-forced move. The point of the grid is structured surprise — and then a ruthless
-filter so only the cells that are *both new and defensible* survive.
+forced move. Each cell works the way explaining a bug to a rubber duck works:
+re-encoding a problem in a register it wasn't stuck in fires reasoning paths the
+original framing never activates. The matrix schedules those re-encodings
+deliberately and in bulk instead of waiting for one to strike. The point of the
+grid is structured surprise — and then a ruthless filter so only the cells that
+are *both new and defensible* survive.
 
 Nearly every invention is an **existing idea relocated into a new context** — a
 mechanism lifted out of the domain that birthed it and dropped onto a new object
@@ -50,8 +54,8 @@ is wanted, ask one question, then proceed.
 
 The six phases are the *full* form; match the grid to the weight of the question
 so the method never costs more than the answer is worth. The phases (frame the
-default, decompose, populate, filter, synthesize) are always run — what scales is
-their visible footprint:
+default, decompose, populate, filter, synthesize, stress-test) are always run —
+what scales is their visible footprint:
 
 - **Light run** (a focused question, one clear insight type): a **3×4** grid,
   scoring done in your head, and only the kept cells shown. Skip the full scoring
@@ -99,6 +103,13 @@ Three moves, briefly:
   sub-questions. Anchors must be specific to *this* problem and roughly
   non-overlapping. Generic anchors ("people," "technology") produce generic
   cells. Aim for the things that, if they changed, would change everything.
+  To find them, list the question's moving parts, then keep only rows that pass
+  two tests: **load-bearing** ("if this changed, would the answer change?") and
+  **problem-specific** ("could this exact row appear in an unrelated problem's
+  matrix? If yes, sharpen it until it couldn't"). The strongest anchors are
+  usually hidden assumptions, mechanisms, and points of tension — note that the
+  worked examples' anchors ("the moment of writing," "shared context," "what
+  'good' means") are all mechanisms or assumptions, never categories.
 - **Columns = lenses.** Choose **5–8 reasoning lenses** from the catalog below.
   Don't use all of them; pick the ones suited to the insight type. See
   `references/operators.md` for the full catalog, a guiding question per lens,
@@ -122,6 +133,7 @@ Compact lens catalog (full versions in the reference file):
 | **Stakeholder inversion** | See it through the eyes of the party usually ignored. |
 | **Edge case** | Push to the extreme where the normal logic breaks. |
 | **Substrate** | What must be true *underneath* for the surface phenomenon to hold? |
+| **Naive narration** | Explain it step by step, jargon-free, to someone with zero context — the step you rush or hand-wave is the cell. The one lens that shifts the *register*, not the subject. |
 
 ### Phase 3 — Populate the matrix
 
@@ -248,6 +260,12 @@ Then place each cell in the quadrant:
 Most cells are noise or confirmation. That's expected and fine. The grid's job is
 to make the few real cells findable.
 
+And sometimes *everything* is. If no cell clears the bar, the deliverable is the
+validated default, stated plainly, plus any Provocations — a null result is the
+method working, not failing (a matrix that always pays out is a bullshit
+generator; see the second, null run in `references/worked-example.md`). Never
+lower the bar to save the grid.
+
 ### Phase 5 — Synthesize (where the real insight lives)
 
 The biggest insights are usually **not** single cells — they're convergences.
@@ -288,6 +306,11 @@ Two guards, or distillation becomes an anti-pattern:
 ### Phase 6 — Stress test, then deliver
 
 For each candidate insight, steelman the opposite and ask what would falsify it.
+This is not the demotion pass repeated: that pass attacked individual *cells*;
+this one attacks the *synthesis*. In particular, check each convergence's
+provenance — did the converging cells really come from different reasoning
+moves? Two lenses that are secretly the same move landing on the same cell isn't
+triangulation, it's one path counted twice, and the "insight" is unsupported.
 Drop any that collapse. Surviving insights are the deliverable. Lead with them.
 The matrix itself goes *below* the insights (or in a collapsed/secondary section)
 — the user wants the building, not the scaffold, but the scaffold should remain
@@ -313,6 +336,10 @@ insights are genuinely plural.]
 [the inquiry, the named default, and the populated + scored grid, so the
 reasoning is fully inspectable]
 ```
+
+On a null run (nothing survived Phase 4), the structure inverts honestly: lead
+with the validated default as the answer — that *is* the finding — then any
+Provocations, then the matrix.
 
 ## Anti-patterns (the ways this method fails)
 

@@ -2,10 +2,15 @@
 
 The lenses are the columns of the matrix — the distinct reasoning moves applied
 to each anchor. Each lens is a different way of refusing to accept the subject as
-given. Diversity matters more than quantity: five lenses that are secretly the
-same move produce a monoculture grid where cross-cell convergence means nothing.
-Pick **5–8** that genuinely differ and that fit the insight type (table at the
-end).
+given, and each works by the same underlying mechanism: re-encoding the anchor in
+a register it wasn't stuck in fires reasoning paths the default framing never
+activates (the rubber-duck-debugging effect, made deliberate and plural).
+
+That mechanism is why diversity matters more than quantity: two lenses that are
+secretly the same move fire the same paths twice, so when their cells "agree" in
+Phase 5 that agreement is one path counted twice — fake triangulation, not
+convergence. Five genuinely different lenses beat eight overlapping ones. Pick
+**5–8** that genuinely differ and that fit the insight type (table at the end).
 
 For each lens below: the **forcing question** to ask of an anchor, a **mini-example**,
 and the **failure mode** to watch for.
@@ -360,6 +365,40 @@ genuinely *different layer* — a precondition, not a paraphrase.
 
 ---
 
+## Naive narration
+
+**Forcing question:** Explain this anchor — step by step, complete, jargon-free —
+to someone with zero context. The step you rush, skip, or hand-wave is the cell.
+
+Every other lens re-frames the *subject*; this one changes the *register*. Serial,
+complete narration to a naive listener forbids the compression that expert fluency
+allows — the term of art that names a step without explaining it, the "obviously"
+that skips one. This is the mechanism of rubber-duck debugging isolated as a lens:
+the insight arrives mid-narration, at the exact point where your explanation and
+your actual understanding diverge. The output is not the explanation — it's the
+stumble.
+
+**vs. its neighbors:** Essence replaces the *label* with what the thing is;
+First principles rebuilds the *solution* from fundamentals. Naive narration
+changes neither — it walks the existing account at full resolution and lets the
+gaps announce themselves. Because it reaches stumble-points by a genuinely
+different route, its convergence with an Essence or Substrate cell is real
+triangulation, not overlap.
+
+**Mini-example:** Anchor "our pricing model." Narrating to an outsider: "we
+charge per seat because... more people means more value?" The stumble — value
+doesn't actually scale with seats for this product — is the cell, and it was
+invisible in expert register, where "per-seat pricing" is a settled phrase that
+never gets unpacked.
+
+**Failure mode:** Narrating fluently and finding nothing. A stumble-free
+explanation usually means you performed the lens instead of running it —
+summarizing in expert register with simpler words. Slow down at exactly the steps
+you feel no need to explain; fluency is the same enemy Phase 4's demotion pass
+names.
+
+---
+
 ## Choosing lenses by insight type
 
 Favor these; mix in others as the anchors suggest. Always include at least one
@@ -373,10 +412,10 @@ idea relocated, plus the condition that now makes the relocation pay.
 
 | Insight type | Strong lenses |
 |---|---|
-| **Causal** (why X happens) | Substrate, Inversion, Second-order, Temporal, First principles |
+| **Causal** (why X happens) | Substrate, Inversion, Second-order, Temporal, First principles, Naive narration |
 | **Design** (how to build) | Cross-domain, Constraint play, Enabling shift, First principles, Edge case |
 | **Strategic** (what to do) | Second-order, Adversarial, Stakeholder inversion, Scale shift, Temporal |
-| **Conceptual** (how to understand) | Essence, Reframe the unit, Substrate, Cross-domain, First principles |
+| **Conceptual** (how to understand) | Essence, Reframe the unit, Substrate, Cross-domain, First principles, Naive narration |
 | **Predictive** (what happens next) | Second-order, Enabling shift, Scale shift, Adversarial, Temporal |
 
 If a chosen lens produces only dead cells across every anchor, swap it out rather
