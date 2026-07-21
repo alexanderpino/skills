@@ -64,7 +64,8 @@ inselberg(h, fractureField, baseLevel):
 
 This is the same "differential lowering to a base level" pattern as tower karst (`11`) and
 marine/lake terraces (`12`) — **base level is the master parameter**. With uniform rock you get a
-bevelled plain and no inselbergs; you need the fracture/hardness field.
+bevelled plain and no inselbergs; you need the fracture/hardness field. The **same recipe at outcrop
+scale**, keyed to joint spacing, makes **tors** (`11` weathering microforms).
 
 ## Alluvial fans & bajadas
 

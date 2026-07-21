@@ -829,6 +829,25 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   pavement is born at the surface over accreting dust, **not** a deflation lag (`16`).
 - **Twidale, C.R. (1982).** *Granite Landforms.* Elsevier, Amsterdam. — Bornhardts and inselbergs by
   differential subsurface weathering and stripping of the regolith (`16`).
+- **Linton, D.L. (1955).** *The problem of tors.* The Geographical Journal 121(4), 470–487. — **Tors**
+  as a two-stage deep-weathering-then-stripping residual, controlled by joint spacing (`11`).
+- **Palmer, J. & Neilson, R.A. (1962).** *The origin of granite tors on Dartmoor, Devonshire.*
+  Proceedings of the Yorkshire Geological Society 33(3), 315–339. — The **periglacial** tor pathway:
+  frost shattering + solifluction stripping, leaving a clitter/blockfield apron (`11`, `17`).
+- **Mustoe, G.E. (1982).** *The origin of honeycomb weathering.* GSA Bulletin 93(2), 108–115. —
+  **Tafoni/honeycomb** as salt-crystallisation granular disintegration behind a case-hardened rind (`11`).
+- **Rodriguez-Navarro, C., Doehne, E. & Sebastian, E. (1999).** *Origins of honeycomb weathering: the
+  role of salts and wind.* GSA Bulletin 111(8), 1250–1255. — Salt and wind as the honeycomb drivers (`11`).
+- **Turkington, A.V. & Phillips, J.D. (2004).** *Cavernous weathering, dynamical instability and
+  self-organization.* Earth Surface Processes and Landforms 29(6), 665–675. — Why cavities **self-deepen**:
+  a case-hardened rind + depth-accelerating hollowing is a self-organising instability (`11`).
+- **Gilbert, G.K. (1904).** *Domes and dome structure of the high Sierra.* GSA Bulletin 15(1), 29–36.
+  — The classic description of **exfoliation/sheeting** domes (`11`).
+- **Bradley, W.C. (1963).** *Large-scale exfoliation in massive sandstones of the Colorado Plateau.*
+  GSA Bulletin 74(5), 519–528. — Sheeting as **unloading** parallel to the topographic surface (`11`).
+- **Martel, S.J. (2006).** *Effect of topographic curvature on near-surface stresses and application to
+  sheeting joints.* Geophysical Research Letters 33(1), L01308. — The mechanism: surface-parallel stress
+  × curvature vs overburden opens sheeting under **convex** surfaces — an implementable equation (`11`).
 - **Kessler, M.A. & Werner, B.T. (2003).** *Self-Organization of Sorted Patterned Ground.* Science
   299(5605), 380–383. — Stone circles / polygons / stripes from freeze–thaw feedbacks; slope selects
   the form. The **same Werner** as the dune model (`05`, `17`).

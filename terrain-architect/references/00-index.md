@@ -126,6 +126,9 @@ of what's reliable here.
 | Volcanic cones, calderas, craters, crater fields | F | Primitive + noise + erosion. No paper. |
 | Rock hardness layers / lithology | F | A material field feeding erodibility `K`. See Št'ava 2008 for the layered coupling. |
 | Soil / regolith production function | P | Heimsath, Dietrich, Nishiizumi & Finkel 1997, Nature 388 — exponential decline with soil depth (`11`) |
+| Tors | P | Linton 1955 (Geographical Journal 121); Palmer & Neilson 1962 — joint-controlled deep-weathering residual (`11`, `16`) |
+| Tafoni / honeycomb (cavernous weathering) | P (form) / L (single cause) | Mustoe 1982; Rodriguez-Navarro et al. 1999; Turkington & Phillips 2004 — salt + case-hardening self-organising hollowing (`11`) |
+| Exfoliation / sheeting joints & domes | P | Martel 2006 (GRL 33) — surface-parallel stress × curvature; Gilbert 1904; Bradley 1963 (`11`, `06`) |
 | Volcano edifice classification & dimensions | P | Pike & Clow 1981, USGS OFR 81-1038 — shield/strato/cinder/caldera (`11`) |
 | Impact crater morphology (simple/complex, ejecta) | P | Melosh 1989; Pike 1977 — depth/diameter, central-peak transition (`11`) |
 | Feature-primitive terrain authoring | P | Génevaux et al. 2015, CGF 34(6) — construction tree of peaks/ridges/rivers/cliffs (`13`) |

@@ -4,7 +4,7 @@ Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terra
 [Folding](#folding) · [Salt & mud diapirism](#salt--mud-diapirism) · [Lithology & erodibility](#lithology--erodibility) ·
 [Outcrops, mesas, badlands](#outcrops-mesas-badlands) · [When the heightfield fails](#when-the-heightfield-fails) ·
 [Karst & caves](#karst--caves) · [Weathering & soil production](#weathering--soil-production) ·
-[Duricrust & relief inversion](#duricrust--relief-inversion) ·
+[Weathering microforms](#weathering-microforms) · [Duricrust & relief inversion](#duricrust--relief-inversion) ·
 [Volcanic landforms](#volcanic-landforms) · [Impact craters](#impact-craters)
 
 ## The central claim
@@ -319,6 +319,43 @@ Why it matters for terrain:
 This is the **production** side of the regolith the whole erosion pipeline consumes, and most
 graphs simply assume regolith exists. Adding it is one exponential, and it makes every
 soil-depth-driven mask physical instead of painted.
+
+## Weathering microforms
+
+Weathering is a *rate* (above); it also carves distinctive **forms** at outcrop scale, and three of
+them fall straight out of fields the skill already has — fracture density (`11`/`07`), curvature (`06`)
+and a salt/moisture mask (`13`/`18`).
+
+- **Tors** — residual rock knobs and stacks on hilltops: the **same two-stage deep-weathering-then-
+  stripping** story as the bornhardt (`16`), but joint-controlled and at outcrop scale (Linton 1955).
+  Subsurface rotting eats along joints — **widely-spaced joints leave big corestones that survive,
+  closely-spaced rock rots to regolith** — so strip the regolith and the sound cores stand up as tors.
+  It is the bornhardt recipe keyed to the **fracture-density field**: low fracture → tor, high fracture
+  → stripped ground around it. In cold climates the final exhumation is **frost shattering +
+  solifluction** rather than fluvial stripping, leaving a **clitter/blockfield apron** downslope (`17`
+  — Palmer & Neilson 1962); scatter that debris (`07`) to sell it.
+- **Tafoni & honeycomb (cavernous weathering)** — cavities hollowed into a rock face, **salt-driven**:
+  salt crystallising from evaporating spray or wicked groundwater granular-disintegrates the rock
+  (Mustoe 1982; Rodriguez-Navarro et al. 1999). Two things make the look: a **case-hardened outer
+  rind** resists while the softer interior excavates once breached, so pits **self-deepen and
+  back-weather** rather than widen evenly — a self-organising instability (Turkington & Phillips 2004)
+  — and they favour **shaded, sheltered, coastal or arid-saline faces** where salt cycles between
+  crystallisation and deliquescence. Implement as a **hollowing that accelerates with existing cavity
+  depth**, gated by a salt/moisture mask and aspect/insolation (`06`/`13`) — not a uniform erode.
+- **Exfoliation / sheeting joints & domes** — curved, surface-parallel fractures that **peel rock in
+  slabs and reinforce domes** (Half Dome, Sugarloaf). They open where **surface-parallel compression
+  times surface curvature beats the gravitational overburden**, so sheeting is strongest under
+  **convex** surfaces (domes, ridges, noses) and suppressed in hollows (Martel 2006; the
+  unloading/topography link from Gilbert 1904 and Bradley 1963). Directly implementable from the `06`
+  curvature field: `sheetingPotential ≈ σ_parallel · curvature − ρg·cosθ`, gate on positive (convex)
+  curvature, then spall slabs parallel to the surface. It is an **active** process — erosion strips
+  overburden, confining stress releases, new sheets open — so a granite dome keeps its onion-skin look
+  as it lowers, not just as inherited structure.
+
+**Tier.** All **P**: tors (Linton 1955; Palmer & Neilson 1962), tafoni/honeycomb (Mustoe 1982;
+Rodriguez-Navarro et al. 1999; Turkington & Phillips 2004), sheeting (Gilbert 1904; Bradley 1963;
+Martel 2006). The specific *cause* of a given tafoni field (salt vs case-hardening vs biogenic) is
+still argued — author the form, not the single cause.
 
 ## Duricrust & relief inversion
 
