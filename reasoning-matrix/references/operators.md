@@ -2,10 +2,15 @@
 
 The lenses are the columns of the matrix — the distinct reasoning moves applied
 to each anchor. Each lens is a different way of refusing to accept the subject as
-given. Diversity matters more than quantity: five lenses that are secretly the
-same move produce a monoculture grid where cross-cell convergence means nothing.
-Pick **5–8** that genuinely differ and that fit the insight type (table at the
-end).
+given, and each works by the same underlying mechanism: re-encoding the anchor in
+a register it wasn't stuck in fires reasoning paths the default framing never
+activates (the rubber-duck-debugging effect, made deliberate and plural).
+
+That mechanism is why diversity matters more than quantity: two lenses that are
+secretly the same move fire the same paths twice, so when their cells "agree" in
+Phase 5 that agreement is one path counted twice — fake triangulation, not
+convergence. Five genuinely different lenses beat eight overlapping ones. Pick
+**5–8** that genuinely differ and that fit the insight type (table at the end).
 
 For each lens below: the **forcing question** to ask of an anchor, a **mini-example**,
 and the **failure mode** to watch for.
@@ -20,6 +25,13 @@ goal were reversed?
 Inversion finds insight by examining the negative space. "How do I succeed" is
 crowded; "what would guarantee failure, and am I doing any of it" is often empty
 and revealing. Flipping a goal exposes assumptions hiding inside it.
+
+**Stance upgrade — the pre-mortem.** Don't just ask what *would* cause failure;
+declare it: "it is two years from now and this has failed — what killed it?"
+Treating the failure as accomplished fact (prospective hindsight) reliably
+surfaces causes the hypothetical framing doesn't — certainty is a different
+conditioning context than possibility. The mirror works too: "it succeeded
+wildly — what made it?"
 
 **Mini-example:** Anchor "user onboarding." Don't ask how to improve retention;
 ask what would guarantee users leave on day one. The list (confusion, no early
@@ -112,6 +124,12 @@ whichever analogy happens to surface. Scan these high-yield source domains and a
 > systems · control theory & feedback · epidemiology · logistics & supply chains ·
 > error-correcting codes · thermodynamics & entropy · insurance & risk pooling
 
+When your donor choices feel predictable, pick one from this list *blind* —
+commit to a row before evaluating fit, then force the connection. Injected
+randomness is a cheap way off your own beaten path: most blind picks die in
+Phase 4, but the survivors are transfers deliberate choice would never have
+attempted.
+
 **Mini-example:** Anchor "content moderation at scale." Transfer from epidemiology:
 moderation as *contact tracing* of a viral claim, not *quarantine* of individual
 posts. Reframes the unit of intervention from post to propagation path.
@@ -188,12 +206,14 @@ change*, the point where the nature of the thing flips.
 **Forcing question:** What becomes possible if a fixed limit vanished — and if it
 *can't* vanish, is the limit itself the problem to go solve?
 
-Three moves.
+Four moves.
 
 **Removal — the pure "what if?":** take a constraint everyone treats as fixed
 (budget, latency, headcount, a law of the domain), wave it away entirely, and ask
 what the ideal or "impossible" version looks like. That version usually reveals
-what you actually want, stripped of what you'd merely settled for.
+what you actually want, stripped of what you'd merely settled for. The sharpest
+form is the *ideal final result*: the function is delivered and the mechanism
+doesn't exist ("the document is signed and there is no signing step").
 
 **Constraint-as-target — attack the wall, find the door:** sometimes the
 constraint you removed isn't a law to respect but *the problem statement itself*.
@@ -206,6 +226,13 @@ by another route, leaving the law intact. Pairs with Essence ("what does this li
 
 **Addition:** impose an absurd limit (one sentence, $0, one day, no screens) —
 forced scarcity is a classic generator of elegance.
+
+**Contradiction — refuse the trade-off:** find the tension everyone treats as
+physics — improving X necessarily worsens Y — and decline to trade. Separate the
+demands instead: in *time* (X at one moment, Y at another), in *space* (X here,
+Y there), by *condition* (X for these cases, Y for those), or by *scale* (X at
+the part, Y at the whole). A trade-off accepted as fundamental is usually a
+design choice wearing a law's clothing.
 
 **Mini-example (removal → target):** "What if we could travel faster than light?"
 Special relativity forbids *local* superluminal motion and signalling — but not
@@ -360,6 +387,40 @@ genuinely *different layer* — a precondition, not a paraphrase.
 
 ---
 
+## Naive narration
+
+**Forcing question:** Explain this anchor — step by step, complete, jargon-free —
+to someone with zero context. The step you rush, skip, or hand-wave is the cell.
+
+Every other lens re-frames the *subject*; this one changes the *register*. Serial,
+complete narration to a naive listener forbids the compression that expert fluency
+allows — the term of art that names a step without explaining it, the "obviously"
+that skips one. This is the mechanism of rubber-duck debugging isolated as a lens:
+the insight arrives mid-narration, at the exact point where your explanation and
+your actual understanding diverge. The output is not the explanation — it's the
+stumble.
+
+**vs. its neighbors:** Essence replaces the *label* with what the thing is;
+First principles rebuilds the *solution* from fundamentals. Naive narration
+changes neither — it walks the existing account at full resolution and lets the
+gaps announce themselves. Because it reaches stumble-points by a genuinely
+different route, its convergence with an Essence or Substrate cell is real
+triangulation, not overlap.
+
+**Mini-example:** Anchor "our pricing model." Narrating to an outsider: "we
+charge per seat because... more people means more value?" The stumble — value
+doesn't actually scale with seats for this product — is the cell, and it was
+invisible in expert register, where "per-seat pricing" is a settled phrase that
+never gets unpacked.
+
+**Failure mode:** Narrating fluently and finding nothing. A stumble-free
+explanation usually means you performed the lens instead of running it —
+summarizing in expert register with simpler words. Slow down at exactly the steps
+you feel no need to explain; fluency is the same enemy Phase 4's demotion pass
+names.
+
+---
+
 ## Choosing lenses by insight type
 
 Favor these; mix in others as the anchors suggest. Always include at least one
@@ -373,10 +434,10 @@ idea relocated, plus the condition that now makes the relocation pay.
 
 | Insight type | Strong lenses |
 |---|---|
-| **Causal** (why X happens) | Substrate, Inversion, Second-order, Temporal, First principles |
+| **Causal** (why X happens) | Substrate, Inversion, Second-order, Temporal, First principles, Naive narration |
 | **Design** (how to build) | Cross-domain, Constraint play, Enabling shift, First principles, Edge case |
 | **Strategic** (what to do) | Second-order, Adversarial, Stakeholder inversion, Scale shift, Temporal |
-| **Conceptual** (how to understand) | Essence, Reframe the unit, Substrate, Cross-domain, First principles |
+| **Conceptual** (how to understand) | Essence, Reframe the unit, Substrate, Cross-domain, First principles, Naive narration |
 | **Predictive** (what happens next) | Second-order, Enabling shift, Scale shift, Adversarial, Temporal |
 
 If a chosen lens produces only dead cells across every anchor, swap it out rather

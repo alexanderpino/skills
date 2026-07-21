@@ -5,7 +5,8 @@ description: >-
   building a reasoning matrix — systematically crossing the building blocks of a
   problem against a curated set of reasoning lenses, then filtering the results
   for novelty AND validity so what survives is both new and true. Use this
-  whenever the user wants to think outside the box, find a fresh angle, break out
+  whenever the user wants to think outside the box, get a helicopter view of a
+  problem, find a fresh angle, break out
   of conventional framing, generate hypotheses, surface hidden structure, chain
   or compose one analysis into the next, attack a problem that "feels stuck," or
   asks for deep brainstorming, lateral thinking,
@@ -23,8 +24,12 @@ Most "thinking harder" produces more of the obvious answer at higher volume. A
 reasoning matrix avoids that by forcing combinations a linear train of thought
 would never reach: it decomposes the subject into anchors, runs each anchor
 through a set of distinct reasoning lenses, and treats every cell as a small
-forced move. The point of the grid is structured surprise — and then a ruthless
-filter so only the cells that are *both new and defensible* survive.
+forced move. Each cell works the way explaining a bug to a rubber duck works:
+re-encoding a problem in a register it wasn't stuck in fires reasoning paths the
+original framing never activates. The matrix schedules those re-encodings
+deliberately and in bulk instead of waiting for one to strike. The point of the
+grid is structured surprise — and then a ruthless filter so only the cells that
+are *both new and defensible* survive.
 
 Nearly every invention is an **existing idea relocated into a new context** — a
 mechanism lifted out of the domain that birthed it and dropped onto a new object
@@ -36,6 +41,31 @@ collide ideas you already have into ones you don't.
 
 The output is **2–4 crystallized insights**, not a wall of cells. The matrix is
 scaffolding; the user sees the building.
+
+## Why this works on the model running it
+
+This skill is executed by an LLM, and it is engineered for one. On an open
+question, a model's first answer is its highest-probability completion — the
+center of a well-worn groove — and "thinking harder" inside that groove produces
+the same answer with more words. The method's whole purpose is to trigger
+reasoning paths that unprompted generation would never take, and each of its
+devices maps directly onto that:
+
+- **The named default is your own attractor, externalized.** Writing it down
+  (Phase 1) converts the groove from the path you're silently sliding along into
+  an object you can measure distance from. Novelty = distance from your own
+  most-probable output.
+- **Each cell is a context with no cached completion.** The bare question has
+  been answered ten thousand times in training; "this anchor × Inversion" hasn't.
+  The unfamiliar conditioning forces computation where retrieval would otherwise
+  serve — the rubber-duck effect above, stated mechanically.
+- **Terse cells are load-bearing, not style.** The longer you generate inside one
+  cell, the more fluency drags the text back toward the groove. One line keeps
+  each move a jump rather than a slide.
+- **The pull never disappears — watch for re-capture.** The attractor reasserts
+  itself at synthesis, when wild cells get smoothed into familiar phrasing. An
+  insight that ends up being the default wearing new vocabulary was re-captured,
+  not discovered; Phase 6 checks for exactly this.
 
 ## When the matrix earns its cost
 
@@ -50,20 +80,25 @@ is wanted, ask one question, then proceed.
 
 The six phases are the *full* form; match the grid to the weight of the question
 so the method never costs more than the answer is worth. The phases (frame the
-default, decompose, populate, filter, synthesize) are always run — what scales is
-their visible footprint:
+default, decompose, populate, filter, synthesize, stress-test) are always run —
+what scales is their visible footprint:
 
 - **Light run** (a focused question, one clear insight type): a **3×4** grid,
-  scoring done in your head, and only the kept cells shown. Skip the full scoring
-  table; still name the default and still deliver the crystallized insights. This
-  is the common case.
+  scoring done in your head, and **the grid stays internal** — render no table,
+  no scaffold section, no filtering narration. Deliver the insights (still
+  naming the default), and at most add one line offering to show the workings.
+  Ceremony the user declined is a cost, not a proof of rigor — the richer your
+  cells, the stronger the temptation to display them; resist it. This is the
+  common case.
 - **Full run** (a genuinely thorny, multi-stakeholder question): the complete
   4–7 × 5–8 grid with the explicit scored table and, if warranted, composition
   across matrices (`references/composition.md`).
 
 Whatever the size, the output the user reads is the 2–4 insights — the grid is
-shown below for inspectability, never as the answer itself. When in doubt, run
-light; escalate only if the light grid keeps landing on the default.
+never the answer itself: on a full run it appears below the insights for
+inspectability; on a light run it stays internal and is offered on request. When
+in doubt, run light; escalate only if the light grid keeps landing on the
+default.
 
 ## The method: six phases
 
@@ -71,7 +106,7 @@ Run these in order. Phases 1, 4, and 5 are where quality is won or lost — do n
 rush them to get to a full grid.
 
 > **Gate before you build (the default-first check).** The very first move is
-> Phase 1's step 3: write the conventional, linear answer in one or two lines.
+> Phase 1's step 4: write the conventional, linear answer in one or two lines.
 > Then judge it. If that answer already satisfies the question, *stop and return
 > it* — the matrix is wasted ceremony on a question that didn't need it. Build the
 > grid only once the linear answer is on the page and visibly *unsatisfying*. This
@@ -81,13 +116,20 @@ rush them to get to a full grid.
 
 ### Phase 1 — Frame and name the default
 
-Three moves, briefly:
+Four moves, briefly:
 
 1. **State the inquiry** in one sharp sentence. Vague input yields vague cells.
-2. **Name the insight type** sought: causal (why), design (how to build),
+2. **Check the altitude** — the helicopter move. Before accepting the question,
+   climb one level: what larger system is this problem embedded in, and is the
+   stated problem a *symptom* of one better solved a level up? ("Why does our
+   onboarding lose users" may really be "why does the product need onboarding at
+   all.") If the higher question is the truer one, renegotiate the inquiry — say
+   so explicitly — and matrix *that*. Anchors decomposed at the wrong altitude
+   produce a beautiful grid that polishes a sub-problem.
+3. **Name the insight type** sought: causal (why), design (how to build),
    strategic (what to do), conceptual (how to understand), or predictive (what
    happens next). This drives lens selection in Phase 2.
-3. **Write the default answer** — the conventional, competent take any informed
+4. **Write the default answer** — the conventional, competent take any informed
    person would give. This is the baseline. *Novelty is measured against it.*
    Without a named default, everything looks fresh and nothing actually is. This
    step is non-negotiable; it's what keeps the matrix honest.
@@ -99,6 +141,18 @@ Three moves, briefly:
   sub-questions. Anchors must be specific to *this* problem and roughly
   non-overlapping. Generic anchors ("people," "technology") produce generic
   cells. Aim for the things that, if they changed, would change everything.
+  To find them, list the question's moving parts, then keep only rows that pass
+  two tests: **load-bearing** ("if this changed, would the answer change?") and
+  **problem-specific** ("could this exact row appear in an unrelated problem's
+  matrix? If yes, sharpen it until it couldn't"). The strongest anchors are
+  usually hidden assumptions, mechanisms, and points of tension — note that the
+  worked examples' anchors ("the moment of writing," "shared context," "what
+  'good' means") are all mechanisms or assumptions, never categories.
+  For *process-shaped* problems, decompose by **events** instead of parts: walk
+  the timeline of what actually happens and anchor on the transitions. And treat
+  **hotspots** — the points where accounts of the process disagree or go vague —
+  as premium anchors: disagreement marks load-bearing structure the same way a
+  narration stumble does.
 - **Columns = lenses.** Choose **5–8 reasoning lenses** from the catalog below.
   Don't use all of them; pick the ones suited to the insight type. See
   `references/operators.md` for the full catalog, a guiding question per lens,
@@ -114,7 +168,7 @@ Compact lens catalog (full versions in the reference file):
 | **Cross-domain transfer** | Import a mechanism from another field — *near* (adjacent subfield) or *far* — onto this object. The skill's primary engine. |
 | **Enabling shift (why now)** | Which idea, once dismissed as impractical, does a recent change in cost/capability now make viable? |
 | **Scale shift** | What changes at 100× bigger, 1/100th, or a different time horizon? |
-| **Constraint play** | The pure *"what if?"* — remove a limit, treat the wall *as* the problem to solve, or *add* a brutal one. |
+| **Constraint play** | The pure *"what if?"* — remove a limit, treat the wall *as* the problem to solve, *add* a brutal one, or refuse a trade-off by separating its demands. |
 | **Second-order** | Consequences of the consequences. Who adapts, and how? |
 | **Adversarial** | How would a hostile party exploit or break this? |
 | **Reframe the unit** | Change the basic object: individual→system, event→process, noun→verb. |
@@ -122,6 +176,7 @@ Compact lens catalog (full versions in the reference file):
 | **Stakeholder inversion** | See it through the eyes of the party usually ignored. |
 | **Edge case** | Push to the extreme where the normal logic breaks. |
 | **Substrate** | What must be true *underneath* for the surface phenomenon to hold? |
+| **Naive narration** | Explain it step by step, jargon-free, to someone with zero context — the step you rush or hand-wave is the cell. The one lens that shifts the *register*, not the subject. |
 
 ### Phase 3 — Populate the matrix
 
@@ -129,13 +184,30 @@ For each (anchor × lens) cell, write **one terse candidate move** — an
 observation, a question, a reframing. One line each. Speed over polish here; the
 filter comes next.
 
+**Generate unguarded.** While populating, novelty is the only goal — do not run
+Phase 4's skepticism mid-generation. The heavy filter exists downstream precisely
+so this phase can be free: wildness is cheap to produce and cheap to check, but a
+bold cell you self-censor here never gets its chance to be scored. The cell that
+feels slightly embarrassing to write is often the one that survives.
+
 Be honest about empty cells. Not every intersection yields something — mark dead
 or trivial cells with `—` and move on. A grid that's 40% empty but has six live
 cells is a success. Forcing every cell to say something is how you manufacture
-noise.
+noise. (An empty cell is one where the lens genuinely produces no move — not one
+you suppressed for sounding too wild; that distinction is the whole discipline of
+this phase.)
 
-Render the populated grid as a markdown table (anchors as rows, lenses as
-columns) so the user can see the raw move-space before the filter.
+**Escalation — populate independently.** In a single context, later cells are
+anchored by earlier ones: every cell shares one attractor state, so some
+cross-lens "agreement" is contamination, not convergence. When the stakes
+justify it, populate each lens in a separate subagent context — each given the
+inquiry and the named default, none shown the other columns — then compare.
+Independence is what converts agreement into evidence (see
+`references/composition.md`).
+
+On a full run, render the populated grid as a markdown table (anchors as rows,
+lenses as columns) so the user can see the raw move-space before the filter. On
+a light run, keep it internal — populate just as honestly, show nothing.
 
 ### Phase 4 — Score and filter
 
@@ -150,6 +222,22 @@ the rest honestly. A bold, non-linear move with real validity is the whole point
 a bold move with no validity isn't trash, it's a Provocation (kept, labeled). The
 probes below exist to stop *vacuous* novelty from masquerading as insight, never
 to push you back toward the safe linear answer.
+
+A cell written as a *question* is scored on the claim it implies — convert it
+first ("what if X?" → "X is true/possible/the real cause"), because Validity has
+no meaning for an unanswered question.
+
+**The filter stack, mapped.** Five skeptical layers follow; that sounds like
+ceremony until you see that each catches a failure the others structurally
+cannot. Run each once, in this order — a check already passed is not re-run:
+
+| Layer | Runs on | Uniquely catches |
+|---|---|---|
+| Three probes (reversal / mechanism / falsifier) | every live cell | vacuous profundity, hand-waving, unfalsifiable claims |
+| Insight-type validity test | cells passing the probes | the failure mode specific to causal/design/strategic/conceptual/predictive claims |
+| Grounding gate | recall-dependent cells | confidently misremembered facts |
+| Demotion pass | cells about to be marked High | your fondness for your own fluent cells |
+| Phase 6 stress test | the synthesized insights | fake convergence, attractor re-capture, insights that collapse when steelmanned |
 
 **Probe Validity — don't just rate it.** Self-scored validity is the softest
 joint in the method: the same judgment that generated a clever-sounding cell will
@@ -184,7 +272,11 @@ parametric memory of that fact may be lossy, stale, or confidently wrong. Scorin
 such a cell High on Validity from memory is the method's blind spot: it launders
 a half-remembered fact into a "validated insight." Flag any cell whose validity
 turns on an empirical claim and **verify it with research/web search before
-rating** — or, if you can't, cap its Validity and label it *ungrounded*. Treat
+rating** — or, if you can't, cap its Validity and label it *ungrounded*.
+Grounding is only as strong as its source: a claim "confirmed" by an SEO
+glossary page or a vendor's marketing blog is not grounded, it's laundered.
+Prefer primary and reputable secondary sources; when only weak ones exist, say
+so and cap Validity accordingly. Treat
 this as a hard gate: **a recall-dependent cell may not hold a High on memory
 alone.** Either an external check confirms it or it's capped — because
 introspection is precisely the instrument this blind spot blinds, and a signal
@@ -200,11 +292,10 @@ high-risk lenses:
 - **Adversarial** — "an attacker would do Z" rests on whether Z is a real,
   current technique.
 
-This is what keeps a less knowledge-saturated model honest: it can't *recall* as
-much, so it must *ground* what it reasons over — and a grounded, cited claim beats
-a confidently-remembered one. When grounding isn't available (no tools, offline),
-say so and treat these cells as Provocations, not Insights. See the deep-research
-skill for the fan-out-and-verify pattern when a cell needs real sourcing.
+A grounded, cited claim beats a confidently-remembered one. When grounding isn't
+available (no tools, offline), say so and treat these cells as Provocations, not
+Insights; when a cell needs real sourcing, the deep-research skill's
+fan-out-and-verify pattern applies.
 
 **Scrub self-preference before you commit a High (the demotion pass).**
 Self-scored Validity is the softest joint in the method, and it fails in one
@@ -240,13 +331,21 @@ Then place each cell in the quadrant:
 
 - **High novelty × High validity → INSIGHT.** Keep. These feed Phase 5.
 - **High novelty × Low validity → PROVOCATION.** Flag separately. Do not present
-  as truth; present as "worth probing." Honest about its status.
+  as truth; present as "worth probing" — and attach the *cheapest test that would
+  settle it*, so the user can act on it. A Provocation without its experiment is
+  just a shrug.
 - **Low novelty × High validity → CONFIRMATION.** Discard for insight purposes
   (it's just the default restated), but note if it anchors a synthesis.
 - **Low × Low → NOISE.** Discard silently.
 
 Most cells are noise or confirmation. That's expected and fine. The grid's job is
 to make the few real cells findable.
+
+And sometimes *everything* is. If no cell clears the bar, the deliverable is the
+validated default, stated plainly, plus any Provocations — a null result is the
+method working, not failing (a matrix that always pays out is a bullshit
+generator; see the second, null run in `references/worked-example.md`). Never
+lower the bar to save the grid.
 
 ### Phase 5 — Synthesize (where the real insight lives)
 
@@ -288,14 +387,28 @@ Two guards, or distillation becomes an anti-pattern:
 ### Phase 6 — Stress test, then deliver
 
 For each candidate insight, steelman the opposite and ask what would falsify it.
-Drop any that collapse. Surviving insights are the deliverable. Lead with them.
+This is not the demotion pass repeated: that pass attacked individual *cells*;
+this one attacks the *synthesis*. In particular, check each convergence's
+provenance — did the converging cells really come from different reasoning
+moves? Two lenses that are secretly the same move landing on the same cell isn't
+triangulation, it's one path counted twice, and the "insight" is unsupported.
+Then re-check each survivor against the Phase 1 default one last time: synthesis
+is where the default's pull quietly reasserts itself, smoothing wild cells back
+into familiar phrasing (attractor re-capture). An insight that has drifted into
+being the default in new vocabulary is dropped or sent back.
+Whatever collapses under any of these attacks is cut; the surviving insights are
+the deliverable. Lead with them.
 The matrix itself goes *below* the insights (or in a collapsed/secondary section)
 — the user wants the building, not the scaffold, but the scaffold should remain
 inspectable.
 
 ## Output structure
 
-ALWAYS deliver in this order:
+This four-section template is for **full runs**. On a light run, deliver only
+the insights (with the named default woven in) — omit the matrix section
+entirely and offer it on request instead.
+
+For full runs, ALWAYS deliver in this order:
 
 ```
 ## Insights
@@ -314,6 +427,10 @@ insights are genuinely plural.]
 reasoning is fully inspectable]
 ```
 
+On a null run (nothing survived Phase 4), the structure inverts honestly: lead
+with the validated default as the answer — that *is* the finding — then any
+Provocations, then the matrix.
+
 ## Anti-patterns (the ways this method fails)
 
 - **Vacuous profundity.** Cells that sound deep but assert nothing testable.
@@ -325,12 +442,18 @@ reasoning is fully inspectable]
   it counts as an Insight.
 - **Skipping the default.** Without Phase 1's baseline, every cell scores High
   novelty and the filter becomes meaningless. This is the most common failure.
+- **Matrixing the wrong altitude.** Accepting the question as posed without the
+  helicopter check. A perfect grid on a sub-problem polishes a symptom.
+- **Filtering while generating.** Running Phase 4's skepticism inside Phase 3
+  kills bold cells before they're ever scored. Generation is unguarded by
+  design; judgment is a separate, later seat.
 - **Filling every cell.** Manufactured noise. Empty cells are honest.
 - **Presenting the grid as the answer.** The grid is process; insights are
   product. Don't make the user mine the matrix themselves.
 - **Lens monoculture.** Using five lenses that are secretly the same move
   (all variants of "what if it were bigger"). Diversity of lens is what makes
-  cross-cell convergence meaningful.
+  cross-cell convergence meaningful — two same-move lenses agreeing is one path
+  counted twice, the fake triangulation Phase 6 hunts.
 - **Generic anchors.** "People / process / technology" produces a matrix of
   platitudes. Anchors must be load-bearing and specific.
 - **False distillation.** Collapsing genuinely plural insights into one "core
@@ -380,25 +503,19 @@ and each honest about how it might fail.
 Feeding the kept insights of one matrix in as the anchors of the next (escalating
 causal → strategic → design) turns the method from one-shot analysis into
 recursion: you interrogate your own conclusions instead of stopping at them.
-Reach for it when one matrix's output is itself a question worth attacking. Two
-disciplines keep a chain honest and are worth stating plainly:
-
-- **Order matters.** Diagnose-then-decide lands somewhere different from
-  decide-then-diagnose. Pick the order deliberately and say why.
-- **Contract, don't stack.** Only the *kept insights* of matrix A become anchors
-  of B; everything else is dropped. Crossing every A-cell with every B-cell isn't
-  chaining, it's a combinatorial noise factory. This is the one trap that sinks it.
-
-The full treatment — including lens-fusion and cross-matrix convergence — is in
-`references/composition.md`.
+Reach for it when one matrix's output is itself a question worth attacking — and
+before chaining, read `references/composition.md` for the two disciplines that
+keep a chain honest (deliberate ordering; contract, don't stack), plus
+lens-fusion and cross-matrix convergence.
 
 ## Reference files
 
 - `references/operators.md` — full lens catalog: a forcing question and mini-example
   for each lens, plus which lenses to favor per insight type. Read it when
   selecting lenses in Phase 2 or when a lens isn't producing live cells.
-- `references/worked-example.md` — one complete end-to-end run (full grid, scoring,
-  synthesis) on a non-trivial question. Read it for a model of the full workflow.
+- `references/worked-example.md` — two end-to-end runs: a full run (grid, scoring,
+  synthesis, distillation) on a non-trivial question, and a null run where the
+  default wins. Read it for a model of the full workflow — and of stopping honestly.
 - `references/composition.md` — chaining matrices (A→B), fusing lenses, and
   cross-matrix convergence. Read it when one matrix's output is a question worth
   attacking, or when escalating causal → strategic → design across stages.

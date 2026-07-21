@@ -12,6 +12,10 @@ its cost.
 **Inquiry:** Why do most knowledge-worker teams get *slower* as they add more
 people, even when everyone is individually competent and motivated?
 
+**Altitude check:** Is this a symptom of a higher question ("why do we grow
+headcount at all")? No — the slowdown appears across orgs with very different
+growth rationales, so the stated level is the right one. Proceed as posed.
+
 **Insight type:** Causal.
 
 **Default answer:** "Communication overhead grows with team size (Brooks's Law) —
@@ -68,8 +72,19 @@ Scoring each live cell on Novelty (vs. the Brooks's-Law default) × Validity:
 - **Incentives × Inversion** ("rewarding visible work"): Novelty Med, Validity
   High. → borderline CONFIRMATION; keep as supporting.
 - **Shared context × Inversion** ("growth faster than propagation"): Novelty
-  High, Validity Med — plausible but hand-wavy as stated. → **PROVOCATION**.
+  High, Validity Med — plausible but hand-wavy as stated. → **PROVOCATION**,
+  attached test: measure whether teams that pause hiring after doubling recover
+  speed faster than teams that keep growing slowly.
 - The rest: Noise or Confirmation, discarded.
+
+**Demotion pass** (attack every candidate High before committing): the
+"−N teacher-hours" cell is the most fluent of the four — tried to break it as a
+relabel of ordinary onboarding cost. It held: the default treats teaching as
+overhead *around* added capacity, this cell flips the sign of the hire itself
+for months, which predicts something the default doesn't (senior output drops
+*before* headcount shows in delivery). "Safer, worse decisions" wobbled hardest
+— its mechanism is one sentence but its falsifier was weak — so it stays High
+only with the single-decider test named in the synthesis.
 
 ---
 
