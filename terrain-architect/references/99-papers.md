@@ -367,6 +367,21 @@ is below.
   karst reference. Tower (fenglin) and cone (fengcong) karst as differential dissolution and
   vertical lowering to a base level (`11`). No graphics paper exists for tower-karst surface
   morphology; cite this for the mechanism.
+- **Hudec, M.R. & Jackson, M.P.A. (2007).** *Terra infirma: understanding salt tectonics.*
+  Earth-Science Reviews 82(1–2), 1–28. — Salt as a viscous fluid, and the argument that **differential
+  loading**, not pure buoyancy, usually drives diapirs. The salt-tectonics review (`11`).
+- **Jackson, M.P.A. & Hudec, M.R. (2017).** *Salt Tectonics: Principles and Practice.* Cambridge
+  University Press, 498 pp. — The textbook: domes, salt walls, withdrawal minibasins, crestal collapse
+  grabens (`11`).
+- **Talbot, C.J. & Rogers, E.A. (1980).** *Seasonal movements in a salt glacier in Iran.* Science
+  208(4442), 395–397. — Namakiers **flow only when wetted** — seasonal, rain-triggered advance (`11`).
+- **Talbot, C.J. & Pohjola, V. (2009).** *Subaerial salt extrusions in Iran as analogues of ice
+  sheets, streams and glaciers.* Earth-Science Reviews 97(1–4), 155–183. — The canonical **namakier**
+  (salt-glacier) morphology paper; arid-only, since halite dissolves in rain (`11`, `12`).
+- **Kopf, A.J. (2002).** *Significance of mud volcanism.* Reviews of Geophysics 40(2), 1005. — The
+  mud-volcanism review: overpressure-driven rise, gas seepage, compressional settings (`11`).
+- **Mazzini, A. & Etiope, G. (2017).** *Mud volcanism: an updated review.* Earth-Science Reviews 168,
+  81–112. — Mud-volcano forms — gryphons, salses, calderas, radial flows — and their gas drivers (`11`).
 - **Stora, D., Agliati, P.-O., Cani, M.-P., Neyret, F. & Gascuel, J.-D. (1999).** *Animating Lava
   Flows.* Graphics Interface '99. — The graphics lava simulation (SPH, temperature-coupled
   viscosity).

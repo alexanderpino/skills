@@ -114,6 +114,9 @@ of what's reliable here.
 | Procedural whole-planet tectonics | P | Cortial, Peytavie, Galin & Guérin 2019, *Procedural Tectonic Planets*, CGF 38(2), Eurographics (`25`) |
 | Fault displacement / fault networks | F | No canonical paper |
 | Folding | F | Coordinate warp of the stratum field. No paper. |
+| Salt tectonics / diapirism (domes, walls, withdrawal minibasins, crestal grabens) | P | Hudec & Jackson 2007, ESR 82; Jackson & Hudec 2017 (Cambridge) — driver (buoyancy vs differential loading) `?` (`11`) |
+| Salt glacier (namakier) | P | Talbot & Rogers 1980 (Science 208); Talbot & Pohjola 2009, ESR 97 — flows only when wetted, arid-only (`11`) |
+| Mud volcano / mud diapir | P | Kopf 2002 (Rev. Geophys. 40); Mazzini & Etiope 2017, ESR 168 — gryphons/salses/mud flows (`11`) |
 | Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
 | Layered terrain with overhangs/arches | P | Peytavie et al. 2009, *Arches: a Framework for Modeling Complex Terrains*, CGF 28(2) |
 | Cave networks / karst dissolution | P | Paris et al. 2021, *Synthesizing Geologically Coherent Cave Networks*, CGF |

@@ -1,7 +1,7 @@
 # Geological Formation
 
 Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terracing](#terracing) ·
-[Folding](#folding) · [Lithology & erodibility](#lithology--erodibility) ·
+[Folding](#folding) · [Salt & mud diapirism](#salt--mud-diapirism) · [Lithology & erodibility](#lithology--erodibility) ·
 [Outcrops, mesas, badlands](#outcrops-mesas-badlands) · [When the heightfield fails](#when-the-heightfield-fails) ·
 [Karst & caves](#karst--caves) · [Weathering & soil production](#weathering--soil-production) ·
 [Duricrust & relief inversion](#duricrust--relief-inversion) ·
@@ -113,6 +113,56 @@ for free — it is not something you could author. This is the strongest argumen
 material-field approach.
 
 No canonical paper. It's structural geology applied as a warp.
+
+## Salt & mud diapirism
+
+Fold beds (above) and they stay put; **salt** doesn't. Rock salt is mechanically weak and **flows as a
+viscous fluid** at geological strain rates, so where a salt layer is buried under denser cover it
+rises, dragging the structural column with it. Gas-charged, overpressured **mud** does the same. One
+**diapir engine** — low-density material piercing denser overburden — drives both; only the rheology
+and the surface products differ (Hudec & Jackson 2007; Kopf 2002).
+
+**What drives the rise — and the honest caveat.** The textbook story is a **density inversion**:
+halite sits near ~2200 kg/m³ and barely compacts, while clastic sediment densifies with burial and
+overtakes it below ~1 km, making a buoyant, Rayleigh–Taylor-unstable layer. But Hudec & Jackson 2007
+argue the *dominant* driver in real basins is usually **differential loading** — an uneven overburden
+squeezing salt out from under thick loads toward thin ones — not pure buoyancy. Treat buoyancy as one
+mode, load asymmetry as the commoner one, and **don't claim a single mechanism** (`?` on the driver).
+
+**Salt structures** (Jackson & Hudec 2017) — all deformations of the `11` stratal/material stack, not
+heightfield sculpting:
+
+| Structure | What it is |
+|---|---|
+| **Salt dome / stock** | A subcircular pillar of salt punched up through the cover — the classic piercement; its roof arches, then faults. |
+| **Salt wall** | The elongate, ridge-like diapir — a linear salt ridge, often along a basement fault. |
+| **Rim syncline / withdrawal minibasin** | The cover **sags into the volume the salt vacated** as it flows away — a depression flanking or between diapirs (a real `03` closed basin if it outlasts the fill). |
+| **Crestal collapse graben** | As salt withdraws from under the roof, the crest **stretches and drops a graben** — an extensional fault trench right over the dome. |
+
+Where the roof overhangs (salt canopies spread laterally at the top), you are out of heightfield
+territory — see *When the heightfield fails*, below.
+
+**Namakier (salt glacier).** Where a diapir reaches the surface, salt **extrudes at the crest and
+flows downslope under gravity**, looking uncannily like ice — lobate sheets, flow foliation, even
+"streams" (Talbot & Pohjola 2009). Two rules make it right: it **flows only when wetted** — plastic in
+the rainy season, near-rigid the rest of the year, so model advance as intermittent and rain-triggered
+(Talbot & Rogers 1980) — and it survives **only in arid climates**, because halite dissolves in rain as
+fast as it emerges elsewhere (gate on the `13` aridity mask). Mechanically it's the glacier/lava
+viscous-spread machinery (`12` SIA-like, `19`) with a salt rheology and a climate gate.
+
+**Mud volcano.** Gas-charged, overpressured mud is low-density and rises the same way, erupting mud,
+water and (mostly methane) gas (Kopf 2002). Forms range from a metre-high **gryphon** to edifices
+**kilometres across and hundreds of metres high**, with bubbling **salses** (mud pools), a summit
+**caldera/collapse crater**, and radial **mud flows** (Mazzini & Etiope 2017). The driver is pore-fluid
+overpressure (rapid burial + tectonic squeezing + gas generation), so bias placement to **compressional
+settings — accretionary prisms and fold-thrust belts** (`02`). Build it as a small edifice (`11`)
+erupting a Bingham mud flow (`19` rheology, low yield stress) instead of lava.
+
+**Tier.** Salt structures and the namakier are **P** (Hudec & Jackson 2007; Jackson & Hudec 2017;
+Talbot & Rogers 1980; Talbot & Pohjola 2009); mud volcanoes **P** (Kopf 2002; Mazzini & Etiope 2017);
+the **driver** (pure buoyancy vs differential loading) is **?**. **The tell:** rim synclines and
+crestal grabens *around and over* a dome (not just the dome itself), namakiers only in deserts, mud
+volcanoes in compressional belts.
 
 ## Lithology & erodibility
 
