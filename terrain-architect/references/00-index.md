@@ -446,21 +446,27 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 
 ## 16. Voxel & streaming (chunk) generation → `24-voxel-streaming-generation.md`
 
-The **Minecraft-style paradigm** — infinite, lazily-streamed voxel worlds generated per chunk from
-`(seed, coord)`. **F/N-tier throughout; no papers.** It deliberately suspends the heightfield-truth,
-process-history and mandatory-flow-routing doctrines and substitutes local noise. Sources are the
-game's datapack worldgen format, developer talks (Kniberg) and reverse-engineering (Cubiomes), never
-peer review.
+A **family** paradigm — chunked, seeded, streamed, editable voxel worlds. **Minecraft is the
+documented exemplar** (public datapack worldgen format, Cubiomes-reverse-engineered); the *family*
+also includes cubic-voxel siblings (Creativerse, Luanti/Minetest, Terasology, Vintage Story) and
+smooth-voxel cousins (Astroneer, No Man's Sky-style). **F/N-tier throughout; no papers.** It
+deliberately suspends the heightfield-truth, process-history and mandatory-flow-routing doctrines and
+substitutes local noise. Sources: documented/open generators (Minecraft's format, Luanti and
+Terasology source), developer talks (Kniberg), reverse-engineering (Cubiomes) — **never a closed
+clone's guessed internals** (N-tier discipline).
 
-| Component | Tier | Source |
+The rows below are **Minecraft's instantiation** (the best-documented); members vary along axes —
+world extent, representation, mesher, biome model, generation authorship — set out in `24`.
+
+| Component (Minecraft's instance) | Tier | Source |
 |---|---|---|
 | Density-function terrain (3D scalar; `d>0` solid) | F | Game noise-router / `noise_settings` datapack format; sampled on a coarse lattice + trilinearly interpolated (`01`, `15`) |
 | Multi-noise biome (6-parameter climate space) | F | Game `multi_noise` biome source; temperature/humidity biome-only, continentalness/erosion/weirdness/depth drive shape (`13`) |
 | Spline shape (climate → offset/factor → density) | F | Kniberg (Mojang) design talks — a developer source, not a paper |
 | Proto-chunk stage pipeline & determinism | F | Engineering practice; seam-ownership = `08`/`23`; reverse-engineered by Cubiomes |
 | Noise caves (cheese/spaghetti/noodle) + aquifers | F | Local noise water-tables, decoupled from drainage — **not** karst dissolution (`11`) |
-| Greedy (cubic) meshing | F | Lysenko "0fps" write-ups; smooth alternative = dual contouring / Transvoxel (`08`) |
-| Legacy 2D biome cascade (pre-1.18 GenLayer zoom) | F | Layered zoom + biome-blended 2D height noise |
+| Meshing — greedy cubic vs smooth (MC/dual-contour/Transvoxel) | F | Lysenko "0fps" (cubic); smooth cousins mesh the same field differently (`08`) |
+| Legacy 2D biome cascade (pre-1.18 GenLayer zoom; many clones) | F | Layered zoom + biome-blended 2D height noise |
 
 **The trap this section prevents:** the *parameter* named "erosion" is a noise axis, not the erosion
 of `04`/`05` — it moves no sediment and conserves no mass. And a runtime voxel world cannot produce
