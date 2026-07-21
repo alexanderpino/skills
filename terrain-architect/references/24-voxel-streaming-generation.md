@@ -143,7 +143,7 @@ coordinates (`01`):
 | **Humidity** (vegetation) | biome only | Does *not* affect terrain shape. |
 | **Continentalness** | biome **and** shape | Ocean → coast → inland → far-inland; the primary "how high is the base land" axis. |
 | **Erosion** | biome **and** shape | High erosion → flat/low; low erosion → mountainous. A *noise parameter named "erosion"* — it is **not** the erosion of `04`/`05`, it carries no sediment and conserves no mass. |
-| **Weirdness** (→ ridges / "peaks & valleys") | biome **and** shape | Folded through `1 − |3|weirdness| − 2||` to make ridge lines. |
+| **Weirdness** (→ ridges / "peaks & valleys") | biome **and** shape | Folded through `1 − |3|weirdness| − 2|` to make ridge lines. |
 | **Depth** | shape | How far below the spline surface a block is; the vertical term that turns the 2D climate splines into a 3D density. |
 
 Each biome declares an **interval box** in this space; a location gets the biome whose box is nearest.
