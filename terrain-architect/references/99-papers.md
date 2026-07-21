@@ -812,6 +812,18 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   0.05–0.002 mm, clay <0.002 mm; triangle adopted 1951). The soil material palette (`18`).
 - **Cooke, R.U., Warren, A. & Goudie, A.S. (1993).** *Desert Geomorphology.* UCL Press, London,
   526 pp. — The desert-landforms text (`16`).
+- **Warren, J.K. (2016).** *Evaporites: A Geological Compendium* (2nd ed.). Springer, Cham, 1813 pp. —
+  The evaporite reference: the concentration/precipitation sequence (carbonate → gypsum → halite →
+  bittern) and sabkha/salina/playa settings (`16`).
+- **Eugster, H.P. & Hardie, L.A. (1978).** *Saline lakes.* In A. Lerman (ed.), *Lakes: Chemistry,
+  Geology, Physics*, ch. 8, pp. 237–293. Springer, New York. — Brine evolution and mineral zonation in
+  closed-basin saline lakes (`16`).
+- **Kinsman, D.J.J. (1969).** *Modes of formation, sedimentary associations, and diagnostic features
+  of shallow-water and supratidal evaporites.* AAPG Bulletin 53(4), 830–840. — The **sabkha**: nodular
+  evaporites growing displacively within supratidal sediment (`16`).
+- **Lokier, S.W. (2012).** *Development and evolution of subaerial halite crust morphologies in a
+  coastal sabkha setting.* Journal of Arid Environments 79, 32–47. — Halite-crust **tepee/thrust
+  polygons** by desiccation, thermal cycling and crystallisation pressure (`16`).
 - **Ward, A.W. & Greeley, R. (1984).** *Evolution of the yardangs at Rogers Lake, California.* GSA
   Bulletin 95(7), 829–837. — Yardang form (teardrop 1:4) and its wind-tunnel evolution (`16`).
 - **Lancaster, N. & Tchakerian, V.P. (1996).** *Geomorphology and sediments of sand ramps in the
@@ -887,6 +899,11 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   `M_max = p/α` — the raised bog's domed profile (`13`).
 - **Grotzinger, J.P. & Knoll, A.H. (1999).** *Stromatolites in Precambrian carbonates.* Annual Review
   of Earth and Planetary Sciences 27, 313–358. — Microbial layered carbonate buildups (`13`).
+- **Oren, A. & Rodríguez-Valera, F. (2001).** *The contribution of halophilic Bacteria to the red
+  coloration of saltern crystallizer ponds.* FEMS Microbiology Ecology 36(2–3), 123–130. — Why a
+  crystalliser pond is red: haloarchaeal bacterioruberin + *Dunaliella* β-carotene at NaCl saturation (`16`).
+- **Oren, A. (2005).** *A hundred years of Dunaliella research: 1905–2005.* Saline Systems 1, art. 2. —
+  *Dunaliella salina* accumulating >10% dry weight as β-carotene under salt-and-light stress (`16`).
 - **Tengberg, A. & Chen, D. (1998).** *A comparative analysis of nebkhas in central Tunisia and
   northern Burkina Faso.* Geomorphology 22(2), 181–192. — Vegetation-anchored sand mounds (`13`, `16`).
 - **Tarnita, C.E., Bonachela, J.A., Sheffer, E. et al. (2017).** *A theoretical foundation for

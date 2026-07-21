@@ -260,6 +260,16 @@ That last note is the interesting one: karst is the exception to the mandatory d
 handling in `03`. In karst, sinks are real. Fill them and you've destroyed the landform. Mark
 them with a mask so the fill node skips them.
 
+**The closed-depression size ladder, and one surface texture** (Ford & Williams 2007). The `03`
+sink vocabulary has more rungs than "doline": a **doline** (single closed depression) coalesces into
+an **uvala** (a compound, multi-centred depression — the classical "merged dolines" definition; the
+term is contested in the modern literature, so treat that as the working one), and the largest,
+flat-floored closed basin is the **polje**. A **cenote** is a doline that has **collapsed to the water
+table** — a water-filled sinkhole (the Yucatán case), i.e. a `03` sink whose floor is a lake surface.
+Distinct from all of these, **karren** (lapiés) is not a landform but the **micro-solution texture** —
+flutes, runnels, grikes, pits — on bare soluble rock; realise it as a `06`/`18` surface-material
+overlay, not a heightfield feature.
+
 ### Tower & cone karst
 
 The dramatic karst *mountains* — the towers of Guilin and Halong Bay (**fenglin**), the cone

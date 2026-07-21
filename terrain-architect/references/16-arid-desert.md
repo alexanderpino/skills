@@ -2,7 +2,7 @@
 
 Contents: [The arid frame](#the-arid-frame) · [Yardangs](#yardangs-wind-abrasion) ·
 [Inselbergs & bornhardts](#inselbergs--bornhardts) · [Alluvial fans & bajadas](#alluvial-fans--bajadas) ·
-[Playas](#playas) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits) ·
+[Playas](#playas) · [Evaporite crusts & salterns](#evaporite-crusts--salterns) · [Desert pavement](#desert-pavement) · [Wadis & aeolian deposits](#wadis--aeolian-deposits) ·
 [Implementation contract](#implementation-contract)
 
 ## The arid frame
@@ -105,6 +105,40 @@ playa: an endorheic basin floor (03 sink, left UNFILLED)
 
 Do **not** breach or fill a playa basin in `03` (like karst and crater lakes, it is a genuine
 closed basin). Mark it; drainage should terminate there, not route through it.
+
+## Evaporite crusts & salterns
+
+A playa (above) is the *dry* end of a closed salt basin; keep standing brine in it — a **salina**, a
+coastal **solar saltern**, a supratidal **sabkha** — and evaporite chemistry paints it. As brine
+concentrates it precipitates minerals **in order of increasing solubility**: carbonate first, then
+**gypsum** (~130–150 g/L), then **halite** (~300–350 g/L), then the very soluble Mg–K "bittern" salts
+(Warren 2016; Eugster & Hardie 1978). So a concentrating basin maps **mineralogy to salinity**, i.e. to
+distance from the inflow: an outer carbonate/gypsum belt grading inward to a white halite pan. Three
+settings differ by *where* the salt grows — a **sabkha** grows evaporites *displacively within the
+sediment* (nodular "chicken-wire" gypsum), a **salina** grows *bottom crystals* under standing brine,
+a continental **playa/salar** dries to an efflorescent surface crust (Kinsman 1969; Warren 2016).
+
+**Surface texture.** A subaerial **halite crust buckles into polygons with upturned "tepee" thrust
+ridges** — desiccation, thermal cycling and crystallisation pressure heave it, and ridges re-nucleate
+over the same lows across crust generations (Lokier 2012). A `06`/`18` displacement texture, not a
+heightfield landform — the arid cousin of mudflat desiccation cracks.
+
+**Why a saltern goes pink — and why it's a *material*, not a mineral, colour.** Pure halite and gypsum
+are white to clear; the electric pink of the Camargue *salins*, Great Salt Lake's north arm or the San
+Francisco Bay ponds is **biogenic pigment in the brine**. At NaCl saturation the red comes from the
+**bacterioruberin** carotenoids of halophilic **Archaea** plus the **β-carotene** of the alga
+***Dunaliella salina***, which packs >10% of its dry weight as β-carotene under salt-and-light stress
+(Oren & Rodríguez-Valera 2001; Oren 2005). Because it tracks salinity, the colour is **concentric
+zoning**, not a flat tint: green/brown concentrator ponds → orange as *Dunaliella* stresses →
+**pink/red crystalliser** at saturation. Treat it as an `18` material/biofilm property keyed to a
+salinity field, layered over the white salt — the same "colour is a material property" rule as desert
+varnish (pavement, above) or Yellowstone's microbial mats (`20`).
+
+**Tier.** Evaporite mineral zonation, sabkha/salina/playa morphology and the salt-crust polygons are
+**P** (Warren 2016; Eugster & Hardie 1978; Kinsman 1969; Lokier 2012); the pink is **P** for the
+mechanism (Oren & Rodríguez-Valera 2001; Oren 2005), **L** for exact per-pond hues. **The tell:**
+colour banded by salinity, not painted uniform — white where the brine is fresh or the crust dry, red
+only at saturation.
 
 ## Desert pavement
 

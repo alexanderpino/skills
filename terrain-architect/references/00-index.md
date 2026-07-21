@@ -120,6 +120,7 @@ of what's reliable here.
 | Stratification / sedimentary layering | P | Beneš & Forsbach 2001, *Layered Data Representation for Visual Simulation of Terrain Erosion*, SCCG |
 | Layered terrain with overhangs/arches | P | Peytavie et al. 2009, *Arches: a Framework for Modeling Complex Terrains*, CGF 28(2) |
 | Cave networks / karst dissolution | P | Paris et al. 2021, *Synthesizing Geologically Coherent Cave Networks*, CGF |
+| Karst closed-depression ladder (doline → uvala → polje) + cenote + karren | P (L for uvala def.) | Ford & Williams 2007 — sink-size ladder, cenote = sink to water table, karren = micro-solution texture (`11`, `03`) |
 | Lava flow (animation) | P | Stora et al. 1999, *Animating Lava Flows*, Graphics Interface |
 | Lava flow morphology (levées, snouts, thickness) | P | Hulme 1974, GJRAS 39(2) — Bingham yield-stress rheology (`11`) |
 | Pahoehoe / ʻaʻā / block lava | P | Macdonald 1953, American Journal of Science 251(3) — surface-texture classification (`11`, `18`) |
@@ -408,6 +409,8 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Oasis (deflation / fault-line / artesian) | L | Deflation basin floored *at the water table* + endorheic sabkha + groundwater-gated palms; blueprint (`20`) |
 | Desert pavement | P | McFadden, Wells & Jercinovich 1987, Geology 15 — born-at-top, not a lag |
 | Loess / sand sheets | F | Aeolian deposition (the deposition side of `05`) |
+| Evaporite zonation & salt-crust (tepee) polygons | P | Warren 2016; Eugster & Hardie 1978; Kinsman 1969 (sabkha); Lokier 2012 (crust polygons) — carbonate→gypsum→halite→bittern by salinity (`16`) |
+| Saltern pink/red colour (biogenic) | P (mechanism) / L (hue) | Oren & Rodríguez-Valera 2001; Oren 2005 — *Dunaliella* β-carotene + haloarchaeal bacterioruberin, salinity-zoned (`16`, `18`) |
 | Obstacle dunes — echo / climbing / falling | P (echo/climbing) / L (family) | Tsoar 1983, *Eolian Sediments & Processes* (Dev. Sedimentology 38) + Qian et al. 2011, JGR-ES 116 (~60° separation threshold) — windward-angle control; lee capture + synthesis Pye & Tsoar 2009 (`05`, `16`) |
 | Sand ramp (aeolian–colluvial–fluvial apron) | P | Lancaster & Tchakerian 1996, Geomorphology 17 — composite deposit banked on a range front, mostly relict (`05`, `16`) |
 | Shadow dune (aerodynamic lee of an obstacle) | P | Hesp 1981, J. Sed. Petrol. 51(1); vegetation-anchored = nebkha (`13`, `05`) |
