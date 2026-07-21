@@ -473,7 +473,7 @@ sand supply and the dune ceiling falls out instead of being authored.
 
 **The Dutch coast as a composite.** The classic North Sea stack is these pieces in a row: a wide
 dissipative **beach** (above) → a **foredune ridge** and **dune belt** (here) → behind them the
-**Wadden barrier islands** and **tidal flats** (above) → and, reclaimed inland, **polders and dikes**
+**Wadden barrier islands** (above) and **tidal flats** (below) → and, reclaimed inland, **polders and dikes**
 (the anthropogenic surface, `20`). Every rung was already in the skill; the coastal dune was the
 missing one.
 

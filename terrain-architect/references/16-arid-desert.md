@@ -145,7 +145,7 @@ Francisco Bay ponds is **biogenic pigment in the brine**. At NaCl saturation the
 zoning**, not a flat tint: green/brown concentrator ponds → orange as *Dunaliella* stresses →
 **pink/red crystalliser** at saturation. Treat it as an `18` material/biofilm property keyed to a
 salinity field, layered over the white salt — the same "colour is a material property" rule as desert
-varnish (pavement, above) or Yellowstone's microbial mats (`20`).
+varnish (desert pavement, below) or Yellowstone's microbial mats (`20`).
 
 **Tier.** Evaporite mineral zonation, sabkha/salina/playa morphology and the salt-crust polygons are
 **P** (Warren 2016; Eugster & Hardie 1978; Kinsman 1969; Lokier 2012); the pink is **P** for the
