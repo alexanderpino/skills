@@ -3,3 +3,5 @@ __pycache__/
 .pytest_cache/
 out/
 *.png
+# keep the committed visual-reference montage (regenerate with gallery.py)
+!gallery.png

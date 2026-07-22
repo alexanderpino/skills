@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 116 pass; 5 optional cross-checks skip
+pytest -q                            # 117 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # 121 pass; the 5 cross-checks now run instead of skipping
+pytest -q                            # 122 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -92,7 +92,10 @@ Two files, both deliberately small:
 The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
 itself is the verified `noise.py` module (noise is the initial condition, not the answer).
 Everything downstream is a thin adapter over the verified modules; `tests/test_graph_demo.py`
-checks the wiring, the cache, and the `09` invariants. For
+checks the wiring, the cache, and the `09` invariants. For a by-eye pass over **every**
+algorithm on one shared base — the visual complement to the oracles, with a numeric range trace
+that catches blow-ups the normalised renders hide — run `python gallery.py` (see `GALLERY.md`).
+For
 where each node comes from — reference library, pinned revision, licence, grounding state and
 which cross-check covers it — see **`GROUNDING.md`**.
 
