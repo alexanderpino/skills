@@ -54,6 +54,12 @@ guided/Perona–Malik filters, morphology, warps) is drawn on ad hoc rather than
 graph node. **paper-grounded** (Frisken 2000, Quilez, Tomasi & Manduchi 1998, He et al. 2010,
 Perona & Malik 1990, Serra 1982) with property oracles in `test_ops_filters.py`.
 
+The **geological landforms** (`landforms.py` — impact craters, strata/terracing, folding,
+karst sinkholes) are likewise a toolbox, not a fixed node. **paper-grounded** (Pike 1977,
+Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with oracles in
+`test_landforms.py`. Landforms without a standalone deterministic oracle — salt diapirs, tower
+karst, relief inversion — stay as reference pseudocode, not code here.
+
 ## What the cross-checks assert
 
 Comparisons are on **physical signatures**, not raw fields — grid conventions and boundary

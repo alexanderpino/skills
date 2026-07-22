@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 100 pass; 5 optional cross-checks skip
+pytest -q                            # 109 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # 105 pass; the 5 cross-checks now run instead of skipping
+pytest -q                            # 114 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -53,6 +53,7 @@ against an independent library.
 | `analysis.py` — analysis & masks | `06` slope/aspect, Zevenbergen–Thorne curvature, horizon AO, Beven–Kirkby TWI, selectors, masks→materials | slope of a plane = its gradient; discrete Laplacian of a paraboloid = `−2/R`; AO 0 on flat, >0 in a pit; TWI finite on flats; material masks **partition** (Σ ≤ 1) |
 | `ops_filters.py` — primitives/ops/filters | `10` SDF primitives, smooth min/max, Gaussian/median/bilateral/guided/Perona–Malik, morphology, warps | SDF exact & signed; `smin ≤ min`; median kills a spike & keeps a step; bilateral/guided/PM keep a step where Gaussian smears it; `dilate ≥ h ≥ erode`, opening idempotent, closing fills a pit |
 | `scatter.py` — object distribution | `07` Bridson Poisson-disk, density rejection, jittered-grid (tileable), rule-based gates | **every pair ≥ r apart** (blue noise); density-rejection follows the field; jittered grid deterministic & seamlessly tileable; gates reject cliffs/treeline/water |
+| `landforms.py` — geological landforms | `11` impact craters (Pike/Melosh), strata & terracing, folding, karst sinkholes | crater `depth/D ≈ 0.2`, rim raised, ejecta `∝ r⁻³`, central peak when complex, diameter `∝ g` inversely; strata periodic; terrace snaps to treads; fold is a sinusoid; karst carves pits **only** on soluble rock (the `03` do-not-fill exception) |
 
 ## Sandbox: run a graph and look at it
 
