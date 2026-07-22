@@ -68,7 +68,7 @@ def stamp_impact_natural(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=20000.0, g
     # irregularity lives in the RIM + EJECTA outline via a separate perturbed radius `re`. That is
     # also the right physics: a hypervelocity impact digs a circular hole; the chaos is in the mass.
     rc = np.hypot(xr / ecc, yr) / R                        # clean cavity radius (smooth bowl)
-    lump = 0.11 + 0.16 * graze                             # rougher outline toward grazing
+    lump = 0.11 + 0.30 * graze                             # break the outline harder toward grazing
     pert = (lump * rough * _ang_noise(psi, seed + 1, k=5, octaves=4)
             + 0.06 * rough * _ang_noise(psi, seed + 11, k=12, octaves=3))
     re = rc - pert                                         # irregular rim / ejecta outline
@@ -98,7 +98,10 @@ def stamp_impact_natural(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=20000.0, g
     rim_h = (0.32 if not is_complex else 0.24) * depth
     ring = rim_h * np.exp(-((re - 1.0) / 0.10) ** 2)
     ring *= 0.6 + 0.8 * (0.5 + 0.5 * _ang_noise(psi, seed + 9, k=9, octaves=4))    # lumpy crest
-    ring *= 0.65 + 0.7 * azw                                                       # downrange higher
+    # azimuthal rim mass: uniform when vertical; toward grazing the UP-RANGE rim is starved into a
+    # depressed 'forbidden' arc while the downrange rim builds up (Schultz 1996; Gault & Wedekind).
+    rim_floor = 0.7 - 0.45 * d
+    ring *= rim_floor + (1.0 - rim_floor) * azw
     prof = prof + ring
 
     # --- DEFINED central peak (complex): an upheaved rough massif rising from the floor ---
@@ -117,9 +120,10 @@ def stamp_impact_natural(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=20000.0, g
     apron = np.clip(1.0 - rim / (reach + 1e-9), 0.0, 1.0) ** 1.6                   # 1 at rim → 0 out
     hum = (0.55 + 0.45 * noise.fbm(xx * fp * 1.5 + 3.0, yy * fp * 1.5, seed + 4)
            + 0.25 * noise.fbm(xx * fp * 3.4, yy * fp * 3.4, seed + 14))            # multi-scale bumps
+    jag = 0.6 + 0.7 * np.clip(noise.ridged_mf(xx * fp * 1.1, yy * fp * 1.1, seed + 15, octaves=4), 0, 1.3)
     rays = 0.85 + 0.15 * _ang_noise(psi, seed + 3, k=13, octaves=3)                # faint long rays
-    ejecta = apron * azw * np.clip(hum, 0.0, None) * rays
-    prof = prof + 0.22 * depth * np.where(re >= 1.0, ejecta, 0.0)                  # lower than the rim
+    ejecta = apron * azw * np.clip(hum, 0.0, None) * rays * jag                    # jagged downrange ridges
+    prof = prof + 0.24 * depth * np.where(re >= 1.0, ejecta, 0.0)                  # lower than the rim
 
     # --- micro-relief everywhere (nothing dead flat) ----------------------------------
     prof = prof + 0.03 * depth * rough * noise.fbm(xx * fp, yy * fp, seed + 5)
