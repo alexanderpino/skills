@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 80 pass; 5 optional cross-checks skip
+pytest -q                            # 92 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # 85 pass; the 5 cross-checks now run instead of skipping
+pytest -q                            # 97 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -51,6 +51,7 @@ against an independent library.
 | `runout.py` — Voellmy runout | `05` Voellmy 1955 | runout length on a ramp matches `L = H/tan(α)`; more friction → shorter |
 | `noise.py` — procedural noise | `01` Perlin (Improved 2002), value, Worley, fBm, ridged/hybrid multifractal, domain warp, curl | Perlin **= 0 on the lattice**; single-octave fBm **= the base noise**; curl noise **divergence = 0**; fractal sums finite & bounded |
 | `analysis.py` — analysis & masks | `06` slope/aspect, Zevenbergen–Thorne curvature, horizon AO, Beven–Kirkby TWI, selectors, masks→materials | slope of a plane = its gradient; discrete Laplacian of a paraboloid = `−2/R`; AO 0 on flat, >0 in a pit; TWI finite on flats; material masks **partition** (Σ ≤ 1) |
+| `ops_filters.py` — primitives/ops/filters | `10` SDF primitives, smooth min/max, Gaussian/median/bilateral/guided/Perona–Malik, morphology, warps | SDF exact & signed; `smin ≤ min`; median kills a spike & keeps a step; bilateral/guided/PM keep a step where Gaussian smears it; `dilate ≥ h ≥ erode`, opening idempotent, closing fills a pit |
 
 ## Sandbox: run a graph and look at it
 

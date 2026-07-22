@@ -48,6 +48,11 @@ shade, `log(A)` overlay); the usual references are GDAL / RichDEM / matplotlib h
 They modify no terrain and carry no pinned upstream — sanity-check the hillshade against
 GDAL's if it matters.
 
+The **toolbox** (`ops_filters.py` — SDF primitives, smooth min/max, Gaussian/median/bilateral/
+guided/Perona–Malik filters, morphology, warps) is drawn on ad hoc rather than wired as a fixed
+graph node. **paper-grounded** (Frisken 2000, Quilez, Tomasi & Manduchi 1998, He et al. 2010,
+Perona & Malik 1990, Serra 1982) with property oracles in `test_ops_filters.py`.
+
 ## What the cross-checks assert
 
 Comparisons are on **physical signatures**, not raw fields — grid conventions and boundary
