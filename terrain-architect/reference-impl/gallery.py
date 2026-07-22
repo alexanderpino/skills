@@ -14,6 +14,7 @@ import numpy as np
 
 import analysis
 import analytic
+import crater
 import diffusion
 import dunes
 import erosion_droplet
@@ -26,6 +27,7 @@ import landforms
 import noise
 import ops_filters
 import render
+import runout
 import scatter
 import sims_illustrative as sims
 import winds
@@ -181,6 +183,38 @@ def panels():
     age = (xx2 / TILE) * 100.0
     out.append(("seafloor age-depth", render.greyscale(
         _track("age-depth", analytic.seafloor_depth_hsc(age + 0.1)))))
+
+    # --- modules the gallery used to omit: parameterised impact, Voellmy runout, MFD, anticline,
+    #     erosional rebound, jittered-grid scatter (the basic Pike crater above is landforms.py;
+    #     THIS is the size+angle crater.py with its downrange-biased, mass-conserving ejecta) ---
+    Dc = crater.final_crater(crater.transient_crater_diameter(50.0, 20000.0, angle=20.0))[0]
+    cs_c = Dc / (TILE * 0.5)
+    hc, _ = crater.stamp_impact(np.zeros((TILE, TILE)), TILE // 2, TILE // 2, cs_c,
+                                L=50.0, v=20000.0, angle=20.0, azimuth=0.0)   # +x = downrange
+    out.append(("crater size+angle 20° (downrange ejecta)", render.hillshade(_track("crater", hc), cs_c)))
+
+    # runout needs a real slope to run on (the shared base is too gentle — a debris flow off a
+    # low bump physically stops fast), so drop the failed mass off a steep cone.
+    cone_h = (2200.0 * np.exp(-((xx2 - 26) ** 2 + (yy2 - 26) ** 2) / (2 * 20.0 ** 2))
+              + 30.0 * noise.fbm(xx2 * 0.2, yy2 * 0.2, 3))
+    track = runout.voellmy_runout(cone_h, (26, 30), mu=0.2, xi=2000.0, cellsize=CELLSIZE, init_dir=(1, 1))
+    tpts = [(j * CELLSIZE, i * CELLSIZE) for i, j in track]
+    out.append(("Voellmy runout (μ=0.2)", render.scatter_overlay(
+        render.hillshade(cone_h, CELLSIZE), tpts, CELLSIZE, color=(230, 40, 40), radius=1)))
+
+    out.append(("MFD accumulation (Freeman)", render.greyscale(
+        np.log1p(flow.mfd_accumulation(filled, CELLSIZE)))))
+
+    anti = landforms.anticline(base, xx2 * CELLSIZE, yy2 * CELLSIZE, 220.0,
+                               (48 * CELLSIZE, 48 * CELLSIZE), (0.7, 0.7), 220.0)
+    out.append(("anticline (up-fold)", render.hillshade(anti, CELLSIZE)))
+
+    removed = np.maximum(base - eroded, 0.0)                    # material erosion took off
+    out.append(("erosional rebound", render.greyscale(isostasy.erosional_rebound(removed))))
+
+    jg = scatter.jittered_grid(TILE * CELLSIZE, TILE * CELLSIZE, CELLSIZE * 5, seed=SEED)
+    out.append(("scatter jittered-grid", render.scatter_overlay(
+        render.hillshade(base, CELLSIZE), jg, CELLSIZE, color=(40, 120, 200))))
     return out
 
 

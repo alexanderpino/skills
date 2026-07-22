@@ -34,9 +34,16 @@ think to check, and **neither is sufficient alone**. Two cautions this gallery m
 | 5,4–5,5 | diffusion (Culling) · dunes (Werner) | smoothed relief; a wind-transverse dune field |
 | 6,0–6,2 | pipe water depth · flexure (200 km) · wind speed | water routed into the lows; the flexural deflection bowl under a mountain load; terrain-following wind magnitude |
 | 6,3–6,5 | tephra fallout · PDC inundation · seafloor age–depth | radial thinning from the vent; the pyroclastic-flow footprint (red) over hillshade; bathymetry deepening with crustal age |
+| 7,0–7,2 | crater size+angle · Voellmy runout · MFD accumulation | circular cavity + **downrange**-biased ejecta at 20° (`crater.py` — the size+angle model, vs the basic Pike crater at 4,1); the failed-mass track down a steep cone (red); dispersive multi-flow drainage (vs D8 at 3,3) |
+| 7,3–7,5 | anticline · erosional rebound · scatter jittered-grid | a single up-fold ridge (vs the fold **train** at 4,4); isostatic rebound concentrated where erosion cut deepest; a stratified/tileable point set (vs blue-noise density scatter at 3,5) |
 
 Panels 30–33 are the `sims_illustrative.py` tier — sketches you can watch move, **not** verified
 numbers. Everything else is oracle-backed (`tests/`), and the ranges printed by `gallery.py`
-must all read sane (no `SUSPECT`). The gallery now covers **every** algorithm module in
-`reference-impl` (age–depth and avulsion have no natural heightfield rendering; age–depth is
-shown as a bathymetry gradient, avulsion is a scalar criterion and is omitted).
+must all read sane (no `SUSPECT`). The gallery covers a field-renderable panel for **every**
+algorithm module in `reference-impl` — including the size+angle `crater.py`, Voellmy runout,
+MFD accumulation, anticline, erosional rebound and jittered-grid scatter (row 7). What is *not*
+panelled is only what has no natural heightfield image: **scalar / 1-D diagnostics** — the
+energy-cone runout *distance* `L = Hc/μ` (shown instead as the PDC inundation footprint it
+drives, at 6,4), the river **superelevation** and **avulsion** criteria, and the GDH1 seafloor
+variant (visually identical to the HSC panel at 6,5) — plus the many `ops_filters` toolbox
+primitives (SDF/morphology/warp/blend) shown by representative rather than exhaustively.
