@@ -76,7 +76,7 @@ These matter *more than any single feature* — they are why a landform reads as
 |---|---|---|---|
 | **Alpine** | cirques + tarns, arêtes/horns, **U-troughs** (flat floor, steep walls), hanging valleys w/ waterfalls, moraines, scree 34–37° | V-valleys with tributaries joining *at grade* (should be U + hanging) | no cirques/U-profile; blobby, fluvial-only |
 | **Canyon** | **cliff-and-bench stair-steps** from hard/soft beds, strata *continuous & horizontal across both rims*, caprock, inner gorge, incised meanders | one uniform smooth V wall | incision good; strata benches too faint, no differential hard/soft |
-| **Mesa/tepui** | flat **structural** top under a resistant caprock, near-vertical wall, **sharp break to talus apron**, accordant summit levels | a domed/rounded top; no caprock→talus break | flat top + caprock rim + cliff→**talus break** now via `_butte` ✓; accordant tops next |
+| **Mesa/tepui** | flat **structural** top under a resistant caprock, near-vertical wall, **sharp break to talus apron**, accordant summit levels, **joint-bounded blocky outline** | a domed/rounded top; a *circular* stamp; no caprock→talus break | flat top + caprock rim + cliff→**talus break** + **fault-bounded polygonal** footprint via `_butte` ✓; accordant tops next |
 | **Erg** | **asymmetric** dunes (gentle windward ~12°, **steep lee slip face ~34°**), oriented by wind; barchan/transverse/linear/star; flat interdunes | symmetric sine-wave ridges | now **asymmetric** stoss/slip-face transverse dunes + flat interdunes ✓; single wind, one dune type |
 | **Basin & range** | parallel ranges, **straight range-front fault + triangular facets**, alluvial **fans→bajada→playa** sorting, back-tilted blocks | blobby scattered mountains; no fans/playa | have tilted blocks; missing facets, fans, bajada, true playa |
 | **Badlands** | dense rilling, **capped hoodoos** (top-heavy, banded), fins→windows→hoodoos series, knife-edge divides | smooth tapered cones, no banding/cap | good dissection; no discrete capped hoodoos/fins |
@@ -88,8 +88,8 @@ These matter *more than any single feature* — they are why a landform reads as
 | **Lunar cratered** | **saturation** + **r⁻² size-frequency**, fresh→ghost degradation gradient, d/D≈1:5 fresh, simple→complex >15–20 km, ejecta + **herringbone secondaries** | uniform-random equal craters, all fresh | good chaos; add SFD power law + degradation states + secondaries |
 | **Lunar maria** | smoothness vs highlands, **wrinkle ridges** (sinuous, ~10s m), sinuous rilles, sparse craters, embayed drowned rims | too much relief / too many craters | smooth ✓; ridge too subtle, no rilles/embayment |
 | **Mars** | **overprint order** impacts→fluvial→aeolian→dust: valley networks, outflow+chaos, **inverted channels**, bright static **TARs** vs dark active dunes, dust mantle | features with no age order / no dust drape | have craters+channel; add TARs, inversion, dust mantle, order |
-| **Arrakis** *(Wadi Rum)* | **flat-vs-vertical binary**: dead-flat sand valleys meeting sheer **jebels**, 3-layer sandstone, fault-grid straight cliffs, honeycomb weathering, sand aprons | uniform Perlin bumpiness | now jebels+sand ✓; add fault-straight edges, layer banding |
-| **Monument Valley** | **3-layer butte** (shale slope base / sandstone cliff / caprock), talus apron, mesa→butte→spire series, isolated on a plain | cookie-cutter cylinders / gears | caprock butte (top→cliff→**talus break**) + mesa→butte→spire series ✓; 3-layer banding next |
+| **Arrakis** *(Wadi Rum)* | **flat-vs-vertical binary**: dead-flat sand valleys meeting sheer **jebels**, 3-layer sandstone, fault-grid straight cliffs, honeycomb weathering, sand aprons | uniform Perlin bumpiness; *round* stamped jebels | now **fault-bounded blocky jebels** (straight joint-aligned walls, shared fracture grid, sand aprons) ✓; add layer banding |
+| **Monument Valley** | **3-layer butte** (shale slope base / sandstone cliff / caprock), talus apron, mesa→butte→spire series, isolated on a plain | cookie-cutter cylinders / gears | **fault-bounded** caprock buttes (blocky, aligned faces) + top→cliff→**talus break** + butte→spire series ✓; 3-layer banding next |
 | **Zhangjiajie/Pandora** | >3000 **angular fracture-bounded** quartz-sandstone columns, joint-aligned corridors, vegetated tops | rounded limestone-style cones | now **sheer near-vertical** columns ✓; make joint-aligned/angular, vegetate tops |
 | **Ha Long/Skull Is.** | drowned towers straight from the sea, **waterline notch** undercut, h/w up to ~6, fenglin+fengcong | towers with beaches / no notch | now sparse sheer **high-h/w** drowned towers ✓; add waterline notch |
 | **Uyuni/Crait** | metre-scale **hexagonal** salt polygons w/ raised ridges, dead-flat, brine mirror (wet look) | raw straight-edged Voronoi | domain-warped cracks ✓; make hexagonal + raised ridges |
@@ -105,7 +105,9 @@ These matter *more than any single feature* — they are why a landform reads as
 2. **Erosion on every fluvial/hillslope tile**: droplet (~5·N²) + interleaved thermal (33°), and
    feed deposition/flow into the splatmap. Fixes "blobby" alpine, canyon, badlands, mars.
 3. **Break-of-slope + slope-discipline per archetype** (*in progress*): the highest-impact set is
-   **done** — caprock top→cliff→**talus break** (`_butte`: mesa, Monument Valley), dune **slip-face
+   **done** — caprock top→cliff→**talus break** on a **fault-bounded polygonal** footprint (`_butte`:
+   mesa, Monument Valley, Arrakis jebels — no more cookie-cutter circles; the outline is the
+   intersection of half-planes at two orthogonal joint sets, domain-warped), dune **slip-face
    asymmetry** (erg), **abrupt near-vertical tower bases + notch** (tower karst, Pandora, Skull
    Island). Remaining: canyon differential hard/soft benches, wave-cut platform+notch (coast),
    sill/overdeepening (fjord), badlands capped hoodoos — the rest of the per-tile work in Part 3.
@@ -127,3 +129,18 @@ shader splatting; World Machine / Gaea / Houdini heightfield docs. Geomorphology
 Waltham (fenglin/fengcong), UNESCO (Zhangjiajie, Ha Long), Riedel 2020 & Krüger 2018 (lunar crater
 degradation & simple→complex), TARs morphology (Balme et al.), Salar de Uyuni & Wadi Rum & Monument
 Valley geology guides. Full URLs are in the research transcripts backing this doc.
+
+**Joint/fault-controlled butte outlines** (the `_butte` polygonal footprint — why buttes/mesas/jebels
+are blocky, not round): flat-lying sandstone fails along **two ~orthogonal vertical joint sets**, so
+plan-view outlines are rectilinear blocks with straight faces and ~90° corners; **cross joints are
+spaced ~1.8× wider than the systematic set**, making footprints *elongated* rectangles aligned to the
+dominant strike (whittled to spires between the same planes). Wadi Rum's jebels retreat by blocky
+rockfall along vertical joints (N–S + E–W sets; regional faults NNE–SSW), with wind-blown **sand
+aprons** onlapping the walls (not talus). Sources: NPS Geodiversity Atlas — Arches & Canyonlands, NPS
+*The Needles* (two orthogonal sets → square blocks → spires); Maher (UNO GEOL3300) joint sets; Li et
+al. 2021 *Orthogonal joints in quartz sandstone* (JRMGE); Narr & Suppe 1991 and *Power-law joint
+spacing vs bed thickness* 2021 (JSG); Moab Happenings *Mesas, Buttes and Spires*; Wadi Rum Geology
+(imga.org.il) & *Sandstone Geomorphology of South-West Jordan*; Navajo Sandstone granular
+disintegration (ESP&L, 10.1002/esp.4866) for the sub-metre face roughening that motivates the domain
+warp. This grounds: **swap the radial distance for a half-plane intersection at two orthogonal joint
+azimuths, unequal spacing, low-amplitude domain warp.**

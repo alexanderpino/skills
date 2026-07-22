@@ -24,18 +24,19 @@ TILE, CELL = A.TILE, A.CELL
 # --- worlds that ARE an archetype already (re-dressed) --------------------------------------
 def arrakis(seed=7, n=TILE, cell=CELL):
     """Dune (Wadi Rum) — extreme CONTRAST, not uniform bumpiness: flat wind-swept sand plains
-    interrupted by sudden sheer sandstone JEBELS (the sietch country + the open erg)."""
-    xx, yy = A._xy(n, cell)
+    interrupted by sudden sheer sandstone JEBELS. The jebels are FAULT/JOINT-BOUNDED blocks (straight
+    near-vertical walls meeting at sharp corners, aligned to a regional fracture grid), not round
+    stamps — with sand aprons, not talus, banked at their feet (Wadi Rum's Cambro-Ordovician sandstone
+    eroded along vertical joints)."""
     sand = A._g(0.28, seed, n, cell) * 20.0 + 8.0                            # near-flat sand sea
     rng = np.random.default_rng(seed)
-    for i in range(4):                                                       # sheer sandstone jebels
+    fault = rng.uniform(0.0, np.pi)                                          # one regional fracture grid
+    for i in range(4):                                                       # sheer fault-bounded jebels
         bx, by = rng.integers(int(0.2 * n), int(0.8 * n), 2)
-        br, bh = rng.uniform(0.10, 0.20) * n, rng.uniform(320.0, 520.0)
-        ang = np.arctan2(yy - by, xx - bx)
-        ecc = rng.uniform(0.6, 1.6)                                          # elongated, irregular jebels
-        wob = 1.0 + 0.20 * noise.fbm(np.cos(ang) * 6 + 5.0 * i, np.sin(ang) * 6 + 5.0, seed + i, octaves=4)
-        cap = np.clip((br * wob - np.hypot((xx - bx) / ecc, yy - by)) / 1.5, 0.0, 1.0)   # SHEER wall
-        sand = np.maximum(sand, 8.0 + cap * bh)
+        br, bh = rng.uniform(0.11, 0.19) * n, rng.uniform(320.0, 520.0)
+        sand = np.maximum(sand, 8.0 + A._butte((n, n), bx, by, br, bh, cell, seed + i,
+                                               ecc=rng.uniform(0.6, 1.7), fault=fault,
+                                               talus=0.30, repose_tan=0.55))   # low sand apron, not scree
     return erosion_droplet.droplet_erode(sand, n_droplets=5 * n, seed=seed, brush_radius=1)   # flute the walls
 
 
@@ -54,12 +55,13 @@ def monument_valley(seed=1, n=TILE, cell=CELL):
     base = 25.0 + A._g(0.5, seed, n, cell) * 12.0
     h = base.copy()
     rng = np.random.default_rng(seed)
+    fault = rng.uniform(0.0, np.pi)                                          # regional joint grid -> aligned faces
     sizes = [0.11, 0.085, 0.065, 0.05, 0.04, 0.032, 0.028]                    # mesa → butte → spire series
     for i, frac in enumerate(sizes):
         bx, by = rng.integers(int(0.15 * n), int(0.85 * n), 2)
         bh = rng.uniform(180.0, 340.0) * (0.7 + 2.4 * frac)                  # smaller remnants stand taller/thinner
-        h = np.maximum(h, base + A._butte((n, n), bx, by, frac * n, bh, cell,
-                                          seed + i, ecc=rng.uniform(0.7, 1.4), talus=0.45))
+        h = np.maximum(h, base + A._butte((n, n), bx, by, frac * n, bh, cell, seed + i,
+                                          ecc=rng.uniform(0.7, 1.4), fault=fault, talus=0.45))
     return erosion_droplet.droplet_erode(h, n_droplets=6 * n, seed=seed, brush_radius=1)   # flute the cliffs
 
 
