@@ -50,8 +50,9 @@ def test_crossvalidation_claim_matches_dependencies():
     dependency_text = (
         SKILL_ROOT / "reference-impl" / "requirements-crossvalidate.txt"
     ).read_text(encoding="utf-8").lower()
-    claimed = {"richdem", "pysheds"}
-    assert claimed <= set(dependency_text.split())
+    dep_tokens = set(dependency_text.split())
+    # richdem + pysheds are the baseline wired flow cross-checks.
+    assert {"richdem", "pysheds"} <= dep_tokens
     documents = (
         SKILL_ROOT / "SKILL.md",
         SKILL_ROOT / "references" / "00-index.md",
@@ -61,9 +62,15 @@ def test_crossvalidation_claim_matches_dependencies():
         document.read_text(encoding="utf-8").lower() for document in documents
     )
     assert "richdem and pysheds" in combined or "richdem/pysheds" in combined
-    assert not re.search(
-        r"cross-validat(?:e|es|ed|ing|ion)[^\n]{0,100}landlab", combined
-    )
+    # No unbacked claims: any library the docs describe as cross-validated must actually
+    # be wired as a cross-validation dependency. (Landlab joined richdem/pysheds once its
+    # cross-checks in tests/test_crossvalidate_landlab.py were wired.)
+    for lib in ("landlab", "richdem", "pysheds"):
+        if re.search(rf"cross-validat(?:e|es|ed|ing|ion)[^\n]{{0,100}}{lib}", combined):
+            assert lib in dep_tokens, (
+                f"docs describe {lib} cross-validation but it is not in "
+                "requirements-crossvalidate.txt"
+            )
 
 
 def test_clean_room_chapter_is_first_class():

@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 60 pass; 2 optional cross-checks skip
+pytest -q                            # 60 pass; 5 optional cross-checks skip
 
-# optional: cross-validate against mature libraries (RichDEM, pysheds).
+# optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # the 2 cross-checks now run instead of skipping
+pytest -q                            # the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -82,14 +82,19 @@ Two files, both deliberately small:
 
 The fBm noise base is a **demo initial condition**, not a verified `01` mirror (noise is the
 initial condition, not the answer). Everything downstream is a thin adapter over the verified
-modules; `tests/test_graph_demo.py` checks the wiring, the cache, and the `09` invariants.
+modules; `tests/test_graph_demo.py` checks the wiring, the cache, and the `09` invariants. For
+where each node comes from — reference library, pinned revision, licence, grounding state and
+which cross-check covers it — see **`GROUNDING.md`**.
 
 ## Coverage boundary and production paths
 
 - **These modules are executable specifications, not production dependencies.** Port the
   paper-derived contracts and `09` oracles into the engine's own C++, Rust, C#, HLSL or compute
   stack. Landlab, fastscapelib, RichDEM and pysheds are useful independent comparison targets when
-  project policy permits test-only dependencies; only RichDEM and pysheds are wired here.
+  project policy permits test-only dependencies; **RichDEM, pysheds and Landlab are wired** as
+  cross-validation here (fastscapelib is not) — RichDEM/pysheds for the flow ops
+  (`tests/test_crossvalidate.py`) and Landlab (MIT) for stream power, D8 accumulation and hillslope
+  diffusion (`tests/test_crossvalidate_landlab.py`). See `GROUNDING.md` for the node-by-node map.
 - **D-infinity** (Tarboton 1997) — implement from the paper when needed. The D8/MFD pair here
   demonstrates the single-receiver-artefact vs dispersive contrast and supplies shared fixtures.
 - **The pipe sediment/erosion coupling** — the water solver (where the documented NaN failure
