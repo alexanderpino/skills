@@ -23,11 +23,10 @@ and every analysis node (drainage area, slope, materials) runs on the *final* ge
 before — the two ordering laws `09` catches most often. Rendering uses the review modes in
 `render.py`, including a material splatmap from the partitioned `06` masks.
 
-Nothing here is a verified reference module. The nodes are thin adapters over the modules
-that *are* verified (``flow``, ``erosion_droplet``, ``erosion_streampower``,
-``erosion_thermal``); the fBm ``noise`` base is a demo initial condition — `01` is not
-mirrored in `reference-impl`, and "noise is the initial condition, not the answer"
-(Doctrine). Run it:
+The nodes are thin adapters over the verified modules (``noise``, ``flow``,
+``erosion_droplet``, ``erosion_streampower``, ``erosion_thermal``, ``analysis``). The base
+node normalises the chosen ``noise`` family to [0,1] for the demo, but the noise itself is
+the verified `01` module — "noise is the initial condition, not the answer" (Doctrine). Run it:
 
     python graph_demo.py                          # droplet backbone, 96^2, -> out/
     python graph_demo.py --backbone streampower --size 128 --extent-km 120
@@ -47,58 +46,20 @@ import erosion_droplet
 import erosion_streampower
 import erosion_thermal
 import flow
+import noise
 import render
 
 
 # --------------------------------------------------------------------------- #
-# demo initial condition: fBm value noise, evaluated in WORLD coordinates
-# (the seed contract, SKILL.md Invariants). Demo-only — not a verified `01` mirror.
+# base initial condition: real noise (01) sampled in WORLD coordinates (the seed
+# contract). The `noise` module is the verified source; for the demo the field is
+# normalised to [0,1] before scaling to metres, so `relief` means the same thing
+# whichever noise type is chosen. Noise is the initial condition, not the answer.
 # --------------------------------------------------------------------------- #
-def _hash2(ix, iy, seed):
-    """Deterministic per-lattice-cell value in [0,1). Vectorised integer hash; the
-    64-bit multiplies are meant to wrap, so overflow is expected, not an error."""
-    mask = np.uint64(0xFFFFFFFFFFFFFFFF)
-    seed_term = np.uint64((seed * 0x165667B19E3779F9) & 0xFFFFFFFFFFFFFFFF)
-    ix_u = ix.astype(np.int64).astype(np.uint64)
-    iy_u = iy.astype(np.int64).astype(np.uint64)
-    with np.errstate(over="ignore"):
-        h = (ix_u * np.uint64(0x9E3779B97F4A7C15)
-             ^ iy_u * np.uint64(0xC2B2AE3D27D4EB4F) ^ seed_term) & mask
-        h ^= h >> np.uint64(33)
-        h *= np.uint64(0xFF51AFD7ED558CCD)
-        h ^= h >> np.uint64(33)
-    return (h >> np.uint64(11)).astype(np.float64) / float(1 << 53)
-
-
-def _value_noise(shape, cellsize, wavelength, seed):
-    n, m = shape
-    yy, xx = np.mgrid[0:n, 0:m].astype(np.float64)
-    u = xx * cellsize / wavelength                 # world metres / wavelength -> lattice
-    v = yy * cellsize / wavelength
-    x0 = np.floor(u).astype(np.int64)
-    y0 = np.floor(v).astype(np.int64)
-    fx, fy = u - x0, v - y0
-    sx = fx * fx * (3.0 - 2.0 * fx)                # smoothstep
-    sy = fy * fy * (3.0 - 2.0 * fy)
-    c00 = _hash2(x0, y0, seed)
-    c10 = _hash2(x0 + 1, y0, seed)
-    c01 = _hash2(x0, y0 + 1, seed)
-    c11 = _hash2(x0 + 1, y0 + 1, seed)
-    nx0 = c00 * (1.0 - sx) + c10 * sx
-    nx1 = c01 * (1.0 - sx) + c11 * sx
-    return nx0 * (1.0 - sy) + nx1 * sy
-
-
-def fbm(shape, cellsize, wavelength, octaves, seed, gain=0.5, lacunarity=2.0):
-    """Fractal sum of value noise, normalised to [0,1]. World-space (no tile seams)."""
-    total = np.zeros(shape, dtype=np.float64)
-    amp, wl, norm = 1.0, float(wavelength), 0.0
-    for o in range(int(octaves)):
-        total += amp * _value_noise(shape, cellsize, wl, seed + o * 1013)
-        norm += amp
-        amp *= gain
-        wl /= lacunarity
-    return total / norm
+def _noise_coords(ctx, wavelength):
+    """World-metre grid divided by the feature wavelength -> noise lattice coordinates."""
+    idx = np.arange(ctx.resolution) * ctx.cellsize / wavelength
+    return np.meshgrid(idx, idx)
 
 
 # --------------------------------------------------------------------------- #
@@ -185,9 +146,20 @@ class Graph:
 # nodes: thin adapters over the verified reference-impl modules
 # --------------------------------------------------------------------------- #
 def _noise_fn(p, ins, ctx):
-    base = fbm((ctx.resolution, ctx.resolution), ctx.cellsize,
-               p["wavelength"], p["octaves"], ctx.root_seed)
-    return base * p["relief"]                                  # -> metres
+    xx, yy = _noise_coords(ctx, p["wavelength"])
+    kind, oc, seed = p.get("noise", "perlin"), int(p["octaves"]), ctx.root_seed
+    if kind == "value":
+        f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.value)
+    elif kind == "ridged":
+        f = noise.ridged_mf(xx, yy, seed, octaves=oc)
+    elif kind == "hybrid":
+        f = noise.hybrid_mf(xx, yy, seed, octaves=oc)
+    elif kind == "warp":
+        f, _, _ = noise.domain_warp(xx, yy, seed, warp=p.get("warp", 4.0), octaves=oc)
+    else:                                                      # perlin fBm (default)
+        f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.perlin)
+    f = (f - f.min()) / max(f.max() - f.min(), 1e-9)          # -> [0,1] for the demo
+    return f * p["relief"]                                     # -> metres
 
 
 def _droplet_fn(p, ins, ctx):
@@ -228,15 +200,16 @@ def _materials_fn(p, ins, ctx):
     return np.stack([m for _, m in stack], axis=0)       # (K, H, W) partitioned MaterialField
 
 
-def build_graph(ctx, backbone="droplet"):
+def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
     """The sample pipeline, as a DAG in Legal Order. Returns the graph plus the names of
     the two output fields: (height, drainage_area)."""
     g = Graph(ctx)
 
-    # 1-3  base shape: fBm noise in world coordinates (the initial condition)
-    g.add("base", "noise.fbm/1", _noise_fn,
-          params={"wavelength": ctx.cellsize * ctx.resolution * 0.45,
-                  "octaves": 6, "relief": 300.0 if backbone == "droplet" else 1400.0},
+    # 1-3  base shape: real noise (01) in world coordinates (the initial condition)
+    g.add("base", f"noise.{noise_kind}/1", _noise_fn,
+          params={"noise": noise_kind, "warp": 4.0,
+                  "wavelength": ctx.cellsize * ctx.resolution * 0.45,
+                  "octaves": 6, "relief": 200.0 if backbone == "droplet" else 1400.0},
           locality="LOCAL", resolution="RESOLUTION_INVARIANT")
 
     # 6  fluvial erosion — backbone chosen by extent (SKILL.md design procedure step 3)
@@ -251,7 +224,7 @@ def build_graph(ctx, backbone="droplet"):
 
     # 7  hillslope erosion — thermal AFTER hydraulic (or it just re-steepens)
     g.add("relaxed", "erosion.thermal/1", _thermal_fn, inputs=("fluvial",),
-          params={"repose": 0.7, "iters": 18},
+          params={"repose": 0.7, "iters": 30},
           locality="NEIGHBOURHOOD", resolution="RESOLUTION_INVARIANT")
 
     # 4-5  analysis routing on the FINAL geometry: fill (mandatory) then accumulate
@@ -350,6 +323,8 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--backbone", choices=("droplet", "streampower"), default="droplet",
                     help="erosion backbone; pick by extent (SKILL.md step 3)")
+    ap.add_argument("--noise", choices=("perlin", "value", "ridged", "hybrid", "warp"),
+                    default="perlin", help="base noise family (01)")
     ap.add_argument("--size", type=int, default=96, help="cells per side")
     ap.add_argument("--extent-km", type=float, default=None,
                     help="world extent in km (default 1 for droplet, 120 for streampower)")
@@ -371,9 +346,9 @@ def main(argv=None):
         cache_demo(ctx, args.backbone)
         return
 
-    print(f"terrain graph: backbone={args.backbone}  size={args.size}^2  "
+    print(f"terrain graph: backbone={args.backbone}  noise={args.noise}  size={args.size}^2  "
           f"extent={extent_km} km  cellsize={cellsize:.1f} m  seed={args.seed}")
-    g, (h_out, a_out) = build_graph(ctx, args.backbone)
+    g, (h_out, a_out) = build_graph(ctx, args.backbone, args.noise)
 
     t0 = time.time()
     height = g.evaluate(h_out)

@@ -29,7 +29,7 @@ Same scale as `references/22-open-source-grounding.md`:
 
 | Sandbox node | Module | Reference library @ rev | Licence | Grounding | Compared by |
 |---|---|---|---|---|---|
-| `base` (noise) | `graph_demo.fbm` | OpenSimplex2 `4cd120d3` · FastNoiseLite `785f37a9` | CC0 · MIT | **demo-only** (value-noise fBm; not a verified `01` mirror) | — |
+| `base` (noise) | `noise.py` | Perlin 2002 · Musgrave · Bridson 2007 · Worley 1996 (OpenSimplex2 `4cd120d3` · FastNoiseLite `785f37a9` for the API/variants) | papers; CC0 · MIT | **paper-grounded** (analytic oracles: lattice-zero, zero-divergence, single-octave identity) | `test_noise.py` |
 | `fluvial` (droplet) | `erosion_droplet.py` | SebLague/Hydraulic-Erosion `f245576d` | MIT | **source-grounded** | `09` oracles (`test_droplet.py`) |
 | `fluvial` (stream power) | `erosion_streampower.py` | **Landlab** FastscapeEroder `0b0ef086` · fastscapelib `b85cc6b1` | **MIT** · GPL-3.0 | **cross-validated** | `test_crossvalidate_landlab.py::test_streampower_slope_area_exponent_matches_landlab` |
 | `relaxed` (thermal) | `erosion_thermal.py` | bshishov/UnityTerrainErosionGPU `0e59f7c4` | MIT | **skill-stricter** (8-neighbour distance-correct; upstream 4-dir bug not ported) | `09` radial-anisotropy oracle (`test_thermal.py`) |

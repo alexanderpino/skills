@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 69 pass; 5 optional cross-checks skip
+pytest -q                            # 80 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # 74 pass; the 5 cross-checks now run instead of skipping
+pytest -q                            # 85 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -49,6 +49,7 @@ against an independent library.
 | `dunes.py` — Werner slab CA | `05` Werner 1995 | slabs conserved; instability (`p_sand>p_bare`) sweeps ground bare; deterministic |
 | `winds.py` — mass-consistent wind | `13` Sherman 1978 | corrected field's divergence → 0 (Helmholtz–Hodge projection); solenoidal field passes through |
 | `runout.py` — Voellmy runout | `05` Voellmy 1955 | runout length on a ramp matches `L = H/tan(α)`; more friction → shorter |
+| `noise.py` — procedural noise | `01` Perlin (Improved 2002), value, Worley, fBm, ridged/hybrid multifractal, domain warp, curl | Perlin **= 0 on the lattice**; single-octave fBm **= the base noise**; curl noise **divergence = 0**; fractal sums finite & bounded |
 | `analysis.py` — analysis & masks | `06` slope/aspect, Zevenbergen–Thorne curvature, horizon AO, Beven–Kirkby TWI, selectors, masks→materials | slope of a plane = its gradient; discrete Laplacian of a paraboloid = `−2/R`; AO 0 on flat, >0 in a pit; TWI finite on flats; material masks **partition** (Σ ≤ 1) |
 
 ## Sandbox: run a graph and look at it
@@ -59,8 +60,9 @@ development and actually see what it does. It has no dependencies beyond the num
 of `reference-impl` already needs.
 
 ```bash
-python graph_demo.py                          # droplet backbone, 96² -> six PNGs in out/
+python graph_demo.py                          # droplet backbone, 96² -> seven PNGs in out/
 python graph_demo.py --backbone streampower --size 128 --extent-km 120
+python graph_demo.py --noise ridged           # base noise family (01): perlin/value/ridged/hybrid/warp
 python graph_demo.py --seed 7 --sun-sweep 8   # rotating-light frames (09's sun sweep)
 python graph_demo.py --cache-demo             # watch the content-addressed cache
 ```
@@ -83,9 +85,10 @@ Two files, both deliberately small:
   material splatmap (partitioned `06` masks blended by weight). Import it directly to render
   any heightfield from the other modules.
 
-The fBm noise base is a **demo initial condition**, not a verified `01` mirror (noise is the
-initial condition, not the answer). Everything downstream is a thin adapter over the verified
-modules; `tests/test_graph_demo.py` checks the wiring, the cache, and the `09` invariants. For
+The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
+itself is the verified `noise.py` module (noise is the initial condition, not the answer).
+Everything downstream is a thin adapter over the verified modules; `tests/test_graph_demo.py`
+checks the wiring, the cache, and the `09` invariants. For
 where each node comes from — reference library, pinned revision, licence, grounding state and
 which cross-check covers it — see **`GROUNDING.md`**.
 
