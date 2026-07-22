@@ -20,9 +20,25 @@ Validity needs evidence from an **independent source**.
 | 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) |
 | 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ partial (catalogue below); gap: **Halfar/Bueler SIA** |
 | 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **sampled** (7/7 confirmed, below); not exhaustive |
-| 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ◻ planned (DEM comparison) |
+| 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ✅ published-statistics (below); full DEM comparison still open |
 
-Rung 5 is the open work; this file grows as each lands.
+All five rungs now carry evidence. The remaining hardening is breadth: a full (not sampled)
+rung-4 citation audit, and a real-DEM (not published-statistics) rung-5 comparison.
+
+## Rung 5 — empirical agreement with real-terrain statistics
+
+Our generated landscape is measured and compared to statistics published for **real**
+landscapes. These targets are **emergent** — nothing in the code sets Hack's exponent or the
+hypsometric integral; they arise from the erosion physics — so landing in the real range is
+evidence of physical realism, not self-consistency. `tests/test_empirical.py`:
+
+| Statistic | Real-terrain value (published) | Ours (emergent) | Verdict |
+|---|---|---|---|
+| Hypsometric integral | ~0.4–0.6, mature fluvial basins (Strahler 1952) | **0.48** | ✅ in range |
+| Hack's law exponent `L ∝ A^h` | ~0.5–0.6 (Hack 1957; classic 0.57) | **0.50** | ✅ in range |
+
+No DEM download — compared against literature values. A stronger version (real SRTM/3DEP tiles,
+more statistics: drainage density, width function, slope PDF) is the remaining rung-5 work.
 
 ## Rung 2 — independent-implementation agreement
 

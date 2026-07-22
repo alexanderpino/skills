@@ -18,12 +18,12 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 119 pass; 15 optional checks skip (see below)
+pytest -q                            # 121 pass; 15 optional checks skip (see below)
 
 # optional independent checks (validity evidence beyond the numpy-only oracles):
 pip install -r requirements-crossvalidate.txt   # RichDEM/pysheds/Landlab -> 5 cross-validation tests
 pip install -r requirements-validate.txt        # pint -> 10 dimensional-consistency tests
-pytest -q                            # 134 pass; all optional checks now run
+pytest -q                            # 136 pass; all optional checks now run
 ```
 
 ## What's here, and how each is verified
