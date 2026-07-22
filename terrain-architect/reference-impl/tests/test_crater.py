@@ -86,6 +86,41 @@ def test_ejecta_conserves_excavated_mass():
         assert abs(info["deposited"] / info["excavated"] - 0.9) < 1e-6
 
 
+def _cross_over_downrange(angle):
+    n, c = 400, 200
+    h, _ = C.stamp_impact(np.zeros((n, n)), c, c, cellsize=200.0, L=1500.0, v=20000.0,
+                          angle=angle, azimuth=0.0)
+    dep = np.maximum(h, 0.0)
+    yy, xx = np.mgrid[0:n, 0:n] - c
+    a = np.degrees(np.arctan2(yy, xx))
+    down = dep[np.abs(a) < 30].sum()
+    cross = dep[np.abs(np.abs(a) - 90) < 30].sum()
+    return cross / (down + 1e-9)
+
+
+def test_butterfly_only_at_grazing_not_premature():
+    """The cross-range 'butterfly' must NOT appear at moderate obliquity — at 8° the ejecta is
+    still a tight DOWNRANGE lobe. It emerges only near grazing (<~5°; Gault & Wedekind 1978),
+    where the downrange sector itself goes forbidden and mass swings cross-range. This is the bug
+    the earlier model had: it split into wings from ~15° down (butterfly onset was 15°, not 5°)."""
+    assert _cross_over_downrange(8.0) < 0.3                   # moderate: downrange lobe, no wings
+    assert _cross_over_downrange(2.0) > 0.9                   # grazing: genuine cross-range butterfly
+
+
+def test_central_peak_offset_is_uprange_not_downrange():
+    """Any central-peak offset points UP-RANGE (deepest-penetration side; Schultz 1996), never
+    downrange — the direction the earlier model had backwards. (Magnitude is contested — Ekholm &
+    Melosh 2001 — so we assert only the sign.)"""
+    n, c = 300, 150
+    h, info = C.stamp_impact(np.zeros((n, n)), c, c, cellsize=300.0, L=4000.0, v=20000.0,
+                             angle=25.0, azimuth=0.0)                  # downrange = +x (+col)
+    assert info["complex"] is True
+    R = 0.5 * info["D_final"] / 300.0
+    w = int(0.4 * R)
+    peak_col = int(np.argmax(h[c, c - w:c + w + 1])) + (c - w)
+    assert peak_col < c                                      # peak sits up-range of the centre
+
+
 def test_finite_and_complex_has_central_peak():
     h, info = C.stamp_impact(np.zeros((300, 300)), 150, 150, cellsize=300.0, L=4000.0,
                              v=20000.0, angle=90.0)

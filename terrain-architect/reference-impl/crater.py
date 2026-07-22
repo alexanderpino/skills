@@ -59,17 +59,25 @@ def _ellipticity(angle):
 
 
 def _ejecta_azimuth_weight(psi, angle):
-    """Azimuthal weight of the ejecta blanket (ψ from DOWNRANGE). Uniform at vertical
-    (`(...)^0 = 1`); as the impact tilts, the exponent grows so the blanket concentrates
-    **downrange** and the **up-range** side empties (the forbidden zone); at very low angle it
-    splits into a cross-range **butterfly** (Gault & Wedekind 1978; Pierazzo & Melosh 2000). A
-    small floor keeps a subdued rim all the way around."""
-    b = np.clip((90.0 - angle) / 75.0, 0.0, 1.0)           # obliquity: 0 vertical, ~1 grazing
+    """Azimuthal weight of the ejecta blanket (ψ measured from DOWNRANGE: 0 = downrange,
+    π = up-range). Calibrated to the observed oblique-impact *sequence*, not a single knob:
+
+      * steep (≳45°): near-symmetric blanket;
+      * below ~45°: increasingly **downrange**-loaded (high-velocity ejecta focuses forward);
+      * below ~20°: a sharp **up-range forbidden wedge** opens (Gault & Wedekind 1978);
+      * below ~5°: a cross-range **butterfly** — most ejecta thrown perpendicular to the path,
+        with forbidden zones BOTH up- and down-range.
+
+    The peak downrange/up-range mass contrast tops out near ~8×, matching the azimuthal sand
+    data (arXiv 2404.16677) rather than the runaway ratio a single exponent produced. Refs:
+    Gault & Wedekind 1978; Anderson et al. 2003 (PIV); Luo et al. 2022 (numerical, Moon)."""
     down = 0.5 + 0.5 * np.cos(psi)                          # 1 downrange, 0 up-range
-    w = down ** (5.0 * b)                                   # vertical -> uniform; oblique -> forward
-    bf = np.clip((15.0 - angle) / 15.0, 0.0, 1.0)           # butterfly onset
-    w = (1.0 - bf) * w + bf * np.sin(psi) ** 2
-    return 0.12 + 0.88 * np.clip(w, 0.0, 1.0)
+    d = np.clip((90.0 - angle) / 85.0, 0.0, 1.0)            # asymmetry: 0 vertical → ~1 grazing
+    p = 1.0 + 3.0 * np.clip((20.0 - angle) / 20.0, 0.0, 1.0)   # sharp up-range wedge below ~20°
+    w = (1.0 - d) + d * down ** p                           # uniform (steep) → downrange-loaded
+    bf = np.clip((5.0 - angle) / 5.0, 0.0, 1.0)             # butterfly onset <5° (Gault & Wedekind)
+    w = (1.0 - bf) * w + bf * np.sin(psi) ** 2              # cross-range wings, both forbidden zones
+    return 0.12 + 0.88 * np.clip(w, 0.0, 1.0)               # floor caps the downrange contrast ~8-9x
 
 
 def stamp_impact(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=17000.0, rho_i=STONY,
@@ -86,7 +94,6 @@ def stamp_impact(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=17000.0, rho_i=STO
     D, is_complex, depth = final_crater(D_tc, g)
     R = 0.5 * D / cellsize                                  # radius in cells
     ecc = _ellipticity(angle)
-    b = np.clip((90.0 - angle) / 75.0, 0.0, 1.0)
 
     yy, xx = np.mgrid[0:n, 0:m].astype(np.float64)
     dx, dy = (xx - cx), (yy - cy)
@@ -100,20 +107,28 @@ def stamp_impact(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=17000.0, rho_i=STO
     excavated = -bowl.sum() * cellsize ** 2                 # m^3 removed
 
     # ejecta blanket (mass-conserving): debris piles up just outside the rim and thins
-    # outward. DOWNRANGE it is thick and reaches farther; UP-RANGE it is starved (the
-    # forbidden zone). Keeping it concentrated near the rim gives it steep flanks, so the
-    # debris reads as a lobe shoved forward instead of a faint wash spread thin.
-    rim = np.maximum(r - 1.0, 0.0)                          # radii beyond the rim
-    span = 0.5 + 1.4 * b * np.clip(np.cos(psi), 0.0, 1.0)   # short up-range, long downrange
+    # outward. It reaches farthest where it carries the most mass — DOWNRANGE at moderate
+    # obliquity, then CROSS-RANGE (the butterfly wings) at grazing angles — and is starved in
+    # the forbidden wedges. Concentrating it near the rim gives it steep flanks, so the debris
+    # reads as a lobe shoved forward instead of a faint wash spread thin.
+    d = np.clip((90.0 - angle) / 85.0, 0.0, 1.0)           # obliquity 0 (vertical) → ~1 (grazing)
+    bf = np.clip((5.0 - angle) / 5.0, 0.0, 1.0)            # butterfly regime <5°
+    downdir = np.clip(np.cos(psi), 0.0, 1.0)               # 1 downrange
+    crossdir = np.sin(psi) ** 2                            # 1 cross-range (the wings)
+    rim = np.maximum(r - 1.0, 0.0)                         # radii beyond the rim
+    span = 0.5 + 0.7 * d * ((1.0 - bf) * downdir + bf * crossdir)   # far downrange, then cross-range
     falloff = np.clip(1.0 - rim / (span + 1e-9), 0.0, 1.0) ** 1.4
     dep_raw = np.where(r >= 1.0, falloff * _ejecta_azimuth_weight(psi, angle), 0.0)
     dep_vol = dep_raw.sum() * cellsize ** 2
     deposit = dep_raw * (deposit_fraction * excavated / (dep_vol + 1e-12))   # conserve mass
 
     prof = bowl + deposit
-    if is_complex:                                          # central peak (centred if vertical,
-        off = 0.18 * R * b                                 # nudged downrange when oblique)
-        pr = np.hypot(xr - off, yr) / (0.18 * R)
+    if is_complex:
+        # Central uplift nudged UP-RANGE — the deepest-penetration / rebound side (Schultz 1996;
+        # our earlier downrange nudge was backwards). The offset is CONTESTED (Ekholm & Melosh
+        # 2001 found none on Venus; lab craters show little), so keep it slight.
+        off = 0.12 * R * d
+        pr = np.hypot(xr + off, yr) / (0.18 * R)            # +off along −x' = up-range
         prof += depth * 0.5 * np.exp(-pr ** 2)
 
     info = {"D_transient": D_tc, "D_final": D, "complex": is_complex, "depth": depth,

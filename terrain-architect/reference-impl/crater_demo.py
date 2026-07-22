@@ -17,7 +17,11 @@ import render
 TILE = 150
 V = 20000.0                                                # 20 km/s, a typical impact speed
 SIZES = [("60 m impactor", 60.0), ("1 km impactor", 1000.0), ("10 km impactor", 10000.0)]
-ANGLES = [90.0, 45.0, 20.0, 8.0]                           # from horizontal
+# columns chosen to walk the observed oblique-impact sequence (Gault & Wedekind 1978):
+#   90° vertical → symmetric   ·   45° most-probable → mild downrange bias
+#   20° → strong downrange lobe + up-range forbidden wedge (still ~circular; ellipse onset ~12°)
+#   3°  → grazing: elongated, cross-range butterfly wings with BOTH forbidden zones
+ANGLES = [90.0, 45.0, 20.0, 3.0]                           # from horizontal
 
 _CUT = np.array([70, 120, 190], dtype=np.float64) / 255.0     # excavated  -> cool blue
 _ZERO = np.array([176, 172, 162], dtype=np.float64) / 255.0   # undisturbed -> neutral
@@ -37,7 +41,8 @@ def cutfill(h, cellsize):
 
 def panel(L, angle):
     D = crater.final_crater(crater.transient_crater_diameter(L, V, angle=angle))[0]
-    cs = D / (TILE * 0.32)                                 # crater ~1/3 of the tile, room for ejecta
+    ecc = crater._ellipticity(angle)
+    cs = D * ecc / (TILE * 0.40)              # frame by the MAJOR axis so ejecta always has room
     h, info = crater.stamp_impact(np.zeros((TILE, TILE)), TILE // 2, TILE // 2, cs,
                                   L=L, v=V, angle=angle, azimuth=0.0)   # +x = downrange
     return cutfill(h, cs), info

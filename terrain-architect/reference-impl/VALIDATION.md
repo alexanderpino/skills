@@ -176,6 +176,17 @@ wrong constant.** Verdicts abbreviated ✅ (paper real, method/constant as claim
 2. **Lunar simple→complex crater transition** — the skill said "~15 km"; Pike's onset is
    ~10.6 km, the change spans ~10–30 km. **Applied:** `references/11-geological.md` now reads
    "~10–20 km" (onset ~11 km, span ~10–30 km) — the one prose correction from the audit.
+3. **Oblique-impact ejecta morphology** — a source check of the oblique-impact literature
+   (Gault & Wedekind 1978; Anderson et al. 2003; Luo et al. 2022; azimuthal sand data
+   arXiv 2404.16677; Schultz 1996; Ekholm & Melosh 2001) corrected the `crater.py` ejecta/peak
+   model, which had three wrong specifics: the cross-range **butterfly** was onsetting at ~15°
+   (it belongs <~5°; the up-range forbidden wedge is the <~20° feature); the downrange/up-range
+   mass contrast ran ~12–18× (the sand data cap is ~8×); and the complex central peak was nudged
+   **downrange** (the offset points **up-range**, toward deepest penetration — and is contested,
+   so now slight). **Applied:** `crater.py`, `references/11-geological.md`, and the size×angle
+   `crater_matrix.png` now follow the observed sequence, with regression oracles in
+   `test_crater.py` (`test_butterfly_only_at_grazing_not_premature`,
+   `test_central_peak_offset_is_uprange_not_downrange`).
 
 **Coverage.** This covers every `reference-impl` module's primary citation(s) and named
 constants. The handful of un-itemised references are standard textbooks whose existence is not

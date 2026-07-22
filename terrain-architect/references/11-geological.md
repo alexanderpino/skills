@@ -616,11 +616,20 @@ Shape under obliquity (**Gault & Wedekind 1978**; **Pierazzo & Melosh 2000**; **
 2011**) — a *look*, not a ballistics sim:
 
 - **Circular until it grazes.** Craters stay round above a target-dependent threshold (~5° in sand,
-  ~30° in rock; ~12° a working default) and **elongate downrange** below it. Only a few percent of
-  craters are elliptical, because few impacts are that shallow (`P(<θ) = sin²θ`).
-- **Asymmetric rim & ejecta.** The **up-range rim is depressed**; ejecta concentrates **downrange**
-  as the angle drops, then splits into a cross-range **butterfly** with **forbidden zones** up- and
-  down-range at very low angles. The central peak (complex craters) offsets slightly downrange.
+  ~30° in rock; ~12° a working default, and *higher* for large/low-efficiency craters — Elbeshausen
+  2013) and **elongate downrange** below it. Only a few percent of craters are elliptical, because
+  few impacts are that shallow (`P(<θ) = sin²θ`; the 12° default matches the observed ~5% — Bottke 2000).
+- **Ejecta walks through a sequence, not a single knob** (Gault & Wedekind 1978; Anderson 2003;
+  Luo 2022): near-symmetric when steep → increasingly **downrange**-loaded below ~45° (peak
+  down/up-range mass contrast ~8×, arXiv 2404.16677) → a sharp **up-range forbidden wedge** opens
+  below **~20°** → a cross-range **butterfly** (forbidden zones *both* up- and down-range, wings
+  thrown perpendicular to the path) only below **~5°**. Don't trigger the butterfly early — at 8–15°
+  the pattern is still a downrange lobe with an up-range gap.
+- **Asymmetric rim & peak.** The **up-range rim is depressed** (structural rim uplift is actually
+  greatest *transverse* to the path, least downrange). Any central-peak offset is **up-range**, toward
+  the deepest-penetration side (Schultz 1996) — and it is **contested**: Ekholm & Melosh 2001 found no
+  offset on Venus, so treat it as a weak indicator, not a law. (Our earlier note said "downrange" — that
+  was wrong.)
 
 `reference-impl/crater.py` implements this size+angle model with the π-scaling exponents verified
 against the source (`reference-impl/VALIDATION.md`). Its ejecta is **mass-conserving** — the
