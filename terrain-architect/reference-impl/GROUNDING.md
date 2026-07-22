@@ -60,6 +60,13 @@ Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with ora
 `test_landforms.py`. Landforms without a standalone deterministic oracle — salt diapirs, tower
 karst, relief inversion — stay as reference pseudocode, not code here.
 
+The **parameterised impact** (`crater.py` — asteroid size/speed/density/gravity/angle → crater)
+is two tiers: the **size** physics is **paper-grounded** with *decisive* oracles (Collins/Melosh/
+Marcus 2005 π-scaling exponents — `L^0.78 v^0.44 g^(−0.22) (sinθ)^(1/3)` — and the 1/g transition,
+verified in `test_crater.py`); the **shape under obliquity** (elongation, downrange/butterfly
+ejecta) is **phenomenological**, matched to the oblique-impact experiments (Gault & Wedekind 1978;
+Pierazzo & Melosh 2000; Collins et al. 2011), not a ballistic-ejecta simulation.
+
 The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
 tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or
 oracle-verified.** These are the regimes the coverage boundary excludes because they have no

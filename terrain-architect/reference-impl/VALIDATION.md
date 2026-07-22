@@ -19,7 +19,7 @@ Validity needs evidence from an **independent source**.
 | 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) |
 | 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) |
 | 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ partial (catalogue below); gap: **Halfar/Bueler SIA** |
-| 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **full** — 32/32 load-bearing citations confirmed (below) |
+| 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **full** — 34/34 load-bearing citations confirmed (below) |
 | 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ✅ **real DEMs** (below) — ours in-range on all 3 metrics |
 
 All five rungs carry evidence, at full coverage of the load-bearing set.
@@ -129,7 +129,7 @@ Run: `pip install -r requirements-validate.txt && pytest -q tests/test_dimension
 
 Every load-bearing citation that drives the `reference-impl` code — each module's primary
 paper(s) and its named constants — re-verified against primary/authoritative sources on the web
-(2026-07). **32 citations audited, 32 confirmed: no fabricated citation, no wrong method, no
+(2026-07). **34 citations audited, 34 confirmed: no fabricated citation, no wrong method, no
 wrong constant.** Verdicts abbreviated ✅ (paper real, method/constant as claimed).
 
 | Family | Citation → skill claim | Verified |
@@ -162,6 +162,8 @@ wrong constant.** Verdicts abbreviated ✅ (paper real, method/constant as claim
 | | Pyle 1989 (BVol 51:1) — exponential tephra thinning | ✅ |
 | | Malin & Sheridan 1982 — energy-cone `H/L` runout | ✅ |
 | | Mohrig et al. 2000 (GSA Bull 112:1787) — avulsion superelevation | ✅ |
+| | Collins/Melosh/Marcus 2005 (MAPS) — impact π-scaling `L^0.78 v^0.44 g^(−0.22) (sinθ)^(1/3)` | ✅ exponents |
+| | Gault & Wedekind 1978 (LPSC 9:3843) — oblique-impact elongation & ejecta | ✅ |
 | Glacial/coastal `12` | Glen's law `n=3`, `A≈2.4e-24 Pa⁻³s⁻¹` @0 °C (Paterson/Cuffey) | ✅ std, temp-dep (flagged) |
 | | Parsons & Sclater 1977 (JGR 82:803) — age–depth `d ∝ √age` | ✅ |
 | Lava `19` | Miyamoto & Sasaki 1997 (C&G 23:283) — CA lava with temperature | ✅ |

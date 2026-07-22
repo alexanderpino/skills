@@ -597,3 +597,30 @@ Melosh's ejecta scaling and Pike's depth/diameter and rim-height ratios are the 
 crater that is a plain Gaussian dimple — no raised rim, no ejecta, no central peak at size — reads
 as a golf divot, not an impact. Crater size also scales with **gravity** (Melosh's π-group scaling),
 which matters off-Earth — see the planetary doctrine in `SKILL.md`.
+
+**From impactor to crater, and impact angle.** To drive a crater from the *asteroid* (diameter,
+speed, density) rather than a chosen `D`, use the **Collins, Melosh & Marcus 2005** π-scaling
+(*Earth Impact Effects Program*, MAPS) — the accessible, validated form. Gravity-regime transient
+diameter:
+
+```
+D_tc = 1.161 · (ρ_i/ρ_t)^(1/3) · L^0.78 · v^0.44 · g^(−0.22) · (sinθ)^(1/3)     # metres
+```
+
+then the final crater (`D = 1.25·D_tc` simple; a shallower complex law above the `~3.2 km·(g_⊕/g)`
+transition). **The angle enters as `(sinθ)^(1/3)`** — only the *vertical* velocity component
+excavates, so a 30° impact digs a crater ~`2^(1/3)` (≈20%) smaller than a vertical one of the same
+energy. θ is measured from horizontal; the most probable impact angle is 45°.
+
+Shape under obliquity (**Gault & Wedekind 1978**; **Pierazzo & Melosh 2000**; **Collins et al.
+2011**) — a *look*, not a ballistics sim:
+
+- **Circular until it grazes.** Craters stay round above a target-dependent threshold (~5° in sand,
+  ~30° in rock; ~12° a working default) and **elongate downrange** below it. Only a few percent of
+  craters are elliptical, because few impacts are that shallow (`P(<θ) = sin²θ`).
+- **Asymmetric rim & ejecta.** The **up-range rim is depressed**; ejecta concentrates **downrange**
+  as the angle drops, then splits into a cross-range **butterfly** with **forbidden zones** up- and
+  down-range at very low angles. The central peak (complex craters) offsets slightly downrange.
+
+`reference-impl/crater.py` implements this size+angle model with the π-scaling exponents verified
+against the source (`reference-impl/VALIDATION.md`).
