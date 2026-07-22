@@ -18,7 +18,7 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 49 pass; 2 optional cross-checks skip
+pytest -q                            # 60 pass; 2 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds).
 pip install -r requirements-crossvalidate.txt
@@ -49,6 +49,40 @@ against an independent library.
 | `dunes.py` — Werner slab CA | `05` Werner 1995 | slabs conserved; instability (`p_sand>p_bare`) sweeps ground bare; deterministic |
 | `winds.py` — mass-consistent wind | `13` Sherman 1978 | corrected field's divergence → 0 (Helmholtz–Hodge projection); solenoidal field passes through |
 | `runout.py` — Voellmy runout | `05` Voellmy 1955 | runout length on a ramp matches `L = H/tan(α)`; more friction → shorter |
+
+## Sandbox: run a graph and look at it
+
+The modules above are *nodes*; `graph_demo.py` is a tiny sandbox that wires them into a
+**terrain graph** you can run and render — the place to drop a new algorithm in during
+development and actually see what it does. It has no dependencies beyond the numpy the rest
+of `reference-impl` already needs.
+
+```bash
+python graph_demo.py                          # droplet backbone, 96² -> six PNGs in out/
+python graph_demo.py --backbone streampower --size 128 --extent-km 120
+python graph_demo.py --seed 7 --sun-sweep 8   # rotating-light frames (09's sun sweep)
+python graph_demo.py --cache-demo             # watch the content-addressed cache
+```
+
+Two files, both deliberately small:
+
+- **`graph_demo.py`** — a scale model of the substrate in `14-graph-runtime.md`: nodes are
+  pure `fn(params, inputs, ctx)` functions with a declared locality
+  (LOCAL / NEIGHBOURHOOD / GLOBAL) and preview class, edges are world-space fields, and the
+  DAG is **content-addressed cached** (change one node, only its downstream cone recomputes —
+  that is what makes it usable for iteration). The sample pipeline walks the **Legal Order**:
+  fBm noise → fluvial erosion (droplet < 2 km, stream power > 50 km, per the design
+  procedure) → thermal *after* hydraulic → depression fill → drainage area, with the analysis
+  computed on the **final** geometry. It prints the `09` checks it should pass (trunk drainage
+  exits at the edge; slope capped at the repose angle; the erosion budget).
+- **`render.py`** — the `09` "visual review modes" as pure-numpy functions returning RGB
+  arrays, plus a zero-dependency PNG writer: greyscale height, hillshade, slope shade,
+  `log(A)` flow overlay, hypsometric tint, and a false-colour clip that flags NaN/Inf. Import
+  it directly to render any heightfield from the other modules.
+
+The fBm noise base is a **demo initial condition**, not a verified `01` mirror (noise is the
+initial condition, not the answer). Everything downstream is a thin adapter over the verified
+modules; `tests/test_graph_demo.py` checks the wiring, the cache, and the `09` invariants.
 
 ## Coverage boundary and production paths
 
