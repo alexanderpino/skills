@@ -8,13 +8,17 @@ primitives — a paraboloid bowl, a Gaussian peak, a cosine-weighted ejecta fall
 on a flat plane they look like "bevel & emboss", not geology. `stamp_impact_natural` below is the
 PRESENTATION layer: it keeps the physical dimensions from `crater.py` (diameter, depth, the
 simple↔complex split, the elongation and downrange-ejecta laws) but composites them with the
-skill's own fractal noise (`noise.py`, chapter 01) so nothing is a perfect circle or dead flat —
-irregular rims, slumped/terraced walls, a lumpy central massif, streaky ejecta rays, and, at
-grazing angles, a plowed FURROW that deepens downrange with lateral levees and mass piled forward.
-It is then shown as ELEVATION via hillshade, so the ejecta reads as excavated earth, not a tint.
+skill's own fractal noise (`noise.py`, chapter 01). The design principle (the crux of the crater
+critiques): keep the CAVITY a smooth near-circular bowl — a hypervelocity impact is a point-source
+explosion, so the hole is circular at all but grazing angles — and put the chaos in the displaced
+MASS. So it adds a distinct raised RIM RING (the overturned flap, Pike 1977), an irregular rim/
+ejecta outline, terraced walls and a defined central MASSIF on complex craters, and a hummocky
+ejecta apron that slopes off the rim and piles heavier + reaches farther DOWNRANGE. Below ~12° the
+cavity elongates into an irregular plowed furrow (deepening forward, levees aside). Shown as
+ELEVATION via hillshade, so the mass reads as excavated/heaped earth, not a tint.
 
 The analytic core stays oracle-clean; this layer is a look, deliberately NOT mass-conserving
-(the levees, rampart and rough peak add material), and is not part of the verified ledger.
+(the rim, apron and rough peak add material), and is not part of the verified ledger.
 """
 import numpy as np
 
@@ -39,7 +43,7 @@ def _ang_noise(psi, seed, k=4.0, octaves=4):
 
 
 def stamp_impact_natural(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=20000.0, g=9.81,
-                         angle=45.0, azimuth=0.0, seed=0, deposit_fraction=0.9, rough=1.0):
+                         angle=45.0, azimuth=0.0, seed=0, rough=1.0):
     """Composite a *natural-looking* impact: the physical skeleton from `crater.py` dressed with
     fractal detail (01). `azimuth` = trajectory heading (0 → downrange = +x). Presentation only —
     for the verified, mass-conserving physics use `crater.stamp_impact`."""
@@ -59,52 +63,66 @@ def stamp_impact_natural(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=20000.0, g
     xr = dx * np.cos(a) + dy * np.sin(a)                   # +x' downrange
     yr = -dx * np.sin(a) + dy * np.cos(a)
     psi = np.arctan2(yr, xr)
-    rim_mod = 1.0 + 0.12 * rough * _ang_noise(psi, seed + 1, k=5, octaves=4)   # irregular rim
-    r = np.hypot(xr / ecc, yr) / (R * rim_mod)
-    inside = r < 1.0
 
-    # --- bowl with slumped / terraced walls (jittered, not perfect rings) --------------
-    bowl = np.where(inside, -depth * (1.0 - r ** 2), 0.0)
-    excavated = -np.where(inside, -depth * (1.0 - r ** 2), 0.0).sum() * cellsize ** 2
+    # The CAVITY stays a smooth (near-circular) bowl — `rc` is clean, so no radial spokes. All the
+    # irregularity lives in the RIM + EJECTA outline via a separate perturbed radius `re`. That is
+    # also the right physics: a hypervelocity impact digs a circular hole; the chaos is in the mass.
+    rc = np.hypot(xr / ecc, yr) / R                        # clean cavity radius (smooth bowl)
+    lump = 0.11 + 0.16 * graze                             # rougher outline toward grazing
+    pert = (lump * rough * _ang_noise(psi, seed + 1, k=5, octaves=4)
+            + 0.06 * rough * _ang_noise(psi, seed + 11, k=12, octaves=3))
+    re = rc - pert                                         # irregular rim / ejecta outline
+    inside = rc < 1.0
+    azw = crater._ejecta_azimuth_weight(psi, angle)        # ~0.12 (up-range) … 1 (downrange)
+
+    # --- parabolic bowl with terraced walls (complex) — uses the CLEAN rc ---------------
+    bowl = np.where(inside, -depth * (1.0 - rc ** 2), 0.0)
+    excavated = -bowl.sum() * cellsize ** 2
     nter = 6 if is_complex else 2                          # complex craters terrace; simple barely
-    tamp = (0.55 if is_complex else 0.20) * depth * rough
-    rj = r * nter + 0.6 * _ang_noise(psi, seed + 8, k=6, octaves=3)
-    bowl = np.where(inside, bowl + tamp * (np.round(rj) / nter - r) * np.clip(r, 0, 1) ** 2, bowl)
+    tamp = (0.55 if is_complex else 0.18) * depth * rough
+    rj = rc * nter + 0.6 * _ang_noise(psi, seed + 8, k=6, octaves=3)
+    bowl = np.where(inside, bowl + tamp * (np.round(rj) / nter - rc) * np.clip(rc, 0, 1) ** 2, bowl)
 
-    # --- plow (grazing): deepen downrange, levees aside, rampart forward ---------------
+    # --- plow (grazing): deepen downrange, levees shoved aside -------------------------
     if graze > 0:
         along = np.clip(xr / (R * ecc), -1.0, 1.0)         # -1 up-range … +1 downrange
-        bowl -= np.where(inside, graze * depth * 0.50 * (0.5 + 0.5 * along), 0.0)   # deepen forward
+        bowl -= np.where(inside, graze * depth * 0.45 * (0.5 + 0.5 * along), 0.0)   # deepen forward
         flank = np.exp(-((np.abs(yr) / R - 1.0) / 0.30) ** 2) * np.clip(1.0 - np.abs(xr) / (R * ecc), 0, 1)
-        bowl += graze * 0.40 * depth * flank               # lateral levees (mass shoved aside)
-        term = np.exp(-((xr / (R * ecc) - 1.05) / 0.40) ** 2) * np.exp(-(yr / (R * 1.2)) ** 2)
-        bowl += graze * 0.55 * depth * term                # terminal rampart (mass piled forward)
+        bowl += graze * 0.35 * depth * flank               # lateral levees
 
     prof = bowl.copy()
 
-    # --- rough central peak (complex), nudged up-range: a lumpy massif, not a cone ------
+    # --- RAISED RIM RING: the overturned flap, a ridge above the plain at the cavity edge.
+    # Every fresh crater has one (Pike 1977: rim height ~15-20% of depth). Lumpy, and piled
+    # higher DOWNRANGE, so the structural mass is asymmetric even though the hole is circular.
+    rim_h = (0.32 if not is_complex else 0.24) * depth
+    ring = rim_h * np.exp(-((re - 1.0) / 0.10) ** 2)
+    ring *= 0.6 + 0.8 * (0.5 + 0.5 * _ang_noise(psi, seed + 9, k=9, octaves=4))    # lumpy crest
+    ring *= 0.65 + 0.7 * azw                                                       # downrange higher
+    prof = prof + ring
+
+    # --- DEFINED central peak (complex): an upheaved rough massif rising from the floor ---
     if is_complex:
         off = 0.12 * R * d
         pr = np.hypot(xr + off, yr) / (0.30 * R)
-        massif = noise.fbm(xx * fp * 2.2, yy * fp * 2.2, seed + 2)
-        ridg = noise.ridged_mf(xx * fp * 1.3, yy * fp * 1.3, seed + 6, octaves=4)
-        peak = depth * 0.55 * np.clip(0.55 + 0.9 * massif + 0.5 * ridg, 0.0, None) * np.exp(-pr ** 2)
-        prof = prof + np.where(r < 1.2, peak, 0.0)
+        cone = np.clip(1.0 - pr, 0.0, 1.0) ** 0.8          # a defined mountain, not a broad dome
+        rk = (0.6 + 0.5 * noise.ridged_mf(xx * fp * 1.3, yy * fp * 1.3, seed + 6, octaves=4)
+              + 0.3 * noise.fbm(xx * fp * 2.6, yy * fp * 2.6, seed + 2))
+        prof = prof + depth * 0.80 * cone * np.clip(rk, 0.0, None)                 # below the rim crest
 
-    # --- ejecta blanket: raised, streaky rays, downrange-biased ------------------------
-    rim = np.maximum(r - 1.0, 0.0)
-    bf = np.clip((5.0 - angle) / 5.0, 0.0, 1.0)
-    span = 0.5 + 0.9 * d * ((1.0 - bf) * np.clip(np.cos(psi), 0, 1) + bf * np.sin(psi) ** 2)
-    fall = np.clip(1.0 - rim / (span + 1e-9), 0.0, 1.0) ** 1.3
-    azw = crater._ejecta_azimuth_weight(psi, angle)
-    rays = 0.5 + 0.5 * _ang_noise(psi, seed + 3, k=14, octaves=3)
-    clump = 0.5 + 0.5 * noise.fbm(xx * fp * 1.7, yy * fp * 1.7, seed + 4)
-    dep_raw = np.where(r >= 1.0, fall * azw * (0.35 + rough * rays) * (0.5 + clump), 0.0)
-    dep_vol = dep_raw.sum() * cellsize ** 2
-    prof = prof + dep_raw * (deposit_fraction * excavated / (dep_vol + 1e-12))
+    # --- ejecta apron: slopes DOWN from the rim outward (rim stays the crest), hummocky, and
+    # reaches far DOWNRANGE — the asymmetry reads as EXTENT + thickness, not a buried rim.
+    rim = np.maximum(re - 1.0, 0.0)
+    reach = 0.6 + 2.4 * d * np.clip(np.cos(psi), 0.0, 1.0) + 0.4 * azw             # far downrange
+    apron = np.clip(1.0 - rim / (reach + 1e-9), 0.0, 1.0) ** 1.6                   # 1 at rim → 0 out
+    hum = (0.55 + 0.45 * noise.fbm(xx * fp * 1.5 + 3.0, yy * fp * 1.5, seed + 4)
+           + 0.25 * noise.fbm(xx * fp * 3.4, yy * fp * 3.4, seed + 14))            # multi-scale bumps
+    rays = 0.85 + 0.15 * _ang_noise(psi, seed + 3, k=13, octaves=3)                # faint long rays
+    ejecta = apron * azw * np.clip(hum, 0.0, None) * rays
+    prof = prof + 0.22 * depth * np.where(re >= 1.0, ejecta, 0.0)                  # lower than the rim
 
     # --- micro-relief everywhere (nothing dead flat) ----------------------------------
-    prof = prof + 0.035 * depth * rough * noise.fbm(xx * fp, yy * fp, seed + 5)
+    prof = prof + 0.03 * depth * rough * noise.fbm(xx * fp, yy * fp, seed + 5)
 
     info = {"D_final": D, "complex": is_complex, "depth": depth, "ellipticity": ecc}
     return terrain + prof, info
