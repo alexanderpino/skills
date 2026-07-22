@@ -1221,6 +1221,13 @@ dressing** — materials, sky/light, and the scatter of props (`06`/`08`, `07`).
 planet / a desert planet" is not a new recipe; it is *decompose the fiction into the archetypes
 above, then re-dress.* There is no "Hoth algorithm" for the same reason there is no atoll one.
 
+**Runnable examples.** `reference-impl/screen_worlds.py` renders eight of these as re-dressed
+archetype compositions (`reference-impl/screen_worlds.png`): Arrakis (the erg), Monument Valley
+(the mesa end-member), Pandora (tower karst), Hoth (glacial, snow render), Skull Island (drowned
+tower karst), Beggar's Canyon (a relict canyon), Crait (evaporite playa, salt-crust material), and
+Interstellar's Miller's world (a flooded sandur). Each reuses an `archetypes.py` composition and
+changes only the dressing — render, sea level, or material — the section's thesis made executable.
+
 - **Hoth** *(filmed at Finse & the Hardangerjøkulen glacier, Norway)* — an **ice-sheet world**: the
   glacial machinery of entry 18 with **sea level off and the ice cap on**. Ice sheet + valley
   glaciers + crevasse fields, **nunataks** (rock islands piercing the ice), wind-scoured **sastrugi**

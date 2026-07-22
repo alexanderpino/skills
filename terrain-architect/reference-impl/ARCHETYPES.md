@@ -60,3 +60,28 @@ storage) are those signatures made quantitative — the by-eye montage's numeric
 Where a place's real number would be nice and isn't verified, it is omitted — `00`'s citation
 discipline does not relax because the subject is famous. The deeper treatments live in the chapters:
 glacial `12`, coastal `12`, karst/volcanic/impact `11`/`19`, arid `16`, anthropogenic `20` Group K.
+
+## Screen worlds — fictional planets as re-dressed archetypes
+
+![screen worlds](screen_worlds.png)
+
+`python screen_worlds.py` — the "Screen worlds" section of `20-archetypes.md` made runnable: a
+film's planet is never new physics, it is **an Earth archetype in costume, and the filming location
+names the archetype**. Each tile is one of the compositions above, re-dressed (render / sea level /
+material), so the point is *decompose the fiction, don't invent a recipe*.
+
+| Tile | World *(filming location)* | Decomposes to |
+|---|---|---|
+| 0,0 | **Arrakis** *(Wadi Rum + Liwa erg)* | the **erg** — open sand where nothing stands |
+| 0,1 | **Monument Valley** *(US-163)* | the **mesa** end-member — plateau consumed to a butte→spire series |
+| 0,2 | **Pandora** *(Zhangjiajie)* | **tower karst** pillars, one impossible edit (float them) |
+| 0,3 | **Hoth** *(Finse / Hardangerjøkulen, Norway)* | **glacial** ice-sheet, sea off — ice + rock nunataks |
+| 1,0 | **Skull Island** *(Ha Long Bay)* | **tower karst DROWNED** — the sea floods a fanged island coast |
+| 1,1 | **Beggar's Canyon** *(Maguer Gorge, Tunisia)* | a **relict canyon** — carved by *vanished* water, like Mars |
+| 1,2 | **Crait** *(Salar de Uyuni)* | the **evaporite playa** — a white crust over red substrate (a material stack, `08`) |
+| 1,3 | **Miller's world** *(Icelandic sandur)* | a **braided outwash plain** flooded ankle-deep → a shoreless ocean + one tidal wave |
+
+The re-dressing is the only difference: Arrakis reuses `erg`, Beggar's Canyon reuses `canyon`, Skull
+Island is `tower karst` with the sea raised over the plain, Hoth/Crait swap the render for snow /
+salt-crust materials. One substrate, one hydrology, per the skill — the fiction is set dressing.
+Same tier-L discipline, same "nothing blows up" test guard (`tests/test_screen_worlds.py`).

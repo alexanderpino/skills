@@ -90,9 +90,9 @@ def mesa(seed=SEED, n=TILE, cell=CELL):
 def erg(seed=SEED, n=TILE, cell=CELL):
     """Aeolian dominant: a sand sheet self-organises into transverse dunes (Werner CA). 09: a
     dominant transverse wavelength, low relief, slopes no steeper than the sand repose regime."""
-    sand = np.round(6.0 + 6.0 * _g(0.25, seed, n, cell)).astype(np.int64)
-    slabs = dunes.werner_dunes(sand, iters=350, seed=seed, wind=(0, 1))
-    return ops_filters.gaussian(slabs.astype(np.float64), 1.0) * 2.5          # smooth to the dune envelope
+    sand = np.round(7.0 + 7.0 * _g(0.25, seed, n, cell)).astype(np.int64)
+    slabs = dunes.werner_dunes(sand, iters=700, seed=seed, wind=(0, 1))       # more time -> coarser dunes
+    return ops_filters.gaussian(slabs.astype(np.float64), 1.6) * 3.0          # smooth to the dune envelope
 
 
 def basin_range(seed=SEED, n=TILE, cell=CELL):
@@ -273,13 +273,34 @@ def montage(tiles, cols=4, pad=4, bg=20):
     return out
 
 
+def labeled_montage(tiles, cols=4, pad=4, title_h=14, bg=(16, 16, 18)):
+    """Montage with a caption under each tile (the fix for 'I can't tell which is which'). Needs
+    Pillow; falls back to the unlabelled numpy montage if it is missing."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:                                                      # pragma: no cover
+        return montage(tiles, cols=cols)
+    n = tiles[0][1].shape[0]
+    rows = (len(tiles) + cols - 1) // cols
+    cw, ch = n + pad, n + pad + title_h
+    img = Image.new("RGB", (cols * cw + pad, rows * ch + pad), bg)
+    dr = ImageDraw.Draw(img)
+    font = ImageFont.load_default(size=10)
+    for k, (label, tile) in enumerate(tiles):
+        r, c = divmod(k, cols)
+        x0, y0 = pad + c * cw, pad + r * ch
+        img.paste(Image.fromarray(np.ascontiguousarray(tile)), (x0, y0))
+        dr.text((x0 + n / 2, y0 + n + 1), label, font=font, fill=(235, 235, 235), anchor="ma")
+    return np.asarray(img)
+
+
 def main():
     tiles, sigs = [], []
     for name, group, fn, mode in ARCHETYPES:
         h = fn()
-        tiles.append((name, _render(h, mode)))
+        tiles.append((f"{group}. {name}", _render(h, mode)))
         sigs.append(_signature(name, group, h))
-    render.write_png("archetypes.png", montage(tiles))
+    render.write_png("archetypes.png", labeled_montage(tiles, cols=4))
     print(f"wrote archetypes.png ({len(tiles)} archetypes, {TILE}px tiles, ~{TILE * CELL / 1000:.1f} km each)")
     print("\n09 verification signatures (the tells to check by eye against the montage):")
     for s in sigs:
