@@ -19,10 +19,10 @@ Validity needs evidence from an **independent source**.
 | 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) |
 | 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) |
 | 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ partial (catalogue below); gap: **Halfar/Bueler SIA** |
-| 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ◻ planned (web) — *the skill claims this; not yet re-verified here* |
+| 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **sampled** (7/7 confirmed, below); not exhaustive |
 | 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ◻ planned (DEM comparison) |
 
-Rungs 4–5 are the open work; this file grows as each lands.
+Rung 5 is the open work; this file grows as each lands.
 
 ## Rung 2 — independent-implementation agreement
 
@@ -93,3 +93,30 @@ All 10 checks pass. Dimensional validity is a *necessary* condition met across t
 physics — it does not by itself prove the equations are physically right (that is rungs 2–5).
 
 Run: `pip install -r requirements-validate.txt && pytest -q tests/test_dimensional.py`
+
+## Rung 4 — primary-source audit (sampled)
+
+A **representative sample** of the most load-bearing constants and citations, re-verified against
+primary or authoritative sources on the web (2026-07). This is *not* exhaustive — the skill's
+claim of full author-by-author verification remains its own — but a 7-item sample across noise,
+scatter, glaciology, cratering, geomorphology and the erosion backbone found **no fabricated
+citation and no wrong constant**, which is consistent with that claim.
+
+| Skill claim (ref) | Primary/authoritative source | Verdict |
+|---|---|---|
+| Improved-Perlin quintic fade `6t⁵−15t⁴+10t³` (`01`) | Perlin 2002, *Improving Noise* (ACM TOG) | ✅ CONFIRMED — exact, continuous 2nd derivative |
+| Bridson Poisson-disk `k=30`, cell `r/√n` (`07`) | Bridson 2007 SIGGRAPH sketch (UBC PDF) | ✅ CONFIRMED — both stated verbatim |
+| Simplex skew `F2=(√3−1)/2`, `G2=(3−√3)/6` (`01`) | Gustavson, *Simplex noise demystified* | ✅ CONFIRMED — exact |
+| Glen's flow law `n=3`, `A≈2.4e-24 Pa⁻³s⁻¹` at 0 °C (`12`) | glaciology (Paterson/Cuffey lineage) | ✅ CONFIRMED — standard 0 °C value; **temperature-dependent, and the skill says so** |
+| Impact-crater depth/diameter ≈ 0.2 (`11`) | Pike 1977 (d/D = 0.1866 ± 0.0004) | ✅ CONFIRMED — 0.19 ≈ 1/5 |
+| Angle of repose, dry sand ≈ 34° (`05`) | USBR hydraulics lab / standard tests | ✅ CONFIRMED |
+| Braun & Willett 2013 O(N) implicit stream power (`04`) | *Geomorphology* 180:170–179 | ✅ CONFIRMED — citation & method real |
+
+**Two honest caveats surfaced (neither a defect):**
+
+1. **Simplex `70` normalisation** is empirical and gradient-set-specific (Gustavson's `simplexnoise1234.c`), not a universal constant — which the skill's `01` already states, and it further warns that OpenSimplex2 is a *different* contract to be ported from the pinned source, not this one.
+2. **Lunar simple→complex crater transition** — the skill says "~15 km", Pike's onset is ~10.6 km and the change spans ~10–30 km. "~15 km" is a reasonable central value within that range; tighten to "~10–20 km" for precision.
+
+**Sources:** [Perlin *Improving Noise* (ACM)](https://dl.acm.org/doi/10.1145/566654.566636) · [Bridson 2007 (UBC PDF)](https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph07-poissondisk.pdf) · [Simplex noise demystified (Gustavson)](https://cgvr.cs.uni-bremen.de/teaching/cg_literatur/simplexnoise.pdf) · [Pike 1977 (ADS)](https://ui.adsabs.harvard.edu/abs/1977iecp.symp..489P/abstract) · [Braun & Willett 2013 (ScienceDirect)](https://www.sciencedirect.com/science/article/abs/pii/S0169555X12004618)
+
+**Scope honesty:** a 7-item sample cannot certify the whole corpus; it raises confidence and found zero defects. A full audit of every `P`-tier citation and load-bearing constant is the remaining rung-4 work.
