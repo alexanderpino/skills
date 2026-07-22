@@ -16,12 +16,12 @@ substrate in `references/14-graph-runtime.md`:
 
 The sample pipeline walks the **Legal Order** from `SKILL.md`:
 
-    noise -> fluvial erosion -> thermal -> fill -> drainage area -> slope -> masks/materials
-     01       04                05         03      03               06       06
+    noise -> fluvial -> thermal -> fill -> area -> slope -> masks/materials -> scatter
+     01       04         05         03      03      06       06                 07
 
-and every analysis node (drainage area, slope, materials) runs on the *final* geometry, never
-before — the two ordering laws `09` catches most often. Rendering uses the review modes in
-`render.py`, including a material splatmap from the partitioned `06` masks.
+and every analysis node (drainage area, slope, materials, scatter) runs on the *final*
+geometry, never before — the two ordering laws `09` catches most often. Rendering uses the
+review modes in `render.py`, including a material splatmap and a boulder scatter overlay.
 
 The nodes are thin adapters over the verified modules (``noise``, ``flow``,
 ``erosion_droplet``, ``erosion_streampower``, ``erosion_thermal``, ``analysis``). The base
@@ -48,6 +48,7 @@ import erosion_thermal
 import flow
 import noise
 import render
+import scatter
 
 
 # --------------------------------------------------------------------------- #
@@ -200,6 +201,20 @@ def _materials_fn(p, ins, ctx):
     return np.stack([m for _, m in stack], axis=0)       # (K, H, W) partitioned MaterialField
 
 
+def _scatter_fn(p, ins, ctx):
+    (slope_tan,) = ins
+    # boulders are a steepness/talus phenomenon: density rises with slope (06 selector)
+    dens_field = analysis.smoothstep(np.tan(np.radians(18.0)),
+                                     np.tan(np.radians(35.0)), slope_tan)
+    extent = ctx.resolution * ctx.cellsize
+
+    def density(pt):
+        return float(scatter.sample_field(dens_field, [pt], ctx.cellsize)[0])
+
+    return scatter.scatter_by_density(extent, extent, density,
+                                      r_min=p["r_min"], seed=ctx.root_seed)
+
+
 def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
     """The sample pipeline, as a DAG in Legal Order. Returns the graph plus the names of
     the two output fields: (height, drainage_area)."""
@@ -237,6 +252,11 @@ def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
     g.add("materials", "analysis.materials/1", _materials_fn,
           inputs=("relaxed", "slope", "area"), locality="LOCAL")
 
+    # 12  scatter: boulders on steep (rocky/talus) ground, blue-noise spaced (07)
+    g.add("scatter", "scatter.boulders/1", _scatter_fn, inputs=("slope",),
+          params={"r_min": ctx.cellsize * 3.0},
+          locality="GLOBAL", resolution="RESOLUTION_BOUND")
+
     return g, ("relaxed", "area")
 
 
@@ -273,7 +293,7 @@ def report_checks(base, height, area, cellsize):
 # --------------------------------------------------------------------------- #
 # rendering the review-mode palette
 # --------------------------------------------------------------------------- #
-def render_all(height, area, cellsize, outdir, materials=None, sun_sweep=0):
+def render_all(height, area, cellsize, outdir, materials=None, scatter_pts=None, sun_sweep=0):
     os.makedirs(outdir, exist_ok=True)
     written = []
 
@@ -289,6 +309,10 @@ def render_all(height, area, cellsize, outdir, materials=None, sun_sweep=0):
     emit("06_clip.png", render.false_colour_clip(height))
     if materials is not None:                                  # 11: the splatmap preview
         emit("07_materials.png", render.material_rgb(materials, cellsize))
+    if scatter_pts is not None:                                # 12: boulders over the hillshade
+        base = render.hillshade(height, cellsize)
+        emit("08_scatter.png", render.scatter_overlay(base, scatter_pts, cellsize,
+                                                      color=(200, 60, 40), radius=1))
 
     for f in range(int(sun_sweep)):                            # 09: the sun sweep
         az = 360.0 * f / sun_sweep
@@ -354,11 +378,14 @@ def main(argv=None):
     height = g.evaluate(h_out)
     area = g.evaluate(a_out)
     materials = g.evaluate("materials")
+    scatter_pts = g.evaluate("scatter")
     base = g._cache[g.key("base")]
     print(f"  evaluated in {time.time() - t0:.1f}s; order: {g.evaluated}")
+    print(f"  scattered {len(scatter_pts)} boulders on steep (rocky) ground")
 
     report_checks(base, height, area, cellsize)
-    written = render_all(height, area, cellsize, args.out, materials, args.sun_sweep)
+    written = render_all(height, area, cellsize, args.out, materials, scatter_pts,
+                         args.sun_sweep)
     print(f"  wrote {len(written)} renders to {args.out}/:")
     for p in written:
         print(f"    {p}")

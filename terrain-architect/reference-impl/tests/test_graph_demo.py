@@ -67,6 +67,17 @@ def test_analysis_and_materials_downstream_of_final_height():
     assert np.allclose(materials.sum(axis=0), 1.0, atol=1e-6)
 
 
+def test_scatter_node_places_spaced_boulders():
+    """07 step 12: the scatter node returns a PointSet; blue-noise spacing holds (>= r_min)."""
+    g, _, ctx = _small(size=40)
+    pts = g.evaluate("scatter")
+    assert pts.ndim == 2 and pts.shape[1] == 2
+    if len(pts) > 1:
+        d = np.hypot(pts[:, None, 0] - pts[None, :, 0], pts[:, None, 1] - pts[None, :, 1])
+        d[np.diag_indices(len(pts))] = np.inf
+        assert d.min() >= g.nodes["scatter"].params["r_min"] - 1e-9
+
+
 def test_cache_recomputes_only_downstream_cone():
     """Editing the thermal node re-runs it and its cone; the upstream base/fluvial are
     served from cache (14, content-addressed caching)."""

@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 92 pass; 5 optional cross-checks skip
+pytest -q                            # 100 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # 97 pass; the 5 cross-checks now run instead of skipping
+pytest -q                            # 105 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -52,6 +52,7 @@ against an independent library.
 | `noise.py` — procedural noise | `01` Perlin (Improved 2002), value, Worley, fBm, ridged/hybrid multifractal, domain warp, curl | Perlin **= 0 on the lattice**; single-octave fBm **= the base noise**; curl noise **divergence = 0**; fractal sums finite & bounded |
 | `analysis.py` — analysis & masks | `06` slope/aspect, Zevenbergen–Thorne curvature, horizon AO, Beven–Kirkby TWI, selectors, masks→materials | slope of a plane = its gradient; discrete Laplacian of a paraboloid = `−2/R`; AO 0 on flat, >0 in a pit; TWI finite on flats; material masks **partition** (Σ ≤ 1) |
 | `ops_filters.py` — primitives/ops/filters | `10` SDF primitives, smooth min/max, Gaussian/median/bilateral/guided/Perona–Malik, morphology, warps | SDF exact & signed; `smin ≤ min`; median kills a spike & keeps a step; bilateral/guided/PM keep a step where Gaussian smears it; `dilate ≥ h ≥ erode`, opening idempotent, closing fills a pit |
+| `scatter.py` — object distribution | `07` Bridson Poisson-disk, density rejection, jittered-grid (tileable), rule-based gates | **every pair ≥ r apart** (blue noise); density-rejection follows the field; jittered grid deterministic & seamlessly tileable; gates reject cliffs/treeline/water |
 
 ## Sandbox: run a graph and look at it
 
@@ -61,7 +62,7 @@ development and actually see what it does. It has no dependencies beyond the num
 of `reference-impl` already needs.
 
 ```bash
-python graph_demo.py                          # droplet backbone, 96² -> seven PNGs in out/
+python graph_demo.py                          # droplet backbone, 96² -> eight PNGs in out/
 python graph_demo.py --backbone streampower --size 128 --extent-km 120
 python graph_demo.py --noise ridged           # base noise family (01): perlin/value/ridged/hybrid/warp
 python graph_demo.py --seed 7 --sun-sweep 8   # rotating-light frames (09's sun sweep)
@@ -77,14 +78,14 @@ Two files, both deliberately small:
   that is what makes it usable for iteration). The sample pipeline walks the **Legal Order**:
   fBm noise → fluvial erosion (droplet < 2 km, stream power > 50 km, per the design
   procedure) → thermal *after* hydraulic → depression fill → drainage area → slope → masks →
-  materials, with all analysis computed on the **final** geometry. It prints the `09` checks it
-  should pass (trunk drainage exits at the edge; slope capped at the repose angle; the erosion
-  budget).
+  materials → scatter, with all analysis computed on the **final** geometry. It prints the `09`
+  checks it should pass (trunk drainage exits at the edge; slope capped at the repose angle; the
+  erosion budget).
 - **`render.py`** — the `09` "visual review modes" as pure-numpy functions returning RGB
   arrays, plus a zero-dependency PNG writer: greyscale height, hillshade, slope shade,
-  `log(A)` flow overlay, hypsometric tint, a false-colour clip that flags NaN/Inf, and a
-  material splatmap (partitioned `06` masks blended by weight). Import it directly to render
-  any heightfield from the other modules.
+  `log(A)` flow overlay, hypsometric tint, a false-colour clip that flags NaN/Inf, a
+  material splatmap (partitioned `06` masks blended by weight), and a boulder scatter overlay.
+  Import it directly to render any heightfield from the other modules.
 
 The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
 itself is the verified `noise.py` module (noise is the initial condition, not the answer).

@@ -180,6 +180,23 @@ def material_rgb(masks, cellsize=1.0, palette=None, shade=True):
     return np.clip(rgb, 0, 255).astype(np.uint8)
 
 
+def scatter_overlay(base_rgb, points, cellsize=1.0, color=(20, 20, 20), radius=1):
+    """Draw a PointSet (07) over a base RGB image as small filled discs. `points` are world
+    metres (x, y); converts to pixels via cellsize."""
+    img = np.ascontiguousarray(base_rgb, dtype=np.uint8).copy()
+    n, m = img.shape[:2]
+    col = np.array(color, dtype=np.uint8)
+    for x, y in np.asarray(points, dtype=np.float64):
+        ci, cj = int(round(y / cellsize)), int(round(x / cellsize))
+        for di in range(-radius, radius + 1):
+            for dj in range(-radius, radius + 1):
+                if di * di + dj * dj <= radius * radius:
+                    i, j = ci + di, cj + dj
+                    if 0 <= i < n and 0 <= j < m:
+                        img[i, j] = col
+    return img
+
+
 # --------------------------------------------------------------------------- #
 # PNG writer  (truecolour 8-bit, no external deps)
 # --------------------------------------------------------------------------- #

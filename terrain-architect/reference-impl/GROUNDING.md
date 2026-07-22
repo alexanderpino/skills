@@ -36,6 +36,7 @@ Same scale as `references/22-open-source-grounding.md`:
 | `filled` (fill) | `flow.py` | **RichDEM** FillDepressions `9a1c97bb` | GPL-3.0 | **cross-validated** | `test_crossvalidate.py::test_priority_flood_matches_richdem` |
 | `area` (D8 accumulation) | `flow.py` | **pysheds** `1949ce1d` · **Landlab** FlowAccumulator `0b0ef086` | GPL-3.0 · MIT | **cross-validated** | `test_crossvalidate.py::test_d8_accumulation_matches_pysheds` · `test_crossvalidate_landlab.py::test_d8_accumulation_matches_landlab` |
 | `slope`, `materials` (analysis/masks) | `analysis.py` | Zevenbergen & Thorne 1987 · Beven & Kirkby 1979 (GDAL/GRASS implement the same) | papers | **paper-grounded** (analytic oracles) | `test_analysis.py` |
+| `scatter` (boulders) | `scatter.py` | Bridson 2007 (tph_poisson `e436117b` for grid/active-list hardening) | paper; MIT | **paper-grounded** (min-distance oracle) | `test_scatter.py` |
 
 Adjacent module the sandbox can wire (a drop-in extra hillslope node), cross-validated too:
 
