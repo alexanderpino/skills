@@ -54,12 +54,16 @@ archetypes (Group L) change the *regime itself*: no liquid water switches the fl
 (`03`/`04`) **off** and lets impact cratering dominate, and gravity rescales craters and dunes —
 the planetary doctrine in `SKILL.md`, built out.
 
-**Runnable examples.** `reference-impl/archetypes.py` implements six of these as diffs from the
-baseline over the verified blocks — alpine orogen, canyon+strata, erg dune sea, fjord coast, lunar
-cratered highlands, tower karst — each printing its `09` signature (relief, slope percentile,
-hypsometric integral, depression storage) and rendered to `reference-impl/archetypes.png`
-(`reference-impl/ARCHETYPES.md`). They are illustrative *kinds* of place at one small extent, not
-scale models — the prime directive below still holds: read the code, then adapt it, don't paste it.
+**Runnable examples.** `reference-impl/archetypes.py` implements **sixteen** of these as diffs from
+the baseline over the verified blocks — alpine & appalachian orogens, plateau canyon, mesa/tepui,
+erg, basin-and-range, badlands, tower karst, stratovolcano, caldera lake, fjord, sea cliffs, ag
+terraces, and the lunar-cratered / maria / Mars off-Earth trio — each printing its `09` signature
+(relief, slope percentile, hypsometric integral, depression storage) and rendered to
+`reference-impl/archetypes.png`. `reference-impl/ARCHETYPES.md` carries the full ledger, including an
+honest account of which blueprints here are *not* rendered and why (waterfalls read as a long-profile
+knickpoint not a plan-view relief; reefs and deltas need processes the sandbox does not implement;
+Himalaya/Ardèche/Zhangjiajie are regime variants of tiles already shown). Illustrative *kinds* of
+place at one small extent, not scale models — the prime directive below still holds: adapt, don't paste.
 
 ---
 

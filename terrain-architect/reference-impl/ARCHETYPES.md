@@ -2,31 +2,61 @@
 
 ![archetypes](archetypes.png)
 
-Six **complex archetypes** from `references/20-archetypes.md`, each assembled from the verified
-Legal-Order blocks and rendered on a ~2 km tile. Regenerate with `python archetypes.py`.
+The renderable **archetypes** from `references/20-archetypes.md` (the master enumeration is
+`references/00-index.md`), each assembled from the verified Legal-Order blocks and rendered on a
+~1.9 km tile. Regenerate with `python archetypes.py`.
 
-These are the **province** altitude — *one recognisable place* — the level between `graph_demo.py`
-(the generic baseline pipeline) and a single landform. The whole lesson of `20-archetypes.md` is
-that these are **not new algorithms**: each is the same Legal Order with the dominant agent
-switched. Adapt, don't paste — they are illustrative *kinds* of place at one small extent, not
-scale models of the named exemplars.
+These are the **province** altitude — *one recognisable place* — between `graph_demo.py` (the
+generic baseline pipeline) and a single landform. The whole lesson of `20-archetypes.md` is that
+these are **not new algorithms**: each is the same Legal Order with the dominant agent switched.
+Adapt, don't paste — illustrative *kinds* of place at one small extent, not scale models. Every
+archetype is **tier L** (a composition); the components keep their cited tiers, the assembly invents
+no citation.
 
-| Tile | Archetype | The switch (diff from baseline) | `09` signature to look for |
+## Rendered (16, by tile — row, col)
+
+| Tile | Group · archetype | The switch (diff from baseline) | `09` signature |
 |---|---|---|---|
-| top-left | **Alpine orogen** | fbm+ridged uplift → droplet fluvial → talus to repose | dissected ridges & dendritic valleys; slopes pack toward repose |
-| top-mid | **Canyon + strata** | plateau + one deeply-incised meandering trunk, then **terrace** (strata) on the walls | a deep trunk in high ground (high hypsometric integral); stepped benches |
-| top-right | **Erg dune sea** | dominant agent → **aeolian** (Werner slab CA) | transverse dunes ⟂ wind; low relief; slopes ≤ sand repose |
-| bot-left | **Fjord coast** | glacial **U-troughs** carved, then flooded to sea level (z=0) | long narrow drowned inlets reaching the open-ocean edge |
-| bot-mid | **Lunar cratered** | regime switch: fluvial **OFF**, **impacts** dominate (power-law crater sizes) | a saturated field of overlapping pits; no connected drainage |
-| bot-right | **Tower karst** | dominant agent → **dissolution** (lower ∝ fracture density) | residual towers over a low alluviated plain (bimodal elevation) |
+| 0,0 | A · **alpine orogen** | fbm+ridged uplift → droplet fluvial → talus to repose | dissected ridges, dendritic valleys; slopes toward repose |
+| 0,1 | A · **appalachian (old)** | low uplift, HEAVY erosion, subdued relief | low relief, gentle slopes — a *mature* hypsometry (gentler than alpine) |
+| 0,2 | C · **canyon + strata** | plateau + one incised meandering trunk, then **terrace** on walls | deep trunk in high ground (high HI); stepped benches |
+| 0,3 | C · **mesa / tepui** | resistant caprock → flat top, steep cliffs | bimodal elevation (top vs base); flat summit |
+| 1,0 | D · **erg dune sea** | dominant agent → **aeolian** (Werner slab CA) | transverse dunes ⟂ wind; low relief; slopes ≤ sand repose |
+| 1,1 | D · **basin & range** | parallel fault-block ranges + flat sediment basins / playa | alternating ranges & flat floors; mostly low ground (low HI) |
+| 1,2 | D · **badlands** | soft flat strata, densely dissected | very high drainage density; stepped strata; knife-edge divides |
+| 1,3 | E · **tower karst** | dominant agent → **dissolution** (lower ∝ fracture) | residual towers over a low plain (bimodal, low HI) |
+| 2,0 | F · **stratovolcano** | radial cone + summit crater, radial gullies | near-radial symmetry; a single central high |
+| 2,1 | F · **caldera lake** | collapsed summit caldera holding a lake | a rim ring around a flat floor; enclosed water |
+| 2,2 | G · **fjord coast** | glacial U-troughs, flooded to sea level | long narrow drowned inlets reaching the ocean edge |
+| 2,3 | H · **sea cliffs & stacks** | wave attack (coastal-retreat sim) | a cliff at the waterline fronting a wave-cut bench |
+| 3,0 | K · **ag terraces** | contour agriculture: many level benches | strongly stepped elevation; benches ⟂ slope |
+| 3,1 | L · **lunar cratered** | regime switch: fluvial **OFF**, impacts dominate | a saturated field of overlapping pits; no drainage |
+| 3,2 | L · **lunar maria** | basaltic flood + wrinkle ridge + sparse craters | very low relief, a flat mature surface with a sinuous ridge |
+| 3,3 | L · **mars relict** | craters + a relict outflow channel + aeolian ripples | craters AND a dry sinuous valley AND dune texture together |
 
-The numbers printed by `archetypes.py` (relief, 99th-percentile slope, hypsometric integral,
-depression storage) are those signatures made quantitative — the by-eye montage's numeric partner,
-and the same tells `tests/test_archetypes.py` asserts. The most important assertion is the plainest:
-**no composition blows up** — the guard that catches an erosion instability a thumbnail would hide
-(the alpine talus step went unstable on razor ridges until its `factor` was lowered).
+The numbers `archetypes.py` prints (relief, 99th-percentile slope, hypsometric integral, depression
+storage) are those signatures made quantitative — the by-eye montage's numeric partner, and what
+`tests/test_archetypes.py` asserts. The plainest assertion matters most: **no composition blows up**
+— the guard that caught a real thermal-erosion checkerboard instability on the alpine razor ridges
+(fixed by lowering the talus step's `factor`).
 
-**Tier.** Every archetype is tier **L** — a composition. The *components* keep their cited tiers
-(`00`); the assembly invents no new citation. The glacial-erosion agent of the real Alps and the
-tower-karst dissolution law are approximated here from the available blocks, not verified sims — see
-`references/12-glacial-coastal.md` and `references/11-geological.md` for the deeper treatments.
+## Not rendered — and why (the honest other 13 of the 29 blueprints)
+
+"Everything the skill mentions that **can** be rendered" excludes three categories:
+
+- **A variant of one already shown** (same pipeline, different regime knob): *Himalayan* (a
+  higher-relief alpine), *Ardèche karst gorge* (an entrenched-meander canyon), *Zhangjiajie pillar
+  forest* (≈ tower karst), *lunar-maria-like flood basalt / Iceland* columnar rift (the plain is
+  the maria tile; columnar jointing is centimetre-scale).
+- **Not a bulk-relief landform** — the story is a profile, water, hydrothermal activity, or a
+  material mosaic, which a plan-view heightfield thumbnail can't carry: the **waterfalls** (Group B —
+  Niagara caprock, Victoria fault gorge, Yosemite hanging valley: a *knickpoint* is a local step in
+  the long profile), the **geothermal field** (Yellowstone — springs/geysers), **field-mosaic
+  farmland & earthworks** (Group K — a texture/material overlay), **salt flat** (Uyuni — near-zero
+  relief), **desert oasis** (a spring in a small basin).
+- **A process `reference-impl` does not implement** (so it would be faked, not composed): the
+  **coral reef & atoll** (biogenic reef growth) and the **inland delta** (distributary avulsion).
+
+Where a place's real number would be nice and isn't verified, it is omitted — `00`'s citation
+discipline does not relax because the subject is famous. The deeper treatments live in the chapters:
+glacial `12`, coastal `12`, karst/volcanic/impact `11`/`19`, arid `16`, anthropogenic `20` Group K.

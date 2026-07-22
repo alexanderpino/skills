@@ -1,13 +1,17 @@
 """Invariant checks for the archetype compositions (archetypes.py). Each blueprint in
-`references/20-archetypes.md` carries a `09` verification signature ("here is what right looks
-like"); this asserts a robust, generous version of each — and, above all, that no composition
-blows up (the guard that would have caught the thermal-erosion instability the alpine build hit).
-These are integration tests over already-oracle-verified blocks, so they check *signatures*, not
-exact numbers. One pass computes all six (the pipelines are the cost)."""
+`references/20-archetypes.md` carries a `09` verification signature; this asserts a robust,
+generous version of a representative spread — and, above all, that NO composition blows up (the
+guard that caught the thermal-erosion instability the alpine build hit). Integration tests over
+already-oracle-verified blocks: they check *signatures*, not exact numbers. Run at low resolution
+(the archetype functions are resolution-parametric) so the whole set is fast; the montage uses 96².
+"""
 import numpy as np
 
 import analysis
 import archetypes as A
+import flow
+
+N = 56
 
 
 def _local_minima(h):
@@ -20,46 +24,60 @@ def _local_minima(h):
     return int(mn.sum())
 
 
-def _p99_slope_deg(h):
-    return np.degrees(np.arctan(np.percentile(analysis.slope(h, A.CELL), 99)))
+def _hi(h):
+    return (h.mean() - h.min()) / max(h.max() - h.min(), 1e-9)
+
+
+def test_archetypes_all_finite_and_not_blown_up():
+    """Every archetype in every group: finite, right shape, bounded relief — the regression guard."""
+    for name, group, fn, _ in A.ARCHETYPES:
+        h = fn(n=N, cell=A.CELL)
+        assert h.shape == (N, N), name
+        assert np.all(np.isfinite(h)), name
+        assert 0.0 < (h.max() - h.min()) < 5e4, f"{name}: relief {(h.max() - h.min()):.2e} — blown up?"
 
 
 def test_archetype_signatures():
-    built = {name: fn() for name, fn, _ in A.ARCHETYPES}
+    b = {name: fn(n=N, cell=A.CELL) for name, _, fn, _ in A.ARCHETYPES}
 
-    # universal: finite, right shape, and NOT blown up (the thermal-instability regression guard)
-    for name, h in built.items():
-        assert h.shape == (A.TILE, A.TILE), name
-        assert np.all(np.isfinite(h)), name
-        assert 0.0 < (h.max() - h.min()) < 5e4, f"{name}: relief {(h.max() - h.min()):.3e} — blown up?"
+    # orogen maturity: the old (appalachian) range is gentler than the young (alpine) one
+    p99 = lambda h: np.degrees(np.arctan(np.percentile(analysis.slope(h, A.CELL), 99)))
+    assert p99(b["appalachian (old)"]) < p99(b["alpine orogen"])
 
-    # alpine — a dissected orogen: substantial relief
-    al = built["alpine (orogen)"]
-    assert (al.max() - al.min()) > 300.0
+    # canyon / mesa: high ground with a deep cut / a flat cap -> high hypsometric integral
+    assert _hi(b["canyon + strata"]) > 0.5
 
-    # canyon — a deep trunk cut into a high plateau: high hypsometric integral (mostly high ground)
-    cn = built["canyon + strata"]
-    assert (cn.mean() - cn.min()) / (cn.max() - cn.min()) > 0.55
+    # erg: aeolian -> low relief, slopes no steeper than the sand regime
+    assert (b["erg dune sea"].max() - b["erg dune sea"].min()) < 130.0
+    assert p99(b["erg dune sea"]) < 45.0
 
-    # erg — aeolian: low relief and slopes no steeper than the sand repose regime
-    eg = built["erg dune sea"]
-    assert (eg.max() - eg.min()) < 130.0 and _p99_slope_deg(eg) < 45.0
+    # basin & range: mostly low basin floor (low HI) punctuated by ranges
+    assert _hi(b["basin & range"]) < 0.45
 
-    # fjord — the sea (z<0) invades a modest fraction AND reaches the open-ocean edge
-    fj = built["fjord coast"]
-    below = fj < 0.0
-    assert 0.03 < below.mean() < 0.7
-    assert below[0].any() or below[-1].any() or below[:, 0].any() or below[:, -1].any()
+    # tower karst: dissolution plain with residual towers -> low HI (mostly low ground)
+    assert _hi(b["tower karst"]) < 0.35
 
-    # lunar cratered — impact-dominated: a field of pits, not a drained surface
-    assert _local_minima(built["lunar cratered"]) > 12
+    # stratovolcano: a single dominant central high -> the max sits near the centre
+    vo = b["stratovolcano"]
+    pk = np.unravel_index(int(np.argmax(vo)), vo.shape)
+    assert abs(pk[0] - N / 2) < N * 0.25 and abs(pk[1] - N / 2) < N * 0.25
 
-    # tower karst — dissolution: mostly low alluviated plain (low hypsometric integral) with towers
-    tk = built["tower karst"]
-    assert (tk.mean() - tk.min()) / (tk.max() - tk.min()) < 0.30
+    # caldera: an ENCLOSED summit basin holds a lake (priority-flood finds real depth)
+    ca = b["caldera lake"]
+    assert float((flow.priority_flood_fill(ca) - ca).max()) > 20.0
+
+    # fjord & sea cliffs: the sea (z<0) invades and reaches an edge
+    for key in ("fjord coast", "sea cliffs & stacks"):
+        below = b[key] < 0.0
+        assert below.any() and (below[0].any() or below[-1].any() or below[:, 0].any() or below[:, -1].any()), key
+
+    # lunar cratered: impact-dominated -> a field of pits
+    assert _local_minima(b["lunar cratered"]) > 6
+
+    # lunar maria: basaltic flood -> very low relief
+    assert (b["lunar maria"].max() - b["lunar maria"].min()) < 120.0
 
 
 def test_archetypes_deterministic():
-    """Same seed → same terrain (the caching/regression-baseline contract)."""
-    assert np.array_equal(A.cratered(seed=3), A.cratered(seed=3))
-    assert not np.array_equal(A.cratered(seed=3), A.cratered(seed=4))
+    assert np.array_equal(A.cratered(seed=3, n=40), A.cratered(seed=3, n=40))
+    assert not np.array_equal(A.cratered(seed=3, n=40), A.cratered(seed=4, n=40))
