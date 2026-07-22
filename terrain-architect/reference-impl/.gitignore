@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 out/
+.dem_cache/
 *.png
 # keep the committed visual-reference montage (regenerate with gallery.py)
 !gallery.png
