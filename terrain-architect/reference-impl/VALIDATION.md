@@ -17,12 +17,47 @@ Validity needs evidence from an **independent source**.
 | Rung | Evidence type | What it proves | Status |
 |---|---|---|---|
 | 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) |
-| 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) · expanding |
-| 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ◻ planned (Bueler SIA, Pike crater, Hack's law) |
+| 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) |
+| 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ partial (catalogue below); gap: **Halfar/Bueler SIA** |
 | 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ◻ planned (web) — *the skill claims this; not yet re-verified here* |
 | 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ◻ planned (DEM comparison) |
 
-Rungs 3–5 are the open work; this file grows as each lands.
+Rungs 4–5 are the open work; this file grows as each lands.
+
+## Rung 2 — independent-implementation agreement
+
+Our result compared **by test** against a mature library developed separately from the same
+papers (agreement = two independent readings converge). `tests/test_crossvalidate*.py`:
+
+| Family | Independent implementation | Check |
+|---|---|---|
+| Priority-flood fill | RichDEM (Barnes) | correlated raised-height, no interior pit |
+| D8 accumulation | pysheds · Landlab `FlowAccumulator` | drainage-area correlation > 0.9 |
+| Stream power | Landlab `FastscapeEroder` | slope-area exponent = −m/n, and agree |
+| Hillslope diffusion | Landlab `LinearDiffuser` | single-mode decay factor matches |
+
+## Rung 3 — published-benchmark agreement
+
+**Emergent** output checked against a result derived *outside* our code (an analytic continuum
+solution or an independent recomputation), not an oracle re-derived from the same equation:
+
+| Model | External benchmark | Where |
+|---|---|---|
+| Hillslope diffusion | Gaussian Green's function — variance = s₀² + 2Dt/dim | `test_benchmarks.py` (new) |
+| Hillslope diffusion | exact discrete single-Fourier-mode decay | `test_diffusion.py` |
+| Worley F1 | independent brute-force nearest-feature-point | `test_benchmarks.py` (new) |
+| Isostatic flexure | analytic single-mode & line-load kernel (Turcotte & Schubert) | `test_isostasy.py` |
+| Stream power | Flint's law S ∝ A^(−m/n) at steady state (emergent) | `test_streampower.py` |
+| Voellmy runout | analytic L = H/tan α on a ramp | `test_runout.py` |
+| Tephra thinning | Pyle 1989: ln(thickness) linear in distance | `test_analytic.py` |
+| Seafloor age–depth | Parsons & Sclater / GDH1: d ∝ √age | `test_analytic.py` |
+| PDC energy cone | Malin & Sheridan: runout = H_c/μ | `test_analytic.py` |
+
+**Known gap:** the SIA glacier (`sims_illustrative.py`) has only invariant checks — no published
+benchmark. The right one is the **Halfar/Bueler exact isothermal-ice-sheet similarity solution**
+(Bueler et al. 2005), which needs the exact formula from the primary source; deferred to the
+rung-4 audit, and it will also quantify how far the *illustrative* (CFL-capped) SIA is from an
+accurate solver.
 
 ## Rung 1 — dimensional audit (machine-checked with `pint`)
 
