@@ -76,11 +76,11 @@ These matter *more than any single feature* — they are why a landform reads as
 |---|---|---|---|
 | **Alpine** | cirques + tarns, arêtes/horns, **U-troughs** (flat floor, steep walls), hanging valleys w/ waterfalls, moraines, scree 34–37° | V-valleys with tributaries joining *at grade* (should be U + hanging) | no cirques/U-profile; blobby, fluvial-only |
 | **Canyon** | **cliff-and-bench stair-steps** from hard/soft beds, strata *continuous & horizontal across both rims*, caprock, inner gorge, incised meanders | one uniform smooth V wall | incision good; strata benches too faint, no differential hard/soft |
-| **Mesa/tepui** | flat **structural** top under a resistant caprock, near-vertical wall, **sharp break to talus apron**, accordant summit levels | a domed/rounded top; no caprock→talus break | flat-top+cliff ok; needs caprock band + talus + accordant tops |
-| **Erg** | **asymmetric** dunes (gentle windward ~12°, **steep lee slip face ~34°**), oriented by wind; barchan/transverse/linear/star; flat interdunes | symmetric sine-wave ridges | dunes are symmetric smoothed slabs; no slip-face asymmetry/orientation |
+| **Mesa/tepui** | flat **structural** top under a resistant caprock, near-vertical wall, **sharp break to talus apron**, accordant summit levels | a domed/rounded top; no caprock→talus break | flat top + caprock rim + cliff→**talus break** now via `_butte` ✓; accordant tops next |
+| **Erg** | **asymmetric** dunes (gentle windward ~12°, **steep lee slip face ~34°**), oriented by wind; barchan/transverse/linear/star; flat interdunes | symmetric sine-wave ridges | now **asymmetric** stoss/slip-face transverse dunes + flat interdunes ✓; single wind, one dune type |
 | **Basin & range** | parallel ranges, **straight range-front fault + triangular facets**, alluvial **fans→bajada→playa** sorting, back-tilted blocks | blobby scattered mountains; no fans/playa | have tilted blocks; missing facets, fans, bajada, true playa |
 | **Badlands** | dense rilling, **capped hoodoos** (top-heavy, banded), fins→windows→hoodoos series, knife-edge divides | smooth tapered cones, no banding/cap | good dissection; no discrete capped hoodoos/fins |
-| **Tower karst** | towers **springing abruptly from a flat plain** at ~90° with a **basal dissolution notch**; fenglin vs fengcong | tapering footslopes / cones | towers taper; need abrupt base + notch |
+| **Tower karst** | towers **springing abruptly from a flat plain** at ~90° with a **basal dissolution notch**; fenglin vs fengcong | tapering footslopes / cones | now sparse near-vertical towers + **basal notch** ✓; fenglin only |
 | **Stratovolcano** | **concave-up** profile (gentle base→steep summit), small summit crater, **radial barrancas** | straight-sided constant-slope triangle | cone ok; profile too linear, gullies ok |
 | **Caldera** | wide **collapse** depression ≫ vent, steep rim scarps of a *truncated* cone, **resurgent dome / Wizard-Island cones**, lake | a neat funnel atop an intact cone | now has jagged rim + dome ✓; could add rim-wall terraces |
 | **Fjord** | drowned **U-trough**, **overdeepened inland + shallow sill at mouth**, hanging valleys w/ waterfalls | uniformly deepening estuary with sloping banks | inlets ok; no sill/overdeepening, no hanging valleys |
@@ -89,9 +89,9 @@ These matter *more than any single feature* — they are why a landform reads as
 | **Lunar maria** | smoothness vs highlands, **wrinkle ridges** (sinuous, ~10s m), sinuous rilles, sparse craters, embayed drowned rims | too much relief / too many craters | smooth ✓; ridge too subtle, no rilles/embayment |
 | **Mars** | **overprint order** impacts→fluvial→aeolian→dust: valley networks, outflow+chaos, **inverted channels**, bright static **TARs** vs dark active dunes, dust mantle | features with no age order / no dust drape | have craters+channel; add TARs, inversion, dust mantle, order |
 | **Arrakis** *(Wadi Rum)* | **flat-vs-vertical binary**: dead-flat sand valleys meeting sheer **jebels**, 3-layer sandstone, fault-grid straight cliffs, honeycomb weathering, sand aprons | uniform Perlin bumpiness | now jebels+sand ✓; add fault-straight edges, layer banding |
-| **Monument Valley** | **3-layer butte** (shale slope base / sandstone cliff / caprock), talus apron, mesa→butte→spire series, isolated on a plain | cookie-cutter cylinders / gears | fluted buttes+talus ✓; add the 3-layer banding, more spires |
-| **Zhangjiajie/Pandora** | >3000 **angular fracture-bounded** quartz-sandstone columns, joint-aligned corridors, vegetated tops | rounded limestone-style cones | pillars ok; make angular/joint-aligned, vegetate tops |
-| **Ha Long/Skull Is.** | drowned towers straight from the sea, **waterline notch** undercut, h/w up to ~6, fenglin+fengcong | towers with beaches / no notch | drowned towers ✓; add waterline notch, taller h/w |
+| **Monument Valley** | **3-layer butte** (shale slope base / sandstone cliff / caprock), talus apron, mesa→butte→spire series, isolated on a plain | cookie-cutter cylinders / gears | caprock butte (top→cliff→**talus break**) + mesa→butte→spire series ✓; 3-layer banding next |
+| **Zhangjiajie/Pandora** | >3000 **angular fracture-bounded** quartz-sandstone columns, joint-aligned corridors, vegetated tops | rounded limestone-style cones | now **sheer near-vertical** columns ✓; make joint-aligned/angular, vegetate tops |
+| **Ha Long/Skull Is.** | drowned towers straight from the sea, **waterline notch** undercut, h/w up to ~6, fenglin+fengcong | towers with beaches / no notch | now sparse sheer **high-h/w** drowned towers ✓; add waterline notch |
 | **Uyuni/Crait** | metre-scale **hexagonal** salt polygons w/ raised ridges, dead-flat, brine mirror (wet look) | raw straight-edged Voronoi | domain-warped cracks ✓; make hexagonal + raised ridges |
 | **Hoth/Norway** | U-troughs drowned/iced, **nunataks** (jagged rock through ice), **roches moutonnées** (stoss/lee asymmetry), hanging valleys | perfect-circle "bullet-hole" rock spots | irregular nunataks ✓; add roches moutonnées, U-troughs |
 | **Miller's world** | shoreless shallow sea over a **braided sandur**, one mountainous **irregular** wave | a straight gradient-line wave | wandering wave ✓; add braided channels under the water |
@@ -104,10 +104,11 @@ These matter *more than any single feature* — they are why a landform reads as
    sub-step here is resolution: render the montage tiles at 2–4× for finer carved detail.
 2. **Erosion on every fluvial/hillslope tile**: droplet (~5·N²) + interleaved thermal (33°), and
    feed deposition/flow into the splatmap. Fixes "blobby" alpine, canyon, badlands, mars.
-3. **Break-of-slope + slope-discipline per archetype**: caprock bands + talus (mesa, monument,
-   canyon, jebels), dune slip-face asymmetry at 34° (erg), abrupt tower bases + notches (karst),
-   wave-cut platform+notch (coast), sill/overdeepening (fjord). This is the per-tile geomorphology
-   work — the bulk of the effort, itemised in Part 3.
+3. **Break-of-slope + slope-discipline per archetype** (*in progress*): the highest-impact set is
+   **done** — caprock top→cliff→**talus break** (`_butte`: mesa, Monument Valley), dune **slip-face
+   asymmetry** (erg), **abrupt near-vertical tower bases + notch** (tower karst, Pandora, Skull
+   Island). Remaining: canyon differential hard/soft benches, wave-cut platform+notch (coast),
+   sill/overdeepening (fjord), badlands capped hoodoos — the rest of the per-tile work in Part 3.
 4. **Sequence/statistics** where they define the look: r⁻² crater SFD + degradation classes (Moon),
    the impacts→fluvial→aeolian→dust overprint (Mars).
 5. **Beyond the sandbox** (would need a new system, not numpy tiles): true PBR surfaces, instanced

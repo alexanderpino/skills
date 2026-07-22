@@ -87,21 +87,43 @@ def canyon(seed=SEED, n=TILE, cell=CELL):
     return landforms.terrace(nb, 9, sharpness=6.0, warp_amp=0.04, cellsize=cell) * (hi - lo) + lo
 
 
+def _butte(shape, bx, by, br, bh, cell, seed=0, ecc=1.0, talus=0.42, repose_tan=0.62):
+    """A caprock butte as height-above-plain (m): flat structural TOP, a near-vertical CLIFF, then a
+    SHARP break of slope to a TALUS apron at the angle of repose. That break — cliff foot to scree — is
+    the #1 photoreal cue (HYPERREALISM.md Part 2), the thing a smoothed noise blob never has. `bx,by,br`
+    in cells; `bh` in metres; `ecc` elongates the outline; `talus` = fraction of height in the scree
+    apron; a thin caprock lip at the rim catches the light. Composite with np.maximum(h, base + this)."""
+    n0, n1 = shape
+    yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    ang = np.arctan2(yy - by, xx - bx)
+    wob = 1.0 + 0.16 * noise.fbm(np.cos(ang) * 6 + 3.0 * seed, np.sin(ang) * 6 + 3.0, seed, octaves=4)
+    rr = np.hypot((xx - bx) / ecc, yy - by) * cell                          # metres from the centre
+    a = br * cell * wob                                                      # wobbly top-edge radius (m)
+    th = talus * bh                                                         # scree-apron height (m)
+    tr = th / repose_tan                                                    # apron run length at repose (m)
+    cw = 1.4 * cell                                                         # cliff width (m) -> near vertical
+    prof = np.where(rr <= a, bh,
+                    np.where(rr <= a + cw, bh - (bh - th) * (rr - a) / cw,   # near-vertical cliff
+                             np.where(rr <= a + cw + tr, th * (1.0 - (rr - a - cw) / tr), 0.0)))  # repose talus
+    prof = np.maximum(prof, 0.0)
+    tal = (rr > a + cw) & (rr <= a + cw + tr)                               # roughen the scree (not a smooth cone)
+    prof = prof + tal * noise.fbm(xx / 5.0, yy / 5.0, seed + 1, octaves=3) * 0.03 * bh
+    lip = np.clip(1.0 - np.abs(rr - a) / (0.8 * cell), 0.0, 1.0) * 0.05 * bh  # resistant caprock rim
+    return prof + lip * (rr <= a + cw)
+
+
 def mesa(seed=SEED, n=TILE, cell=CELL):
-    """Tepui / table-mountain: a few LARGE, blocky tablelands — solid remnants of eroded sedimentary
-    layers with flat tops, near-vertical cliffs and horizontal strata — NOT thin serpentine ridges
-    (thresholding continuous noise makes worms; place solid blocks instead). 09: flat tops, sharp
-    rims, banded cliffs."""
-    xx, yy = _xy(n, cell)
-    h = 30.0 + _g(0.5, seed, n, cell) * 18.0
+    """Tepui / table-mountain: a few LARGE blocky tablelands — flat structural tops under a resistant
+    caprock, near-vertical cliffs, a SHARP break to a talus apron, horizontal strata. NOT serpentine
+    ridges (thresholding noise makes worms; place solid buttes instead). 09: flat tops, sharp rims,
+    caprock→talus break, banded cliffs."""
+    base = 30.0 + _g(0.5, seed, n, cell) * 16.0
+    h = base.copy()
     rng = np.random.default_rng(seed)
     for i in range(3):                                                       # a few big tablelands
-        bx, by = rng.integers(int(0.25 * n), int(0.75 * n), 2)
-        br, bh = rng.uniform(0.16, 0.26) * n, rng.uniform(260.0, 360.0)
-        ang = np.arctan2(yy - by, xx - bx)
-        wob = 1.0 + 0.25 * noise.fbm(np.cos(ang) * 3 + 5.0 * i, np.sin(ang) * 3 + 5.0, seed + i, octaves=3)
-        cap = np.clip((br * wob - np.hypot(xx - bx, yy - by)) / 2.5, 0.0, 1.0)   # flat top, sharp cliff
-        h = np.maximum(h, 30.0 + cap * bh)
+        bx, by = rng.integers(int(0.28 * n), int(0.72 * n), 2)
+        br, bh = rng.uniform(0.13, 0.20) * n, rng.uniform(250.0, 350.0)
+        h = np.maximum(h, base + _butte((n, n), bx, by, br, bh, cell, seed + i, ecc=rng.uniform(0.7, 1.4)))
     lo, hi = float(h.min()), float(h.max())
     nb = (h - lo) / max(hi - lo, 1e-9)
     return landforms.terrace(nb, 7, sharpness=7.0, warp_amp=0.02, cellsize=cell) * (hi - lo) + lo   # strata
@@ -109,11 +131,21 @@ def mesa(seed=SEED, n=TILE, cell=CELL):
 
 # ================= Group D · Deserts ======================================================
 def erg(seed=SEED, n=TILE, cell=CELL):
-    """Aeolian dominant: a sand sheet self-organises into transverse dunes (Werner CA). 09: a
-    dominant transverse wavelength, low relief, slopes no steeper than the sand repose regime."""
-    sand = np.round(7.0 + 7.0 * _g(0.25, seed, n, cell)).astype(np.int64)
-    slabs = dunes.werner_dunes(sand, iters=700, seed=seed, wind=(0, 1))       # more time -> coarser dunes
-    return ops_filters.gaussian(slabs.astype(np.float64), 1.6) * 3.0          # smooth to the dune envelope
+    """Aeolian dominant: transverse dunes with the signature the Werner slabs (dunes.py) smooth away —
+    an ASYMMETRIC profile: a gentle windward (stoss) back rising to the crest, then a steep lee SLIP
+    FACE at the sand repose angle, with flat interdune corridors between. Crests run across-wind and
+    wander (non-periodic), never a sine. 09: a dominant transverse wavelength, low relief, slip faces
+    at ~repose (< 45°)."""
+    xx, yy = _xy(n, cell)
+    xm, ym = xx * cell, yy * cell                                            # metres; wind blows in +x
+    lam = 130.0                                                             # dune wavelength (m)
+    march = 0.9 * noise.fbm(xm / 320.0, ym / 900.0, seed, octaves=4)         # break periodicity down-wind
+    sinu = 0.35 * noise.fbm(ym / 220.0, np.full_like(ym, 3.0), seed + 5, octaves=4)  # crest sinuosity
+    frac = (xm / lam + march + sinu) % 1.0
+    s = 0.72                                                                # windward share; lee is the slip face
+    prof = np.where(frac < s, frac / s, (1.0 - frac) / (1.0 - s))            # gentle stoss, steep lee
+    amp = 8.0 + 13.0 * _g(0.3, seed + 2, n, cell)                            # dune height varies; low -> interdune flat
+    return ops_filters.gaussian(amp * prof, 0.5) + _g(0.08, seed + 3, n, cell) * 2.0
 
 
 def basin_range(seed=SEED, n=TILE, cell=CELL):
@@ -145,11 +177,15 @@ def badlands(seed=SEED, n=TILE, cell=CELL):
 # ================= Group E · Karst ========================================================
 def tower_karst(seed=SEED, n=TILE, cell=CELL):
     """Dissolution: lower the surface in proportion to fracture density, so massive rock survives as
-    towers over an alluviated plain. 09: BIMODAL elevation (towers vs plain), steep tower flanks."""
-    fracture = _g(0.12, seed, n, cell)
-    massive = np.clip(1.0 - fracture / 0.5, 0.0, 1.0) ** 2
-    h = 300.0 - (1.0 - massive) * 280.0
-    return erosion_thermal.thermal_erosion(h, 1.4, 8, cell, factor=0.15)
+    towers. Fenglin towers spring ABRUPTLY from a flat alluviated plain at ~90° with a basal
+    dissolution notch — not tapering cones. 09: BIMODAL elevation (towers vs plain), near-vertical
+    flanks, abrupt base."""
+    fracture = _g(0.11, seed, n, cell)
+    core = analysis.smoothstep(0.66, 0.78, 1.0 - fracture)                   # sparse towers, sharp vertical walls
+    h = 20.0 + core * 270.0
+    notch = analysis.smoothstep(0.08, 0.24, core) * (1.0 - analysis.smoothstep(0.24, 0.42, core))
+    h = h - notch * 12.0                                                     # basal dissolution notch (undercut foot)
+    return erosion_thermal.thermal_erosion(h, 0.9, 3, cell, factor=0.12)     # minimal -> keep the flanks steep
 
 
 # ================= Group F · Volcanic =====================================================

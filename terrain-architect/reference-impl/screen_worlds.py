@@ -48,37 +48,36 @@ def beggars_canyon(seed=3, n=TILE, cell=CELL):
 # --- worlds needing one re-dressing edit ---------------------------------------------------
 def monument_valley(seed=1, n=TILE, cell=CELL):
     """Monument Valley (US-163) — entry 7's END-MEMBER: the plateau all but consumed, leaving a
-    mesa→butte→spire remnant series of flat-capped towers standing on an open plain."""
-    xx, yy = A._xy(n, cell)
-    h = 25.0 + A._g(0.5, seed, n, cell) * 15.0
+    mesa→butte→spire remnant series of flat-capped towers on an open plain. Each is a caprock butte
+    (A._butte): flat top, sheer cliff, a SHARP break to a talus apron — the break-of-slope that reads
+    as sandstone, not a smoothed blob."""
+    base = 25.0 + A._g(0.5, seed, n, cell) * 12.0
+    h = base.copy()
     rng = np.random.default_rng(seed)
-    for i in range(7):                                                        # a mesa→butte→spire series
+    sizes = [0.11, 0.085, 0.065, 0.05, 0.04, 0.032, 0.028]                    # mesa → butte → spire series
+    for i, frac in enumerate(sizes):
         bx, by = rng.integers(int(0.15 * n), int(0.85 * n), 2)
-        br, bh = rng.uniform(0.04, 0.14) * n, rng.uniform(150.0, 350.0)
-        ang = np.arctan2(yy - by, xx - bx)
-        ecc = rng.uniform(0.65, 1.5)                                          # asymmetry via ELONGATION, not lobes
-        wob = 1.0 + 0.18 * noise.fbm(np.cos(ang) * 7 + 10.0 * i, np.sin(ang) * 7 + 10.0, seed + i, octaves=4)
-        rr = np.hypot((xx - bx) / ecc, yy - by) / (br * wob)                  # finely rough edge, not gear teeth
-        top = np.where(rr < 1.0, bh, 0.0)                                     # flat top, vertical cliff
-        skirt = np.clip((1.9 - rr) / 0.9, 0.0, 1.0) ** 2 * (bh * 0.4)         # TALUS debris apron at the base
-        h = np.maximum(h, 25.0 + np.maximum(top, skirt))
-    h = h + A._g(0.08, seed + 1, n, cell) * 5.0
+        bh = rng.uniform(180.0, 340.0) * (0.7 + 2.4 * frac)                  # smaller remnants stand taller/thinner
+        h = np.maximum(h, base + A._butte((n, n), bx, by, frac * n, bh, cell,
+                                          seed + i, ecc=rng.uniform(0.7, 1.4), talus=0.45))
     return erosion_droplet.droplet_erode(h, n_droplets=6 * n, seed=seed, brush_radius=1)   # flute the cliffs
 
 
 def pandora(seed=2, n=TILE, cell=CELL):
     """Pandora's Hallelujah Mountains (modelled on Zhangjiajie) — entry 24's joint-gated pillar
-    forest, taller and denser; the fiction is one impossible edit (float them), the terrain is Earth."""
-    massive = np.clip(1.0 - A._g(0.10, seed, n, cell) / 0.45, 0.0, 1.0) ** 2.5
-    h = 520.0 - (1.0 - massive) * 480.0
-    return erosion_thermal.thermal_erosion(h, 1.6, 6, cell, factor=0.12)
+    forest: tall, near-vertical, fracture-bounded quartz-sandstone COLUMNS, not tapering cones; the
+    fiction is one impossible edit (float them), the terrain is Earth."""
+    core = analysis.smoothstep(0.42, 0.50, 1.0 - A._g(0.10, seed, n, cell)) ** 1.2   # sheer columns
+    h = 40.0 + core * 470.0
+    return erosion_thermal.thermal_erosion(h, 1.1, 4, cell, factor=0.10)      # minimal -> columns stay sheer
 
 
 def skull_island(seed=4, n=TILE, cell=CELL):
     """Kong: Skull Island (Ha Long Bay) — entry 14's tower karst DROWNED: the plain sits below sea
-    level so the sea floods between the towers into a fanged island coast. Rendered with sea at z=0."""
-    massive = np.clip(1.0 - A._g(0.11, seed, n, cell) / 0.5, 0.0, 1.0) ** 2
-    return 200.0 - (1.0 - massive) * 260.0                                    # towers >0, plain <0 (drowned)
+    level so the sea floods between near-vertical fanged towers (high h/w) into an island coast.
+    Rendered with sea at z=0."""
+    core = analysis.smoothstep(0.66, 0.78, 1.0 - A._g(0.11, seed, n, cell))   # sparse sheer fanged islands
+    return 240.0 * core - 70.0 * (1.0 - core)                                 # towers >0 (tall), plain <0 (drowned)
 
 
 # --- worlds whose conceit is the material / the water, not the height ----------------------
