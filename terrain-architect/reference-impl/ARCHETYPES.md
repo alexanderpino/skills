@@ -72,7 +72,7 @@ material), so the point is *decompose the fiction, don't invent a recipe*.
 
 | Tile | World *(filming location)* | Decomposes to |
 |---|---|---|
-| 0,0 | **Arrakis** *(Wadi Rum + Liwa erg)* | the **erg** — open sand where nothing stands |
+| 0,0 | **Arrakis** *(Wadi Rum)* | extreme contrast — flat sand plains + sheer eroded sandstone **jebels** |
 | 0,1 | **Monument Valley** *(US-163)* | the **mesa** end-member — plateau consumed to a butte→spire series |
 | 0,2 | **Pandora** *(Zhangjiajie)* | **tower karst** pillars, one impossible edit (float them) |
 | 0,3 | **Hoth** *(Finse / Hardangerjøkulen, Norway)* | **glacial** ice-sheet, sea off — ice + rock nunataks |

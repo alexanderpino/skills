@@ -44,6 +44,16 @@ def _xy(n, cell):
     return xx, yy
 
 
+def _wander(n, seed, amp, base=0.5):
+    """A NON-periodic wandering centre-line (one column per row) from 1-D fbm — meanders irregular
+    in amplitude and spacing, never a sine. Returns an (n, 1) column of centre positions in cells.
+    ('Kill the sine wave': real river/fault paths struggle through rock, they don't repeat.)"""
+    t = np.arange(n) / n
+    w = noise.fbm(t * 3.5, np.full(n, 5.0 + 0.7 * seed), seed, octaves=5)
+    w = w - w.mean()
+    return (base * n + amp * n * w / (np.max(np.abs(w)) + 1e-9))[:, None]
+
+
 # ================= Group A · Orogens ========================================================
 def alpine(seed=SEED, n=TILE, cell=CELL):
     """Young collisional range: fbm+ridged uplift → droplet fluvial → talus to repose. 09: dissected
@@ -67,9 +77,9 @@ def canyon(seed=SEED, n=TILE, cell=CELL):
     """High plateau with one deeply-incised meandering trunk + tributaries, then STRATA (terrace)
     on the walls. 09: relief concentrated at the trunk; the elevation histogram is stepped."""
     plateau = 260.0 + _g(0.35, seed, n, cell) * 70.0
-    rows, cols = np.arange(n)[:, None], np.arange(n)[None, :]
-    center = n / 2 + 0.19 * n * np.sin(2 * np.pi * rows / (0.9 * n))
-    trunk = np.clip(1.0 - np.abs(cols - center) / (0.14 * n), 0.0, 1.0) ** 1.4
+    cols = np.arange(n)[None, :]
+    center = _wander(n, seed, amp=0.17)                                      # irregular meander, not a sine
+    trunk = np.clip(1.0 - np.abs(cols - center) / (0.13 * n), 0.0, 1.0) ** 1.4
     h = plateau - trunk * 240.0
     h = erosion_droplet.droplet_erode(h, n_droplets=9 * n, seed=seed, brush_radius=2)
     lo, hi = float(h.min()), float(h.max())
@@ -112,7 +122,8 @@ def basin_range(seed=SEED, n=TILE, cell=CELL):
     cols, rows = np.arange(n)[None, :] / n, np.arange(n)[:, None] / n
     # tectonic extension TILTS fault blocks: a gentle alluvial back-slope up to a crest, then a STEEP
     # fault scarp (asymmetric sawtooth, all scarps facing the same way) — not a smooth sine.
-    phase = (2.6 * cols + 0.22 * np.sin(2 * np.pi * rows * 1.3) + 0.18 * _g(0.35, seed, n, cell)) % 1.0
+    warp = 0.28 * _g(0.3, seed, n, cell) + 0.14 * _g(0.11, seed + 4, n, cell)   # 2-scale noise, no sine
+    phase = (2.6 * cols + warp) % 1.0
     block = np.where(phase < 0.78, phase / 0.78, (1.0 - phase) / 0.22)      # ramp up, drop off a scarp
     throw = 300.0 + 260.0 * _g(0.28, seed + 1, n, cell)                     # fault throw varies along strike
     h = block * throw + _g(0.10, seed + 2, n, cell) * 45.0
@@ -177,7 +188,7 @@ def fjord(seed=SEED, n=TILE, cell=CELL):
     rows, cols = np.arange(n)[:, None], np.arange(n)[None, :]
     troughs = np.zeros((n, n))
     for k, frac in enumerate((0.22, 0.5, 0.78)):
-        cc = frac * n + 0.08 * n * np.sin(2 * np.pi * rows / (0.6 * n) + k)
+        cc = _wander(n, seed + 10 + k, amp=0.05, base=frac)                  # troughs wander, not sines
         troughs = np.maximum(troughs, np.clip(1.0 - ((cols - cc) / (0.08 * n)) ** 2, 0.0, 1.0))
     h = massif - troughs * np.clip(1.0 - rows / n, 0.15, 1.0) * 720.0
     return h - (1.0 - rows / n) * 260.0                                      # regional tilt into the sea
@@ -236,8 +247,8 @@ def mars(seed=SEED, n=TILE, cell=CELL):
         D = float(np.clip(50.0 * (1.0 - rng.random()) ** (-0.7), 40.0, n * cell * 0.26))
         h = landforms.impact_crater(h, int(rng.integers(0, n)), int(rng.integers(0, n)),
                                     D, cell, complex_D=1e9)
-    rows, cols = np.arange(n)[:, None], np.arange(n)[None, :]
-    cc = 0.32 * n + 0.15 * n * np.sin(2 * np.pi * rows / (0.8 * n))          # relict outflow channel
+    cols = np.arange(n)[None, :]
+    cc = _wander(n, seed + 7, amp=0.16, base=0.4)                            # relict outflow channel (wanders)
     h = h - np.clip(1.0 - np.abs(cols - cc) / (0.05 * n), 0.0, 1.0) * 55.0
     ripple = 9.0 * np.sin(2 * np.pi * cols / 5.0) * (_g(0.07, seed + 9, n, cell) > 0.55)
     return h + ripple                                                        # aeolian ripples in patches
