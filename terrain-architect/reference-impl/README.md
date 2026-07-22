@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 109 pass; 5 optional cross-checks skip
+pytest -q                            # 116 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # 114 pass; the 5 cross-checks now run instead of skipping
+pytest -q                            # 121 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -54,6 +54,7 @@ against an independent library.
 | `ops_filters.py` — primitives/ops/filters | `10` SDF primitives, smooth min/max, Gaussian/median/bilateral/guided/Perona–Malik, morphology, warps | SDF exact & signed; `smin ≤ min`; median kills a spike & keeps a step; bilateral/guided/PM keep a step where Gaussian smears it; `dilate ≥ h ≥ erode`, opening idempotent, closing fills a pit |
 | `scatter.py` — object distribution | `07` Bridson Poisson-disk, density rejection, jittered-grid (tileable), rule-based gates | **every pair ≥ r apart** (blue noise); density-rejection follows the field; jittered grid deterministic & seamlessly tileable; gates reject cliffs/treeline/water |
 | `landforms.py` — geological landforms | `11` impact craters (Pike/Melosh), strata & terracing, folding, karst sinkholes | crater `depth/D ≈ 0.2`, rim raised, ejecta `∝ r⁻³`, central peak when complex, diameter `∝ g` inversely; strata periodic; terrace snaps to treads; fold is a sinusoid; karst carves pits **only** on soluble rock (the `03` do-not-fill exception) |
+| `sims_illustrative.py` — **⚠ illustrative** sims | `12`/`19` lava CA, SIA glacier, coastal cliff retreat, tides | **INVARIANTS ONLY, no decisive oracle** — lava conserves mass (erupted = molten + frozen), glacier transport conserves ice & H ≥ 0, coastal erosion removes mass monotonically, tide bounded & solid untouched. Sketches to watch move, **not** verified numbers |
 
 ## Sandbox: run a graph and look at it
 
@@ -109,7 +110,8 @@ which cross-check covers it — see **`GROUNDING.md`**.
 - **The pipe sediment/erosion coupling** — the water solver (where the documented NaN failure
   lives) is the verified core; implement the transport-capacity + semi-Lagrangian advection layer
   from `04` and validate mass conservation before moving it to the GPU.
-- **"Look, not a sim" processes** (coastal cliff/longshore, tides), the full MAGFLOW lava CA,
-  the transient SIA glacier, and learned/ML synthesis are **excluded** — they have no decisive
-  deterministic oracle, so they stay as paper-derived pseudocode and verification requirements
-  rather than being presented here as complete code.
+- **The un-oracled sims** (coastal cliff retreat, tides, the lava CA, the transient SIA glacier)
+  have **no decisive deterministic oracle** — so they live in `sims_illustrative.py`, segregated
+  and held only to *invariants* (finite, mass/energy budget, monotone trends). They are sketches
+  you can run and watch, **not** verified numbers; validate against real morphometry before any
+  use. **Learned / ML synthesis** stays out entirely (frontier, unstable metadata).

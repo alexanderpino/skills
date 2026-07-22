@@ -60,6 +60,13 @@ Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with ora
 `test_landforms.py`. Landforms without a standalone deterministic oracle — salt diapirs, tower
 karst, relief inversion — stay as reference pseudocode, not code here.
 
+The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
+tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or
+oracle-verified.** These are the regimes the coverage boundary excludes because they have no
+decisive oracle; they are included to run, held to invariants (finite, mass/energy budget,
+monotone trends) in `test_sims_illustrative.py`, and must not be read as verified numbers. This
+tier is deliberately outside the grounding scale above.
+
 ## What the cross-checks assert
 
 Comparisons are on **physical signatures**, not raw fields — grid conventions and boundary
