@@ -26,7 +26,7 @@ no citation.
 | 1,2 | D · **badlands** | soft flat strata, densely dissected | very high drainage density; stepped strata; knife-edge divides |
 | 1,3 | E · **tower karst** | dominant agent → **dissolution** (lower ∝ fracture) | residual towers over a low plain (bimodal, low HI) |
 | 2,0 | F · **stratovolcano** | radial cone + summit crater, radial gullies | near-radial symmetry; a single central high |
-| 2,1 | F · **caldera lake** | collapsed summit caldera holding a lake | a rim ring around a flat floor; enclosed water |
+| 2,1 | F · **caldera lake** | collapsed edifice (fractured flanks, jagged rim) holding a lake | an irregular rim + a resurgent-dome island in enclosed water (à la Crater Lake) |
 | 2,2 | G · **fjord coast** | glacial U-troughs, flooded to sea level | long narrow drowned inlets reaching the ocean edge |
 | 2,3 | H · **sea cliffs & stacks** | wave attack (coastal-retreat sim) | a cliff at the waterline fronting a wave-cut bench |
 | 3,0 | K · **ag terraces** | contour agriculture: many level benches | strongly stepped elevation; benches ⟂ slope |

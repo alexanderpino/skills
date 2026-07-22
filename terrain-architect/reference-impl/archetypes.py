@@ -78,12 +78,23 @@ def canyon(seed=SEED, n=TILE, cell=CELL):
 
 
 def mesa(seed=SEED, n=TILE, cell=CELL):
-    """Tepui / table-mountain: a resistant caprock holds a FLAT top with near-vertical cliffs over a
-    talus-skirted base. 09: bimodal elevation (plateau top vs base), a flat summit, steep rim."""
-    field = _g(0.45, seed, n, cell, octaves=5)
-    top = analysis.smoothstep(0.52, 0.60, field)                 # sharp plateau caps
-    h = 40.0 + top * 340.0 + _g(0.10, seed + 2, n, cell) * 12.0
-    return erosion_thermal.thermal_erosion(h, 1.2, 6, cell, factor=0.15)   # skirt the cliff with talus
+    """Tepui / table-mountain: a few LARGE, blocky tablelands — solid remnants of eroded sedimentary
+    layers with flat tops, near-vertical cliffs and horizontal strata — NOT thin serpentine ridges
+    (thresholding continuous noise makes worms; place solid blocks instead). 09: flat tops, sharp
+    rims, banded cliffs."""
+    xx, yy = _xy(n, cell)
+    h = 30.0 + _g(0.5, seed, n, cell) * 18.0
+    rng = np.random.default_rng(seed)
+    for i in range(3):                                                       # a few big tablelands
+        bx, by = rng.integers(int(0.25 * n), int(0.75 * n), 2)
+        br, bh = rng.uniform(0.16, 0.26) * n, rng.uniform(260.0, 360.0)
+        ang = np.arctan2(yy - by, xx - bx)
+        wob = 1.0 + 0.25 * noise.fbm(np.cos(ang) * 3 + 5.0 * i, np.sin(ang) * 3 + 5.0, seed + i, octaves=3)
+        cap = np.clip((br * wob - np.hypot(xx - bx, yy - by)) / 2.5, 0.0, 1.0)   # flat top, sharp cliff
+        h = np.maximum(h, 30.0 + cap * bh)
+    lo, hi = float(h.min()), float(h.max())
+    nb = (h - lo) / max(hi - lo, 1e-9)
+    return landforms.terrace(nb, 7, sharpness=7.0, warp_amp=0.02, cellsize=cell) * (hi - lo) + lo   # strata
 
 
 # ================= Group D · Deserts ======================================================
@@ -99,10 +110,15 @@ def basin_range(seed=SEED, n=TILE, cell=CELL):
     """Basin-and-Range: parallel fault-block ranges separated by flat sediment-filled basins, one a
     dead-flat playa. 09: alternating high ridges / flat floors — a bimodal, banded profile."""
     cols, rows = np.arange(n)[None, :] / n, np.arange(n)[:, None] / n
-    crest = 0.5 + 0.5 * np.cos(2 * np.pi * 2.2 * cols + 0.7 * np.sin(2 * np.pi * rows))   # wavy N–S ranges
-    h = crest ** 2 * (450.0 + 150.0 * _g(0.3, seed, n, cell)) + _g(0.15, seed + 1, n, cell) * 50.0
-    floor = np.percentile(h, 40)
-    return np.where(h < floor, floor - 5.0 + _g(0.10, seed + 2, n, cell) * 4.0, h)   # flat basins / playa
+    # tectonic extension TILTS fault blocks: a gentle alluvial back-slope up to a crest, then a STEEP
+    # fault scarp (asymmetric sawtooth, all scarps facing the same way) — not a smooth sine.
+    phase = (2.6 * cols + 0.22 * np.sin(2 * np.pi * rows * 1.3) + 0.18 * _g(0.35, seed, n, cell)) % 1.0
+    block = np.where(phase < 0.78, phase / 0.78, (1.0 - phase) / 0.22)      # ramp up, drop off a scarp
+    throw = 300.0 + 260.0 * _g(0.28, seed + 1, n, cell)                     # fault throw varies along strike
+    h = block * throw + _g(0.10, seed + 2, n, cell) * 45.0
+    floor = np.percentile(h, 32)
+    h = np.where(h < floor, floor - 4.0 + _g(0.12, seed + 3, n, cell) * 5.0, h)   # flat alluvial basins / playa
+    return erosion_thermal.thermal_erosion(h, 1.0, 5, cell, factor=0.15)    # weather the fault scarps
 
 
 def badlands(seed=SEED, n=TILE, cell=CELL):
@@ -140,9 +156,17 @@ def caldera(seed=SEED, n=TILE, cell=CELL):
     """Caldera lake: a broad edifice whose summit collapsed to a flat-floored caldera holding a
     lake. 09: a raised rim RING around a flat interior floor filled with water."""
     xx, yy = _xy(n, cell)
-    cone = ops_filters.cone(xx - n / 2, yy - n / 2, 0.46 * n, 720.0) + _g(0.07, seed, n, cell) * 15.0
-    r = np.hypot(xx - n / 2, yy - n / 2)
-    return np.where(r < 0.22 * n, np.minimum(cone, 300.0), cone)             # collapse summit to a flat floor
+    dx, dy = xx - n / 2, yy - n / 2
+    r, ang = np.hypot(dx, dy), np.arctan2(dy, dx)
+    # a COLLAPSE structure, not a boolean cut: fracture the flanks, jag the rim, rough the floor,
+    # and leave a resurgent central dome (a lake island, like Crater Lake's Wizard Island).
+    cone = (ops_filters.cone(dx, dy, 0.46 * n, 700.0)
+            + (_g(0.09, seed, n, cell) - 0.5) * 110.0 + (_g(0.04, seed + 1, n, cell) - 0.5) * 45.0)
+    rim_r = (0.23 + 0.06 * noise.fbm(np.cos(ang) * 5 + 7.0, np.sin(ang) * 5 + 7.0, seed + 2, octaves=4)) * n
+    floor = 300.0 + (_g(0.12, seed + 3, n, cell) - 0.5) * 30.0
+    dome = 150.0 * np.clip(1.0 - r / (0.09 * n), 0.0, 1.0) ** 1.3
+    h = np.where(r < rim_r, np.minimum(cone, floor) + dome, cone)
+    return erosion_thermal.thermal_erosion(h, 1.3, 4, cell, factor=0.12)     # slump the fresh scarps
 
 
 # ================= Group G · Glacial coasts ================================================
