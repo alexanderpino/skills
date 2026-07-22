@@ -171,8 +171,9 @@ wrong constant.** Verdicts abbreviated ✅ (paper real, method/constant as claim
 
 1. **Simplex `70` normalisation** is empirical / gradient-set-specific (Gustavson's
    `simplexnoise1234.c`), not universal — which `01` already states.
-2. **Lunar simple→complex crater transition** — the skill says "~15 km"; Pike's onset is
-   ~10.6 km, the change spans ~10–30 km. Tighten to "~10–20 km" for precision.
+2. **Lunar simple→complex crater transition** — the skill said "~15 km"; Pike's onset is
+   ~10.6 km, the change spans ~10–30 km. **Applied:** `references/11-geological.md` now reads
+   "~10–20 km" (onset ~11 km, span ~10–30 km) — the one prose correction from the audit.
 
 **Coverage.** This covers every `reference-impl` module's primary citation(s) and named
 constants. The handful of un-itemised references are standard textbooks whose existence is not
