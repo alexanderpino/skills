@@ -14,8 +14,9 @@ explosion, so the hole is circular at all but grazing angles — and put the cha
 MASS. So it adds a distinct raised RIM RING (the overturned flap, Pike 1977), an irregular rim/
 ejecta outline, terraced walls and a defined central MASSIF on complex craters, and a hummocky
 ejecta apron that slopes off the rim and piles heavier + reaches farther DOWNRANGE. Below ~12° the
-cavity elongates into an irregular plowed furrow (deepening forward, levees aside). Shown as
-ELEVATION via hillshade, so the mass reads as excavated/heaped earth, not a tint.
+cavity elongates into an irregular furrow that is DEEPER UP-RANGE (first contact / peak energy;
+Schultz) and shallower downrange, with rim mass shoved to the sides. Shown as ELEVATION via
+hillshade, so the mass reads as excavated/heaped earth, not a tint.
 
 The analytic core stays oracle-clean; this layer is a look, deliberately NOT mass-conserving
 (the rim, apron and rough peak add material), and is not part of the verified ledger.
@@ -83,12 +84,15 @@ def stamp_impact_natural(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=20000.0, g
     rj = rc * nter + 0.6 * _ang_noise(psi, seed + 8, k=6, octaves=3)
     bowl = np.where(inside, bowl + tamp * (np.round(rj) / nter - rc) * np.clip(rc, 0, 1) ** 2, bowl)
 
-    # --- plow (grazing): deepen downrange, levees shoved aside -------------------------
+    # --- grazing asymmetry: DEEPER UP-RANGE — the deepest point and steepest wall sit on the
+    # up-range side (first contact / peak energy transfer; Schultz, arXiv 2308.01876), and the
+    # floor shallows DOWN-RANGE where material is plowed out. Rim mass is shoved to the SIDES
+    # (maximum structural uplift is transverse to the track). ----------------------------------
     if graze > 0:
         along = np.clip(xr / (R * ecc), -1.0, 1.0)         # -1 up-range … +1 downrange
-        bowl -= np.where(inside, graze * depth * 0.45 * (0.5 + 0.5 * along), 0.0)   # deepen forward
+        bowl -= np.where(inside, graze * depth * 0.45 * (0.5 - 0.5 * along), 0.0)   # deepen up-range
         flank = np.exp(-((np.abs(yr) / R - 1.0) / 0.30) ** 2) * np.clip(1.0 - np.abs(xr) / (R * ecc), 0, 1)
-        bowl += graze * 0.35 * depth * flank               # lateral levees
+        bowl += graze * 0.35 * depth * flank               # transverse (cross-range) rim levees
 
     prof = bowl.copy()
 
