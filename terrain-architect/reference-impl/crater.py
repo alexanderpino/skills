@@ -12,9 +12,11 @@ Two tiers, kept honest:
   * SHAPE under obliquity — PHENOMENOLOGICAL morphology matched to the oblique-impact
     experiments (Gault & Wedekind 1978; Pierazzo & Melosh 2000; Collins et al. 2011): craters
     stay circular above a target-dependent threshold (~5° sand … ~30° rock; ~12° typical) and
-    elongate downrange below it; the up-range rim is depressed; ejecta shifts downrange, then
-    into a cross-range butterfly with forbidden zones at very low angles. This is a *look*
-    matched to observation, NOT a ballistic-ejecta simulation.
+    elongate downrange below it; the excavated bowl volume is redeposited as an ejecta blanket
+    that piles DOWNRANGE (mass pushed forward) and starves the up-range side — the forbidden
+    zone — splitting into a cross-range butterfly at very low angles. The *placement* of the
+    ejecta is a look matched to observation, NOT a ballistic-ejecta simulation, but the amount
+    is mass-conserving: what the bowl removes is what the blanket lays back down.
 
 Angles are degrees FROM HORIZONTAL (90 = vertical, the most efficient; 45 = most probable).
 """
@@ -57,52 +59,64 @@ def _ellipticity(angle):
 
 
 def _ejecta_azimuth_weight(psi, angle):
-    """Azimuthal modulation of the r^-3 ejecta (ψ measured from DOWNRANGE). Symmetric at high
-    angle → downrange-enhanced / up-range-depleted when oblique → cross-range butterfly with
-    forbidden zones at very low angle (Gault & Wedekind 1978; Pierazzo & Melosh 2000)."""
-    b = np.clip((45.0 - angle) / 45.0, 0.0, 1.0)            # obliquity: 0 vertical, 1 grazing
-    downrange = np.clip(1.0 + 0.8 * b * np.cos(psi), 0.0, None)
-    if angle >= 15.0:
-        return downrange
-    butterfly = 0.25 + np.sin(psi) ** 2                     # lobes at ±90°, minima downrange/uprange
-    f = np.clip((15.0 - angle) / 15.0, 0.0, 1.0)            # blend in as the impact grazes
-    return np.clip((1.0 - f) * downrange + f * butterfly, 0.0, None)
+    """Azimuthal weight of the ejecta blanket (ψ from DOWNRANGE). Uniform at vertical
+    (`(...)^0 = 1`); as the impact tilts, the exponent grows so the blanket concentrates
+    **downrange** and the **up-range** side empties (the forbidden zone); at very low angle it
+    splits into a cross-range **butterfly** (Gault & Wedekind 1978; Pierazzo & Melosh 2000). A
+    small floor keeps a subdued rim all the way around."""
+    b = np.clip((90.0 - angle) / 75.0, 0.0, 1.0)           # obliquity: 0 vertical, ~1 grazing
+    down = 0.5 + 0.5 * np.cos(psi)                          # 1 downrange, 0 up-range
+    w = down ** (5.0 * b)                                   # vertical -> uniform; oblique -> forward
+    bf = np.clip((15.0 - angle) / 15.0, 0.0, 1.0)           # butterfly onset
+    w = (1.0 - bf) * w + bf * np.sin(psi) ** 2
+    return 0.12 + 0.88 * np.clip(w, 0.0, 1.0)
 
 
 def stamp_impact(terrain, cx, cy, cellsize=1.0, *, L=100.0, v=17000.0, rho_i=STONY,
-                 rho_t=2700.0, g=9.81, angle=45.0, azimuth=0.0):
-    """Stamp an impact at cell (cx, cy). Returns (terrain, info). `azimuth` is the trajectory
-    heading in degrees (0 = travelling toward +x). Morphology: paraboloid bowl (elongated
-    downrange when oblique), raised rim (depressed up-range), r^-3 ejecta (azimuthally modulated
-    by obliquity), and a central peak for complex craters (offset downrange)."""
+                 rho_t=2700.0, g=9.81, angle=45.0, azimuth=0.0, deposit_fraction=0.9):
+    """Stamp an impact at cell (cx, cy). Returns (terrain, info). `azimuth` = trajectory heading
+    in degrees (0 → travelling toward +x = downrange). **Mass-conserving**: the paraboloid bowl
+    is excavated, and that volume is redeposited as an ejecta blanket biased **downrange** — so
+    an oblique impact punches a hole and piles the debris forward, with a clean up-range forbidden
+    zone, rather than just carving an oval. `deposit_fraction` is the share of excavated volume
+    that lands as visible ejecta (the rest bulks the floor / escapes)."""
     terrain = np.asarray(terrain, dtype=np.float64).copy()
     n, m = terrain.shape
     D_tc = transient_crater_diameter(L, v, rho_i, rho_t, g, angle)
     D, is_complex, depth = final_crater(D_tc, g)
-    rim = 0.04 * D
     R = 0.5 * D / cellsize                                  # radius in cells
     ecc = _ellipticity(angle)
+    b = np.clip((90.0 - angle) / 75.0, 0.0, 1.0)
 
     yy, xx = np.mgrid[0:n, 0:m].astype(np.float64)
     dx, dy = (xx - cx), (yy - cy)
     a = np.radians(azimuth)                                 # rotate so downrange = +x'
-    xr = dx * np.cos(a) + dy * np.sin(a)                    # downrange coordinate
-    yr = -dx * np.sin(a) + dy * np.cos(a)                   # cross-range
+    xr = dx * np.cos(a) + dy * np.sin(a)
+    yr = -dx * np.sin(a) + dy * np.cos(a)
     r = np.hypot(xr / ecc, yr) / R                          # elongated radial (downrange axis longer)
-    psi = np.arctan2(yr, xr)                                # azimuth from downrange
+    psi = np.arctan2(yr, xr)
 
-    prof = np.zeros_like(terrain)
-    inside = r < 1.0
-    prof += np.where(inside, -depth * (1.0 - r ** 2), 0.0)  # bowl
-    rim_mod = 1.0 - 0.25 * np.clip((45.0 - angle) / 45.0, 0.0, 1.0) * (1.0 - np.cos(psi)) / 2.0
-    prof += rim * rim_mod * np.exp(-((r - 1.0) / 0.15) ** 2)   # rim, depressed up-range
-    ejecta = rim * 0.5 * np.maximum(r, 1.0) ** (-3.0) * _ejecta_azimuth_weight(psi, angle)
-    prof += np.where((r >= 1.0) & (r < 3.0), ejecta, 0.0)
+    bowl = np.where(r < 1.0, -depth * (1.0 - r ** 2), 0.0)  # excavate
+    excavated = -bowl.sum() * cellsize ** 2                 # m^3 removed
+
+    # ejecta blanket (mass-conserving): debris piles up just outside the rim and thins
+    # outward. DOWNRANGE it is thick and reaches farther; UP-RANGE it is starved (the
+    # forbidden zone). Keeping it concentrated near the rim gives it steep flanks, so the
+    # debris reads as a lobe shoved forward instead of a faint wash spread thin.
+    rim = np.maximum(r - 1.0, 0.0)                          # radii beyond the rim
+    span = 0.5 + 1.4 * b * np.clip(np.cos(psi), 0.0, 1.0)   # short up-range, long downrange
+    falloff = np.clip(1.0 - rim / (span + 1e-9), 0.0, 1.0) ** 1.4
+    dep_raw = np.where(r >= 1.0, falloff * _ejecta_azimuth_weight(psi, angle), 0.0)
+    dep_vol = dep_raw.sum() * cellsize ** 2
+    deposit = dep_raw * (deposit_fraction * excavated / (dep_vol + 1e-12))   # conserve mass
+
+    prof = bowl + deposit
     if is_complex:                                          # central peak (centred if vertical,
-        off = 0.15 * R * np.clip((45.0 - angle) / 45.0, 0.0, 1.0)   # nudged downrange when oblique)
+        off = 0.18 * R * b                                 # nudged downrange when oblique)
         pr = np.hypot(xr - off, yr) / (0.18 * R)
         prof += depth * 0.5 * np.exp(-pr ** 2)
 
     info = {"D_transient": D_tc, "D_final": D, "complex": is_complex, "depth": depth,
-            "ellipticity": ecc}
+            "ellipticity": ecc, "excavated": excavated,
+            "deposited": deposit.sum() * cellsize ** 2}
     return terrain + prof, info

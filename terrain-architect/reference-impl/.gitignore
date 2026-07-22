@@ -4,5 +4,6 @@ __pycache__/
 out/
 .dem_cache/
 *.png
-# keep the committed visual-reference montage (regenerate with gallery.py)
+# keep the committed visual-reference montages (regenerate with gallery.py / crater_demo.py)
 !gallery.png
+!crater_matrix.png

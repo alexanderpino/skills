@@ -76,6 +76,16 @@ def test_ejecta_is_downrange_asymmetric_when_oblique():
             assert down > 1.3 * up                            # oblique: downrange-loaded
 
 
+def test_ejecta_conserves_excavated_mass():
+    """The deposited ejecta volume is `deposit_fraction` of what the bowl excavated — mass is
+    pushed OUT and piled back down, not conjured. (The rest bulks the floor / escapes.)"""
+    for angle in (90.0, 45.0, 20.0, 8.0):
+        _, info = C.stamp_impact(np.zeros((260, 260)), 130, 130, cellsize=200.0, L=1500.0,
+                                 v=20000.0, angle=angle, azimuth=0.0, deposit_fraction=0.9)
+        assert info["excavated"] > 0.0
+        assert abs(info["deposited"] / info["excavated"] - 0.9) < 1e-6
+
+
 def test_finite_and_complex_has_central_peak():
     h, info = C.stamp_impact(np.zeros((300, 300)), 150, 150, cellsize=300.0, L=4000.0,
                              v=20000.0, angle=90.0)

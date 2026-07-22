@@ -3,6 +3,11 @@ contact sheet (`crater_matrix.png`). Trajectory travels left→right, so downran
 RIGHT of each tile. Each tile is normalised to the crater's own size, so the panels compare
 SHAPE (simple bowl → complex central peak; circular → elongated; symmetric → butterfly ejecta),
 not absolute size. Run: `python crater_demo.py`.
+
+Tiles use a CUT/FILL tint about the undisturbed ground (h = 0): what was EXCAVATED reads cool
+(blue), what was DEPOSITED as ejecta reads warm (tan→orange), modulated by hillshade for the
+3-D form. So an oblique impact reads unmistakably — a blue bowl with the debris piled WARM and
+forward, starved on the up-range side — rather than "just an oval".
 """
 import numpy as np
 
@@ -14,13 +19,28 @@ V = 20000.0                                                # 20 km/s, a typical 
 SIZES = [("60 m impactor", 60.0), ("1 km impactor", 1000.0), ("10 km impactor", 10000.0)]
 ANGLES = [90.0, 45.0, 20.0, 8.0]                           # from horizontal
 
+_CUT = np.array([70, 120, 190], dtype=np.float64) / 255.0     # excavated  -> cool blue
+_ZERO = np.array([176, 172, 162], dtype=np.float64) / 255.0   # undisturbed -> neutral
+_FILL = np.array([205, 120, 55], dtype=np.float64) / 255.0    # deposited  -> warm tan
+
+
+def cutfill(h, cellsize):
+    """Diverging cut/fill tint about the h = 0 datum, modulated by hillshade. Excavation goes
+    cool, deposition goes warm — the honest picture of where mass left and where it landed."""
+    m = max(abs(float(h.min())), abs(float(h.max())), 1e-9)
+    t = np.clip(h / m, -1.0, 1.0)[..., None]               # -1 deepest cut … +1 highest fill
+    tint = np.where(t >= 0, _ZERO + t * (_FILL - _ZERO), _ZERO + (-t) * (_CUT - _ZERO))
+    shade = render.hillshade(h, cellsize, azimuth=315, altitude=40).astype(np.float64) / 255.0
+    shade = 0.45 + 0.55 * shade[..., :1]                   # keep colour in the shadows
+    return np.clip(tint * shade * 255.0, 0, 255).astype(np.uint8)
+
 
 def panel(L, angle):
     D = crater.final_crater(crater.transient_crater_diameter(L, V, angle=angle))[0]
     cs = D / (TILE * 0.32)                                 # crater ~1/3 of the tile, room for ejecta
     h, info = crater.stamp_impact(np.zeros((TILE, TILE)), TILE // 2, TILE // 2, cs,
                                   L=L, v=V, angle=angle, azimuth=0.0)   # +x = downrange
-    return render.hillshade(h, cs, azimuth=315, altitude=40), info
+    return cutfill(h, cs), info
 
 
 def main():

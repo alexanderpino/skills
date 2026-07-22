@@ -65,7 +65,9 @@ is two tiers: the **size** physics is **paper-grounded** with *decisive* oracles
 Marcus 2005 π-scaling exponents — `L^0.78 v^0.44 g^(−0.22) (sinθ)^(1/3)` — and the 1/g transition,
 verified in `test_crater.py`); the **shape under obliquity** (elongation, downrange/butterfly
 ejecta) is **phenomenological**, matched to the oblique-impact experiments (Gault & Wedekind 1978;
-Pierazzo & Melosh 2000; Collins et al. 2011), not a ballistic-ejecta simulation.
+Pierazzo & Melosh 2000; Collins et al. 2011), not a ballistic-ejecta simulation — though the ejecta
+placement is held to a **mass-conservation invariant** (the excavated bowl volume is what the
+blanket redeposits, so mass is *pushed forward*, not conjured; `test_ejecta_conserves_excavated_mass`).
 
 The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
 tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or

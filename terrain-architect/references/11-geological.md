@@ -623,4 +623,7 @@ Shape under obliquity (**Gault & Wedekind 1978**; **Pierazzo & Melosh 2000**; **
   down-range at very low angles. The central peak (complex craters) offsets slightly downrange.
 
 `reference-impl/crater.py` implements this size+angle model with the π-scaling exponents verified
-against the source (`reference-impl/VALIDATION.md`).
+against the source (`reference-impl/VALIDATION.md`). Its ejecta is **mass-conserving** — the
+excavated bowl volume is redeposited as the downrange-biased blanket, so the debris is visibly
+*pushed forward* rather than a symmetric ring; `crater_demo.py` renders it as a cut/fill matrix
+(excavation cool, deposition warm) across size × angle.
