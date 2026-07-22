@@ -31,7 +31,12 @@ think to check, and **neither is sufficient alone**. Two cautions this gallery m
 | 4,0 | streampower (200 km) | concave, connected drainage at the **correct** scale — bounded relief |
 | 4,1–4,5 | crater simple · crater complex · terrace · fold · karst | bowl + **raised rim** (simple); bowl + **central peak** (complex); flat treads + risers (terrace); folded ridge train (fold); sinkhole pits on the **left (soluble) half only** (karst) |
 | 5,0–5,3 | lava · glacier H · coastal · tides | ⚠ **illustrative** (invariant-checked only): a lava tongue from the vent; a spreading ice cap; a retreated coast; the intertidal band |
+| 5,4–5,5 | diffusion (Culling) · dunes (Werner) | smoothed relief; a wind-transverse dune field |
+| 6,0–6,2 | pipe water depth · flexure (200 km) · wind speed | water routed into the lows; the flexural deflection bowl under a mountain load; terrain-following wind magnitude |
+| 6,3–6,5 | tephra fallout · PDC inundation · seafloor age–depth | radial thinning from the vent; the pyroclastic-flow footprint (red) over hillshade; bathymetry deepening with crustal age |
 
-The last four panels are the `sims_illustrative.py` tier — sketches you can watch move, **not**
-verified numbers. Everything else is oracle-backed (`tests/`), and the ranges printed by
-`gallery.py` must all read sane (no `SUSPECT`).
+Panels 30–33 are the `sims_illustrative.py` tier — sketches you can watch move, **not** verified
+numbers. Everything else is oracle-backed (`tests/`), and the ranges printed by `gallery.py`
+must all read sane (no `SUSPECT`). The gallery now covers **every** algorithm module in
+`reference-impl` (age–depth and avulsion have no natural heightfield rendering; age–depth is
+shown as a bathymetry gradient, avulsion is a scalar criterion and is omitted).

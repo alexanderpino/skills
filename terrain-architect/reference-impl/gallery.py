@@ -13,16 +13,22 @@ their analytic inputs, which is what makes them decisive). Run: `python gallery.
 import numpy as np
 
 import analysis
+import analytic
+import diffusion
+import dunes
 import erosion_droplet
+import erosion_pipe
 import erosion_streampower
 import erosion_thermal
 import flow
+import isostasy
 import landforms
 import noise
 import ops_filters
 import render
 import scatter
 import sims_illustrative as sims
+import winds
 
 TILE = 96
 SEED = 0
@@ -148,6 +154,33 @@ def panels():
     out.append(("coastal (illustrative)", render.hillshade(_track("coastal", coast), CELLSIZE)))
     inter = sims.intertidal_mask(base, base.mean(), 60.0).astype(float)
     out.append(("tides intertidal (illus.)", render.greyscale(inter)))
+
+    # --- the remaining verified modules: diffusion, dunes, pipe, flexure, wind, tephra, PDC, seafloor ---
+    out.append(("diffusion (Culling)", render.hillshade(
+        diffusion.hillslope_diffuse(base, 50.0, diffusion.stable_dt(50.0, CELLSIZE), 30, CELLSIZE),
+        CELLSIZE)))
+    sand = 5.0 + 3.0 * noise.value(xx * 2, yy * 2, 1)
+    out.append(("dunes (Werner)", render.hillshade(
+        _track("dunes", dunes.werner_dunes(sand, 300, seed=SEED, wind=(0, 1))), CELLSIZE)))
+    out.append(("pipe water depth", render.greyscale(erosion_pipe.pipe_water(
+        base, np.full((TILE, TILE), 2.0), 120, rain=0.0, dt=0.01, cellsize=CELLSIZE))))
+    mtn = 800.0 * np.exp(-((xx2 - 48) ** 2 + (yy2 - 48) ** 2) / (2 * 15.0 ** 2))
+    Dr = isostasy.flexural_rigidity(7e10, 20000.0)
+    out.append(("flexure (200 km)", render.greyscale(
+        _track("flexure", isostasy.flexure_fft(mtn * 2700 * 9.81, Dr, 3300.0, cellsize=2000.0)))))
+    sx, sy = analysis.gradient(base, CELLSIZE)
+    uu, vv = winds.mass_consistent(1.0 - 20.0 * sx, 0.3 - 20.0 * sy, CELLSIZE)
+    out.append(("wind speed |v|", render.greyscale(np.hypot(uu, vv))))
+    rr = np.hypot(xx2 - 48, yy2 - 48) * CELLSIZE
+    out.append(("tephra fallout", render.greyscale(
+        _track("tephra", analytic.tephra_thickness(rr + 1.0, 100.0, 0.002)))))
+    pdc = analytic.pdc_inundated(base, (48, 48), 500.0, 0.55, CELLSIZE).astype(np.float64)
+    hs = render.hillshade(base, CELLSIZE).astype(np.float64)
+    tint = hs * (1 - 0.5 * pdc[..., None]) + np.array([220, 90, 40]) * 0.5 * pdc[..., None]
+    out.append(("PDC inundation", np.clip(tint, 0, 255).astype(np.uint8)))
+    age = (xx2 / TILE) * 100.0
+    out.append(("seafloor age-depth", render.greyscale(
+        _track("age-depth", analytic.seafloor_depth_hsc(age + 0.1)))))
     return out
 
 
