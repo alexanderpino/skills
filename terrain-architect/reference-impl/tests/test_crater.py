@@ -142,6 +142,38 @@ def test_natural_render_is_deterministic_textured_and_forward():
     assert dep[:, N // 2:].sum() > dep[:, :N // 2].sum()    # mass pushed forward (downrange = +x)
 
 
+def test_pseudocode_in_11_geological_matches_crater_py():
+    """The `references/11-geological.md` oblique-impact pseudocode must stay in lock-step with the
+    implementation. This re-implements that block verbatim and asserts it reproduces crater.py — so
+    editing one without the other trips a red test (answers 'does the pseudocode still correspond?')."""
+    clip = lambda x: np.clip(x, 0.0, 1.0)
+
+    def ps_final(D_tc, g=9.81):
+        Dc = 3200.0 * (9.81 / g)
+        if 1.25 * D_tc < Dc:
+            return 1.25 * D_tc, False, 0.20 * 1.25 * D_tc
+        D = 1.17 * D_tc ** 1.13 / Dc ** 0.13
+        return D, True, 0.20 * Dc * (D / Dc) ** 0.3
+
+    ps_ecc = lambda a: 1.0 + 1.2 * clip((12.0 - a) / 12.0)
+
+    def ps_azw(psi, a):
+        d = clip((90.0 - a) / 85.0); p = 1.0 + 3.0 * clip((20.0 - a) / 20.0)
+        bf = clip((5.0 - a) / 5.0); down = 0.5 + 0.5 * np.cos(psi)
+        w = (1.0 - d) + d * down ** p
+        w = (1.0 - bf) * w + bf * np.sin(psi) ** 2
+        return 0.12 + 0.88 * np.clip(w, 0.0, 1.0)
+
+    psis = np.linspace(0, 2 * np.pi, 13)
+    for a in (90, 45, 30, 20, 12, 8, 5, 3):
+        assert abs(ps_ecc(a) - C._ellipticity(a)) < 1e-12
+        assert np.max(np.abs(ps_azw(psis, a) - C._ejecta_azimuth_weight(psis, a))) < 1e-12
+    for D_tc in (300.0, 1500.0, 6000.0, 40000.0):
+        pd, pc, pdep = ps_final(D_tc)
+        cd, cc, cdep = C.final_crater(D_tc)
+        assert pc is cc and abs(pd - cd) < 1e-9 and abs(pdep - cdep) < 1e-9
+
+
 def test_grazing_crater_is_deeper_uprange():
     """A grazing crater's deepest point / steepest wall sits UP-RANGE (first contact / peak energy;
     Schultz, arXiv 2308.01876), shallowing down-range where material is plowed out. The plow used to

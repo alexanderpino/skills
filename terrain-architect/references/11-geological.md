@@ -636,6 +636,36 @@ Shape under obliquity (**Gault & Wedekind 1978**; **Pierazzo & Melosh 2000**; **
   **contested** (Ekholm & Melosh 2001 found none on Venus), so a weak indicator, not a law. (An earlier
   draft here had the deepening *and* the peak going **downrange** — both were backwards.)
 
+As pseudocode — the size + azimuthal-weight + peak-offset core is `reference-impl/crater.py`
+(`transient_crater_diameter`, `final_crater`, `_ellipticity`, `_ejecta_azimuth_weight`,
+`stamp_impact`); the relief styling below the dashed line (deeper up-range, `~0.04·D` rim ring,
+terraces, hummocky apron) is the `crater_demo.py` presentation layer:
+
+```
+finalCrater(D_tc, g):  Dc = 3200·(9.81/g)                    # transition ∝ 1/g
+    if 1.25·D_tc < Dc:  D = 1.25·D_tc;              depth = 0.20·D           # simple
+    else:               D = 1.17·D_tc^1.13 / Dc^0.13; depth < 0.20·D         # complex, shallower
+
+obliqueImpact(D_tc, angle, azimuth):        # angle from horizontal; ψ measured from DOWNRANGE
+    D, depth, complex = finalCrater(D_tc, g)
+    ecc = 1 + 1.2·clip((12−angle)/12, 0, 1)        # CIRCULAR ≥12°, elongates below (Bottke/Collins)
+    r   = dist(stretched by ecc along the track) / (D/2)      # the hole is round unless grazing
+    # azimuthal ejecta / rim weight — the observed sequence, not one knob:
+    d  = clip((90−angle)/85, 0, 1)                 # obliquity 0 (vertical) … 1 (grazing)
+    p  = 1 + 3·clip((20−angle)/20, 0, 1)           # sharpen up-range forbidden wedge <20°
+    bf = clip((5−angle)/5, 0, 1)                   # butterfly <5° (lab; ~10° on the Moon)
+    down = ½(1 + cos ψ)                            # 1 downrange, 0 up-range
+    w   = (1−d) + d·down^p                         # steep→uniform, oblique→downrange-loaded
+    w   = (1−bf)·w + bf·sin²ψ                      # <5°: cross-range wings, both forbidden zones
+    azw = 0.12 + 0.88·w                            # down/up-range mass contrast caps ~8× (arXiv 2404.16677)
+    # ---- crater.py stamps bowl + mass-conserving azw·ejecta + up-range peak above this line ----
+    # ---- crater_demo.py presentation adds the relief styling below, all keyed to azw / d: ------
+    bowl:   paraboloid to depth; at grazing DEEPER UP-RANGE (steeper up-range wall; Schultz)
+    rim:    raised ring ~0.04·D, lumpy; scaled by azw (downrange/transverse build-up, up-range starved)
+    ejecta: hummocky apron off the rim, ∝ azw, reaching farther downrange and thinning outward
+    peak(if complex): rough massif, offset slightly UP-RANGE (deepest-penetration side; contested)
+```
+
 `reference-impl/crater.py` implements this size+angle model with the π-scaling exponents verified
 against the source (`reference-impl/VALIDATION.md`); its ejecta is **mass-conserving** (the excavated
 bowl volume is what the downrange-biased blanket redeposits). For the *look*, the key principle is:
