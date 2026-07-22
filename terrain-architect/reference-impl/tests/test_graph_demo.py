@@ -54,6 +54,19 @@ def test_legal_order_is_wired():
     assert g.nodes["area"].locality == "GLOBAL"
 
 
+def test_analysis_and_materials_downstream_of_final_height():
+    """06 ordering rule: analysis (slope) and materials read the FINAL height, and the
+    material stack partitions (sum ~ 1)."""
+    g, _, ctx = _small()
+    assert g.nodes["slope"].inputs == ("relaxed",)
+    assert g.nodes["materials"].inputs == ("relaxed", "slope", "area")
+    materials = g.evaluate("materials")
+    n = ctx.resolution
+    assert materials.shape == (5, n, n)                # water/snow/rock/sand/grass
+    assert materials.min() >= -1e-9 and materials.max() <= 1.0 + 1e-9
+    assert np.allclose(materials.sum(axis=0), 1.0, atol=1e-6)
+
+
 def test_cache_recomputes_only_downstream_cone():
     """Editing the thermal node re-runs it and its cone; the upstream base/fluvial are
     served from cache (14, content-addressed caching)."""

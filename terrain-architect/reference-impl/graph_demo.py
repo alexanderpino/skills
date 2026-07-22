@@ -16,11 +16,12 @@ substrate in `references/14-graph-runtime.md`:
 
 The sample pipeline walks the **Legal Order** from `SKILL.md`:
 
-    noise (base)  ->  fluvial erosion  ->  thermal (hillslope)  ->  fill  ->  drainage area
-       01              04                   05, AFTER hydraulic     03       03, for analysis
+    noise -> fluvial erosion -> thermal -> fill -> drainage area -> slope -> masks/materials
+     01       04                05         03      03               06       06
 
-and the analysis (drainage area, slope) runs on the *final* geometry, never before — the
-two ordering laws `09` catches most often. Rendering uses the review modes in `render.py`.
+and every analysis node (drainage area, slope, materials) runs on the *final* geometry, never
+before — the two ordering laws `09` catches most often. Rendering uses the review modes in
+`render.py`, including a material splatmap from the partitioned `06` masks.
 
 Nothing here is a verified reference module. The nodes are thin adapters over the modules
 that *are* verified (``flow``, ``erosion_droplet``, ``erosion_streampower``,
@@ -41,6 +42,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+import analysis
 import erosion_droplet
 import erosion_streampower
 import erosion_thermal
@@ -215,6 +217,17 @@ def _area_fn(p, ins, ctx):
     return flow.d8_accumulation(ins[0], cellsize=ctx.cellsize)
 
 
+def _slope_fn(p, ins, ctx):
+    return analysis.slope(ins[0], cellsize=ctx.cellsize)
+
+
+def _materials_fn(p, ins, ctx):
+    height, slope_tan, area = ins
+    stack = analysis.derive_materials(height, slope_tan, area, ctx.cellsize,
+                                      rng_seed=ctx.root_seed)
+    return np.stack([m for _, m in stack], axis=0)       # (K, H, W) partitioned MaterialField
+
+
 def build_graph(ctx, backbone="droplet"):
     """The sample pipeline, as a DAG in Legal Order. Returns the graph plus the names of
     the two output fields: (height, drainage_area)."""
@@ -245,6 +258,11 @@ def build_graph(ctx, backbone="droplet"):
     g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",), locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
+
+    # 10-11  analysis -> masks -> materials, all on the final height (never before)
+    g.add("slope", "analysis.slope/1", _slope_fn, inputs=("relaxed",), locality="LOCAL")
+    g.add("materials", "analysis.materials/1", _materials_fn,
+          inputs=("relaxed", "slope", "area"), locality="LOCAL")
 
     return g, ("relaxed", "area")
 
@@ -282,7 +300,7 @@ def report_checks(base, height, area, cellsize):
 # --------------------------------------------------------------------------- #
 # rendering the review-mode palette
 # --------------------------------------------------------------------------- #
-def render_all(height, area, cellsize, outdir, sun_sweep=0):
+def render_all(height, area, cellsize, outdir, materials=None, sun_sweep=0):
     os.makedirs(outdir, exist_ok=True)
     written = []
 
@@ -296,6 +314,8 @@ def render_all(height, area, cellsize, outdir, sun_sweep=0):
     emit("04_flow_overlay.png", render.flow_overlay(height, area, cellsize))
     emit("05_hypsometric.png", render.hypsometric(height, cellsize))
     emit("06_clip.png", render.false_colour_clip(height))
+    if materials is not None:                                  # 11: the splatmap preview
+        emit("07_materials.png", render.material_rgb(materials, cellsize))
 
     for f in range(int(sun_sweep)):                            # 09: the sun sweep
         az = 360.0 * f / sun_sweep
@@ -358,11 +378,12 @@ def main(argv=None):
     t0 = time.time()
     height = g.evaluate(h_out)
     area = g.evaluate(a_out)
+    materials = g.evaluate("materials")
     base = g._cache[g.key("base")]
     print(f"  evaluated in {time.time() - t0:.1f}s; order: {g.evaluated}")
 
     report_checks(base, height, area, cellsize)
-    written = render_all(height, area, cellsize, args.out, args.sun_sweep)
+    written = render_all(height, area, cellsize, args.out, materials, args.sun_sweep)
     print(f"  wrote {len(written)} renders to {args.out}/:")
     for p in written:
         print(f"    {p}")

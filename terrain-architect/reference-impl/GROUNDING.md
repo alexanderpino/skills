@@ -35,6 +35,7 @@ Same scale as `references/22-open-source-grounding.md`:
 | `relaxed` (thermal) | `erosion_thermal.py` | bshishov/UnityTerrainErosionGPU `0e59f7c4` | MIT | **skill-stricter** (8-neighbour distance-correct; upstream 4-dir bug not ported) | `09` radial-anisotropy oracle (`test_thermal.py`) |
 | `filled` (fill) | `flow.py` | **RichDEM** FillDepressions `9a1c97bb` | GPL-3.0 | **cross-validated** | `test_crossvalidate.py::test_priority_flood_matches_richdem` |
 | `area` (D8 accumulation) | `flow.py` | **pysheds** `1949ce1d` · **Landlab** FlowAccumulator `0b0ef086` | GPL-3.0 · MIT | **cross-validated** | `test_crossvalidate.py::test_d8_accumulation_matches_pysheds` · `test_crossvalidate_landlab.py::test_d8_accumulation_matches_landlab` |
+| `slope`, `materials` (analysis/masks) | `analysis.py` | Zevenbergen & Thorne 1987 · Beven & Kirkby 1979 (GDAL/GRASS implement the same) | papers | **paper-grounded** (analytic oracles) | `test_analysis.py` |
 
 Adjacent module the sandbox can wire (a drop-in extra hillslope node), cross-validated too:
 

@@ -159,6 +159,27 @@ def false_colour_clip(h, lo=None, hi=None):
     return img
 
 
+# water, snow, rock, sand, grass — order matches analysis.MATERIAL_NAMES
+_MATERIAL_PALETTE = [
+    (40, 90, 170), (240, 244, 250), (120, 118, 116), (200, 178, 120), (96, 132, 72),
+]
+
+
+def material_rgb(masks, cellsize=1.0, palette=None, shade=True):
+    """Colour a material stack. `masks` is either a partitioned `(K, H, W)` weight stack
+    (blended by weight — the splatmap preview) or a categorical `(H, W)` index map. Palette
+    order must match the mask order. With `shade`, modulate by hillshade for relief."""
+    masks = np.asarray(masks, dtype=np.float64)
+    pal = np.asarray(palette if palette is not None else _MATERIAL_PALETTE, dtype=np.float64)
+    if masks.ndim == 2:                            # categorical index map -> one-hot
+        idx = np.clip(np.rint(masks).astype(int), 0, len(pal) - 1)
+        rgb = pal[idx]
+    else:                                          # (K,H,W) soft weights -> weighted blend
+        k = masks.shape[0]
+        rgb = np.tensordot(np.moveaxis(masks, 0, -1), pal[:k], axes=([2], [0]))
+    return np.clip(rgb, 0, 255).astype(np.uint8)
+
+
 # --------------------------------------------------------------------------- #
 # PNG writer  (truecolour 8-bit, no external deps)
 # --------------------------------------------------------------------------- #

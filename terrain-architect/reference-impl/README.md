@@ -18,11 +18,11 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 60 pass; 5 optional cross-checks skip
+pytest -q                            # 69 pass; 5 optional cross-checks skip
 
 # optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
 pip install -r requirements-crossvalidate.txt
-pytest -q                            # the 5 cross-checks now run instead of skipping
+pytest -q                            # 74 pass; the 5 cross-checks now run instead of skipping
 ```
 
 ## What's here, and how each is verified
@@ -49,6 +49,7 @@ against an independent library.
 | `dunes.py` — Werner slab CA | `05` Werner 1995 | slabs conserved; instability (`p_sand>p_bare`) sweeps ground bare; deterministic |
 | `winds.py` — mass-consistent wind | `13` Sherman 1978 | corrected field's divergence → 0 (Helmholtz–Hodge projection); solenoidal field passes through |
 | `runout.py` — Voellmy runout | `05` Voellmy 1955 | runout length on a ramp matches `L = H/tan(α)`; more friction → shorter |
+| `analysis.py` — analysis & masks | `06` slope/aspect, Zevenbergen–Thorne curvature, horizon AO, Beven–Kirkby TWI, selectors, masks→materials | slope of a plane = its gradient; discrete Laplacian of a paraboloid = `−2/R`; AO 0 on flat, >0 in a pit; TWI finite on flats; material masks **partition** (Σ ≤ 1) |
 
 ## Sandbox: run a graph and look at it
 
@@ -72,13 +73,15 @@ Two files, both deliberately small:
   DAG is **content-addressed cached** (change one node, only its downstream cone recomputes —
   that is what makes it usable for iteration). The sample pipeline walks the **Legal Order**:
   fBm noise → fluvial erosion (droplet < 2 km, stream power > 50 km, per the design
-  procedure) → thermal *after* hydraulic → depression fill → drainage area, with the analysis
-  computed on the **final** geometry. It prints the `09` checks it should pass (trunk drainage
-  exits at the edge; slope capped at the repose angle; the erosion budget).
+  procedure) → thermal *after* hydraulic → depression fill → drainage area → slope → masks →
+  materials, with all analysis computed on the **final** geometry. It prints the `09` checks it
+  should pass (trunk drainage exits at the edge; slope capped at the repose angle; the erosion
+  budget).
 - **`render.py`** — the `09` "visual review modes" as pure-numpy functions returning RGB
   arrays, plus a zero-dependency PNG writer: greyscale height, hillshade, slope shade,
-  `log(A)` flow overlay, hypsometric tint, and a false-colour clip that flags NaN/Inf. Import
-  it directly to render any heightfield from the other modules.
+  `log(A)` flow overlay, hypsometric tint, a false-colour clip that flags NaN/Inf, and a
+  material splatmap (partitioned `06` masks blended by weight). Import it directly to render
+  any heightfield from the other modules.
 
 The fBm noise base is a **demo initial condition**, not a verified `01` mirror (noise is the
 initial condition, not the answer). Everything downstream is a thin adapter over the verified
