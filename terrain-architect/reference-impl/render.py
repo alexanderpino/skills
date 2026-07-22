@@ -180,6 +180,56 @@ def material_rgb(masks, cellsize=1.0, palette=None, shade=True):
     return np.clip(rgb, 0, 255).astype(np.uint8)
 
 
+# --------------------------------------------------------------------------- #
+# photoreal composite  (HYPERREALISM.md Part 1 — the shared render pipeline)
+# --------------------------------------------------------------------------- #
+def sun_sky_shade(h, cellsize=1.0, azimuth=315.0, altitude=45.0, z_factor=1.0, sky=0.30):
+    """Two-light diffuse shade in [0,1]: a directional *sun* Lambert plus a flat hemispheric
+    *sky* fill so shadows are lifted, never crushed to black (the single-hillshade tell). `sky`
+    is the ambient floor; the remaining (1-sky) is the sun's contribution. Pure — takes only h."""
+    gx, gy = _gradient(h, cellsize)
+    gx *= z_factor
+    gy *= z_factor
+    nz = 1.0 / np.sqrt(gx * gx + gy * gy + 1.0)
+    nx, ny = -gx * nz, -gy * nz
+    az, alt = np.radians(azimuth), np.radians(altitude)
+    lx = np.cos(alt) * np.sin(az)
+    ly = -np.cos(alt) * np.cos(az)
+    lz = np.sin(alt)
+    lambert = np.clip(nx * lx + ny * ly + nz * lz, 0.0, 1.0)
+    return np.clip(sky + (1.0 - sky) * lambert, 0.0, 1.0)
+
+
+def photoreal(material_rgb, h, cellsize=1.0, *, ao=None, rivers=None,
+              azimuth=315.0, altitude=45.0, sky=0.30, ao_strength=0.45,
+              aerial_strength=0.5, aerial_band=0.28, aerial_rgb=(170, 184, 206),
+              water_rgb=(74, 116, 168), sea_level=None):
+    """Composite a photoreal read from a **material-colour** image and the height field
+    (HYPERREALISM.md Part 1): `material × (sun + sky) × AO`, blue rivers painted in, then
+    aerial perspective hazing the low/distant ground toward atmosphere. Kept dependency-free
+    — the caller supplies the already-computed `material_rgb` (a splatmap, `material_rgb(...)`),
+    the horizon `ao` occlusion field (`analysis.horizon_ao`, 0=open…1=occluded) and a `rivers`
+    strength map (e.g. from log drainage area); each is optional. This is the largest, cheapest
+    realism jump over grey hillshade: colour + soft two-light + creased AO + depth haze."""
+    mat = np.asarray(material_rgb, dtype=np.float64)
+    shade = sun_sky_shade(h, cellsize, azimuth, altitude, sky=sky)
+    lit = mat * shade[..., None]
+    if ao is not None:                                       # darken sky-occluded creases/valleys
+        occl = np.clip(np.asarray(ao, dtype=np.float64), 0.0, 1.0)
+        lit *= (1.0 - ao_strength * occl)[..., None]
+    if rivers is not None:                                   # paint the biggest channels blue
+        r = np.clip(np.asarray(rivers, dtype=np.float64), 0.0, 1.0)[..., None]
+        lit = lit * (1.0 - 0.6 * r) + np.array(water_rgb, dtype=np.float64) * 0.6 * r
+    if aerial_strength > 0.0:                                # low ground desaturates toward sky
+        hh = np.asarray(h, dtype=np.float64)
+        base = float(sea_level) if sea_level is not None else float(hh.min())
+        span = max(float(hh.max()) - base, 1e-6)
+        hn = np.clip((hh - base) / span, 0.0, 1.0)
+        haze = (np.clip(aerial_band - hn, 0.0, aerial_band) / aerial_band) * aerial_strength
+        lit = lit * (1.0 - haze[..., None]) + np.array(aerial_rgb, dtype=np.float64) * haze[..., None]
+    return np.clip(lit, 0, 255).astype(np.uint8)
+
+
 def scatter_overlay(base_rgb, points, cellsize=1.0, color=(20, 20, 20), radius=1):
     """Draw a PointSet (07) over a base RGB image as small filled discs. `points` are world
     metres (x, y); converts to pixels via cellsize."""

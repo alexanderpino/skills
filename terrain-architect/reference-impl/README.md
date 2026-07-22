@@ -97,8 +97,10 @@ Two files, both deliberately small:
 - **`render.py`** — the `09` "visual review modes" as pure-numpy functions returning RGB
   arrays, plus a zero-dependency PNG writer: greyscale height, hillshade, slope shade,
   `log(A)` flow overlay, hypsometric tint, a false-colour clip that flags NaN/Inf, a
-  material splatmap (partitioned `06` masks blended by weight), and a boulder scatter overlay.
-  Import it directly to render any heightfield from the other modules.
+  material splatmap (partitioned `06` masks blended by weight), a boulder scatter overlay, and
+  the **photoreal composite** (`sun_sky_shade` + `photoreal`: material colour × sun+sky ×
+  ambient occlusion + rivers + aerial perspective — Stage 1 of `HYPERREALISM.md`, the render
+  behind both montages). Import it directly to render any heightfield from the other modules.
 
 The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
 itself is the verified `noise.py` module (noise is the initial condition, not the answer).
@@ -108,7 +110,10 @@ algorithm on one shared base — the visual complement to the oracles, with a nu
 that catches blow-ups the normalised renders hide — run `python gallery.py` (see `GALLERY.md`).
 For
 where each node comes from — reference library, pinned revision, licence, grounding state and
-which cross-check covers it — see **`GROUNDING.md`**.
+which cross-check covers it — see **`GROUNDING.md`**. For how far these tiles could be pushed
+toward photoreal — the shared render pipeline (Stage 1, now driving both montages), the
+per-archetype geomorphology each landform still needs, and where the numpy sandbox honestly tops
+out — see **`HYPERREALISM.md`**.
 
 ## Coverage boundary and production paths
 

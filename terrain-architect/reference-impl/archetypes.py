@@ -274,11 +274,75 @@ ARCHETYPES = [
 ]
 
 
+# --------------------------------------------------------------------------- #
+# Photoreal render (HYPERREALISM.md Part 1): material colour × sun+sky × AO + rivers + aerial.
+# A per-world PALETTE recolours the same derive_materials stack (water, snow, rock, sand, remainder)
+# so one composite serves Earth / Mars / Moon — the palette is the whole difference, per the doc.
+# --------------------------------------------------------------------------- #
+PALETTES = {                                      # order: water, snow, rock, sand, grass/remainder
+    "temperate": [(58, 110, 150), (236, 240, 246), (120, 114, 106), (196, 178, 132), (92, 120, 74)],
+    "verdant":   [(48, 88, 62), (228, 234, 238), (110, 118, 96), (150, 158, 112), (74, 112, 66)],
+    "arid":      [(120, 92, 64), (208, 198, 178), (156, 104, 72), (206, 176, 120), (178, 150, 112)],
+    "volcanic":  [(52, 100, 150), (228, 230, 236), (92, 84, 82), (140, 120, 110), (86, 108, 72)],
+    "sand":      [(150, 122, 88), (214, 206, 186), (150, 116, 82), (208, 180, 128), (198, 172, 122)],
+    "mars":      [(96, 56, 44), (206, 184, 160), (122, 64, 46), (198, 120, 72), (160, 98, 66)],
+    "lunar":     [(84, 84, 88), (200, 200, 206), (150, 150, 156), (122, 122, 128), (106, 106, 112)],
+}
+FAMILY = {                                        # archetype/world name -> palette family
+    "alpine orogen": "temperate", "appalachian (old)": "temperate", "tower karst": "temperate",
+    "ag terraces": "temperate", "fjord coast": "temperate", "sea cliffs & stacks": "temperate",
+    "canyon + strata": "arid", "mesa / tepui": "arid", "basin & range": "arid", "badlands": "arid",
+    "erg dune sea": "sand", "stratovolcano": "volcanic", "caldera lake": "volcanic",
+    "lunar cratered": "lunar", "lunar maria": "lunar", "mars relict": "mars",
+}
+
+
+def _rich(h, family, cell=CELL, sea_level=None, azimuth=315.0, altitude=42.0):
+    """The shared photoreal composite for one tile: derive the material splat, colour it with the
+    world's PALETTE, and light it with render.photoreal (sun+sky, AO, rivers, aerial). Rivers only
+    on wet worlds; Mars/Moon get no blue channels and a rust/grey palette."""
+    slope = analysis.slope(h, cell)
+    area = flow.d8_accumulation(flow.priority_flood_fill(h), cell)
+    stack = analysis.derive_materials(h, slope, area, cell, rng_seed=0)
+    masks = np.stack([m for _, m in stack])
+    mat = render.material_rgb(masks, palette=PALETTES[family], shade=False)
+    ao = analysis.horizon_ao(h, cell)
+    rivers = None
+    if family in ("temperate", "volcanic"):                                  # wet worlds carry channels
+        la = np.log1p(area)
+        mx = float(la.max())
+        rivers = np.clip((la - 0.87 * mx) / (0.13 * mx + 1e-9), 0.0, 1.0)
+    return render.photoreal(mat, h, cell, ao=ao, rivers=rivers, ao_strength=0.38,
+                            aerial_strength=0.34, aerial_band=0.20,
+                            azimuth=azimuth, altitude=altitude, sea_level=sea_level)
+
+
+def _flood(img, h, water_mask, blue=(46, 96, 156)):
+    """Composite still water (a lake or the sea) over a rendered tile where `water_mask` is True."""
+    w = np.asarray(water_mask, dtype=np.float64)[..., None]
+    return np.clip(np.asarray(img, np.float64) * (1.0 - 0.78 * w)
+                   + np.array(blue, np.float64) * 0.78 * w, 0, 255).astype(np.uint8)
+
+
+def render_tile(h, name, mode, cell=CELL):
+    """Dispatch one archetype to the photoreal composite, honouring its water mode."""
+    family = FAMILY.get(name, "temperate")
+    if mode == "sea":                                                        # ocean floods z<0, reaches edge
+        img = _rich(h, family, cell, sea_level=0.0)
+        return _flood(img, h, h < 0.0)
+    if mode == "lake":                                                       # only ENCLOSED basins hold water
+        img = _rich(h, family, cell)
+        return _flood(img, h, (flow.priority_flood_fill(h) - h) > 1.0)
+    if mode == "dunes":                                                      # aeolian: low raking sun
+        return _rich(h, family, cell, azimuth=270.0, altitude=28.0)
+    return _rich(h, family, cell)
+
+
 def _render(h, mode, cell=CELL):
+    """Legacy grey/hypsometric render (kept for screen_worlds' snow/salt fallbacks and quick checks)."""
     if mode == "sea":
         return render.hypsometric(h, cell, sea_level=0.0)
     if mode == "lake":
-        # flood only ENCLOSED basins (the caldera) — priority-flood leaves the draining exterior dry
         water = (flow.priority_flood_fill(h) - h) > 1.0
         hs = render.hillshade(h, cell).astype(np.float64)
         blue = np.array([45, 95, 155], dtype=np.float64)
@@ -333,7 +397,7 @@ def main():
     tiles, sigs = [], []
     for name, group, fn, mode in ARCHETYPES:
         h = fn()
-        tiles.append((f"{group}. {name}", _render(h, mode)))
+        tiles.append((f"{group}. {name}", render_tile(h, name, mode)))
         sigs.append(_signature(name, group, h))
     render.write_png("archetypes.png", labeled_montage(tiles, cols=4))
     print(f"wrote archetypes.png ({len(tiles)} archetypes, {TILE}px tiles, ~{TILE * CELL / 1000:.1f} km each)")

@@ -6,6 +6,14 @@ The renderable **archetypes** from `references/20-archetypes.md` (the master enu
 `references/00-index.md`), each assembled from the verified Legal-Order blocks and rendered on a
 ~1.9 km tile. Regenerate with `python archetypes.py`.
 
+The tiles render through the **shared photoreal composite** (`render.photoreal`: material colour ×
+sun+sky two-light × ambient occlusion + rivers + aerial perspective), with a per-world palette
+recolouring the same material splat — Earth green, desert red-rock, Mars rust, Moon grey, basalt
+volcano, blue water. This is Stage 1 of `reference-impl/HYPERREALISM.md`, the research-grounded
+ledger of what each tile would need to reach photoreal (and where the numpy sandbox honestly tops
+out); the remaining per-archetype geomorphology — break-of-slope, dune slip faces, caprock bands,
+crater size-frequency — is Stages 2–4 there.
+
 These are the **province** altitude — *one recognisable place* — between `graph_demo.py` (the
 generic baseline pipeline) and a single landform. The whole lesson of `20-archetypes.md` is that
 these are **not new algorithms**: each is the same Legal Order with the dominant agent switched.

@@ -81,3 +81,26 @@ def test_archetype_signatures():
 def test_archetypes_deterministic():
     assert np.array_equal(A.cratered(seed=3, n=40), A.cratered(seed=3, n=40))
     assert not np.array_equal(A.cratered(seed=3, n=40), A.cratered(seed=4, n=40))
+
+
+def test_render_tile_photoreal_composite():
+    """Every archetype renders to a valid RGB tile via the shared photoreal path (render.photoreal):
+    right shape/dtype, in-range, and not a flat single colour (colour + light actually happened)."""
+    for name, group, fn, mode in A.ARCHETYPES:
+        h = fn(n=N, cell=A.CELL)
+        img = A.render_tile(h, name, mode, cell=A.CELL)
+        assert img.shape == (N, N, 3) and img.dtype == np.uint8, name
+        assert img.min() >= 0 and img.max() <= 255, name
+        assert int(img.reshape(-1, 3).std(axis=0).sum()) > 3, f"{name}: render is a flat colour"
+
+
+def test_photoreal_two_light_floor_and_ao():
+    """render.sun_sky_shade never crushes to black (sky floor) and stays <=1; AO only darkens."""
+    import render
+    h = A.alpine(n=N, cell=A.CELL)
+    shade = render.sun_sky_shade(h, A.CELL, sky=0.3)
+    assert shade.min() >= 0.3 - 1e-9 and shade.max() <= 1.0 + 1e-9
+    flat = np.zeros((N, N, 3)) + 200.0
+    occ = np.ones((N, N))                                  # fully occluded -> strictly darker
+    lit = render.photoreal(flat, h, A.CELL, ao=occ, ao_strength=0.4, aerial_strength=0.0)
+    assert lit.max() <= 200

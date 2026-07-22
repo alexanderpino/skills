@@ -9,7 +9,7 @@ N = 48
 
 
 def test_screen_worlds_all_finite_and_not_blown_up():
-    for label, fn, _ in S.SCREEN:
+    for label, fn, *_ in S.SCREEN:
         h = fn(n=N)
         assert h.shape == (N, N), label
         assert np.all(np.isfinite(h)), label
@@ -30,3 +30,15 @@ def test_screen_world_signatures():
 
     # Miller's world — a mountainous tidal wave rises above the shallow seabed
     assert S.miller(n=N).max() > 60.0
+
+
+def test_screen_worlds_render_photoreal():
+    """Each world renders to a valid, non-flat RGB tile through the shared photoreal composite
+    (or its snow/salt custom); drowned worlds come out predominantly blue."""
+    for label, fn, family, sea in S.SCREEN:
+        img = S._render(fn(n=N), family, sea)
+        assert img.shape == (N, N, 3) and img.dtype == np.uint8, label
+        assert int(img.reshape(-1, 3).std(axis=0).sum()) > 3, f"{label}: render is a flat colour"
+    sea_img = S._render(S.skull_island(n=N), "temperate", True)   # Ha Long: mostly sea
+    r, g, b = sea_img.reshape(-1, 3).mean(0)
+    assert b > r and b > g, "drowned coast should read blue"

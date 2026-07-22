@@ -44,9 +44,14 @@ compositing** (soft light + AO + aerial perspective). Ranked by realism-per-effo
 Mental model: `final = tonemap( aerial( material × (sun·shadow + skyfill) × AO ) )`.
 
 `reference-impl` already has the ingredients: `erosion_droplet`, `erosion_thermal`, `flow`,
-`analysis.derive_materials` / `horizon_ao`, `render.material_rgb`, `noise.domain_warp`. A prototype
-composite (material + AO + rivers + haze) is a large step up from the montage's grey hillshade — see
-the roadmap.
+`analysis.derive_materials` / `horizon_ao`, `render.material_rgb`, `noise.domain_warp`.
+
+**Status — Stage 1 is now implemented.** `render.sun_sky_shade` + `render.photoreal` (a pure-numpy
+composite: `material × (sun+sky) × AO + rivers + aerial`) and a per-world `PALETTES`/`_rich` path in
+`archetypes.py` now drive **both montages** — `archetypes.png` and `screen_worlds.png` render in
+colour, not grey hillshade. One composite serves Earth / Mars / Moon / desert / ice / salt: the
+palette recolouring the same material splat is the only difference. This was the largest, cheapest
+jump; what remains (Stages 2–4) is per-tile geomorphology, itemised below.
 
 ## Part 2 — Three cross-cutting principles (from the geomorphology)
 
@@ -94,8 +99,9 @@ These matter *more than any single feature* — they are why a landform reads as
 ## Part 4 — Staged roadmap (and where the sandbox honestly tops out)
 
 1. **Shared realistic render** (buys realism for *all* tiles at once): a `render`-side composite of
-   **material colour × (sun+sky) × AO + rivers + aerial haze**, at 2–4× the current tile resolution.
-   This is the largest, cheapest win — prototyped and working.
+   **material colour × (sun+sky) × AO + rivers + aerial haze**. This is the largest, cheapest win —
+   **done**: `render.photoreal` + per-world palettes now drive both montages (grey → colour). Next
+   sub-step here is resolution: render the montage tiles at 2–4× for finer carved detail.
 2. **Erosion on every fluvial/hillslope tile**: droplet (~5·N²) + interleaved thermal (33°), and
    feed deposition/flow into the splatmap. Fixes "blobby" alpine, canyon, badlands, mars.
 3. **Break-of-slope + slope-discipline per archetype**: caprock bands + talus (mesa, monument,

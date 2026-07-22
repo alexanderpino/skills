@@ -118,25 +118,29 @@ def miller(seed=8, n=TILE, cell=CELL):
     return seabed + amp[None, :] * np.exp(-((rows - front[None, :]) / 0.05) ** 2)
 
 
+# (label, builder, PALETTE family or custom render, sea?) — the photoreal composite (HYPERREALISM.md
+# Part 1) is shared with archetypes.py; a world's family is just which palette recolours the splat.
 SCREEN = [
-    ("Arrakis (Wadi Rum)", arrakis, "hillshade"),
-    ("Monument Valley", monument_valley, "hillshade"),
-    ("Pandora (Zhangjiajie)", pandora, "hillshade"),
-    ("Hoth (Norway ice)", hoth, "snow"),
-    ("Skull Is. (Ha Long)", skull_island, "sea"),
-    ("Beggar's Canyon", beggars_canyon, "hillshade"),
-    ("Crait (Salar Uyuni)", crait, "salt"),
-    ("Miller's world (sandur)", miller, "sea"),
+    ("Arrakis (Wadi Rum)", arrakis, "arid", False),
+    ("Monument Valley", monument_valley, "arid", False),
+    ("Pandora (Zhangjiajie)", pandora, "verdant", False),
+    ("Hoth (Norway ice)", hoth, "snow", False),
+    ("Skull Is. (Ha Long)", skull_island, "temperate", True),
+    ("Beggar's Canyon", beggars_canyon, "arid", False),
+    ("Crait (Salar Uyuni)", crait, "salt", False),
+    ("Miller's world (sandur)", miller, "temperate", True),
 ]
 
 
-def _render(h, mode, cell=CELL):
-    if mode == "snow":                                                        # ice-white, bare rock where steep
+def _render(h, family, sea, cell=CELL):
+    if family == "snow":                                                      # ice-white, bare rock where steep
         hs = render.hillshade(h, cell)[..., :1].astype(np.float64) / 255.0    # (H,W,1) grey factor
         rock = analysis.smoothstep(np.tan(np.radians(48)), np.tan(np.radians(66)), analysis.slope(h, cell))
+        ao = analysis.horizon_ao(h, cell)                                     # AO for glacial-basin depth
         base = np.array([224, 234, 246]) * (1 - rock[..., None]) + np.array([92, 86, 80]) * rock[..., None]
-        return np.clip(base * (0.66 + 0.34 * hs), 0, 255).astype(np.uint8)    # keep ice bright in shadow
-    if mode == "salt":                                                        # white crust, red polygonal cracks
+        lit = base * (0.66 + 0.34 * hs) * (1.0 - 0.3 * ao[..., None])
+        return np.clip(lit, 0, 255).astype(np.uint8)                          # keep ice bright in shadow
+    if family == "salt":                                                      # white crust, red polygonal cracks
         idx = np.arange(h.shape[0]) * cell / (h.shape[0] * cell * 0.12)
         xx, yy = np.meshgrid(idx, idx)
         wx = noise.fbm(xx * 0.7, yy * 0.7, 11, octaves=4)                     # DOMAIN WARP the Voronoi so the
@@ -147,14 +151,15 @@ def _render(h, mode, cell=CELL):
         col = (np.array([238, 236, 230]) * cell_in[..., None]
                + np.array([150, 70, 55]) * (1 - cell_in[..., None]))
         return np.clip(col * (0.78 + 0.22 * hs), 0, 255).astype(np.uint8)
-    return A._render(h, mode, cell)                                           # dunes / sea / hillshade
+    img = A._rich(h, family, cell, sea_level=0.0 if sea else None)            # shared photoreal composite
+    return A._flood(img, h, h < 0.0) if sea else img                         # drowned coast / shoreless sea
 
 
 def main():
-    tiles = [(label, _render(fn(), mode)) for label, fn, mode in SCREEN]
+    tiles = [(label, _render(fn(), family, sea)) for label, fn, family, sea in SCREEN]
     render.write_png("screen_worlds.png", A.labeled_montage(tiles, cols=4))
     print(f"wrote screen_worlds.png ({len(tiles)} screen worlds)")
-    for label, fn, _ in SCREEN:
+    for label, fn, _, _ in SCREEN:
         h = fn()
         print(f"  {label:24s} relief={h.max() - h.min():7.0f} m")
 
