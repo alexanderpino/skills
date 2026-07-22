@@ -64,6 +64,7 @@ benchmarks, primary-source audit — is tracked in **`VALIDATION.md`**.
 | `crater_demo.py` — natural render (presentation) | composites the `crater.py` physics with `noise.py` (01) | smooth circular cavity + distinct raised **rim ring** (Pike), irregular rim/ejecta outline, terraced walls, defined central **massif**, hummocky **downrange** ejecta apron; grazing → irregular furrow (deeper up-range); hillshaded → `crater_matrix.png`. A *look*, not oracle-verified |
 | `crater_anatomy.py` — grazing anatomy figure | labels the corrected grazing morphology | map + trajectory cross-section → `crater_anatomy.png`: deeper up-range floor, up-range forbidden rim, transverse butterfly wings, downrange ejecta. Needs Pillow for the labels (terrain is numpy-only) |
 | `sims_illustrative.py` — **⚠ illustrative** sims | `12`/`19` lava CA, SIA glacier, coastal cliff retreat, tides | **INVARIANTS ONLY, no decisive oracle** — lava conserves mass (erupted = molten + frozen), glacier transport conserves ice & H ≥ 0, coastal erosion removes mass monotonically, tide bounded & solid untouched. Sketches to watch move, **not** verified numbers |
+| `archetypes.py` — **province** compositions | `20` complex archetypes as diffs from the baseline (alpine, canyon+strata, erg, fjord, lunar cratered, tower karst) | one recognisable *place* per tile, dominant agent switched; each carries its `09` signature; montage → `archetypes.png` (see `ARCHETYPES.md`). Tier L — composition of verified blocks, not a new algorithm |
 
 ## Sandbox: run a graph and look at it
 
