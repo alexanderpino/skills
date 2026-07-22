@@ -18,11 +18,12 @@ permission.
 ```bash
 cd terrain-architect/reference-impl
 pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 117 pass; 5 optional cross-checks skip
+pytest -q                            # 117 pass; 15 optional checks skip (see below)
 
-# optional: cross-validate against mature libraries (RichDEM, pysheds, Landlab).
-pip install -r requirements-crossvalidate.txt
-pytest -q                            # 122 pass; the 5 cross-checks now run instead of skipping
+# optional independent checks (validity evidence beyond the numpy-only oracles):
+pip install -r requirements-crossvalidate.txt   # RichDEM/pysheds/Landlab -> 5 cross-validation tests
+pip install -r requirements-validate.txt        # pint -> 10 dimensional-consistency tests
+pytest -q                            # 132 pass; all optional checks now run
 ```
 
 ## What's here, and how each is verified
@@ -31,6 +32,11 @@ The verification design is **layered**: use the strongest oracle available per a
 a closed-form value where one exists, otherwise `09`'s invariants (determinism, no NaN, mass
 conservation, radial symmetry) and quantitative signatures, plus an optional cross-check
 against an independent library.
+
+**On what "verified" means here:** most oracles prove the code *solves the stated equation
+correctly* (internal consistency), not that the equation is *right* (validity). The evidence
+that separates the two — dimensional consistency, independent-library agreement, published
+benchmarks, primary-source audit — is tracked in **`VALIDATION.md`**.
 
 | Module | Mirrors | Verified by (the oracle) |
 |---|---|---|
