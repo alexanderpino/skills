@@ -187,6 +187,14 @@ wrong constant.** Verdicts abbreviated ✅ (paper real, method/constant as claim
    `crater_matrix.png` now follow the observed sequence, with regression oracles in
    `test_crater.py` (`test_butterfly_only_at_grazing_not_premature`,
    `test_central_peak_offset_is_uprange_not_downrange`).
+4. **Grazing-crater depth asymmetry** — a follow-up source check (Schultz; the subsurface-pulse
+   study Anderson et al., arXiv 2308.01876, reporting the up-range floor slope ~10° steeper) showed
+   the `crater_demo.py` grazing "plow" was deepening **down-range** (a skipping-stone intuition) —
+   backwards, and inconsistent with the up-range central peak. A grazing crater is **deeper
+   up-range** (first contact / peak energy). **Applied:** the plow floor tilt is flipped (regression
+   oracle `test_grazing_crater_is_deeper_uprange`), a labelled `crater_anatomy.py` /
+   `crater_anatomy.png` figure documents the corrected morphology, and `references/11-geological.md`
+   is updated. (Presentation layer — the analytic `crater.py` oracles were unaffected.)
 
 **Coverage.** This covers every `reference-impl` module's primary citation(s) and named
 constants. The handful of un-itemised references are standard textbooks whose existence is not

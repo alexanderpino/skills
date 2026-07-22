@@ -142,6 +142,20 @@ def test_natural_render_is_deterministic_textured_and_forward():
     assert dep[:, N // 2:].sum() > dep[:, :N // 2].sum()    # mass pushed forward (downrange = +x)
 
 
+def test_grazing_crater_is_deeper_uprange():
+    """A grazing crater's deepest point / steepest wall sits UP-RANGE (first contact / peak energy;
+    Schultz, arXiv 2308.01876), shallowing down-range where material is plowed out. The plow used to
+    deepen down-range (backwards) — this locks the corrected direction. (Presentation layer.)"""
+    N, c = 400, 200
+    D = C.final_crater(C.transient_crater_diameter(200.0, 20000.0, angle=3.0))[0]
+    cs = D * C._ellipticity(3.0) / (N * 0.55)
+    h, _ = crater_demo.stamp_impact_natural(np.zeros((N, N)), c, c, cs, L=200.0, v=20000.0,
+                                            angle=3.0, azimuth=0.0, seed=5)      # downrange = +x
+    profile = h[c - 1:c + 2].mean(axis=0)                                        # along the track
+    deepest_col = int(np.argmin(profile))
+    assert deepest_col < c                                                       # up-range of centre
+
+
 def test_finite_and_complex_has_central_peak():
     h, info = C.stamp_impact(np.zeros((300, 300)), 150, 150, cellsize=300.0, L=4000.0,
                              v=20000.0, angle=90.0)

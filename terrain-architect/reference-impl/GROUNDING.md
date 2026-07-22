@@ -70,7 +70,8 @@ placement is held to a **mass-conservation invariant** (the excavated bowl volum
 blanket redeposits, so mass is *pushed forward*, not conjured; `test_ejecta_conserves_excavated_mass`).
 The `crater_demo.py` `stamp_impact_natural` render (smooth circular cavity + raised rim ring,
 irregular rim/ejecta outline, terraced walls, defined central massif, hummocky downrange ejecta
-apron, grazing plow furrow) is **demo-only** presentation — it dresses the verified
+apron, grazing furrow deeper up-range) and the labelled `crater_anatomy.py` figure are **demo-only**
+presentation — they dress the verified
 `crater.py` skeleton with `noise.py` (01) detail for a hillshaded *look* and is deliberately outside
 the grounding scale (not mass-conserving, not oracle-verified; only a determinism/texture smoke test).
 

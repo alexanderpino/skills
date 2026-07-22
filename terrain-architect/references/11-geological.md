@@ -624,15 +624,25 @@ Shape under obliquity (**Gault & Wedekind 1978**; **Pierazzo & Melosh 2000**; **
   down/up-range mass contrast ~8×, arXiv 2404.16677) → a sharp **up-range forbidden wedge** opens
   below **~20°** → a cross-range **butterfly** (forbidden zones *both* up- and down-range, wings
   thrown perpendicular to the path) only below **~5°**. Don't trigger the butterfly early — at 8–15°
-  the pattern is still a downrange lobe with an up-range gap.
-- **Asymmetric rim & peak.** The **up-range rim is depressed** (structural rim uplift is actually
-  greatest *transverse* to the path, least downrange). Any central-peak offset is **up-range**, toward
-  the deepest-penetration side (Schultz 1996) — and it is **contested**: Ekholm & Melosh 2001 found no
-  offset on Venus, so treat it as a weak indicator, not a law. (Our earlier note said "downrange" — that
-  was wrong.)
+  the pattern is still a downrange lobe with an up-range gap. (Those are the *laboratory* thresholds;
+  on the Moon the up-range wedge is read from ~25° and butterflies from ~10° — Luo 2022 — slightly
+  higher than the lab values, and rims stay "nearly round" down to ~10°.)
+- **Asymmetric depth, rim & peak.** A grazing crater is **deeper up-range** — the deepest point and
+  steepest wall sit on the up-range side (first contact / peak energy transfer; Schultz — the
+  subsurface-pulse study *Anderson et al., arXiv 2308.01876* finds the up-range floor slope ~10°
+  steeper), shallowing **down-range** where material is plowed out. The **up-range rim is depressed**
+  into a forbidden arc, while structural rim uplift is greatest *transverse* to the path. Any
+  central-peak offset is **up-range**, toward the deepest-penetration side (Schultz 1996) — and it is
+  **contested** (Ekholm & Melosh 2001 found none on Venus), so a weak indicator, not a law. (An earlier
+  draft here had the deepening *and* the peak going **downrange** — both were backwards.)
 
 `reference-impl/crater.py` implements this size+angle model with the π-scaling exponents verified
-against the source (`reference-impl/VALIDATION.md`). Its ejecta is **mass-conserving** — the
-excavated bowl volume is redeposited as the downrange-biased blanket, so the debris is visibly
-*pushed forward* rather than a symmetric ring; `crater_demo.py` renders it as a cut/fill matrix
-(excavation cool, deposition warm) across size × angle.
+against the source (`reference-impl/VALIDATION.md`); its ejecta is **mass-conserving** (the excavated
+bowl volume is what the downrange-biased blanket redeposits). For the *look*, the key principle is:
+a hypervelocity impact is a point-source explosion, so **keep the cavity a smooth near-circular bowl
+and put the chaos in the displaced mass**. `reference-impl/crater_demo.py` does that — a raised rim
+ring, an irregular rim/ejecta outline, terraced walls, a central massif, and a hummocky downrange
+ejecta apron — hillshaded across size × angle (`crater_matrix.png`); only below ~12° does the cavity
+elongate (deeper up-range). `reference-impl/crater_anatomy.py` labels the grazing case in
+`crater_anatomy.png` (map + trajectory cross-section). Those renders are presentation, not verified
+ledger — see `reference-impl/GROUNDING.md`.
