@@ -68,6 +68,10 @@ ejecta) is **phenomenological**, matched to the oblique-impact experiments (Gaul
 Pierazzo & Melosh 2000; Collins et al. 2011), not a ballistic-ejecta simulation — though the ejecta
 placement is held to a **mass-conservation invariant** (the excavated bowl volume is what the
 blanket redeposits, so mass is *pushed forward*, not conjured; `test_ejecta_conserves_excavated_mass`).
+The `crater_demo.py` `stamp_impact_natural` render (irregular rims, terraced walls, lumpy central
+massif, ejecta rays, grazing plow furrow) is **demo-only** presentation — it dresses the verified
+`crater.py` skeleton with `noise.py` (01) detail for a hillshaded *look* and is deliberately outside
+the grounding scale (not mass-conserving, not oracle-verified; only a determinism/texture smoke test).
 
 The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
 tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or

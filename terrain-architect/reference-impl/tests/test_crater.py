@@ -4,6 +4,7 @@ are morphological (elongation onset, downrange ejecta asymmetry) matched to the 
 """
 import numpy as np
 import crater as C
+import crater_demo
 
 
 # --- SIZE: π-scaling exponents (Collins/Melosh/Marcus 2005) ---
@@ -119,6 +120,26 @@ def test_central_peak_offset_is_uprange_not_downrange():
     w = int(0.4 * R)
     peak_col = int(np.argmax(h[c, c - w:c + w + 1])) + (c - w)
     assert peak_col < c                                      # peak sits up-range of the centre
+
+
+def test_natural_render_is_deterministic_textured_and_forward():
+    """The presentation layer (crater_demo.stamp_impact_natural) is a *look*, not oracle physics,
+    but it must still: be deterministic per seed, stay finite, excavate a bowl AND raise ejecta,
+    leave the surrounding plain TEXTURED (not dead flat — the Gemini critique), and throw more
+    ejecta downrange than up-range when oblique."""
+    N = 160
+    D = C.final_crater(C.transient_crater_diameter(500.0, 20000.0, angle=30.0))[0]
+    cs = D / (N * 0.30)
+    a, _ = crater_demo.stamp_impact_natural(np.zeros((N, N)), N // 2, N // 2, cs, L=500.0,
+                                            angle=30.0, azimuth=0.0, seed=3)
+    b, _ = crater_demo.stamp_impact_natural(np.zeros((N, N)), N // 2, N // 2, cs, L=500.0,
+                                            angle=30.0, azimuth=0.0, seed=3)
+    assert np.array_equal(a, b)                              # deterministic for a given seed
+    assert np.all(np.isfinite(a))
+    assert a.min() < 0 < a.max()                            # excavates a bowl and raises ejecta/rim
+    assert a[:16, :16].std() > 0                            # plain is textured, not flat
+    dep = np.maximum(a, 0.0)
+    assert dep[:, N // 2:].sum() > dep[:, :N // 2].sum()    # mass pushed forward (downrange = +x)
 
 
 def test_finite_and_complex_has_central_peak():
