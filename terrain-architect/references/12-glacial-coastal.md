@@ -107,6 +107,18 @@ glacierStep(bed, H, Δt):
     # eroded volume → a moraine/sediment field at margins and terminus (the mass budget)
 ```
 
+*Runnable reference: `reference-impl/glacier.py` (`glacier_carve` = this `glacierStep`; SIA transport
+reused from `sims_illustrative.glacier_sia`, Halfar-validated), verified by `tests/test_glacier.py`.
+Invariant-checked (illustrative-morphological tier): it reduces to the ice-only sim when `K_g=0`,
+carves only (never raises), only under ice, conserves the eroded volume into a moraine field, and
+thick trunk ice erodes far more than thin ice — the arête / hanging-valley differential. The idealised
+parabolic **U** cross-section is the **L-tier** emergent form below: a vertically-integrated SIA
+concentrates abrasion at the thalweg and does not by itself reproduce the textbook parabola (that
+needs a higher-order ice model or the cross-valley sliding distribution of Harbor 1992); the optional
+`wall_abrasion` widens the trough as an honest F-tier "look". The explicit solver is also stiff — it
+stays stable for modest step counts / gentle terrain (as the chapter warns, use an implicit solve for
+large `Δt` on rough beds).*
+
 **The coupled fluvial–glacial loop.** "Glacial runs alongside fluvial" (the Legal Order's 6b) has
 a concrete shape: an outer loop where `glacierStep` erodes under the ice, the mass-balance melt
 feeds `03`'s discharge as a source term (proglacial rivers are melt-fed — it's why they surge in

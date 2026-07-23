@@ -317,6 +317,19 @@ def CELLS():
                                                          tilt=(0.7, 0.25)), table)   # tilted beds -> cuestas
         return hill(_cr(sp.stream_power_evolve(h, 2.0, Kfn, 0.5, 1000.0, 120, cell), 6), cell)
     add("04+11 Differential erosion", "spatial K(p,h): hard beds resist -> cuestas; soft cut to valleys", _diff_erosion)
+    def _glacier():
+        import glacier as GLAC
+        n = 110; cell = 100.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        bed0 = 2700 - 28 * yy2 + 22 * np.minimum(np.abs(xx2 - n * 0.30), np.abs(xx2 - n * 0.70))
+        bed0 = np.maximum(bed0, 2700 - 28 * yy2)                        # two parallel valleys + a ridge
+        bed, H, mor = GLAC.glacier_carve(bed0, np.zeros((n, n)), 8, ela=1820, beta=0.003,
+                                         b_max=0.4, K_g=6e-4, dt=40.0)   # SIA ice + bed abrasion
+        shade = render.hillshade(_cr(bed, 5), cell).astype(float)
+        Hc = _cr(H, 5); ice = np.clip(Hc / 120.0, 0.0, 1.0)             # trunk glaciers, translucent
+        a = (0.15 + 0.7 * ice)[..., None] * (Hc > 5.0)[..., None]
+        rgb = shade * (1 - a) + np.array([205., 225, 240]) * a
+        return np.clip(rgb, 0, 255).astype(np.uint8)
+    add("12 Glacial carving", "SIA trunk glaciers fill valleys; thick ice slides & abrades the bed", _glacier)
 
     return C
 

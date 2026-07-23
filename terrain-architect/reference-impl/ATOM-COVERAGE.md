@@ -35,8 +35,9 @@ incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a f
 `K(p,h)` for lithology-driven differential erosion), droplet erosion (`erosion_droplet.droplet_erode`),
 thermal/talus (`erosion_thermal.thermal_erosion`), hillslope diffusion (`diffusion.hillslope_diffuse`),
 virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), shallow-water
-(`shallow_water.simulate`), and lateral fluvial migration (`meander.migrate`, with the F-tier
-height-field realisation `meander.burn_channel`). The meander solver is the one atom that runs on a
+(`shallow_water.simulate`), lateral fluvial migration (`meander.migrate`, with the F-tier
+height-field realisation `meander.burn_channel`), and glacial erosion (`glacier.glacier_carve` —
+SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier). The meander solver is the one atom that runs on a
 **centreline (polyline)**, not the height field — an agent model (`07`) — and its migration physics
 is the upstream-lagged near-bank velocity (Ikeda–Parker–Sawai 1981), documented in chapter `03`.
 

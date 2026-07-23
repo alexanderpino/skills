@@ -27,6 +27,7 @@ IMPLEMENTED = {
     "erosion_pipe": ["pipe_water", "pipe_erode"],
     "shallow_water": ["simulate"],
     "meander": ["migrate", "burn_channel"],
+    "glacier": ["glacier_carve"],
 }
 
 # ops_filters also carries a filter/morphology TOOLBOX that is not a generative atom — excluded from
