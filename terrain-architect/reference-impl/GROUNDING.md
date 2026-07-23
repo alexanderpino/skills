@@ -90,14 +90,26 @@ presentation — they dress the verified
 `crater.py` skeleton with `noise.py` (01) detail for a hillshaded *look* and is deliberately outside
 the grounding scale (not mass-conserving, not oracle-verified; only a determinism/texture smoke test).
 
-The **hydrology** (`hydrology.py` — a water SURFACE) treats water as a substance at a level, not a
-colour: lakes fill enclosed depressions to their spill level (via the RichDEM-validated priority-flood
-in `flow.py`), and rivers carry a discharge-scaled depth in their channels using **bankfull hydraulic
-geometry** (depth grows with discharge — Leopold & Maddock 1953, *The Hydraulic Geometry of Stream
-Channels and Some Physiographic Implications*, USGS Professional Paper 252). **demo-only** (a plausible water level for rendering, held to invariants in
-`test_hydrology.py`: surface ≥ bed, lakes fill depressions, river depth only in channels — not a
-gauged discharge model). It is what makes rivers read as water *in the carved channel* in `hero.py`
-rather than a painted line.
+The **shallow-water flow** (`shallow_water.py`) is a real, mass-conserving water simulation — the
+**virtual-pipe model** (Mei, Decaudin & Hu 2007, *Fast Hydraulic Erosion Simulation… on GPU*, Pacific
+Graphics, 10.1109/PG.2007.15): water depth is a state variable, a **rainfall source** (m/s) and/or
+point springs (m³/s) add water, flux moves through four pipes driven by the water-surface (head)
+gradient and **clamped so a cell never outputs more than it holds**, water leaves at open boundaries,
+and **discharge is a genuine volumetric flow in m³/s** that accumulates downstream. **paper-grounded,
+invariant-checked** (`test_shallow_water.py`): depth ≥ 0, a **closed basin conserves every drop of
+rain** (stored = rain delivered), an open domain balances **rain in = out + stored**, and discharge
+grows downstream. This is the Eulerian pipe hydraulics the pro tools use, and the base for pipe-model
+erosion (the `SIMULATION-AUDIT.md` upgrade path). It is *not* a gauged/calibrated hydrology model.
+
+The **hydrology** (`hydrology.py` — a water SURFACE for rendering) turns a **discharge** field (m³/s,
+from the `shallow_water` sim, or the steady-state proxy `Q = rain · drainage-area`) into a water level:
+lakes fill enclosed depressions to their spill level (the RichDEM-validated priority-flood in
+`flow.py`), and rivers carry a depth set by that discharge via **bankfull hydraulic geometry** (depth
+grows with Q — Leopold & Maddock 1953, *The Hydraulic Geometry of Stream Channels and Some
+Physiographic Implications*, USGS Professional Paper 252). At landscape resolution the true channel is
+narrower than a cell, so the *discharge* is the physical truth and the channel is drawn from it.
+**demo-only** rendering layer (invariants in `test_hydrology.py`). Together they make rivers in
+`hero.py` real flowing water *in the carved channel*, not a painted line.
 
 The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
 tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or

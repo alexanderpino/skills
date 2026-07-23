@@ -169,8 +169,13 @@ def from_graph(n=180, extent_km=48.0, seed=4):
 def main():
     import analysis
     import archetypes as A
+    import flow
+    import shallow_water
     h, area, cell = from_graph()                                        # graph output — nothing sculpted
-    w = hydrology.water_surface(h, area, cell)                          # real water: lakes + river depth
+    # REAL water: a mass-conserving shallow-water flow with a rainfall source -> discharge in m³/s
+    sim = shallow_water.simulate(flow.priority_flood_fill(h), cell, rain=6e-6, iters=1400)
+    Q = sim["discharge"]                                                # volumetric flow, m³/s
+    w = hydrology.water_surface(h, cell, Q)                             # channel depth from the real discharge
     depth = w - h
     climate = {"has_water": False, "has_snow": True, "snowline": 0.6, "snow_soft": 0.16, "has_veg": True}
     col, _, surf = A.substance_color(h, "temperate", cell, climate=climate)   # LAND cover only (water is a layer)
@@ -180,8 +185,11 @@ def main():
     ao = analysis.horizon_ao(render_surf, cell)
     img = hero(render_surf, cell, col, ao=ao, z_exag=1.0)
     render.write_png("hero.png", img)
+    b = sim["budget"]
     print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {h.shape[0]}² graph mesh, "
-          f"relief {h.max()-h.min():.0f} m, wet {100*wet.mean():.1f}%)")
+          f"relief {h.max()-h.min():.0f} m)")
+    print(f"  shallow-water flow: peak discharge {Q.max():.1f} m³/s, "
+          f"mass balance rain_in {b['rain_in']:.3e} = out+stored {b['out']+b['stored']:.3e} m³")
 
 
 if __name__ == "__main__":
