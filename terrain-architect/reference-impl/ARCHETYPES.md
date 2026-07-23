@@ -6,12 +6,15 @@ The renderable **archetypes** from `references/20-archetypes.md` (the master enu
 `references/00-index.md`), each assembled from the verified Legal-Order blocks and rendered on a
 ~1.9 km tile. Regenerate with `python archetypes.py`.
 
-The tiles are coloured the way Gaea does — a **SatMap** (an elevation-driven curated colour gradient,
-`render.satmap`) for the naturalistic base, then a **splatmap** of erosion-derived masks
-(slope→rock, height+aspect→snow, flow+curvature→valley sediment) laid over it (`render.splat_blend`),
-then the **photoreal composite** (`render.photoreal`: × sun+sky two-light × ambient occlusion +
-rivers + aerial perspective). A per-world SatMap family is the whole difference — temperate green,
-desert red-rock, Mars rust, Moon grey, basalt volcano, sand, verdant. This is Stage 1 of `reference-impl/HYPERREALISM.md`, the research-grounded
+The tiles are coloured by **substance**, not by elevation (`analysis.derive_substances`): each cell
+shows the *material* on it, placed where it physically accumulates — **snow** where it is cold enough
+and the slope holds it and wind loads it (so the snowline dips on shaded aspects and fills sheltered
+hollows, never a clean contour); **rock** where the slope is too steep to hold anything; **scree** at
+repose below the cliffs; **sediment** where flow deposits; **vegetation** on gentle ground below the
+snowline (arid worlds have none). Snow is white because snow is a white *substance*. Each world is a
+**BIOME** (which substances exist + their colours + climate). The **photoreal composite**
+(`render.photoreal`: × sun+sky two-light × ambient occlusion + rivers + aerial perspective) then
+lights it; the elevation-gradient SatMap (`render.satmap`) stays as a toolbox node, not the base. This is Stage 1 of `reference-impl/HYPERREALISM.md`, the research-grounded
 ledger of what each tile would need to reach photoreal (and where the numpy sandbox honestly tops
 out); the remaining per-archetype geomorphology — break-of-slope, dune slip faces, caprock bands,
 crater size-frequency — is Stages 2–4 there.

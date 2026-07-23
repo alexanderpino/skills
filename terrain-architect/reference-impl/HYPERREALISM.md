@@ -21,9 +21,14 @@ material, no drainage, no atmosphere. Photoreal terrain stacks four systems — 
 structure), **multi-scale detail**, **materials/colour** (the largest single jump), and **PBR-ish
 compositing** (soft light + AO + aerial perspective). Ranked by realism-per-effort:
 
-1. **Materials / splatmap colour** — a slope+altitude splat (rock on steep, soil/grass on flats,
-   snow above a *noisy, slope-limited* snow line, sediment in valleys) is the biggest delta. Grey
-   reads as "data"; colour reads as "place". Blend masks with `smoothstep`, never hard bands.
+1. **Materials by SUBSTANCE, not by elevation** — colour each cell by the *material* on it, placed
+   where it physically accumulates: rock where the slope is too steep to hold anything, scree at
+   repose below cliffs, sediment where flow deposits, vegetation on gentle ground, and **snow where
+   it is cold enough AND the slope holds it AND wind loads it** (shaded aspects + hollows collect,
+   steep/convex sheds) — snow is white because snow is a white substance, not because "high == white".
+   This (`analysis.derive_substances`) is the biggest delta; an elevation colour ramp (a SatMap) is a
+   shortcut that paints snow and rock at the wrong places. Blend masks with `smoothstep`, never hard
+   bands.
 2. **Hydraulic droplet erosion** (~**5·N²** droplets; radius 3, capacity 4, erode/deposit ~0.3,
    evaporate 0.01, gravity 4, lifetime 30 — Beyer/Lague defaults). This is what makes terrain look
    *carved by water*: dendritic drainage, V-valleys, ridgelines, sediment fans. Feed its

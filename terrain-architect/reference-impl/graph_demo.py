@@ -327,20 +327,24 @@ def build_scene_graph(ctx):
     return g, ("relaxed", "area")
 
 
+# the mesa lives in a desert biome: bare sandstone substances, no snow/veg/water pooling
+_ARID_BIOME = {"climate": {"has_water": True, "has_snow": False, "has_veg": False},
+               "water": (110, 120, 118), "snow": (230, 224, 208), "rock": (150, 96, 66),
+               "scree": (176, 124, 86), "sediment": (208, 184, 136), "vegetation": (120, 130, 80),
+               "ground": (184, 142, 102)}
+
+
 def run_scene(ctx, outdir):
-    """Evaluate the archetype DAG and colorize it the Gaea way — a SatMap (elevation gradient) plus a
-    splatmap of erosion masks (slope->rock, flow+curvature->sediment) — then photoreal shading. Prints
-    the evaluated node order so the graph is visible."""
+    """Evaluate the archetype DAG and colorize it by SUBSTANCE — bare sandstone / scree / sediment
+    placed by slope & flow (analysis.derive_substances), each its own colour — then photoreal shading.
+    Prints the evaluated node order so the graph is visible."""
     g, (h_out, a_out) = build_scene_graph(ctx)
     height = g.evaluate(h_out)
     area = g.evaluate(a_out)
     slope = g.evaluate("slope")
-    hn = (height - height.min()) / (np.ptp(height) + 1e-9)
-    base = render.satmap(hn, "arid")                                        # SatMap: elevation CLUT
-    rock = analysis.smoothstep(np.tan(np.radians(32)), np.tan(np.radians(46)), slope)
-    la = np.log1p(area)
-    sed = analysis.smoothstep(0.55 * la.max(), 0.82 * la.max(), la) * (1.0 - rock)   # sediment in the washes
-    mat = render.splat_blend(base, [(0.7 * sed, (206, 182, 134)), (rock, (150, 100, 70))])
+    stack = analysis.derive_substances(height, slope, area, ctx.cellsize, climate=_ARID_BIOME["climate"])
+    masks = np.stack([m for _, m in stack])
+    mat = render.material_rgb(masks, palette=[_ARID_BIOME[n] for n, _ in stack], shade=False).astype(np.float64)
     ao = analysis.horizon_ao(height, ctx.cellsize)                          # Max 1988 horizon AO (height-field-native)
     img = render.photoreal(mat, height, ctx.cellsize, ao=ao, ao_strength=0.38,
                            aerial_strength=0.34, aerial_band=0.20)

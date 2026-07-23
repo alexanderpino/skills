@@ -110,12 +110,29 @@ def test_satmap_and_splat_blend():
     assert np.allclose(out[mask == 0.0], 10.0)                        # untouched where mask=0
 
 
-def test_satmap_splat_produces_varied_geology():
-    """The SatMap+splat colouring of an archetype is not a flat tint — the elevation gradient plus
-    slope/flow splat masks give real colour variation."""
-    col, area = A.satmap_splat(A.mesa(n=N, cell=A.CELL), "arid", A.CELL)
+def test_substance_colour_is_material_not_elevation():
+    """Colour comes from SUBSTANCES, not a height ramp: varied colour, and snow is placed by physics
+    (a white substance) only on cold, holdable ground — never on the steep faces that shed it, and
+    never on a warm desert."""
+    col, area = A.substance_color(A.alpine(n=N, cell=A.CELL), "temperate", A.CELL)
     assert col.shape == (N, N, 3)
-    assert int(col.reshape(-1, 3).std(axis=0).sum()) > 12             # graded, not one colour
+    assert int(col.reshape(-1, 3).std(axis=0).sum()) > 12             # real material variation
+
+    # snow (substance) placement: present on the alpine world, absent on the arid desert
+    h = A.alpine(n=N, cell=A.CELL)
+    slope = analysis.slope(h, A.CELL)
+    area = flow.d8_accumulation(flow.priority_flood_fill(h), A.CELL)
+    snow = dict(analysis.derive_substances(h, slope, area, A.CELL,
+                                           climate=A.BIOME["temperate"]["climate"]))["snow"]
+    assert snow.max() > 0.2                                           # snow accumulates somewhere high
+    steep = slope > np.tan(np.radians(60))
+    if steep.any():
+        assert snow[steep].max() < 0.2                               # but not on the faces that shed it
+    desert_snow = dict(analysis.derive_substances(A.mesa(n=N, cell=A.CELL),
+                       analysis.slope(A.mesa(n=N, cell=A.CELL), A.CELL),
+                       flow.d8_accumulation(flow.priority_flood_fill(A.mesa(n=N, cell=A.CELL)), A.CELL),
+                       A.CELL, climate=A.BIOME["arid"]["climate"]))["snow"]
+    assert desert_snow.max() < 1e-9                                  # no snow in a warm desert
 
 
 def test_photoreal_two_light_floor_and_ao():

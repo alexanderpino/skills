@@ -298,23 +298,37 @@ ARCHETYPES = [
 
 
 # --------------------------------------------------------------------------- #
-# Colour the way Gaea does: a SatMap (elevation-driven curated gradient, render.SATMAPS) for the
-# naturalistic base, then a SPLATMAP of erosion-derived masks (slope->rock, height->snow,
-# curvature+flow->sediment) laid over it (render.splat_blend), then photoreal shading. The SatMap
-# family is the whole per-world difference; the splat masks make it read as geology, not a flat tint.
+# Colour by SUBSTANCE, not by elevation. Each world is a BIOME: which substances exist (climate) and
+# what colour each one IS (snow is white because snow is white). `analysis.derive_substances` places
+# them by physics — snow where it's cold + the slope holds it + wind loads it; rock where too steep to
+# hold anything; scree at repose; sediment where flow deposits; vegetation on gentle ground below the
+# snowline — and the splatmap blend (render.material_rgb) paints each substance its own colour.
 # --------------------------------------------------------------------------- #
-# per-family splat overlay colours: (exposed rock, valley sediment/deposits, snow)
-SPLAT = {
-    "temperate": {"rock": (120, 114, 106), "sed": (150, 140, 112), "snow": (238, 240, 245)},
-    "verdant":   {"rock": (110, 118, 96), "sed": (150, 158, 118), "snow": (232, 236, 240)},
-    "arid":      {"rock": (150, 100, 70), "sed": (206, 182, 134)},
-    "sand":      {"rock": (150, 116, 82), "sed": (210, 188, 146)},
-    "volcanic":  {"rock": (92, 84, 82), "sed": (128, 116, 104), "snow": (230, 232, 236)},
-    "mars":      {"rock": (120, 64, 46), "sed": (198, 132, 88)},
-    "lunar":     {"rock": (150, 150, 156), "sed": (120, 120, 126)},
+BIOME = {
+    "temperate": {"climate": {"has_water": True, "has_snow": True, "snowline": 0.70, "snow_soft": 0.12, "has_veg": True},
+                  "water": (58, 104, 150), "snow": (240, 242, 247), "rock": (112, 108, 102), "scree": (146, 138, 126),
+                  "sediment": (150, 142, 116), "vegetation": (84, 114, 64), "ground": (120, 110, 88)},
+    "verdant":   {"climate": {"has_water": True, "has_snow": False, "has_veg": True},
+                  "water": (60, 110, 140), "snow": (240, 242, 247), "rock": (120, 120, 104), "scree": (150, 148, 120),
+                  "sediment": (150, 150, 118), "vegetation": (70, 112, 58), "ground": (116, 128, 90)},
+    "arid":      {"climate": {"has_water": True, "has_snow": False, "has_veg": False},
+                  "water": (110, 120, 118), "snow": (230, 224, 208), "rock": (150, 96, 66), "scree": (176, 124, 86),
+                  "sediment": (208, 184, 136), "vegetation": (120, 130, 80), "ground": (184, 142, 102)},
+    "sand":      {"climate": {"has_water": False, "has_snow": False, "has_veg": False},
+                  "water": (150, 140, 110), "snow": (230, 224, 208), "rock": (160, 120, 84), "scree": (202, 178, 134),
+                  "sediment": (216, 194, 152), "vegetation": (150, 150, 110), "ground": (208, 186, 142)},
+    "volcanic":  {"climate": {"has_water": True, "has_snow": True, "snowline": 0.82, "snow_soft": 0.10, "has_veg": True},
+                  "water": (52, 100, 140), "snow": (236, 238, 242), "rock": (84, 78, 76), "scree": (112, 104, 100),
+                  "sediment": (126, 114, 102), "vegetation": (78, 104, 62), "ground": (98, 92, 86)},
+    "mars":      {"climate": {"has_water": False, "has_snow": False, "has_veg": False},
+                  "water": (70, 45, 40), "snow": (214, 196, 178), "rock": (120, 64, 46), "scree": (150, 92, 64),
+                  "sediment": (198, 132, 88), "vegetation": (150, 110, 80), "ground": (162, 104, 70)},
+    "lunar":     {"climate": {"has_water": False, "has_snow": False, "has_veg": False},
+                  "water": (72, 72, 76), "snow": (210, 210, 214), "rock": (146, 146, 152), "scree": (120, 120, 126),
+                  "sediment": (104, 104, 110), "vegetation": (120, 120, 120), "ground": (122, 122, 128)},
 }
-FAMILY = {                                        # archetype/world name -> SatMap/splat family
-    "alpine orogen": "temperate", "appalachian (old)": "temperate", "tower karst": "temperate",
+FAMILY = {                                        # archetype/world name -> biome
+    "alpine orogen": "temperate", "appalachian (old)": "temperate", "tower karst": "verdant",
     "ag terraces": "temperate", "fjord coast": "temperate", "sea cliffs & stacks": "temperate",
     "canyon + strata": "arid", "mesa / tepui": "arid", "basin & range": "arid", "badlands": "arid",
     "erg dune sea": "sand", "stratovolcano": "volcanic", "caldera lake": "volcanic",
@@ -322,33 +336,22 @@ FAMILY = {                                        # archetype/world name -> SatM
 }
 
 
-def satmap_splat(h, family, cell=CELL):
-    """Gaea's Texture stage as pure fields: a SatMap base (elevation → curated gradient) with a
-    splatmap of erosion-derived masks blended over it. Returns float RGB in 0-255 (shade downstream)."""
+def substance_color(h, family, cell=CELL):
+    """Colour a tile by the SUBSTANCES on it (analysis.derive_substances), each painted its own
+    material colour from the BIOME — no elevation ramp. Returns (float RGB 0-255, drainage area)."""
+    bio = BIOME[family]
     slope = analysis.slope(h, cell)
     area = flow.d8_accumulation(flow.priority_flood_fill(h), cell)
-    hn = (h - h.min()) / (np.ptp(h) + 1e-9)
-    base = render.satmap(hn, family)                                         # SatMap: elevation CLUT
-    sp = SPLAT[family]
-    rock = analysis.smoothstep(np.tan(np.radians(32)), np.tan(np.radians(46)), slope)  # exposed rock on cliffs
-    la = np.log1p(area)
-    mx = float(la.max())
-    curv = analysis.curvature(h, cell, kind="profile")                       # concave = where sediment collects
-    concave = analysis.smoothstep(0.0, float(np.percentile(np.abs(curv), 80) + 1e-9), np.maximum(curv, 0.0))
-    sed = analysis.smoothstep(0.55 * mx, 0.82 * mx, la) * concave * (1.0 - rock)   # deposits in wet, concave lows
-    overlays = [(0.7 * sed, sp["sed"]), (rock, sp["rock"])]
-    if "snow" in sp:                                                         # snow on high, gentle, shaded faces
-        north = 0.5 + 0.5 * analysis.northness(analysis.aspect(h, cell))
-        snow = (analysis.smoothstep(0.72, 0.84, hn)
-                * (1.0 - analysis.smoothstep(np.tan(np.radians(38)), np.tan(np.radians(52)), slope)) * north)
-        overlays.append((snow, sp["snow"]))
-    return render.splat_blend(base, overlays), area
+    stack = analysis.derive_substances(h, slope, area, cell, climate=bio["climate"], rng_seed=0)
+    masks = np.stack([m for _, m in stack])
+    palette = [bio[name] for name, _ in stack]
+    return render.material_rgb(masks, palette=palette, shade=False).astype(np.float64), area
 
 
 def _rich(h, family, cell=CELL, sea_level=None, azimuth=315.0, altitude=42.0):
-    """Colour one tile with the SatMap + splatmap (Gaea Texture stage), then light it with
-    render.photoreal (sun+sky, AO, rivers, aerial). Rivers only on wet worlds."""
-    col, area = satmap_splat(h, family, cell)
+    """Colour one tile by substance (BIOME), then light it with render.photoreal (sun+sky, AO,
+    rivers, aerial). Rivers only on wet worlds."""
+    col, area = substance_color(h, family, cell)
     ao = analysis.horizon_ao(h, cell)
     rivers = None
     if family in ("temperate", "verdant", "volcanic"):                       # wet worlds carry channels

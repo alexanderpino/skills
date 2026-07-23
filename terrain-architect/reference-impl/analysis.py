@@ -223,3 +223,84 @@ def dominant_material(stack):
     Index i is stack[i][0]."""
     weights = np.stack([m for _, m in stack], axis=0)
     return np.argmax(weights, axis=0)
+
+
+SUBSTANCE_NAMES = ("water", "snow", "rock", "scree", "sediment", "vegetation", "ground")
+
+
+def derive_substances(height, slope_tan, area, cellsize, *, climate, rng_seed=0):
+    """Place SUBSTANCES by where their material physically accumulates — NOT an elevation colour ramp.
+    Colour then comes from the substance itself (snow is white because snow is white), never from
+    height. Returns an ordered PRIORITY stack [(name, mask)] partitioned (Σ ≤ 1), names in
+    `SUBSTANCE_NAMES`. The placement rules (06 masks, but read as materials):
+
+      * **rock**   — bedrock is exposed where the slope is too steep for anything to rest (> ~40°).
+      * **scree**  — loose talus sits at the angle of repose (~26–36°), below the cliffs.
+      * **snow**   — a substance, placed where it is COLD ENOUGH (a lapse-rate temperature ∝ elevation)
+                     AND the slope can HOLD it (steep faces shed) AND wind LOADS it: poleward/shaded
+                     aspects and concave hollows collect, convex ridges are scoured. So the snowline
+                     is not a clean contour — it dips on shaded aspects and fills sheltered hollows.
+      * **sediment** — deposited where flow is high, the slope is gentle, and the profile is concave.
+      * **vegetation** — soil/plants on gentle ground below the snowline (thinning with altitude),
+                     only where the `climate` is not arid.
+      * **ground** — the bare remainder (soil / regolith / dust).
+
+    `climate` selects which substances exist and the thresholds:
+    ``{has_water, has_snow, snowline (0–1 of local relief), snow_soft, has_veg}``."""
+    height = np.asarray(height, dtype=np.float64)
+    slope_tan = np.asarray(slope_tan, dtype=np.float64)
+    area = np.asarray(area, dtype=np.float64)
+    lo, hi = float(height.min()), float(height.max())
+    span = max(hi - lo, 1e-6)
+    hn = (height - lo) / span
+    rng = np.random.default_rng(rng_seed)
+    jitter = 0.03 * rng.standard_normal(height.shape)                       # break clean threshold contours
+    north = 0.5 + 0.5 * northness(aspect(height, cellsize))                 # 1 = poleward / shaded (colder)
+    curv = curvature(height, cellsize, kind="profile")                     # >0 concave hollow, <0 convex ridge
+    concave = np.clip(curv / (np.percentile(np.abs(curv), 85) + 1e-9), -1.0, 1.0)
+
+    def tand(d):
+        return np.tan(np.radians(d))
+
+    rock = smoothstep(tand(38), tand(50), slope_tan)                       # exposed bedrock on cliffs
+    scree = smoothstep(tand(26), tand(34), slope_tan) * (1.0 - smoothstep(tand(40), tand(48), slope_tan))
+
+    if climate.get("has_water", True):
+        qa = float(np.quantile(area, 0.985))
+        water = smoothstep(0.5 * qa, qa, area)                             # channels
+    else:
+        water = np.zeros_like(height)
+
+    if climate.get("has_snow", False):
+        snowline = climate.get("snowline", 0.7)
+        soft = climate.get("snow_soft", 0.12)
+        drive = (hn - snowline) + 0.12 * (north - 0.5) + 0.06 * concave + 0.03 * jitter
+        hold = 1.0 - smoothstep(tand(46), tand(58), slope_tan)              # steep faces shed snow
+        snow = np.clip(smoothstep(0.0, soft, drive), 0.0, 1.0) * hold
+    else:
+        snow = np.zeros_like(height)
+
+    la = np.log1p(area)
+    mx = float(la.max())
+    sediment = (smoothstep(0.55 * mx, 0.82 * mx, la)
+                * np.clip(0.5 + 0.5 * concave, 0.0, 1.0)
+                * (1.0 - smoothstep(tand(8), tand(18), slope_tan)))
+
+    if climate.get("has_veg", False):
+        veg = 1.0 - smoothstep(tand(32), tand(44), slope_tan)              # gentle enough to hold soil
+        if climate.get("has_snow", False):
+            veg = veg * (1.0 - np.clip(smoothstep(0.0, climate.get("snow_soft", 0.12),
+                                                  hn - climate.get("snowline", 0.7)), 0.0, 1.0))
+        veg = veg * np.clip(0.35 + 0.65 * (1.0 - hn), 0.0, 1.0)            # thins with altitude
+    else:
+        veg = np.zeros_like(height)
+
+    raw = [("water", water), ("snow", snow), ("rock", rock), ("scree", scree),
+           ("sediment", sediment), ("vegetation", veg)]
+    stack, claimed = [], np.zeros_like(height)
+    for name, m in raw:
+        mm = np.clip(m, 0.0, 1.0) * (1.0 - claimed)
+        stack.append((name, mm))
+        claimed = np.clip(claimed + mm, 0.0, 1.0)
+    stack.append(("ground", 1.0 - claimed))                                # bare soil / regolith / dust
+    return stack
