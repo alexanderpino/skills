@@ -211,14 +211,21 @@ WM *Advanced Perlin/Perlin/Voronoi*; Houdini *HeightField Noise* unified basis):
 
 | Capability | Our node | Grounded in |
 |---|---|---|
+| Improved Perlin gradient noise | `noise.perlin` | Perlin 2002 |
+| Simplex gradient noise (no axis bias, cheaper in high-D) | `noise.simplex` | Perlin/Gustavson (patent expired 2022) |
 | Fractal fBm (natural terrain) | `noise.fbm` | Perlin 1985/2002 |
 | Ridged multifractal (mountainous) | `noise.ridged_mf` | Musgrave 1989 |
 | Billowy / hybrid multifractal (rough peaks, smooth basins) | `noise.hybrid_mf` | Musgrave 1993 (heterogeneous mf) |
 | Voronoi / Worley cellular (ridgelines = cell edges, basins = interiors) | `noise.worley` (`f1`/`f2f1`/`inv_f1`) | Worley 1996 |
+| Gabor / anisotropic directional noise (oriented bands, spectral control) | `noise.gabor` | Lagae et al. 2009 |
 | Domain warp / DriftNoise (flow-like advected noise) | `noise.domain_warp`, `noise.curl` | Quilez *domain warping* |
 | Constant | `np.full` / `inputs.flat` | — |
 | Radial gradient (island/dome falloff) | `ops_filters.radial_gradient`, `.cone` | Quilez SDF |
 | Linear gradient (directional ramp) | `inputs.constant_slope` | — |
+
+The full atomic-base coverage (implemented vs deliberately deferred) and the anti-drift harness that
+keeps the pseudocode, this reference impl, and the scope doc in sync are in `reference-impl/ATOM-COVERAGE.md`
+(enforced by `tests/test_atom_coverage.py`).
 
 **Landform generators** — the named "drop-in a mountain" nodes (Gaea *Mountain/MountainRange/Ridge/
 Canyon/Crater/CraterField/Volcano/DuneSea/Island/…*; WM and Houdini have **no** named landform nodes —
@@ -247,8 +254,9 @@ Generator/File Input*; Houdini *HeightField Project/File*):
 
 **Deferred (reproducible from the core set, not yet stock nodes):** Gaea *Cellular3D, WaveShine,
 LineNoise/DotNoise, Cracks, CutNoise, Pattern, Object, Hemisphere*; *Slump, Rugged, MountainSide*
-(erosion of a `mountain`/`ridge`), *Gabor* directional noise (partly covered by `domain_warp`'s
-anisotropy). These are noted so the catalog is honest about what is and isn't implemented — the priority
+(erosion of a `mountain`/`ridge`); *OpenSimplex2* and *wavelet* noise (the `01` pseudocode covers them;
+`noise.simplex`/`noise.gabor` fill the base-noise and anisotropy needs). These are noted so the catalog
+is honest about what is and isn't implemented — the priority
 set above (fractal + Voronoi + gradient + the named landforms + an erosion pass) already reproduces the
 large majority of real terrain-authoring work across all three tools.
 

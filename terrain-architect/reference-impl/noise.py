@@ -99,6 +99,47 @@ def value(x, y, seed=0):
     return _lerp(_lerp(c00, c10, u), _lerp(c01, c11, u), v)
 
 
+_F2 = 0.5 * (np.sqrt(3.0) - 1.0)                     # skew   ≈ 0.3660254 (01)
+_G2 = (3.0 - np.sqrt(3.0)) / 6.0                     # unskew ≈ 0.2113249
+
+
+def simplex(x, y, seed=0):
+    """Simplex gradient noise (Gustavson's 2-D form; Perlin's simplex, patent expired Jan 2022).
+    Tessellates the plane into triangles, so 3 gradient contributions per sample instead of Perlin's
+    4 — no axis-aligned directional bias, cheaper in higher D. `F2/G2` skew/unskew to the simplex
+    lattice; the `0.5` is the squared kernel radius and the `70` is the empirical 2-D normalisation
+    for the 8-gradient set (both change with the gradient set — measure the range and remap, 01).
+    Roughly zero-mean, ≈[-1, 1]. Matches the `references/01-noise.md` pseudocode."""
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    P = _perm(seed)
+    s = (x + y) * _F2
+    i = np.floor(x + s)
+    j = np.floor(y + s)
+    t = (i + j) * _G2
+    x0 = x - (i - t)                                 # displacement from cell origin (unskewed)
+    y0 = y - (j - t)
+    lower = x0 > y0                                  # which of the two triangles we're in
+    i1 = np.where(lower, 1.0, 0.0)
+    j1 = np.where(lower, 0.0, 1.0)
+    x1, y1 = x0 - i1 + _G2, y0 - j1 + _G2            # middle corner
+    x2, y2 = x0 - 1.0 + 2.0 * _G2, y0 - 1.0 + 2.0 * _G2   # last corner
+    ii = i.astype(np.int64) & 255
+    jj = j.astype(np.int64) & 255
+    gi0 = P[P[ii] + jj] & 7
+    gi1 = P[P[ii + i1.astype(np.int64)] + (jj + j1.astype(np.int64))] & 7
+    gi2 = P[P[ii + 1] + (jj + 1)] & 7
+
+    def _corner(dx, dy, gi):
+        tt = 0.5 - dx * dx - dy * dy                 # kernel attenuation (0.5 = squared radius)
+        g = _GRAD2[gi]
+        dot = g[..., 0] * dx + g[..., 1] * dy
+        return np.where(tt > 0.0, (tt * tt) * (tt * tt) * dot, 0.0)
+
+    n = _corner(x0, y0, gi0) + _corner(x1, y1, gi1) + _corner(x2, y2, gi2)
+    return 70.0 * n
+
+
 def worley(x, y, seed=0, kind="f2f1"):
     """Worley/Voronoi cellular noise (one feature point per cell). `kind`: 'f1' (blobs),
     'f2f1' (cracks/mud-flats, ~0 at cell boundaries), 'inv_f1' (crater fields). Euclidean."""
@@ -201,3 +242,36 @@ def curl(x, y, seed=0, eps=1.0, **fbm_kw):
     dpdy = (psi(x, y + eps) - psi(x, y - eps)) / (2 * eps)
     dpdx = (psi(x + eps, y) - psi(x - eps, y)) / (2 * eps)
     return dpdy, -dpdx
+
+
+def gabor(x, y, seed=0, *, F0=1.4, a=1.3, omega0=0.0, impulses=8, isotropic=False):
+    """Gabor noise (Lagae et al. 2009, *Procedural Noise using Sparse Gabor Convolution*): a sparse
+    convolution of a Poisson impulse process with a Gabor kernel — a Gaussian envelope times a cosine
+    carrier, `K·exp(-pi·a^2·r^2)·cos(2pi·F0·(x·cos w + y·sin w))`. Its point is **direct local control of
+    the power spectrum**: `F0` the frequency, `a` the bandwidth, `omega0` the ORIENTATION — so it makes
+    ANISOTROPIC noise (bands aligned to a direction) that Perlin/Simplex cannot. With `isotropic=True`
+    each impulse takes a random orientation (band-limited but non-directional). Anisotropic (fixed
+    `omega0`) noise varies across the bands and stays flat along them.
+
+    Reference simplification (kept honest): a FIXED `impulses` per cell instead of a true Poisson draw,
+    kernel radius = one cell so the 3x3 neighbourhood captures it. Expensive (many kernels per sample) —
+    a detail/material/ripple layer, not a base terrain (01). Matches `references/01-noise.md`."""
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    total = np.zeros(np.broadcast(x, y).shape, dtype=np.float64)
+    cx = np.floor(x).astype(np.int64)
+    cy = np.floor(y).astype(np.int64)
+    two_pi = 2.0 * np.pi
+    for dj in (-1, 0, 1):                                    # 3x3 neighbourhood of impulse cells
+        for di in (-1, 0, 1):
+            gx, gy = cx + di, cy + dj
+            for k in range(int(impulses)):
+                px = gx + _hash01(gx, gy, seed, salt=10 + k)      # random impulse position in the cell
+                py = gy + _hash01(gx, gy, seed, salt=40 + k)
+                w = 2.0 * _hash01(gx, gy, seed, salt=70 + k) - 1.0   # random weight in [-1, 1]
+                om = (two_pi * _hash01(gx, gy, seed, salt=100 + k)) if isotropic else omega0
+                dx, dy = x - px, y - py
+                env = np.exp(-np.pi * a * a * (dx * dx + dy * dy))       # Gaussian envelope
+                carrier = np.cos(two_pi * F0 * (dx * np.cos(om) + dy * np.sin(om)))
+                total += w * env * carrier
+    return total

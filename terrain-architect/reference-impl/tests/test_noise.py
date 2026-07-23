@@ -40,6 +40,40 @@ def test_value_noise_in_unit_range():
     assert v.min() >= 0.0 and v.max() <= 1.0
 
 
+def test_simplex_bounded_zero_mean_and_continuous():
+    """Simplex is ~[-1,1], zero-mean, deterministic, a pure world-space function, and continuous
+    (a small coordinate step gives a small value change — no lattice discontinuity)."""
+    rng = np.random.default_rng(0)
+    x = rng.uniform(-60, 60, 60000)
+    y = rng.uniform(-60, 60, 60000)
+    v = N.simplex(x, y, seed=3)
+    assert np.all(np.isfinite(v)) and v.min() > -1.05 and v.max() < 1.05
+    assert abs(v.mean()) < 0.02
+    assert np.array_equal(N.simplex(x[:200], y[:200], 3), N.simplex(x[:200], y[:200], 3))
+    # pure world-space: a sub-window equals the slice of a wider evaluation
+    xx, yy = _grid(40, 0.25)
+    assert np.allclose(N.simplex(xx[5:15, 5:15], yy[5:15, 5:15], 7), N.simplex(xx, yy, 7)[5:15, 5:15])
+    step = np.abs(N.simplex(x[:2000] + 1e-4, y[:2000], 3) - N.simplex(x[:2000], y[:2000], 3))
+    assert step.max() < 0.05                                       # continuous (Lipschitz-bounded)
+
+
+def test_gabor_is_anisotropic_and_orientable():
+    """Gabor's defining property: ORIENTATION control. With omega0=0 the bands run so the field
+    varies across x and stays flat along y (var of the x-difference >> the y-difference); omega0=pi/2
+    flips that; isotropic mode removes the directionality (ratio ~1). Zero-mean and deterministic."""
+    g = np.linspace(0, 40, 200)
+    xx, yy = np.meshgrid(g, g)
+    ratio = lambda f: np.diff(f, axis=1).var() / np.diff(f, axis=0).var()
+    horiz = N.gabor(xx, yy, seed=1, omega0=0.0)
+    vert = N.gabor(xx, yy, seed=1, omega0=np.pi / 2)
+    iso = N.gabor(xx, yy, seed=1, isotropic=True)
+    assert ratio(horiz) > 3.0                                     # banded across x
+    assert ratio(vert) < 1.0 / 3.0                                # orientation genuinely rotates the bands
+    assert 0.5 < ratio(iso) < 2.0                                 # random orientation -> ~isotropic
+    assert np.all(np.isfinite(horiz)) and abs(horiz.mean()) < 0.05
+    assert np.array_equal(N.gabor(xx, yy, seed=1), N.gabor(xx, yy, seed=1))
+
+
 def test_worley_orderings():
     xx, yy = _grid(64, 0.2)
     f1 = N.worley(xx, yy, seed=1, kind="f1")
