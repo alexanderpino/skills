@@ -29,14 +29,24 @@ def max_slope(h, cellsize=1.0):
 
 def thermal_erosion(h, repose_slope, iters, cellsize=1.0, factor=0.25,
                     distance_correct=True):
-    """Return h after `iters` talus-relaxation steps. repose_slope = tan(repose angle)."""
+    """Return h after `iters` talus-relaxation steps. repose_slope = tan(repose angle).
+
+    The amount a cell sheds is sized from its **steepest** over-repose pair (`factor * maxExcess`),
+    then split among all over-repose lower neighbours in proportion to their excess. This is the
+    Musgrave 1989 steepest-descent form, and it is what makes the step *unconditionally* stable:
+    sizing from the SUM of all steep neighbours (a naive `factor * total`) lets a spike with many
+    lower neighbours shed several times its own relief in one step and invert — the field then
+    diverges (mass stays conserved, so the explosion hides from a mass test) precisely on the rough,
+    over-steepened terrain thermal is meant to relax. Sizing from the single steepest pair caps the
+    drop at `maxExcess`, so the cell can never fall below its lowest lower-neighbour. Double-buffered
+    (delta from the old field) -> order-independent and deterministic; mass conserved exactly."""
     h = np.asarray(h, dtype=np.float64).copy()
     n, m = h.shape
     for _ in range(int(iters)):
         delta = np.zeros_like(h)
         for i in range(n):
             for j in range(m):
-                per, total = [], 0.0
+                per, total, max_excess = [], 0.0, 0.0
                 for di, dj, dist in _NB:
                     ni, nj = i + di, j + dj
                     if 0 <= ni < n and 0 <= nj < m:
@@ -45,8 +55,10 @@ def thermal_erosion(h, repose_slope, iters, cellsize=1.0, factor=0.25,
                         if excess > 0.0:
                             per.append((ni, nj, excess))
                             total += excess
+                            if excess > max_excess:
+                                max_excess = excess
                 if total > 0.0:
-                    moved = factor * total
+                    moved = factor * max_excess               # steepest pair, NOT the sum -> non-inverting
                     delta[i, j] -= moved
                     for ni, nj, e in per:
                         delta[ni, nj] += moved * (e / total)

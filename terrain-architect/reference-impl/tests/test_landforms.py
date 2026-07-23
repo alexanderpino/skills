@@ -131,10 +131,19 @@ def test_volcano_has_summit_crater_and_concave_cone():
     c = n // 2
     strato = L.volcano((n, n), c, c, radius=n * 0.42 * cell, height=1600.0, cellsize=cell, seed=1, kind="strato")
     shield = L.volcano((n, n), c, c, radius=n * 0.42 * cell, height=1600.0, cellsize=cell, seed=1, kind="shield")
-    assert strato[c, c] < strato[c, c + int(0.18 * n)]                    # summit crater sits below the flank ring
-    # strato is concave-up: steeper just below the summit than the shield
-    assert (strato[c, c + 4] - strato[c, c + 20]) > (shield[c, c + 4] - shield[c, c + 20])
+    R = n * 0.42
+    summit = strato[c, c:c + int(0.3 * n)]                                # radial profile out from the centre
+    assert strato[c, c] < summit.max()                                   # crater floor sits below the crater rim
     assert strato.min() >= 0.0                                            # height-above-base
+    # strato must be CONCAVE-UP: the edifice flank (crater excluded) is STEEPEST near the summit and
+    # flares to a gentle base. Measured along +x, outside the crater. (Exponent<1 would invert this — the
+    # bug the audit caught; a summit-vs-shield check alone did NOT test concavity.)
+    prof = strato[c, c:]
+    slope = np.abs(np.diff(prof))
+    r = np.arange(len(slope))
+    upper = slope[(r > 0.28 * R) & (r < 0.5 * R)].mean()                  # upper flank, above the crater
+    lower = slope[(r > 0.6 * R) & (r < 0.85 * R)].mean()                  # lower flank / apron
+    assert upper > lower                                                  # summit-steepest == concave-up
 
 
 def test_canyon_incises_a_plateau():

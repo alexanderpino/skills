@@ -12,6 +12,20 @@ def test_converges_below_repose():
     assert T.max_slope(h) <= repose + 0.02
 
 
+def test_stable_on_rough_oversteepened_terrain():
+    """The input thermal actually faces: rough, over-steepened terrain with many steep neighbours per
+    cell (what hydraulic erosion leaves behind). Sizing the move from the SUM of all steep neighbours
+    diverges here (a spike sheds several times its relief and inverts); sizing from the steepest pair
+    stays bounded. Mass conservation alone would NOT catch the blow-up (the divergence conserves mass),
+    so we assert the field does not explode — at the default factor."""
+    rng = np.random.default_rng(0)
+    h0 = rng.random((40, 40)) * 100.0
+    h = T.thermal_erosion(h0, repose_slope=0.6, iters=40)          # default factor=0.25
+    assert np.all(np.isfinite(h))
+    assert np.ptp(h) <= np.ptp(h0)                                 # relaxes, never amplifies relief
+    assert T.max_slope(h) < T.max_slope(h0)                        # slopes actually decrease
+
+
 def test_mass_conserved():
     h0 = inputs.cone(n=41, height=10.0, radius=20.0)
     h = T.thermal_erosion(h0, repose_slope=0.3, iters=50)

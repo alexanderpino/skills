@@ -63,8 +63,11 @@ def _grad2(h, x, y):
 # base noises
 # --------------------------------------------------------------------------- #
 def perlin(x, y, seed=0):
-    """Improved Perlin gradient noise. ~[-0.7, 0.7], roughly Gaussian (do not assume [-1,1]).
-    Exactly 0 at integer lattice points — threshold FBM, not raw Perlin, or you outline the grid."""
+    """Improved Perlin gradient noise, roughly Gaussian and centred on 0. Because `_GRAD2` mixes
+    magnitude-1 (axis) and magnitude-√2 (diagonal) gradients, the actual range reaches ≈[-1, 1]
+    (not the ±0.707 of a unit-gradient set) — so **measure the range and remap** (the `01` doctrine);
+    a remap keyed to 0.707 clips the tails. Exactly 0 at integer lattice points — threshold FBM, not
+    raw Perlin, or you outline the grid."""
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     P = _perm(seed)

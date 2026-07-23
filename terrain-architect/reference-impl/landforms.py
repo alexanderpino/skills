@@ -172,18 +172,23 @@ _MOUNTAIN_STYLES = {
 
 def _talus_relax(h, repose_tan, iters, cellsize, factor=0.5):
     """Fast vectorised thermal/talus relaxation (Musgrave 1989): move above-repose material to
-    lower 4-neighbours. Torus-periodic (np.roll) so mass is conserved exactly; the massif margins
-    are ~0 so the wrap never carries real material across. The tested `erosion_thermal.thermal_erosion`
-    is the reference; this is its vectorised twin for baking weathering into the primitive cheaply."""
+    lower 4-neighbours. **No-flux boundaries** — flux is computed on interior slices, never wrapped
+    across the tile edge (an earlier np.roll version wrapped material between opposite margins, which
+    is wrong for a bounded massif whose edges are NOT ~0). Mass is conserved exactly on the finite grid
+    (every shed amount lands on an in-grid neighbour). The tested `erosion_thermal.thermal_erosion` is
+    the reference; this is its vectorised twin for baking weathering into the primitive cheaply."""
     h = np.array(h, dtype=np.float64)
     thr = repose_tan * cellsize
     for _ in range(int(iters)):
         delta = np.zeros_like(h)
-        for si, sj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            nb = np.roll(np.roll(h, -si, 0), -sj, 1)                         # neighbour value at (i+si, j+sj)
-            flux = factor * 0.25 * np.maximum((h - nb) - thr, 0.0)           # cell exceeds repose -> shed
-            delta -= flux
-            delta += np.roll(np.roll(flux, si, 0), sj, 1)                    # neighbour receives it
+        # each cardinal pair, interior-only (a<->b are aligned overlapping slices; no boundary crossing)
+        for a, b in (((slice(0, -1), slice(None)), (slice(1, None), slice(None))),   # vertical
+                     ((slice(None), slice(0, -1)), (slice(None), slice(1, None)))):   # horizontal
+            diff = h[a] - h[b]
+            fwd = factor * 0.25 * np.maximum(diff - thr, 0.0)                # a higher than b: a -> b
+            bwd = factor * 0.25 * np.maximum(-diff - thr, 0.0)              # b higher than a: b -> a
+            delta[a] += bwd - fwd
+            delta[b] += fwd - bwd
         h += delta
     return h
 
@@ -203,7 +208,13 @@ def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0
     **alpine** (sharp high-relief aretes), **old** (subdued, rounded, low relief), **strata** (horizontal
     sedimentary banding). The primitive is "ready for further erosion" — place it, combine several
     (`np.maximum` / `ops_filters.smax`), then run a real hydraulic + thermal pass (see `main`). Returns height (m).
-    `cells`/`warp`/`relief` override the style's drainage-cell count, distortion, and valley-incision depth."""
+    `cells`/`warp`/`relief` override the style's drainage-cell count, distortion, and valley-incision depth.
+
+    Note (composability): the ridge network is scaled by a whole-tile `np.percentile` of the Worley field,
+    so this is a **single-shot, whole-tile generator** — it is NOT tile-composable (a different crop
+    renormalises differently and the seam would not match), the evaluation-dependent-normalisation caveat
+    `10` warns about. That is acceptable here (a Mountain node produces one massif on one tile); for a
+    tiling pipeline, drive it from a fixed normalisation constant instead of the percentile."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
     rng = np.random.default_rng(seed)
@@ -284,8 +295,8 @@ def ridge(shape, cellsize, *, seed=0, height=900.0, angle=None, width_frac=0.16,
     makes across a tile. A wandering crest polyline sets a sharp summit; the flanks are ASYMMETRIC
     (a steep scarp on one side, a gentler dip slope on the other), the cuesta/hogback form dipping
     strata erode into (Twidale & Campbell 2005; a monocline's resistant bed). Light ridged detail
-    breaks the flanks into spurs. `asymmetry` 0.5 = symmetric arête; >0.5 steepens the scarp side.
-    Returns height (m)."""
+    breaks the flanks into spurs. `asymmetry` 0 = symmetric arête (equal flanks); increasing it toward
+    1 shortens/steepens the scarp flank and lengthens the gentle dip flank. Returns height (m)."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
     rng = np.random.default_rng(seed)
@@ -327,7 +338,10 @@ def volcano(shape, cx, cy, radius, height, cellsize=1.0, *, seed=0, kind="strato
     if kind == "shield":
         prof = 1.0 - rn ** 1.7                                              # broad convex dome, low slopes
     else:
-        prof = (1.0 - rn) ** 0.72                                          # concave-up: steep summit, flaring foot
+        prof = (1.0 - rn) ** 1.4                                           # concave-up: STEEPEST at the summit,
+        #  exponent > 1 => |dprof/dr| ~ (1-rn)^0.4 is largest at rn->0 (summit) and flares to 0 at the foot,
+        #  the stratovolcano form (steep upper cone ~30-35deg, gentle apron; Karátson 2010). Exponent < 1 would
+        #  invert this into a foot-steepened dome — the bug the audit caught.
     # radial barrancos: gullies grooving the flanks, deepening downslope, vanishing at the summit
     theta = np.arctan2(yy - cy, xx - cx)
     grooves = 0.5 * (1.0 + np.cos(n_barrancos * theta + 2.0 * np.pi * noise.fbm(xx / 9.0, yy / 9.0, seed + 3, octaves=3)))

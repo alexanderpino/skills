@@ -17,7 +17,7 @@ Validity needs evidence from an **independent source**.
 | Rung | Evidence type | What it proves | Status |
 |---|---|---|---|
 | 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) |
-| 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) |
+| 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) — RichDEM runs in the base env; the pysheds/Landlab checks `pytest.importorskip` and run once `requirements-crossvalidate.txt` is installed |
 | 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ partial (catalogue below); gap: **Halfar/Bueler SIA** |
 | 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **full** — 34/34 load-bearing citations confirmed (below) |
 | 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ✅ **real DEMs** (below) — ours in-range on all 3 metrics |
@@ -58,7 +58,11 @@ careful channel extraction.
 ## Rung 2 — independent-implementation agreement
 
 Our result compared **by test** against a mature library developed separately from the same
-papers (agreement = two independent readings converge). `tests/test_crossvalidate*.py`:
+papers (agreement = two independent readings converge). `tests/test_crossvalidate*.py`. **Only
+RichDEM is a base-environment dependency and always runs; the pysheds and Landlab checks
+`pytest.importorskip` those libraries and are exercised when `requirements-crossvalidate.txt` is
+installed (CI / a dev machine), so in a bare install they SKIP rather than fail** — real external
+validation, but gated on the optional dependency being present:
 
 | Family | Independent implementation | Check |
 |---|---|---|

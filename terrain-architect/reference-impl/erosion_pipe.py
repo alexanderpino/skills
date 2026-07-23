@@ -11,7 +11,9 @@ more radially symmetric than the 4-pipe stencil on a cone.
 reference the radial/conservation tests pin down). `pipe_erode` layers the **sediment/erosion
 coupling** on top (open, draining boundaries): the flow's velocity sets a transport CAPACITY, the
 bed is eroded where the flow is under capacity and material is DEPOSITED where it is over — alluvial
-fans, deltas, valley fill — with suspended sediment advected semi-Lagrangian and mass conserved. That
+fans, deltas, valley fill — with suspended sediment advected by **Eulerian flux-form** upwind transport
+(each cell exports `c·outflow` and imports the neighbours' inflowing sediment through the same pipes,
+so transport is mass-conserving by construction — not a semi-Lagrangian backward trace) and mass conserved. That
 is the full Mei-2007 landscape-evolution loop and the base the pro tools' hydro-erosion nodes descend
 from. For a production pipeline it wants a GPU; the reference here pins down the algorithm.
 """
@@ -28,7 +30,13 @@ def _shift(a, di, dj):
 
 def pipe_water(b, d, iters, *, rain=0.0, evap=0.0, dt=0.02, g=9.81, cellsize=1.0,
                pipes=8, flux_const=1.0):
-    """Advance water depth `d` over terrain `b` for `iters` steps. Returns new depth."""
+    """Advance water depth `d` over terrain `b` for `iters` steps. Returns new depth.
+
+    Caveat: the flux accel here is `g·dh/(len·cellsize)` while the depth update divides by `area=cellsize²`
+    — the pair is physically scaled only at **cellsize=1** (the resolution this reference solver is exercised
+    at; the conservation/radial tests use it there). Mass is conserved at any cellsize (the flux exchange is
+    a symmetric roll), but the flow *rate* is not physically scaled off the grid — `pipe_erode`/`shallow_water`
+    carry the cellsize-correct `g·cellsize` form for that."""
     b = np.asarray(b, dtype=np.float64)
     d = np.asarray(d, dtype=np.float64).copy()
     ndir = 8 if pipes == 8 else 4
