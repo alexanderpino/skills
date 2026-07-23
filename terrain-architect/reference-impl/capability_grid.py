@@ -373,6 +373,17 @@ def CELLS():
                             cellsize=cell, seed=4)                     # decaying displacement -> blocks
         return hill(_cr(h, 4), cell)
     add("02 Fault scarps (blocks)", "faults offset terrain into blocks; fault-as-K -> structure-controlled valleys", _faultblocks)
+    def _plates():
+        import tectonics as TEC
+        n = 160; cell = 6000.0
+        E = TEC.plate_uplift((n, n), n_plates=13, seed=3, cellsize=cell)
+        sx = np.array([-10000, -200, 0, 300, 2500, 5000, 8500.0])       # hypsometric colour ramp
+        sc = np.array([[18, 32, 74], [70, 120, 175], [120, 170, 205], [96, 150, 86],
+                       [176, 158, 120], [210, 205, 205], [248, 248, 252.0]])
+        rgb = np.stack([np.interp(E, sx, sc[:, c]) for c in range(3)], -1)
+        sh = render.hillshade(E, cell).astype(float)[..., 0] / 255.0
+        return np.clip(rgb * (0.55 + 0.5 * sh[..., None]), 0, 255).astype(np.uint8)
+    add("02 Plate tectonics (uplift)", "Voronoi plates, warped boundaries; orogens at convergent margins", _plates)
 
     return C
 

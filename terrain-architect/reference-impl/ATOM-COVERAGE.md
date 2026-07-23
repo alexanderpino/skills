@@ -41,7 +41,8 @@ SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier), the
 snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), aeolian
 abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier), and structural
 tectonics (`tectonics.fault_scarp` displacement fractal + `tectonics.fault_weakness` — the fault-as-
-`K(x,y)` coupling that feeds stream power so valleys follow structure). The meander solver is the one atom that runs on a
+`K(x,y)` coupling that feeds stream power so valleys follow structure — and `tectonics.plate_uplift`,
+the Voronoi-plate boundary-classification uplift field; F-tier). The meander solver is the one atom that runs on a
 **centreline (polyline)**, not the height field — an agent model (`07`) — and its migration physics
 is the upstream-lagged near-bank velocity (Ikeda–Parker–Sawai 1981), documented in chapter `03`.
 

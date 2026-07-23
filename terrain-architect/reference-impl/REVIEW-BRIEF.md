@@ -1,6 +1,6 @@
 # Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
 
-**Companion image:** `capability_grid.png` — a 7‑column grid, 52 tiles, one per capability of the
+**Companion image:** `capability_grid.png` — a 7‑column grid, 53 tiles, one per capability of the
 `terrain-architect` reference implementation. **Read this brief first, then review the image against it.**
 
 ---
@@ -138,6 +138,7 @@ failure mode to watch for.
 | R8C1 | Yardangs — wind abrasion (16) | **streamlined ridges all aligned to one wind direction** (parallel, elongated, drumlin‑like), carved from a soft plain | isotropic bumps / random blobs with no common orientation |
 | R8C2 | Alluvial fans / bajada (16) | **semiconical fans** debouching from the range front onto the basin floor, thinning downfan and **coalescing** along the front (a bajada) | fans pointing uphill; full discs (deposit behind the apex); a single smooth cone |
 | R8C3 | Fault scarps / blocks (02) | terrain **offset into blocks** by a few through‑going **fault scarps** (feathered tonal steps, decaying displacement — big range‑bounding faults + finer ones) | random noise with no linear scarps; hard 1‑pixel cliffs |
+| R8C4 | Plate tectonics (02) | irregular **plates** (warped, non‑straight boundaries) split into **oceans** (blue, deep) and **continents** (green), with **mountain belts (orogens) along convergent boundaries** | straight Voronoi edges; uniform elevation; mountains scattered in plate interiors |
 
 ---
 

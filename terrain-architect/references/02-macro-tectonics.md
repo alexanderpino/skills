@@ -77,6 +77,14 @@ about the pole; spreading rate ∝ sin of the angular distance from it). That is
 window, the erosion will not reach equilibrium and you'll get either a flat plain (too little)
 or an unerodible plateau (too much).
 
+*Runnable reference: `tectonics.plate_uplift` implements this loop — domain-warped Voronoi plates
+(Lloyd-relaxed centres), per-boundary classification (collision / subduction / island-arc / rift /
+transform), and the boundary uplift diffused inland over the orogen width; returns the elevation
+field (per-plate base + orogens). Verified by `tests/test_tectonics.py`: oceans and continents both
+present, orogens exceed the continental base, and — the decisive check — the highest ground is
+concentrated **at plate boundaries** (orogens), not in plate interiors. F-tier (a plausible planar
+plate sketch, not plate physics); the ★★★★ realism still comes from running erosion against it.*
+
 ## Uplift fields
 
 You often don't need plates. If the user wants "a mountain range here", author `U` directly:
