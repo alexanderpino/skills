@@ -151,11 +151,10 @@ def ridged_mf(x, y, seed=0, octaves=6, lacunarity=2.03, gain=2.0, offset=1.0, H=
     signal = offset - np.abs(perlin(x, y, seed))
     signal = signal * signal
     result = signal.copy()
-    weight = np.ones_like(result)
     freq = 1.0
     for i in range(1, int(octaves)):
         freq *= lacunarity
-        weight = np.clip(signal * gain, 0.0, 1.0)
+        weight = np.clip(signal * gain, 0.0, 1.0)                # weight is (re)set here each octave before use
         signal = offset - np.abs(perlin(x * freq, y * freq, seed + i * 1013))
         signal = signal * signal * weight
         result = result + signal * freq ** (-H)

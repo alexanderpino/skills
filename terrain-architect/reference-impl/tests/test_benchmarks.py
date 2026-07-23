@@ -9,6 +9,7 @@ Voellmy runout L=H/tanα, Pyle tephra thinning, Parsons-Sclater age-depth).
 import numpy as np
 import diffusion
 import noise
+import sims_illustrative as sims
 
 
 def test_diffusion_matches_the_gaussian_greens_function():
@@ -52,3 +53,33 @@ def test_worley_f1_equals_independent_nearest_point():
             fy = gy + noise._hash01(gx, gy, 5, salt=2)
             brute = np.minimum(brute, np.hypot(xx - fx, yy - fy))
     assert np.allclose(ours, brute)
+
+
+def test_glacier_sia_matches_halfar_similarity_solution():
+    """The SIA solver's decisive benchmark: the **Halfar (1983) similarity solution** for an
+    isothermal ice dome spreading on a flat bed with NO mass balance (Bueler et al. 2005 'Test B').
+    For Glen n=3 the exact profile is self-similar with shape H(r,t) = H_c(t)·[1 - (r/R(t))^(4/3)]^(3/7)
+    — the exponents (n+1)/n = 4/3 and n/(2n+1) = 3/7 come from the analytic solution, NOT our code, so
+    reproducing the shape is an independent check of the H^(n+2)·|∇s|^(n-1) diffusivity. Started from the
+    Halfar profile the numerical dome must (a) conserve ice exactly, (b) thin at the centre while the
+    margin advances (the self-similar spreading direction), and (c) keep the analytic interior shape.
+    This closes the SIA benchmark gap VALIDATION.md rung 3 recorded as deferred."""
+    n, cell = 121, 12000.0                                          # 12 km cells, ~1450 km domain
+    c = (n - 1) // 2
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    r = np.hypot(xx - c, yy - c) * cell
+    H0, R0 = 3000.0, 500e3
+    shape = lambda rr, Hc, R: Hc * np.maximum(1.0 - np.clip(rr / R, 0, 1) ** (4.0 / 3.0), 0.0) ** (3.0 / 7.0)
+    H = shape(r, H0, R0)
+    A = 1e-16 / (365.25 * 24 * 3600)                               # 1e-16 Pa^-3 a^-1 -> SI (Pa^-3 s^-1)
+    H1 = sims.glacier_sia(np.zeros((n, n)), H, steps=8, A=A, dt=200.0 * 3.15e7,
+                          cellsize=cell, beta=0.0, max_substeps=4000)
+
+    assert abs(H1.sum() - H.sum()) < 1e-9 * H.sum()                # (a) ice volume conserved (no mass balance)
+    Hc = H1[c, c]
+    rad, prof = r[c, c:], H1[c, c:]                                 # radial slice out from the dome centre
+    Rnum = rad[prof > 1.0].max()
+    assert Hc < H0 and Rnum > R0                                   # (b) centre thins, margin advances
+    interior = (rad > 0) & (rad < 0.7 * Rnum)                      # (c) interior matches the Halfar shape
+    err = np.abs(prof[interior] / Hc - shape(rad[interior], 1.0, Rnum))
+    assert err.max() < 0.03                                        # numerical dome reproduces [1-s^(4/3)]^(3/7)

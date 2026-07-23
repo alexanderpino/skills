@@ -37,7 +37,10 @@ def water_surface(bed, cellsize, discharge, *, q_channel=None, depth_coef=1.4, d
         w = np.maximum(w, flow.priority_flood_fill(bed))                    # basins fill flat to the spill
     if q_channel is None:
         q_channel = float(np.quantile(Q, 0.985))
-    is_channel = Q >= q_channel
+    if q_channel <= 0.0:                                                    # degenerate (zero/near-zero Q):
+        is_channel = np.zeros(Q.shape, dtype=bool)                         # no channels, no phantom sheet
+    else:
+        is_channel = Q >= q_channel
     depth = depth_coef * np.power(np.maximum(Q, 1e-9) / (q_channel + 1e-9), depth_exp)
     depth = np.clip(depth, 0.0, max_river_depth) * is_channel               # discharge-scaled river depth
     w = np.maximum(w, bed + depth)

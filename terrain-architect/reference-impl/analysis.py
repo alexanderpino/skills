@@ -25,7 +25,7 @@ def gradient(h, cellsize=1.0, method="central"):
         z4, z6 = p[1:-1, :-2], p[1:-1, 2:]
         z7, z8, z9 = p[2:, :-2], p[2:, 1:-1], p[2:, 2:]
         dzdx = ((z3 + 2 * z6 + z9) - (z1 + 2 * z4 + z7)) / (8 * cellsize)
-        dzdy = ((z1 + 2 * z2 + z3) - (z7 + 2 * z8 + z9)) / (8 * cellsize)
+        dzdy = ((z7 + 2 * z8 + z9) - (z1 + 2 * z2 + z3)) / (8 * cellsize)   # +y = increasing row (match `central`)
         return dzdx, dzdy
     dzdy, dzdx = np.gradient(h, cellsize)          # np.gradient: d/d(axis0), d/d(axis1)
     return dzdx, dzdy
@@ -46,9 +46,11 @@ def aspect(h, cellsize=1.0):
 
 
 def northness(aspect_field):
-    """+1 facing north (row 0), -1 facing south. `sin(aspect)` with y=north. Snow lingers on
-    north faces (N. hemisphere); one term, large payoff (06)."""
-    return np.sin(np.asarray(aspect_field, dtype=np.float64))
+    """+1 facing north (row 0), -1 facing south. Row index increases SOUTHWARD (row 0 = north), so
+    the north-facing component is `-sin(aspect)`, not `+sin(aspect)` — without the minus a north-facing
+    slope reads -1 and snow/shade masks land on the sunny south face. Snow lingers on north faces
+    (N. hemisphere); one term, large payoff (06)."""
+    return -np.sin(np.asarray(aspect_field, dtype=np.float64))
 
 
 def normals(h, cellsize=1.0):
@@ -87,9 +89,9 @@ def curvature(h, cellsize=1.0, kind="profile", eps=1e-12):
     safe = np.where(q < eps, 1.0, q)
     if kind == "plan":
         c = 2 * (D * H ** 2 + E * G ** 2 - F * G * H) / safe
-    else:                                          # profile
-        c = -2 * (D * G ** 2 + E * H ** 2 + F * G * H) / safe
-    return np.where(q < eps, 0.0, c)
+    else:                                          # profile: +ve in concave valley floors, matching the
+        c = 2 * (D * G ** 2 + E * H ** 2 + F * G * H) / safe   # docstring and `derive_substances` (plan/mean
+    return np.where(q < eps, 0.0, c)                            # already use concave-positive; profile was the outlier)
 
 
 def laplacian(h, cellsize=1.0):

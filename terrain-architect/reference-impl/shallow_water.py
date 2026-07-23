@@ -83,6 +83,9 @@ def simulate(bed, cellsize, *, rain=2.0e-6, iters=600, dt=None, sources=None, so
             out_vol += dt * float(outflow.sum() - inflow.sum())            # net leaving the domain
 
     discharge = (fL + fR + fT + fB)                                        # m³/s throughput per cell
-    speed = discharge / (d * cellsize + 1e-6)
+    # speed = discharge / cross-section. Floor the depth (a cell that fully drained this step has d≈0
+    # while discharge still carries last step's flux → speed would blow up); this keeps the reported
+    # field physical, as pipe_erode already does. Dry cells (no discharge) read 0.
+    speed = discharge / (np.maximum(d, 1e-3) * cellsize)
     return {"depth": d, "discharge": discharge, "speed": speed,
             "budget": {"rain_in": rain_in, "out": out_vol, "stored": float(d.sum() * area)}}

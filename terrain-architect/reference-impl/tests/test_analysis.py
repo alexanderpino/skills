@@ -33,6 +33,37 @@ def test_aspect_is_constant_on_a_plane():
     assert np.std(a) < 1e-6
 
 
+def test_northness_sign_matches_facing():
+    """+1 on a NORTH-facing slope (surface dips toward row 0), -1 facing south. Row index increases
+    southward, so this pins the -sin(aspect) orientation — a wrong sign puts snow on the sunny face."""
+    yy = np.mgrid[0:21, 0:21][0].astype(float)
+    north_facing = 2.0 * yy                                # h rises with row -> downhill toward row 0 (north)
+    south_facing = -2.0 * yy
+    assert A.northness(A.aspect(north_facing))[5:-5, 5:-5].mean() > 0.9
+    assert A.northness(A.aspect(south_facing))[5:-5, 5:-5].mean() < -0.9
+
+
+def test_horn_and_central_gradient_agree_in_sign():
+    """The two gradient estimators must agree on the SIGN of both components (Horn smooths, so
+    magnitudes differ slightly, but a flipped dz/dy is a bug — it y-flips analysis.normals)."""
+    yy, xx = np.mgrid[0:24, 0:24].astype(float)
+    h = 5.0 * yy + 3.0 * xx
+    cx, cy = A.gradient(h, 1.0, "central")
+    hx, hy = A.gradient(h, 1.0, "horn")
+    assert np.sign(cy[2:-2, 2:-2]).mean() == np.sign(hy[2:-2, 2:-2]).mean() == 1.0
+    assert np.sign(cx[2:-2, 2:-2]).mean() == np.sign(hx[2:-2, 2:-2]).mean() == 1.0
+
+
+def test_profile_curvature_is_positive_in_concave_hollows():
+    """Profile curvature must be >0 in a concave valley/hollow and <0 on a convex ridge — the
+    convention the docstring states AND derive_substances relies on to deposit sediment in hollows
+    (plan/mean are already concave-positive; profile was the sign outlier)."""
+    bowl = _paraboloid(n=41, R=500.0, cellsize=10.0) * -1.0   # concave-up bowl
+    dome = _paraboloid(n=41, R=500.0, cellsize=10.0)          # convex dome
+    assert A.curvature(bowl, 10.0, "profile")[20, 6] > 0.0    # flank of a concave hollow
+    assert A.curvature(dome, 10.0, "profile")[20, 6] < 0.0    # flank of a convex ridge
+
+
 def test_laplacian_of_paraboloid_is_exact():
     """The decisive curvature oracle: discrete Laplacian of -(X^2+Y^2)/2R equals -2/R."""
     R, cs = 500.0, 10.0

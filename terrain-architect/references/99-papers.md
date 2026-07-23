@@ -250,6 +250,12 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 
 ## Rendering & output
 
+- **Max, N. (1988).** *Horizon mapping: shadows for bump-mapped surfaces.* The Visual Computer 4(2),
+  109–117. — Geometry-native horizon-angle occlusion (per-azimuth max slope); the basis for the
+  terrain ambient-occlusion in `analysis`, distinct from screen-space AO.
+- **Andersson, J. (2007).** *Terrain Rendering in Frostbite Using Procedural Shader Splatting.*
+  SIGGRAPH 2007 Courses (Advanced Real-Time Rendering). — Procedural splatmap material blending by
+  slope/height/curvature masks; the compositor behind `render.splat_blend` / `material_rgb`.
 - **Losasso, F. & Hoppe, H. (2004).** *Geometry clipmaps: terrain rendering using nested
   regular grids.* ACM TOG 23(3), SIGGRAPH '04. — Nested grids, vertex morphing across the
   transition band.
@@ -364,6 +370,17 @@ is below.
 
 ## Geological formation
 
+- **Collins, G.S., Melosh, H.J. & Marcus, R.A. (2005).** *Earth Impact Effects Program: A web-based
+  computer program for calculating the regional environmental consequences of a meteoroid impact on
+  Earth.* Meteoritics & Planetary Science 40(6), 817–840. — The transient-crater π-scaling used in
+  `crater.py`: D_tc = 1.161·(ρ_i/ρ_t)^⅓·L^0.78·v^0.44·g^(−0.22)·(sinθ)^⅓.
+- **Narr, W. & Suppe, J. (1991).** *Joint spacing in sedimentary rocks.* Journal of Structural
+  Geology 13(9), 1037–1048. — Systematic joint spacing scales with bed thickness; the near-orthogonal
+  joint sets that make flat-lying sandstone buttes blocky, not round (`landforms.fault_block_butte`).
+- **Karátson, D., Favalli, M., Tarquini, S., Fornaciai, A. & Wörner, G. (2010).** *The regular shape
+  of stratovolcanoes: A DEM-based morphometrical approach.* Journal of Volcanology and Geothermal
+  Research 193(3–4), 171–181. — Stratovolcano vs shield edifice morphometry (concave-up upper cone,
+  flaring apron, radial barrancos) grounding `landforms.volcano`.
 - **Beneš, B. & Forsbach, R. (2001).** *Layered Data Representation for Visual Simulation of
   Terrain Erosion.* SCCG 2001. — Layered material representation.
 - **Peytavie, A., Galin, E., Grosjean, J. & Mérillou, S. (2009).** *Arches: a Framework for
@@ -650,6 +667,12 @@ is below.
 
 ## Hydrology (additional)
 
+- **Hack, J.T. (1957).** *Studies of longitudinal stream profiles in Virginia and Maryland.* USGS
+  Professional Paper 294-B. — Hack's law, L ∝ A^h with h ≈ 0.57; the emergent length–area exponent the
+  stream-power terrain is checked against (`test_empirical.py`, VALIDATION rung 5).
+- **Leopold, L.B., Wolman, M.G. & Miller, J.P. (1964).** *Fluvial Processes in Geomorphology.*
+  W.H. Freeman. — Meander geometry (wavelength ≈ 10–14× channel width) and downstream hydraulic
+  geometry; grounds the meandering trunk of `landforms.canyon`.
 - **Strahler, A.N. (1957).** *Quantitative analysis of watershed geomorphology.* Transactions,
   AGU 38(6). — Stream ordering. (Horton 1945 is the predecessor.)
 - **Ikeda, S., Parker, G. & Sawai, K. (1981).** *Bend theory of river meanders. Part 1. Linear

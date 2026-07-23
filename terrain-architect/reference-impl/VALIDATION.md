@@ -18,7 +18,7 @@ Validity needs evidence from an **independent source**.
 |---|---|---|---|
 | 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) |
 | 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) — RichDEM runs in the base env; the pysheds/Landlab checks `pytest.importorskip` and run once `requirements-crossvalidate.txt` is installed |
-| 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ partial (catalogue below); gap: **Halfar/Bueler SIA** |
+| 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ catalogue below (incl. the **Halfar/Bueler SIA** exact solution) |
 | 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **full** — 34/34 load-bearing citations confirmed (below) |
 | 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ✅ **real DEMs** (below) — ours in-range on all 3 metrics |
 
@@ -78,6 +78,7 @@ solution or an independent recomputation), not an oracle re-derived from the sam
 
 | Model | External benchmark | Where |
 |---|---|---|
+| **SIA glacier** | **Halfar (1983) similarity solution / Bueler 2005 Test B** — self-similar dome `H_c·[1−(r/R)^(4/3)]^(3/7)` for n=3, exact volume conservation, centre thins while margin advances | `test_benchmarks.py` (interior shape reproduced to <3%) |
 | Hillslope diffusion | Gaussian Green's function — variance = s₀² + 2Dt/dim | `test_benchmarks.py` (new) |
 | Hillslope diffusion | exact discrete single-Fourier-mode decay | `test_diffusion.py` |
 | Worley F1 | independent brute-force nearest-feature-point | `test_benchmarks.py` (new) |
@@ -88,11 +89,15 @@ solution or an independent recomputation), not an oracle re-derived from the sam
 | Seafloor age–depth | Parsons & Sclater / GDH1: d ∝ √age | `test_analytic.py` |
 | PDC energy cone | Malin & Sheridan: runout = H_c/μ | `test_analytic.py` |
 
-**Known gap:** the SIA glacier (`sims_illustrative.py`) has only invariant checks — no published
-benchmark. The right one is the **Halfar/Bueler exact isothermal-ice-sheet similarity solution**
-(Bueler et al. 2005), which needs the exact formula from the primary source; deferred to the
-rung-4 audit, and it will also quantify how far the *illustrative* (CFL-capped) SIA is from an
-accurate solver.
+**SIA glacier — gap now closed.** Previously the SIA glacier (`sims_illustrative.py`) had only
+invariant checks. It is now benchmarked against the **Halfar (1983) exact similarity solution**
+(Bueler et al. 2005, "Test B"): started from the analytic Halfar dome and run with zero mass balance,
+the numerical solver conserves ice exactly, thins at the centre while the margin advances, and
+reproduces the analytic self-similar profile `[1−(r/R)^(4/3)]^(3/7)` (n=3) to within ~1% in the
+interior (`test_glacier_sia_matches_halfar_similarity_solution`). The exponents 4/3 and 3/7 come from
+the analytic solution, not the code, so this is genuinely independent. The illustrative CFL-capped
+sub-cycling is accurate enough to hold the self-similar shape over the tested span; a geological `dt`
+would still want an implicit solver (as the docstring notes).
 
 ## Rung 1 — dimensional audit (machine-checked with `pint`)
 

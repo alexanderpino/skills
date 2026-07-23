@@ -119,9 +119,10 @@ def _conv1d(h, kernel, axis):
 
 
 def gaussian(h, sigma):
-    """Separable Gaussian blur (two 1D passes). Preserves the mean; blurs everything, INCLUDING
-    ridges and cliffs — the chapter's point is that it's the wrong default for terrain. Prefer
-    bilateral/guided/median below; this is here as the baseline they beat."""
+    """Separable Gaussian blur (two 1D passes). Normalised kernel — preserves a constant and the
+    interior mean exactly (the global mean drifts only by an O(border/n) reflect-padding term at the
+    edges). Blurs everything, INCLUDING ridges and cliffs — the chapter's point is that it's the wrong
+    default for terrain. Prefer bilateral/guided/median below; this is here as the baseline they beat."""
     h = np.asarray(h, dtype=np.float64)
     r = max(1, int(np.ceil(3 * sigma)))
     x = np.arange(-r, r + 1)
