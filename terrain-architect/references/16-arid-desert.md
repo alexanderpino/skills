@@ -95,6 +95,12 @@ size** (Blair & McPherson), and **avulsion** — the feeder channel periodically
 lobe — is what makes a fan a *fan* rather than a single incised gully. Coalesce several fans along a
 front and you have a bajada.
 
+*Runnable reference: `landforms.alluvial_fan(h, apex, downfan=…)` — a semiconical, deposition-only
+apex stamp with a concave downfan thinning profile, built from `seed`-jittered **avulsion lobes**;
+coalesce several along a range front for a bajada. Verified by `tests/test_alluvial_fan.py`: adds
+only, deposits only downfan (nothing behind the apex), thins with distance, and is confined to its
+angular sector. F-tier look.*
+
 ## Pediments
 
 A **pediment** is the erosional twin of the fan: a gently sloping (**~0.5–7°**) **bedrock** surface cut

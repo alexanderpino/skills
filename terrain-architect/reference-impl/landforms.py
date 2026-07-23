@@ -420,6 +420,39 @@ def anticline(h, x, y, amp, axis_point, axis_normal, sigma):
     return np.asarray(h, dtype=np.float64) + amp * np.exp(-d * d / (2.0 * sigma * sigma))
 
 
+def alluvial_fan(h, apex, *, flux=9.0, length=90.0, spread_deg=62.0, downfan=(1.0, 0.0),
+                 lobes=6, concavity=1.7, gate_power=1.5, cellsize=1.0, seed=0):
+    """Deposit a semiconical **alluvial fan** at a mountain-front `apex` (16; Blair & McPherson 1994).
+    Where a confined channel debouches onto the basin floor it unconfines, spreads over an angular
+    sector, and drops its load — a fan that **thins downfan** (concave profile: steep near the apex,
+    gentle distal). It is built as overlapping **avulsion lobes** (the feeder channel jumps between
+    episodes, `seed`-jittered within the spread) rather than a smooth cone — which is what makes a fan
+    a fan. Coalesce several along a range front → a **bajada**. `apex=(row, col)`, `downfan=(drow,
+    dcol)`. Deposition only (adds to `h`); returns a new height field."""
+    h = np.asarray(h, dtype=np.float64).copy()
+    n, m = h.shape
+    ai, aj = apex
+    yy, xx = np.mgrid[0:n, 0:m].astype(np.float64)
+    dy, dx = yy - ai, xx - aj
+    r = np.hypot(dy, dx) * cellsize
+    rn = np.hypot(dy, dx) + 1e-9
+    du, dv = downfan
+    dm = float(np.hypot(du, dv)) + 1e-30
+    du, dv = du / dm, dv / dm
+    rng = np.random.default_rng(seed)
+    half = np.radians(spread_deg) / 2.0
+    prof = np.clip(1.0 - r / length, 0.0, 1.0) ** concavity            # concave thinning profile
+    total = np.zeros_like(h)
+    for _ in range(int(lobes)):                                        # avulsion: jittered lobes
+        j = float(rng.uniform(-1.0, 1.0)) * half * 0.7
+        lu = du * np.cos(j) - dv * np.sin(j)
+        lv = du * np.sin(j) + dv * np.cos(j)
+        ang = np.arccos(np.clip((dy * lu + dx * lv) / rn, -1.0, 1.0))  # angle off the lobe axis
+        gate = np.clip(1.0 - ang / half, 0.0, 1.0) ** gate_power
+        total += flux * prof * gate
+    return h + total
+
+
 # --------------------------------------------------------------------------- #
 # karst — the depression-handling exception
 # --------------------------------------------------------------------------- #

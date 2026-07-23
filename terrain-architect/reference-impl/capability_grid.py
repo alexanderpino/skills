@@ -355,6 +355,16 @@ def CELLS():
         h = AEO.yardang(playa, (1.0, 0.25), 1.0, iters=12, saltation_h=4.0, seed=3)
         return hill(_cr(h, 5), cell)
     add("16 Yardangs (wind abrasion)", "streamlined ridges || wind; low ground cut fastest (undercut)", _yardang)
+    def _bajada():
+        n = 150; cell = 12.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        base = 250 - 1.2 * yy2 + noise.fbm(xx2 * 0.05, yy2 * 0.05, 7, octaves=4) * 10
+        base[:40] += (40 - yy2[:40]) * 8                               # mountains above the range front
+        h = base.copy()
+        for aj, seed in [(38, 1), (80, 4), (118, 7)]:                 # three fans -> coalesce to a bajada
+            h = L.alluvial_fan(h, (40, aj), downfan=(1.0, 0.0), flux=7.0, length=95.0,
+                               spread_deg=66.0, lobes=6, seed=seed)
+        return hill(_cr(h, 4), cell)
+    add("16 Alluvial fans (bajada)", "fans debouch at the range front, thin downfan, coalesce -> bajada", _bajada)
 
     return C
 

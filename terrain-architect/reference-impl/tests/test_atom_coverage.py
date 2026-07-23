@@ -53,6 +53,7 @@ GENERATORS = {
     "volcano": "references/11-geological.md",
     "canyon": "references/11-geological.md",
     "fault_block_butte": "references/11-geological.md",
+    "alluvial_fan": "references/16-arid-desert.md",
 }
 
 
