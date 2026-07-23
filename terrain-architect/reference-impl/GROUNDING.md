@@ -90,6 +90,17 @@ presentation — they dress the verified
 `crater.py` skeleton with `noise.py` (01) detail for a hillshaded *look* and is deliberately outside
 the grounding scale (not mass-conserving, not oracle-verified; only a determinism/texture smoke test).
 
+The **coupled hydraulic erosion** (`erosion_pipe.py`) is the full Mei-2007 landscape-evolution loop:
+`pipe_water` routes the water (periodic, water-conserving — the `04` reference, verified in
+`test_pipe.py`), and **`pipe_erode`** couples that flow to sediment — the velocity sets a transport
+capacity, the bed **erodes** under capacity and **deposits** over it (alluvial fans, deltas, valley
+fill — the deposition the detachment-limited stream-power core cannot make), and suspended sediment is
+transported by the water fluxes so **mass is conserved**. **paper-grounded, invariant-checked**
+(`test_pipe.py`): a closed basin conserves bed volume exactly, a steep cone stays bounded (the
+stability guards hold), and a slope-into-basin **erodes the slope and deposits a fan in the basin**
+with material exported off the open edge. This closes `SIMULATION-AUDIT.md`'s #1 gap (deposition) on
+top of the real flow — the base the pro tools' hydro-erosion nodes descend from; not a calibrated LEM.
+
 The **shallow-water flow** (`shallow_water.py`) is a real, mass-conserving water simulation — the
 **virtual-pipe model** (Mei, Decaudin & Hu 2007, *Fast Hydraulic Erosion Simulation… on GPU*, Pacific
 Graphics, 10.1109/PG.2007.15): water depth is a state variable, a **rainfall source** (m/s) and/or

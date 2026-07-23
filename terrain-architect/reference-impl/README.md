@@ -50,7 +50,7 @@ benchmarks, primary-source audit — is tracked in **`VALIDATION.md`**.
 | `diffusion.py` — hillslope diffusion | `04`/`05` Culling 1960 | exact discrete single-mode decay; mass conserved |
 | `erosion_thermal.py` — talus | `05` Musgrave et al. 1989 | converges below repose; distance-correction cuts grid bias; deterministic |
 | `erosion_droplet.py` — droplet | `04` Beyer 2015 | deterministic; mass conserved; ensemble mean is radial (gullies are random, not grid) |
-| `erosion_pipe.py` — virtual-pipe water | `04` Mei et al. 2007 | depth ≥ 0 (step-3 scaling) & finite on steep terrain; water conserved; 8-pipe more radial than 4-pipe |
+| `erosion_pipe.py` — virtual-pipe water **+ coupled erosion** | `04` Mei et al. 2007 | `pipe_water`: depth ≥ 0 (step-3 scaling) & finite on steep terrain, water conserved, 8-pipe more radial than 4-pipe. `pipe_erode`: the full loop — flow → sediment capacity → **erode/deposit** (fans, deltas, valley fill) → conservative sediment transport; closed basin conserves bed mass, slopes erode & basins deposit, stable on steep terrain. `python erosion_pipe.py` → before/after `erosion_pipe.png` |
 | `erosion_streampower.py` — stream power | `04` Braun & Willett 2013; Cordonnier 2016 | **slope–area exponent = −m/n** at steady state |
 | `dunes.py` — Werner slab CA | `05` Werner 1995 | slabs conserved; instability (`p_sand>p_bare`) sweeps ground bare; deterministic |
 | `winds.py` — mass-consistent wind | `13` Sherman 1978 | corrected field's divergence → 0 (Helmholtz–Hodge projection); solenoidal field passes through |

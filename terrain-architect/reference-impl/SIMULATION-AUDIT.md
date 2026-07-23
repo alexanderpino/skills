@@ -53,7 +53,7 @@ Verdict scale: **SOTA** · **solid (not SOTA)** · **superseded** · **gap**. "U
 | **Aeolian (dunes)** | Werner 1995 slab CA | Desertscape (Paris 2019): abrasion, reptation, dune types; GPU 2023 | **solid, not SOTA** (still ahead of the tools) | adopt Desertscape extensions |
 | **Glacial** | SIA shallow ice (~2020 CG level) | Cordonnier 2023 *Forming Terrains by Glacial Erosion* + IGM learned flow (Jouvet 2022) | **solid, superseded for accuracy** | min: hybrid SIA+SSA; frontier: IGM emulator + multi-scale advection |
 | **Coastal** | simple cliff retreat | SCAPE (Walkden & Hall 2005) — no strong CG SOTA | **pragmatic / acceptable** | wave-energy platform down-wearing + talus feedback |
-| **Sediment / deposition** | droplet deposits; **SPL does not** | conserved sediment field is table-stakes (Šťava 2008 … Schott 2024, McDonald 2026) | **superseded (erosion-only)** | **#1 gap:** explicit conserved sediment/alluvium field → fans, deltas, valley fill |
+| **Sediment / deposition** | **now: `erosion_pipe.pipe_erode`** (Mei-2007 coupled flow+sediment, conserved) + droplet; SPL still detachment-only | conserved sediment field (Šťava 2008 … Schott 2024, McDonald 2026) | **gap closed** for the pipe model (fans/deltas/fill + mass conservation); SPL core still detachment-limited | add the transport-limited closure to the SPL stage too |
 | **Flow routing / hydrology** | D8 + MFD + priority-flood (× RichDEM/pysheds/Landlab) | + D-infinity (Tarboton 1997); Fill-Spill-Merge (Barnes 2020) for real lakes; FastFlow 2024 | **current / solid** | optional D-∞; **Fill-Spill-Merge** for real lakes vs filled-flat |
 | **Karst caves** | — (prose only) | Paris 2021 geologically-coherent cave networks | **gap** (if in scope) | anisotropic-shortest-path conduits + SDF |
 | **Lava flow** | ejecta CA only | MAGFLOW/MOLASSES CA or SPH thermal flow | **gap** (if in scope) | thermo-rheological CA or shallow-water thermal |
@@ -118,9 +118,10 @@ Five separable upgrades over a naive slope+height splat, all documented in the t
 
 ## Part 5 — Prioritised gaps (the roadmap this audit produces)
 
-1. **Conserved sediment / deposition field** on the stream-power core (fans, deltas, valley fill). *Highest value*
-   — it's table-stakes SOTA, fixes the erosion-only tell, and feeds the texture masks. (Landlab **SPACE** is the
-   cross-validation oracle.)
+1. **Conserved sediment / deposition field** — **DONE** via `erosion_pipe.pipe_erode` (Mei-2007 coupled
+   flow+sediment: fans, deltas, valley fill, mass-conserved). Remaining: add a transport-limited closure to
+   the *stream-power* stage too, and feed the deposition field into the texture masks. (Landlab **SPACE** is
+   the cross-validation oracle.)
 2. **Layered material representation** (bedrock/regolith/sediment/water/snow). Unlocks #1 *and* seasons; it's the
    Houdini/Beneš-2001 representation. Prereq for dynamics.
 3. **Nonlinear hillslope diffusion** (Roering 1999) beside the repose CA → the standard "SPL channels + diffusion
