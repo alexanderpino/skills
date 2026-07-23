@@ -337,28 +337,50 @@ FAMILY = {                                        # archetype/world name -> biom
 
 
 def substance_color(h, family, cell=CELL):
-    """Colour a tile by the SUBSTANCES on it (analysis.derive_substances), each painted its own
-    material colour from the BIOME — no elevation ramp. Returns (float RGB 0-255, drainage area)."""
-    bio = BIOME[family]
+    """Colour a tile by the SUBSTANCES on it, WITH DEPTH: loose materials pile up and fill the
+    crevices (analysis.deposit_fill), building a surface smoother than the bedrock, and snow covers
+    the gullies it drifts into. Returns (float RGB 0-255, drainage area, piled surface)."""
+    bio, clim = BIOME[family], BIOME[family]["climate"]
     slope = analysis.slope(h, cell)
     area = flow.d8_accumulation(flow.priority_flood_fill(h), cell)
-    stack = analysis.derive_substances(h, slope, area, cell, climate=bio["climate"], rng_seed=0)
-    masks = np.stack([m for _, m in stack])
-    palette = [bio[name] for name, _ in stack]
-    return render.material_rgb(masks, palette=palette, shade=False).astype(np.float64), area
+    stack = analysis.derive_substances(h, slope, area, cell, climate=clim, rng_seed=0)
+    md = {n: m.copy() for n, m in stack}
+    fill = analysis.deposit_fill(h, cell, radius=3)                          # depth that fills crevices/hollows
+    surf = h.astype(np.float64).copy()
+
+    # loose ground settles into the lows first (desert sand/dust drifts into hollows; sediment fills)
+    low = md["sediment"].copy()
+    if not clim.get("has_veg", False):                                       # arid: the bare ground IS sand
+        low = np.clip(low + md["ground"], 0.0, 1.0)
+    surf = surf + low * fill
+
+    if clim.get("has_snow", False):                                          # snow PILES: deep in couloirs/hollows
+        snow_depth = md["snow"] * fill
+        surf = surf + snow_depth
+        span = np.ptp(h) + 1e-9
+        deep = analysis.smoothstep(0.015 * span, 0.06 * span, snow_depth)    # where snow filled in, it now covers
+        md["snow"] = np.clip(np.maximum(md["snow"], deep), 0.0, 1.0)
+
+    # composite in priority order (splatmap): ground base, then deposits, veg, rock, snow, water on top
+    col = render.splat_blend(
+        np.zeros(h.shape + (3,), dtype=np.float64) + np.array(bio["ground"], dtype=np.float64),
+        [(md["sediment"], bio["sediment"]), (md["scree"], bio["scree"]),
+         (md["vegetation"], bio["vegetation"]), (md["rock"], bio["rock"]),
+         (md["snow"], bio["snow"]), (md["water"], bio["water"])])
+    return col, area, surf
 
 
 def _rich(h, family, cell=CELL, sea_level=None, azimuth=315.0, altitude=42.0):
-    """Colour one tile by substance (BIOME), then light it with render.photoreal (sun+sky, AO,
-    rivers, aerial). Rivers only on wet worlds."""
-    col, area = substance_color(h, family, cell)
-    ao = analysis.horizon_ao(h, cell)
+    """Colour one tile by substance-with-depth (BIOME), then light the PILED surface with
+    render.photoreal (sun+sky, AO, rivers, aerial). Rivers only on wet worlds."""
+    col, area, surf = substance_color(h, family, cell)
+    ao = analysis.horizon_ao(surf, cell)                                     # AO on the deposit surface
     rivers = None
     if family in ("temperate", "verdant", "volcanic"):                       # wet worlds carry channels
         la = np.log1p(area)
         mx = float(la.max())
         rivers = np.clip((la - 0.87 * mx) / (0.13 * mx + 1e-9), 0.0, 1.0)
-    return render.photoreal(col, h, cell, ao=ao, rivers=rivers, ao_strength=0.38,
+    return render.photoreal(col, surf, cell, ao=ao, rivers=rivers, ao_strength=0.38,
                             aerial_strength=0.34, aerial_band=0.20,
                             azimuth=azimuth, altitude=altitude, sea_level=sea_level)
 

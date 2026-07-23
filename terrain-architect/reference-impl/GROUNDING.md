@@ -146,9 +146,13 @@ Every effect we add is one of their node categories, grounded in the same litera
   **scree** at the repose angle below cliffs; **sediment** where flow deposits on gentle, concave lows;
   **vegetation** on gentle ground below the snowline (arid biomes have none). So snow is white because
   snow is *a white substance*, not because "high == white" — the snowline is an irregular, aspect- and
-  shelter-dependent surface, not a contour. The per-material blend is the Frostbite-2007 splat; the
-  elevation-gradient **SatMap** (`render.satmap`) stays as a toolbox node but is no longer the tile base.
-  Still simpler than the pro tools' full Flow/Wear/Deposits layer set, but now materially honest.
+  shelter-dependent surface, not a contour. Substances also have **depth: they pile up and fill the
+  crevices** (`analysis.deposit_fill` — a morphological closing minus the surface, deep in gullies/
+  hollows, zero on ridges), so a loose deposit builds a surface *smoother* than the bedrock (snow drifts
+  into couloirs and covers them, sand banks into interdunes) and the render shades that piled surface.
+  The per-material blend is the Frostbite-2007 splat; the elevation-gradient **SatMap** (`render.satmap`)
+  stays as a toolbox node but is no longer the tile base. Still simpler than the pro tools' full
+  Flow/Wear/Deposits layer set, but now materially honest.
 - **Content-addressed caching** (Merkle key over params + upstream cone) is *our* mechanism — consistent
   with how these tools cache cooked nodes, but an implementation choice, not a documented parity claim.
 

@@ -225,6 +225,18 @@ def dominant_material(stack):
     return np.argmax(weights, axis=0)
 
 
+def deposit_fill(h, cellsize=1.0, radius=3):
+    """Depth by which a loose granular deposit PILES UP to fill the crevices/hollows of a surface —
+    a greyscale morphological **closing** minus the surface, clamped ≥ 0 (`ops_filters.closing`, 10).
+    Closing fills every concavity up to the structuring radius, so this is deep in gullies and hollows
+    and zero on ridges and open flats — exactly how snow drifts into couloirs, sand banks into
+    interdunes, and scree ramps up a cliff foot. Scale it by a substance's supply mask, then add it to
+    the surface: the deposit surface is smoother than the bedrock beneath. `radius` is in cells."""
+    import ops_filters
+    closed = ops_filters.closing(np.asarray(h, dtype=np.float64), r=int(radius))
+    return np.maximum(closed - np.asarray(h, dtype=np.float64), 0.0)
+
+
 SUBSTANCE_NAMES = ("water", "snow", "rock", "scree", "sediment", "vegetation", "ground")
 
 

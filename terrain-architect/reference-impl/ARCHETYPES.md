@@ -11,7 +11,10 @@ shows the *material* on it, placed where it physically accumulates — **snow** 
 and the slope holds it and wind loads it (so the snowline dips on shaded aspects and fills sheltered
 hollows, never a clean contour); **rock** where the slope is too steep to hold anything; **scree** at
 repose below the cliffs; **sediment** where flow deposits; **vegetation** on gentle ground below the
-snowline (arid worlds have none). Snow is white because snow is a white *substance*. Each world is a
+snowline (arid worlds have none). Snow is white because snow is a white *substance*. And substances
+have **depth — they pile up and fill the crevices** (`analysis.deposit_fill`): loose material drifts
+into gullies and hollows, building a surface smoother than the bedrock (snow fills a couloir and
+covers it; sand banks into an interdune), and the render shades that piled surface. Each world is a
 **BIOME** (which substances exist + their colours + climate). The **photoreal composite**
 (`render.photoreal`: × sun+sky two-light × ambient occlusion + rivers + aerial perspective) then
 lights it; the elevation-gradient SatMap (`render.satmap`) stays as a toolbox node, not the base. This is Stage 1 of `reference-impl/HYPERREALISM.md`, the research-grounded

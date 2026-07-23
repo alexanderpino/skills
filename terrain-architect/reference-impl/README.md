@@ -114,7 +114,9 @@ Two files, both deliberately small:
   `photoreal`: material colour × sun+sky × ambient occlusion + rivers + aerial perspective — Stage 1
   of `HYPERREALISM.md`, the render behind both montages). The montages colour by **substance**
   (`analysis.derive_substances` — snow/rock/scree/sediment/vegetation placed by physics, coloured by
-  material) rather than by elevation. Import it directly to render any heightfield from the modules.
+  material) rather than by elevation, and those substances **pile up and fill crevices**
+  (`analysis.deposit_fill`) into a surface smoother than the bedrock. Import it directly to render any
+  heightfield from the modules.
 
 The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
 itself is the verified `noise.py` module (noise is the initial condition, not the answer).

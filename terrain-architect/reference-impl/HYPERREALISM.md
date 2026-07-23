@@ -26,7 +26,9 @@ compositing** (soft light + AO + aerial perspective). Ranked by realism-per-effo
    repose below cliffs, sediment where flow deposits, vegetation on gentle ground, and **snow where
    it is cold enough AND the slope holds it AND wind loads it** (shaded aspects + hollows collect,
    steep/convex sheds) — snow is white because snow is a white substance, not because "high == white".
-   This (`analysis.derive_substances`) is the biggest delta; an elevation colour ramp (a SatMap) is a
+   Substances also have **depth: they pile up and fill crevices** (`analysis.deposit_fill`), building a
+   surface smoother than the bedrock (snow drifts into couloirs, sand banks into interdunes). This
+   (`analysis.derive_substances`) is the biggest delta; an elevation colour ramp (a SatMap) is a
    shortcut that paints snow and rock at the wrong places. Blend masks with `smoothstep`, never hard
    bands.
 2. **Hydraulic droplet erosion** (~**5·N²** droplets; radius 3, capacity 4, erode/deposit ~0.3,

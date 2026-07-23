@@ -342,11 +342,14 @@ def run_scene(ctx, outdir):
     height = g.evaluate(h_out)
     area = g.evaluate(a_out)
     slope = g.evaluate("slope")
-    stack = analysis.derive_substances(height, slope, area, ctx.cellsize, climate=_ARID_BIOME["climate"])
-    masks = np.stack([m for _, m in stack])
-    mat = render.material_rgb(masks, palette=[_ARID_BIOME[n] for n, _ in stack], shade=False).astype(np.float64)
-    ao = analysis.horizon_ao(height, ctx.cellsize)                          # Max 1988 horizon AO (height-field-native)
-    img = render.photoreal(mat, height, ctx.cellsize, ao=ao, ao_strength=0.38,
+    stack = dict(analysis.derive_substances(height, slope, area, ctx.cellsize, climate=_ARID_BIOME["climate"]))
+    fill = analysis.deposit_fill(height, ctx.cellsize, radius=3)            # sand/dust piles into the washes
+    surf = height + np.clip(stack["sediment"] + stack["ground"], 0.0, 1.0) * fill
+    mat = render.splat_blend(np.zeros(height.shape + (3,)) + np.array(_ARID_BIOME["ground"], float),
+                             [(stack["sediment"], _ARID_BIOME["sediment"]), (stack["scree"], _ARID_BIOME["scree"]),
+                              (stack["rock"], _ARID_BIOME["rock"]), (stack["water"], _ARID_BIOME["water"])])
+    ao = analysis.horizon_ao(surf, ctx.cellsize)                            # Max 1988 horizon AO on the piled surface
+    img = render.photoreal(mat, surf, ctx.cellsize, ao=ao, ao_strength=0.38,
                            aerial_strength=0.34, aerial_band=0.20)
     os.makedirs(outdir, exist_ok=True)
     p1 = render.write_png(os.path.join(outdir, "scene_mesa_photoreal.png"), img)

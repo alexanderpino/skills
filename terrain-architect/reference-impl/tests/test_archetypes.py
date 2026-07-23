@@ -114,9 +114,15 @@ def test_substance_colour_is_material_not_elevation():
     """Colour comes from SUBSTANCES, not a height ramp: varied colour, and snow is placed by physics
     (a white substance) only on cold, holdable ground — never on the steep faces that shed it, and
     never on a warm desert."""
-    col, area = A.substance_color(A.alpine(n=N, cell=A.CELL), "temperate", A.CELL)
+    hh = A.alpine(n=N, cell=A.CELL)
+    col, area, surf = A.substance_color(hh, "temperate", A.CELL)
     assert col.shape == (N, N, 3)
     assert int(col.reshape(-1, 3).std(axis=0).sum()) > 12             # real material variation
+    # substances PILE UP: the deposit surface only ever rises above bedrock, and it fills crevices
+    assert np.all(surf >= hh - 1e-6)
+    assert surf.max() > hh.max() - 1e-6 and np.any(surf > hh + 1e-6)  # something actually accumulated
+    fill = A.analysis.deposit_fill(hh, A.CELL, radius=3)
+    assert fill.min() >= -1e-9 and fill.max() > 0.0                   # fill is >=0, positive in hollows
 
     # snow (substance) placement: present on the alpine world, absent on the arid desert
     h = A.alpine(n=N, cell=A.CELL)
