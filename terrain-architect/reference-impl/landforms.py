@@ -155,17 +155,64 @@ def fault_block_butte(shape, bx, by, br, bh, cellsize, seed=0, ecc=1.0, talus=0.
 # --------------------------------------------------------------------------- #
 # mountain generator (a placeable feature primitive — Gaea's "Mountain" node)
 # --------------------------------------------------------------------------- #
-def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0.32,
-             detail=0.55, octaves=7, profile=1.6):
-    """A MOUNTAIN feature primitive (Génévaux et al. 2015, *Terrain Modelling from Feature Primitives*;
-    Guérin et al. 2016) — a landform GENERATOR, the "Mountain" node an artist places, distinct from
-    thresholded noise: a wandering ridge-crest **skeleton** (a polyline) sets a concave-flank envelope,
-    which ridged-multifractal **detail** then dissects into spurs and valleys. `n_ridges` crest lines are
-    unioned into a small range. Place it, combine several (`np.maximum` / `ops_filters.smax`), then erode
-    — the construction-tree workflow. Returns height (m)."""
+# Gaea's Mountain node styles. The organized (non-noisy) look comes from a MODULATED
+# VORONOI ridge network — cell EDGES are ridgelines, cell INTERIORS are valleys — broken
+# by a domain distortion into natural spurs (QuadSpinner docs: "modulated Voronoi + distortion",
+# the eroded look baked into the primitive, NOT a downstream erosion sim). The style then shapes
+# that network: sharpness of crests, drainage-cell count, warp, and a talus pass for weathering.
+_MOUNTAIN_STYLES = {
+    #           cells warp  relief spur crest  erode talus repose terr
+    "basic":  dict(cells=4.0, warp=0.30, relief=0.55, spur=0.28, crest=1.15, erode=0.00, talus=0,  repose=0.95, terr=0),
+    "eroded": dict(cells=5.0, warp=0.55, relief=0.66, spur=0.40, crest=1.35, erode=0.15, talus=4,  repose=0.72, terr=0),
+    "alpine": dict(cells=3.6, warp=0.42, relief=0.74, spur=0.44, crest=1.70, erode=0.12, talus=7,  repose=1.15, terr=0),
+    "old":    dict(cells=5.6, warp=0.62, relief=0.44, spur=0.30, crest=1.05, erode=0.20, talus=14, repose=0.42, terr=0),
+    "strata": dict(cells=4.4, warp=0.34, relief=0.52, spur=0.30, crest=1.20, erode=0.13, talus=4,  repose=0.72, terr=8),
+}
+
+
+def _talus_relax(h, repose_tan, iters, cellsize, factor=0.5):
+    """Fast vectorised thermal/talus relaxation (Musgrave 1989): move above-repose material to
+    lower 4-neighbours. Torus-periodic (np.roll) so mass is conserved exactly; the massif margins
+    are ~0 so the wrap never carries real material across. The tested `erosion_thermal.thermal_erosion`
+    is the reference; this is its vectorised twin for baking weathering into the primitive cheaply."""
+    h = np.array(h, dtype=np.float64)
+    thr = repose_tan * cellsize
+    for _ in range(int(iters)):
+        delta = np.zeros_like(h)
+        for si, sj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nb = np.roll(np.roll(h, -si, 0), -sj, 1)                         # neighbour value at (i+si, j+sj)
+            flux = factor * 0.25 * np.maximum((h - nb) - thr, 0.0)           # cell exceeds repose -> shed
+            delta -= flux
+            delta += np.roll(np.roll(flux, si, 0), sj, 1)                    # neighbour receives it
+        h += delta
+    return h
+
+
+def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0.34,
+             style="eroded", cells=None, warp=None, relief=None):
+    """A MOUNTAIN feature primitive — the "Mountain" generator node an artist places (Gaea's Mountain;
+    Génévaux et al. 2015 *Terrain Modelling from Feature Primitives*; Guérin et al. 2016). NOT thresholded
+    isotropic noise (which reads as "noise on a lump"): the eroded, drainage-organised look is baked in via
+    a **modulated Voronoi ridge network** the way Gaea builds it — Worley cell *edges* form the ridgelines and
+    cell *interiors* the valleys, then a **domain distortion** breaks the cell regularity into natural spurs and
+    drainages. A wandering ridge-crest **skeleton** (a polyline SDF) sets the overall concave-flank massif
+    envelope (`n_ridges` crest lines unioned into a small range); the Voronoi network dissects it into a
+    connected system of spurs and incised valleys; a talus pass weathers the faces.
+
+    `style` matches Gaea's presets — **basic** (clean young massif), **eroded** (default; gullied, weathered),
+    **alpine** (sharp high-relief aretes), **old** (subdued, rounded, low relief), **strata** (horizontal
+    sedimentary banding). The primitive is "ready for further erosion" — place it, combine several
+    (`np.maximum` / `ops_filters.smax`), then run a real hydraulic + thermal pass (see `main`). Returns height (m).
+    `cells`/`warp`/`relief` override the style's drainage-cell count, distortion, and valley-incision depth."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
     rng = np.random.default_rng(seed)
+    st = _MOUNTAIN_STYLES.get(style, _MOUNTAIN_STYLES["eroded"])
+    ncell = st["cells"] if cells is None else cells
+    warpamt = st["warp"] if warp is None else warp
+    relief = st["relief"] if relief is None else relief
+
+    # 1) crest-skeleton envelope: a non-circular massif footprint (crest high, margins low).
     reach = reach_frac * max(n0, n1)                                         # flank half-width (cells)
     env = np.zeros(shape)
     for _ in range(int(n_ridges)):
@@ -180,12 +227,44 @@ def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0
         d = np.full(shape, np.inf)
         for a in range(k - 1):
             d = np.minimum(d, ops_filters.sd_segment(xx, yy, cx[a], cy[a], cx[a + 1], cy[a + 1]))
-        env = np.maximum(env, (0.7 + 0.6 * rng.random()) * np.clip(1.0 - d / reach, 0.0, 1.0) ** profile)
-    fx = xx * cellsize / (max(n0, n1) * cellsize * 0.14)                     # ridged detail lattice
-    fy = yy * cellsize / (max(n0, n1) * cellsize * 0.14)
-    rid = noise.ridged_mf(fx, fy, seed + 7, octaves=octaves)
-    rid = (rid - rid.min()) / (np.ptp(rid) + 1e-9)
-    return env * height * ((1.0 - detail) + detail * rid)                    # envelope dissected by ridges
+        env = np.maximum(env, (0.7 + 0.6 * rng.random()) * np.clip(1.0 - d / reach, 0.0, 1.0) ** 1.6)
+
+    # 2) modulated-Voronoi RIDGE NETWORK (the organized, non-noisy dissection Gaea's Mountain is built on).
+    u = xx / max(n0, n1) * ncell                                            # ~ncell drainage cells across the tile
+    v = yy / max(n0, n1) * ncell
+    # Two-scale domain distortion: a COARSE bend curves the ridgelines off Voronoi's straight cell edges,
+    # a FINER warp adds spurs. Without it the cells read as geometric polygons rather than mountain flanks.
+    wx = (noise.fbm(u * 0.35, v * 0.35, seed + 3, octaves=4)
+          + 0.5 * noise.fbm(u * 0.9, v * 0.9, seed + 13, octaves=4))
+    wy = (noise.fbm(u * 0.35 + 4.7, v * 0.35 + 2.3, seed + 4, octaves=4)
+          + 0.5 * noise.fbm(u * 0.9 + 1.9, v * 0.9 + 6.1, seed + 14, octaves=4))
+    u2, v2 = u + warpamt * wx, v + warpamt * wy
+    edge = noise.worley(u2, v2, seed + 1, kind="f2f1")                       # ~0 at cell boundaries, large inside
+    net = 1.0 - edge / (np.percentile(edge, 98) + 1e-9)                      # -> ~1 on the ridgelines (cell edges)
+    edge2 = noise.worley(u2 * 2.0, v2 * 2.0, seed + 8, kind="f2f1")          # finer octave: sub-ridges / spurs
+    net2 = 1.0 - edge2 / (np.percentile(edge2, 98) + 1e-9)
+    ridges = np.clip((1.0 - st["spur"]) * net + st["spur"] * net2, 0.0, 1.0) ** st["crest"]
+
+    # 3) incise the massif: crest sits at the envelope, valleys drop `relief` below it.
+    h = height * env * ((1.0 - relief) + relief * ridges)
+
+    # 4) bake the weathering the style implies. A modest droplet (hydraulic) pass turns the Voronoi
+    #    cell skeleton into a DENDRITIC drainage network — the step that reads as "eroded mountain"
+    #    rather than "crumpled Voronoi" — exactly what Gaea's Eroded/Old presets fold in (the primitive
+    #    is still "ready for" a heavier erosion pass afterwards). Then a talus pass relaxes faces to repose,
+    #    and strata banding is quantised onto the eroded surface (so bands sit on real slopes).
+    if st["erode"] > 0.0:
+        import erosion_droplet
+        h = erosion_droplet.droplet_erode(h, n_droplets=int(st["erode"] * n0 * n1),
+                                          seed=seed + 11, brush_radius=2)
+    if st["talus"]:
+        h = _talus_relax(h, st["repose"], st["talus"], cellsize, factor=0.5)
+    if st["terr"]:
+        peak = h.max()
+        if peak > 0.0:
+            h = terrace(h / peak, st["terr"], sharpness=2.4, warp_amp=0.03,   # warp a HEIGHT-NORMALISED field
+                        warp_wl=max(n0, n1) * cellsize / 6.0, cellsize=cellsize, seed=seed + 5) * peak
+    return h
 
 
 def fold(h, x, y, amp, direction=(1.0, 0.0), freq=0.0, phase=0.0):
@@ -230,18 +309,29 @@ def karst_sinkholes(h, soluble_mask, cellsize=1.0, spacing=None, depth=5.0,
 
 
 def main():
-    """Demo the `mountain` feature primitive (the "Mountain" generator node): place it, then erode —
-    raw primitive | after droplet + thermal erosion. -> landforms.png."""
+    """Demo the `mountain` feature primitive (the "Mountain" generator node). Top row: Gaea's five
+    styles (basic | eroded | alpine | old | strata) — the drainage-organised look is baked into the
+    primitive (modulated Voronoi + distortion), no erosion sim yet. Bottom row: the workflow — place
+    the primitive, then run a REAL hydraulic + thermal pass. -> landforms.png."""
     import erosion_droplet
     import erosion_thermal
     import render
     n, cell = 200, 26.0
-    h = mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0)
+    styles = ["basic", "eroded", "alpine", "old", "strata"]
+    pad = np.full((n, 5, 3), 20, np.uint8)
+    tiles = []
+    for s in styles:
+        tiles.append(render.hillshade(mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style=s), cell))
+    top = np.hstack([t for pair in zip(tiles, [pad] * len(tiles)) for t in pair][:-1])
+
+    h = mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style="basic")
     he = erosion_droplet.droplet_erode(h, n_droplets=55 * n, seed=3, brush_radius=2)
     he = erosion_thermal.thermal_erosion(he, 0.7, 14, cell, factor=0.12)
-    pad = np.full((n, 5, 3), 20, np.uint8)
-    render.write_png("landforms.png", np.hstack([render.hillshade(h, cell), pad, render.hillshade(he, cell)]))
-    print(f"wrote landforms.png — mountain feature primitive (raw | eroded), relief {np.ptp(he):.0f} m")
+    blank = np.full_like(tiles[0], 20)
+    bottom = np.hstack([render.hillshade(h, cell), pad, render.hillshade(he, cell), pad, blank, pad, blank, pad, blank])
+    gap = np.full((5, top.shape[1], 3), 20, np.uint8)
+    render.write_png("landforms.png", np.vstack([top, gap, bottom]))
+    print(f"wrote landforms.png — Mountain node styles (top) + place→erode (bottom), eroded relief {np.ptp(he):.0f} m")
 
 
 if __name__ == "__main__":

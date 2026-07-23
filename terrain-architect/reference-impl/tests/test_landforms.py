@@ -86,6 +86,29 @@ def test_mountain_primitive_is_a_dissected_massif():
     assert margin < h.mean()
 
 
+def test_mountain_is_organized_not_isotropic_noise():
+    """The Voronoi ridge network + baked drainage must dissect the massif into VALLEYS well below the
+    local crest — the structure that reads as an eroded mountain, not noise on a lump. We check the
+    interior carries deep incision: a healthy spread of local relief inside the massif footprint."""
+    h = L.mountain((96, 96), 30.0, seed=4, height=1700.0, style="eroded")
+    core = h[24:72, 24:72]                                               # inside the footprint (skip low margins)
+    # drainage incision: the interior spans a large fraction of the peak (deep valleys next to high spurs)
+    assert np.ptp(core) > 0.4 * h.max()
+
+
+def test_mountain_styles_are_distinct():
+    """Gaea's presets are genuinely different landforms: 'old' is subdued/rounded (less rough) than the
+    sharp 'alpine', and every style is a distinct field."""
+    fields = {s: L.mountain((72, 72), 30.0, seed=5, height=1600.0, style=s)
+              for s in ("basic", "eroded", "alpine", "old", "strata")}
+    for a in fields:                                                     # all five styles differ
+        for b in fields:
+            if a < b:
+                assert not np.array_equal(fields[a], fields[b])
+    rough = lambda f: np.mean(np.abs(np.diff(f, axis=0))) + np.mean(np.abs(np.diff(f, axis=1)))
+    assert rough(fields["old"]) < rough(fields["alpine"])               # 'old' is smoother than 'alpine'
+
+
 def test_mountain_deterministic():
     assert np.array_equal(L.mountain((40, 40), 30.0, seed=2), L.mountain((40, 40), 30.0, seed=2))
     assert not np.array_equal(L.mountain((40, 40), 30.0, seed=2), L.mountain((40, 40), 30.0, seed=3))
