@@ -172,6 +172,49 @@ def test_point_bars_raise_only_the_inner_bank():
 
 
 # --------------------------------------------------------------------------- #
+# Composite belt node (meander_belt) + deposition survival
+# --------------------------------------------------------------------------- #
+def test_seed_wave_tapers_to_straight_ends():
+    """The default seed carries the wave in its interior and tapers flat toward the ends, so the
+    pinned inflow/outflow ride a nearly-straight reach and don't coil. Measured as lateral deviation
+    from the centreline: the outer eighths average a small fraction of the middle."""
+    cl = M.seed_wave((120, 200), cellsize=4.0)
+    y = cl[:, 1]
+    dev = np.abs(y - np.median(y))
+    m = len(y)
+    ends = np.concatenate([dev[:m // 8], dev[-m // 8:]])
+    mid = dev[3 * m // 8: 5 * m // 8]
+    assert ends.mean() < 0.4 * mid.mean()           # ends ride a much flatter reach than the middle
+
+
+def test_meander_belt_is_deterministic_and_carves_a_channel():
+    base = np.full((100, 160), 50.0)
+    cl = M.seed_wave((100, 160), cellsize=4.0)
+    a = M.meander_belt(base, cl, cellsize=4.0, steps=100)
+    b = M.meander_belt(base, cl, cellsize=4.0, steps=100)
+    assert np.array_equal(a["height"], b["height"])         # deterministic
+    assert a["water"].dtype == bool and a["channel"].sum() > 0
+    assert a["water"].sum() >= a["channel"].sum()           # water = channel (+ any oxbow lakes)
+    assert a["height"][a["channel"]].mean() < 50.0          # the channel is incised below the plain
+
+
+def test_belt_is_not_carve_only_point_bars_stand_above_the_carve():
+    """The regression behind Gemini's 'carve-only' read: the belt deposits point/scroll bars on the
+    convex banks AFTER the carve, so material stands ABOVE the deposit=False (carve-only) belt over a
+    real area — the cut-bank-erodes / point-bar-deposits asymmetry, not just an incised groove."""
+    base = np.full((120, 200), 100.0)
+    cl = M.seed_wave((120, 200), cellsize=4.0)
+    kw = dict(cellsize=4.0, steps=140, half_width=8.0, depth=6.0, bank_width=12.0,
+              bar_height=4.0, bar_bank_width=12.0)
+    with_bars = M.meander_belt(base, cl, **kw)["height"]
+    carve_only = M.meander_belt(base, cl, deposit=False, **kw)["height"]
+    standing = with_bars - carve_only
+    assert standing.min() >= -1e-9                          # deposition only ADDS vs the carve-only belt
+    assert standing.max() > 1.0                             # a real bar, not a rounding speck
+    assert (standing > 0.2).sum() > 60                      # over a meaningful scroll-bar area
+
+
+# --------------------------------------------------------------------------- #
 def _sine_centreline():
     x = np.linspace(0.0, 500.0, 260)
     y = 5.0 * np.sin(2 * np.pi * x / 90.0)

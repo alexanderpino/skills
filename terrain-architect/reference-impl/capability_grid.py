@@ -208,27 +208,18 @@ def CELLS():
         xs = np.linspace(-160, 880, 240)                       # ends OFF-frame (0..716) so pins don't coil in view
         win = _smoothstep(-160, 20, xs) * (1 - _smoothstep(700, 880, xs))   # taper -> straight ends, no coil
         ys = 360 + win * (22 * np.sin(2 * np.pi * xs / 135.0) + 7 * np.sin(2 * np.pi * xs / 78.0 + 0.6))
-        belt, ox = MEA.migrate(np.column_stack([xs, ys]), steps=300, dt=1.0, ds=6.0,
-                               L_adj=40.0, E=16.0, cutoff_dist=32.0, min_sep=10)   # upstream-lag skews; necks cut off
-        h = MEA.deposit_point_bars(base, belt, half_width=10.0, bar_height=3.5, bank_width=14.0, cellsize=cell)
-        h = MEA.burn_channel(h, belt, half_width=10.0, depth=7.5, bank_width=16.0, cellsize=cell)
-        for a in ox:
-            if len(a) >= 2:
-                h = MEA.burn_channel(h, a, half_width=7.0, depth=5.0, bank_width=11.0, cellsize=cell)
-        shade = render.hillshade(h, cell).astype(float)
-        chan = MEA.sd_polyline(gx, gy, belt) < 11.0
-        oxwet = np.zeros((n, n), bool)
-        for a in ox:
-            if len(a) >= 2:
-                oxwet = oxwet | (MEA.sd_polyline(gx, gy, a) < 8.0)
-        oxwet = oxwet & ~chan
+        r = MEA.meander_belt(base, np.column_stack([xs, ys]), cellsize=cell, steps=300, ds=6.0,
+                             L_adj=40.0, E=16.0, cutoff_dist=32.0, min_sep=10, half_width=10.0,
+                             depth=7.5, bank_width=16.0, bar_height=4.0, bar_bank_width=16.0)
+        shade = render.hillshade(r["height"], cell).astype(float)   # point bars brighten the inner banks
+        chan = r["channel"]; oxwet = r["water"] & ~chan
         rgb = shade.copy()
         for mask, col, al in [(chan, np.array([54., 108, 168]), 0.75),        # active channel = blue
                               (oxwet, np.array([86., 128, 120]), 0.72)]:       # oxbow lake = stagnant teal
             a2 = np.where(mask, al, 0.0)[..., None]
             rgb = rgb * (1 - a2) + col * a2
         return np.clip(rgb, 0, 255).astype(np.uint8)
-    add("03 River meander (belt)", "upstream-lag skews bends; neck cutoff -> oxbow; carve-only", _meander)
+    add("03 River meander (belt)", "upstream-lag skews bends; cut-bank cuts, point-bar builds; cutoff -> oxbow", _meander)
 
     # ---- LANDFORM GENERATORS (11) ----
     add("11 Mountain (basic)", "raw Voronoi ridge skeleton (pre-erosion base; -> eroded)", lambda: hill(L.mountain((180, 180), 26.0, seed=3, style="basic"), 26))

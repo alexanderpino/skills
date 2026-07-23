@@ -385,11 +385,14 @@ terrain around it.
 ## Meandering & bank erosion
 
 *Runnable reference: `reference-impl/meander.py` (`migrate` = `meanderStep`, upstream-lagged near-bank
-velocity per Ikeda–Parker–Sawai 1981; `burn_channel` = `burnChannel`), verified by
-`tests/test_meander.py` — the decisive check: the migration peak lags the curvature peak downstream
-(drop the lag and it coincides, i.e. sine waves, not meanders). The `migrate` loop is centreline-only;
-the height-field realisation (`burn_channel`, `deposit_point_bars`) is applied after, never during — it
-is the honest F-tier "look", the migration physics never touches `h`.*
+velocity per Ikeda–Parker–Sawai 1981; `burn_channel` = `burnChannel`; `deposit_point_bars` =
+`depositPointBars`), verified by `tests/test_meander.py` — the decisive check: the migration peak lags
+the curvature peak downstream (drop the lag and it coincides, i.e. sine waves, not meanders). The
+`migrate` loop is centreline-only; the height-field realisation is applied after, never during — the
+migration physics never touches `h`. The `meander_belt` composite is the one-call node a scene drops in:
+it migrates, carves the active channel, deposits point/scroll bars on the convex banks (the
+cut-bank-erodes / point-bar-deposits pair — deposit AFTER the carve or it is eaten), and leaves oxbow
+lakes. The migration is P-tier; the realisation is the honest F-tier "look".*
 
 First, the correction that the question usually needs: a river does **not** erode its banks with
 waves. Coastal and marine erosion are *wave*-driven (`12`); a river migrates by **flow

@@ -96,7 +96,7 @@ failure mode to watch for.
 | R3C6 | Pipe erosion | incised channels **and** deposition fans/aprons | erosion only, no deposition; instability |
 | R3C7 | Shallow water | water pooled/threaded in the low channels | uniform sheet; dry everywhere |
 | R4C1 | Hillslope diffusion | an initial spike spread into a smooth Gaussian | still a spike; or ringing/negative halo |
-| R4C2 | River meander (belt) | a sinuous channel with **asymmetric, downstream‑skewed** loops + a detached **oxbow lake** (teal, beside the channel) | symmetric sine waves; no oxbow; a raised trench rim (not carve‑only) |
+| R4C2 | River meander (belt) | a sinuous channel with **asymmetric, downstream‑skewed** loops, **point/scroll bars** brightening the inner (convex) banks, and a detached **oxbow lake** (teal) | symmetric sine waves; no oxbow; a bare incised groove with no inner‑bank deposition |
 
 ### Row 4–5 — Landform generators (11) + analysis start (06)
 | Cell | Tile | ✓ confirms | ✗ red flag |

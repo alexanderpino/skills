@@ -267,7 +267,13 @@ def deposit_point_bars(h, centreline, *, half_width, bar_height, bank_width, cel
     """Raise the inner (convex) bank of each bend — the point bar (03: `depositPointBars`; F-tier
     look). The inner bank is the +N (centre-of-curvature) side where C>0, so a cell is on the inner
     bank when sign((cell-nearest)·N) == sign(C). Aggradation scales with |C| (sharper bends build
-    bigger bars). Call AFTER `burn_channel`. Returns a new height field."""
+    bigger bars).
+
+    The deposition band is concentrated on the CONVEX BANK — zero in the thalweg, rising to a peak at
+    the bank and fading into the floodplain — so it reads as the scroll-bar ridge and, critically,
+    SURVIVES if the active channel is carved through the same corridor. Call AFTER `burn_channel` (the
+    cut-bank-erodes / point-bar-deposits pair): burning first eats a bar laid inside the wetted channel,
+    which is why the belt used to read as carve-only. Returns a new height field."""
     h = np.asarray(h, dtype=np.float64).copy()
     p = np.asarray(centreline, dtype=np.float64)
     C = curvature(p)
@@ -281,6 +287,72 @@ def deposit_point_bars(h, centreline, *, half_width, bar_height, bank_width, cel
     side = np.sign((px - cx) * Nx + (py - cy) * Ny)           # +1 on the +N (centre) side
     inner = side == np.sign(Ci)
     cref = float(np.percentile(np.abs(C), 90)) + 1e-9
-    band = _smoothstep(half_width + bank_width, half_width, d)  # peaks at the bank, fades outward
+    # bump centred on the convex bank: 0 at the thalweg -> 1 near d=half_width -> 0 in the floodplain
+    band = (_smoothstep(0.25 * half_width, half_width, d)
+            * (1.0 - _smoothstep(half_width, half_width + bank_width, d)))
     amt = bar_height * np.clip(np.abs(Ci) / cref, 0.0, 1.5) * band
     return h + np.where(inner & (d < half_width + bank_width), amt, 0.0)
+
+
+# --------------------------------------------------------------------------- #
+# Composite node: the whole meander belt in one call
+# --------------------------------------------------------------------------- #
+def seed_wave(shape, cellsize, *, origin=(0.0, 0.0), amp_frac=0.031, wavelength_frac=0.19,
+              overhang_frac=0.22, n=240, y_frac=0.5):
+    """A convenient default centreline for `meander_belt`: a low-amplitude sinusoid running left→right
+    across the grid that extends OFF both ends (so the pinned inflow/outflow coil off-frame) and TAPERS
+    to straight ends (zero curvature, no coiling in view). Migration amplifies it into the belt. Returns
+    an (n, 2) polyline in world metres."""
+    nrow, ncol = shape
+    W = ncol * cellsize
+    ox, oy = origin
+    ycen = oy + y_frac * nrow * cellsize
+    x0, x1 = ox - overhang_frac * W, ox + (1.0 + overhang_frac) * W
+    xs = np.linspace(x0, x1, n)
+    lam = wavelength_frac * W
+    win = _smoothstep(x0, ox + 0.11 * W, xs) * (1.0 - _smoothstep(ox + 0.89 * W, x1, xs))
+    ys = ycen + win * (amp_frac * W * np.sin(2.0 * np.pi * (xs - ox) / lam)
+                       + 0.32 * amp_frac * W * np.sin(2.0 * np.pi * (xs - ox) / (0.58 * lam) + 0.6))
+    return np.column_stack([xs, ys])
+
+
+def meander_belt(h, centreline=None, *, cellsize=1.0, origin=(0.0, 0.0),
+                 steps=300, dt=1.0, ds=6.0, L_adj=40.0, E=16.0, cutoff_dist=None, min_sep=10,
+                 half_width=10.0, depth=7.5, bank_width=16.0,
+                 bar_height=3.5, bar_bank_width=14.0, oxbow_depth=5.0, deposit=True):
+    """Composite **meander-belt node** (chapter 03) — the building block a composite/archetype drops in
+    for a floodplain river. A MACRO over the meander atoms: migrate the centreline (P-tier upstream-lag
+    physics), then realise it into the height field (F-tier look) — carve the active channel, drop each
+    abandoned loop as an **oxbow lake**, and (deposit=True) build **point/scroll bars** on the inner
+    banks. Because the bars go on AFTER the carve and sit on the convex bank, the belt shows the full
+    cut-bank-erodes / point-bar-deposits asymmetry, not just an incised groove.
+
+    `centreline` defaults to `seed_wave(h.shape, cellsize, origin=origin)`. Returns a dict:
+        height     : the edited height field
+        water      : bool mask of open water (active channel + oxbow lakes)
+        channel    : bool mask of the active channel
+        oxbows     : list of abandoned-arc centrelines (the oxbow lakes)
+        centreline : the final migrated centreline
+    """
+    h = np.asarray(h, dtype=np.float64).copy()
+    if centreline is None:
+        centreline = seed_wave(h.shape, cellsize, origin=origin)
+    belt, oxbows = migrate(centreline, steps=steps, dt=dt, ds=ds, L_adj=L_adj, E=E,
+                           cutoff_dist=cutoff_dist, min_sep=min_sep)
+    h = burn_channel(h, belt, half_width=half_width, depth=depth, bank_width=bank_width,
+                     cellsize=cellsize, origin=origin)
+    for a in oxbows:                                          # abandoned arcs -> shallow oxbow lakes
+        if len(a) >= 2:
+            h = burn_channel(h, a, half_width=half_width * 0.7, depth=oxbow_depth,
+                             bank_width=bank_width * 0.7, cellsize=cellsize, origin=origin)
+    if deposit:                                               # point/scroll bars AFTER the carve
+        h = deposit_point_bars(h, belt, half_width=half_width, bar_height=bar_height,
+                               bank_width=bar_bank_width, cellsize=cellsize, origin=origin)
+    gx, gy = _world_grid(h.shape, cellsize, origin)
+    channel = sd_polyline(gx, gy, belt) < half_width * 1.1
+    water = channel.copy()
+    for a in oxbows:
+        if len(a) >= 2:
+            water = water | (sd_polyline(gx, gy, a) < half_width * 0.8)
+    return {"height": h, "water": water, "channel": channel,
+            "oxbows": oxbows, "centreline": belt}
