@@ -330,6 +330,21 @@ def CELLS():
         rgb = shade * (1 - a) + np.array([205., 225, 240]) * a
         return np.clip(rgb, 0, 255).astype(np.uint8)
     add("12 Glacial carving", "SIA trunk glaciers fill valleys; thick ice slides & abrades the bed", _glacier)
+    def _snowpack():
+        import snow as SNOW
+        n = 130; cell = 30.0
+        h = L.mountain((n, n), cell, seed=7, height=1800, style="eroded")
+        T = 6.0 - 0.011 * (h - h.min())                                # lapse rate: cold high
+        s = np.zeros((n, n))
+        for _ in range(4):                                             # accumulate/melt/shed/avalanche/wind
+            s = SNOW.snow_step(h, s, T, precip=1.2, dt=1.0, melt_factor=0.5, snow_repose_deg=38,
+                               cellsize=cell, avalanche_iters=3, wind=(1.0, 0.3))
+        shade = render.hillshade(_cr(h, 6), cell).astype(float)
+        sn = np.clip(_cr(s, 6) / 6.0, 0.0, 1.0)                        # snow cover, thick in gullies
+        a = (sn ** 0.7)[..., None] * 0.92
+        rgb = shade * (1 - a) + np.array([248., 250, 255]) * a
+        return np.clip(rgb, 0, 255).astype(np.uint8)
+    add("13 Snowpack (dynamic)", "accumulate/melt/avalanche: snow fills gullies, bares steep faces", _snowpack)
 
     return C
 

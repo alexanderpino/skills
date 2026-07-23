@@ -218,6 +218,13 @@ ignores that snow *moves*.
 lee — the same shadow-zone logic as dunes (`05`). Reuse Werner's shadow-zone test with a snow
 field. Cornices are lee-side deposits at a crest.
 
+*Runnable reference: `reference-impl/snow.py` (`snow_step` = this `snowStep`; the avalanche is
+`thermal_on_layer` — talus relaxation of the snow layer on a fixed base, the chapter's
+`thermal(field=snowDepth, base=h)`; plus `wind_redistribute`), verified by `tests/test_snow.py`.
+F-tier, invariant-checked: accumulate-cold / melt-warm, snow stripped past the shed slope, the
+avalanche **conserves snow** and drives the snow surface below repose, and snow **fills hollows** —
+exactly the moving-snow behaviour a static slope mask (`analysis.derive_substances`) cannot show.*
+
 ## Moisture & soil water
 
 Don't build a groundwater model. Use TWI (`06`), which is a moisture proxy derived from

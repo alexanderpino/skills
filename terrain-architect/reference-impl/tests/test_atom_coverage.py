@@ -28,6 +28,7 @@ IMPLEMENTED = {
     "shallow_water": ["simulate"],
     "meander": ["migrate", "burn_channel"],
     "glacier": ["glacier_carve"],
+    "snow": ["snow_step", "thermal_on_layer"],
 }
 
 # ops_filters also carries a filter/morphology TOOLBOX that is not a generative atom — excluded from
