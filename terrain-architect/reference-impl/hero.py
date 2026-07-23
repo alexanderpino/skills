@@ -1,16 +1,24 @@
 """A 3D 'hero' view of a heightfield — a pure-numpy software rasteriser (perspective camera + z-buffer)
-that projects the terrain as a mesh, drapes it with a texture (the photoreal / substance colouring the
-montages already produce), and composites it over a sky background. The plan-view renders in
+that projects the terrain as a mesh, drapes it with the substance colouring, lights it in 3-D
+(sun+sky + AO from the mesh normal) and composites it over a sky background. The plan-view renders in
 `render.py` show the DATA (top-down hillshade / splat); this shows the PLACE — the angled 3/4 view a
 Gaea / World Machine / Terragen viewport gives.
 
+`main()` renders terrain that comes STRAIGHT FROM THE GRAPH — no hand-sculpting: `from_graph()` uplifts
+a noisy block and lets stream-power fluvial erosion (Braun & Willett 2013) carve it, so the ridges and
+dendritic valleys *emerge* from the simulation (Cordonnier-2016 uplift+erosion), exactly how an AAA
+terrain graph produces them. The rivers are real: `hydrology.py` gives a water SURFACE (lakes fill to
+spill level, rivers carry a discharge-scaled depth), rendered as water at a level in the carved
+channel — not a blue line painted on the bed.
+
 Deliberately dependency-free: numpy for the maths, `render.write_png` for output. It is a *software*
-rasteriser (flat-lit through the baked texture, z-buffered, optional depth fog + supersampled AA) — it
-will not match a path-traced engine (no soft shadows, no atmosphere, no PBR), but it turns any
-heightfield + texture into a credible hero render. Run: `python hero.py`.
+rasteriser (z-buffered, sun+sky lit, depth fog + supersampled AA) — it will not match a path-traced
+engine (no soft shadows, no atmosphere, no PBR), but it turns any heightfield into a credible hero
+render. Run: `python hero.py`.
 """
 import numpy as np
 
+import hydrology
 import render
 
 
@@ -146,40 +154,34 @@ def hero(h, cell, texture, *, az=38.0, elev=42.0, fovy=30.0, dist_scale=2.2, z_e
     return frame
 
 
-def _hero_massif(n, cell, seed=4):
-    """A coherent glaciated massif rising from a lower plain (not spiky noise): a domain-warped ridged
-    core inside a broad radial dome, then heavy droplet erosion for dendritic valleys + thermal talus.
-    Moderate relief so the substance model gives a real snow cap, vegetated mid-slopes and river lines."""
-    import erosion_droplet
-    import erosion_thermal
-    import noise
-    import ops_filters
-    idx = np.arange(n) * cell / (n * cell * 0.42)
-    gx, gy = np.meshgrid(idx, idx)
-    warp, _, _ = noise.domain_warp(gx, gy, seed, warp=2.2, octaves=6)
-    rid = noise.ridged_mf(gx * 1.25 + warp, gy * 1.25 + warp, seed + 1, octaves=7)
-    rid = (rid - rid.min()) / (np.ptp(rid) + 1e-9)
-    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
-    r = np.hypot(xx - n / 2, yy - n / 2) / (0.52 * n)
-    dome = np.clip(1.0 - r, 0.0, 1.0) ** 1.4                             # massif rises from a plain
-    h = (0.25 + 0.75 * dome) * rid * 2100.0 * (0.35 + 0.65 * dome)
-    h = ops_filters.gaussian(h, 0.8)
-    h = erosion_droplet.droplet_erode(h, n_droplets=32 * n, seed=seed, brush_radius=2)   # dendritic valleys
-    return erosion_thermal.thermal_erosion(h, 0.7, 22, cell, factor=0.18)                # talus to repose
+def from_graph(n=180, extent_km=48.0, seed=4):
+    """Terrain straight from the node GRAPH — no hand-sculpting. Uplift a noisy block, then let
+    STREAM-POWER fluvial erosion carve it (Braun & Willett 2013, cross-validated vs Landlab), then
+    thermal talus. Ridges and dendritic valleys EMERGE from the simulation (Cordonnier-2016 uplift+
+    erosion), the way an AAA terrain graph produces them. Returns (height, drainage area, cellsize)."""
+    import graph_demo as G
+    cell = extent_km * 1000.0 / n
+    ctx = G.Ctx(cellsize=cell, resolution=n, root_seed=seed)
+    g, (h_out, a_out) = G.build_graph(ctx, backbone="streampower")
+    return g.evaluate(h_out), g.evaluate(a_out), cell
 
 
 def main():
     import analysis
     import archetypes as A
-    n = 220
-    cell = 2000.0 / n
-    h = _hero_massif(n, cell)
-    snowy = {"has_water": True, "has_snow": True, "snowline": 0.56, "snow_soft": 0.16, "has_veg": True}
-    col, _, surf = A.substance_color(h, "temperate", cell, climate=snowy)   # unshaded material + piled surface
-    ao = analysis.horizon_ao(surf, cell)
-    img = hero(surf, cell, col, ao=ao, z_exag=0.9)
+    h, area, cell = from_graph()                                        # graph output — nothing sculpted
+    w = hydrology.water_surface(h, area, cell)                          # real water: lakes + river depth
+    depth = w - h
+    climate = {"has_water": False, "has_snow": True, "snowline": 0.6, "snow_soft": 0.16, "has_veg": True}
+    col, _, surf = A.substance_color(h, "temperate", cell, climate=climate)   # LAND cover only (water is a layer)
+    wet = depth > 0.02
+    col = np.where(wet[..., None], hydrology.water_colour(depth), col)  # water as a substance, depth-tinted
+    render_surf = np.maximum(surf, w)                                   # water fills valleys; snow piles on peaks
+    ao = analysis.horizon_ao(render_surf, cell)
+    img = hero(render_surf, cell, col, ao=ao, z_exag=1.0)
     render.write_png("hero.png", img)
-    print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {n}x{n} mesh, relief {h.max()-h.min():.0f} m)")
+    print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {h.shape[0]}² graph mesh, "
+          f"relief {h.max()-h.min():.0f} m, wet {100*wet.mean():.1f}%)")
 
 
 if __name__ == "__main__":

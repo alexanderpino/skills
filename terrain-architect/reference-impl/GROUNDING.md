@@ -90,6 +90,15 @@ presentation — they dress the verified
 `crater.py` skeleton with `noise.py` (01) detail for a hillshaded *look* and is deliberately outside
 the grounding scale (not mass-conserving, not oracle-verified; only a determinism/texture smoke test).
 
+The **hydrology** (`hydrology.py` — a water SURFACE) treats water as a substance at a level, not a
+colour: lakes fill enclosed depressions to their spill level (via the RichDEM-validated priority-flood
+in `flow.py`), and rivers carry a discharge-scaled depth in their channels using **bankfull hydraulic
+geometry** (depth grows with discharge — Leopold & Maddock 1953, *The Hydraulic Geometry of Stream
+Channels and Some Physiographic Implications*, USGS Professional Paper 252). **demo-only** (a plausible water level for rendering, held to invariants in
+`test_hydrology.py`: surface ≥ bed, lakes fill depressions, river depth only in channels — not a
+gauged discharge model). It is what makes rivers read as water *in the carved channel* in `hero.py`
+rather than a painted line.
+
 The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
 tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or
 oracle-verified.** These are the regimes the coverage boundary excludes because they have no
