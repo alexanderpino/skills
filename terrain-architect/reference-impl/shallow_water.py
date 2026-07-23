@@ -20,11 +20,12 @@ import numpy as np
 G = 9.81
 
 
-def simulate(bed, cellsize, *, rain=2.0e-6, iters=600, dt=None, sources=None,
+def simulate(bed, cellsize, *, rain=2.0e-6, iters=600, dt=None, sources=None, source_field=None,
              drain_edges=True, damp=0.0):
-    """Evolve water over `bed` (m). `rain` is the rainfall source in m/s (2e-6 ≈ 7 mm/h); `sources` is
-    an optional list of (row, col, q_m3s) point springs. Returns a dict with `depth` (m), `discharge`
-    (m³/s per cell, the throughput), `speed` (m/s), and a `budget` (volumes in/out for the mass check)."""
+    """Evolve water over `bed` (m). `rain` is a uniform rainfall source in m/s (2e-6 ≈ 7 mm/h);
+    `source_field` is an optional per-cell source rate (m/s) added on top — e.g. **snowmelt**, so water
+    runs out from under the snow; `sources` is a list of (row, col, q_m3s) point springs. Returns a dict
+    with `depth` (m), `discharge` (m³/s per cell, the throughput), `speed` (m/s), and a `budget`."""
     bed = np.asarray(bed, dtype=np.float64)
     n0, n1 = bed.shape
     if dt is None:                                                          # CFL-safe explicit step
@@ -38,9 +39,13 @@ def simulate(bed, cellsize, *, rain=2.0e-6, iters=600, dt=None, sources=None,
     rain_in = 0.0
     out_vol = 0.0
 
+    src = None if source_field is None else np.asarray(source_field, dtype=np.float64)
     for _ in range(int(iters)):
         d += rain * dt                                                      # rainfall source
         rain_in += rain * dt * n0 * n1 * area
+        if src is not None:                                                 # per-cell source (e.g. snowmelt)
+            d += src * dt
+            rain_in += float(src.sum()) * dt * area
         if sources:
             for (i, j, q) in sources:
                 d[i, j] += q * dt / area

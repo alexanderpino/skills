@@ -42,3 +42,13 @@ def test_discharge_grows_downstream():
     q = r["discharge"]
     assert q[:, -3].mean() > 3.0 * q[:, 2].mean()        # downstream carries much more than upstream
     assert q.max() > 0.0
+
+
+def test_source_field_adds_water_and_flow():
+    """A per-cell source (e.g. snowmelt) delivers extra water and raises discharge over rain alone."""
+    bed = np.tile(np.linspace(100.0, 0.0, 24), (24, 1))
+    base = sw.simulate(bed, 20.0, rain=1e-6, iters=200)
+    melt = np.zeros((24, 24)); melt[:, :6] = 1e-5                     # a meltwater source band up-slope
+    withmelt = sw.simulate(bed, 20.0, rain=1e-6, source_field=melt, iters=200)
+    assert withmelt["budget"]["rain_in"] > base["budget"]["rain_in"]
+    assert withmelt["discharge"].max() > base["discharge"].max()

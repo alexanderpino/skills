@@ -46,3 +46,13 @@ def test_depth_tint_darkens_with_depth():
     shallow = hydrology.water_colour(np.array([0.2]))
     deep = hydrology.water_colour(np.array([7.0]))
     assert deep.sum() < shallow.sum()                                   # deeper water is darker
+
+
+def test_water_over_land_is_translucent_by_depth():
+    """Water is a translucent stage: shallow water shows the bed through; deep water hides it under blue."""
+    land = np.zeros((3, 3, 3)) + np.array([120.0, 100.0, 80.0])       # a soil-brown bed
+    shallow = hydrology.water_over_land(land, np.full((3, 3), 0.1))
+    deep = hydrology.water_over_land(land, np.full((3, 3), 25.0))
+    assert np.linalg.norm(shallow[0, 0] - land[0, 0]) < np.linalg.norm(deep[0, 0] - land[0, 0])
+    assert deep[0, 0, 2] > deep[0, 0, 0]                              # deep water reads blue, not brown
+    assert np.allclose(hydrology.water_over_land(land, np.zeros((3, 3))), land)   # dry land unchanged

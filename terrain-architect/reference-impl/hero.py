@@ -54,12 +54,13 @@ def _perspective(fovy_deg, aspect, near, far):
 # --------------------------------------------------------------------------- #
 def hero(h, cell, texture, *, az=38.0, elev=42.0, fovy=30.0, dist_scale=2.2, z_exag=1.0,
          size=(1200, 760), sun=(-0.5, 0.85, 0.3), sky_top=(120, 150, 192), sky_bottom=(206, 221, 236),
-         fog=0.3, ss=2, ao=None):
+         fog=0.3, ss=2, ao=None, water_depth=None):
     """Render a heightfield `h` (metres, `cell` m/px) as a 3D hero view, draped with `texture` — an
     (H, W, 3) **material** colour (pass the *unshaded* substance colour; the 3D sun+sky lighting is
-    applied here from the mesh normal, so don't pre-shade it). Camera orbits the tile centre at
-    azimuth/elevation `az`/`elev`. `z_exag` scales relief, `fog` hazes the far ground toward the sky
-    (aerial perspective), `ao` is an optional (H, W) occlusion field, `ss` supersamples for AA."""
+    applied here from the mesh normal, so don't pre-shade it). `water_depth` (optional, m) composites
+    **translucent** water as a separate final stage (the bed shows through shallow water). Camera orbits
+    the tile centre at `az`/`elev`; `z_exag` scales relief, `fog` hazes the far ground toward the sky,
+    `ao` is an optional (H, W) occlusion field, `ss` supersamples for AA."""
     h = np.asarray(h, dtype=np.float64)
     tex = np.asarray(texture, dtype=np.float64)
     nH, nW = h.shape
@@ -97,7 +98,10 @@ def hero(h, cell, texture, *, az=38.0, elev=42.0, fovy=30.0, dist_scale=2.2, z_e
     shade = 0.55 + 0.45 * lam                                            # sky floor + sun (bright)
     if ao is not None:                                                   # darken sky-occluded creases
         shade = shade * (1.0 - 0.35 * np.clip(np.asarray(ao, dtype=np.float64), 0, 1))
-    vcol = np.clip(tex * shade[..., None], 0, 255).reshape(-1, 3)
+    lit = tex * shade[..., None]                                         # lit LAND
+    if water_depth is not None:                                         # water is a SEPARATE, TRANSLUCENT stage
+        lit = hydrology.water_over_land(lit, water_depth)              # bed shows through shallow water
+    vcol = np.clip(lit, 0, 255).reshape(-1, 3)
 
     # sky-gradient background
     grad = np.linspace(0.0, 1.0, Hgt)[:, None]
@@ -172,24 +176,31 @@ def main():
     import flow
     import shallow_water
     h, area, cell = from_graph()                                        # graph output — nothing sculpted
-    # REAL water: a mass-conserving shallow-water flow with a rainfall source -> discharge in m³/s
-    sim = shallow_water.simulate(flow.priority_flood_fill(h), cell, rain=6e-6, iters=1400)
-    Q = sim["discharge"]                                                # volumetric flow, m³/s
-    w = hydrology.water_surface(h, cell, Q)                             # channel depth from the real discharge
-    depth = w - h
     climate = {"has_water": False, "has_snow": True, "snowline": 0.6, "snow_soft": 0.16, "has_veg": True}
-    col, _, surf = A.substance_color(h, "temperate", cell, climate=climate)   # LAND cover only (water is a layer)
-    wet = depth > 0.02
-    col = np.where(wet[..., None], hydrology.water_colour(depth), col)  # water as a substance, depth-tinted
-    render_surf = np.maximum(surf, w)                                   # water fills valleys; snow piles on peaks
+
+    # substances: LAND cover (water is a separate layer). Grab the snow mask for meltwater.
+    slope = analysis.slope(h, cell)
+    stack = dict(analysis.derive_substances(h, slope, area, cell, climate=climate))
+    snow = stack["snow"]
+    hn = (h - h.min()) / (np.ptp(h) + 1e-9)
+    melt = 5e-6 * snow * np.clip(1.0 - (hn - climate["snowline"]) / (1.0 - climate["snowline"]), 0.0, 1.0)
+
+    # REAL water: mass-conserving shallow-water flow fed by RAIN + SNOWMELT (water runs from under the snow)
+    sim = shallow_water.simulate(flow.priority_flood_fill(h), cell, rain=4e-6, source_field=melt, iters=1400)
+    Q = sim["discharge"]                                                # volumetric flow, m³/s
+    w = hydrology.water_surface(h, cell, Q)                             # channel/lake surface from the discharge
+    depth = w - h                                                      # water depth (m), 0 on dry land
+
+    col, _, surf = A.substance_color(h, "temperate", cell, climate=climate)   # unshaded LAND material
+    render_surf = np.maximum(surf, w)                                  # water fills valleys; snow piles on peaks
     ao = analysis.horizon_ao(render_surf, cell)
-    img = hero(render_surf, cell, col, ao=ao, z_exag=1.0)
+    img = hero(render_surf, cell, col, ao=ao, z_exag=1.0, water_depth=depth)   # translucent water as its own stage
     render.write_png("hero.png", img)
     b = sim["budget"]
-    print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {h.shape[0]}² graph mesh, "
-          f"relief {h.max()-h.min():.0f} m)")
-    print(f"  shallow-water flow: peak discharge {Q.max():.1f} m³/s, "
-          f"mass balance rain_in {b['rain_in']:.3e} = out+stored {b['out']+b['stored']:.3e} m³")
+    print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {h.shape[0]}² graph mesh, relief {h.max()-h.min():.0f} m)")
+    melt_frac = 100 * melt.sum() / (melt.sum() + 4e-6 * h.size)
+    print(f"  flow: peak discharge {Q.max():.1f} m³/s ({melt_frac:.0f}% from snowmelt); "
+          f"mass balance {b['rain_in']:.3e} = {b['out']+b['stored']:.3e} m³")
 
 
 if __name__ == "__main__":

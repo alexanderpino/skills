@@ -57,7 +57,23 @@ def water_depth(bed, cellsize, discharge, **kw):
 
 def water_colour(depth, max_depth=7.0, shallow=(96, 148, 168), deep=(28, 62, 104), sky=(206, 221, 236)):
     """Depth-tinted still-water colour: shallow teal → deep blue, lifted slightly toward the sky it
-    reflects. Returns float RGB (0-255) per cell."""
+    reflects. Returns float RGB (0-255) per cell. (Opaque; for the translucent stage use
+    `water_over_land`.)"""
     d = np.clip(np.asarray(depth, dtype=np.float64) / max_depth, 0.0, 1.0)
     col = np.array(shallow, np.float64) * (1 - d[..., None]) + np.array(deep, np.float64) * d[..., None]
     return col * 0.85 + np.array(sky, np.float64) * 0.15
+
+
+def water_over_land(land_rgb, depth, *, k=0.45, tint=(24, 66, 104), sky=(200, 218, 238), sheen=0.10):
+    """Composite **translucent** water over the already-lit land as a SEPARATE render stage (like snow,
+    water is its own pass). Beer–Lambert transmittance ``T = exp(-k·depth)``: shallow water lets the bed
+    (rock/soil) show through, deep water hides it under a blue `tint`; a little `sheen` adds the sky the
+    calm surface reflects. `land_rgb` is the shaded land colour (float 0-255), `depth` the water depth
+    (m). Returns float RGB — dry cells are unchanged."""
+    land = np.asarray(land_rgb, dtype=np.float64)
+    d = np.clip(np.asarray(depth, dtype=np.float64), 0.0, None)
+    T = np.exp(-k * d)[..., None]                                           # fraction of the bed still visible
+    water = land * T + np.array(tint, np.float64) * (1.0 - T)              # bed seen through, tinted by depth
+    water = water * (1.0 - sheen) + np.array(sky, np.float64) * sheen       # calm surface reflects a little sky
+    wet = (d > 1e-4)[..., None]
+    return np.where(wet, water, land)
