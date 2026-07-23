@@ -288,7 +288,7 @@ def derive_substances(height, slope_tan, area, cellsize, *, climate, rng_seed=0)
     if climate.get("has_snow", False):
         snowline = climate.get("snowline", 0.7)
         soft = climate.get("snow_soft", 0.12)
-        drive = (hn - snowline) + 0.18 * (north - 0.5) + 0.06 * concave + 0.03 * jitter
+        drive = (hn - snowline) + 0.30 * (north - 0.5) + 0.08 * concave + 0.03 * jitter
         hold = 1.0 - smoothstep(tand(46), tand(58), slope_tan)              # steep faces shed snow
         snow = np.clip(smoothstep(0.0, soft, drive), 0.0, 1.0) * hold
     else:

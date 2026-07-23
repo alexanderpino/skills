@@ -85,10 +85,10 @@ _SUB_COL = {
 
 def substance_rgb(h, cell=40.0):
     slope = A.slope(h, cell)
-    area = np.full_like(h, cell * cell)
-    stack = A.derive_substances(h, slope, area, cell,          # correct climate keys enable snow+veg
+    area = flow.d8_accumulation(flow.priority_flood_fill(h)) * (cell * cell)   # REAL drainage area, not
+    stack = A.derive_substances(h, slope, area, cell,          # uniform (uniform -> water claims everything)
                                 climate={"has_water": True, "has_snow": True, "has_veg": True,
-                                         "snowline": 0.6, "snow_soft": 0.12})
+                                         "snowline": 0.52, "snow_soft": 0.14})
     rgb = np.zeros(h.shape + (3,), float)
     for name, w in stack:                                      # derive_substances -> [(name, mask), ...]
         rgb += np.asarray(w)[..., None] * np.array(_SUB_COL[name], float)
@@ -152,19 +152,19 @@ def CELLS():
     add("10 Twist deform", "k=0 identity; preserves radius from centre", _twist)
 
     # ---- FLOW & EROSION (03/04/05) ----
+    _cr = lambda a, k=10: a[k:-k, k:-k]                                     # crop the fixed-BC edge band for display
     def _accum():
         h = noise.fbm(*_grid(150, 0.06), seed=1, octaves=6) * 600
-        hf = flow.priority_flood_fill(h)
-        acc = flow.d8_accumulation(hf)
-        return ramp(np.log(acc))
+        acc = flow.d8_accumulation(flow.priority_flood_fill(h))
+        return ramp(_cr(np.log(acc)))
     add("03 D8 accumulation", "sum(area) = n*m; vs RichDEM (corr>0.9)", _accum)
     def _mfd():
         h = noise.fbm(*_grid(150, 0.06), seed=1, octaves=6) * 600
-        return ramp(np.log(flow.mfd_accumulation(flow.priority_flood_fill(h))))
+        return ramp(_cr(np.log(flow.mfd_accumulation(flow.priority_flood_fill(h)))))
     add("03 MFD accumulation", "sum = n*m (Freeman p=1.1)", _mfd)
     def _sp():
-        rng = np.random.default_rng(0); h = rng.random((80, 80)) * 5
-        return hill(sp.stream_power_evolve(h, 1e-3, 5e-2, 0.5, 1000.0, 120, 50.0), 50)
+        rng = np.random.default_rng(0); h = rng.random((96, 96)) * 5
+        return hill(_cr(sp.stream_power_evolve(h, 1e-3, 5e-2, 0.5, 1000.0, 120, 50.0), 8), 50)
     add("04 Stream power", "slope-area exponent = -0.5 vs Landlab", _sp)
     def _drop():
         h = L.mountain((150, 150), 30.0, seed=3, style="basic")
@@ -189,7 +189,7 @@ def CELLS():
     def _sw():
         h = L.volcano((120, 120), 60, 60, radius=1400, height=800, cellsize=30, kind="strato")
         r = shallow_water.simulate(h, 30.0, rain=6e-5, iters=80, dt=0.02, drain_edges=True)
-        return ramp(np.sqrt(r["depth"]))
+        return ramp(_cr(np.sqrt(r["depth"]), 8))
     add("04 Shallow water", "rain_in = out + stored (~1e-15)", _sw)
     def _diff():
         n = 128; im = np.zeros((n, n)); im[n//2, n//2] = 1.0

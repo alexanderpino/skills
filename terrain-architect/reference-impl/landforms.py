@@ -105,7 +105,7 @@ def terrace(h, levels, sharpness=2.0, warp_amp=0.0, warp_wl=1.0, cellsize=1.0, s
 # fault/joint-controlled buttes & mesas (a placeable landform primitive)
 # --------------------------------------------------------------------------- #
 def fault_block_butte(shape, bx, by, br, bh, cellsize, seed=0, ecc=1.0, talus=0.42,
-                      repose_tan=0.62, sides=6, fault=None, warp=0.12):
+                      repose_tan=0.62, sides=6, fault=None, warp=0.12, corner_round=1.3):
     """A caprock butte/mesa/jebel as height-above-plain (m): flat structural TOP, a near-vertical
     CLIFF, then a SHARP break of slope to a TALUS apron at the angle of repose. Cliff-foot-to-scree
     is the break-of-slope that reads as rock rather than a smoothed noise blob.
@@ -139,6 +139,10 @@ def fault_block_butte(shape, bx, by, br, bh, cellsize, seed=0, ecc=1.0, talus=0.
         normals.append((np.cos(a), np.sin(a)))
         offsets.append(R * spacing * rng.uniform(0.74, 1.12))              # irregular, off-centre edge offsets
     d = ops_filters.sd_convex_polygon(dx, dy, normals, offsets)             # grounded SDF primitive (10)
+    if corner_round > 0.0:                                                   # blur the SDF a touch so the razor
+        d = ops_filters.gaussian(d, corner_round)                          # ~90° joint corners round off —
+    #  sharp exposed corners weather fastest, so a perfectly square block reads artificial (a short diffusion
+    #  of the footprint SDF is the cheap stand-in for that preferential corner erosion; faces stay straight).
     th = talus * bh                                                         # scree-apron height (m)
     tr = th / repose_tan                                                    # apron run length at repose (m)
     cw = 1.4 * cellsize                                                     # cliff width (m) -> near vertical
@@ -359,11 +363,12 @@ def volcano(shape, cx, cy, radius, height, cellsize=1.0, *, seed=0, kind="strato
 def canyon(shape, cellsize, *, seed=0, rim=1000.0, depth=750.0, width_frac=0.035,
            sinuosity=0.22, benches=3, n_tributaries=3, roughness=0.05):
     """A CANYON primitive — Gaea's "Canyon" node. A high PLATEAU incised by a MEANDERING trunk gorge
-    with terraced (strata-bench) walls and a few tributary side-canyons. Grounded the way real canyons
-    form: a fixed base level with the trunk incising down to a flat floor, resistant beds holding the
-    walls back as benches (the Grand Canyon's cliff-and-bench profile; Leopold 1964 meanders — the
-    trunk's sinuous planform, tributaries joining at acute angles). `depth` below `rim` (m), `width_frac`
-    of the tile for the floor half-width. Returns height (m)."""
+    with HORIZONTAL-STRATA benches and a few tributary side-canyons. Grounded the way real canyons form:
+    a fixed base level with the trunk incising down to a flat floor, and resistant beds holding the walls
+    back as benches AT CONSTANT ABSOLUTE ELEVATIONS — so the terraces stay flat and stationary while the
+    meander cuts down through them (the Grand Canyon's cliff-and-bench profile; Leopold 1964 meanders —
+    the trunk's sinuous planform, tributaries joining at acute angles). `depth` below `rim` (m),
+    `width_frac` of the tile for the floor half-width. Returns height (m)."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
     rng = np.random.default_rng(seed)
@@ -384,12 +389,19 @@ def canyon(shape, cellsize, *, seed=0, rim=1000.0, depth=750.0, width_frac=0.035
         d = np.minimum(d, _polyline_distance(xx, yy, tx, ty))
     floor_w = width_frac * max(n0, n1)                                      # flat floor half-width (cells)
     wall_w = 2.2 * floor_w                                                  # wall run from floor lip to rim (steep)
-    # incision fraction: 1 on the floor, ramping to 0 at the rim, stepped into benches
+    # 1) a SMOOTH V-profile gorge (distance-driven): incision 1 on the floor -> 0 at the rim.
     ramp = np.clip((d - floor_w) / wall_w, 0.0, 1.0)
-    q = np.floor(ramp * benches) + _smoothstep(0.0, 1.0, (ramp * benches) % 1.0) ** 2.2
-    stepped = q / benches
-    incision = np.where(d <= floor_w, 1.0, 1.0 - stepped)
-    h = plateau - depth * incision
+    h_smooth = plateau - depth * np.where(d <= floor_w, 1.0, 1.0 - ramp)
+    # 2) benches are HORIZONTAL STRATA, not river contours: quantise ABSOLUTE ELEVATION to global bands, so
+    #    the steps stay flat and geographically STATIONARY while the meander cuts down THROUGH them (the true
+    #    strath-terrace geometry). A low-frequency warp gives the bed traces natural irregularity, and the
+    #    river floor + plateau keep their smooth surfaces — only the incised walls are terraced.
+    base = rim - depth
+    step = depth / max(int(benches), 1)
+    b = (h_smooth - base) / step + 0.18 * noise.fbm(xx / 9.0, yy / 9.0, seed + 7, octaves=3)
+    bench = base + step * (np.floor(b) + _smoothstep(0.0, 1.0, (b - np.floor(b)) ** 2.4))
+    wall = (d > floor_w) & (h_smooth < rim - 0.02 * depth)                  # incised walls only
+    h = np.where(wall, bench, h_smooth)
     h = h + (d <= floor_w) * roughness * depth * noise.fbm(xx / 6.0, yy / 6.0, seed + 4, octaves=3)  # rough floor
     return h
 
