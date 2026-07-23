@@ -31,7 +31,8 @@ and numerical correctness by the per-atom oracle tests (`test_noise.py`, `test_o
 
 **Solver atoms (iterative, stateful — cannot be composed from static fields):** flow routing
 (`flow.priority_flood_fill`, `d8_receivers`, `d8_accumulation`, `mfd_accumulation`), stream-power
-incision (`erosion_streampower.stream_power_evolve`), droplet erosion (`erosion_droplet.droplet_erode`),
+incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a field, or a callable
+`K(p,h)` for lithology-driven differential erosion), droplet erosion (`erosion_droplet.droplet_erode`),
 thermal/talus (`erosion_thermal.thermal_erosion`), hillslope diffusion (`diffusion.hillslope_diffuse`),
 virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), shallow-water
 (`shallow_water.simulate`), and lateral fluvial migration (`meander.migrate`, with the F-tier

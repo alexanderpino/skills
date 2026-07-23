@@ -220,7 +220,9 @@ droplet(map, x, y):
 
 *Runnable reference: `reference-impl/erosion_streampower.py` (Braun–Willett implicit), verified by
 `tests/test_streampower.py` — the decisive check: the steady-state slope–area exponent comes out at
-−m/n (`09`).*
+−m/n (`09`). `K` may be a scalar, an (n,m) **field**, or a callable **`K(p,h)`** re-evaluated on the
+surface each step — the lithology coupling (`11`): differential erosion of hard/soft beds, verified by
+`tests/test_lithology.py` (relief scales as `K^(−1/n)`; hard rock stands proud; tilted beds → cuestas).*
 
 This is the ★★★★★ row, and the reason is not the equation. The equation is one line:
 

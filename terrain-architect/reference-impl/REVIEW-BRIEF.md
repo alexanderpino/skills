@@ -1,6 +1,6 @@
 # Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
 
-**Companion image:** `capability_grid.png` — a 7×7 grid, 46 tiles, one per capability of the
+**Companion image:** `capability_grid.png` — a 7×7 grid, 47 tiles, one per capability of the
 `terrain-architect` reference implementation. **Read this brief first, then review the image against it.**
 
 ---
@@ -10,7 +10,7 @@
 Each tile is a terrain field or map **generated live in pure NumPy** by a reference implementation of
 a terrain‑generation skill (noise, erosion, hydrology, geology, analysis, rendering). Each caption has
 two parts: **`[chapter] Capability`** and the **oracle/invariant** that the automated test suite uses to
-verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (279 tests) passes; the
+verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (287 tests) passes; the
 fluvial/tectonic core is cross‑validated against external libraries (RichDEM, Landlab); citations were
 audited against primary sources.
 
@@ -128,6 +128,11 @@ failure mode to watch for.
 | R7C2 | Isostatic flexure | a smooth broad deflection basin under the load | point‑spike; ringing |
 | R7C3 | Mass‑consistent wind | smooth flow field (divergence removed) | blocky/noisy; obvious sources |
 | R7C4 | Hero 3D raster | 3D massif, snow on the high core, **translucent** water, no holes | z‑fighting, gaps, opaque water, see‑through faces |
+
+### AAA‑parity tranche (appended after the hero tile; earlier coordinates unchanged)
+| Cell | Tile | ✓ confirms | ✗ red flag |
+|---|---|---|---|
+| R7C5 | Differential erosion (04+11) | terrain follows the **tilted beds** — resistant strata stand as **cuestas/strike ridges**, soft beds cut to valleys (anisotropic, structure‑controlled) | isotropic dendritic drainage with no bedding control (K did nothing) |
 
 ---
 

@@ -56,6 +56,11 @@ talus(p, h) = layerAt(stratCoord(p, h), bedTable).reposeAngle
 Then feed `K` into stream power (`04`) or the pipe model's erodibility, and `talus` into
 thermal (`05`). Erosion produces the landform.
 
+*Runnable reference: `landforms.bed_erodibility(strat_coord(...), bedTable)` builds the `K(p,h)` field,
+fed to `erosion_streampower.stream_power_evolve` as a field or a callable `K(h)` (re-evaluated on the
+surface, so beds are fixed in the column and exposed as incision cuts down — caprock, cuestas, relief
+inversion). Verified by `tests/test_lithology.py`; the coupling is the geologically-correct one (`02`).*
+
 **Bed thickness must be non-uniform.** A `sin` or a uniform modulo gives evenly-spaced steps,
 which is exactly what a terrace node gives — you've done the expensive thing and got the cheap
 result. Use an authored table, or a noise-driven thickness sequence with a plausible

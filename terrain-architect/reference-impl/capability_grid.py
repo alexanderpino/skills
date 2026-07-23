@@ -308,6 +308,16 @@ def CELLS():
             return gray(_terr)
     add("09 Hero 3D raster", "z-buffer, back-face cull, translucent water", _hero)
 
+    # ---- AAA-PARITY TRANCHE (appended; keeps earlier tile coordinates stable) ----
+    def _diff_erosion():
+        n = 96; cell = 50.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        rng = np.random.default_rng(0); h = rng.random((n, n)) * 5
+        table = [(600.0, 7e-2), (280.0, 6e-3)]                          # soft / hard (~12x contrast)
+        Kfn = lambda hh: L.bed_erodibility(L.strat_coord(hh, xx2 * cell, yy2 * cell,
+                                                         tilt=(0.7, 0.25)), table)   # tilted beds -> cuestas
+        return hill(_cr(sp.stream_power_evolve(h, 2.0, Kfn, 0.5, 1000.0, 120, cell), 6), cell)
+    add("04+11 Differential erosion", "spatial K(p,h): hard beds resist -> cuestas; soft cut to valleys", _diff_erosion)
+
     return C
 
 
