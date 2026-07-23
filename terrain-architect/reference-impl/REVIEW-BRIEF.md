@@ -1,6 +1,6 @@
 # Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
 
-**Companion image:** `capability_grid.png` — a 7×7 grid, 45 tiles, one per capability of the
+**Companion image:** `capability_grid.png` — a 7×7 grid, 46 tiles, one per capability of the
 `terrain-architect` reference implementation. **Read this brief first, then review the image against it.**
 
 ---
@@ -10,7 +10,7 @@
 Each tile is a terrain field or map **generated live in pure NumPy** by a reference implementation of
 a terrain‑generation skill (noise, erosion, hydrology, geology, analysis, rendering). Each caption has
 two parts: **`[chapter] Capability`** and the **oracle/invariant** that the automated test suite uses to
-verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (257 tests) passes; the
+verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (279 tests) passes; the
 fluvial/tectonic core is cross‑validated against external libraries (RichDEM, Landlab); citations were
 audited against primary sources.
 
@@ -96,37 +96,38 @@ failure mode to watch for.
 | R3C6 | Pipe erosion | incised channels **and** deposition fans/aprons | erosion only, no deposition; instability |
 | R3C7 | Shallow water | water pooled/threaded in the low channels | uniform sheet; dry everywhere |
 | R4C1 | Hillslope diffusion | an initial spike spread into a smooth Gaussian | still a spike; or ringing/negative halo |
+| R4C2 | River meander (belt) | a sinuous channel with **asymmetric, downstream‑skewed** loops + a detached **oxbow lake** (teal, beside the channel) | symmetric sine waves; no oxbow; a raised trench rim (not carve‑only) |
 
 ### Row 4–5 — Landform generators (11) + analysis start (06)
 | Cell | Tile | ✓ confirms | ✗ red flag |
 |---|---|---|---|
-| R4C2 | Mountain (basic) | a massif with **organised radial ridgelines** | isotropic "noise on a lump" |
-| R4C3 | Mountain (eroded) | **dendritic** incised valleys (drainage network) | same as basic; or mush |
-| R4C4 | Ridge (hogback) | a linear crest, **one flank steeper** than the other | symmetric ridge (asymmetry not showing) |
-| R4C5 | Volcano (strato) | cone **steepest near the summit**, gentle apron, **summit crater** | foot‑steepest dome; no crater |
-| R4C6 | Volcano (shield) | broad, low‑angle, convex dome | indistinguishable from the strato |
-| R4C7 | Canyon | a **dominant plateau** cut by a sinuous incised gorge | whole tile carved; straight ditch |
-| R5C1 | Fault‑block butte | flat top, near‑vertical cliff, talus apron, **polygonal** footprint | round hill; smooth blob |
-| R5C2 | Impact crater | bowl + **raised rim** + central peak + ejecta apron | plain dimple; no rim/peak |
-| R5C3 | Karst sinkholes | scattered pits **only on the soluble band** | pits everywhere; or none |
-| R5C4 | Strata + fold | banded erodibility, bands **folded** (wavy), not flat | uniform field; ruler‑straight bands |
-| R5C5 | Slope | steep faces bright, flats dark | inverted; uniform |
-| R5C6 | Northness | pole‑/shade‑facing slopes highlighted (the snow side) | the sunny side highlighted (sign bug) |
-| R5C7 | Curvature | ridges vs. valley floors separated by sign | flat/noisy; no ridge–valley structure |
+| R4C3 | Mountain (basic) | a massif with **organised radial ridgelines** | isotropic "noise on a lump" |
+| R4C4 | Mountain (eroded) | **dendritic** incised valleys (drainage network) | same as basic; or mush |
+| R4C5 | Ridge (hogback) | a linear crest, **one flank steeper** than the other | symmetric ridge (asymmetry not showing) |
+| R4C6 | Volcano (strato) | cone **steepest near the summit**, gentle apron, **summit crater** | foot‑steepest dome; no crater |
+| R4C7 | Volcano (shield) | broad, low‑angle, convex dome | indistinguishable from the strato |
+| R5C1 | Canyon | a **dominant plateau** cut by a sinuous incised gorge | whole tile carved; straight ditch |
+| R5C2 | Fault‑block butte | flat top, near‑vertical cliff, talus apron, **polygonal** footprint | round hill; smooth blob |
+| R5C3 | Impact crater | bowl + **raised rim** + central peak + ejecta apron | plain dimple; no rim/peak |
+| R5C4 | Karst sinkholes | scattered pits **only on the soluble band** | pits everywhere; or none |
+| R5C5 | Strata + fold | banded erodibility, bands **folded** (wavy), not flat | uniform field; ruler‑straight bands |
+| R5C6 | Slope | steep faces bright, flats dark | inverted; uniform |
+| R5C7 | Northness | pole‑/shade‑facing slopes highlighted (the snow side) | the sunny side highlighted (sign bug) |
 
 ### Row 6–7 — Masks, sims, geophysics, render (06 / 12 / 19 / 02 / 13 / 09)
 | Cell | Tile | ✓ confirms | ✗ red flag |
 |---|---|---|---|
-| R6C1 | Wetness (TWI) | bright in convergent valley floors | bright on ridges (inverted) |
-| R6C2 | Horizon AO | dark in hollows/valleys, ~0 (open) on peaks | uniform; or peaks darkest |
-| R6C3 | Substances | snow on high/cold/**shaded**, veg on gentle, water low | snow on sunny side; colours ignore terrain |
-| R6C4 | SIA glacier | smooth radial ice dome (Halfar profile) | lumpy; asymmetric; negative ice |
-| R6C5 | Lava CA | a channelised flow tongue that **freezes** downstream | uniform flood; no directed flow |
-| R6C6 | Coastal retreat | a notched, landward‑retreated cliff line | untouched coast; sea eroding uphill |
-| R6C7 | Dunes (Werner) | dune‑like corridors/patches (deposition instability) | uniform sand; pure white noise |
-| R7C1 | Isostatic flexure | a smooth broad deflection basin under the load | point‑spike; ringing |
-| R7C2 | Mass‑consistent wind | smooth flow field (divergence removed) | blocky/noisy; obvious sources |
-| R7C3 | Hero 3D raster | 3D massif, snow on the high core, **translucent** water, no holes | z‑fighting, gaps, opaque water, see‑through faces |
+| R6C1 | Curvature | ridges vs. valley floors separated by sign | flat/noisy; no ridge–valley structure |
+| R6C2 | Wetness (TWI) | bright in convergent valley floors | bright on ridges (inverted) |
+| R6C3 | Horizon AO | dark in hollows/valleys, ~0 (open) on peaks | uniform; or peaks darkest |
+| R6C4 | Substances | snow on high/cold/**shaded**, veg on gentle, water low | snow on sunny side; colours ignore terrain |
+| R6C5 | SIA glacier | smooth radial ice dome (Halfar profile) | lumpy; asymmetric; negative ice |
+| R6C6 | Lava CA | a channelised flow tongue that **freezes** downstream | uniform flood; no directed flow |
+| R6C7 | Coastal retreat | a notched, landward‑retreated cliff line | untouched coast; sea eroding uphill |
+| R7C1 | Dunes (Werner) | dune‑like corridors/patches (deposition instability) | uniform sand; pure white noise |
+| R7C2 | Isostatic flexure | a smooth broad deflection basin under the load | point‑spike; ringing |
+| R7C3 | Mass‑consistent wind | smooth flow field (divergence removed) | blocky/noisy; obvious sources |
+| R7C4 | Hero 3D raster | 3D massif, snow on the high core, **translucent** water, no holes | z‑fighting, gaps, opaque water, see‑through faces |
 
 ---
 

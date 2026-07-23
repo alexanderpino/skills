@@ -384,6 +384,13 @@ terrain around it.
 
 ## Meandering & bank erosion
 
+*Runnable reference: `reference-impl/meander.py` (`migrate` = `meanderStep`, upstream-lagged near-bank
+velocity per Ikeda–Parker–Sawai 1981; `burn_channel` = `burnChannel`), verified by
+`tests/test_meander.py` — the decisive check: the migration peak lags the curvature peak downstream
+(drop the lag and it coincides, i.e. sine waves, not meanders). The `migrate` loop is centreline-only;
+the height-field realisation (`burn_channel`, `deposit_point_bars`) is applied after, never during — it
+is the honest F-tier "look", the migration physics never touches `h`.*
+
 First, the correction that the question usually needs: a river does **not** erode its banks with
 waves. Coastal and marine erosion are *wave*-driven (`12`); a river migrates by **flow
 curvature**. The outer, concave bank of a bend is the **cut bank** (erosion); the inner, convex
