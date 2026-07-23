@@ -83,15 +83,18 @@ def curvature(centreline):
 
 
 def near_bank_velocity(C, ds, L_adj):
-    """Upstream-lagged near-bank excess velocity (Ikeda, Parker & Sawai 1981; 03):
+    """Upstream-lagged near-bank excess velocity (Ikeda, Parker & Sawai 1981; 03) — the weighted
+    AVERAGE of upstream curvature with exponential weights w_k = exp(-k·ds / L_adj):
 
-        u_b[i] = Σ_{k≥0} C[i-k] · exp(-k·ds / L_adj)
+        u_b[i] = ( Σ_{k≥0} C[i-k]·w_k ) / ( Σ_{k≥0} w_k )
 
-    computed as the causal exponential (IIR) filter u[i] = C[i] + α·u[i-1] with α = exp(-ds/L_adj),
-    which equals that sum exactly. Normalised by (1-α) so the DC gain is 1 (u_b of a constant-
-    curvature arc equals that curvature). The exponential lag over L_adj (≈ several channel widths)
-    is what puts the migration peak DOWNSTREAM of the curvature peak — the whole reason meanders
-    skew and overturn instead of standing still as sine waves."""
+    computed as the causal exponential (IIR) filter u[i] = C[i] + α·u[i-1] with α = exp(-ds/L_adj)
+    (which equals the numerator sum exactly), then × (1-α) — and since Σ_k w_k = 1/(1-α), that factor
+    is exactly the divide-by-sum-of-weights normalisation. Weights summing to 1 keep the DC gain at 1
+    (u_b of a constant-curvature arc equals that curvature), so E keeps its meaning as L_adj varies.
+    The exponential lag over L_adj (≈ several channel widths) is what puts the migration peak
+    DOWNSTREAM of the curvature peak — the whole reason meanders skew and overturn instead of
+    standing still as sine waves."""
     C = np.asarray(C, dtype=np.float64)
     alpha = float(np.exp(-ds / max(L_adj, 1e-9)))
     u = np.empty_like(C)

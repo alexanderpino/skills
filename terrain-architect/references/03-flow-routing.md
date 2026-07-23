@@ -415,7 +415,8 @@ meanderStep(centreline, Δt):
     # Howard & Knutson 1984): it depends on UPSTREAM curvature, exponentially lagged — not on
     # local curvature alone.
     for node i:
-        u_b[i] = Σ_{k≥0} C[i-k] * exp(-k * ds / L_adj)     # L_adj ≈ several channel widths
+        # weighted AVERAGE of upstream curvature (weights sum to 1, so E keeps its meaning as L_adj varies)
+        u_b[i] = ( Σ_{k≥0} C[i-k] * w_k ) / ( Σ_{k≥0} w_k ),   w_k = exp(-k * ds / L_adj)   # L_adj ≈ several channel widths
         move node i along its outward normal by E * u_b[i] * Δt    # E = bank erodibility
 
     # Neck cutoff → oxbow lake
