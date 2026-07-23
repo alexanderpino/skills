@@ -50,6 +50,32 @@ def hill(h, cell=30.0):
     return render.hillshade(h, cell)
 
 
+def _bilinear(field, px, py):
+    n, m = field.shape
+    px = np.clip(px, 0, m - 1.001); py = np.clip(py, 0, n - 1.001)
+    x0 = np.floor(px).astype(np.int64); y0 = np.floor(py).astype(np.int64)
+    x1, y1 = x0 + 1, y0 + 1; fx = px - x0; fy = py - y0
+    return (field[y0, x0] * (1 - fx) * (1 - fy) + field[y0, x1] * fx * (1 - fy)
+            + field[y1, x0] * (1 - fx) * fy + field[y1, x1] * fx * fy)
+
+
+def lic(u, v, seed=0, steps=16):
+    """Line Integral Convolution — smear a white-noise texture ALONG the flow so streamlines become
+    visible (the honest way to eyeball a vector field / verify it flows smoothly, not as speed noise)."""
+    n, m = u.shape
+    tex = np.random.default_rng(seed).random((n, m))
+    yy, xx = np.mgrid[0:n, 0:m].astype(np.float64)
+    acc = tex.copy(); cnt = np.ones((n, m))
+    for sgn in (1.0, -1.0):
+        px, py = xx.copy(), yy.copy()
+        for _ in range(steps):
+            fu = _bilinear(u, px, py); fv = _bilinear(v, px, py)
+            spd = np.hypot(fu, fv) + 1e-6
+            px = px + sgn * fu / spd; py = py + sgn * fv / spd
+            acc += _bilinear(tex, px, py); cnt += 1.0
+    return acc / cnt
+
+
 _SUB_COL = {
     "water": (54, 108, 168), "snow": (238, 240, 246), "rock": (120, 120, 126),
     "scree": (150, 140, 128), "sediment": (176, 150, 108), "vegetation": (86, 120, 66),
@@ -60,8 +86,9 @@ _SUB_COL = {
 def substance_rgb(h, cell=40.0):
     slope = A.slope(h, cell)
     area = np.full_like(h, cell * cell)
-    stack = A.derive_substances(h, slope, area, cell,
-                                climate={"temp_sea": 6.0, "lapse": 6.5, "snow_temp": 0.0})
+    stack = A.derive_substances(h, slope, area, cell,          # correct climate keys enable snow+veg
+                                climate={"has_water": True, "has_snow": True, "has_veg": True,
+                                         "snowline": 0.6, "snow_soft": 0.12})
     rgb = np.zeros(h.shape + (3,), float)
     for name, w in stack:                                      # derive_substances -> [(name, mask), ...]
         rgb += np.asarray(w)[..., None] * np.array(_SUB_COL[name], float)
@@ -109,7 +136,7 @@ def CELLS():
         a = ops_filters.sd_circle(px + .3, py, .5); b = ops_filters.sd_circle(px - .3, py, .5)
         return ramp(-ops_filters.smin(a, b, .3))
     add("10 smooth-min blend", "-> min as k->0; smin <= min", _smin)
-    add("10 Terrace", "quantise to treads; warp BEFORE quantise", lambda: hill(L.terrace(_norm(noise.fbm(xx, yy, 8, octaves=5)), 6, sharpness=2.5) * 800))
+    add("10 Terrace", "quantise to treads; warp BEFORE quantise (steps wander)", lambda: hill(L.terrace(_norm(noise.fbm(xx, yy, 8, octaves=5)), 6, sharpness=2.5, warp_amp=0.06, warp_wl=32.0, seed=8) * 800))
     def _close():
         h = noise.fbm(xx, yy, 9, octaves=5) * 400
         return gray(ops_filters.closing(h, 3) - h)
@@ -150,9 +177,15 @@ def CELLS():
     add("05 Thermal (talus)", "<= repose; mass conserved; non-inverting", _therm)
     def _pipe():
         h = L.mountain((120, 120), 40.0, seed=5, style="basic")
-        out = erosion_pipe.pipe_erode(h, 40.0, rain=4e-4, iters=250)
-        return hill(out["bed"] if isinstance(out, dict) else out, 40)
-    add("04 Pipe erosion", "bed+sediment conserved (closed basin)", _pipe)
+        h[:, :46] *= 0.05                                                   # a low plain -> alluvial fans build here
+        out = erosion_pipe.pipe_erode(h, 40.0, rain=5e-4, iters=300)
+        bed = out["bed"] if isinstance(out, dict) else out
+        dep = np.clip(bed - h, 0.0, None)                                   # DEPOSITION (fans/aprons)
+        base = render.hillshade(bed, 40).astype(float)
+        a = (np.clip(dep / (np.percentile(dep, 99.5) + 1e-6), 0, 1) * 0.85)[..., None]
+        warm = np.array([235, 170, 70], float)
+        return np.clip(base * (1 - a) + warm * a, 0, 255).astype(np.uint8)  # incision (grey) + deposition (warm)
+    add("04 Pipe erosion", "incises + DEPOSITS fans (warm); bed+sed conserved", _pipe)
     def _sw():
         h = L.volcano((120, 120), 60, 60, radius=1400, height=800, cellsize=30, kind="strato")
         r = shallow_water.simulate(h, 30.0, rain=6e-5, iters=80, dt=0.02, drain_edges=True)
@@ -164,7 +197,7 @@ def CELLS():
     add("04 Hillslope diffusion", "Gaussian Green's fn; 0.25 CFL tight", _diff)
 
     # ---- LANDFORM GENERATORS (11) ----
-    add("11 Mountain (basic)", "modulated-Voronoi ridge network (not noise)", lambda: hill(L.mountain((180, 180), 26.0, seed=3, style="basic"), 26))
+    add("11 Mountain (basic)", "raw Voronoi ridge skeleton (pre-erosion base; -> eroded)", lambda: hill(L.mountain((180, 180), 26.0, seed=3, style="basic"), 26))
     add("11 Mountain (eroded)", "styles distinct; deep dendritic incision", lambda: hill(L.mountain((150, 150), 26.0, seed=3, style="eroded"), 26))
     add("11 Ridge (hogback)", "asymmetric flanks (asymmetry 0 = symmetric)", lambda: hill(L.ridge((180, 180), 30.0, seed=2, height=900, asymmetry=0.6), 30))
     add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
@@ -232,10 +265,14 @@ def CELLS():
         return ramp(isostasy.flexure_fft(load, D, 500.0, cellsize=4000.0))
     add("02 Isostatic flexure", "W=Q/(Dk^4+drho g); single-mode exact", _flex)
     def _wind():
-        rng = np.random.default_rng(1); u = rng.standard_normal((80, 80)); v = rng.standard_normal((80, 80))
-        uc, vc = winds.mass_consistent(u, v)
-        return ramp(np.hypot(uc, vc))
-    add("13 Mass-consistent wind", "divergence -> 0 (machine eps, any grid)", _wind)
+        n = 150; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        ang = 0.5 + 1.1 * noise.fbm(xx2 / 55, yy2 / 55, 5, octaves=3)        # coherent large-scale flow
+        u0, v0 = np.cos(ang), np.sin(ang)
+        r2 = ((xx2 - n * .55) ** 2 + (yy2 - n * .4) ** 2) / (0.05 * n * n)   # + a divergent source (into a hill)
+        s = np.exp(-r2); u0 += 1.5 * (xx2 - n * .55) / n * s; v0 += 1.5 * (yy2 - n * .4) / n * s
+        uc, vc = winds.mass_consistent(u0, v0)                               # remove the divergence
+        return gray(lic(uc, vc, seed=3, steps=18))                          # LIC -> visible smooth streamlines
+    add("13 Mass-consistent wind", "divergence -> 0; LIC shows smooth streamlines", _wind)
 
     # ---- HERO / RENDER (08/09) ----
     def _hero():

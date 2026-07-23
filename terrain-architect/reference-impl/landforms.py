@@ -338,10 +338,11 @@ def volcano(shape, cx, cy, radius, height, cellsize=1.0, *, seed=0, kind="strato
     if kind == "shield":
         prof = 1.0 - rn ** 1.7                                              # broad convex dome, low slopes
     else:
-        prof = (1.0 - rn) ** 1.4                                           # concave-up: STEEPEST at the summit,
-        #  exponent > 1 => |dprof/dr| ~ (1-rn)^0.4 is largest at rn->0 (summit) and flares to 0 at the foot,
-        #  the stratovolcano form (steep upper cone ~30-35deg, gentle apron; Karátson 2010). Exponent < 1 would
-        #  invert this into a foot-steepened dome — the bug the audit caught.
+        prof = (1.0 - rn) ** 2.2                                           # concave-up: STEEPEST at the summit,
+        #  exponent > 1 => |dprof/dr| ~ (1-rn)^1.2 is largest at rn->0 (summit) and flares to 0 at the foot,
+        #  the stratovolcano's pronounced concave SWEEP (steep upper cone ~30-35deg, long gentle apron;
+        #  Karátson 2010). 2.2 gives a summit/foot slope ratio ~3x — a real sweep, not a linear cone.
+        #  Exponent < 1 would invert this into a foot-steepened dome (the bug the audit first caught).
     # radial barrancos: gullies grooving the flanks, deepening downslope, vanishing at the summit
     theta = np.arctan2(yy - cy, xx - cx)
     grooves = 0.5 * (1.0 + np.cos(n_barrancos * theta + 2.0 * np.pi * noise.fbm(xx / 9.0, yy / 9.0, seed + 3, octaves=3)))
