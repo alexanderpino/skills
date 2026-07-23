@@ -209,6 +209,90 @@ Cuesta / hogback  = tilted beds + differential erosion. Set `tilt` in stratCoord
 
 Nobody has published "the mesa algorithm" and nobody will. If asked for a paper, say so.
 
+## Placeable feature-primitive generators
+
+The recipes above build these landforms the **emergent** way: a material field (layered `K`) plus
+erosion, so the cliff/valley *falls out of the physics*. There is a second, equally-legitimate route —
+the one a Gaea "Mountain"/"Volcano"/"Canyon" node takes — the **feature-primitive construction tree**
+(Génévaux et al. 2015, *Terrain Modelling from Feature Primitives*, CGF; Guérin et al. 2016): you
+**place a parametric primitive**, combine several (`max` / smooth-max), then erode. The primitive stamps
+an approximate profile directly (a height op), which is faster and art-directable ("a mountain *here*")
+but less physically pure than letting it emerge — so run a real erosion pass afterwards, and prefer the
+emergent recipe when the material field is what you actually care about. Both are in the toolbox; these
+are the generators the reference implements, with the algorithm each uses.
+
+```
+# MOUNTAIN — a drainage-organised massif (how Gaea's Mountain node is built: modulated Voronoi
+# + distortion; Génévaux 2015). NOT thresholded isotropic noise (that reads as "noise on a lump").
+mountain(shape, style):
+    # 1. crest-skeleton ENVELOPE — a non-circular massif footprint (crest high, margins low)
+    env = 0
+    repeat n_ridges:
+        crest = wandering polyline across the tile (a few control points + perpendicular jitter)
+        d     = min distance to crest segments (ops_filters.sd_segment, 10)
+        env   = max(env, clip(1 - d/reach, 0, 1) ^ profile)
+    # 2. modulated-VORONOI ridge network: Worley f2-f1 cell EDGES are ridgelines, interiors valleys
+    (u,v) = tile coords scaled to ~cells drainage cells
+    (u,v) += warp * (fbm(u,v), fbm(u,v))          # two-scale domain distortion -> curved spurs (01)
+    ridges = 1 - worley(u, v, kind="f2f1") / percentile(.,98)     # ~1 on cell edges
+    ridges = mix(ridges, finer_octave, spur) ^ crestSharpness
+    # 3. incise: crest sits at the envelope, valleys drop `relief` below it
+    h = height * env * ((1 - relief) + relief * ridges)
+    # 4. bake the weathering the STYLE implies (basic|eroded|alpine|old|strata) — this is what
+    #    turns the Voronoi skeleton into a dendritic network, exactly what Gaea's Eroded/Old fold in:
+    if style.erode:  h = droplet_erode(h, ...)    # a modest real hydraulic pass (04)
+    if style.talus:  h = thermal_relax(h, repose, iters)          # faces to the angle of repose (05)
+    if style.strata: h = terrace(h, levels)       # sedimentary banding
+    return h            # NOTE: whole-tile percentile normalisation -> single-shot, not tile-composable
+
+# RIDGE — a single linear hogback/cuesta (asymmetric flanks: steep scarp, gentle dip slope;
+# Twidale & Campbell 2005). The primitive form of the "tilted beds + erosion" recipe above.
+ridge(shape, asymmetry):
+    crest = wandering polyline spanning the tile
+    d     = distance to crest;  side = signed across-crest position
+    scarp = reach*(1-asymmetry);  dip = reach*(1+asymmetry)       # asymmetry 0 = symmetric arete
+    flank = (side >= 0) ? scarp : dip
+    prof  = clip(1 - d/flank, 0, 1) ^ 1.4
+    return height * prof * ((1-detail) + detail * ridged_mf(...))  # spurs on the flanks (01)
+
+# VOLCANO — a radial edifice (Karátson et al. 2010 morphometry).
+volcano(shape, kind):
+    rn = clip(r / R, 0, 1)                          # r = radial distance from the centre
+    prof = (kind=="shield") ? 1 - rn^1.7            # broad convex dome, gentle slopes
+                            : (1 - rn)^1.4          # strato: CONCAVE-UP (steepest at the summit)
+    grooves = ½(1 + cos(n_barrancos*theta + 2*pi*fbm))   # radial barrancos, deepen downslope
+    prof   *= (1 - barranco * grooves * rn)
+    h = height * prof
+    h -= crater_depth * bowl(r < crater_R) ^ 1.5    # summit crater / caldera
+    h += rim * gaussian_ring(r ~ crater_R)          # raised crater rim
+    return max(h, 0)          # barrancos are STAMPED here; run fluvial erosion (04) to cut real ones
+
+# CANYON — a plateau incised by a meandering trunk + tributaries (Leopold 1964 meanders).
+canyon(shape):
+    plateau = rim + roughness * fbm
+    trunk   = meandering centreline down the tile (sinusoid + random walk)
+    d       = distance to trunk; for each tributary: d = min(d, distance to tributary polyline)
+    ramp    = clip((d - floor_w) / wall_w, 0, 1)
+    benches = quantise(ramp, n_benches)             # strata benches (a terrace-style step; a cheap
+    incision = (d <= floor_w) ? 1 : (1 - benches)   #   look — the hard floor() reads slightly fake)
+    return plateau - depth * incision               # plateau stays dominant; a thin deep floor
+
+# FAULT-BLOCK BUTTE — flat structural top, near-vertical cliff, talus at repose; a joint/fault-
+# controlled POLYGONAL footprint (Narr & Suppe 1991), not radial. The primitive form of "caprock
+# over soft beds"; the emergent recipe (layered K + erosion) is the physically-honest alternative.
+fault_block_butte(shape, bh):
+    d = sd_convex_polygon(footprint at two orthogonal joint azimuths, cross-joints ~1.7x wider)  # (10)
+    profile: d<=0 -> flat top bh; thin cliff band -> near-vertical; then talus at repose_tan down to 0
+    add a resistant caprock lip at the rim; roughen the scree
+    return max(profile, 0)     # place, combine with max/smax, then run thermal (05) for real talus
+```
+
+These stamp a profile directly, so honour the chapter's **central claim** where it matters: a butte's
+cliff is *most* honest as an emergent break-of-slope in a layered-`K` field; the primitive is the
+art-directed shortcut. `canyon`'s `quantise` benches are a terrace-style height op — acceptable as part
+of the *primitive* (before any flow routing), but never run `terrace` *after* erosion (it destroys the
+drainage — see Terracing above).
+
 ## When the heightfield fails
 
 A heightfield is a function `h(x,y)` — one height per column. This makes **overhangs,

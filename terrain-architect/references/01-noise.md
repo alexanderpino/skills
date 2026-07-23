@@ -58,13 +58,29 @@ grad(hash, x, y, z):
     return ((h & 1) ? -u : u) + ((h & 2) ? -v : v)
 ```
 
+**2D reduction (what a heightfield actually calls).** `perlin2(x,y)` calls `grad(hash, x, y)` with
+only two coordinates. The reference uses the standard **8-vector 2D** gradient set indexed `hash & 7`
+— the 4 diagonals + 4 axes — instead of the 3D `& 15` table:
+
+```
+GRAD2 = [(1,1),(-1,1),(1,-1),(-1,-1), (1,0),(-1,0),(0,1),(0,-1)]
+grad2(hash, x, y):  g = GRAD2[hash & 7];  return g.x*x + g.y*y
+```
+
+This set mixes magnitude-1 (axis) and magnitude-√2 (diagonal) vectors, so the practical 2D range
+reaches ≈[−1,1], **not** the ±0.707 of a unit-gradient set (see Range).
+
 **Permutation table.** `P` is a 256-entry shuffle of 0..255, duplicated to 512 to avoid
 bounds checks. Seeding = shuffling P with the seed. **Do not** seed by offsetting the input
-coordinates — that gives correlated "seeds" that are just translations of one pattern.
+coordinates — that gives correlated "seeds" that are just translations of one pattern. (fBm/ridged/
+hybrid here decorrelate octaves by a per-octave *seed* offset — `seed + i·1013` — which is the
+shuffle-based form of this rule, not a coordinate offset.)
 
-**Range.** 2D Perlin's theoretical range is ±√(N/4) = ±0.707 for 2D, ±0.866 for 3D, but the
-practical distribution is much tighter and roughly Gaussian. Never assume [−1,1] is filled;
-if you normalise by the theoretical max you will get a washed-out, low-contrast field.
+**Range.** With a UNIT-magnitude gradient set 2D Perlin's theoretical range is ±√(N/4) = ±0.707
+(±0.866 for 3D); the mixed-magnitude 8-vector set above reaches ≈±1 instead. Either way the practical
+distribution is roughly Gaussian and much tighter than the bound — **measure the actual range and
+remap**; never assume [−1,1] is filled, and don't normalise by a theoretical max or you get a
+washed-out, low-contrast field.
 Measure the actual range for your octave stack.
 
 ## Simplex noise

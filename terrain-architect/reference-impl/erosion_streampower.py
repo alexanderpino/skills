@@ -69,5 +69,7 @@ def stream_power_evolve(h, uplift, K, m_exp, dt, iters, cellsize=1.0):
                 continue
             C = K * A[i, j] ** m_exp * dt / dd[i, j]         # n = 1 implicit coefficient
             h[i, j] = (h[i, j] + C * h[ri[i, j], rj[i, j]]) / (1.0 + C)
-        h[edge] = 0.0
+            if h[i, j] < h[ri[i, j], rj[i, j]]:              # receiver-floor guard (04): never incise
+                h[i, j] = h[ri[i, j], rj[i, j]]              # below your receiver — inside a filled pit
+        h[edge] = 0.0                                        # h_r (from filled hf) can exceed h_i
     return h

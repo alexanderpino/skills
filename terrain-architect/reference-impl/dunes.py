@@ -6,9 +6,13 @@ ground. The whole model is that one asymmetry: p_sand > p_bare makes deposition
 self-reinforcing, and dunes grow out of a flat sheet. p_sand == p_bare -> no instability,
 no dunes. Slabs are conserved exactly.
 
-The 15-degree lee shadow-zone capture (which sharpens slip faces and drives migration) is
-an enhancement not implemented here; the deposition-probability instability alone is the
-verifiable core (Werner's central result, and the skill's two dune failure modes).
+This is a MINIMAL Werner variant. Two of the chapter's (05) "three ideas that make it work" are
+**not** implemented and would be needed for a faithful full model: (1) the 15-degree lee **shadow-zone**
+capture that sharpens slip faces and drives migration, and (2) per-move **avalanching** (repose
+relaxation) that keeps the crest from growing into a spike. The deposition-probability instability
+alone (p_sand > p_bare) is the verifiable core — Werner's central result and the skill's two dune
+failure modes — so this is honestly-scoped as illustrative, not a faithful implementation of the full
+`05` pseudocode. Slabs are conserved exactly either way.
 """
 import numpy as np
 

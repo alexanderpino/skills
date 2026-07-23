@@ -78,7 +78,7 @@ H = (Z2 - Z8) / (2 * L)                      # ∂z/∂y
 p = G² + H²
 if p < eps:  profile = plan = 0              # flat — curvature undefined, guard it
 else:
-    profile = -2 * (D*G² + E*H² + F*G*H) / p     # curvature ALONG the slope
+    profile =  2 * (D*G² + E*H² + F*G*H) / p     # curvature ALONG the slope (concave valley +ve)
     plan    =  2 * (D*H² + E*G² - F*G*H) / p     # curvature ACROSS the slope
 ```
 
@@ -279,6 +279,20 @@ grassMask  = (1 - rockMask) * (1 - snowMask) * (1 - sandMask)
 riverMask  = smoothstep(A_channel * 0.5, A_channel, A)           # A from 03, in m²
 ```
 
+**Substance-with-depth.** A material isn't just a mask — a loose granular deposit (snow, sand,
+scree, sediment) has DEPTH: it piles up and fills the crevices/hollows of the bedrock, so the surface
+you shade is *smoother* than the rock beneath (snow drifts into couloirs and covers them). The pile
+depth is a morphological **closing** minus the surface — deep in hollows, ~0 on ridges:
+
+```
+depositFill(h, r)  = max(closing(h, r) - h, 0)      # closing = erode∘dilate (10); extensive => >= 0
+```
+
+The reference's `derive_substances` builds the priority stack above but each substance placed where it
+physically ACCUMULATES (snow by lapse-rate temperature AND slope-holds AND wind-loading; scree at
+repose below cliffs; sediment in concave lows via `profile > 0`) and then piled with `depositFill`, so
+snow is white because it is a white *substance*, not because "high == white".
+
 **Principles:**
 
 - **Every hard threshold needs noise breakup.** A `slope > 0.7` mask has a mathematically
@@ -290,12 +304,14 @@ riverMask  = smoothstep(A_channel * 0.5, A_channel, A)           # A from 03, in
   you specified. Either build them as an explicit priority stack (snow beats rock beats
   grass — each subsequent mask multiplied by `(1 − Σ previous)`), or normalise explicitly and
   know that you did.
-- **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)` — with the
-  downslope aspect above and `y` = north, that is `sin(aspect)`: +1 facing north, −1 facing
-  south. Snow lingers on north faces (northern hemisphere), vegetation differs between north
-  and south slopes. One term, large payoff, and it's the kind of thing that makes people say
-  the terrain "feels real" without knowing why. (This is where the uphill-aspect sign bug
-  bites: it silently negates `northness` and moves the snow to the sunny side.)
+- **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)`. With the
+  downslope aspect above and the STANDARD raster convention — row index increases *southward*, so
+  row 0 = north and the `y` axis points SOUTH — that is `-sin(aspect)`: +1 facing north, −1 facing
+  south. (The naïve `+sin(aspect)` assumes `y` = north, i.e. a south-up array; on a normal north-up
+  DEM it is inverted and silently moves the snow to the sunny side — the sign bug to watch for.) Snow
+  lingers on north faces (northern hemisphere), vegetation differs between north and south slopes.
+  One term, large payoff, and it's the kind of thing that makes people say the terrain "feels real"
+  without knowing why.
 - **Use `deposition`, not just slope, for sediment materials.** If your erosion model tracks
   where it deposited (all three in `04` can), that field is far better than any slope-based
   proxy — it puts sand where sand actually went.

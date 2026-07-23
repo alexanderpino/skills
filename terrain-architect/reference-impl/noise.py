@@ -268,7 +268,7 @@ def gabor(x, y, seed=0, *, F0=1.4, a=1.3, omega0=0.0, impulses=8, isotropic=Fals
             for k in range(int(impulses)):
                 px = gx + _hash01(gx, gy, seed, salt=10 + k)      # random impulse position in the cell
                 py = gy + _hash01(gx, gy, seed, salt=40 + k)
-                w = 2.0 * _hash01(gx, gy, seed, salt=70 + k) - 1.0   # random weight in [-1, 1]
+                w = np.where(_hash01(gx, gy, seed, salt=70 + k) < 0.5, -1.0, 1.0)  # random weight +/-1
                 om = (two_pi * _hash01(gx, gy, seed, salt=100 + k)) if isotropic else omega0
                 dx, dy = x - px, y - py
                 env = np.exp(-np.pi * a * a * (dx * dx + dy * dy))       # Gaussian envelope

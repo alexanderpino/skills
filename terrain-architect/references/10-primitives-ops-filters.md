@@ -50,7 +50,11 @@ sdBox(p, b)        = d = abs(p) - b
 sdSegment(p, a, b) = pa = p - a;  ba = b - a
                      h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1)
                      |pa - ba * h|
-```
+sdConvexPolygon(p, normals[], offsets[])         # a block as the intersection of half-planes;
+                   = max_k( dot(normals[k], p) - offsets[k] )   #   the generalisation of sdBox.
+```                                              # Exact on the faces; slight underestimate at exterior
+                                                 # corners (the max-of-half-planes). Behind fault-block
+                                                 # buttes (11): outline the polygonal joint-controlled footprint.
 
 Why this matters for terrain: an SDF gives you **distance**, and distance is what you want for
 falloffs, road corridors, river authoring, spline deformation, and uplift masks (`02`). A mask
