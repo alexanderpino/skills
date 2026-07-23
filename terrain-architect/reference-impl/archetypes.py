@@ -89,46 +89,12 @@ def canyon(seed=SEED, n=TILE, cell=CELL):
 
 def _butte(shape, bx, by, br, bh, cell, seed=0, ecc=1.0, talus=0.42, repose_tan=0.62,
            sides=6, fault=None, warp=0.12):
-    """A caprock butte as height-above-plain (m): flat structural TOP, a near-vertical CLIFF, then a
-    SHARP break of slope to a TALUS apron at the angle of repose. That break — cliff foot to scree — is
-    the #1 photoreal cue (HYPERREALISM.md Part 2), the thing a smoothed noise blob never has.
-
-    The footprint is **fault/joint-controlled**, not radial: flat-lying sandstone erodes along a couple
-    of near-orthogonal systematic joint sets, so real buttes/mesas/jebels are blocky polygons with
-    straight cliff faces and sharp corners — never cookie-cutter circles. The outline is the
-    intersection of half-planes at two orthogonal joint orientations (+ jitter), domain-warped so the
-    fault traces read jagged, not ruler-straight. Pass `fault` (radians) to share a regional joint grid
-    across several buttes so their faces align. `bx,by,br` in cells; `bh` in metres; `ecc` elongates;
-    `talus` = fraction of height in the scree apron. Composite with np.maximum(h, base + this)."""
-    n0, n1 = shape
-    yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
-    rng = np.random.default_rng(seed)
-    R = br * cell                                                           # nominal footprint radius (m)
-    dx = (xx - bx) * cell
-    dy = (yy - by) * cell / ecc                                             # per-butte aspect variety
-    wx = noise.fbm(xx / 7.0, yy / 7.0, seed, octaves=4)                     # jagged fault traces, not ruler-straight
-    wy = noise.fbm(xx / 7.0 + 5.0, yy / 7.0 + 5.0, seed + 1, octaves=4)
-    dx = dx + warp * R * wx                                                 # warp << spacing: faces stay straight
-    dy = dy + warp * R * wy
-    base_ang = rng.uniform(0.0, np.pi) if fault is None else fault          # regional joint strike
-    d = np.full((n0, n1), -1e18)                                            # convex polygon = ∩ of half-planes
-    for k in range(sides):
-        cross = k % 2                                                       # two orthogonal joint sets...
-        a = base_ang + (np.pi / 2.0) * cross + rng.uniform(-0.18, 0.18)     # ...small jitter keeps ~90° corners
-        spacing = 1.7 if cross else 1.0                                     # cross joints ~1.8x wider -> elongated block
-        rk = R * spacing * rng.uniform(0.74, 1.12)                          # irregular, off-centre edge offsets
-        d = np.maximum(d, np.cos(a) * dx + np.sin(a) * dy - rk)             # signed dist to this fault plane (m)
-    th = talus * bh                                                        # scree-apron height (m)
-    tr = th / repose_tan                                                   # apron run length at repose (m)
-    cw = 1.4 * cell                                                        # cliff width (m) -> near vertical
-    prof = np.where(d <= 0.0, bh,                                          # inside the fault block: flat top
-                    np.where(d <= cw, bh - (bh - th) * d / cw,             # near-vertical cliff
-                             np.where(d <= cw + tr, th * (1.0 - (d - cw) / tr), 0.0)))  # repose talus
-    prof = np.maximum(prof, 0.0)
-    tal = (d > cw) & (d <= cw + tr)                                        # roughen the scree (not a smooth cone)
-    prof = prof + tal * noise.fbm(xx / 5.0, yy / 5.0, seed + 2, octaves=3) * 0.03 * bh
-    lip = np.clip(1.0 - np.abs(d) / (0.8 * cell), 0.0, 1.0) * 0.05 * bh    # resistant caprock rim
-    return prof + lip * (d <= cw)
+    """Local alias for the `landforms.fault_block_butte` primitive (11) — a fault/joint-controlled
+    caprock butte (flat top → cliff → talus break on a blocky polygonal footprint). Kept so the
+    archetype compositions read locally; the grounded implementation, the SDF-primitive composition
+    and the citations live in `landforms.py`."""
+    return landforms.fault_block_butte(shape, bx, by, br, bh, cell, seed=seed, ecc=ecc, talus=talus,
+                                       repose_tan=repose_tan, sides=sides, fault=fault, warp=warp)
 
 
 def mesa(seed=SEED, n=TILE, cell=CELL):

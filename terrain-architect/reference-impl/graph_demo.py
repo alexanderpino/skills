@@ -32,6 +32,7 @@ the verified `01` module — "noise is the initial condition, not the answer" (D
     python graph_demo.py --backbone streampower --size 128 --extent-km 120
     python graph_demo.py --seed 7 --sun-sweep 8   # 8 rotating-light frames (09 sun sweep)
     python graph_demo.py --cache-demo             # show the Merkle cache in action
+    python graph_demo.py --scene mesa             # a mesa ARCHETYPE built as a DAG (Gaea/WM/Houdini-style)
 """
 import argparse
 import hashlib
@@ -46,6 +47,7 @@ import erosion_droplet
 import erosion_streampower
 import erosion_thermal
 import flow
+import landforms
 import noise
 import render
 import scatter
@@ -261,6 +263,103 @@ def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
 
 
 # --------------------------------------------------------------------------- #
+# scene graph: an ARCHETYPE built as a DAG of grounded nodes — the same
+# Create -> Modify -> Erode -> Texture flow Gaea / World Machine / Houdini use.
+# A mesa/butte province: noise plain -> fault-block SDF primitives combined
+# (landforms.fault_block_butte, itself ops_filters.sd_convex_polygon; Genevaux
+# 2015 / Guerin 2016 feature-primitive construction tree) -> strata -> thermal
+# talus (Musgrave 1989) -> flow/slope/materials -> photoreal colorize
+# (Frostbite 2007 splat + Max 1988 horizon AO).
+# --------------------------------------------------------------------------- #
+def _plain_fn(p, ins, ctx):
+    xx, yy = _noise_coords(ctx, p["wavelength"])
+    f = noise.fbm(xx, yy, ctx.root_seed, octaves=int(p["octaves"]), base=noise.perlin)
+    f = (f - f.min()) / max(f.max() - f.min(), 1e-9)
+    return f * p["relief"] + p["base_level"]
+
+
+def _faultblocks_fn(p, ins, ctx):
+    """Place N fault/joint-bounded caprock buttes and union them onto the plain — the
+    feature-primitive construction-tree step. Hard `np.maximum` union is the cliff/plateau case
+    (smooth-min elsewhere); thermal downstream relaxes any seam into talus."""
+    base = np.asarray(ins[0], dtype=np.float64)
+    h = base.copy()
+    n = ctx.resolution
+    rng = np.random.default_rng(ctx.root_seed + 101)
+    fault = rng.uniform(0.0, np.pi)                                  # one regional joint strike
+    for i in range(int(p["n_buttes"])):
+        bx, by = rng.integers(int(0.28 * n), int(0.72 * n), 2)
+        br = rng.uniform(p["br_lo"], p["br_hi"]) * n
+        bh = rng.uniform(p["bh_lo"], p["bh_hi"])
+        block = landforms.fault_block_butte((n, n), bx, by, br, bh, ctx.cellsize,
+                                            seed=ctx.root_seed + i, ecc=rng.uniform(0.75, 1.35), fault=fault)
+        h = np.maximum(h, base + block)
+    return h
+
+
+def _strata_fn(p, ins, ctx):
+    h = np.asarray(ins[0], dtype=np.float64)
+    lo, hi = float(h.min()), float(h.max())
+    nb = (h - lo) / max(hi - lo, 1e-9)
+    return landforms.terrace(nb, int(p["levels"]), sharpness=p["sharpness"],
+                             warp_amp=0.02, cellsize=ctx.cellsize) * (hi - lo) + lo
+
+
+def build_scene_graph(ctx):
+    """A mesa/butte archetype as an explicit DAG (see the header). Returns (graph, (height, area))."""
+    g = Graph(ctx)
+    g.add("plain", "noise.perlin/1", _plain_fn,
+          params={"wavelength": ctx.cellsize * ctx.resolution * 0.5, "octaves": 5,
+                  "relief": 30.0, "base_level": 30.0}, locality="LOCAL")
+    g.add("blocks", "landform.faultblock/1", _faultblocks_fn, inputs=("plain",),
+          params={"n_buttes": 3, "br_lo": 0.13, "br_hi": 0.20, "bh_lo": 250.0, "bh_hi": 350.0},
+          locality="GLOBAL", resolution="RESOLUTION_BOUND")                 # fixed count -> resolution-bound
+    g.add("strata", "landform.terrace/1", _strata_fn, inputs=("blocks",),
+          params={"levels": 7, "sharpness": 7.0}, locality="LOCAL")
+    g.add("relaxed", "erosion.thermal/1", _thermal_fn, inputs=("strata",),
+          params={"repose": 0.62, "iters": 8}, locality="NEIGHBOURHOOD")     # talus at repose (Musgrave 1989)
+    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",), locality="GLOBAL")
+    g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
+          params={"method": "d8"}, locality="GLOBAL")
+    g.add("slope", "analysis.slope/1", _slope_fn, inputs=("relaxed",), locality="LOCAL")
+    g.add("materials", "analysis.materials/1", _materials_fn,
+          inputs=("relaxed", "slope", "area"), locality="LOCAL")
+    return g, ("relaxed", "area")
+
+
+# a desert/red-rock splat palette (water, snow, rock, sand, remainder) for the photoreal colorize
+_ARID_PALETTE = [(120, 92, 64), (208, 198, 178), (156, 104, 72), (206, 176, 120), (178, 150, 112)]
+
+
+def run_scene(ctx, outdir):
+    """Evaluate the archetype DAG and colorize it with the photoreal composite. Prints the
+    evaluated node order so the graph is visible."""
+    g, (h_out, a_out) = build_scene_graph(ctx)
+    height = g.evaluate(h_out)
+    area = g.evaluate(a_out)
+    materials = g.evaluate("materials")
+    mat = render.material_rgb(materials, palette=_ARID_PALETTE, shade=False)
+    ao = analysis.horizon_ao(height, ctx.cellsize)                          # Max 1988 horizon AO (height-field-native)
+    img = render.photoreal(mat, height, ctx.cellsize, ao=ao, ao_strength=0.38,
+                           aerial_strength=0.34, aerial_band=0.20)
+    os.makedirs(outdir, exist_ok=True)
+    p1 = render.write_png(os.path.join(outdir, "scene_mesa_photoreal.png"), img)
+    p2 = render.write_png(os.path.join(outdir, "scene_mesa_hillshade.png"),
+                          render.hillshade(height, ctx.cellsize))
+    print("mesa archetype built as a graph DAG (Create -> Modify -> Erode -> Texture):")
+    for name in g.evaluated:
+        print(f"    {name:10s} [{g.nodes[name].type_id}]")
+    fi, fj = np.unravel_index(int(np.argmax(area)), area.shape)              # 09 check 1 still applies
+    n = area.shape[0]
+    edge = fi in (0, n - 1) or fj in (0, n - 1)
+    print(f"  flow reaches edge: max-drainage outlet at ({fi},{fj}) -> "
+          f"{'ON edge (good)' if edge else 'interior'}  "
+          f"(caprock cliffs are intentionally above repose — a mesa, not a relaxed slope)")
+    print(f"  wrote {p1}\n  wrote {p2}")
+    return [p1, p2]
+
+
+# --------------------------------------------------------------------------- #
 # 09 quantitative checks — the numbers that make a bug loud
 # --------------------------------------------------------------------------- #
 def slope_degrees(h, cellsize):
@@ -358,6 +457,9 @@ def main(argv=None):
                     help="also write N rotating-light hillshade frames (09 sun sweep)")
     ap.add_argument("--cache-demo", action="store_true",
                     help="demonstrate the content-addressed cache and exit")
+    ap.add_argument("--scene", choices=("pipeline", "mesa"), default="pipeline",
+                    help="'mesa' builds a mesa/butte ARCHETYPE as a DAG (fault-block primitive -> "
+                         "strata -> thermal -> materials -> photoreal), the way Gaea/WM/Houdini do")
     args = ap.parse_args(argv)
 
     extent_km = args.extent_km
@@ -368,6 +470,12 @@ def main(argv=None):
 
     if args.cache_demo:
         cache_demo(ctx, args.backbone)
+        return
+
+    if args.scene == "mesa":
+        print(f"terrain graph — mesa archetype scene: size={args.size}^2  extent={extent_km} km  "
+              f"cellsize={cellsize:.1f} m  seed={args.seed}")
+        run_scene(ctx, args.out)
         return
 
     print(f"terrain graph: backbone={args.backbone}  noise={args.noise}  size={args.size}^2  "

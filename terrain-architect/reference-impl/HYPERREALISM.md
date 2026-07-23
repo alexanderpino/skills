@@ -53,6 +53,13 @@ colour, not grey hillshade. One composite serves Earth / Mars / Moon / desert / 
 palette recolouring the same material splat is the only difference. This was the largest, cheapest
 jump; what remains (Stages 2–4) is per-tile geomorphology, itemised below.
 
+**Every effect here is a grounded terrain-graph node — the way Gaea / World Machine / Houdini work.**
+The material splat is Frostbite-2007 slope/altitude splatting; the AO is Max-1988 horizon mapping on
+the height field; the fault-block buttes are Génévaux/Guérin feature primitives (`sd_convex_polygon`);
+thermal talus is Musgrave 1989; domain warp is Quílez. `GROUNDING.md` (*How this maps to Gaea / World
+Machine / Houdini*) tabulates each node category against the tool and paper it mirrors and discloses
+where we diverge; `graph_demo.py --scene mesa` builds a whole archetype as an explicit DAG.
+
 ## Part 2 — Three cross-cutting principles (from the geomorphology)
 
 These matter *more than any single feature* — they are why a landform reads as real:

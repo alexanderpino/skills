@@ -67,6 +67,26 @@ def test_analysis_and_materials_downstream_of_final_height():
     assert np.allclose(materials.sum(axis=0), 1.0, atol=1e-6)
 
 
+def test_scene_graph_builds_an_archetype_as_a_dag():
+    """The mesa scene is an archetype expressed as a DAG of grounded nodes (Create -> Modify ->
+    Erode -> Texture) — the wiring is Legal Order and it evaluates finite, non-flat, with a real
+    fault-block cliff (99th-pct slope well above repose: a mesa, not a relaxed hill)."""
+    ctx = G.Ctx(cellsize=1000.0 / 48, resolution=48, root_seed=3)
+    g, (h_out, a_out) = G.build_scene_graph(ctx)
+    # Legal Order: primitive -> strata -> thermal -> fill -> area; analysis on final height
+    assert g.nodes["blocks"].inputs == ("plain",)
+    assert g.nodes["strata"].inputs == ("blocks",)
+    assert g.nodes["relaxed"].inputs == ("strata",)
+    assert g.nodes["filled"].inputs == ("relaxed",)
+    assert g.nodes["materials"].inputs == ("relaxed", "slope", "area")
+    height = g.evaluate(h_out)
+    g.evaluate(a_out)
+    assert np.all(np.isfinite(height))
+    assert (height.max() - height.min()) > 150.0                     # a real butte stands above the plain
+    p99_slope_deg = np.percentile(G.slope_degrees(height, ctx.cellsize), 99)
+    assert p99_slope_deg > 45.0                                      # near-vertical caprock cliff, not a hill
+
+
 def test_scatter_node_places_spaced_boulders():
     """07 step 12: the scatter node returns a PointSet; blue-noise spacing holds (>= r_min)."""
     g, _, ctx = _small(size=40)

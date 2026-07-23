@@ -47,18 +47,33 @@ Adjacent module the sandbox can wire (a drop-in extra hillslope node), cross-val
 The **render modes** (`render.py`) are standard cartographic transforms (hillshade, slope
 shade, `log(A)` overlay); the usual references are GDAL / RichDEM / matplotlib hillshade.
 They modify no terrain and carry no pinned upstream — sanity-check the hillshade against
-GDAL's if it matters.
+GDAL's if it matters. The **photoreal composite** (`sun_sky_shade` + `photoreal`: material
+colour × two-light (sun+sky) × ambient occlusion + rivers + aerial perspective) is
+**paper-grounded** in the standard real-time / cartographic pipeline: slope+altitude material
+splatting (Andersson/DICE, *Terrain Rendering in Frostbite Using Procedural Shader Splatting*,
+SIGGRAPH 2007); **horizon-based ambient occlusion computed on the height field itself** — Max
+1988, *Horizon mapping* (The Visual Computer 4(2)), the geometry-native method, not screen-space
+HBAO; and sky illumination + aerial perspective (Preetham et al. 1999; Bruneton & Neyret 2008).
+It is a *look*, not a verified field (a non-flat-render smoke test only).
 
-The **toolbox** (`ops_filters.py` — SDF primitives, smooth min/max, Gaussian/median/bilateral/
-guided/Perona–Malik filters, morphology, warps) is drawn on ad hoc rather than wired as a fixed
-graph node. **paper-grounded** (Frisken 2000, Quilez, Tomasi & Manduchi 1998, He et al. 2010,
-Perona & Malik 1990, Serra 1982) with property oracles in `test_ops_filters.py`.
+The **toolbox** (`ops_filters.py` — SDF primitives incl. `sd_convex_polygon`, smooth min/max,
+Gaussian/median/bilateral/guided/Perona–Malik filters, morphology, warps) is drawn on ad hoc
+rather than wired as a fixed graph node. **paper-grounded** (Frisken 2000, Quilez SDF & smooth-min,
+Tomasi & Manduchi 1998, He et al. 2010, Perona & Malik 1990, Serra 1982) with property oracles in
+`test_ops_filters.py`. `sd_convex_polygon` (a block as the intersection of half-planes) is the
+generalisation of `sd_box` and the primitive behind the fault-block landform below.
 
 The **geological landforms** (`landforms.py` — impact craters, strata/terracing, folding,
-karst sinkholes) are likewise a toolbox, not a fixed node. **paper-grounded** (Pike 1977,
-Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with oracles in
-`test_landforms.py`. Landforms without a standalone deterministic oracle — salt diapirs, tower
-karst, relief inversion — stay as reference pseudocode, not code here.
+karst sinkholes, **`fault_block_butte`**) are likewise a toolbox, not a fixed node. **paper-grounded**
+(Pike 1977, Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with oracles in
+`test_landforms.py`. `fault_block_butte` is a **feature-primitive construction-tree** node in the
+Génévaux et al. 2015 (*Terrain Modelling from Feature Primitives*, CGF) / Guérin et al. 2016 (*Sparse
+representation of terrains*, CGF) sense — a placeable SDF primitive (`ops_filters.sd_convex_polygon`)
+combined by union and eroded — with its **joint/fault-controlled outline grounded in geomorphology**
+(NPS Arches/Canyonlands *The Needles*; Li et al. 2021 orthogonal joints in quartz sandstone; Narr &
+Suppe 1991 joint spacing; Wadi Rum sandstone geomorphology). Verified by profile oracles (flat top,
+cliff, talus break, bounded footprint), not a physical simulation. Landforms without a standalone
+deterministic oracle — salt diapirs, tower karst, relief inversion — stay as reference pseudocode.
 
 The **parameterised impact** (`crater.py` — asteroid size/speed/density/gravity/angle → crater)
 is two tiers: the **size** physics is **paper-grounded** with *decisive* oracles (Collins/Melosh/
@@ -81,6 +96,53 @@ oracle-verified.** These are the regimes the coverage boundary excludes because 
 decisive oracle; they are included to run, held to invariants (finite, mass/energy budget,
 monotone trends) in `test_sims_illustrative.py`, and must not be read as verified numbers. This
 tier is deliberately outside the grounding scale above.
+
+## How this maps to Gaea / World Machine / Houdini (node-graph parity)
+
+The sandbox is the **same paradigm** these tools use: a DAG of pure field→field operators over a
+heightfield, evaluated on demand (`graph_demo.py`; run `--scene mesa` to see an archetype built as a
+DAG — noise → fault-block primitive → strata → thermal → flow/materials → photoreal). Gaea, World
+Machine and Houdini heightfields are all confirmed node graphs with the workflow *Create → Modify →
+Erode → Texture → Export*; the academic framing is the **construction tree** of Génévaux et al. 2013
+(*Terrain from Hydrology*, SIGGRAPH) and 2015 (*Feature Primitives*, CGF), Guérin et al. 2016 (*Sparse
+representation*, CGF), and the Galin et al. 2019 review (*A Review of Digital Terrain Modeling*, CGF).
+Every effect we add is one of their node categories, grounded in the same literature:
+
+| Node category | Our node(s) | Grounded in | How the pro tools do it |
+|---|---|---|---|
+| Generator | `noise` (Perlin/value/Worley/fBm/ridged) | Perlin 2002, Musgrave, Worley 1996 | noise/shape generators |
+| Warp | `noise.domain_warp`, `ops_filters` twist/bend | Quilez *domain warping*; Musgrave | Warp/Perturb/Distort |
+| Combiner | `ops_filters.smin/smax/blend`, `np.maximum` union | Quilez *smooth minimum*; Génévaux 2015 (Lipschitz operators) | Combine/Layer/math |
+| Primitive placement | `landforms.fault_block_butte` (`sd_convex_polygon`) | Génévaux 2015 / Guérin 2016 feature-primitive tree; Quilez SDF | masks + project (academic: SDF primitives) |
+| Erosion (hydraulic) | `erosion_droplet`, `erosion_streampower` | Krištof 2009, Chiba 1998, Beyer 2015 (droplet); Braun & Willett 2013 (stream power) | Erode/Hydro |
+| Erosion (thermal) | `erosion_thermal` | **Musgrave, Kolb & Mace 1989** (angle-of-repose talus) | Thermal/Talus/Slump |
+| Selector / mask | `analysis` slope/curvature/**horizon AO**/TWI/area | Zevenbergen & Thorne 1987; Max 1988 (AO) | Slope/Height/Flow masks |
+| Colorizer / splat | `render.material_rgb`, `render.photoreal` | **Andersson/Frostbite 2007** (slope+altitude splat) | SatMaps / Colorizer |
+
+**Honest divergences (disclosed, not hidden):**
+
+- **Hydraulic erosion is Lagrangian here, Eulerian there.** Our droplet model (particle over the
+  heightfield) is literature-grounded — Krištof et al. 2009 (*Hydraulic Erosion Using SPH*, CGF, the
+  peer-reviewed bridge showing particle ≈ grid physics) and Chiba et al. 1998 (velocity-field erosion);
+  Beyer 2015 is the practical recipe but only a BSc thesis, so the *authority* is Krištof/Chiba. The
+  pro tools use **Eulerian grid / virtual-pipe** erosion (Houdini confirmed; Mei et al. 2007 is the
+  canonical model). We also ship a **grid fluvial path** (`erosion_streampower`, cross-validated vs
+  Landlab) for the broad-valley regime, so both discretisations are represented — but a droplet result
+  is a *known approximation* of the tools' grid erosion, best at fine dendritic channels.
+- **Gaea and World Machine erosion algorithms are proprietary/undisclosed** — we can claim *node-level*
+  parity (same category, same phenomenology, same repose-angle thermal) but **not algorithm-level
+  parity**. Only Houdini's grid approach is documented.
+- **SDF-primitive placement is the academic route.** `fault_block_butte` follows Génévaux/Guérin
+  (place a primitive, combine, erode); the tools' *default* idiom is generators + selection masks +
+  erosion. Both are valid; we do not claim primitive placement is how the tools default to it.
+- **Hard-`max` union creases.** We union plateau blocks with `np.maximum` (the acceptable cliff/plateau
+  case) and relax the seam with thermal downstream; `ops_filters.smax` is the crease-free (Lipschitz)
+  combiner for general merges.
+- **Splat masks.** We drive materials by slope + altitude **and drainage area** (a flow-derived
+  channel/water mask); the pro tools additionally splat from deposition/wear/curvature erosion layers —
+  a documented enhancement, not yet wired.
+- **Content-addressed caching** (Merkle key over params + upstream cone) is *our* mechanism — consistent
+  with how these tools cache cooked nodes, but an implementation choice, not a documented parity claim.
 
 ## What the cross-checks assert
 

@@ -55,6 +55,28 @@ def test_terrace_snaps_to_flat_treads():
     assert np.mean(np.abs(row - nearest) < 0.02) > 0.6     # most cells sit on a tread
 
 
+def test_fault_block_butte_flat_top_cliff_and_talus():
+    n, cell, bh = 80, 10.0, 300.0
+    b = L.fault_block_butte((n, n), n / 2, n / 2, 0.22 * n, bh, cell, seed=1, fault=0.0)
+    assert b.shape == (n, n) and np.all(np.isfinite(b))
+    c = n // 2
+    assert abs(b[c, c] - bh) < 0.06 * bh                   # flat structural top near full height at the centre
+    assert b.min() >= 0.0 and b.max() <= bh * 1.1          # height-above-plain, capped near bh
+    # a horizontal profile through the centre: flat top -> steep cliff -> gentler talus -> plain
+    row = b[c]
+    top = row >= 0.94 * bh
+    apron = (row > 0.02 * bh) & (row < 0.35 * bh)          # the talus band exists (break of slope)
+    assert top.any() and apron.any()
+    # the footprint is joint-bounded (a straight edge), so the top is a compact block, not a disc
+    assert top.sum() < 0.5 * n                             # a bounded tableland, not filling the row
+
+
+def test_fault_block_butte_is_deterministic():
+    a = L.fault_block_butte((48, 48), 24, 24, 10.0, 200.0, 10.0, seed=5, fault=0.3)
+    b = L.fault_block_butte((48, 48), 24, 24, 10.0, 200.0, 10.0, seed=5, fault=0.3)
+    assert np.array_equal(a, b)
+
+
 def test_strat_coord_horizontal_tilt_and_fold():
     h = inputs.cone(32, height=5.0)
     yy, xx = np.mgrid[0:32, 0:32].astype(float)

@@ -37,6 +37,23 @@ def sd_box(px, py, bx, by):
             + np.minimum(np.maximum(dx, dy), 0.0))
 
 
+def sd_convex_polygon(px, py, normals, offsets):
+    """Signed distance to a convex polygon given as the intersection of half-planes:
+    ``max_k( n_k · p - d_k )`` for outward unit normals ``n_k`` and offsets ``d_k`` (distance from
+    the origin along ``n_k``). Negative inside, 0 on an edge, positive outside; exact on the faces
+    (the generalisation of `sd_box`, which is this at four axis-aligned normals). This is the
+    grounded primitive behind fault/joint-bounded landforms — a butte or mesa is a convex block
+    bounded by a couple of near-orthogonal joint sets (place it, then combine with `smax`/`np.maximum`
+    and erode). `normals` is a sequence of (nx, ny) unit vectors; `offsets` a matching sequence of
+    scalars."""
+    px = np.asarray(px, dtype=np.float64)
+    py = np.asarray(py, dtype=np.float64)
+    d = np.full(np.broadcast(px, py).shape, -np.inf)
+    for (nx, ny), dk in zip(normals, offsets):
+        d = np.maximum(d, nx * px + ny * py - dk)
+    return d
+
+
 def sd_segment(px, py, ax, ay, bx, by):
     """Distance to the segment a->b — the workhorse: a spline is a polyline, and distance to
     it is the min over segments. Remap the field with a profile to cut a valley/ridge/road."""

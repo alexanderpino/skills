@@ -23,6 +23,23 @@ def test_sd_box_sign():
     assert abs(F.sd_box(np.array(2.0), np.array(0.0), 2.0, 2.0)) < 1e-9   # on the face
 
 
+def test_sd_convex_polygon_matches_box_and_signs():
+    yy, xx = np.mgrid[-5:6, -5:6].astype(float)
+    # a 2x2 axis-aligned square as four half-planes == sd_box on its faces/interior
+    normals = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+    offsets = [2.0, 2.0, 2.0, 2.0]
+    d = F.sd_convex_polygon(xx, yy, normals, offsets)
+    box = F.sd_box(xx, yy, 2.0, 2.0)
+    inside = box <= 0                                    # half-plane form is exact where sd_box is (interior/faces)
+    assert np.allclose(d[inside], box[inside])
+    assert d[5, 5] < 0 and d[0, 0] > 0                   # centre inside, corner outside
+    assert abs(F.sd_convex_polygon(np.array(2.0), np.array(0.0), normals, offsets)) < 1e-9   # on a face
+    # a rotated (non-axis-aligned) triangle is still sign-correct
+    tri_n = [(np.cos(a), np.sin(a)) for a in (0.3, 0.3 + 2.094, 0.3 + 4.188)]
+    dt = F.sd_convex_polygon(xx, yy, tri_n, [1.5, 1.5, 1.5])
+    assert dt[5, 5] < 0                                  # origin is inside the centred triangle
+
+
 def test_smin_below_hard_min_and_converges():
     rng = np.random.default_rng(0)
     a = rng.normal(0, 5, 500)
