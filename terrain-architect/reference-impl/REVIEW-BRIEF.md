@@ -1,6 +1,6 @@
 # Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
 
-**Companion image:** `capability_grid.png` — a 7×7 grid, 49 tiles, one per capability of the
+**Companion image:** `capability_grid.png` — a 7‑column grid, 50 tiles, one per capability of the
 `terrain-architect` reference implementation. **Read this brief first, then review the image against it.**
 
 ---
@@ -135,6 +135,7 @@ failure mode to watch for.
 | R7C5 | Differential erosion (04+11) | terrain follows the **tilted beds** — resistant strata stand as **cuestas/strike ridges**, soft beds cut to valleys (anisotropic, structure‑controlled) | isotropic dendritic drainage with no bedding control (K did nothing) |
 | R7C6 | Glacial carving (12) | **trunk glaciers** (pale ice) fill and flow down the valleys, thick in the trunks and thinning to their termini; ice‑free ridge between | ice sitting on ridge‑tops; uniform ice sheet; no valley‑filling flow |
 | R7C7 | Snowpack — dynamic (13) | snow **fills gullies/hollows** and is **stripped from steep faces & ridge crests** — it followed the terrain and avalanched, not a flat white cap above a contour | a uniform white cap above a snowline; snow clinging to vertical faces |
+| R8C1 | Yardangs — wind abrasion (16) | **streamlined ridges all aligned to one wind direction** (parallel, elongated, drumlin‑like), carved from a soft plain | isotropic bumps / random blobs with no common orientation |
 
 ---
 

@@ -45,6 +45,12 @@ The detail that sells it: **abrasion is bottom-weighted** — saltating sand onl
 so yardangs are undercut at the base and the nose is steepest low down (Ward & Greeley). Which
 grains are in the abrading stream comes from the `05` Bagnold threshold.
 
+*Runnable reference: `reference-impl/aeolian.py` (`yardang`; wind-aligned lanes seeded by anisotropic
+fBm, abraded with a bottom-weighted saltation term inside a soft mask), verified by
+`tests/test_aeolian.py`. F-tier, invariant-checked: ridges elongate **‖ wind** (along-wind autocorr ≫
+cross-wind — the drumlin-like signature), abrasion is carve-only and confined to `softMask`, and the
+**low ground is cut fastest** (bottom-weighting → undercut, streamlined ridges).*
+
 ## Inselbergs & bornhardts
 
 Isolated steep-sided hills standing above a plain — **bornhardts** (bald domes) and their

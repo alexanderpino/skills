@@ -345,6 +345,16 @@ def CELLS():
         rgb = shade * (1 - a) + np.array([248., 250, 255]) * a
         return np.clip(rgb, 0, 255).astype(np.uint8)
     add("13 Snowpack (dynamic)", "accumulate/melt/avalanche: snow fills gullies, bares steep faces", _snowpack)
+    def _yardang():
+        import aeolian as AEO
+        n = 150; cell = 4.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        u2, v2 = 1.0, 0.25; mg = np.hypot(u2, v2); u2, v2 = u2 / mg, v2 / mg
+        along = xx2 * u2 + yy2 * v2; cross = -xx2 * v2 + yy2 * u2
+        playa = 10.0 * noise.fbm(along * 0.018, cross * 0.11, 3, octaves=4)   # soft substrate, faint grain
+        playa = playa - playa.min()
+        h = AEO.yardang(playa, (1.0, 0.25), 1.0, iters=12, saltation_h=4.0, seed=3)
+        return hill(_cr(h, 5), cell)
+    add("16 Yardangs (wind abrasion)", "streamlined ridges || wind; low ground cut fastest (undercut)", _yardang)
 
     return C
 
