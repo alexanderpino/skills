@@ -267,6 +267,118 @@ def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0
     return h
 
 
+# --------------------------------------------------------------------------- #
+# more placeable feature primitives (Gaea's Ridge / Volcano / Canyon nodes)
+# --------------------------------------------------------------------------- #
+def _polyline_distance(xx, yy, px, py):
+    """Distance (cells) from every grid point to a polyline through control points (px, py)."""
+    d = np.full(xx.shape, np.inf)
+    for a in range(len(px) - 1):
+        d = np.minimum(d, ops_filters.sd_segment(xx, yy, px[a], py[a], px[a + 1], py[a + 1]))
+    return d
+
+
+def ridge(shape, cellsize, *, seed=0, height=900.0, angle=None, width_frac=0.16,
+          sinuosity=0.10, asymmetry=0.55, detail=0.35):
+    """A single linear RIDGELINE primitive — Gaea's "Ridge" node; the hogback/cuesta a crest line
+    makes across a tile. A wandering crest polyline sets a sharp summit; the flanks are ASYMMETRIC
+    (a steep scarp on one side, a gentler dip slope on the other), the cuesta/hogback form dipping
+    strata erode into (Twidale & Campbell 2005; a monocline's resistant bed). Light ridged detail
+    breaks the flanks into spurs. `asymmetry` 0.5 = symmetric arête; >0.5 steepens the scarp side.
+    Returns height (m)."""
+    n0, n1 = shape
+    yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    rng = np.random.default_rng(seed)
+    ang = rng.uniform(0.0, np.pi) if angle is None else angle
+    k = 7
+    t = np.linspace(-0.62, 0.62, k)
+    cx = 0.5 * n1 + n1 * np.cos(ang) * t
+    cy = 0.5 * n0 + n0 * np.sin(ang) * t
+    perp = np.array([-np.sin(ang), np.cos(ang)])                            # across-crest unit vector
+    wob = np.cumsum(rng.normal(0.0, sinuosity, k)); wob -= wob.mean()       # the crest wanders
+    cx += perp[0] * wob * n1; cy += perp[1] * wob * n0
+    d = _polyline_distance(xx, yy, cx, cy)
+    side = (xx - 0.5 * n1) * perp[0] + (yy - 0.5 * n0) * perp[1]            # signed across-crest position
+    reach = width_frac * max(n0, n1)
+    scarp = reach * (1.0 - asymmetry)                                       # short, steep scarp flank
+    dip = reach * (1.0 + asymmetry)                                         # long, gentle dip flank
+    flank = np.where(side >= 0.0, scarp, dip)
+    prof = np.clip(1.0 - d / np.maximum(flank, 1e-6), 0.0, 1.0) ** 1.4
+    fx = xx * cellsize / (max(n0, n1) * cellsize * 0.10)
+    fy = yy * cellsize / (max(n0, n1) * cellsize * 0.10)
+    rid = noise.ridged_mf(fx, fy, seed + 7, octaves=6)
+    rid = (rid - rid.min()) / (np.ptp(rid) + 1e-9)
+    return height * prof * ((1.0 - detail) + detail * rid)
+
+
+def volcano(shape, cx, cy, radius, height, cellsize=1.0, *, seed=0, kind="strato",
+            crater_frac=0.14, crater_depth_frac=0.35, barranco=0.10, n_barrancos=16):
+    """A VOLCANO edifice primitive — Gaea's "Volcano" node. A radial cone with the CONCAVE-UP profile
+    real volcanoes show (upper slopes steepest), a summit CRATER, and radial BARRANCOS (the erosional
+    gullies that groove every stratovolcano flank). `kind`: 'strato' = steep concave cone (upper slopes
+    ~30–35°, flaring to a gentle base; Karátson et al. 2010 morphometry) with a deep summit crater;
+    'shield' = low-angle (~5–8°) broad convex dome with a shallow caldera (Hawaiian type). `radius`,
+    `height`, crater sizes in the obvious units. Returns height-above-base (m)."""
+    n0, n1 = shape
+    yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    R = radius
+    r = np.hypot((xx - cx) * cellsize, (yy - cy) * cellsize)
+    rn = np.clip(r / R, 0.0, 1.0)
+    if kind == "shield":
+        prof = 1.0 - rn ** 1.7                                              # broad convex dome, low slopes
+    else:
+        prof = (1.0 - rn) ** 0.72                                          # concave-up: steep summit, flaring foot
+    # radial barrancos: gullies grooving the flanks, deepening downslope, vanishing at the summit
+    theta = np.arctan2(yy - cy, xx - cx)
+    grooves = 0.5 * (1.0 + np.cos(n_barrancos * theta + 2.0 * np.pi * noise.fbm(xx / 9.0, yy / 9.0, seed + 3, octaves=3)))
+    prof = prof * (1.0 - barranco * grooves * rn)                          # grooves grow toward the base
+    h = height * np.clip(prof, 0.0, 1.0)
+    # summit crater / caldera: a rimmed bowl at the centre
+    cr = crater_frac * R
+    bowl = np.clip(1.0 - r / cr, 0.0, 1.0)
+    h = h - crater_depth_frac * height * bowl ** 1.5                        # depression
+    h = h + 0.05 * height * np.exp(-((r - cr) / (0.35 * cr)) ** 2)         # raised crater rim
+    return np.maximum(h, 0.0)
+
+
+def canyon(shape, cellsize, *, seed=0, rim=1000.0, depth=750.0, width_frac=0.035,
+           sinuosity=0.22, benches=3, n_tributaries=3, roughness=0.05):
+    """A CANYON primitive — Gaea's "Canyon" node. A high PLATEAU incised by a MEANDERING trunk gorge
+    with terraced (strata-bench) walls and a few tributary side-canyons. Grounded the way real canyons
+    form: a fixed base level with the trunk incising down to a flat floor, resistant beds holding the
+    walls back as benches (the Grand Canyon's cliff-and-bench profile; Leopold 1964 meanders — the
+    trunk's sinuous planform, tributaries joining at acute angles). `depth` below `rim` (m), `width_frac`
+    of the tile for the floor half-width. Returns height (m)."""
+    n0, n1 = shape
+    yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    rng = np.random.default_rng(seed)
+    plateau = rim + roughness * rim * noise.fbm(xx / 12.0, yy / 12.0, seed + 1, octaves=5)
+    # trunk centreline runs down the tile (row-parametric) and meanders across it
+    k = 10
+    ry = np.linspace(0.0, n0 - 1.0, k)
+    mx = 0.5 * n1 + sinuosity * n1 * np.sin(np.linspace(0.0, 3.0, k) * np.pi) \
+        + np.cumsum(rng.normal(0.0, 0.05, k)) * n1
+    d = _polyline_distance(xx, yy, mx, ry)
+    for _ in range(int(n_tributaries)):                                     # tributaries join the trunk
+        j = rng.integers(2, k - 2)
+        ex = rng.uniform(0.12, 0.88) * n1                                   # tributary head on a plateau margin
+        ey = rng.uniform(0.12, 0.88) * n0
+        tk = 5
+        tx = np.linspace(ex, mx[j], tk) + rng.normal(0.0, 0.03 * n1, tk)
+        ty = np.linspace(ey, ry[j], tk) + rng.normal(0.0, 0.03 * n0, tk)
+        d = np.minimum(d, _polyline_distance(xx, yy, tx, ty))
+    floor_w = width_frac * max(n0, n1)                                      # flat floor half-width (cells)
+    wall_w = 2.2 * floor_w                                                  # wall run from floor lip to rim (steep)
+    # incision fraction: 1 on the floor, ramping to 0 at the rim, stepped into benches
+    ramp = np.clip((d - floor_w) / wall_w, 0.0, 1.0)
+    q = np.floor(ramp * benches) + _smoothstep(0.0, 1.0, (ramp * benches) % 1.0) ** 2.2
+    stepped = q / benches
+    incision = np.where(d <= floor_w, 1.0, 1.0 - stepped)
+    h = plateau - depth * incision
+    h = h + (d <= floor_w) * roughness * depth * noise.fbm(xx / 6.0, yy / 6.0, seed + 4, octaves=3)  # rough floor
+    return h
+
+
 def fold(h, x, y, amp, direction=(1.0, 0.0), freq=0.0, phase=0.0):
     """A sinusoidal fold train added to the (stratigraphic) coordinate. Fold beds, THEN erode,
     and erosion through an anticline crest exposes older beds in a bullseye — free, unauthorable."""
@@ -309,29 +421,32 @@ def karst_sinkholes(h, soluble_mask, cellsize=1.0, spacing=None, depth=5.0,
 
 
 def main():
-    """Demo the `mountain` feature primitive (the "Mountain" generator node). Top row: Gaea's five
-    styles (basic | eroded | alpine | old | strata) — the drainage-organised look is baked into the
-    primitive (modulated Voronoi + distortion), no erosion sim yet. Bottom row: the workflow — place
-    the primitive, then run a REAL hydraulic + thermal pass. -> landforms.png."""
+    """A gallery of the placeable landform GENERATORS — the Gaea-style "nodes" an artist drops in.
+    Top row: the Mountain node's five styles (basic | eroded | alpine | old | strata) — the
+    drainage-organised look is baked into the primitive (modulated Voronoi + distortion). Bottom
+    row: Mountain(basic) then a REAL hydraulic+thermal pass | Ridge | Volcano | Canyon. -> landforms.png."""
     import erosion_droplet
     import erosion_thermal
     import render
     n, cell = 200, 26.0
-    styles = ["basic", "eroded", "alpine", "old", "strata"]
     pad = np.full((n, 5, 3), 20, np.uint8)
-    tiles = []
-    for s in styles:
-        tiles.append(render.hillshade(mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style=s), cell))
+    tiles = [render.hillshade(mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style=s), cell)
+             for s in ("basic", "eroded", "alpine", "old", "strata")]
     top = np.hstack([t for pair in zip(tiles, [pad] * len(tiles)) for t in pair][:-1])
 
     h = mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style="basic")
-    he = erosion_droplet.droplet_erode(h, n_droplets=55 * n, seed=3, brush_radius=2)
-    he = erosion_thermal.thermal_erosion(he, 0.7, 14, cell, factor=0.12)
-    blank = np.full_like(tiles[0], 20)
-    bottom = np.hstack([render.hillshade(h, cell), pad, render.hillshade(he, cell), pad, blank, pad, blank, pad, blank])
+    he = erosion_thermal.thermal_erosion(
+        erosion_droplet.droplet_erode(h, n_droplets=55 * n, seed=3, brush_radius=2), 0.7, 14, cell, factor=0.12)
+    rg = ridge((n, n), cell, seed=2, height=1400.0, asymmetry=0.6)
+    vo = volcano((n, n), n / 2, n / 2, radius=n * 0.42 * cell, height=1900.0, cellsize=cell, seed=1, kind="strato")
+    ca = canyon((n, n), cell, seed=3, rim=1200.0, depth=950.0)
+    bottom_tiles = [render.hillshade(x, cell) for x in (he, rg, vo, ca)]
+    bottom = np.hstack([t for pair in zip(bottom_tiles, [pad] * len(bottom_tiles)) for t in pair][:-1])
+    bottom = np.hstack([bottom, np.full((n, top.shape[1] - bottom.shape[1], 3), 20, np.uint8)])
     gap = np.full((5, top.shape[1], 3), 20, np.uint8)
     render.write_png("landforms.png", np.vstack([top, gap, bottom]))
-    print(f"wrote landforms.png — Mountain node styles (top) + place→erode (bottom), eroded relief {np.ptp(he):.0f} m")
+    print(f"wrote landforms.png — landform generators: Mountain styles + Erode/Ridge/Volcano/Canyon, "
+          f"eroded relief {np.ptp(he):.0f} m")
 
 
 if __name__ == "__main__":

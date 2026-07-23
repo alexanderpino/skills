@@ -64,13 +64,17 @@ Tomasi & Manduchi 1998, He et al. 2010, Perona & Malik 1990, Serra 1982) with pr
 generalisation of `sd_box` and the primitive behind the fault-block landform below.
 
 The **geological landforms** (`landforms.py` — impact craters, strata/terracing, folding,
-karst sinkholes, **`fault_block_butte`**) are likewise a toolbox, not a fixed node. **paper-grounded**
-(Pike 1977, Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with oracles in
-`test_landforms.py`. `fault_block_butte` and **`mountain`** are **feature-primitive construction-tree** nodes in the
+karst sinkholes, **`fault_block_butte`**, and the **`mountain`/`ridge`/`volcano`/`canyon`** generators) are
+likewise a toolbox, not a fixed node. **paper-grounded** (Pike 1977, Melosh 1989; Beneš & Forsbach 2001
+strata; Ford & Williams 2007 karst; Karátson 2010 volcanoes; Leopold 1964 canyons) with oracles in
+`test_landforms.py`. These are **feature-primitive construction-tree** nodes in the
 Génévaux et al. 2015 (*Terrain Modelling from Feature Primitives*, CGF) / Guérin et al. 2016 (*Sparse
-representation of terrains*, CGF) sense — placeable landform generators (the Gaea-style "Mountain"
-node: a ridge-crest skeleton + ridged detail; vs mountains emerging from noise+erosion) that you
-combine by union and erode. `fault_block_butte` is a placeable SDF primitive (`ops_filters.sd_convex_polygon`)
+representation of terrains*, CGF) sense — the placeable landform *generators* an artist drops in (Gaea's
+**Mountain / Ridge / Volcano / Canyon / Crater** nodes) that you combine by union and erode. The
+**`mountain`** node in particular is built the way Gaea's is — a **modulated-Voronoi ridge network**
+(`noise.worley` cell edges = ridgelines) broken by a domain distortion, with Gaea's five style presets
+(Basic/Eroded/Old/Alpine/Strata) baking the weathering in — so the raw primitive reads as a
+drainage-organised massif, not isotropic noise on a lump; see the catalog table below. `fault_block_butte` is a placeable SDF primitive (`ops_filters.sd_convex_polygon`)
 combined by union and eroded — with its **joint/fault-controlled outline grounded in geomorphology**
 (NPS Arches/Canyonlands *The Needles*; Li et al. 2021 orthogonal joints in quartz sandstone; Narr &
 Suppe 1991 joint spacing; Wadi Rum sandstone geomorphology). Verified by profile oracles (flat top,
@@ -147,10 +151,10 @@ Every effect we add is one of their node categories, grounded in the same litera
 
 | Node category | Our node(s) | Grounded in | How the pro tools do it |
 |---|---|---|---|
-| Generator | `noise` (Perlin/value/Worley/fBm/ridged) + **`landforms.mountain`** (ridge-skeleton primitive) | Perlin 2002, Musgrave, Worley 1996; Génévaux 2015 | noise + **Mountain/Ridge primitive nodes** |
+| Generator | `noise` (Perlin/value/Worley/fBm/ridged/hybrid-mf) + **landform generators** (`mountain`, `ridge`, `volcano`, `canyon`, craters, `dunes`) | Perlin 2002, Musgrave, Worley 1996; Génévaux 2015 | noise + **Mountain/Ridge/Volcano/Canyon/Crater/Dunes primitive nodes** |
 | Warp | `noise.domain_warp`, `ops_filters` twist/bend | Quilez *domain warping*; Musgrave | Warp/Perturb/Distort |
 | Combiner | `ops_filters.smin/smax/blend`, `np.maximum` union | Quilez *smooth minimum*; Génévaux 2015 (Lipschitz operators) | Combine/Layer/math |
-| Primitive placement | `landforms.fault_block_butte`, `landforms.mountain`, crater/fold | Génévaux 2015 / Guérin 2016 feature-primitive tree; Quilez SDF | **Mountain/Crater/Range primitive nodes** |
+| Primitive placement | `landforms.mountain` (+styles), `ridge`, `volcano`, `canyon`, `fault_block_butte`, crater/fold | Génévaux 2015 / Guérin 2016 feature-primitive tree; Quilez SDF | **Mountain/Crater/Range/Volcano/Canyon primitive nodes** |
 | Erosion (hydraulic) | `erosion_droplet`, `erosion_streampower` | Krištof 2009, Chiba 1998, Beyer 2015 (droplet); Braun & Willett 2013 (stream power) | Erode/Hydro |
 | Erosion (thermal) | `erosion_thermal` | **Musgrave, Kolb & Mace 1989** (angle-of-repose talus) | Thermal/Talus/Slump |
 | Selector / mask | `analysis` slope/curvature/**horizon AO**/TWI/area | Zevenbergen & Thorne 1987; Max 1988 (AO) | Slope/Height/Flow masks |
@@ -192,6 +196,61 @@ Every effect we add is one of their node categories, grounded in the same litera
   Flow/Wear/Deposits layer set, but now materially honest.
 - **Content-addressed caching** (Merkle key over params + upstream cone) is *our* mechanism — consistent
   with how these tools cache cooked nodes, but an implementation choice, not a documented parity claim.
+
+### Generator / primitive node catalog (coverage vs Gaea, World Machine, Houdini)
+
+The generator/primitive nodes each tool ships, and what provides the same capability here. "Generator" =
+a node that *synthesises* a heightfield from parameters (a landform, a noise basis, a pattern); erosion,
+filters, masks and outputs live in the rows above. Sources: QuadSpinner Gaea 2.x node reference
+(`docs.gaea.app/reference/nodes/terrain` + `/primitive`), World Machine device reference
+(`world-machine.com/learn.php?page=devref`), SideFX Houdini HeightField docs
+(`sidefx.com/docs/houdini/model/heightfields.html`).
+
+**Noise / pattern bases** — the workhorses (Gaea *Perlin/Voronoi/MultiFractal/DriftNoise/Gabor…*;
+WM *Advanced Perlin/Perlin/Voronoi*; Houdini *HeightField Noise* unified basis):
+
+| Capability | Our node | Grounded in |
+|---|---|---|
+| Fractal fBm (natural terrain) | `noise.fbm` | Perlin 1985/2002 |
+| Ridged multifractal (mountainous) | `noise.ridged_mf` | Musgrave 1989 |
+| Billowy / hybrid multifractal (rough peaks, smooth basins) | `noise.hybrid_mf` | Musgrave 1993 (heterogeneous mf) |
+| Voronoi / Worley cellular (ridgelines = cell edges, basins = interiors) | `noise.worley` (`f1`/`f2f1`/`inv_f1`) | Worley 1996 |
+| Domain warp / DriftNoise (flow-like advected noise) | `noise.domain_warp`, `noise.curl` | Quilez *domain warping* |
+| Constant | `np.full` / `inputs.flat` | — |
+| Radial gradient (island/dome falloff) | `ops_filters.radial_gradient`, `.cone` | Quilez SDF |
+| Linear gradient (directional ramp) | `inputs.constant_slope` | — |
+
+**Landform generators** — the named "drop-in a mountain" nodes (Gaea *Mountain/MountainRange/Ridge/
+Canyon/Crater/CraterField/Volcano/DuneSea/Island/…*; WM and Houdini have **no** named landform nodes —
+they build shape from noise + the Layout/Project guide + a separate erosion pass, which we also support):
+
+| Gaea landform node | Our node | Grounded in |
+|---|---|---|
+| **Mountain** (+ Basic/Eroded/Old/Alpine/Strata styles) | `landforms.mountain(style=…)` — modulated-Voronoi ridge network + distortion + baked hydraulic/thermal | QuadSpinner Mountain docs; Génévaux 2015; Musgrave 1989 |
+| **Ridge** (hogback / cuesta / arête) | `landforms.ridge` — asymmetric-flank crest line | Twidale & Campbell 2005 (cuesta/hogback) |
+| **Volcano** (strato + shield, summit crater, barrancos) | `landforms.volcano(kind=…)` | Karátson et al. 2010 (volcano morphometry) |
+| **Canyon** (plateau incised by a meandering gorge) | `landforms.canyon` — trunk + tributaries + strata benches | Leopold 1964 (meanders); Grand-Canyon cliff-bench profile |
+| **Crater** (impact) / **CraterField** | `landforms.impact_crater` (+ `scatter` for fields) | Pike 1977; Melosh 1989 (pi-scaling) |
+| **DuneSea / Dunes** (wind-formed dune fields) | `dunes.werner_dunes` (slab cellular automaton) | Werner 1995 |
+| **MountainRange** (a chain of peaks) | `mountain(n_ridges=N)` or union several `mountain`/`ridge` with `np.maximum`/`smax` | Génévaux 2015 (combine primitives) |
+| **Island** | `radial_gradient × noise`, then a sea level (see `sims_illustrative` coastal) | — (compose from core set) |
+| **Uplift / Plates** (broad tectonic rise) | `isostasy` + `erosion_streampower` uplift term | Cordonnier 2016 (uplift+erosion) |
+| **Butte / Mesa** (not a stock Gaea node; our addition) | `landforms.fault_block_butte` | Narr & Suppe 1991; NPS Arches/Canyonlands |
+
+**Guide / import** — art direction and real data (Gaea *Shape/Draw/File/TileInput*; WM *Layout
+Generator/File Input*; Houdini *HeightField Project/File*):
+
+| Capability | Our node |
+|---|---|
+| Spline / shape guides (draw a feature *here*) | `ops_filters.sd_segment`, `.sd_convex_polygon`, `.sd_box` (SDF building blocks) |
+| DEM / heightmap import | `empirical_dem.fetch_dem` (Copernicus/FABDEM/3DEP GeoTIFF) |
+
+**Deferred (reproducible from the core set, not yet stock nodes):** Gaea *Cellular3D, WaveShine,
+LineNoise/DotNoise, Cracks, CutNoise, Pattern, Object, Hemisphere*; *Slump, Rugged, MountainSide*
+(erosion of a `mountain`/`ridge`), *Gabor* directional noise (partly covered by `domain_warp`'s
+anisotropy). These are noted so the catalog is honest about what is and isn't implemented — the priority
+set above (fractal + Voronoi + gradient + the named landforms + an erosion pass) already reproduces the
+large majority of real terrain-authoring work across all three tools.
 
 ## What the cross-checks assert
 

@@ -114,6 +114,41 @@ def test_mountain_deterministic():
     assert not np.array_equal(L.mountain((40, 40), 30.0, seed=2), L.mountain((40, 40), 30.0, seed=3))
 
 
+def test_ridge_is_a_linear_asymmetric_crest():
+    """The Ridge node: a single high crest line with ASYMMETRIC flanks (steep scarp / gentle dip)."""
+    h = L.ridge((90, 90), 30.0, seed=2, height=900.0, asymmetry=0.6)
+    assert np.all(np.isfinite(h)) and 400.0 < np.ptp(h) < 1600.0
+    assert h.max() > h.mean() + 0.30 * np.ptp(h)                          # a real crest, not flat noise
+    # a symmetric arête has a narrower footprint above half-height than an asymmetric hogback
+    frac = lambda a: np.mean(L.ridge((90, 90), 30.0, seed=2, height=900.0, asymmetry=a) > 450.0)
+    assert frac(0.6) > frac(0.0)
+
+
+def test_volcano_has_summit_crater_and_concave_cone():
+    """The Volcano node: a radial edifice, a summit crater depression, and (strato) a steeper summit
+    than the shield type."""
+    n, cell = 120, 30.0
+    c = n // 2
+    strato = L.volcano((n, n), c, c, radius=n * 0.42 * cell, height=1600.0, cellsize=cell, seed=1, kind="strato")
+    shield = L.volcano((n, n), c, c, radius=n * 0.42 * cell, height=1600.0, cellsize=cell, seed=1, kind="shield")
+    assert strato[c, c] < strato[c, c + int(0.18 * n)]                    # summit crater sits below the flank ring
+    # strato is concave-up: steeper just below the summit than the shield
+    assert (strato[c, c + 4] - strato[c, c + 20]) > (shield[c, c + 4] - shield[c, c + 20])
+    assert strato.min() >= 0.0                                            # height-above-base
+
+
+def test_canyon_incises_a_plateau():
+    """The Canyon node: a high plateau cut by a deep gorge — most of the field near the rim, a thin
+    deep floor far below."""
+    h = L.canyon((120, 120), 30.0, seed=3, rim=1000.0, depth=750.0)
+    assert np.all(np.isfinite(h))
+    hi, lo = np.percentile(h, 90), np.percentile(h, 2)
+    assert hi - lo > 500.0                                                # a real gorge, not a dimple
+    assert np.median(h) > 1000.0 - 0.2 * 750.0                            # plateau dominates; the gorge is a minority
+    assert np.mean(h < 1000.0 - 0.5 * 750.0) > 0.02                       # but a genuine deep floor exists
+    assert np.array_equal(L.canyon((40, 40), 30.0, seed=3), L.canyon((40, 40), 30.0, seed=3))  # deterministic
+
+
 def test_strat_coord_horizontal_tilt_and_fold():
     h = inputs.cone(32, height=5.0)
     yy, xx = np.mgrid[0:32, 0:32].astype(float)
