@@ -181,6 +181,59 @@ def material_rgb(masks, cellsize=1.0, palette=None, shade=True):
 
 
 # --------------------------------------------------------------------------- #
+# SatMap + splatmap colour  (Gaea's Texture stage)
+# --------------------------------------------------------------------------- #
+# SatMaps: curated multi-stop colour gradients (a CLUT indexed by a driver, usually elevation) —
+# Gaea's naturalistic "satellite" palettes, here a hand-tuned gradient per world. Stops are
+# (position in [0,1], (r,g,b) in 0-255), low elevation -> high.
+SATMAPS = {
+    "temperate": [(0.00, (46, 78, 54)), (0.12, (72, 104, 66)), (0.34, (120, 138, 86)),
+                  (0.54, (150, 140, 104)), (0.74, (126, 116, 102)), (0.90, (182, 178, 174)),
+                  (1.00, (236, 240, 246))],
+    "verdant":   [(0.00, (40, 72, 50)), (0.30, (64, 104, 60)), (0.62, (96, 128, 80)),
+                  (0.86, (140, 150, 110)), (1.00, (210, 214, 206))],
+    "arid":      [(0.00, (96, 54, 40)), (0.20, (150, 80, 52)), (0.44, (178, 120, 78)),
+                  (0.68, (200, 168, 120)), (0.86, (214, 196, 166)), (1.00, (232, 222, 200))],
+    "sand":      [(0.00, (150, 120, 84)), (0.40, (196, 168, 120)), (0.76, (216, 192, 150)),
+                  (1.00, (230, 216, 188))],
+    "volcanic":  [(0.00, (40, 36, 38)), (0.30, (78, 72, 72)), (0.54, (112, 86, 80)),
+                  (0.76, (120, 112, 106)), (1.00, (218, 216, 216))],
+    "mars":      [(0.00, (92, 50, 40)), (0.30, (140, 72, 50)), (0.58, (180, 104, 66)),
+                  (0.80, (200, 140, 96)), (1.00, (214, 182, 152))],
+    "lunar":     [(0.00, (64, 64, 68)), (0.40, (110, 110, 116)), (0.72, (150, 150, 156)),
+                  (1.00, (200, 200, 206))],
+}
+
+
+def satmap(driver, stops):
+    """A SatMap: colour a normalised driver field (in [0,1], typically elevation) through a curated
+    multi-stop gradient — a colour lookup table, exactly Gaea's SatMap idea. `stops` is a name in
+    `SATMAPS` or an explicit [(pos, (r,g,b)), ...] list. Returns float RGB in 0-255 (compose further
+    with `splat_blend` before quantising)."""
+    stops = SATMAPS[stops] if isinstance(stops, str) else stops
+    v = np.clip(np.asarray(driver, dtype=np.float64), 0.0, 1.0)
+    pos = np.array([p for p, _ in stops])
+    cols = np.array([c for _, c in stops], dtype=np.float64)
+    out = np.empty(v.shape + (3,), dtype=np.float64)
+    for ch in range(3):
+        out[..., ch] = np.interp(v, pos, cols[:, ch])
+    return out
+
+
+def splat_blend(base_rgb, overlays):
+    """Splatmap compositing (the Texture stage): over a base colour (e.g. a `satmap`), lay down
+    per-material colours where their coverage MASK is high. `overlays` is an ordered list of
+    (mask in [0,1], (r,g,b)); later overlays paint over earlier ones — snow over rock over sediment.
+    The masks are the splat channels; drive them from slope, height, flow, curvature (06), which is
+    how Gaea's splatmaps read as geology rather than a flat tint. Returns float RGB in 0-255."""
+    out = np.array(base_rgb, dtype=np.float64)
+    for mask, color in overlays:
+        m = np.clip(np.asarray(mask, dtype=np.float64), 0.0, 1.0)[..., None]
+        out = out * (1.0 - m) + np.array(color, dtype=np.float64) * m
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # photoreal composite  (HYPERREALISM.md Part 1 — the shared render pipeline)
 # --------------------------------------------------------------------------- #
 def sun_sky_shade(h, cellsize=1.0, azimuth=315.0, altitude=45.0, z_factor=1.0, sky=0.30):

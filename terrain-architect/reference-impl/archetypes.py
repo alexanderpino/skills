@@ -298,20 +298,22 @@ ARCHETYPES = [
 
 
 # --------------------------------------------------------------------------- #
-# Photoreal render (HYPERREALISM.md Part 1): material colour × sun+sky × AO + rivers + aerial.
-# A per-world PALETTE recolours the same derive_materials stack (water, snow, rock, sand, remainder)
-# so one composite serves Earth / Mars / Moon — the palette is the whole difference, per the doc.
+# Colour the way Gaea does: a SatMap (elevation-driven curated gradient, render.SATMAPS) for the
+# naturalistic base, then a SPLATMAP of erosion-derived masks (slope->rock, height->snow,
+# curvature+flow->sediment) laid over it (render.splat_blend), then photoreal shading. The SatMap
+# family is the whole per-world difference; the splat masks make it read as geology, not a flat tint.
 # --------------------------------------------------------------------------- #
-PALETTES = {                                      # order: water, snow, rock, sand, grass/remainder
-    "temperate": [(58, 110, 150), (236, 240, 246), (120, 114, 106), (196, 178, 132), (92, 120, 74)],
-    "verdant":   [(48, 88, 62), (228, 234, 238), (110, 118, 96), (150, 158, 112), (74, 112, 66)],
-    "arid":      [(120, 92, 64), (208, 198, 178), (156, 104, 72), (206, 176, 120), (178, 150, 112)],
-    "volcanic":  [(52, 100, 150), (228, 230, 236), (92, 84, 82), (140, 120, 110), (86, 108, 72)],
-    "sand":      [(150, 122, 88), (214, 206, 186), (150, 116, 82), (208, 180, 128), (198, 172, 122)],
-    "mars":      [(96, 56, 44), (206, 184, 160), (122, 64, 46), (198, 120, 72), (160, 98, 66)],
-    "lunar":     [(84, 84, 88), (200, 200, 206), (150, 150, 156), (122, 122, 128), (106, 106, 112)],
+# per-family splat overlay colours: (exposed rock, valley sediment/deposits, snow)
+SPLAT = {
+    "temperate": {"rock": (120, 114, 106), "sed": (150, 140, 112), "snow": (238, 240, 245)},
+    "verdant":   {"rock": (110, 118, 96), "sed": (150, 158, 118), "snow": (232, 236, 240)},
+    "arid":      {"rock": (150, 100, 70), "sed": (206, 182, 134)},
+    "sand":      {"rock": (150, 116, 82), "sed": (210, 188, 146)},
+    "volcanic":  {"rock": (92, 84, 82), "sed": (128, 116, 104), "snow": (230, 232, 236)},
+    "mars":      {"rock": (120, 64, 46), "sed": (198, 132, 88)},
+    "lunar":     {"rock": (150, 150, 156), "sed": (120, 120, 126)},
 }
-FAMILY = {                                        # archetype/world name -> palette family
+FAMILY = {                                        # archetype/world name -> SatMap/splat family
     "alpine orogen": "temperate", "appalachian (old)": "temperate", "tower karst": "temperate",
     "ag terraces": "temperate", "fjord coast": "temperate", "sea cliffs & stacks": "temperate",
     "canyon + strata": "arid", "mesa / tepui": "arid", "basin & range": "arid", "badlands": "arid",
@@ -320,22 +322,40 @@ FAMILY = {                                        # archetype/world name -> pale
 }
 
 
-def _rich(h, family, cell=CELL, sea_level=None, azimuth=315.0, altitude=42.0):
-    """The shared photoreal composite for one tile: derive the material splat, colour it with the
-    world's PALETTE, and light it with render.photoreal (sun+sky, AO, rivers, aerial). Rivers only
-    on wet worlds; Mars/Moon get no blue channels and a rust/grey palette."""
+def satmap_splat(h, family, cell=CELL):
+    """Gaea's Texture stage as pure fields: a SatMap base (elevation → curated gradient) with a
+    splatmap of erosion-derived masks blended over it. Returns float RGB in 0-255 (shade downstream)."""
     slope = analysis.slope(h, cell)
     area = flow.d8_accumulation(flow.priority_flood_fill(h), cell)
-    stack = analysis.derive_materials(h, slope, area, cell, rng_seed=0)
-    masks = np.stack([m for _, m in stack])
-    mat = render.material_rgb(masks, palette=PALETTES[family], shade=False)
+    hn = (h - h.min()) / (np.ptp(h) + 1e-9)
+    base = render.satmap(hn, family)                                         # SatMap: elevation CLUT
+    sp = SPLAT[family]
+    rock = analysis.smoothstep(np.tan(np.radians(32)), np.tan(np.radians(46)), slope)  # exposed rock on cliffs
+    la = np.log1p(area)
+    mx = float(la.max())
+    curv = analysis.curvature(h, cell, kind="profile")                       # concave = where sediment collects
+    concave = analysis.smoothstep(0.0, float(np.percentile(np.abs(curv), 80) + 1e-9), np.maximum(curv, 0.0))
+    sed = analysis.smoothstep(0.55 * mx, 0.82 * mx, la) * concave * (1.0 - rock)   # deposits in wet, concave lows
+    overlays = [(0.7 * sed, sp["sed"]), (rock, sp["rock"])]
+    if "snow" in sp:                                                         # snow on high, gentle, shaded faces
+        north = 0.5 + 0.5 * analysis.northness(analysis.aspect(h, cell))
+        snow = (analysis.smoothstep(0.72, 0.84, hn)
+                * (1.0 - analysis.smoothstep(np.tan(np.radians(38)), np.tan(np.radians(52)), slope)) * north)
+        overlays.append((snow, sp["snow"]))
+    return render.splat_blend(base, overlays), area
+
+
+def _rich(h, family, cell=CELL, sea_level=None, azimuth=315.0, altitude=42.0):
+    """Colour one tile with the SatMap + splatmap (Gaea Texture stage), then light it with
+    render.photoreal (sun+sky, AO, rivers, aerial). Rivers only on wet worlds."""
+    col, area = satmap_splat(h, family, cell)
     ao = analysis.horizon_ao(h, cell)
     rivers = None
-    if family in ("temperate", "volcanic"):                                  # wet worlds carry channels
+    if family in ("temperate", "verdant", "volcanic"):                       # wet worlds carry channels
         la = np.log1p(area)
         mx = float(la.max())
         rivers = np.clip((la - 0.87 * mx) / (0.13 * mx + 1e-9), 0.0, 1.0)
-    return render.photoreal(mat, h, cell, ao=ao, rivers=rivers, ao_strength=0.38,
+    return render.photoreal(col, h, cell, ao=ao, rivers=rivers, ao_strength=0.38,
                             aerial_strength=0.34, aerial_band=0.20,
                             azimuth=azimuth, altitude=altitude, sea_level=sea_level)
 

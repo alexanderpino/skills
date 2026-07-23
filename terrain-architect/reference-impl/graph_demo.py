@@ -327,18 +327,20 @@ def build_scene_graph(ctx):
     return g, ("relaxed", "area")
 
 
-# a desert/red-rock splat palette (water, snow, rock, sand, remainder) for the photoreal colorize
-_ARID_PALETTE = [(120, 92, 64), (208, 198, 178), (156, 104, 72), (206, 176, 120), (178, 150, 112)]
-
-
 def run_scene(ctx, outdir):
-    """Evaluate the archetype DAG and colorize it with the photoreal composite. Prints the
-    evaluated node order so the graph is visible."""
+    """Evaluate the archetype DAG and colorize it the Gaea way — a SatMap (elevation gradient) plus a
+    splatmap of erosion masks (slope->rock, flow+curvature->sediment) — then photoreal shading. Prints
+    the evaluated node order so the graph is visible."""
     g, (h_out, a_out) = build_scene_graph(ctx)
     height = g.evaluate(h_out)
     area = g.evaluate(a_out)
-    materials = g.evaluate("materials")
-    mat = render.material_rgb(materials, palette=_ARID_PALETTE, shade=False)
+    slope = g.evaluate("slope")
+    hn = (height - height.min()) / (np.ptp(height) + 1e-9)
+    base = render.satmap(hn, "arid")                                        # SatMap: elevation CLUT
+    rock = analysis.smoothstep(np.tan(np.radians(32)), np.tan(np.radians(46)), slope)
+    la = np.log1p(area)
+    sed = analysis.smoothstep(0.55 * la.max(), 0.82 * la.max(), la) * (1.0 - rock)   # sediment in the washes
+    mat = render.splat_blend(base, [(0.7 * sed, (206, 182, 134)), (rock, (150, 100, 70))])
     ao = analysis.horizon_ao(height, ctx.cellsize)                          # Max 1988 horizon AO (height-field-native)
     img = render.photoreal(mat, height, ctx.cellsize, ao=ao, ao_strength=0.38,
                            aerial_strength=0.34, aerial_band=0.20)

@@ -108,10 +108,12 @@ Two files, both deliberately small:
 - **`render.py`** — the `09` "visual review modes" as pure-numpy functions returning RGB
   arrays, plus a zero-dependency PNG writer: greyscale height, hillshade, slope shade,
   `log(A)` flow overlay, hypsometric tint, a false-colour clip that flags NaN/Inf, a
-  material splatmap (partitioned `06` masks blended by weight), a boulder scatter overlay, and
-  the **photoreal composite** (`sun_sky_shade` + `photoreal`: material colour × sun+sky ×
-  ambient occlusion + rivers + aerial perspective — Stage 1 of `HYPERREALISM.md`, the render
-  behind both montages). Import it directly to render any heightfield from the other modules.
+  material splatmap (partitioned `06` masks blended by weight), a boulder scatter overlay, the
+  **SatMap + splatmap** colouriser (`satmap`: an elevation-driven curated colour gradient/CLUT, à
+  la Gaea's SatMaps; `splat_blend`: per-material colours laid over it via slope/height/flow/curvature
+  masks), and the **photoreal composite** (`sun_sky_shade` + `photoreal`: material colour × sun+sky ×
+  ambient occlusion + rivers + aerial perspective — Stage 1 of `HYPERREALISM.md`, the render behind
+  both montages). Import it directly to render any heightfield from the other modules.
 
 The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
 itself is the verified `noise.py` module (noise is the initial condition, not the answer).

@@ -6,10 +6,12 @@ The renderable **archetypes** from `references/20-archetypes.md` (the master enu
 `references/00-index.md`), each assembled from the verified Legal-Order blocks and rendered on a
 ~1.9 km tile. Regenerate with `python archetypes.py`.
 
-The tiles render through the **shared photoreal composite** (`render.photoreal`: material colour ×
-sun+sky two-light × ambient occlusion + rivers + aerial perspective), with a per-world palette
-recolouring the same material splat — Earth green, desert red-rock, Mars rust, Moon grey, basalt
-volcano, blue water. This is Stage 1 of `reference-impl/HYPERREALISM.md`, the research-grounded
+The tiles are coloured the way Gaea does — a **SatMap** (an elevation-driven curated colour gradient,
+`render.satmap`) for the naturalistic base, then a **splatmap** of erosion-derived masks
+(slope→rock, height+aspect→snow, flow+curvature→valley sediment) laid over it (`render.splat_blend`),
+then the **photoreal composite** (`render.photoreal`: × sun+sky two-light × ambient occlusion +
+rivers + aerial perspective). A per-world SatMap family is the whole difference — temperate green,
+desert red-rock, Mars rust, Moon grey, basalt volcano, sand, verdant. This is Stage 1 of `reference-impl/HYPERREALISM.md`, the research-grounded
 ledger of what each tile would need to reach photoreal (and where the numpy sandbox honestly tops
 out); the remaining per-archetype geomorphology — break-of-slope, dune slip faces, caprock bands,
 crater size-frequency — is Stages 2–4 there.

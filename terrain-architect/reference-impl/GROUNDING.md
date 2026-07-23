@@ -117,7 +117,7 @@ Every effect we add is one of their node categories, grounded in the same litera
 | Erosion (hydraulic) | `erosion_droplet`, `erosion_streampower` | Krištof 2009, Chiba 1998, Beyer 2015 (droplet); Braun & Willett 2013 (stream power) | Erode/Hydro |
 | Erosion (thermal) | `erosion_thermal` | **Musgrave, Kolb & Mace 1989** (angle-of-repose talus) | Thermal/Talus/Slump |
 | Selector / mask | `analysis` slope/curvature/**horizon AO**/TWI/area | Zevenbergen & Thorne 1987; Max 1988 (AO) | Slope/Height/Flow masks |
-| Colorizer / splat | `render.material_rgb`, `render.photoreal` | **Andersson/Frostbite 2007** (slope+altitude splat) | SatMaps / Colorizer |
+| Colorizer / splat | `render.satmap` (CLUT), `render.splat_blend`, `material_rgb`, `photoreal` | **Andersson/Frostbite 2007** (slope+altitude splat); hypsometric CLUT | **SatMaps** (elevation gradient) + splatmap masks |
 
 **Honest divergences (disclosed, not hidden):**
 
@@ -138,9 +138,12 @@ Every effect we add is one of their node categories, grounded in the same litera
 - **Hard-`max` union creases.** We union plateau blocks with `np.maximum` (the acceptable cliff/plateau
   case) and relax the seam with thermal downstream; `ops_filters.smax` is the crease-free (Lipschitz)
   combiner for general merges.
-- **Splat masks.** We drive materials by slope + altitude **and drainage area** (a flow-derived
-  channel/water mask); the pro tools additionally splat from deposition/wear/curvature erosion layers —
-  a documented enhancement, not yet wired.
+- **Colour = SatMap + splatmap (Gaea's Texture stage).** `render.satmap` is a curated elevation
+  gradient (a colour lookup table — Gaea's *SatMap* idea, grounded as a hypsometric CLUT); `satmap_splat`
+  then lays a **splatmap** over it whose masks come from **slope (rock), height+aspect (snow), and the
+  erosion-derived flow + profile-curvature (sediment in concave, high-flow lows)** — closing the earlier
+  gap where the splat used slope+height only. Per-material blend follows Frostbite 2007. Still simpler
+  than the tools' full Flow/Wear/Deposits layer set, but now geology-driven rather than a flat tint.
 - **Content-addressed caching** (Merkle key over params + upstream cone) is *our* mechanism — consistent
   with how these tools cache cooked nodes, but an implementation choice, not a documented parity claim.
 

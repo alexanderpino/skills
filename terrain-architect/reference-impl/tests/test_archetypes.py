@@ -94,6 +94,30 @@ def test_render_tile_photoreal_composite():
         assert int(img.reshape(-1, 3).std(axis=0).sum()) > 3, f"{name}: render is a flat colour"
 
 
+def test_satmap_and_splat_blend():
+    """render.satmap is a monotone CLUT hitting its endpoint colours; splat_blend paints a mask's
+    colour where the mask is 1 and leaves the base where it is 0."""
+    import render
+    d = np.linspace(0.0, 1.0, 50)
+    rgb = render.satmap(d, "arid")
+    assert rgb.shape == (50, 3)
+    assert np.allclose(rgb[0], render.SATMAPS["arid"][0][1])          # low end == first stop
+    assert np.allclose(rgb[-1], render.SATMAPS["arid"][-1][1])        # high end == last stop
+    base = np.zeros((4, 4, 3)) + 10.0
+    mask = np.array([[0.0, 1.0, 0.0, 1.0]] * 4)
+    out = render.splat_blend(base, [(mask, (200, 100, 50))])
+    assert np.allclose(out[mask == 1.0], (200, 100, 50))              # fully painted where mask=1
+    assert np.allclose(out[mask == 0.0], 10.0)                        # untouched where mask=0
+
+
+def test_satmap_splat_produces_varied_geology():
+    """The SatMap+splat colouring of an archetype is not a flat tint — the elevation gradient plus
+    slope/flow splat masks give real colour variation."""
+    col, area = A.satmap_splat(A.mesa(n=N, cell=A.CELL), "arid", A.CELL)
+    assert col.shape == (N, N, 3)
+    assert int(col.reshape(-1, 3).std(axis=0).sum()) > 12             # graded, not one colour
+
+
 def test_photoreal_two_light_floor_and_ao():
     """render.sun_sky_shade never crushes to black (sky floor) and stays <=1; AO only darkens."""
     import render
