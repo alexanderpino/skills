@@ -77,6 +77,20 @@ def test_fault_block_butte_is_deterministic():
     assert np.array_equal(a, b)
 
 
+def test_mountain_primitive_is_a_dissected_massif():
+    h = L.mountain((80, 80), 30.0, seed=1, n_ridges=3, height=1600.0)
+    assert h.shape == (80, 80) and np.all(np.isfinite(h))
+    assert 800.0 < np.ptp(h) < 4000.0                                    # relief near the requested height
+    assert h.max() > h.mean() + 0.25 * np.ptp(h)                         # a real high massif, not flat noise
+    margin = np.concatenate([h[0], h[-1], h[:, 0], h[:, -1]]).mean()     # a defined envelope: crest high, edges low
+    assert margin < h.mean()
+
+
+def test_mountain_deterministic():
+    assert np.array_equal(L.mountain((40, 40), 30.0, seed=2), L.mountain((40, 40), 30.0, seed=2))
+    assert not np.array_equal(L.mountain((40, 40), 30.0, seed=2), L.mountain((40, 40), 30.0, seed=3))
+
+
 def test_strat_coord_horizontal_tilt_and_fold():
     h = inputs.cone(32, height=5.0)
     yy, xx = np.mgrid[0:32, 0:32].astype(float)

@@ -152,6 +152,42 @@ def fault_block_butte(shape, bx, by, br, bh, cellsize, seed=0, ecc=1.0, talus=0.
     return np.maximum(prof + lip * (d <= cw), 0.0)                           # height-above-plain (>= 0)
 
 
+# --------------------------------------------------------------------------- #
+# mountain generator (a placeable feature primitive — Gaea's "Mountain" node)
+# --------------------------------------------------------------------------- #
+def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0.32,
+             detail=0.55, octaves=7, profile=1.6):
+    """A MOUNTAIN feature primitive (Génévaux et al. 2015, *Terrain Modelling from Feature Primitives*;
+    Guérin et al. 2016) — a landform GENERATOR, the "Mountain" node an artist places, distinct from
+    thresholded noise: a wandering ridge-crest **skeleton** (a polyline) sets a concave-flank envelope,
+    which ridged-multifractal **detail** then dissects into spurs and valleys. `n_ridges` crest lines are
+    unioned into a small range. Place it, combine several (`np.maximum` / `ops_filters.smax`), then erode
+    — the construction-tree workflow. Returns height (m)."""
+    n0, n1 = shape
+    yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    rng = np.random.default_rng(seed)
+    reach = reach_frac * max(n0, n1)                                         # flank half-width (cells)
+    env = np.zeros(shape)
+    for _ in range(int(n_ridges)):
+        ang = rng.uniform(0.0, np.pi)                                        # crest orientation
+        k = 6
+        t = np.linspace(-1.0, 1.0, k)
+        cx = 0.5 * n1 + 0.4 * n1 * np.cos(ang) * t                          # crest control points across the tile
+        cy = 0.5 * n0 + 0.4 * n0 * np.sin(ang) * t
+        perp = np.array([-np.sin(ang), np.cos(ang)])
+        wob = np.cumsum(rng.normal(0.0, 0.05, k)); wob -= wob.mean()        # the crest wanders (non-straight)
+        cx += perp[0] * wob * n1; cy += perp[1] * wob * n0
+        d = np.full(shape, np.inf)
+        for a in range(k - 1):
+            d = np.minimum(d, ops_filters.sd_segment(xx, yy, cx[a], cy[a], cx[a + 1], cy[a + 1]))
+        env = np.maximum(env, (0.7 + 0.6 * rng.random()) * np.clip(1.0 - d / reach, 0.0, 1.0) ** profile)
+    fx = xx * cellsize / (max(n0, n1) * cellsize * 0.14)                     # ridged detail lattice
+    fy = yy * cellsize / (max(n0, n1) * cellsize * 0.14)
+    rid = noise.ridged_mf(fx, fy, seed + 7, octaves=octaves)
+    rid = (rid - rid.min()) / (np.ptp(rid) + 1e-9)
+    return env * height * ((1.0 - detail) + detail * rid)                    # envelope dissected by ridges
+
+
 def fold(h, x, y, amp, direction=(1.0, 0.0), freq=0.0, phase=0.0):
     """A sinusoidal fold train added to the (stratigraphic) coordinate. Fold beds, THEN erode,
     and erosion through an anticline crest exposes older beds in a bullseye — free, unauthorable."""
@@ -191,3 +227,22 @@ def karst_sinkholes(h, soluble_mask, cellsize=1.0, spacing=None, depth=5.0,
             h -= depth * np.clip(1.0 - r / radius, 0.0, 1.0)
             sink_mask |= r < radius
     return h, sink_mask
+
+
+def main():
+    """Demo the `mountain` feature primitive (the "Mountain" generator node): place it, then erode —
+    raw primitive | after droplet + thermal erosion. -> landforms.png."""
+    import erosion_droplet
+    import erosion_thermal
+    import render
+    n, cell = 200, 26.0
+    h = mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0)
+    he = erosion_droplet.droplet_erode(h, n_droplets=55 * n, seed=3, brush_radius=2)
+    he = erosion_thermal.thermal_erosion(he, 0.7, 14, cell, factor=0.12)
+    pad = np.full((n, 5, 3), 20, np.uint8)
+    render.write_png("landforms.png", np.hstack([render.hillshade(h, cell), pad, render.hillshade(he, cell)]))
+    print(f"wrote landforms.png — mountain feature primitive (raw | eroded), relief {np.ptp(he):.0f} m")
+
+
+if __name__ == "__main__":
+    main()

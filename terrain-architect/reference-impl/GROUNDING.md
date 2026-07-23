@@ -66,9 +66,11 @@ generalisation of `sd_box` and the primitive behind the fault-block landform bel
 The **geological landforms** (`landforms.py` — impact craters, strata/terracing, folding,
 karst sinkholes, **`fault_block_butte`**) are likewise a toolbox, not a fixed node. **paper-grounded**
 (Pike 1977, Melosh 1989; Beneš & Forsbach 2001 strata; Ford & Williams 2007 karst) with oracles in
-`test_landforms.py`. `fault_block_butte` is a **feature-primitive construction-tree** node in the
+`test_landforms.py`. `fault_block_butte` and **`mountain`** are **feature-primitive construction-tree** nodes in the
 Génévaux et al. 2015 (*Terrain Modelling from Feature Primitives*, CGF) / Guérin et al. 2016 (*Sparse
-representation of terrains*, CGF) sense — a placeable SDF primitive (`ops_filters.sd_convex_polygon`)
+representation of terrains*, CGF) sense — placeable landform generators (the Gaea-style "Mountain"
+node: a ridge-crest skeleton + ridged detail; vs mountains emerging from noise+erosion) that you
+combine by union and erode. `fault_block_butte` is a placeable SDF primitive (`ops_filters.sd_convex_polygon`)
 combined by union and eroded — with its **joint/fault-controlled outline grounded in geomorphology**
 (NPS Arches/Canyonlands *The Needles*; Li et al. 2021 orthogonal joints in quartz sandstone; Narr &
 Suppe 1991 joint spacing; Wadi Rum sandstone geomorphology). Verified by profile oracles (flat top,
@@ -145,10 +147,10 @@ Every effect we add is one of their node categories, grounded in the same litera
 
 | Node category | Our node(s) | Grounded in | How the pro tools do it |
 |---|---|---|---|
-| Generator | `noise` (Perlin/value/Worley/fBm/ridged) | Perlin 2002, Musgrave, Worley 1996 | noise/shape generators |
+| Generator | `noise` (Perlin/value/Worley/fBm/ridged) + **`landforms.mountain`** (ridge-skeleton primitive) | Perlin 2002, Musgrave, Worley 1996; Génévaux 2015 | noise + **Mountain/Ridge primitive nodes** |
 | Warp | `noise.domain_warp`, `ops_filters` twist/bend | Quilez *domain warping*; Musgrave | Warp/Perturb/Distort |
 | Combiner | `ops_filters.smin/smax/blend`, `np.maximum` union | Quilez *smooth minimum*; Génévaux 2015 (Lipschitz operators) | Combine/Layer/math |
-| Primitive placement | `landforms.fault_block_butte` (`sd_convex_polygon`) | Génévaux 2015 / Guérin 2016 feature-primitive tree; Quilez SDF | masks + project (academic: SDF primitives) |
+| Primitive placement | `landforms.fault_block_butte`, `landforms.mountain`, crater/fold | Génévaux 2015 / Guérin 2016 feature-primitive tree; Quilez SDF | **Mountain/Crater/Range primitive nodes** |
 | Erosion (hydraulic) | `erosion_droplet`, `erosion_streampower` | Krištof 2009, Chiba 1998, Beyer 2015 (droplet); Braun & Willett 2013 (stream power) | Erode/Hydro |
 | Erosion (thermal) | `erosion_thermal` | **Musgrave, Kolb & Mace 1989** (angle-of-repose talus) | Thermal/Talus/Slump |
 | Selector / mask | `analysis` slope/curvature/**horizon AO**/TWI/area | Zevenbergen & Thorne 1987; Max 1988 (AO) | Slope/Height/Flow masks |
