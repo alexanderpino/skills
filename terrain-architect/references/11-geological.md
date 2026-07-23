@@ -259,7 +259,8 @@ ridge(shape, asymmetry):
 volcano(shape, kind):
     rn = clip(r / R, 0, 1)                          # r = radial distance from the centre
     prof = (kind=="shield") ? 1 - rn^1.7            # broad convex dome, gentle slopes
-                            : (1 - rn)^1.4          # strato: CONCAVE-UP (steepest at the summit)
+                            : (1 - rn)^2.2          # strato: CONCAVE-UP sweep (exponent > 1, ~2.2 -> summit
+                                                    #   ~3x steeper than the foot; a real sweep, not a cone)
     grooves = ½(1 + cos(n_barrancos*theta + 2*pi*fbm))   # radial barrancos, deepen downslope
     prof   *= (1 - barranco * grooves * rn)
     h = height * prof
@@ -273,15 +274,23 @@ canyon(shape):
     trunk   = meandering centreline down the tile (sinusoid + random walk)
     d       = distance to trunk; for each tributary: d = min(d, distance to tributary polyline)
     ramp    = clip((d - floor_w) / wall_w, 0, 1)
-    benches = quantise(ramp, n_benches)             # strata benches (a terrace-style step; a cheap
-    incision = (d <= floor_w) ? 1 : (1 - benches)   #   look — the hard floor() reads slightly fake)
-    return plateau - depth * incision               # plateau stays dominant; a thin deep floor
+    smooth  = plateau - depth * ((d <= floor_w) ? 1 : 1 - ramp)     # a SMOOTH V-profile gorge, no benches
+    # benches are HORIZONTAL STRATA, not river contours: quantise ABSOLUTE ELEVATION to global bands (with a
+    # low-frequency warp for natural bed irregularity), ONLY on the incised walls — so the steps stay flat and
+    # geographically STATIONARY while the meander cuts down THROUGH them (true strath-terrace geometry).
+    step    = depth / n_benches
+    b       = (smooth - (rim - depth)) / step + 0.18 * fbm         # elevation-indexed band + irregularity
+    bench   = (rim - depth) + step * (floor(b) + riser(frac(b)))   # snap wall elevation to the strata band
+    wall    = (d > floor_w) and (smooth < rim - 0.02*depth)        # incised walls only (not floor/plateau)
+    return  wall ? bench : smooth                                  # plateau stays dominant; a thin deep floor
 
 # FAULT-BLOCK BUTTE — flat structural top, near-vertical cliff, talus at repose; a joint/fault-
 # controlled POLYGONAL footprint (Narr & Suppe 1991), not radial. The primitive form of "caprock
 # over soft beds"; the emergent recipe (layered K + erosion) is the physically-honest alternative.
 fault_block_butte(shape, bh):
     d = sd_convex_polygon(footprint at two orthogonal joint azimuths, cross-joints ~1.7x wider)  # (10)
+    d = gaussian(d, corner_round)   # a short diffusion of the SDF rounds the ~90° joint corners — sharp
+                                    #   exposed corners weather fastest, so a perfectly square block reads fake
     profile: d<=0 -> flat top bh; thin cliff band -> near-vertical; then talus at repose_tan down to 0
     add a resistant caprock lip at the rim; roughen the scree
     return max(profile, 0)     # place, combine with max/smax, then run thermal (05) for real talus
@@ -289,9 +298,10 @@ fault_block_butte(shape, bh):
 
 These stamp a profile directly, so honour the chapter's **central claim** where it matters: a butte's
 cliff is *most* honest as an emergent break-of-slope in a layered-`K` field; the primitive is the
-art-directed shortcut. `canyon`'s `quantise` benches are a terrace-style height op — acceptable as part
-of the *primitive* (before any flow routing), but never run `terrace` *after* erosion (it destroys the
-drainage — see Terracing above).
+art-directed shortcut. Note `canyon` quantises benches by **absolute elevation** (horizontal strata),
+*not* by distance-to-river — so the terraces are geologically correct (flat, stationary, cut through by
+the meander), and this is a *primitive* step done before any flow routing; still never run `terrace`
+*after* erosion (it destroys the drainage — see Terracing above).
 
 ## When the heightfield fails
 

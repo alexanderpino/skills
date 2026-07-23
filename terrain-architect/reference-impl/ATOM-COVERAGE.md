@@ -12,9 +12,12 @@ over these atoms and live in `landforms.py`; this file is only about the atoms.
 here. They are meant to correspond. `tests/test_atom_coverage.py` is the anti-drift harness that keeps
 them honest: every atom listed as *implemented* below must exist as a callable in its module, the
 reference module's public surface must not contain an atom missing from this list, and every
-*deferred* atom must be genuinely absent from the code (documented, not silently half-built). What the
-harness does **not** prove is that the pseudocode is numerically correct — that is what the per-atom
-oracle tests (`test_noise.py`, `test_ops_filters.py`, the solver tests) are for.
+*deferred* atom must be genuinely absent from the code (documented, not silently half-built). The same
+harness also guards the **landform generators** (macros over the atoms — `mountain`, `ridge`, `volcano`,
+`canyon`, `fault_block_butte`): each must stay named in its chapter (`11`) pseudocode. What the harness
+does **not** prove is that the pseudocode is numerically correct, nor that its CONSTANTS match the code
+(e.g. a profile exponent) — pseudocode↔code *constant* drift is caught by the review/faithfulness passes,
+and numerical correctness by the per-atom oracle tests (`test_noise.py`, `test_ops_filters.py`, the solver tests).
 
 ## Implemented atomic bases
 

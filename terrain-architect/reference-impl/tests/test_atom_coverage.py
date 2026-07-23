@@ -38,6 +38,19 @@ DEFERRED = {"OpenSimplex2": "references/01-noise.md", "Wavelet": "references/01-
 
 _ATOMS = [(m, f) for m, fns in IMPLEMENTED.items() for f in fns]
 
+# Landform GENERATORS (macros over the atoms) must stay DOCUMENTED in their chapter — an existence guard
+# against adding/keeping a generator with no backing pseudocode (the Simplex/Gabor drift class, for the
+# generator family). This checks the generator is named in the chapter; it does NOT verify that the
+# pseudocode's CONSTANTS match the code (e.g. a profile exponent) — prose-vs-code constant drift is caught
+# by the review/faithfulness passes, not here.
+GENERATORS = {
+    "mountain": "references/11-geological.md",
+    "ridge": "references/11-geological.md",
+    "volcano": "references/11-geological.md",
+    "canyon": "references/11-geological.md",
+    "fault_block_butte": "references/11-geological.md",
+}
+
 
 def _public_callables(module_name):
     mod = importlib.import_module(module_name)
@@ -72,6 +85,15 @@ def test_ops_surface_is_fully_accounted_for():
     """Every public ops_filters function is either a listed atom or an explicit non-atom filter."""
     unaccounted = _public_callables("ops_filters") - set(IMPLEMENTED["ops_filters"]) - _OPS_NON_ATOM
     assert not unaccounted, f"ops_filters functions neither atom nor listed non-atom: {sorted(unaccounted)}"
+
+
+@pytest.mark.parametrize("fn,chapter", GENERATORS.items())
+def test_landform_generators_are_documented(fn, chapter):
+    """Each landform generator must exist AND be named in its chapter's pseudocode — so a generator can't
+    be added (or kept) as code-only. (Existence only; constant-level faithfulness is a review concern.)"""
+    lf = importlib.import_module("landforms")
+    assert callable(getattr(lf, fn, None)), f"landforms.{fn} missing"
+    assert fn in (SKILL_ROOT / chapter).read_text(encoding="utf-8"), f"landforms.{fn} not documented in {chapter}"
 
 
 @pytest.mark.parametrize("name,chapter", DEFERRED.items())
