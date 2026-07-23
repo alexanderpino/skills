@@ -120,6 +120,14 @@ Erosion exploiting a fault-weakened line produces valleys that follow structure,
 exactly what real faulted terrain looks like. Implement as a spatially varying erodibility
 `K(x,y)` rather than as height displacement — that is the geologically correct coupling.
 
+*Runnable reference: `reference-impl/tectonics.py` — `fault_scarp` is this `faultIteration`
+(feathered offsets, decaying displacement → fault blocks); `fault_weakness` is the K(x,y) coupling
+(fault traces set MORE erodible), fed to `erosion_streampower.stream_power_evolve`. Verified by
+`tests/test_tectonics.py`: the scarp offsets a flat field finitely and deterministically, and the
+decisive check — with the fault-weakened K, far more of the fault cells end up as valley floor than
+chance (structure-controlled drainage). The scarp is an F-tier fractal; the K coupling is P-tier once
+the erosion runs on it.*
+
 ## Islands and continents
 
 ```

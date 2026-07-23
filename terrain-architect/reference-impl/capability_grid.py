@@ -365,6 +365,14 @@ def CELLS():
                                spread_deg=66.0, lobes=6, seed=seed)
         return hill(_cr(h, 4), cell)
     add("16 Alluvial fans (bajada)", "fans debouch at the range front, thin downfan, coalesce -> bajada", _bajada)
+    def _faultblocks():
+        import tectonics as TEC
+        n = 130; cell = 40.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        base = noise.fbm(xx2 * 0.04, yy2 * 0.04, 7, octaves=5) * 160 + 400
+        h = TEC.fault_scarp(base, n_faults=6, displacement=520, width=2.5, decay=0.62,
+                            cellsize=cell, seed=4)                     # decaying displacement -> blocks
+        return hill(_cr(h, 4), cell)
+    add("02 Fault scarps (blocks)", "faults offset terrain into blocks; fault-as-K -> structure-controlled valleys", _faultblocks)
 
     return C
 

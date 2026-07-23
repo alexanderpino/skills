@@ -38,8 +38,10 @@ virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), s
 (`shallow_water.simulate`), lateral fluvial migration (`meander.migrate`, with the F-tier
 height-field realisation `meander.burn_channel`), glacial erosion (`glacier.glacier_carve` —
 SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier), the dynamic
-snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), and aeolian
-abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier). The meander solver is the one atom that runs on a
+snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), aeolian
+abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier), and structural
+tectonics (`tectonics.fault_scarp` displacement fractal + `tectonics.fault_weakness` — the fault-as-
+`K(x,y)` coupling that feeds stream power so valleys follow structure). The meander solver is the one atom that runs on a
 **centreline (polyline)**, not the height field — an agent model (`07`) — and its migration physics
 is the upstream-lagged near-bank velocity (Ikeda–Parker–Sawai 1981), documented in chapter `03`.
 

@@ -30,6 +30,7 @@ IMPLEMENTED = {
     "glacier": ["glacier_carve"],
     "snow": ["snow_step", "thermal_on_layer"],
     "aeolian": ["yardang"],
+    "tectonics": ["fault_scarp", "fault_weakness"],
 }
 
 # ops_filters also carries a filter/morphology TOOLBOX that is not a generative atom — excluded from
