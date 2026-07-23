@@ -7,6 +7,15 @@ every module ships a test that asserts the *exact oracle* the skill's verificati
 so a reader can **run the skill's own algorithms and watch `09`'s checks pass**, and so the
 claims in the references are executable rather than merely asserted.
 
+> **Contributor rule — keep code and pseudocode in lockstep.** Any change to a reference `*.py`
+> that alters an algorithm or a named constant (an exponent, coefficient, threshold) MUST land its
+> matching chapter/pseudocode edit in the *same commit* — the pseudocode is the spec, the code is its
+> faithful mirror, and they must never drift. Adding a new atom or landform generator? Document it in
+> its chapter and register it in `ATOM-COVERAGE.md` (the `tests/test_atom_coverage.py` harness enforces
+> that a generator/atom stays documented, but it does **not** check that pseudocode *constants* match the
+> code — that stays your responsibility as the author). Display-only tweaks (`capability_grid.py`, other
+> render scripts) and pure code comments need no chapter edit.
+
 This repository currently provides no separate licence grant for these files. Treat them as
 executable evidence, not code that may automatically be copied into a product. Engine
 implementations consume the neutral pseudocode, grounding decisions and oracles from the
