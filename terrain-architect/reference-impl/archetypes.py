@@ -336,11 +336,13 @@ FAMILY = {                                        # archetype/world name -> biom
 }
 
 
-def substance_color(h, family, cell=CELL):
+def substance_color(h, family, cell=CELL, climate=None):
     """Colour a tile by the SUBSTANCES on it, WITH DEPTH: loose materials pile up and fill the
     crevices (analysis.deposit_fill), building a surface smoother than the bedrock, and snow covers
-    the gullies it drifts into. Returns (float RGB 0-255, drainage area, piled surface)."""
-    bio, clim = BIOME[family], BIOME[family]["climate"]
+    the gullies it drifts into. `climate` overrides the biome's default (e.g. a lower snowline).
+    Returns (float RGB 0-255, drainage area, piled surface)."""
+    bio = BIOME[family]
+    clim = climate if climate is not None else bio["climate"]
     slope = analysis.slope(h, cell)
     area = flow.d8_accumulation(flow.priority_flood_fill(h), cell)
     stack = analysis.derive_substances(h, slope, area, cell, climate=clim, rng_seed=0)
