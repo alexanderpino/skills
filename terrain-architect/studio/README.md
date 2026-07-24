@@ -100,14 +100,24 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Filter** | Warp (domain warp) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
-| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** |
+| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (colour LUT node) |
 | **Output** | Output (drives the viewport / export) |
 
-**Water and snow are nodes, not global switches.** Add a **Water** or **Snow** node and wire it into the
-pipeline (e.g. `… → erosion → Snow → Water → Output`); the viewport picks up whichever effect nodes feed
-the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes + downhill rivers) or the
-simple **Sea level** (a flat ocean at a level). Effect nodes pass the height through unchanged — they add
-a scene layer, so deleting one removes just that effect.
+**Water, snow and colour are nodes, not global switches.** Add a **Water**, **Snow** or **SatMap** node and
+wire it into the pipeline (e.g. `… → erosion → Snow → Water → SatMap → Output`); the viewport picks up
+whichever effect nodes feed the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes +
+downhill rivers) or the simple **Sea level** (a flat ocean at a level). Effect nodes pass the height through
+unchanged — they add a scene layer, so deleting one removes just that effect.
+
+**The SatMap node — Gaea's colouring model.** In Gaea a SatMap is a *node* that colours a terrain through a
+gradient, driven by **whatever grayscale you feed it** (not only height). This node mirrors that: it takes
+an **In** (the height, passed through unchanged) and an optional **Driver** input, with **Driven by** =
+*Driver ▸ / Height*, *Height*, or *Slope*. So you can colour by **elevation** (the classic SatMap), by
+**slope** (cliffs one colour, benches another), or by **any field you wire into Driver** (flow, a mask, a
+Blend). It picks a **Gradient** from the SatMap library (including ones you author in SatMap Studio), and
+applies **Reverse**, a **Range** (use just a slice of the gradient) and a **Shift** (offset the lookup) —
+the same transforms Gaea's SatMap node exposes. With no SatMap node in the graph, the viewport falls back
+to the global SatMap dropdown driven by elevation.
 
 ## Controls
 

@@ -345,6 +345,8 @@ const SATMAPS={
  Tundra:[[0,[19,26,30]],[.125,[33,33,32]],[.208,[60,43,37]],[.292,[89,54,43]],[.375,[113,65,51]],[.458,[130,76,62]],[.542,[141,91,77]],[.625,[145,110,99]],[.708,[151,135,128]],[.792,[167,167,162]],[.875,[196,204,200]],[1,[220,231,228]]]
 };
 let satName="Temperate";
+let satUniform={lo:0,hi:1,shift:0,reverse:0};   // SatMap-node Range/Shift/Reverse applied to the driver in the terrain shader
+function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
 function sunDir(){const ce=Math.cos(sun.el);return[ce*Math.cos(sun.az),Math.sin(sun.el),ce*Math.sin(sun.az)];}
 // A real, public-domain USGS/SRTM heightmap (Colorado Plateau, 128²) embedded so a real-world area
@@ -658,6 +660,16 @@ const TYPES={
     passthrough:true,effect:"snow",
     params:[P.slider("amount","Amount",0,1,0.5)],
     eval:(p,ins)=>ins[0]||newField()},
+  satmap:{cat:"effect",name:"SatMap",ins:["In","Driver"],desc:"Colour the terrain through a gradient LUT — driven by the height, its slope, or any field wired into Driver (Gaea's SatMap). In passes through unchanged.",
+    passthrough:true,effect:"satmap",
+    params:[P.select("gradient","Gradient",null,"Temperate"),
+      P.seg("source","Driven by",[["auto","Driver ▸ / Height"],["height","Height"],["slope","Slope"]],"auto"),
+      P.seg("reverse","Reverse",[["off","Off"],["on","On"]],"off"),
+      P.slider("rangeLo","Range low",0,1,0),P.slider("rangeHi","Range high",0,1,1),
+      P.slider("shift","Shift",-0.5,0.5,0)],
+    eval:(p,ins,nd)=>{const h=ins[0]||newField();
+      let drv=p.source==="slope"?normalize(slopeOf(h)):p.source==="height"?h:(ins[1]||h);
+      nd._driver=normalize(drv);return h;}},
 
   output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
     params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
@@ -676,13 +688,14 @@ function makeNode(type,x,y){
 function nodeById(id){return nodes.find(n=>n.id===id);}
 function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
-function collectScene(){                            // walk upstream from Output; pick the nearest Water / Snow effect nodes
-  const s={water:null,snow:null};const out=outputNode();if(!out)return s;
+function collectScene(){                            // walk upstream from Output; pick the nearest Water / Snow / SatMap effect nodes
+  const s={water:null,snow:null,satmap:null};const out=outputNode();if(!out)return s;
   const q=[out.id],seen=new Set();
   while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);
     const nd=nodeById(id);if(!nd)continue;
     if(nd.type==="water"&&!s.water)s.water={...nd.params};
     if(nd.type==="snow"&&!s.snow)s.snow={...nd.params};
+    if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params,driver:nd._driver};
     edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
   return s;
 }
@@ -938,7 +951,8 @@ function buildField(pr){
     f.appendChild(inp);
   }else if(pr.type==="select"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
-    const s=document.createElement("select");s.className="inp";pr.opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
+    const opts=pr.opts||(pr.key==="gradient"?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
+    const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
     s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
   }else if(pr.type==="seg"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
@@ -1018,7 +1032,7 @@ let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world 
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
 // walking upstream from the Output and picking up any Water / Snow effect nodes and their params.
-let scene={water:null,snow:null};
+let scene={water:null,snow:null,satmap:null};
 const SHADE=["SatMap","Slope","Grey"];
 function initGL(){
   gl=glc.getContext("webgl2",{antialias:true,alpha:false})||glc.getContext("webgl",{antialias:true,alpha:false});
@@ -1026,26 +1040,28 @@ function initGL(){
   const g2=(typeof WebGL2RenderingContext!=="undefined")&&(gl instanceof WebGL2RenderingContext);
   // ---------- STAGE 1: opaque terrain (+ snow accumulation) ----------
   const tVs=(g2?`#version 300 es
-    in vec3 pos;in vec3 nrm;in float hgt;out vec3 vN;out float vH;out vec3 vW;
+    in vec3 pos;in vec3 nrm;in float hgt;in float drive;out vec3 vN;out float vH;out float vD;out vec3 vW;
     uniform mat4 uMVP;uniform mat4 uM;
-    void main(){vN=nrm;vH=hgt;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
-  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;varying vec3 vN;varying float vH;varying vec3 vW;
+    void main(){vN=nrm;vH=hgt;vD=drive;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
+  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;attribute float drive;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;
     uniform mat4 uMVP;uniform mat4 uM;
-    void main(){vN=nrm;vH=hgt;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
+    void main(){vN=nrm;vH=hgt;vD=drive;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
   const tFs=(g2?`#version 300 es
-    precision highp float;in vec3 vN;in float vH;in vec3 vW;out vec4 frag;
+    precision highp float;in vec3 vN;in float vH;in float vD;in vec3 vW;out vec4 frag;
     #define SAMP texture
     #define OUT frag
-    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`
-  :`precision highp float;varying vec3 vN;varying float vH;varying vec3 vW;
+    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
+  :`precision highp float;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;
     #define SAMP texture2D
     #define OUT gl_FragColor
-    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`)+`
+    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
     void main(){
       vec3 N=normalize(vN);float slope=1.0-N.y;
-      // ---- ALBEDO (unlit material colour) : SatMap LUT by elevation, rock on steeps, snow on high flats ----
+      // ---- ALBEDO (unlit material colour) : SatMap LUT by the DRIVER (height/slope/any input), rock on steeps, snow on high flats ----
       vec3 base;
-      if(uShade==0)base=SAMP(uSat,vec2(clamp(vH,.001,.999),0.5)).rgb;   // SatMap colour LUT by elevation
+      float dv=(uReverse>0.5)?1.0-vD:vD;                                // SatMap driver -> Reverse, then Range slice + Shift
+      float sc=clamp(mix(uRange.x,uRange.y,dv)+uShift,0.001,0.999);
+      if(uShade==0)base=SAMP(uSat,vec2(sc,0.5)).rgb;                    // SatMap colour LUT indexed by the driver
       else if(uShade==1)base=mix(vec3(.32,.5,.34),vec3(.5,.34,.28),smoothstep(.15,.6,slope));
       else base=vec3(.72);
       float rockAmt=smoothstep(.35,.8,slope)*.6;
@@ -1208,7 +1224,7 @@ function initGL(){
     USE_DEFERRED=true;
   }
   buildSatLUT(satName);
-  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),gridXZ:gl.createBuffer(),
+  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),drive:gl.createBuffer(),gridXZ:gl.createBuffer(),
            wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
   gl.enable(gl.DEPTH_TEST);
@@ -1242,9 +1258,16 @@ function updateViewport(f){
     const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
     const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2;const L=Math.hypot(sx,1,sz)||1;
     nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
+  // SatMap driver attribute: default = elevation; a SatMap node can drive colour by slope or any wired field.
+  const sm=scene.satmap;const drv=new Float32Array(n*n);
+  if(sm&&sm.driver){const dn=normalize(sm.driver);for(let i=0;i<n*n;i++)drv[i]=dn[i];
+    satUniform={lo:sm.rangeLo,hi:sm.rangeHi,shift:sm.shift,reverse:sm.reverse==="on"?1:0};}
+  else{for(let i=0;i<n*n;i++)drv[i]=hgt[i];satUniform={lo:0,hi:1,shift:0,reverse:0};}
+  if(!satDrawerOpen())buildSatLUT(sm?sm.gradient:satName);  // node gradient overrides the global dropdown (unless the editor is live)
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,drv,gl.DYNAMIC_DRAW);
   if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);} // terrain height for composite lighting
   curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
   let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];             // cheap checksum: skip fill/accum when the terrain is unchanged
@@ -1350,8 +1373,9 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
   {const sd=sunDir();gl.uniform3f(u(terrainProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
   gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
   gl.uniform1i(u(terrainProg,"uDeferred"),deferred?1:0);
+  gl.uniform2f(u(terrainProg,"uRange"),satUniform.lo,satUniform.hi);gl.uniform1f(u(terrainProg,"uShift"),satUniform.shift);gl.uniform1f(u(terrainProg,"uReverse"),satUniform.reverse);
   gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,satTex);gl.uniform1i(u(terrainProg,"uSat"),3);
-  bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);
+  bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);bindAttr(terrainProg,"drive",1,buffers.drive);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
 }
@@ -1491,7 +1515,7 @@ $("#satSel").onchange=e=>{satName=e.target.value;buildSatLUT(satName);};
     computeHist();drawer.classList.add("open");render();
   }
   function close(revert){drawer.classList.remove("open");shadeMode=prevShade;$("#shadeSel").textContent=SHADE[shadeMode];
-    if(revert!==false)buildSatLUT(satName);}                              // restore the selected map unless we applied
+    if(revert!==false)buildSatLUT(scene&&scene.satmap?scene.satmap.gradient:satName);}   // restore the active map unless we applied
   $("#satGenBtn").onclick=()=>drawer.classList.contains("open")?close():open();
   $("#sgClose").onclick=()=>close();
 
