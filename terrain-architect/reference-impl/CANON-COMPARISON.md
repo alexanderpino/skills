@@ -16,6 +16,21 @@ How to refresh: fetch the canon listed below (Commons API search → `Special:Fi
 raw README images for the reference repos), render the matching tile from `capability_grid.py`,
 and compare. Two review rounds + one algorithm round were run in 2026-07; verdicts below.
 
+## Research-paper figure canon (the strictest: the figure from the paper we cite)
+
+The most defensible comparison — our render beside the actual figure in the grounding publication
+(figures not redistributed here; fetch the open-access PDFs below and extract with any PDF tool).
+
+| Atom | Paper + figure | Verdict |
+|---|---|---|
+| `erosion_streampower` / Mountain(eroded) / Differential erosion | **Cordonnier et al. 2016**, *Large Scale Terrain Generation from Tectonic Uplift and Fluvial Erosion* (CGF; open PDF at cs.purdue.edu/cgvlab, hal.inria.fr) — the top-down eroded-terrain + drainage-network figures | ✅ **same algorithm** (stream-power incision, Braun–Willett solver — which our `tests/test_crossvalidate_landlab.py` also validates numerically): same dendritic branching drainage incised into the massif. Honest deltas: theirs is higher-res and more mature (smoother trunk valleys, larger domain); ours is grainier at 96–180 px; our differential-erosion tile is the *anisotropic* tilted-K case (strike ridges), so it reads structural by design, not isotropic like their figure |
+| `aeolian.yardang` | **Kok et al. 2012**, *The physics of wind-blown sand and dust* (Rep. Prog. Phys.; arXiv 1201.4353), yardang-field panels | ✅ ours matches the **mega-yardang lineation** panel (parallel wind-aligned ridges, ~50 km scale); the discrete 1:4 **teardrop/whaleback** yardangs (individual-scale panels) are the documented open gap (follow-up 5) |
+| `aeolian.yardang` bottom-weighted abrasion | Kok et al. 2012, saltation-trajectory plots (height vs distance, by grain size) | ✅ grounds the `saltation_h` weighting: hop heights are a few cm, concentrated LOW — exactly the bottom-weighted (undercut) abrasion the atom applies |
+
+Not obtained (paywalled / no open figure): Werner 1995 (Geology), Blair & McPherson 1994, Braun &
+Willett 2013 originals, Argudo 2020 thesis — the algorithm itself is still grounded (constants
+audited in `99-papers.md`) and, for stream power and SIA, numerically cross-validated in the suite.
+
 ## Algorithm canon (same algorithm, published output)
 
 | Atom | Canon | Verdict |
