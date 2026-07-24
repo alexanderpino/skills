@@ -55,13 +55,19 @@ def lava_flow(bed, source, steps, *, erupt=2.0, T_erupt=1400.0, T_env=25.0, T_so
             outs.append(dL)
             total += dL
         scale = np.where(total > 1e-12, np.minimum(1.0, L / (total + 1e-30)), 0.0)
-        for (di, dj, _), dL in zip(_D8, outs):
+        Hcont = L * T                                  # advect thermal content WITH the lava (SCIARA: temperature
+        newL, newH = L.copy(), Hcont.copy()            # changes by the mixture of lavas between cells), so a flow
+        for (di, dj, _), dL in zip(_D8, outs):         # front stays hot and keeps moving — else it freezes the
+                                                       # instant it reaches a cold cell and no tongue ever forms
             moved = dL * scale
-            L = L - moved
-            L = L + np.roll(np.roll(moved, di, 0), dj, 1)
+            movedH = moved * T                          # the slab carries its SOURCE cell's temperature
+            newL = newL - moved + np.roll(np.roll(moved, di, 0), dj, 1)
+            newH = newH - movedH + np.roll(np.roll(movedH, di, 0), dj, 1)
+        L = newL
+        T = np.where(L > 1e-9, newH / np.maximum(L, 1e-9), T_env)   # recover the advected (mass-mixed) temperature
 
         molten = L > 1e-9
-        T = np.where(molten, T - cool * dt, T_env)
+        T = np.where(molten, T - cool * dt, T_env)     # then cool (radiate/conduct)
         T = np.maximum(T, T_env)
         frozen = molten & (T <= T_solidus)
         bed = bed + np.where(frozen, L, 0.0)

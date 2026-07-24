@@ -77,7 +77,7 @@ failure mode to watch for.
 ### Row 2 — Curl + primitives/ops (01 / 10)
 | Cell | Tile | ✓ confirms | ✗ red flag |
 |---|---|---|---|
-| R2C1 | Curl noise | smooth swirling (divergence‑free) field | sources/sinks, blocky discontinuities |
+| R2C1 | Curl noise | **LIC streamlines** swirl smoothly, no sources/sinks (divergence‑free) | sources/sinks, blocky discontinuities |
 | R2C2 | Convex‑poly SDF | clean polygonal distance field (concentric bands) | rounded circle; wrong sign inside |
 | R2C3 | smooth‑min blend | two shapes fused with a smooth neck | hard crease at the join |
 | R2C4 | Terrace | flat treads + sharp risers, steps that **wander** | perfectly straight contour steps |
@@ -124,7 +124,7 @@ failure mode to watch for.
 | R6C5 | SIA glacier | smooth radial ice dome (Halfar profile) | lumpy; asymmetric; negative ice |
 | R6C6 | Lava CA | a channelised flow tongue that **freezes** downstream | uniform flood; no directed flow |
 | R6C7 | Coastal retreat | a notched, landward‑retreated cliff line | untouched coast; sea eroding uphill |
-| R7C1 | Dunes (Werner) | dune‑like corridors/patches (deposition instability) | uniform sand; pure white noise |
+| R7C1 | Dunes (Werner) | **transverse dunes** — sinuous ridges across the wind, bare corridors between (shadow‑zone + avalanche) | uniform sand; pure white‑noise speckle |
 | R7C2 | Isostatic flexure | a smooth broad deflection basin under the load | point‑spike; ringing |
 | R7C3 | Mass‑consistent wind | smooth flow field (divergence removed) | blocky/noisy; obvious sources |
 | R7C4 | Hero 3D raster | 3D massif, snow on the high core, **translucent** water, no holes | z‑fighting, gaps, opaque water, see‑through faces |

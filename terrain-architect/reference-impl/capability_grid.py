@@ -129,7 +129,10 @@ def CELLS():
     add("01 Hybrid MF", "finite via min(weight,1) clamp", lambda: hill(_norm(noise.hybrid_mf(xx, yy, 5, octaves=6)) * 900))
     add("01 Gabor (anisotropic)", "orientable: bands rotate with omega0", lambda: gray(noise.gabor(*_grid(220, 0.11), seed=2, omega0=0.5)))
     add("01 Domain warp", "warps (flow-like q mask != 0)", lambda: hill(noise.domain_warp(xx, yy, 6, warp=4.0)[0] * 900))
-    add("01 Curl noise", "divergence = 0 to machine epsilon", lambda: gray(noise.curl(xx * 3, yy * 3, 7)[0]))
+    def _curl():                                                     # divergence-free flow: LIC streamlines swirl, no sources/sinks
+        u, v = noise.curl(*_grid(150, 0.06), seed=7)
+        return gray(lic(u, v, seed=1, steps=22))
+    add("01 Curl noise", "divergence-free: LIC streamlines swirl (no sources/sinks)", _curl)
 
     # ---- PRIMITIVES / OPS (10) ----
     def _sdf():
@@ -176,7 +179,7 @@ def CELLS():
         h = L.mountain((150, 150), 30.0, seed=3, style="basic")
         return hill(erosion_droplet.droplet_erode(h, n_droplets=60 * 150, seed=3, brush_radius=2))
     add("04 Droplet erosion", "total volume conserved (~1e-13)", _drop)
-    def _therm():
+    def _therm():                                                     # a cone steeper than repose relaxes to a talus cone
         yy2, xx2 = np.mgrid[0:81, 0:81] - 40
         cone = np.maximum(0, 40 - np.hypot(xx2, yy2)) * 6.0
         return hill(erosion_thermal.thermal_erosion(cone, 0.3, 200, factor=0.25), 5)
@@ -232,7 +235,9 @@ def CELLS():
         return hill(_cr(base + r, 4), cell)                                # base + atom, that's it
     add("11 Ridge (hogback)", "asymmetric hogback (smin-rounded crest, warped strike) on a foothill base", _ridge)
     add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
-    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian)", lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=900, cellsize=20, kind="shield"), 20))
+    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian); barranco-grooved flanks",
+        lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=700, cellsize=20, kind="shield",
+                               barranco=0.30, n_barrancos=28), 20))                # radial erosion gullies (Karátson 2010)
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
     def _butte():
         h = np.zeros((180, 180))
@@ -276,21 +281,30 @@ def CELLS():
         return ramp(H1)
     add("12 SIA glacier", "Halfar exact profile to ~1%; ice conserved", _glac)
     def _lava():
-        xx2, yy2 = _grid(120, 0.06); bed = noise.fbm(xx2, yy2, 2, octaves=5) * 300
-        out = sims.lava_flow(bed, (60, 20), 90)               # source = (i, j) point
-        lav = out[0] if isinstance(out, tuple) else out
-        return hill(np.asarray(lav), 30)
-    add("19 Lava CA", "Bingham yield gate; freezes; mass budget", _lava)
+        n = 120; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        bed0 = 600 - 3.2 * yy2 + noise.fbm(xx2 * 0.05, yy2 * 0.05, 2, octaves=4) * 40   # a slope to flow down
+        out = sims.lava_flow(bed0, (12, 60), 170, erupt=4.0, cool=6.0)   # vent near the top -> (bed, L, T, budget)
+        bed, molten = (out[0], out[1]) if isinstance(out, tuple) else (out, np.zeros_like(bed0))
+        lava = np.clip(bed - bed0, 0.0, None) + molten        # frozen + still-molten thickness = the flow tongue
+        shade = render.hillshade(bed, 30).astype(float)
+        m = lava > 1e-6
+        a = (np.clip(lava / (np.percentile(lava[m], 55) + 1e-6), 0, 1)[..., None] * 0.95) if m.any() else np.zeros(bed.shape + (1,))
+        return np.clip(shade * (1 - a) + np.array([230., 90, 35]) * a, 0, 255).astype(np.uint8)  # basalt tongue (hot)
+    add("19 Lava CA", "Bingham yield gate: a flow tongue that freezes; mass budget", _lava)
     def _coast():
         xx2, yy2 = _grid(140, 0.05); h = yy2 * 60 + noise.fbm(xx2, yy2, 3, octaves=4) * 40
-        out = sims.coastal_retreat(h, 120.0, 30)
+        sea = 120.0
+        out = sims.coastal_retreat(h, sea, 30)
         hc = out[0] if isinstance(out, tuple) else out
-        return hill(hc, 20)
-    add("12 Coastal retreat", "cliff retreats landward (monotone)", _coast)
+        shade = render.hillshade(hc, 20).astype(float)
+        under = (hc < sea)[..., None]                         # below sea level -> water (shows the cut platform)
+        return np.clip(np.where(under, np.array([44., 92, 150]), shade), 0, 255).astype(np.uint8)
+    add("12 Coastal retreat", "wave-cut platform; cliff retreats landward (monotone)", _coast)
     def _dunes():
-        rng = np.random.default_rng(0); sand = (rng.random((120, 120)) * 6).astype(int)
-        return gray(dunes.werner_dunes(sand, 40, seed=0, p_sand=0.75, p_bare=0.25, wind=(0, 1)))
-    add("05 Dunes (Werner)", "slabs conserved; p_sand>p_bare instability", _dunes)
+        rng = np.random.default_rng(0); sand = (rng.random((110, 110)) * 3 + 1).astype(int)   # thin sand sheet
+        d = dunes.werner_dunes(sand, 70, seed=0, p_sand=0.6, p_bare=0.1, hop=3, wind=(0, 1))    # full Werner model
+        return hill(d.astype(float) * 8.0, 1.0)                                                 # hillshade the dune surface
+    add("05 Dunes (Werner)", "shadow-zone + avalanche -> transverse dunes; slabs conserved", _dunes)
     def _flex():
         n = 160; load = np.zeros((n, n)); load[70:90, 70:90] = 2.5e8
         D = isostasy.flexural_rigidity(7e10, 20e3)
@@ -327,8 +341,11 @@ def CELLS():
     def _glacier():
         import glacier as GLAC
         n = 110; cell = 100.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        bed0 = 2700 - 28 * yy2 + 22 * np.minimum(np.abs(xx2 - n * 0.30), np.abs(xx2 - n * 0.70))
-        bed0 = np.maximum(bed0, 2700 - 28 * yy2)                        # two parallel valleys + a ridge
+        c1 = n * 0.32 + 13.0 * noise.fbm(yy2 * 0.05, xx2 * 0 + 3.0, 4, octaves=3)   # sinuous valley axes
+        c2 = n * 0.70 + 13.0 * noise.fbm(yy2 * 0.05, xx2 * 0 + 9.0, 5, octaves=3)   # (meander down-valley)
+        bed0 = 2700 - 26 * yy2 + 20 * np.minimum(np.abs(xx2 - c1), np.abs(xx2 - c2))
+        bed0 = np.maximum(bed0, 2700 - 26 * yy2)                        # two curving valleys + interfluve
+        bed0 = bed0 + noise.fbm(xx2 * 0.13, yy2 * 0.13, 4, octaves=5) * 170   # rough bedrock (breaks ramp banding)
         bed, H, mor = GLAC.glacier_carve(bed0, np.zeros((n, n)), 8, ela=1820, beta=0.003,
                                          b_max=0.4, K_g=6e-4, dt=40.0)   # SIA ice + bed abrasion
         shade = render.hillshade(_cr(bed, 5), cell).astype(float)
@@ -364,12 +381,14 @@ def CELLS():
     add("16 Yardangs (wind abrasion)", "streamlined ridges || wind; low ground cut fastest (undercut)", _yardang)
     def _bajada():
         n = 150; cell = 12.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        front = 40.0 + 7.0 * noise.fbm(xx2 * 0.06, xx2 * 0 + 2.0, 5, octaves=3)   # IRREGULAR range front
         base = 250 - 1.2 * yy2 + noise.fbm(xx2 * 0.05, yy2 * 0.05, 7, octaves=4) * 10
-        base[:40] += (40 - yy2[:40]) * 8                               # mountains above the range front
+        mtn = np.clip(front - yy2, 0.0, None)                          # mountain mask above the front
+        base = base + mtn * 6.0 + (noise.fbm(xx2 * 0.10, yy2 * 0.10, 8, octaves=4) * 60.0) * (mtn > 0)   # textured massif
         h = base.copy()
         for aj, seed in [(38, 1), (80, 4), (118, 7)]:                 # three fans -> coalesce to a bajada
-            h = L.alluvial_fan(h, (40, aj), downfan=(1.0, 0.0), flux=7.0, length=95.0,
-                               spread_deg=66.0, lobes=6, seed=seed)
+            h = L.alluvial_fan(h, (40, aj), downfan=(1.0, 0.0), flux=10.0, length=100.0,
+                               spread_deg=64.0, lobes=6, seed=seed)
         return hill(_cr(h, 4), cell)
     add("16 Alluvial fans (bajada)", "fans debouch at the range front, thin downfan, coalesce -> bajada", _bajada)
     def _faultblocks():

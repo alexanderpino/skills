@@ -251,8 +251,11 @@ tell the user why a linear wind-strength slider feels wrong.
 
 ## Werner (1995) — the implementable model
 
-*Runnable reference: `reference-impl/dunes.py`, verified by `tests/test_dunes.py` — slabs conserved
-exactly; the `p_sand > p_bare` instability sweeps ground bare between dunes; deterministic (`09`).*
+*Runnable reference: `reference-impl/dunes.py`, verified by `tests/test_dunes.py` — the FULL model
+(all three ideas below): slabs conserved exactly; the `p_sand > p_bare` instability sweeps ground
+bare (shown on the minimal variant, `shadow=False, avalanche=False`); the lee **shadow zone** +
+**avalanching** organise **transverse dunes** (ridge signal ≫ the minimal variant); deterministic
+(`09`). `hop` is the saltation length (≈3 cells); a longer hop sets a longer dune wavelength.*
 
 *Eolian dunes: computer simulations and attractor interpretation.* A cellular automaton with
 sand "slabs". This is what to actually build. It is remarkably short and it produces barchans,

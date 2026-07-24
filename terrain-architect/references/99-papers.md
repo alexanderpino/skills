@@ -155,7 +155,13 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Werner, B.T. (1995).** *Eolian dunes: Computer simulations and attractor interpretation.*
   Geology 23(12), 1107–1110. — **The implementable dune model.** Slab CA with shadow zone and
   differential deposition probability. Produces barchan/transverse/linear/star dunes from wind
-  regime alone. Under-cited relative to its usefulness.
+  regime alone. Under-cited relative to its usefulness. **Constants** (`reference-impl/dunes.py`):
+  lee shadow line at **15°** (flow-separation/recirculation angle); avalanche at the dry-sand
+  angle of repose **33.7°** = tan⁻¹(2/3), i.e. a 2-slab drop under the standard 1:3 slab aspect.
+- **Momiji, H., Carretero-González, R., Bishop, S.R. & Warren, A. (2000).** *Simulation of the
+  effect of wind speedup in the formation of transverse dune fields.* Earth Surf. Process. Landforms
+  25, 905–918. — Refines Werner: **no erosion inside the lee shadow zone** (the separation bubble),
+  which sharpens slip faces and drives migration. The shadow-capture rule used in `05`.
 - **Tsoar, H. (1983).** *Wind tunnel modeling of echo and climbing dunes.* In M.E. Brookfield &
   T.S. Ahlbrandt (eds), *Eolian Sediments and Processes*, Developments in Sedimentology 38, Elsevier,
   Amsterdam, pp. 247–259. — **Anchored (obstacle) dunes.** The windward-slope angle sets whether sand
@@ -446,6 +452,11 @@ is below.
   10.1007/s00445-007-0168-8. — CA whose evolution function derives from a steady-state
   Navier–Stokes solution for a **Bingham** fluid + simplified heat transfer; run operationally at
   Etna; GPU-ported (*Porting and optimizing MAGFLOW on CUDA*, Annals of Geophysics) (`19`, `15`).
+- **Crisci, G.M., Rongo, R., Di Gregorio, S. & Spataro, W. (2004); D'Ambrosio, Spataro et al.** —
+  **SCIARA**: macroscopic-CA lava flow, Bingham outflow by the *minimisation of differences*, with
+  cooling from **radiative surface loss AND the change of temperature by the mixture of lavas
+  between cells**. That last term = advecting thermal content with the flux — the grounding for the
+  heat advection in `sims_illustrative.lava_flow` (without it a flow front freezes on arrival) (`19`).
 - **Culling, W.E.H. (1960).** *Analytical Theory of Erosion.* Journal of Geology 68(3). —
   Hillslope diffusion / soil creep as `D·∇²h`. The origin of the diffusion term in `04`.
 
