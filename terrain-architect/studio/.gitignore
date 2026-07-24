@@ -1,0 +1,6 @@
+# dev / verification artifacts — not part of the shipped app
+node_modules/
+package.json
+package-lock.json
+_*.js
+_*.png

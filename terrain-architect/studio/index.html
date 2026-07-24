@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Terrain Studio — node-based WebGL terrain generator</title>
+</head>
+<body>
+<style>
+/* ============================================================= TOKENS === */
+:root{
+  --bg:#0f1216; --bg2:#12161c; --panel:#161b22; --panel2:#1c232c; --panel3:#232c37;
+  --line:#2a333f; --line2:#354150; --text:#c9d4e0; --muted:#7c8a9c; --faint:#586573;
+  --accent:#e2a45c; --accent-dim:#a9793f; --water:#4b9fb5;
+  --good:#5cb87a; --warn:#e0b054; --bad:#e0685c;
+  --cat-gen:#5cb87a; --cat-comb:#5c8fe0; --cat-filt:#e2a45c; --cat-ero:#4b9fb5;
+  --cat-mask:#b07de0; --cat-out:#e0685c;
+  --radius:7px; --radius-sm:5px;
+  --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+}
+:root[data-theme="light"]{
+  --bg:#eef1f5; --bg2:#e7ebf1; --panel:#ffffff; --panel2:#f3f6fa; --panel3:#e9eef4;
+  --line:#d3dbe4; --line2:#c1ccd8; --text:#1d2733; --muted:#5c6a7a; --faint:#8794a4;
+  --accent-dim:#b57e3e; --shadow:0 8px 26px rgba(40,60,90,.14);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:13px;line-height:1.45;overflow:hidden;-webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit}
+::selection{background:var(--accent);color:#12161c}
+
+/* ============================================================= LAYOUT === */
+#app{display:grid;grid-template-rows:46px 1fr 26px;height:100vh;width:100vw}
+#topbar{
+  display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);
+  border-bottom:1px solid var(--line);z-index:20;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.2px}
+.brand .mark{width:22px;height:22px;border-radius:6px;
+  background:linear-gradient(150deg,var(--accent),#8a5a2a 70%);position:relative;flex:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.brand .mark::after{content:"";position:absolute;inset:0;border-radius:6px;
+  background:
+    repeating-linear-gradient(115deg,transparent 0 3px,rgba(0,0,0,.28) 3px 4px);opacity:.6}
+.brand small{color:var(--muted);font-weight:400;font-size:11px;letter-spacing:0}
+.tspacer{flex:1}
+.tgroup{display:flex;align-items:center;gap:6px}
+.tsep{width:1px;height:22px;background:var(--line);margin:0 4px}
+.lbl{font-size:10px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);
+  color:var(--text);font-size:12px;cursor:pointer;transition:.12s;white-space:nowrap;
+}
+.btn:hover{background:var(--panel3);border-color:var(--line2)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-dim));
+  border-color:var(--accent-dim);color:#1a1206;font-weight:600}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.icon{padding:0;width:28px;justify-content:center}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+select.btn{appearance:none;padding-right:22px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 12px) 12px,calc(100% - 8px) 12px;background-size:4px 4px;background-repeat:no-repeat}
+
+#main{display:grid;grid-template-columns:1fr 372px;min-height:0;position:relative}
+#graphwrap{position:relative;min-width:0;background:
+  radial-gradient(1200px 800px at 30% 0%,#151b23 0%,var(--bg) 70%)}
+:root[data-theme="light"] #graphwrap{background:radial-gradient(1200px 800px at 30% 0%,#f4f7fb,var(--bg) 70%)}
+#graph{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#graph.panning{cursor:grabbing}
+#graph.linking{cursor:crosshair}
+
+#rail{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);min-width:0}
+#viewport{position:relative;height:52%;min-height:0;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#1b222c,#0e1319)}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.vp-overlay{position:absolute;left:10px;top:9px;display:flex;gap:6px;pointer-events:none;flex-wrap:wrap;max-width:80%}
+.vp-chip{pointer-events:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.3px;
+  background:rgba(10,13,18,.6);border:1px solid var(--line);border-radius:4px;padding:3px 7px;color:var(--muted);backdrop-filter:blur(6px)}
+.vp-chip b{color:var(--text);font-weight:600}
+.vp-tools{position:absolute;right:10px;top:9px;display:flex;gap:5px}
+.vp-tools .btn{height:24px;padding:0 8px;font-size:11px;background:rgba(10,13,18,.55);backdrop-filter:blur(6px)}
+
+/* -- properties -- */
+#props{flex:1;min-height:0;display:flex;flex-direction:column}
+.prop-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.prop-swatch{width:9px;height:22px;border-radius:3px;flex:none;background:var(--accent)}
+.prop-title{font-weight:600;font-size:13px}
+.prop-title small{display:block;color:var(--muted);font-weight:400;font-size:10.5px;letter-spacing:.2px;margin-top:1px}
+.prop-body{flex:1;overflow-y:auto;padding:6px 12px 16px}
+.prop-empty{color:var(--faint);text-align:center;padding:34px 20px;font-size:12px;line-height:1.7}
+.field{margin:11px 0}
+.field .frow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.field label{font-size:11px;color:var(--muted);letter-spacing:.2px}
+.field .val{font-family:var(--mono);font-size:11px;color:var(--text);font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;
+  background:var(--panel3);outline:none;margin:2px 0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--accent);cursor:pointer;border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--panel)}
+select.inp,input.inp{width:100%;height:28px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--radius-sm);color:var(--text);padding:0 8px;font-size:12px;font-family:var(--mono)}
+select.inp{appearance:none}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+.seg button{flex:1;height:26px;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer}
+.seg button.on{background:var(--panel3);color:var(--accent)}
+.hint{font-size:11px;color:var(--faint);line-height:1.5;margin-top:4px}
+.prop-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+
+/* -- add-node menu -- */
+#menu{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line2);
+  border-radius:var(--radius);box-shadow:var(--shadow);width:210px;padding:6px;display:none;max-height:70vh;overflow:auto}
+#menu.open{display:block}
+.menu-cat{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);padding:8px 8px 3px}
+.menu-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px}
+.menu-item:hover{background:var(--panel2)}
+.menu-item .dot{width:8px;height:8px;border-radius:2px;flex:none}
+.menu-item small{color:var(--faint);margin-left:auto;font-family:var(--mono);font-size:10px}
+
+/* -- status bar -- */
+#status{display:flex;align-items:center;gap:16px;padding:0 14px;background:var(--panel);
+  border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+#status .s b{color:var(--text)}
+#status .dotk{width:7px;height:7px;border-radius:50%;background:var(--good);display:inline-block;margin-right:5px}
+#status .grow{flex:1}
+kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:1px 5px;color:var(--muted)}
+
+.toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%) translateY(10px);
+  background:var(--panel3);border:1px solid var(--line2);border-radius:var(--radius);padding:9px 15px;font-size:12px;
+  box-shadow:var(--shadow);opacity:0;transition:.2s;pointer-events:none;z-index:80}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="app">
+  <div id="topbar">
+    <div class="brand"><span class="mark"></span><span>Terrain&nbsp;Studio <small>node&nbsp;· webgl</small></span></div>
+    <div class="tsep"></div>
+    <div class="tgroup">
+      <button class="btn primary" id="addBtn" title="Add node (double-click canvas)">＋ Add node</button>
+      <button class="btn" id="autoBtn" title="Recompute automatically on every edit">Auto ⟳</button>
+      <button class="btn" id="buildBtn" title="Recompute the graph now">Build</button>
+    </div>
+    <div class="tsep"></div>
+    <div class="tgroup">
+      <span class="lbl">Res</span>
+      <select class="btn" id="resSel" title="Working resolution">
+        <option value="128">128²</option><option value="192" selected>192²</option><option value="256">256²</option>
+      </select>
+    </div>
+    <div class="tspacer"></div>
+    <div class="tgroup">
+      <button class="btn" id="importBtn" title="Load a real heightmap (PNG / .r16 raw) as a base">⭳ Import DEM</button>
+      <button class="btn" id="exportBtn" title="Download the output heightmap as 16-bit PNG">⭱ Export height</button>
+      <div class="tsep"></div>
+      <button class="btn icon" id="frameBtn" title="Frame terrain">⤢</button>
+      <button class="btn icon" id="themeBtn" title="Toggle theme">◑</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="graphwrap">
+      <canvas id="graph"></canvas>
+    </div>
+    <div id="rail">
+      <div id="viewport">
+        <canvas id="gl"></canvas>
+        <div class="vp-overlay" id="vpInfo"></div>
+        <div class="vp-tools">
+          <button class="btn" id="shadeSel" title="Cycle shading">Hypsometric</button>
+          <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
+        </div>
+      </div>
+      <div id="props">
+        <div class="prop-head"><div class="prop-swatch" id="pSwatch"></div>
+          <div class="prop-title" id="pTitle">No node selected<small id="pSub">Click a node to edit it</small></div></div>
+        <div class="prop-body" id="pBody"><div class="prop-empty">Select a node in the graph to edit its parameters.<br><br>
+          Double-click empty canvas to add a node. Drag from a node's right port to wire it into another's left port.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">
+    <span class="s"><span class="dotk" id="statDot"></span><span id="statMsg">Ready</span></span>
+    <span class="s">out <b id="statOut">—</b></span>
+    <span class="s">nodes <b id="statNodes">0</b></span>
+    <span class="s">range <b id="statRange">—</b></span>
+    <span class="s">eval <b id="statTime">—</b></span>
+    <span class="grow"></span>
+    <span class="s">drag <kbd>MMB</kbd>/space pan · <kbd>wheel</kbd> zoom · <kbd>Del</kbd> remove · <kbd>F</kbd> frame</span>
+  </div>
+</div>
+<input type="file" id="fileInput" accept=".png,.r16,.raw,.bin" style="display:none">
+<div id="menu"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   TERRAIN STUDIO — a node-based WebGL terrain generator.
+   Compute runs on the CPU (Float32Array heightfields, deterministic,
+   mirrors the pure-numpy reference-impl atoms); the 3D viewport is WebGL2.
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const clamp=(x,a,b)=>x<a?a:x>b?b:x;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=t=>t*t*(3-2*t);
+const fract=x=>x-Math.floor(x);
+
+let RES=192;                                   // working grid resolution (square)
+let AUTO=true;
+
+/* ------------------------------------------------------------ Field --- */
+// A heightfield is a Float32Array of RES*RES, values nominally in [0,1].
+function newField(v=0){const a=new Float32Array(RES*RES);if(v)a.fill(v);return a;}
+function sampleBilinear(f,x,y){            // x,y in grid coords
+  const n=RES;x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+  const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
+  const a=f[i],b=f[i+1],c=f[i+n],d=f[i+n+1];
+  return lerp(lerp(a,b,fx),lerp(c,d,fx),fy);
+}
+function fieldRange(f){let mn=1e9,mx=-1e9;for(let i=0;i<f.length;i++){const v=f[i];if(v<mn)mn=v;if(v>mx)mx=v;}return[mn,mx];}
+function normalize(f){const[mn,mx]=fieldRange(f);const d=mx-mn||1;const o=newField();for(let i=0;i<f.length;i++)o[i]=(f[i]-mn)/d;return o;}
+
+/* --------------------------------------------------- hash & gradients -- */
+function hash2(x,y,s){let h=x*374761393+y*668265263+s*1442695041;h=(h^(h>>>13))*1274126177;return((h^(h>>>16))>>>0)/4294967295;}
+function vnoise(x,y,s){ // value noise, C1 smooth
+  const x0=Math.floor(x),y0=Math.floor(y),fx=smooth(x-x0),fy=smooth(y-y0);
+  const a=hash2(x0,y0,s),b=hash2(x0+1,y0,s),c=hash2(x0,y0+1,s),d=hash2(x0+1,y0+1,s);
+  return lerp(lerp(a,b,fx),lerp(c,d,fx),fy);
+}
+function gnoise(x,y,s){ // gradient (perlin-ish) noise in ~[-1,1] -> [0,1]
+  const x0=Math.floor(x),y0=Math.floor(y),xf=x-x0,yf=y-y0;
+  function grad(ix,iy,dx,dy){const a=hash2(ix,iy,s)*6.2831853;return Math.cos(a)*dx+Math.sin(a)*dy;}
+  const u=smooth(xf),v=smooth(yf);
+  const n00=grad(x0,y0,xf,yf),n10=grad(x0+1,y0,xf-1,yf),n01=grad(x0,y0+1,xf,yf-1),n11=grad(x0+1,y0+1,xf-1,yf-1);
+  return 0.5+0.5*lerp(lerp(n00,n10,u),lerp(n01,n11,u),v)*1.35;
+}
+// fractal sum over a base function
+function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
+  const o=newField();const n=RES;let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    let sum=0,amp=1,f=freq;
+    for(let k=0;k<octaves;k++){
+      let v=base(x/n*f,y/n*f,seed+k*7);
+      if(ridge){v=1-Math.abs(v*2-1);v=v*v;}
+      sum+=v*amp;amp*=gain;f*=lac;
+    }
+    o[y*n+x]=sum/amps;
+  }
+  return ridge?normalize(o):o;
+}
+function worleyField({seed=1,freq=5,mode="f2f1"}){
+  const o=newField();const n=RES,cells=Math.max(2,Math.round(freq));
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const px=x/n*cells,py=y/n*cells,cx=Math.floor(px),cy=Math.floor(py);
+    let f1=9,f2=9;
+    for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
+      const gx=cx+i,gy=cy+j;
+      const fx=gx+hash2(gx,gy,seed),fy=gy+hash2(gx,gy,seed+91);
+      const d=Math.hypot(px-fx,py-fy);
+      if(d<f1){f2=f1;f1=d;}else if(d<f2){f2=d;}
+    }
+    let v=mode==="f1"?f1:mode==="invf1"?1-f1:f2-f1;
+    o[y*n+x]=v;
+  }
+  return normalize(o);
+}
+function gradientField(angleDeg){
+  const o=newField();const n=RES,a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(x/n*cx+y/n*cy);}
+  return normalize(o);
+}
+function radialField(){
+  const o=newField();const n=RES;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=x/n-.5,dy=y/n-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
+  return o;
+}
+
+/* ------------------------------------------------------- modifiers ---- */
+function warpField(inp,{strength=0.12,freq=3,seed=7}){
+  const o=newField();const n=RES,s=strength*n;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const ox=(gnoise(x/n*freq,y/n*freq,seed)-.5)*2*s;
+    const oy=(gnoise(x/n*freq,y/n*freq,seed+53)-.5)*2*s;
+    o[y*n+x]=sampleBilinear(inp,x+ox,y+oy);
+  }
+  return o;
+}
+function terraceField(inp,{steps=8,sharp=0.6}){
+  const o=newField();
+  for(let i=0;i<inp.length;i++){
+    const v=inp[i]*steps;const f=Math.floor(v),frac=v-f;
+    const s=frac<0.5?0.5*Math.pow(frac*2,1+sharp*4):1-0.5*Math.pow((1-frac)*2,1+sharp*4);
+    o[i]=(f+s)/steps;
+  }
+  return o;
+}
+function curveField(inp,{bias=0.5,gain=0.5}){
+  // Schlick bias/gain tone curve; 0.5 = identity for each.
+  const b=clamp(bias,.01,.99),g=clamp(gain,.01,.99);
+  const biasF=(x,k)=>x/(((1/k-2)*(1-x))+1);
+  const gainF=(x,k)=>x<0.5?biasF(2*x,k)/2:1-biasF(2-2*x,k)/2;
+  const o=newField();
+  for(let i=0;i<inp.length;i++){let x=clamp(inp[i],0,1);x=biasF(x,b);x=gainF(x,g);o[i]=clamp(x,0,1);}
+  return o;
+}
+function levelsField(inp,{inLo=0,inHi=1,gamma=1,outLo=0,outHi=1}){
+  const o=newField();const d=(inHi-inLo)||1e-6;const ig=1/Math.max(1e-3,gamma);
+  for(let i=0;i<inp.length;i++){let v=clamp((inp[i]-inLo)/d,0,1);v=Math.pow(v,ig);o[i]=outLo+v*(outHi-outLo);}
+  return o;
+}
+function clampField(inp,{lo=0,hi=1}){const o=newField();for(let i=0;i<inp.length;i++)o[i]=clamp(inp[i],lo,hi);return o;}
+function invertField(inp){const o=newField();for(let i=0;i<inp.length;i++)o[i]=1-inp[i];return o;}
+function blurField(inp,{radius=2}){
+  const n=RES,r=Math.max(1,Math.round(radius));const tmp=newField(),o=newField();
+  const w=[];let ws=0;for(let k=-r;k<=r;k++){const g=Math.exp(-(k*k)/(2*(r*0.6)*(r*0.6)));w.push(g);ws+=g;}
+  for(let i=0;i<w.length;i++)w[i]/=ws;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=inp[y*n+clamp(x+k,0,n-1)]*w[k+r];tmp[y*n+x]=s;}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,n-1)*n+x]*w[k+r];o[y*n+x]=s;}
+  return o;
+}
+function histEqualizeField(inp,{bins=256,amount=1}){
+  const[mn,mx]=fieldRange(inp);const d=mx-mn||1;const hist=new Float64Array(bins);
+  for(let i=0;i<inp.length;i++){const b=clamp(((inp[i]-mn)/d*(bins-1))|0,0,bins-1);hist[b]++;}
+  const cdf=new Float64Array(bins);let acc=0;for(let b=0;b<bins;b++){acc+=hist[b];cdf[b]=acc;}
+  const tot=cdf[bins-1]||1;const o=newField();
+  for(let i=0;i<inp.length;i++){const b=clamp(((inp[i]-mn)/d*(bins-1))|0,0,bins-1);const eq=cdf[b]/tot;o[i]=lerp((inp[i]-mn)/d,eq,amount);}
+  return o;
+}
+
+/* ------------------------------------------------------- combiners ---- */
+function combine(a,b,fn){const o=newField();for(let i=0;i<o.length;i++)o[i]=fn(a?a[i]:0,b?b[i]:0);return o;}
+function blendField(a,b,mask,factor){
+  const o=newField();for(let i=0;i<o.length;i++){const t=mask?mask[i]:factor;o[i]=lerp(a?a[i]:0,b?b[i]:0,t);}return o;
+}
+function smin(a,b,k){const h=clamp(0.5+0.5*(b-a)/k,0,1);return lerp(b,a,h)-k*h*(1-h);}
+
+/* ----------------------------------------------------- selectors ------ */
+function slopeOf(inp){
+  const n=RES,o=newField();
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const l=inp[y*n+clamp(x-1,0,n-1)],r=inp[y*n+clamp(x+1,0,n-1)];
+    const u=inp[clamp(y-1,0,n-1)*n+x],d=inp[clamp(y+1,0,n-1)*n+x];
+    o[y*n+x]=Math.hypot((r-l)*0.5,(d-u)*0.5)*n;
+  }
+  return o;
+}
+function slopeSelect(inp,{lo=0.1,hi=0.6,falloff=0.1}){
+  const sl=normalize(slopeOf(inp));const o=newField();
+  for(let i=0;i<o.length;i++){const v=sl[i];
+    const a=smooth(clamp((v-(lo-falloff))/(falloff+1e-4),0,1));
+    const b=smooth(clamp(((hi+falloff)-v)/(falloff+1e-4),0,1));o[i]=a*b;}
+  return o;
+}
+function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
+  const o=newField();
+  for(let i=0;i<o.length;i++){const v=inp[i];
+    const a=smooth(clamp((v-(lo-falloff))/(falloff+1e-4),0,1));
+    const b=smooth(clamp(((hi+falloff)-v)/(falloff+1e-4),0,1));o[i]=a*b;}
+  return o;
+}
+
+/* ------------------------------------------------------- erosion ------ */
+// Thermal (talus) erosion — material above the repose angle slides to lower neighbours.
+function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
+  const n=RES;let h=inp.slice();
+  const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
+  for(let it=0;it<iters;it++){
+    const dh=new Float32Array(n*n);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
+      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
+        const d=c-h[yy*n+xx];const e=d-talus;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
+      if(sum<=0)continue;
+      const move=rate*maxd;let k=0;
+      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(diffs[k]>0){const q=move*diffs[k]/sum;dh[y*n+x]-=q;dh[yy*n+xx]+=q;}k++;}
+    }
+    for(let i=0;i<h.length;i++)h[i]+=dh[i];
+  }
+  return h;
+}
+// Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
+// erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
+function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1}){
+  const n=RES;let h=inp.slice();
+  const R=Math.max(1,radius|0);const brush=[];let bw=0;
+  for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const dd=Math.hypot(dx,dy);if(dd<=R){const w=1-dd/(R+1);brush.push([dx,dy,w]);bw+=w;}}
+  for(const b of brush)b[2]/=bw;
+  let rng=(seed*2654435761)>>>0;const rnd=()=>((rng=(rng*1664525+1013904223)>>>0)/4294967295);
+  const at=(px,py)=>{ // bilinear height + gradient
+    const x0=clamp(px|0,0,n-2),y0=clamp(py|0,0,n-2),fx=px-x0,fy=py-y0,i=y0*n+x0;
+    const a=h[i],b=h[i+1],c=h[i+n],d=h[i+n+1];
+    return{gx:(b-a)*(1-fy)+(d-c)*fy,gy:(c-a)*(1-fx)+(d-b)*fx,
+      hh:a*(1-fx)*(1-fy)+b*fx*(1-fy)+c*(1-fx)*fy+d*fx*fy,x0,y0,fx,fy};
+  };
+  const deposit1=(g,amt)=>{const i=g.y0*n+g.x0;
+    h[i]+=amt*(1-g.fx)*(1-g.fy);h[i+1]+=amt*g.fx*(1-g.fy);h[i+n]+=amt*(1-g.fx)*g.fy;h[i+n+1]+=amt*g.fx*g.fy;};
+  const erode1=(g,amt)=>{for(const[dx,dy,w]of brush){const xx=g.x0+dx,yy=g.y0+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;h[yy*n+xx]-=amt*w;}};
+  for(let d=0;d<droplets;d++){
+    let px=rnd()*(n-1),py=rnd()*(n-1),dx=0,dy=0,speed=1,water=1,sed=0;
+    for(let life=0;life<n*0.7;life++){
+      const g=at(px,py);const hOld=g.hh;
+      dx=dx*inertia-g.gx*(1-inertia);dy=dy*inertia-g.gy*(1-inertia);
+      const len=Math.hypot(dx,dy);if(len<1e-5){dx=rnd()-0.5;dy=rnd()-0.5;}else{dx/=len;dy/=len;}
+      const nx=px+dx,ny=py+dy;
+      if(nx<0||ny<0||nx>=n-1||ny>=n-1)break;
+      const dH=at(nx,ny).hh-hOld;
+      const cap=Math.max(-dH,minSlope)*speed*water*capacity;
+      if(sed>cap||dH>0){                                   // over capacity, or going uphill -> deposit
+        const amt=dH>0?Math.min(dH,sed):(sed-cap)*deposit;deposit1(g,amt);sed-=amt;
+      }else{                                               // under capacity -> scour (brush-distributed)
+        const amt=Math.min((cap-sed)*erode,-dH);erode1(g,amt);sed+=amt;
+      }
+      speed=Math.sqrt(Math.max(0,speed*speed-dH*gravity));water*=(1-evap);
+      px=nx;py=ny;if(water<0.008)break;
+    }
+  }
+  return h;
+}
+
+/* =====================================================================
+   NODE TYPES
+   ===================================================================== */
+const P={
+  slider:(key,label,min,max,def,step=0.01,fmt)=>({key,label,type:"slider",min,max,def,step,fmt}),
+  int:(key,label,min,max,def)=>({key,label,type:"slider",min,max,def,step:1,fmt:v=>v|0}),
+  select:(key,label,opts,def)=>({key,label,type:"select",opts,def}),
+  seg:(key,label,opts,def)=>({key,label,type:"seg",opts,def}),
+};
+const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
+  filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
+  mask:{c:"--cat-mask",name:"Mask"},out:{c:"--cat-out",name:"Output"}};
+
+const TYPES={
+  perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
+    params:[P.int("seed","Seed",1,999,7),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
+      P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
+    eval:(p)=>fbmField(gnoise,{seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain})},
+  ridged:{cat:"gen",name:"Ridged MF",ins:[],desc:"Ridged multifractal — sharp mountain crests.",
+    params:[P.int("seed","Seed",1,999,3),P.slider("freq","Frequency",0.5,12,3.5,0.1),P.int("octaves","Octaves",1,9,6),
+      P.slider("lac","Lacunarity",1.5,3,2.1,0.05),P.slider("gain","Gain",0.3,0.8,0.55,0.01)],
+    eval:(p)=>fbmField(gnoise,{seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,ridge:true})},
+  worley:{cat:"gen",name:"Voronoi",ins:[],desc:"Cellular / Worley noise — plates and cracks.",
+    params:[P.int("seed","Seed",1,999,5),P.slider("freq","Cell density",2,16,6,0.5),P.seg("mode","Mode",[["f2f1","F2−F1"],["f1","F1"],["invf1","1−F1"]],"f2f1")],
+    eval:(p)=>worleyField({seed:p.seed,freq:p.freq,mode:p.mode})},
+  gradient:{cat:"gen",name:"Gradient",ins:[],desc:"Linear or radial ramp — a base slope or falloff.",
+    params:[P.seg("kind","Kind",[["lin","Linear"],["rad","Radial"]],"lin"),P.slider("angle","Angle",0,360,35,1,v=>v|0)],
+    eval:(p)=>p.kind==="rad"?radialField():gradientField(p.angle)},
+  constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
+    params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
+  import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
+    params:[P.slider("scale","Height",0,1,1)],
+    eval:(p,ins,node)=>{if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
+
+  blend:{cat:"comb",name:"Blend",ins:["A","B","Mask"],desc:"Mix A→B by a factor or a mask input.",
+    params:[P.slider("factor","Factor",0,1,0.5)],
+    eval:(p,ins)=>blendField(ins[0],ins[1],ins[2],p.factor)},
+  add:{cat:"comb",name:"Combine",ins:["A","B"],desc:"Arithmetic combine of two fields.",
+    params:[P.seg("op","Op",[["add","Add"],["sub","Sub"],["mul","Mul"]],"add"),P.slider("amt","Amount",0,1,0.5)],
+    eval:(p,ins)=>combine(ins[0],ins[1],p.op==="add"?(a,b)=>a+b*p.amt:p.op==="sub"?(a,b)=>a-b*p.amt:(a,b)=>a*lerp(1,b,p.amt))},
+  maxmin:{cat:"comb",name:"Max / Min",ins:["A","B"],desc:"Union (max) or intersection (min).",
+    params:[P.seg("op","Op",[["max","Max"],["min","Min"]],"max")],
+    eval:(p,ins)=>combine(ins[0],ins[1],p.op==="max"?Math.max:Math.min)},
+  smin:{cat:"comb",name:"Smooth Min",ins:["A","B"],desc:"Crease-free smooth union (Quilez smin).",
+    params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
+    eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
+
+  warp:{cat:"filt",name:"Warp",ins:["In"],desc:"Domain-warp the input by internal noise.",
+    params:[P.slider("strength","Strength",0,0.4,0.12),P.slider("freq","Frequency",0.5,8,3,0.1),P.int("seed","Seed",1,999,7)],
+    eval:(p,ins)=>ins[0]?warpField(ins[0],p):newField()},
+  terrace:{cat:"filt",name:"Terrace",ins:["In"],desc:"Snap to stratified benches.",
+    params:[P.int("steps","Steps",2,24,8),P.slider("sharp","Sharpness",0,1,0.6)],
+    eval:(p,ins)=>ins[0]?terraceField(ins[0],p):newField()},
+  levels:{cat:"filt",name:"Levels",ins:["In"],desc:"Clip range + gamma + output range.",
+    params:[P.slider("inLo","In low",0,1,0),P.slider("inHi","In high",0,1,1),P.slider("gamma","Gamma",0.2,3,1),
+      P.slider("outLo","Out low",0,1,0),P.slider("outHi","Out high",0,1,1)],
+    eval:(p,ins)=>ins[0]?levelsField(ins[0],p):newField()},
+  curve:{cat:"filt",name:"Curve",ins:["In"],desc:"Bias / gain tone curve.",
+    params:[P.slider("bias","Bias",0.05,0.95,0.5),P.slider("gain","Gain",0.05,0.95,0.5)],
+    eval:(p,ins)=>ins[0]?curveField(ins[0],p):newField()},
+  histeq:{cat:"filt",name:"Histogram EQ",ins:["In"],desc:"CDF equalization — spread the tonal range.",
+    params:[P.slider("amount","Amount",0,1,1),P.int("bins","Bins",16,256,256)],
+    eval:(p,ins)=>ins[0]?histEqualizeField(ins[0],p):newField()},
+  blur:{cat:"filt",name:"Blur",ins:["In"],desc:"Separable Gaussian smoothing.",
+    params:[P.slider("radius","Radius",1,10,2,1,v=>v|0)],
+    eval:(p,ins)=>ins[0]?blurField(ins[0],p):newField()},
+  clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
+    params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
+    eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
+  invert:{cat:"filt",name:"Invert",ins:["In"],desc:"1 − height.",params:[],
+    eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
+
+  thermal:{cat:"ero",name:"Thermal erosion",ins:["In"],desc:"Talus: material above repose slides down.",
+    params:[P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5)],
+    eval:(p,ins)=>ins[0]?thermalErode(ins[0],p):newField()},
+  hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In"],desc:"Droplet sim — carves valleys, deposits fans.",
+    params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
+      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1)],
+    eval:(p,ins)=>ins[0]?hydraulicErode(ins[0],p):newField()},
+
+  slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
+    params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],
+    eval:(p,ins)=>ins[0]?slopeSelect(ins[0],p):newField()},
+  heightmask:{cat:"mask",name:"Height select",ins:["In"],desc:"Mask by elevation band.",
+    params:[P.slider("lo","Low",0,1,0.3),P.slider("hi","High",0,1,0.7),P.slider("falloff","Falloff",0.01,0.4,0.12)],
+    eval:(p,ins)=>ins[0]?heightSelect(ins[0],p):newField()},
+
+  output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
+    params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
+    eval:(p,ins)=>{const f=ins[0]||newField();return p.norm==="on"?normalize(f):f;}},
+};
+
+/* =====================================================================
+   GRAPH MODEL
+   ===================================================================== */
+let nodes=[],edges=[],uid=1,selected=null;
+function makeNode(type,x,y){
+  const def=TYPES[type];const p={};def.params.forEach(pr=>p[pr.key]=pr.def);
+  const nd={id:uid++,type,x,y,w:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null};
+  nodes.push(nd);return nd;
+}
+function nodeById(id){return nodes.find(n=>n.id===id);}
+function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
+function outputNode(){return nodes.find(n=>n.type==="output");}
+function markDirtyFrom(id){ // mark node and everything downstream dirty
+  const stack=[id];const seen=new Set();
+  while(stack.length){const cur=stack.pop();if(seen.has(cur))continue;seen.add(cur);
+    const nd=nodeById(cur);if(nd)nd._dirty=true;
+    edges.filter(e=>e.from===cur).forEach(e=>stack.push(e.to));}
+}
+function evalGraph(){
+  const t0=performance.now();
+  const memo={};let evals=0;
+  function ev(id,guard){
+    if(!id)return null;if(guard.has(id))return null;guard.add(id);
+    const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
+    if(!nd._dirty&&nd._field){guard.delete(id);return nd._field;}
+    const def=TYPES[nd.type];const ins=def.ins.map((_,s)=>{const e=inputEdge(id,s);return e?ev(e.from,guard):null;});
+    let f;try{f=def.eval(nd.params,ins,nd);}catch(err){console.error("node",nd.type,err);f=newField();}
+    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;guard.delete(id);return f;
+  }
+  nodes.forEach(n=>{if(n.type==="output"||true)ev(n.id,new Set());}); // eval all (for thumbnails)
+  const out=outputNode();const outF=out?out._field:null;
+  const t1=performance.now();
+  updateViewport(outF);
+  redrawThumbs();
+  const rng=outF?fieldRange(outF):[0,0];
+  $("#statTime").textContent=(t1-t0).toFixed(0)+" ms";
+  $("#statNodes").textContent=nodes.length;
+  $("#statOut").textContent=out?TYPES[out.type].name:"—";
+  $("#statRange").textContent=outF?rng[0].toFixed(2)+" – "+rng[1].toFixed(2):"—";
+  setStat(out?"ok":"warn",out?"Graph evaluated · "+evals+" nodes":"Add an Output node");
+  drawGraph();
+}
+function requestEval(){if(AUTO)evalGraph();else drawGraph();}
+
+/* =====================================================================
+   THUMBNAILS (hillshaded preview baked per node)
+   ===================================================================== */
+const TH=48;
+function bakeThumb(nd){
+  const f=nd._field;if(!f)return null;
+  const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
+  const img=ctx.createImageData(TH,TH);const n=RES;
+  const[mn,mx]=fieldRange(f);const d=mx-mn||1;
+  for(let y=0;y<TH;y++)for(let x=0;x<TH;x++){
+    const sx=x/TH*(n-1),sy=y/TH*(n-1);
+    const h=(sampleBilinear(f,sx,sy)-mn)/d;
+    const hl=(sampleBilinear(f,sx-1,sy)-mn)/d,hr=(sampleBilinear(f,sx+1,sy)-mn)/d;
+    const hu=(sampleBilinear(f,sx,sy-1)-mn)/d,hd=(sampleBilinear(f,sx,sy+1)-mn)/d;
+    const nx=(hl-hr),ny=(hu-hd),nz=0.12;const L=Math.hypot(nx,ny,nz)||1;
+    const sh=clamp((nx*0.5+ny*0.6+nz*0.6)/L,0,1);
+    const col=hyps(h);const s=0.35+0.85*sh;
+    const i=(y*TH+x)*4;img.data[i]=col[0]*s;img.data[i+1]=col[1]*s;img.data[i+2]=col[2]*s;img.data[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);return c;
+}
+function hyps(h){ // hypsometric tint 0..1
+  const stops=[[0.0,[38,58,84]],[0.28,[54,92,74]],[0.45,[120,132,86]],[0.62,[150,124,86]],[0.78,[128,96,72]],[0.92,[196,190,182]],[1,[245,247,250]]];
+  h=clamp(h,0,1);for(let i=0;i<stops.length-1;i++){if(h<=stops[i+1][0]){const t=(h-stops[i][0])/(stops[i+1][0]-stops[i][0]||1);
+    return[lerp(stops[i][1][0],stops[i+1][1][0],t),lerp(stops[i][1][1],stops[i+1][1][1],t),lerp(stops[i][1][2],stops[i+1][1][2],t)];}}
+  return stops[stops.length-1][1];
+}
+function redrawThumbs(){nodes.forEach(n=>{if(!n._thumb)n._thumb=bakeThumb(n);});}
+
+/* =====================================================================
+   GRAPH EDITOR (canvas)
+   ===================================================================== */
+const gc=$("#graph"),gx=gc.getContext("2d");
+let view={x:60,y:70,z:1};
+let drag=null,linking=null,hoverPort=null;
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function resizeGraph(){const r=gc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
+  gc.width=r.width*dpr;gc.height=r.height*dpr;gc.style.width=r.width+"px";gc.style.height=r.height+"px";gx.setTransform(dpr,0,0,dpr,0,0);drawGraph();}
+function toWorld(mx,my){return{x:(mx-view.x)/view.z,y:(my-view.y)/view.z};}
+function nodeH(nd){return 30+TH+8;}
+function portPos(nd,which,slot){
+  const h=nodeH(nd);
+  if(which==="out")return{x:nd.x+nd.w,y:nd.y+h/2};
+  const ins=TYPES[nd.type].ins;const n=ins.length;const gapY=h/(n+1);
+  return{x:nd.x,y:nd.y+gapY*(slot+1)};
+}
+function drawGraph(){
+  const w=gc.clientWidth,h=gc.clientHeight;gx.clearRect(0,0,w,h);
+  // grid
+  gx.save();const g=18*view.z,ox=view.x%g,oy=view.y%g;
+  gx.strokeStyle=css("--line")+"55";gx.lineWidth=1;gx.beginPath();
+  for(let x=ox;x<w;x+=g){gx.moveTo(x,0);gx.lineTo(x,h);}for(let y=oy;y<h;y+=g){gx.moveTo(0,y);gx.lineTo(w,y);}gx.stroke();
+  const g2=90*view.z,ox2=view.x%g2,oy2=view.y%g2;gx.strokeStyle=css("--line")+"aa";gx.beginPath();
+  for(let x=ox2;x<w;x+=g2){gx.moveTo(x,0);gx.lineTo(x,h);}for(let y=oy2;y<h;y+=g2){gx.moveTo(0,y);gx.lineTo(w,y);}gx.stroke();
+  gx.restore();
+  gx.save();gx.translate(view.x,view.y);gx.scale(view.z,view.z);
+  // edges
+  edges.forEach(e=>{const a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)return;
+    const p0=portPos(a,"out"),p1=portPos(b,"in",e.slot);drawWire(p0,p1,(selected&&(selected.id===a.id||selected.id===b.id)));});
+  if(linking){const p0=portPos(nodeById(linking.from),"out");drawWire(p0,linking.cur,true,true);}
+  // nodes
+  nodes.forEach(nd=>drawNode(nd));
+  gx.restore();
+}
+function drawWire(p0,p1,hot,dashed){
+  const dx=Math.max(30,Math.abs(p1.x-p0.x)*0.5);
+  gx.beginPath();gx.moveTo(p0.x,p0.y);gx.bezierCurveTo(p0.x+dx,p0.y,p1.x-dx,p1.y,p1.x,p1.y);
+  gx.lineWidth=hot?2.4:1.8;gx.strokeStyle=hot?css("--accent"):css("--line2");
+  if(dashed){gx.setLineDash([6,5]);}gx.stroke();gx.setLineDash([]);
+}
+function roundRect(x,y,w,h,r){gx.beginPath();gx.moveTo(x+r,y);gx.arcTo(x+w,y,x+w,y+h,r);gx.arcTo(x+w,y+h,x,y+h,r);gx.arcTo(x,y+h,x,y,r);gx.arcTo(x,y,x+w,y,r);gx.closePath();}
+function drawNode(nd){
+  const def=TYPES[nd.type],h=nodeH(nd),sel=selected&&selected.id===nd.id;
+  const cc=css(CAT[def.cat].c);
+  gx.save();
+  gx.shadowColor="rgba(0,0,0,.5)";gx.shadowBlur=sel?18:9;gx.shadowOffsetY=4;
+  roundRect(nd.x,nd.y,nd.w,h,8);gx.fillStyle=css("--panel2");gx.fill();
+  gx.shadowColor="transparent";
+  roundRect(nd.x,nd.y,nd.w,h,8);gx.lineWidth=sel?2:1;gx.strokeStyle=sel?css("--accent"):css("--line2");gx.stroke();
+  // category stripe
+  gx.save();roundRect(nd.x,nd.y,nd.w,h,8);gx.clip();gx.fillStyle=cc;gx.fillRect(nd.x,nd.y,nd.w,3);gx.restore();
+  // title
+  gx.fillStyle=css("--text");gx.font="600 11px "+css("--sans").split(",")[0]+",sans-serif";gx.textBaseline="middle";
+  gx.fillText(def.name,nd.x+10,nd.y+16,nd.w-18);
+  // thumb
+  const tx=nd.x+nd.w/2-TH/2,ty=nd.y+28;
+  if(nd._thumb){gx.drawImage(nd._thumb,tx,ty,TH,TH);}else{gx.fillStyle=css("--panel3");gx.fillRect(tx,ty,TH,TH);}
+  gx.strokeStyle=css("--line");gx.lineWidth=1;gx.strokeRect(tx+.5,ty+.5,TH-1,TH-1);
+  // ports
+  def.ins.forEach((nm,s)=>{const p=portPos(nd,"in",s);drawPort(p,cc,hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="in"&&hoverPort.slot===s);
+    gx.fillStyle=css("--muted");gx.font="9px "+css("--mono");gx.textAlign="left";gx.fillText(nm,p.x+8,p.y);gx.textAlign="left";});
+  if(def.cat!=="out"){const p=portPos(nd,"out");drawPort(p,css("--accent"),hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="out");}
+  gx.restore();
+}
+function drawPort(p,color,hot){gx.beginPath();gx.arc(p.x,p.y,hot?6:4.5,0,7);gx.fillStyle=hot?css("--accent"):css("--panel");gx.fill();
+  gx.lineWidth=2;gx.strokeStyle=color;gx.stroke();}
+function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],h=nodeH(nd);
+  if(wx>=nd.x&&wx<=nd.x+nd.w&&wy>=nd.y&&wy<=nd.y+h)return nd;}return null;}
+function portAt(wx,wy){
+  for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],def=TYPES[nd.type];
+    if(def.cat!=="out"){const p=portPos(nd,"out");if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"out"};}
+    for(let s=0;s<def.ins.length;s++){const p=portPos(nd,"in",s);if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"in",slot:s};}}
+  return null;
+}
+
+/* ---- interaction ---- */
+let spaceDown=false;
+gc.addEventListener("mousedown",e=>{
+  const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const w=toWorld(mx,my);
+  if(e.button===1||spaceDown||(e.button===0&&e.altKey)){drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");return;}
+  const port=portAt(w.x,w.y);
+  if(port){
+    if(port.which==="out"){linking={from:port.node,cur:w};gc.classList.add("linking");}
+    else{const ex=inputEdge(port.node,port.slot);if(ex){edges=edges.filter(x=>x!==ex);linking={from:ex.from,cur:w};markDirtyFrom(port.node);gc.classList.add("linking");}}
+    return;
+  }
+  const nd=nodeAt(w.x,w.y);
+  if(nd){select(nd);drag={node:nd,dx:w.x-nd.x,dy:w.y-nd.y,moved:false};}
+  else{select(null);drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");}
+  drawGraph();
+});
+window.addEventListener("mousemove",e=>{
+  const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const w=toWorld(mx,my);
+  hoverPort=portAt(w.x,w.y);
+  if(drag&&drag.pan){view.x=drag.vx+(mx-drag.sx);view.y=drag.vy+(my-drag.sy);drawGraph();return;}
+  if(drag&&drag.node){drag.node.x=w.x-drag.dx;drag.node.y=w.y-drag.dy;drag.moved=true;drawGraph();return;}
+  if(linking){linking.cur=w;drawGraph();return;}
+  if(hoverPort)drawGraph();
+});
+window.addEventListener("mouseup",e=>{
+  if(linking){const r=gc.getBoundingClientRect(),w=toWorld(e.clientX-r.left,e.clientY-r.top);const port=portAt(w.x,w.y);
+    if(port&&port.which==="in"&&port.node!==linking.from){
+      edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
+      if(!wouldCycle(linking.from,port.node)){edges.push({from:linking.from,to:port.node,slot:port.slot});markDirtyFrom(port.node);requestEval();}
+      else toast("That would create a cycle");
+    }
+    linking=null;gc.classList.remove("linking");drawGraph();
+  }
+  if(drag){gc.classList.remove("panning");drag=null;}
+});
+function wouldCycle(from,to){ // does 'to' already feed 'from'?
+  const stack=[from];const seen=new Set();
+  while(stack.length){const c=stack.pop();if(c===to)return true;if(seen.has(c))continue;seen.add(c);
+    edges.filter(e=>e.to===c).forEach(e=>stack.push(e.from));}
+  return false;
+}
+gc.addEventListener("wheel",e=>{e.preventDefault();const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const f=e.deltaY<0?1.1:1/1.1;const nz=clamp(view.z*f,0.35,2.4);
+  view.x=mx-(mx-view.x)*(nz/view.z);view.y=my-(my-view.y)*(nz/view.z);view.z=nz;drawGraph();},{passive:false});
+gc.addEventListener("dblclick",e=>{const r=gc.getBoundingClientRect();openMenu(e.clientX,e.clientY,toWorld(e.clientX-r.left,e.clientY-r.top));});
+
+/* =====================================================================
+   ADD-NODE MENU
+   ===================================================================== */
+const menu=$("#menu");let menuWorld=null;
+function openMenu(clientX,clientY,world){
+  menuWorld=world;menu.innerHTML="";
+  const cats={};Object.keys(TYPES).forEach(t=>{const c=TYPES[t].cat;(cats[c]=cats[c]||[]).push(t);});
+  Object.keys(CAT).forEach(c=>{if(!cats[c])return;
+    const h=document.createElement("div");h.className="menu-cat";h.textContent=CAT[c].name;menu.appendChild(h);
+    cats[c].forEach(t=>{const def=TYPES[t];const it=document.createElement("div");it.className="menu-item";
+      it.innerHTML=`<span class="dot" style="background:${css(CAT[c].c)}"></span>${def.name}<small>${def.ins.length?def.ins.length+"in":"gen"}</small>`;
+      it.onclick=()=>{const nd=makeNode(t,menuWorld.x-nd0w(t)/2,menuWorld.y-30);select(nd);requestEval();closeMenu();};
+      menu.appendChild(it);});
+  });
+  menu.classList.add("open");
+  const mw=210,mh=Math.min(menu.scrollHeight,window.innerHeight*0.7);
+  menu.style.left=Math.min(clientX,window.innerWidth-mw-8)+"px";
+  menu.style.top=Math.min(clientY,window.innerHeight-mh-8)+"px";
+}
+function nd0w(t){return 150;}
+function closeMenu(){menu.classList.remove("open");}
+window.addEventListener("mousedown",e=>{if(menu.classList.contains("open")&&!menu.contains(e.target)&&e.target.id!=="addBtn")closeMenu();});
+$("#addBtn").onclick=e=>{const r=gc.getBoundingClientRect();openMenu(r.left+80,r.top+70,toWorld(120,120));};
+
+/* =====================================================================
+   PROPERTIES PANEL
+   ===================================================================== */
+function select(nd){selected=nd;buildProps();drawGraph();}
+function buildProps(){
+  const body=$("#pBody"),title=$("#pTitle"),sub=$("#pSub"),sw=$("#pSwatch");
+  if(!selected){title.firstChild.textContent="No node selected";sub.textContent="Click a node to edit it";
+    sw.style.background=css("--faint");body.innerHTML='<div class="prop-empty">Select a node in the graph to edit its parameters.<br><br>Double-click empty canvas to add a node. Drag a node’s right port into another’s left port to wire them.</div>';return;}
+  const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
+  title.firstChild.textContent=def.name;sub.textContent=def.desc;
+  body.innerHTML="";
+  def.params.forEach(pr=>body.appendChild(buildField(pr)));
+  if(selected.type==="import"){const b=document.createElement("button");b.className="btn";b.style.width="100%";b.style.marginTop="8px";
+    b.textContent=selected._dem?"Replace heightmap…":"Load heightmap file…";b.onclick=()=>{importTarget=selected;$("#fileInput").click();};
+    const wrap=document.createElement("div");wrap.className="field";wrap.appendChild(b);
+    const hint=document.createElement("div");hint.className="hint";hint.innerHTML=selected._dem?"Loaded a real DEM as this node’s base — now wire it into erosion.":"PNG (any) or square 16-bit <code>.r16</code> raw. Real USGS/SRTM works.";
+    wrap.appendChild(hint);body.appendChild(wrap);}
+  const act=document.createElement("div");act.className="prop-actions";
+  const dup=document.createElement("button");dup.className="btn";dup.textContent="Duplicate";dup.onclick=duplicateSel;
+  const del=document.createElement("button");del.className="btn";del.textContent="Delete";del.onclick=deleteSel;
+  act.appendChild(dup);act.appendChild(del);body.appendChild(act);
+}
+function buildField(pr){
+  const f=document.createElement("div");f.className="field";
+  if(pr.type==="slider"){
+    const val=selected.params[pr.key];
+    f.innerHTML=`<div class="frow"><label>${pr.label}</label><span class="val">${fmtVal(pr,val)}</span></div>`;
+    const inp=document.createElement("input");inp.type="range";inp.min=pr.min;inp.max=pr.max;inp.step=pr.step;inp.value=val;
+    inp.oninput=()=>{selected.params[pr.key]=parseFloat(inp.value);f.querySelector(".val").textContent=fmtVal(pr,selected.params[pr.key]);
+      markDirtyFrom(selected.id);requestEval();};
+    f.appendChild(inp);
+  }else if(pr.type==="select"){
+    f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
+    const s=document.createElement("select");s.className="inp";pr.opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
+    s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
+  }else if(pr.type==="seg"){
+    f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
+    const seg=document.createElement("div");seg.className="seg";
+    pr.opts.forEach(o=>{const b=document.createElement("button");b.textContent=o[1];if(selected.params[pr.key]===o[0])b.classList.add("on");
+      b.onclick=()=>{selected.params[pr.key]=o[0];[...seg.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");markDirtyFrom(selected.id);requestEval();};seg.appendChild(b);});
+    f.appendChild(seg);
+  }
+  return f;
+}
+function fmtVal(pr,v){return pr.fmt?pr.fmt(v):(Number.isInteger(pr.step)?(v|0):(+v).toFixed(2));}
+function duplicateSel(){if(!selected)return;const nd=makeNode(selected.type,selected.x+30,selected.y+30);nd.params=JSON.parse(JSON.stringify(selected.params));nd._dem=selected._dem;select(nd);requestEval();}
+function deleteSel(){if(!selected)return;const id=selected.id;edges=edges.filter(e=>e.from!==id&&e.to!==id);
+  nodes=nodes.filter(n=>n.id!==id);nodes.forEach(n=>n._dirty=true);select(null);requestEval();}
+
+/* =====================================================================
+   IMPORT / EXPORT
+   ===================================================================== */
+let importTarget=null;
+$("#importBtn").onclick=()=>{importTarget=nodes.find(n=>n.type==="import"&&(!selected||true))||null;
+  if(selected&&selected.type==="import")importTarget=selected;
+  if(!importTarget){importTarget=makeNode("import",toWorld(80,80).x,toWorld(80,80).y);select(importTarget);}
+  $("#fileInput").click();};
+$("#fileInput").onchange=e=>{const file=e.target.files[0];if(!file||!importTarget)return;
+  const name=file.name.toLowerCase();
+  if(name.endsWith(".r16")||name.endsWith(".raw")||name.endsWith(".bin")){
+    file.arrayBuffer().then(buf=>{const u16=new Uint16Array(buf);const side=Math.round(Math.sqrt(u16.length));
+      if(side*side!==u16.length){toast("Raw must be square (got "+u16.length+" samples)");return;}
+      loadDEM(resampleTo(u16,side,v=>v/65535));toast("Loaded "+side+"² raw heightmap");});
+  }else{
+    const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
+      cx.drawImage(img,0,0,RES,RES);const d=cx.getImageData(0,0,RES,RES).data;const f=newField();
+      for(let i=0;i<RES*RES;i++)f[i]=(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;loadDEM(f);toast("Loaded heightmap "+img.width+"×"+img.height);};
+    img.onerror=()=>toast("Could not read that image");img.src=URL.createObjectURL(file);}
+  e.target.value="";
+};
+function resampleTo(src,side,map){const f=newField();for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
+  const sx=Math.min(side-1,(x/RES*side)|0),sy=Math.min(side-1,(y/RES*side)|0);f[y*RES+x]=map(src[sy*side+sx]);}return normalize(f);}
+function loadDEM(f){importTarget._dem=f;markDirtyFrom(importTarget.id);buildProps();requestEval();}
+
+$("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast("No output to export");return;}
+  const f=normalize(out._field);const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
+  const img=cx.createImageData(RES,RES);for(let i=0;i<RES*RES;i++){const v=Math.round(f[i]*255);img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;}
+  cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG");};
+
+/* =====================================================================
+   WEBGL 3D VIEWPORT
+   ===================================================================== */
+const glc=$("#gl");let gl,prog,buffers,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
+const SHADE=["Hypsometric","Slope","Grey"];
+function initGL(){
+  gl=glc.getContext("webgl2",{antialias:true})||glc.getContext("webgl",{antialias:true});
+  if(!gl){$("#viewport").insertAdjacentHTML("beforeend",'<div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px">WebGL unavailable</div>');return;}
+  const isGL2=(typeof WebGL2RenderingContext!=="undefined")&&(gl instanceof WebGL2RenderingContext);
+  const vsSrc=(isGL2?`#version 300 es
+    in vec3 pos;in vec3 nrm;in float hgt;out vec3 vN;out float vH;out vec3 vW;
+    uniform mat4 uMVP;uniform mat4 uM;
+    void main(){vN=nrm;vH=hgt;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
+  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;varying vec3 vN;varying float vH;varying vec3 vW;
+    uniform mat4 uMVP;uniform mat4 uM;
+    void main(){vN=nrm;vH=hgt;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
+  const fsSrc=(isGL2?`#version 300 es
+    precision highp float;in vec3 vN;in float vH;in vec3 vW;out vec4 frag;
+    uniform int uShade;uniform vec3 uSun;`
+  :`precision highp float;varying vec3 vN;varying float vH;varying vec3 vW;
+    uniform int uShade;uniform vec3 uSun;`)+`
+    vec3 hyps(float h){
+      vec3 c0=vec3(.15,.23,.33),c1=vec3(.21,.36,.29),c2=vec3(.47,.52,.34),c3=vec3(.59,.49,.34),c4=vec3(.5,.38,.28),c5=vec3(.77,.75,.71),c6=vec3(.96,.97,.98);
+      if(h<.28)return mix(c0,c1,smoothstep(0.,.28,h));
+      if(h<.45)return mix(c1,c2,smoothstep(.28,.45,h));
+      if(h<.62)return mix(c2,c3,smoothstep(.45,.62,h));
+      if(h<.78)return mix(c3,c4,smoothstep(.62,.78,h));
+      if(h<.92)return mix(c4,c5,smoothstep(.78,.92,h));
+      return mix(c5,c6,smoothstep(.92,1.,h));
+    }
+    void main(){
+      vec3 N=normalize(vN);float d=max(dot(N,normalize(uSun)),0.0);
+      float amb=.32+.18*N.y;float slope=1.0-N.y;
+      vec3 base;
+      if(uShade==0)base=hyps(vH);
+      else if(uShade==1)base=mix(vec3(.32,.5,.34),vec3(.5,.34,.28),smoothstep(.15,.6,slope));
+      else base=vec3(.7);
+      vec3 rock=vec3(.42,.38,.34);base=mix(base,rock,smoothstep(.35,.8,slope)*.6);
+      vec3 col=base*(amb+d*.95);
+      col=mix(col,vec3(.55,.62,.72),clamp(vW.z*0.0,0.,0.)); // reserved
+      col=pow(col,vec3(.9));`+(isGL2?`frag=vec4(col,1.);}`:`gl_FragColor=vec4(col,1.);}`);
+  prog=makeProg(vsSrc,fsSrc);
+  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),idx:gl.createBuffer(),count:0};
+  buildIndex();
+  gl.enable(gl.DEPTH_TEST);
+  glc.addEventListener("mousedown",e=>{glDrag={x:e.clientX,y:e.clientY};});
+  window.addEventListener("mousemove",e=>{if(!glDrag)return;cam.az-=(e.clientX-glDrag.x)*0.01;cam.el=clamp(cam.el-(e.clientY-glDrag.y)*0.01,0.05,1.5);glDrag={x:e.clientX,y:e.clientY};});
+  window.addEventListener("mouseup",()=>glDrag=null);
+  glc.addEventListener("wheel",e=>{e.preventDefault();cam.dist=clamp(cam.dist*(e.deltaY<0?0.92:1.08),1.3,6);},{passive:false});
+  requestAnimationFrame(renderGL);
+}
+let glDrag=null;
+function makeProg(vs,fs){function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o),s);return o;}
+  const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(p));return p;}
+function buildIndex(){const n=RES,idx=[];for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;idx.push(i,i+1,i+n,i+1,i+n+1,i+n);}
+  const arr=(n*n>65000)?new Uint32Array(idx):new Uint16Array(idx);buffers.idxType=(n*n>65000)?0x1405:0x1403; // UINT/USHORT
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arr,gl.STATIC_DRAW);buffers.count=idx.length;
+  buffers.u32=(n*n>65000);
+}
+let curField=null;
+function updateViewport(f){
+  if(!gl){return;}
+  curField=f;const n=RES;const field=f||newField();const[mn,mx]=fieldRange(field);const d=mx-mn||1;
+  const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),hgt=new Float32Array(n*n);
+  const H=0.42; // vertical exaggeration
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;const h=(field[i]-mn)/d;
+    pos[i*3]=(x/(n-1)-0.5)*2;pos[i*3+1]=h*H;pos[i*3+2]=(y/(n-1)-0.5)*2;hgt[i]=h;}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+    const hl=(field[y*n+clamp(x-1,0,n-1)]-mn)/d,hr=(field[y*n+clamp(x+1,0,n-1)]-mn)/d;
+    const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
+    const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2;const L=Math.hypot(sx,1,sz)||1;
+    nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+}
+function resizeGL(){const r=glc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
+  glc.width=r.width*dpr;glc.height=r.height*dpr;}
+function mat4mul(a,b){const o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s;}return o;}
+function perspective(fov,asp,n,f){const t=1/Math.tan(fov/2);return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]);}
+function lookAt(e,c,u){const z=norm3(sub3(e,c)),x=norm3(cross3(u,z)),y=cross3(z,x);
+  return new Float32Array([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot3(x,e),-dot3(y,e),-dot3(z,e),1]);}
+const sub3=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm3=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
+function renderGL(){
+  if(!gl){return;}
+  resizeGL();gl.viewport(0,0,glc.width,glc.height);
+  const bg=css("--bg2");gl.clearColor(...hex3(bg),1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(prog);
+  const asp=glc.width/glc.height||1;const P=perspective(1.05,asp,0.05,20);
+  const ex=Math.cos(cam.az)*Math.cos(cam.el)*cam.dist,ey=Math.sin(cam.el)*cam.dist,ez=Math.sin(cam.az)*Math.cos(cam.el)*cam.dist;
+  const V=lookAt([ex,ey,ez],[0,0.05,0],[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
+  loc("uMVP",MVP,true);loc("uM",M,true);
+  gl.uniform3f(gl.getUniformLocation(prog,"uSun"),0.5,0.8,0.35);
+  gl.uniform1i(gl.getUniformLocation(prog,"uShade"),shadeMode);
+  bindAttr("pos",3);bindAttr("nrm",3);bindAttr("hgt",1);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+  gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+  requestAnimationFrame(renderGL);
+}
+function identity(){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);}
+function loc(name,m){gl.uniformMatrix4fv(gl.getUniformLocation(prog,name),false,m);}
+function bindAttr(name,size){const l=gl.getAttribLocation(prog,name);if(l<0)return;gl.bindBuffer(gl.ARRAY_BUFFER,buffers[name]);gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,size,gl.FLOAT,false,0,0);}
+function hex3(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");return[parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];}
+
+/* =====================================================================
+   UI WIRING
+   ===================================================================== */
+function setStat(kind,msg){$("#statMsg").textContent=msg;$("#statDot").style.background=kind==="ok"?css("--good"):kind==="warn"?css("--warn"):css("--bad");}
+let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1900);}
+$("#autoBtn").classList.toggle("on",AUTO);
+$("#autoBtn").onclick=()=>{AUTO=!AUTO;$("#autoBtn").classList.toggle("on",AUTO);if(AUTO)evalGraph();toast(AUTO?"Auto-recompute on":"Auto-recompute off — use Build");};
+$("#buildBtn").onclick=()=>{nodes.forEach(n=>n._dirty=true);evalGraph();};
+$("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n._demSrc)n._dem=null;});buildIndex();evalGraph();toast("Resolution "+RES+"²");};
+$("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
+  document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
+$("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
+$("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
+$("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
+window.addEventListener("keydown",e=>{if(e.code==="Space")spaceDown=true;
+  if(e.key==="Delete"||e.key==="Backspace"){if(selected&&document.activeElement.tagName!=="INPUT"){deleteSel();}}
+  if(e.key==="f"||e.key==="F"){cam={az:0.7,el:0.62,dist:2.6};}});
+window.addEventListener("keyup",e=>{if(e.code==="Space")spaceDown=false;});
+$("#vpInfo").innerHTML=`<span class="vp-chip"><b>Viewport</b> drag orbit · wheel zoom</span>`;
+
+/* =====================================================================
+   DEFAULT GRAPH — a good-looking starting point
+   ===================================================================== */
+function defaultGraph(){
+  const base=makeNode("perlin",40,40);base.params={seed:7,freq:3,octaves:6,lac:2,gain:0.5};
+  const ridge=makeNode("ridged",40,220);ridge.params={seed:12,freq:4,octaves:6,lac:2.1,gain:0.55};
+  const mix=makeNode("blend",250,120);mix.params={factor:0.5};
+  const warp=makeNode("warp",250,300);warp.params={strength:0.08,freq:3,seed:5};
+  const hyd=makeNode("hydraulic",470,120);hyd.params={droplets:16000,erode:0.35,deposit:0.28,capacity:6,inertia:0.05,seed:1};
+  const th=makeNode("thermal",470,300);th.params={talus:0.014,iters:22,rate:0.5};
+  const out=makeNode("output",690,210);out.params={norm:"on"};
+  edges.push({from:base.id,to:mix.id,slot:0});
+  edges.push({from:ridge.id,to:mix.id,slot:1});
+  edges.push({from:mix.id,to:warp.id,slot:0});
+  edges.push({from:warp.id,to:hyd.id,slot:0});
+  edges.push({from:hyd.id,to:th.id,slot:0});
+  edges.push({from:th.id,to:out.id,slot:0});
+  select(out);
+}
+
+/* ------------------------------------------------------------ boot --- */
+function boot(){
+  if(!document.documentElement.getAttribute("data-theme"))document.documentElement.setAttribute("data-theme","dark");
+  resizeGraph();initGL();defaultGraph();evalGraph();
+  window.addEventListener("resize",()=>{resizeGraph();});
+  new ResizeObserver(()=>resizeGraph()).observe(gc.parentElement);
+}
+boot();
+</script>
+</body>
+</html>
