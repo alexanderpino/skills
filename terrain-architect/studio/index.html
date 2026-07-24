@@ -14,7 +14,7 @@
   --accent:#e2a45c; --accent-dim:#a9793f; --water:#4b9fb5;
   --good:#5cb87a; --warn:#e0b054; --bad:#e0685c;
   --cat-gen:#5cb87a; --cat-comb:#5c8fe0; --cat-filt:#e2a45c; --cat-ero:#4b9fb5;
-  --cat-mask:#b07de0; --cat-out:#e0685c;
+  --cat-mask:#b07de0; --cat-effect:#6fc7d8; --cat-out:#e0685c;
   --radius:7px; --radius-sm:5px;
   --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -185,11 +185,6 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px s
         <div class="vp-tools">
           <button class="btn" id="shadeSel" title="Cycle shading">Hypsometric</button>
           <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
-        </div>
-        <div class="vp-render">
-          <div class="rrow"><button class="tog" id="seaBtn" title="Global ocean — a flat plane at one level (coastlines)">≈</button><label>SEA</label><input type="range" id="seaSlider" min="0" max="0.6" step="0.005" value="0.1"></div>
-          <div class="rrow"><button class="tog on" id="hydroBtn" title="Hydrology — lakes fill each basin to its spill level, rivers flow downhill (priority-flood fill + flow accumulation)">⇣</button><label>FLOW</label><input type="range" id="flowSlider" min="0" max="1" step="0.01" value="0.5"></div>
-          <div class="rrow"><button class="tog on" id="snowBtn" title="Snow accumulation pass">❄</button><label>SNOW</label><input type="range" id="snowSlider" min="0" max="1" step="0.01" value="0.5"></div>
         </div>
       </div>
       <div id="props">
@@ -455,7 +450,7 @@ const P={
 };
 const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
-  mask:{c:"--cat-mask",name:"Mask"},out:{c:"--cat-out",name:"Output"}};
+  mask:{c:"--cat-mask",name:"Mask"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};
 
 const TYPES={
   perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
@@ -531,6 +526,16 @@ const TYPES={
     params:[P.slider("lo","Low",0,1,0.3),P.slider("hi","High",0,1,0.7),P.slider("falloff","Falloff",0.01,0.4,0.12)],
     eval:(p,ins)=>ins[0]?heightSelect(ins[0],p):newField()},
 
+  water:{cat:"effect",name:"Water",ins:["In"],desc:"Adds water to the scene. Hydrology = lakes fill each basin + rivers flow downhill; Sea = a flat ocean at a level.",
+    passthrough:true,effect:"water",
+    params:[P.seg("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
+      P.slider("level","Sea level",0,0.6,0.12),P.slider("flow","River flow",0,1,0.5)],
+    eval:(p,ins)=>ins[0]||newField()},
+  snow:{cat:"effect",name:"Snow",ins:["In"],desc:"Adds snow: settles on high, gentle ground; steep faces stay bare.",
+    passthrough:true,effect:"snow",
+    params:[P.slider("amount","Amount",0,1,0.5)],
+    eval:(p,ins)=>ins[0]||newField()},
+
   output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
     params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
     eval:(p,ins)=>{const f=ins[0]||newField();return p.norm==="on"?normalize(f):f;}},
@@ -548,6 +553,16 @@ function makeNode(type,x,y){
 function nodeById(id){return nodes.find(n=>n.id===id);}
 function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
+function collectScene(){                            // walk upstream from Output; pick the nearest Water / Snow effect nodes
+  const s={water:null,snow:null};const out=outputNode();if(!out)return s;
+  const q=[out.id],seen=new Set();
+  while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);
+    const nd=nodeById(id);if(!nd)continue;
+    if(nd.type==="water"&&!s.water)s.water={...nd.params};
+    if(nd.type==="snow"&&!s.snow)s.snow={...nd.params};
+    edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
+  return s;
+}
 function markDirtyFrom(id){ // mark node and everything downstream dirty
   const stack=[id];const seen=new Set();
   while(stack.length){const cur=stack.pop();if(seen.has(cur))continue;seen.add(cur);
@@ -567,6 +582,7 @@ function evalGraph(){
   }
   nodes.forEach(n=>{if(n.type==="output"||true)ev(n.id,new Set());}); // eval all (for thumbnails)
   const out=outputNode();const outF=out?out._field:null;
+  scene=collectScene();                            // gather Water/Snow effect nodes feeding the Output
   const t1=performance.now();
   updateViewport(outF);
   redrawThumbs();
@@ -845,10 +861,9 @@ $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast(
 const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,gbuf=null,USE_DEFERRED=false,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
 let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
-let sea={on:false,level:0.10};                  // STAGE 2a — global ocean: a flat plane at one level (coastlines)
-let hydro={on:true,flow:0.5};                   // STAGE 2b — HYDROLOGY: lakes fill basins to their spill level
-                                                //   (priority-flood, Barnes 2014) + rivers flow downhill (flow accumulation).
-let snow={on:true,amount:0.5};                  // STAGE 1 — snow accumulation inside the opaque terrain pass
+// Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
+// walking upstream from the Output and picking up any Water / Snow effect nodes and their params.
+let scene={water:null,snow:null};
 const SHADE=["Hypsometric","Slope","Grey"];
 function initGL(){
   gl=glc.getContext("webgl2",{antialias:true,alpha:false})||glc.getContext("webgl",{antialias:true,alpha:false});
@@ -1008,10 +1023,13 @@ function updateViewport(f){
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
   curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
-  curFilled=priorityFloodFill(hgt);                        // lakes: each basin filled to its pour point (Barnes 2014)
-  curAccum=d8Accumulation(curFilled);                      // rivers: drainage area on the filled DEM
+  let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];             // cheap checksum: skip fill/accum when the terrain is unchanged
+  if(cs!==lastTerrainCsum){lastTerrainCsum=cs;
+    curFilled=priorityFloodFill(hgt);                      // lakes: each basin filled to its pour point (Barnes 2014)
+    curAccum=d8Accumulation(curFilled);}                   // rivers: drainage area on the filled DEM
   refreshWater();
 }
+let lastTerrainCsum=NaN;
 // --- Priority-flood depression fill (Barnes, Lehman & Mulla 2014): every pit fills to the elevation of
 //     its lowest spill point on the basin rim -> filled-h is the standing-water depth, flat per basin. ---
 function priorityFloodFill(h){
@@ -1044,15 +1062,17 @@ function refreshWater(){
   if(!gl||!curHgt)return;
   const n=RES,N=n*n,h=curHgt,filled=curFilled,A=curAccum,H=H_SCALE;
   const W=new Float32Array(N);
-  const thr=(0.02-0.0194*hydro.flow)*N;                   // FLOW slider: high -> denser river network (lower area threshold)
-  const seaL=sea.on?sea.level:-1;
+  const wn_=scene.water;                                  // params come from the Water effect node (null = no water)
+  const hydroOn=wn_&&wn_.mode!=="sea",seaOn=wn_&&wn_.mode==="sea";
+  const thr=(0.02-0.0194*((wn_&&wn_.flow)||0))*N;         // River flow param: high -> denser network (lower area threshold)
+  const seaL=seaOn?wn_.level:-1;
   for(let i=0;i<N;i++){
     let w=h[i];
-    if(hydro.on){
+    if(hydroOn){
       if(filled[i]>w)w=filled[i];                         // lake: stand water to the basin spill level
       if(A[i]>thr){const film=Math.min(0.022,0.007+0.006*Math.log(A[i]/thr));if(h[i]+film>w)w=h[i]+film;} // river film, follows terrain
     }
-    if(seaL>w)w=seaL;                                     // global ocean plane
+    if(seaL>w)w=seaL;                                     // flat ocean at a level (Sea mode)
     W[i]=w;
   }
   const wn=new Float32Array(N*3);                          // normal of the WATER surface (0 gradient in lakes -> up)
@@ -1103,7 +1123,7 @@ function drawTerrain(MVP,M,ex,ey,ez){
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);
   gl.useProgram(terrainProg);setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
   gl.uniform3f(u(terrainProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
-  gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),snow.on?snow.amount:0.0);
+  gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
   bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
@@ -1126,7 +1146,7 @@ function renderGL(){
     gl.useProgram(compProg);setM(compProg,"uInvMVP",mat4inv(MVP));
     gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);gl.uniform3f(u(compProg,"uSun"),0.5,0.8,0.35);
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
-    gl.uniform1f(u(compProg,"uSeaLevel"),sea.level);gl.uniform1f(u(compProg,"uHasSea"),sea.on?1:0);
+    gl.uniform1f(u(compProg,"uSeaLevel"),0.0);gl.uniform1f(u(compProg,"uHasSea"),0.0);  // sea is baked into the water-height texture (W)
     gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
     gl.uniform2f(u(compProg,"uPx"),1/glc.width,1/glc.height);
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gbuf.color);gl.uniform1i(u(compProg,"gColor"),0);
@@ -1138,7 +1158,7 @@ function renderGL(){
     // FORWARD fallback (WebGL1 / wireframe): terrain + translucent geometry water
     gl.viewport(0,0,glc.width,glc.height);gl.clearColor(...hex3(css("--bg2")),1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     drawTerrain(MVP,M,ex,ey,ez);
-    if((sea.on||hydro.on)&&!wire){
+    if(scene.water&&!wire){
       gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
       setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uTime"),uTime);
       gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
@@ -1172,12 +1192,6 @@ $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("dat
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
 $("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
 $("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
-$("#seaBtn").onclick=()=>{sea.on=!sea.on;$("#seaBtn").classList.toggle("on",sea.on);refreshWater();};
-$("#hydroBtn").onclick=()=>{hydro.on=!hydro.on;$("#hydroBtn").classList.toggle("on",hydro.on);refreshWater();};
-$("#snowBtn").onclick=()=>{snow.on=!snow.on;$("#snowBtn").classList.toggle("on",snow.on);};
-$("#seaSlider").oninput=e=>{sea.level=parseFloat(e.target.value);refreshWater();};
-$("#flowSlider").oninput=e=>{hydro.flow=parseFloat(e.target.value);refreshWater();};
-$("#snowSlider").oninput=e=>{snow.amount=parseFloat(e.target.value);};
 window.addEventListener("keydown",e=>{if(e.code==="Space")spaceDown=true;
   if(e.key==="Delete"||e.key==="Backspace"){if(selected&&document.activeElement.tagName!=="INPUT"){deleteSel();}}
   if(e.key==="f"||e.key==="F"){cam={az:0.7,el:0.62,dist:2.6};}});
@@ -1194,14 +1208,18 @@ function defaultGraph(){
   const warp=makeNode("warp",250,300);warp.params={strength:0.08,freq:3,seed:5};
   const hyd=makeNode("hydraulic",470,120);hyd.params={droplets:16000,erode:0.35,deposit:0.28,capacity:6,inertia:0.05,seed:1};
   const th=makeNode("thermal",470,300);th.params={talus:0.014,iters:22,rate:0.5};
-  const out=makeNode("output",690,210);out.params={norm:"on"};
+  const snow=makeNode("snow",690,300);snow.params={amount:0.5};
+  const water=makeNode("water",900,300);water.params={mode:"hydro",level:0.12,flow:0.5};
+  const out=makeNode("output",900,90);out.params={norm:"on"};
   edges.push({from:base.id,to:mix.id,slot:0});
   edges.push({from:ridge.id,to:mix.id,slot:1});
   edges.push({from:mix.id,to:warp.id,slot:0});
   edges.push({from:warp.id,to:hyd.id,slot:0});
   edges.push({from:hyd.id,to:th.id,slot:0});
-  edges.push({from:th.id,to:out.id,slot:0});
-  select(out);
+  edges.push({from:th.id,to:snow.id,slot:0});           // ... erosion -> Snow -> Water -> Output (effects are nodes)
+  edges.push({from:snow.id,to:water.id,slot:0});
+  edges.push({from:water.id,to:out.id,slot:0});
+  select(water);
 }
 
 /* ------------------------------------------------------------ boot --- */
