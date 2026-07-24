@@ -935,36 +935,37 @@ function initGL(){
   const tFs=(g2?`#version 300 es
     precision highp float;in vec3 vN;in float vH;in vec3 vW;out vec4 frag;
     #define SAMP texture
-    uniform int uShade;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`
+    #define OUT frag
+    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`
   :`precision highp float;varying vec3 vN;varying float vH;varying vec3 vW;
     #define SAMP texture2D
-    uniform int uShade;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`)+`
-    vec3 hyps(float h){
-      vec3 c0=vec3(.15,.23,.33),c1=vec3(.21,.36,.29),c2=vec3(.47,.52,.34),c3=vec3(.59,.49,.34),c4=vec3(.5,.38,.28),c5=vec3(.77,.75,.71),c6=vec3(.96,.97,.98);
-      if(h<.28)return mix(c0,c1,smoothstep(0.,.28,h));
-      if(h<.45)return mix(c1,c2,smoothstep(.28,.45,h));
-      if(h<.62)return mix(c2,c3,smoothstep(.45,.62,h));
-      if(h<.78)return mix(c3,c4,smoothstep(.62,.78,h));
-      if(h<.92)return mix(c4,c5,smoothstep(.78,.92,h));
-      return mix(c5,c6,smoothstep(.92,1.,h));
-    }
+    #define OUT gl_FragColor
+    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`)+`
     void main(){
-      vec3 N=normalize(vN);vec3 S=normalize(uSun);float d=max(dot(N,S),0.0);
-      float amb=.32+.18*N.y;float slope=1.0-N.y;
+      vec3 N=normalize(vN);float slope=1.0-N.y;
+      // ---- ALBEDO (unlit material colour) : SatMap LUT by elevation, rock on steeps, snow on high flats ----
       vec3 base;
       if(uShade==0)base=SAMP(uSat,vec2(clamp(vH,.001,.999),0.5)).rgb;   // SatMap colour LUT by elevation
       else if(uShade==1)base=mix(vec3(.32,.5,.34),vec3(.5,.34,.28),smoothstep(.15,.6,slope));
-      else base=vec3(.7);
-      vec3 rock=vec3(.42,.38,.34);base=mix(base,rock,smoothstep(.35,.8,slope)*.6);
-      // snow accumulation: settles on gentle, high ground; steep faces stay bare; line drops as coverage rises
+      else base=vec3(.72);
+      float rockAmt=smoothstep(.35,.8,slope)*.6;
+      base=mix(base,vec3(.42,.38,.34),rockAmt);                          // exposed rock on steep faces
       float flatv=smoothstep(0.5,0.12,slope);
       float line=1.0-uSnow*0.85;
       float snowCov=smoothstep(line-0.06,line+0.06,vH)*flatv*step(0.001,uSnow);
       base=mix(base,vec3(.93,.96,1.0),snowCov);
-      vec3 col=base*(amb+d*.95);
-      vec3 V=normalize(uCam-vW);vec3 Hh=normalize(V+S);       // snow sheen (specular), snow only
-      col+=pow(max(dot(N,Hh),0.0),60.0)*snowCov*0.6;
-      col=pow(col,vec3(.9));`+(g2?`frag=vec4(col,1.);}`:`gl_FragColor=vec4(col,1.);}`);
+      // material smoothness -> drives specular in the deferred composite (soil rough, rock a touch glossier, snow sheen)
+      float matSmooth=mix(mix(0.05,0.16,rockAmt),0.55,snowCov);
+      // DEFERRED: write pure albedo (rgb) + smoothness (a); the composite does all the lighting from the height field.
+      if(uDeferred==1){OUT=vec4(base,matSmooth);return;}
+      // ---- FORWARD fallback (WebGL1 / wireframe): light here with sun + hemispheric sky irradiance ----
+      vec3 S=normalize(uSun);float d=max(dot(N,S),0.0);
+      float hemi=N.y*0.5+0.5;vec3 ambIrr=mix(vec3(.26,.24,.20),vec3(.42,.55,.76),hemi);
+      vec3 col=base*(ambIrr*0.9+vec3(1.0,0.955,0.86)*d*1.12);
+      vec3 V=normalize(uCam-vW);vec3 Hh=normalize(V+S);
+      col+=pow(max(dot(N,Hh),0.0),80.0)*snowCov*0.5;                     // snow sheen
+      col=(col*(2.51*col+0.03))/(col*(2.43*col+0.59)+0.14);             // ACES filmic tonemap
+      OUT=vec4(clamp(col,0.,1.),1.);}`;
   terrainProg=makeProg(tVs,tFs);
   // ---------- STAGE 2: translucent water ----------
   const wVs=(g2?`#version 300 es
@@ -1007,10 +1008,24 @@ function initGL(){
       precision highp float;in vec2 vUv;out vec4 frag;
       uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;uniform sampler2D gH;
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES;uniform vec2 uPx;
-      vec3 skyCol(vec3 d){d=normalize(d);float t=clamp(d.y*0.7+0.35,0.,1.);vec3 c=mix(vec3(0.70,0.77,0.85),vec3(0.19,0.39,0.68),pow(t,0.92));
-        return c+pow(max(dot(d,normalize(uSun)),0.),300.)*vec3(1.2,1.05,0.8)+pow(max(dot(d,normalize(uSun)),0.),6.)*0.12*vec3(1.0,0.85,0.6);}
+      const vec3 SUNCOL=vec3(1.0,0.955,0.86);                       // warm daylight
+      // analytic sky: horizon-pale -> zenith-deep gradient + sun disk, aureole and near-sun horizon scatter
+      vec3 skyCol(vec3 d){d=normalize(d);float h=d.y;
+        vec3 zen=vec3(0.17,0.33,0.62),hor=vec3(0.75,0.81,0.87);
+        float t=pow(clamp(h,0.,1.),0.42);vec3 c=mix(hor,zen,t);
+        c=mix(c,vec3(0.58,0.60,0.63),smoothstep(0.0,-0.12,h));      // below the horizon
+        float sd=max(dot(d,normalize(uSun)),0.);
+        c+=vec3(1.4,1.24,0.98)*pow(sd,1200.);                       // sun disk
+        c+=vec3(1.0,0.72,0.46)*pow(sd,10.)*0.22;                    // aureole
+        c+=vec3(1.0,0.66,0.42)*pow(sd,3.5)*0.10*(1.0-t);           // warm horizon scatter toward the sun
+        return c;}
       float Wat(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gW,b).r,c=texture(gW,b+vec2(uWpx,0.)).r,d=texture(gW,b+vec2(0.,uWpx)).r,e=texture(gW,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
       float Ht(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gH,b).r,c=texture(gH,b+vec2(uWpx,0.)).r,d=texture(gH,b+vec2(0.,uWpx)).r,e=texture(gH,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+      // per-pixel terrain normal from central differences of the height field (higher-res than the mesh vertex normals)
+      vec3 terrainNormal(vec2 uv){float e=uWpx;
+        float hl=Ht(uv-vec2(e,0.))*uH,hr=Ht(uv+vec2(e,0.))*uH,hd=Ht(uv-vec2(0.,e))*uH,hu=Ht(uv+vec2(0.,e))*uH;
+        float s=uRES*0.25;                                          // world span across the central difference is 4/uRES
+        return normalize(vec3(-(hr-hl)*s,1.0,-(hu-hd)*s));}
       // soft CAST shadow: march the height field toward the sun; occluded if terrain rises above the ray
       float shadowT(vec3 P,vec3 S){
         if(S.y<=0.03)return 1.0;
@@ -1018,47 +1033,70 @@ function initGL(){
         vec2 dir=normalize(S.xz+vec2(1e-5));vec2 duv=dir*(2.6/uRES);
         float dry=length(duv)/max(hstep,1e-3);                     // ray height gain per step (world)
         vec2 uv=P.xz*0.5+0.5+duv; float ry=P.y+dry; float occ=0.0;
-        for(int i=0;i<20;i++){ if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)break;
+        for(int i=0;i<24;i++){ if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)break;
           occ=max(occ,clamp((Ht(uv)*uH-ry)/(0.03*uH),0.,1.)); uv+=duv; ry+=dry; }
         return 1.0-occ*0.92;
       }
       // horizon ambient occlusion: how much the neighbourhood rises around this point
-      float aoT(vec2 uv){float hc=Ht(uv)*uH,o=0.0;const int D=5;
+      float aoT(vec2 uv){float hc=Ht(uv)*uH,o=0.0;const int D=6;
         for(int k=0;k<D;k++){float a=6.2831*float(k)/float(D);vec2 dr=vec2(cos(a),sin(a))/uRES;float m=0.0;
           for(int r=1;r<=3;r++){float rr=float(r)*2.5;m=max(m,(Ht(uv+dr*rr)*uH-hc)/(rr/uRES));}o+=clamp(m,0.,1.);}
         return 1.0-o/float(D)*0.7;
       }
-      vec3 aces(vec3 x){x*=0.9;return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
-      vec3 atmos(vec3 c,vec3 P){float f=1.0-exp(-max(length(P-uCam)-1.3,0.0)*0.11);return mix(c,vec3(0.72,0.78,0.85),f*0.32);}
+      vec3 aces(vec3 x){x*=1.05;return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
+      // aerial perspective: fade to a sky-tinted haze with distance, warming toward the sun (in-scatter)
+      vec3 atmos(vec3 c,vec3 P){float dist=length(P-uCam);float f=1.0-exp(-max(dist-1.35,0.0)*0.13);
+        vec3 vd=normalize(P-uCam);
+        vec3 haze=mix(vec3(0.68,0.74,0.83),vec3(0.95,0.86,0.72),pow(max(dot(vd,normalize(uSun)),0.),4.)*0.5);
+        return mix(c,haze,f*0.28);}
+      // physically-flavoured surface shading: sun (Lambert) + hemispheric sky irradiance + GGX specular
+      vec3 shadeSurface(vec3 albedo,vec3 N,vec3 Pw,float smoothv,float sh,float ao){
+        vec3 S=normalize(uSun),Vd=normalize(uCam-Pw);
+        float NdL=max(dot(N,S),0.0);
+        vec3 diffuse=albedo*SUNCOL*1.28*NdL*sh;
+        float hemi=N.y*0.5+0.5;
+        vec3 ambIrr=mix(vec3(0.26,0.24,0.20),vec3(0.42,0.55,0.76),hemi); // warm ground bounce -> cool sky dome
+        vec3 ambient=albedo*ambIrr*ao;
+        float rough=clamp(1.0-smoothv,0.06,1.0);                    // GGX microfacet specular
+        vec3 Hh=normalize(S+Vd);float NdH=max(dot(N,Hh),0.),NdV=max(dot(N,Vd),0.);
+        float a2=rough*rough;a2*=a2;float den=NdH*NdH*(a2-1.)+1.;
+        float Dg=a2/(3.14159*den*den+1e-4);
+        float F=0.04+0.96*pow(1.0-NdV,5.0);                         // Schlick, dielectric F0=0.04
+        vec3 specular=SUNCOL*min(Dg*F,6.0)*smoothv*NdL*sh;
+        return diffuse+ambient+specular;
+      }
       void main(){
         float z=texture(gDepth,vUv).r;
         vec4 clip=vec4(vUv*2.-1.,z*2.-1.,1.);vec4 wp=uInvMVP*clip;vec3 Pw=wp.xyz/wp.w;
         vec3 viewDir=normalize(Pw-uCam),S=normalize(uSun);
         if(z>=0.99999){frag=vec4(aces(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
-        vec3 terrain=texture(gColor,vUv).rgb;
+        vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float smoothv=g.a;
         vec2 wuv=Pw.xz*0.5+0.5;
+        vec3 Nt=terrainNormal(wuv);
         float sh=shadowT(Pw,S),ao=aoT(wuv);                        // cast shadow + ambient occlusion from the height field
         float wSurf=Wat(wuv)*uH; if(uHasSea>0.5)wSurf=max(wSurf,uSeaLevel*uH);
         float thick=wSurf-Pw.y;
-        if(thick<=0.0016){                                         // DRY LAND: apply shadow + AO, atmosphere, tonemap
-          vec3 col=terrain*mix(0.40,1.0,sh)*mix(0.5,1.0,ao);
+        if(thick<=0.0016){                                         // DRY LAND: full surface shading, atmosphere, tonemap
+          vec3 col=shadeSurface(albedo,Nt,Pw,smoothv,sh,ao);
           frag=vec4(aces(atmos(col,Pw)),1.);return;
         }
+        // ---- WATER (screen-space): lit lakebed refraction + Beer–Lambert + Fresnel sky reflection ----
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
         vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
         float t=uTime;
         N=normalize(N+vec3(0.03*sin(Pw.x*46.+t*1.7)+0.022*sin(Pw.z*37.-t*1.15),0.,0.03*sin(Pw.z*46.+t*1.35)+0.022*sin(Pw.x*34.+t*0.95)));
         vec3 Vd=normalize(uCam-Pw);
         vec2 refrUv=clamp(vUv+N.xz*uPx*28.*clamp(thick*8.,0.,1.),vec2(0.002),vec2(0.998)); // refract the terrain colour
-        vec3 bed=texture(gColor,refrUv).rgb*mix(0.5,1.0,ao);
+        vec3 bedAlb=texture(gColor,refrUv).rgb;
+        vec3 bed=shadeSurface(bedAlb,Nt,Pw,0.05,sh,ao);            // light the lakebed (albedo was unlit in the g-buffer)
         float dn=1.0-exp(-thick*10.0);                              // Beer–Lambert absorption
-        vec3 wc=mix(bed,mix(vec3(0.30,0.60,0.63),vec3(0.03,0.12,0.30),clamp(thick*3.5,0.,1.)),clamp(dn+0.12,0.,1.));
+        vec3 wc=mix(bed,mix(vec3(0.24,0.52,0.55),vec3(0.02,0.10,0.26),clamp(thick*3.5,0.,1.)),clamp(dn+0.10,0.,1.));
         float fres=pow(1.0-max(dot(N,Vd),0.0),4.0);
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
-        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),220.)*0.9*sh;
+        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*sh;
         float foam=smoothstep(0.02,0.0,thick)*0.5;                  // soft shoreline (thickness -> 0)
-        vec3 col=mix(wc,refl,fres*0.5)+spec; col=mix(col,vec3(0.9,0.95,1.0),foam);
-        col*=mix(0.6,1.0,sh);                                       // water in cast shadow is darker
+        vec3 col=mix(wc,refl,fres*0.5)+spec*SUNCOL; col=mix(col,vec3(0.9,0.95,1.0),foam);
+        col*=mix(0.65,1.0,sh);                                      // water in cast shadow is darker
         frag=vec4(aces(atmos(col,Pw)),1.);
       }`;
     compProg=makeProg(cVs,cFs);
@@ -1206,11 +1244,12 @@ function mat4inv(m){
     (a10*b10-a11*b08+a13*b06)*det,(a01*b08-a00*b10-a03*b06)*det,(a30*b04-a31*b02+a33*b00)*det,(a21*b02-a20*b04-a23*b00)*det,
     (a11*b07-a10*b09-a12*b06)*det,(a00*b09-a01*b07+a02*b06)*det,(a31*b01-a30*b03-a32*b00)*det,(a20*b03-a21*b01+a22*b00)*det]);
 }
-function drawTerrain(MVP,M,ex,ey,ez){
+function drawTerrain(MVP,M,ex,ey,ez,deferred){
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);
   gl.useProgram(terrainProg);setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
   {const sd=sunDir();gl.uniform3f(u(terrainProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
   gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
+  gl.uniform1i(u(terrainProg,"uDeferred"),deferred?1:0);
   gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,satTex);gl.uniform1i(u(terrainProg,"uSat"),3);
   bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
@@ -1227,7 +1266,7 @@ function renderGL(){
     // PASS 1: terrain -> offscreen colour + depth
     gl.bindFramebuffer(gl.FRAMEBUFFER,gbuf.fbo);gl.viewport(0,0,glc.width,glc.height);
     gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    drawTerrain(MVP,M,ex,ey,ez);
+    drawTerrain(MVP,M,ex,ey,ez,true);
     // PASS 2: fullscreen triangle -> screen (sky + screen-space water)
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,glc.width,glc.height);
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
