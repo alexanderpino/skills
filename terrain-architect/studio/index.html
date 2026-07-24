@@ -205,7 +205,9 @@ select.sg-btn{appearance:auto}
       <span class="lbl">Res</span>
       <select class="btn" id="resSel" title="Working resolution">
         <option value="128">128²</option><option value="192" selected>192²</option><option value="256">256²</option>
+        <option value="512">512²</option><option value="1024">1024²</option>
       </select>
+      <button class="btn" id="gpuBtn" title="Use the WebGL2 GPU fast path for generators and thermal erosion">GPU</button>
     </div>
     <div class="tspacer"></div>
     <div class="tgroup">
@@ -385,7 +387,11 @@ function fieldRange(f){let mn=1e9,mx=-1e9;for(let i=0;i<f.length;i++){const v=f[
 function normalize(f){const[mn,mx]=fieldRange(f);const d=mx-mn||1;const o=newField();for(let i=0;i<f.length;i++)o[i]=(f[i]-mn)/d;return o;}
 
 /* --------------------------------------------------- hash & gradients -- */
-function hash2(x,y,s){let h=x*374761393+y*668265263+s*1442695041;h=(h^(h>>>13))*1274126177;return((h^(h>>>16))>>>0)/4294967295;}
+// Exact 32-bit integer hash (Math.imul, not float multiply): the second multiply exceeds 2^53 as a
+// double, so plain `*` would round. Being exact also makes it reproducible bit-for-bit in GLSL `uint`,
+// which is what lets the GPU fast path generate the *same* noise as this CPU reference.
+function hash2(x,y,s){let h=(Math.imul(x,374761393)+Math.imul(y,668265263)+Math.imul(s,1442695041))|0;
+  h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967295;}
 function vnoise(x,y,s){ // value noise, C1 smooth
   const x0=Math.floor(x),y0=Math.floor(y),fx=smooth(x-x0),fy=smooth(y-y0);
   const a=hash2(x0,y0,s),b=hash2(x0+1,y0,s),c=hash2(x0,y0+1,s),d=hash2(x0+1,y0+1,s);
@@ -438,6 +444,122 @@ function radialField(){
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=x/n-.5,dy=y/n-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
   return o;
 }
+
+/* =====================================================================
+   GPU COMPUTE — optional WebGL2 GPGPU fast path for the heavy kernels.
+   Each kernel is a fragment shader run over a fullscreen triangle into an
+   RGBA32F render target (the same technique as the deferred composite).
+   The CPU kernels above stay the REFERENCE implementation; `_verify_gpu.js`
+   checks the GPU output against them. Only the parallel-friendly kernels
+   live here — sequential ones (priority flood, D8) remain CPU.
+   ===================================================================== */
+let USE_GPU=true;
+const GPU={
+  ok:null,vs:null,progs:{},rts:{},fbo:null,
+  init(){
+    if(this.ok!==null)return this.ok;
+    this.ok=false;
+    if(!gl||typeof WebGL2RenderingContext==="undefined"||!(gl instanceof WebGL2RenderingContext))return false;
+    if(!gl.getExtension("EXT_color_buffer_float"))return false;   // required to render into float textures
+    this.vs=`#version 300 es
+      void main(){vec2 p=vec2((gl_VertexID==1)?3.:-1.,(gl_VertexID==2)?3.:-1.);gl_Position=vec4(p,0.,1.);}`;
+    this.fbo=gl.createFramebuffer();
+    this.ok=true;return true;
+  },
+  prog(key,fs){if(!this.progs[key])this.progs[key]=makeProg(this.vs,fs);return this.progs[key];},
+  rt(key,n){const k=key+"_"+n;let t=this.rts[k];
+    if(!t){t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,null);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      this.rts[k]=t;}
+    return t;},
+  bind(target,n){gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target,0);gl.viewport(0,0,n,n);},
+  run(prog,n,target,setup){
+    this.bind(target,n);gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
+    gl.useProgram(prog);if(setup)setup(prog);
+    gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,null);},
+  upload(key,n,data){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);
+    for(let i=0;i<n*n;i++)rgba[i*4]=data[i];
+    gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
+  read(target,n){this.bind(target,n);
+    const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    const o=new Float32Array(n*n);for(let i=0;i<n*n;i++)o[i]=rgba[i*4];return o;},
+};
+// GLSL twin of hash2/gnoise/fbm above — identical uint32 hash, so the same seed gives the same field.
+const GLSL_NOISE=`
+  float hashf(int x,int y,int s){
+    uint h=uint(x)*374761393u+uint(y)*668265263u+uint(s)*1442695041u;
+    h=(h^(h>>13u))*1274126177u;
+    return float(h^(h>>16u))/4294967295.0;}
+  float sm(float t){return t*t*(3.0-2.0*t);}
+  float gnoise(float x,float y,int s){
+    float fx=floor(x),fy=floor(y);int x0=int(fx),y0=int(fy);
+    float xf=x-fx,yf=y-fy;const float TAU=6.2831853;
+    float a00=hashf(x0,y0,s)*TAU,a10=hashf(x0+1,y0,s)*TAU,a01=hashf(x0,y0+1,s)*TAU,a11=hashf(x0+1,y0+1,s)*TAU;
+    float n00=cos(a00)*xf+sin(a00)*yf;
+    float n10=cos(a10)*(xf-1.0)+sin(a10)*yf;
+    float n01=cos(a01)*xf+sin(a01)*(yf-1.0);
+    float n11=cos(a11)*(xf-1.0)+sin(a11)*(yf-1.0);
+    float u=sm(xf),v=sm(yf);
+    return 0.5+0.5*mix(mix(n00,n10,u),mix(n01,n11,u),v)*1.35;}`;
+const GPU_FBM_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform float uN,uFreq,uLac,uGain,uRidge;uniform int uOct,uSeed;`+GLSL_NOISE+`
+  void main(){
+    float x=floor(gl_FragCoord.x),y=floor(gl_FragCoord.y);
+    float amps=0.0,a=1.0;
+    for(int k=0;k<32;k++){if(k>=uOct)break;amps+=a;a*=uGain;}
+    float sum=0.0,amp=1.0,f=uFreq;
+    for(int k=0;k<32;k++){if(k>=uOct)break;
+      float v=gnoise(x/uN*f,y/uN*f,uSeed+k*7);
+      if(uRidge>0.5){v=1.0-abs(v*2.0-1.0);v=v*v;}
+      sum+=v*amp;amp*=uGain;f*=uLac;}
+    frag=vec4(sum/amps,0.0,0.0,1.0);}`;
+// Thermal erosion, gather form: a cell LOSES rate*maxDrop and GAINS each neighbour's share.
+// Same arithmetic as thermalErode() above, restructured so every cell can be solved independently.
+const GPU_THERMAL_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uH;uniform float uTalus,uRate;uniform int uN;
+  float H(ivec2 p){return texelFetch(uH,p,0).r;}
+  bool inb(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
+  const ivec2 NB[8]=ivec2[8](ivec2(-1,0),ivec2(1,0),ivec2(0,-1),ivec2(0,1),ivec2(-1,-1),ivec2(1,1),ivec2(-1,1),ivec2(1,-1));
+  vec2 moveSum(ivec2 p){                       // (rate*maxDrop, sum of drops) for cell p
+    float c=H(p),maxd=0.0,sum=0.0;
+    for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q))continue;
+      float e=c-H(q)-uTalus;if(e>0.0){sum+=e;maxd=max(maxd,e);}}
+    return vec2(uRate*maxd,sum);}
+  void main(){
+    ivec2 p=ivec2(gl_FragCoord.xy);float h=H(p);
+    vec2 me=moveSum(p);
+    float lose=(me.y>0.0)?me.x:0.0,gain=0.0;
+    for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q))continue;
+      vec2 mn=moveSum(q);if(mn.y<=0.0)continue;
+      float e=H(q)-h-uTalus;if(e>0.0)gain+=mn.x*e/mn.y;}
+    frag=vec4(h+gain-lose,0.0,0.0,1.0);}`;
+function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
+  const n=RES,prog=GPU.prog("fbm",GPU_FBM_FS),out=GPU.rt("gen",n);
+  GPU.run(prog,n,out,p=>{
+    gl.uniform1f(u(p,"uN"),n);gl.uniform1f(u(p,"uFreq"),freq);gl.uniform1f(u(p,"uLac"),lac);
+    gl.uniform1f(u(p,"uGain"),gain);gl.uniform1f(u(p,"uRidge"),ridge?1:0);
+    gl.uniform1i(u(p,"uOct"),octaves|0);gl.uniform1i(u(p,"uSeed"),seed|0);});
+  const f=GPU.read(out,n);
+  return ridge?normalize(f):f;                 // ridged normalises on the CPU (a reduction), as before
+}
+function gpuThermal(inp,{talus=0.012,iters=30,rate=0.5}){
+  const n=RES,prog=GPU.prog("thermal",GPU_THERMAL_FS);
+  let src=GPU.upload("thA",n,inp),dst=GPU.rt("thB",n);
+  for(let i=0;i<iters;i++){
+    GPU.run(prog,n,dst,p=>{
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(u(p,"uH"),0);
+      gl.uniform1f(u(p,"uTalus"),talus);gl.uniform1f(u(p,"uRate"),rate);gl.uniform1i(u(p,"uN"),n);});
+    const t=src;src=dst;dst=t;                 // ping-pong
+  }
+  return GPU.read(src,n);
+}
+const gpuReady=()=>USE_GPU&&GPU.init();
 
 /* ------------------------------------------------------- modifiers ---- */
 function warpField(inp,{strength=0.12,freq=3,seed=7}){
@@ -676,11 +798,11 @@ const TYPES={
   perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
     params:[P.int("seed","Seed",1,999,7),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
-    eval:(p)=>fbmField(gnoise,{seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain})},
+    eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
   ridged:{cat:"gen",name:"Ridged MF",ins:[],desc:"Ridged multifractal — sharp mountain crests.",
     params:[P.int("seed","Seed",1,999,3),P.slider("freq","Frequency",0.5,12,3.5,0.1),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2.1,0.05),P.slider("gain","Gain",0.3,0.8,0.55,0.01)],
-    eval:(p)=>fbmField(gnoise,{seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,ridge:true})},
+    eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,ridge:true};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
   worley:{cat:"gen",name:"Voronoi",ins:[],desc:"Cellular / Worley noise — plates and cracks.",
     params:[P.int("seed","Seed",1,999,5),P.slider("freq","Cell density",2,16,6,0.5),P.seg("mode","Mode",[["f2f1","F2−F1"],["f1","F1"],["invf1","1−F1"]],"f2f1")],
     eval:(p)=>worleyField({seed:p.seed,freq:p.freq,mode:p.mode})},
@@ -734,7 +856,7 @@ const TYPES={
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In"],desc:"Talus: material above repose slides down.",
     params:[P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5)],
-    eval:(p,ins)=>ins[0]?thermalErode(ins[0],p):newField()},
+    eval:(p,ins)=>ins[0]?(gpuReady()?gpuThermal(ins[0],p):thermalErode(ins[0],p)):newField()},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1)],
@@ -1421,10 +1543,12 @@ function makeProg(vs,fs){function sh(t,s){const o=gl.createShader(t);gl.shaderSo
   if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o),s);return o;}
   const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(p));return p;}
-function buildIndex(){const n=RES,idx=[];for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;idx.push(i,i+1,i+n,i+1,i+n+1,i+n);}
-  const arr=(n*n>65000)?new Uint32Array(idx):new Uint16Array(idx);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arr,gl.STATIC_DRAW);buffers.count=idx.length;
-  buffers.u32=(n*n>65000);
+function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
+  const arr=u32?new Uint32Array(cnt):new Uint16Array(cnt);   // fill the typed array directly (a JS array costs ~4x at 1024²)
+  let w=0;for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;
+    arr[w++]=i;arr[w++]=i+1;arr[w++]=i+n;arr[w++]=i+1;arr[w++]=i+n+1;arr[w++]=i+n;}
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arr,gl.STATIC_DRAW);buffers.count=cnt;
+  buffers.u32=u32;
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
@@ -1455,10 +1579,14 @@ function updateViewport(f){
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
   if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);} // terrain height for composite lighting
   curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
-  let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];             // cheap checksum: skip fill/accum when the terrain is unchanged
-  if(cs!==lastTerrainCsum){lastTerrainCsum=cs;
-    curFilled=priorityFloodFill(hgt);                      // lakes: each basin filled to its pour point (Barnes 2014)
-    curAccum=d8Accumulation(curFilled);}                   // rivers: drainage area on the filled DEM
+  // The priority-flood + D8 pair is the one sequential (CPU-only) stage and the costliest at high
+  // resolution, so only pay for it when a Water node actually needs it.
+  if(scene.water){
+    let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];           // cheap checksum: skip fill/accum when the terrain is unchanged
+    if(cs!==lastTerrainCsum){lastTerrainCsum=cs;
+      curFilled=priorityFloodFill(hgt);                    // lakes: each basin filled to its pour point (Barnes 2014)
+      curAccum=d8Accumulation(curFilled);}                 // rivers: drainage area on the filled DEM
+  }
   refreshWater();
 }
 let lastTerrainCsum=NaN;
@@ -1624,7 +1752,19 @@ let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add
 $("#autoBtn").classList.toggle("on",AUTO);
 $("#autoBtn").onclick=()=>{AUTO=!AUTO;$("#autoBtn").classList.toggle("on",AUTO);if(AUTO)evalGraph();toast(AUTO?"Auto-recompute on":"Auto-recompute off — use Build");};
 $("#buildBtn").onclick=()=>{nodes.forEach(n=>n._dirty=true);evalGraph();};
-$("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});buildIndex();evalGraph();toast("Resolution "+RES+"²");};
+$("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});
+  buildIndex();
+  if(RES>=512&&AUTO){AUTO=false;$("#autoBtn").classList.remove("on");toast(RES+"² — Auto off, use Build (heavy)");}
+  else toast("Resolution "+RES+"²");
+  evalGraph();};
+// GPU fast path toggle. Generators + thermal erosion run as WebGL2 fragment-shader kernels; the CPU
+// implementations stay the reference (see _verify_gpu.js for the GPU-vs-CPU parity check).
+$("#gpuBtn").onclick=()=>{
+  if(!GPU.init()){toast("GPU compute unavailable (needs WebGL2 + float render targets)");return;}
+  USE_GPU=!USE_GPU;$("#gpuBtn").classList.toggle("on",USE_GPU);
+  nodes.forEach(n=>n._dirty=true);evalGraph();
+  toast(USE_GPU?"GPU fast path on":"CPU reference path");};
+setTimeout(()=>{if(GPU.init()){$("#gpuBtn").classList.toggle("on",USE_GPU);}else{$("#gpuBtn").disabled=true;$("#gpuBtn").title="WebGL2 float render targets unavailable";}},0);
 $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
   document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};

@@ -189,3 +189,24 @@ Compute runs on the **CPU** (deterministic `Float32Array` heightfields) so it mi
 authoring tool — the numerically-validated implementations, oracles and cross-checks live in
 `reference-impl/`. Verified headless with Playwright (graph eval, WebGL init, all interactions,
 import/export — no console/page errors) during development.
+
+### GPU fast path (WebGL2 GPGPU)
+
+The **CPU kernels remain the reference implementation**. On top of them there is an optional GPU path
+(the **GPU** button in the toolbar) that runs the heavy, embarrassingly-parallel kernels as fragment
+shaders over a fullscreen triangle into `RGBA32F` ping-pong render targets — the same technique as the
+deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Ridged MF** and **thermal erosion**.
+
+It produces the *same* terrain as the CPU because the 32-bit integer hash is reproduced exactly in GLSL
+`uint` (the CPU hash now uses `Math.imul`; plain `*` silently rounded past 2⁵³). `_verify_gpu.js` is the
+parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 1.1e-4 (ridged), 4.8e-7 (thermal)**, i.e. float32
+-vs-float64 rounding, not algorithmic drift.
+
+This is what makes **512² and 1024²** practical: a 1024² build is 1,048,576 cells / 2.09M triangles.
+Selecting ≥512² switches **Auto** off so you drive it with **Build**.
+
+Honest scope: **hydraulic (droplet) erosion is still CPU** — the particle sim scatters writes, so it wants
+the virtual-pipes model to go on GPU (planned, mirroring `reference-impl`'s `pipe_erode`). The
+priority-flood + D8 pair behind lakes/rivers is inherently sequential and stays CPU; it is now skipped
+entirely unless a **Water** node needs it. Timings measured in CI are under **swiftshader** (a *software*
+rasteriser), so they understate real-GPU gains — even there, fBm at 512² is 47 ms GPU vs 196 ms CPU.
