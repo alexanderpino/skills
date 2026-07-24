@@ -10,9 +10,15 @@
 Each tile is a terrain field or map **generated live in pure NumPy** by a reference implementation of
 a terrain‑generation skill (noise, erosion, hydrology, geology, analysis, rendering). Each caption has
 two parts: **`[chapter] Capability`** and the **oracle/invariant** that the automated test suite uses to
-verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (287 tests) passes; the
+verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (332 tests) passes; the
 fluvial/tectonic core is cross‑validated against external libraries (RichDEM, Landlab); citations were
 audited against primary sources.
+
+**Composition convention:** every tile is **base (+ supportive atom if needed) + the tested atom** — the
+showcased atom acting on a *real terrain base*, not a bare primitive on a blank canvas. So a crater is
+dug into cratered highlands, a mesa/mask is stamped onto a desert floor, a filter/analysis runs on a
+mountain, and a sim (glacier, flexure, wind) acts on/over real relief. When you see terrain "under" an
+effect, that is the deliberate base — judge the **effect**, and whether it sits believably in its base.
 
 Your job is **not** to check the code. It is to look at the **pictures** and tell us, per tile and
 overall: does the visual match the claimed capability and its caption, is it physically plausible, what
@@ -68,22 +74,22 @@ failure mode to watch for.
 |---|---|---|---|
 | R1C1 | Perlin fBm | cloudy, natural multi‑scale relief | axis‑aligned creases; visible lattice grid |
 | R1C2 | Simplex fBm | like Perlin but no directional bias | hexagonal/striped lattice showing through |
-| R1C3 | Worley F2−F1 | cellular "cracked‑mud" network, thin cell edges | blobby with no cell structure |
+| R1C3 | Worley F2−F1 | **cellular ridge terrain** (hillshaded cell walls) | blobby with no cell structure |
 | R1C4 | Ridged MF | sharp bright ridgelines, smooth valleys | rounded blobs (not ridged) |
 | R1C5 | Hybrid MF | rough peaks, smooth basins (heterogeneous) | uniform roughness everywhere |
-| R1C6 | Gabor (anisotropic) | clear **directional bands/streaks** | isotropic blobs (no orientation = broken) |
+| R1C6 | Gabor (anisotropic) | **anisotropic ridged terrain** — parallel directional ridges | isotropic blobs (no orientation = broken) |
 | R1C7 | Domain warp | fBm bent into swirled, flow‑like forms | undistorted plain fBm |
 
 ### Row 2 — Curl + primitives/ops (01 / 10)
 | Cell | Tile | ✓ confirms | ✗ red flag |
 |---|---|---|---|
-| R2C1 | Curl noise | smooth swirling (divergence‑free) field | sources/sinks, blocky discontinuities |
-| R2C2 | Convex‑poly SDF | clean polygonal distance field (concentric bands) | rounded circle; wrong sign inside |
-| R2C3 | smooth‑min blend | two shapes fused with a smooth neck | hard crease at the join |
+| R2C1 | Curl noise | **terrain warped by a divergence‑free flow** (organic swirls) | sources/sinks, blocky discontinuities |
+| R2C2 | Convex‑poly SDF | a **flat‑topped mesa** (polygon footprint) rising from a textured plain with a straight cliff | rounded blob; no straight cliff |
+| R2C3 | smooth‑min blend | two summits fused by a **smoothly rounded saddle** | hard crease/notch at the join |
 | R2C4 | Terrace | flat treads + sharp risers, steps that **wander** | perfectly straight contour steps |
-| R2C5 | Morph closing | pit‑fill / pile‑depth map (bright in hollows) | negative values; noise unchanged |
-| R2C6 | Bilateral filter | smooth regions but a **sharp preserved edge** | edge blurred away (that's a plain blur) |
-| R2C7 | Twist deform | field rotated more toward the centre | uniform rotation; torn/pinched centre |
+| R2C5 | Morph closing | terrain hillshade with the **pits it fills marked** (blue in hollows) | overlay everywhere; noise unchanged |
+| R2C6 | Bilateral filter | **canyon** terrain smoothed on slopes but the **cliff edge preserved** | cliff blurred away (that's a plain blur) |
+| R2C7 | Twist deform | **terrain** swirled about the centre (more rotation inward) | uniform rotation; torn/pinched centre |
 
 ### Row 3 — Flow & erosion (03 / 04 / 05)
 | Cell | Tile | ✓ confirms | ✗ red flag |
@@ -95,7 +101,7 @@ failure mode to watch for.
 | R3C5 | Thermal (talus) | a cone relaxed so no slope exceeds repose | central spike, inverted pit, or explosion |
 | R3C6 | Pipe erosion | incised channels **and** deposition fans/aprons | erosion only, no deposition; instability |
 | R3C7 | Shallow water | water pooled/threaded in the low channels | uniform sheet; dry everywhere |
-| R4C1 | Hillslope diffusion | an initial spike spread into a smooth Gaussian | still a spike; or ringing/negative halo |
+| R4C1 | Hillslope diffusion | a **rough massif rounded/smoothed** by linear diffusion | unchanged rough; or ringing/negative halo |
 | R4C2 | River meander (belt) | a sinuous channel with **asymmetric, downstream‑skewed** loops, **point/scroll bars** brightening the inner (convex) banks, and a detached **oxbow lake** (teal) | symmetric sine waves; no oxbow; a bare incised groove with no inner‑bank deposition |
 
 ### Row 4–5 — Landform generators (11) + analysis start (06)
@@ -110,7 +116,7 @@ failure mode to watch for.
 | R5C2 | Fault‑block butte | flat top, near‑vertical cliff, talus apron, **polygonal** footprint | round hill; smooth blob |
 | R5C3 | Impact crater | bowl + **raised rim** + central peak + ejecta apron | plain dimple; no rim/peak |
 | R5C4 | Karst sinkholes | scattered pits **only on the soluble band** | pits everywhere; or none |
-| R5C5 | Strata + fold | banded erodibility, bands **folded** (wavy), not flat | uniform field; ruler‑straight bands |
+| R5C5 | Strata + fold | hard/soft **bands (blue‑grey vs tan) draped on folded, hillshaded terrain**, wavy not flat | uniform field; ruler‑straight bands |
 | R5C6 | Slope | steep faces bright, flats dark | inverted; uniform |
 | R5C7 | Northness | pole‑/shade‑facing slopes highlighted (the snow side) | the sunny side highlighted (sign bug) |
 
@@ -121,12 +127,12 @@ failure mode to watch for.
 | R6C2 | Wetness (TWI) | bright in convergent valley floors | bright on ridges (inverted) |
 | R6C3 | Horizon AO | dark in hollows/valleys, ~0 (open) on peaks | uniform; or peaks darkest |
 | R6C4 | Substances | snow on high/cold/**shaded**, veg on gentle, water low | snow on sunny side; colours ignore terrain |
-| R6C5 | SIA glacier | smooth radial ice dome (Halfar profile) | lumpy; asymmetric; negative ice |
+| R6C5 | SIA glacier | an **ice cap filling a real mountain basin** (translucent ice over a hillshaded bed) | negative/lumpy ice; bed invisible |
 | R6C6 | Lava CA | a channelised flow tongue that **freezes** downstream | uniform flood; no directed flow |
 | R6C7 | Coastal retreat | a notched, landward‑retreated cliff line | untouched coast; sea eroding uphill |
 | R7C1 | Dunes (Werner) | dune‑like corridors/patches (deposition instability) | uniform sand; pure white noise |
-| R7C2 | Isostatic flexure | a smooth broad deflection basin under the load | point‑spike; ringing |
-| R7C3 | Mass‑consistent wind | smooth flow field (divergence removed) | blocky/noisy; obvious sources |
+| R7C2 | Isostatic flexure | a broad deflection **moat around a mountain‑range load** | point‑spike; ringing |
+| R7C3 | Mass‑consistent wind | smooth **streamlines (LIC) flowing over hillshaded terrain** (divergence removed) | blocky/noisy; obvious sources |
 | R7C4 | Hero 3D raster | 3D massif, snow on the high core, **translucent** water, no holes | z‑fighting, gaps, opaque water, see‑through faces |
 
 ### AAA‑parity tranche (appended after the hero tile; earlier coordinates unchanged)
