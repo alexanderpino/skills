@@ -4,3 +4,4 @@ package.json
 package-lock.json
 _*.js
 _*.png
+satmaps/extract.log
