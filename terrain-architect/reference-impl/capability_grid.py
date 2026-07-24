@@ -124,50 +124,38 @@ def CELLS():
     # ---- NOISE (01) ----
     add("01 Perlin fBm", "=0 on integer lattice; 1-octave = base noise", lambda: _noise_fbm(noise.perlin, 1))
     add("01 Simplex fBm", "bounded, zero-mean, world-space, continuous", lambda: _noise_fbm(noise.simplex, 2))
-    add("01 Worley F2-F1", "cellular ridge terrain; 3x3 search == brute-force nearest", lambda: hill(noise.worley(*_grid(220, 0.12), seed=3, kind="f2f1") * 700))
+    add("01 Worley F2-F1", "3x3 search == brute-force nearest point", lambda: gray(noise.worley(*_grid(220, 0.12), seed=3, kind="f2f1")))
     add("01 Ridged MF", "non-negative, finite (Musgrave weight-feedback)", lambda: hill(noise.ridged_mf(xx, yy, 4, octaves=6) * 500))
     add("01 Hybrid MF", "finite via min(weight,1) clamp", lambda: hill(_norm(noise.hybrid_mf(xx, yy, 5, octaves=6)) * 900))
-    add("01 Gabor (anisotropic)", "anisotropic ridged terrain; bands rotate with omega0", lambda: hill(noise.gabor(*_grid(220, 0.11), seed=2, omega0=0.5) * 550))
+    add("01 Gabor (anisotropic)", "orientable: bands rotate with omega0", lambda: gray(noise.gabor(*_grid(220, 0.11), seed=2, omega0=0.5)))
     add("01 Domain warp", "warps (flow-like q mask != 0)", lambda: hill(noise.domain_warp(xx, yy, 6, warp=4.0)[0] * 900))
-    def _curl():                                                       # divergence-free flow warps a base terrain
-        gx, gy = _grid(220, 0.03)
-        u, v = noise.curl(gx, gy, 7)                                   # a divergence-free flow field
-        return hill(noise.fbm(gx + 0.35 * u, gy + 0.35 * v, 3, octaves=5) * 900)
-    add("01 Curl noise", "divergence-free flow swirls terrain; div=0 to eps", _curl)
+    add("01 Curl noise", "divergence = 0 to machine epsilon", lambda: gray(noise.curl(xx * 3, yy * 3, 7)[0]))
 
     # ---- PRIMITIVES / OPS (10) ----
-    def _sdf():                                                       # SDF footprint flattens a mesa top out of terrain
+    def _sdf():
         px, py = np.mgrid[-1:1:220j, -1:1:220j]
         d = ops_filters.sd_convex_polygon(px, py, [(1, 0.2), (-.3, 1), (-1, -.4), (.4, -1)], [.6, .6, .6, .6])
-        base = noise.fbm(*_grid(220, 0.14), seed=5, octaves=6) * 200 + 120           # textured desert floor
-        mask = _smoothstep(0.02, -0.02, d)                            # 1 inside the polygon
-        top = base.max() + 320.0                                      # flat tableland above the plain
-        return hill(base * (1 - mask) + top * mask)                   # smooth top, textured plain, SDF cliff between
-    add("10 Convex-poly SDF", "SDF footprint stamps a flat-topped mesa; == sd_box on faces", _sdf)
-    def _smin():                                                       # smooth union of two cones: a rounded saddle
-        n = 220; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        base = noise.fbm(xx2 * 0.08, yy2 * 0.08, 6, octaves=5) * 70 + 40
-        h1 = np.maximum(760.0 - 12.0 * np.hypot(xx2 - 88, yy2 - 110), 0.0)            # two steep cones
-        h2 = np.maximum(760.0 - 11.0 * np.hypot(xx2 - 138, yy2 - 122), 0.0)
-        return hill(base + ops_filters.smax(h1, h2, 240.0))           # smooth union -> rounded saddle, no crease
-    add("10 smooth-min blend", "smooth union: rounded saddle joins two peaks (smin family)", _smin)
-    add("10 Terrace", "quantise a hillside to treads; steps wander (warp before quantise)", lambda: hill(L.terrace(_norm(noise.fbm(xx, yy, 8, octaves=5)), 6, sharpness=2.5, warp_amp=0.06, warp_wl=32.0, seed=8) * 800))
-    def _close():                                                      # closing fills pits on real terrain
-        m = L.mountain((180, 180), 30.0, seed=9, style="eroded", height=1200.0)
-        depth = ops_filters.closing(m, 3) - m                          # how deep each filled pit was
-        base = render.hillshade(m, 30.0).astype(float)
-        a = np.clip(depth / (np.percentile(depth, 99.0) + 1e-6), 0, 1)[..., None] * 0.9
-        return np.clip(base * (1 - a) + np.array([90., 150, 230]) * a, 0, 255).astype(np.uint8)
-    add("10 Morph closing", "marks the pits it fills on terrain (closing >= h)", _close)
-    def _bilat():                                                      # edge-aware: smooth slopes, keep the cliff
-        m = L.canyon((180, 180), 30.0, seed=3, rim=800.0, depth=600.0)
-        return hill(ops_filters.bilateral(m, 3.0, 0.2 * np.ptp(m)), 30.0)
-    add("10 Bilateral filter", "smooths slopes but keeps the cliff (edge-aware)", _bilat)
-    def _twist():                                                      # twist swirls a base terrain about the centre
+        return ramp(-d)
+    add("10 Convex-poly SDF", "== sd_box on faces (half-plane intersection)", _sdf)
+    def _smin():
+        px, py = np.mgrid[-1:1:220j, -1:1:220j]
+        a = ops_filters.sd_circle(px + .3, py, .5); b = ops_filters.sd_circle(px - .3, py, .5)
+        return ramp(-ops_filters.smin(a, b, .3))
+    add("10 smooth-min blend", "-> min as k->0; smin <= min", _smin)
+    add("10 Terrace", "quantise to treads; warp BEFORE quantise (steps wander)", lambda: hill(L.terrace(_norm(noise.fbm(xx, yy, 8, octaves=5)), 6, sharpness=2.5, warp_amp=0.06, warp_wl=32.0, seed=8) * 800))
+    def _close():
+        h = noise.fbm(xx, yy, 9, octaves=5) * 400
+        return gray(ops_filters.closing(h, 3) - h)
+    add("10 Morph closing", "fills pits (closing >= h); pile depth", _close)
+    def _bilat():
+        h = _norm(noise.fbm(xx, yy, 3, octaves=4)); h = (h > 0.5).astype(float)
+        return gray(ops_filters.bilateral(h, 3.0, 0.2))
+    add("10 Bilateral filter", "preserves step edge (edge-aware)", _bilat)
+    def _twist():
         px, py = np.mgrid[-1:1:220j, -1:1:220j]
         qx, qy = ops_filters.twist(px, py, 0, 0, 3.0)
-        return hill(noise.fbm(qx * 3, qy * 3, 2, octaves=5) * 900)
-    add("10 Twist deform", "swirls terrain; k=0 identity, radius preserved", _twist)
+        return gray(noise.fbm(qx * 3, qy * 3, 2, octaves=4))
+    add("10 Twist deform", "k=0 identity; preserves radius from centre", _twist)
 
     # ---- FLOW & EROSION (03/04/05) ----
     _cr = lambda a, k=10: a[k:-k, k:-k]                                     # crop the fixed-BC edge band for display
@@ -180,19 +168,19 @@ def CELLS():
         h = noise.fbm(*_grid(150, 0.06), seed=1, octaves=6) * 600
         return ramp(_cr(np.log(flow.mfd_accumulation(flow.priority_flood_fill(h)))))
     add("03 MFD accumulation", "sum = n*m (Freeman p=1.1)", _mfd)
-    def _sp():                                                        # uplift + incision grow a network from a proto-surface
-        rng = np.random.default_rng(0)
-        h = rng.random((96, 96)) * 5                                  # low-relief noisy proto-surface (the base IC)
+    def _sp():
+        rng = np.random.default_rng(0); h = rng.random((96, 96)) * 5   # random proto-surface (minimal IC)
         return hill(_cr(sp.stream_power_evolve(h, 2.0, 5e-2, 0.5, 1000.0, 120, 50.0), 8), 50)
     add("04 Stream power", "slope-area exponent = -0.5 vs Landlab", _sp)
     def _drop():
         h = L.mountain((150, 150), 30.0, seed=3, style="basic")
         return hill(erosion_droplet.droplet_erode(h, n_droplets=60 * 150, seed=3, brush_radius=2))
     add("04 Droplet erosion", "total volume conserved (~1e-13)", _drop)
-    def _therm():                                                    # steep raw massif (base) -> talus aprons
-        m = L.mountain((130, 130), 30.0, seed=6, style="basic", height=1300.0)
-        return hill(erosion_thermal.thermal_erosion(m, 0.6, 220, cellsize=30.0, factor=0.25), 30.0)
-    add("05 Thermal (talus)", "base massif -> talus <= repose; mass conserved; non-inverting", _therm)
+    def _therm():
+        yy2, xx2 = np.mgrid[0:81, 0:81] - 40
+        cone = np.maximum(0, 40 - np.hypot(xx2, yy2)) * 6.0
+        return hill(erosion_thermal.thermal_erosion(cone, 0.3, 200, factor=0.25), 5)
+    add("05 Thermal (talus)", "<= repose; mass conserved; non-inverting", _therm)
     def _pipe():
         h = L.mountain((120, 120), 40.0, seed=5, style="basic")
         h[:, :46] *= 0.05                                                   # a low plain -> alluvial fans build here
@@ -209,10 +197,10 @@ def CELLS():
         r = shallow_water.simulate(h, 30.0, rain=6e-5, iters=80, dt=0.02, drain_edges=True)
         return ramp(_cr(np.sqrt(r["depth"]), 8))
     add("04 Shallow water", "rain_in = out + stored (~1e-15)", _sw)
-    def _diff():                                                      # linear diffusion rounds a rough massif
-        m = L.mountain((150, 150), 30.0, seed=11, style="basic", height=1200.0)
-        return hill(diffusion.hillslope_diffuse(m, 0.2, 0.2, 120), 30.0)
-    add("04 Hillslope diffusion", "rounds hillslopes; Gaussian Green's fn, 0.25 CFL", _diff)
+    def _diff():
+        n = 128; im = np.zeros((n, n)); im[n//2, n//2] = 1.0
+        return ramp(diffusion.hillslope_diffuse(im, 0.5, 0.1, 60))
+    add("04 Hillslope diffusion", "Gaussian Green's fn; 0.25 CFL tight", _diff)
     def _meander():
         n = 180; cell = 4.0
         gx, gy = np.meshgrid(np.arange(n) * cell, np.arange(n) * cell)
@@ -243,47 +231,32 @@ def CELLS():
                     sinuosity=0.45, detail=0.3, width_frac=0.34)           # domain-warped, smin-rounded crest
         return hill(_cr(base + r, 4), cell)                                # base + atom, that's it
     add("11 Ridge (hogback)", "asymmetric hogback (smin-rounded crest, warped strike) on a foothill base", _ridge)
-    def _volc_strato():                                              # edifice rising from a volcanic apron (base)
-        n = 180; cell = 20.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 12, octaves=5) * 110 + 60
-        return hill(base + L.volcano((n, n), 90, 90, radius=1500, height=1600, cellsize=cell, seed=1, kind="strato"), cell)
-    add("11 Volcano (strato)", "concave-up cone + summit crater on a volcanic apron", _volc_strato)
-    def _volc_shield():
-        n = 180; cell = 20.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 15, octaves=5) * 110 + 60
-        return hill(base + L.volcano((n, n), 90, 90, radius=1600, height=900, cellsize=cell, seed=1, kind="shield"), cell)
-    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian) on a volcanic apron", _volc_shield)
+    add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
+    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian)", lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=900, cellsize=20, kind="shield"), 20))
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
-    def _butte():                                                    # tablelands standing on a desert floor (base)
-        n = 180; cell = 22.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 21, octaves=4) * 50 + 40
-        relief = np.zeros((n, n))
+    def _butte():
+        h = np.zeros((180, 180))
         for bx, by, s in [(60, 70, 0), (110, 95, 1), (95, 130, 2)]:
-            relief = np.maximum(relief, L.fault_block_butte((n, n), bx, by, 26, 300, cell, seed=s,
-                                                            fault=0.5, corner_round=3.2, warp=0.17))
-        return hill(base + relief, cell)
-    add("11 Fault-block butte", "flat top, cliff, repose talus on a desert floor; polygonal", _butte)
-    def _crater():                                                   # dug into cratered highlands (base)
-        n = 180; cell = 22.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        base = noise.fbm(xx2 * 0.045, yy2 * 0.045, 9, octaves=5) * 130 + 200
-        return hill(L.impact_crater(base, 90, 90, 2600, cell, complex_D=3000), cell)
-    add("11 Impact crater", "depth/D=0.2, rim 0.04D, r^-3 ejecta on cratered highlands", _crater)
+            h = np.maximum(h, L.fault_block_butte((180, 180), bx, by, 26, 300, 22.0, seed=s,
+                                                  fault=0.5, corner_round=3.2, warp=0.17))
+        return hill(h, 22)
+    add("11 Fault-block butte", "flat top, cliff, repose talus; polygonal", _butte)
+    def _crater():
+        h = np.zeros((180, 180)); h = L.impact_crater(h, 90, 90, 2600, 22.0, complex_D=3000)
+        return hill(h, 22)
+    add("11 Impact crater", "depth/D=0.2, rim 0.04D, r^-3 ejecta", _crater)
     def _karst():
         xx2, yy2 = _grid(150, 0.05); h = noise.fbm(xx2, yy2, 4, octaves=4) * 120 + 200
         sol = (noise.fbm(xx2 + 9, yy2, 7, octaves=3) > 0.0).astype(float)
         hk, _ = L.karst_sinkholes(h, sol, cellsize=20.0, spacing=90.0, depth=40.0, radius=45.0, seed=1)
         return hill(hk, 20)
     add("11 Karst sinkholes", "pits only on soluble; do-not-fill mask", _karst)
-    def _strata():                                                    # hard/soft beds draped on a folded surface
+    def _strata():
         xx2, yy2 = _grid(180, 0.05)
-        surf = noise.fbm(xx2, yy2, 2, octaves=5) * 300 + 250          # a real (folded) surface = base terrain
-        s = L.strat_coord(surf, xx2, yy2, fold_amp=120, fold_dir=(1, .3), fold_freq=.6)
-        k = L.bed_erodibility(s, [(40, 1.0), (25, 0.4), (60, 0.8)])   # periodic hard/soft bands
-        shade = render.hillshade(surf, 30.0).astype(float)[..., 0] / 255.0
-        t = _norm(k)[..., None]
-        rgb = np.array([120., 138, 170]) * (1 - t) + np.array([198., 120, 78]) * t   # hard=blue-grey, soft=tan
-        return np.clip(rgb * (0.4 + 0.6 * shade)[..., None], 0, 255).astype(np.uint8)
-    add("11 Strata + fold", "hard/soft bands draped on folded terrain; periodic K", _strata)
+        s = L.strat_coord(noise.fbm(xx2, yy2, 2, octaves=5) * 300, xx2, yy2, fold_amp=120, fold_dir=(1, .3), fold_freq=.6)
+        k = L.bed_erodibility(s, [(40, 1.0), (25, 0.4), (60, 0.8)])
+        return ramp(k)
+    add("11 Strata + fold", "periodic K bands; folded coordinate", _strata)
 
     # ---- ANALYSIS & MASKS (06) ----
     _terr = L.mountain((160, 160), 30.0, seed=8, style="basic")
@@ -295,17 +268,13 @@ def CELLS():
     add("06 Substances", "priority stack sums to 1; snow on shaded", lambda: substance_rgb(L.mountain((150, 150), 40.0, seed=8, style="eroded"), 40))
 
     # ---- SIMS & GEOPHYSICS (12/19/02/13) ----
-    def _glac():                                                      # SIA ice cap resting on a real bed
+    def _glac():
         n = 121; c = 60; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
         r = np.hypot(xx2 - c, yy2 - c) * 12000
         H = 3000 * np.maximum(1 - np.clip(r / 500e3, 0, 1) ** (4/3), 0) ** (3/7)
-        bed = L.mountain((n, n), 12000.0, seed=2, style="eroded", height=2600.0)   # a real mountain bed (base)
-        H1 = sims.glacier_sia(bed, H, 8, A=3.17e-24, dt=200 * 3.15e7, cellsize=12000, beta=0.0, max_substeps=4000)
-        shade = render.hillshade(bed, 12000.0).astype(float)
-        ice = np.clip(H1 / 1600.0, 0.0, 1.0)[..., None]               # translucent -> bed shows through
-        rgb = shade * (1 - 0.7 * ice) + np.array([214., 232, 246]) * (0.7 * ice)
-        return np.clip(rgb, 0, 255).astype(np.uint8)
-    add("12 SIA glacier", "SIA ice cap on a real bed; ice conserved (Halfar-validated)", _glac)
+        H1 = sims.glacier_sia(np.zeros((n, n)), H, 8, A=3.17e-24, dt=200 * 3.15e7, cellsize=12000, beta=0.0, max_substeps=4000)
+        return ramp(H1)
+    add("12 SIA glacier", "Halfar exact profile to ~1%; ice conserved", _glac)
     def _lava():
         xx2, yy2 = _grid(120, 0.06); bed = noise.fbm(xx2, yy2, 2, octaves=5) * 300
         out = sims.lava_flow(bed, (60, 20), 90)               # source = (i, j) point
@@ -322,28 +291,20 @@ def CELLS():
         rng = np.random.default_rng(0); sand = (rng.random((120, 120)) * 6).astype(int)
         return gray(dunes.werner_dunes(sand, 40, seed=0, p_sand=0.75, p_bare=0.25, wind=(0, 1)))
     add("05 Dunes (Werner)", "slabs conserved; p_sand>p_bare instability", _dunes)
-    def _flex():                                                      # a mountain-range load flexes the crust into a moat
-        n = 160; cell = 4000.0
-        range_h = L.mountain((n, n), cell, seed=3, style="basic", height=4500.0)   # the load = base terrain
-        load = 2700.0 * 9.81 * range_h                                # rho*g*h
+    def _flex():
+        n = 160; load = np.zeros((n, n)); load[70:90, 70:90] = 2.5e8
         D = isostasy.flexural_rigidity(7e10, 20e3)
-        w = isostasy.flexure_fft(load, D, 500.0, cellsize=cell)       # downward crustal deflection
-        return ramp(-w)                                               # the flexural moat around the load
-    add("02 Isostatic flexure", "range load deflects crust into a moat; single-mode exact", _flex)
-    def _wind():                                                            # mass-consistent wind streamlines over terrain
+        return ramp(isostasy.flexure_fft(load, D, 500.0, cellsize=4000.0))
+    add("02 Isostatic flexure", "W=Q/(Dk^4+drho g); single-mode exact", _flex)
+    def _wind():
         n = 150; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        terr = L.mountain((n, n), 30.0, seed=8, style="eroded", height=1400.0)   # terrain base
         ang = 0.5 + 1.1 * noise.fbm(xx2 / 55, yy2 / 55, 5, octaves=3)        # coherent large-scale flow
         u0, v0 = np.cos(ang), np.sin(ang)
-        r2 = ((xx2 - n * .55) ** 2 + (yy2 - n * .4) ** 2) / (0.05 * n * n)   # + a divergent source...
+        r2 = ((xx2 - n * .55) ** 2 + (yy2 - n * .4) ** 2) / (0.05 * n * n)   # + a divergent source (into a hill)
         s = np.exp(-r2); u0 += 1.5 * (xx2 - n * .55) / n * s; v0 += 1.5 * (yy2 - n * .4) / n * s
-        uc, vc = winds.mass_consistent(u0, v0)                               # ...divergence removed
-        streak = _norm(lic(uc, vc, seed=3, steps=18))                        # LIC -> visible smooth streamlines
-        shade = render.hillshade(terr, 30.0).astype(float)[..., 0] / 255.0
-        base = shade[..., None] * np.array([92., 110, 140])                  # cool terrain underneath
-        a = (streak ** 1.3)[..., None] * 0.8
-        return np.clip(base * (1 - a) + np.array([235., 240, 250]) * a, 0, 255).astype(np.uint8)
-    add("13 Mass-consistent wind", "streamlines over terrain; divergence -> 0 (LIC)", _wind)
+        uc, vc = winds.mass_consistent(u0, v0)                               # remove the divergence
+        return gray(lic(uc, vc, seed=3, steps=18))                          # LIC -> visible smooth streamlines
+    add("13 Mass-consistent wind", "divergence -> 0; LIC shows smooth streamlines", _wind)
 
     # ---- HERO / RENDER (08/09) ----
     def _hero():
