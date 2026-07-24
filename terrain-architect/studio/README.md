@@ -16,15 +16,19 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
   hill-shaded **thumbnail** of its own output — so you read the pipeline at a glance.
 - **Live 3D viewport**: WebGL2 lit terrain mesh with hypsometric / slope / grey shading, orbit +
   zoom, wireframe. Updates as you edit.
-- **Real heightmaps as a base**: the **Import DEM** node loads a PNG or a square 16-bit `.r16` raw —
-  including real USGS/SRTM tiles exported from `reference-impl/heightfield_io.py` — so you can add
-  erosion and effects to real-world areas, then **Export** the result as a heightmap PNG.
+- **Real heightmaps as a base**: the **Import DEM** node has a one-click **Use real SRTM sample**
+  (a real public-domain USGS/SRTM crop of the Colorado Plateau, embedded in the page) *and* loads your
+  own PNG or square 16-bit `.r16` raw — including real USGS/SRTM tiles exported from
+  `reference-impl/heightfield_io.py`. So you can add erosion and effects to real-world areas, then
+  **Export** the result as a heightmap PNG. (An in-browser live fetch of the USGS/SRTM buckets isn't
+  possible — they send no CORS headers — which is why `heightfield_io.py` does the fetching and the
+  Studio imports the file, plus the embedded sample for zero-setup real terrain.)
 
 ### Node library (mirrors the reference-impl atoms)
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Import DEM** |
+| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) |
 | **Filter** | Warp (domain warp) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
