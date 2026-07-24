@@ -103,6 +103,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Filter** | Warp (domain warp) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
+| **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (colour LUT node) · **SatMap Blend** (merge two colour branches) |
 | **Output** | Output (drives the viewport / export) |
 
@@ -121,6 +122,19 @@ Driver** (flow, a mask, a Blend). It picks a **Gradient** from the library (incl
 SatMap Studio) and applies **Reverse**, **Range** (use just a slice of the gradient) and **Shift** (offset
 the lookup) — the same transforms Gaea's SatMap node exposes.
 
+- **Bind a SatMap to any Data map — the same channels Gaea offers.** In Gaea a SatMap is a CLUT fed by
+  *any* grayscale, and what you feed it comes from the **Derive / Data Maps** family (Slope, Curvature,
+  FlowMap, Occlusion, Peaks, Soil, RockMap, Texture…) or from simulation data outputs (Erosion emits
+  **Wear** = where sediment was stripped, **Deposits** = where it came to rest, **Flow** = the path
+  between). The **Data map** node group mirrors that set: **Slope**, **Curvature** (Zevenbergen–Thorne
+  profile/plan/mean), **Flow** (priority-flood + D8 accumulation), **Occlusion** (horizon AO),
+  **Deposits** (morphological closing − surface, i.e. what piles into hollows), **Wear** (convex, steep,
+  exposed ground), **Peaks** (prominence over the local mean), and **Texture** (Gaea's composite
+  slope + soil + flow driver). Wire any of them into a SatMap's **Driver** — or into a **Mask** — so
+  colour follows rivers, cavities, sediment or ridges rather than only elevation. All mirror
+  `reference-impl/analysis.py` + `flow.py`. *(Difference to note: Gaea's Erosion node emits Wear/Deposits/
+  Flow as extra output ports of the simulation; our graph gives one output per node, so these are
+  standalone nodes that derive the same channels from the height field.)*
 - **Colour flows through the graph — branch, blend and stack.** Colour is resolved by walking the graph:
   a SatMap **composites its ramp over the colour already coming down its In chain** (so chaining
   `… → SatMap(base) → SatMap(rock) → Output` stacks them, each with **Opacity**, **Blend**
@@ -128,7 +142,9 @@ the lookup) — the same transforms Gaea's SatMap node exposes.
   SatMap branches** — wire `SatMap A → A`, `SatMap B → B`, a mask into **Mask** — exactly Gaea's
   SatMap-combine; and any other node (erosion, filter) just passes colour through. So you can build a real
   colour graph — e.g. an elevation SatMap and a flow-driven SatMap blended by a slope mask. It's resolved
-  per-vertex on the CPU into the terrain's albedo.
+  per-vertex on the CPU into the terrain's albedo. Blend modes are **Normal / Max / Min / Multiply /
+  Screen / Overlay** — Gaea's own documented SatMap-blend technique is two SatMaps through a Combine node
+  at **Max**, masked by noise, which this reproduces.
 - **2D biome (altitude × slope).** Switch **Mode** to *2D biome* and the node blends **two** gradients — a
   flat-ground **Gradient** and a steep-ground **Steep gradient** — by slope: green valleys and gentle
   ground read from the first, cliffs and scree from the second. That's the classic 2D terrain LUT

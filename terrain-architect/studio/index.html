@@ -14,7 +14,7 @@
   --accent:#e2a45c; --accent-dim:#a9793f; --water:#4b9fb5;
   --good:#5cb87a; --warn:#e0b054; --bad:#e0685c;
   --cat-gen:#5cb87a; --cat-comb:#5c8fe0; --cat-filt:#e2a45c; --cat-ero:#4b9fb5;
-  --cat-mask:#b07de0; --cat-effect:#6fc7d8; --cat-out:#e0685c;
+  --cat-mask:#b07de0; --cat-data:#8ea3c8; --cat-effect:#6fc7d8; --cat-out:#e0685c;
   --radius:7px; --radius-sm:5px;
   --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -508,6 +508,84 @@ function slopeOf(inp){
   }
   return o;
 }
+/* ---------------------------------------------------------------------
+   DATA MAPS (Gaea's "Derive" channels) — grayscale fields you can bind a
+   SatMap (or any mask input) to. Mirrors reference-impl/analysis.py.
+   --------------------------------------------------------------------- */
+const gAt=(f,x,y)=>f[clamp(y,0,RES-1)*RES+clamp(x,0,RES-1)];
+// Zevenbergen-Thorne curvature on the 3x3 window (analysis.curvature). profile: +ve concave valley floor.
+function curvatureField(inp,{kind="profile",strength=1}){
+  const n=RES,o=newField(),L=1/n,eps=1e-12;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const z1=gAt(inp,x-1,y-1),z2=gAt(inp,x,y-1),z3=gAt(inp,x+1,y-1);
+    const z4=gAt(inp,x-1,y),z5=gAt(inp,x,y),z6=gAt(inp,x+1,y);
+    const z7=gAt(inp,x-1,y+1),z8=gAt(inp,x,y+1),z9=gAt(inp,x+1,y+1);
+    const D=((z4+z6)/2-z5)/(L*L),E=((z2+z8)/2-z5)/(L*L),F=(-z1+z3+z7-z9)/(4*L*L);
+    const G=(-z4+z6)/(2*L),H=(z2-z8)/(2*L),q=G*G+H*H;
+    let c;
+    if(kind==="mean")c=((1+G*G)*E*2-2*G*H*F+(1+H*H)*D*2)/(2*Math.pow(1+G*G+H*H,1.5));
+    else if(q<eps)c=0;
+    else if(kind==="plan")c=2*(D*H*H+E*G*G-F*G*H)/q;
+    else c=2*(D*G*G+E*H*H+F*G*H)/q;
+    o[y*n+x]=0.5+0.5*Math.tanh(c*strength*0.02);      // 0.5 = flat, >0.5 concave, <0.5 convex
+  }
+  return o;
+}
+// Flow accumulation: priority-flood fill then D8 drainage area, log-compressed (analysis/flow).
+function flowField(inp,{gain=1}){
+  const acc=d8Accumulation(priorityFloodFill(inp)),o=newField();
+  for(let i=0;i<o.length;i++)o[i]=Math.log1p(acc[i]*gain);
+  return normalize(o);
+}
+// Horizon-based ambient occlusion: occl = 1 - mean(cos^2 theta) over n dirs (analysis.horizon_ao).
+function occlusionField(inp,{radius=0.06,dirs=8}){
+  const n=RES,o=newField(),maxD=Math.max(2,radius*n);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const h0=inp[y*n+x];let occ=0;
+    for(let k=0;k<dirs;k++){
+      const a=2*Math.PI*k/dirs,dx=Math.cos(a),dy=Math.sin(a);let mt=0,d=1;
+      while(d<maxD){const s=gAt(inp,Math.round(x+dx*d),Math.round(y+dy*d));
+        mt=Math.max(mt,(s-h0)*n/d);d*=1.35;}
+      const c=Math.cos(Math.atan(mt));occ+=c*c;
+    }
+    o[y*n+x]=1-occ/dirs;                                // 0 = open sky, 1 = fully enclosed
+  }
+  return normalize(o);
+}
+// Separable grayscale dilate/erode (square SE) -> morphological closing, for deposits.
+function morph1D(inp,r,mx){
+  const n=RES,t=newField(),o=newField();
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=inp[y*n+x];
+    for(let k=-r;k<=r;k++){const s=gAt(inp,x+k,y);v=mx?Math.max(v,s):Math.min(v,s);}t[y*n+x]=v;}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=t[y*n+x];
+    for(let k=-r;k<=r;k++){const s=gAt(t,x,y+k);v=mx?Math.max(v,s):Math.min(v,s);}o[y*n+x]=v;}
+  return o;
+}
+// Deposits / soil: closing(h) - h, the depth loose material piles into hollows (analysis.deposit_fill).
+function depositsField(inp,{radius=3}){
+  const r=Math.max(1,Math.round(radius)),closed=morph1D(morph1D(inp,r,true),r,false),o=newField();
+  for(let i=0;i<o.length;i++)o[i]=Math.max(closed[i]-inp[i],0);
+  return normalize(o);
+}
+// Peaks: prominence above the local mean (h - blur(h), positive part).
+function peaksField(inp,{radius=4}){
+  const b=blurField(inp,{radius:Math.max(1,Math.round(radius))}),o=newField();
+  for(let i=0;i<o.length;i++)o[i]=Math.max(inp[i]-b[i],0);
+  return normalize(o);
+}
+// Wear: convex, steep ground — the exposed edges erosion strips first (convexity x slope).
+function wearField(inp,{strength=1}){
+  const cur=curvatureField(inp,{kind:"mean",strength:1}),sl=normalize(slopeOf(inp)),o=newField();
+  for(let i=0;i<o.length;i++)o[i]=Math.max(0.5-cur[i],0)*2*sl[i]*strength;
+  return normalize(o);
+}
+// Texture: Gaea's composite colour driver — slope + soil(deposits) + flow mixed into one mask.
+function textureField(inp,{slopeW=0.5,soilW=0.3,flowW=0.2}){
+  const sl=normalize(slopeOf(inp)),so=depositsField(inp,{radius:3}),fl=flowField(inp,{gain:1});
+  const o=newField(),tot=(slopeW+soilW+flowW)||1;
+  for(let i=0;i<o.length;i++)o[i]=(sl[i]*slopeW+so[i]*soilW+fl[i]*flowW)/tot;
+  return normalize(o);
+}
 function slopeSelect(inp,{lo=0.1,hi=0.6,falloff=0.1}){
   const sl=normalize(slopeOf(inp));const o=newField();
   for(let i=0;i<o.length;i++){const v=sl[i];
@@ -592,7 +670,7 @@ const P={
 };
 const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
-  mask:{c:"--cat-mask",name:"Mask"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};
+  mask:{c:"--cat-mask",name:"Mask"},data:{c:"--cat-data",name:"Data map"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};
 
 const TYPES={
   perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
@@ -669,6 +747,32 @@ const TYPES={
     params:[P.slider("lo","Low",0,1,0.3),P.slider("hi","High",0,1,0.7),P.slider("falloff","Falloff",0.01,0.4,0.12)],
     eval:(p,ins)=>ins[0]?heightSelect(ins[0],p):newField()},
 
+  // ---- DATA MAPS (Gaea's "Derive" channels): grayscale fields to bind a SatMap / mask to ----
+  d_slope:{cat:"data",name:"Slope",ins:["In"],desc:"Steepness as a grayscale field (0 flat → 1 vertical). The classic cliff/bench colour driver.",
+    params:[],eval:(p,ins)=>ins[0]?normalize(slopeOf(ins[0])):newField()},
+  d_curvature:{cat:"data",name:"Curvature",ins:["In"],desc:"Zevenbergen–Thorne curvature: convex ridges/lips vs concave valley floors (0.5 = flat).",
+    params:[P.seg("kind","Kind",[["profile","Profile"],["plan","Plan"],["mean","Mean"]],"profile"),
+      P.slider("strength","Strength",0.1,4,1,0.1)],
+    eval:(p,ins)=>ins[0]?curvatureField(ins[0],p):newField()},
+  d_flow:{cat:"data",name:"Flow",ins:["In"],desc:"Flow accumulation — the drainage network (priority-flood fill + D8), log-compressed. Where water runs.",
+    params:[P.slider("gain","Gain",0.1,8,1,0.1)],
+    eval:(p,ins)=>ins[0]?flowField(ins[0],p):newField()},
+  d_occlusion:{cat:"data",name:"Occlusion",ins:["In"],desc:"Horizon-based ambient occlusion — crevices and enclosed valleys dark, open peaks light.",
+    params:[P.slider("radius","Radius",0.01,0.2,0.06,0.01),P.int("dirs","Directions",4,16,8)],
+    eval:(p,ins)=>ins[0]?occlusionField(ins[0],p):newField()},
+  d_deposits:{cat:"data",name:"Deposits",ins:["In"],desc:"Soil / sediment: the depth loose material piles into hollows (morphological closing − surface).",
+    params:[P.int("radius","Radius",1,10,3)],
+    eval:(p,ins)=>ins[0]?depositsField(ins[0],p):newField()},
+  d_wear:{cat:"data",name:"Wear",ins:["In"],desc:"Exposed, convex, steep ground — the edges erosion strips first.",
+    params:[P.slider("strength","Strength",0.2,3,1,0.1)],
+    eval:(p,ins)=>ins[0]?wearField(ins[0],p):newField()},
+  d_peaks:{cat:"data",name:"Peaks",ins:["In"],desc:"Prominence above the local mean — isolates summits and crests.",
+    params:[P.int("radius","Radius",1,12,4)],
+    eval:(p,ins)=>ins[0]?peaksField(ins[0],p):newField()},
+  d_texture:{cat:"data",name:"Texture",ins:["In"],desc:"Gaea's composite colour driver: slope + soil + flow mixed into one mask — the usual SatMap input.",
+    params:[P.slider("slopeW","Slope",0,1,0.5),P.slider("soilW","Soil",0,1,0.3),P.slider("flowW","Flow",0,1,0.2)],
+    eval:(p,ins)=>ins[0]?textureField(ins[0],p):newField()},
+
   water:{cat:"effect",name:"Water",ins:["In"],desc:"Adds water to the scene. Hydrology = lakes fill each basin + rivers flow downhill; Sea = a flat ocean at a level.",
     passthrough:true,effect:"water",
     params:[P.seg("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
@@ -688,13 +792,13 @@ const TYPES={
       P.slider("rangeLo","Range low",0,1,0),P.slider("rangeHi","Range high",0,1,1),
       P.slider("shift","Shift",-0.5,0.5,0),
       P.slider("opacity","Opacity",0,1,1),
-      P.seg("blend","Blend",[["normal","Normal"],["multiply","Multiply"],["screen","Screen"]],"normal")],
+      P.select("blend","Blend",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
     eval:(p,ins,nd)=>{const h=ins[0]||newField();
       let drv=p.source==="slope"?normalize(slopeOf(h)):p.source==="height"?h:(ins[1]||h);
       nd._driver=normalize(drv);nd._slope=normalize(slopeOf(h));nd._mask=ins[2]||null;return h;}},
   satmapblend:{cat:"effect",name:"SatMap Blend",ins:["A","B","Mask"],desc:"Blend two SatMap (colour) branches — A underneath, B over it by Mask × Opacity with a Blend mode. Height passes through from A. Gaea's SatMap-combine.",
     passthrough:true,effect:"satmapblend",
-    params:[P.seg("blend","Blend",[["normal","Normal"],["multiply","Multiply"],["screen","Screen"]],"normal"),
+    params:[P.select("blend","Blend",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal"),
       P.slider("opacity","Opacity",0,1,1)],
     eval:(p,ins,nd)=>{nd._mask=ins[2]||null;return ins[0]||newField();}},
 
@@ -1068,7 +1172,14 @@ function satLayerColor(L,i){                          // one layer's colour at v
     return[a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s,a[2]+(b[2]-a[2])*s];}
   return a;}
 function satBlend(dst,src,m,mode){const o=[0,0,0];
-  for(let c=0;c<3;c++){let s=src[c];if(mode==="multiply")s=dst[c]*src[c];else if(mode==="screen")s=1-(1-dst[c])*(1-src[c]);o[c]=dst[c]+(s-dst[c])*m;}return o;}
+  for(let c=0;c<3;c++){let s=src[c];
+    if(mode==="multiply")s=dst[c]*src[c];
+    else if(mode==="screen")s=1-(1-dst[c])*(1-src[c]);
+    else if(mode==="max")s=Math.max(dst[c],src[c]);           // Gaea's Combine "Max" — the documented SatMap blend
+    else if(mode==="min")s=Math.min(dst[c],src[c]);
+    else if(mode==="overlay")s=dst[c]<0.5?2*dst[c]*src[c]:1-2*(1-dst[c])*(1-src[c]);
+    o[c]=dst[c]+(s-dst[c])*m;}
+  return o;}
 function satNodeColorField(nd,n){                     // a single SatMap node's colour (1D ramp or 2D biome), as a per-vertex field
   const L={...nd.params,driver:nd._driver,slope:nd._slope},col=new Float32Array(n*n*3);
   for(let i=0;i<n*n;i++){const c=satLayerColor(L,i);col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];}
