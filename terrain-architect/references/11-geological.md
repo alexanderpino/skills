@@ -250,15 +250,24 @@ mountain(shape, style):
     if style.strata: h = terrace(h, levels)       # sedimentary banding
     return h            # NOTE: whole-tile percentile normalisation -> single-shot, not tile-composable
 
-# RIDGE — a single linear hogback/cuesta (asymmetric flanks: steep scarp, gentle dip slope;
-# Twidale & Campbell 2005). The primitive form of the "tilted beds + erosion" recipe above.
+# RIDGE — a single linear hogback/cuesta. Geology: the exhumed edge of a DIPPING RESISTANT BED
+# (a homocline) under differential erosion — the gentle DIP SLOPE is the exhumed top bedding plane
+# (angle ~ the bed dip), the steep SCARP cuts across the beds; dip angle sets the class (cuesta <~25°,
+# hogback >~30-40°). Huggett 2011 Fundamentals of Geomorphology; Fairbridge 1968. The PHYSICALLY-
+# CORRECT route is differential erosion of a tilted bed_erodibility field (04+11 above). This is the
+# fast PRIMITIVE, built the way graphics builds ridges — a BLENDED shape, not a hard-stamped wedge
+# (Génevaux 2013; Guérin 2016) — with three fixes so the crest is not a razor mathematical cut:
 ridge(shape, asymmetry):
-    crest = wandering polyline spanning the tile
-    d     = distance to crest;  side = signed across-crest position
+    s0 = signed across-crest coordinate (straight base line)
+    s  = s0 + warp * reach * fbm(p)               # 1. DOMAIN WARP: the strike-line meanders (01; Quilez)
     scarp = reach*(1-asymmetry);  dip = reach*(1+asymmetry)       # asymmetry 0 = symmetric arete
-    flank = (side >= 0) ? scarp : dip
-    prof  = clip(1 - d/flank, 0, 1) ^ 1.4
-    return height * prof * ((1-detail) + detail * ridged_mf(...))  # spurs on the flanks (01)
+    p_scarp = height*(1 - s/scarp)                # roof plane descending on the scarp side
+    p_dip   = height*(1 + s/dip)                  # roof plane descending on the dip side
+    z = smin(p_scarp, p_dip, crest_round*height)  # 2. SMOOTH-MIN crest: rounded C-inf, not a C1 cut (10; Quilez)
+    z = clip(smax(z, 0, k_toe), 0, height)        #    ...and a smooth toe onto the plain
+    z *= (1 - detail*scarpMask) + detail*scarpMask*ridged_mf(...)  # dissect the SCARP; dip stays smooth (01)
+    if weather: z = thermal(z, repose)            # 3. talus-weather the over-steep crest (05; Musgrave 1989)
+    return z
 
 # VOLCANO — a radial edifice (Karátson et al. 2010 morphometry).
 volcano(shape, kind):

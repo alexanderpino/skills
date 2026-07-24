@@ -37,7 +37,12 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   online versions omit. Also **Musgrave, F.K. (1993),** *Methods for Realistic Landscape
   Imaging*, PhD thesis, Yale.
 - **Quilez, I.** *Domain warping.* iquilezles.org/articles/warp — The `fbm(p + fbm(p + fbm(p)))`
-  construction.
+  construction. Warp a mask/strike coordinate before evaluating it so straight boundaries meander
+  organically (`11` ridge crest).
+- **Quilez, I.** *Smooth minimum.* iquilezles.org/articles/smin — The polynomial
+  `smin(a,b,k) = min(a,b) − h²·k/4`, `h = max(k−|a−b|,0)/k`, with `k` the blend thickness; `smax(a,b,k)
+  = −smin(−a,−b,k)`. Blending two flank profiles with `smin`/`smax` turns the C1 crease at a ridge
+  crest into a rounded C∞ transition (`10`/`11`).
 - **Bridson, R., Hourihan, J. & Nordenstam, M. (2007).** *Curl-Noise for Procedural Fluid Flow.*
   ACM TOG 26(3), SIGGRAPH '07. — Divergence-free noise.
 
@@ -370,6 +375,13 @@ is below.
 
 ## Geological formation
 
+- **Huggett, R.J. (2011).** *Fundamentals of Geomorphology*, 3rd ed. Routledge. — Structural
+  landforms: a **cuesta / homoclinal ridge / hogback** is the exhumed edge of a dipping resistant bed
+  (a homocline) under differential erosion — gentle **dip slope** (= the exhumed bedding plane, angle
+  ≈ bed dip) vs steep **scarp** (cuts across the beds); dip angle sets the class (cuesta ≲25°, hogback
+  ≳30–40°). Grounds `landforms.ridge`.
+- **Fairbridge, R.W. (1968).** *Hogback and Flatiron*, in *The Encyclopedia of Geomorphology*,
+  Reinhold. — Hogback definition and the triangular flatiron facets on a hogback dip slope.
 - **Collins, G.S., Melosh, H.J. & Marcus, R.A. (2005).** *Earth Impact Effects Program: A web-based
   computer program for calculating the regional environmental consequences of a meteoroid impact on
   Earth.* Meteoritics & Planetary Science 40(6), 817–840. — The transient-crater π-scaling used in

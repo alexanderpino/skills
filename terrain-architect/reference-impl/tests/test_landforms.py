@@ -115,13 +115,24 @@ def test_mountain_deterministic():
 
 
 def test_ridge_is_a_linear_asymmetric_crest():
-    """The Ridge node: a single high crest line with ASYMMETRIC flanks (steep scarp / gentle dip)."""
+    """The Ridge node (hogback): a real crest with ASYMMETRIC flanks — a steep scarp and a gentle dip
+    slope. The asymmetry shows as a markedly steeper max slope on the scarp side than a symmetric arête."""
+    import analysis
     h = L.ridge((90, 90), 30.0, seed=2, height=900.0, asymmetry=0.6)
     assert np.all(np.isfinite(h)) and 400.0 < np.ptp(h) < 1600.0
     assert h.max() > h.mean() + 0.30 * np.ptp(h)                          # a real crest, not flat noise
-    # a symmetric arête has a narrower footprint above half-height than an asymmetric hogback
-    frac = lambda a: np.mean(L.ridge((90, 90), 30.0, seed=2, height=900.0, asymmetry=a) > 450.0)
-    assert frac(0.6) > frac(0.0)
+    ms = lambda a: analysis.slope(L.ridge((90, 90), 30.0, seed=2, height=900.0,
+                                          asymmetry=a, angle=1.4), 30.0).max()
+    assert ms(0.6) > 1.3 * ms(0.0)                                        # steep scarp >> symmetric flanks
+
+
+def test_ridge_crest_is_rounded_not_a_razor_cut():
+    """The crest is a smooth-min blend (Quilez smin), NOT a hard mathematical plane-cut: more crest
+    rounding lowers the peak slope. (This is the fix for the razor-crest failure.)"""
+    import analysis
+    ms = lambda cr: analysis.slope(L.ridge((90, 90), 30.0, seed=2, height=900.0, angle=1.4,
+                                           detail=0.0, crest_round=cr), 30.0).max()
+    assert ms(0.30) < ms(0.02)                                            # rounder crest -> gentler peak
 
 
 def test_volcano_has_summit_crater_and_concave_cone():

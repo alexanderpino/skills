@@ -294,36 +294,56 @@ def _polyline_distance(xx, yy, px, py):
 
 
 def ridge(shape, cellsize, *, seed=0, height=900.0, angle=None, width_frac=0.16,
-          sinuosity=0.10, asymmetry=0.55, detail=0.35):
-    """A single linear RIDGELINE primitive — Gaea's "Ridge" node; the hogback/cuesta a crest line
-    makes across a tile. A wandering crest polyline sets a sharp summit; the flanks are ASYMMETRIC
-    (a steep scarp on one side, a gentler dip slope on the other), the cuesta/hogback form dipping
-    strata erode into (Twidale & Campbell 2005; a monocline's resistant bed). Light ridged detail
-    breaks the flanks into spurs. `asymmetry` 0 = symmetric arête (equal flanks); increasing it toward
-    1 shortens/steepens the scarp flank and lengthens the gentle dip flank. Returns height (m)."""
+          sinuosity=0.5, asymmetry=0.55, detail=0.35, crest_round=0.12, weather_iters=0):
+    """A single linear RIDGELINE primitive — Gaea's "Ridge" node; the **hogback / cuesta** an
+    exhumed resistant bed makes. Geology: a hogback/cuesta is the erosional expression of a **dipping
+    resistant bed** (a homocline) under differential erosion — the gentle **dip slope** IS the exhumed
+    top bedding plane (angle ≈ bed dip), the steep **scarp** cuts across the beds; the dip angle sets
+    the class (cuesta ≲25°, hogback ≳30–40°). Huggett 2011 *Fundamentals of Geomorphology*; Fairbridge
+    1968. The physically-correct route is differential erosion of a tilted `bed_erodibility` field
+    (the `04+11` differential-erosion path); THIS is the fast placeable *primitive*, built the way the
+    graphics literature builds ridges — a BLENDED shape, not a hard-stamped wedge (Génevaux 2013;
+    Guérin 2016), with three fixes so the crest is not a razor mathematical cut:
+
+      1. **domain warp** the across-crest coordinate (Quilez, iquilezles.org/articles/warp) so the
+         strike-line meanders organically instead of running dead-straight;
+      2. **smooth-min the two flank planes** (`ops_filters.smin`; Quilez, iquilezles.org/articles/smin)
+         so the crest is a rounded C∞ transition of width `crest_round·height`, not a C1 crease;
+      3. optional **thermal weathering** (`weather_iters`; Musgrave, Kolb & Mace 1989) to shed talus
+         and round the over-steep crest.
+
+    The ridged detail is weighted onto the SCARP flank (dissected), leaving the dip slope smooth (the
+    exhumed bedding plane). `asymmetry` 0 = symmetric arête; → 1 steepens/shortens the scarp and
+    lengthens the gentle dip. Returns height (m)."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
     rng = np.random.default_rng(seed)
     ang = rng.uniform(0.0, np.pi) if angle is None else angle
-    k = 7
-    t = np.linspace(-0.62, 0.62, k)
-    cx = 0.5 * n1 + n1 * np.cos(ang) * t
-    cy = 0.5 * n0 + n0 * np.sin(ang) * t
-    perp = np.array([-np.sin(ang), np.cos(ang)])                            # across-crest unit vector
-    wob = np.cumsum(rng.normal(0.0, sinuosity, k)); wob -= wob.mean()       # the crest wanders
-    cx += perp[0] * wob * n1; cy += perp[1] * wob * n0
-    d = _polyline_distance(xx, yy, cx, cy)
-    side = (xx - 0.5 * n1) * perp[0] + (yy - 0.5 * n0) * perp[1]            # signed across-crest position
     reach = width_frac * max(n0, n1)
-    scarp = reach * (1.0 - asymmetry)                                       # short, steep scarp flank
-    dip = reach * (1.0 + asymmetry)                                         # long, gentle dip flank
-    flank = np.where(side >= 0.0, scarp, dip)
-    prof = np.clip(1.0 - d / np.maximum(flank, 1e-6), 0.0, 1.0) ** 1.4
+    perpx, perpy = -np.sin(ang), np.cos(ang)                                # across-crest unit vector
+    s0 = (xx - 0.5 * n1) * perpx + (yy - 0.5 * n0) * perpy                  # signed across-crest coord (cells)
+    fw = 2.4 / max(n0, n1)                                                  # low frequency -> few meanders/tile
+    warp = (noise.fbm(xx * fw, yy * fw, seed + 3, octaves=4)               # DOMAIN WARP the crest (Quilez)
+            + 0.4 * noise.fbm(xx * fw * 3.0, yy * fw * 3.0, seed + 9, octaves=3))
+    s = s0 + sinuosity * reach * warp                                      # warped -> the crest s=0 meanders
+    scarp = reach * (1.0 - asymmetry)                                      # short, steep scarp flank
+    dip = reach * (1.0 + asymmetry)                                        # long, gentle dip flank
+    p_scarp = height * (1.0 - s / scarp)                                   # roof plane descending on the scarp side
+    p_dip = height * (1.0 + s / dip)                                       # roof plane descending on the dip side
+    z = ops_filters.smin(p_scarp, p_dip, crest_round * height)            # SMOOTH crest (rounded, no razor cut)
+    z = ops_filters.smax(z, 0.0, 0.06 * height)                           # rounded toe onto the plain
+    z = np.clip(z, 0.0, height)
     fx = xx * cellsize / (max(n0, n1) * cellsize * 0.10)
     fy = yy * cellsize / (max(n0, n1) * cellsize * 0.10)
     rid = noise.ridged_mf(fx, fy, seed + 7, octaves=6)
     rid = (rid - rid.min()) / (np.ptp(rid) + 1e-9)
-    return height * prof * ((1.0 - detail) + detail * rid)
+    scarp_w = _smoothstep(-0.2 * reach, 0.4 * reach, s)                    # dissect the scarp, keep the dip smooth
+    dfac = detail * scarp_w
+    z = z * ((1.0 - dfac) + dfac * rid)
+    if weather_iters > 0:                                                  # talus weathering rounds the crest (05)
+        import erosion_thermal
+        z = erosion_thermal.thermal_erosion(z, 0.7, int(weather_iters), cellsize)
+    return z
 
 
 def volcano(shape, cx, cy, radius, height, cellsize=1.0, *, seed=0, kind="strato",
