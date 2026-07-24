@@ -144,6 +144,38 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px s
   background:var(--panel3);border:1px solid var(--line2);border-radius:var(--radius);padding:9px 15px;font-size:12px;
   box-shadow:var(--shadow);opacity:0;transition:.2s;pointer-events:none;z-index:80}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* -- SatMap Studio (image -> colour LUT) -- */
+.sg-modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(6,8,11,.62);backdrop-filter:blur(3px)}
+.sg-modal.open{display:flex}
+.sg-panel{width:min(880px,95vw);max-height:93vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow)}
+.sg-head{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--line)}
+.sg-head b{font-size:13px}.sg-head small{display:block;color:var(--faint);font-size:11px;margin-top:2px;font-weight:400}
+.sg-body{display:flex;gap:16px;padding:15px}
+.sg-left{flex:1;min-width:0}
+.sg-right{width:300px;flex:none;display:flex;flex-direction:column;gap:8px}
+.sg-canvas-wrap{position:relative;border:1px dashed var(--line2);border-radius:var(--radius-sm);background:var(--bg2);overflow:hidden;min-height:240px;display:flex;align-items:center;justify-content:center}
+.sg-canvas-wrap.drag{border-color:var(--accent);background:var(--panel2)}
+#sgStage{position:relative;line-height:0}
+#sgCanvas{max-width:100%;display:block;cursor:crosshair}
+#sgOverlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.sg-hint{position:absolute;color:var(--muted);font-size:12px;text-align:center;line-height:1.8;pointer-events:none}
+.sg-hint span{color:var(--faint);font-size:11px}
+.sg-hint .sg-link{color:var(--accent);text-decoration:underline;cursor:pointer;pointer-events:auto}
+.sg-row{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.sg-row label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.4px}
+.sg-row input[type=range]{width:86px}
+.sg-row input[type=text]{flex:1;min-width:90px;height:28px;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius-sm);color:var(--text);padding:0 9px;font-size:12px;font-family:var(--sans)}
+.sg-mono{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sg-help{font-size:11px;color:var(--faint);line-height:1.65;margin-top:11px}
+.sg-help b{color:var(--muted);font-weight:600}
+.sg-sub{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:8px}
+.sg-lut{width:100%;height:40px;border-radius:var(--radius-sm);border:1px solid var(--line2);display:block}
+.sg-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.5px}
+.sg-stops{display:flex;flex-wrap:wrap;gap:5px;min-height:30px;padding:6px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius-sm)}
+.sg-chip{width:22px;height:22px;border-radius:4px;border:1px solid rgba(0,0,0,.35);cursor:pointer;position:relative}
+.sg-chip:hover::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.45);font-size:10px;border-radius:3px}
+.sg-mini{height:20px;padding:0 8px;font-size:10px;margin-left:auto}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -183,6 +215,7 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px s
         <div class="vp-overlay" id="vpInfo"></div>
         <div class="vp-tools">
           <select class="btn" id="satSel" title="SatMap colour LUT"></select>
+          <button class="btn" id="satGenBtn" title="Create a SatMap colour LUT from an image">＋LUT</button>
           <button class="btn" id="shadeSel" title="Cycle shading (SatMap / Slope / Grey)">SatMap</button>
           <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
         </div>
@@ -212,6 +245,42 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px s
 </div>
 <input type="file" id="fileInput" accept=".png,.r16,.raw,.bin" style="display:none">
 <div id="menu"></div>
+
+<!-- SatMap Studio: build a colour LUT from an image (sample colours, or auto-extract by luminance) -->
+<div id="satgen" class="sg-modal">
+  <div class="sg-panel">
+    <div class="sg-head">
+      <div><b>SatMap Studio</b><small>Build a colour LUT from an image — a satellite/aerial photo maps to an elevation gradient (low → high)</small></div>
+      <button class="btn" id="sgClose" title="Close">✕</button>
+    </div>
+    <div class="sg-body">
+      <div class="sg-left">
+        <div class="sg-canvas-wrap" id="sgDrop">
+          <div id="sgStage"><canvas id="sgCanvas"></canvas><canvas id="sgOverlay"></canvas></div>
+          <div class="sg-hint" id="sgHint">Drop an image here, or <label class="sg-link">browse<input type="file" id="satImg" accept="image/*" hidden></label><br><span>top-down satellite / aerial photos work best</span></div>
+        </div>
+        <div class="sg-row">
+          <label>RADIUS</label><input type="range" id="sgRad" min="2" max="40" step="1" value="12"><span id="sgRadV" class="sg-mono">12px</span>
+          <label style="margin-left:8px">STOPS</label><input type="range" id="sgN" min="4" max="16" step="1" value="12"><span id="sgNV" class="sg-mono">12</span>
+          <button class="btn" id="sgAuto" title="Order the whole image by luminance into stops">Auto-extract</button>
+        </div>
+        <div class="sg-help"><b>Click</b> the image to sample the <b>average colour inside the circle</b> — each sample becomes a stop, placed by its brightness (dark = valley, bright = peak). Or press <b>Auto-extract</b> to order the whole image automatically (the same method used for the built-in SatMaps).</div>
+      </div>
+      <div class="sg-right">
+        <div class="sg-sub">LUT preview</div>
+        <canvas id="sgLut" class="sg-lut"></canvas>
+        <div class="sg-scale"><span>▎low</span><span>elevation →</span><span>high▐</span></div>
+        <div class="sg-sub">Stops <span id="sgCount" class="sg-mono">0</span><button class="btn sg-mini" id="sgClear">clear</button></div>
+        <div class="sg-stops" id="sgStops"></div>
+        <div class="sg-row">
+          <input type="text" id="sgName" placeholder="SatMap name" value="Custom" spellcheck="false">
+          <button class="btn primary" id="sgApply">Add to viewport</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1329,6 +1398,76 @@ $("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);
 $("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
 Object.keys(SATMAPS).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=k;if(k===satName)o.selected=true;$("#satSel").appendChild(o);});
 $("#satSel").onchange=e=>{satName=e.target.value;buildSatLUT(satName);};
+
+/* ---- SatMap Studio: build a colour LUT from an image (sample colours or auto-extract by luminance) ---- */
+(function(){
+  const modal=$("#satgen"),cv=$("#sgCanvas"),ov=$("#sgOverlay"),wrap=$("#sgDrop");
+  const cx=cv.getContext("2d",{willReadFrequently:true}),ox=ov.getContext("2d");
+  let idata=null,picks=[],radius=12;
+  const lum=(r,g,b)=>0.2126*r+0.7152*g+0.0722*b;
+  const openM=()=>{modal.classList.add("open");render();};
+  const closeM=()=>modal.classList.remove("open");
+  $("#satGenBtn").onclick=openM; $("#sgClose").onclick=closeM;
+  modal.addEventListener("mousedown",e=>{if(e.target===modal)closeM();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&modal.classList.contains("open"))closeM();});
+
+  function loadImage(src){
+    const img=new Image();
+    img.onload=()=>{let w=img.width,h=img.height;const s=Math.min(500/w,340/h,1);w=Math.max(1,Math.round(w*s));h=Math.max(1,Math.round(h*s));
+      cv.width=w;cv.height=h;ov.width=w;ov.height=h;cx.drawImage(img,0,0,w,h);
+      idata=cx.getImageData(0,0,w,h).data;$("#sgHint").style.display="none";picks=[];render();};
+    img.onerror=()=>toast("Could not load that image");img.src=src;
+  }
+  function fileToImg(f){if(!f||!/^image\//.test(f.type)){if(f)toast("Not an image file");return;}const rd=new FileReader();rd.onload=()=>loadImage(rd.result);rd.readAsDataURL(f);}
+  $("#satImg").onchange=e=>fileToImg(e.target.files[0]);
+  wrap.addEventListener("dragover",e=>{e.preventDefault();wrap.classList.add("drag");});
+  wrap.addEventListener("dragleave",()=>wrap.classList.remove("drag"));
+  wrap.addEventListener("drop",e=>{e.preventDefault();wrap.classList.remove("drag");fileToImg(e.dataTransfer.files[0]);});
+
+  const evtXY=e=>{const r=cv.getBoundingClientRect();return[Math.round((e.clientX-r.left)*cv.width/r.width),Math.round((e.clientY-r.top)*cv.height/r.height)];};
+  function sample(x,y){if(!idata)return null;const w=cv.width,h=cv.height,R=radius;let r=0,g=0,b=0,n=0;
+    for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){if(dx*dx+dy*dy>R*R)continue;const px=x+dx,py=y+dy;if(px<0||py<0||px>=w||py>=h)continue;
+      const i=(py*w+px)*4;r+=idata[i];g+=idata[i+1];b+=idata[i+2];n++;}
+    return n?[Math.round(r/n),Math.round(g/n),Math.round(b/n)]:null;}
+  cv.addEventListener("mousemove",e=>{const[x,y]=evtXY(e);ox.clearRect(0,0,ov.width,ov.height);
+    ox.beginPath();ox.arc(x,y,radius,0,7);ox.lineWidth=2;ox.strokeStyle="rgba(0,0,0,.55)";ox.stroke();
+    ox.beginPath();ox.arc(x,y,radius,0,7);ox.lineWidth=1;ox.strokeStyle="rgba(255,255,255,.95)";ox.stroke();});
+  cv.addEventListener("mouseleave",()=>ox.clearRect(0,0,ov.width,ov.height));
+  cv.addEventListener("click",e=>{const[x,y]=evtXY(e);const c=sample(x,y);if(c){picks.push(c);render();}});
+
+  $("#sgRad").oninput=e=>{radius=+e.target.value;$("#sgRadV").textContent=radius+"px";};
+  $("#sgN").oninput=e=>$("#sgNV").textContent=e.target.value;
+  $("#sgClear").onclick=()=>{picks=[];render();};
+  $("#sgAuto").onclick=()=>{if(!idata){toast("Load an image first");return;}
+    const N=+$("#sgN").value,w=cv.width,h=cv.height,arr=[],step=Math.max(1,Math.floor(Math.sqrt(w*h/20000)));
+    for(let y=0;y<h;y+=step)for(let x=0;x<w;x+=step){const i=(y*w+x)*4;arr.push([idata[i],idata[i+1],idata[i+2],lum(idata[i],idata[i+1],idata[i+2])]);}
+    arr.sort((a,b)=>a[3]-b[3]);const out=[];
+    for(let k=0;k<N;k++){const a=Math.floor(k*arr.length/N),z=Math.floor((k+1)*arr.length/N);let r=0,g=0,b=0,n=0;
+      for(let j=a;j<z;j++){r+=arr[j][0];g+=arr[j][1];b+=arr[j][2];n++;}if(n)out.push([Math.round(r/n),Math.round(g/n),Math.round(b/n)]);}
+    picks=out;render();};
+
+  // stops: sort samples by luminance (dark->bright = low->high), position by normalised luminance, stretch ends to 0/1
+  function stops(){if(picks.length<2)return picks.length?[[0,picks[0]],[1,picks[0]]]:[];
+    const p=picks.map(c=>({c,l:lum(c[0],c[1],c[2])})).sort((a,b)=>a.l-b.l);
+    const lo=p[0].l,rng=(p[p.length-1].l-lo)||1;
+    return p.map((s,i)=>[i===0?0:i===p.length-1?1:+(((s.l-lo)/rng).toFixed(3)),s.c]);}
+  function colAt(t,S){let a=S[0],b=S[S.length-1];for(let k=0;k<S.length-1;k++){if(t>=S[k][0]&&t<=S[k+1][0]){a=S[k];b=S[k+1];break;}}
+    const f=Math.max(0,Math.min(1,(t-a[0])/((b[0]-a[0])||1)));return[0,1,2].map(c=>Math.round(a[1][c]+(b[1][c]-a[1][c])*f));}
+  function render(){
+    const S=stops(),lc=$("#sgLut"),W=Math.max(160,lc.clientWidth||280),g=lc.getContext("2d");lc.width=W;lc.height=40;
+    if(S.length>1)for(let i=0;i<W;i++){const c=colAt(i/(W-1),S);g.fillStyle="rgb("+c[0]+","+c[1]+","+c[2]+")";g.fillRect(i,0,1,40);}
+    else{g.fillStyle=css("--bg2");g.fillRect(0,0,W,40);}
+    const box=$("#sgStops");box.innerHTML="";
+    picks.forEach((c,idx)=>{const d=document.createElement("div");d.className="sg-chip";d.style.background="rgb("+c[0]+","+c[1]+","+c[2]+")";
+      d.title="rgb("+c[0]+","+c[1]+","+c[2]+") — click to remove";d.onclick=()=>{picks.splice(idx,1);render();};box.appendChild(d);});
+    $("#sgCount").textContent=picks.length;
+  }
+  $("#sgApply").onclick=()=>{const S=stops();if(S.length<2){toast("Add at least 2 colours (or Auto-extract)");return;}
+    let name=($("#sgName").value||"Custom").trim()||"Custom";
+    if(SATMAPS[name]){let n=2;while(SATMAPS[name+" "+n])n++;name+=" "+n;}
+    SATMAPS[name]=S;const o=document.createElement("option");o.value=name;o.textContent=name;$("#satSel").appendChild(o);
+    $("#satSel").value=name;satName=name;buildSatLUT(name);toast('SatMap "'+name+'" added');closeM();};
+})();
 $("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);};
 $("#sunEl").oninput=e=>{sun.el=parseFloat(e.target.value);};
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}

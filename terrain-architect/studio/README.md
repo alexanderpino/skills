@@ -42,6 +42,14 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
   provenance and licences are recorded in `satmaps/derived.json` (NASA/USGS = public domain, ESA =
   CC BY). Temperate/Canyon/Arid/Mars stay authored (labelled as such) where no on-biome true-colour
   source was found.
+  - **Make your own in-app — SatMap Studio** (the **＋LUT** button in the viewport). A **SatMap LUT is
+    a 1-D colour gradient** — low elevation on the left → high on the right, baked to a 256-px strip
+    and indexed by each point's normalised height. SatMap Studio builds one from *any* image: drop a
+    photo, then **click to sample the average colour inside a radius** (the circle follows the cursor;
+    each sample becomes a stop, placed by its brightness — dark = valley, bright = peak), or press
+    **Auto-extract** to luminance-order the whole image (the same method as the built-in palettes). A
+    live **LUT preview bar** shows the gradient as you go; name it and **Add to viewport** to apply it
+    to the terrain immediately.
 - **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (SatMap / slope /
   grey shading, orbit + zoom, wireframe), rendered in two passes —
   1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
