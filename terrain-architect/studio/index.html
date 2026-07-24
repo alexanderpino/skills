@@ -208,7 +208,7 @@ select.sg-btn{appearance:auto}
         <option value="512">512²</option><option value="1024">1024²</option>
       </select>
       <button class="btn" id="gpuBtn" title="Use the WebGL2 GPU fast path for generators and thermal erosion">GPU</button>
-      <button class="btn" id="scaleBtn" title="Resolution independence: keep cell-relative params (talus angle, droplet density, radii) constant as RES changes">Scale</button>
+      <button class="btn" id="scaleBtn" title="Resolution independence: keep cell-relative params (talus angle, droplet density, radii) constant as RES changes">Res Lock</button>
     </div>
     <div class="tspacer"></div>
     <div class="tgroup">
@@ -881,9 +881,17 @@ const TYPES={
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In"],desc:"Talus: material above repose slides down.",
-    params:[P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5)],
-    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale(),
-      q={...p,talus:p.talus/k,iters:Math.max(1,Math.round(p.iters*k))};   // constant repose angle, constant travel distance
+    params:[P.seg("realScale","Real Scale",[["off","Off"],["on","On"]],"off"),
+      P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),
+      P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5)],
+    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
+    // Real Scale ON: `repose` is a true angle, so the per-cell drop is tan(angle) * cellSize / height
+    // — physically meaningful AND inherently resolution independent (it already carries the 1/RES).
+    // OFF: `talus` is a raw per-cell drop, divided by k to hold the same angle as the reference grid.
+    const talus=(p.realScale==="on")
+      ? Math.tan(p.repose*Math.PI/180)*cellSizeM()/terrainDef.height
+      : p.talus/k;
+    const q={...p,talus,iters:Math.max(1,Math.round(p.iters*k))};
     return gpuReady()?gpuThermal(ins[0],q):thermalErode(ins[0],q);}},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
@@ -1203,8 +1211,27 @@ $("#addBtn").onclick=e=>{const r=gc.getBoundingClientRect();openMenu(r.left+80,r
 function select(nd){if(nd===selected){drawGraph();return;}selected=nd;buildProps();drawGraph();}
 function buildProps(){
   const body=$("#pBody"),title=$("#pTitle"),sub=$("#pSub"),sw=$("#pSwatch");
-  if(!selected){title.firstChild.textContent="No node selected";sub.textContent="Click a node to edit it";
-    sw.style.background=css("--faint");body.innerHTML='<div class="prop-empty">Select a node in the graph to edit its parameters.<br><br>Double-click empty canvas to add a node. Drag a node’s right port into another’s left port to wire them.</div>';return;}
+  if(!selected){ // no node selected -> scene-level TERRAIN DEFINITION (the world the heightfield represents)
+    title.firstChild.textContent="Terrain definition";sub.textContent="The real-world size of this terrain";
+    sw.style.background=css("--faint");body.innerHTML="";
+    const mk=(key,label,min,max)=>{
+      const f=document.createElement("div");f.className="field";
+      f.innerHTML=`<div class="frow"><label>${label}</label><span class="val">${terrainDef[key]} m</span></div>`;
+      const i=document.createElement("input");i.type="range";i.min=min;i.max=max;i.step=(max-min)/400;i.value=terrainDef[key];
+      i.oninput=()=>{terrainDef[key]=Math.round(parseFloat(i.value));
+        f.querySelector(".val").textContent=terrainDef[key]+" m";
+        H_SCALE=terrainDef.height/terrainDef.scale;if(curField)updateViewport(curField);tdInfo();};
+      i.onchange=()=>{if(nodes.some(n=>n.type==="thermal"&&n.params.realScale==="on")){
+        nodes.forEach(n=>{if(n.type==="thermal")n._dirty=true;});requestEval();}};
+      f.appendChild(i);return f;};
+    body.appendChild(mk("scale","Scale (across)",500,20000));
+    body.appendChild(mk("height","Height",100,8000));
+    const info=document.createElement("div");info.className="hint";info.id="tdInfo";body.appendChild(info);
+    tdInfo();
+    const hint=document.createElement("div");hint.className="hint";hint.style.marginTop="10px";
+    hint.innerHTML="Select a node in the graph to edit its parameters. Double-click empty canvas to add one.";
+    body.appendChild(hint);
+    return;}
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
@@ -1222,6 +1249,11 @@ function buildProps(){
   const del=document.createElement("button");del.className="btn";del.textContent="Delete";del.onclick=deleteSel;
   act.appendChild(dup);act.appendChild(del);body.appendChild(act);
 }
+function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
+  el.innerHTML=`Vertical ratio <b>${(terrainDef.height/terrainDef.scale).toFixed(2)}</b> (height ÷ scale) ·
+    cell size <b>${cellSizeM().toFixed(1)} m</b> at ${RES}².<br>
+    Drives the viewport's vertical exaggeration, and any node with <b>Real Scale</b> on
+    (thermal reads its repose angle as a true angle). Gaea's defaults are 5000 m × 2600 m → 0.52.`;}
 function buildField(pr){
   const f=document.createElement("div");f.className="field";
   if(pr.type==="slider"){
@@ -1361,7 +1393,13 @@ function resolveColor(nodeId,n,memo,guard){
   }
   guard.delete(nodeId);memo[nodeId]=col;return col;
 }
-let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
+// TERRAIN DEFINITION — the world the heightfield represents, in metres. Gaea's defaults: 5 x 5 km
+// across and 2.6 km tall, giving a vertical ratio of height/scale = 0.52. This is what makes cell
+// size (scale/RES) and therefore slope ANGLES physically meaningful, which nodes with "Real Scale"
+// use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
+let terrainDef={scale:5000,height:2600};
+const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell
+let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
 // walking upstream from the Output and picking up any Water / Snow effect nodes and their params.
@@ -1798,7 +1836,7 @@ setTimeout(()=>{if(GPU.init()){$("#gpuBtn").classList.toggle("on",USE_GPU);}else
 $("#scaleBtn").classList.toggle("on",SCALE_RES);
 $("#scaleBtn").onclick=()=>{SCALE_RES=!SCALE_RES;$("#scaleBtn").classList.toggle("on",SCALE_RES);
   nodes.forEach(n=>n._dirty=true);evalGraph();
-  toast(SCALE_RES?"Scaling params to resolution":"Raw cell-unit params");};
+  toast(SCALE_RES?"Res Lock on — params held constant across resolution":"Res Lock off — raw cell-unit params");};
 $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
   document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
