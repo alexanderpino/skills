@@ -87,6 +87,14 @@ select.btn{appearance:none;padding-right:22px;
 .vp-chip b{color:var(--text);font-weight:600}
 .vp-tools{position:absolute;right:10px;top:9px;display:flex;gap:5px}
 .vp-tools .btn{height:24px;padding:0 8px;font-size:11px;background:rgba(10,13,18,.55);backdrop-filter:blur(6px)}
+select#satSel{appearance:none;padding-right:20px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 11px) 10px,calc(100% - 7px) 10px;background-size:4px 4px;background-repeat:no-repeat}
+.vp-render{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;
+  background:rgba(10,13,18,.6);border:1px solid var(--line);border-radius:7px;padding:8px 11px;backdrop-filter:blur(7px)}
+:root[data-theme="light"] .vp-render{background:rgba(255,255,255,.72)}
+.vp-render .rrow{display:flex;align-items:center;gap:8px}
+.vp-render label{font-family:var(--mono);font-size:10px;color:var(--muted);width:30px;letter-spacing:.4px}
+.vp-render .sunico{width:14px;text-align:center;color:var(--accent);font-size:12px}
+.vp-render input[type=range]{width:104px;height:3px}
 
 /* -- properties -- */
 #props{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -174,8 +182,13 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px s
         <canvas id="gl"></canvas>
         <div class="vp-overlay" id="vpInfo"></div>
         <div class="vp-tools">
-          <button class="btn" id="shadeSel" title="Cycle shading">Hypsometric</button>
+          <select class="btn" id="satSel" title="SatMap colour LUT"></select>
+          <button class="btn" id="shadeSel" title="Cycle shading (SatMap / Slope / Grey)">SatMap</button>
           <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
+        </div>
+        <div class="vp-render">
+          <div class="rrow"><span class="sunico">☀</span><label>SUN</label><input type="range" id="sunAz" min="0" max="6.28" step="0.02" value="0.55" title="Sun azimuth"></div>
+          <div class="rrow"><span class="sunico">⤒</span><label>ELEV</label><input type="range" id="sunEl" min="0.08" max="1.5" step="0.01" value="0.85" title="Sun elevation"></div>
         </div>
       </div>
       <div id="props">
@@ -216,6 +229,25 @@ const fract=x=>x-Math.floor(x);
 
 let RES=192;                                   // working grid resolution (square)
 let AUTO=true;
+// SatMap colour LUTs — curated elevation gradients (Gaea's "SatMap" idea). "Dune" is EXTRACTED from a
+// real NASA Terra/ASTER top-down image (reference-impl render.extract_satmap); the rest are authored to
+// real terrain palettes. Applied as a 1-D lookup by normalized height, blended to rock on slopes.
+const SATMAPS={
+ Temperate:[[0,[46,78,54]],[.12,[72,104,66]],[.34,[120,138,86]],[.54,[150,140,104]],[.74,[126,116,102]],[.9,[182,178,174]],[1,[236,240,246]]],
+ Alpine:[[0,[38,58,44]],[.2,[58,84,56]],[.4,[96,112,80]],[.58,[124,124,110]],[.74,[150,148,140]],[.88,[200,202,204]],[1,[248,250,253]]],
+ Verdant:[[0,[40,72,50]],[.3,[64,104,60]],[.62,[96,128,80]],[.86,[140,150,110]],[1,[210,214,206]]],
+ Canyon:[[0,[92,44,32]],[.18,[140,66,42]],[.36,[176,92,58]],[.54,[196,124,84]],[.72,[176,150,120]],[.88,[150,122,98]],[1,[214,196,176]]],
+ Arid:[[0,[96,54,40]],[.2,[150,80,52]],[.44,[178,120,78]],[.68,[200,168,120]],[.86,[214,196,166]],[1,[232,222,200]]],
+ Dune:[[0,[57,27,13]],[.12,[75,45,26]],[.21,[98,68,45]],[.29,[113,86,65]],[.38,[122,103,85]],[.46,[129,116,103]],[.54,[135,127,118]],[.62,[143,137,129]],[.71,[153,147,138]],[.79,[168,161,148]],[.88,[195,184,163]],[1,[217,204,176]]],
+ Volcanic:[[0,[36,32,34]],[.3,[70,64,64]],[.54,[104,82,76]],[.76,[120,112,106]],[1,[214,214,216]]],
+ Mars:[[0,[92,50,40]],[.3,[140,72,50]],[.58,[180,104,66]],[.8,[200,140,96]],[1,[214,182,152]]],
+ Lunar:[[0,[60,60,64]],[.4,[104,104,110]],[.72,[150,150,156]],[1,[204,204,210]]],
+ Arctic:[[0,[42,60,84]],[.28,[92,120,150]],[.54,[150,178,198]],[.78,[206,224,234]],[1,[246,250,253]]],
+ Tundra:[[0,[68,72,56]],[.28,[98,98,72]],[.5,[124,118,90]],[.72,[138,130,108]],[.88,[150,150,146]],[1,[206,208,206]]]
+};
+let satName="Temperate";
+let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
+function sunDir(){const ce=Math.cos(sun.el);return[ce*Math.cos(sun.az),Math.sin(sun.el),ce*Math.sin(sun.az)];}
 // A real, public-domain USGS/SRTM heightmap (Colorado Plateau, 128²) embedded so a real-world area
 // is one click — an in-browser fetch of the AWS SRTM bucket is impossible (the bucket sends no CORS
 // headers, and the reference-impl heightfield_io.py is the tool that pulls arbitrary real tiles).
@@ -870,13 +902,24 @@ $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast(
 /* =====================================================================
    WEBGL 3D VIEWPORT
    ===================================================================== */
-const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,gbuf=null,USE_DEFERRED=false,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
+const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,hTex,satTex,gbuf=null,USE_DEFERRED=false,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
+function buildSatLUT(name){                                  // bake a 256-wide RGBA LUT texture from the SatMap stops
+  if(!gl)return;const stops=SATMAPS[name]||SATMAPS.Temperate,W=256,d=new Uint8Array(W*4);
+  for(let i=0;i<W;i++){const t=i/(W-1);let a=stops[0],b=stops[stops.length-1];
+    for(let k=0;k<stops.length-1;k++){if(t>=stops[k][0]&&t<=stops[k+1][0]){a=stops[k];b=stops[k+1];break;}}
+    const f=(t-a[0])/((b[0]-a[0])||1);
+    for(let c=0;c<3;c++)d[i*4+c]=Math.round(a[1][c]+(b[1][c]-a[1][c])*Math.max(0,Math.min(1,f)));d[i*4+3]=255;}
+  if(!satTex){satTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,satTex);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);}
+  gl.bindTexture(gl.TEXTURE_2D,satTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,W,1,0,gl.RGBA,gl.UNSIGNED_BYTE,d);
+}
 let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
 // walking upstream from the Output and picking up any Water / Snow effect nodes and their params.
 let scene={water:null,snow:null};
-const SHADE=["Hypsometric","Slope","Grey"];
+const SHADE=["SatMap","Slope","Grey"];
 function initGL(){
   gl=glc.getContext("webgl2",{antialias:true,alpha:false})||glc.getContext("webgl",{antialias:true,alpha:false});
   if(!gl){$("#viewport").insertAdjacentHTML("beforeend",'<div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px">WebGL unavailable</div>');return;}
@@ -891,9 +934,11 @@ function initGL(){
     void main(){vN=nrm;vH=hgt;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
   const tFs=(g2?`#version 300 es
     precision highp float;in vec3 vN;in float vH;in vec3 vW;out vec4 frag;
-    uniform int uShade;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;`
+    #define SAMP texture
+    uniform int uShade;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`
   :`precision highp float;varying vec3 vN;varying float vH;varying vec3 vW;
-    uniform int uShade;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;`)+`
+    #define SAMP texture2D
+    uniform int uShade;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;`)+`
     vec3 hyps(float h){
       vec3 c0=vec3(.15,.23,.33),c1=vec3(.21,.36,.29),c2=vec3(.47,.52,.34),c3=vec3(.59,.49,.34),c4=vec3(.5,.38,.28),c5=vec3(.77,.75,.71),c6=vec3(.96,.97,.98);
       if(h<.28)return mix(c0,c1,smoothstep(0.,.28,h));
@@ -907,7 +952,7 @@ function initGL(){
       vec3 N=normalize(vN);vec3 S=normalize(uSun);float d=max(dot(N,S),0.0);
       float amb=.32+.18*N.y;float slope=1.0-N.y;
       vec3 base;
-      if(uShade==0)base=hyps(vH);
+      if(uShade==0)base=SAMP(uSat,vec2(clamp(vH,.001,.999),0.5)).rgb;   // SatMap colour LUT by elevation
       else if(uShade==1)base=mix(vec3(.32,.5,.34),vec3(.5,.34,.28),smoothstep(.15,.6,slope));
       else base=vec3(.7);
       vec3 rock=vec3(.42,.38,.34);base=mix(base,rock,smoothstep(.35,.8,slope)*.6);
@@ -960,43 +1005,71 @@ function initGL(){
       out vec2 vUv;void main(){vec2 p=vec2((gl_VertexID==1)?3.:-1.,(gl_VertexID==2)?3.:-1.);vUv=p*0.5+0.5;gl_Position=vec4(p,0.,1.);}`;
     const cFs=`#version 300 es
       precision highp float;in vec2 vUv;out vec4 frag;
-      uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;
+      uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;uniform sampler2D gH;
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES;uniform vec2 uPx;
-      vec3 skyCol(vec3 d){d=normalize(d);float t=clamp(d.y*0.6+0.4,0.,1.);vec3 c=mix(vec3(0.66,0.72,0.80),vec3(0.20,0.40,0.68),pow(t,0.9));return c+pow(max(dot(d,normalize(uSun)),0.),250.)*vec3(1.0,0.92,0.72);}
+      vec3 skyCol(vec3 d){d=normalize(d);float t=clamp(d.y*0.7+0.35,0.,1.);vec3 c=mix(vec3(0.70,0.77,0.85),vec3(0.19,0.39,0.68),pow(t,0.92));
+        return c+pow(max(dot(d,normalize(uSun)),0.),300.)*vec3(1.2,1.05,0.8)+pow(max(dot(d,normalize(uSun)),0.),6.)*0.12*vec3(1.0,0.85,0.6);}
       float Wat(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gW,b).r,c=texture(gW,b+vec2(uWpx,0.)).r,d=texture(gW,b+vec2(0.,uWpx)).r,e=texture(gW,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+      float Ht(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gH,b).r,c=texture(gH,b+vec2(uWpx,0.)).r,d=texture(gH,b+vec2(0.,uWpx)).r,e=texture(gH,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+      // soft CAST shadow: march the height field toward the sun; occluded if terrain rises above the ray
+      float shadowT(vec3 P,vec3 S){
+        if(S.y<=0.03)return 1.0;
+        float hstep=length(S.xz)/max(S.y,1e-3);                    // horizontal advance per unit rise
+        vec2 dir=normalize(S.xz+vec2(1e-5));vec2 duv=dir*(2.6/uRES);
+        float dry=length(duv)/max(hstep,1e-3);                     // ray height gain per step (world)
+        vec2 uv=P.xz*0.5+0.5+duv; float ry=P.y+dry; float occ=0.0;
+        for(int i=0;i<20;i++){ if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)break;
+          occ=max(occ,clamp((Ht(uv)*uH-ry)/(0.03*uH),0.,1.)); uv+=duv; ry+=dry; }
+        return 1.0-occ*0.92;
+      }
+      // horizon ambient occlusion: how much the neighbourhood rises around this point
+      float aoT(vec2 uv){float hc=Ht(uv)*uH,o=0.0;const int D=5;
+        for(int k=0;k<D;k++){float a=6.2831*float(k)/float(D);vec2 dr=vec2(cos(a),sin(a))/uRES;float m=0.0;
+          for(int r=1;r<=3;r++){float rr=float(r)*2.5;m=max(m,(Ht(uv+dr*rr)*uH-hc)/(rr/uRES));}o+=clamp(m,0.,1.);}
+        return 1.0-o/float(D)*0.7;
+      }
+      vec3 aces(vec3 x){x*=0.9;return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
+      vec3 atmos(vec3 c,vec3 P){float f=1.0-exp(-max(length(P-uCam)-1.3,0.0)*0.11);return mix(c,vec3(0.72,0.78,0.85),f*0.32);}
       void main(){
         float z=texture(gDepth,vUv).r;
         vec4 clip=vec4(vUv*2.-1.,z*2.-1.,1.);vec4 wp=uInvMVP*clip;vec3 Pw=wp.xyz/wp.w;
-        vec3 viewDir=normalize(Pw-uCam);
-        if(z>=0.99999){frag=vec4(skyCol(viewDir),1.);return;}       // background: analytic sky (skydome technique)
+        vec3 viewDir=normalize(Pw-uCam),S=normalize(uSun);
+        if(z>=0.99999){frag=vec4(aces(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
         vec3 terrain=texture(gColor,vUv).rgb;
         vec2 wuv=Pw.xz*0.5+0.5;
+        float sh=shadowT(Pw,S),ao=aoT(wuv);                        // cast shadow + ambient occlusion from the height field
         float wSurf=Wat(wuv)*uH; if(uHasSea>0.5)wSurf=max(wSurf,uSeaLevel*uH);
-        float thick=wSurf-Pw.y;                                     // view-through water thickness at this pixel
-        if(thick<=0.0016){frag=vec4(terrain,1.);return;}            // dry land
+        float thick=wSurf-Pw.y;
+        if(thick<=0.0016){                                         // DRY LAND: apply shadow + AO, atmosphere, tonemap
+          vec3 col=terrain*mix(0.40,1.0,sh)*mix(0.5,1.0,ao);
+          frag=vec4(aces(atmos(col,Pw)),1.);return;
+        }
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
         vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
         float t=uTime;
         N=normalize(N+vec3(0.03*sin(Pw.x*46.+t*1.7)+0.022*sin(Pw.z*37.-t*1.15),0.,0.03*sin(Pw.z*46.+t*1.35)+0.022*sin(Pw.x*34.+t*0.95)));
-        vec3 Vd=normalize(uCam-Pw),S=normalize(uSun);
+        vec3 Vd=normalize(uCam-Pw);
         vec2 refrUv=clamp(vUv+N.xz*uPx*28.*clamp(thick*8.,0.,1.),vec2(0.002),vec2(0.998)); // refract the terrain colour
-        vec3 bed=texture(gColor,refrUv).rgb;
+        vec3 bed=texture(gColor,refrUv).rgb*mix(0.5,1.0,ao);
         float dn=1.0-exp(-thick*10.0);                              // Beer–Lambert absorption
         vec3 wc=mix(bed,mix(vec3(0.30,0.60,0.63),vec3(0.03,0.12,0.30),clamp(thick*3.5,0.,1.)),clamp(dn+0.12,0.,1.));
         float fres=pow(1.0-max(dot(N,Vd),0.0),4.0);
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
-        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),220.)*0.9;
+        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),220.)*0.9*sh;
         float foam=smoothstep(0.02,0.0,thick)*0.5;                  // soft shoreline (thickness -> 0)
         vec3 col=mix(wc,refl,fres*0.5)+spec; col=mix(col,vec3(0.9,0.95,1.0),foam);
-        frag=vec4(col,1.);
+        col*=mix(0.6,1.0,sh);                                       // water in cast shadow is darker
+        frag=vec4(aces(atmos(col,Pw)),1.);
       }`;
     compProg=makeProg(cVs,cFs);
-    wTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,wTex);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,RES,RES,0,gl.RED,gl.FLOAT,new Float32Array(RES*RES));
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    const mkFloatTex=()=>{const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,RES,RES,0,gl.RED,gl.FLOAT,new Float32Array(RES*RES));
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return tx;};
+    wTex=mkFloatTex();hTex=mkFloatTex();                     // water-surface + terrain-height textures (composite lighting)
     USE_DEFERRED=true;
   }
+  buildSatLUT(satName);
   buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),gridXZ:gl.createBuffer(),
            wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
@@ -1034,6 +1107,7 @@ function updateViewport(f){
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+  if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);} // terrain height for composite lighting
   curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
   let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];             // cheap checksum: skip fill/accum when the terrain is unchanged
   if(cs!==lastTerrainCsum){lastTerrainCsum=cs;
@@ -1096,8 +1170,9 @@ function refreshWater(){
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wnrm);gl.bufferData(gl.ARRAY_BUFFER,wn,gl.DYNAMIC_DRAW);
   if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,W);} // deferred-path water-height texture
 }
-function resizeGL(){const r=glc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
-  glc.width=r.width*dpr;glc.height=r.height*dpr;}
+function resizeGL(){const r=glc.parentElement.getBoundingClientRect();
+  const ss=Math.min(2.0,(devicePixelRatio||1)*1.35);          // supersample the whole render -> anti-aliased silhouettes
+  glc.width=Math.round(r.width*ss);glc.height=Math.round(r.height*ss);}
 function mat4mul(a,b){const o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s;}return o;}
 function perspective(fov,asp,n,f){const t=1/Math.tan(fov/2);return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]);}
 function lookAt(e,c,u){const z=norm3(sub3(e,c)),x=norm3(cross3(u,z)),y=cross3(z,x);
@@ -1134,8 +1209,9 @@ function mat4inv(m){
 function drawTerrain(MVP,M,ex,ey,ez){
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);
   gl.useProgram(terrainProg);setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
-  gl.uniform3f(u(terrainProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
+  {const sd=sunDir();gl.uniform3f(u(terrainProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
   gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
+  gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,satTex);gl.uniform1i(u(terrainProg,"uSat"),3);
   bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
@@ -1156,7 +1232,7 @@ function renderGL(){
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,glc.width,glc.height);
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
     gl.useProgram(compProg);setM(compProg,"uInvMVP",mat4inv(MVP));
-    gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);gl.uniform3f(u(compProg,"uSun"),0.5,0.8,0.35);
+    {const sd=sunDir();gl.uniform3f(u(compProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
     gl.uniform1f(u(compProg,"uSeaLevel"),0.0);gl.uniform1f(u(compProg,"uHasSea"),0.0);  // sea is baked into the water-height texture (W)
     gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
@@ -1164,6 +1240,7 @@ function renderGL(){
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gbuf.color);gl.uniform1i(u(compProg,"gColor"),0);
     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,gbuf.depth);gl.uniform1i(u(compProg,"gDepth"),1);
     gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,wTex);gl.uniform1i(u(compProg,"gW"),2);
+    gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,hTex);gl.uniform1i(u(compProg,"gH"),3);
     gl.drawArrays(gl.TRIANGLES,0,3);
     gl.enable(gl.DEPTH_TEST);
   }else{
@@ -1204,6 +1281,10 @@ $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("dat
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
 $("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
 $("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
+Object.keys(SATMAPS).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=k;if(k===satName)o.selected=true;$("#satSel").appendChild(o);});
+$("#satSel").onchange=e=>{satName=e.target.value;buildSatLUT(satName);};
+$("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);};
+$("#sunEl").oninput=e=>{sun.el=parseFloat(e.target.value);};
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{
   if(typing())return;                                          // don't hijack keys while editing a parameter

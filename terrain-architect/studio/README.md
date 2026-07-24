@@ -14,7 +14,14 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 - **Node graph** (the core): drag nodes, wire outputs into inputs, and every node shows a live
   hill-shaded **thumbnail** of its own output — so you read the pipeline at a glance.
-- **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (hypsometric / slope /
+- **SatMap colour + cinematic lighting** (the Gaea-style look): terrain is coloured through a
+  **SatMap LUT** — a curated elevation gradient (pick from ~13 in the viewport: Temperate, Alpine,
+  Canyon, Arid, Dune, Volcanic, Mars, Arctic, …; **Dune** is extracted from a real NASA top-down
+  image, the rest authored to real palettes). The deferred composite then adds **cast shadows**
+  (ray-marched over the height field toward a **movable sun** — azimuth + elevation sliders),
+  **horizon ambient occlusion** (crevice darkening), **atmospheric haze**, and **ACES tone mapping**,
+  with the whole frame **supersampled** for anti-aliased silhouettes.
+- **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (SatMap / slope /
   grey shading, orbit + zoom, wireframe), rendered in two passes —
   1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
      and leaves steep faces bare, with a specular snow sheen (driven by a **Snow** effect node).
