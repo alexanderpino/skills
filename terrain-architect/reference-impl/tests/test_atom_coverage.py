@@ -142,6 +142,16 @@ FAITHFUL = [
      "Glen flow-law exponent n = 3"),
     ("landforms.py", "concavity=1.7", "references/16-arid-desert.md", "concave",
      "alluvial-fan concave (steep-apex, gentle-distal) downfan profile (Blair & McPherson 1994)"),
+    ("flow.py", "p=1.1", "references/03-flow-routing.md", "1.1",
+     "MFD multiple-flow-direction exponent p = 1.1 (Freeman 1991)"),
+    ("isostasy.py", "nu=0.25", "references/02-macro-tectonics.md", "0.25",
+     "crustal Poisson ratio nu = 0.25 in flexural rigidity D = E*Te^3 / 12(1-nu^2)"),
+    ("snow.py", "shed_lo_deg=50.0", "references/13-climate-ecosystem.md", "tan(50",
+     "snow sheds off ground steeper than 50deg (smoothstep 50->60deg; Cordonnier 2018)"),
+    ("snow.py", "shed_hi_deg=60.0", "references/13-climate-ecosystem.md", "tan(60",
+     "snow fully shed by 60deg"),
+    ("tectonics.py", "k_fault=6.0", "references/02-macro-tectonics.md", "weak",
+     "fault-as-K SIGN: a fault trace is WEAK rock -> HIGHER erodibility, so valleys follow structure"),
 ]
 
 
