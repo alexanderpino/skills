@@ -346,6 +346,7 @@ const SATMAPS={
 };
 let satName="Temperate";
 let satUniform={lo:0,hi:1,shift:0,reverse:0};   // SatMap-node Range/Shift/Reverse applied to the driver in the terrain shader
+let satComposite=0;                             // 1 when a SatMap layer stack is compositing per-vertex colour (else global LUT)
 function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
 function sunDir(){const ce=Math.cos(sun.el);return[ce*Math.cos(sun.az),Math.sin(sun.el),ce*Math.sin(sun.az)];}
@@ -660,16 +661,20 @@ const TYPES={
     passthrough:true,effect:"snow",
     params:[P.slider("amount","Amount",0,1,0.5)],
     eval:(p,ins)=>ins[0]||newField()},
-  satmap:{cat:"effect",name:"SatMap",ins:["In","Driver"],desc:"Colour the terrain through a gradient LUT — driven by the height, its slope, or any field wired into Driver (Gaea's SatMap). In passes through unchanged.",
+  satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Colour through a gradient LUT — driven by height, slope, or any field wired into Driver (Gaea's SatMap). STACK several (each Masked, with Opacity + Blend) to composite colour in the graph. 2D biome mode blends a flat-ground and a steep-ground gradient by slope. In passes through unchanged.",
     passthrough:true,effect:"satmap",
-    params:[P.select("gradient","Gradient",null,"Temperate"),
+    params:[P.seg("mode","Mode",[["1d","1D"],["2d","2D biome"]],"1d"),
+      P.select("gradient","Gradient",null,"Temperate"),
+      P.select("gradientB","Steep gradient (2D)",null,"Canyon"),
       P.seg("source","Driven by",[["auto","Driver ▸ / Height"],["height","Height"],["slope","Slope"]],"auto"),
       P.seg("reverse","Reverse",[["off","Off"],["on","On"]],"off"),
       P.slider("rangeLo","Range low",0,1,0),P.slider("rangeHi","Range high",0,1,1),
-      P.slider("shift","Shift",-0.5,0.5,0)],
+      P.slider("shift","Shift",-0.5,0.5,0),
+      P.slider("opacity","Opacity",0,1,1),
+      P.seg("blend","Blend",[["normal","Normal"],["multiply","Multiply"],["screen","Screen"]],"normal")],
     eval:(p,ins,nd)=>{const h=ins[0]||newField();
       let drv=p.source==="slope"?normalize(slopeOf(h)):p.source==="height"?h:(ins[1]||h);
-      nd._driver=normalize(drv);return h;}},
+      nd._driver=normalize(drv);nd._slope=normalize(slopeOf(h));nd._mask=ins[2]||null;return h;}},
 
   output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
     params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
@@ -688,15 +693,17 @@ function makeNode(type,x,y){
 function nodeById(id){return nodes.find(n=>n.id===id);}
 function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
-function collectScene(){                            // walk upstream from Output; pick the nearest Water / Snow / SatMap effect nodes
-  const s={water:null,snow:null,satmap:null};const out=outputNode();if(!out)return s;
-  const q=[out.id],seen=new Set();
+function collectScene(){                            // walk upstream from Output; pick Water / Snow + the full SatMap layer stack
+  const s={water:null,snow:null,satmap:null,satLayers:[]};const out=outputNode();if(!out)return s;
+  const q=[out.id],seen=new Set(),layers=[];
   while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);
     const nd=nodeById(id);if(!nd)continue;
     if(nd.type==="water"&&!s.water)s.water={...nd.params};
     if(nd.type==="snow"&&!s.snow)s.snow={...nd.params};
-    if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params,driver:nd._driver};
+    if(nd.type==="satmap")layers.push({...nd.params,driver:nd._driver,slope:nd._slope,mask:nd._mask});
     edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
+  s.satLayers=layers.reverse();                     // BFS is nearest-first; base = farthest upstream, top = nearest to Output
+  s.satmap=s.satLayers.length?s.satLayers[s.satLayers.length-1]:null;
   return s;
 }
 function markDirtyFrom(id){ // mark node and everything downstream dirty
@@ -951,7 +958,7 @@ function buildField(pr){
     f.appendChild(inp);
   }else if(pr.type==="select"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
-    const opts=pr.opts||(pr.key==="gradient"?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
+    const opts=pr.opts||((pr.key==="gradient"||pr.key==="gradientB")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
     const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
     s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
   }else if(pr.type==="seg"){
@@ -1028,6 +1035,26 @@ function buildSatLUTStops(stops){                            // bake a 256-wide 
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);}
   gl.bindTexture(gl.TEXTURE_2D,satTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,W,1,0,gl.RGBA,gl.UNSIGNED_BYTE,d);
 }
+// ---- SatMap layer compositing (colour in the graph): each SatMap node is a colour layer; masked + blended into a per-vertex RGB ----
+function sampleStops(stops,t){t=clamp(t,0,1);let a=stops[0],b=stops[stops.length-1];
+  for(let k=0;k<stops.length-1;k++){if(t>=stops[k][0]&&t<=stops[k+1][0]){a=stops[k];b=stops[k+1];break;}}
+  const f=clamp((t-a[0])/((b[0]-a[0])||1),0,1);
+  return[(a[1][0]+(b[1][0]-a[1][0])*f)/255,(a[1][1]+(b[1][1]-a[1][1])*f)/255,(a[1][2]+(b[1][2]-a[1][2])*f)/255];}
+function satLayerColor(L,i){                          // one layer's colour at vertex i (1D ramp, or 2D flat↔steep blend by slope)
+  const drv=L.driver?L.driver[i]:0,dv=L.reverse==="on"?1-drv:drv;
+  const x=clamp(L.rangeLo+(L.rangeHi-L.rangeLo)*dv+L.shift,0,1);
+  const a=sampleStops(SATMAPS[L.gradient]||SATMAPS.Temperate,x);
+  if(L.mode==="2d"){const b=sampleStops(SATMAPS[L.gradientB]||SATMAPS.Canyon,x),s=L.slope?clamp(L.slope[i],0,1):0;
+    return[a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s,a[2]+(b[2]-a[2])*s];}
+  return a;}
+function satBlend(dst,src,m,mode){const o=[0,0,0];
+  for(let c=0;c<3;c++){let s=src[c];if(mode==="multiply")s=dst[c]*src[c];else if(mode==="screen")s=1-(1-dst[c])*(1-src[c]);o[c]=dst[c]+(s-dst[c])*m;}return o;}
+function buildSatComposite(n){                        // composite the layer stack (base → top) into a per-vertex RGB buffer
+  const L=scene.satLayers,col=new Float32Array(n*n*3);if(!L||!L.length)return col;
+  for(let i=0;i<n*n;i++){let rgb=satLayerColor(L[0],i);
+    for(let k=1;k<L.length;k++){const src=satLayerColor(L[k],i),m=(L[k].mask?clamp(L[k].mask[i],0,1):1)*L[k].opacity;rgb=satBlend(rgb,src,m,L[k].blend);}
+    col[i*3]=rgb[0];col[i*3+1]=rgb[1];col[i*3+2]=rgb[2];}
+  return col;}
 let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
@@ -1040,28 +1067,28 @@ function initGL(){
   const g2=(typeof WebGL2RenderingContext!=="undefined")&&(gl instanceof WebGL2RenderingContext);
   // ---------- STAGE 1: opaque terrain (+ snow accumulation) ----------
   const tVs=(g2?`#version 300 es
-    in vec3 pos;in vec3 nrm;in float hgt;in float drive;out vec3 vN;out float vH;out float vD;out vec3 vW;
+    in vec3 pos;in vec3 nrm;in float hgt;in float drive;in vec3 col;out vec3 vN;out float vH;out float vD;out vec3 vW;out vec3 vCol;
     uniform mat4 uMVP;uniform mat4 uM;
-    void main(){vN=nrm;vH=hgt;vD=drive;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
-  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;attribute float drive;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;
+    void main(){vN=nrm;vH=hgt;vD=drive;vCol=col;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
+  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;attribute float drive;attribute vec3 col;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;varying vec3 vCol;
     uniform mat4 uMVP;uniform mat4 uM;
-    void main(){vN=nrm;vH=hgt;vD=drive;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
+    void main(){vN=nrm;vH=hgt;vD=drive;vCol=col;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
   const tFs=(g2?`#version 300 es
-    precision highp float;in vec3 vN;in float vH;in float vD;in vec3 vW;out vec4 frag;
+    precision highp float;in vec3 vN;in float vH;in float vD;in vec3 vW;in vec3 vCol;out vec4 frag;
     #define SAMP texture
     #define OUT frag
-    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
-  :`precision highp float;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;
+    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
+  :`precision highp float;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;varying vec3 vCol;
     #define SAMP texture2D
     #define OUT gl_FragColor
-    uniform int uShade;uniform int uDeferred;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
+    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
     void main(){
       vec3 N=normalize(vN);float slope=1.0-N.y;
-      // ---- ALBEDO (unlit material colour) : SatMap LUT by the DRIVER (height/slope/any input), rock on steeps, snow on high flats ----
+      // ---- ALBEDO (unlit material colour) : composited SatMap layers, or LUT by the DRIVER; then rock on steeps, snow on high flats ----
       vec3 base;
       float dv=(uReverse>0.5)?1.0-vD:vD;                                // SatMap driver -> Reverse, then Range slice + Shift
       float sc=clamp(mix(uRange.x,uRange.y,dv)+uShift,0.001,0.999);
-      if(uShade==0)base=SAMP(uSat,vec2(sc,0.5)).rgb;                    // SatMap colour LUT indexed by the driver
+      if(uShade==0)base=(uSatComposite==1)?vCol:SAMP(uSat,vec2(sc,0.5)).rgb;   // per-vertex layer stack OR single LUT
       else if(uShade==1)base=mix(vec3(.32,.5,.34),vec3(.5,.34,.28),smoothstep(.15,.6,slope));
       else base=vec3(.72);
       float rockAmt=smoothstep(.35,.8,slope)*.6;
@@ -1224,7 +1251,7 @@ function initGL(){
     USE_DEFERRED=true;
   }
   buildSatLUT(satName);
-  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),drive:gl.createBuffer(),gridXZ:gl.createBuffer(),
+  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),drive:gl.createBuffer(),col:gl.createBuffer(),gridXZ:gl.createBuffer(),
            wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
   gl.enable(gl.DEPTH_TEST);
@@ -1258,16 +1285,19 @@ function updateViewport(f){
     const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
     const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2;const L=Math.hypot(sx,1,sz)||1;
     nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
-  // SatMap driver attribute: default = elevation; a SatMap node can drive colour by slope or any wired field.
-  const sm=scene.satmap;const drv=new Float32Array(n*n);
-  if(sm&&sm.driver){const dn=normalize(sm.driver);for(let i=0;i<n*n;i++)drv[i]=dn[i];
-    satUniform={lo:sm.rangeLo,hi:sm.rangeHi,shift:sm.shift,reverse:sm.reverse==="on"?1:0};}
+  // SatMap colouring. ≥1 SatMap node -> composite the layer stack to per-vertex RGB (colour in the graph, Gaea-style);
+  // otherwise drive the global LUT by elevation (backward-compatible fallback).
+  const layers=scene.satLayers||[];satComposite=layers.length?1:0;
+  const col=satComposite?buildSatComposite(n):new Float32Array(n*n*3);
+  const sm=scene.satmap;const drv=new Float32Array(n*n);const dn=(sm&&sm.driver)?normalize(sm.driver):null;
+  if(dn){for(let i=0;i<n*n;i++)drv[i]=dn[i];satUniform={lo:sm.rangeLo,hi:sm.rangeHi,shift:sm.shift,reverse:sm.reverse==="on"?1:0};}
   else{for(let i=0;i<n*n;i++)drv[i]=hgt[i];satUniform={lo:0,hi:1,shift:0,reverse:0};}
-  if(!satDrawerOpen())buildSatLUT(sm?sm.gradient:satName);  // node gradient overrides the global dropdown (unless the editor is live)
+  if(!satDrawerOpen()&&!satComposite)buildSatLUT(satName);  // global LUT only matters in the no-node fallback
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,drv,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
   if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);} // terrain height for composite lighting
   curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
   let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];             // cheap checksum: skip fill/accum when the terrain is unchanged
@@ -1374,8 +1404,9 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
   gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
   gl.uniform1i(u(terrainProg,"uDeferred"),deferred?1:0);
   gl.uniform2f(u(terrainProg,"uRange"),satUniform.lo,satUniform.hi);gl.uniform1f(u(terrainProg,"uShift"),satUniform.shift);gl.uniform1f(u(terrainProg,"uReverse"),satUniform.reverse);
+  gl.uniform1i(u(terrainProg,"uSatComposite"),satComposite);
   gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,satTex);gl.uniform1i(u(terrainProg,"uSat"),3);
-  bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);bindAttr(terrainProg,"drive",1,buffers.drive);
+  bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);bindAttr(terrainProg,"drive",1,buffers.drive);bindAttr(terrainProg,"col",3,buffers.col);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
 }
