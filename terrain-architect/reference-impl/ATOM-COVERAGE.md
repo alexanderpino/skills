@@ -39,7 +39,9 @@ virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), s
 (`shallow_water.simulate`), lateral fluvial migration (`meander.migrate`, with the F-tier
 height-field realisation `meander.burn_channel`), braided/anastomosing rivers
 (`braided.braided_river` — the Murray–Paola 1994 cellular braided-stream model: split flow +
-super-linear transport + lateral exchange → multi-thread channels; F-tier), glacial erosion (`glacier.glacier_carve` —
+**per-branch** super-linear transport that banks bars where flow splits + lateral relaxation →
+multi-thread channels; reduced-complexity tier — statistically braided, not a photoreal planform),
+glacial erosion (`glacier.glacier_carve` —
 SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier), the dynamic
 snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), aeolian
 abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier), and structural

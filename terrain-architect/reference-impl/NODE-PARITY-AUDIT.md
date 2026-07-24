@@ -22,9 +22,19 @@ Inventories collected from the official references (2026-07):
 
 | # | Capability | Where it ships | Verdict |
 |---|---|---|---|
-| **1** | **Braided / anastomosing rivers** — *multi-thread* channels that split and rejoin around bars (not a single meandering thread) | Gaea **Anastomosis** (and partly **Rivers**) | ✅ **CLOSED** — implemented as `braided.braided_river` (Murray & Paola 1994 cellular model: split flow + super-linear transport `qs∝Qᵐ` + lateral exchange), with a braiding-index oracle (`tests/test_braided.py`: braids, super-linearity is what braids, sediment conserved). Was the only clear-cut atomic geomorphic gap; now filled. |
+| **1** | **Braided / anastomosing rivers** — *multi-thread* channels that split and rejoin around bars (not a single meandering thread) | Gaea **Anastomosis** (and partly **Rivers**) | ◑ **FILLED at reduced-complexity tier** — implemented as `braided.braided_river` (Murray & Paola 1994 cellular model: split flow + **per-branch** super-linear transport that banks bars at splits + lateral relaxation), with oracles (`tests/test_braided.py`: braids index>1, the super-linearity banks bars = exports far less than m=1, sediment conserved, deterministic). **Honest limits:** (a) statistically braided, not a photoreal woven planform — the documented ceiling of reduced-complexity cellular models; a crisp braid needs a CFD morphodynamic solver (Delft3D/BASEMENT), out of pure-NumPy scope. (b) Gaea's own "Anastomosis" is **not** a braidplain simulation — it's a stylized downcutting *carve* on existing terrain, so the tool baseline here is a look, not physics. See `CANON-COMPARISON.md` follow-up 6 + `references/03-flow-routing.md`. |
 
-That was the **only** clear-cut atomic geomorphic gap across all three tools — **now closed**.
+That was the **only** clear-cut atomic geomorphic gap across all three tools — now filled at the
+reduced-complexity tier (a photoreal braid is a CFD-tier gap we do not fake; see above).
+
+### Now covered — the File Input/Output node (was scoped out as "I/O")
+Gaea **File**, World Machine **File Input / File Output**, Houdini **HeightField File** — load an
+external/real heightmap as a base, write the result back. Originally excluded here as non-atomic I/O,
+but it is what makes real-world workflows possible ("add erosion to a real USGS/SRTM area"). Now
+implemented as `heightfield_io.py` (`load_heightfield`/`save_heightfield` for `.npy`/16-bit `.png`/raw
+`.r16`/`.r32`/SRTM `.hgt`, `fetch_srtm` for real AWS Terrain-Tiles, `window` to crop) — every atom
+already takes a plain float array, so a real DEM drops straight into stream-power/thermal/analysis.
+Verified by `tests/test_heightfield_io.py`; demo tile "08 Real DEM base + erosion" in the grid.
 
 ### Borderline — noted, not counted as gaps
 - **Spectral / multi-band terrain filter** (Gaea *Filter*, *GraphicEQ*) — isolate/suppress features at

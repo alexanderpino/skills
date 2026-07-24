@@ -3,6 +3,10 @@ __pycache__/
 .pytest_cache/
 out/
 .dem_cache/
+# raw heightfield exports (heightfield_io demo/output artifacts) — regenerate, don't commit
+*.r16
+*.r32
+*.raw
 *.png
 # keep the committed visual-reference montages (regenerate with gallery.py / crater_demo.py /
 # crater_anatomy.py / archetypes.py)

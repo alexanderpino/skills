@@ -16,6 +16,7 @@ import shallow_water
 import diffusion
 import meander as MEA
 import braided as BRA
+import heightfield_io as HIO
 import landforms as L
 import analysis as A
 import sims_illustrative as sims
@@ -431,16 +432,32 @@ def CELLS():
         return np.clip(rgb * (0.55 + 0.55 * sh)[..., None], 0, 255).astype(np.uint8)
     add("08 SatMap (from satellite)", "CLUT extracted from real NASA imagery (extract_satmap); monotone, in-gamut", _satmap)
     def _braided():                                                  # Murray-Paola braided river (multi-thread)
-        n = 150; m2 = 170; yy2, xx2 = np.mgrid[0:n, 0:m2].astype(float)
-        bed0 = 200.0 - 0.5 * yy2 + noise.fbm(xx2 * 0.05, yy2 * 0.05, 3, octaves=4) * 4.0
-        bed, Q = BRA.braided_river(bed0, 130, K=0.04, m_exp=2.5, erode_rate=0.13, lateral=0.30,
-                                   sed_feed=1.0, Q0=1.0, rain=0.03)     # split flow + Q^m transport -> braid
-        q = np.log(Q + 1e-3); q = (q - np.percentile(q, 55)) / (np.percentile(q, 99.5) - np.percentile(q, 55) + 1e-9)
-        a = _smoothstep(0.15, 0.75, np.clip(q, 0, 1))[..., None]        # log-discharge threads (blue) on the braidplain
-        sh = render.hillshade(bed, 20).astype(float)[..., 0:1] / 255.0
-        rgb = (np.array([206., 188, 150]) * (0.7 + 0.5 * sh)) * (1 - a) + np.array([54., 104, 168]) * a
+        n = 150; m2 = 190; yy2, xx2 = np.mgrid[0:n, 0:m2].astype(float)
+        grad = 0.0022                                                  # GENTLE gradient (braided regime)
+        bed0 = 100.0 - grad * yy2 + noise.fbm(xx2 * 0.11, yy2 * 0.11, 11, octaves=4) * 0.9   # gravel braidplain
+        bed, Q = BRA.braided_river(bed0, 110, m_exp=2.5)               # per-branch super-linear transport -> bars -> braid
+        q = np.log(Q + 1e-3); q = (q - np.percentile(q, 62)) / (np.percentile(q, 99) - np.percentile(q, 62) + 1e-9)
+        a = _smoothstep(0.1, 0.7, np.clip(q, 0, 1))[..., None]         # log-discharge threads (blue) on the braidplain
+        detr = (bed + grad * yy2); detr = (detr - detr.min())          # detrend the downstream slope for hillshade
+        sh = render.hillshade(detr * 1.5, 30).astype(float)[..., 0:1] / 255.0    # bar-and-swale relief
+        rgb = (np.array([205., 188, 154]) * (0.7 + 0.5 * sh)) * (1 - a) + np.array([70., 124, 180]) * a
         return np.clip(rgb, 0, 255).astype(np.uint8)
-    add("03 Braided river (Murray-Paola)", "super-linear transport splits flow into threads round bars; braiding index > 1", _braided)
+    add("03 Braided river (Murray-Paola, RC)", "super-linear per-branch transport banks bars; reduced-complexity, statistically braided (index>1)", _braided)
+    def _real_dem():                                                 # real USGS/SRTM heightmap as base + our erosion
+        dem = HIO.fetch_srtm("N36W113")                             # Colorado Plateau (cached; None offline)
+        if dem is not None:
+            base = np.nan_to_num(HIO.window(dem, 1400, 1200, 400, stride=2), nan=0.0)
+        else:                                                       # offline fallback: a stand-in "imported" surface
+            yy3, xx3 = np.mgrid[0:200, 0:200].astype(float)
+            base = 1200.0 + noise.fbm(xx3 * 0.02, yy3 * 0.02, 4, octaves=6) * 500.0
+        er = sp.stream_power_evolve(base, np.zeros_like(base), 1.5e-5, 0.45, 1e3, 22, 60.0)
+        er = erosion_thermal.thermal_erosion(er, 0.6, 8, 60.0)     # add fluvial incision + talus to the REAL terrain
+        left = render.hillshade(base, 60.0).astype(float)          # left half = imported DEM, right half = + erosion
+        right = render.hillshade(er, 60.0).astype(float)
+        n2 = base.shape[1]; out = left.copy(); h2 = n2 // 2
+        out[:, h2:] = right[:, h2:]; out[:, h2:h2 + 1] = np.array([230., 90, 60])   # seam marker
+        return np.clip(out, 0, 255).astype(np.uint8)
+    add("08 Real DEM base + erosion", "import a real USGS/SRTM heightmap (heightfield_io) and run our atoms on it; L=imported, R=+erosion", _real_dem)
 
     return C
 

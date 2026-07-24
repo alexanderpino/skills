@@ -376,18 +376,28 @@ or from the process model below; a braid's individual channels shift every flood
 long-term memory worth simulating, so the *pattern* is the deliverable, not any one channel.
 
 The implementable process model is **Murray & Paola 1994** (*A cellular model of braided rivers*,
-Nature 371:54–57): on a downstream-sloping bed, (1) water in a cell splits among the downstream‑
-forward cells weighted by √slope, (2) sediment transport is **super‑linear** in discharge
-`qs = K·Qᵐ`, m ≈ 2.5 — a cell under capacity erodes, over capacity deposits — and (3) sediment also
-moves laterally down the cross‑stream slope, building the bars that split the flow again. The
-super‑linearity is the whole instability: with `m = 1` the reach stays single‑thread; with `m > 1`
-it braids. Sediment is conserved to the downstream export.
+Nature 371:54–57): on a **gently** downstream-sloping, sediment-charged bed, (1) water in a cell
+splits among the downstream‑forward cells weighted by √slope, (2) transport capacity is super‑linear
+in discharge and is evaluated **per branch** — each downstream branch carries `K·(Q_branch)ᵐ`, m ≈ 2.5.
+This is the braiding engine: when a thread splits, its discharge divides, so `Σ K·(Q_branch)ᵐ ≪
+K·(Q_total)ᵐ` — capacity collapses super‑linearly, the sediment can no longer be carried, it drops as
+a mid‑channel **bar**, and the next flow routes around it. Where flow re‑concentrates, capacity rises
+and the bed is scoured (a channel). (3) Sediment also relaxes laterally down the cross‑stream slope —
+which shifts threads but, per Murray & Paola, is *not* what causes braiding. With `m = 1` the split
+capacities sum straight back to the single‑thread capacity, nothing deposits at splits, and the reach
+stays single‑thread — the super‑linearity IS the instability. Sediment is conserved to the export.
 
 *Runnable reference: `reference-impl/braided.py` (`braided_river` = this Murray–Paola model;
 `braiding_index` = mean active threads per cross‑section), verified by `tests/test_braided.py`:
-braids (index > 1), the super‑linear transport is what braids (`m=2.5` index ≫ `m=1`), sediment
-conserved (Σbed_change = fed − exported), deterministic. F‑tier illustrative — the multi‑thread
-pattern + braiding instability + mass budget, not a calibrated transport rate.*
+braids (index > 1 on a gravel braidplain); the super‑linearity is what banks bars (an m=2.5 reach
+retains sediment and exports far less than a near‑linear m=1 reach — the mass‑budget fingerprint of
+bar‑building); sediment conserved (Σbed_change = fed − exported); deterministic. **Reduced‑complexity
+tier:** this cellular model reproduces braiding *statistically* — multi‑thread topology, the
+super‑linear instability, a closed mass budget — but not a photoreal woven planform (it reads as
+downstream‑grained threads); a crisp braid needs a depth‑resolved CFD morphodynamic solver
+(Delft3D/BASEMENT class), out of scope for this pure‑NumPy sandbox. Gaea's "braided" (Anastomosis)
+sidesteps the physics entirely — it is a stylized downcutting carve on existing terrain, not a
+simulation; see `reference-impl/CANON-COMPARISON.md`.*
 
 **Bedrock vs alluvial.** High in the range the river cuts *rock* (detachment-limited — stream
 power, `04`); lower down it reworks its own *sediment* (transport-limited — deposition). The

@@ -137,6 +137,16 @@ memory cost is real but the alternative is baking the artefact in permanently.
 Note `65535`, not `65536`. If the engine uses `65536` and you used `65535`, you have a
 sub-millimetre error that nobody will find but which will haunt a seam somewhere.
 
+*Runnable reference: `reference-impl/heightfield_io.py` — the *File Input / Output* node (Gaea
+**File**, WM **File Input/Output**, Houdini **HeightField File**). `load_heightfield` /
+`save_heightfield` round-trip `.npy` (lossless R32-equivalent), 16-bit `.png`, raw `.r16`/`.raw` and
+`.r32` float, and SRTM/USGS `.hgt` tiles, using exactly this `/65535` dequantisation (verified to one
+quantum in `tests/test_heightfield_io.py`); `fetch_srtm` pulls a real AWS Terrain-Tiles SRTM1 tile and
+`window` crops it. This is what makes a **real-world DEM a first-class base** — load it, then run the
+same erosion / thermal / analysis atoms on it (`python heightfield_io.py` does exactly that on a real
+Colorado-Plateau tile). The rule above (quantise once, at export, after every derivative) is why the
+loaders return R32F floats and only `save_heightfield` quantises.*
+
 **Float precision at large world coordinates** — see `01`. At 100 km from the origin, fp32
 has ~8 mm of mantissa resolution. Terrain vertices computed in absolute world space that far
 out will jitter. Use camera-relative or tile-relative rendering coordinates.

@@ -134,6 +134,16 @@ Two files, both deliberately small:
   material) rather than by elevation, and those substances **pile up and fill crevices**
   (`analysis.deposit_fill`) into a surface smoother than the bedrock. Import it directly to render any
   heightfield from the modules.
+- **`heightfield_io.py`** — the *File Input / File Output* node (Gaea **File**, World Machine **File
+  Input/Output**, Houdini **HeightField File**): bring a **real / external heightmap in as a base**,
+  write results back. `load_heightfield` / `save_heightfield` cover the interchange formats — `.npy`
+  (lossless), 16-bit `.png` (Gaea/WM/Unreal), raw `.r16`/`.raw` (Unreal Landscape, WM RAW), `.r32`
+  float, and SRTM/USGS `.hgt`/`.hgt.gz` tiles (metres, void-aware); `fetch_srtm` pulls a real SRTM1
+  tile from the AWS Terrain-Tiles open bucket (no auth, cached) and `window` crops a working region.
+  Because every atom takes a plain float array, a real DEM is a first-class base — `python
+  heightfield_io.py` loads an actual Colorado-Plateau tile and runs stream-power + thermal erosion on
+  it (before/after hillshades + an `.r16` re-export). Round-trips verified in
+  `tests/test_heightfield_io.py`.
 
 The base node normalises the chosen `01` noise family to [0,1] for the demo, but the noise
 itself is the verified `noise.py` module (noise is the initial condition, not the answer).

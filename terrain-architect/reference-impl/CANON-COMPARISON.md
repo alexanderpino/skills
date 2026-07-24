@@ -48,6 +48,7 @@ audited in `99-papers.md`) and, for stream power and SIA, numerically cross-vali
 | `shallow_water.simulate` | SWE dam-break paper panels | ⚠️ same equations, different scenario (ours: rain ponding on a volcano) — algorithm canon is the mass-budget test, not the picture |
 | `sims.glacier_sia` | **Halfar analytic solution** (also plotted in PISM docs) | ✅ the tile *is* the Halfar dome; profile verified to ~1% in tests |
 | `erosion_streampower` | Landlab SPL outputs | ✅ cross-validated numerically (tests); visually shows slight lattice grain inherent to D8-receiver solvers at 96px |
+| `braided.braided_river` | **Gaea "Anastomosis"** node output (docs.quadspinner.com) + Murray & Paola 1994 fig. | ◑ **honest partial.** Two findings from this comparison. (a) Gaea's "braided" is **not a simulation** — Anastomosis is a LookDev *downcutting carve* ("interconnected water-flow-based downcutting") applied to existing terrain, so it is an *incision look*, not the Murray–Paola *depositional* braidplain we implement; different node, not a fair like-for-like. (b) vs the Murray–Paola figure: ours reproduces the **statistics** (multi-thread index>1, super-linear bar-banking, closed mass budget) but reads as **downstream-grained threads, not a woven planform** — the documented ceiling of reduced-complexity cellular braided models. A photoreal braid needs a CFD morphodynamic solver (Delft3D/BASEMENT), out of the pure-NumPy scope. The prior tile was worse — it was in the wrong regime (rain→discharge grows downstream→catastrophic incision fingers); now fixed to the gentle-gradient aggradational regime. |
 
 ## Landform canon (real imagery, node-level bar)
 
@@ -91,6 +92,10 @@ Done (2026-07):
 Open:
 5. Discrete teardrop yardang hulls (Ward & Greeley 1:4) alongside the lineation field — a new
    landform representation, not a parameter (would need its own atom + oracle).
+6. Photoreal braided planform — the Murray–Paola reduced-complexity model is statistically braided
+   but reads as downstream-grained threads; a crisp woven braid is a CFD-tier gap we do **not** fake
+   (would need a depth-resolved morphodynamic solver, out of pure-NumPy scope). Fixed the regime bug
+   (rain→incision) in 2026-07; the honest tier is documented in `braided.py` and `03-flow-routing.md`.
 6. Lava levées via margin-vs-core cooling asymmetry (documented in `19`, unimplemented) — a sim
    change to `lava_flow` (freeze margins faster than the core so walls emerge and the flow channelises).
 7. Alluvial-fan cone convexity legibility; butte cliff fluting (needs oblique render, item 2).
