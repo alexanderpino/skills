@@ -87,15 +87,6 @@ select.btn{appearance:none;padding-right:22px;
 .vp-chip b{color:var(--text);font-weight:600}
 .vp-tools{position:absolute;right:10px;top:9px;display:flex;gap:5px}
 .vp-tools .btn{height:24px;padding:0 8px;font-size:11px;background:rgba(10,13,18,.55);backdrop-filter:blur(6px)}
-.vp-render{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:7px;
-  background:rgba(10,13,18,.62);border:1px solid var(--line);border-radius:7px;padding:9px 11px;backdrop-filter:blur(7px)}
-:root[data-theme="light"] .vp-render{background:rgba(255,255,255,.72)}
-.vp-render .rrow{display:flex;align-items:center;gap:9px}
-.vp-render label{font-family:var(--mono);font-size:10px;color:var(--muted);width:30px;letter-spacing:.4px}
-.vp-render input[type=range]{width:104px;height:3px}
-.tog{width:25px;height:22px;border-radius:5px;border:1px solid var(--line);background:var(--panel2);color:var(--faint);
-  cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center;flex:none}
-.tog.on{border-color:var(--water);color:var(--water);background:rgba(75,159,181,.16)}
 
 /* -- properties -- */
 #props{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -471,7 +462,8 @@ const TYPES={
     params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
   import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
     params:[P.slider("scale","Height",0,1,1)],
-    eval:(p,ins,node)=>{if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
+    eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==RES*RES)&&(node._demImg||node._demRaw))buildDemFromSource(node);
+      if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
   blend:{cat:"comb",name:"Blend",ins:["A","B","Mask"],desc:"Mix A→B by a factor or a mask input.",
     params:[P.slider("factor","Factor",0,1,0.5)],
@@ -705,7 +697,7 @@ function portAt(wx,wy){
 let spaceDown=false;
 gc.addEventListener("mousedown",e=>{
   const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const w=toWorld(mx,my);
-  if(e.button===1||spaceDown||(e.button===0&&e.altKey)){drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");return;}
+  if(e.button===1||spaceDown||(e.button===0&&e.altKey)){e.preventDefault();drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");return;}
   const port=portAt(w.x,w.y);
   if(port){
     if(port.which==="out"){linking={from:port.node,cur:w};gc.classList.add("linking");}
@@ -717,20 +709,28 @@ gc.addEventListener("mousedown",e=>{
   else{select(null);drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");}
   drawGraph();
 });
+const _pk=a=>a?a.node+":"+a.which+":"+(a.slot==null?"":a.slot):"";   // hover-port identity key
 window.addEventListener("mousemove",e=>{
-  const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const w=toWorld(mx,my);
-  hoverPort=portAt(w.x,w.y);
+  const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,w=toWorld(mx,my);
   if(drag&&drag.pan){view.x=drag.vx+(mx-drag.sx);view.y=drag.vy+(my-drag.sy);drawGraph();return;}
   if(drag&&drag.node){drag.node.x=w.x-drag.dx;drag.node.y=w.y-drag.dy;drag.moved=true;drawGraph();return;}
   if(linking){linking.cur=w;drawGraph();return;}
-  if(hoverPort)drawGraph();
+  const inside=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;   // only hover over the graph
+  const hp=inside?portAt(w.x,w.y):null;
+  if(inside)gc.style.cursor=hp?"crosshair":(nodeAt(w.x,w.y)?"move":"grab");
+  if(_pk(hp)!==_pk(hoverPort)){hoverPort=hp;drawGraph();}                 // redraw on enter AND leave
 });
 window.addEventListener("mouseup",e=>{
-  if(linking){const r=gc.getBoundingClientRect(),w=toWorld(e.clientX-r.left,e.clientY-r.top);const port=portAt(w.x,w.y);
+  if(linking){
+    const r=gc.getBoundingClientRect();
+    const inside=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
+    const w=toWorld(e.clientX-r.left,e.clientY-r.top);const port=inside?portAt(w.x,w.y):null;
     if(port&&port.which==="in"&&port.node!==linking.from){
-      edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
-      if(!wouldCycle(linking.from,port.node)){edges.push({from:linking.from,to:port.node,slot:port.slot});markDirtyFrom(port.node);requestEval();}
-      else toast("That would create a cycle");
+      if(wouldCycle(linking.from,port.node))toast("That would create a cycle");
+      else{                                                              // mutate ONLY on a valid drop (don't clobber the input on reject)
+        edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
+        edges.push({from:linking.from,to:port.node,slot:port.slot});markDirtyFrom(port.node);requestEval();
+      }
     }
     linking=null;gc.classList.remove("linking");drawGraph();
   }
@@ -774,7 +774,7 @@ $("#addBtn").onclick=e=>{const r=gc.getBoundingClientRect();openMenu(r.left+80,r
 /* =====================================================================
    PROPERTIES PANEL
    ===================================================================== */
-function select(nd){selected=nd;buildProps();drawGraph();}
+function select(nd){if(nd===selected){drawGraph();return;}selected=nd;buildProps();drawGraph();}
 function buildProps(){
   const body=$("#pBody"),title=$("#pTitle"),sub=$("#pSub"),sw=$("#pSwatch");
   if(!selected){title.firstChild.textContent="No node selected";sub.textContent="Click a node to edit it";
@@ -787,7 +787,7 @@ function buildProps(){
     b.textContent=selected._dem?"Replace heightmap…":"Load heightmap file…";b.onclick=()=>{importTarget=selected;$("#fileInput").click();};
     const b2=document.createElement("button");b2.className="btn";b2.style.width="100%";b2.style.marginTop="6px";
     b2.textContent="Use real SRTM sample";b2.title="A real public-domain USGS/SRTM heightmap (Colorado Plateau)";
-    b2.onclick=()=>{importTarget=selected;loadImageAsDEM(REAL_DEM_SAMPLE,"Loaded real SRTM sample — Colorado Plateau");};
+    b2.onclick=()=>{importTarget=selected;loadImageAsDEM(selected,REAL_DEM_SAMPLE,"Loaded real SRTM sample — Colorado Plateau");};
     const wrap=document.createElement("div");wrap.className="field";wrap.appendChild(b);wrap.appendChild(b2);
     const hint=document.createElement("div");hint.className="hint";hint.innerHTML=selected._dem?"Loaded a real DEM as this node’s base — now wire it into erosion, then Export.":"PNG (any) or square 16-bit <code>.r16</code> raw — real USGS/SRTM works (export one from <code>heightfield_io.py</code>). Or load the embedded real sample.";
     wrap.appendChild(hint);body.appendChild(wrap);}
@@ -819,36 +819,48 @@ function buildField(pr){
   return f;
 }
 function fmtVal(pr,v){return pr.fmt?pr.fmt(v):(Number.isInteger(pr.step)?(v|0):(+v).toFixed(2));}
-function duplicateSel(){if(!selected)return;const nd=makeNode(selected.type,selected.x+30,selected.y+30);nd.params=JSON.parse(JSON.stringify(selected.params));nd._dem=selected._dem;select(nd);requestEval();}
-function deleteSel(){if(!selected)return;const id=selected.id;edges=edges.filter(e=>e.from!==id&&e.to!==id);
+function duplicateSel(){if(!selected)return;const nd=makeNode(selected.type,selected.x+30,selected.y+30);
+  nd.params=JSON.parse(JSON.stringify(selected.params));nd._dem=selected._dem;nd._demImg=selected._demImg;nd._demRaw=selected._demRaw;
+  select(nd);requestEval();}
+function deleteSel(){if(!selected)return;const id=selected.id;
+  const incoming=edges.filter(e=>e.to===id),outgoing=edges.filter(e=>e.from===id);
+  const src=incoming.length===1?incoming[0].from:null;                 // auto-bridge only when the input source is unambiguous
+  edges=edges.filter(e=>e.from!==id&&e.to!==id);
+  if(src!=null)outgoing.forEach(o=>{if(!edges.some(e=>e.to===o.to&&e.slot===o.slot)&&!wouldCycle(src,o.to))edges.push({from:src,to:o.to,slot:o.slot});});
   nodes=nodes.filter(n=>n.id!==id);nodes.forEach(n=>n._dirty=true);select(null);requestEval();}
 
 /* =====================================================================
    IMPORT / EXPORT
    ===================================================================== */
 let importTarget=null;
-$("#importBtn").onclick=()=>{importTarget=nodes.find(n=>n.type==="import"&&(!selected||true))||null;
-  if(selected&&selected.type==="import")importTarget=selected;
+$("#importBtn").onclick=()=>{
+  importTarget=(selected&&selected.type==="import")?selected:nodes.find(n=>n.type==="import")||null;
   if(!importTarget){importTarget=makeNode("import",toWorld(80,80).x,toWorld(80,80).y);select(importTarget);}
   $("#fileInput").click();};
 $("#fileInput").onchange=e=>{const file=e.target.files[0];if(!file||!importTarget)return;
-  const name=file.name.toLowerCase();
+  const nd=importTarget,name=file.name.toLowerCase();
   if(name.endsWith(".r16")||name.endsWith(".raw")||name.endsWith(".bin")){
     file.arrayBuffer().then(buf=>{const u16=new Uint16Array(buf);const side=Math.round(Math.sqrt(u16.length));
       if(side*side!==u16.length){toast("Raw must be square (got "+u16.length+" samples)");return;}
-      loadDEM(resampleTo(u16,side,v=>v/65535));toast("Loaded "+side+"² raw heightmap");});
-  }else{loadImageAsDEM(URL.createObjectURL(file),"Loaded heightmap file");}
+      nd._demRaw={u16,side};nd._demImg=null;buildDemFromSource(nd);finishDem(nd);toast("Loaded "+side+"² raw heightmap");});
+  }else{loadImageAsDEM(nd,URL.createObjectURL(file),"Loaded heightmap file");}
   e.target.value="";
 };
-function loadImageAsDEM(src,label){
-  const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
-    cx.drawImage(img,0,0,RES,RES);const d=cx.getImageData(0,0,RES,RES).data;const f=newField();
-    for(let i=0;i<RES*RES;i++)f[i]=(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;loadDEM(f);toast(label);};
+function loadImageAsDEM(nd,src,label){
+  const img=new Image();img.onload=()=>{nd._demImg=img;nd._demRaw=null;buildDemFromSource(nd);finishDem(nd);toast(label);};
   img.onerror=()=>toast("Could not read that image");img.src=src;
+}
+// (re)build a node's imported heightfield at the CURRENT resolution from its retained source, so changing
+// the working resolution re-resamples cleanly instead of reading a stale, wrong-sized array.
+function buildDemFromSource(nd){
+  if(nd._demImg){const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
+    cx.drawImage(nd._demImg,0,0,RES,RES);const d=cx.getImageData(0,0,RES,RES).data;const f=newField();
+    for(let i=0;i<RES*RES;i++)f[i]=(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;nd._dem=f;}
+  else if(nd._demRaw){nd._dem=resampleTo(nd._demRaw.u16,nd._demRaw.side,v=>v/65535);}
 }
 function resampleTo(src,side,map){const f=newField();for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
   const sx=Math.min(side-1,(x/RES*side)|0),sy=Math.min(side-1,(y/RES*side)|0);f[y*RES+x]=map(src[sy*side+sx]);}return normalize(f);}
-function loadDEM(f){importTarget._dem=f;markDirtyFrom(importTarget.id);buildProps();requestEval();}
+function finishDem(nd){markDirtyFrom(nd.id);buildProps();requestEval();}
 
 $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast("No output to export");return;}
   const f=normalize(out._field);const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
@@ -1186,15 +1198,18 @@ let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add
 $("#autoBtn").classList.toggle("on",AUTO);
 $("#autoBtn").onclick=()=>{AUTO=!AUTO;$("#autoBtn").classList.toggle("on",AUTO);if(AUTO)evalGraph();toast(AUTO?"Auto-recompute on":"Auto-recompute off — use Build");};
 $("#buildBtn").onclick=()=>{nodes.forEach(n=>n._dirty=true);evalGraph();};
-$("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n._demSrc)n._dem=null;});buildIndex();evalGraph();toast("Resolution "+RES+"²");};
+$("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});buildIndex();evalGraph();toast("Resolution "+RES+"²");};
 $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
   document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
 $("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
 $("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
-window.addEventListener("keydown",e=>{if(e.code==="Space")spaceDown=true;
-  if(e.key==="Delete"||e.key==="Backspace"){if(selected&&document.activeElement.tagName!=="INPUT"){deleteSel();}}
-  if(e.key==="f"||e.key==="F"){cam={az:0.7,el:0.62,dist:2.6};}});
+function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
+window.addEventListener("keydown",e=>{
+  if(typing())return;                                          // don't hijack keys while editing a parameter
+  if(e.code==="Space")spaceDown=true;
+  if(e.key==="Delete"||e.key==="Backspace"){if(selected)deleteSel();}
+  if(e.key==="f"||e.key==="F")cam={az:0.7,el:0.62,dist:2.6};});
 window.addEventListener("keyup",e=>{if(e.code==="Space")spaceDown=false;});
 $("#vpInfo").innerHTML=`<span class="vp-chip"><b>Viewport</b> drag orbit · wheel zoom</span>`;
 

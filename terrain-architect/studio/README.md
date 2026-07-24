@@ -72,6 +72,8 @@ a scene layer, so deleting one removes just that effect.
 - **Double-click** empty canvas (or **＋ Add node**) to add a node.
 - Drag a node's **right port** into another node's **left port** to wire them (cycles are rejected).
 - Click a node to edit its parameters on the right; **Duplicate** / **Delete** or press <kbd>Del</kbd>.
+  Deleting a mid-chain node **auto-bridges** its neighbours (its input source reconnects to its outputs)
+  when the input is unambiguous, so the pipeline stays connected.
 - Pan with **middle-drag** / space-drag / empty-drag; **wheel** to zoom the graph.
 - In the 3D view: **drag** to orbit, **wheel** to zoom, <kbd>F</kbd> to frame.
 - **Auto** recomputes on every edit; turn it off and use **Build** for heavy graphs.
