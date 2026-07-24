@@ -224,7 +224,14 @@ def CELLS():
     # ---- LANDFORM GENERATORS (11) ----
     add("11 Mountain (basic)", "raw Voronoi ridge skeleton (pre-erosion base; -> eroded)", lambda: hill(L.mountain((180, 180), 26.0, seed=3, style="basic", warp=0.42), 26))
     add("11 Mountain (eroded)", "styles distinct; deep dendritic incision", lambda: hill(L.mountain((150, 150), 26.0, seed=3, style="eroded"), 26))
-    add("11 Ridge (hogback)", "asymmetric flanks (asymmetry 0 = symmetric)", lambda: hill(L.ridge((180, 180), 30.0, seed=2, height=900, asymmetry=0.6, sinuosity=0.22, detail=0.5), 30))
+    def _ridge():                                                     # a hogback is a PRIMITIVE: place on a
+        n = 150; cell = 30.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)   # base + erode, don't show it raw
+        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 11, octaves=4) * 80 + 70   # gentle foothills (no flat plain)
+        r = L.ridge((n, n), cell, seed=2, height=760, angle=1.42, asymmetry=0.5,
+                    sinuosity=0.13, detail=0.2, width_frac=0.4)             # near-vertical asymmetric spine
+        h = erosion_thermal.thermal_erosion(base + r, 0.62, 6, cell)        # blend the toe / round the crest
+        return hill(_cr(h, 4), cell)
+    add("11 Ridge (hogback)", "asymmetric hogback: steep scarp / gentle dip slope, in eroded foothills", _ridge)
     add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
     add("11 Volcano (shield)", "convex low-angle dome (Hawaiian)", lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=900, cellsize=20, kind="shield"), 20))
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
