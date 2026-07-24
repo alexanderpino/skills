@@ -235,9 +235,10 @@ def CELLS():
         return hill(_cr(base + r, 4), cell)                                # base + atom, that's it
     add("11 Ridge (hogback)", "asymmetric hogback (smin-rounded crest, warped strike) on a foothill base", _ridge)
     add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
-    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian); barranco-grooved flanks",
+    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian); lightly gullied",
         lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=700, cellsize=20, kind="shield",
-                               barranco=0.30, n_barrancos=28), 20))                # radial erosion gullies (Karátson 2010)
+                               barranco=0.12, n_barrancos=22), 20))                # young shields are barely dissected
+                               # (Mauna Loa canon: deep radial barrancos belong to old/strato edifices, Karátson 2010)
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
     def _butte():
         h = np.zeros((180, 180))
@@ -286,9 +287,10 @@ def CELLS():
         out = sims.lava_flow(bed0, (12, 60), 170, erupt=4.0, cool=6.0)   # vent near the top -> (bed, L, T, budget)
         bed, molten = (out[0], out[1]) if isinstance(out, tuple) else (out, np.zeros_like(bed0))
         lava = np.clip(bed - bed0, 0.0, None) + molten        # frozen + still-molten thickness = the flow tongue
-        shade = render.hillshade(bed, 30).astype(float)
-        m = lava > 1e-6
-        a = (np.clip(lava / (np.percentile(lava[m], 55) + 1e-6), 0, 1)[..., None] * 0.95) if m.any() else np.zeros(bed.shape + (1,))
+        sl = (slice(0, 60), slice(30, 90))                    # crop to the flow so the tongue is legible
+        shade = render.hillshade(bed[sl], 30).astype(float)
+        lv = lava[sl]; m = lv > 1e-6
+        a = (np.clip(lv / (np.percentile(lv[m], 55) + 1e-6), 0, 1)[..., None] * 0.95) if m.any() else np.zeros(lv.shape + (1,))
         return np.clip(shade * (1 - a) + np.array([230., 90, 35]) * a, 0, 255).astype(np.uint8)  # basalt tongue (hot)
     add("19 Lava CA", "Bingham yield gate: a flow tongue that freezes; mass budget", _lava)
     def _coast():
