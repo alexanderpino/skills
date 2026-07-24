@@ -691,3 +691,40 @@ real, not pedantry.
 **The emitter must not resample.** If the emitter is resampling to fit the engine's expected
 resolution, the graph produced the wrong resolution and should be fixed. Resampling in the
 emitter reintroduces every artefact the graph was careful to avoid.
+
+## Scale invariance: parameters must not be in cells
+
+A parameter expressed in **cells** silently changes meaning whenever the grid changes, because the
+cell is not a unit — `cellSize = extent / n` is. This is the most common way a graph that looked
+right at preview resolution comes out wrong at build resolution, and it is a *correctness* bug, not
+a tuning preference.
+
+The canonical case is talus. If a thermal node takes a per-cell height **drop**, the repose angle it
+actually encodes is `atan(drop · n)` — so the same value is 66° on a 192² grid and 85° on a 1024²
+one. At 1024² almost nothing exceeds the threshold, thermal stops running, and the build comes out
+spiky. `erosion_thermal.thermal_erosion` avoids this by taking `repose_slope` (a *slope*, tan of the
+angle) and multiplying by `cellsize`; `tests/test_thermal.py::test_repose_angle_is_resolution_independent`
+pins it.
+
+Two independent things have to scale, and fixing only the first is the usual half-fix:
+
+| Quantity | Wrong (cell units) | Right | Scales as |
+|---|---|---|---|
+| Threshold / magnitude | height drop per cell | slope × `cellsize`, or an angle | `1/n` |
+| Transport distance | fixed iteration count | iterations for a fixed physical distance | `n` |
+| Event density | fixed particle/droplet count | count per unit **area** | `n²` |
+| Kernel radius | radius in cells | radius in metres ÷ `cellsize` | `n` |
+
+Iteration count is the one people miss: a relaxation that moves material at most one cell per step
+needs iterations proportional to `n` to cover the same ground. Measured on a fixed 300 iterations, a
+cone relaxes to slope 0.51 / 0.55 / 0.60 at n = 32 / 64 / 128 — converged only at the coarsest grid.
+
+**Carry `cellsize` with the field.** Angles, densities and radii are only meaningful when the
+heightfield is accompanied by its horizontal extent and vertical range. An interactive tool should
+expose that as an explicit terrain definition (extent × height in metres); the vertical exaggeration
+of any preview is then `height / extent`, not an arbitrary constant.
+
+**Verify it, don't assume it.** The check is cheap: build the *same physical* landform at two or
+three resolutions and assert the derived angle agrees. Compare roughness in **slope** units
+(`per-cell drop × n`) — per-cell differences shrink as cells get closer, so raw per-cell roughness
+falsely suggests a finer grid is smoother when it is actually spikier.

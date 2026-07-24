@@ -38,7 +38,7 @@ IMPLEMENTED = {
 # the surface check so it isn't mistaken for an undocumented atom.
 _OPS_NON_ATOM = {"gaussian", "box_filter", "median", "bilateral", "guided_filter", "perona_malik",
                  "dilate", "erode", "opening", "closing", "tophat", "bothat", "twist", "bend",
-                 "unsharp", "histogram_equalize"}
+                 "unsharp", "histogram_equalize", "resample", "at_feature_scale"}
 
 # Atoms discussed in the pseudocode but deliberately NOT implemented: {name: chapter it's discussed in}.
 DEFERRED = {"OpenSimplex2": "references/01-noise.md", "Wavelet": "references/01-noise.md"}

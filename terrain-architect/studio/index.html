@@ -538,6 +538,7 @@ const GPU_FBM_FS=`#version 300 es
 // single-pass version recomputed every neighbour's moveSum (72 fetches/cell); this is ~27.
 const GPU_THERMAL_NB=`
   const ivec2 NB[8]=ivec2[8](ivec2(-1,0),ivec2(1,0),ivec2(0,-1),ivec2(0,1),ivec2(-1,-1),ivec2(1,1),ivec2(-1,1),ivec2(1,-1));
+  const float ND[8]=float[8](1.,1.,1.,1.,1.41421356,1.41421356,1.41421356,1.41421356);  // diagonal distance correction
   bool inb(ivec2 p,int n){return p.x>=0&&p.y>=0&&p.x<n&&p.y<n;}`;
 const GPU_THERMAL_MS_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
@@ -546,7 +547,7 @@ const GPU_THERMAL_MS_FS=`#version 300 es
   void main(){                                  // -> (rate*maxDrop, sumOfDrops)
     ivec2 p=ivec2(gl_FragCoord.xy);float c=H(p),maxd=0.0,sum=0.0;
     for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q,uN))continue;
-      float e=c-H(q)-uTalus;if(e>0.0){sum+=e;maxd=max(maxd,e);}}
+      float e=c-H(q)-uTalus*ND[k];if(e>0.0){sum+=e;maxd=max(maxd,e);}}
     frag=vec4(uRate*maxd,sum,0.0,1.0);}`;
 const GPU_THERMAL_APPLY_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
@@ -559,7 +560,7 @@ const GPU_THERMAL_APPLY_FS=`#version 300 es
     float lose=(me.y>0.0)?me.x:0.0,gain=0.0;
     for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q,uN))continue;
       vec2 mn=MS(q);if(mn.y<=0.0)continue;
-      float e=H(q)-h-uTalus;if(e>0.0)gain+=mn.x*e/mn.y;}
+      float e=H(q)-h-uTalus*ND[k];if(e>0.0)gain+=mn.x*e/mn.y;}
     frag=vec4(h+gain-lose,0.0,0.0,1.0);}`;
 function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   const n=RES,prog=GPU.prog("fbm",GPU_FBM_FS),out=GPU.rt("gen",n);
@@ -795,13 +796,16 @@ function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
 // Thermal (talus) erosion — material above the repose angle slides to lower neighbours.
 function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
   const n=RES;let h=inp.slice();
-  const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
+  // 8-neighbour offsets with their DISTANCE (diagonals are sqrt(2) away). The repose threshold must
+  // scale with distance or diagonals relax at a shallower true angle — the plus-shaped grid artefact.
+  // Mirrors reference-impl/erosion_thermal.py's `distance_correct`.
+  const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
   for(let it=0;it<iters;it++){
     const dh=new Float32Array(n*n);
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
       const c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
-      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
-        const d=c-h[yy*n+xx];const e=d-talus;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
+      for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
+        const d=c-h[yy*n+xx];const e=d-talus*dist;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
       if(sum<=0)continue;
       const move=rate*maxd;let k=0;
       for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(diffs[k]>0){const q=move*diffs[k]/sum;dh[y*n+x]-=q;dh[yy*n+xx]+=q;}k++;}

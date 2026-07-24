@@ -307,3 +307,42 @@ def bend(px, py, k):
     """Parabolic bend of the sample coordinate (k=0 is identity)."""
     px = np.asarray(px, dtype=np.float64)
     return px, np.asarray(py, dtype=np.float64) + k * px * px
+
+
+def resample(h, shape):
+    """Bilinear resample a field to `shape` (rows, cols). Pixel-centre aligned, edge-clamped."""
+    h = np.asarray(h, dtype=np.float64)
+    n, m = h.shape
+    to_n, to_m = int(shape[0]), int(shape[1])
+    r = (np.arange(to_n) + 0.5) * n / to_n - 0.5
+    c = (np.arange(to_m) + 0.5) * m / to_m - 0.5
+    r = np.clip(r, 0, n - 1)[:, None]
+    c = np.clip(c, 0, m - 1)[None, :]
+    r0 = np.floor(r).astype(np.int64); r1 = np.minimum(r0 + 1, n - 1)
+    c0 = np.floor(c).astype(np.int64); c1 = np.minimum(c0 + 1, m - 1)
+    fr, fc = r - r0, c - c0
+    return (h[r0, c0] * (1 - fr) * (1 - fc) + h[r0, c1] * (1 - fr) * fc
+            + h[r1, c0] * fr * (1 - fc) + h[r1, c1] * fr * fc)
+
+
+def at_feature_scale(h, factor, fn):
+    """Run `fn` so its features come out `factor` times WIDER — "the same effect over a larger area".
+
+    A simulation's characteristic feature size is set by the grid it runs on, so to widen its
+    footprint you coarsen the grid rather than re-tune the physics: resample down by `factor`, run
+    `fn`, then resample only the *change* back and add it to the full-resolution field. The delta
+    (not the result) is what returns, so fine detail present in `h` survives untouched and only the
+    effect's footprint grows. The coarse cell is `factor * cellsize` wide — that is the lateral size
+    the simulation actually sees, and what a "feature scale in metres" control should be derived
+    from. Cheaper too: the sim runs on factor^2 fewer cells.
+
+    `fn` takes and returns a field. `factor <= 1` runs `fn` directly at full resolution.
+    """
+    h = np.asarray(h, dtype=np.float64)
+    if not factor > 1.0:
+        return fn(h)
+    n, m = h.shape
+    small_shape = (max(4, int(round(n / factor))), max(4, int(round(m / factor))))
+    small = resample(h, small_shape)
+    delta = np.asarray(fn(small), dtype=np.float64) - small
+    return h + resample(delta, (n, m))

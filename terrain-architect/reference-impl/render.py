@@ -249,6 +249,50 @@ def satmap(driver, stops):
     return out
 
 
+def satmap_2d(driver_a, driver_b, stops_a, stops_b):
+    """A 2-D colour LUT: blend two elevation ramps by a SECOND driver. The classic pairing is
+    altitude x slope — `driver_a` (usually height) indexes both ramps, `driver_b` (usually
+    normalised slope) mixes between the flat-ground palette `stops_a` and the steep-ground palette
+    `stops_b`, so gentle ground reads as soil/vegetation and cliffs as bare rock at the same
+    elevation. This is the two-ramp form of the biome LUT: cheaper and easier to author than a full
+    per-cell 2-D image, and it covers the usual altitude/slope and altitude/moisture cases.
+    Returns float RGB in 0-255."""
+    a = satmap(driver_a, stops_a)
+    b = satmap(driver_a, stops_b)
+    t = np.clip(np.asarray(driver_b, dtype=np.float64), 0.0, 1.0)[..., None]
+    return a * (1.0 - t) + b * t
+
+
+# Blend modes for compositing colour layers. `max`/`min` are the pair terrain tools lean on (a
+# max-blend keeps whichever layer is brighter, which is how two SatMaps are usually merged).
+BLEND_MODES = {
+    "normal":   lambda d, s: s,
+    "max":      lambda d, s: np.maximum(d, s),
+    "min":      lambda d, s: np.minimum(d, s),
+    "multiply": lambda d, s: d * s / 255.0,
+    "screen":   lambda d, s: 255.0 - (255.0 - d) * (255.0 - s) / 255.0,
+    "overlay":  lambda d, s: np.where(d < 127.5, 2.0 * d * s / 255.0,
+                                      255.0 - 2.0 * (255.0 - d) * (255.0 - s) / 255.0),
+}
+
+
+def blend_rgb(base_rgb, over_rgb, mask=None, opacity=1.0, mode="normal"):
+    """Composite one colour layer over another — the operation that lets SatMaps be *combined*
+    rather than chosen. `mask` (in 0-1, broadcast over channels) times `opacity` is the blend
+    weight, and `mode` is one of `BLEND_MODES`. Chain it to stack layers (a slope-driven rock
+    SatMap over a height-driven ground SatMap, masked to the steeps), or call it once to merge two
+    independent SatMap branches. Returns float RGB in 0-255."""
+    d = np.asarray(base_rgb, dtype=np.float64)
+    s = np.asarray(over_rgb, dtype=np.float64)
+    try:
+        blended = BLEND_MODES[mode](d, s)
+    except KeyError:
+        raise ValueError(f"unknown blend mode {mode!r}; expected one of {sorted(BLEND_MODES)}")
+    w = float(opacity) if mask is None else \
+        np.clip(np.asarray(mask, dtype=np.float64), 0.0, 1.0)[..., None] * float(opacity)
+    return d + (blended - d) * w
+
+
 def splat_blend(base_rgb, overlays):
     """Splatmap compositing (the Texture stage): over a base colour (e.g. a `satmap`), lay down
     per-material colours where their coverage MASK is high. `overlays` is an ordered list of

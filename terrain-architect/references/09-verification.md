@@ -362,3 +362,19 @@ For reviewing an existing graph. Ordered by expected yield.
 
 **Report findings as: symptom → mechanism → minimal fix.** A graph with one misordered node
 needs one node moved, not a rewrite. Minimal diffs are reviewable; rewrites are not.
+
+## Two failure modes of the measurement itself
+
+**A saturating metric hides the thing you are testing.** Verifying that a 2× magnification really
+doubles feature size by counting zero-crossings gave 2.14× and 5× for true 2× and 4× — the metric
+was quantised (at 4× only ~3 crossings remain across a row), not the transform wrong. Replacing it
+with an **analytic oracle** — transform a sine, and assert the result equals `sin()` evaluated at
+the inverse-mapped coordinate — gave max error 0 / 0.0064 / 0.008, i.e. bilinear interpolation error
+only. Prefer an oracle you can derive in closed form over a statistic of the output; when a
+statistic is all you have, check its dynamic range covers the effect you are claiming.
+
+**A metric in the wrong units inverts the conclusion.** Comparing surface roughness across
+resolutions using mean per-cell height difference makes a *spikier* fine grid look *smoother*,
+because cells are closer together. Convert to **slope** (per-cell drop × n) and the same data says
+the fine grid is 3.15× spikier. Whenever a quantity is compared across two grids, state it in units
+that do not contain the grid.

@@ -239,6 +239,46 @@ def deposit_fill(h, cellsize=1.0, radius=3):
     return np.maximum(closed - np.asarray(h, dtype=np.float64), 0.0)
 
 
+def wear(h, cellsize=1.0, eps=1e-12):
+    """Where the surface is both CONVEX and STEEP — the exposed edges erosion strips first (ridge
+    crests, cliff lips, spur noses). Convexity from the mean curvature (negative = convex, so the
+    sign is flipped) times normalised slope, clipped to >= 0. The companion of `deposit_fill`: wear
+    is what is removed, deposit is where it comes to rest, and colouring by the pair is what makes a
+    texture read as worn rather than tinted. Returns a mask in 0-1."""
+    conv = np.maximum(-curvature(h, cellsize, kind="mean"), 0.0)
+    s = slope(h, cellsize)
+    out = conv * s
+    hi = out.max()
+    return out / hi if hi > eps else np.zeros_like(out)
+
+
+def peaks(h, cellsize=1.0, radius=4, eps=1e-12):
+    """Prominence above the local mean — isolates summits and crests from the surrounding relief.
+    `h - boxblur(h, radius)`, positive part, normalised. `radius` is in CELLS, so scale it with
+    resolution (08) if you want a fixed prominence footprint in metres. Returns a mask in 0-1."""
+    import ops_filters
+    lo = ops_filters.box_filter(np.asarray(h, dtype=np.float64), r=int(radius))
+    out = np.maximum(np.asarray(h, dtype=np.float64) - lo, 0.0)
+    hi = out.max()
+    return out / hi if hi > eps else np.zeros_like(out)
+
+
+def texture_base(h, area, cellsize=1.0, *, slope_w=0.5, soil_w=0.3, flow_w=0.2, radius=3):
+    """The composite colour driver: slope + soil + flow mixed into one mask. Colouring straight off
+    elevation reads as a tint; colouring off this reads as material, because it carries steepness
+    (bare rock), deposition (soil in hollows) and drainage (damp channels) at once. Feed it to
+    `render.satmap` as the driver. Weights need not sum to 1 — the result is renormalised."""
+    s = slope(h, cellsize)
+    s = s / s.max() if s.max() > 0 else s
+    soil = deposit_fill(h, cellsize, radius=radius)
+    soil = soil / soil.max() if soil.max() > 0 else soil
+    a = np.log1p(np.maximum(np.asarray(area, dtype=np.float64), 0.0))
+    a = a / a.max() if a.max() > 0 else a
+    out = s * slope_w + soil * soil_w + a * flow_w
+    hi = out.max()
+    return out / hi if hi > 1e-12 else out
+
+
 SUBSTANCE_NAMES = ("water", "snow", "rock", "scree", "sediment", "vegetation", "ground")
 
 
