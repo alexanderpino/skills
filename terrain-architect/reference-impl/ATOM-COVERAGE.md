@@ -37,7 +37,9 @@ incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a f
 thermal/talus (`erosion_thermal.thermal_erosion`), hillslope diffusion (`diffusion.hillslope_diffuse`),
 virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), shallow-water
 (`shallow_water.simulate`), lateral fluvial migration (`meander.migrate`, with the F-tier
-height-field realisation `meander.burn_channel`), glacial erosion (`glacier.glacier_carve` —
+height-field realisation `meander.burn_channel`), braided/anastomosing rivers
+(`braided.braided_river` — the Murray–Paola 1994 cellular braided-stream model: split flow +
+super-linear transport + lateral exchange → multi-thread channels; F-tier), glacial erosion (`glacier.glacier_carve` —
 SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier), the dynamic
 snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), aeolian
 abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier), and structural

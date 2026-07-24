@@ -371,8 +371,23 @@ mid-channel, flow splits around it, the split channels widen and deposit new bar
 multiplies. For terrain, a braided reach is a *wide, flat, gravel-floored corridor* (a `06` material
 band) stamped with a multi-thread channel pattern — anastomosing threads and lens-shaped bars —
 rather than a single incised line; glacial outwash plains (`12`) and alluvial-fan surfaces (`16`)
-are the type settings. Author the corridor from the routing (`03`) and the threads as a look; a
-braid's individual channels shift every flood and carry no long-term memory worth simulating.
+are the type settings. Author the corridor from the routing (`03`) and the threads either as a look
+or from the process model below; a braid's individual channels shift every flood and carry no
+long-term memory worth simulating, so the *pattern* is the deliverable, not any one channel.
+
+The implementable process model is **Murray & Paola 1994** (*A cellular model of braided rivers*,
+Nature 371:54–57): on a downstream-sloping bed, (1) water in a cell splits among the downstream‑
+forward cells weighted by √slope, (2) sediment transport is **super‑linear** in discharge
+`qs = K·Qᵐ`, m ≈ 2.5 — a cell under capacity erodes, over capacity deposits — and (3) sediment also
+moves laterally down the cross‑stream slope, building the bars that split the flow again. The
+super‑linearity is the whole instability: with `m = 1` the reach stays single‑thread; with `m > 1`
+it braids. Sediment is conserved to the downstream export.
+
+*Runnable reference: `reference-impl/braided.py` (`braided_river` = this Murray–Paola model;
+`braiding_index` = mean active threads per cross‑section), verified by `tests/test_braided.py`:
+braids (index > 1), the super‑linear transport is what braids (`m=2.5` index ≫ `m=1`), sediment
+conserved (Σbed_change = fed − exported), deterministic. F‑tier illustrative — the multi‑thread
+pattern + braiding instability + mass budget, not a calibrated transport rate.*
 
 **Bedrock vs alluvial.** High in the range the river cuts *rock* (detachment-limited — stream
 power, `04`); lower down it reworks its own *sediment* (transport-limited — deposition). The

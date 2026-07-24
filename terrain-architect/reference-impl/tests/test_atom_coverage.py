@@ -27,6 +27,7 @@ IMPLEMENTED = {
     "erosion_pipe": ["pipe_water", "pipe_erode"],
     "shallow_water": ["simulate"],
     "meander": ["migrate", "burn_channel"],
+    "braided": ["braided_river"],
     "glacier": ["glacier_carve"],
     "snow": ["snow_step", "thermal_on_layer"],
     "aeolian": ["yardang"],

@@ -15,6 +15,7 @@ import erosion_pipe
 import shallow_water
 import diffusion
 import meander as MEA
+import braided as BRA
 import landforms as L
 import analysis as A
 import sims_illustrative as sims
@@ -429,6 +430,17 @@ def CELLS():
         sh = render.hillshade(h, 30.0).astype(float)[..., 0] / 255.0
         return np.clip(rgb * (0.55 + 0.55 * sh)[..., None], 0, 255).astype(np.uint8)
     add("08 SatMap (from satellite)", "CLUT extracted from real NASA imagery (extract_satmap); monotone, in-gamut", _satmap)
+    def _braided():                                                  # Murray-Paola braided river (multi-thread)
+        n = 150; m2 = 170; yy2, xx2 = np.mgrid[0:n, 0:m2].astype(float)
+        bed0 = 200.0 - 0.5 * yy2 + noise.fbm(xx2 * 0.05, yy2 * 0.05, 3, octaves=4) * 4.0
+        bed, Q = BRA.braided_river(bed0, 130, K=0.04, m_exp=2.5, erode_rate=0.13, lateral=0.30,
+                                   sed_feed=1.0, Q0=1.0, rain=0.03)     # split flow + Q^m transport -> braid
+        q = np.log(Q + 1e-3); q = (q - np.percentile(q, 55)) / (np.percentile(q, 99.5) - np.percentile(q, 55) + 1e-9)
+        a = _smoothstep(0.15, 0.75, np.clip(q, 0, 1))[..., None]        # log-discharge threads (blue) on the braidplain
+        sh = render.hillshade(bed, 20).astype(float)[..., 0:1] / 255.0
+        rgb = (np.array([206., 188, 150]) * (0.7 + 0.5 * sh)) * (1 - a) + np.array([54., 104, 168]) * a
+        return np.clip(rgb, 0, 255).astype(np.uint8)
+    add("03 Braided river (Murray-Paola)", "super-linear transport splits flow into threads round bars; braiding index > 1", _braided)
 
     return C
 

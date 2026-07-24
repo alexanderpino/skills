@@ -22,9 +22,9 @@ Inventories collected from the official references (2026-07):
 
 | # | Capability | Where it ships | Verdict |
 |---|---|---|---|
-| **1** | **Braided / anastomosing rivers** — *multi-thread* channels that split and rejoin around bars (not a single meandering thread) | Gaea **Anastomosis** (and partly **Rivers**) | ✅ **REAL GAP.** Our fluvial set is single-thread (`meander_belt`) + dendritic drainage (`flow`). A braided/anastomosing network is a distinct process (Murray & Paola 1994 braided-stream model; Nicholas 2013). Not composable from what we have. |
+| **1** | **Braided / anastomosing rivers** — *multi-thread* channels that split and rejoin around bars (not a single meandering thread) | Gaea **Anastomosis** (and partly **Rivers**) | ✅ **CLOSED** — implemented as `braided.braided_river` (Murray & Paola 1994 cellular model: split flow + super-linear transport `qs∝Qᵐ` + lateral exchange), with a braiding-index oracle (`tests/test_braided.py`: braids, super-linearity is what braids, sediment conserved). Was the only clear-cut atomic geomorphic gap; now filled. |
 
-That is the **only** clear-cut atomic geomorphic gap across all three tools.
+That was the **only** clear-cut atomic geomorphic gap across all three tools — **now closed**.
 
 ### Borderline — noted, not counted as gaps
 - **Spectral / multi-band terrain filter** (Gaea *Filter*, *GraphicEQ*) — isolate/suppress features at

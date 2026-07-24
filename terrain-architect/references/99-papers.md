@@ -711,6 +711,14 @@ is below.
 - **Leopold, L.B. & Wolman, M.G. (1957).** *River channel patterns: Braided, meandering, and
   straight.* USGS Professional Paper 282-B. — The planform classification; braiding starts as a
   central bar of stalled coarse bedload (`03`).
+- **Murray, A.B. & Paola, C. (1994).** *A cellular model of braided rivers.* Nature 371, 54–57
+  (and JGR 102, 1997). — **The implementable braided-river model** (`braided.braided_river`, `03`):
+  water splits among downstream cells by √slope, sediment transport is **super-linear** in discharge
+  (`qs ∝ Qᵐ`, m≈2.5), and lateral transport builds bars. The super-linearity IS the braiding
+  instability — m=1 stays single-thread, m>1 braids.
+- **Nicholas, A.P. (2013).** *Modelling the continuum of river channel patterns.* Earth Surf.
+  Process. Landforms 38, 1187–1196. — Straight→meandering→braided as one continuum; context for
+  when the Murray–Paola regime applies.
 - **Beneš, B., Těšínský, V., Hornyš, J. & Bhatia, S.K. (2006).** *Hydraulic Erosion.* Computer
   Animation and Virtual Worlds 17(2), 99–108. — Shallow-water erosion.
 - **Montgomery, D.R. & Buffington, J.M. (1997).** *Channel-reach morphology in mountain drainage
