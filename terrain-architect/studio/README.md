@@ -14,8 +14,13 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 - **Node graph** (the core): drag nodes, wire outputs into inputs, and every node shows a live
   hill-shaded **thumbnail** of its own output — so you read the pipeline at a glance.
-- **Live 3D viewport**: WebGL2 lit terrain mesh with hypsometric / slope / grey shading, orbit +
-  zoom, wireframe. Updates as you edit.
+- **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (hypsometric / slope /
+  grey shading, orbit + zoom, wireframe), rendered in two passes —
+  1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
+     and leaves steep faces bare, with a specular snow sheen (the ❄ SNOW toggle + line slider).
+  2. **Translucent water** — a separate alpha-blended pass with depth-based colour (shallow teal →
+     deep blue), a Fresnel edge, animated ripples, and shoreline foam (the ≈ SEA toggle + level
+     slider). Depth-tested against the terrain so it fills valleys and clips cleanly at the shore.
 - **Real heightmaps as a base**: the **Import DEM** node has a one-click **Use real SRTM sample**
   (a real public-domain USGS/SRTM crop of the Colorado Plateau, embedded in the page) *and* loads your
   own PNG or square 16-bit `.r16` raw — including real USGS/SRTM tiles exported from
