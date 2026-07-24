@@ -208,6 +208,7 @@ select.sg-btn{appearance:auto}
         <option value="512">512²</option><option value="1024">1024²</option>
       </select>
       <button class="btn" id="gpuBtn" title="Use the WebGL2 GPU fast path for generators and thermal erosion">GPU</button>
+      <button class="btn" id="scaleBtn" title="Resolution independence: keep cell-relative params (talus angle, droplet density, radii) constant as RES changes">Scale</button>
     </div>
     <div class="tspacer"></div>
     <div class="tgroup">
@@ -453,6 +454,19 @@ function radialField(){
    checks the GPU output against them. Only the parallel-friendly kernels
    live here — sequential ones (priority flood, D8) remain CPU.
    ===================================================================== */
+/* --------------------------------------------------------------------
+   RESOLUTION INDEPENDENCE. Several node params are expressed in CELLS, so
+   raising RES silently changes what they mean — e.g. thermal `talus` is a
+   height drop per cell, and cell spacing is 1/RES, so the repose ANGLE it
+   encodes is atan(talus*RES): 66° at 192² but 85° at 1024², which is why a
+   high-res build came out spiky. Scaling converts those to resolution-
+   independent quantities against a reference grid, so the same graph gives
+   the same landform at any resolution (just with more detail) — the parity
+   Gaea documents between a 512² preview and a 4K/8K build.
+   -------------------------------------------------------------------- */
+let SCALE_RES=true;
+const REF_RES=192;
+const resScale=()=>SCALE_RES?RES/REF_RES:1;          // >1 when finer than the reference grid
 let USE_GPU=true;
 const GPU={
   ok:null,vs:null,progs:{},rts:{},fbo:null,
@@ -859,7 +873,7 @@ const TYPES={
     eval:(p,ins)=>ins[0]?histEqualizeField(ins[0],p):newField()},
   blur:{cat:"filt",name:"Blur",ins:["In"],desc:"Separable Gaussian smoothing.",
     params:[P.slider("radius","Radius",1,10,2,1,v=>v|0)],
-    eval:(p,ins)=>ins[0]?blurField(ins[0],p):newField()},
+    eval:(p,ins)=>ins[0]?blurField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}):newField()},
   clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
@@ -868,11 +882,14 @@ const TYPES={
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In"],desc:"Talus: material above repose slides down.",
     params:[P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5)],
-    eval:(p,ins)=>ins[0]?(gpuReady()?gpuThermal(ins[0],p):thermalErode(ins[0],p)):newField()},
+    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale(),
+      q={...p,talus:p.talus/k,iters:Math.max(1,Math.round(p.iters*k))};   // constant repose angle, constant travel distance
+    return gpuReady()?gpuThermal(ins[0],q):thermalErode(ins[0],q);}},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1)],
-    eval:(p,ins)=>ins[0]?hydraulicErode(ins[0],p):newField()},
+    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
+    return hydraulicErode(ins[0],{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))});}},
 
   slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
     params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],
@@ -896,13 +913,13 @@ const TYPES={
     eval:(p,ins)=>ins[0]?occlusionField(ins[0],p):newField()},
   d_deposits:{cat:"data",name:"Deposits",ins:["In"],desc:"Soil / sediment: the depth loose material piles into hollows (morphological closing − surface).",
     params:[P.int("radius","Radius",1,10,3)],
-    eval:(p,ins)=>ins[0]?depositsField(ins[0],p):newField()},
+    eval:(p,ins)=>ins[0]?depositsField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}):newField()},
   d_wear:{cat:"data",name:"Wear",ins:["In"],desc:"Exposed, convex, steep ground — the edges erosion strips first.",
     params:[P.slider("strength","Strength",0.2,3,1,0.1)],
     eval:(p,ins)=>ins[0]?wearField(ins[0],p):newField()},
   d_peaks:{cat:"data",name:"Peaks",ins:["In"],desc:"Prominence above the local mean — isolates summits and crests.",
     params:[P.int("radius","Radius",1,12,4)],
-    eval:(p,ins)=>ins[0]?peaksField(ins[0],p):newField()},
+    eval:(p,ins)=>ins[0]?peaksField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}):newField()},
   d_texture:{cat:"data",name:"Texture",ins:["In"],desc:"Gaea's composite colour driver: slope + soil + flow mixed into one mask — the usual SatMap input.",
     params:[P.slider("slopeW","Slope",0,1,0.5),P.slider("soilW","Soil",0,1,0.3),P.slider("flowW","Flow",0,1,0.2)],
     eval:(p,ins)=>ins[0]?textureField(ins[0],p):newField()},
@@ -1777,6 +1794,11 @@ $("#gpuBtn").onclick=()=>{
   nodes.forEach(n=>n._dirty=true);evalGraph();
   toast(USE_GPU?"GPU fast path on":"CPU reference path");};
 setTimeout(()=>{if(GPU.init()){$("#gpuBtn").classList.toggle("on",USE_GPU);}else{$("#gpuBtn").disabled=true;$("#gpuBtn").title="WebGL2 float render targets unavailable";}},0);
+// Resolution independence toggle — off means params stay in raw cell units (and a high-res build goes spiky).
+$("#scaleBtn").classList.toggle("on",SCALE_RES);
+$("#scaleBtn").onclick=()=>{SCALE_RES=!SCALE_RES;$("#scaleBtn").classList.toggle("on",SCALE_RES);
+  nodes.forEach(n=>n._dirty=true);evalGraph();
+  toast(SCALE_RES?"Scaling params to resolution":"Raw cell-unit params");};
 $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
   document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};

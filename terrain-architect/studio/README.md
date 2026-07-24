@@ -190,6 +190,33 @@ authoring tool — the numerically-validated implementations, oracles and cross-
 `reference-impl/`. Verified headless with Playwright (graph eval, WebGL init, all interactions,
 import/export — no console/page errors) during development.
 
+### Resolution independence (the **Scale** toggle)
+
+Several node parameters are expressed **in cells**, so raising the resolution silently changes what they
+mean. The worst offender is thermal `talus`, a height drop *per cell*: cell spacing is `1/RES`, so the
+repose **angle** it encodes is `atan(talus·RES)` — **66° at 192² but 85° at 1024²**. At high resolution the
+talus angle is near-vertical, thermal erosion barely runs, and the build comes out **spiky**. Droplet
+density (a fixed count spread over `RES²` cells) and blur/deposit/peak radii have the same problem.
+
+**Scale** (on by default) converts these to resolution-independent quantities against a 192² reference:
+`talus/k` (constant angle), `iters·k` (constant travel distance), `droplets·k²` (constant density),
+radii `·k`. Measured on the default graph, comparing a 1024² build downsampled to 192²:
+
+| scaling | spikiness vs 192² | build cost |
+|---|---|---|
+| off | **3.15×** | 4.6 s |
+| talus only | 1.97× | 4.5 s (free) |
+| talus + droplets·k² | 1.85× | 15.3 s |
+| talus + iters·√k | 1.55× | 7.2 s |
+| **full (default)** | **1.21×** | 25.4 s |
+
+Fixing the talus angle is the single biggest win and costs nothing; the rest buys the remaining parity by
+doing proportionally more work — which is the honest price of resolution independence, and why a 1024²
+build is a **Build**, not an Auto-recompute. (Gaea documents the same goal: a 512² preview keeps *"essential
+parity for all major erosion features"* with a 4K/8K build.) Turn **Scale** off for fast iteration at
+high res, at the cost of a spikier surface. Timings are under a software rasteriser; the droplet term is
+the CPU sim, so a GPU pipe-model hydraulic would remove most of that cost.
+
 ### GPU fast path (WebGL2 GPGPU)
 
 The **CPU kernels remain the reference implementation**. On top of them there is an optional GPU path
