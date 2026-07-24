@@ -29,9 +29,11 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
   - a richer **analytic sky** (horizon→zenith gradient, sun disk, aureole, near-sun horizon scatter)
     and distance-tinted **aerial perspective**, resolved through **ACES** tone mapping and
     **supersampled** for anti-aliased silhouettes.
-- **SatMaps genuinely derived from real satellite imagery** (not hand-picked): pick from ~11 palettes
+- **SatMaps genuinely derived from real satellite imagery** (not hand-picked): pick from ~13 palettes
   in the viewport (Temperate, Alpine, Verdant, Canyon, Arid, Dune, Volcanic, Mars, Lunar, Arctic,
-  Tundra). **Seven are extracted from real public-domain top-down satellite/aerial imagery** — the
+  Tundra, plus **Estuary** and **Dusk** traced from Gaea SatMap-editor gradient strips — a per-column
+  median of the bar, Dusk being the selected in-range window). **Seven are extracted from real
+  public-domain top-down satellite/aerial imagery** — the
   source image is ordered by luminance into an elevation ramp by the skill's own `reference-impl`
   `extract_satmap`, the same method Gaea describes for its SatMap library, done reproducibly rather
   than by eye. Derived: **Alpine** (Ligurian Alps), **Dune** (Rub′ al Khali / Terra), **Verdant**
