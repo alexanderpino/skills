@@ -100,7 +100,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Filter** | Warp (domain warp) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
-| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (colour LUT node) |
+| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (colour LUT node) · **SatMap Blend** (merge two colour branches) |
 | **Output** | Output (drives the viewport / export) |
 
 **Water, snow and colour are nodes, not global switches.** Add a **Water**, **Snow** or **SatMap** node and
@@ -118,11 +118,14 @@ Driver** (flow, a mask, a Blend). It picks a **Gradient** from the library (incl
 SatMap Studio) and applies **Reverse**, **Range** (use just a slice of the gradient) and **Shift** (offset
 the lookup) — the same transforms Gaea's SatMap node exposes.
 
-- **Stack them — colour composites in the graph.** Chain several SatMap nodes (`… → SatMap(base) →
-  SatMap(rock) → Output`) and they **composite**, base → top: each layer has an **Opacity**, a **Blend**
-  (Normal / Multiply / Screen), and an optional **Mask** input, so you can lay a slope-driven rock SatMap
-  over an elevation SatMap only where a mask is high — Gaea's SatMap/splat layering. Compositing is done
-  per-vertex on the CPU into a colour that becomes the terrain's albedo.
+- **Colour flows through the graph — branch, blend and stack.** Colour is resolved by walking the graph:
+  a SatMap **composites its ramp over the colour already coming down its In chain** (so chaining
+  `… → SatMap(base) → SatMap(rock) → Output` stacks them, each with **Opacity**, **Blend**
+  (Normal / Multiply / Screen) and an optional **Mask**); a **SatMap Blend** node **merges two separate
+  SatMap branches** — wire `SatMap A → A`, `SatMap B → B`, a mask into **Mask** — exactly Gaea's
+  SatMap-combine; and any other node (erosion, filter) just passes colour through. So you can build a real
+  colour graph — e.g. an elevation SatMap and a flow-driven SatMap blended by a slope mask. It's resolved
+  per-vertex on the CPU into the terrain's albedo.
 - **2D biome (altitude × slope).** Switch **Mode** to *2D biome* and the node blends **two** gradients — a
   flat-ground **Gradient** and a steep-ground **Steep gradient** — by slope: green valleys and gentle
   ground read from the first, cliffs and scree from the second. That's the classic 2D terrain LUT

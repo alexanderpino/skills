@@ -675,6 +675,11 @@ const TYPES={
     eval:(p,ins,nd)=>{const h=ins[0]||newField();
       let drv=p.source==="slope"?normalize(slopeOf(h)):p.source==="height"?h:(ins[1]||h);
       nd._driver=normalize(drv);nd._slope=normalize(slopeOf(h));nd._mask=ins[2]||null;return h;}},
+  satmapblend:{cat:"effect",name:"SatMap Blend",ins:["A","B","Mask"],desc:"Blend two SatMap (colour) branches — A underneath, B over it by Mask × Opacity with a Blend mode. Height passes through from A. Gaea's SatMap-combine.",
+    passthrough:true,effect:"satmapblend",
+    params:[P.seg("blend","Blend",[["normal","Normal"],["multiply","Multiply"],["screen","Screen"]],"normal"),
+      P.slider("opacity","Opacity",0,1,1)],
+    eval:(p,ins,nd)=>{nd._mask=ins[2]||null;return ins[0]||newField();}},
 
   output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
     params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
@@ -693,17 +698,15 @@ function makeNode(type,x,y){
 function nodeById(id){return nodes.find(n=>n.id===id);}
 function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
-function collectScene(){                            // walk upstream from Output; pick Water / Snow + the full SatMap layer stack
-  const s={water:null,snow:null,satmap:null,satLayers:[]};const out=outputNode();if(!out)return s;
-  const q=[out.id],seen=new Set(),layers=[];
+function collectScene(){                            // walk upstream from Output; pick the nearest Water / Snow / SatMap
+  const s={water:null,snow:null,satmap:null};const out=outputNode();if(!out)return s;
+  const q=[out.id],seen=new Set();
   while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);
     const nd=nodeById(id);if(!nd)continue;
     if(nd.type==="water"&&!s.water)s.water={...nd.params};
     if(nd.type==="snow"&&!s.snow)s.snow={...nd.params};
-    if(nd.type==="satmap")layers.push({...nd.params,driver:nd._driver,slope:nd._slope,mask:nd._mask});
+    if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params};
     edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
-  s.satLayers=layers.reverse();                     // BFS is nearest-first; base = farthest upstream, top = nearest to Output
-  s.satmap=s.satLayers.length?s.satLayers[s.satLayers.length-1]:null;
   return s;
 }
 function markDirtyFrom(id){ // mark node and everything downstream dirty
@@ -1049,12 +1052,36 @@ function satLayerColor(L,i){                          // one layer's colour at v
   return a;}
 function satBlend(dst,src,m,mode){const o=[0,0,0];
   for(let c=0;c<3;c++){let s=src[c];if(mode==="multiply")s=dst[c]*src[c];else if(mode==="screen")s=1-(1-dst[c])*(1-src[c]);o[c]=dst[c]+(s-dst[c])*m;}return o;}
-function buildSatComposite(n){                        // composite the layer stack (base → top) into a per-vertex RGB buffer
-  const L=scene.satLayers,col=new Float32Array(n*n*3);if(!L||!L.length)return col;
-  for(let i=0;i<n*n;i++){let rgb=satLayerColor(L[0],i);
-    for(let k=1;k<L.length;k++){const src=satLayerColor(L[k],i),m=(L[k].mask?clamp(L[k].mask[i],0,1):1)*L[k].opacity;rgb=satBlend(rgb,src,m,L[k].blend);}
-    col[i*3]=rgb[0];col[i*3+1]=rgb[1];col[i*3+2]=rgb[2];}
+function satNodeColorField(nd,n){                     // a single SatMap node's colour (1D ramp or 2D biome), as a per-vertex field
+  const L={...nd.params,driver:nd._driver,slope:nd._slope},col=new Float32Array(n*n*3);
+  for(let i=0;i<n*n;i++){const c=satLayerColor(L,i);col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];}
   return col;}
+function blendFields(base,over,nd,n){                 // composite `over` onto `base` by (nd mask × opacity) with nd blend mode
+  if(!base)return over;if(!over)return base;
+  const col=new Float32Array(n*n*3),mask=nd._mask,op=(nd.params.opacity!=null?nd.params.opacity:1),mode=nd.params.blend||"normal";
+  for(let i=0;i<n*n;i++){const m=(mask?clamp(mask[i],0,1):1)*op;
+    const o=satBlend([base[i*3],base[i*3+1],base[i*3+2]],[over[i*3],over[i*3+1],over[i*3+2]],m,mode);
+    col[i*3]=o[0];col[i*3+1]=o[1];col[i*3+2]=o[2];}
+  return col;}
+const inEdgeFrom=(id,slot)=>{const e=inputEdge(id,slot);return e?e.from:null;};
+// Resolve the per-vertex terrain COLOUR by walking the graph: a SatMap composites its ramp over the colour from its
+// In chain (stacking); a SatMap Blend merges its A and B colour branches; any other node passes colour through. This
+// is colour-in-the-graph — branch, blend, and stack SatMaps like Gaea. Returns a field, or null if there is no colour node.
+function resolveColor(nodeId,n,memo,guard){
+  memo=memo||{};guard=guard||new Set();
+  if(!nodeId)return null;
+  if(nodeId in memo)return memo[nodeId];
+  if(guard.has(nodeId))return null;guard.add(nodeId);
+  const nd=nodeById(nodeId);let col=null;
+  if(nd){
+    if(nd.type==="satmap"){const base=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard),own=satNodeColorField(nd,n);
+      col=base?blendFields(base,own,nd,n):own;}
+    else if(nd.type==="satmapblend"){const a=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard),b=resolveColor(inEdgeFrom(nodeId,1),n,memo,guard);
+      col=(!a&&!b)?null:!a?b:!b?a:blendFields(a,b,nd,n);}
+    else col=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard);       // colour flows through height/filter/erosion nodes
+  }
+  guard.delete(nodeId);memo[nodeId]=col;return col;
+}
 let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
@@ -1285,13 +1312,13 @@ function updateViewport(f){
     const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
     const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2;const L=Math.hypot(sx,1,sz)||1;
     nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
-  // SatMap colouring. ≥1 SatMap node -> composite the layer stack to per-vertex RGB (colour in the graph, Gaea-style);
-  // otherwise drive the global LUT by elevation (backward-compatible fallback).
-  const layers=scene.satLayers||[];satComposite=layers.length?1:0;
-  const col=satComposite?buildSatComposite(n):new Float32Array(n*n*3);
-  const sm=scene.satmap;const drv=new Float32Array(n*n);const dn=(sm&&sm.driver)?normalize(sm.driver):null;
-  if(dn){for(let i=0;i<n*n;i++)drv[i]=dn[i];satUniform={lo:sm.rangeLo,hi:sm.rangeHi,shift:sm.shift,reverse:sm.reverse==="on"?1:0};}
-  else{for(let i=0;i<n*n;i++)drv[i]=hgt[i];satUniform={lo:0,hi:1,shift:0,reverse:0};}
+  // SatMap colouring. Resolve the colour graph (SatMap ramps composite/branch/blend) to a per-vertex RGB buffer;
+  // if there is no colour node, drive the global LUT by elevation (backward-compatible fallback).
+  const outN=outputNode();
+  const colField=outN?resolveColor(inEdgeFrom(outN.id,0),n):null;
+  satComposite=colField?1:0;
+  const col=colField||new Float32Array(n*n*3);
+  const drv=hgt;satUniform={lo:0,hi:1,shift:0,reverse:0};   // driver attribute = elevation for the fallback shader path
   if(!satDrawerOpen()&&!satComposite)buildSatLUT(satName);  // global LUT only matters in the no-node fallback
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
