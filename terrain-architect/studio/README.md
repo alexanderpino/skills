@@ -28,9 +28,20 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
        DEM): a thin water film that **follows the terrain downhill**, widening with catchment.
      - **Sea** (**≈ SEA** toggle + level) adds an optional flat global ocean for coastlines,
        combined with the lakes/rivers by taking the higher surface.
-     The water-surface normal is computed from that surface (flat in lakes, sloped along rivers), and
-     it's depth-tested against the terrain so everything clips cleanly at the shore. This is the same
-     `priority_flood_fill` + `d8_accumulation` pair the reference-impl uses.
+     The water-surface normal is computed from that surface (flat in lakes, sloped along rivers). This
+     is the same `priority_flood_fill` + `d8_accumulation` pair the reference-impl uses.
+
+  **Screen-space (deferred) compositing — the fullscreen-triangle technique.** On WebGL2 the water and
+  sky are drawn *without geometry*, the same way a skydome is rendered from one fullscreen triangle:
+  the terrain renders into an offscreen **colour + depth** G-buffer, then a single fullscreen triangle
+  reconstructs each pixel's world position from the depth texture and composites analytically —
+  **sky** on the background, and **water** by sampling the water-height texture. Because it has the
+  depth buffer and the terrain colour, the water gets **refraction** (the lakebed sampled with a
+  normal-based offset), **Beer–Lambert depth absorption** from the real view-ray thickness, a
+  **Fresnel** sky reflection, sun glint and soft foam — quality a forward transparent plane can't
+  reach. (WebGL1 falls back to the forward geometry-water pass; wireframe uses it too. The one
+  tradeoff is that terrain silhouettes lose the forward MSAA, softened by the device-pixel-ratio
+  supersample on hi-dpi displays.)
 - **Real heightmaps as a base**: the **Import DEM** node has a one-click **Use real SRTM sample**
   (a real public-domain USGS/SRTM crop of the Colorado Plateau, embedded in the page) *and* loads your
   own PNG or square 16-bit `.r16` raw — including real USGS/SRTM tiles exported from

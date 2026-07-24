@@ -842,7 +842,7 @@ $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast(
 /* =====================================================================
    WEBGL 3D VIEWPORT
    ===================================================================== */
-const glc=$("#gl");let gl,terrainProg,waterProg,buffers,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
+const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,gbuf=null,USE_DEFERRED=false,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
 let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 let sea={on:false,level:0.10};                  // STAGE 2a — global ocean: a flat plane at one level (coastlines)
@@ -924,6 +924,52 @@ function initGL(){
       float alpha=clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0);`
     +(g2?`frag=vec4(col,alpha);}`:`gl_FragColor=vec4(col,alpha);}`);
   waterProg=makeProg(wVs,wFs);
+  // ---------- DEFERRED water + analytic sky — the fullscreen-triangle technique (WebGL2) ----------
+  // Terrain renders to an offscreen colour+depth G-buffer; then ONE fullscreen triangle reconstructs
+  // each pixel's world position from the depth texture and composites sky + screen-space water
+  // (refraction from the colour texture, Beer–Lambert absorption from view-ray thickness, Fresnel).
+  if(g2){
+    const cVs=`#version 300 es
+      out vec2 vUv;void main(){vec2 p=vec2((gl_VertexID==1)?3.:-1.,(gl_VertexID==2)?3.:-1.);vUv=p*0.5+0.5;gl_Position=vec4(p,0.,1.);}`;
+    const cFs=`#version 300 es
+      precision highp float;in vec2 vUv;out vec4 frag;
+      uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;
+      uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES;uniform vec2 uPx;
+      vec3 skyCol(vec3 d){d=normalize(d);float t=clamp(d.y*0.6+0.4,0.,1.);vec3 c=mix(vec3(0.66,0.72,0.80),vec3(0.20,0.40,0.68),pow(t,0.9));return c+pow(max(dot(d,normalize(uSun)),0.),250.)*vec3(1.0,0.92,0.72);}
+      float Wat(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gW,b).r,c=texture(gW,b+vec2(uWpx,0.)).r,d=texture(gW,b+vec2(0.,uWpx)).r,e=texture(gW,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+      void main(){
+        float z=texture(gDepth,vUv).r;
+        vec4 clip=vec4(vUv*2.-1.,z*2.-1.,1.);vec4 wp=uInvMVP*clip;vec3 Pw=wp.xyz/wp.w;
+        vec3 viewDir=normalize(Pw-uCam);
+        if(z>=0.99999){frag=vec4(skyCol(viewDir),1.);return;}       // background: analytic sky (skydome technique)
+        vec3 terrain=texture(gColor,vUv).rgb;
+        vec2 wuv=Pw.xz*0.5+0.5;
+        float wSurf=Wat(wuv)*uH; if(uHasSea>0.5)wSurf=max(wSurf,uSeaLevel*uH);
+        float thick=wSurf-Pw.y;                                     // view-through water thickness at this pixel
+        if(thick<=0.0016){frag=vec4(terrain,1.);return;}            // dry land
+        float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
+        vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
+        float t=uTime;
+        N=normalize(N+vec3(0.03*sin(Pw.x*46.+t*1.7)+0.022*sin(Pw.z*37.-t*1.15),0.,0.03*sin(Pw.z*46.+t*1.35)+0.022*sin(Pw.x*34.+t*0.95)));
+        vec3 Vd=normalize(uCam-Pw),S=normalize(uSun);
+        vec2 refrUv=clamp(vUv+N.xz*uPx*28.*clamp(thick*8.,0.,1.),vec2(0.002),vec2(0.998)); // refract the terrain colour
+        vec3 bed=texture(gColor,refrUv).rgb;
+        float dn=1.0-exp(-thick*10.0);                              // Beer–Lambert absorption
+        vec3 wc=mix(bed,mix(vec3(0.30,0.60,0.63),vec3(0.03,0.12,0.30),clamp(thick*3.5,0.,1.)),clamp(dn+0.12,0.,1.));
+        float fres=pow(1.0-max(dot(N,Vd),0.0),4.0);
+        vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
+        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),220.)*0.9;
+        float foam=smoothstep(0.02,0.0,thick)*0.5;                  // soft shoreline (thickness -> 0)
+        vec3 col=mix(wc,refl,fres*0.5)+spec; col=mix(col,vec3(0.9,0.95,1.0),foam);
+        frag=vec4(col,1.);
+      }`;
+    compProg=makeProg(cVs,cFs);
+    wTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,wTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,RES,RES,0,gl.RED,gl.FLOAT,new Float32Array(RES*RES));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    USE_DEFERRED=true;
+  }
   buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),gridXZ:gl.createBuffer(),
            wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
@@ -1014,8 +1060,9 @@ function refreshWater(){
     const wl=W[y*n+clamp(x-1,0,n-1)],wr=W[y*n+clamp(x+1,0,n-1)],wu=W[clamp(y-1,0,n-1)*n+x],wd=W[clamp(y+1,0,n-1)*n+x];
     const sx=(wl-wr)*H*(n-1)/2,sz=(wu-wd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
     wn[i*3]=sx/L;wn[i*3+1]=1/L;wn[i*3+2]=sz/L;}
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,W,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,W,gl.DYNAMIC_DRAW);   // forward-path geometry water
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wnrm);gl.bufferData(gl.ARRAY_BUFFER,wn,gl.DYNAMIC_DRAW);
+  if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,W);} // deferred-path water-height texture
 }
 function resizeGL(){const r=glc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
   glc.width=r.width*dpr;glc.height=r.height*dpr;}
@@ -1025,33 +1072,82 @@ function lookAt(e,c,u){const z=norm3(sub3(e,c)),x=norm3(cross3(u,z)),y=cross3(z,
   return new Float32Array([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot3(x,e),-dot3(y,e),-dot3(z,e),1]);}
 const sub3=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const norm3=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
-function renderGL(){
-  if(!gl){return;}
-  resizeGL();gl.viewport(0,0,glc.width,glc.height);
-  gl.clearColor(...hex3(css("--bg2")),1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  const asp=glc.width/glc.height||1;const P=perspective(1.05,asp,0.05,20);
-  const ex=Math.cos(cam.az)*Math.cos(cam.el)*cam.dist,ey=Math.sin(cam.el)*cam.dist,ez=Math.sin(cam.az)*Math.cos(cam.el)*cam.dist;
-  const V=lookAt([ex,ey,ez],[0,0.05,0],[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
-  // ---- STAGE 1: opaque terrain (writes depth) ----
+function ensureGBuffer(){                                    // offscreen colour + depth textures, resized to the canvas
+  const w=glc.width,h=glc.height;if(gbuf&&gbuf.w===w&&gbuf.h===h)return;
+  if(gbuf){gl.deleteFramebuffer(gbuf.fbo);gl.deleteTexture(gbuf.color);gl.deleteTexture(gbuf.depth);}
+  const color=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,color);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  const depth=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,depth);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,w,h,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  const fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,color,0);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)USE_DEFERRED=false;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gbuf={fbo,color,depth,w,h};
+}
+function mat4inv(m){
+  const a00=m[0],a01=m[1],a02=m[2],a03=m[3],a10=m[4],a11=m[5],a12=m[6],a13=m[7],a20=m[8],a21=m[9],a22=m[10],a23=m[11],a30=m[12],a31=m[13],a32=m[14],a33=m[15];
+  const b00=a00*a11-a01*a10,b01=a00*a12-a02*a10,b02=a00*a13-a03*a10,b03=a01*a12-a02*a11,b04=a01*a13-a03*a11,b05=a02*a13-a03*a12,
+        b06=a20*a31-a21*a30,b07=a20*a32-a22*a30,b08=a20*a33-a23*a30,b09=a21*a32-a22*a31,b10=a21*a33-a23*a31,b11=a22*a33-a23*a32;
+  let det=b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;if(!det)return identity();det=1/det;
+  return new Float32Array([(a11*b11-a12*b10+a13*b09)*det,(a02*b10-a01*b11-a03*b09)*det,(a31*b05-a32*b04+a33*b03)*det,(a22*b04-a21*b05-a23*b03)*det,
+    (a12*b08-a10*b11-a13*b07)*det,(a00*b11-a02*b08+a03*b07)*det,(a32*b02-a30*b05-a33*b01)*det,(a20*b05-a22*b02+a23*b01)*det,
+    (a10*b10-a11*b08+a13*b06)*det,(a01*b08-a00*b10-a03*b06)*det,(a30*b04-a31*b02+a33*b00)*det,(a21*b02-a20*b04-a23*b00)*det,
+    (a11*b07-a10*b09-a12*b06)*det,(a00*b09-a01*b07+a02*b06)*det,(a31*b01-a30*b03-a32*b00)*det,(a20*b03-a21*b01+a22*b00)*det]);
+}
+function drawTerrain(MVP,M,ex,ey,ez){
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);
-  gl.useProgram(terrainProg);
-  setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
+  gl.useProgram(terrainProg);setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
   gl.uniform3f(u(terrainProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
   gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),snow.on?snow.amount:0.0);
   bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
-  // ---- STAGE 2: translucent water (blends over terrain, no depth write) ----
-  if(sea.on||hydro.on){
-    gl.useProgram(waterProg);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
-    setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uTime"),uTime);
-    gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
-    bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
-    bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"awn",3,buffers.wnrm);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
-    gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
-    gl.depthMask(true);gl.disable(gl.BLEND);
+}
+function renderGL(){
+  if(!gl){return;}
+  resizeGL();
+  const asp=glc.width/glc.height||1;const P=perspective(1.05,asp,0.05,20);
+  const ex=Math.cos(cam.az)*Math.cos(cam.el)*cam.dist,ey=Math.sin(cam.el)*cam.dist,ez=Math.sin(cam.az)*Math.cos(cam.el)*cam.dist;
+  const V=lookAt([ex,ey,ez],[0,0.05,0],[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
+  if(USE_DEFERRED&&!wire){
+    ensureGBuffer();
+    // PASS 1: terrain -> offscreen colour + depth
+    gl.bindFramebuffer(gl.FRAMEBUFFER,gbuf.fbo);gl.viewport(0,0,glc.width,glc.height);
+    gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    drawTerrain(MVP,M,ex,ey,ez);
+    // PASS 2: fullscreen triangle -> screen (sky + screen-space water)
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,glc.width,glc.height);
+    gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
+    gl.useProgram(compProg);setM(compProg,"uInvMVP",mat4inv(MVP));
+    gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);gl.uniform3f(u(compProg,"uSun"),0.5,0.8,0.35);
+    gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
+    gl.uniform1f(u(compProg,"uSeaLevel"),sea.level);gl.uniform1f(u(compProg,"uHasSea"),sea.on?1:0);
+    gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
+    gl.uniform2f(u(compProg,"uPx"),1/glc.width,1/glc.height);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gbuf.color);gl.uniform1i(u(compProg,"gColor"),0);
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,gbuf.depth);gl.uniform1i(u(compProg,"gDepth"),1);
+    gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,wTex);gl.uniform1i(u(compProg,"gW"),2);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.enable(gl.DEPTH_TEST);
+  }else{
+    // FORWARD fallback (WebGL1 / wireframe): terrain + translucent geometry water
+    gl.viewport(0,0,glc.width,glc.height);gl.clearColor(...hex3(css("--bg2")),1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    drawTerrain(MVP,M,ex,ey,ez);
+    if((sea.on||hydro.on)&&!wire){
+      gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
+      setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uTime"),uTime);
+      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
+      bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
+      bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"awn",3,buffers.wnrm);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+      gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+      gl.depthMask(true);gl.disable(gl.BLEND);
+    }
   }
   if(!REDUCED)uTime+=0.016;
   requestAnimationFrame(renderGL);
