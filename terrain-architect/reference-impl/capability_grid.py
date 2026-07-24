@@ -176,11 +176,10 @@ def CELLS():
         h = L.mountain((150, 150), 30.0, seed=3, style="basic")
         return hill(erosion_droplet.droplet_erode(h, n_droplets=60 * 150, seed=3, brush_radius=2))
     add("04 Droplet erosion", "total volume conserved (~1e-13)", _drop)
-    def _therm():
-        yy2, xx2 = np.mgrid[0:81, 0:81] - 40
-        cone = np.maximum(0, 40 - np.hypot(xx2, yy2)) * 6.0
-        return hill(erosion_thermal.thermal_erosion(cone, 0.3, 200, factor=0.25), 5)
-    add("05 Thermal (talus)", "<= repose; mass conserved; non-inverting", _therm)
+    def _therm():                                                    # steep raw massif (base) -> talus aprons
+        m = L.mountain((130, 130), 30.0, seed=6, style="basic", height=1300.0)
+        return hill(erosion_thermal.thermal_erosion(m, 0.6, 220, cellsize=30.0, factor=0.25), 30.0)
+    add("05 Thermal (talus)", "base massif -> talus <= repose; mass conserved; non-inverting", _therm)
     def _pipe():
         h = L.mountain((120, 120), 40.0, seed=5, style="basic")
         h[:, :46] *= 0.05                                                   # a low plain -> alluvial fans build here
@@ -231,20 +230,31 @@ def CELLS():
                     sinuosity=0.45, detail=0.3, width_frac=0.34)           # domain-warped, smin-rounded crest
         return hill(_cr(base + r, 4), cell)                                # base + atom, that's it
     add("11 Ridge (hogback)", "asymmetric hogback (smin-rounded crest, warped strike) on a foothill base", _ridge)
-    add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
-    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian)", lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=900, cellsize=20, kind="shield"), 20))
+    def _volc_strato():                                              # edifice rising from a volcanic apron (base)
+        n = 180; cell = 20.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 12, octaves=5) * 110 + 60
+        return hill(base + L.volcano((n, n), 90, 90, radius=1500, height=1600, cellsize=cell, seed=1, kind="strato"), cell)
+    add("11 Volcano (strato)", "concave-up cone + summit crater on a volcanic apron", _volc_strato)
+    def _volc_shield():
+        n = 180; cell = 20.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 15, octaves=5) * 110 + 60
+        return hill(base + L.volcano((n, n), 90, 90, radius=1600, height=900, cellsize=cell, seed=1, kind="shield"), cell)
+    add("11 Volcano (shield)", "convex low-angle dome (Hawaiian) on a volcanic apron", _volc_shield)
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
-    def _butte():
-        h = np.zeros((180, 180))
+    def _butte():                                                    # tablelands standing on a desert floor (base)
+        n = 180; cell = 22.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 21, octaves=4) * 50 + 40
+        relief = np.zeros((n, n))
         for bx, by, s in [(60, 70, 0), (110, 95, 1), (95, 130, 2)]:
-            h = np.maximum(h, L.fault_block_butte((180, 180), bx, by, 26, 300, 22.0, seed=s,
-                                                  fault=0.5, corner_round=3.2, warp=0.17))
-        return hill(h, 22)
-    add("11 Fault-block butte", "flat top, cliff, repose talus; polygonal", _butte)
-    def _crater():
-        h = np.zeros((180, 180)); h = L.impact_crater(h, 90, 90, 2600, 22.0, complex_D=3000)
-        return hill(h, 22)
-    add("11 Impact crater", "depth/D=0.2, rim 0.04D, r^-3 ejecta", _crater)
+            relief = np.maximum(relief, L.fault_block_butte((n, n), bx, by, 26, 300, cell, seed=s,
+                                                            fault=0.5, corner_round=3.2, warp=0.17))
+        return hill(base + relief, cell)
+    add("11 Fault-block butte", "flat top, cliff, repose talus on a desert floor; polygonal", _butte)
+    def _crater():                                                   # dug into cratered highlands (base)
+        n = 180; cell = 22.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
+        base = noise.fbm(xx2 * 0.045, yy2 * 0.045, 9, octaves=5) * 130 + 200
+        return hill(L.impact_crater(base, 90, 90, 2600, cell, complex_D=3000), cell)
+    add("11 Impact crater", "depth/D=0.2, rim 0.04D, r^-3 ejecta on cratered highlands", _crater)
     def _karst():
         xx2, yy2 = _grid(150, 0.05); h = noise.fbm(xx2, yy2, 4, octaves=4) * 120 + 200
         sol = (noise.fbm(xx2 + 9, yy2, 7, octaves=3) > 0.0).astype(float)
