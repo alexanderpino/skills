@@ -520,23 +520,31 @@ const GPU_FBM_FS=`#version 300 es
     frag=vec4(sum/amps,0.0,0.0,1.0);}`;
 // Thermal erosion, gather form: a cell LOSES rate*maxDrop and GAINS each neighbour's share.
 // Same arithmetic as thermalErode() above, restructured so every cell can be solved independently.
-const GPU_THERMAL_FS=`#version 300 es
-  precision highp float;precision highp int;out vec4 frag;
-  uniform sampler2D uH;uniform float uTalus,uRate;uniform int uN;
-  float H(ivec2 p){return texelFetch(uH,p,0).r;}
-  bool inb(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
+// Split into TWO passes: pass 1 memoises each cell's (move, sum); pass 2 only reads it back. The
+// single-pass version recomputed every neighbour's moveSum (72 fetches/cell); this is ~27.
+const GPU_THERMAL_NB=`
   const ivec2 NB[8]=ivec2[8](ivec2(-1,0),ivec2(1,0),ivec2(0,-1),ivec2(0,1),ivec2(-1,-1),ivec2(1,1),ivec2(-1,1),ivec2(1,-1));
-  vec2 moveSum(ivec2 p){                       // (rate*maxDrop, sum of drops) for cell p
-    float c=H(p),maxd=0.0,sum=0.0;
-    for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q))continue;
+  bool inb(ivec2 p,int n){return p.x>=0&&p.y>=0&&p.x<n&&p.y<n;}`;
+const GPU_THERMAL_MS_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uH;uniform float uTalus,uRate;uniform int uN;`+GPU_THERMAL_NB+`
+  float H(ivec2 p){return texelFetch(uH,p,0).r;}
+  void main(){                                  // -> (rate*maxDrop, sumOfDrops)
+    ivec2 p=ivec2(gl_FragCoord.xy);float c=H(p),maxd=0.0,sum=0.0;
+    for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q,uN))continue;
       float e=c-H(q)-uTalus;if(e>0.0){sum+=e;maxd=max(maxd,e);}}
-    return vec2(uRate*maxd,sum);}
+    frag=vec4(uRate*maxd,sum,0.0,1.0);}`;
+const GPU_THERMAL_APPLY_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uH,uMS;uniform float uTalus;uniform int uN;`+GPU_THERMAL_NB+`
+  float H(ivec2 p){return texelFetch(uH,p,0).r;}
+  vec2 MS(ivec2 p){return texelFetch(uMS,p,0).rg;}
   void main(){
     ivec2 p=ivec2(gl_FragCoord.xy);float h=H(p);
-    vec2 me=moveSum(p);
+    vec2 me=MS(p);
     float lose=(me.y>0.0)?me.x:0.0,gain=0.0;
-    for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q))continue;
-      vec2 mn=moveSum(q);if(mn.y<=0.0)continue;
+    for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q,uN))continue;
+      vec2 mn=MS(q);if(mn.y<=0.0)continue;
       float e=H(q)-h-uTalus;if(e>0.0)gain+=mn.x*e/mn.y;}
     frag=vec4(h+gain-lose,0.0,0.0,1.0);}`;
 function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
@@ -549,12 +557,16 @@ function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   return ridge?normalize(f):f;                 // ridged normalises on the CPU (a reduction), as before
 }
 function gpuThermal(inp,{talus=0.012,iters=30,rate=0.5}){
-  const n=RES,prog=GPU.prog("thermal",GPU_THERMAL_FS);
-  let src=GPU.upload("thA",n,inp),dst=GPU.rt("thB",n);
+  const n=RES,pMS=GPU.prog("thermalMS",GPU_THERMAL_MS_FS),pAp=GPU.prog("thermalApply",GPU_THERMAL_APPLY_FS);
+  let src=GPU.upload("thA",n,inp),dst=GPU.rt("thB",n);const ms=GPU.rt("thMS",n);
   for(let i=0;i<iters;i++){
-    GPU.run(prog,n,dst,p=>{
+    GPU.run(pMS,n,ms,p=>{                      // pass 1: per-cell (move, sum)
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(u(p,"uH"),0);
       gl.uniform1f(u(p,"uTalus"),talus);gl.uniform1f(u(p,"uRate"),rate);gl.uniform1i(u(p,"uN"),n);});
+    GPU.run(pAp,n,dst,p=>{                     // pass 2: redistribute
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(u(p,"uH"),0);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,ms);gl.uniform1i(u(p,"uMS"),1);
+      gl.uniform1f(u(p,"uTalus"),talus);gl.uniform1i(u(p,"uN"),n);});
     const t=src;src=dst;dst=t;                 // ping-pong
   }
   return GPU.read(src,n);

@@ -205,8 +205,15 @@ parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 1.1e-4 (ridged), 4.8e-
 This is what makes **512² and 1024²** practical: a 1024² build is 1,048,576 cells / 2.09M triangles.
 Selecting ≥512² switches **Auto** off so you drive it with **Build**.
 
+Thermal runs as **two passes** — one memoising each cell's `(move, sum)`, one redistributing — because the
+obvious single-pass version recomputes every neighbour's `moveSum` (72 texture fetches per cell vs ~27).
+Profiling a 1024² build showed thermal at **84% of total time**; the split cut the whole build from
+**10.6 s → 3.9 s** with parity unchanged.
+
 Honest scope: **hydraulic (droplet) erosion is still CPU** — the particle sim scatters writes, so it wants
-the virtual-pipes model to go on GPU (planned, mirroring `reference-impl`'s `pipe_erode`). The
-priority-flood + D8 pair behind lakes/rivers is inherently sequential and stays CPU; it is now skipped
-entirely unless a **Water** node needs it. Timings measured in CI are under **swiftshader** (a *software*
-rasteriser), so they understate real-GPU gains — even there, fBm at 512² is 47 ms GPU vs 196 ms CPU.
+the virtual-pipes model to go on GPU (planned, mirroring `reference-impl`'s `pipe_erode`). It is only ~17%
+of a 1024² build, so it is no longer the bottleneck. The priority-flood + D8 pair behind lakes/rivers is
+inherently sequential and stays CPU; it is now skipped entirely unless a **Water** node needs it. Each GPU
+node still reads its result back to a `Float32Array` for the next node — keeping the field resident in a
+texture across nodes is the remaining big win. Timings measured in CI are under **swiftshader** (a
+*software* rasteriser) and so understate real-GPU gains substantially.
