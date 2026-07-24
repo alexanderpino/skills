@@ -187,7 +187,8 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px s
           <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
         </div>
         <div class="vp-render">
-          <div class="rrow"><button class="tog on" id="waterBtn" title="Translucent water pass">≈</button><label>SEA</label><input type="range" id="seaSlider" min="0" max="0.6" step="0.005" value="0.15"></div>
+          <div class="rrow"><button class="tog" id="seaBtn" title="Global ocean — a flat plane at one level (coastlines)">≈</button><label>SEA</label><input type="range" id="seaSlider" min="0" max="0.6" step="0.005" value="0.1"></div>
+          <div class="rrow"><button class="tog on" id="hydroBtn" title="Hydrology — lakes fill each basin to its spill level, rivers flow downhill (priority-flood fill + flow accumulation)">⇣</button><label>FLOW</label><input type="range" id="flowSlider" min="0" max="1" step="0.01" value="0.5"></div>
           <div class="rrow"><button class="tog on" id="snowBtn" title="Snow accumulation pass">❄</button><label>SNOW</label><input type="range" id="snowSlider" min="0" max="1" step="0.01" value="0.5"></div>
         </div>
       </div>
@@ -844,7 +845,9 @@ $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast(
 const glc=$("#gl");let gl,terrainProg,waterProg,buffers,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
 let uTime=0;const H_SCALE=0.42;                 // vertical exaggeration: world y = normalized height * H_SCALE
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
-let water={on:true,level:0.15};                 // STAGE 2 — translucent water pass; level is a fraction of the height range
+let sea={on:false,level:0.10};                  // STAGE 2a — global ocean: a flat plane at one level (coastlines)
+let hydro={on:true,flow:0.5};                   // STAGE 2b — HYDROLOGY: lakes fill basins to their spill level
+                                                //   (priority-flood, Barnes 2014) + rivers flow downhill (flow accumulation).
 let snow={on:true,amount:0.5};                  // STAGE 1 — snow accumulation inside the opaque terrain pass
 const SHADE=["Hypsometric","Slope","Grey"];
 function initGL(){
@@ -893,34 +896,36 @@ function initGL(){
   terrainProg=makeProg(tVs,tFs);
   // ---------- STAGE 2: translucent water ----------
   const wVs=(g2?`#version 300 es
-    in vec2 axz;in float ah;out float vDepth;out vec3 vW;out vec2 vXZ;
-    uniform mat4 uMVP;uniform float uSea;uniform float uH;
-    void main(){vDepth=uSea-ah*uH;vW=vec3(axz.x,uSea,axz.y);vXZ=axz;gl_Position=uMVP*vec4(vW,1.);}`
-  :`attribute vec2 axz;attribute float ah;varying float vDepth;varying vec3 vW;varying vec2 vXZ;
-    uniform mat4 uMVP;uniform float uSea;uniform float uH;
-    void main(){vDepth=uSea-ah*uH;vW=vec3(axz.x,uSea,axz.y);vXZ=axz;gl_Position=uMVP*vec4(vW,1.);}`);
+    in vec2 axz;in float ah;in float aw;in vec3 awn;out float vDepth;out vec3 vW;out vec2 vXZ;out vec3 vWN;
+    uniform mat4 uMVP;uniform float uH;
+    void main(){vDepth=(aw-ah)*uH;vW=vec3(axz.x,aw*uH,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`
+  :`attribute vec2 axz;attribute float ah;attribute float aw;attribute vec3 awn;varying float vDepth;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
+    uniform mat4 uMVP;uniform float uH;
+    void main(){vDepth=(aw-ah)*uH;vW=vec3(axz.x,aw*uH,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
-    precision highp float;in float vDepth;in vec3 vW;in vec2 vXZ;out vec4 frag;
+    precision highp float;in float vDepth;in vec3 vW;in vec2 vXZ;in vec3 vWN;out vec4 frag;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;`
-  :`precision highp float;varying float vDepth;varying vec3 vW;varying vec2 vXZ;
+  :`precision highp float;varying float vDepth;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;`)+`
     void main(){
-      if(vDepth<=0.0) discard;                               // land above the waterline
-      float t=uTime;                                         // animated ripple normal
-      vec3 N=normalize(vec3(0.035*sin(vXZ.x*40.+t*1.6)+0.025*sin(vXZ.y*33.-t*1.1),1.0,
-                            0.035*sin(vXZ.y*40.+t*1.3)+0.025*sin(vXZ.x*31.+t*0.9)));
+      if(vDepth<=0.0010) discard;                            // dry land / below the water film
+      float t=uTime;                                         // ripple perturbs the water-surface normal
+      vec3 rip=vec3(0.03*sin(vXZ.x*46.+t*1.7)+0.022*sin(vXZ.y*37.-t*1.15),0.0,
+                    0.03*sin(vXZ.y*46.+t*1.35)+0.022*sin(vXZ.x*34.+t*0.95));
+      vec3 N=normalize(vWN+rip);                             // flat in lakes (up), sloped along rivers (follows terrain)
       vec3 V=normalize(uCam-vW);vec3 S=normalize(uSun);
       float fres=pow(1.0-max(dot(N,V),0.0),3.0);             // Fresnel — reflective at grazing angles
-      float dn=clamp(vDepth/(uH*0.5),0.0,1.0);               // depth attenuation: shallow teal -> deep blue
-      vec3 wc=mix(vec3(0.24,0.55,0.60),vec3(0.03,0.11,0.27),dn);
-      vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),120.0);
-      vec3 col=mix(wc,vec3(0.55,0.68,0.82),fres*0.6)+spec*0.85;
-      float foam=smoothstep(0.05,0.0,vDepth)*0.6;            // shoreline foam
+      float dn=clamp(vDepth/(uH*0.35),0.0,1.0);              // depth attenuation: shallow teal -> deep blue
+      vec3 wc=mix(vec3(0.28,0.58,0.62),vec3(0.03,0.12,0.30),dn);
+      vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),110.0);
+      vec3 col=mix(wc,vec3(0.55,0.68,0.82),fres*0.55)+spec*0.8;
+      float foam=smoothstep(0.02,0.0,vDepth)*0.5;            // shoreline / channel-edge foam
       col=mix(col,vec3(0.9,0.95,1.0),foam);
-      float alpha=clamp(mix(0.5,0.92,dn)+fres*0.25+foam*0.4,0.0,1.0);`
+      float alpha=clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0);`
     +(g2?`frag=vec4(col,alpha);}`:`gl_FragColor=vec4(col,alpha);}`);
   waterProg=makeProg(wVs,wFs);
-  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),gridXZ:gl.createBuffer(),idx:gl.createBuffer(),count:0};
+  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),gridXZ:gl.createBuffer(),
+           wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
   gl.enable(gl.DEPTH_TEST);
   glc.addEventListener("mousedown",e=>{glDrag={x:e.clientX,y:e.clientY};});
@@ -941,7 +946,7 @@ function buildIndex(){const n=RES,idx=[];for(let y=0;y<n-1;y++)for(let x=0;x<n-1
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
-let curField=null;
+let curField=null,curHgt=null,curFilled=null,curAccum=null;
 function updateViewport(f){
   if(!gl){return;}
   curField=f;const n=RES;const field=f||newField();const[mn,mx]=fieldRange(field);const d=mx-mn||1;
@@ -956,6 +961,61 @@ function updateViewport(f){
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+  curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
+  curFilled=priorityFloodFill(hgt);                        // lakes: each basin filled to its pour point (Barnes 2014)
+  curAccum=d8Accumulation(curFilled);                      // rivers: drainage area on the filled DEM
+  refreshWater();
+}
+// --- Priority-flood depression fill (Barnes, Lehman & Mulla 2014): every pit fills to the elevation of
+//     its lowest spill point on the basin rim -> filled-h is the standing-water depth, flat per basin. ---
+function priorityFloodFill(h){
+  const n=RES,N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),heap=[];
+  const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;const t=heap[p];heap[p]=heap[c];heap[c]=t;c=p;}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+2-1,s=c;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===c)break;const t=heap[s];heap[s]=heap[c];heap[c]=t;c=s;}}return top;};
+  const seed=(x,y)=>{const i=y*n+x;if(!done[i]){done[i]=1;filled[i]=h[i];push(h[i],i);}};
+  for(let x=0;x<n;x++){seed(x,0);seed(x,n-1);}
+  for(let y=0;y<n;y++){seed(0,y);seed(n-1,y);}
+  const nb=[[-1,0],[1,0],[0,-1],[0,1]];
+  while(heap.length){const it=pop(),e=it[0],c=it[1],cy=(c/n)|0,cx=c-cy*n;
+    for(const dd of nb){const xx=cx+dd[0],yy=cy+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(done[ni])continue;
+      done[ni]=1;const fv=Math.max(h[ni],e);filled[ni]=fv;push(fv,ni);}}
+  return filled;
+}
+// --- D8 flow accumulation on the (pit-free) filled DEM: drainage area per cell -> the river network. ---
+function d8Accumulation(g){
+  const n=RES,N=n*n,rec=new Int32Array(N),A=new Float32Array(N).fill(1);
+  const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=g[i],bi=-1;
+    for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(g[ni]<best){best=g[ni];bi=ni;}}
+    rec[i]=bi;}
+  const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>g[b]-g[a]);   // upstream (high) before downstream (low)
+  for(const i of order){if(rec[i]>=0)A[rec[i]]+=A[i];}
+  return A;
+}
+// Build the per-vertex WATER SURFACE (flat in lake basins, sloped along rivers) + its normals, from the
+// cached fill/accumulation and the current sea/hydro controls. Cheap O(N) -> runs live on slider drags.
+function refreshWater(){
+  if(!gl||!curHgt)return;
+  const n=RES,N=n*n,h=curHgt,filled=curFilled,A=curAccum,H=H_SCALE;
+  const W=new Float32Array(N);
+  const thr=(0.02-0.0194*hydro.flow)*N;                   // FLOW slider: high -> denser river network (lower area threshold)
+  const seaL=sea.on?sea.level:-1;
+  for(let i=0;i<N;i++){
+    let w=h[i];
+    if(hydro.on){
+      if(filled[i]>w)w=filled[i];                         // lake: stand water to the basin spill level
+      if(A[i]>thr){const film=Math.min(0.022,0.007+0.006*Math.log(A[i]/thr));if(h[i]+film>w)w=h[i]+film;} // river film, follows terrain
+    }
+    if(seaL>w)w=seaL;                                     // global ocean plane
+    W[i]=w;
+  }
+  const wn=new Float32Array(N*3);                          // normal of the WATER surface (0 gradient in lakes -> up)
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+    const wl=W[y*n+clamp(x-1,0,n-1)],wr=W[y*n+clamp(x+1,0,n-1)],wu=W[clamp(y-1,0,n-1)*n+x],wd=W[clamp(y+1,0,n-1)*n+x];
+    const sx=(wl-wr)*H*(n-1)/2,sz=(wu-wd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
+    wn[i*3]=sx/L;wn[i*3+1]=1/L;wn[i*3+2]=sz/L;}
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,W,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wnrm);gl.bufferData(gl.ARRAY_BUFFER,wn,gl.DYNAMIC_DRAW);
 }
 function resizeGL(){const r=glc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
   glc.width=r.width*dpr;glc.height=r.height*dpr;}
@@ -982,14 +1042,13 @@ function renderGL(){
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
   // ---- STAGE 2: translucent water (blends over terrain, no depth write) ----
-  if(water.on){
+  if(sea.on||hydro.on){
     gl.useProgram(waterProg);
     gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
-    setM(waterProg,"uMVP",MVP);
-    gl.uniform1f(u(waterProg,"uSea"),water.level*H_SCALE);gl.uniform1f(u(waterProg,"uH"),H_SCALE);
-    gl.uniform1f(u(waterProg,"uTime"),uTime);
+    setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uTime"),uTime);
     gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
     bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
+    bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"awn",3,buffers.wnrm);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
     gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
     gl.depthMask(true);gl.disable(gl.BLEND);
@@ -1017,9 +1076,11 @@ $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("dat
 $("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
 $("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
 $("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
-$("#waterBtn").onclick=()=>{water.on=!water.on;$("#waterBtn").classList.toggle("on",water.on);};
+$("#seaBtn").onclick=()=>{sea.on=!sea.on;$("#seaBtn").classList.toggle("on",sea.on);refreshWater();};
+$("#hydroBtn").onclick=()=>{hydro.on=!hydro.on;$("#hydroBtn").classList.toggle("on",hydro.on);refreshWater();};
 $("#snowBtn").onclick=()=>{snow.on=!snow.on;$("#snowBtn").classList.toggle("on",snow.on);};
-$("#seaSlider").oninput=e=>{water.level=parseFloat(e.target.value);};
+$("#seaSlider").oninput=e=>{sea.level=parseFloat(e.target.value);refreshWater();};
+$("#flowSlider").oninput=e=>{hydro.flow=parseFloat(e.target.value);refreshWater();};
 $("#snowSlider").oninput=e=>{snow.amount=parseFloat(e.target.value);};
 window.addEventListener("keydown",e=>{if(e.code==="Space")spaceDown=true;
   if(e.key==="Delete"||e.key==="Backspace"){if(selected&&document.activeElement.tagName!=="INPUT"){deleteSel();}}
