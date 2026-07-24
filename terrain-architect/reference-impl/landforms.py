@@ -477,10 +477,16 @@ def alluvial_fan(h, apex, *, flux=9.0, length=90.0, spread_deg=62.0, downfan=(1.
 # karst — the depression-handling exception
 # --------------------------------------------------------------------------- #
 def karst_sinkholes(h, soluble_mask, cellsize=1.0, spacing=None, depth=5.0,
-                    radius=None, seed=0):
+                    radius=None, seed=0, size_var=0.0):
     """Carve dolines (sinkholes) at blue-noise points that fall on soluble rock. Returns
     (h, sink_mask). The sink_mask marks pits that must NOT be filled (03): in karst the water
-    genuinely goes underground and leaves the surface network — the one case a pit is correct."""
+    genuinely goes underground and leaves the surface network — the one case a pit is correct.
+
+    `size_var` gives the dolines a natural SIZE DISTRIBUTION rather than one radius: real doline
+    fields are lognormal/power-law in diameter (Williams 1972; Denizman 2003), so each pit's radius
+    is scaled by a lognormal factor exp(size_var * N(0,1)) (clamped to [0.4, 2.2]) and its depth
+    scaled the same way, preserving the conical depth:diameter aspect. `size_var=0` = uniform (the
+    old behaviour)."""
     h = np.asarray(h, dtype=np.float64).copy()
     soluble_mask = np.asarray(soluble_mask, dtype=np.float64)
     n, m = h.shape
@@ -489,14 +495,16 @@ def karst_sinkholes(h, soluble_mask, cellsize=1.0, spacing=None, depth=5.0,
     if radius is None:
         radius = 3.0 * cellsize
     pts = scatter.poisson_disk(m * cellsize, n * cellsize, spacing, seed)
+    rng = np.random.default_rng(seed + 12345)              # size draws, independent of the point pattern
     yy, xx = np.mgrid[0:n, 0:m].astype(np.float64)
     sink_mask = np.zeros((n, m), dtype=bool)
     for x, y in pts:
         j, i = int(x / cellsize), int(y / cellsize)
+        f = float(np.clip(np.exp(size_var * rng.standard_normal()), 0.4, 2.2)) if size_var else 1.0
         if 0 <= i < n and 0 <= j < m and soluble_mask[i, j] > 0.5:
             r = np.hypot((xx - j) * cellsize, (yy - i) * cellsize)
-            h -= depth * np.clip(1.0 - r / radius, 0.0, 1.0)
-            sink_mask |= r < radius
+            h -= depth * f * np.clip(1.0 - r / (radius * f), 0.0, 1.0)   # bigger dolines dig deeper (const aspect)
+            sink_mask |= r < radius * f
     return h, sink_mask
 
 

@@ -42,7 +42,7 @@ and compare. Two review rounds + one algorithm round were run in 2026-07; verdic
 | Dunes (full Werner) | Rub' al Khali, Terra/ASTER (NASA, PD) | ✅ sinuous barchanoid-transverse ridges ⊥ wind, bare corridors, Y-junctions |
 | Snowpack | Tuckerman Ravine | ✅ snowfields on gentle ground, bare steep faces, gullies filled |
 | Differential erosion (spatial-K) | cuesta escarpments (aerial) | ✅ structure-controlled strike ridges |
-| Meander belt | oxbow river aerial | ✅ loops/point bars/oxbow; ⚠️ ours is a too-regular wave train (seeded 2-sine centerline) vs canon's irregular multi-scale loops |
+| Meander belt | oxbow river aerial | ✅ loops/point bars/oxbow; seed is now a **disturbed periodic** (Ferguson 1975: fbm-perturbed wavelength + amplitude) → irregular varying-size loops, not a uniform sine train |
 | Glacial carve | Arrigetch U-valley | ✅ trunk ice in sinuous valleys; U cross-section is test-verified (V→U metric) |
 | Ridge (hogback) | Dakota Hogback | ✅ linear asymmetric crest, wandering strike |
 | Canyon | Grand Canyon | ✅ plateau-dominant meandering slot with benches |
@@ -52,9 +52,9 @@ and compare. Two review rounds + one algorithm round were run in 2026-07; verdic
 | Lava CA | channelised ʻaʻā tongue | ✅ Bingham tongue + steep snout (exists only because heat is advected, per SCIARA); levées absent (needs margin-vs-core cooling asymmetry — documented in `19`) |
 | Volcano (shield) | Mauna Loa | ✅ after fix: young shields are barely gullied → barranco amplitude at the atom default (my 0.30 override over-dissected it) |
 | Mountain (eroded) | Grand Teton / alpine aerials | ✅ organised ridge-valley fabric |
-| Fault-block butte | Monument Valley | ⚠️ ours too rounded-rectangular, clustered, smooth-topped vs isolated fluted towers |
-| Fault scarps | Basin & Range satellite | ⚠️ our feathered scarps too gentle to read as range-front blocks |
-| Karst sinkholes | doline imagery | ⚠️ pits-on-soluble correct; same-radius pits read synthetic (vary radius/depth) |
+| Fault-block butte | Monument Valley | ✅ now **isolated + size-varied** flat-topped blocks (sharper corners, jaggier joint faces). Vertical cliff **fluting** is an oblique-view feature — invisible top-down — so it's deferred to the 3D/oblique render, not a top-down gap |
+| Fault scarps | Basin & Range satellite | ✅ now **sharp range-front traces** (feather 6→2.5, quieter base, dominant first fault) cutting the terrain into blocks — Stewart 1978 range-bounding normal faults |
+| Karst sinkholes | doline imagery | ✅ dolines now carry a **lognormal size distribution** (`size_var`; Williams 1972) instead of one radius |
 | Coastal retreat | sea cliff + wave-cut platform | ⚠️ platform/cliff correct but washes out in hillshade |
 | Plate uplift | world hypsometry (ETOPO-style) | ✅ continents/oceans/orogens at convergent margins; orogen belts thinner than Earth's, interiors featureless |
 | Thermal (talus) | scree below crags | ✅ minimal cone-at-repose demo (a talus cone genuinely is a smooth cone); the crag-and-apron scene is a composition, not the atom |
@@ -67,9 +67,15 @@ river terraces — both share family canon above (badlands / canyon benches) and
 
 ## Standing follow-ups the comparison surfaced
 
-1. Basin & Range-crisp fault scarps (steeper range fronts; displacement/width contrast).
-2. Butte isolation + fluted cliffs + varied footprints (Monument Valley).
-3. Karst radius/depth variation.
-4. Meander centerline seeded with multi-scale noise instead of two sines.
-5. Discrete teardrop yardang hulls (Ward & Greeley 1:4) alongside the lineation field.
-6. Lava levées via margin-vs-core cooling asymmetry (documented in `19`, unimplemented).
+Done (2026-07):
+1. ✅ Basin & Range-crisp fault scarps — sharp feather + dominant range-front fault (Stewart 1978).
+2. ◑ Butte isolation + varied footprints (done); **fluted cliffs** deferred to oblique/3D render.
+3. ✅ Karst radius/depth variation — lognormal `size_var` (Williams 1972), atom + oracle.
+4. ✅ Meander irregularity — disturbed-periodic seed (Ferguson 1975).
+
+Open:
+5. Discrete teardrop yardang hulls (Ward & Greeley 1:4) alongside the lineation field — a new
+   landform representation, not a parameter (would need its own atom + oracle).
+6. Lava levées via margin-vs-core cooling asymmetry (documented in `19`, unimplemented) — a sim
+   change to `lava_flow` (freeze margins faster than the core so walls emerge and the flow channelises).
+7. Alluvial-fan cone convexity legibility; butte cliff fluting (needs oblique render, item 2).

@@ -213,7 +213,10 @@ def CELLS():
         base = 120.0 - 0.02 * gx + noise.fbm(gx / 300.0, gy / 300.0, 5, octaves=3) * 6.0
         xs = np.linspace(-160, 880, 240)                       # ends OFF-frame (0..716) so pins don't coil in view
         win = _smoothstep(-160, 20, xs) * (1 - _smoothstep(700, 880, xs))   # taper -> straight ends, no coil
-        ys = 360 + win * (22 * np.sin(2 * np.pi * xs / 135.0) + 7 * np.sin(2 * np.pi * xs / 78.0 + 0.6))
+        z = xs * 0.0                                           # Ferguson 1975 "disturbed periodic": a meander
+        amp = 30.0 * (1.0 + 0.7 * noise.fbm(xs / 200.0, z + 3.0, 7, octaves=3))      # loop AMPLITUDE varies
+        phase = 2 * np.pi * xs / 210.0 + 3.0 * noise.fbm(xs / 260.0, z + 9.0, 8, octaves=4)  # wavelength drifts -> irregular
+        ys = 360 + win * (amp * np.sin(phase) + 7.0 * np.sin(2 * np.pi * xs / 96.0 + 0.6))
         r = MEA.meander_belt(base, np.column_stack([xs, ys]), cellsize=cell, steps=300, ds=6.0,
                              L_adj=40.0, E=16.0, cutoff_dist=32.0, min_sep=10, half_width=10.0,
                              depth=7.5, bank_width=16.0, bar_height=4.0, bar_bank_width=16.0)
@@ -243,13 +246,14 @@ def CELLS():
                                barranco=0.12, n_barrancos=22), 20))                # young shields are barely dissected
                                # (Mauna Loa canon: deep radial barrancos belong to old/strato edifices, Karátson 2010)
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
-    def _butte():
+    def _butte():                                                   # isolated, size-varied buttes (Monument Valley)
         h = np.zeros((180, 180))
-        for bx, by, s in [(60, 70, 0), (110, 95, 1), (95, 130, 2)]:
-            h = np.maximum(h, L.fault_block_butte((180, 180), bx, by, 26, 300, 22.0, seed=s,
-                                                  fault=0.5, corner_round=3.2, warp=0.17))
+        for bx, by, br, bh, s in [(44, 52, 30, 340, 0), (128, 74, 20, 300, 1),
+                                  (86, 138, 24, 320, 2), (150, 150, 14, 260, 3)]:
+            h = np.maximum(h, L.fault_block_butte((180, 180), bx, by, br, bh, 22.0, seed=s,
+                                                  fault=0.5, corner_round=1.7, warp=0.22))  # sharper, jagged faces
         return hill(h, 22)
-    add("11 Fault-block butte", "flat top, cliff, repose talus; polygonal", _butte)
+    add("11 Fault-block butte", "flat top, cliff, repose talus; polygonal, isolated", _butte)
     def _crater():
         h = np.zeros((180, 180)); h = L.impact_crater(h, 90, 90, 2600, 22.0, complex_D=3000)
         return hill(h, 22)
@@ -257,9 +261,10 @@ def CELLS():
     def _karst():
         xx2, yy2 = _grid(150, 0.05); h = noise.fbm(xx2, yy2, 4, octaves=4) * 120 + 200
         sol = (noise.fbm(xx2 + 9, yy2, 7, octaves=3) > 0.0).astype(float)
-        hk, _ = L.karst_sinkholes(h, sol, cellsize=20.0, spacing=90.0, depth=40.0, radius=45.0, seed=1)
+        hk, _ = L.karst_sinkholes(h, sol, cellsize=20.0, spacing=90.0, depth=40.0, radius=45.0,
+                                  seed=1, size_var=0.6)             # lognormal doline sizes (Williams 1972)
         return hill(hk, 20)
-    add("11 Karst sinkholes", "pits only on soluble; do-not-fill mask", _karst)
+    add("11 Karst sinkholes", "pits only on soluble (varied doline sizes); do-not-fill mask", _karst)
     def _strata():
         xx2, yy2 = _grid(180, 0.05)
         s = L.strat_coord(noise.fbm(xx2, yy2, 2, octaves=5) * 300, xx2, yy2, fold_amp=120, fold_dir=(1, .3), fold_freq=.6)
@@ -399,9 +404,9 @@ def CELLS():
     def _faultblocks():
         import tectonics as TEC
         n = 130; cell = 40.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
-        base = noise.fbm(xx2 * 0.04, yy2 * 0.04, 7, octaves=5) * 160 + 400
-        h = TEC.fault_scarp(base, n_faults=6, displacement=460, width=6.0, decay=0.62,
-                            cellsize=cell, seed=4)                     # wide feather -> decayed slopes, not cliffs
+        base = noise.fbm(xx2 * 0.05, yy2 * 0.05, 7, octaves=5) * 90 + 400   # quieter base so scarps dominate
+        h = TEC.fault_scarp(base, n_faults=5, displacement=620, width=2.5, decay=0.6,
+                            cellsize=cell, seed=4)          # sharp feather + big first fault = range-front blocks
         return hill(_cr(h, 4), cell)
     add("02 Fault scarps (blocks)", "faults offset terrain into blocks; fault-as-K -> structure-controlled valleys", _faultblocks)
     def _plates():

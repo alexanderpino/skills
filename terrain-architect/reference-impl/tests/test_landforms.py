@@ -203,3 +203,17 @@ def test_karst_carves_pits_only_on_soluble_rock():
     assert hk.min() < 0.0                                  # some doline carved
     assert np.all(hk[:, 40:] == 0.0)                       # dry (insoluble) half untouched
     assert not np.any(sink[:, 40:]) and np.any(sink[:, :32])
+
+
+def test_karst_size_var_gives_a_doline_size_distribution():
+    """size_var makes the dolines lognormal in size (Williams 1972), not one radius: the per-pit
+    depths spread out, deeper pits appear, and the soluble-only contract still holds."""
+    h = inputs.flat(96)
+    soluble = np.zeros((96, 96)); soluble[:, :64] = 1.0
+    uni = L.karst_sinkholes(h, soluble, cellsize=1.0, spacing=11.0, depth=5.0, radius=3.0, seed=0)[0]
+    var = L.karst_sinkholes(h, soluble, cellsize=1.0, spacing=11.0, depth=5.0, radius=3.0, seed=0,
+                            size_var=0.7)[0]
+    assert np.all(var[:, 70:] == 0.0)                      # still carves only on soluble rock
+    # varied field has a wider spread of pit depths AND digs deeper than the single-radius field
+    assert var.min() < uni.min() - 1e-6                    # a lognormal tail -> some doline deeper than uniform
+    assert var[var < 0].std() > uni[uni < 0].std()         # depths are genuinely distributed, not one value
