@@ -14,13 +14,34 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 - **Node graph** (the core): drag nodes, wire outputs into inputs, and every node shows a live
   hill-shaded **thumbnail** of its own output — so you read the pipeline at a glance.
-- **SatMap colour + cinematic lighting** (the Gaea-style look): terrain is coloured through a
-  **SatMap LUT** — a curated elevation gradient (pick from ~13 in the viewport: Temperate, Alpine,
-  Canyon, Arid, Dune, Volcanic, Mars, Arctic, …; **Dune** is extracted from a real NASA top-down
-  image, the rest authored to real palettes). The deferred composite then adds **cast shadows**
-  (ray-marched over the height field toward a **movable sun** — azimuth + elevation sliders),
-  **horizon ambient occlusion** (crevice darkening), **atmospheric haze**, and **ACES tone mapping**,
-  with the whole frame **supersampled** for anti-aliased silhouettes.
+- **AAA deferred-PBR surface + SatMap colour** (the Gaea-class look): the terrain renders through a
+  **true deferred pipeline**. The terrain pass writes only **albedo** (SatMap colour + rock on steeps
+  + snow) and a per-material **smoothness** into a G-buffer; a single fullscreen composite then does
+  *all* the lighting from the height field:
+  - **per-pixel surface normals** reconstructed from central differences of the height texture
+    (finer than the mesh vertex normals),
+  - **sun** (Lambert) **+ hemispheric sky-irradiance ambient** — a warm ground-bounce → cool sky-dome
+    gradient, so shadowed faces read *blue* instead of flat grey (the single biggest realism lever),
+  - **GGX microfacet specular** driven by material smoothness (soil rough, rock glossier, snow sheen)
+    with a Schlick Fresnel,
+  - **soft ray-marched cast shadows** toward a **movable sun** (azimuth + elevation sliders) and
+    **horizon ambient occlusion** (crevice darkening), folded into the same pass,
+  - a richer **analytic sky** (horizon→zenith gradient, sun disk, aureole, near-sun horizon scatter)
+    and distance-tinted **aerial perspective**, resolved through **ACES** tone mapping and
+    **supersampled** for anti-aliased silhouettes.
+- **SatMaps genuinely derived from real satellite imagery** (not hand-picked): pick from ~11 palettes
+  in the viewport (Temperate, Alpine, Verdant, Canyon, Arid, Dune, Volcanic, Mars, Lunar, Arctic,
+  Tundra). **Seven are extracted from real public-domain top-down satellite/aerial imagery** — the
+  source image is ordered by luminance into an elevation ramp by the skill's own `reference-impl`
+  `extract_satmap`, the same method Gaea describes for its SatMap library, done reproducibly rather
+  than by eye. Derived: **Alpine** (Ligurian Alps), **Dune** (Rub′ al Khali / Terra), **Verdant**
+  (Amazon / Landsat), **Volcanic** (Icelandic lava / ESA), **Arctic** (Greenland), **Tundra**
+  (Iceland / ESA), **Lunar** (LROC). The pipeline (`satmaps/extract_satmaps.py`) fetches from
+  Wikimedia Commons (satellite-image categories guarantee orbital framing — no sky to pollute the
+  ramp), masks out space + open ocean, and rejects false-colour / off-biome frames with a hue guard;
+  provenance and licences are recorded in `satmaps/derived.json` (NASA/USGS = public domain, ESA =
+  CC BY). Temperate/Canyon/Arid/Mars stay authored (labelled as such) where no on-biome true-colour
+  source was found.
 - **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (SatMap / slope /
   grey shading, orbit + zoom, wireframe), rendered in two passes —
   1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
