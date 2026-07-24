@@ -128,7 +128,10 @@ def CELLS():
     add("01 Ridged MF", "non-negative, finite (Musgrave weight-feedback)", lambda: hill(noise.ridged_mf(xx, yy, 4, octaves=6) * 500))
     add("01 Hybrid MF", "finite via min(weight,1) clamp", lambda: hill(_norm(noise.hybrid_mf(xx, yy, 5, octaves=6)) * 900))
     add("01 Gabor (anisotropic)", "orientable: bands rotate with omega0", lambda: gray(noise.gabor(*_grid(220, 0.11), seed=2, omega0=0.5)))
-    add("01 Domain warp", "warps (flow-like q mask != 0)", lambda: hill(noise.domain_warp(xx, yy, 6, warp=4.0)[0] * 900))
+    add("01 Domain warp", "warps (flow-like q mask != 0); large marble swirls (Quilez)",
+        lambda: gray(noise.domain_warp(xx * 0.35, yy * 0.35, 6, warp=4.0, octaves=4)[0]))
+        # low base freq + VALUE render = the signature large smooth swirls of the canon
+        # (iquilezles.org/articles/warp shows the warped field's value, where the marble reads)
     def _curl():                                                     # divergence-free flow: LIC streamlines swirl, no sources/sinks
         u, v = noise.curl(*_grid(150, 0.06), seed=7)
         return gray(lic(u, v, seed=1, steps=22))

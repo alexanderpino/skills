@@ -148,7 +148,10 @@ toward photoreal — the shared render pipeline (Stage 1, now driving both monta
 per-archetype geomorphology each landform still needs, and where the numpy sandbox honestly tops
 out — see **`HYPERREALISM.md`**. For whether each *simulation* is best-in-class — a per-process SOTA
 scorecard (ours vs Gaea/WM/Houdini vs the academic frontier), the objective realism metrics that tell
-you, and the prioritised gaps — see **`SIMULATION-AUDIT.md`**.
+you, and the prioritised gaps — see **`SIMULATION-AUDIT.md`**. For every atom judged **side-by-side
+against a canonical online counterpart** — published outputs of the *same algorithm* (Quilez, Werner
+CA repos, LIC, Landlab/Halfar) and real landform imagery (NASA/Commons) — with per-atom verdicts and
+the follow-ups the comparison surfaced, see **`CANON-COMPARISON.md`**.
 
 ## Coverage boundary and production paths
 
