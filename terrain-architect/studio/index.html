@@ -587,6 +587,48 @@ function gpuThermal(inp,{talus=0.012,iters=30,rate=0.5}){
 }
 const gpuReady=()=>USE_GPU&&GPU.init();
 
+/* ---- SPATIAL SCALE: run an effect over a larger/smaller area (Gaea's Feature Scale + Transform) ---- */
+function resampleField(f,fromN,toN){            // bilinear resample between two square grids
+  const o=new Float32Array(toN*toN);
+  const g=(xx,yy)=>f[clamp(yy,0,fromN-1)*fromN+clamp(xx,0,fromN-1)];
+  for(let y=0;y<toN;y++)for(let x=0;x<toN;x++){
+    const sx=(x+0.5)*fromN/toN-0.5,sy=(y+0.5)*fromN/toN-0.5;
+    const x0=Math.floor(sx),y0=Math.floor(sy),fx=sx-x0,fy=sy-y0;
+    o[y*toN+x]=lerp(lerp(g(x0,y0),g(x0+1,y0),fx),lerp(g(x0,y0+1),g(x0+1,y0+1),fx),fy);}
+  return o;
+}
+// FEATURE SCALE — run `fn` on a grid k times coarser so its features come out k times WIDER, then add
+// the change back at full resolution (fine detail is preserved; only the erosion's footprint grows).
+// Coarse cell size is k * cellSizeM() metres, which is the lateral size the simulation actually sees.
+function atFeatureScale(inp,k,fn){
+  if(!(k>1.02))return fn(inp);
+  const full=RES,w=Math.max(16,Math.round(RES/k));
+  const small=resampleField(inp,full,w);
+  const prev=RES;let out;
+  RES=w;try{out=fn(small);}finally{RES=prev;}   // the kernels read the global RES
+  const d=new Float32Array(w*w);for(let i=0;i<w*w;i++)d[i]=out[i]-small[i];
+  const up=resampleField(d,w,full),o=newField();
+  for(let i=0;i<o.length;i++)o[i]=inp[i]+up[i];
+  return o;
+}
+// TRANSFORM — move / rotate / scale the terrain itself (Gaea's Transform node). scale>1 magnifies.
+function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,edge="clamp"}){
+  const n=RES,o=newField(),a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
+  const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
+  const wrap=(t)=>edge==="wrap"?((t%n)+n)%n
+    :edge==="mirror"?(()=>{const p=((t%(2*n))+2*n)%(2*n);return p<n?p:2*n-1-p;})()
+    :clamp(t,0,n-1);
+  const samp=(fx,fy)=>{const x0=Math.floor(fx),y0=Math.floor(fy),tx=fx-x0,ty=fy-y0;
+    const g=(xx,yy)=>inp[wrap(yy)*n+wrap(xx)];
+    return lerp(lerp(g(x0,y0),g(x0+1,y0),tx),lerp(g(x0,y0+1),g(x0+1,y0+1),tx),ty);};
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const u=(x+0.5)/n-0.5,v=(y+0.5)/n-0.5;
+    let ru=(u*ca-v*sa)/sX,rv=(u*sa+v*ca)/sY;    // inverse map: sample a smaller region to magnify
+    ru+=0.5-offX;rv+=0.5-offY;
+    o[y*n+x]=samp(ru*n-0.5,rv*n-0.5);}
+  return o;
+}
+
 /* ------------------------------------------------------- modifiers ---- */
 function warpField(inp,{strength=0.12,freq=3,seed=7}){
   const o=newField();const n=RES,s=strength*n;
@@ -877,13 +919,21 @@ const TYPES={
   clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
+  transform:{cat:"filt",name:"Transform",ins:["In"],desc:"Move, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",
+    params:[P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
+      P.slider("aspect","Scale Y",0.25,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
+      P.slider("angle","Angle",0,360,0,1,v=>(v|0)+"\u00b0"),
+      P.slider("offX","Offset X",-1,1,0,0.01),P.slider("offY","Offset Y",-1,1,0,0.01),
+      P.seg("edge","Edges",[["clamp","Clamp"],["wrap","Wrap"],["mirror","Mirror"]],"clamp")],
+    eval:(p,ins)=>ins[0]?transformField(ins[0],p):newField()},
   invert:{cat:"filt",name:"Invert",ins:["In"],desc:"1 − height.",params:[],
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In"],desc:"Talus: material above repose slides down.",
     params:[P.seg("realScale","Real Scale",[["off","Off"],["on","On"]],"off"),
       P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),
-      P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5)],
+      P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
+      P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     // Real Scale ON: `repose` is a true angle, so the per-cell drop is tan(angle) * cellSize / height
     // — physically meaningful AND inherently resolution independent (it already carries the 1/RES).
@@ -892,12 +942,13 @@ const TYPES={
       ? Math.tan(p.repose*Math.PI/180)*cellSizeM()/terrainDef.height
       : p.talus/k;
     const q={...p,talus,iters:Math.max(1,Math.round(p.iters*k))};
-    return gpuReady()?gpuThermal(ins[0],q):thermalErode(ins[0],q);}},
+    return atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q));}},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
-      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1)],
+      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1),
+      P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
-    return hydraulicErode(ins[0],{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))});}},
+    return atFeatureScale(ins[0],p.feat,f=>hydraulicErode(f,{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))}));}},
 
   slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
     params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],

@@ -100,7 +100,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 |---|---|
 | **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) |
-| **Filter** | Warp (domain warp) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
+| **Filter** | Warp (domain warp) · **Transform** (move/rotate/scale) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
 | **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
@@ -189,6 +189,23 @@ Compute runs on the **CPU** (deterministic `Float32Array` heightfields) so it mi
 authoring tool — the numerically-validated implementations, oracles and cross-checks live in
 `reference-impl/`. Verified headless with Playwright (graph eval, WebGL init, all interactions,
 import/export — no console/page errors) during development.
+
+### Spatial scale — the same effect over a bigger or smaller area
+
+Two Gaea mechanisms, both now here:
+
+- **Feature Scale** on **Thermal** and **Hydraulic erosion**. Gaea's Erosion node describes it as
+  *"the lateral size of the largest erosion features in meters: width of largest valleys and ridges
+  between them."* Ours is a `1×–8×` multiplier: the simulation is run on a grid that many times
+  **coarser** (so its footprint is that many times wider) and only the *change* is resampled back onto
+  the full-resolution terrain — fine detail survives, the erosion's footprint grows. The coarse cell is
+  `feature × cellSize` metres, which is the lateral size the sim actually sees. Measured: the erosion
+  delta widens 2.76 → 4.32 → 5.8 cells at 1× / 3× / 6× (the metric saturates for wide features, so read
+  it as monotonic rather than proportional) — and it gets *faster*, 183 ms → 5 ms, since the grid is smaller.
+- **Transform** node (Filter group) — Gaea's Transform: **Scale**, **Scale Y**, **Angle**, **Offset X/Y**
+  and a Clamp / Wrap / Mirror edge mode, usable anywhere in the graph. Scale >1 magnifies. Verified
+  against an analytic oracle: transforming a sine reproduces `sin()` at the inverse-mapped coordinate to
+  **max error 0 / 0.0064 / 0.008** at 1× / 2× / 4× (bilinear interpolation error only).
 
 ### Terrain definition (real-world scale) and **Real Scale**
 
