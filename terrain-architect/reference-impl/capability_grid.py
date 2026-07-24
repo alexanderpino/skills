@@ -222,16 +222,17 @@ def CELLS():
     add("03 River meander (belt)", "upstream-lag skews bends; cut-bank cuts, point-bar builds; cutoff -> oxbow", _meander)
 
     # ---- LANDFORM GENERATORS (11) ----
-    add("11 Mountain (basic)", "raw Voronoi ridge skeleton (pre-erosion base; -> eroded)", lambda: hill(L.mountain((180, 180), 26.0, seed=3, style="basic"), 26))
+    add("11 Mountain (basic)", "raw Voronoi ridge skeleton (pre-erosion base; -> eroded)", lambda: hill(L.mountain((180, 180), 26.0, seed=3, style="basic", warp=0.42), 26))
     add("11 Mountain (eroded)", "styles distinct; deep dendritic incision", lambda: hill(L.mountain((150, 150), 26.0, seed=3, style="eroded"), 26))
-    add("11 Ridge (hogback)", "asymmetric flanks (asymmetry 0 = symmetric)", lambda: hill(L.ridge((180, 180), 30.0, seed=2, height=900, asymmetry=0.6), 30))
+    add("11 Ridge (hogback)", "asymmetric flanks (asymmetry 0 = symmetric)", lambda: hill(L.ridge((180, 180), 30.0, seed=2, height=900, asymmetry=0.6, sinuosity=0.22, detail=0.5), 30))
     add("11 Volcano (strato)", "concave-up cone + summit crater", lambda: hill(L.volcano((180, 180), 90, 90, radius=1500, height=1600, cellsize=20, kind="strato"), 20))
     add("11 Volcano (shield)", "convex low-angle dome (Hawaiian)", lambda: hill(L.volcano((180, 180), 90, 90, radius=1600, height=900, cellsize=20, kind="shield"), 20))
     add("11 Canyon", "plateau dominant; deep meandering floor", lambda: hill(L.canyon((180, 180), 26.0, seed=3, rim=1000, depth=800), 26))
     def _butte():
         h = np.zeros((180, 180))
         for bx, by, s in [(60, 70, 0), (110, 95, 1), (95, 130, 2)]:
-            h = np.maximum(h, L.fault_block_butte((180, 180), bx, by, 26, 300, 22.0, seed=s, fault=0.5))
+            h = np.maximum(h, L.fault_block_butte((180, 180), bx, by, 26, 300, 22.0, seed=s,
+                                                  fault=0.5, corner_round=3.2, warp=0.17))
         return hill(h, 22)
     add("11 Fault-block butte", "flat top, cliff, repose talus; polygonal", _butte)
     def _crater():
@@ -369,14 +370,14 @@ def CELLS():
         import tectonics as TEC
         n = 130; cell = 40.0; yy2, xx2 = np.mgrid[0:n, 0:n].astype(float)
         base = noise.fbm(xx2 * 0.04, yy2 * 0.04, 7, octaves=5) * 160 + 400
-        h = TEC.fault_scarp(base, n_faults=6, displacement=520, width=2.5, decay=0.62,
-                            cellsize=cell, seed=4)                     # decaying displacement -> blocks
+        h = TEC.fault_scarp(base, n_faults=6, displacement=460, width=6.0, decay=0.62,
+                            cellsize=cell, seed=4)                     # wide feather -> decayed slopes, not cliffs
         return hill(_cr(h, 4), cell)
     add("02 Fault scarps (blocks)", "faults offset terrain into blocks; fault-as-K -> structure-controlled valleys", _faultblocks)
     def _plates():
         import tectonics as TEC
         n = 160; cell = 6000.0
-        E = TEC.plate_uplift((n, n), n_plates=13, seed=3, cellsize=cell)
+        E = TEC.plate_uplift((n, n), n_plates=13, seed=3, cellsize=cell, warp_amp=20.0, warp_freq=0.06)
         sx = np.array([-10000, -200, 0, 300, 2500, 5000, 8500.0])       # hypsometric colour ramp
         sc = np.array([[18, 32, 74], [70, 120, 175], [120, 170, 205], [96, 150, 86],
                        [176, 158, 120], [210, 205, 205], [248, 248, 252.0]])
