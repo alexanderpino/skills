@@ -158,7 +158,7 @@ Every effect we add is one of their node categories, grounded in the same litera
 | Erosion (hydraulic) | `erosion_droplet`, `erosion_streampower` | Krištof 2009, Chiba 1998, Beyer 2015 (droplet); Braun & Willett 2013 (stream power) | Erode/Hydro |
 | Erosion (thermal) | `erosion_thermal` | **Musgrave, Kolb & Mace 1989** (angle-of-repose talus) | Thermal/Talus/Slump |
 | Selector / mask | `analysis` slope/curvature/**horizon AO**/TWI/area | Zevenbergen & Thorne 1987; Max 1988 (AO) | Slope/Height/Flow masks |
-| Colorizer / splat | `analysis.derive_substances` + `material_rgb` (default); `render.satmap`/`splat_blend` (toolbox); `photoreal` | **Andersson/Frostbite 2007** splat; **substance placement** by slope/aspect/curvature/flow | splatmap masks (SatMap CLUT also available) |
+| Colorizer / splat | `analysis.derive_substances` + `material_rgb` (default); `render.satmap`/`splat_blend` (toolbox); `render.extract_satmap` (authors a SatMap from real satellite imagery — Gaea's own SatMap-library path; `SATMAPS["desert_terra"]` is extracted from a PD NASA Terra image); `photoreal` | **Andersson/Frostbite 2007** splat; **substance placement** by slope/aspect/curvature/flow | splatmap masks (SatMap CLUT also available) |
 
 **Honest divergences (disclosed, not hidden):**
 

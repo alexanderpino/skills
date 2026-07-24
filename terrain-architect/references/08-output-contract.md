@@ -416,6 +416,25 @@ skill warns about (`00`):
   *colour map*) that an engine actually samples. It is *composited* from the fields, and a gradient
   is one of the operators you build it with.
 
+**Authoring the gradient from imagery.** Sampling a satmap from a real satellite image is a small,
+mechanical extraction — order the pixels by a scalar that proxies elevation and average bins into
+stops. Luminance is the standard proxy (valley floors and shadow dark; crests, sand and snow
+bright), which holds in the imagery this is for (dunes, deserts, snow-capped ranges):
+
+```
+extractSatmap(rgbImage, nStops):
+    lum   = 0.2126 R + 0.7152 G + 0.0722 B          # Rec.709 luminance, the elevation proxy
+    order = argsort(lum)                             # darkest .. brightest pixel indices
+    stops = [mean(rgb[bin]) for bin in split(order, nStops)]
+    smooth stops along the ramp (box, width ~3)      # kill bin noise, keep the trend
+    return [(i/(nStops-1), stops[i])]                # -> the 1D LUT for satmap()
+```
+
+*Runnable reference: `reference-impl/render.py` — `extract_satmap` (this extraction; the shipped
+`SATMAPS["desert_terra"]` was extracted from a public-domain NASA Terra/ASTER image) and `satmap`
+(the CLUT application), verified in `tests/test_archetypes.py`: stops stay inside the source
+gamut, brighten monotonically, and plug into `satmap` unchanged.*
+
 The gradient is a `curve` / LUT (`10`), so it inherits that node's one real trap: **height is
 Gaussian-ish, not uniform** (`01`), so a gradient applied to raw altitude bunches most of its
 colours into the mid-band and starves the peaks and troughs. Histogram-match the field, or remap

@@ -1,6 +1,6 @@
 # Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
 
-**Companion image:** `capability_grid.png` — a 7‑column grid, 53 tiles, one per capability of the
+**Companion image:** `capability_grid.png` — a 7‑column grid, 54 tiles, one per capability of the
 `terrain-architect` reference implementation. **Read this brief first, then review the image against it.**
 
 ---
@@ -10,7 +10,7 @@
 Each tile is a terrain field or map **generated live in pure NumPy** by a reference implementation of
 a terrain‑generation skill (noise, erosion, hydrology, geology, analysis, rendering). Each caption has
 two parts: **`[chapter] Capability`** and the **oracle/invariant** that the automated test suite uses to
-verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (332 tests) passes; the
+verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (334 tests) passes; the
 fluvial/tectonic core is cross‑validated against external libraries (RichDEM, Landlab); citations were
 audited against primary sources.
 
@@ -139,6 +139,7 @@ failure mode to watch for.
 | R8C2 | Alluvial fans / bajada (16) | **semiconical fans** debouching from the range front onto the basin floor, thinning downfan and **coalescing** along the front (a bajada) | fans pointing uphill; full discs (deposit behind the apex); a single smooth cone |
 | R8C3 | Fault scarps / blocks (02) | terrain **offset into blocks** by a few through‑going **fault scarps** (feathered tonal steps, decaying displacement — big range‑bounding faults + finer ones) | random noise with no linear scarps; hard 1‑pixel cliffs |
 | R8C4 | Plate tectonics (02) | irregular **plates** (warped, non‑straight boundaries) split into **oceans** (blue, deep) and **continents** (green), with **mountain belts (orogens) along convergent boundaries** | straight Voronoi edges; uniform elevation; mountains scattered in plate interiors |
+| R8C5 | SatMap from satellite (08) | terrain coloured through a **CLUT extracted from a real NASA satellite image** (`extract_satmap`) — dark valley browns to bright crest sand, modulated by shade | psychedelic/no‑gamut colours; colour bands ignoring elevation |
 
 ---
 

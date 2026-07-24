@@ -110,6 +110,33 @@ def test_satmap_and_splat_blend():
     assert np.allclose(out[mask == 0.0], 10.0)                        # untouched where mask=0
 
 
+def test_extract_satmap_authors_a_valid_gradient_from_imagery():
+    """render.extract_satmap (the SatMap-AUTHORING step — Gaea's gradients are extracted from
+    satellite imagery): stops are luminance-ordered bin means of the SOURCE pixels, so the ramp
+    (a) stays inside the source colour gamut, (b) brightens monotonically low->high, and (c) plugs
+    straight into render.satmap. Deterministic. The shipped 'desert_terra' entry (from NASA Terra/
+    ASTER Rub' al Khali, public domain) must satisfy the same contract."""
+    import render
+    rng = np.random.default_rng(7)                                    # synthetic "satellite" image:
+    yy = np.linspace(0.0, 1.0, 64)[:, None] * np.ones((1, 64))        # dark valley -> bright crest
+    img = np.stack([40 + 180 * yy + rng.normal(0, 6, (64, 64)),
+                    30 + 150 * yy + rng.normal(0, 6, (64, 64)),
+                    20 + 110 * yy + rng.normal(0, 6, (64, 64))], -1).clip(0, 255)
+    stops = render.extract_satmap(img, n_stops=10)
+    assert len(stops) == 10 and stops[0][0] == 0.0 and stops[-1][0] == 1.0
+    pos = np.array([p for p, _ in stops]); cols = np.array([c for _, c in stops])
+    assert np.all(np.diff(pos) > 0)                                   # ascending, satmap-ready
+    assert cols.min() >= img.min() - 1e-9 and cols.max() <= img.max() + 1e-9   # inside source gamut
+    lum = cols @ np.array([0.2126, 0.7152, 0.0722])
+    assert np.all(np.diff(lum) > -1e-6) and lum[-1] > lum[0] + 40     # brightens low -> high
+    assert render.satmap(np.linspace(0, 1, 9), stops).shape == (9, 3)  # plugs into the CLUT
+    again = render.extract_satmap(img, n_stops=10)
+    assert stops == again                                             # deterministic
+    dt = render.SATMAPS["desert_terra"]                               # the shipped extracted ramp
+    dpos = np.array([p for p, _ in dt]); dlum = np.array([c for _, c in dt]) @ np.array([0.2126, 0.7152, 0.0722])
+    assert np.all(np.diff(dpos) > 0) and np.all(np.diff(dlum) > 0)
+
+
 def test_substance_colour_is_material_not_elevation():
     """Colour comes from SUBSTANCES, not a height ramp: varied colour, and snow is placed by physics
     (a white substance) only on cold, holdable ground — never on the steep faces that shed it, and

@@ -412,6 +412,15 @@ def CELLS():
         sh = render.hillshade(E, cell).astype(float)[..., 0] / 255.0
         return np.clip(rgb * (0.55 + 0.5 * sh[..., None]), 0, 255).astype(np.uint8)
     add("02 Plate tectonics (uplift)", "Voronoi plates, warped boundaries; orogens at convergent margins", _plates)
+    def _satmap():                                                   # SatMap AUTHORED from real satellite imagery
+        h = L.mountain((160, 160), 30.0, seed=3, style="eroded", height=1600.0)
+        drv = (h.argsort(axis=None).argsort(axis=None) / (h.size - 1.0)).reshape(h.shape)
+        rgb = render.satmap(drv, "desert_terra")                     # CLUT extracted from NASA Terra (PD) via
+        #  ^ driver is HISTOGRAM-EQUALISED first (08: height is Gaussian-ish; raw altitude would bunch
+        #    the ramp into its mid-band) -- extract_satmap authored the gradient, satmap applies it
+        sh = render.hillshade(h, 30.0).astype(float)[..., 0] / 255.0
+        return np.clip(rgb * (0.55 + 0.55 * sh)[..., None], 0, 255).astype(np.uint8)
+    add("08 SatMap (from satellite)", "CLUT extracted from real NASA imagery (extract_satmap); monotone, in-gamut", _satmap)
 
     return C
 

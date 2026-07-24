@@ -202,7 +202,36 @@ SATMAPS = {
                   (0.80, (200, 140, 96)), (1.00, (214, 182, 152))],
     "lunar":     [(0.00, (64, 64, 68)), (0.40, (110, 110, 116)), (0.72, (150, 150, 156)),
                   (1.00, (200, 200, 206))],
+    # EXTRACTED from real satellite imagery via `extract_satmap` (the SatMap-authoring path):
+    # NASA Terra/ASTER, Rub' al Khali dune field ("Arabian Empty Quarter sand dunes imaged by
+    # Terra (EOS AM-1)", Wikimedia Commons; NASA imagery, public domain). Interdune shadow-brown
+    # -> sand -> bright crest.
+    "desert_terra": [(0.00, (57, 27, 13)), (0.12, (75, 45, 26)), (0.21, (98, 68, 45)),
+                     (0.29, (113, 86, 65)), (0.38, (122, 103, 85)), (0.46, (129, 116, 103)),
+                     (0.54, (135, 127, 118)), (0.62, (143, 137, 129)), (0.71, (153, 147, 138)),
+                     (0.79, (168, 161, 148)), (0.88, (195, 184, 163)), (1.00, (217, 204, 176))],
 }
+
+
+def extract_satmap(rgb, n_stops=12, smooth=1):
+    """AUTHOR a SatMap gradient from a real satellite/aerial image — the step Gaea uses to build its
+    SatMap library ("gradients extracted from satellite imagery"; the applied op itself is the
+    standard gradient-map CLUT). Order the image's pixels by LUMINANCE — a proxy for elevation that
+    holds in the imagery this is meant for (dunes, snow-capped ranges, deserts: valley floors and
+    shadow dark, crests/snow bright) — average each luminance bin into a colour stop, and lightly
+    smooth along the ramp. Returns [(pos, (r,g,b)), ...] ready for `satmap`. `rgb` is an (n,m,3)
+    array in 0-255 (load the image however you like; this stays pure numpy on arrays)."""
+    px = np.asarray(rgb, dtype=np.float64).reshape(-1, 3)
+    lum = px @ np.array([0.2126, 0.7152, 0.0722])            # Rec.709 luminance
+    order = np.argsort(lum, kind="stable")
+    cols = np.array([px[b].mean(axis=0) for b in np.array_split(order, int(n_stops))])
+    if smooth:
+        k = 2 * int(smooth) + 1
+        pad = np.pad(cols, ((smooth, smooth), (0, 0)), mode="edge")
+        cols = np.stack([np.convolve(pad[:, c], np.ones(k) / k, mode="valid") for c in range(3)], 1)
+    pos = (np.arange(int(n_stops)) + 0.5) / float(n_stops)
+    pos[0], pos[-1] = 0.0, 1.0
+    return [(float(p), (float(r), float(g), float(b))) for p, (r, g, b) in zip(pos, cols)]
 
 
 def satmap(driver, stops):
