@@ -74,6 +74,14 @@ def cone(px, py, radius, height=1.0):
     return height * np.clip(1.0 - np.hypot(px, py) / radius, 0.0, None)
 
 
+def linear_gradient(px, py, angle=0.0, length=1.0):
+    """A directional ramp: 0 -> 1 along `angle` (radians; 0 = +x) over `length` world units, clamped.
+    The linear sibling of `radial_gradient` — the base of tilts, coasts, wind/rain fields and
+    directional masks. Coordinate-based, so it composes without seaming (no data dependence)."""
+    px = np.asarray(px, dtype=np.float64); py = np.asarray(py, dtype=np.float64)
+    return np.clip((px * np.cos(angle) + py * np.sin(angle)) / length, 0.0, 1.0)
+
+
 # --------------------------------------------------------------------------- #
 # heightfield operators
 # --------------------------------------------------------------------------- #
@@ -87,6 +95,25 @@ def remap(a, lo, hi, out_lo=0.0, out_hi=1.0):
     """Map [lo, hi] -> [out_lo, out_hi] with lo/hi you WROTE DOWN. The composable replacement
     for `normalize`, whose min/max depend on the evaluation and therefore seam."""
     return out_lo + (np.asarray(a, dtype=np.float64) - lo) * (out_hi - out_lo) / (hi - lo)
+
+
+def curve(a, xs, ys):
+    """Remap values through an editable CURVE (Gaea `Curve` / WM `Curves`): piecewise-linear through
+    control points (`xs` ascending inputs, `ys` outputs). The general form of `remap` (the 2-point
+    case); monotone `ys` re-tones without inverting the terrain. `xs` are values you WROTE DOWN, so
+    it composes (no data dependence)."""
+    return np.interp(np.asarray(a, dtype=np.float64), np.asarray(xs, dtype=np.float64),
+                     np.asarray(ys, dtype=np.float64))
+
+
+def levels(a, in_lo, in_hi, gamma=1.0, out_lo=0.0, out_hi=1.0):
+    """Photoshop 'Levels' (Gaea `Autolevel`+`Gamma`, WM `Levels`): clip to [in_lo, in_hi], apply a
+    midtone `gamma` (>1 brightens), then map to [out_lo, out_hi]. `in_lo/in_hi` are constants you
+    WROTE DOWN — the composable, non-seaming form (unlike an auto-stretch to the data min/max)."""
+    t = np.clip((np.asarray(a, dtype=np.float64) - in_lo) / (in_hi - in_lo), 0.0, 1.0)
+    if gamma != 1.0:
+        t = t ** (1.0 / gamma)
+    return out_lo + t * (out_hi - out_lo)
 
 
 def smin(a, b, k):
@@ -129,6 +156,31 @@ def gaussian(h, sigma):
     k = np.exp(-(x * x) / (2 * sigma * sigma))
     k /= k.sum()
     return _conv1d(_conv1d(h, k, 0), k, 1)
+
+
+def unsharp(h, sigma, amount=1.0):
+    """Unsharp-mask SHARPEN (Gaea/WM `Sharpen`): h + amount·(h − gaussian(h, sigma)) — boosts detail
+    finer than `sigma`. amount=0 is identity; large amount rings/overshoots. A fixed-kernel op, so
+    it composes. The honest counterpart to `gaussian` (which softens)."""
+    h = np.asarray(h, dtype=np.float64)
+    return h + amount * (h - gaussian(h, sigma))
+
+
+def histogram_equalize(h, bins=256):
+    """Equalize the value histogram (Gaea `Equalize`, WM `Equalizer`): map each value to its CDF /
+    rank, so every elevation band gets equal area and tonal contrast is maximised. Returns [0,1].
+    Monotone (order-preserving), so it never inverts terrain. DATA-DEPENDENT — like the `normalize`
+    this module deliberately omits, its output depends on the whole field, so it SEAMS across tiles:
+    a final-look / mask filter, not a mid-graph op."""
+    h = np.asarray(h, dtype=np.float64)
+    lo, hi = float(h.min()), float(h.max())
+    if hi <= lo:
+        return np.zeros_like(h)
+    hist, edges = np.histogram(h, bins=int(bins), range=(lo, hi))
+    cdf = np.cumsum(hist).astype(np.float64)
+    cdf /= cdf[-1]                                       # 0..1, non-decreasing
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return np.interp(h, centers, cdf)
 
 
 def box_filter(h, r):

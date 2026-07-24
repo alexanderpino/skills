@@ -18,7 +18,7 @@ IMPLEMENTED = {
     "noise": ["perlin", "value", "simplex", "worley", "fbm", "ridged_mf", "hybrid_mf",
               "gabor", "domain_warp", "curl"],
     "ops_filters": ["sd_circle", "sd_box", "sd_convex_polygon", "sd_segment", "radial_gradient",
-                    "cone", "smin", "smax", "blend", "remap"],
+                    "linear_gradient", "cone", "smin", "smax", "blend", "remap", "curve", "levels"],
     "flow": ["priority_flood_fill", "d8_receivers", "d8_accumulation", "mfd_accumulation"],
     "erosion_streampower": ["stream_power_evolve"],
     "erosion_droplet": ["droplet_erode"],
@@ -36,7 +36,8 @@ IMPLEMENTED = {
 # ops_filters also carries a filter/morphology TOOLBOX that is not a generative atom — excluded from
 # the surface check so it isn't mistaken for an undocumented atom.
 _OPS_NON_ATOM = {"gaussian", "box_filter", "median", "bilateral", "guided_filter", "perona_malik",
-                 "dilate", "erode", "opening", "closing", "tophat", "bothat", "twist", "bend"}
+                 "dilate", "erode", "opening", "closing", "tophat", "bothat", "twist", "bend",
+                 "unsharp", "histogram_equalize"}
 
 # Atoms discussed in the pseudocode but deliberately NOT implemented: {name: chapter it's discussed in}.
 DEFERRED = {"OpenSimplex2": "references/01-noise.md", "Wavelet": "references/01-noise.md"}

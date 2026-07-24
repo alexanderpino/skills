@@ -115,3 +115,50 @@ def test_warps_are_identity_at_zero():
 def test_remap_uses_written_constants():
     a = np.array([0.0, 5.0, 10.0])
     assert np.allclose(F.remap(a, 0.0, 10.0), [0.0, 0.5, 1.0])
+
+
+def test_linear_gradient_is_a_directional_ramp():
+    """0->1 along the angle, clamped, coordinate-based (no data dependence)."""
+    yy, xx = np.mgrid[0:10, 0:10].astype(float)
+    g = F.linear_gradient(xx, yy, angle=0.0, length=9.0)                # +x ramp over 9 cells
+    assert np.allclose(g[:, 0], 0.0) and np.allclose(g[:, 9], 1.0)      # ends hit 0 and 1
+    assert np.all(np.diff(g, axis=1) >= -1e-12)                         # monotone along +x
+    gy = F.linear_gradient(xx, yy, angle=np.pi / 2, length=9.0)         # +y ramp
+    assert np.allclose(gy[0, :], 0.0) and np.allclose(gy[9, :], 1.0)
+
+
+def test_curve_generalises_remap_and_is_monotone():
+    """curve through 2 points == remap; a monotone curve is order-preserving (never inverts)."""
+    a = np.linspace(0.0, 10.0, 11)
+    assert np.allclose(F.curve(a, [0.0, 10.0], [0.0, 1.0]), F.remap(a, 0.0, 10.0))
+    c = F.curve(a, [0.0, 5.0, 10.0], [0.0, 0.9, 1.0])                   # steep low, flat high (an S-ish curve)
+    assert np.all(np.diff(c) >= -1e-12)                                # monotone -> no terrain inversion
+    assert c[5] == 0.9
+
+
+def test_levels_clips_gammas_and_maps():
+    a = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    lv = F.levels(a, 0.25, 0.75)                                        # clip to [.25,.75] -> [0,1]
+    assert lv[0] == 0.0 and lv[-1] == 1.0 and abs(lv[2] - 0.5) < 1e-9
+    bright = F.levels(a, 0.0, 1.0, gamma=2.0)                           # gamma>1 lifts midtones
+    assert bright[2] > 0.5
+
+
+def test_histogram_equalize_flattens_and_preserves_order():
+    """Equalized output is monotone in the input (no inversion) and its histogram is far flatter
+    than the (skewed) input's — every band gets ~equal area."""
+    rng = np.random.default_rng(0)
+    h = rng.random((64, 64)) ** 3                                       # strongly skewed toward 0
+    e = F.histogram_equalize(h, bins=64)
+    order = np.argsort(h, axis=None)
+    assert np.all(np.diff(e.flatten()[order]) >= -1e-9)                # monotone in h -> order-preserving
+    flat = np.histogram(e, bins=16)[0]
+    skew = np.histogram(h, bins=16)[0]
+    assert flat.std() < skew.std()                                     # flatter histogram than the input
+
+
+def test_unsharp_zero_amount_is_identity_and_boosts_edges():
+    h = inputs.step(16, lo=0.0, hi=1.0).astype(float)
+    assert np.allclose(F.unsharp(h, 1.0, amount=0.0), h)               # amount 0 == identity
+    s = F.unsharp(h, 1.0, amount=1.0)
+    assert s.max() > h.max() and s.min() < h.min()                     # overshoot/undershoot at the edge

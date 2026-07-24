@@ -24,10 +24,11 @@ and numerical correctness by the per-atom oracle tests (`test_noise.py`, `test_o
 **Noise (`noise.py`, chapter `01`):** `perlin`, `value`, `simplex`, `worley` (f1 / f2f1 / inv_f1),
 `fbm`, `ridged_mf`, `hybrid_mf`, `gabor` (anisotropic/directional), `domain_warp`, `curl`.
 
-**SDF / gradient / combiner primitives (`ops_filters.py`, chapter `10`):** `sd_circle`, `sd_box`,
-`sd_convex_polygon`, `sd_segment`, `radial_gradient`, `cone`, `smin`, `smax`, `blend`, `remap`.
-(The module also carries the filter/morphology toolbox — `gaussian`, `bilateral`, `guided_filter`,
-`perona_malik`, `dilate`/`erode`/`opening`/`closing`, `twist`, `bend` — treated as filters, not atoms.)
+**SDF / gradient / combiner / tonal primitives (`ops_filters.py`, chapter `10`):** `sd_circle`, `sd_box`,
+`sd_convex_polygon`, `sd_segment`, `radial_gradient`, `linear_gradient`, `cone`, `smin`, `smax`, `blend`,
+`remap`, `curve`, `levels`. (The module also carries the filter/morphology toolbox — `gaussian`,
+`unsharp`, `histogram_equalize`, `bilateral`, `guided_filter`, `perona_malik`,
+`dilate`/`erode`/`opening`/`closing`, `twist`, `bend` — treated as filters, not atoms.)
 
 **Solver atoms (iterative, stateful — cannot be composed from static fields):** flow routing
 (`flow.priority_flood_fill`, `d8_receivers`, `d8_accumulation`, `mfd_accumulation`), stream-power

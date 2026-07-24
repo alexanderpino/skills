@@ -91,6 +91,19 @@ larger domain. **That is a guaranteed seam.**
 Use `normalize` only inside the export node, or never. If you need a [0,1] field, use an
 explicit `remap(a, knownMin, knownMax)` with constants you wrote down.
 
+**Tonal family (the "Levels/Curve/Equalize/Sharpen" nodes).** `curve` (above) is the general
+value-remap; `levels(a, inLo, inHi, gamma)` = clip to a written range + a midtone gamma (the
+composable Levels); `sharpen`/`unsharp = a + amount·(a − blur(a))` boosts sub-`sigma` detail (the
+honest inverse of `gaussian`, which softens). `equalize` maps each value to its **CDF** so every
+band gets equal area — maximal contrast, but it is **data-dependent like `normalize`** (it reads the
+whole field's histogram), so it **seams**: a final-look / mask op, never mid-graph. `gradient` and
+`radialGradient` are the two ramps everything else masks against.
+
+*Runnable reference: `reference-impl/ops_filters.py` — `linear_gradient`, `curve`, `levels`,
+`histogram_equalize`, `unsharp` (verified in `tests/test_ops_filters.py`: gradient monotone & clamped,
+curve==remap at 2 points & order-preserving, levels clips/gammas, equalize flattens the histogram &
+never inverts, unsharp is identity at amount 0).*
+
 **2. `max` and `min` create creases.** `max(mountainA, mountainB)` produces a C1 discontinuity
 along the intersection curve — a hard crease that reads as obviously CG, and which produces a
 line of infinite curvature that will wreck any curvature-driven mask (`06`). Use smooth
