@@ -96,7 +96,8 @@ def test_ops_surface_is_fully_accounted_for():
 @pytest.mark.parametrize("fn,chapter", GENERATORS.items())
 def test_landform_generators_are_documented(fn, chapter):
     """Each landform generator must exist AND be named in its chapter's pseudocode — so a generator can't
-    be added (or kept) as code-only. (Existence only; constant-level faithfulness is a review concern.)"""
+    be added (or kept) as code-only. (Existence here; the load-bearing CONSTANTS are checked separately
+    by test_key_constant_agrees_between_chapter_and_code below.)"""
     lf = importlib.import_module("landforms")
     assert callable(getattr(lf, fn, None)), f"landforms.{fn} missing"
     assert fn in (SKILL_ROOT / chapter).read_text(encoding="utf-8"), f"landforms.{fn} not documented in {chapter}"
@@ -110,3 +111,47 @@ def test_deferred_atoms_are_discussed_but_absent(name, chapter):
     assert not hasattr(mod, name.lower()), f"{name} is listed deferred but exists in noise"
     assert name in (SKILL_ROOT / chapter).read_text(encoding="utf-8"), f"{name} not discussed in {chapter}"
     assert name in COVERAGE, f"deferred {name} not listed in ATOM-COVERAGE.md"
+
+
+# --------------------------------------------------------------------------- #
+# FAITHFULNESS: the chapter pseudocode and the code must agree on the key physical CONSTANTS.
+# The tests above prove an atom exists and is named in its chapter; they do NOT prove the numbers
+# match. This closes that gap for the physically-load-bearing constants (the ones whose value IS
+# the correctness of the atom): each is triangulated — the literal must appear in the reference
+# MODULE source AND its documented value/statement must appear in the CHAPTER (or the citation
+# ledger). Change one side without the other and this fails, forcing a synchronised edit — the
+# contributor rule, mechanised. Sampled (the load-bearing constants), not exhaustive; a defect here
+# is prose-vs-code DRIFT, not numeric wrongness (the oracle/benchmark/cross-val tests cover that).
+FAITHFUL = [
+    # (module, code literal in the module source, chapter/doc file, string that must be in that doc, what)
+    ("dunes.py", "shadow_tan=0.268", "references/05-erosion-thermal-aeolian.md", "tan(15",
+     "Werner lee shadow line = 15deg flow-separation angle (tan 15 = 0.268)"),
+    ("dunes.py", "repose=2", "references/99-papers.md", "33.7",
+     "sand angle of repose 33.7deg = atan(2/3), the 2-slab drop under the 1:3 slab aspect"),
+    ("landforms.py", "(1.0 - rn) ** 2.2", "references/11-geological.md", "2.2",
+     "stratovolcano concave-up flank profile exponent (Karatson 2010)"),
+    ("landforms.py", "0.2 * D", "references/11-geological.md", "0.2",
+     "impact-crater depth/diameter ~= 0.2 (Pike 1977)"),
+    ("landforms.py", "0.04 * D", "references/11-geological.md", "0.04",
+     "impact-crater rim height ~= 0.04 D"),
+    ("landforms.py", "(-3.0)", "references/11-geological.md", "r⁻³",
+     "impact-crater ejecta blanket thins as r^-3 (McGetchin 1973)"),
+    ("glacier.py", "rho=917.0", "references/12-glacial-coastal.md", "917",
+     "glacier ice density 917 kg/m^3"),
+    ("glacier.py", "n=3", "references/12-glacial-coastal.md", "n = 3",
+     "Glen flow-law exponent n = 3"),
+    ("landforms.py", "concavity=1.7", "references/16-arid-desert.md", "concave",
+     "alluvial-fan concave (steep-apex, gentle-distal) downfan profile (Blair & McPherson 1994)"),
+]
+
+
+@pytest.mark.parametrize("module,code_lit,doc,doc_str,what", FAITHFUL, ids=[e[0] + ":" + e[1] for e in FAITHFUL])
+def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc_str, what):
+    """A load-bearing physical constant must read the same in the code and in its chapter (faithfulness,
+    not just existence). Fails on prose<->code drift, so neither side can move alone."""
+    src = (REF / module).read_text(encoding="utf-8")
+    assert code_lit in src, f"{what}: code literal {code_lit!r} missing from reference-impl/{module} " \
+                            f"(the code constant changed — update the code, or fix this manifest AND the chapter)"
+    chap = (SKILL_ROOT / doc).read_text(encoding="utf-8")
+    assert doc_str in chap, f"{what}: {doc_str!r} missing from {doc} " \
+                            f"(the chapter drifted from the code constant {code_lit!r} — resync the pseudocode)"
