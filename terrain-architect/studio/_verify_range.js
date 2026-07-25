@@ -64,6 +64,35 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     out.oneRange = { unionedOnly: components(soft, 0.35), afterErosion: components(eroded, 0.35),
                      erosionKnitsThemTogether:
                        components(eroded,0.35).components < components(soft,0.35).components };
+    // ---- 5. placing N Mountains must give N DIFFERENT mountains ----
+    // Taking the type default gave every node the same seed, so three placed Mountains were three
+    // identical ones and the whole place-and-combine workflow was pointless.
+    nodes.length=0; edges.length=0; uid=1;
+    const m1=makeNode("mountain",0,0), m2=makeNode("mountain",0,0), m3=makeNode("mountain",0,0);
+    const f1=TYPES.mountain.eval(m1.params,[],m1), f2=TYPES.mountain.eval(m2.params,[],m2);
+    // compare INSIDE the footprint: most of the tile is zero in both, and averaging over it dilutes
+    // the difference into nothing (0.0067 whole-tile vs 0.30 relative, for the same two fields)
+    let d12=0, sum=0, c12=0;
+    for (let i=0;i<f1.length;i++){ if (f1[i]<=0 && f2[i]<=0) continue;
+      d12 += Math.abs(f1[i]-f2[i]); sum += Math.max(f1[i],f2[i]); c12++; }
+    const rel = d12/Math.max(sum,1e-9);
+    // the control that gives the number meaning: SAME seed must reproduce bit-for-bit, so any
+    // non-zero relative difference is attributable to the seed and nothing else
+    const same = TYPES.mountain.eval({...m1.params, seed:m2.params.seed},[],m2);
+    let dSame=0; for (let i=0;i<f2.length;i++) dSame += Math.abs(f2[i]-same[i]);
+    // ...and rebuilding the SAME graph must reproduce the SAME seeds, so it is derived not random
+    const firstRun=[m1.params.seed,m2.params.seed,m3.params.seed];
+    nodes.length=0; edges.length=0; uid=1;
+    const r1=makeNode("mountain",0,0), r2=makeNode("mountain",0,0), r3=makeNode("mountain",0,0);
+    out.seedPerPlacedNode = {
+      seeds: firstRun, rebuilt: [r1.params.seed,r2.params.seed,r3.params.seed],
+      allDistinct: new Set(firstRun).size === 3,
+      sameSeedIsIdentical: dSame === 0,
+      differentTerrain: rel > 0.05 && dSame === 0,
+      relativeDiffInFootprint: +rel.toFixed(3),
+      footprintCells: c12,
+      deterministicAcrossRebuilds: firstRun.every((v,i)=>v===[r1,r2,r3][i].params.seed),
+      notTheTypeDefault: firstRun.every(v=>v!==TYPES.mountain.params.find(q=>q.key==="seed").def) };
     return out;
   });
 

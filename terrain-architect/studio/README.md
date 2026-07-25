@@ -320,6 +320,15 @@ The primitive also stays strictly inside its own footprint (total height outside
 because erosion otherwise scatters deposit onto ground the primitive does not own — and a primitive
 that respects its footprint is the one that composites cleanly under Stamp and a placement mask.
 
+**Every placed node gets its own seed.** Node parameters used to be initialised straight from the
+type defaults, so three placed Mountains were three *identical* mountains and the whole
+place-and-combine workflow was pointless. A node carrying a `seed` now derives it from its own id —
+**derived, not random**, so the same graph built the same way reproduces exactly across reloads and in
+the verifiers. Three fresh Mountains get seeds 459 / 895 / 604; rebuilding the graph gets the same
+three. Verified with the control that gives the number meaning: two mountains sharing a seed are
+bit-for-bit identical, while two with different seeds differ by **10%** of total height inside the
+footprint. *Duplicate* stays a true copy — nudge the Seed slider to fork it.
+
 Verified in `_verify_range.js`. Three Mountains placed at X = 0.26 / 0.50 / 0.74 land at measured
 centroids **0.281 / 0.505 / 0.722**, each with relief ≈ 0.84–1.08. Unioning with Smooth Max instead of a
 hard Max cuts the curvature crease along the seam (135 seam cells) by **74.9%**.

@@ -1513,9 +1513,16 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
    GRAPH MODEL
    ===================================================================== */
 let nodes=[],edges=[],uid=1,selected=null;
+// Every node carrying a `seed` gets one DERIVED FROM ITS ID rather than the type default. Placing
+// three Mountains has to give three different mountains -- taking the default gave three identical
+// ones, which makes the place-and-combine workflow pointless. Derived rather than random so the same
+// graph built the same way reproduces exactly, across reloads and in the verifiers.
+// (Duplicate stays a true copy: it is a copy. Nudge the Seed slider to fork it.)
+const seedForNode=(id)=>1+((Math.imul(id^0x9e3779b9,2654435761)>>>0)%999);
 function makeNode(type,x,y){
   const def=TYPES[type];const p={};def.params.forEach(pr=>p[pr.key]=pr.def);
   const nd={id:uid++,type,x,y,w:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null};
+  if("seed"in p)p.seed=seedForNode(nd.id);
   nodes.push(nd);return nd;
 }
 function nodeById(id){return nodes.find(n=>n.id===id);}
