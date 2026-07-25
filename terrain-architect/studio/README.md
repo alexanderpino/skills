@@ -99,8 +99,8 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | Group | Nodes |
 |---|---|
 | **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
-| **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) |
-| **Filter** | Warp (domain warp) · **Transform** (move/rotate/scale, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
+| **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) · **Stamp** (place a patch onto a base through a mask) |
+| **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
 | **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
@@ -128,6 +128,39 @@ node contains a Mask input port… the processing of that node is applied only w
 
 Both mirror `reference-impl/placement.py` (`disc`/`rect`/`capsule`/`polygon`/`path_mask`,
 `apply_masked`, `stamp`), where placements are authored in **metres**.
+
+**Placing a feature takes three things**, and the studio has one node for each:
+
+| | Node | Question it answers |
+|---|---|---|
+| **Transform** | Filter ▸ Transform | *Where does it go, which way does it face, how big is it?* |
+| **Placement mask** | Generator ▸ Shape | *How far does it reach, and how soft is the edge?* |
+| **Stamp** | Combine ▸ Stamp | *How does it meet the terrain already there?* |
+
+The **Transform** is a full TRS: **Move X/Y** (shown in metres against the terrain definition),
+**Rotation**, **Scale** + **Scale Y**, and a **Pivot**. Rotation is about the **up axis** — the only
+rotation a heightfield admits, because tipping the surface would make it multi-valued, two heights over
+one point. The **Pivot** is what rotation and scale turn about: leave it centred to spin a ridge in
+place, move it to swing that ridge around a point instead. It also has a **Mask** input, so a move can
+be confined — verified, change outside the mask is **exactly 0**.
+
+**Stamp** is `placement.stamp`: **Max** unions a landform in without trenching what is already there
+(the default, and the only mode that cannot dig a hole), **Add** accumulates relief so overlapping fans
+build into a bajada, **Replace** overwrites — which only reads well inside a soft-edged mask. Without a
+Mask the patch applies everywhere it is defined; the mask is what turns a global combine into a
+*placement*.
+
+Verified in `_verify_trs.js` — the placed centroid lands exactly where asked (`0.7, 0.4` requested and
+measured); a 90° turn about the tile centre swings a disc from `(0.75, 0.5)` to `(0.5, 0.75)` with its
+radius preserved, while the same turn about a pivot **on** the disc leaves it at `(0.75, 0.5)`; scale
+gives **4.00×** and **0.25×** area for 2× and 0.5× exactly as the square law demands; and Stamp's Max
+never drops below the base, Add accumulates, Replace overwrites, `Amount 0` and a missing Patch are both
+the identity.
+
+Exact and raster sampling describe the *same* placement including the pivot: correlation **0.9977**
+across the tile interior. Over the whole tile it drops to 0.944, and that gap is not disagreement about
+placement — it is the two modes' different edge policy, since exact mode has real terrain past the old
+tile edge where raster has clamped smear. Scoring the interior separates the two.
 
 **The SatMap node — Gaea's colouring model.** In Gaea a SatMap is a *node* that colours a terrain through a
 gradient, driven by **whatever grayscale you feed it** (not only height). This node mirrors that: it takes
@@ -332,6 +365,7 @@ alongside the app rather than being scratch:
 ```sh
 npm i playwright-core@1.49.0
 node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/GPU parity under XF
+node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths

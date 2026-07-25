@@ -406,11 +406,14 @@ let XF=null;
 const xfU=(u,v)=>XF?XF[0]*u+XF[1]*v+XF[2]:u;
 const xfV=(u,v)=>XF?XF[3]*u+XF[4]*v+XF[5]:v;
 // The SAME inverse map transformField() uses, so exact and raster modes describe one placement.
-function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0}){
+function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5}){
   const a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
-  return [ca/sX,-sa/sX,(-0.5*ca+0.5*sa)/sX+0.5-offX,
-          sa/sY, ca/sY,(-0.5*sa-0.5*ca)/sY+0.5-offY];
+  // M = T(offset) . T(pivot) . R(yaw) . S(scale) . T(-pivot), inverted for sampling. Rotation and
+  // scale happen about PIVOT, not about the tile centre \u2014 the difference between turning a ridge
+  // in place and swinging it across the map.
+  return [ca/sX,-sa/sX,(-ca*pivX+sa*pivY)/sX+pivX-offX,
+          sa/sY, ca/sY,(-sa*pivX-ca*pivY)/sY+pivY-offY];
 }
 function xfMul(inner,outer){        // result(u,v) = inner(outer(u,v)) — outer applied first
   if(!inner)return outer;if(!outer)return inner;
@@ -678,7 +681,7 @@ function atFeatureScale(inp,k,fn){
   return o;
 }
 // TRANSFORM — move / rotate / scale the terrain itself (Gaea's Transform node). scale>1 magnifies.
-function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,edge="clamp"}){
+function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5,edge="clamp"}){
   const n=RES,o=newField(),a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
   const wrap=(t)=>edge==="wrap"?((t%n)+n)%n
@@ -688,9 +691,9 @@ function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,edge="clamp"
     const g=(xx,yy)=>inp[wrap(yy)*n+wrap(xx)];
     return lerp(lerp(g(x0,y0),g(x0+1,y0),tx),lerp(g(x0,y0+1),g(x0+1,y0+1),tx),ty);};
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=(x+0.5)/n-0.5,v=(y+0.5)/n-0.5;
+    const u=(x+0.5)/n-pivX,v=(y+0.5)/n-pivY;
     let ru=(u*ca-v*sa)/sX,rv=(u*sa+v*ca)/sY;    // inverse map: sample a smaller region to magnify
-    ru+=0.5-offX;rv+=0.5-offY;
+    ru+=pivX-offX;rv+=pivY-offY;
     o[y*n+x]=samp(ru*n-0.5,rv*n-0.5);}
   return o;
 }
@@ -940,7 +943,7 @@ const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combi
    and has to be resampled. Honest caveat: Ridged/Voronoi/Gradient self-normalise, a whole-field
    reduction — geometry is exact, but the value range is re-stretched over the new window. */
 const EXACT_TYPES=new Set(["perlin","ridged","worley","gradient","shape","constant",
-  "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin"]);
+  "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","stampn"]);
 function exactChain(id,guard){
   guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
   const nd=nodeById(id);if(!nd||!EXACT_TYPES.has(nd.type))return false;
@@ -996,6 +999,21 @@ const TYPES={
   maxmin:{cat:"comb",name:"Max / Min",ins:["A","B"],desc:"Union (max) or intersection (min).",
     params:[P.seg("op","Op",[["max","Max"],["min","Min"]],"max")],
     eval:(p,ins)=>combine(ins[0],ins[1],p.op==="max"?Math.max:Math.min)},
+  stampn:{cat:"comb",name:"Stamp",ins:["Base","Patch","Mask"],
+    desc:"Drop a placed feature onto a base terrain. This is the other half of placement: a Transform says WHERE the feature goes, a Shape mask says HOW FAR it reaches, and Stamp composites it in.",
+    params:[P.seg("op","Mode",[["max","Max"],["add","Add"],["replace","Replace"]],"max"),
+      P.slider("amount","Amount",0,1,1)],
+    // Mirrors reference-impl/placement.py `stamp`. Max is the default because it unions a landform in
+    // WITHOUT trenching what is already there; Add accumulates relief (two overlapping fans build up);
+    // Replace overwrites, which only reads well inside a soft-edged mask.
+    eval:(p,ins)=>{
+      const base=ins[0]||newField();if(!ins[1])return base;
+      const patch=ins[1],o=newField();
+      for(let i=0;i<o.length;i++){
+        const v=p.op==="max"?Math.max(base[i],patch[i]):p.op==="add"?base[i]+patch[i]:patch[i];
+        o[i]=base[i]+(v-base[i])*p.amount;}
+      return maskApply(base,o,ins[2]);},
+    note:"Without a <b>Mask</b> the patch applies everywhere it is defined, so a Shape (or any mask) is what turns this from a global combine into a <i>placement</i>. Because masking is a post-process lerp, dragging the mask never re-runs whatever generated the patch."},
   smin:{cat:"comb",name:"Smooth Min",ins:["A","B"],desc:"Crease-free smooth union (Quilez smin).",
     params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
     eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
@@ -1022,28 +1040,35 @@ const TYPES={
   clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
-  transform:{cat:"filt",name:"Transform",ins:["In"],desc:"Move, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",
+  transform:{cat:"filt",name:"Transform",ins:["In","Mask"],desc:"Translate, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",
     params:[P.seg("mode","Sampling",[["auto","Exact"],["raster","Raster"]],"auto"),
       P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("aspect","Scale Y",0.25,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
-      P.slider("angle","Angle",0,360,0,1,v=>(v|0)+"\u00b0"),
-      P.slider("offX","Offset X",-1,1,0,0.01),P.slider("offY","Offset Y",-1,1,0,0.01),
+      P.slider("angle","Rotation",0,360,0,1,v=>(v|0)+"\u00b0"),
+      P.slider("offX","Move X",-1,1,0,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("offY","Move Y",-1,1,0,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("pivX","Pivot X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("pivY","Pivot Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.seg("edge","Edges",[["clamp","Clamp"],["wrap","Wrap"],["mirror","Mirror"]],"clamp")],
     // PLACE BEFORE YOU SAMPLE. If everything upstream is procedural, push this placement down into
-    // the generators' coordinates and re-evaluate \u2014 exact, and the terrain simply continues past the
+    // the generators' coordinates and re-evaluate — exact, and the terrain simply continues past the
     // old tile edge instead of clamping. Otherwise fall back to resampling the finished raster.
     eval:(p,ins,node)=>{
       const src=inputEdge(node.id,0);
+      // The Mask branch never has to be procedural: masking is a post-process lerp against the
+      // UNtransformed input, so only slot 0 decides whether the exact path is available.
       if(p.mode!=="raster"&&src&&exactChain(src.from)){
         const prev=XF;XF=xfMul(xfFromParams(p),prev);     // compose: N transforms, ONE evaluation
-        try{const f=evalExact(src.from,new Set());node._xfMode="exact";return f||newField();}
-        finally{XF=prev;}
+        let f;try{f=evalExact(src.from,new Set());}finally{XF=prev;}
+        node._xfMode="exact";
+        return maskApply(ins[0]||newField(),f||newField(),ins[1]);
       }
       node._xfMode=ins[0]?"raster":"none";
-      return ins[0]?transformField(ins[0],p):newField();},
-    info:(nd)=>nd._xfMode==="raster"
-      ? "<b>Raster resample.</b> The input cannot be re-evaluated \u2014 an erosion sim, a blur, an imported DEM \u2014 so the finished heightmap is filtered. Bilinear resampling is a low-pass: on fBm here it costs ~25% of the fine detail for one non-integer move and ~54% over four. Put the Transform <i>below</i> the erosion to place exactly instead."
-      : "<b>Exact placement.</b> Everything upstream is procedural, so it is re-evaluated at transformed coordinates rather than resampled: no filtering, no detail loss, and the terrain continues past the old tile edge instead of clamping (Edges is unused). Stacked Transforms compose into one matrix, so they still cost one evaluation."},
+      return ins[0]?maskApply(ins[0],transformField(ins[0],p),ins[1]):newField();},
+    info:(nd)=>(nd._xfMode==="raster"
+      ? "<b>Raster resample.</b> The input cannot be re-evaluated — an erosion sim, a blur, an imported DEM — so the finished heightmap is filtered. Bilinear resampling is a low-pass: on fBm here it costs ~25% of the fine detail for one non-integer move and ~54% over four. Put the Transform <i>below</i> the erosion to place exactly instead."
+      : "<b>Exact placement.</b> Everything upstream is procedural, so it is re-evaluated at transformed coordinates rather than resampled: no filtering, no detail loss, and the terrain continues past the old tile edge instead of clamping (Edges is unused). Stacked Transforms compose into one matrix, so they still cost one evaluation.")
+      + "<br><br>Rotation is about the <b>up axis</b> — the only rotation a heightfield admits, since tipping the surface would make it multi-valued (two heights over one point). <b>Pivot</b> is the point rotation and scale turn about: centred spins a feature in place, moved swings it around that point. <b>Mask</b> confines the move to where it is bright."},
   invert:{cat:"filt",name:"Invert",ins:["In"],desc:"1 − height.",params:[],
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
@@ -1404,8 +1429,9 @@ function buildProps(){
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
-  if(def.info){const nt=document.createElement("div");nt.className="hint";
-    nt.style.margin="0 0 10px";nt.innerHTML=def.info(selected);body.appendChild(nt);}
+  const note=def.info?def.info(selected):def.note;
+  if(note){const nt=document.createElement("div");nt.className="hint";
+    nt.style.margin="0 0 10px";nt.innerHTML=note;body.appendChild(nt);}
   def.params.forEach(pr=>body.appendChild(buildField(pr)));
   if(selected.type==="import"){const b=document.createElement("button");b.className="btn";b.style.width="100%";b.style.marginTop="8px";
     b.textContent=selected._dem?"Replace heightmap…":"Load heightmap file…";b.onclick=()=>{importTarget=selected;$("#fileInput").click();};
