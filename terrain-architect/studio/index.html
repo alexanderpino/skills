@@ -780,7 +780,7 @@ function peakField(p){
   // drainage cells across the tile. `detail` is the density that actually controls how mountainous
   // it looks: at 1x the dome carries ~10 spurs, at 3x ~40, which is where the reference sits.
   const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
-  const relief=p.relief;
+  const relief=p.relief,skirt=Math.max(p.skirt||1.4,0.15);
   let h=newField(0);
   const cover=newField(0);                        // the primitive's own footprint, kept for later
   const envF=newField(0),netF=newField(1);
@@ -794,7 +794,12 @@ function peakField(p){
                +0.14*fbm2(Math.cos(th)*3.7,Math.sin(th)*3.7,p.seed+22,3);
     const r=Math.hypot(rx,ry)/(reach*Math.max(wob,0.35));
     if(r>=1)continue;
-    const env=Math.pow(1-r*r,1.25);                 // dome, concave flanks, soft skirt at the base
+    // THE SKIRT. (1-r^2)^p is a BELL: measured, its slope at the summit is -0.001, i.e. flat on top
+    // and steepest halfway out. A bell with texture on it is pudding on a plate. (1-r)^p is steep at
+    // the summit and convex all the way out -- the concave pediment / talus apron a real massif
+    // grades into. `skirt` is that exponent: 1 is a straight cone, higher is a sharper peak with a
+    // wider sprawling apron, below 1 is a plateau with an abrupt rim.
+    const env=Math.pow(1-r,skirt);
     // DENSE dissection: modulated Voronoi, cell edges = spur crests, interiors = valleys
     const wx=fbm2(u*ncell*0.35,v*ncell*0.35,p.seed+3,4)+0.5*fbm2(u*ncell*0.9,v*ncell*0.9,p.seed+13,4);
     const wy=fbm2(u*ncell*0.35+4.7,v*ncell*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*ncell*0.9+1.9,v*ncell*0.9+6.1,p.seed+14,4);
@@ -803,7 +808,7 @@ function peakField(p){
     const i=y*n+x;
     envF[i]=env;
     netF[i]=(1-st.spur)*e1+st.spur*e2;
-    cover[i]=clamp((1-r)/0.06,0,1);               // soft only in the last 6% of the radius
+    cover[i]=1;                                   // inside the footprint; see the support cut below
   }
   // Normalise the network by a PERCENTILE of itself, not a constant. Worley F2-F1 scales with cell
   // size, so a fixed divisor makes incision shallower as the cells get finer -- which made the
@@ -820,10 +825,12 @@ function peakField(p){
   // style -- and radial drainage is exactly what the reference shows. 3x the style's droplet budget.
   if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*3*n*n),seed:p.seed+11,radius:2});
   if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
-  // Confine to the footprint. Erosion scatters deposit onto the surrounding flat, which reads as
-  // speckle on ground the primitive does not own -- and a primitive that stays inside its footprint
-  // is the one that composites cleanly under Stamp and a placement mask.
-  for(let i=0;i<h.length;i++)h[i]*=cover[i];
+  // Confine to the footprint -- erosion scatters deposit onto ground the primitive does not own, and
+  // a primitive that respects its footprint composites cleanly under Stamp and a placement mask.
+  // This is a BINARY cut at the envelope's own support, not a ramp: (1-r)^skirt already reaches zero
+  // with near-zero slope, so there is nothing left to feather and a collar would only re-introduce
+  // the hard seam it was meant to hide.
+  for(let i=0;i<h.length;i++)if(cover[i]<=0)h[i]=0;
   if(st.terr){const[,mx]=fieldRange(h);
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
   return h;
@@ -1251,7 +1258,8 @@ const TYPES={
       P.int("ridges","Crest lines",1,5,2),
       P.slider("detail","Drainage detail",0.4,3.5,2.6,0.1,v=>v.toFixed(1)+"\u00d7"),
       P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
-      P.slider("relief","Valley depth",0.1,0.95,0.66,0.01)],
+      P.slider("relief","Valley depth",0.1,0.95,0.80,0.01),
+      P.slider("skirt","Skirt curve",0.6,3,1.4,0.05,v=>v.toFixed(2))],
     eval:(p)=>mountainField(p),
     note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
   layout:{cat:"gen",name:"Layout",ins:["Base","Mask"],

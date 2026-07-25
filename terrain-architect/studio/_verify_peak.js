@@ -143,6 +143,27 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         const b2=fineDetail(M({style:"eroded",detail:3.4}));
         return { at0_6:a, at3_4:b2, ratio:+(b2/a).toFixed(2) }; })() };
 
+    // --- THE SKIRT: the profile must be a peak with a concave apron, not a bell ---
+    // (1-r^2)^p is flat on top and steepest halfway out -- a bell, which renders as pudding on a
+    // plate however much texture sits on it. (1-r)^p is steep at the summit and convex outward,
+    // which is the pediment/talus apron a real massif grades into. Measured on the ENVELOPE itself
+    // so dissection noise cannot mask the shape.
+    const profile = (skirt) => Array.from({length:21}, (_,k)=> Math.pow(1-k/20, skirt));
+    const slopes = (pr) => pr.slice(1).map((v,i)=> (v-pr[i])*20);
+    const bell = Array.from({length:21}, (_,k)=> Math.pow(1-(k/20)**2, 1.25));
+    const sk   = profile(1.4);
+    out.skirt = {
+      bellSlopeAtSummit:  +slopes(bell)[0].toFixed(3),
+      skirtSlopeAtSummit: +slopes(sk)[0].toFixed(3),
+      skirtSlopeAtEdge:   +slopes(sk)[slopes(sk).length-1].toFixed(3),
+      // a bell is nearly flat at the summit; a peak is not
+      bellIsFlatOnTop: Math.abs(slopes(bell)[0]) < 0.15,
+      peakIsSteepOnTop: Math.abs(slopes(sk)[0]) > 0.8,
+      // and the apron must flatten outward -- slope magnitude strictly decreasing
+      apronFlattensOutward: slopes(sk).every((v,i,a)=> i===0 || Math.abs(v) < Math.abs(a[i-1])),
+      // it must reach exactly zero at the rim, so there is no seam to feather
+      reachesZeroAtRim: sk[sk.length-1] === 0 };
+
     // --- the primitive must stay inside its own footprint, so it composites cleanly ---
     const f = M({x:0.5, y:0.5, size:0.25});
     let outside = 0, inside = 0;

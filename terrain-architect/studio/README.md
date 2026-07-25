@@ -248,6 +248,21 @@ choosing what to place three of:
   them. The statistics were not wrong; they simply do not measure the thing that makes a mountain look
   like one, and nobody had rendered the output to check.
 
+  **The skirt is the difference between a mountain and a pudding.** An outside review called the
+  render "pudding on a plate" and blamed the base noise, suggesting we swap in Cellular or Ridged
+  instead of Perlin. That part was wrong — the basis was already modulated Voronoi (`worleyAt` F2−F1,
+  two octaves) with two-scale domain warping. The real defect was the envelope: `(1−r²)^p` has a
+  measured slope of **−0.001 at the summit**, i.e. flat on top and steepest halfway out. That is a
+  *bell*, and no amount of texture rescues a bell. `(1−r)^skirt` is steep at the summit (−1.386) and
+  convex all the way out to −0.302 at the rim — the concave **pediment / talus apron** a real massif
+  grades into, reaching exactly zero so there is no seam to feather. The **Skirt curve** parameter is
+  that exponent: 1 is a straight cone, higher gives a sharper peak with a wider sprawling apron, below
+  1 gives a plateau with an abrupt rim.
+
+  The footprint cut is now **binary at the envelope's own support** rather than a linear collar over
+  the last 6% of the radius. The collar was mine, added to kill erosion speckle, and it re-introduced
+  exactly the hard seam it was meant to hide.
+
   Measured against Gaea's default Alpine mountain, the macro shape *is* roughly a radial dome. What
   makes it read as a mountain is the **density of drainage dissection** — dozens of fine valleys
   running out from the high ground with sharp spurs between them. So Peak is a wobbled dome envelope,
