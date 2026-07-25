@@ -222,7 +222,10 @@ droplet(map, x, y):
 `tests/test_streampower.py` — the decisive check: the steady-state slope–area exponent comes out at
 −m/n (`09`). `K` may be a scalar, an (n,m) **field**, or a callable **`K(p,h)`** re-evaluated on the
 surface each step — the lithology coupling (`11`): differential erosion of hard/soft beds, verified by
-`tests/test_lithology.py` (relief scales as `K^(−1/n)`; hard rock stands proud; tilted beds → cuestas).*
+`tests/test_lithology.py` (relief scales as `K^(−1/n)`; hard rock stands proud; tilted beds → cuestas).
+The Cordonnier **hillslope-diffusion companion term is coupled in the same solver** via `D=` (scalar
+or field), sub-cycled to stay under the explicit stability limit — see "Do not skip the diffusion
+term" below.*
 
 This is the ★★★★★ row, and the reason is not the equation. The equation is one line:
 
@@ -312,6 +315,36 @@ Dirichlet-only at raster borders.
 **Do not skip the diffusion term.** Stream power without it produces knife-edge interfluves
 and reads as obviously synthetic. In practice you can substitute a thermal erosion pass
 (`05`) for the diffusion, which is cheaper and gives you the repose-angle behaviour too.
+
+*Runnable reference: `erosion_streampower.stream_power_evolve(..., D=)`. It is coupled **inside**
+the solver rather than left as a separate pass the caller bolts on, because `D` and `K` are not
+independent — their competition is what selects a valley spacing, so two un-coupled passes give
+you no handle on the one landscape property the pair exists to set. Measured on 80×80, K=1,
+m=0.5, 200 steps:*
+
+| `D` | valley spacing (cells) | mean \|∇²h\| (divide roughness) |
+|---|---|---|
+| 0.0 | 3.32 | 1.4135 |
+| 0.1 | 3.38 | 0.6797 |
+| 0.5 | 3.81 | 0.2588 |
+| 1.5 | 6.33 | 0.1078 |
+| 4.0 | 9.76 | 0.0512 |
+| 10.0 | *network erased* | 0.0204 |
+
+*and at fixed `D`=0.5, raising `K` 1→2→4 tightens spacing 3.81→3.59→3.37. Two traps, both hit
+here: measure valley **spacing** (mean distance to the nearest channel), not channel **count** —
+the count reads flat (360/363/316/211/215 over that sweep) because at these grid sizes the network
+fills the domain regardless; and past some `D` diffusion **erases** the network rather than
+coarsening it, at which point a slope–area fit degrades for want of anything to fit. Verified by
+`tests/test_streampower.py`.*
+
+**The stability limit must be met strictly, not exactly.** The explicit Laplacian is stable for
+`D·dt/Δx² ≤ 0.25`, so sub-cycling seems like a matter of `ceil(D·dt / (0.25·Δx²))`. That expression
+lands *exactly* on `0.25` for every `D·dt` that divides evenly — and at exactly `0.25` the
+checkerboard mode's amplification is `1 − 8c = −1`, so it flips sign forever and never damps. The
+field stays finite and mass stays conserved while the pass **roughens** the terrain: mean `|∇²h|`
+*rose* 0.68 → 2.36 across `D` = 0.1 → 10 instead of falling. Keep the conventional 0.9 safety factor
+(`c` = 0.225), and assert the *direction* of the effect rather than merely that the output is finite.
 
 **Verification for stream power:** plot the long profile of the main channel (elevation vs
 distance downstream). It must be concave. Plot `log(S)` vs `log(A)` for channel cells — it

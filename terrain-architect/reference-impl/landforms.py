@@ -218,6 +218,23 @@ def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0
     (`np.maximum` / `ops_filters.smax`), then run a real hydraulic + thermal pass (see `main`). Returns height (m).
     `cells`/`warp`/`relief` override the style's drainage-cell count, distortion, and valley-incision depth.
 
+    **Why the envelope is a polyline and not a radial falloff.** The construction is `envelope x
+    texture`, and that form has one catastrophic degenerate case: if the envelope is RADIAL —
+    `(1-r)**k`, a bell, a cone — then no amount of texture rescues it, because multiplying a solid
+    of revolution by anything leaves the silhouette revolved. It renders as a tipi tent, and every
+    obvious metric (relief in range, one dominant summit, summit above the mean, margins below it,
+    deep interior incision) passes, because a cone satisfies all of them. Here the envelope is
+    instead a wandering **crest-line polyline SDF** (`n_ridges` crests unioned), which is
+    anisotropic from the start; the Voronoi network then dissects an already-asymmetric mass rather
+    than grooving a cone. Measured at n=192: rotational correlation about the summit 0.073-0.337
+    across the five styles, against 1.000 for a cone and 0.092 for pure noise; a best-fit radial
+    profile leaves 0.79-0.91 of the variance unexplained, against 0.022 for a cone. Pinned by
+    `tests/test_landforms.py::test_mountain_is_not_a_solid_of_revolution`, controls included.
+
+    The general rule, for any feature primitive: **build the asymmetric mass first, dissect it
+    after.** Starting from a radial envelope and cutting into it cannot produce a mountain; the
+    order is not interchangeable. See `10-primitives-ops-filters.md`.
+
     Note (composability): the ridge network is scaled by a whole-tile `np.percentile` of the Worley field,
     so this is a **single-shot, whole-tile generator** — it is NOT tile-composable (a different crop
     renormalises differently and the seam would not match), the evaluation-dependent-normalisation caveat

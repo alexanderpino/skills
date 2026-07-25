@@ -528,6 +528,21 @@ level (water leaves, erosion cuts inward), a wall (water pools, terrain bulges),
 The default of "whatever the loop happens to do at index 0" produces a visible frame of
 artefacts. State it in the graph spec.
 
+**Build the mass before you dissect it.** A feature primitive written as `envelope(r) × texture`
+with a *radial* envelope is a solid of revolution, and stays one however good the texture — it
+renders as a tipi tent while satisfying every obvious assertion, because a cone satisfies them too
+(relief in range, one dominant summit, monotone descent, deep incision). Build the asymmetric mass
+first — crest-line SDFs, unioned sub-masses, saddles, faces of unequal steepness — then dissect. The
+order is not interchangeable: dissection is local and cannot introduce large-scale asymmetry that
+was never there. Test it with a **cone as the control**, not a bare threshold (`10`).
+
+**A metric with no control is not evidence.** Terrain claims are almost always statistics of a
+field, and a statistic can read green while measuring nothing — averaged over a region where the
+effect doesn't live, saturated by the grid resolution, or asserting an invariant the failure case
+also satisfies. Every claimed measurement ships with a case that must *fail* (a cone, pure noise,
+the same seed twice) so the number has a scale, and thresholds are set from measured spreads rather
+than chosen in advance. `09` catalogues the specific ways this has gone wrong here.
+
 ## When you are reviewing, not designing
 
 Look for these in order — they account for most real defects:

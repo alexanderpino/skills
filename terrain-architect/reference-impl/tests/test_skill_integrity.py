@@ -42,8 +42,18 @@ def test_literal_skill_paths_resolve():
     for markdown in SKILL_ROOT.rglob("*.md"):
         text = markdown.read_text(encoding="utf-8")
         for raw_path in pattern.findall(text):
-            path = raw_path.rstrip(".,;:)")
-            assert (SKILL_ROOT / path).exists(), f"{markdown}: missing {path}"
+            # A pytest node ID (`tests/test_x.py::test_name`) is a legitimate way to cite a
+            # specific test; check the file it names, not the whole node ID. Without this the
+            # guard rejects the most precise citation form available and pushes prose toward
+            # vaguer references — which is the opposite of what it exists to enforce.
+            path, _, node = raw_path.partition("::")
+            path = path.rstrip(".,;:)")
+            target = SKILL_ROOT / path
+            assert target.exists(), f"{markdown}: missing {path}"
+            if node:                      # ...and the named test must actually be defined in it
+                node = node.rstrip(".,;:)")
+                assert f"def {node}(" in target.read_text(encoding="utf-8"), (
+                    f"{markdown}: {path} has no test named {node}")
 
 
 def test_crossvalidation_claim_matches_dependencies():

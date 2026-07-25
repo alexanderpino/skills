@@ -49,7 +49,7 @@ Verdict scale: **SOTA** · **solid (not SOTA)** · **superseded** · **gap**. "U
 | **Fluvial (large-scale)** | stream-power incision, Braun & Willett 2013 (×-validated vs Landlab) | Cordonnier 2016 uplift+SPL; Schott 2023 interactive; McDonald & Cordonnier 2026 momentum particles | **SOTA core** — but **detachment-limited: incises, never deposits** | add a transport-limited / sediment-flux closure (see deposition) |
 | **Hydraulic (detail/interactive)** | Lagrangian droplet (Beyer/Lague) | Eulerian virtual-pipe (Mei 2007), SPH (Krištof 2009) | **solid, not SOTA** | keep as a fast detail pass; don't make physical claims on it |
 | **Tectonic / orogeny** | isostasy + SPL uplift + **fault scarps, fault-as-K & a Voronoi plate sim** (`tectonics.py`) | Cordonnier 2016 uplift+fluvial; Sculpting Mountains 2018 | **SOTA & ahead of all commercial tools** | foreground it; optional flexural isostasy / folds |
-| **Thermal / hillslope** | Musgrave 1989 angle-of-repose talus | repose (rock) **+ nonlinear diffusion** Roering 1999 (soil creep) | **solid, partly superseded** | add linear+nonlinear hillslope diffusion beside the repose CA |
+| **Thermal / hillslope** | Musgrave 1989 angle-of-repose talus **+ linear hillslope diffusion coupled inside the SPL solver** (`stream_power_evolve(D=)`, Cordonnier's companion term; scalar or field `D`) | repose (rock) + linear diffusion (Culling) **+ nonlinear diffusion** Roering 1999 (soil creep) | **solid**; linear coupling done, nonlinear still missing | add the Roering 1999 nonlinear (slope-dependent) closure beside the linear term |
 | **Aeolian (dunes + abrasion)** | Werner 1995 slab CA **+ yardang wind abrasion** (`aeolian.yardang`, Ward & Greeley 1984) | Desertscape (Paris 2019): abrasion, reptation, dune types; GPU 2023 | **solid, not SOTA** (still ahead of the tools) | adopt Desertscape extensions |
 | **Glacial** | SIA shallow ice **+ `glacierStep` bed abrasion** (`glacier.glacier_carve`; ice was flow-only before) | Cordonnier 2023 *Forming Terrains by Glacial Erosion* + IGM learned flow (Jouvet 2022) | **solid, superseded for accuracy** | min: hybrid SIA+SSA + implicit solve (explicit is stiff on rough beds); frontier: IGM emulator + multi-scale advection |
 | **Coastal** | simple cliff retreat | SCAPE (Walkden & Hall 2005) — no strong CG SOTA | **pragmatic / acceptable** | wave-energy platform down-wearing + talus feedback |
@@ -124,8 +124,11 @@ Five separable upgrades over a naive slope+height splat, all documented in the t
    the cross-validation oracle.)
 2. **Layered material representation** (bedrock/regolith/sediment/water/snow). Unlocks #1 *and* seasons; it's the
    Houdini/Beneš-2001 representation. Prereq for dynamics.
-3. **Nonlinear hillslope diffusion** (Roering 1999) beside the repose CA → the standard "SPL channels + diffusion
-   hillslopes" LEM, and it's what makes the **PSD spectral break** appear (Part 3's top discriminator).
+3. **Nonlinear hillslope diffusion** (Roering 1999) beside the repose CA. The **linear** half is now done —
+   `stream_power_evolve(D=)` couples `+D∇²h` inside the solver, giving the standard "SPL channels + diffusion
+   hillslopes" LEM and a measured handle on valley spacing (3.32→9.76 cells) and divide roughness
+   (1.41→0.05). What remains is the slope-dependent `q ∝ ∇h / (1 − |∇h|²/S_c²)` closure, which is what makes
+   the **PSD spectral break** appear (Part 3's top discriminator).
 4. **The realism-metric harness** (slope–area θ, Hack h, Horton, HI, PSD-break, geomorphons) vs matched real
    DEMs. *This is the instrument that answers "are we best" continuously* — build it before chasing more features.
 5. **Texture:** feed the new deposition/wear field into the substance masks; add PBR channels + anti-tiling for

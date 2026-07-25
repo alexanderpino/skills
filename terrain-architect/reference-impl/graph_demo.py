@@ -174,7 +174,8 @@ def _droplet_fn(p, ins, ctx):
 def _streampower_fn(p, ins, ctx):
     uplift = np.full((ctx.resolution, ctx.resolution), p["uplift"], dtype=np.float64)
     return erosion_streampower.stream_power_evolve(
-        ins[0], uplift, p["K"], p["m"], p["dt"], int(p["iters"]), cellsize=ctx.cellsize)
+        ins[0], uplift, p["K"], p["m"], p["dt"], int(p["iters"]), cellsize=ctx.cellsize,
+        D=p.get("D", 0.0))          # hillslope diffusion companion term; 0 = pure fluvial
 
 
 def _thermal_fn(p, ins, ctx):

@@ -96,6 +96,70 @@ def test_mountain_is_organized_not_isotropic_noise():
     assert np.ptp(core) > 0.4 * h.max()
 
 
+def _rotational_correlation(f, degs=(30, 60, 90, 120, 150)):
+    """Correlate the field with itself rotated about its own summit. A SOLID OF REVOLUTION —
+    a cone, a bell, a tent — is invariant under that rotation and scores ~1.0. Nearest-neighbour
+    sampling, applied identically to the field and the controls."""
+    n = f.shape[0]
+    bi = int(np.argmax(f))
+    by, bx = bi // n, bi % n
+    ii, jj = np.mgrid[0:n, 0:n]
+    dy, dx = ii - by, jj - bx
+    keep = np.hypot(dy, dx) < 0.45 * n
+    out = []
+    for d in degs:
+        a = np.deg2rad(d)
+        sy = np.rint(by + dy * np.cos(a) - dx * np.sin(a)).astype(int)
+        sx = np.rint(bx + dy * np.sin(a) + dx * np.cos(a)).astype(int)
+        ok = keep & (sy >= 0) & (sy < n) & (sx >= 0) & (sx < n)
+        a1, a2 = f[ii[ok], jj[ok]], f[sy[ok], sx[ok]]
+        out.append(1.0 if a1.std() < 1e-12 or a2.std() < 1e-12
+                   else float(np.corrcoef(a1, a2)[0, 1]))
+    return float(np.mean(out))
+
+
+def _radial_residual(f):
+    """Fraction of the field's variance a best-fit RADIAL PROFILE about the summit cannot
+    explain. A cone ~0.02 (a radial profile IS the cone); pure noise ~0.97."""
+    n = f.shape[0]
+    bi = int(np.argmax(f))
+    by, bx = bi // n, bi % n
+    ii, jj = np.mgrid[0:n, 0:n]
+    r = np.hypot(ii - by, jj - bx)
+    nb = 48
+    b = np.clip((r / (0.5 * n) * nb).astype(int), 0, nb - 1)
+    prof = np.array([f[b == k].mean() if (b == k).any() else 0.0 for k in range(nb)])
+    return float((f - prof[b]).std() / (f.std() + 1e-12))
+
+
+def test_mountain_is_not_a_solid_of_revolution():
+    """The failure mode this pins is a cone with grooves cut in it — the "tipi tent". It is worth
+    a dedicated test because the OTHER mountain assertions above (relief in range, summit above
+    the mean, margins below the mean, deep interior incision) are ALL satisfied by a smooth cone,
+    so they cannot catch it. The controls are asserted too: if the metric ever stops separating a
+    cone from noise, this test fails on the control rather than passing vacuously.
+
+    What keeps `mountain` off the cone is that its envelope is a wandering crest-line POLYLINE
+    SDF, not a radial falloff. If anyone ever "simplifies" that to `(1-r)**k`, this test is what
+    should stop them. Measured at n=192: rotational correlation 0.073-0.337 across the five
+    styles (cone 1.000, noise 0.092); radial residual 0.79-0.91 (cone 0.022, noise 0.965)."""
+    n = 96
+    ii, jj = np.mgrid[0:n, 0:n]
+    cone = np.maximum(0.0, 1.0 - np.hypot(ii - n / 2, jj - n / 2) / (0.45 * n))
+    rng = np.random.default_rng(0)
+    pure = rng.normal(size=(n, n))
+
+    assert _rotational_correlation(cone) > 0.95, "control broken: a cone must read as revolved"
+    assert _radial_residual(cone) < 0.15, "control broken: a radial profile must explain a cone"
+    assert _rotational_correlation(pure) < 0.30, "control broken: noise must not read as revolved"
+
+    for style in ("basic", "eroded", "alpine", "old", "strata"):
+        h = L.mountain((n, n), 30.0, seed=7, n_ridges=3, style=style)
+        rc, rr = _rotational_correlation(h), _radial_residual(h)
+        assert rc < 0.60, f"{style}: rotationally symmetric (corr {rc:.3f}) — it is a cone"
+        assert rr > 0.55, f"{style}: a radial profile explains it (residual {rr:.3f}) — it is a cone"
+
+
 def test_mountain_styles_are_distinct():
     """Gaea's presets are genuinely different landforms: 'old' is subdued/rounded (less rough) than the
     sharp 'alpine', and every style is a distinct field."""

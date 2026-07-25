@@ -53,7 +53,9 @@ grid so its footprint widens; only the delta is carried back).
 **Solver atoms (iterative, stateful — cannot be composed from static fields):** flow routing
 (`flow.priority_flood_fill`, `d8_receivers`, `d8_accumulation`, `mfd_accumulation`), stream-power
 incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a field, or a callable
-`K(p,h)` for lithology-driven differential erosion), droplet erosion (`erosion_droplet.droplet_erode`),
+`K(p,h)` for lithology-driven differential erosion, and `D=` couples the Cordonnier hillslope-diffusion
+companion term in the same loop — the pair sets valley spacing and divide roughness),
+droplet erosion (`erosion_droplet.droplet_erode`),
 thermal/talus (`erosion_thermal.thermal_erosion`), hillslope diffusion (`diffusion.hillslope_diffuse`),
 virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), shallow-water
 (`shallow_water.simulate`), lateral fluvial migration (`meander.migrate`, with the F-tier

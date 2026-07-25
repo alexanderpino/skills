@@ -37,6 +37,46 @@ base. Real hills have neither. If a primitive is going to be the base of a mount
 `smoothstep` on it or run thermal erosion (`05`) afterward — the latter is more honest and
 gives you a repose-angle profile for free.
 
+### Build the mass first, dissect it after
+
+The single most expensive mistake in this whole file, measured in rebuilds. Feature primitives are
+almost always written as **envelope × texture**:
+
+```
+h(p) = envelope(|p - centre|) * detail(p)          // <-- the trap
+```
+
+If the envelope is a function of **radius alone** — `(1-r)^k`, a bell, a cone, a Gaussian — the
+result is a **solid of revolution**, and multiplying it by texture does not change that. The
+silhouette stays revolved however good the texture is. It renders as a tipi tent. Starting with a
+cone and cutting radial grooves into it leaves a tent no matter how good the grooves are.
+
+This is hard to catch because it hides from the obvious checks. A smooth cone satisfies *all* of:
+relief within the requested range, exactly one dominant summit, summit well above the mean, margins
+below the mean, monotone radial descent, deep interior incision. Those are the assertions a
+mountain primitive naturally attracts, and every one of them passes.
+
+**The fix is an ordering, not a parameter.** Build an *asymmetric mass* first — a wandering
+crest-line polyline SDF, several unioned sub-masses, saddles, faces of unequal steepness — and only
+then dissect it with the Voronoi/drainage network. The mass carries the anisotropy; the dissection
+adds relief within it. Reversing the two cannot work, because dissection is a local operation and
+cannot introduce a large-scale asymmetry the envelope did not have.
+
+**Two metrics that separate the cases**, both cheap, both needing a cone as the control:
+
+| Metric | Cone | Pure noise | `landforms.mountain` |
+|---|---|---|---|
+| Rotational correlation about the summit (mean over 30–150°) | 1.000 | 0.092 | 0.073–0.337 |
+| Variance a best-fit radial profile leaves unexplained | 0.022 | 0.965 | 0.79–0.91 |
+
+Measure both against a cone every time; a bare threshold with no control is how the tent shipped
+twice. `landforms.mountain` uses the polyline envelope for exactly this reason, pinned by
+`tests/test_landforms.py::test_mountain_is_not_a_solid_of_revolution`.
+
+The same trap applies to any radially-enveloped primitive — volcanoes, craters, hills, islands. A
+volcano genuinely *is* close to a solid of revolution, so there it is fine; a mountain is not, and
+neither is an island.
+
 ## Distance fields (Frisken et al. 2000)
 
 *Adaptively Sampled Distance Fields*, SIGGRAPH 2000 — the canonical ADF reference. For

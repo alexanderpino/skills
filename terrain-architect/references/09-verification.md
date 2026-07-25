@@ -363,7 +363,7 @@ For reviewing an existing graph. Ordered by expected yield.
 **Report findings as: symptom → mechanism → minimal fix.** A graph with one misordered node
 needs one node moved, not a rewrite. Minimal diffs are reviewable; rewrites are not.
 
-## Two failure modes of the measurement itself
+## Failure modes of the measurement itself
 
 **A saturating metric hides the thing you are testing.** Verifying that a 2× magnification really
 doubles feature size by counting zero-crossings gave 2.14× and 5× for true 2× and 4× — the metric
@@ -378,3 +378,59 @@ resolutions using mean per-cell height difference makes a *spikier* fine grid lo
 because cells are closer together. Convert to **slope** (per-cell drop × n) and the same data says
 the fine grid is 3.15× spikier. Whenever a quantity is compared across two grids, state it in units
 that do not contain the grid.
+
+**Averaging over a region where the effect does not live.** A mountain primitive occupies perhaps
+30% of its tile; comparing whole-tile means diluted a real 10% difference between two seeds to
+0.0067 and read as "seeds do nothing". The same error in a different costume: sampling the first
+4000 cells of a field to compare two variants, when those rows are above the feature's footprint
+and identical either way. **Restrict the metric to the support of the thing you are measuring**,
+and if you cannot state where that support is, you are not ready to measure.
+
+**A harness that restates the defaults drifts away from them.** A verifier hard-coded
+`relief: 0.66` and kept passing after the default moved to `0.80`; worse, it never passed the
+`character` parameter at all, so the feature it existed to test was switched off in every run.
+Build test inputs **from the implementation's own defaults** (`TYPES.<node>.params`, the function
+signature, a shared fixture) and override only the one parameter under test. A literal copied into
+a test is a fact that will silently go stale.
+
+**Asserting an invariant the failure case also satisfies.** The clearest instance: a Mountain
+primitive was checked for relief in range, one dominant summit, a summit above the mean, margins
+below the mean, and deep interior incision. A smooth cone satisfies all five, and one shipped
+twice. The fix is not a stricter threshold, it is a **control that must fail** — measure a cone and
+pure noise with the same code, and assert the controls land where they should. If the control ever
+stops separating, the test fails loudly instead of passing vacuously. See
+`tests/test_landforms.py::test_mountain_is_not_a_solid_of_revolution`.
+
+**Thresholds invented before the measurement.** Writing `assert ratio > 3.0` first and then
+adjusting the code until it passes tests the threshold, not the code. Measure first with the
+numbers printed, look at the spread across seeds and parameters, and *then* set the bound — below
+the observed floor, with the observed values recorded in the docstring so the next person can see
+whether a later change moved them.
+
+**A number that is stable across the whole input range is not a measurement.** A "straightness"
+statistic read 0.183 / 0.189 / 0.188 across the entire parameter sweep it was supposed to
+characterise. That is not a weak effect, it is no instrument. Before trusting a green result, run
+the metric at both extremes of its input and confirm the output actually moves; if it does not,
+replace the metric rather than the threshold. When the replacement measures something weaker than
+the original claim, **state the weaker claim** — do not let the wording outrun the instrument.
+
+**When the obvious diagnosis appears, test it before acting on it.** A slope–area fit came out at
+−1.11 instead of −0.5 and the natural reading was "heavy diffusion is contaminating the fit", so
+the channel-area threshold was raised to exclude hillslopes — and the fit got *worse* (−0.35 →
+−0.61 → −1.11), because there were zero channel cells left above the new threshold. Diffusion had
+not contaminated the network, it had **erased** it (max drainage area 3969 → 707). Separately, a
+solver was suspected when the slope–area oracle failed at −0.591 / −1.003 / −1.213; the harness was
+wrong (a structured fBm initial condition with unbalanced uplift never reaches steady state), and
+reproducing the reference conditions gave −0.387 / −0.490 / −0.591, errors of 0.013 / 0.010 /
+0.009. **Suspect the harness at least as readily as the code**, and confirm which one is broken
+with a cheap direct probe before changing either.
+
+**A stability limit met exactly is not met.** The explicit 5-point Laplacian is stable for
+`D·dt/Δx² ≤ 0.25`, and sub-cycling sized with `ceil(D·dt / (0.25·Δx²))` lands *exactly* on 0.25
+whenever `D·dt` divides evenly. At exactly 0.25 the checkerboard mode's amplification factor is
+`1 − 8c = −1`: it flips sign forever and never decays. The field stays finite, mass stays
+conserved, and every blow-up assertion passes — while the diffusion pass **roughens** the terrain
+(mean `|∇²h|` rose 0.68 → 2.36 across `D` = 0.1 → 10 instead of falling). Use the safety factor
+(`diffusion.stable_dt`, 0.9), and test the *direction of the effect*, not merely that the output is
+finite. This is the general shape: an assertion that a result is finite/conserved/non-NaN says
+nothing about whether it is right.
