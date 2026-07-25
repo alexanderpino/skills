@@ -259,6 +259,30 @@ choosing what to place three of:
   that exponent: 1 is a straight cone, higher gives a sharper peak with a wider sprawling apron, below
   1 gives a plateau with an abrupt rim.
 
+  **The skirt is drawn, not typed.** The exponent is gone; the Mountain node carries a curve editor in
+  the properties panel. X is distance from the centre (0 at the summit, 1 at the radius), Y is the
+  elevation multiplier (1 → 0). Drag control points to shape the apron, click empty space to add one,
+  double-click to remove; endpoints stay pinned in X so the curve always spans exactly centre → rim.
+  Presets: **Cone**, **Apron**, **Sweeping**, **Plateau**.
+
+  | | |
+  |---|---|
+  | Interpolation | Monotone cubic Hermite (Fritsch–Carlson) |
+  | Baked to | 256-entry `Float32Array` LUT, once per evaluation |
+  | Read as | one lerped lookup per cell — cheaper than the `pow()` it replaced |
+
+  Monotone cubic rather than a plain bezier or Catmull–Rom for a specific reason: **an overshooting
+  spline is an invalid envelope.** Above 1 puts terrain higher than the summit; below 0 puts it under
+  the plane. Monotone cubic cannot overshoot by construction, so every curve an artist can draw is
+  valid. Verified against a deliberately nasty control set (a near-vertical drop between two nearly
+  flat runs): the LUT stayed inside [0, 1] and stayed monotone throughout. The bake also reproduces
+  the analytic `(1−r)^1.4` it replaced to a max error of ~1e-3, with exact endpoints.
+
+  The curve genuinely drives the landform — mean apron height at 70% of the radius, by preset:
+  Plateau **0.299**, Cone **0.196**, Apron **0.121**, Sweeping **0.043**, all distinct and ordered as
+  the shapes imply. A hand-drawn curve matching no exponent works the same. Dragging a control point
+  in the live widget changes the terrain (mean |Δ| 0.016).
+
   The footprint cut is now **binary at the envelope's own support** rather than a linear collar over
   the last 6% of the radius. The collar was mine, added to kill erosion speckle, and it re-introduced
   exactly the hard seam it was meant to hide.
@@ -517,6 +541,7 @@ node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/G
 node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
 node _verify_range.js                # place 3 Mountains, union with Smooth Max, erode into one range
 node _verify_peak.js                 # prominence: Peak is one summit, Massif is several, neither is noise
+node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule

@@ -656,6 +656,52 @@ function maskApply(base,modified,mask){
   return o;
 }
 
+/* ---- FALLOFF CURVE — the artist draws the transition, the engine reads a LUT.
+   X is distance from the feature centre (0 at the summit, 1 at the radius); Y is the elevation
+   multiplier (1 down to 0). A deep concave curve gives a wide sweeping talus apron; a straight line
+   gives a cone; a convex one gives a plateau with an abrupt rim.
+
+   Interpolation is monotone cubic Hermite (Fritsch-Carlson), NOT a plain Catmull-Rom or bezier,
+   because an overshooting spline between control points would push the multiplier above 1 (terrain
+   above the summit) or below 0 (terrain below the plane). Monotone cubic cannot overshoot by
+   construction, so every curve an artist can draw is a valid envelope.
+
+   The curve bakes once to a 256-entry LUT and the generator does a single lerped lookup per cell --
+   cheaper than the pow() it replaces, and it means an arbitrary drawn shape costs the same as the
+   analytic one. ---- */
+const CURVE_N=256;
+function bakeCurve(pts){
+  const P=(pts||[]).slice().sort((a,b)=>a[0]-b[0]),out=new Float32Array(CURVE_N),m=P.length;
+  if(m===0){out.fill(0);return out;}
+  if(m===1){out.fill(clamp(P[0][1],0,1));return out;}
+  const xs=P.map(q=>q[0]),ys=P.map(q=>q[1]),d=[],tg=[];
+  for(let i=0;i<m-1;i++)d.push((ys[i+1]-ys[i])/Math.max(xs[i+1]-xs[i],1e-6));
+  tg.push(d[0]);
+  for(let i=1;i<m-1;i++){
+    if(d[i-1]*d[i]<=0)tg.push(0);                       // local extremum -> flat, no overshoot
+    else{const h1=Math.max(xs[i]-xs[i-1],1e-6),h2=Math.max(xs[i+1]-xs[i],1e-6);
+      tg.push(3*(h1+h2)/((2*h2+h1)/d[i-1]+(h2+2*h1)/d[i]));}}
+  tg.push(d[m-2]);
+  for(let k=0;k<CURVE_N;k++){
+    const x=k/(CURVE_N-1);
+    if(x<=xs[0]){out[k]=clamp(ys[0],0,1);continue;}
+    if(x>=xs[m-1]){out[k]=clamp(ys[m-1],0,1);continue;}
+    let i=0;while(i<m-2&&x>xs[i+1])i++;
+    const h=Math.max(xs[i+1]-xs[i],1e-6),t=(x-xs[i])/h,t2=t*t,t3=t2*t;
+    out[k]=clamp((2*t3-3*t2+1)*ys[i]+(t3-2*t2+t)*h*tg[i]
+                +(-2*t3+3*t2)*ys[i+1]+(t3-t2)*h*tg[i+1],0,1);}
+  return out;
+}
+function curveAt(lut,x){                                // lerped lookup, so 256 entries read smooth
+  const t=clamp(x,0,1)*(CURVE_N-1),i=Math.floor(t),f=t-i;
+  return i>=CURVE_N-1?lut[CURVE_N-1]:lut[i]+(lut[i+1]-lut[i])*f;
+}
+function curveFromExponent(e,k=6){                      // the analytic (1-x)^e as control points
+  const o=[];for(let i=0;i<k;i++){const x=i/(k-1);o.push([+x.toFixed(3),+Math.pow(1-x,e).toFixed(4)]);}
+  return o;
+}
+const SKIRT_PRESETS=[["Cone",1.0],["Apron",1.4],["Sweeping",2.2],["Plateau",0.65]];
+
 /* ---- LAYOUT — the art-direction layer every terrain tool converges on. World Machine's Layout
    Generator, Houdini's HeightField Project from curves, Gaea's vector drawing, and academically
    Hnaidi et al. 2010 "Feature based terrain generation using diffusion equation" all do the same
@@ -780,7 +826,10 @@ function peakField(p){
   // drainage cells across the tile. `detail` is the density that actually controls how mountainous
   // it looks: at 1x the dome carries ~10 spurs, at 3x ~40, which is where the reference sits.
   const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
-  const relief=p.relief,skirt=Math.max(p.skirt||1.4,0.15);
+  const relief=p.relief;
+  // The artist-drawn skirt, baked once per evaluation. A drawn curve costs the same as the analytic
+  // exponent it replaces -- one lerped lookup per cell instead of a pow().
+  const skirtLUT=bakeCurve(p.skirt&&p.skirt.length?p.skirt:curveFromExponent(1.4));
   let h=newField(0);
   const cover=newField(0);                        // the primitive's own footprint, kept for later
   const envF=newField(0),netF=newField(1);
@@ -794,12 +843,12 @@ function peakField(p){
                +0.14*fbm2(Math.cos(th)*3.7,Math.sin(th)*3.7,p.seed+22,3);
     const r=Math.hypot(rx,ry)/(reach*Math.max(wob,0.35));
     if(r>=1)continue;
-    // THE SKIRT. (1-r^2)^p is a BELL: measured, its slope at the summit is -0.001, i.e. flat on top
-    // and steepest halfway out. A bell with texture on it is pudding on a plate. (1-r)^p is steep at
-    // the summit and convex all the way out -- the concave pediment / talus apron a real massif
-    // grades into. `skirt` is that exponent: 1 is a straight cone, higher is a sharper peak with a
-    // wider sprawling apron, below 1 is a plateau with an abrupt rim.
-    const env=Math.pow(1-r,skirt);
+    // THE SKIRT, now drawn rather than hardcoded. (1-r^2)^p is a BELL: measured, its slope at the
+    // summit is -0.001, flat on top and steepest halfway out, which renders as pudding on a plate.
+    // The default curve is (1-r)^1.4 -- steep at the summit, convex all the way out, the concave
+    // pediment/talus apron a real massif grades into -- but any monotone curve the artist draws is
+    // valid, and the presets span cone / apron / sweeping / plateau.
+    const env=curveAt(skirtLUT,r);                 // X = distance from centre, Y = height multiplier
     // DENSE dissection: modulated Voronoi, cell edges = spur crests, interiors = valleys
     const wx=fbm2(u*ncell*0.35,v*ncell*0.35,p.seed+3,4)+0.5*fbm2(u*ncell*0.9,v*ncell*0.9,p.seed+13,4);
     const wy=fbm2(u*ncell*0.35+4.7,v*ncell*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*ncell*0.9+1.9,v*ncell*0.9+6.1,p.seed+14,4);
@@ -1193,6 +1242,7 @@ const P={
   select:(key,label,opts,def)=>({key,label,type:"select",opts,def}),
   seg:(key,label,opts,def)=>({key,label,type:"seg",opts,def}),
   text:(key,label,def,rows=9)=>({key,label,type:"text",def,rows}),
+  curve:(key,label,def)=>({key,label,type:"curve",def}),
 };
 const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
@@ -1259,7 +1309,7 @@ const TYPES={
       P.slider("detail","Drainage detail",0.4,3.5,2.6,0.1,v=>v.toFixed(1)+"\u00d7"),
       P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("relief","Valley depth",0.1,0.95,0.80,0.01),
-      P.slider("skirt","Skirt curve",0.6,3,1.4,0.05,v=>v.toFixed(2))],
+      P.curve("skirt","Skirt profile",curveFromExponent(1.4))],
     eval:(p)=>mountainField(p),
     note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
   layout:{cat:"gen",name:"Layout",ins:["Base","Mask"],
@@ -1764,6 +1814,69 @@ function buildField(pr){
     const opts=pr.opts||((pr.key==="gradient"||pr.key==="gradientB")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
     const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
     s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
+  }else if(pr.type==="curve"){
+    f.innerHTML=`<div class="frow"><label>${pr.label}</label><span class="val hint" style="font-size:10px">drag \u00b7 click adds \u00b7 dbl-click removes</span></div>`;
+    const nd=selected,W=272,H=132,PAD=10;
+    const cv=document.createElement("canvas");cv.width=W*2;cv.height=H*2;
+    cv.style.cssText=`width:100%;height:${H}px;background:#0d1117;border:1px solid var(--line);border-radius:6px;cursor:crosshair;display:block;touch-action:none`;
+    const cx2=cv.getContext("2d");cx2.scale(2,2);
+    const toPx=(x,y)=>[PAD+x*(W-2*PAD), PAD+(1-y)*(H-2*PAD)];
+    const toVal=(px,py)=>[clamp((px-PAD)/(W-2*PAD),0,1), clamp(1-(py-PAD)/(H-2*PAD),0,1)];
+    const draw=()=>{
+      const pts=nd.params[pr.key],lut=bakeCurve(pts);
+      cx2.clearRect(0,0,W,H);
+      cx2.strokeStyle="#1c2530";cx2.lineWidth=1;
+      for(let i=0;i<=4;i++){                              // grid
+        const gx=PAD+i/4*(W-2*PAD),gy=PAD+i/4*(H-2*PAD);
+        cx2.beginPath();cx2.moveTo(gx,PAD);cx2.lineTo(gx,H-PAD);cx2.stroke();
+        cx2.beginPath();cx2.moveTo(PAD,gy);cx2.lineTo(W-PAD,gy);cx2.stroke();}
+      // the profile the curve produces, mirrored, so the artist sees the mountain not the graph
+      cx2.fillStyle="rgba(120,170,220,0.16)";cx2.beginPath();
+      const midY=H-PAD;
+      cx2.moveTo(PAD,midY);
+      for(let k=0;k<CURVE_N;k++){const x=k/(CURVE_N-1);const[a,b2]=toPx(x,lut[k]);cx2.lineTo(a,b2);}
+      cx2.lineTo(W-PAD,midY);cx2.closePath();cx2.fill();
+      cx2.strokeStyle="#7fb4e6";cx2.lineWidth=1.6;cx2.beginPath();
+      for(let k=0;k<CURVE_N;k++){const x=k/(CURVE_N-1);const[a,b2]=toPx(x,lut[k]);
+        k?cx2.lineTo(a,b2):cx2.moveTo(a,b2);}
+      cx2.stroke();
+      pts.forEach((q,i)=>{const[a,b2]=toPx(q[0],q[1]);
+        cx2.beginPath();cx2.arc(a,b2,4,0,6.2832);
+        cx2.fillStyle=i===0||i===pts.length-1?"#8fa3b8":"#e8eef5";cx2.fill();
+        cx2.strokeStyle="#0d1117";cx2.lineWidth=1.5;cx2.stroke();});
+    };
+    const hit=(px,py)=>{const pts=nd.params[pr.key];
+      for(let i=0;i<pts.length;i++){const[a,b2]=toPx(pts[i][0],pts[i][1]);
+        if(Math.hypot(a-px,b2-py)<8)return i;} return -1;};
+    const local=(e)=>{const r=cv.getBoundingClientRect();
+      return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height];};
+    let drag=-1;
+    cv.addEventListener("pointerdown",e=>{
+      const[px,py]=local(e);let i=hit(px,py);
+      if(i<0){                                            // click on empty space adds a point
+        const[x,y]=toVal(px,py);const pts=nd.params[pr.key];
+        pts.push([x,y]);pts.sort((a,b2)=>a[0]-b2[0]);i=pts.findIndex(q=>q[0]===x&&q[1]===y);
+        markDirtyFrom(nd.id);requestEval();}
+      drag=i;cv.setPointerCapture(e.pointerId);draw();});
+    cv.addEventListener("pointermove",e=>{
+      if(drag<0)return;
+      const[px,py]=local(e),pts=nd.params[pr.key];let[x,y]=toVal(px,py);
+      // endpoints stay pinned in x: the curve must span exactly centre -> radius
+      if(drag===0)x=0;else if(drag===pts.length-1)x=1;
+      else x=clamp(x,pts[drag-1][0]+0.01,pts[drag+1][0]-0.01);
+      pts[drag]=[x,y];draw();markDirtyFrom(nd.id);requestEval();});
+    const stop=()=>{drag=-1;};
+    cv.addEventListener("pointerup",stop);cv.addEventListener("pointercancel",stop);
+    cv.addEventListener("dblclick",e=>{
+      const[px,py]=local(e),i=hit(px,py),pts=nd.params[pr.key];
+      if(i>0&&i<pts.length-1&&pts.length>2){pts.splice(i,1);draw();markDirtyFrom(nd.id);requestEval();}});
+    f.appendChild(cv);
+    const seg=document.createElement("div");seg.className="seg";seg.style.marginTop="6px";
+    SKIRT_PRESETS.forEach(([lab,e])=>{const b=document.createElement("button");b.textContent=lab;
+      b.onclick=()=>{nd.params[pr.key]=curveFromExponent(e);draw();markDirtyFrom(nd.id);requestEval();};
+      seg.appendChild(b);});
+    f.appendChild(seg);
+    draw();
   }else if(pr.type==="text"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
     const ta=document.createElement("textarea");ta.className="inp";ta.rows=pr.rows||9;
