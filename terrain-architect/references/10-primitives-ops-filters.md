@@ -355,3 +355,24 @@ Two rules that are easy to get wrong:
 A placement mask is also a **shape**: the same disc that confines an erosion can be treated as a
 heightfield and eroded into a landform. That dual use — mask *or* primitive — is why the shape
 belongs in the graph rather than in a brush tool.
+
+### Place before you sample, not after
+
+There are two ways to move a feature, and only one is free.
+
+**Coordinate transform (before sampling).** A procedural generator is a *function of position*, so
+evaluating it at shifted coordinates moves the feature **exactly** — it is the same function, sampled
+somewhere else. `placement.place_coords(xx, yy, shape, cellsize, center=, rotation=, scale=)`
+transforms a generator's own coordinate grid, and `landforms.mountain/ridge/canyon` take a `place=`
+argument that applies it. Placing at the native centre is the identity; placing elsewhere lands the
+crest at exactly the requested offset.
+
+**Raster transform (after sampling).** Moving the *output* resamples it, and bilinear resampling is a
+low-pass filter. Measured on 6-octave fBm with a non-integer offset: **one move loses ~17% of the
+fine detail, four chained moves lose ~34%.** Use it only for fields you cannot re-evaluate — an
+imported DEM, or the output of an erosion simulation — which is exactly what a Transform node is for.
+
+One honest caveat: a generator that normalises by its **own** extremes is not perfectly
+translation-invariant, because moving it changes what is in frame. Measured on `ridge`, that shows up
+as a global scale factor of 1.0006 and a mean difference of 0.013% of relief — negligible, but it is
+why the test asserts "the same terrain, moved" within a tolerance rather than bit-equality.

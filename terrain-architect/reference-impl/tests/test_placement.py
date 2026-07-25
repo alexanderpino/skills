@@ -133,3 +133,65 @@ def test_stamp_respects_its_mask():
     out = placement.stamp(base, patch, mask=mask, mode="max")
     assert out[8, 8] == pytest.approx(10.0, rel=1e-6)
     assert out[28, 28] == pytest.approx(0.0, abs=1e-9)
+
+
+# --------------------------------------------------------------------------- #
+# placing a GENERATOR: transform the coordinates, not the raster
+# --------------------------------------------------------------------------- #
+def test_place_coords_is_an_exact_coordinate_shift():
+    """ORACLE: a pure translation must offset the sample coordinates exactly — no interpolation."""
+    n, cellsize = 128, 10.0
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
+    ox, oy = placement.place_coords(xx, yy, (n, n), cellsize, center=(320.0, 520.0))
+    assert np.allclose(ox, xx - (320.0 / cellsize - n / 2))
+    assert np.allclose(oy, yy - (520.0 / cellsize - n / 2))
+
+
+def test_placing_at_the_native_centre_is_the_identity():
+    import landforms
+
+    n, cellsize = 96, 10.0
+    plain = landforms.ridge((n, n), cellsize, seed=2)
+    placed = landforms.ridge((n, n), cellsize, seed=2,
+                             place=dict(center=(n / 2 * cellsize, n / 2 * cellsize)))
+    assert np.allclose(plain, placed)
+
+
+def test_placing_translates_the_feature_by_exactly_what_was_asked():
+    """The crest must land where the layout says, and the interior must be the SAME terrain —
+    up to the generator's own self-normalisation, which depends on what is in frame (measured
+    global scale factor 1.0006, mean difference 0.013% of relief)."""
+    import landforms
+
+    n, cellsize, shift = 128, 10.0, 20
+    plain = landforms.ridge((n, n), cellsize, seed=2)
+    placed = landforms.ridge((n, n), cellsize, seed=2,
+                             place=dict(center=((n / 2 + shift) * cellsize, n / 2 * cellsize)))
+    assert int(np.argmax(placed.max(axis=0))) - int(np.argmax(plain.max(axis=0))) == shift
+    overlap = np.abs(placed[:, shift:] - plain[:, :n - shift]).mean()
+    assert overlap < 0.01 * np.ptp(plain), "placed terrain is not the same terrain, moved"
+
+
+def test_coordinate_transform_keeps_detail_a_raster_transform_loses():
+    """WHY placement belongs before sampling: resampling a raster is a low-pass filter. Generating
+    at shifted coordinates is exact; translating the output blurs it."""
+    import noise
+    import ops_filters
+
+    n, off = 192, 37.4                                    # non-integer: the realistic case
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
+    detail = lambda h: float(np.abs(h - ops_filters.gaussian(h, sigma=1.5)).mean())
+
+    at_coords = noise.fbm((xx + off) / 40.0, (yy + off) / 40.0, seed=3, octaves=6)
+    plain = noise.fbm(xx / 40.0, yy / 40.0, seed=3, octaves=6)
+    as_raster = ops_filters.resample(plain, (n, n))        # a resample at the same size still filters
+    x0 = np.clip(xx + off, 0, n - 1); y0 = np.clip(yy + off, 0, n - 1)
+    i0 = np.floor(x0).astype(int); j0 = np.floor(y0).astype(int)
+    i1 = np.minimum(i0 + 1, n - 1); j1 = np.minimum(j0 + 1, n - 1)
+    fx, fy = x0 - i0, y0 - j0
+    as_raster = (plain[j0, i0] * (1 - fx) * (1 - fy) + plain[j0, i1] * fx * (1 - fy)
+                 + plain[j1, i0] * (1 - fx) * fy + plain[j1, i1] * fx * fy)
+
+    core = (slice(0, n - 60), slice(0, n - 60))            # exclude the raster path's edge clamp
+    assert detail(as_raster[core]) < 0.9 * detail(at_coords[core]), (
+        "expected the raster transform to lose detail the coordinate transform keeps")

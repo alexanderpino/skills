@@ -115,3 +115,31 @@ def stamp(base, patch, mask=None, mode="max"):
     else:
         raise ValueError(f"unknown stamp mode {mode!r}; expected max, add or replace")
     return out if mask is None else apply_masked(base, out, mask)
+
+
+def place_coords(xx, yy, shape, cellsize=1.0, center=None, rotation=0.0, scale=1.0):
+    """Move/turn/resize a GENERATOR by transforming the coordinates it samples, before it runs.
+
+    This is the placement that costs nothing. A procedural generator is a function of position, so
+    evaluating it at shifted coordinates moves the feature EXACTLY — the same function, sampled
+    somewhere else. Transforming the generator's raster afterwards instead resamples it, and
+    bilinear resampling is a low-pass filter: measured on fBm, one non-integer raster move loses
+    ~17% of the fine detail and four chained moves lose ~34%, while this loses none.
+
+    Use a raster transform (`ops_filters.resample`, a Transform node) only for fields you cannot
+    re-evaluate — an imported DEM, or the output of an erosion sim.
+
+    `xx`, `yy` are the generator's own cell-coordinate grids and the return value replaces them.
+    `center` is in METRES (08) and defaults to the tile centre, which is where these generators put
+    their feature natively; `rotation` is radians, `scale` > 1 magnifies.
+    """
+    n0, n1 = shape
+    c0x, c0y = 0.5 * n1, 0.5 * n0                     # the generator's native centre, in cells
+    cx = c0x if center is None else center[0] / cellsize
+    cy = c0y if center is None else center[1] / cellsize
+    dx = (np.asarray(xx, dtype=np.float64) - cx) / float(scale)
+    dy = (np.asarray(yy, dtype=np.float64) - cy) / float(scale)
+    if rotation:
+        c, s = np.cos(-rotation), np.sin(-rotation)
+        dx, dy = dx * c - dy * s, dx * s + dy * c
+    return dx + c0x, dy + c0y

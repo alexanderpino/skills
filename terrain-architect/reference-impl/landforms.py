@@ -9,6 +9,8 @@ no standalone deterministic oracle and are out of scope here.
 """
 import numpy as np
 
+import placement
+
 import noise
 import ops_filters
 import scatter
@@ -105,7 +107,7 @@ def terrace(h, levels, sharpness=2.0, warp_amp=0.0, warp_wl=1.0, cellsize=1.0, s
 # fault/joint-controlled buttes & mesas (a placeable landform primitive)
 # --------------------------------------------------------------------------- #
 def fault_block_butte(shape, bx, by, br, bh, cellsize, seed=0, ecc=1.0, talus=0.42,
-                      repose_tan=0.62, sides=6, fault=None, warp=0.12, corner_round=1.3):
+                      repose_tan=0.62, sides=6, fault=None, warp=0.12, corner_round=1.3, place=None):
     """A caprock butte/mesa/jebel as height-above-plain (m): flat structural TOP, a near-vertical
     CLIFF, then a SHARP break of slope to a TALUS apron at the angle of repose. Cliff-foot-to-scree
     is the break-of-slope that reads as rock rather than a smoothed noise blob.
@@ -123,6 +125,8 @@ def fault_block_butte(shape, bx, by, br, bh, cellsize, seed=0, ecc=1.0, talus=0.
     in the scree apron."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    if place is not None:                       # PLACE before sampling — exact, no resample loss
+        xx, yy = placement.place_coords(xx, yy, shape, cellsize, **place)
     rng = np.random.default_rng(seed)
     R = br * cellsize                                                        # nominal footprint radius (m)
     dx = (xx - bx) * cellsize
@@ -198,7 +202,7 @@ def _talus_relax(h, repose_tan, iters, cellsize, factor=0.5):
 
 
 def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0.34,
-             style="eroded", cells=None, warp=None, relief=None):
+             style="eroded", cells=None, warp=None, relief=None, place=None):
     """A MOUNTAIN feature primitive — the "Mountain" generator node an artist places (Gaea's Mountain;
     Génévaux et al. 2015 *Terrain Modelling from Feature Primitives*; Guérin et al. 2016). NOT thresholded
     isotropic noise (which reads as "noise on a lump"): the eroded, drainage-organised look is baked in via
@@ -221,6 +225,8 @@ def mountain(shape, cellsize, *, seed=0, n_ridges=3, height=1600.0, reach_frac=0
     tiling pipeline, drive it from a fixed normalisation constant instead of the percentile."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    if place is not None:                       # PLACE before sampling — exact, no resample loss
+        xx, yy = placement.place_coords(xx, yy, shape, cellsize, **place)
     rng = np.random.default_rng(seed)
     st = _MOUNTAIN_STYLES.get(style, _MOUNTAIN_STYLES["eroded"])
     ncell = st["cells"] if cells is None else cells
@@ -294,7 +300,7 @@ def _polyline_distance(xx, yy, px, py):
 
 
 def ridge(shape, cellsize, *, seed=0, height=900.0, angle=None, width_frac=0.16,
-          sinuosity=0.5, asymmetry=0.55, detail=0.35, crest_round=0.12, weather_iters=0):
+          sinuosity=0.5, asymmetry=0.55, detail=0.35, crest_round=0.12, weather_iters=0, place=None):
     """A single linear RIDGELINE primitive — Gaea's "Ridge" node; the **hogback / cuesta** an
     exhumed resistant bed makes. Geology: a hogback/cuesta is the erosional expression of a **dipping
     resistant bed** (a homocline) under differential erosion — the gentle **dip slope** IS the exhumed
@@ -317,6 +323,8 @@ def ridge(shape, cellsize, *, seed=0, height=900.0, angle=None, width_frac=0.16,
     lengthens the gentle dip. Returns height (m)."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    if place is not None:                       # PLACE before sampling — exact, no resample loss
+        xx, yy = placement.place_coords(xx, yy, shape, cellsize, **place)
     rng = np.random.default_rng(seed)
     ang = rng.uniform(0.0, np.pi) if angle is None else angle
     reach = width_frac * max(n0, n1)
@@ -381,7 +389,7 @@ def volcano(shape, cx, cy, radius, height, cellsize=1.0, *, seed=0, kind="strato
 
 
 def canyon(shape, cellsize, *, seed=0, rim=1000.0, depth=750.0, width_frac=0.035,
-           sinuosity=0.22, benches=3, n_tributaries=3, roughness=0.05):
+           sinuosity=0.22, benches=3, n_tributaries=3, roughness=0.05, place=None):
     """A CANYON primitive — Gaea's "Canyon" node. A high PLATEAU incised by a MEANDERING trunk gorge
     with HORIZONTAL-STRATA benches and a few tributary side-canyons. Grounded the way real canyons form:
     a fixed base level with the trunk incising down to a flat floor, and resistant beds holding the walls
@@ -391,6 +399,8 @@ def canyon(shape, cellsize, *, seed=0, rim=1000.0, depth=750.0, width_frac=0.035
     `width_frac` of the tile for the floor half-width. Returns height (m)."""
     n0, n1 = shape
     yy, xx = np.mgrid[0:n0, 0:n1].astype(np.float64)
+    if place is not None:                       # PLACE before sampling — exact, no resample loss
+        xx, yy = placement.place_coords(xx, yy, shape, cellsize, **place)
     rng = np.random.default_rng(seed)
     plateau = rim + roughness * rim * noise.fbm(xx / 12.0, yy / 12.0, seed + 1, octaves=5)
     # trunk centreline runs down the tile (row-parametric) and meanders across it
