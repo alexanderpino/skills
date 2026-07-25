@@ -820,83 +820,91 @@ const MOUNTAIN_STYLES={
    So: a wobbled dome envelope, dissected by a dense modulated-Voronoi drainage network, then eroded.
    Layout of a RANGE is not this node's job -- that is what combining, blending and placement masks
    are for. */
+/* THE ENVELOPE IS A RIDGE, NOT A RADIUS.
+   Four rebuilds of this primitive stayed inside h = f(distance from a centre) * texture, and every
+   one rendered as a cone. Tuning was tested and disproven: deeper relief, sharper crests and heavier
+   erosion all leave the silhouette a triangle, because that form makes height fall monotonically
+   from one point in every direction and no parameter escapes it.
+
+   A mountain is high ground along a LINE. So the envelope is a small crest SKELETON -- two or three
+   wandering polylines carrying an elevation profile, deliberately NOT radiating from one summit --
+   and height falls away perpendicular to them through the artist's skirt curve. That is exactly the
+   Layout node's evaluator (polylineNearest: distance to a polyline plus the elevation interpolated
+   along it) applied where it always belonged. Silhouettes become ridge profiles with subsidiary
+   summits and saddles, which is what a range front actually looks like.
+
+   The earlier crest-line form was abandoned for measuring 4-8 summits instead of 1. That was a
+   metric-driven call made without looking at a render, and it was wrong: a real mountain carries
+   subsidiary summits along its ridges. */
+function crestSkeleton(p,reach,rot){
+  const hs=(k)=>hash2(p.seed|0,k,7717);
+  const crests=[],K=2+Math.floor(hs(1)*2);            // 2-3 crest lines
+  for(let c=0;c<K;c++){
+    // each crest runs at its own heading, offset from the centre -- they do NOT share an apex
+    const head=rot+(hs(10+c)-0.5)*1.5+(c?(hs(20+c)-0.5)*2.2:0);
+    const ox=(hs(30+c)-0.5)*reach*0.55,oy=(hs(40+c)-0.5)*reach*0.55;
+    const len=reach*(0.85+0.7*hs(50+c)),segs=5;
+    const pts=[];let dir=head,x=p.x+ox-Math.cos(head)*len*0.5,y=p.y+oy-Math.sin(head)*len*0.5;
+    for(let i=0;i<=segs;i++){
+      const t=i/segs;
+      // elevation along the crest: a broad hump with per-vertex jitter, so summits and saddles fall
+      // out of the profile rather than being placed
+      const hump=Math.sin(Math.PI*Math.pow(t,0.85+0.4*hs(60+c)));
+      const e=(c?0.62+0.3*hs(70+c):1.0)*(0.45+0.55*hump)*(0.82+0.32*hs(80+c*7+i));
+      pts.push([x,y,clamp(e,0,1)]);
+      dir+=(hs(90+c*11+i)-0.5)*1.1;                   // the crest wanders
+      x+=Math.cos(dir)*len/segs;y+=Math.sin(dir)*len/segs;
+    }
+    crests.push(pts);
+  }
+  return crests;
+}
 function peakField(p){
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
-  // THE MASK MUST NOT STAMP EVERY MOUNTAIN INTO ONE SHAPE. With reach, aspect and rotation fixed,
-  // the seed only displaces noise inside a footprint whose PROPORTIONS never change: measured across
-  // six seeds, elongation stayed between 1.03 and 1.26 and area within +-8%, i.e. six variations on
-  // one circle. `variation` lets the seed jitter the mask itself, so one massif comes out long and
-  // narrow and the next compact. At 0 you get exactly the proportions you authored.
   const variation=Math.max(p.variation||0,0);
   const vr=(k,amt)=>1+(hash2(p.seed|0,k,9137)*2-1)*amt*variation;
-  const cx=p.x,cy=p.y;
   const reach=Math.max(p.size,0.02)*vr(1,0.30);
   const aspectS=Math.max(p.aspect||1,0.15)*vr(2,0.50);
   const rot=p.angle*Math.PI/180+(hash2(p.seed|0,3,9137)*2-1)*Math.PI*variation;
-  // drainage cells across the tile. `detail` is the density that actually controls how mountainous
-  // it looks: at 1x the dome carries ~10 spurs, at 3x ~40, which is where the reference sits.
-  const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
   const relief=p.relief,char=Math.max(p.character||0,0);
-  // The artist-drawn skirt, baked once per evaluation. A drawn curve costs the same as the analytic
-  // exponent it replaces -- one lerped lookup per cell instead of a pow().
   const skirtLUT=bakeCurve(p.skirt&&p.skirt.length?p.skirt:curveFromExponent(1.4));
+  const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
+  const crests=crestSkeleton(p,reach,rot);
+  const halfW=reach*0.62;                             // how far the flank reaches from its crest
   let h=newField(0);
-  const cover=newField(0);                        // the primitive's own footprint, kept for later
-  const envF=newField(0),netF=newField(1);
+  const envF=newField(0),netF=newField(1),cover=newField(0);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const u=(x+0.5)/n,v=(y+0.5)/n;
-    let dx=u-cx,dy=v-cy;
-    const rx=dx*Math.cos(rot)-dy*Math.sin(rot),ry=(dx*Math.sin(rot)+dy*Math.cos(rot))/aspectS;
-    // DOMAIN-WARP THE DISTANCE FIELD ITSELF, in 2D. Warping only the outline -- angular noise on the
-    // radius, which is what this did before -- moves the footprint but leaves every radial profile a
-    // straight run to a single apex. That is a tipi tent with flutes cut in it, however dense the
-    // flutes. Displacing the position before measuring distance makes the level sets irregular at
-    // EVERY radius: shoulders, benches, sub-crests, an off-centre summit, a lobed outline. This is
-    // the "Character" control -- the step that stops the primitive being a solid of revolution.
+    // domain-warp the sample point, so the crests are not clean geometric lines (Character)
     const wu=fbm2(u*2.1,v*2.1,p.seed+31,4)+0.45*fbm2(u*4.7,v*4.7,p.seed+33,3);
     const wv=fbm2(u*2.1+3.1,v*2.1+7.7,p.seed+32,4)+0.45*fbm2(u*4.7+1.3,v*4.7+5.9,p.seed+34,3);
-    const wx2=rx+wu*char*reach,wy2=ry+wv*char*reach;
-    // a single low-frequency lobe on top, so one flank runs long and another stays short
-    const th=Math.atan2(wy2,wx2);
-    const lobe=1+0.22*vr(4,0.9)*fbm2(Math.cos(th)*1.15,Math.sin(th)*1.15,p.seed+21,2);
-    const r=Math.hypot(wx2,wy2)/(reach*Math.max(lobe,0.4));
-    if(r>=1)continue;
-    // THE SKIRT, now drawn rather than hardcoded. (1-r^2)^p is a BELL: measured, its slope at the
-    // summit is -0.001, flat on top and steepest halfway out, which renders as pudding on a plate.
-    // The default curve is (1-r)^1.4 -- steep at the summit, convex all the way out, the concave
-    // pediment/talus apron a real massif grades into -- but any monotone curve the artist draws is
-    // valid, and the presets span cone / apron / sweeping / plateau.
-    const env=curveAt(skirtLUT,r);                 // X = distance from centre, Y = height multiplier
-    // DENSE dissection: modulated Voronoi, cell edges = spur crests, interiors = valleys
+    let qx=u+wu*char*reach*0.55,qy=v+wv*char*reach*0.55;
+    // anisotropy about the massif's own axis
+    const dx=qx-p.x,dy=qy-p.y;
+    const rx=dx*Math.cos(rot)-dy*Math.sin(rot),ry=(dx*Math.sin(rot)+dy*Math.cos(rot))/aspectS;
+    qx=p.x+rx*Math.cos(-rot)-ry*Math.sin(-rot);qy=p.y+rx*Math.sin(-rot)+ry*Math.cos(-rot);
+    let env=0;
+    for(const c of crests){                           // upper envelope of the crest flanks
+      const {d,e}=polylineNearest(qx,qy,c);
+      const val=e*curveAt(skirtLUT,clamp(d/halfW,0,1));
+      if(val>env)env=val;
+    }
+    if(env<=0)continue;
+    const i=y*n+x;
+    envF[i]=env;cover[i]=1;
     const wx=fbm2(u*ncell*0.35,v*ncell*0.35,p.seed+3,4)+0.5*fbm2(u*ncell*0.9,v*ncell*0.9,p.seed+13,4);
     const wy=fbm2(u*ncell*0.35+4.7,v*ncell*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*ncell*0.9+1.9,v*ncell*0.9+6.1,p.seed+14,4);
     const uu=u*ncell+st.warp*wx,vv=v*ncell+st.warp*wy;
-    const e1=worleyAt(uu,vv,p.seed+1,"f2f1"),e2=worleyAt(uu*2.1,vv*2.1,p.seed+8,"f2f1");
-    const i=y*n+x;
-    envF[i]=env;
-    netF[i]=(1-st.spur)*e1+st.spur*e2;
-    cover[i]=1;                                   // inside the footprint; see the support cut below
+    netF[i]=(1-st.spur)*worleyAt(uu,vv,p.seed+1,"f2f1")+st.spur*worleyAt(uu*2.1,vv*2.1,p.seed+8,"f2f1");
   }
-  // Normalise the network by a PERCENTILE of itself, not a constant. Worley F2-F1 scales with cell
-  // size, so a fixed divisor makes incision shallower as the cells get finer -- which made the
-  // Drainage detail parameter fight itself: measured, fine-detail energy FELL from 0.0089 to 0.0056
-  // as detail went 0.6 -> 3.4. With a percentile the incision depth is scale free, so the parameter
-  // controls density and nothing else. (The massif form always did this; the peak form did not.)
   const pn=percentileOf(netF,0.92)+1e-9;
   for(let i=0;i<h.length;i++){
     if(envF[i]<=0)continue;
-    const ridges=Math.pow(1-Math.min(netF[i]/pn,1),st.crest);  // ~1 on a crest, 0 in a valley floor
+    const ridges=Math.pow(1-Math.min(netF[i]/pn,1),st.crest);
     h[i]=envF[i]*((1-relief)+relief*ridges);
   }
-  // A dome concentrates flow outward, so it earns far more drainage than a flat tile of the same
-  // style -- and radial drainage is exactly what the reference shows. 3x the style's droplet budget.
   if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*3*n*n),seed:p.seed+11,radius:2});
   if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
-  // Confine to the footprint -- erosion scatters deposit onto ground the primitive does not own, and
-  // a primitive that respects its footprint composites cleanly under Stamp and a placement mask.
-  // This is a BINARY cut at the envelope's own support, not a ramp: (1-r)^skirt already reaches zero
-  // with near-zero slope, so there is nothing left to feather and a collar would only re-introduce
-  // the hard seam it was meant to hide.
   for(let i=0;i<h.length;i++)if(cover[i]<=0)h[i]=0;
   if(st.terr){const[,mx]=fieldRange(h);
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
