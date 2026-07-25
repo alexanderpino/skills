@@ -98,7 +98,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Mountain** (placeable massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Mountain** (placeable Peak / Massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
@@ -168,7 +168,7 @@ The reference implementation prescribes the workflow in `landforms.mountain`'s o
 it, combine several (`np.maximum` / `ops_filters.smax`), then run a real hydraulic + thermal pass"* — so
 the studio has a node for each step.
 
-1. **Mountain** ×N. A placeable massif, ported from `reference-impl/landforms.py` (Génévaux et al. 2015
+1. **Mountain** ×N, in **Peak** form. A placeable massif, ported from `reference-impl/landforms.py` (Génévaux et al. 2015
    *Terrain Modelling from Feature Primitives*; Guérin et al. 2016). Not thresholded isotropic noise,
    which reads as "noise on a lump": a wandering **crest skeleton** of polyline SDFs sets a non-circular
    envelope, a **modulated-Voronoi ridge network** dissects it — cell *edges* become ridgelines, cell
@@ -180,6 +180,40 @@ the studio has a node for each step.
 2. **Smooth Max** to union them. Union of two *surfaces* is a **max** — the merged terrain is whichever
    is higher.
 3. **Thermal** or **Hydraulic** over the union. This is the step that actually makes it a *range*.
+
+#### A mountain is a peak, not noise with erosion on it
+
+Worth stating as numbers, because it is easy to build the wrong thing and not notice. The measure is
+**topographic prominence** — the same one mountaineers use: flood the terrain top-down, and when two
+basins merge, the lower summit's prominence is its height above that saddle. A peak has *one* prominent
+summit; noise has hundreds.
+
+| | hypsometric | summits >10% relief | 2nd/1st prominence | descends from summit |
+|---|---|---|---|---|
+| ideal cone | 0.262 | 1 | 0 | yes |
+| **Mountain — Peak** | 0.080–0.099 | **1** | **0.015–0.045** | yes |
+| **Mountain — Massif** | 0.243–0.294 | 4–8 | 0.25–0.35 | yes |
+| ridged fBm | 0.556 | 109 | 0.56 | no |
+| Perlin fBm | 0.555 | 25 | 0.56 | no |
+
+Neither form is noise — both sit at the cone end of the hypsometric scale, an order of magnitude away
+from fBm on summit count. But they are different landforms, and the distinction matters when you are
+choosing what to place three of:
+
+- **Peak** — one summit with spurs radiating from it. **One** prominent summit across all five styles
+  and every seed tested, second summit at 1.5–4.5% of the first. This is the unit you place.
+- **Massif** — `Crest lines` unioned into a small range, which is what `landforms.mountain` builds by
+  design (its docstring: *"n_ridges crest lines unioned into a small range"*). Right for a shoulder or a
+  plateau edge; wrong as the thing you place three of, because you would be unioning three small ranges.
+
+**Spurs radiate, so they are periodic in azimuth.** A first attempt sampled the Voronoi ridge network in
+polar space, which fails: Voronoi cells subdivide radially too, so their edges run partly
+circumferentially and you get terracing rather than spurs. Measured, the `Spurs` parameter had no effect
+at all — 4, 7 and 12 spurs all produced ~22–30 angular maxima, and azimuthal relief was 0.08 against the
+massif's 0.27, i.e. a smooth cone with texture on it. Replacing it with an explicitly angular ridge
+function fixed both: the count now tracks the parameter (4→5, 7→9, 10→13, 12→20 at 60% of the reach —
+above the asked number because sub-spurs branch off the primary divides lower down), and azimuthal relief
+rose to 0.18–0.25, against **0.006** for a smooth cone. Pinned in `_verify_peak.js`.
 
 Verified in `_verify_range.js`. Three Mountains placed at X = 0.26 / 0.50 / 0.74 land at measured
 centroids **0.281 / 0.505 / 0.722**, each with relief ≈ 0.84–1.08. Unioning with Smooth Max instead of a
@@ -401,6 +435,7 @@ npm i playwright-core@1.49.0
 node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/GPU parity under XF
 node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
 node _verify_range.js                # place 3 Mountains, union with Smooth Max, erode into one range
+node _verify_peak.js                 # prominence: Peak is one summit, Massif is several, neither is noise
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths

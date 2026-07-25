@@ -675,7 +675,55 @@ const MOUNTAIN_STYLES={
   old:   {cells:5.6,warp:0.62,relief:0.44,spur:0.30,crest:1.05,erode:0.20,talus:14,repose:0.42,terr:0},
   strata:{cells:4.4,warp:0.34,relief:0.52,spur:0.30,crest:1.20,erode:0.13,talus:4, repose:0.72,terr:8},
 };
+/* A PEAK is not a crest line. Its defining structure is a SUMMIT with spurs radiating outward and
+   drainage divides between them, so the ridge network has to be organised radially, not as a Voronoi
+   field that happens to sit under a lump. Sampling the same network in POLAR space around the summit
+   does exactly that: cells become angular wedges, so their edges run downhill as spurs. The angular
+   axis is periodic, hence worleyAt's `period`, or the network would tear at +-pi.
+   Measured against the diagnostics in _verify_peak.js: crest-line form gives 4-8 prominent summits
+   with the second at ~0.3 of the first (a massif); this gives ONE. */
+function peakField(p){
+  const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
+  const cx=p.x*n,cy=p.y*n,reach=Math.max(p.size,0.02)*n;
+  const nspur=Math.max(3,Math.round(p.spurs||7));      // spurs around the summit
+  const relief=p.relief;
+  let h=newField();
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const dx=x-cx,dy=y-cy;
+    let r=Math.hypot(dx,dy)/reach;                     // 0 at summit, 1 at the base
+    const th=Math.atan2(dy,dx);
+    // the footprint is not a circle: wobble the reach with angle so the base is organic
+    const wob=1+0.22*(fbm2(Math.cos(th)*1.7,Math.sin(th)*1.7,p.seed+21,3));
+    r/=Math.max(wob,0.3);
+    if(r>=1){h[y*n+x]=0;continue;}
+    // concave flanks: steep near the summit, easing out to the base (the profile real peaks show)
+    const env=Math.pow(1-r,1.15);
+    // SPURS are periodic in AZIMUTH -- that is what makes them radiate. A Voronoi field sampled in
+    // polar space does NOT give this: its cells subdivide radially too, so the edges run partly
+    // circumferentially and you get terracing instead of spurs (measured: the spur count did not
+    // follow the parameter at all). An explicitly angular ridge function does, exactly `nspur` of
+    // them, with an fbm in (angle, radius) letting the divides wander and bifurcate downslope.
+    const wander=fbm2(Math.cos(th)*2.2,Math.sin(th)*2.2+r*3.0,p.seed+31,4);
+    let spur=0.5+0.5*Math.cos(th*nspur+wander*1.6);    // 1 on a divide, 0 in a gully
+    spur=Math.pow(spur,Math.max(st.crest*0.7,0.35));
+    // sub-spurs branch off further down, where there is room for them
+    const wander2=fbm2(Math.cos(th)*4.4+2.1,Math.sin(th)*4.4+r*5.0,p.seed+41,3);
+    const spur2=Math.pow(0.5+0.5*Math.cos(th*nspur*2.0+wander2*2.0),0.8);
+    const branch=clamp((r-0.22)/0.35,0,1);
+    let net=clamp((1-st.spur*branch)*spur+st.spur*branch*spur2,0,1);
+    // near the summit the azimuthal frame is singular -- converge the spurs so the top is a POINT
+    const cap=clamp((r-0.05)/0.12,0,1);
+    net=1-(1-net)*cap;                                 // -> 1 (no incision) at the summit
+    h[y*n+x]=env*((1-relief)+relief*net);
+  }
+  if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*n*n),seed:p.seed+11,radius:2});
+  if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
+  if(st.terr){const[,mx]=fieldRange(h);
+    if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
+  return h;
+}
 function mountainField(p){
+  if(p.form==="peak")return peakField(p);
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
   const relief=p.relief,ncell=st.cells,warpamt=st.warp;
   // deterministic per-seed stream, so the same seed always builds the same massif
@@ -843,11 +891,13 @@ function sdSegment(px,py,ax,ay,bx,by){
   const t=clamp((wx*vx+wy*vy)/(vx*vx+vy*vy||1e-9),0,1);
   return Math.hypot(wx-t*vx,wy-t*vy);
 }
-function worleyAt(u,v,seed,mode){                 // F2-F1 at a point; no whole-field normalisation
+function worleyAt(u,v,seed,mode,period){         // F2-F1 at a point; no whole-field normalisation
   const cx=Math.floor(u),cy=Math.floor(v);let f1=9,f2=9;
   for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
     const gx=cx+i,gy=cy+j;
-    const fx=gx+hash2(gx,gy,seed),fy=gy+hash2(gx,gy,seed+91);
+    // `period` wraps the u axis, so a network sampled in ANGLE joins seamlessly at +-pi
+    const hx=period?((gx%period)+period)%period:gx;
+    const fx=gx+hash2(hx,gy,seed),fy=gy+hash2(hx,gy,seed+91);
     const d=Math.hypot(u-fx,v-fy);
     if(d<f1){f2=f1;f1=d;}else if(d<f2){f2=d;}}
   return mode==="f1"?f1:f2-f1;
@@ -1084,16 +1134,18 @@ const TYPES={
       P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
     eval:(p)=>shapeField(p)},
   mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A placeable mountain massif \u2014 Gaea's Mountain node. A wandering crest skeleton sets the envelope, a modulated-Voronoi ridge network dissects it into spurs and valleys, and the style bakes in its weathering.",
-    params:[P.seg("style","Style",[["basic","Basic"],["eroded","Eroded"],["alpine","Alpine"],["old","Old"],["strata","Strata"]],"eroded"),
+    params:[P.seg("form","Form",[["peak","Peak"],["massif","Massif"]],"peak"),
+      P.seg("style","Style",[["basic","Basic"],["eroded","Eroded"],["alpine","Alpine"],["old","Old"],["strata","Strata"]],"eroded"),
       P.int("seed","Seed",1,999,7),
       P.slider("x","Position X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("y","Position Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("size","Reach",0.08,0.9,0.35,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("angle","Trend",0,180,25,1,v=>(v|0)+"\u00b0"),
       P.int("ridges","Crest lines",1,5,2),
+      P.int("spurs","Spurs",3,14,7),   // primary divides; sub-spurs branch off these lower down
       P.slider("relief","Valley depth",0.1,0.95,0.66,0.01)],
     eval:(p)=>mountainField(p),
-    note:"Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
+    note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
   constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
     params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
   import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
