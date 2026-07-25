@@ -98,7 +98,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Mountain** (placeable Peak / Massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (placeable Peak / Massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
@@ -181,6 +181,40 @@ the studio has a node for each step.
    is higher.
 3. **Thermal** or **Hydraulic** over the union. This is the step that actually makes it a *range*.
 
+### Art direction: author the skeleton, generate the detail
+
+All three reference tools converge on the same idea, and it is not "a mask that gates an effect":
+
+| Tool | How you art-direct |
+|---|---|
+| **World Machine** | [Layout Generator](https://help.world-machine.com/topic/layout-generator/) — vector polygons/paths/primitives with per-shape elevation, opacity, falloff distance *and profile* (linear / squared / sqrt / S-curve), positive or negative, "breakup" fractal participation, bezier splines, and **per-vertex elevation with keypoints**. Source mode generates; Modifier mode embeds into incoming terrain. Overlaps resolve by greatest height. |
+| **Houdini** | [HeightField Project](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_project) ray-casts real 3D geometry (curves, meshes) into the heightfield with Replace/Add/Multiply/Max/Min, and [Mask by Feature](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_maskbyfeature.html) derives selections from height, slope, curvature and direction. |
+| **Gaea** | Geo primitives (Mountain, Ridge, Crater, Badlands, Dunes), Mask as a primitive, and an [explicitly retired Draw node](https://docs.quadspinner.com/Reference/Primitives/Draw.html) now rebuilt in Gaea 3 to combine vector *and* brush modes. Erosion2 exposes **Shape** and **Shape Sharpness** to trade authored shape against simulated reshaping. |
+
+The **Layout** node is that idea: a list of vector shapes carrying elevation, evaluated as distance →
+falloff profile → combine. Academically this is [Hnaidi et al. 2010](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-8659.2010.01806.x),
+curves carrying elevation/slope/roughness constraints with the surface diffused between them.
+
+```
+path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
+  0.10,0.70,0.35  0.28,0.62,0.85  0.44,0.66,0.55
+  0.62,0.52,1.00  0.80,0.46,0.62  0.93,0.52,0.30
+```
+
+Shape kinds are `path`, `point` and `poly`; ops are `max` (greatest height wins, as in World Machine),
+`add`, `sub` and `replace`; falloff profiles are `linear`, `squared`, `sqrt` and `scurve`; `breakup`
+lets a fractal distort the outline so it is not geometric. With no **Base** wired the node generates
+(Source); wire one and it embeds instead (Modifier).
+
+**Elevation is per vertex, and that is the whole point.** A path is not a constant-height ribbon — it
+carries a height profile along its length, so summits fall out at the high vertices, saddles at the low
+ones, and faces fall away either side. Verified in `_verify_layout.js`: vertices authored at
+0.30 / 0.90 / 0.45 / 1.00 measure **0.31 / 0.90 / 0.46 / 1.00**, values between vertices interpolate,
+and the resulting spine scores 4 summits and 2 saddles along its crest with height falling away
+perpendicular. The four falloff profiles are all distinct at the same distance (sqrt 0.698, linear
+0.488, scurve 0.482, squared 0.238); overlapping shapes resolve to the greater height; Modifier mode
+leaves the base at 0.25 away from the shape and lifts it to 0.80 on it.
+
 #### A mountain is a peak, not noise with erosion on it
 
 Worth stating as numbers, because it is easy to build the wrong thing and not notice. The measure is
@@ -191,7 +225,7 @@ summit; noise has hundreds.
 | | hypsometric | summits >10% relief | 2nd/1st prominence | descends from summit |
 |---|---|---|---|---|
 | ideal cone | 0.262 | 1 | 0 | yes |
-| **Mountain — Peak** | 0.080–0.099 | **1** | **0.015–0.045** | yes |
+| **Mountain — Peak** | 0.072–0.084 | **1** | **0.009–0.013** | yes |
 | **Mountain — Massif** | 0.243–0.294 | 4–8 | 0.25–0.35 | yes |
 | ridged fBm | 0.556 | 109 | 0.56 | no |
 | Perlin fBm | 0.555 | 25 | 0.56 | no |
@@ -200,8 +234,18 @@ Neither form is noise — both sit at the cone end of the hypsometric scale, an 
 from fBm on summit count. But they are different landforms, and the distinction matters when you are
 choosing what to place three of:
 
-- **Peak** — one summit with spurs radiating from it. **One** prominent summit across all five styles
-  and every seed tested, second summit at 1.5–4.5% of the first. This is the unit you place.
+- **Peak** — one summit where several **arêtes** meet. **One** prominent summit across all five styles
+  and every seed tested, second summit at 0.9–1.3% of the first. This is the unit you place.
+
+  A peak is a *junction in a ridge network*, not a radial object, and the first attempt got that wrong
+  in a way worth recording. Building it as `env(r) × spurs(θ)` — a radially symmetric envelope with
+  flutes cut in it — measured a steepest-to-gentlest flank ratio of **1.09** against a perfect cone's
+  1.00, with the summit 0.009 off the footprint centroid. That is a volcano, and no amount of texture
+  fixes it, because *any* function of that form is a cone. It is now built as a small ridge skeleton
+  and evaluated as the upper envelope of planes anchored on the arêtes — planes through ridge lines
+  meet in **facets**, the triangular faces you see on any range front, which the radial formulation
+  cannot express at all. Arête lengths, headings and face slopes vary, so asymmetry is intrinsic:
+  steepest/gentlest is now **1.31–1.71** with the summit 0.027–0.062 off-centre.
 - **Massif** — `Crest lines` unioned into a small range, which is what `landforms.mountain` builds by
   design (its docstring: *"n_ridges crest lines unioned into a small range"*). Right for a shoulder or a
   plateau edge; wrong as the thing you place three of, because you would be unioning three small ranges.
@@ -436,6 +480,7 @@ node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/G
 node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
 node _verify_range.js                # place 3 Mountains, union with Smooth Max, erode into one range
 node _verify_peak.js                 # prominence: Peak is one summit, Massif is several, neither is noise
+node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths

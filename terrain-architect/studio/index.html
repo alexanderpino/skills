@@ -656,6 +656,89 @@ function maskApply(base,modified,mask){
   return o;
 }
 
+/* ---- LAYOUT — the art-direction layer every terrain tool converges on. World Machine's Layout
+   Generator, Houdini's HeightField Project from curves, Gaea's vector drawing, and academically
+   Hnaidi et al. 2010 "Feature based terrain generation using diffusion equation" all do the same
+   thing: you author a SKELETON in vector form with ELEVATION attached, and the procedural system
+   fills in between. That is different from a mask, which only gates an effect that already exists.
+
+   The decisive detail, taken from World Machine: elevation is PER VERTEX. A path is not a constant
+   height ribbon, it carries a height profile along its length. That single property is what turns a
+   drawn line into a ridgeline -- summits at the high vertices, saddles at the low ones, faces
+   falling away either side -- and it is why the same node that art-directs a range is also the
+   right way to build one mountain. ---- */
+const FALLOFF={                                   // World Machine's falloff function list
+  linear:  t=>t,
+  squared: t=>t*t,
+  sqrt:    t=>Math.sqrt(t),
+  scurve:  t=>t*t*(3-2*t),
+};
+// Nearest point on a polyline, and the elevation INTERPOLATED along it at that point.
+function polylineNearest(px,py,pts){
+  if(pts.length===1)return {d:Math.hypot(px-pts[0][0],py-pts[0][1]),e:pts[0][2]};
+  let bd=Infinity,be=0;
+  for(let i=0;i<pts.length-1;i++){
+    const ax=pts[i][0],ay=pts[i][1],ae=pts[i][2];
+    const bx=pts[i+1][0],by=pts[i+1][1],be2=pts[i+1][2];
+    const vx=bx-ax,vy=by-ay,wx=px-ax,wy=py-ay;
+    const t=clamp((wx*vx+wy*vy)/(vx*vx+vy*vy||1e-9),0,1);
+    const d=Math.hypot(px-(ax+t*vx),py-(ay+t*vy));
+    if(d<bd){bd=d;be=ae+(be2-ae)*t;}}
+  return {d:bd,e:be};
+}
+function pointInPoly(px,py,pts){
+  let inside=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+    const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];
+    if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/((yj-yi)||1e-9)+xi)inside=!inside;}
+  return inside;
+}
+/* Text format, one shape per header line, vertices `x,y,elevation` on the lines under it:
+     path width=0.04 falloff=0.22 profile=scurve op=max breakup=0.4
+       0.12,0.66,0.30   0.34,0.58,0.90   0.74,0.46,1.00 */
+function parseLayout(text){
+  const shapes=[];let cur=null;
+  for(const raw of String(text||"").split("\n")){
+    const line=raw.trim();
+    if(!line||line[0]==="#")continue;
+    const m=line.match(/^(path|point|poly)\b(.*)$/i);
+    if(m){
+      cur={kind:m[1].toLowerCase(),pts:[],width:0,falloff:0.15,profile:"scurve",op:"max",breakup:0,seed:1};
+      const kv=m[2].matchAll(/([A-Za-z]+)\s*=\s*([\w.\-]+)/g);
+      for(const g of kv){const k=g[1],v=g[2];
+        if(k==="profile"||k==="op")cur[k]=v;else if(k in cur)cur[k]=parseFloat(v);}
+      shapes.push(cur);continue;}
+    if(!cur)continue;
+    for(const tok of line.split(/\s+/)){
+      const a=tok.split(",").map(Number);
+      if(a.length>=2&&a.every(v=>isFinite(v)))cur.pts.push([a[0],a[1],a.length>2?a[2]:1]);}
+  }
+  return shapes.filter(sh=>sh.pts.length>0);
+}
+function layoutField(shapes,base){
+  const n=RES,o=base?base.slice():newField(0);
+  for(const sh of shapes){
+    const prof=FALLOFF[sh.profile]||FALLOFF.scurve;
+    const fall=Math.max(sh.falloff,1e-4),half=(sh.width||0)*0.5;
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const u=(x+0.5)/n,v=(y+0.5)/n;
+      let {d,e}=polylineNearest(u,v,sh.pts);
+      // inside a closed polygon the distance is zero, so the interior sits at the shape's elevation
+      if(sh.kind==="poly"&&sh.pts.length>2&&pointInPoly(u,v,sh.pts))d=0;
+      // "breakup" (World Machine's term): let a fractal distort the outline so it is not geometric
+      if(sh.breakup)d+=fbm2(u*7,v*7,(sh.seed|0)+13,4)*sh.breakup*fall*0.5;
+      d=Math.max(0,d-half);
+      if(d>=fall)continue;
+      const w=prof(clamp(1-d/fall,0,1)),val=e*w,i=y*n+x;
+      o[i]=sh.op==="add"?o[i]+val
+          :sh.op==="sub"?o[i]-val
+          :sh.op==="replace"?(w>0.5?e:o[i])
+          :Math.max(o[i],val);                    // max: greatest height governs (World Machine)
+    }
+  }
+  return o;
+}
+
 /* ---- MOUNTAIN — a placeable FEATURE PRIMITIVE (Gaea's Mountain node), ported from
    reference-impl/landforms.py `mountain` (Genevaux et al. 2015 "Terrain Modelling from Feature
    Primitives"; Guerin et al. 2016). NOT thresholded isotropic noise, which reads as "noise on a lump":
@@ -675,46 +758,66 @@ const MOUNTAIN_STYLES={
   old:   {cells:5.6,warp:0.62,relief:0.44,spur:0.30,crest:1.05,erode:0.20,talus:14,repose:0.42,terr:0},
   strata:{cells:4.4,warp:0.34,relief:0.52,spur:0.30,crest:1.20,erode:0.13,talus:4, repose:0.72,terr:8},
 };
-/* A PEAK is not a crest line. Its defining structure is a SUMMIT with spurs radiating outward and
-   drainage divides between them, so the ridge network has to be organised radially, not as a Voronoi
-   field that happens to sit under a lump. Sampling the same network in POLAR space around the summit
-   does exactly that: cells become angular wedges, so their edges run downhill as spurs. The angular
-   axis is periodic, hence worleyAt's `period`, or the network would tear at +-pi.
-   Measured against the diagnostics in _verify_peak.js: crest-line form gives 4-8 prominent summits
-   with the second at ~0.3 of the first (a massif); this gives ONE. */
+/* A PEAK IS A JUNCTION IN A RIDGE NETWORK, not a radial object.
+
+   The previous attempt was h = env(r) * spurs(theta) -- a radially symmetric envelope with flutes
+   cut in it. Measured by mean descent gradient per octant, its steepest flank was 1.09x its gentlest
+   against a perfect cone's 1.00, with the summit 0.009 off the footprint centroid. That is a
+   volcano. No amount of texture fixes it, because ANY function of that form is a cone.
+
+   Real peaks are where two to four ARETES meet, and those aretes continue PAST the summit toward
+   neighbouring peaks. The faces between them are broad and planar -- the triangular facets you see
+   on any range front -- not conical. And they are strongly asymmetric, because one face was
+   glaciated and the other was not.
+
+   So the peak is built as a small ridge skeleton and evaluated as the upper envelope of planes
+   anchored on those aretes: h = max_i (elevation along arete i - distance * faceSlope). Planes
+   through ridge lines meet in facets, which is the structure the cone formulation cannot express.
+   Arete lengths, headings and face slopes vary, so asymmetry is intrinsic rather than added. */
+function peakSkeleton(p){
+  let rs=((p.seed|0)*2654435761)>>>0;
+  const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
+  const cx=p.x,cy=p.y,reach=Math.max(p.size,0.02),base=p.angle*Math.PI/180;
+  const k=Math.max(2,Math.min(6,Math.round(p.spurs*0.5)));   // 2-6 primary aretes meet at the summit
+  const aretes=[];
+  for(let i=0;i<k;i++){
+    const th=base+(i/k)*2*Math.PI+(rnd()-0.5)*0.9;
+    // asymmetry: aretes differ in length and in how fast they lose height
+    const len=reach*(0.55+0.75*rnd()),drop=0.55+0.4*rnd();
+    const pts=[[cx,cy,1.0]];
+    let ax=cx,ay=cy,dir=th;
+    const segs=4;
+    for(let sgi=1;sgi<=segs;sgi++){
+      dir+=(rnd()-0.5)*0.7;                                  // the crest wanders
+      const step=len/segs;
+      ax+=Math.cos(dir)*step;ay+=Math.sin(dir)*step;
+      const t=sgi/segs;
+      pts.push([ax,ay,Math.max(0,1-drop*Math.pow(t,0.75))]); // concave crest profile
+    }
+    aretes.push(pts);
+  }
+  return aretes;
+}
 function peakField(p){
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
-  const cx=p.x*n,cy=p.y*n,reach=Math.max(p.size,0.02)*n;
-  const nspur=Math.max(3,Math.round(p.spurs||7));      // spurs around the summit
-  const relief=p.relief;
-  let h=newField();
+  const aretes=peakSkeleton(p);
+  const faceSlope=1.0/Math.max(p.size*0.55,0.02)*(0.55+0.7*p.relief);
+  let h=newField(0);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const dx=x-cx,dy=y-cy;
-    let r=Math.hypot(dx,dy)/reach;                     // 0 at summit, 1 at the base
-    const th=Math.atan2(dy,dx);
-    // the footprint is not a circle: wobble the reach with angle so the base is organic
-    const wob=1+0.22*(fbm2(Math.cos(th)*1.7,Math.sin(th)*1.7,p.seed+21,3));
-    r/=Math.max(wob,0.3);
-    if(r>=1){h[y*n+x]=0;continue;}
-    // concave flanks: steep near the summit, easing out to the base (the profile real peaks show)
-    const env=Math.pow(1-r,1.15);
-    // SPURS are periodic in AZIMUTH -- that is what makes them radiate. A Voronoi field sampled in
-    // polar space does NOT give this: its cells subdivide radially too, so the edges run partly
-    // circumferentially and you get terracing instead of spurs (measured: the spur count did not
-    // follow the parameter at all). An explicitly angular ridge function does, exactly `nspur` of
-    // them, with an fbm in (angle, radius) letting the divides wander and bifurcate downslope.
-    const wander=fbm2(Math.cos(th)*2.2,Math.sin(th)*2.2+r*3.0,p.seed+31,4);
-    let spur=0.5+0.5*Math.cos(th*nspur+wander*1.6);    // 1 on a divide, 0 in a gully
-    spur=Math.pow(spur,Math.max(st.crest*0.7,0.35));
-    // sub-spurs branch off further down, where there is room for them
-    const wander2=fbm2(Math.cos(th)*4.4+2.1,Math.sin(th)*4.4+r*5.0,p.seed+41,3);
-    const spur2=Math.pow(0.5+0.5*Math.cos(th*nspur*2.0+wander2*2.0),0.8);
-    const branch=clamp((r-0.22)/0.35,0,1);
-    let net=clamp((1-st.spur*branch)*spur+st.spur*branch*spur2,0,1);
-    // near the summit the azimuthal frame is singular -- converge the spurs so the top is a POINT
-    const cap=clamp((r-0.05)/0.12,0,1);
-    net=1-(1-net)*cap;                                 // -> 1 (no incision) at the summit
-    h[y*n+x]=env*((1-relief)+relief*net);
+    const u=(x+0.5)/n,v=(y+0.5)/n;
+    let best=0;
+    for(const a of aretes){
+      const {d,e}=polylineNearest(u,v,a);
+      // a plane anchored on the crest, descending at faceSlope. Facets appear where planes meet.
+      const val=e-d*faceSlope;
+      if(val>best)best=val;
+    }
+    // gullies: incise the FACES, leaving the crests alone (roughness grows away from a divide)
+    if(best>0){
+      const g=fbm2(u*11,v*11,p.seed+53,4);
+      best*=1-st.spur*0.35*clamp(g*0.5+0.5,0,1);
+    }
+    h[y*n+x]=Math.max(0,best);
   }
   if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*n*n),seed:p.seed+11,radius:2});
   if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
@@ -1079,6 +1182,7 @@ const P={
   int:(key,label,min,max,def)=>({key,label,type:"slider",min,max,def,step:1,fmt:v=>v|0}),
   select:(key,label,opts,def)=>({key,label,type:"select",opts,def}),
   seg:(key,label,opts,def)=>({key,label,type:"seg",opts,def}),
+  text:(key,label,def,rows=9)=>({key,label,type:"text",def,rows}),
 };
 const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
@@ -1146,6 +1250,22 @@ const TYPES={
       P.slider("relief","Valley depth",0.1,0.95,0.66,0.01)],
     eval:(p)=>mountainField(p),
     note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
+  layout:{cat:"gen",name:"Layout",ins:["Base","Mask"],
+    desc:"Author the terrain's SKELETON as vector shapes carrying elevation \u2014 World Machine's Layout Generator, Houdini's project-from-curves, Gaea's vector drawing. Wire a Base to embed the shapes into existing terrain instead of generating from scratch.",
+    params:[P.text("spec","Shapes",
+`# path | point | poly, then vertices as x,y,elevation (0-1 of the tile)
+# width= falloff= profile=linear|squared|sqrt|scurve op=max|add|sub|replace breakup= seed=
+path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
+  0.10,0.70,0.35  0.28,0.62,0.85  0.44,0.66,0.55
+  0.62,0.52,1.00  0.80,0.46,0.62  0.93,0.52,0.30`, 10),
+      P.slider("height","Height",0,1,1,0.01)],
+    eval:(p,ins,node)=>{
+      let shapes;try{shapes=parseLayout(p.spec);}catch(err){console.error("layout",err);shapes=[];}
+      node._shapeCount=shapes.length;
+      const f=layoutField(shapes,ins[0]||null);
+      if(p.height!==1)for(let i=0;i<f.length;i++)f[i]*=p.height;
+      return maskApply(ins[0]||newField(0),f,ins[1]);},
+    note:"Elevation is <b>per vertex</b>, which is the whole point: a path is not a constant-height ribbon, it carries a height profile along its length. Summits fall out at the high vertices, saddles at the low ones, and faces fall away either side \u2014 so the node that art-directs a range is the same one that builds a single mountain. Overlapping shapes resolve by <b>greatest height wins</b>, as in World Machine. <b>Breakup</b> lets a fractal distort the outline so it is not geometric. With no <b>Base</b> wired it generates; wire one and it embeds instead."},
   constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
     params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
   import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
@@ -1632,6 +1752,13 @@ function buildField(pr){
     const opts=pr.opts||((pr.key==="gradient"||pr.key==="gradientB")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
     const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
     s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
+  }else if(pr.type==="text"){
+    f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
+    const ta=document.createElement("textarea");ta.className="inp";ta.rows=pr.rows||9;
+    ta.style.cssText="font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;resize:vertical;white-space:pre;overflow-x:auto";
+    ta.value=selected.params[pr.key];
+    ta.onchange=()=>{selected.params[pr.key]=ta.value;markDirtyFrom(selected.id);requestEval();};
+    f.appendChild(ta);
   }else if(pr.type==="seg"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
     const seg=document.createElement("div");seg.className="seg";
