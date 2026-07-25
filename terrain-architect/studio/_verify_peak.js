@@ -195,6 +195,37 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       farFromRotationallySymmetric: atDefault.mean < 0.93,
       characterDrivesIt: meanRot(0).mean > meanRot(0.9).mean };
 
+    // --- THE MASK MUST NOT FORCE EVERY MOUNTAIN INTO ONE SHAPE ---
+    // With reach, aspect and rotation fixed, the seed only displaces noise inside a footprint whose
+    // proportions never change. Measured before this was fixed: across six seeds, elongation stayed
+    // between 1.03 and 1.26 -- six variations on one circle. Second moments of the support give
+    // area, elongation and orientation without any reference to height.
+    const footprint = (f) => {
+      let sx=0, sy=0, w=0;
+      for (let y=0;y<n;y++) for (let x=0;x<n;x++){ if (f[y*n+x]<=0) continue; sx+=x; sy+=y; w++; }
+      if (w < 10) return null;
+      const fx=sx/w, fy=sy/w; let xx=0, yy=0, xy=0;
+      for (let y=0;y<n;y++) for (let x=0;x<n;x++){ if (f[y*n+x]<=0) continue;
+        const dx=x-fx, dy=y-fy; xx+=dx*dx; yy+=dy*dy; xy+=dx*dy; }
+      xx/=w; yy/=w; xy/=w;
+      const tr=xx+yy, det=xx*yy-xy*xy, disc=Math.sqrt(Math.max(tr*tr/4-det,0));
+      return { area:w/(n*n), elongation:Math.sqrt((tr/2+disc)/Math.max(tr/2-disc,1e-9)),
+               orientation:(Math.atan2(2*xy,xx-yy)/2)*180/Math.PI }; };
+    const SEEDS = [3,7,11,29,101,777,1234,5150,9001,424242];
+    const survey = (V) => { const fp = SEEDS.map(seed => footprint(M({seed, variation:V})));
+      const el = fp.map(q=>q.elongation), ar = fp.map(q=>q.area), or = fp.map(q=>q.orientation);
+      const sp = (v) => { const m=v.reduce((a,x)=>a+x,0)/v.length;
+        return Math.sqrt(v.reduce((a,x)=>a+(x-m)**2,0)/v.length)/Math.abs(m); };
+      return { elongationRange:[+Math.min(...el).toFixed(2), +Math.max(...el).toFixed(2)],
+               areaSpread:+sp(ar).toFixed(3), elongationSpread:+sp(el).toFixed(3),
+               orientationRangeDeg:+(Math.max(...or)-Math.min(...or)).toFixed(0) }; };
+    const v0 = survey(0), vDef = survey(DEF.variation), v1 = survey(1);
+    out.maskDoesNotForceOneShape = { atVariation0:v0, atDefault:vDef, atVariation1:v1,
+      // at 0 you get exactly the proportions you authored; the knob has to actually widen them
+      variationWidensShapes: v1.elongationSpread > v0.elongationSpread * 1.5,
+      areaVariesMore: v1.areaSpread > v0.areaSpread * 1.5,
+      someMassifIsElongated: v1.elongationRange[1] > 1.6 };
+
     // --- the primitive must stay inside its own footprint, so it composites cleanly ---
     const f = M({x:0.5, y:0.5, size:0.25});
     let outside = 0, inside = 0;

@@ -259,6 +259,19 @@ choosing what to place three of:
   that exponent: 1 is a straight cone, higher gives a sharper peak with a wider sprawling apron, below
   1 gives a plateau with an abrupt rim.
 
+  **Shape variation — so the mask does not stamp every mountain into one shape.** With reach, aspect
+  and rotation fixed, the seed only displaced *noise* inside a footprint whose proportions never
+  changed. Measured across ten seeds by the second moments of the support: elongation stayed between
+  **1.03 and 1.36** — ten variations on one circle. **Shape variation** lets the seed jitter the mask
+  itself, so one massif comes out long and narrow and the next compact. At 0 you get exactly the
+  proportions you authored.
+
+  | Shape variation | elongation range | area spread |
+  |---|---|---|
+  | 0 | 1.03 – 1.36 | 0.077 |
+  | 0.55 (default) | 1.11 – 1.42 | 0.242 |
+  | 1.0 | 1.06 – **1.89** | 0.399 |
+
   **Character — the domain warp that stops it being a tipi tent.** The dome was warped only on its
   *outline*: angular noise on the radius. That moves the footprint but leaves every radial profile a
   straight run to a single apex, so the result was a cone with flutes cut in it however dense the

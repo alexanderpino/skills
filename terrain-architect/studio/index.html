@@ -822,7 +822,17 @@ const MOUNTAIN_STYLES={
    are for. */
 function peakField(p){
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
-  const cx=p.x,cy=p.y,reach=Math.max(p.size,0.02),rot=p.angle*Math.PI/180;
+  // THE MASK MUST NOT STAMP EVERY MOUNTAIN INTO ONE SHAPE. With reach, aspect and rotation fixed,
+  // the seed only displaces noise inside a footprint whose PROPORTIONS never change: measured across
+  // six seeds, elongation stayed between 1.03 and 1.26 and area within +-8%, i.e. six variations on
+  // one circle. `variation` lets the seed jitter the mask itself, so one massif comes out long and
+  // narrow and the next compact. At 0 you get exactly the proportions you authored.
+  const variation=Math.max(p.variation||0,0);
+  const vr=(k,amt)=>1+(hash2(p.seed|0,k,9137)*2-1)*amt*variation;
+  const cx=p.x,cy=p.y;
+  const reach=Math.max(p.size,0.02)*vr(1,0.30);
+  const aspectS=Math.max(p.aspect||1,0.15)*vr(2,0.50);
+  const rot=p.angle*Math.PI/180+(hash2(p.seed|0,3,9137)*2-1)*Math.PI*variation;
   // drainage cells across the tile. `detail` is the density that actually controls how mountainous
   // it looks: at 1x the dome carries ~10 spurs, at 3x ~40, which is where the reference sits.
   const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
@@ -836,7 +846,7 @@ function peakField(p){
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const u=(x+0.5)/n,v=(y+0.5)/n;
     let dx=u-cx,dy=v-cy;
-    const rx=dx*Math.cos(rot)-dy*Math.sin(rot),ry=(dx*Math.sin(rot)+dy*Math.cos(rot))/Math.max(p.aspect||1,0.15);
+    const rx=dx*Math.cos(rot)-dy*Math.sin(rot),ry=(dx*Math.sin(rot)+dy*Math.cos(rot))/aspectS;
     // DOMAIN-WARP THE DISTANCE FIELD ITSELF, in 2D. Warping only the outline -- angular noise on the
     // radius, which is what this did before -- moves the footprint but leaves every radial profile a
     // straight run to a single apex. That is a tipi tent with flutes cut in it, however dense the
@@ -848,7 +858,7 @@ function peakField(p){
     const wx2=rx+wu*char*reach,wy2=ry+wv*char*reach;
     // a single low-frequency lobe on top, so one flank runs long and another stays short
     const th=Math.atan2(wy2,wx2);
-    const lobe=1+0.22*fbm2(Math.cos(th)*1.15,Math.sin(th)*1.15,p.seed+21,2);
+    const lobe=1+0.22*vr(4,0.9)*fbm2(Math.cos(th)*1.15,Math.sin(th)*1.15,p.seed+21,2);
     const r=Math.hypot(wx2,wy2)/(reach*Math.max(lobe,0.4));
     if(r>=1)continue;
     // THE SKIRT, now drawn rather than hardcoded. (1-r^2)^p is a BELL: measured, its slope at the
@@ -1319,6 +1329,7 @@ const TYPES={
       P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("relief","Valley depth",0.1,0.95,0.80,0.01),
       P.slider("character","Character",0,0.9,0.55,0.01,v=>v.toFixed(2)),
+      P.slider("variation","Shape variation",0,1,0.55,0.01,v=>v.toFixed(2)),
       P.curve("skirt","Skirt profile",curveFromExponent(1.4))],
     eval:(p)=>mountainField(p),
     note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
