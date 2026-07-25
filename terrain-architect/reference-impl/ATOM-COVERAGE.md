@@ -24,6 +24,19 @@ and numerical correctness by the per-atom oracle tests (`test_noise.py`, `test_o
 **Noise (`noise.py`, chapter `01`):** `perlin`, `value`, `simplex`, `worley` (f1 / f2f1 / inv_f1),
 `fbm`, `ridged_mf`, `hybrid_mf`, `gabor` (anisotropic/directional), `domain_warp`, `curl`.
 
+**Scale contract (chapter `08`).** Atom parameters must not be silently in CELL units — a cell is not
+a unit, `cellSize = extent / n` is. Every atom either takes `cellsize` or is listed with a reason in
+`tests/test_scale_contract.py` (caller-coordinate sampling, pure value maps, comparison-only
+algorithms, or an explicitly cell-space model). `erosion_droplet.resolution_matched()` carries
+droplet settings between grids (count ~ n², brush radius ~ n).
+
+**Colour production (`render.py`, chapter `18`):** `satmap` (CLUT on any driver), `satmap_2d`
+(altitude × slope), `blend_rgb` + `BLEND_MODES`, `splat_blend`, `extract_satmap`.
+**Data-map channels (`analysis.py`, chapter `06`):** `wear`, `peaks`, `texture_base` alongside
+`curvature`, `horizon_ao`, `deposit_fill`, `twi`.
+**Spatial scale (`ops_filters.py`):** `resample`, `at_feature_scale` (run an effect on a coarser
+grid so its footprint widens; only the delta is carried back).
+
 **SDF / gradient / combiner / tonal primitives (`ops_filters.py`, chapter `10`):** `sd_circle`, `sd_box`,
 `sd_convex_polygon`, `sd_segment`, `radial_gradient`, `linear_gradient`, `cone`, `smin`, `smax`, `blend`,
 `remap`, `curve`, `levels`. (The module also carries the filter/morphology toolbox — `gaussian`,
