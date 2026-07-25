@@ -195,3 +195,57 @@ def test_coordinate_transform_keeps_detail_a_raster_transform_loses():
     core = (slice(0, n - 60), slice(0, n - 60))            # exclude the raster path's edge clamp
     assert detail(as_raster[core]) < 0.9 * detail(at_coords[core]), (
         "expected the raster transform to lose detail the coordinate transform keeps")
+
+
+# --------------------------------------------------------------------------- #
+# the placement IS an affine matrix — and sampling uses its inverse
+# --------------------------------------------------------------------------- #
+def test_place_coords_is_exactly_the_inverse_affine():
+    """`place_coords` is the hand-decomposed inverse of `affine`. Proving they agree pins the whole
+    convention — including that sampling uses M^-1, the classic sign error in texture transforms."""
+    n, cellsize = 128, 10.0
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
+    for kw in ({"center": (320.0, 520.0)},
+               {"center": (300.0, 300.0), "rotation": 0.7},
+               {"center": (400.0, 200.0), "rotation": -0.3, "scale": 1.8}):
+        hand = placement.place_coords(xx, yy, (n, n), cellsize, **kw)
+        M = placement.affine(center=(kw["center"][0] / cellsize, kw["center"][1] / cellsize),
+                             rotation=kw.get("rotation", 0.0), scale=kw.get("scale", 1.0),
+                             pivot=(n / 2, n / 2))
+        mat = placement.sample_coords(xx, yy, M)
+        assert np.allclose(hand[0], mat[0]) and np.allclose(hand[1], mat[1]), kw
+
+
+def test_affine_round_trip_is_the_identity():
+    n = 64
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
+    M = placement.affine(center=(12.0, -7.0), rotation=0.4, scale=(1.7, 0.6), shear=0.25)
+    fx, fy = placement.transform_coords(xx, yy, M)
+    bx, by = placement.sample_coords(fx, fy, M)
+    assert np.allclose(bx, xx) and np.allclose(by, yy)
+
+
+def test_compose_equals_applying_in_sequence():
+    """Composing to ONE matrix must equal applying each in turn — the property that lets a chain of
+    placements collapse into a single evaluation."""
+    n = 48
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
+    A = placement.affine(center=(10.0, 0.0))
+    B = placement.affine(rotation=np.pi / 2)
+    C = placement.affine(scale=(2.0, 0.5))
+    x1, y1 = placement.transform_coords(xx, yy, A)
+    x2, y2 = placement.transform_coords(x1, y1, B)
+    x3, y3 = placement.transform_coords(x2, y2, C)
+    xc, yc = placement.transform_coords(xx, yy, placement.compose(A, B, C))
+    assert np.allclose(x3, xc) and np.allclose(y3, yc)
+
+
+def test_affine_supports_non_uniform_scale_and_shear():
+    """What the hand-decomposed form cannot express: per-axis scale and shear."""
+    M = placement.affine(scale=(2.0, 0.5), shear=0.3)
+    assert M[0, 0] == pytest.approx(2.0) and M[1, 1] == pytest.approx(0.5)
+    assert M[0, 1] == pytest.approx(0.3 * 0.5)          # shear composed with the y scale
+    n = 32
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
+    fx, fy = placement.transform_coords(xx, yy, M)
+    assert np.ptp(fx) > np.ptp(xx) and np.ptp(fy) < np.ptp(yy)

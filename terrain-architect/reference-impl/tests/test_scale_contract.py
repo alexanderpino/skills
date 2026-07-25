@@ -43,6 +43,8 @@ PIXEL_OR_CALLER_SPACE = {
     **{("ops_filters", f): _VALUE_ONLY for f in
        ("smin", "smax", "blend", "remap", "curve", "levels")},
     **{("placement", f): _VALUE_ONLY for f in ("apply_masked", "stamp")},
+    **{("placement", f): _CALLER_COORDS for f in
+       ("place_coords", "affine", "compose", "transform_coords", "sample_coords")},
     ("flow", "priority_flood_fill"): _SCALE_FREE,
     ("meander", "migrate"):
         "evolves a centreline, not a grid: ds/dt/cutoff_dist are all in the caller's units, so the "

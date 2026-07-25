@@ -31,7 +31,9 @@ algorithms, or an explicitly cell-space model). `erosion_droplet.resolution_matc
 droplet settings between grids (count ~ n², brush radius ~ n).
 
 **Placement & masking (`placement.py`, chapter `10`) — the art-direction layer:** `disc`, `rect`,
-`capsule`, `polygon`, `path_mask` build coverage masks from SDFs positioned in METRES; `apply_masked`
+`capsule`, `polygon`, `path_mask` build coverage masks from SDFs positioned in METRES; `place_coords` moves a GENERATOR by transforming the coordinates it samples (exact, unlike
+resampling its output); `affine`/`compose`/`transform_coords`/`sample_coords` are the 3x3 homogeneous
+form of the same thing, adding non-uniform scale, shear and chaining. `apply_masked`
 is the universal mask rule (an effect applies only where the mask is bright) and `stamp` composites a
 placed feature (max / add / replace).
 

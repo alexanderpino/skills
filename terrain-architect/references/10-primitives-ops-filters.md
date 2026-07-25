@@ -376,3 +376,23 @@ One honest caveat: a generator that normalises by its **own** extremes is not pe
 translation-invariant, because moving it changes what is in frame. Measured on `ridge`, that shows up
 as a global scale factor of 1.0006 and a mean difference of 0.013% of relief — negligible, but it is
 why the test asserts "the same terrain, moved" within a tolerance rather than bit-equality.
+
+#### It is an affine matrix — and sampling uses its inverse
+
+The placement above is a standard **affine transform**, and `placement.affine(center, rotation,
+scale, shear, pivot)` builds it explicitly as a 3x3 homogeneous matrix:
+
+    M = T(center) . R(rotation) . Sh(shear) . S(scale) . T(-pivot)
+
+The subtlety worth stating plainly: **you sample with the inverse.** You iterate over *destination*
+pixels and need the *source* coordinate feeding each one, so the sampler applies `M^-1`
+(`sample_coords`) while the feature moves by `M` (`transform_coords`). Getting that backwards moves
+everything the wrong way — the classic sign error in every texture transform. `place_coords` is
+exactly this inverse, hand-decomposed for the common translate/rotate/uniform-scale case; the tests
+assert the two agree.
+
+Two things the matrix form buys: **non-uniform scale and shear**, which the decomposed version
+cannot express, and **composition** — `compose(A, B, C)` collapses a chain into one transform. For a
+generator that is merely tidier (sampling is exact either way), but for a **raster** it is a real
+quality win: each extra resample is another low-pass filter, so collapsing four moves into one
+avoids the ~34% detail loss measured above.

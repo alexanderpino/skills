@@ -143,3 +143,52 @@ def place_coords(xx, yy, shape, cellsize=1.0, center=None, rotation=0.0, scale=1
         c, s = np.cos(-rotation), np.sin(-rotation)
         dx, dy = dx * c - dy * s, dx * s + dy * c
     return dx + c0x, dy + c0y
+
+
+# --------------------------------------------------------------------------- #
+# affine placement as a matrix
+# --------------------------------------------------------------------------- #
+def affine(center=(0.0, 0.0), rotation=0.0, scale=(1.0, 1.0), shear=0.0, pivot=(0.0, 0.0)):
+    """The FORWARD 3x3 homogeneous transform that places a feature: feature space -> world space.
+
+    Composed as T(center) . R(rotation) . Sh(shear) . S(scale) . T(-pivot) — scale and rotate about
+    `pivot` (a generator's native centre), then move to `center`. `scale` may be a scalar or
+    (sx, sy) for non-uniform; `shear` slews x by y.
+
+    Sampling uses the INVERSE of this (`sample_coords`): you iterate over destination pixels and
+    need the source coordinate feeding each one. Getting that backwards moves the feature the wrong
+    way — the classic sign error in every texture transform. `place_coords` above is this same
+    inverse, hand-decomposed for the common translate/rotate/uniform-scale case."""
+    sx, sy = (scale, scale) if np.isscalar(scale) else (scale[0], scale[1])
+    ct, st = np.cos(rotation), np.sin(rotation)
+    T_c = np.array([[1.0, 0.0, center[0]], [0.0, 1.0, center[1]], [0.0, 0.0, 1.0]])
+    R = np.array([[ct, -st, 0.0], [st, ct, 0.0], [0.0, 0.0, 1.0]])
+    Sh = np.array([[1.0, shear, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    S = np.array([[sx, 0.0, 0.0], [0.0, sy, 0.0], [0.0, 0.0, 1.0]])
+    T_p = np.array([[1.0, 0.0, -pivot[0]], [0.0, 1.0, -pivot[1]], [0.0, 0.0, 1.0]])
+    return T_c @ R @ Sh @ S @ T_p
+
+
+def compose(*matrices):
+    """Combine placements into ONE transform, applied left to right. For a generator, composing and
+    sampling once is equivalent to sampling repeatedly; for a RASTER it is strictly better, because
+    every extra resample is another low-pass filter (see `place_coords`)."""
+    out = np.eye(3)
+    for m in matrices:
+        out = np.asarray(m, dtype=np.float64) @ out
+    return out
+
+
+def transform_coords(xx, yy, matrix):
+    """Apply a 3x3 homogeneous `matrix` to coordinate grids. Returns (x', y')."""
+    m = np.asarray(matrix, dtype=np.float64)
+    x = np.asarray(xx, dtype=np.float64)
+    y = np.asarray(yy, dtype=np.float64)
+    return (m[0, 0] * x + m[0, 1] * y + m[0, 2],
+            m[1, 0] * x + m[1, 1] * y + m[1, 2])
+
+
+def sample_coords(xx, yy, matrix):
+    """Destination coords -> SOURCE coords for a feature placed by `matrix`: `transform_coords`
+    with the inverse. The feature moves by `matrix`, so the sampler moves by its opposite."""
+    return transform_coords(xx, yy, np.linalg.inv(np.asarray(matrix, dtype=np.float64)))
