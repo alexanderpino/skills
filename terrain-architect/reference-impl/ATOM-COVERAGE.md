@@ -30,6 +30,11 @@ a unit, `cellSize = extent / n` is. Every atom either takes `cellsize` or is lis
 algorithms, or an explicitly cell-space model). `erosion_droplet.resolution_matched()` carries
 droplet settings between grids (count ~ n², brush radius ~ n).
 
+**Placement & masking (`placement.py`, chapter `10`) — the art-direction layer:** `disc`, `rect`,
+`capsule`, `polygon`, `path_mask` build coverage masks from SDFs positioned in METRES; `apply_masked`
+is the universal mask rule (an effect applies only where the mask is bright) and `stamp` composites a
+placed feature (max / add / replace).
+
 **Colour production (`render.py`, chapter `18`):** `satmap` (CLUT on any driver), `satmap_2d`
 (altitude × slope), `blend_rgb` + `BLEND_MODES`, `splat_blend`, `extract_satmap`.
 **Data-map channels (`analysis.py`, chapter `06`):** `wear`, `peaks`, `texture_base` alongside

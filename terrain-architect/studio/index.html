@@ -588,6 +588,36 @@ function gpuThermal(inp,{talus=0.012,iters=30,rate=0.5}){
 }
 const gpuReady=()=>USE_GPU&&GPU.init();
 
+/* ---- PLACEMENT (art direction): SDF shape masks positioned in METRES, mirroring
+   reference-impl/placement.py. A Shape is both a mask (wire it into any node's Mask input to
+   confine an effect) and a heightfield (erode it into a landform) — Gaea's Mask-as-Primitive. ---- */
+function shapeField(p){
+  const n=RES,o=newField(),cs=cellSizeM();
+  const cx=p.x*terrainDef.scale,cy=p.y*terrainDef.scale;          // 0..1 of the terrain -> metres
+  const rad=p.size*terrainDef.scale*0.5,fall=Math.max(p.falloff*terrainDef.scale*0.5,cs);
+  const a=-p.angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
+  const half=Math.max(rad*p.aspect,cs);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    let dx=(x+0.5)*cs-cx,dy=(y+0.5)*cs-cy;
+    const rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;                          // rotate into object space
+    let d;
+    if(p.kind==="box"){const qx=Math.abs(rx)-rad,qy=Math.abs(ry)-half;
+      d=Math.hypot(Math.max(qx,0),Math.max(qy,0))+Math.min(Math.max(qx,qy),0);}
+    else if(p.kind==="line"){const L=rad;const t=clamp(rx/(2*L)+0.5,0,1);
+      const px=rx-(t*2*L-L),py=ry;d=Math.hypot(px,py)-half;}
+    else d=Math.hypot(rx,ry/Math.max(p.aspect,1e-3))-rad;          // circle / ellipse
+    o[y*n+x]=smooth(clamp((fall*0.5-d)/(fall||1e-6),0,1));         // SDF -> soft coverage
+  }
+  return p.invert==="on"?invertField(o):o;
+}
+// Universal MASK rule (Gaea: "connect a mask to a node and it is applied only within the masked
+// area"). Applied as a POST-PROCESS lerp, so changing the mask never re-runs the effect.
+function maskApply(base,modified,mask){
+  if(!mask)return modified;
+  const o=newField();for(let i=0;i<o.length;i++){const m=clamp(mask[i],0,1);o[i]=base[i]+(modified[i]-base[i])*m;}
+  return o;
+}
+
 /* ---- SPATIAL SCALE: run an effect over a larger/smaller area (Gaea's Feature Scale + Transform) ---- */
 function resampleField(f,fromN,toN){            // bilinear resample between two square grids
   const o=new Float32Array(toN*toN);
@@ -881,6 +911,14 @@ const TYPES={
   gradient:{cat:"gen",name:"Gradient",ins:[],desc:"Linear or radial ramp — a base slope or falloff.",
     params:[P.seg("kind","Kind",[["lin","Linear"],["rad","Radial"]],"lin"),P.slider("angle","Angle",0,360,35,1,v=>v|0)],
     eval:(p)=>p.kind==="rad"?radialField():gradientField(p.angle)},
+  shape:{cat:"gen",name:"Shape",ins:[],desc:"An SDF placement mask — circle/box/line positioned in the terrain, with a soft edge. Wire it into any node's Mask input to confine that effect, or erode it directly into a landform (Gaea's Mask-as-Primitive).",
+    params:[P.seg("kind","Kind",[["circle","Circle"],["box","Box"],["line","Line"]],"circle"),
+      P.slider("x","Position X",0,1,0.5),P.slider("y","Position Y",0,1,0.5),
+      P.slider("size","Size",0.02,1.5,0.4),P.slider("aspect","Aspect",0.05,4,1,0.05),
+      P.slider("angle","Angle",0,360,0,1,v=>(v|0)+"\u00b0"),
+      P.slider("falloff","Falloff",0,1,0.25),
+      P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
+    eval:(p)=>shapeField(p)},
   constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
     params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
   import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
@@ -901,12 +939,12 @@ const TYPES={
     params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
     eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
 
-  warp:{cat:"filt",name:"Warp",ins:["In"],desc:"Domain-warp the input by internal noise.",
+  warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",
     params:[P.slider("strength","Strength",0,0.4,0.12),P.slider("freq","Frequency",0.5,8,3,0.1),P.int("seed","Seed",1,999,7)],
-    eval:(p,ins)=>ins[0]?warpField(ins[0],p):newField()},
-  terrace:{cat:"filt",name:"Terrace",ins:["In"],desc:"Snap to stratified benches.",
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],warpField(ins[0],p),ins[1]):newField()},
+  terrace:{cat:"filt",name:"Terrace",ins:["In","Mask"],desc:"Snap to stratified benches.",
     params:[P.int("steps","Steps",2,24,8),P.slider("sharp","Sharpness",0,1,0.6)],
-    eval:(p,ins)=>ins[0]?terraceField(ins[0],p):newField()},
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],terraceField(ins[0],p),ins[1]):newField()},
   levels:{cat:"filt",name:"Levels",ins:["In"],desc:"Clip range + gamma + output range.",
     params:[P.slider("inLo","In low",0,1,0),P.slider("inHi","In high",0,1,1),P.slider("gamma","Gamma",0.2,3,1),
       P.slider("outLo","Out low",0,1,0),P.slider("outHi","Out high",0,1,1)],
@@ -917,9 +955,9 @@ const TYPES={
   histeq:{cat:"filt",name:"Histogram EQ",ins:["In"],desc:"CDF equalization — spread the tonal range.",
     params:[P.slider("amount","Amount",0,1,1),P.int("bins","Bins",16,256,256)],
     eval:(p,ins)=>ins[0]?histEqualizeField(ins[0],p):newField()},
-  blur:{cat:"filt",name:"Blur",ins:["In"],desc:"Separable Gaussian smoothing.",
+  blur:{cat:"filt",name:"Blur",ins:["In","Mask"],desc:"Separable Gaussian smoothing.",
     params:[P.slider("radius","Radius",1,10,2,1,v=>v|0)],
-    eval:(p,ins)=>ins[0]?blurField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}):newField()},
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],blurField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}),ins[1]):newField()},
   clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
@@ -933,7 +971,7 @@ const TYPES={
   invert:{cat:"filt",name:"Invert",ins:["In"],desc:"1 − height.",params:[],
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
-  thermal:{cat:"ero",name:"Thermal erosion",ins:["In"],desc:"Talus: material above repose slides down.",
+  thermal:{cat:"ero",name:"Thermal erosion",ins:["In","Mask"],desc:"Talus: material above repose slides down.",
     params:[P.seg("realScale","Real Scale",[["off","Off"],["on","On"]],"off"),
       P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),
       P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
@@ -946,13 +984,13 @@ const TYPES={
       ? Math.tan(p.repose*Math.PI/180)*cellSizeM()/terrainDef.height
       : p.talus/k;
     const q={...p,talus,iters:Math.max(1,Math.round(p.iters*k))};
-    return atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q));}},
-  hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In"],desc:"Droplet sim — carves valleys, deposits fans.",
+    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
+  hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
-    return atFeatureScale(ins[0],p.feat,f=>hydraulicErode(f,{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))}));}},
+    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>hydraulicErode(f,{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))})),ins[1]);}},
 
   slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
     params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],

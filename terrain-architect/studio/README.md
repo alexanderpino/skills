@@ -98,7 +98,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) |
 | **Filter** | Warp (domain warp) · **Transform** (move/rotate/scale) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
@@ -112,6 +112,22 @@ wire it into the pipeline (e.g. `… → erosion → Snow → Water → SatMap �
 whichever effect nodes feed the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes +
 downhill rivers) or the simple **Sea level** (a flat ocean at a level). Effect nodes pass the height through
 unchanged — they add a scene layer, so deleting one removes just that effect.
+
+**Art direction — Shape masks and the universal Mask input.** A procedural graph that only generates
+*everywhere* can't be directed, so two things make it placeable, mirroring Gaea (where "almost every
+node contains a Mask input port… the processing of that node is applied only within the masked area"):
+
+- A **Shape** generator — an SDF placement mask (circle / box / line) with position, size, aspect,
+  rotation and a soft **falloff**, authored as a fraction of the terrain so it stays put when the
+  resolution changes. Like Gaea's Mask-as-Primitive it is *both* a mask and a heightfield: wire it into
+  a Mask input to confine an effect, or erode it directly into a landform.
+- A **Mask** input on **Thermal**, **Hydraulic**, **Warp**, **Terrace** and **Blur** — the effect runs,
+  then applies only where the mask is bright (`base + (modified − base) · mask`). Because it is a
+  post-process, changing the mask never re-runs the erosion. Verified: with a circular Shape mask, mean
+  change inside the mask is 5.2e-4 and **outside is exactly 0**.
+
+Both mirror `reference-impl/placement.py` (`disc`/`rect`/`capsule`/`polygon`/`path_mask`,
+`apply_masked`, `stamp`), where placements are authored in **metres**.
 
 **The SatMap node — Gaea's colouring model.** In Gaea a SatMap is a *node* that colours a terrain through a
 gradient, driven by **whatever grayscale you feed it** (not only height). This node mirrors that: it takes

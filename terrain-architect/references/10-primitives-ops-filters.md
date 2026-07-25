@@ -325,3 +325,33 @@ Two rules:
   upstream of step 4 in the Legal Order. A `twist` node downstream of stream power is a bug,
   and it is the kind of bug that looks great in a hillshade and fails the flow accumulation
   check (`09`) instantly.
+
+## Placement & masking: making a procedural terrain art-directable
+
+A generator that only produces terrain *everywhere* cannot be directed. Two operations turn a
+procedural graph into something an artist can lay out, and every terrain tool converges on the same
+pair (`reference-impl/placement.py`):
+
+**Place** — build a coverage mask from an SDF positioned in **world coordinates**: `disc`, `rect`,
+`capsule` (a thick segment, for a river corridor or ridgeline), `polygon`, `path_mask` (a polyline
+corridor). The SDF primitives themselves are the `sd_*` functions above; placement adds the
+transform (centre, rotation) and the distance→coverage step.
+
+**Mask** — `apply_masked(base, modified, mask)` applies an effect *only where the mask is bright*:
+`base + (modified − base) · mask`. This is the universal "mask input" — erode this valley, leave
+that plateau; warp here, not there. Note it is a **post-process**: the effect runs, then the mask
+selects. Changing the mask therefore does not re-run the effect, which is what makes laying out a
+composition interactive. Gaea makes the same distinction explicitly, warning that masking a node
+*directly* forces a full rebuild while a separate mask node is "extremely fast".
+
+Two rules that are easy to get wrong:
+
+- **Author placements in metres, never cells** (08). A layout keyed to cell indices slides across
+  the terrain the moment the build resolution changes. `placement` takes `cellsize` and world-space
+  centres/radii for exactly this reason, and the invariance is pinned by a test.
+- **Never ship a binary mask.** A hard 0/1 edge prints its staircase through every downstream blend,
+  so `coverage()` clamps the soft edge to at least one cell even when `falloff=0`.
+
+A placement mask is also a **shape**: the same disc that confines an erosion can be treated as a
+heightfield and eroded into a landform. That dual use — mask *or* primitive — is why the shape
+belongs in the graph rather than in a brush tool.
