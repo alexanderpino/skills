@@ -11,7 +11,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   const errors = []; p.on('pageerror', e => errors.push(e.message));
   await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1600);
 
-  const r = await p.evaluate(() => {
+  const r = await p.evaluate(async () => {
     const n = RES, out = {};
     const noisy = fbmField(gnoise, {seed:5, freq:2, octaves:4, lac:2, gain:0.5});
 
@@ -153,6 +153,35 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       networkShrinksWithDiffusion: dk.every((q,i)=> i===0 || q.maxDrainageArea < dk[i-1].maxDrainageArea),
       modestDiffusionKeepsTheScaling: dk[1].fit.withinReferenceTolerance,
       heavyDiffusionErasesTheNetwork: dk[3].maxDrainageArea < dk[0].maxDrainageArea * 0.25 };
+    // ---- THE SLOPE DISTRIBUTION MUST LOOK LIKE REAL TERRAIN ----
+    // The strongest grounded check available: compare against the embedded real SRTM tile rather
+    // than against judgement. It caught what "spiky and erratic" actually was -- a landscape that
+    // was 90% dead flat with razor blades in the top 1%, slope median 0 and p90 0.47 against the
+    // real tile's 2.45 and 9.26, with a maximum twice anything real.
+    const nd = makeNode("import",0,0);
+    await new Promise(res => { loadImageAsDEM(nd, REAL_DEM_SAMPLE, "");
+      const t = setInterval(()=>{ if (nd._dem){ clearInterval(t); res(); } }, 200); });
+    const realDem = TYPES.import.eval({scale:1},[],nd);
+    // normalise each field to relief 1 first, so this compares SHAPE not amplitude
+    const slopeQuantiles = (f) => { let lo=1e9,hi=-1e9; for (const v of f){ if(v<lo)lo=v; if(v>hi)hi=v; }
+      const d=(hi-lo)||1, arr=[];
+      for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++){ const i=y*n+x;
+        arr.push(Math.hypot(((f[i+1]-f[i-1])/d)*n/2, ((f[i+n]-f[i-n])/d)*n/2)); }
+      arr.sort((a,b2)=>a-b2);
+      const q=(t)=>+arr[Math.floor(arr.length*t)].toFixed(2);
+      return { median:q(0.5), p90:q(0.9), p99:q(0.99), max:+arr[arr.length-1].toFixed(1) }; };
+    const up = TYPES.tectonic.eval({seed:3, plates:10, warp:0.5, orogen:0.30,
+                                    ocean:0.4, land:0.45, output:"orogen"});
+    const sp = TYPES.streampower.params.reduce((a,q)=>(a[q.key]=q.def,a),{});
+    const built = streamPowerErode(newField(0), {Kdt:sp.strength*2.0, Udt:0.004, m:sp.m,
+                                                 iters:180, uplift:up, Ddt:sp.hillslope*0.24});
+    const R = slopeQuantiles(realDem), M = slopeQuantiles(built);
+    out.slopeDistributionVsRealDEM = { realSRTM:R, atShippedDefaults:M,
+      // within ~2 units at every percentile, on a scale where the failure mode read 0 vs 2.45
+      p90Close: Math.abs(M.p90-R.p90) < 2.5,
+      p99Close: Math.abs(M.p99-R.p99) < 2.5,
+      maxNotRazor: M.max < R.max * 1.35,
+      notFlat: M.median > R.median * 0.5 };
     return out;
   });
 

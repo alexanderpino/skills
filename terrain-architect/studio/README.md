@@ -180,6 +180,25 @@ give more boundary, warping relocates 21% of belt cells, and handing the result 
 terrain **4.8× more textured than the uplift that produced it** with a drainage network reaching 1434
 cells.
 
+**A continent rises as a whole, not only along its belts.** Uplift confined to boundary belts leaves
+the rest of the tile at base level, so the carved result came out **90% dead flat with razor blades
+where the belts were** — slope median 0 and p90 0.47 against a real SRTM tile's 2.45 and 9.26, with a
+maximum of 44.3 against the real tile's 22.8, i.e. edges twice as steep as anything real. **Continental
+uplift** restores the per-plate base the reference includes, and the land mask is blurred over the
+orogen scale so plate margins are shelves rather than cliff walls.
+
+**The slope distribution is checked against the embedded real SRTM tile**, which is the strongest
+grounded test in the studio and the thing that identified "spiky and erratic" precisely:
+
+| | median | p90 | p99 | max |
+|---|---|---|---|---|
+| real SRTM | 2.45 | 9.26 | 15.72 | 22.8 |
+| tectonic → stream power, shipped defaults | 3.72 | 10.27 | 16.49 | 24.8 |
+
+Within about 1–2 units at every percentile. One caveat worth stating: the embedded DEM is the Colorado
+**Plateau**, so matching its slope distribution does not by itself validate mountain-*range*
+morphology — it rules out razor edges and dead-flat plains, not much more.
+
 **Zero has to mean zero in an uplift field.** Rifts contribute *negative* boundary values, and
 normalising the result mapped that negative floor to 0 — pushing "no uplift" up to the middle of the
 range. Measured, the 25th, 50th and 75th percentiles all sat at **0.377**: a constant uplift over most

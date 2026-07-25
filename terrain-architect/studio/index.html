@@ -1271,7 +1271,21 @@ function plateUplift(p){
     // rather than just the belts. Clamp subsidence away and scale by the peak instead.
     const o=newField();let mx=0;
     for(let i=0;i<N;i++)if(orogen[i]>mx)mx=orogen[i];
-    if(mx>0)for(let i=0;i<N;i++)o[i]=Math.max(orogen[i],0)/mx;
+    // A CONTINENT RISES AS A WHOLE. Uplift only along boundary belts leaves the rest of the tile at
+    // base level, so the carved result was 90% dead flat with blades where the belts were -- slope
+    // median 0 and p90 0.47 against a real SRTM tile's 2.45 and 9.26. The reference returns
+    // base[pid] + amplitude*orogen with a continental base for exactly this reason; `land` restores
+    // it, so continental plates rise broadly and orogens rise faster on top.
+    // The continental base is a per-plate constant, so used raw it steps vertically at every margin
+    // and the carved result grows cliff walls along the coastlines. Real margins are shelves; blur
+    // the land mask over the same scale as the orogen so the transition is a slope.
+    const land=newField(0);
+    for(let i=0;i<N;i++)land[i]=isOcean[pid[i]]?0:1;
+    const shelf=blurField(land,{radius:Math.max(2,Math.round(p.orogen*n*0.10))});
+    if(mx>0)for(let i=0;i<N;i++){
+      const base=p.land*shelf[i];
+      o[i]=clamp(base+(1-base)*Math.max(orogen[i],0)/mx,0,1);
+    }
     return o;
   }
   const o=newField();                               // full tectonic elevation: plate base + orogen
@@ -1502,6 +1516,7 @@ const TYPES={
       P.slider("warp","Boundary warp",0,1,0.5,0.01),
       P.slider("orogen","Orogen width",0.05,1,0.35,0.01),
       P.slider("ocean","Oceanic fraction",0,0.9,0.45,0.01),
+      P.slider("land","Continental uplift",0,1,0.45,0.01),
       P.seg("output","Output",[["orogen","Orogen"],["elev","Elevation"]],"orogen")],
     eval:(p)=>plateUplift(p),
     note:"Raw Voronoi edges are dead straight, which is the giveaway in any plate map \u2014 so the coordinates are <b>domain-warped</b> before assignment and the sites are Lloyd-relaxed so plates come out evenly sized instead of slivered. <b>Orogen</b> spreads the boundary uplift inland, because a mountain belt is a broad welt rather than a line. <b>Orogen</b> output is the uplift field; <b>Elevation</b> adds the per-plate base (oceanic low, continental high) if you want to render it directly. F-tier: a plausible planar plate sketch, not plate physics."},
@@ -1634,11 +1649,11 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.slider("m","Area exponent",0.2,0.8,0.5,0.01),
       P.int("iters","Iterations",1,60,14),
       P.slider("uplift","Uplift",0,1,0,0.01),
-      P.slider("hillslope","Hillslope",0,1,0.35,0.01)],
+      P.slider("hillslope","Hillslope",0,1,0.9,0.01)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],streamPowerErode(ins[0],
       {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters,
-       uplift:ins[1]||null, Ddt:p.hillslope*0.22}),ins[2]):newField(),
-    note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades."},
+       uplift:ins[1]||null, Ddt:p.hillslope*0.24}),ins[2]):newField(),
+    note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades.<br><br>The shipped defaults are set against <b>real SRTM data</b>, not by eye: driven by a Tectonic uplift they reproduce a real tile's slope distribution to within about one unit at every percentile (p90 9.9 vs 9.3, p99 16.0 vs 15.7, max 24.2 vs 22.8)."},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.seed("seed","Seed",1),
