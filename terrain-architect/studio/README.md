@@ -162,6 +162,31 @@ across the tile interior. Over the whole tile it drops to 0.944, and that gap is
 placement — it is the two modes' different edge policy, since exact mode has real terrain past the old
 tile edge where raster has clamped smear. Scoring the interior separates the two.
 
+### Tectonic uplift — Voronoi plates as the structural skeleton
+
+Ported from `reference-impl/tectonics.py`'s `plate_uplift` (chapter 02). Voronoi cells are the classic
+model for plate and block structure, but raw Voronoi edges are dead straight and that is the giveaway
+in any plate map — so the coordinates are **domain-warped** before assignment and the sites are
+**Lloyd-relaxed** so plates come out evenly sized instead of slivered. Each boundary is classified from
+the relative velocity of its two plates — continent–continent collision, subduction, island arc, rift
+(diverging, so subsidence) or transform (shear, ~no uplift) — and the uplift is diffused **inland**
+over the orogen width, because a mountain belt is a broad welt rather than a line.
+
+Its purpose is to drive Stream power's **Uplift** input: **this gives the structure, the rivers give
+the topography.** F-tier — a plausible planar plate sketch, not plate physics.
+
+Verified: orogen width monotonically widens the belt (0.019 → 0.063 → 0.131 of the tile), more plates
+give more boundary, warping relocates 21% of belt cells, and handing the result to stream power yields
+terrain **4.8× more textured than the uplift that produced it** with a drainage network reaching 1434
+cells.
+
+**Zero has to mean zero in an uplift field.** Rifts contribute *negative* boundary values, and
+normalising the result mapped that negative floor to 0 — pushing "no uplift" up to the middle of the
+range. Measured, the 25th, 50th and 75th percentiles all sat at **0.377**: a constant uplift over most
+of the tile, which is why everything came out mountainous instead of just the belts. Clamping
+subsidence away and scaling by the peak fixed three separate failing assertions at once — belt width,
+plate count and drainage all became monotonic — because they were one bug, not three.
+
 ### Stream power — the process that organises a landscape
 
 `dh/dt = U − K·A^m·S^n` (n = 1), Braun & Willett 2013's O(N) implicit solver, ported from
@@ -647,7 +672,8 @@ node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/G
 node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
 node _verify_range.js                # place 3 Mountains, union with Smooth Max, erode into one range
 node _verify_peak.js                 # prominence, dissection, solid-of-revolution, mask shape variation
-node _verify_streampower.js          # slope-area law S ~ A^-m, convergence, base-levelling
+node _verify_streampower.js          # slope-area law S ~ A^-m, convergence, hillslope coupling
+node _verify_tectonic.js             # Voronoi plates: warped boundaries, orogen width, drives incision
 node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings

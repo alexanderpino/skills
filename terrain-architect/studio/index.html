@@ -1200,6 +1200,85 @@ function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
 
 /* ------------------------------------------------------- erosion ------ */
 // Thermal (talus) erosion — material above the repose angle slides to lower neighbours.
+/* PLATE TECTONICS -- Voronoi plates as the structural skeleton of a range.
+   Ported from reference-impl/tectonics.py `plate_uplift` (chapter 02). Voronoi cells are the classic
+   model for plate/block structure, but raw Voronoi edges are dead straight and that is the tell, so
+   the coordinates are DOMAIN-WARPED before assignment and the sites are Lloyd-relaxed so plates come
+   out evenly sized rather than slivered.
+
+   Each boundary is classified from the relative velocity of the two plates: continent-continent
+   collision, subduction (one oceanic), island arc (both oceanic), rift (diverging, so subsidence),
+   or transform (shear-dominated, ~no uplift). The boundary uplift is then diffused INLAND over the
+   orogen width, because a mountain belt is a broad welt, not a line.
+
+   Its purpose is to drive Stream power's Uplift input: this gives the structure, the rivers give the
+   topography. F-tier -- a plausible planar plate sketch, not plate physics. */
+function plateUplift(p){
+  const n=RES,N=n*n,P=Math.max(3,Math.round(p.plates));
+  let rs=((p.seed|0)*2654435761)>>>0;
+  const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
+  const gauss=()=>{let u=0,v=0;while(u<=1e-9)u=rnd();v=rnd();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318530718*v);};
+  const cx=[],cy=[];for(let k=0;k<P;k++){cx.push(rnd()*n);cy.push(rnd()*n);}
+  const nearest=(x,y)=>{let bd=Infinity,bi=0;
+    for(let k=0;k<P;k++){const d=(x-cx[k])**2+(y-cy[k])**2;if(d<bd){bd=d;bi=k;}}return bi;};
+  for(let it=0;it<2;it++){                          // Lloyd relaxation -> evenly sized plates
+    const sx=new Float64Array(P),sy=new Float64Array(P),c=new Float64Array(P);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const k=nearest(x,y);sx[k]+=x;sy[k]+=y;c[k]++;}
+    for(let k=0;k<P;k++)if(c[k]>0){cx[k]=sx[k]/c[k];cy[k]=sy[k]/c[k];}
+  }
+  const warp=p.warp*n*0.06;
+  const pid=new Int32Array(N);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){        // assign on WARPED coordinates
+    // Warp FREQUENCY matters more than amplitude here. The reference uses warp_freq 0.045, i.e. ~8.6
+    // cycles across a 192 tile; at 3.2 cycles the noise is so smooth it translates whole boundaries
+    // rigidly instead of bending them, and they stay recognisably straight. Measured, the low
+    // frequency relocated only 17% of belt cells across the entire warp range.
+    const wf=8.6;
+    const wx=x+warp*fbm2(x/n*wf,y/n*wf,p.seed,4);
+    const wy=y+warp*fbm2(x/n*wf+5.3,y/n*wf+1.7,p.seed+7,4);
+    pid[y*n+x]=nearest(wx,wy);
+  }
+  const vx=[],vy=[],isOcean=[];
+  for(let k=0;k<P;k++){vx.push(gauss());vy.push(gauss());isOcean.push(rnd()<p.ocean);}
+  const boundary=newField(0);
+  const NB=[[-1,0],[1,0],[0,-1],[0,1]];
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x,a=pid[i];
+    for(const d of NB){
+      const xx=Math.min(n-1,Math.max(0,x+d[0])),yy=Math.min(n-1,Math.max(0,y+d[1]));
+      const b=pid[yy*n+xx];if(b===a)continue;
+      let nx=cx[b]-cx[a],ny=cy[b]-cy[a];const nl=Math.hypot(nx,ny)+1e-9;nx/=nl;ny/=nl;
+      const rvx=vx[a]-vx[b],rvy=vy[a]-vy[b];
+      const conv=rvx*nx+rvy*ny, shear=Math.abs(rvx*ny-rvy*nx);
+      if(Math.abs(conv)<shear)continue;             // transform boundary: shear, ~no uplift
+      const oa=isOcean[a],ob=isOcean[b];
+      let val=0;
+      if(conv>0) val=(!oa&&!ob)?1.0*conv                       // continent-continent collision
+                 :(oa!==ob)?0.7*conv                            // subduction, one oceanic
+                 :0.45*conv;                                    // island arc, both oceanic
+      else       val=0.6*conv;                                  // rift: conv<0 -> subsidence
+      boundary[i]+=val;
+    }
+  }
+  for(let i=0;i<N;i++)boundary[i]*=0.5;             // each boundary counted from both sides
+  const orogen=blurField(boundary,{radius:Math.max(2,Math.round(p.orogen*n*0.16))});
+  if(p.output==="orogen"){
+    // ZERO MUST MEAN ZERO in an uplift field. Rifts are divergent, so they contribute NEGATIVE
+    // boundary values; normalising the result maps that negative floor to 0 and pushes "no uplift"
+    // up to the middle of the range. Measured, that put the 25th, 50th and 75th percentiles all at
+    // 0.377 -- a constant uplift over most of the tile, which is why everything came out mountainous
+    // rather than just the belts. Clamp subsidence away and scale by the peak instead.
+    const o=newField();let mx=0;
+    for(let i=0;i<N;i++)if(orogen[i]>mx)mx=orogen[i];
+    if(mx>0)for(let i=0;i<N;i++)o[i]=Math.max(orogen[i],0)/mx;
+    return o;
+  }
+  const o=newField();                               // full tectonic elevation: plate base + orogen
+  for(let i=0;i<N;i++)o[i]=(isOcean[pid[i]]?0.0:0.55)+2.2*orogen[i];
+  return normalize(o);
+}
+
 /* STREAM-POWER FLUVIAL INCISION --  dh/dt = U - K*A^m*S^n,  n = 1.
    Braun & Willett 2013 O(N) implicit solver, ported from reference-impl/erosion_streampower.py
    (P-tier there, cross-validated against Landlab).
@@ -1416,6 +1495,16 @@ const TYPES={
       P.curve("skirt","Skirt profile",curveFromExponent(1.4))],
     eval:(p)=>mountainField(p),
     note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
+  tectonic:{cat:"gen",name:"Tectonic uplift",ins:[],
+    desc:"Voronoi plates with noise-warped boundaries, each classified into collision / subduction / island arc / rift / transform, with the boundary uplift diffused inland over the orogen width. Wire it into Stream power's Uplift input: this gives the structure, the rivers give the topography.",
+    params:[P.seed("seed","Seed",3),
+      P.int("plates","Plates",3,24,10),
+      P.slider("warp","Boundary warp",0,1,0.5,0.01),
+      P.slider("orogen","Orogen width",0.05,1,0.35,0.01),
+      P.slider("ocean","Oceanic fraction",0,0.9,0.45,0.01),
+      P.seg("output","Output",[["orogen","Orogen"],["elev","Elevation"]],"orogen")],
+    eval:(p)=>plateUplift(p),
+    note:"Raw Voronoi edges are dead straight, which is the giveaway in any plate map \u2014 so the coordinates are <b>domain-warped</b> before assignment and the sites are Lloyd-relaxed so plates come out evenly sized instead of slivered. <b>Orogen</b> spreads the boundary uplift inland, because a mountain belt is a broad welt rather than a line. <b>Orogen</b> output is the uplift field; <b>Elevation</b> adds the per-plate base (oceanic low, continental high) if you want to render it directly. F-tier: a plausible planar plate sketch, not plate physics."},
   layout:{cat:"gen",name:"Layout",ins:["Base","Mask"],
     desc:"Author the terrain's SKELETON as vector shapes carrying elevation \u2014 World Machine's Layout Generator, Houdini's project-from-curves, Gaea's vector drawing. Wire a Base to embed the shapes into existing terrain instead of generating from scratch.",
     params:[P.text("spec","Shapes",
