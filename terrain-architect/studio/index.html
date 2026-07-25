@@ -1230,7 +1230,19 @@ function spReceivers(g,cellsize){
 // the equation it claims to implement -- the node maps its 0..1 controls onto these. Conflating the
 // two hid a real failure: driven by slider-scaled values the slope-area exponent wandered between
 // -0.28 and +0.02 instead of settling at -m, because that regime never reaches steady state.
-function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25}){
+// `Udt` may be a scalar OR a FIELD, as in the reference. A spatially varying uplift is the whole
+// point of the node: feed a broad high region in and the rivers carve it into topography, so summits
+// and ridges come out as RESIDUE between the valleys rather than being authored. That is the
+// difference between a mountain and a drawing of one.
+// Ddt is HILLSLOPE DIFFUSION, and it is not optional decoration. The full detachment-limited
+// landscape equation is dh/dt = U - K*A^m*S^n + D*grad^2(h): stream power incises channels, and
+// diffusion relaxes the interfluves between them. Run without it, ridges sharpen without bound and
+// the result is a field of razor blades -- which is exactly what the first uplift-driven render
+// produced. Diffusion is what gives hillslopes a length and valleys a width.
+// It has to run INSIDE the loop; a single relaxation pass afterwards cannot undo ridges that
+// sharpened for 200 iterations. reference-impl has hillslope_diffuse but never couples the two,
+// which is a gap there as well.
+function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
   const n=RES,N=n*n;
   let h=inp.slice();
   const isEdge=new Uint8Array(N);
@@ -1239,7 +1251,8 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25}){
   for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
   const A=new Float32Array(N);
   for(let it=0;it<iters;it++){
-    if(Udt)for(let i=0;i<N;i++)if(!isEdge[i])h[i]+=Udt;
+    if(uplift){for(let i=0;i<N;i++)if(!isEdge[i])h[i]+=Udt*uplift[i];}
+    else if(Udt){for(let i=0;i<N;i++)if(!isEdge[i])h[i]+=Udt;}
     const hf=priorityFloodFill(h);
     const {rec,dist}=spReceivers(hf,1);
     const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>hf[b]-hf[a]);   // high -> low
@@ -1251,6 +1264,12 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25}){
       const C=Kdt*Math.pow(A[i],m)/dist[i];
       h[i]=(h[i]+C*h[rec[i]])/(1+C);
       if(h[i]<h[rec[i]])h[i]=h[rec[i]];                   // never incise below your own receiver
+    }
+    if(Ddt>0){                                          // explicit 5-point Laplacian
+      const c=Math.min(Ddt,0.24);                       // dt <= 0.25*cellsize^2/D or it blows up
+      const t=h.slice();
+      for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
+        h[i]=t[i]+c*(-4*t[i]+t[i-1]+t[i+1]+t[i-n]+t[i+n]);}
     }
     for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
   }
@@ -1520,15 +1539,17 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       : p.talus/k;
     const q={...p,talus,iters:Math.max(1,Math.round(p.iters*k))};
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
-  streampower:{cat:"ero",name:"Stream power",ins:["In","Mask"],
+  streampower:{cat:"ero",name:"Stream power",ins:["In","Uplift","Mask"],
     desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
     params:[P.slider("strength","Incision",0,1,0.15,0.01),
       P.slider("m","Area exponent",0.2,0.8,0.5,0.01),
       P.int("iters","Iterations",1,60,14),
-      P.slider("uplift","Uplift",0,1,0,0.01)],
+      P.slider("uplift","Uplift",0,1,0,0.01),
+      P.slider("hillslope","Hillslope",0,1,0.35,0.01)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],streamPowerErode(ins[0],
-      {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters}),ins[1]):newField(),
-    note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>."},
+      {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters,
+       uplift:ins[1]||null, Ddt:p.hillslope*0.22}),ins[2]):newField(),
+    note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades."},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.seed("seed","Seed",1),

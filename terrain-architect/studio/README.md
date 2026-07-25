@@ -191,6 +191,36 @@ because that regime never reaches steady state. Reproducing the reference's own 
 uniform noise so the network self-organises, `U·dt = K·dt`) it lands on −m immediately. Working code
 came close to being "fixed" on the strength of a broken measurement.
 
+**Hillslope diffusion is the other half of the equation.** The full detachment-limited form is
+`dh/dt = U − K·A^m·S^n + D·∇²h`. Stream power sharpens interfluves without limit — run it alone from a
+smooth uplift field and you get a field of razor blades. Diffusion relaxes them, giving hillslopes a
+length and valleys a width. It runs *inside* the loop; one relaxation afterwards cannot undo ridges
+that sharpened for 200 iterations. Measured, ridge sharpness falls **0.048 → 0.032 → 0.024 → 0.016**
+across the Hillslope range while relief stays flat — relaxing ridges and flattening a landscape are
+different things. (`reference-impl` has `hillslope_diffuse` but never couples it to stream power,
+which is a gap there too.)
+
+**Terrain built entirely by uplift and incision.** Wire a field into the **Uplift** input and the
+rivers carve it: feed in a smooth featureless blob (texture 0.0006) and the result carries texture
+0.0235 — **39× more structure than went in**, all of it residue between channels. No summit is
+authored anywhere. This is the workflow the node exists for, and the answer to why authoring the
+summit directly kept producing a children's drawing.
+
+**D/K sets drainage density.** Past a point, diffusion does not blur the channel network — it erases
+it:
+
+| Hillslope (D·dt at K·dt = 2) | max drainage area | fitted exponent | r² |
+|---|---|---|---|
+| 0 | 3969 | −0.490 | 0.62 |
+| 0.01 | 2758 | −0.521 | 0.69 |
+| 0.04 | 973 | −0.531 | 0.18 |
+| 0.08 | 707 | −0.352 | 0.06 |
+
+That was nearly misread as "diffusion contaminates the fit". Raising the area threshold to escape the
+contamination made the exponent *worse* (−0.35 → −0.61 → −1.11), and above A = 1000 there were **zero**
+channel cells — because there was no fluvial domain left to fit. Higher D means fewer, longer
+hillslopes and a sparser network, which is the textbook D/K competition rather than a defect.
+
 **Uplift 0 will erode your terrain away, and that is correct.** Rivers reduce a landmass that has
 stopped rising. Measured on a Mountain, peak height goes **0.687 → 0.530 → 0.196 → 0.000** as incision
 rises with uplift at 0. The shipped defaults sit well clear of that (they keep 77% of peak relief while

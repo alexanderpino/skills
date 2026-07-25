@@ -96,6 +96,63 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       actuallyCarves: (()=>{ let d=0; for(let i=0;i<mt.length;i++) d+=Math.abs(mt[i]-atDefaults[i]);
         return d/mt.length > 1e-4; })() };
     out.noNegatives = { mountainMin:+Math.min(...mt).toFixed(6), clean: Math.min(...mt) >= 0 };
+    // ---- HILLSLOPE DIFFUSION: the other half of the equation ----
+    // dh/dt = U - K*A^m*S^n + D*grad^2(h). Stream power sharpens interfluves without limit; run it
+    // alone from a smooth uplift field and the result is a field of razor blades. Diffusion is what
+    // gives hillslopes a length and valleys a width. It must run INSIDE the loop -- one relaxation
+    // afterwards cannot undo ridges that sharpened for 200 iterations.
+    const blob = TYPES.shape.eval({kind:"circle", x:0.5, y:0.5, size:0.62, aspect:1.25,
+                                   angle:20, falloff:0.55, invert:"off"});
+    const flat = newField(0);
+    const sharpness = (f) => { let lo=1e9,hi=-1e9,lap=0,c=0;
+      for (const v of f){ if(v<lo)lo=v; if(v>hi)hi=v; }
+      for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++){ const i=y*n+x;
+        lap += Math.abs(4*f[i]-f[i-1]-f[i+1]-f[i-n]-f[i+n]); c++; }
+      return { relief:+(hi-lo).toFixed(4), ridge:+((lap/c)/((hi-lo)||1)).toFixed(4) }; };
+    const byD = [0, 0.05, 0.10, 0.18].map(Ddt =>
+      ({ Ddt, ...sharpness(streamPowerErode(flat,{Kdt:0.6,Udt:0.004,m:0.5,iters:140,uplift:blob,Ddt})) }));
+    out.hillslopeDiffusion = { byD,
+      ridgesRelaxMonotonically: byD.every((v,i)=> i===0 || v.ridge < byD[i-1].ridge),
+      sharpnessRange: +(byD[0].ridge/byD[byD.length-1].ridge).toFixed(2),
+      // relaxing ridges must not flatten the landscape -- those are different things
+      reliefPreserved: byD.every(v => v.relief > byD[0].relief*0.85) };
+
+    // ---- terrain built ENTIRELY by uplift + incision, with no authored summit ----
+    // The uplift field is a smooth featureless blob; every ridge and valley in the result is residue
+    // between channels. This is the workflow the whole node exists for.
+    const residue = streamPowerErode(flat,{Kdt:0.6,Udt:0.004,m:0.5,iters:140,uplift:blob,Ddt:0.10});
+    const lapOf = (f) => { let s2=0,c=0,hi=0;
+      for (const v of f) if (v>hi) hi=v;
+      for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++){ const i=y*n+x;
+        s2 += Math.abs(4*f[i]-f[i-1]-f[i+1]-f[i-n]-f[i+n]); c++; }
+      return +((s2/c)/(hi||1)).toFixed(4); };
+    out.terrainFromUpliftAlone = {
+      upliftFieldTexture: lapOf(blob), carvedTexture: lapOf(residue),
+      // the input carries essentially no structure; the output is all structure
+      structureIsEmergent: lapOf(residue) > 20 * lapOf(blob),
+      hasRelief: (()=>{ let hi=0; for(const v of residue) if(v>hi) hi=v; return hi > 0.02; })() };
+
+    // ---- D/K sets DRAINAGE DENSITY, and past a point there is no fluvial domain left ----
+    // Modest diffusion leaves the fluvial scaling intact; heavy diffusion does not "contaminate the
+    // fit", it erases the channel network outright. Raising the area threshold to escape it makes
+    // the fit worse, not better, which is how the distinction was settled: at Ddt 0.08 the largest
+    // drainage area is 707 cells against 3969 with no diffusion, and above A=1000 there are zero
+    // channel cells to fit. Higher D means fewer, longer hillslopes and a sparser network -- the
+    // textbook D/K competition, not a bug.
+    const dk = [0, 0.01, 0.04, 0.08].map(Ddt => {
+      const h = streamPowerErode(h0,{Kdt:2,Udt:2,m:0.5,iters:400,Ddt});
+      const hf = priorityFloodFill(h); const { rec } = spReceivers(hf,1);
+      const A = new Float32Array(n*n).fill(1);
+      const o = Array.from({length:n*n},(_,i)=>i).sort((a,b)=>hf[b]-hf[a]);
+      for (const i of o) if (rec[i]>=0) A[rec[i]] += A[i];
+      let maxA=0; for (const v of A) if (v>maxA) maxA=v;
+      return { Ddt, maxDrainageArea:Math.round(maxA), fit:fitSlopeArea(h,0.5) }; });
+    out.diffusionSetsDrainageDensity = {
+      byD: dk.map(q=>({Ddt:q.Ddt, maxDrainageArea:q.maxDrainageArea,
+                       slope:q.fit.slope, r2:q.fit.r2})),
+      networkShrinksWithDiffusion: dk.every((q,i)=> i===0 || q.maxDrainageArea < dk[i-1].maxDrainageArea),
+      modestDiffusionKeepsTheScaling: dk[1].fit.withinReferenceTolerance,
+      heavyDiffusionErasesTheNetwork: dk[3].maxDrainageArea < dk[0].maxDrainageArea * 0.25 };
     return out;
   });
 
