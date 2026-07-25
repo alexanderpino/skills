@@ -656,6 +656,84 @@ function maskApply(base,modified,mask){
   return o;
 }
 
+/* ---- MOUNTAIN — a placeable FEATURE PRIMITIVE (Gaea's Mountain node), ported from
+   reference-impl/landforms.py `mountain` (Genevaux et al. 2015 "Terrain Modelling from Feature
+   Primitives"; Guerin et al. 2016). NOT thresholded isotropic noise, which reads as "noise on a lump":
+   the drainage-organised look is built in.
+     1. a wandering CREST SKELETON (polyline SDFs) sets a non-circular massif envelope,
+     2. a modulated-VORONOI ridge network dissects it -- cell EDGES become ridgelines, cell INTERIORS
+        become valleys, and a two-scale domain distortion bends them off Voronoi's straight edges into
+        spurs and drainages,
+     3. the style's weathering is baked in (droplet pass -> dendritic drainage, talus -> repose faces).
+   Placement is a parameter rather than a downstream Transform, exactly like the reference impl's
+   `place=`: the crest skeleton is built at the placed position, so it is exact by construction. ---- */
+const MOUNTAIN_STYLES={
+  //            cells warp  relief spur crest erode talus repose terr
+  basic: {cells:4.0,warp:0.30,relief:0.55,spur:0.28,crest:1.15,erode:0.00,talus:0, repose:0.95,terr:0},
+  eroded:{cells:5.0,warp:0.55,relief:0.66,spur:0.40,crest:1.35,erode:0.15,talus:4, repose:0.72,terr:0},
+  alpine:{cells:3.6,warp:0.42,relief:0.74,spur:0.44,crest:1.70,erode:0.12,talus:7, repose:1.15,terr:0},
+  old:   {cells:5.6,warp:0.62,relief:0.44,spur:0.30,crest:1.05,erode:0.20,talus:14,repose:0.42,terr:0},
+  strata:{cells:4.4,warp:0.34,relief:0.52,spur:0.30,crest:1.20,erode:0.13,talus:4, repose:0.72,terr:8},
+};
+function mountainField(p){
+  const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
+  const relief=p.relief,ncell=st.cells,warpamt=st.warp;
+  // deterministic per-seed stream, so the same seed always builds the same massif
+  let rs=(p.seed|0)*2654435761>>>0;
+  const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
+  const cx0=p.x*n,cy0=p.y*n,reach=Math.max(p.size,0.02)*n;
+  const rot=p.angle*Math.PI/180;
+
+  // 1) crest-skeleton envelope
+  const env=newField();
+  for(let r=0;r<Math.max(1,p.ridges|0);r++){
+    const ang=rot+rnd()*Math.PI*(p.ridges>1?1:0),k=6,cxp=[],cyp=[];
+    const px=-Math.sin(ang),py=Math.cos(ang);
+    const wob=[];let acc=0;for(let a=0;a<k;a++){acc+=(rnd()-0.5)*0.1;wob.push(acc);}
+    const wm=wob.reduce((s2,v)=>s2+v,0)/k;
+    for(let a=0;a<k;a++){const t=-1+2*a/(k-1);
+      cxp.push(cx0+0.9*reach*Math.cos(ang)*t+px*(wob[a]-wm)*n);
+      cyp.push(cy0+0.9*reach*Math.sin(ang)*t+py*(wob[a]-wm)*n);}
+    const amp=0.7+0.6*rnd();
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      let d=Infinity;
+      for(let a=0;a<k-1;a++)d=Math.min(d,sdSegment(x,y,cxp[a],cyp[a],cxp[a+1],cyp[a+1]));
+      const e=amp*Math.pow(clamp(1-d/reach,0,1),1.6);
+      const i=y*n+x;if(e>env[i])env[i]=e;}
+  }
+
+  // 2) modulated-Voronoi ridge network
+  const netA=new Float32Array(n*n),netB=new Float32Array(n*n);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const u=x/n*ncell,v=y/n*ncell;
+    const wx=fbm2(u*0.35,v*0.35,p.seed+3,4)+0.5*fbm2(u*0.9,v*0.9,p.seed+13,4);
+    const wy=fbm2(u*0.35+4.7,v*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*0.9+1.9,v*0.9+6.1,p.seed+14,4);
+    const u2=u+warpamt*wx,v2=v+warpamt*wy,i=y*n+x;
+    netA[i]=worleyAt(u2,v2,p.seed+1,"f2f1");
+    netB[i]=worleyAt(u2*2,v2*2,p.seed+8,"f2f1");}
+  const pA=percentileOf(netA,0.98)+1e-9,pB=percentileOf(netB,0.98)+1e-9;
+
+  // 3) incise: crest sits at the envelope, valleys drop `relief` below it
+  let h=newField();
+  for(let i=0;i<h.length;i++){
+    const a=1-netA[i]/pA,b2=1-netB[i]/pB;
+    const ridges=Math.pow(clamp((1-st.spur)*a+st.spur*b2,0,1),st.crest);
+    h[i]=env[i]*((1-relief)+relief*ridges);}
+
+  // 4) bake in the weathering the style implies
+  if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*n*n),seed:p.seed+11,radius:2});
+  if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
+  if(st.terr){const[,mx]=fieldRange(h);
+    if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
+  return h;
+}
+function fbm2(x,y,seed,oct){                      // small fbm helper for the domain distortion
+  let s=0,amp=1,f=1,tot=0;
+  for(let k=0;k<oct;k++){s+=(gnoise(x*f,y*f,seed+k*7)-0.5)*2*amp;tot+=amp;amp*=0.5;f*=2;}
+  return s/(tot||1);
+}
+function scaleField(f,k){const o=newField();for(let i=0;i<o.length;i++)o[i]=f[i]*k;return o;}
+
 /* ---- SPATIAL SCALE: run an effect over a larger/smaller area (Gaea's Feature Scale + Transform) ---- */
 function resampleField(f,fromN,toN){            // bilinear resample between two square grids
   const o=new Float32Array(toN*toN);
@@ -756,6 +834,28 @@ function blendField(a,b,mask,factor){
   const o=newField();for(let i=0;i<o.length;i++){const t=mask?mask[i]:factor;o[i]=lerp(a?a[i]:0,b?b[i]:0,t);}return o;
 }
 function smin(a,b,k){const h=clamp(0.5+0.5*(b-a)/k,0,1);return lerp(b,a,h)-k*h*(1-h);}
+// Quilez smooth MAX. For a heightfield this is the crease-free UNION: merging two peaks means taking
+// the higher surface, so it is max, not min. smin would take the lower one and delete both summits.
+function smax(a,b,k){return -smin(-a,-b,k);}
+// --- pointwise primitives for feature generators (evaluate at ARBITRARY coordinates, not a grid) ---
+function sdSegment(px,py,ax,ay,bx,by){
+  const vx=bx-ax,vy=by-ay,wx=px-ax,wy=py-ay;
+  const t=clamp((wx*vx+wy*vy)/(vx*vx+vy*vy||1e-9),0,1);
+  return Math.hypot(wx-t*vx,wy-t*vy);
+}
+function worleyAt(u,v,seed,mode){                 // F2-F1 at a point; no whole-field normalisation
+  const cx=Math.floor(u),cy=Math.floor(v);let f1=9,f2=9;
+  for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
+    const gx=cx+i,gy=cy+j;
+    const fx=gx+hash2(gx,gy,seed),fy=gy+hash2(gx,gy,seed+91);
+    const d=Math.hypot(u-fx,v-fy);
+    if(d<f1){f2=f1;f1=d;}else if(d<f2){f2=d;}}
+  return mode==="f1"?f1:f2-f1;
+}
+function percentileOf(f,q){                       // q in [0,1]
+  const s=Float32Array.from(f);s.sort();
+  return s[clamp(Math.floor(s.length*q),0,s.length-1)];
+}
 
 /* ----------------------------------------------------- selectors ------ */
 function slopeOf(inp){
@@ -943,7 +1043,7 @@ const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combi
    and has to be resampled. Honest caveat: Ridged/Voronoi/Gradient self-normalise, a whole-field
    reduction — geometry is exact, but the value range is re-stretched over the new window. */
 const EXACT_TYPES=new Set(["perlin","ridged","worley","gradient","shape","constant",
-  "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","stampn"]);
+  "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
 function exactChain(id,guard){
   guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
   const nd=nodeById(id);if(!nd||!EXACT_TYPES.has(nd.type))return false;
@@ -983,6 +1083,17 @@ const TYPES={
       P.slider("falloff","Falloff",0,1,0.25),
       P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
     eval:(p)=>shapeField(p)},
+  mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A placeable mountain massif \u2014 Gaea's Mountain node. A wandering crest skeleton sets the envelope, a modulated-Voronoi ridge network dissects it into spurs and valleys, and the style bakes in its weathering.",
+    params:[P.seg("style","Style",[["basic","Basic"],["eroded","Eroded"],["alpine","Alpine"],["old","Old"],["strata","Strata"]],"eroded"),
+      P.int("seed","Seed",1,999,7),
+      P.slider("x","Position X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("y","Position Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("size","Reach",0.08,0.9,0.35,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("angle","Trend",0,180,25,1,v=>(v|0)+"\u00b0"),
+      P.int("ridges","Crest lines",1,5,2),
+      P.slider("relief","Valley depth",0.1,0.95,0.66,0.01)],
+    eval:(p)=>mountainField(p),
+    note:"Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
   constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
     params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
   import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
@@ -1014,7 +1125,11 @@ const TYPES={
         o[i]=base[i]+(v-base[i])*p.amount;}
       return maskApply(base,o,ins[2]);},
     note:"Without a <b>Mask</b> the patch applies everywhere it is defined, so a Shape (or any mask) is what turns this from a global combine into a <i>placement</i>. Because masking is a post-process lerp, dragging the mask never re-runs whatever generated the patch."},
-  smin:{cat:"comb",name:"Smooth Min",ins:["A","B"],desc:"Crease-free smooth union (Quilez smin).",
+  smax:{cat:"comb",name:"Smooth Max",ins:["A","B"],desc:"Crease-free UNION of two heightfields (Quilez smax) \u2014 the node for merging placed peaks into one massif without a seam.",
+    params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
+    eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smax(a,b,p.k)),
+    note:"Union of two <i>surfaces</i> is a <b>max</b>: the merged terrain is whichever is higher. A hard Max/Min at Max does that but leaves a curvature crease where the two cross \u2014 measured across three placed Mountains, this smooths the seam by <b>75%</b>. Use Smooth <i>Min</i> only when you want the lower envelope (carving, intersections); on two peaks it deletes both summits."},
+  smin:{cat:"comb",name:"Smooth Min",ins:["A","B"],desc:"Crease-free smooth INTERSECTION \u2014 the lower envelope of two heightfields (Quilez smin). For merging peaks you want Smooth Max instead.",
     params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
     eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
 

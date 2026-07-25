@@ -98,8 +98,8 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
-| **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) · **Stamp** (place a patch onto a base through a mask) |
+| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Mountain** (placeable massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
@@ -161,6 +161,40 @@ Exact and raster sampling describe the *same* placement including the pivot: cor
 across the tile interior. Over the whole tile it drops to 0.944, and that gap is not disagreement about
 placement — it is the two modes' different edge policy, since exact mode has real terrain past the old
 tile edge where raster has clamped smear. Scoring the interior separates the two.
+
+### Building a mountain range from placed massifs
+
+The reference implementation prescribes the workflow in `landforms.mountain`'s own docstring — *"place
+it, combine several (`np.maximum` / `ops_filters.smax`), then run a real hydraulic + thermal pass"* — so
+the studio has a node for each step.
+
+1. **Mountain** ×N. A placeable massif, ported from `reference-impl/landforms.py` (Génévaux et al. 2015
+   *Terrain Modelling from Feature Primitives*; Guérin et al. 2016). Not thresholded isotropic noise,
+   which reads as "noise on a lump": a wandering **crest skeleton** of polyline SDFs sets a non-circular
+   envelope, a **modulated-Voronoi ridge network** dissects it — cell *edges* become ridgelines, cell
+   *interiors* valleys, and a two-scale domain distortion bends them off Voronoi's straight edges into
+   spurs — then the style bakes in its weathering. Five styles matching Gaea's presets: **Basic**,
+   **Eroded**, **Alpine**, **Old**, **Strata**. Placement is *built in* (Position / Reach / Trend) rather
+   than a Transform above it, mirroring the reference impl's `place=`: the crest skeleton is constructed
+   at the placed position, so it is exact by construction. 157–482 ms per massif at 192².
+2. **Smooth Max** to union them. Union of two *surfaces* is a **max** — the merged terrain is whichever
+   is higher.
+3. **Thermal** or **Hydraulic** over the union. This is the step that actually makes it a *range*.
+
+Verified in `_verify_range.js`. Three Mountains placed at X = 0.26 / 0.50 / 0.74 land at measured
+centroids **0.281 / 0.505 / 0.722**, each with relief ≈ 0.84–1.08. Unioning with Smooth Max instead of a
+hard Max cuts the curvature crease along the seam (135 seam cells) by **74.9%**.
+
+The finding worth stating plainly: **three unioned massifs are not yet a range.** Thresholded at 35% of
+peak height, the union is **4 disconnected components**. After a thermal pass it collapses to **1**
+component of 20,833 cells. Erosion is what knits separate massifs into one connected landform, which is
+also why the primitive is documented as *"ready for further erosion"* rather than finished.
+
+**Smooth Max vs Smooth Min.** These are not interchangeable, and the studio previously had only the
+wrong one — `smin` was labelled "crease-free smooth union", which it is not for a heightfield. `smin`
+takes the *lower* envelope: applied to three peaks it produced a mean height of **−0.037** and collapsed
+relief to 0.047, deleting every summit. Smooth **Max** is the union; Smooth **Min** is the intersection,
+useful for carving. Both ship, correctly described, mirroring `ops_filters.smax` / `smin`.
 
 **The SatMap node — Gaea's colouring model.** In Gaea a SatMap is a *node* that colours a terrain through a
 gradient, driven by **whatever grayscale you feed it** (not only height). This node mirrors that: it takes
@@ -366,6 +400,7 @@ alongside the app rather than being scratch:
 npm i playwright-core@1.49.0
 node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/GPU parity under XF
 node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
+node _verify_range.js                # place 3 Mountains, union with Smooth Max, erode into one range
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths
