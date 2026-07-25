@@ -332,16 +332,22 @@ The primitive also stays strictly inside its own footprint (total height outside
 because erosion otherwise scatters deposit onto ground the primitive does not own — and a primitive
 that respects its footprint is the one that composites cleanly under Stamp and a placement mask.
 
-**Every placed node gets its own seed, and you can still change it.** Node parameters used to be initialised straight from the
-type defaults, so three placed Mountains were three *identical* mountains and the whole
-place-and-combine workflow was pointless. A node carrying a `seed` now derives it from its own id —
-**derived, not random**, so the same graph built the same way reproduces exactly across reloads and in
-the verifiers. Three fresh Mountains get seeds 459 / 895 / 604; rebuilding the graph gets the same
-three. Verified with the control that gives the number meaning: two mountains sharing a seed are
-bit-for-bit identical, while two with different seeds differ by **10%** of total height inside the
-footprint. Duplicating re-seeds too: a duplicate is a new feature, not a clone, so three duplicated Mountains
-are three different mountains while every other parameter is copied. The **Seed** slider overrides it
-either way — verified, two nodes forced to the same seed produce bit-for-bit identical terrain.
+**Every placed node gets its own random seed, and you can still change it.** Node parameters used to
+be initialised straight from the type defaults, so three placed Mountains were three *identical*
+mountains and the whole place-and-combine workflow was pointless. A node carrying a `seed` now gets a
+fresh random one in **[0, 1 000 000]**, on placement and on duplicate alike — a duplicate is a new
+feature, not a clone, while every other parameter is copied.
+
+The trade that makes, stated plainly: a graph is no longer reproducible from its construction order,
+because reloading re-rolls every seed. **Reproducibility comes from the seed values instead**, which is
+why the control is a typable number field with a **↻** reroll button rather than a slider — a million
+values through a few hundred pixels cannot address a specific one, and the earlier requirement was that
+you be able to *change* the seed, not just perturb it.
+
+Verified: three fresh Mountains get three distinct in-range seeds, a second batch rolls different ones
+again, typing `4242` takes and reroll moves off it, and — the control that gives the rest meaning — two
+nodes forced to the same seed produce **bit-for-bit identical** terrain while two different-seeded ones
+differ by **33%** of total height inside the footprint.
 
 Verified in `_verify_range.js`. Three Mountains placed at X = 0.26 / 0.50 / 0.74 land at measured
 centroids **0.281 / 0.505 / 0.722**, each with relief ≈ 0.84–1.08. Unioning with Smooth Max instead of a

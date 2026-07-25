@@ -66,12 +66,13 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
                        components(eroded,0.35).components < components(soft,0.35).components };
     // ---- 5. placing N Mountains must give N DIFFERENT mountains ----
     // Taking the type default gave every node the same seed, so three placed Mountains were three
-    // identical ones and the whole place-and-combine workflow was pointless.
+    // identical ones and the whole place-and-combine workflow was pointless. Seeds are now random in
+    // [0, 1000000]. That deliberately gives up reproducing a graph from its construction order --
+    // a reload re-rolls every seed -- and buys reproducibility from the seed VALUES instead, which
+    // is why the control is a typable number field rather than a slider.
     nodes.length=0; edges.length=0; uid=1;
     const m1=makeNode("mountain",0,0), m2=makeNode("mountain",0,0), m3=makeNode("mountain",0,0);
     const f1=TYPES.mountain.eval(m1.params,[],m1), f2=TYPES.mountain.eval(m2.params,[],m2);
-    // compare INSIDE the footprint: most of the tile is zero in both, and averaging over it dilutes
-    // the difference into nothing (0.0067 whole-tile vs 0.30 relative, for the same two fields)
     let d12=0, sum=0, c12=0;
     for (let i=0;i<f1.length;i++){ if (f1[i]<=0 && f2[i]<=0) continue;
       d12 += Math.abs(f1[i]-f2[i]); sum += Math.max(f1[i],f2[i]); c12++; }
@@ -80,36 +81,38 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     // non-zero relative difference is attributable to the seed and nothing else
     const same = TYPES.mountain.eval({...m1.params, seed:m2.params.seed},[],m2);
     let dSame=0; for (let i=0;i<f2.length;i++) dSame += Math.abs(f2[i]-same[i]);
-    // ...and rebuilding the SAME graph must reproduce the SAME seeds, so it is derived not random
-    const firstRun=[m1.params.seed,m2.params.seed,m3.params.seed];
-    nodes.length=0; edges.length=0; uid=1;
-    const r1=makeNode("mountain",0,0), r2=makeNode("mountain",0,0), r3=makeNode("mountain",0,0);
+    const seeds=[m1,m2,m3].map(nd=>nd.params.seed);
     out.seedPerPlacedNode = {
-      seeds: firstRun, rebuilt: [r1.params.seed,r2.params.seed,r3.params.seed],
-      allDistinct: new Set(firstRun).size === 3,
+      seeds, allDistinct: new Set(seeds).size === 3,
+      inRange: seeds.every(v=>Number.isInteger(v) && v>=0 && v<=SEED_MAX),
       sameSeedIsIdentical: dSame === 0,
       differentTerrain: rel > 0.05 && dSame === 0,
       relativeDiffInFootprint: +rel.toFixed(3),
-      footprintCells: c12,
-      deterministicAcrossRebuilds: firstRun.every((v,i)=>v===[r1,r2,r3][i].params.seed),
-      notTheTypeDefault: firstRun.every(v=>v!==TYPES.mountain.params.find(q=>q.key==="seed").def) };
+      notTheTypeDefault: seeds.every(v=>v!==TYPES.mountain.params.find(q=>q.key==="seed").def) };
 
-    // ...and the seed must remain EDITABLE -- a derived seed that cannot be overridden is just a
-    // different hardcoded one. Setting it by hand must reproduce that exact terrain.
-    const hand = {...r1.params, seed: 123};
-    const a1 = TYPES.mountain.eval(hand,[],r1), a2 = TYPES.mountain.eval({...r2.params, seed:123},[],r2);
-    let dHand=0; for (let i=0;i<a1.length;i++) dHand += Math.abs(a1[i]-a2[i]);
+    // A fresh batch must roll DIFFERENT seeds -- that is the point of random rather than derived,
+    // and it is what the old id-derived scheme could not do.
+    nodes.length=0; edges.length=0; uid=1;
+    const again=[makeNode("mountain",0,0),makeNode("mountain",0,0),makeNode("mountain",0,0)]
+      .map(nd=>nd.params.seed);
+    out.rerollsOnEachPlacement = { first:seeds, second:again,
+      differ: again.some((v,i)=>v!==seeds[i]) };
+
+    // ...and the seed stays EDITABLE: setting it by hand reproduces that exact terrain, which is the
+    // only reproducibility guarantee random seeding leaves, so it has to hold exactly.
+    const hand = TYPES.mountain.eval({...m1.params, seed:12345},[],m1);
+    const hand2= TYPES.mountain.eval({...m2.params, seed:12345},[],m2);
+    let dHand=0; for (let i=0;i<hand.length;i++) dHand += Math.abs(hand[i]-hand2[i]);
     out.seedIsEditable = { twoNodesForcedToSameSeedMatch: dHand === 0,
-      differsFromItsDerivedSeed: (()=>{ const d0=TYPES.mountain.eval(r1.params,[],r1);
-        let z=0; for (let i=0;i<a1.length;i++) z += Math.abs(a1[i]-d0[i]); return z > 0; })() };
+      differsFromItsRandomSeed: (()=>{ let z=0;
+        for (let i=0;i<hand.length;i++) z += Math.abs(hand[i]-f1[i]); return z > 0; })() };
 
-    // duplicating gives a NEW feature, not a clone -- "every node gets a new seed"
+    // duplicating gives a NEW feature, not a clone
     nodes.length=0; edges.length=0; uid=1;
     const orig = makeNode("mountain",0,0);
     selected = orig; duplicateSel();
     const dup = nodes[nodes.length-1];
-    out.duplicateReseeds = { original: orig.params.seed, duplicate: dup.params.seed,
-      differs: dup.params.seed !== orig.params.seed,
+    out.duplicateReseeds = { differs: dup.params.seed !== orig.params.seed,
       otherParamsCopied: dup.params.size === orig.params.size && dup.params.style === orig.params.style };
     return out;
   });

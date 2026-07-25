@@ -1251,6 +1251,7 @@ const P={
   seg:(key,label,opts,def)=>({key,label,type:"seg",opts,def}),
   text:(key,label,def,rows=9)=>({key,label,type:"text",def,rows}),
   curve:(key,label,def)=>({key,label,type:"curve",def}),
+  seed:(key,label,def)=>({key,label,type:"seed",def}),
 };
 const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
@@ -1284,15 +1285,15 @@ function evalExact(id,guard){
 
 const TYPES={
   perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
-    params:[P.int("seed","Seed",1,999,7),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
+    params:[P.seed("seed","Seed",7),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
     eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
   ridged:{cat:"gen",name:"Ridged MF",ins:[],desc:"Ridged multifractal — sharp mountain crests.",
-    params:[P.int("seed","Seed",1,999,3),P.slider("freq","Frequency",0.5,12,3.5,0.1),P.int("octaves","Octaves",1,9,6),
+    params:[P.seed("seed","Seed",3),P.slider("freq","Frequency",0.5,12,3.5,0.1),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2.1,0.05),P.slider("gain","Gain",0.3,0.8,0.55,0.01)],
     eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,ridge:true};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
   worley:{cat:"gen",name:"Voronoi",ins:[],desc:"Cellular / Worley noise — plates and cracks.",
-    params:[P.int("seed","Seed",1,999,5),P.slider("freq","Cell density",2,16,6,0.5),P.seg("mode","Mode",[["f2f1","F2−F1"],["f1","F1"],["invf1","1−F1"]],"f2f1")],
+    params:[P.seed("seed","Seed",5),P.slider("freq","Cell density",2,16,6,0.5),P.seg("mode","Mode",[["f2f1","F2−F1"],["f1","F1"],["invf1","1−F1"]],"f2f1")],
     eval:(p)=>worleyField({seed:p.seed,freq:p.freq,mode:p.mode})},
   gradient:{cat:"gen",name:"Gradient",ins:[],desc:"Linear or radial ramp — a base slope or falloff.",
     params:[P.seg("kind","Kind",[["lin","Linear"],["rad","Radial"]],"lin"),P.slider("angle","Angle",0,360,35,1,v=>v|0)],
@@ -1308,7 +1309,7 @@ const TYPES={
   mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A placeable mountain massif \u2014 Gaea's Mountain node. A wandering crest skeleton sets the envelope, a modulated-Voronoi ridge network dissects it into spurs and valleys, and the style bakes in its weathering.",
     params:[P.seg("form","Form",[["peak","Peak"],["massif","Massif"]],"peak"),
       P.seg("style","Style",[["basic","Basic"],["eroded","Eroded"],["alpine","Alpine"],["old","Old"],["strata","Strata"]],"eroded"),
-      P.int("seed","Seed",1,999,7),
+      P.seed("seed","Seed",7),
       P.slider("x","Position X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("y","Position Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("size","Reach",0.08,0.9,0.35,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
@@ -1377,7 +1378,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
 
   warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",
-    params:[P.slider("strength","Strength",0,0.4,0.12),P.slider("freq","Frequency",0.5,8,3,0.1),P.int("seed","Seed",1,999,7)],
+    params:[P.slider("strength","Strength",0,0.4,0.12),P.slider("freq","Frequency",0.5,8,3,0.1),P.seed("seed","Seed",7)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],warpField(ins[0],p),ins[1]):newField()},
   terrace:{cat:"filt",name:"Terrace",ins:["In","Mask"],desc:"Snap to stratified benches.",
     params:[P.int("steps","Steps",2,24,8),P.slider("sharp","Sharpness",0,1,0.6)],
@@ -1446,7 +1447,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
-      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.int("seed","Seed",1,999,1),
+      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.seed("seed","Seed",1),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>hydraulicErode(f,{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))})),ins[1]);}},
@@ -1522,16 +1523,19 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
    GRAPH MODEL
    ===================================================================== */
 let nodes=[],edges=[],uid=1,selected=null;
-// Every node carrying a `seed` gets one DERIVED FROM ITS ID rather than the type default. Placing
-// three Mountains has to give three different mountains -- taking the default gave three identical
-// ones, which makes the place-and-combine workflow pointless. Derived rather than random so the same
-// graph built the same way reproduces exactly, across reloads and in the verifiers.
-// (Duplicate stays a true copy: it is a copy. Nudge the Seed slider to fork it.)
-const seedForNode=(id)=>1+((Math.imul(id^0x9e3779b9,2654435761)>>>0)%999);
+// Every node carrying a `seed` gets a fresh RANDOM one, 0..1000000. Taking the type default gave
+// every Mountain seed 7, so three placed Mountains were three identical mountains and the whole
+// place-and-combine workflow was pointless.
+// The trade this makes: a graph is no longer reproducible from its construction order alone, because
+// reloading re-rolls every seed. Reproducibility comes from the seed VALUES, which is why the Seed
+// control is a number field you can read off and type back rather than a slider -- 1e6 of range
+// through a few hundred pixels cannot address a specific value.
+const SEED_MAX=1000000;
+const randomSeed=()=>Math.floor(Math.random()*(SEED_MAX+1));
 function makeNode(type,x,y){
   const def=TYPES[type];const p={};def.params.forEach(pr=>p[pr.key]=pr.def);
   const nd={id:uid++,type,x,y,w:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null};
-  if("seed"in p)p.seed=seedForNode(nd.id);
+  if("seed"in p)p.seed=randomSeed();
   nodes.push(nd);return nd;
 }
 function nodeById(id){return nodes.find(n=>n.id===id);}
@@ -1830,6 +1834,18 @@ function buildField(pr){
     const opts=pr.opts||((pr.key==="gradient"||pr.key==="gradientB")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
     const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
     s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
+  }else if(pr.type==="seed"){
+    f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
+    const wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:6px";
+    const inp=document.createElement("input");inp.type="number";inp.className="inp";
+    inp.min=0;inp.max=SEED_MAX;inp.step=1;inp.value=selected.params[pr.key];inp.style.flex="1";
+    const set=(v)=>{selected.params[pr.key]=clamp(Math.round(v)||0,0,SEED_MAX);
+      inp.value=selected.params[pr.key];markDirtyFrom(selected.id);requestEval();};
+    inp.onchange=()=>set(parseFloat(inp.value));
+    const dice=document.createElement("button");dice.className="btn";dice.textContent="\u21bb";
+    dice.title="New random seed";dice.style.cssText="flex:0 0 auto;min-width:34px";
+    dice.onclick=()=>set(randomSeed());
+    wrap.appendChild(inp);wrap.appendChild(dice);f.appendChild(wrap);
   }else if(pr.type==="curve"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label><span class="val hint" style="font-size:10px">drag \u00b7 click adds \u00b7 dbl-click removes</span></div>`;
     const nd=selected,W=272,H=132,PAD=10;
@@ -1912,7 +1928,7 @@ function buildField(pr){
 function fmtVal(pr,v){return pr.fmt?pr.fmt(v):(Number.isInteger(pr.step)?(v|0):(+v).toFixed(2));}
 function duplicateSel(){if(!selected)return;const nd=makeNode(selected.type,selected.x+30,selected.y+30);
   nd.params=JSON.parse(JSON.stringify(selected.params));
-  if("seed"in nd.params)nd.params.seed=seedForNode(nd.id);   // a duplicate is a NEW feature, not a copy
+  if("seed"in nd.params)nd.params.seed=randomSeed();   // a duplicate is a NEW feature, not a copy
   nd._dem=selected._dem;nd._demImg=selected._demImg;nd._demRaw=selected._demRaw;
   select(nd);requestEval();}
 function deleteSel(){if(!selected)return;const id=selected.id;
