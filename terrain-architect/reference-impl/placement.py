@@ -123,8 +123,11 @@ def place_coords(xx, yy, shape, cellsize=1.0, center=None, rotation=0.0, scale=1
     This is the placement that costs nothing. A procedural generator is a function of position, so
     evaluating it at shifted coordinates moves the feature EXACTLY — the same function, sampled
     somewhere else. Transforming the generator's raster afterwards instead resamples it, and
-    bilinear resampling is a low-pass filter: measured on fBm, one non-integer raster move loses
-    ~17% of the fine detail and four chained moves lose ~34%, while this loses none.
+    bilinear resampling is a low-pass filter. Measured on fBm as mean |laplacian| (see
+    `test_raster_transform_loses_detail_that_placement_keeps`), one non-integer raster move loses
+    ~24% of the fine detail and four chained moves ~53%; this loses none, at any depth. Quote the
+    metric with the number — the same experiment scored on high-frequency band energy reads ~9% and
+    ~26%, so a bare percentage here means nothing.
 
     Use a raster transform (`ops_filters.resample`, a Transform node) only for fields you cannot
     re-evaluate — an imported DEM, or the output of an erosion sim.

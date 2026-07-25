@@ -100,7 +100,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 |---|---|
 | **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · Smooth Min (Quilez `smin`) |
-| **Filter** | Warp (domain warp) · **Transform** (move/rotate/scale) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
+| **Filter** | Warp (domain warp) · **Transform** (move/rotate/scale, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
 | **Mask** | Slope select · Height select |
 | **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
@@ -223,6 +223,38 @@ Two Gaea mechanisms, both now here:
   against an analytic oracle: transforming a sine reproduces `sin()` at the inverse-mapped coordinate to
   **max error 0 / 0.0064 / 0.008** at 1× / 2× / 4× (bilinear interpolation error only).
 
+**Place before you sample — the Transform is exact over a procedural chain.**
+A procedural generator is a *function of position*, so evaluating it at transformed coordinates moves,
+turns and resizes the feature **exactly**: the same function, sampled somewhere else. Transforming the
+finished *raster* instead costs a bilinear resample, and bilinear is a low-pass filter. So the Transform
+node checks what is upstream and picks:
+
+| Upstream chain | Mode | What happens |
+|---|---|---|
+| Only generators (Perlin, Ridged, Voronoi, Gradient, Shape, Constant) and per-pixel ops (Levels, Curve, Clamp, Invert, Terrace, Blend, Combine, Max/Min, Smooth Min) | **Exact** | The placement is folded into the generators' coordinates and the chain is re-evaluated. No filtering, no detail loss — and the terrain *continues* past the old tile edge instead of clamping, so **Edges** is unused. |
+| Anything that reads neighbours or the whole field — erosion, Warp, Blur, Histogram EQ, an imported DEM | **Raster** | The finished heightmap is resampled, as in Gaea and World Machine. Move the Transform *below* the erosion to get the exact path back. |
+
+**Sampling** (*Exact* / *Raster*) forces the choice, and the properties panel says which one is live.
+Stacked Transforms **compose into one matrix**, so N moves still cost exactly one evaluation — this is
+`reference-impl/placement.py`'s `affine` / `compose` / `sample_coords` in normalised tile units, where
+`sample_coords` applies `M⁻¹` because the feature moves by `M` while the *sampler* moves the opposite way.
+
+Measured on fBm as mean |laplacian| (`_verify_exact_transform.js`) — exact placement loses **none** of the
+fine detail at any depth, while each raster hop is another low-pass:
+
+| Operation | Detail lost, raster | Detail lost, exact |
+|---|---|---|
+| 2× magnify | 27.2% | 0% |
+| 1 non-integer move | 24.7% | 0% |
+| 4 chained moves | 53.8% | 0% |
+
+Also verified: identity is **bit-for-bit** the untransformed field (max diff `0`); the exact 2× result
+matches an independent direct evaluation of the transformed coordinates to **max diff `0`**; `2× ∘ 2×`
+equals a single `4×` to **`0`** in both matrix and field; the graph picks *exact* for a Perlin chain and
+*raster* after a thermal node; and **CPU/GPU parity survives the transform** (max diff `2.5e-5`, the same
+float32 floor as before — the placement matrix is a shader uniform, so both paths sample identical
+coordinates).
+
 ### Terrain definition (real-world scale) and **Real Scale**
 
 Deselect everything and the properties panel shows the **Terrain definition** — the world this heightfield
@@ -291,3 +323,32 @@ inherently sequential and stays CPU; it is now skipped entirely unless a **Water
 node still reads its result back to a `Float32Array` for the next node — keeping the field resident in a
 texture across nodes is the remaining big win. Timings measured in CI are under **swiftshader** (a
 *software* rasteriser) and so understate real-GPU gains substantially.
+
+## Verification
+
+Every measured number in this file comes from a headless script that anyone can re-run — they ship
+alongside the app rather than being scratch:
+
+```sh
+npm i playwright-core@1.49.0
+node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/GPU parity under XF
+node _verify_gpu.js                  # CPU/GPU bit-parity + timings
+node _verify_placement.js            # SDF Shape masks + the universal Mask rule
+node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths
+node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² / 768²
+node _verify_realscale.js            # Real Scale: repose angle in degrees, resolution independent
+node _verify_data.js                 # the eight Data Map channels
+node _verify_satnode.js              # SatMap node: stacking, branch+blend, 2D biome
+node _verify_satgen.js               # SatMap Studio extraction + LUT build
+node _verify_highres.js              # 512² / 1024² build timings
+node _verify.js                      # graph editor interactions (add/wire/rewire/cycle/delete/pan/zoom)
+```
+
+They drive the real page in Chromium and assert on the actual field data, not on screenshots. Note that
+CI runs them under **swiftshader**, a software rasteriser, so every GPU timing they print is a floor —
+real hardware is substantially faster. Non-timing results (parity, oracles, invariants) are unaffected.
+
+Claims that cross into the Python skill are pinned twice: the raster-vs-exact detail loss quoted above,
+for instance, is enforced by `reference-impl/tests/test_placement.py::test_raster_transform_loses_detail_that_placement_keeps`
+as well as by `_verify_exact_transform.js`, and the two independent implementations agree to within
+0.6 percentage points.

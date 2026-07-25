@@ -4,4 +4,7 @@ package.json
 package-lock.json
 _*.js
 _*.png
+# ...but the verification scripts ARE the evidence for every measured claim in README.md,
+# so they ship. Run them with: npm i playwright-core@1.49.0 && node _verify_<name>.js
+!_verify*.js
 satmaps/extract.log

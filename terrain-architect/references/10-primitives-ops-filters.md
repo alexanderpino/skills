@@ -368,9 +368,22 @@ argument that applies it. Placing at the native centre is the identity; placing 
 crest at exactly the requested offset.
 
 **Raster transform (after sampling).** Moving the *output* resamples it, and bilinear resampling is a
-low-pass filter. Measured on 6-octave fBm with a non-integer offset: **one move loses ~17% of the
-fine detail, four chained moves lose ~34%.** Use it only for fields you cannot re-evaluate — an
-imported DEM, or the output of an erosion simulation — which is exactly what a Transform node is for.
+low-pass filter. Measured on 6-octave fBm with a non-integer offset, scored as **mean |laplacian|**:
+**one move loses ~24% of the fine detail, four chained moves ~53%** — the losses compound, because
+each hop filters the already-filtered result. Coordinate placement loses none of it at any depth. Use
+a raster transform only for fields you cannot re-evaluate — an imported DEM, or the output of an
+erosion simulation — which is exactly what a Transform node is for.
+
+**Always quote the metric with the number.** The same experiment scored on high-frequency band energy
+(field minus a σ=2 gaussian) reads ~9% and ~26% instead. Neither is wrong; a bare percentage is.
+`tests/test_placement.py::test_raster_transform_loses_detail_that_placement_keeps` pins these so the
+prose cannot drift from the code, and the Terrain Studio's independent JS implementation measures
+24.7% / 53.8% on the same metric — two implementations, one number.
+
+A second measurement trap sits inside this one: coordinate placement lands on a *different window* of
+the same fBm, and detail energy genuinely varies window to window (±6% at 192²). Read that variance as
+"placement lost detail too" and you have measured your own sampling noise. The invariant that survives
+is **no systematic decline with depth**, not equality.
 
 One honest caveat: a generator that normalises by its **own** extremes is not perfectly
 translation-invariant, because moving it changes what is in frame. Measured on `ridge`, that shows up
@@ -394,5 +407,5 @@ assert the two agree.
 Two things the matrix form buys: **non-uniform scale and shear**, which the decomposed version
 cannot express, and **composition** — `compose(A, B, C)` collapses a chain into one transform. For a
 generator that is merely tidier (sampling is exact either way), but for a **raster** it is a real
-quality win: each extra resample is another low-pass filter, so collapsing four moves into one
-avoids the ~34% detail loss measured above.
+quality win: each extra resample is another low-pass filter, so collapsing four moves into one avoids
+the ~53% detail loss measured above.

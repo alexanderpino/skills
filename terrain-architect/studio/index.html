@@ -391,6 +391,33 @@ function normalize(f){const[mn,mx]=fieldRange(f);const d=mx-mn||1;const o=newFie
 // Exact 32-bit integer hash (Math.imul, not float multiply): the second multiply exceeds 2^53 as a
 // double, so plain `*` would round. Being exact also makes it reproducible bit-for-bit in GLSL `uint`,
 // which is what lets the GPU fast path generate the *same* noise as this CPU reference.
+/* ---- COORDINATE-SPACE PLACEMENT — "place before you sample".
+   A procedural generator is a function of position, so evaluating it at TRANSFORMED coordinates
+   moves/rotates/scales the feature EXACTLY: same function, sampled somewhere else. Transforming the
+   finished RASTER instead costs a bilinear resample, and bilinear is a low-pass filter. Measured here
+   on fBm as mean |laplacian| (_verify_exact_transform.js): one non-integer move loses 24.7% of the
+   fine detail, four chained moves 53.8%, a 2x magnify 27.2% — exact placement loses none of it, at
+   any depth. Gaea's and World Machine's Transform are raster nodes; Houdini transforms the noise's
+   input P, which is this.
+   XF maps DESTINATION uv -> SOURCE uv as a 2x3 affine [a,b,c, d,e,f]; null means identity. Nested
+   transforms COMPOSE into one matrix (xfMul), so N moves still cost exactly one evaluation. This is
+   reference-impl/placement.py's `affine`/`compose`/`sample_coords` in normalised tile units. ---- */
+let XF=null;
+const xfU=(u,v)=>XF?XF[0]*u+XF[1]*v+XF[2]:u;
+const xfV=(u,v)=>XF?XF[3]*u+XF[4]*v+XF[5]:v;
+// The SAME inverse map transformField() uses, so exact and raster modes describe one placement.
+function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0}){
+  const a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
+  const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
+  return [ca/sX,-sa/sX,(-0.5*ca+0.5*sa)/sX+0.5-offX,
+          sa/sY, ca/sY,(-0.5*sa-0.5*ca)/sY+0.5-offY];
+}
+function xfMul(inner,outer){        // result(u,v) = inner(outer(u,v)) — outer applied first
+  if(!inner)return outer;if(!outer)return inner;
+  const[a,b,c,d,e,f]=inner,[A,B,C,D,E,F]=outer;
+  return [a*A+b*D,a*B+b*E,a*C+b*F+c,
+          d*A+e*D,d*B+e*E,d*C+e*F+f];
+}
 function hash2(x,y,s){let h=(Math.imul(x,374761393)+Math.imul(y,668265263)+Math.imul(s,1442695041))|0;
   h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967295;}
 function vnoise(x,y,s){ // value noise, C1 smooth
@@ -409,9 +436,10 @@ function gnoise(x,y,s){ // gradient (perlin-ish) noise in ~[-1,1] -> [0,1]
 function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   const o=newField();const n=RES;let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const gu=xfU(x/n,y/n),gv=xfV(x/n,y/n);   // placement folded into the coordinates, not the raster
     let sum=0,amp=1,f=freq;
     for(let k=0;k<octaves;k++){
-      let v=base(x/n*f,y/n*f,seed+k*7);
+      let v=base(gu*f,gv*f,seed+k*7);
       if(ridge){v=1-Math.abs(v*2-1);v=v*v;}
       sum+=v*amp;amp*=gain;f*=lac;
     }
@@ -422,7 +450,7 @@ function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
 function worleyField({seed=1,freq=5,mode="f2f1"}){
   const o=newField();const n=RES,cells=Math.max(2,Math.round(freq));
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const px=x/n*cells,py=y/n*cells,cx=Math.floor(px),cy=Math.floor(py);
+    const px=xfU(x/n,y/n)*cells,py=xfV(x/n,y/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
     let f1=9,f2=9;
     for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
       const gx=cx+i,gy=cy+j;
@@ -437,12 +465,12 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
 }
 function gradientField(angleDeg){
   const o=newField();const n=RES,a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(x/n*cx+y/n*cy);}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU(x/n,y/n)*cx+xfV(x/n,y/n)*cy);}
   return normalize(o);
 }
 function radialField(){
   const o=newField();const n=RES;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=x/n-.5,dy=y/n-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=xfU(x/n,y/n)-.5,dy=xfV(x/n,y/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
   return o;
 }
 
@@ -521,14 +549,18 @@ const GLSL_NOISE=`
     return 0.5+0.5*mix(mix(n00,n10,u),mix(n01,n11,u),v)*1.35;}`;
 const GPU_FBM_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
-  uniform float uN,uFreq,uLac,uGain,uRidge;uniform int uOct,uSeed;`+GLSL_NOISE+`
+  uniform float uN,uFreq,uLac,uGain,uRidge;uniform int uOct,uSeed;
+  uniform vec3 uXFa,uXFb;                    // dest-uv -> source-uv affine rows (identity by default)
+  `+GLSL_NOISE+`
   void main(){
     float x=floor(gl_FragCoord.x),y=floor(gl_FragCoord.y);
+    vec3 uv=vec3(x/uN,y/uN,1.0);
+    float gu=dot(uXFa,uv),gv=dot(uXFb,uv);
     float amps=0.0,a=1.0;
     for(int k=0;k<32;k++){if(k>=uOct)break;amps+=a;a*=uGain;}
     float sum=0.0,amp=1.0,f=uFreq;
     for(int k=0;k<32;k++){if(k>=uOct)break;
-      float v=gnoise(x/uN*f,y/uN*f,uSeed+k*7);
+      float v=gnoise(gu*f,gv*f,uSeed+k*7);
       if(uRidge>0.5){v=1.0-abs(v*2.0-1.0);v=v*v;}
       sum+=v*amp;amp*=uGain;f*=uLac;}
     frag=vec4(sum/amps,0.0,0.0,1.0);}`;
@@ -567,7 +599,9 @@ function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   GPU.run(prog,n,out,p=>{
     gl.uniform1f(u(p,"uN"),n);gl.uniform1f(u(p,"uFreq"),freq);gl.uniform1f(u(p,"uLac"),lac);
     gl.uniform1f(u(p,"uGain"),gain);gl.uniform1f(u(p,"uRidge"),ridge?1:0);
-    gl.uniform1i(u(p,"uOct"),octaves|0);gl.uniform1i(u(p,"uSeed"),seed|0);});
+    gl.uniform1i(u(p,"uOct"),octaves|0);gl.uniform1i(u(p,"uSeed"),seed|0);
+    const M=XF||[1,0,0,0,1,0];                 // same placement matrix the CPU path uses
+    gl.uniform3f(u(p,"uXFa"),M[0],M[1],M[2]);gl.uniform3f(u(p,"uXFb"),M[3],M[4],M[5]);});
   const f=GPU.read(out,n);
   return ridge?normalize(f):f;                 // ridged normalises on the CPU (a reduction), as before
 }
@@ -598,7 +632,8 @@ function shapeField(p){
   const a=-p.angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const half=Math.max(rad*p.aspect,cs);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    let dx=(x+0.5)*cs-cx,dy=(y+0.5)*cs-cy;
+    const U=(x+0.5)/n,V=(y+0.5)/n;                                 // (x+0.5)*cs === U*terrainDef.scale
+    let dx=xfU(U,V)*terrainDef.scale-cx,dy=xfV(U,V)*terrainDef.scale-cy;
     const rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;                          // rotate into object space
     let d;
     if(p.kind==="box"){const qx=Math.abs(rx)-rad,qy=Math.abs(ry)-half;
@@ -896,6 +931,32 @@ const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combi
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
   mask:{c:"--cat-mask",name:"Mask"},data:{c:"--cat-data",name:"Data map"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};
 
+/* Node types that COMMUTE with a coordinate transform, so a Transform above them can be folded into
+   their coordinate evaluation (exact) instead of resampling their output (lossy). Two families:
+     * GENERATORS that are pure functions of position — evaluate them at any coordinate.
+     * PER-PIXEL value ops, where T(op(f)) === op(T(f)) because the op never mixes neighbours.
+   Everything else reads neighbours (blur, warp), runs a grid simulation (erosion), depends on the
+   whole field (histogram EQ) or has no closed form (an imported DEM), so it exists only as a raster
+   and has to be resampled. Honest caveat: Ridged/Voronoi/Gradient self-normalise, a whole-field
+   reduction — geometry is exact, but the value range is re-stretched over the new window. */
+const EXACT_TYPES=new Set(["perlin","ridged","worley","gradient","shape","constant",
+  "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin"]);
+function exactChain(id,guard){
+  guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
+  const nd=nodeById(id);if(!nd||!EXACT_TYPES.has(nd.type))return false;
+  return TYPES[nd.type].ins.every((_,s)=>{const e=inputEdge(id,s);return !e||exactChain(e.from,guard);});
+}
+// Re-evaluate a chain under the ambient XF. Deliberately does NOT write nd._field: the cached fields
+// are the untransformed ones other branches and the thumbnails still depend on.
+function evalExact(id,guard){
+  if(!id||guard.has(id))return null;guard.add(id);
+  const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
+  const def=TYPES[nd.type];
+  const ins=def.ins.map((_,s)=>{const e=inputEdge(id,s);return e?evalExact(e.from,guard):null;});
+  let f;try{f=def.eval(nd.params,ins,nd);}catch(err){console.error("exact",nd.type,err);f=newField();}
+  guard.delete(id);return f;
+}
+
 const TYPES={
   perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
     params:[P.int("seed","Seed",1,999,7),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
@@ -962,12 +1023,27 @@ const TYPES={
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
   transform:{cat:"filt",name:"Transform",ins:["In"],desc:"Move, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",
-    params:[P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
+    params:[P.seg("mode","Sampling",[["auto","Exact"],["raster","Raster"]],"auto"),
+      P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("aspect","Scale Y",0.25,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("angle","Angle",0,360,0,1,v=>(v|0)+"\u00b0"),
       P.slider("offX","Offset X",-1,1,0,0.01),P.slider("offY","Offset Y",-1,1,0,0.01),
       P.seg("edge","Edges",[["clamp","Clamp"],["wrap","Wrap"],["mirror","Mirror"]],"clamp")],
-    eval:(p,ins)=>ins[0]?transformField(ins[0],p):newField()},
+    // PLACE BEFORE YOU SAMPLE. If everything upstream is procedural, push this placement down into
+    // the generators' coordinates and re-evaluate \u2014 exact, and the terrain simply continues past the
+    // old tile edge instead of clamping. Otherwise fall back to resampling the finished raster.
+    eval:(p,ins,node)=>{
+      const src=inputEdge(node.id,0);
+      if(p.mode!=="raster"&&src&&exactChain(src.from)){
+        const prev=XF;XF=xfMul(xfFromParams(p),prev);     // compose: N transforms, ONE evaluation
+        try{const f=evalExact(src.from,new Set());node._xfMode="exact";return f||newField();}
+        finally{XF=prev;}
+      }
+      node._xfMode=ins[0]?"raster":"none";
+      return ins[0]?transformField(ins[0],p):newField();},
+    info:(nd)=>nd._xfMode==="raster"
+      ? "<b>Raster resample.</b> The input cannot be re-evaluated \u2014 an erosion sim, a blur, an imported DEM \u2014 so the finished heightmap is filtered. Bilinear resampling is a low-pass: on fBm here it costs ~25% of the fine detail for one non-integer move and ~54% over four. Put the Transform <i>below</i> the erosion to place exactly instead."
+      : "<b>Exact placement.</b> Everything upstream is procedural, so it is re-evaluated at transformed coordinates rather than resampled: no filtering, no detail loss, and the terrain continues past the old tile edge instead of clamping (Edges is unused). Stacked Transforms compose into one matrix, so they still cost one evaluation."},
   invert:{cat:"filt",name:"Invert",ins:["In"],desc:"1 − height.",params:[],
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
@@ -1328,6 +1404,8 @@ function buildProps(){
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
+  if(def.info){const nt=document.createElement("div");nt.className="hint";
+    nt.style.margin="0 0 10px";nt.innerHTML=def.info(selected);body.appendChild(nt);}
   def.params.forEach(pr=>body.appendChild(buildField(pr)));
   if(selected.type==="import"){const b=document.createElement("button");b.className="btn";b.style.width="100%";b.style.marginTop="8px";
     b.textContent=selected._dem?"Replace heightmap…":"Load heightmap file…";b.onclick=()=>{importTarget=selected;$("#fileInput").click();};

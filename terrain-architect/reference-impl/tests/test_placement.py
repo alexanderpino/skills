@@ -7,6 +7,7 @@ interpolation between "not applied" and "applied everywhere".
 import numpy as np
 import pytest
 
+import noise
 import ops_filters
 import placement
 
@@ -249,3 +250,61 @@ def test_affine_supports_non_uniform_scale_and_shear():
     yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
     fx, fy = placement.transform_coords(xx, yy, M)
     assert np.ptp(fx) > np.ptp(xx) and np.ptp(fy) < np.ptp(yy)
+
+
+def _bilinear_shift(f, dx, dy):
+    """The lossy operation under test: translate a RASTER by resampling it."""
+    n, m = f.shape
+    yy, xx = np.mgrid[0:n, 0:m].astype(float)
+    sx, sy = xx + dx, yy + dy
+    x0 = np.clip(np.floor(sx).astype(int), 0, m - 1); x1 = np.clip(x0 + 1, 0, m - 1)
+    y0 = np.clip(np.floor(sy).astype(int), 0, n - 1); y1 = np.clip(y0 + 1, 0, n - 1)
+    tx = np.clip(sx - x0, 0.0, 1.0); ty = np.clip(sy - y0, 0.0, 1.0)
+    return ((f[y0, x0] * (1 - tx) + f[y0, x1] * tx) * (1 - ty)
+            + (f[y1, x0] * (1 - tx) + f[y1, x1] * tx) * ty)
+
+
+def _detail(f):
+    """Fine-detail energy as mean |laplacian| — the band a low-pass filter removes."""
+    return float(np.abs(4 * f[1:-1, 1:-1] - f[1:-1, :-2] - f[1:-1, 2:]
+                        - f[:-2, 1:-1] - f[2:, 1:-1]).mean())
+
+
+def test_raster_transform_loses_detail_that_placement_keeps():
+    """WHY placement transforms coordinates instead of rasters, as a number rather than an assertion.
+
+    Bilinear resampling is a low-pass filter, so every raster move costs fine detail and the losses
+    compound. Evaluating the generator at moved coordinates is the same function sampled elsewhere,
+    so it costs nothing however many times you move it. The percentages quoted in `placement.py` and
+    references/10 are pinned here; they are metric-dependent (mean |laplacian|) and meaningless
+    without that qualifier, which is the point of measuring rather than asserting.
+    """
+    n = 192
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    build = lambda gx, gy: noise.fbm(gx / n * 3.0, gy / n * 3.0, seed=7,
+                                     octaves=6, lacunarity=2.0, gain=0.5)
+    h = build(xx, yy)
+    base = _detail(h)
+    dx, dy = 0.037 * n, 0.023 * n                 # deliberately non-integer: the worst case
+
+    raster, losses, placed_ratios = h, [], []
+    for k in range(1, 5):
+        raster = _bilinear_shift(raster, dx, dy)
+        losses.append(1.0 - _detail(raster) / base)
+        # coordinate-space placement of the SAME move, k times over — one evaluation, no filtering
+        placed = build(xx + k * dx, yy + k * dy)
+        placed_ratios.append(_detail(placed) / base)
+        assert _detail(placed) > _detail(raster), (
+            f"move {k}: coordinate placement ({_detail(placed):.5f}) must stay sharper than the "
+            f"resampled raster ({_detail(raster):.5f})")
+
+    # Placement lands on a DIFFERENT WINDOW of the same fBm, and detail energy genuinely varies
+    # between windows — so the invariant is "no systematic decline", not "identical". Reading that
+    # window variance as a loss would be the measurement failing, not the code.
+    assert max(abs(r - 1.0) for r in placed_ratios) < 0.15, placed_ratios
+    assert placed_ratios[-1] > placed_ratios[0] - 0.15, (
+        f"coordinate placement must not degrade with depth, got {placed_ratios}")
+
+    assert 0.15 < losses[0] < 0.35, f"one raster move lost {losses[0]:.1%}, expected ~24%"
+    assert 0.45 < losses[3] < 0.65, f"four raster moves lost {losses[3]:.1%}, expected ~53%"
+    assert losses == sorted(losses), f"raster loss must compound with each move, got {losses}"
