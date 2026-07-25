@@ -752,75 +752,78 @@ function layoutField(shapes,base){
    `place=`: the crest skeleton is built at the placed position, so it is exact by construction. ---- */
 const MOUNTAIN_STYLES={
   //            cells warp  relief spur crest erode talus repose terr
-  basic: {cells:4.0,warp:0.30,relief:0.55,spur:0.28,crest:1.15,erode:0.00,talus:0, repose:0.95,terr:0},
+  basic: {cells:4.0,warp:0.30,relief:0.55,spur:0.28,crest:1.15,erode:0.00,talus:3, repose:0.95,terr:0},
   eroded:{cells:5.0,warp:0.55,relief:0.66,spur:0.40,crest:1.35,erode:0.15,talus:4, repose:0.72,terr:0},
   alpine:{cells:3.6,warp:0.42,relief:0.74,spur:0.44,crest:1.70,erode:0.12,talus:7, repose:1.15,terr:0},
   old:   {cells:5.6,warp:0.62,relief:0.44,spur:0.30,crest:1.05,erode:0.20,talus:14,repose:0.42,terr:0},
   strata:{cells:4.4,warp:0.34,relief:0.52,spur:0.30,crest:1.20,erode:0.13,talus:4, repose:0.72,terr:8},
 };
-/* A PEAK IS A JUNCTION IN A RIDGE NETWORK, not a radial object.
+/* A MOUNTAIN IS A DISSECTED DOME. Do not overthink the macro shape.
 
-   The previous attempt was h = env(r) * spurs(theta) -- a radially symmetric envelope with flutes
-   cut in it. Measured by mean descent gradient per octant, its steepest flank was 1.09x its gentlest
-   against a perfect cone's 1.00, with the summit 0.009 off the footprint centroid. That is a
-   volcano. No amount of texture fixes it, because ANY function of that form is a cone.
+   Measured against Gaea's default Alpine mountain: the footprint IS roughly radial, a broad dome
+   sitting on a plane. What makes it read as a mountain is not its topology -- it is the DENSITY of
+   drainage dissection. Dozens of fine valleys running out from the high ground, sharp spur crests
+   between them, at a scale far finer than any hand-placed ridge skeleton.
 
-   Real peaks are where two to four ARETES meet, and those aretes continue PAST the summit toward
-   neighbouring peaks. The faces between them are broad and planar -- the triangular facets you see
-   on any range front -- not conical. And they are strongly asymmetric, because one face was
-   glaciated and the other was not.
+   Two earlier attempts got this backwards. env(r) * spurs(theta) with 7 flutes was a fluted cone; a
+   ridge skeleton evaluated as planes anchored on aretes was a SMOOTH pyramid -- planar faces carry
+   no texture at all. Both satisfied every statistic being measured (one summit, monotonic descent,
+   prominence) because a cone satisfies all of them. The statistics were not wrong; they simply do
+   not measure the thing that makes a mountain look like one.
 
-   So the peak is built as a small ridge skeleton and evaluated as the upper envelope of planes
-   anchored on those aretes: h = max_i (elevation along arete i - distance * faceSlope). Planes
-   through ridge lines meet in facets, which is the structure the cone formulation cannot express.
-   Arete lengths, headings and face slopes vary, so asymmetry is intrinsic rather than added. */
-function peakSkeleton(p){
-  let rs=((p.seed|0)*2654435761)>>>0;
-  const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
-  const cx=p.x,cy=p.y,reach=Math.max(p.size,0.02),base=p.angle*Math.PI/180;
-  const k=Math.max(2,Math.min(6,Math.round(p.spurs*0.5)));   // 2-6 primary aretes meet at the summit
-  const aretes=[];
-  for(let i=0;i<k;i++){
-    const th=base+(i/k)*2*Math.PI+(rnd()-0.5)*0.9;
-    // asymmetry: aretes differ in length and in how fast they lose height
-    const len=reach*(0.55+0.75*rnd()),drop=0.55+0.4*rnd();
-    const pts=[[cx,cy,1.0]];
-    let ax=cx,ay=cy,dir=th;
-    const segs=4;
-    for(let sgi=1;sgi<=segs;sgi++){
-      dir+=(rnd()-0.5)*0.7;                                  // the crest wanders
-      const step=len/segs;
-      ax+=Math.cos(dir)*step;ay+=Math.sin(dir)*step;
-      const t=sgi/segs;
-      pts.push([ax,ay,Math.max(0,1-drop*Math.pow(t,0.75))]); // concave crest profile
-    }
-    aretes.push(pts);
-  }
-  return aretes;
-}
+   So: a wobbled dome envelope, dissected by a dense modulated-Voronoi drainage network, then eroded.
+   Layout of a RANGE is not this node's job -- that is what combining, blending and placement masks
+   are for. */
 function peakField(p){
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
-  const aretes=peakSkeleton(p);
-  const faceSlope=1.0/Math.max(p.size*0.55,0.02)*(0.55+0.7*p.relief);
+  const cx=p.x,cy=p.y,reach=Math.max(p.size,0.02),rot=p.angle*Math.PI/180;
+  // drainage cells across the tile. `detail` is the density that actually controls how mountainous
+  // it looks: at 1x the dome carries ~10 spurs, at 3x ~40, which is where the reference sits.
+  const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
+  const relief=p.relief;
   let h=newField(0);
+  const cover=newField(0);                        // the primitive's own footprint, kept for later
+  const envF=newField(0),netF=newField(1);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const u=(x+0.5)/n,v=(y+0.5)/n;
-    let best=0;
-    for(const a of aretes){
-      const {d,e}=polylineNearest(u,v,a);
-      // a plane anchored on the crest, descending at faceSlope. Facets appear where planes meet.
-      const val=e-d*faceSlope;
-      if(val>best)best=val;
-    }
-    // gullies: incise the FACES, leaving the crests alone (roughness grows away from a divide)
-    if(best>0){
-      const g=fbm2(u*11,v*11,p.seed+53,4);
-      best*=1-st.spur*0.35*clamp(g*0.5+0.5,0,1);
-    }
-    h[y*n+x]=Math.max(0,best);
+    let dx=u-cx,dy=v-cy;
+    const rx=dx*Math.cos(rot)-dy*Math.sin(rot),ry=(dx*Math.sin(rot)+dy*Math.cos(rot))/Math.max(p.aspect||1,0.15);
+    const th=Math.atan2(ry,rx);
+    // the footprint is a wobbled dome, not a circle -- two octaves of angular noise on the radius
+    const wob=1+0.30*fbm2(Math.cos(th)*1.6,Math.sin(th)*1.6,p.seed+21,3)
+               +0.14*fbm2(Math.cos(th)*3.7,Math.sin(th)*3.7,p.seed+22,3);
+    const r=Math.hypot(rx,ry)/(reach*Math.max(wob,0.35));
+    if(r>=1)continue;
+    const env=Math.pow(1-r*r,1.25);                 // dome, concave flanks, soft skirt at the base
+    // DENSE dissection: modulated Voronoi, cell edges = spur crests, interiors = valleys
+    const wx=fbm2(u*ncell*0.35,v*ncell*0.35,p.seed+3,4)+0.5*fbm2(u*ncell*0.9,v*ncell*0.9,p.seed+13,4);
+    const wy=fbm2(u*ncell*0.35+4.7,v*ncell*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*ncell*0.9+1.9,v*ncell*0.9+6.1,p.seed+14,4);
+    const uu=u*ncell+st.warp*wx,vv=v*ncell+st.warp*wy;
+    const e1=worleyAt(uu,vv,p.seed+1,"f2f1"),e2=worleyAt(uu*2.1,vv*2.1,p.seed+8,"f2f1");
+    const i=y*n+x;
+    envF[i]=env;
+    netF[i]=(1-st.spur)*e1+st.spur*e2;
+    cover[i]=clamp((1-r)/0.06,0,1);               // soft only in the last 6% of the radius
   }
-  if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*n*n),seed:p.seed+11,radius:2});
+  // Normalise the network by a PERCENTILE of itself, not a constant. Worley F2-F1 scales with cell
+  // size, so a fixed divisor makes incision shallower as the cells get finer -- which made the
+  // Drainage detail parameter fight itself: measured, fine-detail energy FELL from 0.0089 to 0.0056
+  // as detail went 0.6 -> 3.4. With a percentile the incision depth is scale free, so the parameter
+  // controls density and nothing else. (The massif form always did this; the peak form did not.)
+  const pn=percentileOf(netF,0.92)+1e-9;
+  for(let i=0;i<h.length;i++){
+    if(envF[i]<=0)continue;
+    const ridges=Math.pow(1-Math.min(netF[i]/pn,1),st.crest);  // ~1 on a crest, 0 in a valley floor
+    h[i]=envF[i]*((1-relief)+relief*ridges);
+  }
+  // A dome concentrates flow outward, so it earns far more drainage than a flat tile of the same
+  // style -- and radial drainage is exactly what the reference shows. 3x the style's droplet budget.
+  if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*3*n*n),seed:p.seed+11,radius:2});
   if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
+  // Confine to the footprint. Erosion scatters deposit onto the surrounding flat, which reads as
+  // speckle on ground the primitive does not own -- and a primitive that stays inside its footprint
+  // is the one that composites cleanly under Stamp and a placement mask.
+  for(let i=0;i<h.length;i++)h[i]*=cover[i];
   if(st.terr){const[,mx]=fieldRange(h);
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
   return h;
@@ -1246,7 +1249,8 @@ const TYPES={
       P.slider("size","Reach",0.08,0.9,0.35,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("angle","Trend",0,180,25,1,v=>(v|0)+"\u00b0"),
       P.int("ridges","Crest lines",1,5,2),
-      P.int("spurs","Spurs",3,14,7),   // primary divides; sub-spurs branch off these lower down
+      P.slider("detail","Drainage detail",0.4,3.5,2.6,0.1,v=>v.toFixed(1)+"\u00d7"),
+      P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("relief","Valley depth",0.1,0.95,0.66,0.01)],
     eval:(p)=>mountainField(p),
     note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},

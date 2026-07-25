@@ -215,49 +215,71 @@ perpendicular. The four falloff profiles are all distinct at the same distance (
 0.488, scurve 0.482, squared 0.238); overlapping shapes resolve to the greater height; Modifier mode
 leaves the base at 0.25 away from the shape and lifts it to 0.80 on it.
 
-#### A mountain is a peak, not noise with erosion on it
+#### Do not overthink the mountain — layout is what combining and masks are for
 
 Worth stating as numbers, because it is easy to build the wrong thing and not notice. The measure is
 **topographic prominence** — the same one mountaineers use: flood the terrain top-down, and when two
 basins merge, the lower summit's prominence is its height above that saddle. A peak has *one* prominent
 summit; noise has hundreds.
 
-| | hypsometric | summits >10% relief | 2nd/1st prominence | descends from summit |
-|---|---|---|---|---|
-| ideal cone | 0.262 | 1 | 0 | yes |
-| **Mountain — Peak** | 0.072–0.084 | **1** | **0.009–0.013** | yes |
-| **Mountain — Massif** | 0.243–0.294 | 4–8 | 0.25–0.35 | yes |
-| ridged fBm | 0.556 | 109 | 0.56 | no |
-| Perlin fBm | 0.555 | 25 | 0.56 | no |
+| | summits >10% relief | 2nd/1st prominence | texture vs a cone |
+|---|---|---|---|
+| ideal cone | 1 | 0 | 1× |
+| **Mountain — Peak** | **1** | **≤0.08** | **29.6×** |
+| **Mountain — Massif** | 4–8 | 0.25–0.35 | — |
+| ridged fBm | 109 | 0.56 | — |
+
+Note what the first two columns cannot tell you: a smooth cone scores perfectly on both. Texture is the
+column that catches it, which is why it is measured now — and why the renders get looked at.
 
 Neither form is noise — both sit at the cone end of the hypsometric scale, an order of magnitude away
 from fBm on summit count. But they are different landforms, and the distinction matters when you are
 choosing what to place three of:
 
-- **Peak** — one summit where several **arêtes** meet. **One** prominent summit across all five styles
-  and every seed tested, second summit at 0.9–1.3% of the first. This is the unit you place.
+- **Peak** — a dissected dome. One dominant summit across all five styles and every seed tested
+  (second summit at ≤8% of the first), descending monotonically, and **29.6×** more textured than a
+  smooth cone of the same footprint. This is the unit you place.
 
-  A peak is a *junction in a ridge network*, not a radial object, and the first attempt got that wrong
-  in a way worth recording. Building it as `env(r) × spurs(θ)` — a radially symmetric envelope with
-  flutes cut in it — measured a steepest-to-gentlest flank ratio of **1.09** against a perfect cone's
-  1.00, with the summit 0.009 off the footprint centroid. That is a volcano, and no amount of texture
-  fixes it, because *any* function of that form is a cone. It is now built as a small ridge skeleton
-  and evaluated as the upper envelope of planes anchored on the arêtes — planes through ridge lines
-  meet in **facets**, the triangular faces you see on any range front, which the radial formulation
-  cannot express at all. Arête lengths, headings and face slopes vary, so asymmetry is intrinsic:
-  steepest/gentlest is now **1.31–1.71** with the summit 0.027–0.062 off-centre.
+  Getting here took two wrong turns, both worth recording because they were the *same* mistake. First
+  `env(r) × spurs(θ)` — a radially symmetric envelope with flutes — a fluted cone. Then a ridge
+  skeleton evaluated as planes anchored on arêtes, which measured *better* on asymmetry and still
+  produced a **smooth pyramid**, because planar faces carry no texture at all. Both passed every
+  statistic being measured — one summit, monotonic descent, prominence — since a cone satisfies all of
+  them. The statistics were not wrong; they simply do not measure the thing that makes a mountain look
+  like one, and nobody had rendered the output to check.
+
+  Measured against Gaea's default Alpine mountain, the macro shape *is* roughly a radial dome. What
+  makes it read as a mountain is the **density of drainage dissection** — dozens of fine valleys
+  running out from the high ground with sharp spurs between them. So Peak is a wobbled dome envelope,
+  dissected by a dense modulated-Voronoi drainage network, then eroded. **Drainage detail** is the
+  parameter that actually controls how mountainous it looks.
+
 - **Massif** — `Crest lines` unioned into a small range, which is what `landforms.mountain` builds by
   design (its docstring: *"n_ridges crest lines unioned into a small range"*). Right for a shoulder or a
   plateau edge; wrong as the thing you place three of, because you would be unioning three small ranges.
 
-**Spurs radiate, so they are periodic in azimuth.** A first attempt sampled the Voronoi ridge network in
-polar space, which fails: Voronoi cells subdivide radially too, so their edges run partly
-circumferentially and you get terracing rather than spurs. Measured, the `Spurs` parameter had no effect
-at all — 4, 7 and 12 spurs all produced ~22–30 angular maxima, and azimuthal relief was 0.08 against the
-massif's 0.27, i.e. a smooth cone with texture on it. Replacing it with an explicitly angular ridge
-function fixed both: the count now tracks the parameter (4→5, 7→9, 10→13, 12→20 at 60% of the reach —
-above the asked number because sub-spurs branch off the primary divides lower down), and azimuthal relief
-rose to 0.18–0.25, against **0.006** for a smooth cone. Pinned in `_verify_peak.js`.
+**Two parameter bugs found the same way.** `Spurs` (in an earlier polar-Voronoi form) had no effect
+at all — 4, 7 and 12 all produced ~22–30 angular maxima. Its replacement, `Drainage detail`, had the
+*opposite* of the intended effect: fine-detail energy **fell** from 0.0089 to 0.0056 as detail went
+0.6 → 3.4, because the Voronoi network was normalised by a hardcoded constant while Worley F2−F1 scales
+with cell size, so finer cells incised more shallowly. Normalising by a percentile of the network makes
+incision scale-free; detail then spans **2.9×** across its usable range and **saturates** past ~2–3×,
+where the talus pass relaxes anything finer than its own scale. That is a real floor on feature size,
+and it is why the default sits at 2.6. On heavily eroded styles the sweep reads flat (ratio 0.96)
+because erosion overprints the network — a fact about erosion, not about the knob.
+
+Two of the measurements used to check this were themselves broken and had to be thrown out: an angular
+crest count saturated at ~130 regardless of input at 192², and requiring *exactly* one summit is what
+let the smooth pyramid through. The invariants that survive are scale-free — fine-detail energy per
+unit height, one clearly dominant summit, few summits.
+
+Giving `basic` a talus pass was a real fix that fell out of this: with zero weathering, dense
+dissection left **45** crumpled Voronoi spikes rather than a mountain. A surface with no talus is
+unphysical whatever the style.
+
+The primitive also stays strictly inside its own footprint (total height outside it is exactly **0**),
+because erosion otherwise scatters deposit onto ground the primitive does not own — and a primitive
+that respects its footprint is the one that composites cleanly under Stamp and a placement mask.
 
 Verified in `_verify_range.js`. Three Mountains placed at X = 0.26 / 0.50 / 0.74 land at measured
 centroids **0.281 / 0.505 / 0.722**, each with relief ≈ 0.84–1.08. Unioning with Smooth Max instead of a

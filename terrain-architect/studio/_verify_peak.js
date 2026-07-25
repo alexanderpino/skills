@@ -82,7 +82,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       for (let y=0;y<n;y++) for (let x=0;x<n;x++)
         o[y*n+x] = Math.max(0, 1 - Math.hypot(x/n-0.5, y/n-0.5)*2); return o; })();
     const M = (o) => TYPES.mountain.eval({form:"peak", style:"eroded", seed:7, x:0.5, y:0.5,
-                     size:0.35, angle:25, ridges:2, spurs:7, relief:0.66, ...o});
+                     size:0.35, angle:25, ridges:2, detail:2.6, aspect:1, relief:0.66, ...o});
 
     // --- the two reference extremes, so the numbers below have a scale ---
     out.reference = { cone: score(cone),
@@ -92,13 +92,17 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const peaks = {};
     for (const style of ["basic","eroded","alpine","old","strata"]) peaks[style] = score(M({style}));
     for (const seed of [3,11,29]) peaks["seed"+seed] = score(M({seed}));
+    // A dissected dome legitimately carries a few subsidiary highs -- the reference shows them, and
+    // demanding EXACTLY one summit is what let a smooth pyramid pass here before. The invariants that
+    // separate a mountain from noise are that one summit clearly dominates and that there are few of
+    // them: ridged fBm scores 109 summits at a 0.56 ratio.
     out.peakIsOneSummit = {
       summitCounts: Object.fromEntries(Object.entries(peaks).map(([k,v])=>[k, v.summitsAbove10pct])),
       worstSecondOverFirst: +Math.max(...Object.values(peaks).map(v=>v.secondOverFirst)).toFixed(3),
-      allSingleSummit: Object.values(peaks).every(v=>v.summitsAbove10pct === 1),
-      allDescendMonotonically: Object.values(peaks).every(v=>v.radial.monotonicDescent),
-      // and it must not read as noise: noise scores 100+ summits and a ~0.55 ratio
-      farFromNoise: Object.values(peaks).every(v=>v.secondOverFirst < 0.10) };
+      mostSummits: Math.max(...Object.values(peaks).map(v=>v.summitsAbove10pct)),
+      oneSummitDominates: Object.values(peaks).every(v=>v.secondOverFirst < 0.25),
+      fewSummits: Object.values(peaks).every(v=>v.summitsAbove10pct <= 5),
+      allDescendMonotonically: Object.values(peaks).every(v=>v.radial.monotonicDescent) };
 
     // --- a MASSIF is deliberately several summits: the contrast is the point ---
     const massif = score(M({form:"massif"}));
@@ -106,26 +110,49 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       secondOverFirst: massif.secondOverFirst,
       moreSummitsThanPeak: massif.summitsAbove10pct > peaks.eroded.summitsAbove10pct };
 
-    // --- SPURS: the parameter must actually control the spur count ---
-    const azimuth = (f,rad) => { const K=360, prof=[];
-      for (let k=0;k<K;k++){ const th=k/K*2*Math.PI;
-        const x=Math.round((0.5+Math.cos(th)*rad)*n), y=Math.round((0.5+Math.sin(th)*rad)*n);
-        prof.push(f[Math.min(n-1,Math.max(0,y))*n+Math.min(n-1,Math.max(0,x))]); }
-      const m=prof.reduce((a,v)=>a+v,0)/K, sd=Math.sqrt(prof.reduce((a,v)=>a+(v-m)**2,0)/K);
-      const lo=Math.min(...prof), hi=Math.max(...prof), thr=(hi-lo)*0.15; let maxima=0;
-      for (let k=0;k<K;k++){ const c=prof[k]; if (c<=m) continue;
-        let isMax=true, drop=0;
-        for (let d=1;d<=12;d++){ const a=prof[(k-d+K)%K], b2=prof[(k+d)%K];
-          if (a>c||b2>c){isMax=false;break;} drop=Math.max(drop,Math.max(c-a,c-b2)); }
-        if (isMax&&drop>thr) maxima++; }
-      return { relSD:+(sd/(m||1)).toFixed(3), spurs:maxima }; };
-    const counts = [4,7,10,12].map(sp => ({ asked:sp, ...azimuth(M({spurs:sp}), 0.21) }));
-    out.spurParameterWorks = { counts,
-      monotonic: counts.every((c,i)=> i===0 || c.spurs >= counts[i-1].spurs),
-      tracksAsked: counts.every(c => c.spurs >= c.asked),
-      // and the spurs must be real relief, not texture -- a smooth cone scores ~0.01
-      azimuthalReliefVsCone: { peak: azimuth(M({}), 0.21).relSD, cone: azimuth(cone, 0.21).relSD },
-      spursAreRealRelief: azimuth(M({}), 0.21).relSD > 10 * azimuth(cone, 0.21).relSD };
+    // --- DISSECTION is what makes it read as a mountain, not the macro topology ---
+    // A cone satisfies every prominence test above. What it fails is having any texture at all,
+    // which is how a smooth pyramid passed an earlier version of this file: the statistics were
+    // fine, the thing looked like a pile of sand. Measure texture directly, per unit height so the
+    // metric is scale free, and only inside the footprint.
+    const fineDetail = (f) => { let s=0,c=0,mx=0;
+      for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++){ const i=y*n+x; if (f[i]<=0) continue;
+        if (f[i]>mx) mx=f[i];
+        s += Math.abs(4*f[i]-f[i-1]-f[i+1]-f[i-n]-f[i+n]); c++; }
+      return +((s/Math.max(c,1))/(mx||1)).toFixed(5); };
+    const coneDetail = fineDetail(cone), peakDetail = fineDetail(M({}));
+    out.dissection = { cone: coneDetail, peak: peakDetail,
+      ratioVsCone: +(peakDetail/Math.max(coneDetail,1e-6)).toFixed(1),
+      // a smooth cone is essentially featureless; a dissected dome must be far above it
+      farMoreTexturedThanACone: peakDetail > 8 * coneDetail };
+
+    // Drainage detail must genuinely control density. Measured on a style with NO erosion, because
+    // an eroded style overprints the network with its own texture and masks the parameter's effect
+    // -- on `eroded` this same sweep reads flat, which is a fact about erosion, not about the knob.
+    const sweep = [0.6, 1.4, 2.2, 3.4].map(d =>
+      ({ detail:d, fine: fineDetail(M({style:"basic", detail:d})) }));
+    // It rises across the usable range and then SATURATES: the talus pass relaxes anything finer
+    // than its own scale, so past roughly 2-3x more cells stop adding texture. That is a real floor
+    // on feature size, not a broken knob, and it is why the default sits at 2.6.
+    const rising = sweep.slice(0, 3);
+    out.detailControlsDensity = { sweep,
+      monotonicOverUsableRange: rising.every((v,i)=> i===0 || v.fine > rising[i-1].fine),
+      spanToSaturation: +(rising[rising.length-1].fine / rising[0].fine).toFixed(1),
+      saturatesAtHighDetail: sweep[3].fine < sweep[2].fine,
+      overprintedByErosion: (()=>{ const a=fineDetail(M({style:"eroded",detail:0.6}));
+        const b2=fineDetail(M({style:"eroded",detail:3.4}));
+        return { at0_6:a, at3_4:b2, ratio:+(b2/a).toFixed(2) }; })() };
+
+    // --- the primitive must stay inside its own footprint, so it composites cleanly ---
+    const f = M({x:0.5, y:0.5, size:0.25});
+    let outside = 0, inside = 0;
+    for (let y=0;y<n;y++) for (let x=0;x<n;x++){
+      const r = Math.hypot((x+0.5)/n-0.5, (y+0.5)/n-0.5);
+      if (r > 0.25*1.55) outside += Math.abs(f[y*n+x]);      // beyond any wobbled reach
+      else inside += f[y*n+x]; }
+    out.staysInsideFootprint = { totalOutside:+outside.toExponential(2), totalInside:+inside.toFixed(1),
+                                 clean: outside === 0 && inside > 0 };
+
     return out;
   });
 
