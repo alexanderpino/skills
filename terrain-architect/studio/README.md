@@ -101,7 +101,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (placeable Peak / Massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
-| **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) |
+| **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | Slope select · Height select |
 | **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (colour LUT node) · **SatMap Blend** (merge two colour branches) |
@@ -161,6 +161,40 @@ Exact and raster sampling describe the *same* placement including the pivot: cor
 across the tile interior. Over the whole tile it drops to 0.944, and that gap is not disagreement about
 placement — it is the two modes' different edge policy, since exact mode has real terrain past the old
 tile edge where raster has clamped smear. Scoring the interior separates the two.
+
+### Stream power — the process that organises a landscape
+
+`dh/dt = U − K·A^m·S^n` (n = 1), Braun & Willett 2013's O(N) implicit solver, ported from
+`reference-impl/erosion_streampower.py` where it is cross-validated against Landlab.
+
+This is the piece that was missing, and its absence explains a lot. Drainage area **A** is what makes
+valleys join into a tree and deepen downstream, so ridges emerge as *what is left between them*.
+Droplet erosion cuts local gullies; this builds topography. A mountain is not an object you add — it
+is the residue after a river network incises high ground, which is why authoring the summit directly
+kept producing a children's-drawing triangle.
+
+Verified against the slope–area law, not by eye: at steady state `S ∝ A^(−m/n)`, a straight line of
+slope −m on a log–log plot of channel cells.
+
+| m | fitted exponent | error |
+|---|---|---|
+| 0.4 | −0.387 | 0.013 |
+| 0.5 | −0.490 | 0.010 |
+| 0.6 | −0.591 | 0.009 |
+
+all inside the reference's 0.1 tolerance, and stable across 100 / 200 / 400 / 800 iterations
+(−0.468, −0.505, −0.490, −0.494) so it is converged rather than passing at one lucky count.
+
+**Getting that oracle to work exposed a harness bug, not a solver bug.** Driven from structured fBm
+with unbalanced uplift, the fitted exponent wandered between −0.28 and +0.02 and r² collapsed to 0 —
+because that regime never reaches steady state. Reproducing the reference's own conditions (small
+uniform noise so the network self-organises, `U·dt = K·dt`) it lands on −m immediately. Working code
+came close to being "fixed" on the strength of a broken measurement.
+
+**Uplift 0 will erode your terrain away, and that is correct.** Rivers reduce a landmass that has
+stopped rising. Measured on a Mountain, peak height goes **0.687 → 0.530 → 0.196 → 0.000** as incision
+rises with uplift at 0. The shipped defaults sit well clear of that (they keep 77% of peak relief while
+still measurably carving), and the node says so in its panel rather than letting you discover it.
 
 ### Building a mountain range from placed massifs
 
@@ -582,7 +616,8 @@ npm i playwright-core@1.49.0
 node _verify_exact_transform.js      # exact vs raster placement, compose, CPU/GPU parity under XF
 node _verify_trs.js                  # translate/rotate/scale about a pivot, Transform mask, Stamp
 node _verify_range.js                # place 3 Mountains, union with Smooth Max, erode into one range
-node _verify_peak.js                 # prominence: Peak is one summit, Massif is several, neither is noise
+node _verify_peak.js                 # prominence, dissection, solid-of-revolution, mask shape variation
+node _verify_streampower.js          # slope-area law S ~ A^-m, convergence, base-levelling
 node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU bit-parity + timings

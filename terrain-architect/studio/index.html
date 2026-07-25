@@ -905,7 +905,7 @@ function peakField(p){
   }
   if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*3*n*n),seed:p.seed+11,radius:2});
   if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
-  for(let i=0;i<h.length;i++)if(cover[i]<=0)h[i]=0;
+  for(let i=0;i<h.length;i++)if(cover[i]<=0||h[i]<0)h[i]=0;   // the internal passes can dip below 0
   if(st.terr){const[,mx]=fieldRange(h);
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
   return h;
@@ -1200,6 +1200,62 @@ function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
 
 /* ------------------------------------------------------- erosion ------ */
 // Thermal (talus) erosion — material above the repose angle slides to lower neighbours.
+/* STREAM-POWER FLUVIAL INCISION --  dh/dt = U - K*A^m*S^n,  n = 1.
+   Braun & Willett 2013 O(N) implicit solver, ported from reference-impl/erosion_streampower.py
+   (P-tier there, cross-validated against Landlab).
+
+   This is the process that ORGANISES a landscape rather than decorating one. Drainage area A is what
+   makes valleys join into a tree and deepen downstream, so the ridges emerge as what is LEFT between
+   them. Droplet erosion cuts local gullies; this builds topography. A mountain is not an object you
+   add, it is the residue after a river network incises high ground -- which is why every attempt to
+   author the summit directly produced a children's-drawing triangle.
+
+   Nodes are solved receiver-before-donor so the implicit update is one linear solve per node, which
+   is why n=1 is unconditionally stable. Domain edges are held at base level: without a fixed outlet
+   there is nothing to incise toward. At steady state S ~ A^(-m/n) -- a straight line of slope -m on
+   a log-log slope/area plot, which is the decisive verification (see _verify_streampower.js). */
+function spReceivers(g,cellsize){
+  const n=RES,N=n*n,rec=new Int32Array(N).fill(-1),dist=new Float32Array(N).fill(cellsize);
+  const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],
+            [-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x;let best=0,bi=-1,bd=cellsize;
+    for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      const ni=yy*n+xx,sl=(g[i]-g[ni])/(d[2]*cellsize);
+      if(sl>best){best=sl;bi=ni;bd=d[2]*cellsize;}}
+    rec[i]=bi;dist[i]=bd;}
+  return {rec,dist};
+}
+// Takes the PHYSICAL quantities K*dt and U*dt rather than UI sliders, so the solver can be tested as
+// the equation it claims to implement -- the node maps its 0..1 controls onto these. Conflating the
+// two hid a real failure: driven by slider-scaled values the slope-area exponent wandered between
+// -0.28 and +0.02 instead of settling at -m, because that regime never reaches steady state.
+function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25}){
+  const n=RES,N=n*n;
+  let h=inp.slice();
+  const isEdge=new Uint8Array(N);
+  for(let x=0;x<n;x++){isEdge[x]=1;isEdge[(n-1)*n+x]=1;}
+  for(let y=0;y<n;y++){isEdge[y*n]=1;isEdge[y*n+n-1]=1;}
+  for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
+  const A=new Float32Array(N);
+  for(let it=0;it<iters;it++){
+    if(Udt)for(let i=0;i<N;i++)if(!isEdge[i])h[i]+=Udt;
+    const hf=priorityFloodFill(h);
+    const {rec,dist}=spReceivers(hf,1);
+    const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>hf[b]-hf[a]);   // high -> low
+    A.fill(1);
+    for(const i of order)if(rec[i]>=0)A[rec[i]]+=A[i];
+    for(let k=N-1;k>=0;k--){                              // low -> high: receiver solved first
+      const i=order[k];
+      if(isEdge[i]||rec[i]<0)continue;
+      const C=Kdt*Math.pow(A[i],m)/dist[i];
+      h[i]=(h[i]+C*h[rec[i]])/(1+C);
+      if(h[i]<h[rec[i]])h[i]=h[rec[i]];                   // never incise below your own receiver
+    }
+    for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
+  }
+  return h;
+}
 function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
   const n=RES;let h=inp.slice();
   // 8-neighbour offsets with their DISTANCE (diagonals are sqrt(2) away). The repose threshold must
@@ -1464,6 +1520,15 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       : p.talus/k;
     const q={...p,talus,iters:Math.max(1,Math.round(p.iters*k))};
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
+  streampower:{cat:"ero",name:"Stream power",ins:["In","Mask"],
+    desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
+    params:[P.slider("strength","Incision",0,1,0.15,0.01),
+      P.slider("m","Area exponent",0.2,0.8,0.5,0.01),
+      P.int("iters","Iterations",1,60,14),
+      P.slider("uplift","Uplift",0,1,0,0.01)],
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],streamPowerErode(ins[0],
+      {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters}),ins[1]):newField(),
+    note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>."},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"Droplet sim — carves valleys, deposits fans.",
     params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.seed("seed","Seed",1),
