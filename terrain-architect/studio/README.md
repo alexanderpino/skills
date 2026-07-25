@@ -98,7 +98,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (placeable Peak / Massif, 5 styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
@@ -276,15 +276,15 @@ The reference implementation prescribes the workflow in `landforms.mountain`'s o
 it, combine several (`np.maximum` / `ops_filters.smax`), then run a real hydraulic + thermal pass"* — so
 the studio has a node for each step.
 
-1. **Mountain** ×N, in **Peak** form. A placeable massif, ported from `reference-impl/landforms.py` (Génévaux et al. 2015
-   *Terrain Modelling from Feature Primitives*; Guérin et al. 2016). Not thresholded isotropic noise,
-   which reads as "noise on a lump": a wandering **crest skeleton** of polyline SDFs sets a non-circular
-   envelope, a **modulated-Voronoi ridge network** dissects it — cell *edges* become ridgelines, cell
-   *interiors* valleys, and a two-scale domain distortion bends them off Voronoi's straight edges into
-   spurs — then the style bakes in its weathering. Five styles matching Gaea's presets: **Basic**,
-   **Eroded**, **Alpine**, **Old**, **Strata**. Placement is *built in* (Position / Reach / Trend) rather
-   than a Transform above it, mirroring the reference impl's `place=`: the crest skeleton is constructed
-   at the placed position, so it is exact by construction. 157–482 ms per massif at 192².
+1. **Mountain** ×N, in **Mountain** landform mode. The primary mass is a variable-height, asymmetric
+   crest ribbon with connected cellular shoulders and broad, unequal face basins — not a radial cone
+   with grooves stamped into it. **Shape family** selects one of four clean-room uplift generators:
+   **Dominant peak**, **Compound peaks** (default), **Ridgeline**, or **Broad dome**. Independently,
+   **Mountain type** selects **Basic**, **Eroded**, **Old**, **Alpine**, or **Strata**; these change the
+   core profile, cellular response, basin expression, and process history, not just viewport shading.
+   Placement is built in (Position / Reach / Trend), so the feature is evaluated directly in world
+   space rather than moved as a finished raster. Typical warmed default build: about 250–300 ms at
+   192².
 2. **Smooth Max** to union them. Union of two *surfaces* is a **max** — the merged terrain is whichever
    is higher.
 3. **Thermal** or **Hydraulic** over the union. This is the step that actually makes it a *range*.
@@ -323,74 +323,74 @@ perpendicular. The four falloff profiles are all distinct at the same distance (
 0.488, scurve 0.482, squared 0.238); overlapping shapes resolve to the greater height; Modifier mode
 leaves the base at 0.25 away from the shape and lifts it to 0.80 on it.
 
-#### Do not overthink the mountain — layout is what combining and masks are for
+#### Mountain: public Gaea contract, clean-room implementation
 
-Worth stating as numbers, because it is easy to build the wrong thing and not notice. The measure is
-**topographic prominence** — the same one mountaineers use: flood the terrain top-down, and when two
-basins merge, the lower summit's prominence is its height above that saddle. A peak has *one* prominent
-summit; noise has hundreds.
+The public Gaea references clarify the abstraction. The current
+[Mountain](https://docs.gaea.app/reference/nodes/terrain/mountain) is described as a modulated Voronoi
+pattern plus distortions and exposes five styles: Basic, Eroded, Old, Alpine, and Strata. The older
+[Mountain reference](https://docs.quadspinner.com/Reference/GeoPrimitives/Mountain.html) explicitly
+says its Type control selected “four different generative algorithms,” but does not publish those
+algorithms. Gaea's older [geo-variant Voronoi](https://docs.quadspinner.com/Reference/Primitives/Voronoi.html)
+does publish several mountain-oriented cellular forms. The studio therefore implements the observable
+contract without claiming proprietary internals: four genuinely different cellular uplift families,
+followed by five genuinely different geomorphic types.
+
+The topology gate uses **topographic prominence**: flood the terrain top-down, and when two basins
+merge, the lower summit's prominence is its height above that saddle. Unlike the previous
+one-summit-only gate, the expected result depends on the selected shape family.
 
 | | summits >10% relief | 2nd/1st prominence | texture vs a cone |
 |---|---|---|---|
 | ideal cone | 1 | 0 | 1× |
-| **Mountain — Peak** | **1** | **≤0.08** | **29.6×** |
-| **Mountain — Massif** | 4–8 | 0.25–0.35 | — |
-| ridged fBm | 109 | 0.56 | — |
+| **Mountain — Dominant peak** | **1** | **0.066** | — |
+| **Mountain — Compound peaks (default)** | **3** | **0.138** | **96.3×** |
+| **Mountain range** | 12 | 0.353 | — |
+| ridged fBm | 122 | 0.553 | — |
 
 Note what the first two columns cannot tell you: a smooth cone scores perfectly on both. Texture is the
 column that catches it, which is why it is measured now — and why the renders get looked at.
 
-Neither form is noise — both sit at the cone end of the hypsometric scale, an order of magnitude away
-from fBm on summit count. But they are different landforms, and the distinction matters when you are
-choosing what to place three of:
+The four Mountain shape families are deliberately different landforms:
 
-- **Peak** — a dissected dome. One dominant summit across all five styles and every seed tested
-  (second summit at ≤8% of the first), descending monotonically, and **29.6×** more textured than a
-  smooth cone of the same footprint. This is the unit you place.
+- **Dominant peak** favours one strong cellular uplift and a short hero summit.
+- **Compound peaks** joins several high uplift cells through real saddles; it is the natural default.
+- **Ridgeline** lengthens the connected crest and favours cellular boundaries.
+- **Broad dome** favours cell interiors, wider faces, and a broader summit shoulder.
 
-  Getting here took two wrong turns, both worth recording because they were the *same* mistake. First
-  `env(r) × spurs(θ)` — a radially symmetric envelope with flutes — a fluted cone. Then a ridge
-  skeleton evaluated as planes anchored on arêtes, which measured *better* on asymmetry and still
-  produced a **smooth pyramid**, because planar faces carry no texture at all. Both passed every
-  statistic being measured — one summit, monotonic descent, prominence — since a cone satisfies all of
-  them. The statistics were not wrong; they simply do not measure the thing that makes a mountain look
-  like one, and nobody had rendered the output to check.
+The five Mountain types then alter that chosen mass: **Basic** is restrained, **Eroded** deepens
+cellular faces and runs hydraulic weathering, **Old** broadens and relaxes the profile while retaining
+residual gullies, **Alpine** narrows and sharpens the rock divisions, and **Strata** applies a layered
+elevation response. With weathering disabled, the least pairwise normalized field difference is
+**0.0675** between shape families and **0.0245** between Mountain types, proving both settings change
+generator geometry.
 
-  **The skirt is the difference between a mountain and a pudding.** An outside review called the
-  render "pudding on a plate" and blamed the base noise, suggesting we swap in Cellular or Ridged
-  instead of Perlin. That part was wrong — the basis was already modulated Voronoi (`worleyAt` F2−F1,
-  two octaves) with two-scale domain warping. The real defect was the envelope: `(1−r²)^p` has a
-  measured slope of **−0.001 at the summit**, i.e. flat on top and steepest halfway out. That is a
-  *bell*, and no amount of texture rescues a bell. `(1−r)^skirt` is steep at the summit (−1.386) and
-  convex all the way out to −0.302 at the rim — the concave **pediment / talus apron** a real massif
-  grades into, reaching exactly zero so there is no seam to feather. The **Skirt curve** parameter is
-  that exponent: 1 is a straight cone, higher gives a sharper peak with a wider sprawling apron, below
-  1 gives a plateau with an abrupt rim.
+**A good texture stack cannot rescue the wrong mass.** The rejected version was a convex radial ramp
+with summit-to-rim seams — the tipi tent failure. The current primary envelope is instead a
+variable-height crest ribbon with unequal widths on its two faces. Connected cellular volumes add
+shoulders and buttresses; broad basin heads begin at different crest positions; only then do meso
+fracture and erosion operate. The editable skirt still supplies distinct upper-crag, shoulder, face,
+talus, and pediment slope bands, but it no longer defines the whole landform as a solid of revolution.
 
-  **Shape variation — so the mask does not stamp every mountain into one shape.** With reach, aspect
-  and rotation fixed, the seed only displaced *noise* inside a footprint whose proportions never
-  changed. Measured across ten seeds by the second moments of the support: elongation stayed between
-  **1.03 and 1.36** — ten variations on one circle. **Shape variation** lets the seed jitter the mask
-  itself, so one massif comes out long and narrow and the next compact. At 0 you get exactly the
-  proportions you authored.
+  **Shape variation — so the mask does not stamp every mountain into one shape.** The seed alters
+  reach, aspect, trend, and the low-order outline while leaving Position exact. The default Compound
+  family is already elongated at zero variation; increasing the control broadens the distribution of
+  areas, orientations, and aspect ratios across seeds.
 
   | Shape variation | elongation range | area spread |
   |---|---|---|
-  | 0 | 1.03 – 1.36 | 0.077 |
-  | 0.55 (default) | 1.11 – 1.42 | 0.242 |
-  | 1.0 | 1.06 – **1.89** | 0.399 |
+  | 0 | 1.90 – 1.96 | 0.011 |
+  | 0.55 (default) | 1.44 – 2.28 | 0.105 |
+  | 1.0 | 1.14 – **2.45** | 0.181 |
 
-  **Character — the domain warp that stops it being a tipi tent.** The dome was warped only on its
-  *outline*: angular noise on the radius. That moves the footprint but leaves every radial profile a
-  straight run to a single apex, so the result was a cone with flutes cut in it however dense the
-  flutes. **Character** displaces the position *before* measuring distance — a 2D domain warp of the
-  distance field — which makes the level sets irregular at every radius: shoulders, benches,
-  sub-crests, an off-centre summit, a lobed outline.
+  **Character — macro structure, not a noisier cone.** Character expands the uplift cluster, warps
+  level sets, and changes the balance between the crest ribbon, shoulders, and cellular crags. The
+  authored Position remains the dominant high area.
 
-  Measured by correlating the field against a 90° rotation of itself, since a solid of revolution is
-  unchanged when you spin it about its axis. An ideal cone scores **1.000**. Character 0 scores
-  **0.992** — still essentially a solid of revolution. The default 0.55 scores **0.880**, and 0.9
-  scores **0.720**. Averaged over five seeds, because a single seed says nothing.
+  Raw field correlation was discarded as a misleading metric because radial bulk dominates it even
+  when the shoulders differ strongly. The replacement measures the mid-elevation contour and the
+  normalised L1 difference against a 90° rotation. A cone scores **0.020** difference. With variation
+  and baked weathering disabled to isolate this control, Character 0 / 0.3 / default 0.72 / 0.9 score
+  **0.419 / 0.540 / 0.612 / 0.631**: the control changes macro shape, not just high-frequency texture.
 
   **The skirt is drawn, not typed.** The exponent is gone; the Mountain node carries a curve editor in
   the properties panel. X is distance from the centre (0 at the summit, 1 at the radius), Y is the
@@ -409,49 +409,43 @@ choosing what to place three of:
   the plane. Monotone cubic cannot overshoot by construction, so every curve an artist can draw is
   valid. Verified against a deliberately nasty control set (a near-vertical drop between two nearly
   flat runs): the LUT stayed inside [0, 1] and stayed monotone throughout. The bake also reproduces
-  the analytic `(1−r)^1.4` it replaced to a max error of ~1e-3, with exact endpoints.
+  an analytic `(1−r)^1.4` preset to a max error of 0.011, with exact endpoints.
 
   The curve genuinely drives the landform — mean apron height at 70% of the radius, by preset:
-  Plateau **0.299**, Cone **0.196**, Apron **0.121**, Sweeping **0.043**, all distinct and ordered as
+  Plateau **0.0486**, Cone **0.0295**, Apron **0.0168**, Sweeping **0.0064**, all distinct and ordered as
   the shapes imply. A hand-drawn curve matching no exponent works the same. Dragging a control point
-  in the live widget changes the terrain (mean |Δ| 0.016).
+  in the live widget changes the terrain (mean |Δ| 0.0026 in the current interaction probe).
 
   The footprint cut is now **binary at the envelope's own support** rather than a linear collar over
   the last 6% of the radius. The collar was mine, added to kill erosion speckle, and it re-introduced
   exactly the hard seam it was meant to hide.
 
-  Measured against Gaea's default Alpine mountain, the macro shape *is* roughly a radial dome. What
-  makes it read as a mountain is the **density of drainage dissection** — dozens of fine valleys
-  running out from the high ground with sharp spurs between them. So Peak is a wobbled dome envelope,
-  dissected by a dense modulated-Voronoi drainage network, then eroded. **Drainage detail** is the
-  parameter that actually controls how mountainous it looks.
+  **Drainage is topology, cellular structure is rock mass.** Mountain authors only a few broad,
+  unequal basin heads beginning on different shoulders. A coarse distorted-cellular band divides the
+  primary faces and a finer band fractures them; the hydraulic pass supplies the smaller connected
+  flow hierarchy. **Drainage detail** changes basin and fracture scale; **Reduce details** suppresses
+  the cellular/micro bands independently.
 
-- **Massif** — `Crest lines` unioned into a small range, which is what `landforms.mountain` builds by
+- **Mountain range** — `Massif crests` unioned into a small range, which is what `landforms.mountain` builds by
   design (its docstring: *"n_ridges crest lines unioned into a small range"*). Right for a shoulder or a
   plateau edge; wrong as the thing you place three of, because you would be unioning three small ranges.
 
-**Two parameter bugs found the same way.** `Spurs` (in an earlier polar-Voronoi form) had no effect
-at all — 4, 7 and 12 all produced ~22–30 angular maxima. Its replacement, `Drainage detail`, had the
-*opposite* of the intended effect: fine-detail energy **fell** from 0.0089 to 0.0056 as detail went
-0.6 → 3.4, because the Voronoi network was normalised by a hardcoded constant while Worley F2−F1 scales
-with cell size, so finer cells incised more shallowly. Normalising by a percentile of the network makes
-incision scale-free; detail then spans **2.9×** across its usable range and **saturates** past ~2–3×,
-where the talus pass relaxes anything finer than its own scale. That is a real floor on feature size,
-and it is why the default sits at 2.6. On heavily eroded styles the sweep reads flat (ratio 0.96)
-because erosion overprints the network — a fact about erosion, not about the knob.
+**The controls own independent axes.** The current quality gate verifies Height is linear (0.5 gives
+exactly half the pre-weathering peak), High Bulk has over 25% more mass than Low, Reduce Details cuts
+Alpine fine energy by at least 18%, and Weathering produces a materially different surface. Drainage
+  detail rises monotonically from 0.6× through 3.4×, spanning **2.9×** in scale-free fine energy instead
+of reversing or saturating.
 
 Two of the measurements used to check this were themselves broken and had to be thrown out: an angular
 crest count saturated at ~130 regardless of input at 192², and requiring *exactly* one summit is what
 let the smooth pyramid through. The invariants that survive are scale-free — fine-detail energy per
-unit height, one clearly dominant summit, few summits.
+unit height, family-appropriate summit topology, few summits, pairwise generator differences, and
+render review.
 
-Giving `basic` a talus pass was a real fix that fell out of this: with zero weathering, dense
-dissection left **45** crumpled Voronoi spikes rather than a mountain. A surface with no talus is
-unphysical whatever the style.
-
-The primitive also stays strictly inside its own footprint (total height outside it is exactly **0**),
-because erosion otherwise scatters deposit onto ground the primitive does not own — and a primitive
-that respects its footprint is the one that composites cleanly under Stamp and a placement mask.
+The primitive also stays strictly inside its own footprint (total height outside it is exactly **0**).
+At 192² versus 384², including baked weathering, the 48² macro comparison has RMS **0.0062** and max
+error **0.0375** (the raw fine-detail comparison is 0.0079 RMS); the landform therefore survives
+preview/build resolution changes while resolution-appropriate fracture detail is allowed to differ.
 
 **Every placed node gets its own random seed, and you can still change it.** Node parameters used to
 be initialised straight from the type defaults, so three placed Mountains were three *identical*

@@ -2,7 +2,9 @@
 // prescribes: "place it, combine several (np.maximum / ops_filters.smax), then run a real pass".
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,

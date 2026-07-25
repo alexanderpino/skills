@@ -1,8 +1,10 @@
-// Is our "Mountain" a PEAK, or is it noise-on-a-lump? Judged by topographic prominence, the measure
-// mountaineers and geomorphologists actually use, plus the hypsometric integral and a radial profile.
+// Is our Mountain a coherent landform, or merely noise on a cone? Judge primary topology,
+// multi-scale dissection, asymmetry, independent generator families, controls and scale behaviour.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,
@@ -94,20 +96,22 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     out.reference = { cone: score(cone),
                       ridgedNoise: score(fbmField(gnoise,{seed:7,freq:5,octaves:6,lac:2.1,gain:0.55,ridge:true})) };
 
-    // --- a PEAK has ONE summit. Topographic prominence is the measure that says so. ---
+    // --- SUMMIT TOPOLOGY depends on the selected generator family. ---------------------------
     const peaks = {};
     for (const style of ["basic","eroded","alpine","old","strata"]) peaks[style] = score(M({style}));
     for (const seed of [3,11,29]) peaks["seed"+seed] = score(M({seed}));
-    // A dissected dome legitimately carries a few subsidiary highs -- the reference shows them, and
-    // demanding EXACTLY one summit is what let a smooth pyramid pass here before. The invariants that
-    // separate a mountain from noise are that one summit clearly dominates and that there are few of
-    // them: ridged fBm scores 109 summits at a 0.56 ratio.
-    out.peakIsOneSummit = {
+    const dominant=score(M({shape:"dominant"})),compound=score(M({shape:"compound"}));
+    // Dominant Peak should retain one clear hero summit. Compound Peaks deliberately admits several
+    // nearby highs and saddles, but must remain far below the topology of unbounded ridged noise.
+    out.peakTopology = {
       summitCounts: Object.fromEntries(Object.entries(peaks).map(([k,v])=>[k, v.summitsAbove10pct])),
       worstSecondOverFirst: +Math.max(...Object.values(peaks).map(v=>v.secondOverFirst)).toFixed(3),
       mostSummits: Math.max(...Object.values(peaks).map(v=>v.summitsAbove10pct)),
-      oneSummitDominates: Object.values(peaks).every(v=>v.secondOverFirst < 0.25),
-      fewSummits: Object.values(peaks).every(v=>v.summitsAbove10pct <= 5),
+      dominantPeak:{summits:dominant.summitsAbove10pct,secondOverFirst:dominant.secondOverFirst},
+      compoundPeaks:{summits:compound.summitsAbove10pct,secondOverFirst:compound.secondOverFirst},
+      dominantHasClearHero:dominant.secondOverFirst < .25,
+      compoundAllowsShoulders:compound.summitsAbove10pct >= dominant.summitsAbove10pct,
+      coherentNotNoise:Object.values(peaks).every(v=>v.secondOverFirst < .40&&v.summitsAbove10pct <= 10),
       allDescendMonotonically: Object.values(peaks).every(v=>v.radial.monotonicDescent) };
 
     // --- a MASSIF is deliberately several summits: the contrast is the point ---
@@ -127,73 +131,90 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         s += Math.abs(4*f[i]-f[i-1]-f[i+1]-f[i-n]-f[i+n]); c++; }
       return +((s/Math.max(c,1))/(mx||1)).toFixed(5); };
     const coneDetail = fineDetail(cone), peakDetail = fineDetail(M({}));
+    const upperDetail = (f) => { let mx=0;for(const v of f)if(v>mx)mx=v;let s=0,c=0;
+      for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;if(f[i]<mx*.55)continue;
+        s+=Math.abs(4*f[i]-f[i-1]-f[i+1]-f[i-n]-f[i+n]);c++;}
+      return +((s/Math.max(c,1))/(mx||1)).toFixed(5); };
+    const fieldDifference = (a,b) => { let s=0,c=0,mx=0;
+      for(let i=0;i<a.length;i++){mx=Math.max(mx,a[i],b[i]);if(a[i]>0||b[i]>0){s+=Math.abs(a[i]-b[i]);c++;}}
+      return +(s/Math.max(c*mx,1e-9)).toFixed(4); };
     out.dissection = { cone: coneDetail, peak: peakDetail,
       ratioVsCone: +(peakDetail/Math.max(coneDetail,1e-6)).toFixed(1),
+      upperCrag:upperDetail(M({})),coneUpper:upperDetail(cone),
       // a smooth cone is essentially featureless; a dissected dome must be far above it
       farMoreTexturedThanACone: peakDetail > 8 * coneDetail };
+
+    // Shape family and Mountain type must change generating geometry, not just labels or materials.
+    // Weather is disabled here so a pass-specific overprint cannot manufacture the distinction.
+    const shapeFields=Object.fromEntries(["dominant","compound","ridge","broad"].map(shape=>
+      [shape,M({shape,style:"basic",weather:0})]));
+    const typeFields=Object.fromEntries(["basic","eroded","old","alpine","strata"].map(style=>
+      [style,M({shape:"compound",style,weather:0})]));
+    const pairwise=(fields)=>{
+      const names=Object.keys(fields),d={};let least=Infinity;
+      for(let i=0;i<names.length;i++)for(let j=i+1;j<names.length;j++){
+        const k=names[i]+" / "+names[j],v=fieldDifference(fields[names[i]],fields[names[j]]);
+        d[k]=v;least=Math.min(least,v);}
+      return{differences:d,leastDifference:+least.toFixed(4)};};
+    const shapePairs=pairwise(shapeFields),typePairs=pairwise(typeFields);
+    out.generatorFamilies={
+      shapes:shapePairs,
+      types:typePairs,
+      typeFineEnergy:Object.fromEntries(Object.entries(typeFields).map(([k,v])=>[k,fineDetail(v)])),
+      allShapesDistinct:shapePairs.leastDifference>.025,
+      allTypesDistinct:typePairs.leastDifference>.018,
+      alpineSharperThanBasic:fineDetail(typeFields.alpine)>fineDetail(typeFields.basic)*1.25,
+      oldRounderThanAlpine:fineDetail(typeFields.old)<fineDetail(typeFields.alpine)*.75
+    };
 
     // Drainage detail must genuinely control density. Measured on a style with NO erosion, because
     // an eroded style overprints the network with its own texture and masks the parameter's effect
     // -- on `eroded` this same sweep reads flat, which is a fact about erosion, not about the knob.
     const sweep = [0.6, 1.4, 2.2, 3.4].map(d =>
       ({ detail:d, fine: fineDetail(M({style:"basic", detail:d})) }));
-    // It rises across the usable range and then SATURATES: the talus pass relaxes anything finer
-    // than its own scale, so past roughly 2-3x more cells stop adding texture. That is a real floor
-    // on feature size, not a broken knob, and it is why the default sits at 2.6.
-    const rising = sweep.slice(0, 3);
+    // Density must rise across the full authored range. Separate meso-cell and fracture bands keep
+    // the control from saturating when its finest structures approach the talus scale.
     out.detailControlsDensity = { sweep,
-      monotonicOverUsableRange: rising.every((v,i)=> i===0 || v.fine > rising[i-1].fine),
-      spanToSaturation: +(rising[rising.length-1].fine / rising[0].fine).toFixed(1),
-      saturatesAtHighDetail: sweep[3].fine < sweep[2].fine,
+      monotonicAcrossRange: sweep.every((v,i)=> i===0 || v.fine > sweep[i-1].fine),
+      fullRangeSpan: +(sweep[sweep.length-1].fine / sweep[0].fine).toFixed(1),
       overprintedByErosion: (()=>{ const a=fineDetail(M({style:"eroded",detail:0.6}));
         const b2=fineDetail(M({style:"eroded",detail:3.4}));
         return { at0_6:a, at3_4:b2, ratio:+(b2/a).toFixed(2) }; })() };
 
-    // --- THE SKIRT: the profile must be a peak with a concave apron, not a bell ---
-    // (1-r^2)^p is flat on top and steepest halfway out -- a bell, which renders as pudding on a
-    // plate however much texture sits on it. (1-r)^p is steep at the summit and convex outward,
-    // which is the pediment/talus apron a real massif grades into. Measured on the ENVELOPE itself
-    // so dissection noise cannot mask the shape.
-    const profile = (skirt) => Array.from({length:21}, (_,k)=> Math.pow(1-k/20, skirt));
-    const slopes = (pr) => pr.slice(1).map((v,i)=> (v-pr[i])*20);
-    const bell = Array.from({length:21}, (_,k)=> Math.pow(1-(k/20)**2, 1.25));
-    const sk   = profile(1.4);
+    // --- THE SKIRT: a mountain profile has distinct upper-crag, shoulder, face and apron bands. ---
+    // A constant-slope radial ramp is literally a tent. Measure the declared default curve itself
+    // so cellular detail cannot hide a regressed cone.
+    const profile = (skirt) => Array.from({length:41}, (_,k)=> Math.pow(1-k/40, skirt));
+    const slopes = (pr) => pr.slice(1).map((v,i)=> (v-pr[i])*40);
+    const cv = (a) => {const q=a.map(Math.abs),m=q.reduce((s,v)=>s+v,0)/q.length;
+      return Math.sqrt(q.reduce((s,v)=>s+(v-m)**2,0)/q.length)/(m||1);};
+    const bell = Array.from({length:41}, (_,k)=> Math.pow(1-(k/40)**2, 1.25));
+    const tent=profile(1),sk=Array.from({length:41},(_,k)=>curveAt(bakeCurve(DEF.skirt),k/40));
     out.skirt = {
       bellSlopeAtSummit:  +slopes(bell)[0].toFixed(3),
       skirtSlopeAtSummit: +slopes(sk)[0].toFixed(3),
       skirtSlopeAtEdge:   +slopes(sk)[slopes(sk).length-1].toFixed(3),
-      // a bell is nearly flat at the summit; a peak is not
-      bellIsFlatOnTop: Math.abs(slopes(bell)[0]) < 0.15,
-      peakIsSteepOnTop: Math.abs(slopes(sk)[0]) > 0.8,
-      // and the apron must flatten outward -- slope magnitude strictly decreasing
-      apronFlattensOutward: slopes(sk).every((v,i,a)=> i===0 || Math.abs(v) < Math.abs(a[i-1])),
-      // it must reach exactly zero at the rim, so there is no seam to feather
+      tentSlopeVariation:+cv(slopes(tent)).toFixed(3),
+      mountainSlopeVariation:+cv(slopes(sk)).toFixed(3),
+      hasBrokenSlopeBands:cv(slopes(sk))>.40,
       reachesZeroAtRim: sk[sk.length-1] === 0 };
 
     // --- IT MUST NOT BE A SOLID OF REVOLUTION ---
-    // A cone with flutes cut in it is a tipi tent, and the flutes do not save it: what gives it away
-    // is that it is unchanged when you spin it about its axis. So correlate the field against a
-    // 90-degree rotation of itself. A solid of revolution scores ~1; a real massif does not.
-    // This replaced a per-octant descent metric that anchored on the summit CELL -- when the warp
-    // moves the summit the window moves with it, and the reading swung around non-monotonically on
-    // a single seed. Rotational correlation needs no anchor and is averaged over five seeds.
-    const rotCorr = (f) => { const A=[],B=[];
-      for (let y=0;y<n;y++) for (let x=0;x<n;x++){
-        const rx=n-1-y, ry=x;                              // 90 degrees about the tile centre
-        if (f[y*n+x]<=0 && f[ry*n+rx]<=0) continue;
-        A.push(f[y*n+x]); B.push(f[ry*n+rx]); }
-      const ma=A.reduce((a,v)=>a+v,0)/A.length, mb=B.reduce((a,v)=>a+v,0)/B.length;
-      let num=0,da=0,db=0;
-      for (let i=0;i<A.length;i++){ const u=A[i]-ma, v=B[i]-mb; num+=u*v; da+=u*u; db+=v*v; }
-      return +(num/Math.sqrt(da*db)).toFixed(3); };
-    const meanRot = (c) => { const vs=[3,7,11,29,101].map(seed=>rotCorr(M({character:c, seed})));
-      return { perSeed:vs, mean:+(vs.reduce((a,v)=>a+v,0)/vs.length).toFixed(3) }; };
-    const atDefault = meanRot(DEF.character);
-    out.notASolidOfRevolution = {
-      cone: rotCorr(cone), atDefaultCharacter: atDefault,
-      byCharacter: Object.fromEntries([0, 0.3, 0.9].map(c => [c, meanRot(c).mean])),
-      farFromRotationallySymmetric: atDefault.mean < 0.93,
-      characterDrivesIt: meanRot(0).mean > meanRot(0.9).mean };
+    // Raw correlation was a bad measurement: the radial bulk dominates it even when the shoulders
+    // are strongly asymmetric. Score the mid-elevation contour and normalised L1 difference against
+    // a 90-degree rotation instead. A cone has IoU≈1 and L1≈0; Character must lower the contour
+    // overlap and raise the difference without needing noisy high-frequency texture.
+    const rotShape = (f) => { let hi=0;for(const v of f)if(v>hi)hi=v;
+      let inter=0,uni=0,diff=0,sum=0;
+      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+        const a=f[y*n+x],b2=f[x*n+(n-1-y)],aa=a>hi*.42,bb=b2>hi*.42;
+        if(aa||bb)uni++;if(aa&&bb)inter++;diff+=Math.abs(a-b2);sum+=Math.max(a,b2);}
+      return {contourIoU:+(inter/Math.max(uni,1)).toFixed(3),relativeL1:+(diff/Math.max(sum,1e-9)).toFixed(3)}; };
+    const byCharacter=Object.fromEntries([0,.3,DEF.character,.9].map(c=>
+      [c,rotShape(M({character:c,variation:0,weather:0}))]));
+    out.notASolidOfRevolution = { cone:rotShape(cone), byCharacter,
+      asymmetricAtDefault:byCharacter[DEF.character].relativeL1>.18,
+      characterDrivesIt:byCharacter[.9].relativeL1>byCharacter[0].relativeL1*1.45 };
 
     // --- THE MASK MUST NOT FORCE EVERY MOUNTAIN INTO ONE SHAPE ---
     // With reach, aspect and rotation fixed, the seed only displaces noise inside a footprint whose
@@ -236,11 +257,61 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     out.staysInsideFootprint = { totalOutside:+outside.toExponential(2), totalInside:+inside.toFixed(1),
                                  clean: outside === 0 && inside > 0 };
 
+    // --- COMMERCIAL-GRADE CONTROL SURFACE: every exposed control must own one independent axis ---
+    const sumField=f=>{let s=0;for(const v of f)s+=v;return s;};
+    const peakOf=f=>{let m=-Infinity;for(const v of f)if(v>m)m=v;return m;};
+    const h05=M({height:.5,weather:0}),h10=M({height:1,weather:0});
+    const bulkLow=M({bulk:"low",weather:0}),bulkHigh=M({bulk:"high",weather:0});
+    const detailFull=M({reduce:0,style:"alpine",weather:0}),detailReduced=M({reduce:1,style:"alpine",weather:0});
+    out.productionControls = {
+      heightIsLinear:+(peakOf(h05)/peakOf(h10)).toFixed(3),
+      highBulkHasMoreMass:sumField(bulkHigh)>sumField(bulkLow)*1.25,
+      reduceDetailsLowersFineEnergy:fineDetail(detailReduced)<fineDetail(detailFull)*.82,
+      weatheringChangesSurface:(()=>{const a=M({weather:0}),b2=M({weather:2});let d=0;
+        for(let i=0;i<a.length;i++)d+=Math.abs(a[i]-b2[i]);return d>1;})()
+    };
+
+    // Same world, twice the build resolution: macro structure must stay put. Weathering remains on,
+    // so this covers the resolution-scaled droplet brush and per-cell talus threshold as well as the
+    // analytic generator. Box-downsample 384² back to the 192² preview for the comparison.
+    const lowRes=M({}),oldRes=RES;RES=384;
+    const highRes=TYPES.mountain.eval({...DEF,form:"peak",style:"eroded",seed:7,x:.5,y:.5,size:.35});
+    RES=oldRes;let se=0,maxAbs=0;
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=0;
+      for(let j=0;j<2;j++)for(let i=0;i<2;i++)v+=highRes[(y*2+j)*384+x*2+i];
+      const d=lowRes[y*n+x]-v*.25;se+=d*d;maxAbs=Math.max(maxAbs,Math.abs(d));}
+    const rawRms=Math.sqrt(se/(n*n)),rawMaxAbs=maxAbs,coarse=n/4;se=0;maxAbs=0;
+    for(let y=0;y<coarse;y++)for(let x=0;x<coarse;x++){let a=0,b2=0;
+      for(let j=0;j<4;j++)for(let i=0;i<4;i++)a+=lowRes[(y*4+j)*n+x*4+i];
+      for(let j=0;j<8;j++)for(let i=0;i<8;i++)b2+=highRes[(y*8+j)*384+x*8+i];
+      const d=a/16-b2/64;se+=d*d;maxAbs=Math.max(maxAbs,Math.abs(d));}
+    out.resolutionConsistency={rms:+Math.sqrt(se/(coarse*coarse)).toFixed(5),
+      maxAbs:+maxAbs.toFixed(5),rawRms:+rawRms.toFixed(5),rawMaxAbs:+rawMaxAbs.toFixed(5)};
+
     return out;
   });
 
   console.log(JSON.stringify(r, null, 2));
   console.log('errors', errors.length ? JSON.stringify(errors) : 'none');
+  const failed = [
+    ["coherent summit topology",r.peakTopology.dominantHasClearHero&&
+      r.peakTopology.compoundAllowsShoulders&&r.peakTopology.coherentNotNoise],
+    ["monotonic macro descent",r.peakTopology.allDescendMonotonically],
+    ["four shape generators",r.generatorFamilies.allShapesDistinct],
+    ["five mountain types",r.generatorFamilies.allTypesDistinct&&
+      r.generatorFamilies.alpineSharperThanBasic&&r.generatorFamilies.oldRounderThanAlpine],
+    ["connected detail control",r.detailControlsDensity.monotonicAcrossRange&&r.detailControlsDensity.fullRangeSpan>1.25],
+    ["not a tipi",r.skirt.hasBrokenSlopeBands&&r.dissection.upperCrag>r.dissection.coneUpper*8],
+    ["asymmetric character",r.notASolidOfRevolution.asymmetricAtDefault&&r.notASolidOfRevolution.characterDrivesIt],
+    ["shape variation",r.maskDoesNotForceOneShape.variationWidensShapes&&r.maskDoesNotForceOneShape.areaVariesMore],
+    ["bounded footprint",r.staysInsideFootprint.clean],
+    ["height control",Math.abs(r.productionControls.heightIsLinear-.5)<.01],
+    ["bulk control",r.productionControls.highBulkHasMoreMass],
+    ["detail reduction",r.productionControls.reduceDetailsLowersFineEnergy],
+    ["weathering control",r.productionControls.weatheringChangesSurface],
+    ["resolution consistency",r.resolutionConsistency.rms<.009&&r.resolutionConsistency.maxAbs<.055],
+  ].filter(([,ok])=>!ok).map(([name])=>name);
+  if(failed.length)console.error("FAILED CONTRACTS:",failed.join(", "));
   await b.close();
-  process.exit(errors.length ? 1 : 0);
+  process.exit(errors.length||failed.length ? 1 : 0);
 })().catch(e => { console.error('FATAL', e); process.exit(2); });

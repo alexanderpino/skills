@@ -77,7 +77,8 @@ select.btn{appearance:none;padding-right:22px;
 #graph.panning{cursor:grabbing}
 #graph.linking{cursor:crosshair}
 
-#rail{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);min-width:0}
+#rail{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);
+  min-width:0;min-height:0;overflow:hidden}
 #viewport{position:relative;height:52%;min-height:0;border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,#1b222c,#0e1319)}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -117,7 +118,8 @@ select.inp,input.inp{width:100%;height:28px;background:var(--panel2);border:1px 
   border-radius:var(--radius-sm);color:var(--text);padding:0 8px;font-size:12px;font-family:var(--mono)}
 select.inp{appearance:none}
 .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
-.seg button{flex:1;height:26px;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer}
+.seg button{flex:1;height:26px;padding:0 4px;background:none;border:none;color:var(--muted);
+  font-size:10.5px;cursor:pointer;white-space:nowrap}
 .seg button.on{background:var(--panel3);color:var(--accent)}
 .hint{font-size:11px;color:var(--faint);line-height:1.5;margin-top:4px}
 .prop-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
@@ -320,6 +322,7 @@ const $=s=>document.querySelector(s);
 const clamp=(x,a,b)=>x<a?a:x>b?b:x;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=t=>t*t*(3-2*t);
+const fade5=t=>t*t*t*(t*(t*6-15)+10);          // improved Perlin: C2 at lattice boundaries
 const fract=x=>x-Math.floor(x);
 
 let RES=192;                                   // working grid resolution (square)
@@ -431,7 +434,7 @@ function vnoise(x,y,s){ // value noise, C1 smooth
 function gnoise(x,y,s){ // gradient (perlin-ish) noise in ~[-1,1] -> [0,1]
   const x0=Math.floor(x),y0=Math.floor(y),xf=x-x0,yf=y-y0;
   function grad(ix,iy,dx,dy){const a=hash2(ix,iy,s)*6.2831853;return Math.cos(a)*dx+Math.sin(a)*dy;}
-  const u=smooth(xf),v=smooth(yf);
+  const u=fade5(xf),v=fade5(yf);
   const n00=grad(x0,y0,xf,yf),n10=grad(x0+1,y0,xf-1,yf),n01=grad(x0,y0+1,xf,yf-1),n11=grad(x0+1,y0+1,xf-1,yf-1);
   return 0.5+0.5*lerp(lerp(n00,n10,u),lerp(n01,n11,u),v)*1.35;
 }
@@ -539,7 +542,7 @@ const GLSL_NOISE=`
     uint h=uint(x)*374761393u+uint(y)*668265263u+uint(s)*1442695041u;
     h=(h^(h>>13u))*1274126177u;
     return float(h^(h>>16u))/4294967295.0;}
-  float sm(float t){return t*t*(3.0-2.0*t);}
+  float sm(float t){return t*t*t*(t*(t*6.0-15.0)+10.0);}
   float gnoise(float x,float y,int s){
     float fx=floor(x),fy=floor(y);int x0=int(fx),y0=int(fy);
     float xf=x-fx,yf=y-fy;const float TAU=6.2831853;
@@ -579,11 +582,11 @@ const GPU_THERMAL_MS_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
   uniform sampler2D uH;uniform float uTalus,uRate;uniform int uN;`+GPU_THERMAL_NB+`
   float H(ivec2 p){return texelFetch(uH,p,0).r;}
-  void main(){                                  // -> (rate*maxDrop, sumOfDrops)
+  void main(){                                  // -> (stable move budget, sumOfExcess)
     ivec2 p=ivec2(gl_FragCoord.xy);float c=H(p),maxd=0.0,sum=0.0;
     for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q,uN))continue;
       float e=c-H(q)-uTalus*ND[k];if(e>0.0){sum+=e;maxd=max(maxd,e);}}
-    frag=vec4(uRate*maxd,sum,0.0,1.0);}`;
+    frag=vec4(0.5*uRate*maxd,sum,0.0,1.0);}`;
 const GPU_THERMAL_APPLY_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
   uniform sampler2D uH,uMS;uniform float uTalus;uniform int uN;`+GPU_THERMAL_NB+`
@@ -591,11 +594,12 @@ const GPU_THERMAL_APPLY_FS=`#version 300 es
   vec2 MS(ivec2 p){return texelFetch(uMS,p,0).rg;}
   void main(){
     ivec2 p=ivec2(gl_FragCoord.xy);float h=H(p);
-    vec2 me=MS(p);
-    float lose=(me.y>0.0)?me.x:0.0,gain=0.0;
+    vec2 me=MS(p);float lose=0.0,gain=0.0;
     for(int k=0;k<8;k++){ivec2 q=p+NB[k];if(!inb(q,uN))continue;
+      float own=h-H(q)-uTalus*ND[k];
+      if(own>0.0&&me.y>0.0)lose+=min(me.x*own/me.y,0.5*own);
       vec2 mn=MS(q);if(mn.y<=0.0)continue;
-      float e=H(q)-h-uTalus*ND[k];if(e>0.0)gain+=mn.x*e/mn.y;}
+      float e=H(q)-h-uTalus*ND[k];if(e>0.0)gain+=min(mn.x*e/mn.y,0.5*e);}
     frag=vec4(h+gain-lose,0.0,0.0,1.0);}`;
 function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   const n=RES,prog=GPU.prog("fbm",GPU_FBM_FS),out=GPU.rt("gen",n);
@@ -701,6 +705,12 @@ function curveFromExponent(e,k=6){                      // the analytic (1-x)^e 
   return o;
 }
 const SKIRT_PRESETS=[["Cone",1.0],["Apron",1.4],["Sweeping",2.2],["Plateau",0.65]];
+// The Mountain default is intentionally not a one-exponent radial ramp. Its upper crag, shoulder,
+// main face and pediment occupy separate slope bands, which prevents the profile reading as canvas
+// stretched between one pole and a circular rim.
+const mountainSkirtDefault=()=>[
+  [0,1],[.08,.975],[.18,.90],[.31,.72],[.44,.655],[.60,.40],[.78,.15],[.94,0],[1,0]
+];
 
 /* ---- LAYOUT — the art-direction layer every terrain tool converges on. World Machine's Layout
    Generator, Houdini's HeightField Project from curves, Gaea's vector drawing, and academically
@@ -785,137 +795,246 @@ function layoutField(shapes,base){
   return o;
 }
 
-/* ---- MOUNTAIN — a placeable FEATURE PRIMITIVE (Gaea's Mountain node), ported from
-   reference-impl/landforms.py `mountain` (Genevaux et al. 2015 "Terrain Modelling from Feature
-   Primitives"; Guerin et al. 2016). NOT thresholded isotropic noise, which reads as "noise on a lump":
-   the drainage-organised look is built in.
-     1. a wandering CREST SKELETON (polyline SDFs) sets a non-circular massif envelope,
-     2. a modulated-VORONOI ridge network dissects it -- cell EDGES become ridgelines, cell INTERIORS
-        become valleys, and a two-scale domain distortion bends them off Voronoi's straight edges into
-        spurs and drainages,
-     3. the style's weathering is baked in (droplet pass -> dendritic drainage, talus -> repose faces).
-   Placement is a parameter rather than a downstream Transform, exactly like the reference impl's
-   `place=`: the crest skeleton is built at the placed position, so it is exact by construction. ---- */
+/* ---- MOUNTAIN — a placeable FEATURE PRIMITIVE in the Gaea/World Machine/Houdini family,
+   grounded in Genevaux et al. 2015 "Terrain Modelling from Feature Primitives" and Guerin et al.
+   2016. It is not thresholded isotropic noise:
+     PEAK   = an asymmetric uplift MASS composed from overlapping rock volumes, a short broken
+              summit divide, broad face basins, modulated cellular structure and style weathering.
+     MASSIF = the earlier multi-crest envelope + modulated Voronoi + style weathering.
+   Placement is evaluated directly in the generator's world-space coordinates, so Position, Reach,
+   Aspect and Trend are exact before the non-commuting erosion passes run.
+
+   The order is deliberate. Starting with a cone and cutting radial grooves into it leaves a tent
+   no matter how good the grooves are. Here the large rock masses, saddles and asymmetric faces exist
+   BEFORE drainage and fine fracture. The cellular bands redistribute surface mass without replacing
+   that silhouette, and the hydraulic/thermal passes weather the result rather than inventing it. ---- */
 const MOUNTAIN_STYLES={
-  //            cells warp  relief spur crest erode talus repose terr
-  basic: {cells:4.0,warp:0.30,relief:0.55,spur:0.28,crest:1.15,erode:0.00,talus:3, repose:0.95,terr:0},
-  eroded:{cells:5.0,warp:0.55,relief:0.66,spur:0.40,crest:1.35,erode:0.15,talus:4, repose:0.72,terr:0},
-  alpine:{cells:3.6,warp:0.42,relief:0.74,spur:0.44,crest:1.70,erode:0.12,talus:7, repose:1.15,terr:0},
-  old:   {cells:5.6,warp:0.62,relief:0.44,spur:0.30,crest:1.05,erode:0.20,talus:14,repose:0.42,terr:0},
-  strata:{cells:4.4,warp:0.34,relief:0.52,spur:0.30,crest:1.20,erode:0.13,talus:4, repose:0.72,terr:8},
+  // Legacy massif controls                       Peak controls
+  //            cells warp relief spur crest erode talus repose terr  incise width rough cell branches profile macro meso divide basin
+  basic: {cells:4.0,warp:.30,relief:.55,spur:.28,crest:1.15,erode:.00,talus:0, repose:.95,terr:0, incise:.46,width:1.16,rough:.032,cell:.070,branches:.55,profile:.92,macro:.12,meso:.020,divide:.94,basin:.50},
+  eroded:{cells:5.0,warp:.55,relief:.66,spur:.40,crest:1.35,erode:.15,talus:0, repose:.72,terr:0, incise:.82,width:1.00,rough:.082,cell:.175,branches:1.00,profile:1.00,macro:.32,meso:.090,divide:.84,basin:1.00},
+  old:   {cells:5.6,warp:.62,relief:.44,spur:.30,crest:1.05,erode:.18,talus:2, repose:.42,terr:0, incise:.54,width:1.42,rough:.040,cell:.080,branches:1.12,profile:.70,macro:.14,meso:.030,divide:.72,basin:.62},
+  alpine:{cells:3.6,warp:.42,relief:.74,spur:.44,crest:1.70,erode:.10,talus:0, repose:1.15,terr:0, incise:.94,width:.78,rough:.125,cell:.230,branches:.82,profile:1.18,macro:.44,meso:.135,divide:.98,basin:1.08},
+  strata:{cells:4.4,warp:.34,relief:.52,spur:.30,crest:1.20,erode:.08,talus:1, repose:.72,terr:9, incise:.68,width:1.06,rough:.048,cell:.115,branches:.78,profile:.86,macro:.22,meso:.055,divide:.86,basin:.82},
 };
-/* A MOUNTAIN IS A DISSECTED DOME. Do not overthink the macro shape.
-
-   Measured against Gaea's default Alpine mountain: the footprint IS roughly radial, a broad dome
-   sitting on a plane. What makes it read as a mountain is not its topology -- it is the DENSITY of
-   drainage dissection. Dozens of fine valleys running out from the high ground, sharp spur crests
-   between them, at a scale far finer than any hand-placed ridge skeleton.
-
-   Two earlier attempts got this backwards. env(r) * spurs(theta) with 7 flutes was a fluted cone; a
-   ridge skeleton evaluated as planes anchored on aretes was a SMOOTH pyramid -- planar faces carry
-   no texture at all. Both satisfied every statistic being measured (one summit, monotonic descent,
-   prominence) because a cone satisfies all of them. The statistics were not wrong; they simply do
-   not measure the thing that makes a mountain look like one.
-
-   So: a wobbled dome envelope, dissected by a dense modulated-Voronoi drainage network, then eroded.
-   Layout of a RANGE is not this node's job -- that is what combining, blending and placement masks
-   are for. */
-/* THE ENVELOPE IS A RIDGE, NOT A RADIUS.
-   Four rebuilds of this primitive stayed inside h = f(distance from a centre) * texture, and every
-   one rendered as a cone. Tuning was tested and disproven: deeper relief, sharper crests and heavier
-   erosion all leave the silhouette a triangle, because that form makes height fall monotonically
-   from one point in every direction and no parameter escapes it.
-
-   A mountain is high ground along a LINE. So the envelope is a small crest SKELETON -- two or three
-   wandering polylines carrying an elevation profile, deliberately NOT radiating from one summit --
-   and height falls away perpendicular to them through the artist's skirt curve. That is exactly the
-   Layout node's evaluator (polylineNearest: distance to a polyline plus the elevation interpolated
-   along it) applied where it always belonged. Silhouettes become ridge profiles with subsidiary
-   summits and saddles, which is what a range front actually looks like.
-
-   The earlier crest-line form was abandoned for measuring 4-8 summits instead of 1. That was a
-   metric-driven call made without looking at a render, and it was wrong: a real mountain carries
-   subsidiary summits along its ridges. */
-function crestSkeleton(p,reach,rot){
-  const hs=(k)=>hash2(p.seed|0,k,7717);
-  const crests=[],K=2+Math.floor(hs(1)*2);            // 2-3 crest lines
-  for(let c=0;c<K;c++){
-    // each crest runs at its own heading, offset from the centre -- they do NOT share an apex
-    const head=rot+(hs(10+c)-0.5)*1.5+(c?(hs(20+c)-0.5)*2.2:0);
-    const ox=(hs(30+c)-0.5)*reach*0.55,oy=(hs(40+c)-0.5)*reach*0.55;
-    const len=reach*(0.85+0.7*hs(50+c)),segs=5;
-    const pts=[];let dir=head,x=p.x+ox-Math.cos(head)*len*0.5,y=p.y+oy-Math.sin(head)*len*0.5;
-    for(let i=0;i<=segs;i++){
-      const t=i/segs;
-      // elevation along the crest: a broad hump with per-vertex jitter, so summits and saddles fall
-      // out of the profile rather than being placed
-      const hump=Math.sin(Math.PI*Math.pow(t,0.85+0.4*hs(60+c)));
-      const e=(c?0.62+0.3*hs(70+c):1.0)*(0.45+0.55*hump)*(0.82+0.32*hs(80+c*7+i));
-      pts.push([x,y,clamp(e,0,1)]);
-      dir+=(hs(90+c*11+i)-0.5)*1.1;                   // the crest wanders
-      x+=Math.cos(dir)*len/segs;y+=Math.sin(dir)*len/segs;
+/* Gaea's public 1.3 documentation says its old Type control selected four different generative
+   algorithms, but does not disclose those algorithms. These are clean-room behavioural families
+   built from the documented geo-cellular vocabulary: they change the uplift topology before the
+   five modern Mountain types add their own geomorphic expression. */
+const MOUNTAIN_SHAPES={
+  dominant:{spread:.82,central:1.00,alongA:.82,alongB:.64,sideA:.42,sideB:.36,tail:.30,
+            broad:1.00,lobe:.76,face:.56,crest:.80,cellEdge:.78,cellCore:.22,basins:.78},
+  compound:{spread:1.16,central:.96,alongA:1.00,alongB:.88,sideA:.72,sideB:.64,tail:.58,
+            broad:1.08,lobe:.72,face:.60,crest:1.08,cellEdge:.62,cellCore:.38,basins:1.00},
+  ridge:{spread:1.32,central:.93,alongA:.98,alongB:.91,sideA:.43,sideB:.38,tail:.67,
+         broad:.88,lobe:.66,face:.50,crest:1.28,cellEdge:.90,cellCore:.10,basins:.86},
+  broad:{spread:.92,central:1.00,alongA:.87,alongB:.78,sideA:.62,sideB:.56,tail:.48,
+         broad:1.30,lobe:.70,face:.74,crest:.68,cellEdge:.42,cellCore:.58,basins:.66},
+};
+/* The clean-room peak model follows the visible/public contract of a modulated, distorted cellular
+   primitive without attempting to reproduce proprietary internals. It builds an irregular cluster
+   of overlapping uplift volumes around a short crest. Those volumes are intentionally broad:
+   cellular detail may split a face, but it cannot turn a thin polyline into a mountain after the
+   fact. Seed variation moves and reshapes the volumes; Position remains the dominant high point. */
+function peakMasses(seed,character,variation,shape){
+  const sh=MOUNTAIN_SHAPES[shape]||MOUNTAIN_SHAPES.compound;
+  const hs=k=>hash2(seed|0,k,24733),axis=(hs(3)-.5)*(.22+.58*variation);
+  const ca=Math.cos(axis),sa=Math.sin(axis),px=-sa,py=ca;
+  const spread=(.46+.78*character)*sh.spread;
+  const broad=sh.broad;
+  const at=(t,side,amp,rx,ry,key)=>({
+    x:ca*t*spread+px*side*spread,y:sa*t*spread+py*side*spread,
+    amp:amp*(.72+.28*character),
+    rx:rx*(1+(hs(key)-.5)*.42*variation),
+    ry:ry*(1+(hs(key+1)-.5)*.48*variation),
+    angle:axis+(hs(key+2)-.5)*(.18+.38*variation)
+  });
+  const lobes=[
+    {...at(-.035,.018,sh.central,(.59+.10*character)*broad,(.54-.04*character)*broad,20),
+      amp:sh.central*sh.lobe},
+    at(.30+.08*(hs(31)-.5)*variation,.045,sh.alongA+.035*hs(32),.54*broad,.37*broad,34),
+    at(-.33-.08*hs(40)*variation,-.055,sh.alongB+.05*hs(41),.52*broad,.35*broad,43),
+    at(.06,.34+.08*(hs(50)-.5)*variation,sh.sideA+.06*hs(51),.46*broad,.30*broad,53),
+    at(.10,-.38-.07*hs(60)*variation,sh.sideB+.06*hs(61),.44*broad,.28*broad,63),
+    at(.57+.08*hs(70)*variation,.18*(hs(71)>.5?1:-1),sh.tail+.06*hs(72),.41*broad,.26*broad,74)
+  ];
+  for(let i=1;i<lobes.length;i++)lobes[i].amp*=sh.lobe;
+  // A variable-height crest is the primary uplift skeleton. Each family gets a different summit /
+  // saddle arrangement before any cellular modulation or erosion is applied.
+  const crestSpec=shape==="dominant"
+    ?[[-.47,-.04,.48],[-.23,.025,.73],[-.04,.01,1],[.19,.055,.74],[.43,-.02,.46]]
+    :shape==="ridge"
+    ?[[-.73,-.04,.42],[-.48,.035,.66],[-.19,.01,.94],[.08,.06,.98],[.37,-.015,.79],[.68,.025,.48]]
+    :shape==="broad"
+    ?[[-.50,-.04,.64],[-.27,.025,.91],[-.04,.01,.98],[.22,.055,.92],[.48,-.02,.64]]
+    :[[-.61,-.045,.45],[-.35,.03,.79],[-.09,.012,.98],[.17,.06,.93],[.44,-.02,.67],[.65,.025,.43]];
+  const crest=crestSpec
+    .map((q,k)=>{
+      const t=q[0]*spread,side=(q[1]+(hs(100+k)-.5)*.10*variation)*spread;
+      return[ca*t+px*side,sa*t+py*side,q[2]-(k&&k<4?.025*hs(120+k):0)];
+    });
+  return{axis,lobes,crest,width:(.145+.065*character)*sh.crest,
+    faceWidth:sh.face*(.90+.16*character),shape:sh};
+}
+// Only the largest face basins are authored. They start on different shoulders of the crest and
+// wander toward unequal outlets; the hydraulic pass supplies the smaller connected hierarchy.
+// This avoids the radial spoke field that made the old primitive read as stitched canvas panels.
+function peakBasins(seed,axis,variation,detail){
+  const hs=k=>hash2(seed|0,k,17749),basins=[];
+  const angles=[axis+1.42,axis-1.18,axis+2.72,axis-.38];
+  const count=detail<1?3:4;
+  for(let j=0;j<count;j++){
+    const a=angles[j]+(hs(30+j)-.5)*(.34+.38*variation);
+    const headR=.16+.13*hs(45+j),endR=.82+.17*hs(55+j),pts=[];let aa=a;
+    for(let k=0;k<=6;k++){
+      const t=k/6,tt=smooth(t),r=lerp(headR,endR,tt);
+      const target=a+(hs(80+j*11+k)-.5)*(.20+.26*variation)
+        +Math.sin(t*Math.PI*1.4+hs(120+j)*6.283)*(.06+.08*variation);
+      aa=lerp(aa,target,.46);
+      pts.push([r*Math.cos(aa),r*Math.sin(aa),.34+.66*tt]);
     }
-    crests.push(pts);
+    basins.push({pts,width:(j===0?.17+.035*hs(150+j):.082+.040*hs(150+j))*(.94+detail*.035),
+      strength:j===0?.84+.12*hs(170+j):.56+.28*hs(170+j)});
   }
-  return crests;
+  return basins;
+}
+function smoothMaxHeight(a,b,k){
+  if(a<=0)return Math.max(0,b);
+  if(b<=0)return Math.max(0,a);
+  if(!(k>0))return Math.max(a,b);
+  const t=clamp(.5+.5*(a-b)/k,0,1);
+  return lerp(b,a,t)+k*t*(1-t);
 }
 function peakField(p){
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
-  const variation=Math.max(p.variation||0,0);
-  const vr=(k,amt)=>1+(hash2(p.seed|0,k,9137)*2-1)*amt*variation;
-  const reach=Math.max(p.size,0.02)*vr(1,0.30);
-  const aspectS=Math.max(p.aspect||1,0.15)*vr(2,0.50);
-  const rot=p.angle*Math.PI/180+(hash2(p.seed|0,3,9137)*2-1)*Math.PI*variation;
-  const relief=p.relief,char=Math.max(p.character||0,0);
-  const skirtLUT=bakeCurve(p.skirt&&p.skirt.length?p.skirt:curveFromExponent(1.4));
-  const ncell=st.cells*3.0*Math.max(p.detail||1,0.2);
-  const crests=crestSkeleton(p,reach,rot);
-  const halfW=reach*0.62;                             // how far the flank reaches from its crest
-  let h=newField(0);
-  const envF=newField(0),netF=newField(1),cover=newField(0);
+  const variation=Math.max(p.variation||0,0),hs=k=>hash2(p.seed|0,k,9137);
+  const vr=(k,amt)=>1+(hs(k)*2-1)*amt*variation;
+  const reach=Math.max(p.size,0.02)*vr(1,.22);
+  const aspectS=Math.max(p.aspect||1,.15)*Math.exp((hs(2)-.5)*1.05*variation);
+  const rot=p.angle*Math.PI/180+(hs(3)-.5)*.90*variation;
+  const ca=Math.cos(rot),sa=Math.sin(rot),sx=reach*Math.sqrt(aspectS),sy=reach/Math.sqrt(aspectS);
+  const relief=clamp(p.relief,0,1),char=Math.max(p.character||0,0);
+  const weather=Math.max(p.weather==null?1:p.weather,0),height=Math.max(p.height==null?1:p.height,0);
+  const reduce=clamp(p.reduce==null?0:p.reduce,0,1);
+  const bulkExp=p.bulk==="low"?1.28:p.bulk==="high"?.72:1;
+  const skirtLUT=bakeCurve(p.skirt&&p.skirt.length?p.skirt:mountainSkirtDefault());
+  const detail=Math.max(p.detail||1,.2);
+  const masses=peakMasses(p.seed,char,variation,p.shape);
+  const basins=peakBasins(p.seed,masses.axis,variation,detail);
+  const warpAmp=(.035+.075*char)*(.72+.28*variation);
+  const w0x=fbm2(4.2,1.7,p.seed+31,4),w0y=fbm2(8.3,5.1,p.seed+32,4);
+  let h=newField(0);const cover=newField(0);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=(x+0.5)/n,v=(y+0.5)/n;
-    // domain-warp the sample point, so the crests are not clean geometric lines (Character)
-    const wu=fbm2(u*2.1,v*2.1,p.seed+31,4)+0.45*fbm2(u*4.7,v*4.7,p.seed+33,3);
-    const wv=fbm2(u*2.1+3.1,v*2.1+7.7,p.seed+32,4)+0.45*fbm2(u*4.7+1.3,v*4.7+5.9,p.seed+34,3);
-    let qx=u+wu*char*reach*0.55,qy=v+wv*char*reach*0.55;
-    // anisotropy about the massif's own axis
-    const dx=qx-p.x,dy=qy-p.y;
-    const rx=dx*Math.cos(rot)-dy*Math.sin(rot),ry=(dx*Math.sin(rot)+dy*Math.cos(rot))/aspectS;
-    qx=p.x+rx*Math.cos(-rot)-ry*Math.sin(-rot);qy=p.y+rx*Math.sin(-rot)+ry*Math.cos(-rot);
-    let env=0;
-    for(const c of crests){                           // upper envelope of the crest flanks
-      const {d,e}=polylineNearest(qx,qy,c);
-      const val=e*curveAt(skirtLUT,clamp(d/halfW,0,1));
-      if(val>env)env=val;
+    const u=(x+0.5)/n,v=(y+0.5)/n,dx=u-p.x,dy=v-p.y;
+    let qx=( dx*ca+dy*sa)/sx,qy=(-dx*sa+dy*ca)/sy;
+    // Subtract the warp at the origin: Character can move shoulders and contours without moving
+    // the authored summit away from Position X/Y.
+    const wx=fbm2(qx*1.65+4.2,qy*1.65+1.7,p.seed+31,4)-w0x;
+    const wy=fbm2(qx*1.65+8.3,qy*1.65+5.1,p.seed+32,4)-w0y;
+    qx+=wx*warpAmp;qy+=wy*warpAmp;
+    // The broad, variable-height crest ribbon is the load-bearing envelope. Unequal widths on its
+    // two sides create a steep wall and a longer face without requiring a radial cone.
+    const cq=polylineNearest(qx,qy,masses.crest);
+    const side=qx*(-Math.sin(masses.axis))+qy*Math.cos(masses.axis);
+    const faceWarp=1+(fbm2(qx*1.25+2.7,qy*1.25+6.1,p.seed+46,3)-.5)*.22*char;
+    const faceWidth=masses.faceWidth*(side>=0?1.10:.82)*faceWarp;
+    let uplift=0;
+    if(cq.d<faceWidth){
+      const r=cq.d/Math.max(faceWidth,1e-5);
+      uplift=cq.e*Math.pow(curveAt(skirtLUT,r),bulkExp*st.profile);
     }
-    if(env<=0)continue;
-    const i=y*n+x;
-    envF[i]=env;cover[i]=1;
-    const wx=fbm2(u*ncell*0.35,v*ncell*0.35,p.seed+3,4)+0.5*fbm2(u*ncell*0.9,v*ncell*0.9,p.seed+13,4);
-    const wy=fbm2(u*ncell*0.35+4.7,v*ncell*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*ncell*0.9+1.9,v*ncell*0.9+6.1,p.seed+14,4);
-    const uu=u*ncell+st.warp*wx,vv=v*ncell+st.warp*wy;
-    netF[i]=(1-st.spur)*worleyAt(uu,vv,p.seed+1,"f2f1")+st.spur*worleyAt(uu*2.1,vv*2.1,p.seed+8,"f2f1");
+    // Cellular uplift volumes now form shoulders and buttresses around that crest. Smooth max
+    // removes Boolean seams but they no longer define the entire mountain as nested radial domes.
+    for(const lobe of masses.lobes){
+      const la=Math.cos(lobe.angle),ls=Math.sin(lobe.angle),lx=qx-lobe.x,ly=qy-lobe.y;
+      const ex=(lx*la+ly*ls)/Math.max(lobe.rx,1e-4);
+      const ey=(-lx*ls+ly*la)/Math.max(lobe.ry,1e-4),r=Math.hypot(ex,ey);
+      if(r>=1)continue;
+      const candidate=lobe.amp*Math.pow(curveAt(skirtLUT,r),bulkExp*st.profile);
+      uplift=smoothMaxHeight(uplift,candidate,.025+.030*char);
+    }
+    if(cq.d<masses.width){
+      const cross=Math.pow(1-cq.d/masses.width,.72);
+      uplift=smoothMaxHeight(uplift,Math.pow(cq.e*cross,bulkExp*st.profile),.025+.018*char);
+    }
+    if(uplift<=.00005)continue;
+    const i=y*n+x;cover[i]=1;
+
+    // Two distorted cellular bands create connected large faces and subordinate rock blocks. The
+    // frequencies are far enough apart to read as a hierarchy, not the same pattern at two scales.
+    const mvx=fbm2(qx*1.28+7.2,qy*1.28+2.4,p.seed+55,4);
+    const mvy=fbm2(qx*1.28+1.6,qy*1.28+8.7,p.seed+56,4);
+    const macroU=qx*(2.45+detail*.10)+(.46+.28*char)*mvx;
+    const macroV=qy*(2.45+detail*.10)+(.46+.28*char)*mvy;
+    const macroEdge=worleyAt(macroU,macroV,p.seed+57,"f2f1");
+    const macroF1=worleyAt(macroU,macroV,p.seed+57,"f1");
+    const mesoEdge=worleyAt(qx*(5.05+detail*.30)+st.warp*mvy+3.1,
+      qy*(5.05+detail*.30)-st.warp*mvx+6.7,p.seed+59,"f2f1");
+    const macroBoundary=1-smooth(clamp(macroEdge/.42,0,1));
+    const macroCore=1-smooth(clamp(macroF1/.72,0,1));
+    const macroRidge=macroBoundary*masses.shape.cellEdge+macroCore*masses.shape.cellCore;
+    const mesoRidge=1-smooth(clamp(mesoEdge/.34,0,1));
+    const pointKeep=1-smooth(clamp((Math.hypot(qx,qy)-.012)/.055,0,1));
+    const divideKeep=Math.pow(1-clamp(cq.d/(masses.width*.86),0,1),1.35)
+      *smooth(clamp((cq.e-.43)/.48,0,1));
+    const summitKeep=Math.max(pointKeep,divideKeep*st.divide);
+    const macroDepth=st.macro*relief*(1-.55*reduce);
+    let env=uplift*(1-macroDepth*(1-macroRidge));
+    env*=1-st.meso*relief*(1-mesoRidge)*(1-reduce);
+    env=lerp(env,uplift,summitKeep);
+
+    // Four unequal, broad basins interrupt the faces. They do not share an apex and they do not
+    // divide the footprint into radial sectors; smaller gullies are left to the process pass.
+    let survive=1;
+    for(const basin of basins){
+      const q=polylineNearest(qx,qy,basin.pts),w=basin.width*st.width*(1+.30*q.e);
+      const z=q.d/Math.max(w,1e-5);
+      const cut=Math.exp(-1.65*z*z)*(.42+.58*q.e)*basin.strength;
+      survive*=1-clamp(cut,0,.88);
+    }
+    env*=1-clamp((1-survive)*relief*st.incise*.66*st.basin*masses.shape.basins,0,.72);
+
+    // Surface expression is subordinate to the uplift mass. A signed, slope-scale rock band breaks
+    // planar faces; fine cellular boundaries cut fractures. Reduce Details removes these bands but
+    // leaves the macro masses and basins intact.
+    const rf=smooth(clamp((uplift-.025)/.28,0,1))*(1-summitKeep*.25);
+    const rock=.68*fbm2(qx*(3.7+detail*.30)+5.7,qy*(3.7+detail*.30)+1.4,p.seed+69,5)
+      +.32*(mesoRidge*2-1);
+    const micro=Math.max(0,-fbm2(qx*(7+detail*1.8),qy*(7+detail*1.8),p.seed+73,4));
+    const cellFreq=7.2+detail*2.05;
+    const cwx=fbm2(qx*1.7+3.4,qy*1.7+8.1,p.seed+81,3);
+    const cwy=fbm2(qx*1.7+7.8,qy*1.7+2.2,p.seed+82,3);
+    const cellEdge=worleyAt(qx*cellFreq+st.warp*cwx,qy*cellFreq+st.warp*cwy,p.seed+83,"f2f1");
+    const cellEdge2=worleyAt(qx*cellFreq*1.92+st.warp*cwy+4.1,
+      qy*cellFreq*1.92-st.warp*cwx+7.3,p.seed+89,"f2f1");
+    const fracture=.72*(1-smooth(clamp(cellEdge/.145,0,1)))
+      +.28*(1-smooth(clamp(cellEdge2/.105,0,1)));
+    const detailGain=.25+1.45*clamp((detail-.4)/3.1,0,1);
+    const faceGain=(.045+st.rough*(.55+.45*weather))*char*(1-reduce)*rf;
+    const fineCut=(st.cell*fracture+st.rough*.45*weather*micro)
+      *detailGain*(1-reduce)*rf;
+    h[i]=Math.max(0,env*(1+rock*faceGain)*(1-clamp(fineCut,0,.52)));
   }
-  const pn=percentileOf(netF,0.92)+1e-9;
-  for(let i=0;i<h.length;i++){
-    if(envF[i]<=0)continue;
-    const ridges=Math.pow(1-Math.min(netF[i]/pn,1),st.crest);
-    h[i]=envF[i]*((1-relief)+relief*ridges);
-  }
-  if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*3*n*n),seed:p.seed+11,radius:2});
-  if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
-  for(let i=0;i<h.length;i++)if(cover[i]<=0||h[i]<0)h[i]=0;   // the internal passes can dip below 0
+  if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*n),
+    seed:p.seed+11,radius:Math.max(2,Math.round(resScale()*2)),spawn:cover});
+  if(st.talus&&weather>0)h=thermalErode(h,{talus:st.repose*0.012/resScale(),
+    iters:Math.max(1,Math.round(st.talus*weather)),rate:0.5});
+  for(let i=0;i<h.length;i++)if(cover[i]<=0||h[i]<0)h[i]=0;   // open base-level footprint
   if(st.terr){const[,mx]=fieldRange(h);
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
+  // Height is the final maximum elevation, matching the node contract after style weathering.
+  const[,mx]=fieldRange(h);
+  if(mx>0)for(let i=0;i<h.length;i++)h[i]=h[i]/mx*height;
   return h;
 }
 function mountainField(p){
   if(p.form==="peak")return peakField(p);
   const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
   const relief=p.relief,ncell=st.cells,warpamt=st.warp;
+  const weather=Math.max(p.weather==null?1:p.weather,0),height=Math.max(p.height==null?1:p.height,0);
+  const reduce=clamp(p.reduce==null?0:p.reduce,0,1),bulkExp=p.bulk==="low"?1.28:p.bulk==="high"?.72:1;
   // deterministic per-seed stream, so the same seed always builds the same massif
-  let rs=(p.seed|0)*2654435761>>>0;
+  let rs=Math.imul(p.seed|0,2654435761)>>>0;
   const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
   const cx0=p.x*n,cy0=p.y*n,reach=Math.max(p.size,0.02)*n;
   const rot=p.angle*Math.PI/180;
@@ -954,11 +1073,14 @@ function mountainField(p){
   for(let i=0;i<h.length;i++){
     const a=1-netA[i]/pA,b2=1-netB[i]/pB;
     const ridges=Math.pow(clamp((1-st.spur)*a+st.spur*b2,0,1),st.crest);
-    h[i]=env[i]*((1-relief)+relief*ridges);}
+    h[i]=Math.pow(lerp(env[i]*((1-relief)+relief*ridges),env[i],reduce),bulkExp);}
 
   // 4) bake in the weathering the style implies
-  if(st.erode>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*n*n),seed:p.seed+11,radius:2});
-  if(st.talus)h=thermalErode(h,{talus:st.repose*0.012,iters:st.talus,rate:0.5});
+  if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*n),
+    seed:p.seed+11,radius:Math.max(2,Math.round(resScale()*2)),spawn:env});
+  if(st.talus&&weather>0)h=thermalErode(h,{talus:st.repose*0.012/resScale(),
+    iters:Math.max(1,Math.round(st.talus*weather)),rate:0.5});
+  for(let i=0;i<h.length;i++)h[i]=env[i]>0?Math.max(0,h[i])*height:0;
   if(st.terr){const[,mx]=fieldRange(h);
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
   return h;
@@ -1381,8 +1503,10 @@ function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
       for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
         const d=c-h[yy*n+xx];const e=d-talus*dist;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
       if(sum<=0)continue;
-      const move=rate*maxd;let k=0;
-      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(diffs[k]>0){const q=move*diffs[k]/sum;dh[y*n+x]-=q;dh[yy*n+xx]+=q;}k++;}
+      const move=rate*maxd*0.5;let k=0;                 // /2 keeps the steepest pair stable
+      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(diffs[k]>0){
+        const q=Math.min(move*diffs[k]/sum,diffs[k]*0.5); // never invert an individual pair
+        dh[y*n+x]-=q;dh[yy*n+xx]+=q;}k++;}
     }
     for(let i=0;i<h.length;i++)h[i]+=dh[i];
   }
@@ -1390,12 +1514,13 @@ function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
 }
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
-function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1}){
+function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null}){
   const n=RES;let h=inp.slice();
   const R=Math.max(1,radius|0);const brush=[];let bw=0;
   for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const dd=Math.hypot(dx,dy);if(dd<=R){const w=1-dd/(R+1);brush.push([dx,dy,w]);bw+=w;}}
   for(const b of brush)b[2]/=bw;
-  let rng=(seed*2654435761)>>>0;const rnd=()=>((rng=(rng*1664525+1013904223)>>>0)/4294967295);
+  let rng=Math.imul(seed|0,2654435761)>>>0;
+  const rnd=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967295);
   const at=(px,py)=>{ // bilinear height + gradient
     const x0=clamp(px|0,0,n-2),y0=clamp(py|0,0,n-2),fx=px-x0,fy=py-y0,i=y0*n+x0;
     const a=h[i],b=h[i+1],c=h[i+n],d=h[i+n+1];
@@ -1406,7 +1531,10 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
     h[i]+=amt*(1-g.fx)*(1-g.fy);h[i+1]+=amt*g.fx*(1-g.fy);h[i+n]+=amt*(1-g.fx)*g.fy;h[i+n+1]+=amt*g.fx*g.fy;};
   const erode1=(g,amt)=>{for(const[dx,dy,w]of brush){const xx=g.x0+dx,yy=g.y0+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;h[yy*n+xx]-=amt*w;}};
   for(let d=0;d<droplets;d++){
-    let px=rnd()*(n-1),py=rnd()*(n-1),dx=0,dy=0,speed=1,water=1,sed=0;
+    let px=rnd()*(n-1),py=rnd()*(n-1);
+    if(spawn)for(let tries=0;tries<16&&spawn[clamp(py|0,0,n-1)*n+clamp(px|0,0,n-1)]<=0;tries++){
+      px=rnd()*(n-1);py=rnd()*(n-1);}
+    let dx=0,dy=0,speed=1,water=1,sed=0;
     for(let life=0;life<n*0.7;life++){
       const g=at(px,py);const hOld=g.hh;
       dx=dx*inertia-g.gx*(1-inertia);dy=dy*inertia-g.gy*(1-inertia);
@@ -1492,23 +1620,28 @@ const TYPES={
       P.slider("falloff","Falloff",0,1,0.25),
       P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
     eval:(p)=>shapeField(p)},
-  mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A placeable mountain massif \u2014 Gaea's Mountain node. A wandering crest skeleton sets the envelope, a modulated-Voronoi ridge network dissects it into spurs and valleys, and the style bakes in its weathering.",
-    params:[P.seg("form","Form",[["peak","Peak"],["massif","Massif"]],"peak"),
-      P.seg("style","Style",[["basic","Basic"],["eroded","Eroded"],["alpine","Alpine"],["old","Old"],["strata","Strata"]],"eroded"),
+  mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A cellular geological primitive: Mountain creates a hero landform from distorted, modulated Voronoi structure; Mountain range creates a broader multi-crest base. Five mountain types change the generating geometry as well as its weathering.",
+    params:[P.seg("form","Landform",[["peak","Mountain"],["massif","Mountain range"]],"peak"),
+      P.seg("shape","Shape family",[["dominant","Dominant peak"],["compound","Compound peaks"],["ridge","Ridgeline"],["broad","Broad dome"]],"compound"),
+      P.seg("style","Mountain type",[["basic","Basic"],["eroded","Eroded"],["old","Old"],["alpine","Alpine"],["strata","Strata"]],"eroded"),
       P.seed("seed","Seed",7),
       P.slider("x","Position X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("y","Position Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("size","Reach",0.08,0.9,0.35,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("size","Reach",0.08,0.9,0.40,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
+      P.slider("height","Peak height",0.1,2,0.72,0.01,v=>Math.round(v*terrainDef.height)+" m"),
+      P.seg("bulk","Bulk",[["low","Low"],["medium","Medium"],["high","High"]],"medium"),
       P.slider("angle","Trend",0,180,25,1,v=>(v|0)+"\u00b0"),
-      P.int("ridges","Crest lines",1,5,2),
+      P.int("ridges","Massif crests",1,5,2),
       P.slider("detail","Drainage detail",0.4,3.5,2.6,0.1,v=>v.toFixed(1)+"\u00d7"),
       P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("relief","Valley depth",0.1,0.95,0.80,0.01),
-      P.slider("character","Character",0,0.9,0.55,0.01,v=>v.toFixed(2)),
+      P.slider("character","Character",0,0.9,0.72,0.01,v=>v.toFixed(2)),
       P.slider("variation","Shape variation",0,1,0.55,0.01,v=>v.toFixed(2)),
-      P.curve("skirt","Skirt profile",curveFromExponent(1.4))],
+      P.slider("reduce","Reduce details",0,1,0.08,0.01,v=>Math.round(v*100)+"%"),
+      P.slider("weather","Weathering",0,2,1,0.05,v=>v.toFixed(2)+"\u00d7"),
+      P.curve("skirt","Skirt profile",mountainSkirtDefault())],
     eval:(p)=>mountainField(p),
-    note:"<b>Peak</b> is one summit with spurs radiating from it. Spurs are periodic in <i>azimuth</i> \u2014 that is what makes them radiate \u2014 so the ridge function is angular, not a noise field that happens to sit under a lump. <b>Spurs</b> sets the primary divides; sub-spurs branch off them lower down, so mid-slope shows somewhat more than you ask for (4\u21925, 7\u21929, 10\u219213, 12\u219220 measured at 60% of the reach). <b>Massif</b> unions <i>Crest lines</i> into a small range instead; it is the right shape for a shoulder or a plateau edge, but it has several summits, so it is not what you want as the unit you place three of. Measured by topographic prominence: Peak gives <b>one</b> summit above 10% of relief, Massif gives 4\u20138.<br><br>Placement is <b>built in</b> (Position / Reach / Trend), not a Transform above it \u2014 the crest skeleton is constructed at the placed position, so it is exact by construction. That is also why a Transform over a Mountain uses the raster path: the style's droplet and talus passes are grid simulations, which do not commute with a coordinate transform. To build a <b>range</b>, place two or three, union them with <b>Smooth Max</b>, then erode the result \u2014 the erosion is what knits separate massifs into one connected landform."},
+    note:"<b>Mountain</b> is a clean-room geological primitive based on Gaea's public contract: distorted, modulated cellular fields create the large faces and rock divisions inside an asymmetric uplift mass. It is not a cone with radial ridge stamps. Broad basins interrupt different shoulders, while the hydraulic pass supplies smaller flow detail. The default <b>Skirt profile</b> has separate upper-crag, shoulder, face, talus and pediment bands rather than one constant tent slope.<br><br>For the <b>Mountain</b> landform, two controls deliberately stay separate. <b>Shape family</b> selects the primary uplift algorithm: <b>Dominant peak</b> favours one strong cell, <b>Compound peaks</b> joins several high cells and saddles, <b>Ridgeline</b> favours a long connected cellular divide, and <b>Broad dome</b> favours cell interiors and wide shoulders. These are clean-room behavioural families, not claims about Gaea's unpublished Type internals. <b>Mountain type</b> changes the geomorphic expression: <b>Basic</b> keeps broad simple masses; <b>Eroded</b> deepens cellular faces and basins before hydraulic weathering; <b>Old</b> rounds the elevation profile while retaining residual gullies; <b>Alpine</b> narrows the profile, strengthens large and medium rock divisions, and preserves the summit divide; <b>Strata</b> uses a broader profile with a layered elevation response. Both settings change geometry, not materials.<br><br><b>Bulk</b> changes flank mass, <b>Drainage detail</b> changes basin and fracture scale, <b>Character</b> expands the uplift and cellular breakup, <b>Reduce details</b> suppresses the cellular/micro bands, <b>Valley depth</b> changes incision, and <b>Weathering</b> scales the type's process overprint. <b>Peak height</b> is shown in metres against the Terrain Definition.<br><br><b>Mountain range</b> uses the broader multi-crest generator; <i>Massif crests</i> applies only to it. Gaea documents MountainSide as a separate primitive, so a one-sided slope is not silently folded into this hero-mountain mode. Placement is built in (Position / Reach / Trend), so the feature is constructed at the requested world-space location."},
   tectonic:{cat:"gen",name:"Tectonic uplift",ins:[],
     desc:"Voronoi plates with noise-warped boundaries, each classified into collision / subduction / island arc / rift / transform, with the boundary uplift diffused inland over the orogen width. Wire it into Stream power's Uplift input: this gives the structure, the rivers give the topography.",
     params:[P.seed("seed","Seed",3),
@@ -2007,10 +2140,10 @@ function buildProps(){
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
+  def.params.forEach(pr=>body.appendChild(buildField(pr)));
   const note=def.info?def.info(selected):def.note;
   if(note){const nt=document.createElement("div");nt.className="hint";
-    nt.style.margin="0 0 10px";nt.innerHTML=note;body.appendChild(nt);}
-  def.params.forEach(pr=>body.appendChild(buildField(pr)));
+    nt.style.margin="14px 0 10px";nt.innerHTML=note;body.appendChild(nt);}
   if(selected.type==="import"){const b=document.createElement("button");b.className="btn";b.style.width="100%";b.style.marginTop="8px";
     b.textContent=selected._dem?"Replace heightmap…":"Load heightmap file…";b.onclick=()=>{importTarget=selected;$("#fileInput").click();};
     const b2=document.createElement("button");b2.className="btn";b2.style.width="100%";b2.style.marginTop="6px";

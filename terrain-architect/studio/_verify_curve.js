@@ -1,8 +1,10 @@
 // The artist draws the skirt; the engine reads a LUT. Data flow: control points -> monotone cubic
-// -> 256-entry LUT -> one lerped lookup per cell driving the radial mask.
+// -> 256-entry LUT -> one lerped lookup per cell driving the crest-face cross section.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,
