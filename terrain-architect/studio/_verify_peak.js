@@ -81,8 +81,14 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const cone = (()=>{ const o=newField();
       for (let y=0;y<n;y++) for (let x=0;x<n;x++)
         o[y*n+x] = Math.max(0, 1 - Math.hypot(x/n-0.5, y/n-0.5)*2); return o; })();
-    const M = (o) => TYPES.mountain.eval({form:"peak", style:"eroded", seed:7, x:0.5, y:0.5,
-                     size:0.35, angle:25, ridges:2, detail:2.6, aspect:1, relief:0.66, ...o});
+    // Build from the node's DECLARED defaults, not a hand-copied list. The hand-copied version had
+    // drifted -- it still said relief 0.66 after the default moved to 0.80, and never passed
+    // `character` at all, so the solid-of-revolution probe below was silently measuring the domain
+    // warp switched off. A harness that restates defaults will always drift away from them.
+    const DEF = Object.fromEntries(TYPES.mountain.params.map(q=>[q.key,
+      Array.isArray(q.def) ? JSON.parse(JSON.stringify(q.def)) : q.def]));
+    const M = (o) => TYPES.mountain.eval({...DEF, form:"peak", style:"eroded", seed:7,
+                     x:0.5, y:0.5, size:0.35, ...o});
 
     // --- the two reference extremes, so the numbers below have a scale ---
     out.reference = { cone: score(cone),
@@ -163,6 +169,31 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       apronFlattensOutward: slopes(sk).every((v,i,a)=> i===0 || Math.abs(v) < Math.abs(a[i-1])),
       // it must reach exactly zero at the rim, so there is no seam to feather
       reachesZeroAtRim: sk[sk.length-1] === 0 };
+
+    // --- IT MUST NOT BE A SOLID OF REVOLUTION ---
+    // A cone with flutes cut in it is a tipi tent, and the flutes do not save it: what gives it away
+    // is that it is unchanged when you spin it about its axis. So correlate the field against a
+    // 90-degree rotation of itself. A solid of revolution scores ~1; a real massif does not.
+    // This replaced a per-octant descent metric that anchored on the summit CELL -- when the warp
+    // moves the summit the window moves with it, and the reading swung around non-monotonically on
+    // a single seed. Rotational correlation needs no anchor and is averaged over five seeds.
+    const rotCorr = (f) => { const A=[],B=[];
+      for (let y=0;y<n;y++) for (let x=0;x<n;x++){
+        const rx=n-1-y, ry=x;                              // 90 degrees about the tile centre
+        if (f[y*n+x]<=0 && f[ry*n+rx]<=0) continue;
+        A.push(f[y*n+x]); B.push(f[ry*n+rx]); }
+      const ma=A.reduce((a,v)=>a+v,0)/A.length, mb=B.reduce((a,v)=>a+v,0)/B.length;
+      let num=0,da=0,db=0;
+      for (let i=0;i<A.length;i++){ const u=A[i]-ma, v=B[i]-mb; num+=u*v; da+=u*u; db+=v*v; }
+      return +(num/Math.sqrt(da*db)).toFixed(3); };
+    const meanRot = (c) => { const vs=[3,7,11,29,101].map(seed=>rotCorr(M({character:c, seed})));
+      return { perSeed:vs, mean:+(vs.reduce((a,v)=>a+v,0)/vs.length).toFixed(3) }; };
+    const atDefault = meanRot(DEF.character);
+    out.notASolidOfRevolution = {
+      cone: rotCorr(cone), atDefaultCharacter: atDefault,
+      byCharacter: Object.fromEntries([0, 0.3, 0.9].map(c => [c, meanRot(c).mean])),
+      farFromRotationallySymmetric: atDefault.mean < 0.93,
+      characterDrivesIt: meanRot(0).mean > meanRot(0.9).mean };
 
     // --- the primitive must stay inside its own footprint, so it composites cleanly ---
     const f = M({x:0.5, y:0.5, size:0.25});

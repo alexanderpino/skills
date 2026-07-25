@@ -93,6 +93,24 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       footprintCells: c12,
       deterministicAcrossRebuilds: firstRun.every((v,i)=>v===[r1,r2,r3][i].params.seed),
       notTheTypeDefault: firstRun.every(v=>v!==TYPES.mountain.params.find(q=>q.key==="seed").def) };
+
+    // ...and the seed must remain EDITABLE -- a derived seed that cannot be overridden is just a
+    // different hardcoded one. Setting it by hand must reproduce that exact terrain.
+    const hand = {...r1.params, seed: 123};
+    const a1 = TYPES.mountain.eval(hand,[],r1), a2 = TYPES.mountain.eval({...r2.params, seed:123},[],r2);
+    let dHand=0; for (let i=0;i<a1.length;i++) dHand += Math.abs(a1[i]-a2[i]);
+    out.seedIsEditable = { twoNodesForcedToSameSeedMatch: dHand === 0,
+      differsFromItsDerivedSeed: (()=>{ const d0=TYPES.mountain.eval(r1.params,[],r1);
+        let z=0; for (let i=0;i<a1.length;i++) z += Math.abs(a1[i]-d0[i]); return z > 0; })() };
+
+    // duplicating gives a NEW feature, not a clone -- "every node gets a new seed"
+    nodes.length=0; edges.length=0; uid=1;
+    const orig = makeNode("mountain",0,0);
+    selected = orig; duplicateSel();
+    const dup = nodes[nodes.length-1];
+    out.duplicateReseeds = { original: orig.params.seed, duplicate: dup.params.seed,
+      differs: dup.params.seed !== orig.params.seed,
+      otherParamsCopied: dup.params.size === orig.params.size && dup.params.style === orig.params.style };
     return out;
   });
 

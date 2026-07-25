@@ -259,6 +259,18 @@ choosing what to place three of:
   that exponent: 1 is a straight cone, higher gives a sharper peak with a wider sprawling apron, below
   1 gives a plateau with an abrupt rim.
 
+  **Character — the domain warp that stops it being a tipi tent.** The dome was warped only on its
+  *outline*: angular noise on the radius. That moves the footprint but leaves every radial profile a
+  straight run to a single apex, so the result was a cone with flutes cut in it however dense the
+  flutes. **Character** displaces the position *before* measuring distance — a 2D domain warp of the
+  distance field — which makes the level sets irregular at every radius: shoulders, benches,
+  sub-crests, an off-centre summit, a lobed outline.
+
+  Measured by correlating the field against a 90° rotation of itself, since a solid of revolution is
+  unchanged when you spin it about its axis. An ideal cone scores **1.000**. Character 0 scores
+  **0.992** — still essentially a solid of revolution. The default 0.55 scores **0.880**, and 0.9
+  scores **0.720**. Averaged over five seeds, because a single seed says nothing.
+
   **The skirt is drawn, not typed.** The exponent is gone; the Mountain node carries a curve editor in
   the properties panel. X is distance from the centre (0 at the summit, 1 at the radius), Y is the
   elevation multiplier (1 → 0). Drag control points to shape the apron, click empty space to add one,
@@ -320,14 +332,16 @@ The primitive also stays strictly inside its own footprint (total height outside
 because erosion otherwise scatters deposit onto ground the primitive does not own — and a primitive
 that respects its footprint is the one that composites cleanly under Stamp and a placement mask.
 
-**Every placed node gets its own seed.** Node parameters used to be initialised straight from the
+**Every placed node gets its own seed, and you can still change it.** Node parameters used to be initialised straight from the
 type defaults, so three placed Mountains were three *identical* mountains and the whole
 place-and-combine workflow was pointless. A node carrying a `seed` now derives it from its own id —
 **derived, not random**, so the same graph built the same way reproduces exactly across reloads and in
 the verifiers. Three fresh Mountains get seeds 459 / 895 / 604; rebuilding the graph gets the same
 three. Verified with the control that gives the number meaning: two mountains sharing a seed are
 bit-for-bit identical, while two with different seeds differ by **10%** of total height inside the
-footprint. *Duplicate* stays a true copy — nudge the Seed slider to fork it.
+footprint. Duplicating re-seeds too: a duplicate is a new feature, not a clone, so three duplicated Mountains
+are three different mountains while every other parameter is copied. The **Seed** slider overrides it
+either way — verified, two nodes forced to the same seed produce bit-for-bit identical terrain.
 
 Verified in `_verify_range.js`. Three Mountains placed at X = 0.26 / 0.50 / 0.74 land at measured
 centroids **0.281 / 0.505 / 0.722**, each with relief ≈ 0.84–1.08. Unioning with Smooth Max instead of a
