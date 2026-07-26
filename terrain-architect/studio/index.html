@@ -2662,9 +2662,9 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     },
     note:"This node is a <b>terrain-space analysis map</b>: white means the climate sun reaches the surface and black means terrain blocks it. It uses a logarithmic heightfield-horizon march followed by a spatial penumbra filter. A cascaded shadow map is intentionally not used here because cascades are fitted to the current camera frustum and therefore change as the view moves."},
   d_temperature:{cat:"data",name:"Temperature",ins:["Height","Sun visibility"],desc:"Generates the base surface-temperature field from elevation lapse rate plus solar exposure. The physical Celsius map remains editable downstream.",
-    params:[P.number("seaTemp","Sea-level temperature",-100,100,6,.1,"°C"),
-      P.number("lapseRate","Altitude lapse rate",0,20,6.5,.1,"°C / km"),
-      P.number("warming","Solar warming",-100,500,5,.1,"°C")],
+    params:[P.slider("seaTemp","Sea-level temperature",-50,50,6,.5,v=>v.toFixed(1)+" °C"),
+      P.slider("lapseRate","Altitude lapse rate",-10,15,6.5,.1,v=>v.toFixed(1)+" °C/km"),
+      P.slider("warming","Solar warming",0,50,5,.5,v=>v.toFixed(1)+" °C")],
     eval:(p,ins,nd)=>{
       if(!ins[0]){
         nd._temperatureC=new Float32Array(RES*RES);nd._solarShadow=newField();nd._solarExposure=newField();
@@ -2675,7 +2675,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       return tagTemperatureField(maps.encoded,maps.temperatureC,{solarShadow:maps.solarShadow,solarExposure:maps.solarExposure,
         lapseRate:p.lapseRate,heightField:ins[0]});
     },
-    note:"This node creates the <b>base</b> temperature map; it is not a terminal display effect. Its output carries a Celsius field contract through downstream Filter and Combine nodes, and the Snow/ice consumers read the final connected result. The scalar encoding spans −100…1400 °C so volcanic heat remains representable. Connect <b>Sun Shadow</b> to Sun visibility to make terrain occlusion part of the field. Terrain Definition supplies sea-level temperature, lapse rate, latitude, north, and solar elevation."},
+    note:"This node creates the <b>base</b> temperature map; it is not a terminal display effect. Its climate sliders stay in useful Earth-scale ranges: sea-level temperature −50…+50 °C, lapse rate −10…+15 °C/km (including inversions), and solar warming 0…50 °C. Its output carries a Celsius field contract through downstream Filter and Combine nodes, and the Snow/ice consumers read the final connected result. The scalar encoding still spans −100…1400 °C so volcanic heat remains representable through <b>Temperature Modify</b>. Connect <b>Sun Shadow</b> to Sun visibility to make terrain occlusion part of the field. Terrain Definition supplies latitude, north, and solar elevation."},
   d_heat:{cat:"data",name:"Temperature Modify",ins:["Temperature","Source","Mask"],desc:"Modifies a Temperature field in physical °C. Use Source for a biome, lava, geothermal, shade, or authored microclimate map; Mask confines the exchange.",
     params:[P.tabs("mode","Operation",[["offset","Offset"],["set","Set"],["minimum","Minimum"]],"offset"),
       WHEN(P.number("offsetC","Temperature offset",-500,1400,0,1,"°C"),"mode","offset"),
@@ -4069,18 +4069,18 @@ function initGL(){
   terrainProg=makeProg(tVs,tFs);
   // ---------- STAGE 2: translucent water ----------
   const wVs=(g2?`#version 300 es
-    in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;
+    in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;in vec3 asnowN;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;out vec3 vSnowN;
     uniform mat4 uMVP;uniform float uH;uniform float uScale;
-    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`
-  :`attribute vec2 axz;attribute float ah;attribute float aw;attribute float ais;attribute float aice;attribute vec3 awn;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
+    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`
+  :`attribute vec2 axz;attribute float ah;attribute float aw;attribute float ais;attribute float aice;attribute vec3 awn;attribute vec3 asnowN;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform mat4 uMVP;uniform float uH;uniform float uScale;
-    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`);
+    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
-    precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;out vec4 frag;
+    precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;out vec4 frag;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
-  :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
+  :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
@@ -4114,7 +4114,8 @@ function initGL(){
       float ice=clamp(vIce,0.0,1.0);
       float snowCov=smoothstep(.015,.10,vIceSnow)*ice;
       float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage*(1.0-ice);vec3 wave=waveData(vXZ,t);
-      vec3 N=normalize(vWN+waveAmt*vec3(wave.x,0.,wave.y));   // pattern perturbs the fluid normal, never its depth
+      vec3 baseN=normalize(mix(vWN,vSnowN,snowCov));
+      vec3 N=normalize(baseN+waveAmt*vec3(wave.x,0.,wave.y)); // snow uses its raised top normal; waves perturb liquid only
       vec3 V=normalize(uCam-vW);vec3 S=normalize(uSun);
       float fres=pow(1.0-max(dot(N,V),0.0),3.0);             // Fresnel — reflective at grazing angles
       float dn=clamp(max(vDepth,0.)/(uH*0.35),0.0,1.0);      // depth attenuation: shallow teal -> deep blue
@@ -4191,11 +4192,12 @@ function initGL(){
         return 1.0-occ*0.92;
       }
       // horizon ambient occlusion: how much the neighbourhood rises around this point
-      float aoT(vec2 uv){float hc=Ht(uv)*uH,o=0.0;const int D=6;
+      float aoAt(vec2 uv,float hc){float o=0.0;const int D=6;
         for(int k=0;k<D;k++){float a=6.2831*float(k)/float(D);vec2 dr=vec2(cos(a),sin(a))/uRES;float m=0.0;
           for(int r=1;r<=3;r++){float rr=float(r)*2.5;m=max(m,(Ht(uv+dr*rr)*uH-hc)/(rr/uRES));}o+=clamp(m,0.,1.);}
         return 1.0-o/float(D)*0.7;
       }
+      float aoT(vec2 uv){return aoAt(uv,Ht(uv)*uH);}
       vec3 aces(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
       vec3 displayMap(vec3 hdr){return linearToSrgb(aces(hdr*exp2(uExposure)));}
       // aerial perspective: fade to a sky-tinted haze with distance, warming toward the sun (in-scatter)
@@ -4301,9 +4303,16 @@ function initGL(){
         float ice=clamp(texture(gIce,wuv).r,0.0,1.0);
         float iceSnowDepth=texture(gIceSnow,wuv).r;
         float iceSnowCov=smoothstep(.015,.10,iceSnowDepth);
+        float sl=wl*uH+texture(gIceSnow,wuv-vec2(uWpx,0.)).r*uH/uTerrainHeight;
+        float sr=wr*uH+texture(gIceSnow,wuv+vec2(uWpx,0.)).r*uH/uTerrainHeight;
+        float sd=wdn*uH+texture(gIceSnow,wuv-vec2(0.,uWpx)).r*uH/uTerrainHeight;
+        float su=wup*uH+texture(gIceSnow,wuv+vec2(0.,uWpx)).r*uH/uTerrainHeight;
+        vec3 snowN=normalize(vec3((sl-sr)*uRES*.25,1.0,(sd-su)*uRES*.25));
+        N=normalize(mix(N,snowN,iceSnowCov));
         float t=uTime*uRippleSpeed;vec3 wave=waveData(Pwater.xz,t);float waveAmt=uRipple*waterCov*(1.0-ice);
         N=normalize(N+waveAmt*vec3(wave.x,0.,wave.y));
         vec3 Vd=normalize(uCam-Pwater);
+        float surfaceSh=shadowT(Pwater,S),surfaceAo=aoAt(wuv,Pwater.y);
         float refrDepth=clamp(thick*8.,0.,1.);
         vec2 refrOff=N.xz*uPx*34.*refrDepth*uRefraction*(1.0-ice);
         vec2 refrUv=clamp(vUv+refrOff,vec2(0.002),vec2(0.998));
@@ -4322,18 +4331,18 @@ function initGL(){
         wc+=vec3(.025,.050,.075)*crest;                             // small-scale reflected wave crests
         float fres=.02+.98*pow(1.0-max(dot(N,Vd),0.0),5.0);         // dielectric water F0 ≈ 0.02
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
-        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*sh;
+        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*surfaceSh;
         float edgeW=max(shoreAA*5.0,.0015);
         float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov*(1.0-ice);
         vec3 col=mix(wc,refl,fres)+spec*SUNCOL; col=mix(col,vec3(.78,.86,.92),foam);
-        col*=mix(0.65,1.0,sh);                                      // water in cast shadow is darker
+        col*=mix(0.65,1.0,surfaceSh);                               // use the fluid/ice surface, not the submerged bed, for shadowing
         float frost=vnoise(wuv*83.0)+.5*vnoise(wuv*211.0+19.0);
         float cracks=1.0-smoothstep(.015,.055,abs(fract((wuv.x+wuv.y*.37)*37.0+frost*.18)-.5));
         vec3 iceAlb=mix(vec3(.34,.51,.64),vec3(.58,.70,.77),clamp(frost*.55,0.,1.));
-        vec3 iceCol=shadeSurface(iceAlb,N,Pwater,.56,sh,ao)*(1.0-cracks*.18);
+        vec3 iceCol=shadeSurface(iceAlb,N,Pwater,.56,surfaceSh,surfaceAo)*(1.0-cracks*.18);
         col=mix(col,iceCol,ice);
         vec3 iceSnowAlb=vec3(.88,.93,.97)*mix(.94,1.04,clamp(frost*.55,0.,1.));
-        vec3 iceSnowCol=shadeSurface(iceSnowAlb,N,Pwater,.66,sh,ao);
+        vec3 iceSnowCol=shadeSurface(iceSnowAlb,N,Pwater,.66,surfaceSh,surfaceAo);
         col=mix(col,iceSnowCol,iceSnowCov);
         col=mix(dryCol,col,waterCov);                                // analytic coverage removes the binary triangle shoreline
         frag=vec4(displayMap(atmos(col,Pwater)),1.);
@@ -4349,7 +4358,8 @@ function initGL(){
   buildSatLUT(satName);
   buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),drive:gl.createBuffer(),snow:gl.createBuffer(),
            temperature:gl.createBuffer(),sunvis:gl.createBuffer(),col:gl.createBuffer(),gridXZ:gl.createBuffer(),
-           wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),ice:gl.createBuffer(),iceSnow:gl.createBuffer(),idx:gl.createBuffer(),count:0};
+           wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),ice:gl.createBuffer(),iceSnow:gl.createBuffer(),
+           iceSnowNrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
   gl.enable(gl.DEPTH_TEST);
   glc.addEventListener("contextmenu",e=>e.preventDefault());
@@ -4398,7 +4408,7 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
 }
 let curField=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSnowLayerRef=null;
 let curTemperatureRef=null,curSunVisibilityRef=null;
-let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null;
+let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curIceSnowSurfaceY=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null;
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
   const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;rootNode=rootNode||activePreviewNode();
@@ -4571,11 +4581,23 @@ function refreshWater(){
     const melted=Math.min(deposited,Math.max(0,temp)*meltRate/1000*meltDays);
     iceSnow[i]=(deposited-melted)*frozen;
   }
-  curWaterLiquid=liquidMask;curWaterIce=iceMask;curIceSnow=iceSnow;
+  // Keep the visible transient stack explicit in world render units:
+  // terrain < water/ice surface < snow-on-ice top. Its own normal prevents the raised snow
+  // geometry from being lit as though it were still the flat ice sheet or submerged bed.
+  const iceSnowSurfaceY=new Float32Array(N),iceSnowNrm=new Float32Array(N*3);
+  for(let i=0;i<N;i++)iceSnowSurfaceY[i]=W[i]*H+iceSnow[i]/terrainDef.scale;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+    const l=iceSnowSurfaceY[y*n+clamp(x-1,0,n-1)],r=iceSnowSurfaceY[y*n+clamp(x+1,0,n-1)];
+    const d=iceSnowSurfaceY[clamp(y-1,0,n-1)*n+x],u_=iceSnowSurfaceY[clamp(y+1,0,n-1)*n+x];
+    const sx=(l-r)*(n-1)/2,sz=(d-u_)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
+    iceSnowNrm[i*3]=sx/L;iceSnowNrm[i*3+1]=1/L;iceSnowNrm[i*3+2]=sz/L;
+  }
+  curWaterLiquid=liquidMask;curWaterIce=iceMask;curIceSnow=iceSnow;curIceSnowSurfaceY=iceSnowSurfaceY;
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,W,gl.DYNAMIC_DRAW);   // forward-path geometry water
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wnrm);gl.bufferData(gl.ARRAY_BUFFER,wn,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.ice);gl.bufferData(gl.ARRAY_BUFFER,iceMask,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnow);gl.bufferData(gl.ARRAY_BUFFER,iceSnow,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnowNrm);gl.bufferData(gl.ARRAY_BUFFER,iceSnowNrm,gl.DYNAMIC_DRAW);
   if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,W);} // deferred-path water-height texture
   if(iTex){gl.bindTexture(gl.TEXTURE_2D,iTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,iceMask);}
   if(isTex){gl.bindTexture(gl.TEXTURE_2D,isTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,iceSnow);}
@@ -4593,8 +4615,10 @@ function cameraEye(){const ce=Math.cos(cam.el);return[cam.target[0]+Math.cos(cam
 function cameraBasis(){const eye=cameraEye(),forward=norm3(sub3(cam.target,eye)),right=norm3(cross3(forward,[0,1,0]));return{eye,forward,right,up:norm3(cross3(right,forward))};}
 function surfaceHeight(wx,wz){
   const surface=curSurfaceY||curHgt;if(!surface)return cam.target[1];
-  const h=sampleBilinear(surface,(wx*.5+.5)*(RES-1),(wz*.5+.5)*(RES-1));
-  return curSurfaceY?h:h*H_SCALE;
+  const x=(wx*.5+.5)*(RES-1),z=(wz*.5+.5)*(RES-1);
+  const h=sampleBilinear(surface,x,z),terrainY=curSurfaceY?h:h*H_SCALE;
+  const iceSnowY=curIceSnowSurfaceY&&curIceSnowSurfaceY.length===RES*RES?sampleBilinear(curIceSnowSurfaceY,x,z):-Infinity;
+  return Math.max(terrainY,iceSnowY);
 }
 // Project authored terrain directions into the current camera plane. Unlike a screen-fixed north
 // badge, this needle remains useful after orbiting: it shows where map north and the equator actually
@@ -4765,7 +4789,8 @@ function renderGL(){
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
       gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
-      bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"ais",1,buffers.iceSnow);bindAttr(waterProg,"aice",1,buffers.ice);bindAttr(waterProg,"awn",3,buffers.wnrm);
+      bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"ais",1,buffers.iceSnow);bindAttr(waterProg,"aice",1,buffers.ice);
+      bindAttr(waterProg,"awn",3,buffers.wnrm);bindAttr(waterProg,"asnowN",3,buffers.iceSnowNrm);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
       gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
       gl.depthMask(true);gl.disable(gl.BLEND);

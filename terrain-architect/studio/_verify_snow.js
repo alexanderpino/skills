@@ -47,6 +47,16 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     };
     const mapRange=a=>{let lo=Infinity,hi=-Infinity;for(const v of a||[]){lo=Math.min(lo,v);hi=Math.max(hi,v);}return[lo,hi];};
 
+    // The Temperature node must consume terrain shadow as climate data, not merely infer warmth
+    // from slope/aspect. At identical elevation, an explicitly occluded cell is colder.
+    const flatClimateHeight=new Float32Array(RES*RES).fill(.5),climateVisibility=new Float32Array(RES*RES).fill(1);
+    const climateShadowI=((RES/2)|0)*RES+((RES/2)|0),climateOpenI=climateShadowI+8;
+    climateVisibility[climateShadowI]=0;
+    const climateProbe={};
+    TYPES.d_temperature.eval({seaTemp:6,lapseRate:6.5,warming:10},[flatClimateHeight,climateVisibility],climateProbe);
+    const terrainShadowTemperature={shadowC:climateProbe._temperatureC[climateShadowI],
+      openC:climateProbe._temperatureC[climateOpenI]};
+
     // Default north points toward the top of the heightfield. In the northern hemisphere,
     // a plane falling toward +Y is equator-facing and must lose more snow to solar warming.
     const n=33,N=n*n,def={scale:320,height:100,latitude:46,north:0,seaTemp:-4,lapseRate:0,solarElevation:45};
@@ -94,6 +104,10 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const temperatureLabels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
     const temperatureEditors={numbers:document.querySelectorAll('#props input[type="number"]').length,
       ranges:document.querySelectorAll('#props input[type="range"]').length};
+    const temperatureRanges={};
+    document.querySelectorAll('#props .field').forEach(f=>{
+      const i=f.querySelector('input[type="range"]');if(i)temperatureRanges[f.dataset.paramKey]={min:+i.min,max:+i.max,step:+i.step};
+    });
     select(null);
     const terrainLabels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
 
@@ -101,6 +115,18 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const savedClimate={seaTemp:terrainDef.seaTemp,lapseRate:terrainDef.lapseRate},savedSceneSnow=scene.snow;
     terrainDef.seaTemp=-20;terrainDef.lapseRate=6.5;scene.snow=savedSceneSnow;refreshWater();
     let snowOnIce=0;for(const d of curIceSnow)snowOnIce=Math.max(snowOnIce,d);
+    let layeredCells=0,maxLayerError=0,minWaterAboveTerrain=Infinity,minSnowAboveIce=Infinity;
+    for(let i=0;i<curIceSnow.length;i++)if(curIceSnow[i]>.1&&curWaterIce[i]>.5){
+      layeredCells++;
+      const terrainY=curHgt[i]*H_SCALE,iceY=curWater[i]*H_SCALE,expected=iceY+curIceSnow[i]/terrainDef.scale;
+      maxLayerError=Math.max(maxLayerError,Math.abs(curIceSnowSurfaceY[i]-expected));
+      minWaterAboveTerrain=Math.min(minWaterAboveTerrain,iceY-terrainY);
+      minSnowAboveIce=Math.min(minSnowAboveIce,curIceSnowSurfaceY[i]-iceY);
+    }
+    const iceLayerRendering={layeredCells,maxLayerError,minWaterAboveTerrain,minSnowAboveIce,
+      snowNormalAttribute:gl.getAttribLocation(waterProg,'asnowN'),
+      forwardTop:gl.getShaderSource(gl.getAttachedShaders(waterProg).find(s=>gl.getShaderParameter(s,gl.SHADER_TYPE)===gl.VERTEX_SHADER)).includes('aw*uH+ais/uScale'),
+      deferredSurfaceLighting:gl.getShaderSource(gl.getAttachedShaders(compProg).find(s=>gl.getShaderParameter(s,gl.SHADER_TYPE)===gl.FRAGMENT_SHADER)).includes('surfaceAo=aoAt(wuv,Pwater.y)')};
     scene.snow=null;refreshWater();
     let withoutSnow=0;for(const d of curIceSnow)withoutSnow=Math.max(withoutSnow,d);
     terrainDef.seaTemp=savedClimate.seaTemp;terrainDef.lapseRate=savedClimate.lapseRate;scene.snow=savedSceneSnow;refreshWater();
@@ -145,9 +171,10 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       compass:{before:compassA,after:compassB,label:$('#viewportCompass').getAttribute('aria-label')},
       climate:{snowOnIce,withoutSnow,liquidSnow,liquidCells,tempC,tempF,terrainLabels,
         temperatureRange:mapRange(temperatureNode&&temperatureNode._temperatureC),
-        shadowRange:mapRange(shadowNode&&shadowNode._solarShadow)},
+        shadowRange:mapRange(shadowNode&&shadowNode._solarShadow),terrainShadowTemperature},
       defaultGraph,
-      temperatureField:{...modification,labels:temperatureLabels,editors:temperatureEditors},
+      temperatureField:{...modification,labels:temperatureLabels,editors:temperatureEditors,ranges:temperatureRanges},
+      iceLayerRendering,
       hud:{compassTemperature:overlaps(boxes[0],boxes[1]),compassRail:overlaps(boxes[0],boxes[2]),temperatureRail:overlaps(boxes[1],boxes[2])},
       labels
     };
@@ -170,6 +197,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     &&result.climate.liquidCells>0&&result.climate.liquidSnow===0
     &&result.climate.temperatureRange[1]>result.climate.temperatureRange[0]
     &&result.climate.shadowRange[1]>result.climate.shadowRange[0]
+    &&result.climate.terrainShadowTemperature.openC>result.climate.terrainShadowTemperature.shadowC+5
     &&result.climate.tempC.includes('°C')&&result.climate.tempF.includes('°F')
     &&Object.values(result.defaultGraph).every(Boolean)
     &&result.temperatureField.kind==='temperature'&&result.temperatureField.sourceCentreC>899&&result.temperatureField.centreC>850
@@ -177,7 +205,14 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     &&result.temperatureField.biomeCentre>.9&&result.temperatureField.biomeCorner<.01
     &&result.temperatureField.snowReadsModified&&result.temperatureField.sceneReadsModified
     &&['Sea-level temperature','Altitude lapse rate','Solar warming'].every(label=>result.temperatureField.labels.includes(label))
-    &&result.temperatureField.editors.numbers===3&&result.temperatureField.editors.ranges===0
+    &&result.temperatureField.editors.numbers===0&&result.temperatureField.editors.ranges===3
+    &&result.temperatureField.ranges.seaTemp.min===-50&&result.temperatureField.ranges.seaTemp.max===50
+    &&result.temperatureField.ranges.lapseRate.min===-10&&result.temperatureField.ranges.lapseRate.max===15
+    &&result.temperatureField.ranges.warming.min===0&&result.temperatureField.ranges.warming.max===50
+    &&result.iceLayerRendering.layeredCells>0&&result.iceLayerRendering.maxLayerError<1e-7
+    &&result.iceLayerRendering.minWaterAboveTerrain>0&&result.iceLayerRendering.minSnowAboveIce>0
+    &&result.iceLayerRendering.snowNormalAttribute>=0&&result.iceLayerRendering.forwardTop
+    &&result.iceLayerRendering.deferredSurfaceLighting
     &&!result.hud.compassTemperature&&!result.hud.compassRail&&!result.hud.temperatureRail
     &&!errors.length;
   console.log(JSON.stringify({result,errors,ok},null,2));

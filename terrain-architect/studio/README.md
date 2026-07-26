@@ -750,8 +750,10 @@ The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM`
    **Temperature** are explicit Data map nodes, so these fields can be previewed, blended, masked, and
    reused elsewhere. The Temperature node owns editable numeric fields for **sea-level temperature**,
    **altitude lapse rate**, and **solar warming**; it combines those with Height and Sun Shadow to
-   generate the base map. These are edit boxes with physical units, not narrow look-development
-   sliders.
+   generate the base map. These are physical sliders with useful climate ranges: −50…+50 °C at
+   sea level, −10…+15 °C/km lapse rate (including inversions), and 0…50 °C solar warming.
+   Volcanic and geothermal extremes remain the responsibility of Temperature Modify rather than
+   making ordinary climate controls too coarse.
 3. **Temperature composition:** the map is not metadata attached to its generator. Its physical
    Celsius contract follows the field through downstream Filter and Combine nodes. **Temperature
    Modify** adds/removes degrees, approaches a target, or enforces a minimum through an optional
