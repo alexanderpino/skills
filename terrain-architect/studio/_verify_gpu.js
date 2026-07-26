@@ -1,7 +1,9 @@
 // GPU-vs-CPU parity: the CPU kernels are the reference; the GPU fast path must match them.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
 (async () => {
@@ -31,6 +33,16 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const base = fbmField(gnoise,A), T = {talus:0.012,iters:30,rate:0.5};
     const c3 = time(()=>thermalErode(base,T)), g3 = time(()=>gpuThermal(base,T));
     res.thermal = { ...diff(c3.v,g3.v), cpuMs:c3.ms, gpuMs:g3.ms };
+    // --- Warp: same noise offsets and manual bilinear sampling ---
+    const W={strength:0.12,freq:3,seed:7};
+    const c4=time(()=>warpField(base,W)),g4=time(()=>gpuWarp(base,W));
+    res.warp={...diff(c4.v,g4.v),cpuMs:c4.ms,gpuMs:g4.ms};
+    // --- GPU hydraulic pipes: invariants + expected erosion and deposition ---
+    const hp=time(()=>gpuHydraulicPipes(base,{iters:48,capacity:6,erode:.35,deposit:.28,inertia:.05}));
+    let eroded=0,deposited=0,maxDrop=0,maxRise=0,finite=true;
+    for(let i=0;i<base.length;i++){const d=hp.v[i]-base[i];if(!Number.isFinite(hp.v[i]))finite=false;
+      if(d<0){eroded++;maxDrop=Math.max(maxDrop,-d);}if(d>0){deposited++;maxRise=Math.max(maxRise,d);}}
+    res.hydraulic={gpuMs:hp.ms,finite,eroded,deposited,maxDrop:+maxDrop.toFixed(5),maxRise:+maxRise.toFixed(5)};
 
     // --- scaling: how long does a 512^2 / 1024^2 generator take on each path? ---
     res.scale = {};
@@ -47,8 +59,9 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
   if (!r.gpuAvailable) { console.log('GPU NOT AVAILABLE'); }
   else {
-    for (const k of ['perlin','ridged','thermal'])
+    for (const k of ['perlin','ridged','thermal','warp'])
       console.log(`${k.padEnd(8)} maxAbs=${r[k].maxAbs} meanAbs=${r[k].meanAbs}   cpu=${r[k].cpuMs}ms gpu=${r[k].gpuMs}ms`);
+    console.log('hydraulic',JSON.stringify(r.hydraulic));
     for (const [n,v] of Object.entries(r.scale))
       console.log(`fbm@${n}^2  gpu=${v.gpuMs}ms cpu=${v.cpuMs===null?'(skipped)':v.cpuMs+'ms'}`);
   }

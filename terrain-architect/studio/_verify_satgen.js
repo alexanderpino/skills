@@ -1,7 +1,9 @@
 // Headless test of the docked SatMap Studio gradient editor.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 const log = (...a) => console.log(...a);
 
@@ -22,8 +24,9 @@ const log = (...a) => console.log(...a);
     const d=g.getImageData(0,0,c.width,c.height).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>0) n++; return n; });
 
   // open
-  await page.click('#satGenBtn'); await page.waitForTimeout(200);
-  log('drawer open:', await page.evaluate(()=>document.querySelector('#satgen').classList.contains('open')));
+  await page.getByRole('button',{name:'Open SatMap Studio…'}).click(); await page.waitForTimeout(200);
+  log('drawer open:', await page.evaluate(()=>({open:document.querySelector('#satgen').classList.contains('open'),
+    nodeGradient:nearestUpstreamNode('satmap').params.gradient})));
   log('handles (Temperate=7):', await handleCount(), '| histo bars:', await histoHasBars(), '| lut mid:', JSON.stringify(await lutMid()));
 
   // preset -> Dune (12 stops)
@@ -65,7 +68,11 @@ const log = (...a) => console.log(...a);
   // from image -> auto-extract
   await page.click('#sgFromImg'); await page.waitForTimeout(120);
   log('image panel visible:', await page.evaluate(()=>!document.querySelector('#sgImgPanel').hidden));
-  await page.setInputFiles('#satImg', path.resolve(__dirname, '_testimg.png')); await page.waitForTimeout(400);
+  const fixture=Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48">
+    <defs><linearGradient id="g"><stop stop-color="#20364c"/><stop offset=".35" stop-color="#70865c"/>
+      <stop offset=".7" stop-color="#b47b4d"/><stop offset="1" stop-color="#e4d8c4"/></linearGradient></defs>
+    <rect width="96" height="48" fill="url(#g)"/></svg>`);
+  await page.setInputFiles('#satImg',{name:'satmap-fixture.svg',mimeType:'image/svg+xml',buffer:fixture}); await page.waitForTimeout(400);
   await page.evaluate(()=>{const s=document.querySelector('#sgN');s.value=10;s.dispatchEvent(new Event('input'));});
   await page.click('#sgAuto'); await page.waitForTimeout(200);
   log('handles after Auto-extract (10):', await handleCount());
@@ -75,7 +82,8 @@ const log = (...a) => console.log(...a);
   // apply
   await page.fill('#sgName', 'DrawerMap'); await page.click('#sgApply'); await page.waitForTimeout(400);
   const applied = await page.evaluate(()=>({ open:document.querySelector('#satgen').classList.contains('open'),
-    inSat: !!SATMAPS['DrawerMap'], sel: document.querySelector('#satSel').value, satName }));
+    inSat: !!SATMAPS['DrawerMap'], satName,
+    nodeGradient:nearestUpstreamNode('satmap').params.gradient }));
   log('after apply:', JSON.stringify(applied));
   await page.screenshot({ path: path.resolve(__dirname, '_shot_drawer_applied.png') });
 

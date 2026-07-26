@@ -60,6 +60,7 @@ button{font-family:inherit;color:inherit}
 }
 .btn:hover{background:var(--panel3);border-color:var(--line2)}
 .btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.38;cursor:default;transform:none}
 .btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-dim));
   border-color:var(--accent-dim);color:#1a1206;font-weight:600}
 .btn.primary:hover{filter:brightness(1.06)}
@@ -69,36 +70,73 @@ select.btn{appearance:none;padding-right:22px;
   background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
   background-position:calc(100% - 12px) 12px,calc(100% - 8px) 12px;background-size:4px 4px;background-repeat:no-repeat}
 
-#main{display:grid;grid-template-columns:1fr 372px;min-height:0;position:relative}
-#graphwrap{position:relative;min-width:0;background:
+#main{display:grid;grid-template-columns:minmax(0,1fr) 372px;grid-template-rows:52% 48%;
+  grid-template-areas:"graph viewport" "graph props";min-height:0;position:relative}
+#main.stacked{grid-template-areas:"viewport props" "graph props"}
+#graphwrap{grid-area:graph;position:relative;min-width:0;min-height:0;background:
   radial-gradient(1200px 800px at 30% 0%,#151b23 0%,var(--bg) 70%)}
 :root[data-theme="light"] #graphwrap{background:radial-gradient(1200px 800px at 30% 0%,#f4f7fb,var(--bg) 70%)}
 #graph{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
 #graph.panning{cursor:grabbing}
 #graph.linking{cursor:crosshair}
 
-#rail{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);
-  min-width:0;min-height:0;overflow:hidden}
-#viewport{position:relative;height:52%;min-height:0;border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg,#1b222c,#0e1319)}
+#viewport{grid-area:viewport;position:relative;min-width:0;min-height:0;border-left:1px solid var(--line);
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1b222c,#0e1319)}
+#main.stacked #viewport{border-left:0}
+#main.stacked #graphwrap{border-top:1px solid var(--line)}
+#viewport:fullscreen{width:100vw;height:100vh;border:0;background:#0e1319}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .vp-overlay{position:absolute;left:10px;top:9px;display:flex;gap:6px;pointer-events:none;flex-wrap:wrap;max-width:80%}
 .vp-chip{pointer-events:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.3px;
   background:rgba(10,13,18,.6);border:1px solid var(--line);border-radius:4px;padding:3px 7px;color:var(--muted);backdrop-filter:blur(6px)}
 .vp-chip b{color:var(--text);font-weight:600}
-.vp-tools{position:absolute;right:10px;top:9px;display:flex;gap:5px}
+.vp-tools{position:absolute;right:10px;top:9px;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;
+  max-width:calc(100% - 20px)}
 .vp-tools .btn{height:24px;padding:0 8px;font-size:11px;background:rgba(10,13,18,.55);backdrop-filter:blur(6px)}
-select#satSel{appearance:none;padding-right:20px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 11px) 10px,calc(100% - 7px) 10px;background-size:4px 4px;background-repeat:no-repeat}
+#main:not(.stacked) .vp-tools{left:8px;right:8px;gap:4px}
+#main:not(.stacked) .vp-tools .btn{height:22px;padding:0 5px;font-size:10px}
+#main:not(.stacked) .vp-tools .btn.icon{width:24px}
+#main:not(.stacked) .vp-overlay{top:38px;max-width:calc(100% - 20px)}
+.sat-picker-swatch{width:72px;height:14px;flex:none;border:1px solid rgba(255,255,255,.28);box-shadow:inset 0 0 0 1px rgba(0,0,0,.16)}
+.sat-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+.sat-picker-caret{margin-left:auto;color:var(--muted);font-size:9px}
+.sat-menu{position:fixed;z-index:80;width:min(304px,calc(100vw - 20px));max-height:min(560px,calc(100vh - 20px));
+  display:flex;flex-direction:column;overflow:hidden;
+  padding:8px;background:rgba(15,19,24,.97);border:1px solid var(--line2);border-radius:8px;
+  box-shadow:0 18px 45px rgba(0,0,0,.52);backdrop-filter:blur(12px)}
+.sat-menu[hidden]{display:none}
+:root[data-theme="light"] .sat-menu{background:rgba(247,249,252,.98)}
+.sat-menu-head{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 4px 7px;
+  color:var(--text);font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
+.sat-menu-head small{color:var(--muted);font-family:var(--mono);font-size:9px;font-weight:400}
+.sat-picker-list{min-height:0;overflow-y:auto;padding:7px 2px 1px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.sat-option{position:relative;width:100%;height:42px;display:block;padding:0;margin:0 0 4px;border:1px solid var(--line2);
+  border-radius:3px;overflow:hidden;cursor:pointer;background:var(--panel3);box-shadow:none}
+.sat-option:hover,.sat-option:focus-visible{border-color:var(--text);outline:none}
+.sat-option.selected{border:2px solid var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.75)}
+.sat-option-strip{position:absolute;inset:0}
+.sat-option-name{position:absolute;right:4px;bottom:3px;max-width:80%;overflow:hidden;text-overflow:ellipsis;
+  padding:1px 5px;border-radius:3px;background:rgba(7,9,12,.68);color:#fff;font:600 9px var(--mono);
+  letter-spacing:.2px;text-shadow:0 1px 1px #000}
+.prop-sat-picker{width:100%;height:38px;display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer}
+.prop-sat-picker .sat-picker-swatch{height:24px;flex:1;width:auto}
+.prop-sat-picker .sat-picker-name{font-family:var(--mono);font-size:10px;max-width:92px}
+.mix-layer{margin:0 0 8px;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.mix-layer-head{display:flex;align-items:center;gap:5px;margin-bottom:7px;font:600 10px var(--mono);color:var(--text)}
+.mix-layer-head span{margin-right:auto}.mix-layer-head .btn{height:22px;min-width:26px;padding:0 6px}
+.mix-layer-row{display:grid;grid-template-columns:68px 1fr;align-items:center;gap:7px;margin-top:6px;font-size:10px;color:var(--muted)}
+.mix-layer-row input[type=range]{width:100%}
 .vp-render{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;
   background:rgba(10,13,18,.6);border:1px solid var(--line);border-radius:7px;padding:8px 11px;backdrop-filter:blur(7px)}
 :root[data-theme="light"] .vp-render{background:rgba(255,255,255,.72)}
 .vp-render .rrow{display:flex;align-items:center;gap:8px}
-.vp-render label{font-family:var(--mono);font-size:10px;color:var(--muted);width:30px;letter-spacing:.4px}
+.vp-render label{font-family:var(--mono);font-size:10px;color:var(--muted);width:34px;letter-spacing:.4px}
 .vp-render .sunico{width:14px;text-align:center;color:var(--accent);font-size:12px}
 .vp-render input[type=range]{width:104px;height:3px}
 
 /* -- properties -- */
-#props{flex:1;min-height:0;display:flex;flex-direction:column}
+#props{grid-area:props;min-width:0;min-height:0;display:flex;flex-direction:column;
+  border-left:1px solid var(--line);background:var(--panel)}
 .prop-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
 .prop-swatch{width:9px;height:22px;border-radius:3px;flex:none;background:var(--accent)}
 .prop-title{font-weight:600;font-size:13px}
@@ -201,6 +239,8 @@ select.sg-btn{appearance:auto}
       <button class="btn primary" id="addBtn" title="Add node (double-click canvas)">＋ Add node</button>
       <button class="btn" id="autoBtn" title="Recompute automatically on every edit">Auto ⟳</button>
       <button class="btn" id="buildBtn" title="Recompute the graph now">Build</button>
+      <button class="btn icon" id="undoBtn" title="Undo (Ctrl/Cmd+Z)" disabled>↶</button>
+      <button class="btn icon" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷</button>
     </div>
     <div class="tsep"></div>
     <div class="tgroup">
@@ -209,7 +249,10 @@ select.sg-btn{appearance:auto}
         <option value="128">128²</option><option value="192" selected>192²</option><option value="256">256²</option>
         <option value="512">512²</option><option value="1024">1024²</option>
       </select>
-      <button class="btn" id="gpuBtn" title="Use the WebGL2 GPU fast path for generators and thermal erosion">GPU</button>
+      <select class="btn" id="qualitySel" title="Interactive caps simulation travel for responsive previews; Final uses the full resolution-scaled budget">
+        <option value="interactive" selected>Interactive</option><option value="final">Final</option>
+      </select>
+      <button class="btn" id="gpuBtn" title="Use WebGL2 GPU paths for generators, Warp, thermal and hydraulic erosion">GPU</button>
       <button class="btn" id="scaleBtn" title="Resolution independence: keep cell-relative params (talus angle, droplet density, radii) constant as RES changes">Res Lock</button>
     </div>
     <div class="tspacer"></div>
@@ -217,6 +260,7 @@ select.sg-btn{appearance:auto}
       <button class="btn" id="importBtn" title="Load a real heightmap (PNG / .r16 raw) as a base">⭳ Import DEM</button>
       <button class="btn" id="exportBtn" title="Download the output heightmap as 16-bit PNG">⭱ Export height</button>
       <div class="tsep"></div>
+      <button class="btn icon" id="layoutBtn" title="Stack rendering above the graph">⬍</button>
       <button class="btn icon" id="frameBtn" title="Frame terrain">⤢</button>
       <button class="btn icon" id="themeBtn" title="Toggle theme">◑</button>
     </div>
@@ -226,27 +270,32 @@ select.sg-btn{appearance:auto}
     <div id="graphwrap">
       <canvas id="graph"></canvas>
     </div>
-    <div id="rail">
-      <div id="viewport">
-        <canvas id="gl"></canvas>
-        <div class="vp-overlay" id="vpInfo"></div>
-        <div class="vp-tools">
-          <select class="btn" id="satSel" title="SatMap colour LUT"></select>
-          <button class="btn" id="satGenBtn" title="Create a SatMap colour LUT from an image">＋LUT</button>
-          <button class="btn" id="shadeSel" title="Cycle shading (SatMap / Slope / Grey)">SatMap</button>
-          <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
-        </div>
-        <div class="vp-render">
-          <div class="rrow"><span class="sunico">☀</span><label>SUN</label><input type="range" id="sunAz" min="0" max="6.28" step="0.02" value="0.55" title="Sun azimuth"></div>
-          <div class="rrow"><span class="sunico">⤒</span><label>ELEV</label><input type="range" id="sunEl" min="0.08" max="1.5" step="0.01" value="0.85" title="Sun elevation"></div>
-        </div>
+    <div id="viewport">
+      <canvas id="gl"></canvas>
+      <div class="vp-overlay" id="vpInfo"></div>
+      <div class="vp-tools">
+        <button class="btn" id="previewBtn" title="Preview the Output or selected node">Output</button>
+        <button class="btn" id="viewBtn" title="Toggle hero and plan inspection cameras">Plan</button>
+        <select class="btn" id="shadeSel" title="Viewport render style">
+          <option value="0" selected>Realistic</option><option value="1">Clay</option>
+          <option value="2">Albedo</option><option value="3">Slope</option><option value="4">Normals</option>
+        </select>
+        <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
+        <button class="btn icon" id="fullscreenBtn" title="Fullscreen rendering (Shift+F)">⛶</button>
       </div>
-      <div id="props">
-        <div class="prop-head"><div class="prop-swatch" id="pSwatch"></div>
-          <div class="prop-title" id="pTitle">No node selected<small id="pSub">Click a node to edit it</small></div></div>
-        <div class="prop-body" id="pBody"><div class="prop-empty">Select a node in the graph to edit its parameters.<br><br>
-          Double-click empty canvas to add a node. Drag from a node's right port to wire it into another's left port.</div></div>
+      <button id="satGenBtn" type="button" hidden aria-hidden="true">Open SatMap Studio</button>
+      <div class="vp-render">
+        <div class="rrow"><span class="sunico">☀</span><label>SUN</label><input type="range" id="sunAz" min="0" max="6.28" step="0.02" value="0.55" title="Sun azimuth"></div>
+        <div class="rrow"><span class="sunico">⤒</span><label>ELEV</label><input type="range" id="sunEl" min="0.08" max="1.5" step="0.01" value="0.85" title="Sun elevation"></div>
+        <div class="rrow"><span class="sunico">◐</span><label>EXP</label><input type="range" id="exposure" min="-2" max="2" step="0.05" value="-0.15" title="Scene exposure (stops)"></div>
+        <div class="rrow"><span class="sunico">≋</span><label>HAZE</label><input type="range" id="haze" min="0" max="1" step="0.02" value="0.28" title="Aerial perspective density"></div>
       </div>
+    </div>
+    <div id="props">
+      <div class="prop-head"><div class="prop-swatch" id="pSwatch"></div>
+        <div class="prop-title" id="pTitle">No node selected<small id="pSub">Click a node to edit it</small></div></div>
+      <div class="prop-body" id="pBody"><div class="prop-empty">Select a node in the graph to edit its parameters.<br><br>
+        Double-click empty canvas to add a node. Drag from a node's right port to wire it into another's left port.</div></div>
     </div>
   </div>
 
@@ -257,11 +306,15 @@ select.sg-btn{appearance:auto}
     <span class="s">range <b id="statRange">—</b></span>
     <span class="s">eval <b id="statTime">—</b></span>
     <span class="grow"></span>
-    <span class="s">drag <kbd>MMB</kbd>/space pan · <kbd>wheel</kbd> zoom · <kbd>Del</kbd> remove · <kbd>F</kbd> frame</span>
+    <span class="s">drag <kbd>MMB</kbd>/space pan · <kbd>wheel</kbd> zoom · <kbd>Del</kbd> remove · <kbd>F</kbd> frame · <kbd>⇧F</kbd> fullscreen</span>
   </div>
 </div>
 <input type="file" id="fileInput" accept=".png,.r16,.raw,.bin" style="display:none">
 <div id="menu"></div>
+<div class="sat-menu" id="satPickerMenu" role="dialog" aria-label="SatMap Library" hidden>
+  <div class="sat-menu-head"><span>SatMap Library</span><small id="satPickerCount"></small></div>
+  <div class="sat-picker-list" id="satPickerList" role="listbox" aria-label="SatMap colour palettes"></div>
+</div>
 
 <!-- SatMap Studio: full-width bottom sheet gradient editor. The 3D viewport (upper right) stays visible; terrain recolours live. -->
 <div id="satgen" class="sg-drawer">
@@ -372,6 +425,7 @@ let satUniform={lo:0,hi:1,shift:0,reverse:0};   // SatMap-node Range/Shift/Rever
 let satComposite=0;                             // 1 when a SatMap layer stack is compositing per-vertex colour (else global LUT)
 function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
+let renderLook={exposure:-0.15,haze:0.28};     // scene-linear look development; exposure is in stops
 function sunDir(){const ce=Math.cos(sun.el);return[ce*Math.cos(sun.az),Math.sin(sun.el),ce*Math.sin(sun.az)];}
 // A real, public-domain USGS/SRTM heightmap (Colorado Plateau, 128²) embedded so a real-world area
 // is one click — an in-browser fetch of the AWS SRTM bucket is impossible (the bucket sends no CORS
@@ -501,6 +555,7 @@ function radialField(){
 let SCALE_RES=true;
 const REF_RES=192;
 const resScale=()=>SCALE_RES?RES/REF_RES:1;          // >1 when finer than the reference grid
+let BUILD_QUALITY="interactive";
 let USE_GPU=true;
 const GPU={
   ok:null,vs:null,progs:{},rts:{},fbo:null,
@@ -528,8 +583,12 @@ const GPU={
     this.bind(target,n);gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
     gl.useProgram(prog);if(setup)setup(prog);
     gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,null);},
+  clear(target,n){this.bind(target,n);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.bindFramebuffer(gl.FRAMEBUFFER,null);},
   upload(key,n,data){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);
     for(let i=0;i<n*n;i++)rgba[i*4]=data[i];
+    gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
+  uploadState(key,n,bed){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);
+    for(let i=0;i<n*n;i++){rgba[i*4]=bed[i];rgba[i*4+3]=1;}
     gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
   read(target,n){this.bind(target,n);
     const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);
@@ -626,6 +685,94 @@ function gpuThermal(inp,{talus=0.012,iters=30,rate=0.5}){
     const t=src;src=dst;dst=t;                 // ping-pong
   }
   return GPU.read(src,n);
+}
+const GPU_WARP_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uH;uniform float uN,uStrength,uFreq;uniform int uSeed;
+  `+GLSL_NOISE+`
+  float H(ivec2 p){int n=int(uN);return texelFetch(uH,clamp(p,ivec2(0),ivec2(n-1)),0).r;}
+  float bilinear(vec2 p){
+    ivec2 a=ivec2(floor(p));vec2 f=p-vec2(a);
+    return mix(mix(H(a),H(a+ivec2(1,0)),f.x),mix(H(a+ivec2(0,1)),H(a+ivec2(1,1)),f.x),f.y);}
+  void main(){
+    vec2 p=floor(gl_FragCoord.xy);float s=uStrength*uN;
+    float ox=(gnoise(p.x/uN*uFreq,p.y/uN*uFreq,uSeed)-0.5)*2.0*s;
+    float oy=(gnoise(p.x/uN*uFreq,p.y/uN*uFreq,uSeed+53)-0.5)*2.0*s;
+    frag=vec4(bilinear(p+vec2(ox,oy)),0.0,0.0,1.0);}`;
+function gpuWarp(inp,{strength=0.12,freq=3,seed=7}){
+  const n=RES,src=GPU.upload("warpIn",n,inp),dst=GPU.rt("warpOut",n),p=GPU.prog("warp",GPU_WARP_FS);
+  GPU.run(p,n,dst,q=>{
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(u(q,"uH"),0);
+    gl.uniform1f(u(q,"uN"),n);gl.uniform1f(u(q,"uStrength"),strength);gl.uniform1f(u(q,"uFreq"),freq);
+    gl.uniform1i(u(q,"uSeed"),seed|0);});
+  return GPU.read(dst,n);
+}
+
+// Mei-style virtual-pipe hydraulic erosion in gather form. Unlike the CPU droplet solver, every
+// pixel only reads its four neighbours, so the whole simulation remains in float textures until one
+// final readback. RGBA state = bed, water, sediment, 1; RGBA flux = left, right, top, bottom.
+const GPU_PIPE_FLUX_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uS,uPrevF;uniform int uN;uniform float uRain,uMomentum,uFlow;
+  bool inside(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
+  vec3 S(ivec2 p){return texelFetch(uS,clamp(p,ivec2(0),ivec2(uN-1)),0).rgb;}
+  float head(ivec2 p,float edge){return inside(p)?S(p).r+S(p).g:edge;}
+  void main(){
+    ivec2 p=ivec2(gl_FragCoord.xy);vec3 s=S(p);float water=s.g+uRain,h=s.r+water;
+    vec4 prev=texelFetch(uPrevF,p,0);
+    vec4 dh=vec4(h-head(p+ivec2(-1,0),s.r-0.03),h-head(p+ivec2(1,0),s.r-0.03),
+                 h-head(p+ivec2(0,-1),s.r-0.03),h-head(p+ivec2(0,1),s.r-0.03));
+    vec4 f=max(vec4(0.0),prev*uMomentum+max(dh,vec4(0.0))*uFlow);
+    float total=f.x+f.y+f.z+f.w;
+    if(total>water&&total>0.0)f*=water/total;
+    frag=f;}`;
+const GPU_PIPE_STATE_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uS,uF;uniform int uN;
+  uniform float uRain,uEvap,uCapacity,uErode,uDeposit;
+  bool inside(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
+  vec3 S(ivec2 p){return texelFetch(uS,clamp(p,ivec2(0),ivec2(uN-1)),0).rgb;}
+  vec4 F(ivec2 p){return inside(p)?texelFetch(uF,p,0):vec4(0.0);}
+  void main(){
+    ivec2 p=ivec2(gl_FragCoord.xy);vec3 s=S(p);vec4 own=F(p);
+    float inL=F(p+ivec2(-1,0)).y,inR=F(p+ivec2(1,0)).x;
+    float inT=F(p+ivec2(0,-1)).w,inB=F(p+ivec2(0,1)).z;
+    float inflow=inL+inR+inT+inB,outflow=own.x+own.y+own.z+own.w;
+    float water0=s.g+uRain,water=max(0.0,water0+inflow-outflow)*uEvap;
+    float c=s.b/max(water0,0.0001);
+    float sedIn=S(p+ivec2(-1,0)).b/max(S(p+ivec2(-1,0)).g+uRain,0.0001)*inL
+               +S(p+ivec2(1,0)).b/max(S(p+ivec2(1,0)).g+uRain,0.0001)*inR
+               +S(p+ivec2(0,-1)).b/max(S(p+ivec2(0,-1)).g+uRain,0.0001)*inT
+               +S(p+ivec2(0,1)).b/max(S(p+ivec2(0,1)).g+uRain,0.0001)*inB;
+    float sediment=max(0.0,s.b+sedIn-c*outflow);
+    float b=s.r;
+    float slope=max(max(abs(b-S(p+ivec2(-1,0)).r),abs(b-S(p+ivec2(1,0)).r)),
+                    max(abs(b-S(p+ivec2(0,-1)).r),abs(b-S(p+ivec2(0,1)).r)));
+    float speed=min(8.0,(inflow+outflow)/max(0.001,0.5*(water0+water)));
+    float cap=uCapacity*max(slope,0.0005)*speed*(water0>0.0002?1.0:0.0);
+    float er=cap>sediment?min(uErode*(cap-sediment),0.0025):0.0;
+    float dep=cap<=sediment?min(uDeposit*(sediment-cap),sediment):0.0;
+    frag=vec4(b+dep-er,water,sediment+er-dep,1.0);}`;
+function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,inertia=0.05}){
+  const n=RES,pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
+  let state=GPU.uploadState("pipeStateA",n,inp),next=GPU.rt("pipeStateB",n);
+  let flux=GPU.rt("pipeFluxA",n),nextFlux=GPU.rt("pipeFluxB",n);GPU.clear(flux,n);
+  const rain=0.0012,evap=0.985,momentum=clamp(0.35+inertia,0.2,0.82);
+  for(let i=0;i<iters;i++){
+    GPU.run(pF,n,nextFlux,p=>{
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uS"),0);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,flux);gl.uniform1i(u(p,"uPrevF"),1);
+      gl.uniform1i(u(p,"uN"),n);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uMomentum"),momentum);
+      gl.uniform1f(u(p,"uFlow"),0.42);});
+    GPU.run(pS,n,next,p=>{
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uS"),0);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,nextFlux);gl.uniform1i(u(p,"uF"),1);
+      gl.uniform1i(u(p,"uN"),n);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uEvap"),evap);
+      gl.uniform1f(u(p,"uCapacity"),capacity*0.075);gl.uniform1f(u(p,"uErode"),erode*0.16);
+      gl.uniform1f(u(p,"uDeposit"),deposit*0.22);});
+    let t=state;state=next;next=t;t=flux;flux=nextFlux;nextFlux=t;
+  }
+  return GPU.read(state,n);
 }
 const gpuReady=()=>USE_GPU&&GPU.init();
 
@@ -1581,10 +1728,11 @@ const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combi
    reduction — geometry is exact, but the value range is re-stretched over the new window. */
 const EXACT_TYPES=new Set(["perlin","ridged","worley","gradient","shape","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
+function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
 function exactChain(id,guard){
   guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
   const nd=nodeById(id);if(!nd||!EXACT_TYPES.has(nd.type))return false;
-  return TYPES[nd.type].ins.every((_,s)=>{const e=inputEdge(id,s);return !e||exactChain(e.from,guard);});
+  return nodeInputs(nd).every((_,s)=>{const e=inputEdge(id,s);return !e||exactChain(e.from,guard);});
 }
 // Re-evaluate a chain under the ambient XF. Deliberately does NOT write nd._field: the cached fields
 // are the untransformed ones other branches and the thumbnails still depend on.
@@ -1592,7 +1740,7 @@ function evalExact(id,guard){
   if(!id||guard.has(id))return null;guard.add(id);
   const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
   const def=TYPES[nd.type];
-  const ins=def.ins.map((_,s)=>{const e=inputEdge(id,s);return e?evalExact(e.from,guard):null;});
+  const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);return e?evalExact(e.from,guard):null;});
   let f;try{f=def.eval(nd.params,ins,nd);}catch(err){console.error("exact",nd.type,err);f=newField();}
   guard.delete(id);return f;
 }
@@ -1710,7 +1858,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
 
   warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",
     params:[P.slider("strength","Strength",0,0.4,0.12),P.slider("freq","Frequency",0.5,8,3,0.1),P.seed("seed","Seed",7)],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],warpField(ins[0],p),ins[1]):newField()},
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],gpuReady()?gpuWarp(ins[0],p):warpField(ins[0],p),ins[1]):newField()},
   terrace:{cat:"filt",name:"Terrace",ins:["In","Mask"],desc:"Snap to stratified benches.",
     params:[P.int("steps","Steps",2,24,8),P.slider("sharp","Sharpness",0,1,0.6)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],terraceField(ins[0],p),ins[1]):newField()},
@@ -1774,7 +1922,10 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     const talus=(p.realScale==="on")
       ? Math.tan(p.repose*Math.PI/180)*cellSizeM()/terrainDef.height
       : p.talus/k;
-    const q={...p,talus,iters:Math.max(1,Math.round(p.iters*k))};
+    // Interactive is a preview-tier budget: enough relaxation to read the landform, bounded so a
+    // 1024² property edit does not launch 117+ simulation steps. Final retains full scaled travel.
+    const travel=BUILD_QUALITY==="final"?k:Math.min(1.5,Math.sqrt(k));
+    const q={...p,talus,iters:Math.max(1,Math.round(p.iters*travel))};
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
   streampower:{cat:"ero",name:"Stream power",ins:["In","Uplift","Mask"],
     desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
@@ -1787,12 +1938,19 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters,
        uplift:ins[1]||null, Ddt:p.hillslope*0.24}),ins[2]):newField(),
     note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades.<br><br>The shipped defaults are set against <b>real SRTM data</b>, not by eye: driven by a Tectonic uplift they reproduce a real tile's slope distribution to within about one unit at every percentile (p90 9.9 vs 9.3, p99 16.0 vs 15.7, max 24.2 vs 22.8)."},
-  hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"Droplet sim — carves valleys, deposits fans.",
-    params:[P.int("droplets","Droplets",2000,60000,18000),P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
+  hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"GPU virtual-pipe flow or CPU droplets — carves valleys and transports sediment.",
+    params:[P.seg("engine","Engine",[["auto","GPU pipes"],["droplets","CPU droplets"]],"auto"),
+      P.int("pipeIters","Pipe iterations",8,120,48),P.int("droplets","CPU droplets",2000,60000,18000),
+      P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.seed("seed","Seed",1),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
-    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>hydraulicErode(f,{...p,droplets:Math.round(p.droplets*k*k),radius:Math.max(1,Math.round(p.radius*k))})),ins[1]);}},
+    const usePipes=p.engine!=="droplets"&&gpuReady();
+    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>usePipes
+      ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters})
+      :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*(BUILD_QUALITY==="final"?k*k:Math.min(4,k*k))),
+        radius:Math.max(1,Math.round(p.radius*k))})),ins[1]);},
+    note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
 
   slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
     params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],
@@ -1827,34 +1985,69 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.slider("slopeW","Slope",0,1,0.5),P.slider("soilW","Soil",0,1,0.3),P.slider("flowW","Flow",0,1,0.2)],
     eval:(p,ins)=>ins[0]?textureField(ins[0],p):newField()},
 
-  water:{cat:"effect",name:"Water",ins:["In"],desc:"Adds water to the scene. Hydrology = lakes fill each basin + rivers flow downhill; Sea = a flat ocean at a level.",
+  water:{cat:"effect",name:"Water",ins:["In"],desc:"Adds a separate fluid surface to the scene. Hydrology fills basins and routes rivers; Sea adds a flat level. Filtered signed-depth coverage smooths the rendered shoreline without blurring terrain or changing water depth.",
     passthrough:true,effect:"water",
     params:[P.seg("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
-      P.slider("level","Sea level",0,0.6,0.12),P.slider("flow","River flow",0,1,0.5)],
+      P.slider("level","Sea level",0,0.6,0.12),P.slider("flow","River flow",0,1,0.5),
+      P.slider("shoreSmooth","Shore smoothing",0,2.5,1.35,.05),
+      P.slider("foam","Shore foam",0,1,.18,.01),
+      P.select("pattern","Surface pattern",[["cross","Cross ripples"],["wind","Wind waves"],["rings","Interference rings"],["none","None"]],"wind"),
+      P.slider("ripple","Pattern strength",0,1,.55,.01),
+      P.slider("rippleScale","Pattern scale",.25,3,1,.01),
+      P.slider("rippleSpeed","Pattern speed",0,2,1,.01)],
     eval:(p,ins)=>ins[0]||newField()},
   snow:{cat:"effect",name:"Snow",ins:["In"],desc:"Adds snow: settles on high, gentle ground; steep faces stay bare.",
     passthrough:true,effect:"snow",
     params:[P.slider("amount","Amount",0,1,0.5)],
     eval:(p,ins)=>ins[0]||newField()},
-  satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Colour through a gradient LUT — driven by height, slope, or any field wired into Driver (Gaea's SatMap). STACK several (each Masked, with Opacity + Blend) to composite colour in the graph. 2D biome mode blends a flat-ground and a steep-ground gradient by slope. In passes through unchanged.",
+  satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Authors one colour gradient, driven by height, slope, or any field wired into Driver. Chain a masked SatMap over another for a simple overlay, or blend separate SatMap branches in Color Blend for explicit biome composition. Height passes through unchanged.",
     passthrough:true,effect:"satmap",
-    params:[P.seg("mode","Mode",[["1d","1D"],["2d","2D biome"]],"1d"),
-      P.select("gradient","Gradient",null,"Temperate"),
-      P.select("gradientB","Steep gradient (2D)",null,"Canyon"),
+    params:[P.select("gradient","Gradient",null,"Temperate"),
       P.seg("source","Driven by",[["auto","Driver ▸ / Height"],["height","Height"],["slope","Slope"]],"auto"),
+      P.select("enhance","Enhance",[["none","None"],["autolevel","Autolevel"],["equalize","Equalize"]],"autolevel"),
       P.seg("reverse","Reverse",[["off","Off"],["on","On"]],"off"),
       P.slider("rangeLo","Range low",0,1,0),P.slider("rangeHi","Range high",0,1,1),
-      P.slider("shift","Shift",-0.5,0.5,0),
-      P.slider("opacity","Opacity",0,1,1),
-      P.select("blend","Blend",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
+      P.slider("shift","Bias",-0.5,0.5,0),
+      P.select("rough","Roughness",[["none","None"],["low","Low"],["med","Medium"],["high","High"],["ultra","Ultra"]],"med"),
+      P.slider("hue","Hue",-1,1,0,.01),P.slider("saturation","Saturation",-1,1,0,.01),
+      P.slider("lightness","Lightness",-1,1,0,.01)],
     eval:(p,ins,nd)=>{const h=ins[0]||newField();
-      let drv=p.source==="slope"?normalize(slopeOf(h)):p.source==="height"?h:(ins[1]||h);
-      nd._driver=normalize(drv);nd._slope=normalize(slopeOf(h));nd._mask=ins[2]||null;return h;}},
-  satmapblend:{cat:"effect",name:"SatMap Blend",ins:["A","B","Mask"],desc:"Blend two SatMap (colour) branches — A underneath, B over it by Mask × Opacity with a Blend mode. Height passes through from A. Gaea's SatMap-combine.",
+      const raw=p.source==="slope"?slopeOf(h):p.source==="height"?h:(ins[1]||h);
+      if(p.enhance==="equalize")nd._driver=histEqualizeField(raw,{bins:256,amount:1});
+      else if(p.enhance==="none"){nd._driver=new Float32Array(raw.length);for(let i=0;i<raw.length;i++)nd._driver[i]=clamp(raw[i],0,1);}
+      else nd._driver=normalize(raw);
+      nd._mask=ins[2]||null;return h;}},
+  colorerosion:{cat:"effect",name:"Color Erosion",ins:["In","Sediment","Mask"],desc:"Transports the upstream SatMap stack downhill as mineral pigment, then deposits it along convergent flow paths. Optional Sediment accepts Deposits, Flow, Soil, or any mask; height passes through unchanged.",
+    passthrough:true,effect:"colorerosion",
+    params:[P.slider("transport","Transport distance",0,3,1.43,.01),
+      P.slider("density","Sediment density",0,1,.2,.01),P.slider("blend","Blend",0,1,.89,.01),
+      P.slider("hold","Color hold",0,1,.89,.01),P.slider("flow","Flow volume",0,1,0,.01),
+      P.seg("laminar","Laminar flow",[["off","Off"],["on","On"]],"off"),
+      P.slider("diffusion","Diffusion",0,1,0,.01),P.seed("seed","Seed",7),
+      P.select("blendMode","Blend mode",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
+    eval:(p,ins,nd)=>{const h=ins[0]||newField();nd._height=h;nd._sediment=ins[1]||null;nd._mask=ins[2]||null;return h;}},
+  weathering:{cat:"effect",name:"Weathering",ins:["In","Mask"],desc:"A terrain-aware colour ageing pass: exposed relief can bleach or brighten, while sheltered recesses collect dirt. Includes scale, creep, inversion, HSL post controls, opacity, and blend mode; height passes through unchanged.",
+    passthrough:true,effect:"weathering",
+    params:[P.slider("scale","Scale",.02,1,.72,.01),P.slider("creep","Creep",0,1,.27,.01),
+      P.slider("amount","Amount",0,1,.26,.01),
+      P.seg("washed","Washed out",[["off","Off"],["on","On"]],"on"),
+      P.seg("inverse","Inverse",[["off","Off"],["on","On"]],"off"),
+      P.slider("dirt","Dirt",0,1,.01,.01),P.seg("darker","Darker",[["off","Off"],["on","On"]],"on"),
+      P.slider("hue","Hue",-1,1,0,.01),P.slider("saturation","Saturation",-1,1,0,.01),
+      P.slider("lightness","Lightness",-1,1,0,.01),P.slider("opacity","Opacity",0,1,1,.01),
+      P.select("blendMode","Blend mode",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
+    eval:(p,ins,nd)=>{const h=ins[0]||newField();nd._height=h;nd._mask=ins[1]||null;return h;}},
+  satmapblend:{cat:"effect",name:"Color Blend",ins:["A","B","Mask"],desc:"Blend any two colour branches — SatMap, Color Erosion, Weathering, or a mixed chain. A is underneath; B composites over it by Mask × Opacity using the selected mode. Height passes through from A.",
     passthrough:true,effect:"satmapblend",
-    params:[P.select("blend","Blend",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal"),
+    params:[P.select("blend","Blend",[["normal","Blend"],["add","Add"],["screen","Screen"],["subtract","Subtract"],
+      ["difference","Difference"],["multiply","Multiply"],["divide","Divide"],["divide2","Divide 2"],
+      ["max","Max"],["min","Min"],["hypotenuse","Hypotenuse"],["overlay","Overlay"],["power","Power"]],"normal"),
       P.slider("opacity","Opacity",0,1,1)],
     eval:(p,ins,nd)=>{nd._mask=ins[2]||null;return ins[0]||newField();}},
+  colormixer:{cat:"effect",name:"Color Mixer",ins:["Layer 1","Layer 2","Layer 3"],
+    desc:"Ordered color-layer stack with 2–15 dynamic inputs. Each layer has its own opacity and blend method; mask a layer in its upstream SatMap or Color Blend branch. Height passes through from Layer 1.",
+    passthrough:true,effect:"colormixer",params:[],
+    eval:(p,ins)=>ins[0]||newField()},
 
   output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
     params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
@@ -1865,6 +2058,37 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
    GRAPH MODEL
    ===================================================================== */
 let nodes=[],edges=[],uid=1,selected=null;
+let historyReady=false,undoStack=[],redoStack=[];
+const HISTORY_LIMIT=60;
+const cloneParams=p=>typeof structuredClone==="function"?structuredClone(p):JSON.parse(JSON.stringify(p));
+function graphSnapshot(){
+  return{
+    nodes:nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,w:n.w,params:cloneParams(n.params),
+      _inputs:n._inputs?[...n._inputs]:null,_dem:n._dem,_demImg:n._demImg,_demRaw:n._demRaw})),
+    edges:edges.map(e=>({...e})),uid,selectedId:selected?selected.id:null,terrainDef:{...terrainDef}
+  };
+}
+function updateHistoryButtons(){
+  $("#undoBtn").disabled=!undoStack.length;$("#redoBtn").disabled=!redoStack.length;
+}
+function pushUndo(snap){
+  if(!historyReady||!snap)return;
+  undoStack.push(snap);if(undoStack.length>HISTORY_LIMIT)undoStack.shift();redoStack.length=0;updateHistoryButtons();
+}
+function recordHistory(){pushUndo(graphSnapshot());}
+function restoreGraph(snap){
+  nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true}));
+  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={...snap.terrainDef};
+  H_SCALE=terrainDef.height/terrainDef.scale;
+  selected=snap.selectedId==null?null:nodeById(snap.selectedId);
+  buildProps();evalGraph();updateHistoryButtons();
+}
+function undoGraph(){
+  if(!undoStack.length)return;const cur=graphSnapshot(),snap=undoStack.pop();redoStack.push(cur);restoreGraph(snap);toast("Undo");
+}
+function redoGraph(){
+  if(!redoStack.length)return;const cur=graphSnapshot(),snap=redoStack.pop();undoStack.push(cur);restoreGraph(snap);toast("Redo");
+}
 // Every node carrying a `seed` gets a fresh RANDOM one, 0..1000000. Taking the type default gave
 // every Mountain seed 7, so three placed Mountains were three identical mountains and the whole
 // place-and-combine workflow was pointless.
@@ -1875,17 +2099,22 @@ let nodes=[],edges=[],uid=1,selected=null;
 const SEED_MAX=1000000;
 const randomSeed=()=>Math.floor(Math.random()*(SEED_MAX+1));
 function makeNode(type,x,y){
+  if(historyReady)recordHistory();
   const def=TYPES[type];const p={};def.params.forEach(pr=>p[pr.key]=pr.def);
-  const nd={id:uid++,type,x,y,w:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null};
+  const nd={id:uid++,type,x,y,w:type==="colormixer"?190:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null};
+  if(type==="colormixer"){
+    nd._inputs=["Layer 1","Layer 2","Layer 3"];
+    nd.params.layers=[{opacity:1,blend:"normal"},{opacity:1,blend:"normal"},{opacity:1,blend:"normal"}];
+  }
   if("seed"in p)p.seed=randomSeed();
   nodes.push(nd);return nd;
 }
 function nodeById(id){return nodes.find(n=>n.id===id);}
 function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
-function collectScene(){                            // walk upstream from Output; pick the nearest Water / Snow / SatMap
-  const s={water:null,snow:null,satmap:null};const out=outputNode();if(!out)return s;
-  const q=[out.id],seen=new Set();
+function collectScene(root){                        // walk upstream from the active preview root
+  const s={water:null,snow:null,satmap:null};root=root||outputNode();if(!root)return s;
+  const q=[root.id],seen=new Set();
   while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);
     const nd=nodeById(id);if(!nd)continue;
     if(nd.type==="water"&&!s.water)s.water={...nd.params};
@@ -1894,38 +2123,68 @@ function collectScene(){                            // walk upstream from Output
     edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
   return s;
 }
+function nearestUpstreamNode(type,root){
+  root=root||activePreviewNode()||outputNode();if(!root)return null;
+  const q=[root.id],seen=new Set();
+  while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);const nd=nodeById(id);if(!nd)continue;
+    if(nd.type===type)return nd;edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
+  return null;
+}
 function markDirtyFrom(id){ // mark node and everything downstream dirty
   const stack=[id];const seen=new Set();
   while(stack.length){const cur=stack.pop();if(seen.has(cur))continue;seen.add(cur);
     const nd=nodeById(cur);if(nd)nd._dirty=true;
     edges.filter(e=>e.from===cur).forEach(e=>stack.push(e.to));}
 }
+// Parameter edits on passthrough/effect nodes change colour or scene state, not height.
+// Keep the cached downstream heightfield alive so a SatMap drag does not normalize and
+// rebuild the entire mesh, normals, height texture, and hydrology as if geology changed.
+function markParamDirty(nd){
+  if(!nd)return;
+  if(TYPES[nd.type]&&TYPES[nd.type].passthrough){nd._dirty=true;nd._thumb=null;}
+  else markDirtyFrom(nd.id);
+}
+let evalFrame=0;
 function evalGraph(){
+  if(evalFrame){cancelAnimationFrame(evalFrame);evalFrame=0;}
   const t0=performance.now();
-  const memo={};let evals=0;
+  const memo={};let evals=0,colorDirty=false;
   function ev(id,guard){
     if(!id)return null;if(guard.has(id))return null;guard.add(id);
     const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
     if(!nd._dirty&&nd._field){guard.delete(id);return nd._field;}
-    const def=TYPES[nd.type];const ins=def.ins.map((_,s)=>{const e=inputEdge(id,s);return e?ev(e.from,guard):null;});
-    let f;try{f=def.eval(nd.params,ins,nd);}catch(err){console.error("node",nd.type,err);f=newField();}
-    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;guard.delete(id);return f;
+    const def=TYPES[nd.type];const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);return e?ev(e.from,guard):null;});
+    const nt0=performance.now();let f;try{f=def.eval(nd.params,ins,nd);}catch(err){console.error("node",nd.type,err);f=newField();}
+    nd._lastMs=performance.now()-nt0;
+    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
+    if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
+    guard.delete(id);return f;
   }
   nodes.forEach(n=>{if(n.type==="output"||true)ev(n.id,new Set());}); // eval all (for thumbnails)
   const out=outputNode();const outF=out?out._field:null;
-  scene=collectScene();                            // gather Water/Snow effect nodes feeding the Output
-  const t1=performance.now();
-  updateViewport(outF);
+  const preview=activePreviewNode();
+  scene=collectScene(preview);                     // effect nodes feeding the active viewport preview
+  if(scene.satmap&&SATMAPS[scene.satmap.gradient]){
+    satName=scene.satmap.gradient;if(typeof syncSatPicker==="function")syncSatPicker(false);
+  }
+  updateViewport(preview?preview._field:null,preview,{color:colorDirty});
+  updatePreviewInfo(preview);
   redrawThumbs();
   const rng=outF?fieldRange(outF):[0,0];
-  $("#statTime").textContent=(t1-t0).toFixed(0)+" ms";
+  $("#statTime").textContent=(performance.now()-t0).toFixed(0)+" ms";
   $("#statNodes").textContent=nodes.length;
   $("#statOut").textContent=out?TYPES[out.type].name:"—";
   $("#statRange").textContent=outF?rng[0].toFixed(2)+" – "+rng[1].toFixed(2):"—";
   setStat(out?"ok":"warn",out?"Graph evaluated · "+evals+" nodes":"Add an Output node");
   drawGraph();
 }
-function requestEval(){if(AUTO)evalGraph();else drawGraph();}
+function requestEval(){
+  if(!AUTO){drawGraph();return;}
+  // Slider/pointer events can arrive much faster than a terrain frame. Coalesce the
+  // burst to the newest value instead of synchronously evaluating every stale value.
+  if(evalFrame)return;
+  evalFrame=requestAnimationFrame(()=>{evalFrame=0;evalGraph();});
+}
 
 /* =====================================================================
    THUMBNAILS (hillshaded preview baked per node)
@@ -1948,6 +2207,30 @@ function bakeThumb(nd){
   }
   ctx.putImageData(img,0,0);return c;
 }
+function bakeColorThumb(nd,col){
+  const f=nd._field;if(!f||!col)return null;
+  const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
+  const img=ctx.createImageData(TH,TH),n=RES,[mn,mx]=fieldRange(f),d=mx-mn||1;
+  const rgbAt=(sx,sy,ch)=>{
+    sx=clamp(sx,0,n-1);sy=clamp(sy,0,n-1);
+    const x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(x0+1,n-1),y1=Math.min(y0+1,n-1),tx=sx-x0,ty=sy-y0;
+    const a=col[(y0*n+x0)*3+ch]*(1-tx)+col[(y0*n+x1)*3+ch]*tx;
+    const b=col[(y1*n+x0)*3+ch]*(1-tx)+col[(y1*n+x1)*3+ch]*tx;
+    return a*(1-ty)+b*ty;
+  };
+  for(let y=0;y<TH;y++)for(let x=0;x<TH;x++){
+    const sx=x/(TH-1)*(n-1),sy=y/(TH-1)*(n-1);
+    const hl=(sampleBilinear(f,sx-1,sy)-mn)/d,hr=(sampleBilinear(f,sx+1,sy)-mn)/d;
+    const hu=(sampleBilinear(f,sx,sy-1)-mn)/d,hd=(sampleBilinear(f,sx,sy+1)-mn)/d;
+    const nx=hl-hr,ny=hu-hd,nz=.16,L=Math.hypot(nx,ny,nz)||1;
+    const sh=.62+.52*clamp((nx*.5+ny*.6+nz*.6)/L,0,1),i=(y*TH+x)*4;
+    img.data[i]=Math.round(clamp(rgbAt(sx,sy,0)*sh,0,1)*255);
+    img.data[i+1]=Math.round(clamp(rgbAt(sx,sy,1)*sh,0,1)*255);
+    img.data[i+2]=Math.round(clamp(rgbAt(sx,sy,2)*sh,0,1)*255);
+    img.data[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);return c;
+}
 function hyps(h){ // hypsometric tint 0..1
   const stops=[[0.0,[38,58,84]],[0.28,[54,92,74]],[0.45,[120,132,86]],[0.62,[150,124,86]],[0.78,[128,96,72]],[0.92,[196,190,182]],[1,[245,247,250]]];
   h=clamp(h,0,1);for(let i=0;i<stops.length-1;i++){if(h<=stops[i+1][0]){const t=(h-stops[i][0])/(stops[i+1][0]-stops[i][0]||1);
@@ -1966,12 +2249,13 @@ function css(v){return getComputedStyle(document.documentElement).getPropertyVal
 function resizeGraph(){const r=gc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
   gc.width=r.width*dpr;gc.height=r.height*dpr;gc.style.width=r.width+"px";gc.style.height=r.height+"px";gx.setTransform(dpr,0,0,dpr,0,0);drawGraph();}
 function toWorld(mx,my){return{x:(mx-view.x)/view.z,y:(my-view.y)/view.z};}
-function nodeH(nd){return 30+TH+8;}
+function nodeH(nd){const n=nodeInputs(nd).length;return nd.type==="colormixer"?Math.max(30+TH+8,38+n*15):30+TH+8;}
 function portPos(nd,which,slot){
   const h=nodeH(nd);
   if(which==="out")return{x:nd.x+nd.w,y:nd.y+h/2};
-  const ins=TYPES[nd.type].ins;const n=ins.length;const gapY=h/(n+1);
-  return{x:nd.x,y:nd.y+gapY*(slot+1)};
+  const ins=nodeInputs(nd),n=ins.length;
+  if(nd.type==="colormixer")return{x:nd.x,y:nd.y+31+(slot+.5)*(h-36)/Math.max(n,1)};
+  const gapY=h/(n+1);return{x:nd.x,y:nd.y+gapY*(slot+1)};
 }
 function drawGraph(){
   const w=gc.clientWidth,h=gc.clientHeight;gx.clearRect(0,0,w,h);
@@ -2000,6 +2284,7 @@ function drawWire(p0,p1,hot,dashed){
 function roundRect(x,y,w,h,r){gx.beginPath();gx.moveTo(x+r,y);gx.arcTo(x+w,y,x+w,y+h,r);gx.arcTo(x+w,y+h,x,y+h,r);gx.arcTo(x,y+h,x,y,r);gx.arcTo(x,y,x+w,y,r);gx.closePath();}
 function drawNode(nd){
   const def=TYPES[nd.type],h=nodeH(nd),sel=selected&&selected.id===nd.id;
+  const shown=activePreviewNode()&&activePreviewNode().id===nd.id;
   const cc=css(CAT[def.cat].c);
   gx.save();
   gx.shadowColor="rgba(0,0,0,.5)";gx.shadowBlur=sel?18:9;gx.shadowOffsetY=4;
@@ -2011,12 +2296,15 @@ function drawNode(nd){
   // title
   gx.fillStyle=css("--text");gx.font="600 11px "+css("--sans").split(",")[0]+",sans-serif";gx.textBaseline="middle";
   gx.fillText(def.name,nd.x+10,nd.y+16,nd.w-18);
+  if(shown){gx.beginPath();gx.arc(nd.x+nd.w-11,nd.y+16,4,0,6.2832);gx.fillStyle="#62a8ff";gx.fill();}
   // thumb
-  const tx=nd.x+nd.w/2-TH/2,ty=nd.y+28;
+  const tx=nd.type==="colormixer"?nd.x+nd.w-TH-8:nd.x+nd.w/2-TH/2,ty=nd.y+28;
   if(nd._thumb){gx.drawImage(nd._thumb,tx,ty,TH,TH);}else{gx.fillStyle=css("--panel3");gx.fillRect(tx,ty,TH,TH);}
+  if(nd._lastMs!=null){gx.fillStyle=css("--faint");gx.font="9px "+css("--mono");gx.textBaseline="alphabetic";
+    gx.fillText(nd._lastMs<10?nd._lastMs.toFixed(1)+" ms":Math.round(nd._lastMs)+" ms",nd.x+7,nd.y+h-7);}
   gx.strokeStyle=css("--line");gx.lineWidth=1;gx.strokeRect(tx+.5,ty+.5,TH-1,TH-1);
   // ports
-  def.ins.forEach((nm,s)=>{const p=portPos(nd,"in",s);drawPort(p,cc,hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="in"&&hoverPort.slot===s);
+  nodeInputs(nd).forEach((nm,s)=>{const p=portPos(nd,"in",s);drawPort(p,cc,hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="in"&&hoverPort.slot===s);
     gx.fillStyle=css("--muted");gx.font="9px "+css("--mono");gx.textAlign="left";gx.fillText(nm,p.x+8,p.y);gx.textAlign="left";});
   if(def.cat!=="out"){const p=portPos(nd,"out");drawPort(p,css("--accent"),hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="out");}
   gx.restore();
@@ -2028,7 +2316,7 @@ function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],h=no
 function portAt(wx,wy){
   for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],def=TYPES[nd.type];
     if(def.cat!=="out"){const p=portPos(nd,"out");if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"out"};}
-    for(let s=0;s<def.ins.length;s++){const p=portPos(nd,"in",s);if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"in",slot:s};}}
+    for(let s=0;s<nodeInputs(nd).length;s++){const p=portPos(nd,"in",s);if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"in",slot:s};}}
   return null;
 }
 
@@ -2040,11 +2328,11 @@ gc.addEventListener("mousedown",e=>{
   const port=portAt(w.x,w.y);
   if(port){
     if(port.which==="out"){linking={from:port.node,cur:w};gc.classList.add("linking");}
-    else{const ex=inputEdge(port.node,port.slot);if(ex){edges=edges.filter(x=>x!==ex);linking={from:ex.from,cur:w};markDirtyFrom(port.node);gc.classList.add("linking");}}
+    else{const ex=inputEdge(port.node,port.slot);if(ex){linking={from:ex.from,cur:w,original:ex};gc.classList.add("linking");}}
     return;
   }
   const nd=nodeAt(w.x,w.y);
-  if(nd){select(nd);drag={node:nd,dx:w.x-nd.x,dy:w.y-nd.y,moved:false};}
+  if(nd){select(nd);drag={node:nd,dx:w.x-nd.x,dy:w.y-nd.y,moved:false,before:graphSnapshot()};}
   else{select(null);drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");}
   drawGraph();
 });
@@ -2067,13 +2355,15 @@ window.addEventListener("mouseup",e=>{
     if(port&&port.which==="in"&&port.node!==linking.from){
       if(wouldCycle(linking.from,port.node))toast("That would create a cycle");
       else{                                                              // mutate ONLY on a valid drop (don't clobber the input on reject)
+        recordHistory();
+        if(linking.original)edges=edges.filter(x=>x!==linking.original);
         edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
         edges.push({from:linking.from,to:port.node,slot:port.slot});markDirtyFrom(port.node);requestEval();
       }
     }
     linking=null;gc.classList.remove("linking");drawGraph();
   }
-  if(drag){gc.classList.remove("panning");drag=null;}
+  if(drag){if(drag.node&&drag.moved)pushUndo(drag.before);gc.classList.remove("panning");drag=null;}
 });
 function wouldCycle(from,to){ // does 'to' already feed 'from'?
   const stack=[from];const seen=new Set();
@@ -2113,7 +2403,25 @@ $("#addBtn").onclick=e=>{const r=gc.getBoundingClientRect();openMenu(r.left+80,r
 /* =====================================================================
    PROPERTIES PANEL
    ===================================================================== */
-function select(nd){if(nd===selected){drawGraph();return;}selected=nd;buildProps();drawGraph();}
+let previewMode="output";
+function activePreviewNode(){
+  return previewMode==="selected"&&selected&&selected._field?selected:outputNode();
+}
+function updatePreviewInfo(root){
+  const name=root?TYPES[root.type].name:"No output";
+  $("#vpInfo").innerHTML=`<span class="vp-chip"><b>${previewMode==="selected"?"Selected":"Output"}</b> · ${name}</span>
+    <span class="vp-chip">drag orbit · ⇧/right-drag pan · wheel deep zoom</span>`;
+  $("#previewBtn").textContent=previewMode==="selected"?"Selected":"Output";
+  $("#previewBtn").classList.toggle("on",previewMode==="selected");
+}
+function refreshPreview(){
+  const root=activePreviewNode();scene=collectScene(root);updateViewport(root?root._field:null,root);updatePreviewInfo(root);drawGraph();
+}
+function select(nd){
+  if(nd===selected){drawGraph();return;}
+  selected=nd;buildProps();
+  if(previewMode==="selected")refreshPreview();else drawGraph();
+}
 function buildProps(){
   const body=$("#pBody"),title=$("#pTitle"),sub=$("#pSub"),sw=$("#pSwatch");
   if(!selected){ // no node selected -> scene-level TERRAIN DEFINITION (the world the heightfield represents)
@@ -2123,11 +2431,12 @@ function buildProps(){
       const f=document.createElement("div");f.className="field";
       f.innerHTML=`<div class="frow"><label>${label}</label><span class="val">${terrainDef[key]} m</span></div>`;
       const i=document.createElement("input");i.type="range";i.min=min;i.max=max;i.step=(max-min)/400;i.value=terrainDef[key];
-      i.oninput=()=>{terrainDef[key]=Math.round(parseFloat(i.value));
+      let before=null,changed=false;
+      i.oninput=()=>{if(!before)before=graphSnapshot();changed=true;terrainDef[key]=Math.round(parseFloat(i.value));
         f.querySelector(".val").textContent=terrainDef[key]+" m";
         H_SCALE=terrainDef.height/terrainDef.scale;if(curField)updateViewport(curField);tdInfo();};
-      i.onchange=()=>{if(nodes.some(n=>n.type==="thermal"&&n.params.realScale==="on")){
-        nodes.forEach(n=>{if(n.type==="thermal")n._dirty=true;});requestEval();}};
+      i.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;if(nodes.some(n=>n.type==="thermal"&&n.params.realScale==="on")){
+        nodes.filter(n=>n.type==="thermal").forEach(n=>markDirtyFrom(n.id));requestEval();}};
       f.appendChild(i);return f;};
     body.appendChild(mk("scale","Scale (across)",500,20000));
     body.appendChild(mk("height","Height",100,8000));
@@ -2141,6 +2450,16 @@ function buildProps(){
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
   def.params.forEach(pr=>body.appendChild(buildField(pr)));
+  if(selected.type==="colormixer")buildColorMixerProps(body);
+  if(selected.type==="satmap"){
+    const tools=document.createElement("div");tools.className="prop-actions";tools.style.margin="2px 0 8px";
+    const random=document.createElement("button");random.type="button";random.className="btn";random.textContent="Randomize";
+    random.title="Choose another SatMap palette";random.onclick=()=>{
+      const names=Object.keys(SATMAPS).filter(x=>x!==selected.params.gradient),name=names[Math.floor(Math.random()*names.length)];chooseSatMap(name,false);};
+    const studio=document.createElement("button");studio.type="button";studio.className="btn";
+    studio.textContent="Open SatMap Studio…";studio.title="Create or edit a SatMap LUT";studio.onclick=()=>$("#satGenBtn").click();
+    tools.append(random,studio);body.appendChild(tools);
+  }
   const note=def.info?def.info(selected):def.note;
   if(note){const nt=document.createElement("div");nt.className="hint";
     nt.style.margin="14px 0 10px";nt.innerHTML=note;body.appendChild(nt);}
@@ -2157,6 +2476,46 @@ function buildProps(){
   const del=document.createElement("button");del.className="btn";del.textContent="Delete";del.onclick=deleteSel;
   act.appendChild(dup);act.appendChild(del);body.appendChild(act);
 }
+function buildColorMixerProps(body){
+  const nd=selected;if(!nd._inputs)nd._inputs=["Layer 1","Layer 2","Layer 3"];
+  if(!Array.isArray(nd.params.layers))nd.params.layers=nd._inputs.map(()=>({opacity:1,blend:"normal"}));
+  while(nd.params.layers.length<nd._inputs.length)nd.params.layers.push({opacity:1,blend:"normal"});
+  const relabel=()=>{nd._inputs=nd._inputs.map((_,i)=>"Layer "+(i+1));};
+  const changed=()=>{relabel();markDirtyFrom(nd.id);buildProps();requestEval();};
+  const swap=(a,b)=>{if(b<0||b>=nd._inputs.length)return;recordHistory();
+    [nd.params.layers[a],nd.params.layers[b]]=[nd.params.layers[b],nd.params.layers[a]];
+    edges.filter(e=>e.to===nd.id).forEach(e=>{if(e.slot===a)e.slot=b;else if(e.slot===b)e.slot=a;});changed();};
+  nd._inputs.forEach((_,i)=>{
+    const cfg=nd.params.layers[i],card=document.createElement("div");card.className="mix-layer";
+    const head=document.createElement("div");head.className="mix-layer-head";
+    const name=document.createElement("span");name.textContent=i===0?"Layer 1 · Base":"Layer "+(i+1);
+    const up=document.createElement("button");up.className="btn";up.textContent="↑";up.title="Move layer up";up.disabled=i===0;up.onclick=()=>swap(i,i-1);
+    const down=document.createElement("button");down.className="btn";down.textContent="↓";down.title="Move layer down";down.disabled=i===nd._inputs.length-1;down.onclick=()=>swap(i,i+1);
+    const del=document.createElement("button");del.className="btn";del.textContent="×";del.title="Remove layer";del.disabled=nd._inputs.length<=2;
+    del.onclick=()=>{if(nd._inputs.length<=2)return;recordHistory();edges=edges.filter(e=>!(e.to===nd.id&&e.slot===i));
+      edges.filter(e=>e.to===nd.id&&e.slot>i).forEach(e=>e.slot--);nd._inputs.splice(i,1);nd.params.layers.splice(i,1);changed();};
+    head.append(name,up,down,del);card.appendChild(head);
+    if(i>0){
+      const modeRow=document.createElement("div");modeRow.className="mix-layer-row";modeRow.innerHTML="<span>Blend</span>";
+      const mode=document.createElement("select");mode.className="inp";
+      TYPES.satmapblend.params.find(p=>p.key==="blend").opts.forEach(o=>{const op=document.createElement("option");op.value=o[0];op.textContent=o[1];mode.appendChild(op);});
+      mode.value=cfg.blend||"normal";mode.onchange=()=>{recordHistory();cfg.blend=mode.value;markParamDirty(nd);requestEval();};modeRow.appendChild(mode);card.appendChild(modeRow);
+      const opRow=document.createElement("div");opRow.className="mix-layer-row";
+      const lab=document.createElement("span");lab.textContent="Opacity "+(cfg.opacity==null?1:cfg.opacity).toFixed(2);
+      const slider=document.createElement("input");slider.type="range";slider.min=0;slider.max=1;slider.step=.01;slider.value=cfg.opacity==null?1:cfg.opacity;
+      let before=null,dirty=false;slider.oninput=()=>{if(!before)before=graphSnapshot();dirty=true;cfg.opacity=+slider.value;lab.textContent="Opacity "+cfg.opacity.toFixed(2);markParamDirty(nd);requestEval();};
+      slider.onchange=()=>{if(dirty)pushUndo(before);before=null;dirty=false;};opRow.append(lab,slider);card.appendChild(opRow);
+    }
+    body.appendChild(card);
+  });
+  const add=document.createElement("button");add.className="btn";add.style.width="100%";add.disabled=nd._inputs.length>=15;
+  add.textContent=nd._inputs.length>=15?"15-layer limit reached":"＋ Add color layer ("+nd._inputs.length+"/15)";
+  add.onclick=()=>{if(nd._inputs.length>=15)return;recordHistory();nd._inputs.push("Layer "+(nd._inputs.length+1));nd.params.layers.push({opacity:1,blend:"normal"});changed();};
+  body.appendChild(add);
+  const hint=document.createElement("div");hint.className="hint";hint.style.marginTop="8px";
+  hint.innerHTML="For a per-layer biome mask, feed that layer through a masked <b>SatMap</b> or <b>Color Blend</b> before the Mixer. Layer 1 supplies the height stream.";
+  body.appendChild(hint);
+}
 function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
   el.innerHTML=`Vertical ratio <b>${(terrainDef.height/terrainDef.scale).toFixed(2)}</b> (height ÷ scale) ·
     cell size <b>${cellSizeM().toFixed(1)} m</b> at ${RES}².<br>
@@ -2168,21 +2527,31 @@ function buildField(pr){
     const val=selected.params[pr.key];
     f.innerHTML=`<div class="frow"><label>${pr.label}</label><span class="val">${fmtVal(pr,val)}</span></div>`;
     const inp=document.createElement("input");inp.type="range";inp.min=pr.min;inp.max=pr.max;inp.step=pr.step;inp.value=val;
-    inp.oninput=()=>{selected.params[pr.key]=parseFloat(inp.value);f.querySelector(".val").textContent=fmtVal(pr,selected.params[pr.key]);
-      markDirtyFrom(selected.id);requestEval();};
+    let before=null,changed=false;
+    inp.oninput=()=>{if(!before)before=graphSnapshot();changed=true;selected.params[pr.key]=parseFloat(inp.value);f.querySelector(".val").textContent=fmtVal(pr,selected.params[pr.key]);
+      markParamDirty(selected);requestEval();};
+    inp.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;};
     f.appendChild(inp);
   }else if(pr.type==="select"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
-    const opts=pr.opts||((pr.key==="gradient"||pr.key==="gradientB")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
+    if(selected.type==="satmap"&&pr.key==="gradient"){
+      const b=document.createElement("button");b.type="button";b.className="inp prop-sat-picker";
+      b.setAttribute("aria-haspopup","listbox");b.title="Choose a SatMap palette";
+      const strip=document.createElement("span");strip.className="sat-picker-swatch";strip.style.background=satGradientCSS(selected.params.gradient);
+      const name=document.createElement("span");name.className="sat-picker-name";name.textContent=selected.params.gradient;
+      const caret=document.createElement("span");caret.className="sat-picker-caret";caret.textContent="▾";
+      b.append(strip,name,caret);b.onclick=()=>openSatPicker(b);f.appendChild(b);return f;
+    }
+    const opts=pr.opts||((pr.key==="gradient")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
     const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
-    s.value=selected.params[pr.key];s.onchange=()=>{selected.params[pr.key]=s.value;markDirtyFrom(selected.id);requestEval();};f.appendChild(s);
+    s.value=selected.params[pr.key];s.onchange=()=>{recordHistory();selected.params[pr.key]=s.value;markParamDirty(selected);requestEval();};f.appendChild(s);
   }else if(pr.type==="seed"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
     const wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:6px";
     const inp=document.createElement("input");inp.type="number";inp.className="inp";
     inp.min=0;inp.max=SEED_MAX;inp.step=1;inp.value=selected.params[pr.key];inp.style.flex="1";
-    const set=(v)=>{selected.params[pr.key]=clamp(Math.round(v)||0,0,SEED_MAX);
-      inp.value=selected.params[pr.key];markDirtyFrom(selected.id);requestEval();};
+    const set=(v)=>{recordHistory();selected.params[pr.key]=clamp(Math.round(v)||0,0,SEED_MAX);
+      inp.value=selected.params[pr.key];markParamDirty(selected);requestEval();};
     inp.onchange=()=>set(parseFloat(inp.value));
     const dice=document.createElement("button");dice.className="btn";dice.textContent="\u21bb";
     dice.title="New random seed";dice.style.cssText="flex:0 0 auto;min-width:34px";
@@ -2224,13 +2593,14 @@ function buildField(pr){
         if(Math.hypot(a-px,b2-py)<8)return i;} return -1;};
     const local=(e)=>{const r=cv.getBoundingClientRect();
       return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height];};
-    let drag=-1;
+    let drag=-1,before=null,changed=false;
     cv.addEventListener("pointerdown",e=>{
+      before=graphSnapshot();changed=false;
       const[px,py]=local(e);let i=hit(px,py);
       if(i<0){                                            // click on empty space adds a point
         const[x,y]=toVal(px,py);const pts=nd.params[pr.key];
         pts.push([x,y]);pts.sort((a,b2)=>a[0]-b2[0]);i=pts.findIndex(q=>q[0]===x&&q[1]===y);
-        markDirtyFrom(nd.id);requestEval();}
+        changed=true;markParamDirty(nd);requestEval();}
       drag=i;cv.setPointerCapture(e.pointerId);draw();});
     cv.addEventListener("pointermove",e=>{
       if(drag<0)return;
@@ -2238,16 +2608,16 @@ function buildField(pr){
       // endpoints stay pinned in x: the curve must span exactly centre -> radius
       if(drag===0)x=0;else if(drag===pts.length-1)x=1;
       else x=clamp(x,pts[drag-1][0]+0.01,pts[drag+1][0]-0.01);
-      pts[drag]=[x,y];draw();markDirtyFrom(nd.id);requestEval();});
-    const stop=()=>{drag=-1;};
+      pts[drag]=[x,y];changed=true;draw();markParamDirty(nd);requestEval();});
+    const stop=()=>{if(changed)pushUndo(before);before=null;changed=false;drag=-1;};
     cv.addEventListener("pointerup",stop);cv.addEventListener("pointercancel",stop);
     cv.addEventListener("dblclick",e=>{
       const[px,py]=local(e),i=hit(px,py),pts=nd.params[pr.key];
-      if(i>0&&i<pts.length-1&&pts.length>2){pts.splice(i,1);draw();markDirtyFrom(nd.id);requestEval();}});
+      if(i>0&&i<pts.length-1&&pts.length>2){recordHistory();pts.splice(i,1);draw();markParamDirty(nd);requestEval();}});
     f.appendChild(cv);
     const seg=document.createElement("div");seg.className="seg";seg.style.marginTop="6px";
     SKIRT_PRESETS.forEach(([lab,e])=>{const b=document.createElement("button");b.textContent=lab;
-      b.onclick=()=>{nd.params[pr.key]=curveFromExponent(e);draw();markDirtyFrom(nd.id);requestEval();};
+      b.onclick=()=>{recordHistory();nd.params[pr.key]=curveFromExponent(e);draw();markParamDirty(nd);requestEval();};
       seg.appendChild(b);});
     f.appendChild(seg);
     draw();
@@ -2256,13 +2626,13 @@ function buildField(pr){
     const ta=document.createElement("textarea");ta.className="inp";ta.rows=pr.rows||9;
     ta.style.cssText="font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;resize:vertical;white-space:pre;overflow-x:auto";
     ta.value=selected.params[pr.key];
-    ta.onchange=()=>{selected.params[pr.key]=ta.value;markDirtyFrom(selected.id);requestEval();};
+    ta.onchange=()=>{recordHistory();selected.params[pr.key]=ta.value;markParamDirty(selected);requestEval();};
     f.appendChild(ta);
   }else if(pr.type==="seg"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
     const seg=document.createElement("div");seg.className="seg";
     pr.opts.forEach(o=>{const b=document.createElement("button");b.textContent=o[1];if(selected.params[pr.key]===o[0])b.classList.add("on");
-      b.onclick=()=>{selected.params[pr.key]=o[0];[...seg.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");markDirtyFrom(selected.id);requestEval();};seg.appendChild(b);});
+      b.onclick=()=>{if(selected.params[pr.key]===o[0])return;recordHistory();selected.params[pr.key]=o[0];[...seg.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");markParamDirty(selected);requestEval();};seg.appendChild(b);});
     f.appendChild(seg);
   }
   return f;
@@ -2270,15 +2640,18 @@ function buildField(pr){
 function fmtVal(pr,v){return pr.fmt?pr.fmt(v):(Number.isInteger(pr.step)?(v|0):(+v).toFixed(2));}
 function duplicateSel(){if(!selected)return;const nd=makeNode(selected.type,selected.x+30,selected.y+30);
   nd.params=JSON.parse(JSON.stringify(selected.params));
+  nd._inputs=selected._inputs?[...selected._inputs]:null;
   if("seed"in nd.params)nd.params.seed=randomSeed();   // a duplicate is a NEW feature, not a copy
   nd._dem=selected._dem;nd._demImg=selected._demImg;nd._demRaw=selected._demRaw;
   select(nd);requestEval();}
 function deleteSel(){if(!selected)return;const id=selected.id;
+  recordHistory();
   const incoming=edges.filter(e=>e.to===id),outgoing=edges.filter(e=>e.from===id);
   const src=incoming.length===1?incoming[0].from:null;                 // auto-bridge only when the input source is unambiguous
   edges=edges.filter(e=>e.from!==id&&e.to!==id);
   if(src!=null)outgoing.forEach(o=>{if(!edges.some(e=>e.to===o.to&&e.slot===o.slot)&&!wouldCycle(src,o.to))edges.push({from:src,to:o.to,slot:o.slot});});
-  nodes=nodes.filter(n=>n.id!==id);nodes.forEach(n=>n._dirty=true);select(null);requestEval();}
+  nodes=nodes.filter(n=>n.id!==id);nodes.forEach(n=>n._dirty=true);
+  if(previewMode==="selected")previewMode="output";select(null);requestEval();}
 
 /* =====================================================================
    IMPORT / EXPORT
@@ -2293,12 +2666,13 @@ $("#fileInput").onchange=e=>{const file=e.target.files[0];if(!file||!importTarge
   if(name.endsWith(".r16")||name.endsWith(".raw")||name.endsWith(".bin")){
     file.arrayBuffer().then(buf=>{const u16=new Uint16Array(buf);const side=Math.round(Math.sqrt(u16.length));
       if(side*side!==u16.length){toast("Raw must be square (got "+u16.length+" samples)");return;}
+      recordHistory();
       nd._demRaw={u16,side};nd._demImg=null;buildDemFromSource(nd);finishDem(nd);toast("Loaded "+side+"² raw heightmap");});
   }else{loadImageAsDEM(nd,URL.createObjectURL(file),"Loaded heightmap file");}
   e.target.value="";
 };
 function loadImageAsDEM(nd,src,label){
-  const img=new Image();img.onload=()=>{nd._demImg=img;nd._demRaw=null;buildDemFromSource(nd);finishDem(nd);toast(label);};
+  const img=new Image();img.onload=()=>{recordHistory();nd._demImg=img;nd._demRaw=null;buildDemFromSource(nd);finishDem(nd);toast(label);};
   img.onerror=()=>toast("Could not read that image");img.src=src;
 }
 // (re)build a node's imported heightfield at the CURRENT resolution from its retained source, so changing
@@ -2321,7 +2695,10 @@ $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast(
 /* =====================================================================
    WEBGL 3D VIEWPORT
    ===================================================================== */
-const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,hTex,satTex,gbuf=null,USE_DEFERRED=false,cam={az:0.7,el:0.62,dist:2.6},shadeMode=0,wire=false;
+const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,hTex,satTex,gbuf=null,USE_DEFERRED=false;
+const DEFAULT_HERO={az:0.7,el:0.62,dist:2.6,target:[0,.05,0]};
+const copyCam=c=>({az:c.az,el:c.el,dist:c.dist,target:[...c.target]});
+let cam=copyCam(DEFAULT_HERO),shadeMode=0,wire=false;
 function buildSatLUT(name){buildSatLUTStops(SATMAPS[name]||SATMAPS.Temperate);}
 function buildSatLUTStops(stops){                            // bake a 256-wide RGBA LUT texture from stops [[pos,[r,g,b]],...]
   if(!gl||!stops||!stops.length)return;const W=256,d=new Uint8Array(W*4);
@@ -2339,24 +2716,32 @@ function sampleStops(stops,t){t=clamp(t,0,1);let a=stops[0],b=stops[stops.length
   for(let k=0;k<stops.length-1;k++){if(t>=stops[k][0]&&t<=stops[k+1][0]){a=stops[k];b=stops[k+1];break;}}
   const f=clamp((t-a[0])/((b[0]-a[0])||1),0,1);
   return[(a[1][0]+(b[1][0]-a[1][0])*f)/255,(a[1][1]+(b[1][1]-a[1][1])*f)/255,(a[1][2]+(b[1][2]-a[1][2])*f)/255];}
-function satLayerColor(L,i){                          // one layer's colour at vertex i (1D ramp, or 2D flat↔steep blend by slope)
+function satLayerColor(L,i){                          // one SatMap owns exactly one gradient
   const drv=L.driver?L.driver[i]:0,dv=L.reverse==="on"?1-drv:drv;
-  const x=clamp(L.rangeLo+(L.rangeHi-L.rangeLo)*dv+L.shift,0,1);
-  const a=sampleStops(SATMAPS[L.gradient]||SATMAPS.Temperate,x);
-  if(L.mode==="2d"){const b=sampleStops(SATMAPS[L.gradientB]||SATMAPS.Canyon,x),s=L.slope?clamp(L.slope[i],0,1):0;
-    return[a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s,a[2]+(b[2]-a[2])*s];}
-  return a;}
+  const rp={low:[.025,7],med:[.045,13],high:[.075,23],ultra:[.115,39]}[L.rough];
+  let chaos=0;
+  if(rp){const px=i%RES,py=(i/RES)|0;chaos=(vnoise(px/RES*rp[1]+3.7,py/RES*rp[1]+11.2,1709)-.5)*2*rp[0];}
+  const x=clamp(L.rangeLo+(L.rangeHi-L.rangeLo)*dv+L.shift+chaos,0,1);
+  const c=sampleStops(SATMAPS[L.gradient]||SATMAPS.Temperate,x);
+  return gradeWeatherColor(c[0],c[1],c[2],L.hue||0,L.saturation||0,L.lightness||0);}
 function satBlend(dst,src,m,mode){const o=[0,0,0];
   for(let c=0;c<3;c++){let s=src[c];
-    if(mode==="multiply")s=dst[c]*src[c];
+    if(mode==="add")s=clamp(dst[c]+src[c],0,1);
+    else if(mode==="subtract")s=clamp(dst[c]-src[c],0,1);
+    else if(mode==="difference")s=Math.abs(dst[c]-src[c]);
+    else if(mode==="multiply")s=dst[c]*src[c];
     else if(mode==="screen")s=1-(1-dst[c])*(1-src[c]);
+    else if(mode==="divide")s=clamp(dst[c]/Math.max(src[c],1/255),0,1);
+    else if(mode==="divide2")s=clamp(src[c]/Math.max(dst[c],1/255),0,1);
     else if(mode==="max")s=Math.max(dst[c],src[c]);           // Gaea's Combine "Max" — the documented SatMap blend
     else if(mode==="min")s=Math.min(dst[c],src[c]);
+    else if(mode==="hypotenuse")s=clamp(Math.hypot(dst[c],src[c]),0,1);
     else if(mode==="overlay")s=dst[c]<0.5?2*dst[c]*src[c]:1-2*(1-dst[c])*(1-src[c]);
-    o[c]=dst[c]+(s-dst[c])*m;}
+    else if(mode==="power")s=Math.pow(clamp(dst[c],0,1),.25+clamp(src[c],0,1)*3.75);
+    o[c]=clamp(dst[c]+(s-dst[c])*m,0,1);}
   return o;}
-function satNodeColorField(nd,n){                     // a single SatMap node's colour (1D ramp or 2D biome), as a per-vertex field
-  const L={...nd.params,driver:nd._driver,slope:nd._slope},col=new Float32Array(n*n*3);
+function satNodeColorField(nd,n){                     // a single SatMap node's colour as a per-vertex field
+  const L={...nd.params,driver:nd._driver},col=new Float32Array(n*n*3);
   for(let i=0;i<n*n;i++){const c=satLayerColor(L,i);col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];}
   return col;}
 function blendFields(base,over,nd,n){                 // composite `over` onto `base` by (nd mask × opacity) with nd blend mode
@@ -2366,10 +2751,93 @@ function blendFields(base,over,nd,n){                 // composite `over` onto `
     const o=satBlend([base[i*3],base[i*3+1],base[i*3+2]],[over[i*3],over[i*3+1],over[i*3+2]],m,mode);
     col[i*3]=o[0];col[i*3+1]=o[1];col[i*3+2]=o[2];}
   return col;}
+function boxBlurScalar(src,n,r){                       // summed-area box filter: O(N), independent of radius
+  if(r<=0)return Float32Array.from(src);
+  const s=n+1,ii=new Float64Array(s*s),out=new Float32Array(n*n);
+  for(let y=0;y<n;y++){let row=0,ir=(y+1)*s,prev=y*s,si=y*n;
+    for(let x=0;x<n;x++){row+=src[si+x];ii[ir+x+1]=ii[prev+x+1]+row;}}
+  for(let y=0;y<n;y++){const ya=Math.max(0,y-r),yb=Math.min(n,y+r+1);
+    for(let x=0;x<n;x++){const xa=Math.max(0,x-r),xb=Math.min(n,x+r+1);
+      out[y*n+x]=(ii[yb*s+xb]-ii[ya*s+xb]-ii[yb*s+xa]+ii[ya*s+xa])/((xb-xa)*(yb-ya));}}
+  return out;
+}
+function blurColorMass(rgb,mass,n,r){
+  if(r<=0)return{rgb,mass};const N=n*n,out=new Float32Array(N*3);
+  for(let c=0;c<3;c++){const ch=new Float32Array(N);for(let i=0;i<N;i++)ch[i]=rgb[i*3+c];
+    const b=boxBlurScalar(ch,n,r);for(let i=0;i<N;i++)out[i*3+c]=b[i];}
+  return{rgb:out,mass:boxBlurScalar(mass,n,r)};
+}
+function colorErodeField(base,h,p,mask,n,owner){       // owned colour-advection/deposition model; height is unchanged
+  const N=n*n,laminar=p.laminar==="on",seed=p.seed|0;
+  const steps=clamp(Math.round((2+p.transport*10)*Math.min(resScale(),2.5)),1,96);
+  let route=owner&&owner._colorErosionRoute,recv,jumps;
+  if(route&&route.h===h&&route.n===n&&route.steps===steps&&route.laminar===laminar&&route.seed===seed){
+    recv=route.recv;jumps=route.jumps;
+  }else{
+    recv=new Int32Array(N);
+    const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,hi=h[i];let best=i,bv=hi;
+      for(let k=0;k<8;k++){const xx=x+nb[k][0],yy=y+nb[k][1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
+        const j=yy*n+xx,hj=h[j];if(hj>=hi-1e-8)continue;
+        const score=hj+(laminar?0:(hash2(x+k*17,y-k*13,seed)-.5)*2e-5);
+        if(score<bv){bv=score;best=j;}}
+      recv[i]=best;}
+    const levels=Math.ceil(Math.log2(steps+1));jumps=[recv];
+    for(let l=1;l<levels;l++){const a=jumps[l-1],b=new Int32Array(N);for(let i=0;i<N;i++)b[i]=a[a[i]];jumps.push(b);}
+    if(owner)owner._colorErosionRoute={h,n,steps,laminar,seed,recv,jumps};
+  }
+  const advance=(i,d)=>{let bit=0;while(d>0){if(d&1)i=jumps[Math.min(bit,jumps.length-1)][i];d>>=1;bit++;}return i;};
+  let dep=new Float32Array(N*3),mass=new Float32Array(N);
+  const density=clamp(p.density,0,1),hold=clamp(p.hold,0,1),flow=clamp(p.flow,0,1);
+  if(density<=1e-5||p.blend<=1e-5)return Float32Array.from(base);
+  const fr=[.34,.67,1],fw=[.28,.31,.41+flow*.65];
+  for(let i=0;i<N;i++){if(recv[i]===i)continue;
+    const sm=p._sediment?clamp(p._sediment[i],0,1):1,w0=density*(p._sediment?(.18+.82*sm):(.55+.45*Math.min(1,Math.abs(h[i]-h[recv[i]])*n)));
+    if(w0<=1e-6)continue;
+    const r=base[i*3],g=base[i*3+1],b=base[i*3+2],lum=.2126*r+.7152*g+.0722*b;
+    const mr=lum*.92,mg=lum*.82,mb=lum*.70,pr=mr+(r-mr)*hold,pg=mg+(g-mg)*hold,pb=mb+(b-mb)*hold;
+    for(let q=0;q<3;q++){const d=advance(i,Math.max(1,Math.round(steps*fr[q]))),w=w0*fw[q];
+      dep[d*3]+=pr*w;dep[d*3+1]+=pg*w;dep[d*3+2]+=pb*w;mass[d]+=w;}}
+  const br=Math.round(clamp(p.diffusion,0,1)*6*Math.min(resScale(),2.5));if(br>0){const z=blurColorMass(dep,mass,n,br);dep=z.rgb;mass=z.mass;}
+  const out=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const m=mass[i],fm=m>1e-7?1-Math.exp(-m*(4+flow*7)):0,msk=mask?clamp(mask[i],0,1):1;
+    const a=clamp(p.blend*fm*msk,0,1),j=i*3;
+    if(m>1e-7){out[j]=base[j]+(dep[j]/m-base[j])*a;out[j+1]=base[j+1]+(dep[j+1]/m-base[j+1])*a;out[j+2]=base[j+2]+(dep[j+2]/m-base[j+2])*a;}
+    else{out[j]=base[j];out[j+1]=base[j+1];out[j+2]=base[j+2];}}
+  return out;
+}
+function gradeWeatherColor(r,g,b,hue,sat,light){
+  if(Math.abs(hue)>1e-6){const Y=.299*r+.587*g+.114*b,I=.596*r-.274*g-.322*b,Q=.211*r-.523*g+.312*b,a=hue*Math.PI;
+    const ii=I*Math.cos(a)-Q*Math.sin(a),qq=I*Math.sin(a)+Q*Math.cos(a);r=Y+.956*ii+.621*qq;g=Y-.272*ii-.647*qq;b=Y-1.106*ii+1.703*qq;}
+  const l=.2126*r+.7152*g+.0722*b,k=Math.max(0,1+sat);r=l+(r-l)*k;g=l+(g-l)*k;b=l+(b-l)*k;
+  if(light>=0){r+= (1-r)*light;g+=(1-g)*light;b+=(1-b)*light;}else{r*=1+light;g*=1+light;b*=1+light;}
+  return[clamp(r,0,1),clamp(g,0,1),clamp(b,0,1)];
+}
+function weatherColorField(base,h,p,mask,n,owner){       // exposed relief + sheltered dirt; operates on sRGB colour data
+  const N=n*n,r=Math.max(1,Math.round((1+Math.pow(2,p.scale*4.5))*Math.min(resScale(),2.5)));
+  let cached=owner&&owner._weatherSignal,signal;
+  if(cached&&cached.h===h&&cached.n===n&&cached.r===r&&cached.creep===p.creep)signal=cached.signal;
+  else{
+    const smoothH=boxBlurScalar(h,n,r);let mean=0;
+    for(let i=0;i<N;i++)mean+=Math.abs(h[i]-smoothH[i]);mean/=N;
+    signal=new Float32Array(N);const gain=1/(mean*3.2+1e-6);
+    for(let i=0;i<N;i++)signal[i]=Math.tanh((h[i]-smoothH[i])*gain);
+    const creepR=Math.round(clamp(p.creep,0,1)*r*.65);if(creepR>0)signal=boxBlurScalar(signal,n,creepR);
+    if(owner)owner._weatherSignal={h,n,r,creep:p.creep,signal};
+  }
+  const out=new Float32Array(N*3),inv=p.inverse==="on"?-1:1,washed=p.washed==="on",dark=p.darker==="on"?1.9:1;
+  for(let i=0;i<N;i++){const s=signal[i]*inv,ex=Math.max(s,0),re=Math.max(-s,0),msk=mask?clamp(mask[i],0,1):1,a=clamp(p.amount*msk,0,1),j=i*3;
+    let r0=base[j],g0=base[j+1],b0=base[j+2],r1=r0,g1=g0,b1=b0;
+    if(washed){const l=.2126*r1+.7152*g1+.0722*b1,pale=.16+l*.84,t=ex*a*.62;r1+= (pale-r1)*t;g1+=(pale-g1)*t;b1+=(pale-b1)*t;}
+    else{const hi=1+ex*a*.32;r1*=hi;g1*=hi;b1*=hi;}
+    const dirt=clamp(re*p.dirt*dark*msk,0,1);r1+=(.16-r1)*dirt;g1+=(.115-g1)*dirt;b1+=(.075-b1)*dirt;
+    const q=gradeWeatherColor(r1,g1,b1,p.hue*msk,p.saturation*msk,p.lightness*msk);out[j]=q[0];out[j+1]=q[1];out[j+2]=q[2];}
+  return out;
+}
 const inEdgeFrom=(id,slot)=>{const e=inputEdge(id,slot);return e?e.from:null;};
-// Resolve the per-vertex terrain COLOUR by walking the graph: a SatMap composites its ramp over the colour from its
-// In chain (stacking); a SatMap Blend merges its A and B colour branches; any other node passes colour through. This
-// is colour-in-the-graph — branch, blend, and stack SatMaps like Gaea. Returns a field, or null if there is no colour node.
+// Resolve the per-vertex terrain COLOUR by walking the graph: SatMap authors colour, Color Erosion transports it,
+// Weathering ages it, SatMap Blend merges branches, and height-only nodes pass it through. Height remains a separate
+// field throughout. Returns a colour field, or null if no upstream node has authored colour.
 function resolveColor(nodeId,n,memo,guard){
   memo=memo||{};guard=guard||new Set();
   if(!nodeId)return null;
@@ -2379,6 +2847,18 @@ function resolveColor(nodeId,n,memo,guard){
   if(nd){
     if(nd.type==="satmap"){const base=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard),own=satNodeColorField(nd,n);
       col=base?blendFields(base,own,nd,n):own;}
+    else if(nd.type==="colorerosion"){const base=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard);
+      if(base){const pp={...nd.params,_sediment:nd._sediment,blend:1},raw=colorErodeField(base,nd._height||nd._field,pp,null,n,nd);
+        col=blendFields(base,raw,{_mask:nd._mask,params:{opacity:nd.params.blend,blend:nd.params.blendMode||"normal"}},n);}}
+    else if(nd.type==="weathering"){const base=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard);
+      if(base){const raw=weatherColorField(base,nd._height||nd._field,nd.params,null,n,nd);
+        col=blendFields(base,raw,{_mask:nd._mask,params:{opacity:nd.params.opacity==null?1:nd.params.opacity,blend:nd.params.blendMode||"normal"}},n);}}
+    else if(nd.type==="colormixer"){
+      const cfg=nd.params.layers||[];
+      for(let s=0;s<nodeInputs(nd).length;s++){const layer=resolveColor(inEdgeFrom(nodeId,s),n,memo,guard);if(!layer)continue;
+        if(!col)col=layer;else{const q=cfg[s]||{opacity:1,blend:"normal"};
+          col=blendFields(col,layer,{_mask:null,params:{opacity:q.opacity==null?1:q.opacity,blend:q.blend||"normal"}},n);}}
+    }
     else if(nd.type==="satmapblend"){const a=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard),b=resolveColor(inEdgeFrom(nodeId,1),n,memo,guard);
       col=(!a&&!b)?null:!a?b:!b?a:blendFields(a,b,nd,n);}
     else col=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard);       // colour flows through height/filter/erosion nodes
@@ -2396,7 +2876,7 @@ const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-moti
 // Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
 // walking upstream from the Output and picking up any Water / Snow effect nodes and their params.
 let scene={water:null,snow:null,satmap:null};
-const SHADE=["SatMap","Slope","Grey"];
+const SHADE=["Realistic","Clay","Albedo","Slope","Normals"];
 function initGL(){
   gl=glc.getContext("webgl2",{antialias:true,alpha:false})||glc.getContext("webgl",{antialias:true,alpha:false});
   if(!gl){$("#viewport").insertAdjacentHTML("beforeend",'<div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px">WebGL unavailable</div>');return;}
@@ -2413,38 +2893,57 @@ function initGL(){
     precision highp float;in vec3 vN;in float vH;in float vD;in vec3 vW;in vec3 vCol;out vec4 frag;
     #define SAMP texture
     #define OUT frag
-    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
+    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform float uExposure;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
   :`precision highp float;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;varying vec3 vCol;
     #define SAMP texture2D
     #define OUT gl_FragColor
-    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
+    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform float uExposure;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
+    vec3 srgbToLinear(vec3 c){return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}
+    vec3 linearToSrgb(vec3 c){c=max(c,vec3(0.0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
+    float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);}
+    float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+      return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
+    float surfaceNoise(vec2 p){return vnoise(p)+0.5*vnoise(p*2.03+7.1)+0.25*vnoise(p*4.11+19.7);}
+    vec3 acesF(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
     void main(){
       vec3 N=normalize(vN);float slope=1.0-N.y;
-      // ---- ALBEDO (unlit material colour) : composited SatMap layers, or LUT by the DRIVER; then rock on steeps, snow on high flats ----
-      vec3 base;
+      // SatMaps and authored swatches arrive as display-sRGB. Decode before lighting so the G-buffer
+      // contains scene-linear albedo; otherwise midtones become chalky and energy is not conserved.
+      vec3 baseSrgb;
       float dv=(uReverse>0.5)?1.0-vD:vD;                                // SatMap driver -> Reverse, then Range slice + Shift
       float sc=clamp(mix(uRange.x,uRange.y,dv)+uShift,0.001,0.999);
-      if(uShade==0)base=(uSatComposite==1)?vCol:SAMP(uSat,vec2(sc,0.5)).rgb;   // per-vertex layer stack OR single LUT
-      else if(uShade==1)base=mix(vec3(.32,.5,.34),vec3(.5,.34,.28),smoothstep(.15,.6,slope));
-      else base=vec3(.72);
-      float rockAmt=smoothstep(.35,.8,slope)*.6;
-      base=mix(base,vec3(.42,.38,.34),rockAmt);                          // exposed rock on steep faces
-      float flatv=smoothstep(0.5,0.12,slope);
-      float line=1.0-uSnow*0.85;
-      float snowCov=smoothstep(line-0.06,line+0.06,vH)*flatv*step(0.001,uSnow);
-      base=mix(base,vec3(.93,.96,1.0),snowCov);
-      // material smoothness -> drives specular in the deferred composite (soil rough, rock a touch glossier, snow sheen)
-      float matSmooth=mix(mix(0.05,0.16,rockAmt),0.55,snowCov);
-      // DEFERRED: write pure albedo (rgb) + smoothness (a); the composite does all the lighting from the height field.
-      if(uDeferred==1){OUT=vec4(base,matSmooth);return;}
+      if(uShade==0||uShade==2)baseSrgb=(uSatComposite==1)?vCol:SAMP(uSat,vec2(sc,0.5)).rgb;
+      else if(uShade==1)baseSrgb=vec3(.46,.38,.30);                     // neutral clay: inspect form without colour
+      else if(uShade==3)baseSrgb=mix(vec3(.12,.34,.70),vec3(.92,.24,.08),smoothstep(.08,.72,slope));
+      else baseSrgb=vec3(.5);
+      vec3 base=srgbToLinear(baseSrgb);
+      float materialView=(uShade==0||uShade==2)?1.0:0.0;
+      float rockAmt=smoothstep(.30,.76,slope)*.72*materialView;
+      vec3 mineral=mix(base,srgbToLinear(vec3(.38,.34,.30)),.42);
+      base=mix(base,mineral,rockAmt);                                    // exposed rock, while preserving biome palette
+      // Natural breakup without baking a light direction into albedo. Two broad bands prevent the
+      // elevation LUT from reading as a sterile contour ramp.
+      float macro=surfaceNoise(vW.xz*8.0+vec2(3.7,11.2))/1.75;
+      float grain=surfaceNoise(vW.xz*34.0+vec2(17.1,2.8))/1.75;
+      base*=mix(1.0,0.88+0.18*macro+0.08*grain,materialView);
+      // Snow is a high-altitude accumulation material, not a white height ramp. Break up the line and
+      // reject steep faces; amount=.5 now targets roughly the upper quarter rather than half the terrain.
+      float snowLine=mix(.96,.56,uSnow)+(macro-.5)*.10;
+      float gentle=1.0-smoothstep(.15,.48,slope);
+      float snowCov=smoothstep(snowLine,snowLine+.09,vH)*gentle*materialView*step(.001,uSnow);
+      base=mix(base,srgbToLinear(vec3(.88,.92,.97)),snowCov);
+      // Store perceptual roughness directly: soil is broad/rough, rock moderately rough, snow tighter.
+      float matRough=mix(mix(.84,.62,rockAmt),.38,snowCov);
+      if(uDeferred==1){OUT=vec4(clamp(base,0.,1.),matRough);return;}
       // ---- FORWARD fallback (WebGL1 / wireframe): light here with sun + hemispheric sky irradiance ----
+      if(uShade==2||uShade==3){OUT=vec4(linearToSrgb(base),1.);return;}
+      if(uShade==4){OUT=vec4(N*.5+.5,1.);return;}
       vec3 S=normalize(uSun);float d=max(dot(N,S),0.0);
-      float hemi=N.y*0.5+0.5;vec3 ambIrr=mix(vec3(.26,.24,.20),vec3(.42,.55,.76),hemi);
-      vec3 col=base*(ambIrr*0.9+vec3(1.0,0.955,0.86)*d*1.12);
+      float hemi=N.y*0.5+0.5;vec3 ambIrr=mix(vec3(.12,.10,.08),vec3(.28,.38,.58),hemi);
+      vec3 col=base*(ambIrr+vec3(1.0,.955,.86)*d*1.2);
       vec3 V=normalize(uCam-vW);vec3 Hh=normalize(V+S);
-      col+=pow(max(dot(N,Hh),0.0),80.0)*snowCov*0.5;                     // snow sheen
-      col=(col*(2.51*col+0.03))/(col*(2.43*col+0.59)+0.14);             // ACES filmic tonemap
-      OUT=vec4(clamp(col,0.,1.),1.);}`;
+      col+=pow(max(dot(N,Hh),0.0),80.0)*snowCov*.32;
+      OUT=vec4(linearToSrgb(acesF(col*exp2(uExposure))),1.);}`;
   terrainProg=makeProg(tVs,tFs);
   // ---------- STAGE 2: translucent water ----------
   const wVs=(g2?`#version 300 es
@@ -2456,24 +2955,52 @@ function initGL(){
     void main(){vDepth=(aw-ah)*uH;vW=vec3(axz.x,aw*uH,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
     precision highp float;in float vDepth;in vec3 vW;in vec2 vXZ;in vec3 vWN;out vec4 frag;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;`
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
   :`precision highp float;varying float vDepth;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;`)+`
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
+    vec3 waveData(vec2 p,float t){
+      float s=max(uRippleScale,.05);
+      if(uPattern==0){
+        float a=sin(p.x*46.*s+t*1.7),b=sin(p.y*37.*s-t*1.15);
+        float c=sin(p.y*46.*s+t*1.35),d=sin(p.x*34.*s+t*.95);
+        return vec3(.032*a+.021*b,.032*c+.021*d,.5+.22*a+.16*b+.08*c);
+      }
+      if(uPattern==1){
+        vec2 d1=normalize(vec2(.93,.37)),d2=normalize(vec2(.72,-.69));
+        float a=sin(dot(p,d1)*58.*s+t*1.9),b=sin(dot(p,d2)*24.*s+t*.74+a*.35);
+        return vec3(.042*(d1.x*a+d2.x*b*.38),.042*(d1.y*a+d2.y*b*.38),.5+.28*a+.15*b);
+      }
+      if(uPattern==2){
+        vec2 q1=p-vec2(.36,-.22),q2=p-vec2(-.48,.31);
+        float r1=max(length(q1),.001),r2=max(length(q2),.001);
+        float a=sin(r1*54.*s-t*2.0),b=sin(r2*43.*s-t*1.45);
+        vec2 g=.034*(q1/r1*a+q2/r2*b*.72);
+        return vec3(g,.5+.23*a+.18*b);
+      }
+      return vec3(0.,0.,.5);
+    }
     void main(){
-      if(vDepth<=0.0010) discard;                            // dry land / below the water film
-      float t=uTime;                                         // ripple perturbs the water-surface normal
-      vec3 rip=vec3(0.03*sin(vXZ.x*46.+t*1.7)+0.022*sin(vXZ.y*37.-t*1.15),0.0,
-                    0.03*sin(vXZ.y*46.+t*1.35)+0.022*sin(vXZ.x*34.+t*0.95));
-      vec3 N=normalize(vWN+rip);                             // flat in lakes (up), sloped along rivers (follows terrain)
+      float shoreAA=.0008+uShoreSmooth*.0018;
+      // Dry vertices encode "no water" as exactly zero depth. Centering smoothstep around zero
+      // made every dry fragment 50% water and leaked animated normals across the whole terrain.
+      float coverage=vDepth>0.0?smoothstep(0.0,shoreAA,vDepth):0.0;
+      if(coverage<=.005)discard;
+      float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage;vec3 wave=waveData(vXZ,t);
+      vec3 N=normalize(vWN+waveAmt*vec3(wave.x,0.,wave.y));   // pattern perturbs the fluid normal, never its depth
       vec3 V=normalize(uCam-vW);vec3 S=normalize(uSun);
       float fres=pow(1.0-max(dot(N,V),0.0),3.0);             // Fresnel — reflective at grazing angles
-      float dn=clamp(vDepth/(uH*0.35),0.0,1.0);              // depth attenuation: shallow teal -> deep blue
+      float dn=clamp(max(vDepth,0.)/(uH*0.35),0.0,1.0);      // depth attenuation: shallow teal -> deep blue
       vec3 wc=mix(vec3(0.28,0.58,0.62),vec3(0.03,0.12,0.30),dn);
       vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),110.0);
-      vec3 col=mix(wc,vec3(0.55,0.68,0.82),fres*0.55)+spec*0.8;
-      float foam=smoothstep(0.02,0.0,vDepth)*0.5;            // shoreline / channel-edge foam
+      float pat=clamp(.5+(wave.z-.5)*waveAmt*1.6,0.,1.);
+      vec3 col=(mix(wc,vec3(0.55,0.68,0.82),fres*0.55)+spec*0.8)*mix(.93,1.07,pat);
+      float crest=smoothstep(.68,.92,wave.z)*waveAmt;
+      col+=vec3(.035,.065,.085)*crest*(.35+.65*fres);      // restrained bright wavelets make the pattern legible
+      float foam=(1.0-smoothstep(0.0,.022+uShoreSmooth*.006,max(vDepth,0.)))*uFoam*coverage;
       col=mix(col,vec3(0.9,0.95,1.0),foam);
-      float alpha=clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0);`
+      float alpha=clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0)*coverage;`
     +(g2?`frag=vec4(col,alpha);}`:`gl_FragColor=vec4(col,alpha);}`);
   waterProg=makeProg(wVs,wFs);
   // ---------- DEFERRED water + analytic sky — the fullscreen-triangle technique (WebGL2) ----------
@@ -2486,17 +3013,21 @@ function initGL(){
     const cFs=`#version 300 es
       precision highp float;in vec2 vUv;out vec4 frag;
       uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;uniform sampler2D gH;
-      uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES;uniform vec2 uPx;
-      const vec3 SUNCOL=vec3(1.0,0.955,0.86);                       // warm daylight
+      uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;
+      uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze;
+      uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
+      const float PI=3.14159265;
+      const vec3 SUNCOL=vec3(1.0,0.92,0.78);                         // warm daylight, scene-linear
+      vec3 linearToSrgb(vec3 c){c=max(c,vec3(0.0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
       // analytic sky: horizon-pale -> zenith-deep gradient + sun disk, aureole and near-sun horizon scatter
       vec3 skyCol(vec3 d){d=normalize(d);float h=d.y;
-        vec3 zen=vec3(0.17,0.33,0.62),hor=vec3(0.75,0.81,0.87);
+        vec3 zen=vec3(0.10,0.24,0.55),hor=vec3(0.62,0.70,0.80);
         float t=pow(clamp(h,0.,1.),0.42);vec3 c=mix(hor,zen,t);
-        c=mix(c,vec3(0.58,0.60,0.63),smoothstep(0.0,-0.12,h));      // below the horizon
+        c=mix(c,vec3(0.42,0.45,0.50),smoothstep(0.0,-0.12,h));      // below the horizon
         float sd=max(dot(d,normalize(uSun)),0.);
-        c+=vec3(1.4,1.24,0.98)*pow(sd,1200.);                       // sun disk
-        c+=vec3(1.0,0.72,0.46)*pow(sd,10.)*0.22;                    // aureole
-        c+=vec3(1.0,0.66,0.42)*pow(sd,3.5)*0.10*(1.0-t);           // warm horizon scatter toward the sun
+        c+=vec3(8.0,6.4,4.2)*pow(sd,1200.);                         // HDR sun disk
+        c+=vec3(1.2,0.72,0.38)*pow(sd,10.)*0.20;                    // aureole
+        c+=vec3(0.8,0.42,0.20)*pow(sd,3.5)*0.10*(1.0-t);           // warm horizon scatter toward the sun
         return c;}
       float Wat(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gW,b).r,c=texture(gW,b+vec2(uWpx,0.)).r,d=texture(gW,b+vec2(0.,uWpx)).r,e=texture(gW,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
       float Ht(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gH,b).r,c=texture(gH,b+vec2(uWpx,0.)).r,d=texture(gH,b+vec2(0.,uWpx)).r,e=texture(gH,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
@@ -2522,61 +3053,125 @@ function initGL(){
           for(int r=1;r<=3;r++){float rr=float(r)*2.5;m=max(m,(Ht(uv+dr*rr)*uH-hc)/(rr/uRES));}o+=clamp(m,0.,1.);}
         return 1.0-o/float(D)*0.7;
       }
-      vec3 aces(vec3 x){x*=1.05;return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
+      vec3 aces(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
+      vec3 displayMap(vec3 hdr){return linearToSrgb(aces(hdr*exp2(uExposure)));}
       // aerial perspective: fade to a sky-tinted haze with distance, warming toward the sun (in-scatter)
-      vec3 atmos(vec3 c,vec3 P){float dist=length(P-uCam);float f=1.0-exp(-max(dist-1.35,0.0)*0.13);
+      vec3 atmos(vec3 c,vec3 P){float dist=length(P-uCam);float f=1.0-exp(-max(dist-1.15,0.0)*(0.05+uHaze*.34));
         vec3 vd=normalize(P-uCam);
-        vec3 haze=mix(vec3(0.68,0.74,0.83),vec3(0.95,0.86,0.72),pow(max(dot(vd,normalize(uSun)),0.),4.)*0.5);
-        return mix(c,haze,f*0.28);}
-      // physically-flavoured surface shading: sun (Lambert) + hemispheric sky irradiance + GGX specular
-      vec3 shadeSurface(vec3 albedo,vec3 N,vec3 Pw,float smoothv,float sh,float ao){
+        vec3 haze=mix(vec3(0.48,0.58,0.72),vec3(0.88,0.72,0.52),pow(max(dot(vd,normalize(uSun)),0.),4.)*0.5);
+        return mix(c,haze,f*uHaze*.72);}
+      float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);}
+      float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
+      float detailNoise(vec2 p){return vnoise(p)+.5*vnoise(p*2.07+9.2);}
+      vec3 waveData(vec2 p,float t){
+        float s=max(uRippleScale,.05);
+        if(uPattern==0){
+          float a=sin(p.x*46.*s+t*1.7),b=sin(p.y*37.*s-t*1.15);
+          float c=sin(p.y*46.*s+t*1.35),d=sin(p.x*34.*s+t*.95);
+          return vec3(.032*a+.021*b,.032*c+.021*d,.5+.22*a+.16*b+.08*c);
+        }
+        if(uPattern==1){
+          vec2 d1=normalize(vec2(.93,.37)),d2=normalize(vec2(.72,-.69));
+          float a=sin(dot(p,d1)*58.*s+t*1.9),b=sin(dot(p,d2)*24.*s+t*.74+a*.35);
+          return vec3(.042*(d1.x*a+d2.x*b*.38),.042*(d1.y*a+d2.y*b*.38),.5+.28*a+.15*b);
+        }
+        if(uPattern==2){
+          vec2 q1=p-vec2(.36,-.22),q2=p-vec2(-.48,.31);
+          float r1=max(length(q1),.001),r2=max(length(q2),.001);
+          float a=sin(r1*54.*s-t*2.0),b=sin(r2*43.*s-t*1.45);
+          vec2 g=.034*(q1/r1*a+q2/r2*b*.72);
+          return vec3(g,.5+.23*a+.18*b);
+        }
+        return vec3(0.,0.,.5);
+      }
+      float signedWaterDepth(vec2 uv){
+        float ws=Wat(uv)*uH;if(uHasSea>0.5)ws=max(ws,uSeaLevel*uH);
+        return ws-Ht(uv)*uH;
+      }
+      float filteredShoreDepth(vec2 uv){
+        float c=signedWaterDepth(uv),r=uWpx*uShoreSmooth;
+        if(uShoreSmooth<=.001)return c;
+        float axis=signedWaterDepth(uv+vec2(r,0.))+signedWaterDepth(uv-vec2(r,0.))
+          +signedWaterDepth(uv+vec2(0.,r))+signedWaterDepth(uv-vec2(0.,r));
+        float diag=signedWaterDepth(uv+vec2(r,r))+signedWaterDepth(uv+vec2(r,-r))
+          +signedWaterDepth(uv+vec2(-r,r))+signedWaterDepth(uv-vec2(r,r));
+        return (c*4.0+axis*2.0+diag)/16.0;
+      }
+      vec3 addMaterialNormal(vec3 N,vec3 P){
+        float fade=1.0-smoothstep(2.6,4.5,length(P-uCam)),e=.0015;
+        float n=detailNoise(P.xz*48.0),nx=detailNoise((P.xz+vec2(e,0))*48.0),nz=detailNoise((P.xz+vec2(0,e))*48.0);
+        return normalize(N+vec3(-(nx-n)*.42*fade,0.,-(nz-n)*.42*fade));}
+      // Cook-Torrance GGX in scene-linear radiance. The same roughness controls the sun lobe and the
+      // low-cost sky reflection, while derivative variance raises roughness to suppress sparkling.
+      vec3 shadeSurface(vec3 albedo,vec3 N,vec3 Pw,float rough,float sh,float ao){
         vec3 S=normalize(uSun),Vd=normalize(uCam-Pw);
-        float NdL=max(dot(N,S),0.0);
-        vec3 diffuse=albedo*SUNCOL*1.28*NdL*sh;
+        if(uStyle==0)N=addMaterialNormal(N,Pw);
+        float NdL=max(dot(N,S),0.0),NdV=max(dot(N,Vd),1e-4);
+        vec3 Hh=normalize(S+Vd);float NdH=max(dot(N,Hh),0.),VdH=max(dot(Vd,Hh),0.);
+        float variance=max(dot(dFdx(N),dFdx(N)),dot(dFdy(N),dFdy(N)));
+        rough=clamp(sqrt(rough*rough+variance*.28),.08,1.0);
+        float a=rough*rough,a2=a*a;
+        float den=NdH*NdH*(a2-1.)+1.;
+        float D=a2/(PI*den*den+1e-5);
+        float gv=NdL*sqrt(max(NdV*(NdV-NdV*a2)+a2,1e-5));
+        float gl=NdV*sqrt(max(NdL*(NdL-NdL*a2)+a2,1e-5));
+        float Vis=.5/max(gv+gl,1e-5);
+        vec3 F0=vec3(.04),F=F0+(1.0-F0)*pow(1.0-VdH,5.0);
+        vec3 spec=D*Vis*F;
+        vec3 direct=((1.0-F)*albedo/PI+spec)*SUNCOL*3.15*NdL*sh;
         float hemi=N.y*0.5+0.5;
-        vec3 ambIrr=mix(vec3(0.26,0.24,0.20),vec3(0.42,0.55,0.76),hemi); // warm ground bounce -> cool sky dome
+        vec3 ambIrr=mix(vec3(.15,.115,.085),vec3(.34,.46,.66),hemi);
         vec3 ambient=albedo*ambIrr*ao;
-        float rough=clamp(1.0-smoothv,0.06,1.0);                    // GGX microfacet specular
-        vec3 Hh=normalize(S+Vd);float NdH=max(dot(N,Hh),0.),NdV=max(dot(N,Vd),0.);
-        float a2=rough*rough;a2*=a2;float den=NdH*NdH*(a2-1.)+1.;
-        float Dg=a2/(3.14159*den*den+1e-4);
-        float F=0.04+0.96*pow(1.0-NdV,5.0);                         // Schlick, dielectric F0=0.04
-        vec3 specular=SUNCOL*min(Dg*F,6.0)*smoothv*NdL*sh;
-        return diffuse+ambient+specular;
+        vec3 Fenv=F0+(1.0-F0)*pow(1.0-NdV,5.0);
+        vec3 envSpec=skyCol(reflect(-Vd,N))*Fenv*(.12+.24*(1.0-rough))*ao;
+        return direct+ambient+envSpec;
       }
       void main(){
         float z=texture(gDepth,vUv).r;
         vec4 clip=vec4(vUv*2.-1.,z*2.-1.,1.);vec4 wp=uInvMVP*clip;vec3 Pw=wp.xyz/wp.w;
         vec3 viewDir=normalize(Pw-uCam),S=normalize(uSun);
-        if(z>=0.99999){frag=vec4(aces(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
-        vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float smoothv=g.a;
+        if(z>=0.99999){frag=vec4(displayMap(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
+        vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float rough=g.a;
         vec2 wuv=Pw.xz*0.5+0.5;
         vec3 Nt=terrainNormal(wuv);
+        if(uStyle==2||uStyle==3){frag=vec4(linearToSrgb(albedo),1.);return;}
+        if(uStyle==4){frag=vec4(Nt*.5+.5,1.);return;}
         float sh=shadowT(Pw,S),ao=aoT(wuv);                        // cast shadow + ambient occlusion from the height field
-        float wSurf=Wat(wuv)*uH; if(uHasSea>0.5)wSurf=max(wSurf,uSeaLevel*uH);
-        float thick=wSurf-Pw.y;
-        if(thick<=0.0016){                                         // DRY LAND: full surface shading, atmosphere, tonemap
-          vec3 col=shadeSurface(albedo,Nt,Pw,smoothv,sh,ao);
-          frag=vec4(aces(atmos(col,Pw)),1.);return;
-        }
+        vec3 dryCol=shadeSurface(albedo,Nt,Pw,rough,sh,ao);
+        float wSurf=Wat(wuv)*uH;if(uHasSea>0.5)wSurf=max(wSurf,uSeaLevel*uH);
+        float rawDepth=signedWaterDepth(wuv),thick=max(rawDepth,0.0);
+        float shoreDepth=filteredShoreDepth(wuv);
+        float shoreAA=max(fwidth(shoreDepth)*1.5,.00035);
+        // Filtering may soften an existing shoreline but must never create fluid where the raw
+        // depth says dry. Zero depth is absence, not the midpoint of an antialias transition.
+        float waterCov=rawDepth>0.0?smoothstep(0.0,shoreAA,max(shoreDepth,0.0)):0.0;
+        if(waterCov<=.001){frag=vec4(displayMap(atmos(dryCol,Pw)),1.);return;}
         // ---- WATER (screen-space): lit lakebed refraction + Beer–Lambert + Fresnel sky reflection ----
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
         vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
-        float t=uTime;
-        N=normalize(N+vec3(0.03*sin(Pw.x*46.+t*1.7)+0.022*sin(Pw.z*37.-t*1.15),0.,0.03*sin(Pw.z*46.+t*1.35)+0.022*sin(Pw.x*34.+t*0.95)));
+        float t=uTime*uRippleSpeed;vec3 wave=waveData(Pw.xz,t);float waveAmt=uRipple*waterCov;
+        N=normalize(N+waveAmt*vec3(wave.x,0.,wave.y));
         vec3 Vd=normalize(uCam-Pw);
         vec2 refrUv=clamp(vUv+N.xz*uPx*28.*clamp(thick*8.,0.,1.),vec2(0.002),vec2(0.998)); // refract the terrain colour
         vec3 bedAlb=texture(gColor,refrUv).rgb;
-        vec3 bed=shadeSurface(bedAlb,Nt,Pw,0.05,sh,ao);            // light the lakebed (albedo was unlit in the g-buffer)
-        float dn=1.0-exp(-thick*10.0);                              // Beer–Lambert absorption
-        vec3 wc=mix(bed,mix(vec3(0.24,0.52,0.55),vec3(0.02,0.10,0.26),clamp(thick*3.5,0.,1.)),clamp(dn+0.10,0.,1.));
-        float fres=pow(1.0-max(dot(N,Vd),0.0),4.0);
+        vec3 bed=shadeSurface(bedAlb,Nt,Pw,0.82,sh,ao);            // light the rough lakebed (albedo was unlit in the g-buffer)
+        vec3 sigma=vec3(2.6,1.10,.45);                              // Beer–Lambert: red dies first, blue travels furthest
+        vec3 trans=exp(-sigma*thick*5.0);
+        vec3 scatter=vec3(.018,.080,.140)*(1.0-trans);
+        float pat=clamp(.5+(wave.z-.5)*waveAmt*1.6,0.,1.);
+        vec3 wc=(bed*trans+scatter)*mix(.93,1.07,pat);              // subtle visible pattern follows the normal motion
+        float crest=smoothstep(.68,.92,wave.z)*waveAmt;
+        wc+=vec3(.025,.050,.075)*crest;                             // small-scale reflected wave crests
+        float fres=.02+.98*pow(1.0-max(dot(N,Vd),0.0),5.0);         // dielectric water F0 ≈ 0.02
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
         vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*sh;
-        float foam=smoothstep(0.02,0.0,thick)*0.5;                  // soft shoreline (thickness -> 0)
-        vec3 col=mix(wc,refl,fres*0.5)+spec*SUNCOL; col=mix(col,vec3(0.9,0.95,1.0),foam);
+        float edgeW=max(shoreAA*5.0,.0015);
+        float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov;
+        vec3 col=mix(wc,refl,fres)+spec*SUNCOL; col=mix(col,vec3(.78,.86,.92),foam);
         col*=mix(0.65,1.0,sh);                                      // water in cast shadow is darker
-        frag=vec4(aces(atmos(col,Pw)),1.);
+        col=mix(dryCol,col,waterCov);                                // analytic coverage removes the binary triangle shoreline
+        frag=vec4(displayMap(atmos(col,Pw)),1.);
       }`;
     compProg=makeProg(cVs,cFs);
     const mkFloatTex=()=>{const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);
@@ -2591,10 +3186,34 @@ function initGL(){
            wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
   gl.enable(gl.DEPTH_TEST);
-  glc.addEventListener("mousedown",e=>{glDrag={x:e.clientX,y:e.clientY};});
-  window.addEventListener("mousemove",e=>{if(!glDrag)return;cam.az-=(e.clientX-glDrag.x)*0.01;cam.el=clamp(cam.el-(e.clientY-glDrag.y)*0.01,0.05,1.5);glDrag={x:e.clientX,y:e.clientY};});
+  glc.addEventListener("contextmenu",e=>e.preventDefault());
+  glc.addEventListener("mousedown",e=>{glDrag={x:e.clientX,y:e.clientY,mode:(e.button===2||e.shiftKey)?"pan":"orbit"};});
+  window.addEventListener("mousemove",e=>{
+    if(!glDrag)return;
+    const dx=e.clientX-glDrag.x,dy=e.clientY-glDrag.y;
+    if(glDrag.mode==="pan"){
+      const b=cameraBasis(),worldPerPx=2*Math.tan(1.05/2)*cam.dist/Math.max(glc.clientHeight,1);
+      for(let k=0;k<3;k++)cam.target[k]+=(-b.right[k]*dx+b.up[k]*dy)*worldPerPx;
+      cam.target[0]=clamp(cam.target[0],-1.25,1.25);cam.target[1]=clamp(cam.target[1],-.25,.9);cam.target[2]=clamp(cam.target[2],-1.25,1.25);
+    }else{
+      cam.az-=dx*.01;cam.el=clamp(cam.el-dy*.01,.035,1.535);
+    }
+    glDrag.x=e.clientX;glDrag.y=e.clientY;
+  });
   window.addEventListener("mouseup",()=>glDrag=null);
-  glc.addEventListener("wheel",e=>{e.preventDefault();cam.dist=clamp(cam.dist*(e.deltaY<0?0.92:1.08),1.3,6);},{passive:false});
+  glc.addEventListener("wheel",e=>{
+    e.preventDefault();
+    const r=glc.getBoundingClientRect(),ndcX=((e.clientX-r.left)/Math.max(r.width,1))*2-1,ndcY=1-((e.clientY-r.top)/Math.max(r.height,1))*2;
+    const b=cameraBasis(),halfH=Math.tan(1.05/2)*cam.dist,asp=r.width/Math.max(r.height,1);
+    const focus=[b.right[0]*ndcX*halfH*asp+b.up[0]*ndcY*halfH,
+                 b.right[1]*ndcX*halfH*asp+b.up[1]*ndcY*halfH,
+                 b.right[2]*ndcX*halfH*asp+b.up[2]*ndcY*halfH];
+    const ratio=clamp(Math.exp(e.deltaY*.00135),.72,1.38),next=clamp(cam.dist*ratio,.012,8),move=(1-next/cam.dist)*.92;
+    for(let k=0;k<3;k++)cam.target[k]+=focus[k]*move;
+    cam.target[0]=clamp(cam.target[0],-1.1,1.1);cam.target[2]=clamp(cam.target[2],-1.1,1.1);
+    if(curHgt&&Math.abs(cam.target[0])<=1&&Math.abs(cam.target[2])<=1)cam.target[1]=surfaceHeight(cam.target[0],cam.target[2]);
+    cam.dist=next;
+  },{passive:false});
   requestAnimationFrame(renderGL);
 }
 let glDrag=null;
@@ -2611,44 +3230,55 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
-let curField=null,curHgt=null,curFilled=null,curAccum=null;
-function updateViewport(f){
+let curField=null,curHgt=null,curFilled=null,curAccum=null,curGeomKey="",lastWaterSig="";
+function updateViewport(f,rootNode,options){
   if(!gl){return;}
-  curField=f;const n=RES;const field=f||newField();const[mn,mx]=fieldRange(field);const d=mx-mn||1;
-  const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),hgt=new Float32Array(n*n);const H=H_SCALE;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;const h=(field[i]-mn)/d;
-    pos[i*3]=(x/(n-1)-0.5)*2;pos[i*3+1]=h*H;pos[i*3+2]=(y/(n-1)-0.5)*2;hgt[i]=h;}
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
-    const hl=(field[y*n+clamp(x-1,0,n-1)]-mn)/d,hr=(field[y*n+clamp(x+1,0,n-1)]-mn)/d;
-    const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
-    const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2;const L=Math.hypot(sx,1,sz)||1;
-    nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
-  // SatMap colouring. Resolve the colour graph (SatMap ramps composite/branch/blend) to a per-vertex RGB buffer;
-  // if there is no colour node, drive the global LUT by elevation (backward-compatible fallback).
-  const outN=outputNode();
-  const colField=outN?resolveColor(inEdgeFrom(outN.id,0),n):null;
-  satComposite=colField?1:0;
-  const col=colField||new Float32Array(n*n*3);
-  const drv=hgt;satUniform={lo:0,hi:1,shift:0,reverse:0};   // driver attribute = elevation for the fallback shader path
-  if(!satDrawerOpen()&&!satComposite)buildSatLUT(satName);  // global LUT only matters in the no-node fallback
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,drv,gl.DYNAMIC_DRAW);
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
-  if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);} // terrain height for composite lighting
-  curHgt=hgt;                                              // the expensive hydrology depends only on the terrain -> cache
-  // The priority-flood + D8 pair is the one sequential (CPU-only) stage and the costliest at high
-  // resolution, so only pay for it when a Water node actually needs it.
-  if(scene.water){
-    let cs=0;for(let i=0;i<n*n;i+=37)cs+=hgt[i];           // cheap checksum: skip fill/accum when the terrain is unchanged
-    if(cs!==lastTerrainCsum){lastTerrainCsum=cs;
-      curFilled=priorityFloodFill(hgt);                    // lakes: each basin filled to its pour point (Barnes 2014)
-      curAccum=d8Accumulation(curFilled);}                 // rivers: drainage area on the filled DEM
+  const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;
+  const geometryChanged=curField!==f||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
+  let hgt=curHgt;
+  if(geometryChanged){
+    const[mn,mx]=fieldRange(field),d=mx-mn||1,H=H_SCALE;
+    const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3);hgt=new Float32Array(n*n);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,h=(field[i]-mn)/d;
+      pos[i*3]=(x/(n-1)-0.5)*2;pos[i*3+1]=h*H;pos[i*3+2]=(y/(n-1)-0.5)*2;hgt[i]=h;}
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+      const hl=(field[y*n+clamp(x-1,0,n-1)]-mn)/d,hr=(field[y*n+clamp(x+1,0,n-1)]-mn)/d;
+      const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
+      const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
+      nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+    if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);}
+    curHgt=hgt;curFilled=null;curAccum=null;
   }
-  refreshWater();
+  curField=f;curGeomKey=geomKey;
+  if(geometryChanged||!options||options.color!==false){
+    // SatMap colouring. Resolve the colour graph (SatMap ramps composite/branch/blend) to a per-vertex RGB buffer;
+    // if there is no colour node, drive the global LUT by elevation (backward-compatible fallback).
+    rootNode=rootNode||activePreviewNode();
+    const colorRoot=rootNode?(rootNode.type==="output"?inEdgeFrom(rootNode.id,0):rootNode.id):null;
+    const colorMemo={},colField=colorRoot?resolveColor(colorRoot,n,colorMemo):null;
+    // Graph-native colour nodes must preview their actual albedo output, not a misleading duplicate height thumbnail.
+    // Bake the tiny canvases now, then release the full intermediate RGB fields with colorMemo after this update.
+    for(const id in colorMemo){const nd=nodeById(+id),rgb=colorMemo[id];if(nd&&rgb)nd._thumb=bakeColorThumb(nd,rgb);}
+    satComposite=colField?1:0;
+    const col=colField||new Float32Array(n*n*3);
+    satUniform={lo:0,hi:1,shift:0,reverse:0};               // driver attribute = elevation for the fallback shader path
+    if(!satDrawerOpen()&&!satComposite)buildSatLUT("Pewter"); // no SatMap node: neutral inspection material, never a hidden palette choice
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
+  }
+  // The priority-flood + D8 pair is the one sequential (CPU-only) stage and the costliest at high
+  // resolution, so only pay for it when hydrology needs a new terrain surface.
+  if(scene.water&&scene.water.mode!=="sea"&&(!curFilled||!curAccum)){
+    curFilled=priorityFloodFill(hgt);                       // lakes: each basin filled to its pour point (Barnes 2014)
+    curAccum=d8Accumulation(curFilled);                     // rivers: drainage area on the filled DEM
+  }
+  const waterSig=scene.water?JSON.stringify(scene.water):"";
+  if(geometryChanged||waterSig!==lastWaterSig)refreshWater();
+  lastWaterSig=waterSig;
 }
-let lastTerrainCsum=NaN;
 // --- Priority-flood depression fill (Barnes, Lehman & Mulla 2014): every pit fills to the elevation of
 //     its lowest spill point on the basin rim -> filled-h is the standing-water depth, flat per basin. ---
 function priorityFloodFill(h){
@@ -2712,6 +3342,10 @@ function lookAt(e,c,u){const z=norm3(sub3(e,c)),x=norm3(cross3(u,z)),y=cross3(z,
   return new Float32Array([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot3(x,e),-dot3(y,e),-dot3(z,e),1]);}
 const sub3=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const norm3=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
+function cameraEye(){const ce=Math.cos(cam.el);return[cam.target[0]+Math.cos(cam.az)*ce*cam.dist,cam.target[1]+Math.sin(cam.el)*cam.dist,cam.target[2]+Math.sin(cam.az)*ce*cam.dist];}
+function cameraBasis(){const eye=cameraEye(),forward=norm3(sub3(cam.target,eye)),right=norm3(cross3(forward,[0,1,0]));return{eye,forward,right,up:norm3(cross3(right,forward))};}
+function surfaceHeight(wx,wz){if(!curHgt)return cam.target[1];return sampleBilinear(curHgt,(wx*.5+.5)*(RES-1),(wz*.5+.5)*(RES-1))*H_SCALE;}
+const cameraNear=()=>clamp(cam.dist*.018,.00018,.045);       // deep inspection without slicing the surface
 function ensureGBuffer(){                                    // offscreen colour + depth textures, resized to the canvas
   const w=glc.width,h=glc.height;if(gbuf&&gbuf.w===w&&gbuf.h===h)return;
   if(gbuf){gl.deleteFramebuffer(gbuf.fbo);gl.deleteTexture(gbuf.color);gl.deleteTexture(gbuf.depth);}
@@ -2744,6 +3378,7 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
   gl.useProgram(terrainProg);setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
   {const sd=sunDir();gl.uniform3f(u(terrainProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
   gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
+  gl.uniform1f(u(terrainProg,"uExposure"),renderLook.exposure);
   gl.uniform1i(u(terrainProg,"uDeferred"),deferred?1:0);
   gl.uniform2f(u(terrainProg,"uRange"),satUniform.lo,satUniform.hi);gl.uniform1f(u(terrainProg,"uShift"),satUniform.shift);gl.uniform1f(u(terrainProg,"uReverse"),satUniform.reverse);
   gl.uniform1i(u(terrainProg,"uSatComposite"),satComposite);
@@ -2755,9 +3390,15 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
 function renderGL(){
   if(!gl){return;}
   resizeGL();
-  const asp=glc.width/glc.height||1;const P=perspective(1.05,asp,0.05,20);
-  const ex=Math.cos(cam.az)*Math.cos(cam.el)*cam.dist,ey=Math.sin(cam.el)*cam.dist,ez=Math.sin(cam.az)*Math.cos(cam.el)*cam.dist;
-  const V=lookAt([ex,ey,ez],[0,0.05,0],[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
+  const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
+  const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
+  const waterRipple=scene.water?(scene.water.ripple==null ? .55 : scene.water.ripple):0;
+  const waterRippleScale=scene.water?(scene.water.rippleScale==null?1:scene.water.rippleScale):1;
+  const waterRippleSpeed=scene.water?(scene.water.rippleSpeed==null?1:scene.water.rippleSpeed):1;
+  const waterShoreSmooth=scene.water?(scene.water.shoreSmooth==null?1.35:scene.water.shoreSmooth):0;
+  const waterFoam=scene.water?(scene.water.foam==null?.18:scene.water.foam):0;
+  const waterPattern=scene.water?({cross:0,wind:1,rings:2,none:3}[scene.water.pattern]??0):3;
+  const V=lookAt(eye,cam.target,[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
   if(USE_DEFERRED&&!wire){
     ensureGBuffer();
     // PASS 1: terrain -> offscreen colour + depth
@@ -2769,7 +3410,10 @@ function renderGL(){
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
     gl.useProgram(compProg);setM(compProg,"uInvMVP",mat4inv(MVP));
     {const sd=sunDir();gl.uniform3f(u(compProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);
+    gl.uniform1i(u(compProg,"uStyle"),shadeMode);gl.uniform1f(u(compProg,"uExposure"),renderLook.exposure);gl.uniform1f(u(compProg,"uHaze"),renderLook.haze);
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
+    gl.uniform1f(u(compProg,"uRipple"),waterRipple);gl.uniform1f(u(compProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(compProg,"uRippleSpeed"),waterRippleSpeed);
+    gl.uniform1f(u(compProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(compProg,"uFoam"),waterFoam);gl.uniform1i(u(compProg,"uPattern"),waterPattern);
     gl.uniform1f(u(compProg,"uSeaLevel"),0.0);gl.uniform1f(u(compProg,"uHasSea"),0.0);  // sea is baked into the water-height texture (W)
     gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
     gl.uniform2f(u(compProg,"uPx"),1/glc.width,1/glc.height);
@@ -2786,6 +3430,8 @@ function renderGL(){
     if(scene.water&&!wire){
       gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
       setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uTime"),uTime);
+      gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
+      gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
       gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
       bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"awn",3,buffers.wnrm);
@@ -2816,6 +3462,9 @@ $("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirt
   if(RES>=512&&AUTO){AUTO=false;$("#autoBtn").classList.remove("on");toast(RES+"² — Auto off, use Build (heavy)");}
   else toast("Resolution "+RES+"²");
   evalGraph();};
+$("#qualitySel").onchange=e=>{BUILD_QUALITY=e.target.value;nodes.forEach(n=>n._dirty=true);
+  toast(BUILD_QUALITY==="final"?"Final simulation budgets":"Interactive preview budgets");
+  evalGraph();};
 // GPU fast path toggle. Generators + thermal erosion run as WebGL2 fragment-shader kernels; the CPU
 // implementations stay the reference (see _verify_gpu.js for the GPU-vs-CPU parity check).
 $("#gpuBtn").onclick=()=>{
@@ -2831,18 +3480,108 @@ $("#scaleBtn").onclick=()=>{SCALE_RES=!SCALE_RES;$("#scaleBtn").classList.toggle
   toast(SCALE_RES?"Res Lock on — params held constant across resolution":"Res Lock off — raw cell-unit params");};
 $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
   document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
-$("#frameBtn").onclick=()=>{cam={az:0.7,el:0.62,dist:2.6};};
+let heroCam=copyCam(DEFAULT_HERO),planView=false;
+function frameHero(){planView=false;cam=copyCam(DEFAULT_HERO);heroCam=copyCam(DEFAULT_HERO);$("#viewBtn").textContent="Plan";$("#viewBtn").classList.remove("on");}
+function togglePlanView(){
+  if(!planView){heroCam=copyCam(cam);cam={az:0,el:1.535,dist:2.55,target:[...cam.target]};planView=true;}
+  else{cam=copyCam(heroCam);planView=false;}
+  $("#viewBtn").textContent=planView?"Hero":"Plan";$("#viewBtn").classList.toggle("on",planView);
+}
+$("#frameBtn").onclick=frameHero;
+$("#viewBtn").onclick=togglePlanView;
+$("#previewBtn").onclick=()=>{
+  if(previewMode==="output"){
+    if(!selected){toast("Select a node to preview it");return;}
+    previewMode="selected";
+  }else previewMode="output";
+  refreshPreview();
+};
+$("#undoBtn").onclick=undoGraph;$("#redoBtn").onclick=redoGraph;
+function setLayout(stacked){
+  $("#main").classList.toggle("stacked",stacked);$("#layoutBtn").classList.toggle("on",stacked);
+  $("#layoutBtn").textContent=stacked?"⬌":"⬍";
+  $("#layoutBtn").title=stacked?"Use side-by-side graph and rendering":"Stack rendering above the graph";
+  try{localStorage.setItem("terrainStudioLayout",stacked?"stacked":"side");}catch(_){}
+  requestAnimationFrame(()=>{resizeGraph();resizeGL();});
+}
+$("#layoutBtn").onclick=()=>setLayout(!$("#main").classList.contains("stacked"));
+async function toggleFullscreen(){
+  try{
+    if(document.fullscreenElement)await document.exitFullscreen();
+    else await $("#viewport").requestFullscreen();
+  }catch(err){toast("Fullscreen is unavailable in this browser");}
+}
+$("#fullscreenBtn").onclick=toggleFullscreen;
+document.addEventListener("fullscreenchange",()=>{
+  const on=document.fullscreenElement===$("#viewport");
+  $("#fullscreenBtn").classList.toggle("on",on);$("#fullscreenBtn").textContent=on?"×":"⛶";
+  $("#fullscreenBtn").title=on?"Exit fullscreen (Shift+F)":"Fullscreen rendering (Shift+F)";
+  requestAnimationFrame(resizeGL);
+});
 $("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
-$("#shadeSel").onclick=()=>{shadeMode=(shadeMode+1)%SHADE.length;$("#shadeSel").textContent=SHADE[shadeMode];};
-Object.keys(SATMAPS).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=k;if(k===satName)o.selected=true;$("#satSel").appendChild(o);});
-$("#satSel").onchange=e=>{satName=e.target.value;buildSatLUT(satName);};
+$("#shadeSel").onchange=e=>{shadeMode=parseInt(e.target.value,10)||0;};
+function satGradientCSS(name){
+  const stops=SATMAPS[name]||SATMAPS.Temperate;
+  return"linear-gradient(90deg,"+stops.map(s=>"rgb("+s[1][0]+","+s[1][1]+","+s[1][2]+") "+(clamp(s[0],0,1)*100).toFixed(1)+"%").join(",")+")";
+}
+function syncSatPicker(scroll){
+  $("#satPickerList").querySelectorAll(".sat-option").forEach(b=>{
+    const on=b.dataset.name===satName;b.classList.toggle("selected",on);b.setAttribute("aria-selected",on?"true":"false");
+    if(on&&scroll)b.scrollIntoView({block:"nearest"});});
+}
+function rebuildSatPicker(){
+  const list=$("#satPickerList"),names=Object.keys(SATMAPS);
+  list.innerHTML="";
+  names.forEach(name=>{
+    const b=document.createElement("button");b.type="button";b.className="sat-option";b.dataset.name=name;b.setAttribute("role","option");
+    const strip=document.createElement("span");strip.className="sat-option-strip";strip.style.background=satGradientCSS(name);
+    const label=document.createElement("span");label.className="sat-option-name";label.textContent=name;
+    b.append(strip,label);b.onclick=()=>chooseSatMap(name,true);list.appendChild(b);
+  });
+  $("#satPickerCount").textContent=names.length+" palettes";syncSatPicker(false);
+}
+function closeSatPicker(){
+  $("#satPickerMenu").hidden=true;satPickerAnchor=null;
+}
+let satPickerAnchor=null;
+function openSatPicker(anchor){
+  if(!anchor)return;satPickerAnchor=anchor;
+  const menu=$("#satPickerMenu"),r=anchor.getBoundingClientRect(),w=Math.min(304,window.innerWidth-20);
+  const below=window.innerHeight-r.bottom-8,above=r.top-8,useBelow=below>=Math.min(300,above);
+  menu.style.width=w+"px";menu.style.left=clamp(r.right-w,10,window.innerWidth-w-10)+"px";
+  menu.style.top=(useBelow?r.bottom+6:10)+"px";menu.style.maxHeight=Math.max(180,(useBelow?below-6:above-6))+"px";
+  menu.hidden=false;
+  requestAnimationFrame(()=>{syncSatPicker(true);const b=$("#satPickerList .selected");if(b)b.focus({preventScroll:true});});
+}
+function chooseSatMap(name,close){
+  if(!SATMAPS[name])return;
+  const target=selected&&selected.type==="satmap"?selected:nearestUpstreamNode("satmap");
+  if(target&&target.params.gradient!==name){
+    if(historyReady)recordHistory();target.params.gradient=name;markParamDirty(target);
+    if(selected&&selected.id===target.id)buildProps();requestEval();
+  }
+  satName=name;buildSatLUT(name);syncSatPicker(false);
+  if(close)closeSatPicker();
+}
+$("#satPickerList").onkeydown=e=>{
+  const items=[...$("#satPickerList").querySelectorAll(".sat-option")],i=items.indexOf(document.activeElement);
+  if(e.key==="Escape"){e.preventDefault();const a=satPickerAnchor;closeSatPicker();if(a&&a.isConnected)a.focus();return;}
+  let j=null;if(e.key==="ArrowDown")j=Math.min(items.length-1,i+1);else if(e.key==="ArrowUp")j=Math.max(0,i-1);
+  else if(e.key==="Home")j=0;else if(e.key==="End")j=items.length-1;
+  if(j!=null){e.preventDefault();items[j].focus();items[j].scrollIntoView({block:"nearest"});}
+};
+document.addEventListener("mousedown",e=>{if(!$("#satPickerMenu").hidden&&!$("#satPickerMenu").contains(e.target)
+  &&(!satPickerAnchor||!satPickerAnchor.contains(e.target)))closeSatPicker();});
+rebuildSatPicker();
 
 /* ---- SatMap Studio: docked gradient editor. Drag stops (position = elevation); the terrain recolours live. ---- */
 (function(){
   const drawer=$("#satgen"),track=$("#sgTrack"),lut=$("#sgLut"),histo=$("#sgHisto");
   const cv=$("#sgCanvas"),ov=$("#sgOverlay"),imgPanel=$("#sgImgPanel"),imgWrap=$("#sgDrop");
   const cx=cv.getContext("2d",{willReadFrequently:true}),ox=ov.getContext("2d");
+  const previewKey="__SatMap Studio Preview";
   let stops=[],sel=-1,interp="smooth",adj={hue:0,bright:1,contrast:1,sat:1},idata=null,prevShade=0,hist=null;
+  let target=null,previousGradient=null,studioBefore=null;
   const lum=(r,g,b)=>0.2126*r+0.7152*g+0.0722*b;
   const hex=c=>"#"+c.map(v=>clamp(v|0,0,255).toString(16).padStart(2,"0")).join("");
   const unhex=h=>{h=h.replace("#","");return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
@@ -2892,20 +3631,29 @@ $("#satSel").onchange=e=>{satName=e.target.value;buildSatLUT(satName);};
       h.style.left=(s.pos*100)+"%";const fc=applyAdj(s.col);h.style.background="rgb("+fc[0]+","+fc[1]+","+fc[2]+")";
       h.style.borderBottomColor="rgb("+fc[0]+","+fc[1]+","+fc[2]+")";h.dataset.i=i;track.appendChild(h);});
     if(sel>=0&&stops[sel])$("#sgStopCol").value=hex(stops[sel].col);
-    if(drawer.classList.contains("open"))buildSatLUTStops(bake());   // live recolour of the terrain
+    if(drawer.classList.contains("open")){
+      SATMAPS[previewKey]=bake();
+      if(target){target.params.gradient=previewKey;target._thumb=null;refreshPreview();}
+      else buildSatLUTStops(SATMAPS[previewKey]);
+    }
   }
 
   // ---- open / close (viewport stays live behind the drawer) ----
   function resetAdj(){adj={hue:0,bright:1,contrast:1,sat:1};
     $("#sgHue").value=0;$("#sgBright").value=1;$("#sgContrast").value=1;$("#sgSat").value=1;}
   function open(){
-    stops=(SATMAPS[satName]||SATMAPS.Temperate).map(s=>({pos:s[0],col:s[1].slice()}));
+    target=selected&&selected.type==="satmap"?selected:nearestUpstreamNode("satmap");
+    previousGradient=target?target.params.gradient:satName;studioBefore=historyReady?graphSnapshot():null;
+    stops=(SATMAPS[previousGradient]||SATMAPS.Temperate).map(s=>({pos:s[0],col:s[1].slice()}));
     sel=stops.length?0:-1;resetAdj();setSeg("smooth");$("#sgName").value="Custom";
-    prevShade=shadeMode;shadeMode=0;$("#shadeSel").textContent=SHADE[0];   // force SatMap shading so edits show
+    prevShade=shadeMode;shadeMode=2;$("#shadeSel").value="2";             // force unlit Albedo so LUT edits are judged without lighting
     computeHist();drawer.classList.add("open");render();
   }
-  function close(revert){drawer.classList.remove("open");shadeMode=prevShade;$("#shadeSel").textContent=SHADE[shadeMode];
-    if(revert!==false)buildSatLUT(scene&&scene.satmap?scene.satmap.gradient:satName);}   // restore the active map unless we applied
+  function close(revert){drawer.classList.remove("open");shadeMode=prevShade;$("#shadeSel").value=String(shadeMode);
+    if(revert!==false&&target)target.params.gradient=previousGradient;
+    delete SATMAPS[previewKey];
+    if(revert!==false){satName=target?target.params.gradient:satName;buildProps();refreshPreview();syncSatPicker(false);}
+    target=null;previousGradient=null;studioBefore=null;}
   $("#satGenBtn").onclick=()=>drawer.classList.contains("open")?close():open();
   $("#sgClose").onclick=()=>close();
 
@@ -2971,22 +3719,30 @@ $("#satSel").onchange=e=>{satName=e.target.value;buildSatLUT(satName);};
     let name=($("#sgName").value||"Custom").trim()||"Custom";
     if(SATMAPS[name]&&name!==satName){let n=2;while(SATMAPS[name+" "+n])n++;name+=" "+n;}
     SATMAPS[name]=bake();
-    [$("#satSel"),$("#sgPreset")].forEach(sel2=>{if(![...sel2.options].some(o=>o.value===name)){
-      const o=document.createElement("option");o.value=name;o.textContent=name;sel2.appendChild(o);}});
-    $("#satSel").value=name;satName=name;buildSatLUT(name);toast('SatMap "'+name+'" saved');close(false);};
+    delete SATMAPS[previewKey];
+    if(![...$("#sgPreset").options].some(o=>o.value===name)){
+      const o=document.createElement("option");o.value=name;o.textContent=name;$("#sgPreset").appendChild(o);}
+    if(target)target.params.gradient=name;satName=name;rebuildSatPicker();buildProps();refreshPreview();
+    if(studioBefore)pushUndo(studioBefore);
+    toast('SatMap "'+name+'" saved');close(false);};
 
   window.addEventListener("resize",()=>{if(drawer.classList.contains("open"))render();});
 })();
 $("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);};
 $("#sunEl").oninput=e=>{sun.el=parseFloat(e.target.value);};
+$("#exposure").oninput=e=>{renderLook.exposure=parseFloat(e.target.value);};
+$("#haze").oninput=e=>{renderLook.haze=parseFloat(e.target.value);};
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{
   if(typing())return;                                          // don't hijack keys while editing a parameter
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();e.shiftKey?redoGraph():undoGraph();return;}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redoGraph();return;}
   if(e.code==="Space")spaceDown=true;
   if(e.key==="Delete"||e.key==="Backspace"){if(selected)deleteSel();}
-  if(e.key==="f"||e.key==="F")cam={az:0.7,el:0.62,dist:2.6};});
+  if((e.key==="f"||e.key==="F")&&e.shiftKey){e.preventDefault();toggleFullscreen();}
+  else if(e.key==="f"||e.key==="F")frameHero();});
 window.addEventListener("keyup",e=>{if(e.code==="Space")spaceDown=false;});
-$("#vpInfo").innerHTML=`<span class="vp-chip"><b>Viewport</b> drag orbit · wheel zoom</span>`;
+updatePreviewInfo(activePreviewNode());
 
 /* =====================================================================
    DEFAULT GRAPH — a good-looking starting point
@@ -2994,28 +3750,39 @@ $("#vpInfo").innerHTML=`<span class="vp-chip"><b>Viewport</b> drag orbit · whee
 function defaultGraph(){
   const base=makeNode("perlin",40,40);base.params={seed:7,freq:3,octaves:6,lac:2,gain:0.5};
   const ridge=makeNode("ridged",40,220);ridge.params={seed:12,freq:4,octaves:6,lac:2.1,gain:0.55};
-  const mix=makeNode("blend",250,120);mix.params={factor:0.5};
-  const warp=makeNode("warp",250,300);warp.params={strength:0.08,freq:3,seed:5};
-  const hyd=makeNode("hydraulic",470,120);hyd.params={droplets:16000,erode:0.35,deposit:0.28,capacity:6,inertia:0.05,seed:1};
-  const th=makeNode("thermal",470,300);th.params={talus:0.014,iters:22,rate:0.5};
-  const snow=makeNode("snow",690,300);snow.params={amount:0.5};
-  const water=makeNode("water",900,300);water.params={mode:"hydro",level:0.12,flow:0.5};
-  const out=makeNode("output",900,90);out.params={norm:"on"};
+  const mix=makeNode("blend",200,120);mix.params={factor:0.5};
+  const warp=makeNode("warp",200,300);warp.params={strength:0.08,freq:3,seed:5};
+  const hyd=makeNode("hydraulic",360,120);hyd.params={engine:"auto",pipeIters:48,droplets:16000,erode:0.35,deposit:0.28,capacity:6,inertia:0.05,seed:1,feat:1};
+  const th=makeNode("thermal",520,120);th.params={talus:0.014,iters:22,rate:0.5};
+  const deposits=makeNode("d_deposits",520,300);deposits.params.radius=4;
+  const sat=makeNode("satmap",680,120);sat.params.gradient="Temperate";sat.params.source="height";sat.params.rough="med";
+  const colorErosion=makeNode("colorerosion",840,120);colorErosion.params.seed=7;
+  const weathering=makeNode("weathering",1000,120);
+  const snow=makeNode("snow",1160,120);snow.params={amount:0.5};
+  const water=makeNode("water",1320,120);water.params={mode:"hydro",level:0.12,flow:0.5,shoreSmooth:1.35,foam:.18,pattern:"wind",ripple:.55,rippleScale:1,rippleSpeed:1};
+  const out=makeNode("output",1480,120);out.params={norm:"on"};
   edges.push({from:base.id,to:mix.id,slot:0});
   edges.push({from:ridge.id,to:mix.id,slot:1});
   edges.push({from:mix.id,to:warp.id,slot:0});
   edges.push({from:warp.id,to:hyd.id,slot:0});
   edges.push({from:hyd.id,to:th.id,slot:0});
-  edges.push({from:th.id,to:snow.id,slot:0});           // ... erosion -> Snow -> Water -> Output (effects are nodes)
+  edges.push({from:th.id,to:deposits.id,slot:0});       // final solid surface -> sediment/deposition analysis
+  edges.push({from:th.id,to:sat.id,slot:0});
+  edges.push({from:sat.id,to:colorErosion.id,slot:0});
+  edges.push({from:deposits.id,to:colorErosion.id,slot:1});
+  edges.push({from:colorErosion.id,to:weathering.id,slot:0});
+  edges.push({from:weathering.id,to:snow.id,slot:0});   // colour ageing -> transient snow -> water overlay
   edges.push({from:snow.id,to:water.id,slot:0});
   edges.push({from:water.id,to:out.id,slot:0});
-  select(water);
+  view={x:22,y:28,z:.64};                               // frame the expanded production graph on first launch
+  select(sat);                                            // the node owns its visible palette library; the viewport does not
 }
 
 /* ------------------------------------------------------------ boot --- */
 function boot(){
   if(!document.documentElement.getAttribute("data-theme"))document.documentElement.setAttribute("data-theme","dark");
-  resizeGraph();initGL();defaultGraph();evalGraph();
+  try{setLayout(localStorage.getItem("terrainStudioLayout")==="stacked");}catch(_){setLayout(false);}
+  resizeGraph();initGL();defaultGraph();evalGraph();historyReady=true;updateHistoryButtons();
   window.addEventListener("resize",()=>{resizeGraph();});
   new ResizeObserver(()=>resizeGraph()).observe(gc.parentElement);
 }

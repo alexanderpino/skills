@@ -2,7 +2,9 @@
 // Metric: mean feature width from zero-crossing spacing of (h - blur(h)) along rows, in cells.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,

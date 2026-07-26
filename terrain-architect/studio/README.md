@@ -12,23 +12,39 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 ## What it does
 
+- **Production authoring workspace**: switch between the original side layout and a **stacked layout**
+  with the live rendering above the graph while Properties remains full-height. The rendering has a
+  real browser **fullscreen** control, deliberate **Hero / Plan** cameras, and an **Output / Selected**
+  display flag so any intermediate node can drive the viewport without rewiring the graph. Graph edits
+  are undoable/redoable (including topology, node moves, parameters and terrain definition), and each
+  node reports its last evaluation time directly on the graph.
 - **Node graph** (the core): drag nodes, wire outputs into inputs, and every node shows a live
   hill-shaded **thumbnail** of its own output — so you read the pipeline at a glance.
-- **AAA deferred-PBR surface + SatMap colour** (the Gaea-class look): the terrain renders through a
-  **true deferred pipeline**. The terrain pass writes only **albedo** (SatMap colour + rock on steeps
-  + snow) and a per-material **smoothness** into a G-buffer; a single fullscreen composite then does
+- **Scene-linear deferred PBR surface + SatMap colour**: the terrain renders through a two-stage
+  deferred pipeline. Authored SatMap colours are decoded from **sRGB to scene-linear albedo before
+  lighting**, and the final HDR image is exposed, ACES-tonemapped, then encoded back to sRGB. This
+  fixes the chalky, low-contrast result caused by lighting display-space colours. The terrain pass
+  writes only **albedo** (SatMap colour + terrain-aware mineral exposure + snow) and per-material
+  **perceptual roughness** into a G-buffer; a fullscreen composite then does all lighting:
   *all* the lighting from the height field:
   - **per-pixel surface normals** reconstructed from central differences of the height texture
     (finer than the mesh vertex normals),
   - **sun** (Lambert) **+ hemispheric sky-irradiance ambient** — a warm ground-bounce → cool sky-dome
     gradient, so shadowed faces read *blue* instead of flat grey (the single biggest realism lever),
-  - **GGX microfacet specular** driven by material smoothness (soil rough, rock glossier, snow sheen)
-    with a Schlick Fresnel,
+  - an energy-balanced **Cook–Torrance GGX** BRDF with Smith visibility and Schlick Fresnel, driven by
+    soil / rock / snow roughness, plus derivative-based specular anti-aliasing,
+  - subtle multi-scale, non-directional albedo breakup and material normals, so a SatMap does not read
+    as smooth elevation bands while still remaining an unlit material map,
   - **soft ray-marched cast shadows** toward a **movable sun** (azimuth + elevation sliders) and
     **horizon ambient occlusion** (crevice darkening), folded into the same pass,
   - a richer **analytic sky** (horizon→zenith gradient, sun disk, aureole, near-sun horizon scatter)
     and distance-tinted **aerial perspective**, resolved through **ACES** tone mapping and
-    **supersampled** for anti-aliased silhouettes.
+    **supersampled** for anti-aliased silhouettes,
+  - **Realistic, Clay, Albedo, Slope, and Normals** viewport styles. Albedo is deliberately unlit, so
+    SatMaps can be judged without the sun; Clay isolates terrain form; Slope and Normals expose data.
+    Sun azimuth/elevation, **exposure in stops**, and **haze** are live look-development controls.
+  - Water uses dielectric Fresnel (F0 ≈ 0.02), wavelength-dependent **Beer–Lambert absorption**, a
+    screen-stable shoreline, restrained ripples, and reflected scene-linear sky radiance.
 - **SatMaps genuinely derived from real satellite imagery** (not hand-picked): pick from ~26 palettes
   in the viewport. The core set (Temperate, Alpine, Verdant, Canyon, Arid, Dune, Volcanic, Mars, Lunar,
   Arctic, Tundra) plus **Estuary/Dusk** and a **13-strip set** (Steel, Moss, Pewter, Copper, Chrome,
@@ -36,7 +52,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
   — each gradient strip read as a per-column median of the bar (Dusk being the selected in-range window).
   Of the core set, **seven are extracted from real public-domain top-down satellite/aerial imagery** — the
   source image is ordered by luminance into an elevation ramp by the skill's own `reference-impl`
-  `extract_satmap`, the same method Gaea describes for its SatMap library, done reproducibly rather
+  `extract_satmap`, following the colour-lookup workflow Gaea documents, done reproducibly rather
   than by eye. Derived: **Alpine** (Ligurian Alps), **Dune** (Rub′ al Khali / Terra), **Verdant**
   (Amazon / Landsat), **Volcanic** (Icelandic lava / ESA), **Arctic** (Greenland), **Tundra**
   (Iceland / ESA), **Lunar** (LROC). The pipeline (`satmaps/extract_satmaps.py`) fetches from
@@ -59,12 +75,12 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
       stop's colour.
     - **Apply** bakes the LUT into the SatMap list and selects it. (Ordering is by brightness, the usual
       elevation proxy; the colour picker and eyedropper let you override any stop.)
-- **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (SatMap / slope /
-  grey shading, orbit + zoom, wireframe), rendered in two passes —
+- **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (the five render
+  styles above, orbit + zoom, wireframe), rendered in two passes —
   1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
      and leaves steep faces bare, with a specular snow sheen (driven by a **Snow** effect node).
-  2. **Translucent water** — a separate alpha-blended pass with depth-based colour (shallow teal →
-     deep blue), a Fresnel edge, animated ripples, and shoreline foam. It uses a **hydrologically
+  2. **Water composite** — screen-space refraction, absorption, Fresnel reflection, restrained
+     animated ripples, and shoreline foam. It uses a **hydrologically
      correct water surface**, not a flat cut through the heightmap:
      - **Lakes** (**FLOW** on) fill each closed basin to its own **spill level** via a
        **priority-flood depression fill** (Barnes 2014) — flat lakes whose edges follow the basin
@@ -104,14 +120,20 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | Slope select · Height select |
 | **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
-| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (colour LUT node) · **SatMap Blend** (merge two colour branches) |
+| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
 | **Output** | Output (drives the viewport / export) |
 
-**Water, snow and colour are nodes, not global switches.** Add a **Water**, **Snow** or **SatMap** node and
-wire it into the pipeline (e.g. `… → erosion → Snow → Water → SatMap → Output`); the viewport picks up
-whichever effect nodes feed the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes +
-downhill rivers) or the simple **Sea level** (a flat ocean at a level). Effect nodes pass the height through
-unchanged — they add a scene layer, so deleting one removes just that effect.
+**Water, snow and colour are nodes, not global switches.** Add and wire them into the pipeline; for example,
+`… → erosion → SatMap → Color Erosion → Weathering → Output`. The viewport picks up whichever effect nodes
+feed the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes + downhill rivers) or the
+simple **Sea level** (a flat ocean at a level). **Ripple strength**, **Ripple scale**, and **Ripple speed**
+animate crossing wave trains in the water normal, which moves reflection, refraction, and highlights without
+changing the hydrological water surface or terrain height. Effect nodes pass height through unchanged and add
+or transform a separate scene/colour stream, so deleting one removes just that effect.
+
+The default terrain ships with the full surface graph already wired:
+`Thermal → SatMap → Color Erosion → Weathering → Snow → Water → Output`, plus
+`Thermal → Deposits → Color Erosion.Sediment`. The default Water node enables subtle animated ripples.
 
 **Art direction — Shape masks and the universal Mask input.** A procedural graph that only generates
 *everywhere* can't be directed, so two things make it placeable, mirroring Gaea (where "almost every
@@ -485,8 +507,8 @@ an **In** (the height, passed through unchanged), an optional **Driver** input, 
 input, with **Driven by** = *Driver ▸ / Height*, *Height*, or *Slope*. So you can colour by **elevation**
 (the classic SatMap), by **slope** (cliffs one colour, benches another), or by **any field you wire into
 Driver** (flow, a mask, a Blend). It picks a **Gradient** from the library (including ones you author in
-SatMap Studio) and applies **Reverse**, **Range** (use just a slice of the gradient) and **Shift** (offset
-the lookup) — the same transforms Gaea's SatMap node exposes.
+SatMap Studio) and applies **Reverse**, **Range** (use just a slice), **Bias**, Roughness, HSL grading,
+and **Enhance** (None / Autolevel / Equalize), matching Gaea's documented public SatMap controls.
 
 - **Bind a SatMap to any Data map — the same channels Gaea offers.** In Gaea a SatMap is a CLUT fed by
   *any* grayscale, and what you feed it comes from the **Derive / Data Maps** family (Slope, Curvature,
@@ -503,42 +525,82 @@ the lookup) — the same transforms Gaea's SatMap node exposes.
   standalone nodes that derive the same channels from the height field.)*
 - **Colour flows through the graph — branch, blend and stack.** Colour is resolved by walking the graph:
   a SatMap **composites its ramp over the colour already coming down its In chain** (so chaining
-  `… → SatMap(base) → SatMap(rock) → Output` stacks them, each with **Opacity**, **Blend**
-  (Normal / Multiply / Screen) and an optional **Mask**); a **SatMap Blend** node **merges two separate
-  SatMap branches** — wire `SatMap A → A`, `SatMap B → B`, a mask into **Mask** — exactly Gaea's
-  SatMap-combine; and any other node (erosion, filter) just passes colour through. So you can build a real
-  colour graph — e.g. an elevation SatMap and a flow-driven SatMap blended by a slope mask. It's resolved
-  per-vertex on the CPU into the terrain's albedo. Blend modes are **Normal / Max / Min / Multiply /
-  Screen / Overlay** — Gaea's own documented SatMap-blend technique is two SatMaps through a Combine node
-  at **Max**, masked by noise, which this reproduces.
-- **2D biome (altitude × slope).** Switch **Mode** to *2D biome* and the node blends **two** gradients — a
-  flat-ground **Gradient** and a steep-ground **Steep gradient** — by slope: green valleys and gentle
-  ground read from the first, cliffs and scree from the second. That's the classic 2D terrain LUT
-  (altitude on one axis, slope on the other), built from two 1-D ramps.
+  `… → SatMap(base) → SatMap(rock) → Output` makes the second a normal masked overlay).
+  **Color Erosion** and **Weathering** then transform
+  that upstream colour as independent graph nodes; height-only nodes pass colour through unchanged. Each
+  colour node can be masked and composited, and **Color Blend** merges any two colour branches—not only
+  SatMaps. Wire any SatMap / Color Erosion / Weathering branch into **A** or **B**, then optionally feed a
+  grayscale field into **Mask**. Color Blend exposes Gaea-style methods: **Blend, Add, Screen, Subtract,
+  Difference, Multiply, Divide, Divide 2, Max, Min, Hypotenuse, Overlay, and Power**. The result is
+  resolved per vertex into terrain albedo.
+- **SatMap is a surface lookup, not hidden strata.** The layered sediment appearance comes from an explicit
+  graph. Start with one or more SatMaps driven or masked by height, slope, curvature, flow, wear, and
+  deposits; pass that colour through **Color Erosion** to transport upstream pigment downhill; then use
+  **Weathering** to bleach exposed relief and darken protected recesses. A typical chain is
+  `height → SatMap → Color Erosion → Weathering → Output`, with `Deposits → Color Erosion.Sediment`.
+  This creates material/sediment-like surface layers without pretending that the 1-D SatMap itself is a
+  subsurface geology simulation.
+- **Every colour result remains blendable.** Color Erosion retains its transport **Blend** control and
+  Weathering has physical **Amount** plus **Opacity** and **Blend mode**. SatMap, Color Erosion, and
+  Weathering all accept masks; any output can feed **Color Blend**. **Color Mixer** is the layer-oriented
+  convenience node: add, remove, and reorder from 2 up to 15 color inputs, with opacity and blend method
+  per layer. Per-layer biome masks stay explicit in the upstream SatMap / Color Blend branch.
+- **One SatMap, one gradient; biomes stay explicit.** A SatMap can receive another SatMap through **In**
+  when the second node is a masked overlay. For a true biome split, branch the height into one SatMap per
+  biome, derive a biome mask from slope / height / flow / climate, and merge the colour branches in
+  **Color Blend**. Its Mask, Opacity, and full blend-method set make
+  the transition visible and configurable instead of hiding a second gradient inside one SatMap node.
+- **Visual SatMap library lives on the node.** The SatMap Gradient property opens a scrollable palette
+  library rendered directly from the LUT stops that feed that node. The viewport has no global SatMap
+  selector. Newly authored LUTs appear immediately after **Apply**.
 
-With no SatMap node in the graph, the viewport falls back to the global SatMap dropdown driven by elevation.
+With no SatMap node in the graph, the viewport uses a neutral inspection material; adding a SatMap node is
+the only way to author a palette.
+Each SatMap node also has **None / Low / Medium / High / Ultra Roughness**. It coherently perturbs the
+lookup coordinate, matching Gaea's documented “scatter the pixels of the colour map” behavior instead of
+adding directional light or indiscriminate RGB noise to the exported albedo.
 
 ## Controls
 
+- Use **⬍** in the top bar to switch to the stacked layout (rendering above graph); the choice persists.
+- Use **⛶** in the rendering or <kbd>Shift</kbd>+<kbd>F</kbd> for rendering fullscreen.
+- **Output / Selected** moves the viewport display flag between the final Output and the selected
+  intermediate node. **Plan / Hero** switches between top-down inspection and the perspective camera.
+- Choose **Realistic / Clay / Albedo / Slope / Normals** in the viewport render-style selector. The lower-left
+  render panel controls sun azimuth, elevation, exposure, and atmospheric haze.
+- The **Water** node owns shoreline and surface-material authoring. **Shore smoothing** filters only
+  the signed-depth coverage used for rendering, preserving terrain and hydrology data; **Shore foam**
+  controls the transition band. Choose **Cross ripples**, **Wind waves**, **Interference rings**, or
+  **None**, then tune Pattern strength, scale, and speed.
+- Undo/redo with the toolbar buttons or <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> /
+  <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>.
 - **Double-click** empty canvas (or **＋ Add node**) to add a node.
 - Drag a node's **right port** into another node's **left port** to wire them (cycles are rejected).
 - Click a node to edit its parameters on the right; **Duplicate** / **Delete** or press <kbd>Del</kbd>.
   Deleting a mid-chain node **auto-bridges** its neighbours (its input source reconnects to its outputs)
   when the input is unambiguous, so the pipeline stays connected.
 - Pan with **middle-drag** / space-drag / empty-drag; **wheel** to zoom the graph.
-- In the 3D view: **drag** to orbit, **wheel** to zoom, <kbd>F</kbd> to frame.
+- In the 3D view: **drag** to orbit, <kbd>Shift</kbd>-drag or right-drag to pan, and **wheel**
+  to cursor-focused deep zoom. The camera can dolly from a full-terrain view down to roughly
+  `0.012` world units (about 30 m at the default 5 km extent); its near plane scales with distance
+  so the inspected surface is not clipped. Press <kbd>F</kbd> to restore the framed Hero camera.
 - **Auto** recomputes on every edit; turn it off and use **Build** for heavy graphs.
+  Auto uses frame-coalesced, domain-aware invalidation: a burst of slider events evaluates the newest
+  value once per display frame. SatMap, Color Erosion, and Weathering parameter edits preserve the
+  downstream heightfield and update only terrain colour; Water updates only its fluid-surface buffers.
+  Geometry, normals, height textures, and hydrology rebuild only when a height-producing node changes.
 
 ## Design — learning from Gaea, World Machine and Houdini
 
 The brief was to learn from the strengths *and* weaknesses of the three baselines:
 
-- **Adopted — Gaea:** a per-node **live preview thumbnail** and beautiful, sensible defaults, so the
-  graph is legible and the first result already looks like terrain.
-- **Adopted — World Machine:** a clean, single-window **device-graph** model — generators → filters →
-  erosion → output — with an explicit Output node, easy to reason about.
-- **Adopted — Houdini:** real **procedural depth** (physically-motivated erosion, masks, warps that
-  compose arbitrarily) rather than a fixed pipeline.
+- **Adopted — Gaea:** a graph → viewport → properties loop, per-node thumbnails, a lockable
+  intermediate preview, 2D/3D inspection, and beautiful, sensible defaults.
+- **Adopted — World Machine:** a clean single-window device graph, live property preview, standard
+  undo/redo, and an explicit Output node.
+- **Adopted — Houdini:** movable display state for inspecting any intermediate result, per-node
+  performance data, flexible pane layouts, and real procedural depth (grounded erosion, masks and
+  composable warps) rather than a fixed pipeline.
 - **Avoided:** Houdini's learning cliff (approachable palette grouped by category, no network of
   wrangles to learn), World Machine's dated UI (a modern, calm dark theme with a considered
   hypsometric-amber accent), and node sprawl (a curated, meaningful node set — every node maps to a
@@ -627,7 +689,15 @@ repose **angle** it encodes is `atan(talus·RES)` — **66° at 192² but 85° a
 talus angle is near-vertical, thermal erosion barely runs, and the build comes out **spiky**. Droplet
 density (a fixed count spread over `RES²` cells) and blur/deposit/peak radii have the same problem.
 
-**Res Lock** (on by default) converts these to resolution-independent quantities against a 192² reference:
+**Res Lock** (on by default) converts these to resolution-independent quantities against a 192² reference.
+The toolbar's **Interactive / Final** tier separates iteration latency from final parity:
+
+- **Interactive** (default) keeps physical talus scaling but caps simulation travel to at most 1.5×
+  the authored iteration count. It is the live authoring tier.
+- **Final** uses the full resolution-scaled iteration/droplet budget when the export needs the
+  longer-travel simulation rather than the responsive preview.
+
+The earlier CPU/reference measurements explain the trade:
 `talus/k` (constant angle), `iters·k` (constant travel distance), `droplets·k²` (constant density),
 radii `·k`. Measured on the default graph, comparing a 1024² build downsampled to 192²:
 
@@ -637,21 +707,22 @@ radii `·k`. Measured on the default graph, comparing a 1024² build downsampled
 | talus only | 1.97× | 4.5 s (free) |
 | talus + droplets·k² | 1.85× | 15.3 s |
 | talus + iters·√k | 1.55× | 7.2 s |
-| **full (default)** | **1.21×** | 25.4 s |
+| **full (Final tier)** | **1.21×** | 25.4 s |
 
 Fixing the talus angle is the single biggest win and costs nothing; the rest buys the remaining parity by
 doing proportionally more work — which is the honest price of resolution independence, and why a 1024²
 build is a **Build**, not an Auto-recompute. (Gaea documents the same goal: a 512² preview keeps *"essential
-parity for all major erosion features"* with a 4K/8K build.) Turn **Res Lock** off for fast iteration at
-high res, at the cost of a spikier surface. Timings are under a software rasteriser; the droplet term is
-the CPU sim, so a GPU pipe-model hydraulic would remove most of that cost.
+parity for all major erosion features"* with a 4K/8K build.) Use **Interactive** for authoring and
+**Final** when longer settling is worth the cost; turning **Res Lock** off is still available for raw
+cell-unit experiments.
 
 ### GPU fast path (WebGL2 GPGPU)
 
 The **CPU kernels remain the reference implementation**. On top of them there is an optional GPU path
 (the **GPU** button in the toolbar) that runs the heavy, embarrassingly-parallel kernels as fragment
 shaders over a fullscreen triangle into `RGBA32F` ping-pong render targets — the same technique as the
-deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Ridged MF** and **thermal erosion**.
+deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Ridged MF**, **Warp**, **thermal
+erosion**, and the default **Hydraulic erosion** engine.
 
 It produces the *same* terrain as the CPU because the 32-bit integer hash is reproduced exactly in GLSL
 `uint` (the CPU hash now uses `Math.imul`; plain `*` silently rounded past 2⁵³). `_verify_gpu.js` is the
@@ -666,13 +737,20 @@ obvious single-pass version recomputes every neighbour's `moveSum` (72 texture f
 Profiling a 1024² build showed thermal at **84% of total time**; the split cut the whole build from
 **10.6 s → 3.9 s** with parity unchanged.
 
-Honest scope: **hydraulic (droplet) erosion is still CPU** — the particle sim scatters writes, so it wants
-the virtual-pipes model to go on GPU (planned, mirroring `reference-impl`'s `pipe_erode`). It is only ~17%
-of a 1024² build, so it is no longer the bottleneck. The priority-flood + D8 pair behind lakes/rivers is
-inherently sequential and stays CPU; it is now skipped entirely unless a **Water** node needs it. Each GPU
-node still reads its result back to a `Float32Array` for the next node — keeping the field resident in a
-texture across nodes is the remaining big win. Timings measured in CI are under **swiftshader** (a
-*software* rasteriser) and so understate real-GPU gains substantially.
+Hydraulic now has two honest engines. **GPU pipes** is a Mei-style four-neighbour virtual-pipe solver:
+bed, water, suspended sediment and directional flux stay in `RGBA32F` textures for the whole simulation,
+with outflow clamped to available water and sediment transported by the same flux field. **CPU droplets**
+keeps the older scatter-write particle reference for comparisons. At 192² under SwiftShader, GPU pipes
+finish 48 iterations in **47 ms**, produce both erosion (30,514 cells) and deposition (6,350 cells), and
+remain finite; Warp matches its CPU reference to max |Δ| **4.4e-5**.
+
+On the default graph, the combined GPU-pipe + GPU-warp + Interactive-tier change cut a 1024² evaluation
+under the software-GPU harness from **14.7 s to 3.6 s (4.1×)**. Real hardware should be faster; these
+figures are deliberately the conservative floor.
+
+The priority-flood + D8 pair behind displayed lakes/rivers is inherently sequential and stays CPU; it is
+skipped unless a Water node needs it. GPU nodes still read their result back to a `Float32Array` between
+nodes, so a fully texture-resident graph runtime is the next large architectural win.
 
 ## Verification
 
@@ -689,14 +767,21 @@ node _verify_streampower.js          # slope-area law S ~ A^-m, convergence, hil
 node _verify_tectonic.js             # Voronoi plates: warped boundaries, orogen width, drives incision
 node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
-node _verify_gpu.js                  # CPU/GPU bit-parity + timings
+node _verify_gpu.js                  # CPU/GPU parity, GPU hydraulic invariants + timings
+node _verify_workflow.js             # layouts, fullscreen, selected preview, undo/redo, 1024² smoke
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths
 node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² / 768²
 node _verify_realscale.js            # Real Scale: repose angle in degrees, resolution independent
 node _verify_data.js                 # the eight Data Map channels
-node _verify_satnode.js              # SatMap node: stacking, branch+blend, 2D biome
+node _verify_satnode.js              # one-gradient SatMap: stacking + explicit biome branch/blend
+node _verify_satpicker.js            # visual LUT-strip library + graph-bound selection
+node _verify_colormixer.js           # dynamic 2–15 layer stack, ordering, modes, opacity
 node _verify_satgen.js               # SatMap Studio extraction + LUT build
+node _verify_render.js               # colour pipeline, PBR/data views, exposure, image contrast
+node _verify_zoom.js                 # cursor-focused deep zoom, pivot pan, clipping, frame reset
+node _verify_colorfx.js              # SatMap -> Color Erosion -> Weathering node semantics
+node _verify_realtime.js             # coalesced live edits + colour/water/height buffer invalidation
 node _verify_highres.js              # 512² / 1024² build timings
 node _verify.js                      # graph editor interactions (add/wire/rewire/cycle/delete/pan/zoom)
 ```

@@ -1,8 +1,9 @@
-// Resolution independence: the same graph at 192² and 1024² should give the SAME landform
-// (the 1024 one just carrying more detail). Compare by downsampling 1024 -> 192.
+// Resolution independence: compare the same graph at 192² and 768² (an exact 4× downsample).
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
 (async () => {
@@ -13,6 +14,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1600);
 
   const r = await p.evaluate(() => {
+    BUILD_QUALITY = 'interactive';
     // strip water/snow so we compare pure terrain
     const o = outputNode();
     nodes.filter(n=>n.type==='water'||n.type==='snow').forEach(sm=>{
@@ -41,15 +43,15 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     for (const scaled of [false, true]) {
       SCALE_RES = scaled;
       const lo = norm(build(192));
-      const hi = norm(build(1024));
-      const hiDown = norm(down(hi,1024,192));
+      const hi = norm(build(768));
+      const hiDown = norm(down(hi,768,192));
       // roughness in SLOPE units (x RES) is the resolution-comparable form: per-cell drops shrink
       // as cells get closer, so only slope tells you whether the surface is genuinely spikier.
       out[scaled?'scaled':'unscaled'] = {
         ...compare(lo, hiDown),
         slope192: +(rough(lo,192)*192).toFixed(3),
-        slope1024: +(rough(hi,1024)*1024).toFixed(3),
-        spikier: +((rough(hi,1024)*1024)/(rough(lo,192)*192)).toFixed(2),
+        slope768: +(rough(hi,768)*768).toFixed(3),
+        spikier: +((rough(hi,768)*768)/(rough(lo,192)*192)).toFixed(2),
       };
     }
     SCALE_RES = true; RES=192; buildIndex();
@@ -57,7 +59,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   });
 
   for (const [k,v] of Object.entries(r))
-    console.log(`${k.padEnd(9)} rms=${v.rms} maxAbs=${v.maxAbs}   slope@192=${v.slope192} slope@1024=${v.slope1024}  -> ${v.spikier}x spikier`);
+    console.log(`${k.padEnd(9)} rms=${v.rms} maxAbs=${v.maxAbs}   slope@192=${v.slope192} slope@768=${v.slope768}  -> ${v.spikier}x spikier`);
   console.log('errors', errors.length?JSON.stringify(errors):'none');
   await b.close();
   process.exit(errors.length?1:0);

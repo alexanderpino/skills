@@ -2,7 +2,9 @@
 // then handed to stream power so the rivers make the topography.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,
@@ -14,7 +16,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   const r = await p.evaluate(() => {
     const n = RES, out = {};
     const T = (o) => TYPES.tectonic.eval({seed:3, plates:10, warp:0.5, orogen:0.35,
-                                          ocean:0.45, output:"orogen", ...o});
+                                          ocean:0.45, land:0.45, output:"orogen", ...o});
 
     // ---- 1. it produces a structured field, not a blur of nothing ----
     const base = T({});

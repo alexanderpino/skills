@@ -1,7 +1,9 @@
 // End-to-end: build + render the default graph at 1024^2 on the GPU fast path.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
 (async () => {
@@ -15,7 +17,8 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   await p.evaluate(() => {
     document.querySelector('#graphwrap').style.display='none';
     document.querySelector('#props').style.display='none';
-    document.querySelector('#rail').style.flex='1';
+    document.querySelector('#main').style.gridTemplate='1fr / 1fr';
+    document.querySelector('#viewport').style.gridArea='1 / 1';
     document.querySelector('#status').style.display='none';
   });
 
