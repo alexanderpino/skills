@@ -114,11 +114,12 @@ function imageStats(png, r) {
     return {webgl2:gl instanceof WebGL2RenderingContext,deferred:USE_DEFERRED,
       linked:{terrain:linked(terrainProg),composite:linked(compProg),water:linked(waterProg)},
       styles:Array.from(document.querySelector('#shadeSel').options).map(o=>o.text),
-      look:{exposure:renderLook.exposure,haze:renderLook.haze},
+      look:{exposure:renderLook.exposure,haze:renderLook.haze},indexPattern:buffers.indexPattern,
       srgbRoundtripError:Math.max(...[.02,.18,.5,.9].map(v=>Math.abs(v-roundtrip(v)))),
       satRoughnessDelta:delta,rippleMotion:{mean:motionSum/samples,stillMean:stillSum/samples,changed}};
   });
   const ok = diag.webgl2 && diag.deferred && Object.values(diag.linked).every(Boolean)
+    && diag.indexPattern==='checkerboard'
     && diag.styles.join('|') === 'Realistic|Clay|Albedo|Slope|Normals|Temperature|Sun shadow'
     && diag.srgbRoundtripError < 1e-6 && diag.satRoughnessDelta > 1
     && diag.rippleMotion.mean > diag.rippleMotion.stillMean + .01 && diag.rippleMotion.stillMean < .01 && diag.rippleMotion.changed > 20

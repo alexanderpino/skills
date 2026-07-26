@@ -131,7 +131,8 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 **Water extent, snow and colour are nodes, not global switches.** Add and wire them into the pipeline; for example,
 `… → erosion → SatMap → Color Erosion → Weathering → Output`. The viewport picks up whichever effect nodes
 feed the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes + downhill rivers) or the
-simple **Sea level** (a flat ocean at a level). Wave pattern, strength, scale, speed, and refraction are
+simple **Sea level** (a flat ocean at a level); its **Temperature** input controls liquid/ice phase independently
+of Snow. Wave pattern, strength, scale, speed, and refraction are
 **global renderer settings** in the viewport's Water Surface flyout: they describe how every fluid surface
 is viewed, not where water exists. Waves are sampled at the reconstructed water-plane world position—not the
 terrain/lakebed position—so motion cannot look glued to the heightmap. Effect nodes pass height through unchanged and add
@@ -140,7 +141,8 @@ or transform a separate scene/colour stream, so deleting one removes just that e
 The default terrain ships with the full surface graph already wired:
 `Thermal → SatMap → Color Erosion → Weathering → Water → Snow → Output`, plus
 `Thermal → Deposits → Color Erosion.Sediment` and the explicit climate branch
-`Weathering → Height → Sun Shadow → Temperature → Temperature Modify → Snow.Temperature`. Water is deliberately before
+`Weathering → Height → Sun Shadow → Temperature → Temperature Modify`, with that final physical field wired to
+both `Water.Temperature` and `Snow.Temperature`. Water is deliberately before
 Snow: open liquid masks terrain snow out, while frozen standing water can receive a separate raised
 snow-on-ice layer. Its Snow node starts with a 3 m settled-snow event, temperature/lapse melt, aspect
 warming, and avalanche settling. The renderer supplies subtle animated ripples globally.
@@ -719,10 +721,11 @@ coordinates).
 ### Terrain definition (real-world scale) and **Real Scale**
 
 Deselect everything and the properties panel shows the **Terrain definition** — the world this heightfield
-represents, in metres. Defaults match Gaea's: **5000 m across × 2600 m tall**, a **vertical ratio of 0.52**
-(`height ÷ scale`), which is also the viewport's vertical exaggeration. Cell size is `scale ÷ RES`
-(26 m at 192², 4.9 m at 1024²). It also owns the shared **sea-level temperature**, **temperature
-lapse rate**, **climate sun elevation**, **latitude**, and **map north**. The panel reports the derived 0 °C freezing altitude.
+represents, in metres. Defaults are **5000 m across × 2600 m relief** above a **0 m ASL base elevation**,
+a **vertical ratio of 0.52** (`relief ÷ scale`), which is also the viewport's vertical exaggeration.
+Cell size is `scale ÷ RES` (9.8 m at the default 512², 4.9 m at 1024²). It also owns the
+**fallback sea-level temperature/lapse rate**, **climate sun elevation**, **latitude**, and **map north**.
+The fallback is used only by unconnected Snow/Water consumers. The panel reports the derived 0 °C freezing altitude.
 North is authored clockwise from the heightfield's top edge; latitude decides which side points toward
 the equator. The viewport compass projects both directions through the orbit camera, and the temperature
 chip reports air temperature at the terrain under the camera focus; click it to toggle °C / °F.
@@ -739,8 +742,11 @@ drop halving as the cells do.
 The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM` in **world metres**:
 
 1. **Placement:** settled snowfall is partitioned between rain and snow across a −3 °C to +2 °C
-   transition. Temperature comes from Terrain Definition: sea-level temperature minus the global
-   lapse rate times elevation.
+   transition. Temperature comes from the physical field connected to Snow. Terrain Definition's
+   clearly labelled fallback temperature/lapse values apply only when that input is absent or invalid.
+   Relative Height is converted to altitude with both **Base elevation** (datum) and **Relief height**,
+   so an artist can keep a cropped alpine tile above sea level by authoring its datum. Imported
+   grayscale files do not infer ASL metadata automatically.
 2. **Insolation + ablation:** an equator-side climate sun supplies incidence from slope/aspect, then
    a logarithmic horizon march casts shadows from both nearby and distant terrain. Two separable
    spatial blur passes turn binary visibility into soft penumbra/diffuse exposure. That spatial map
@@ -754,10 +760,12 @@ The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM`
    sea level, −10…+15 °C/km lapse rate (including inversions), and 0…50 °C solar warming.
    Volcanic and geothermal extremes remain the responsibility of Temperature Modify rather than
    making ordinary climate controls too coarse.
-3. **Temperature composition:** the map is not metadata attached to its generator. Its physical
-   Celsius contract follows the field through downstream Filter and Combine nodes. **Temperature
-   Modify** adds/removes degrees, approaches a target, or enforces a minimum through an optional
-   Source and Mask. A lava simulation can therefore heat its footprint, a shadow/microclimate branch
+3. **Temperature composition:** the map is not metadata stranded on its generator. Its physical
+   Celsius contract follows only unit-preserving spatial operations (Blur, Warp, Transform), or
+   Blend/Min/Max when both value inputs are Temperature fields. Tonal remaps, arithmetic combines,
+   terraces, and arbitrary grayscale inputs deliberately lose/reject the contract instead of decoding
+   ordinary 0–1 data as −100…1400 °C. **Temperature Modify** adds/removes degrees, approaches a target,
+   or enforces a minimum/maximum through an optional Driver and Mask. A lava simulation can therefore heat its footprint, a shadow/microclimate branch
    can cool a valley, and every downstream consumer sees the edited result. The scalar transport
    encoding spans −100…1400 °C; physical Celsius values remain available to nodes and the viewport.
    **Temperature Select** converts Celsius intervals into ordinary 0–1 masks, allowing the same
@@ -766,7 +774,9 @@ The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM`
 4. **Stability:** simultaneous, distance-corrected transfers relax the combined
    `bedrock + snow depth` surface toward the snow repose angle. Only snow moves, and the transfer is
    volume-conserving, so steep faces unload into real deposits in couloirs and hollows.
-5. **Rendering:** the depth field displaces geometry and normals. The same field controls a
+5. **Rendering:** the depth field displaces geometry and normals. A composed solid-surface heightfield
+   also includes frozen-water support plus snow-on-ice, while the underlying bedrock stream stays
+   non-destructive for downstream geology/hydrology. The same field controls a
    high-albedo, rough dielectric material; deferred shadows, AO, water intersection, and terrain
    normals sample the displaced surface too.
 
@@ -779,11 +789,23 @@ described by [Timonen & Westerholm (2010)](https://onlinelibrary.wiley.com/doi/a
 The viewport may use camera shadow maps for presentation, but they never become simulation input. TAA
 is temporal anti-aliasing and is likewise not a climate signal.
 
-Standing water uses that same altitude temperature. Across a narrow transition around 0 °C, flat lake
+Standing water uses its own connected Temperature field rather than reaching through Snow. Across a
+spatially filtered transition around 0 °C, flat lake
 and sea surfaces become **ice**: liquid ripples and refraction stop and a rough, frosted material takes
 over. The renderer removes bed snow anywhere water covers terrain, then adds snow back only where the
 standing-water phase is frozen. There is therefore no floating snow on liquid water; removing the Snow
 node leaves bare ice. The flatness gate avoids converting sloping river films into raised white ribbons.
+The ice transition remains local—sheltered coves may freeze while warmer water stays liquid—but a physical
+three-degree transition plus explicit bilinear field sampling removes block-sized phase stair steps without
+a full-resolution CPU blur on every edit. A one-cell dry-side surface guard keeps shoreline
+triangles on the water plane; signed depth still clips coverage, eliminating mountain-sized shoreline fins.
+The fallback Water model is intentionally lapse-only; connect the Temperature graph for the same solar/shadow
+climate used by Snow.
+
+The render mesh alternates heightmap-quad diagonals in a balanced checkerboard. This removes the repeating
+directional ridge zipper of a single fixed split without rebuilding a 4K index buffer on every edit. Fully
+height-aware edge spinning requires topology generation, which WebGL2 vertex/fragment shaders cannot perform;
+the scalable follow-up is a WebGPU compute-generated mesh/clipmap rather than a CPU per-edit triangulation.
 
 This placement/stability split follows John Fearing's
 [*Computer Modelling of Fallen Snow*](https://graphics.stanford.edu/courses/cs448-01-spring/papers/fearing.pdf)

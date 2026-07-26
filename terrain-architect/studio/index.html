@@ -2139,19 +2139,24 @@ function temperatureCFromField(field){
   if(!meta.temperatureC)meta.temperatureC=decodeTemperatureField(field);
   return meta.temperatureC;
 }
-// Generic value modifiers keep the physical field kind of their primary input. Analysis nodes
-// deliberately do not: Slope(Temperature) is a scalar gradient, not another temperature field.
+// Physical field kinds survive only operations whose maths preserves their units. This is an
+// explicit node contract: a Levels/Invert/Add applied to encoded Celsius is not temperature merely
+// because Temperature happened to be input A.
 function propagateFieldMetadata(field,inputs,def){
   if(!field||fieldMetadata(field)||!inputs||!inputs[0])return field;
   const source=fieldMetadata(inputs[0]);
-  if(source&&source.kind==="temperature"&&(def.cat==="filt"||def.cat==="comb"))
-    tagTemperatureField(field,null,{solarShadow:source.solarShadow,solarExposure:source.solarExposure,
-      lapseRate:source.lapseRate,heightField:source.heightField});
+  if(!source||source.kind!=="temperature")return field;
+  let preserves=def.fieldSemantics==="preserve-primary";
+  if(def.fieldSemantics==="temperature-pair")
+    preserves=!!(inputs[1]&&fieldMetadata(inputs[1])&&fieldMetadata(inputs[1]).kind==="temperature");
+  if(preserves)tagTemperatureField(field,null,{solarShadow:source.solarShadow,solarExposure:source.solarExposure,
+    lapseRate:source.lapseRate,heightField:source.heightField});
   return field;
 }
 function metricHeightField(inp,n,def){
   const N=n*n,[mn,mx]=fieldRange(inp),range=mx-mn||1,out=new Float32Array(N),heightM=def.height||2600;
-  for(let i=0;i<N;i++)out[i]=(inp[i]-mn)/range*heightM;
+  const datum=def.baseElevation||0;
+  for(let i=0;i<N;i++)out[i]=datum+(inp[i]-mn)/range*heightM;
   return out;
 }
 function climateSolarExposure(baseM,n,def,options={}){
@@ -2160,7 +2165,7 @@ function climateSolarExposure(baseM,n,def,options={}){
   const sinEl=Math.sin(elevation),cosEl=Math.cos(elevation),tanEl=Math.tan(elevation);
   const cell=(def.scale||5000)/n,direct=new Float32Array(N),visibility=new Float32Array(N);
   const suppliedVisibility=options.visibility&&options.visibility.length===N?options.visibility:null;
-  const distances=[];if(!suppliedVisibility&&orient.hemisphere!==0&&cosEl>.01){
+  const distances=[];if(!suppliedVisibility&&!options.skipHorizon&&orient.hemisphere!==0&&cosEl>.01){
     const reachM=options.reachM==null?(def.scale||5000)*.55:options.reachM;
     const maxD=Math.max(2,Math.min(n*.95,reachM/cell)),steps=Math.min(32,Math.max(12,Math.round(Math.sqrt(n)*1.35)));
     let prev=0;for(let k=1;k<=steps;k++){const d=Math.max(1,Math.round(Math.exp(Math.log(maxD+1)*k/steps)-1));
@@ -2196,12 +2201,23 @@ function climateSolarExposure(baseM,n,def,options={}){
   for(let i=0;i<N;i++)exposure[i]=clamp(.12+.88*direct[i]*(.08+.92*softShadow[i]),0,1);
   return{exposure,direct,shadow:softShadow,sunElevationDeg:elevation*180/Math.PI};
 }
-function evaluateClimateMaps(inp,p={},shadowInput=null){
+function evaluateSunShadowMap(inp,p={}){
+  const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
+  const h=preview===full?inp:resampleField(inp,full,preview);
+  const baseM=metricHeightField(h,preview,terrainDef);
+  const solar=climateSolarExposure(baseM,preview,terrainDef,{reachM:p.reach,softness:p.softness});
+  if(preview===full)return{heightM:baseM,solarExposure:solar.exposure,solarShadow:solar.shadow};
+  return{heightM:resampleField(baseM,preview,full),solarExposure:resampleField(solar.exposure,preview,full),
+    solarShadow:resampleField(solar.shadow,preview,full)};
+}
+function evaluateTemperatureMap(inp,p={},shadowInput=null){
   const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
   const h=preview===full?inp:resampleField(inp,full,preview);
   const supplied=shadowInput?(preview===full?shadowInput:resampleField(shadowInput,full,preview)):null;
   const baseM=metricHeightField(h,preview,terrainDef);
-  const solar=climateSolarExposure(baseM,preview,terrainDef,{reachM:p.reach,softness:p.softness,visibility:supplied});
+  // No visibility edge means open sky. Terrain occlusion is an explicit Sun Shadow graph input;
+  // slope/aspect incidence remains part of the base temperature model.
+  const solar=climateSolarExposure(baseM,preview,terrainDef,{visibility:supplied,skipHorizon:!supplied});
   const rawC=new Float32Array(preview*preview),encoded=new Float32Array(preview*preview);
   const warming=p.warming==null?5:p.warming;
   const seaTemp=p.seaTemp==null?(terrainDef.seaTemp==null?6:terrainDef.seaTemp):p.seaTemp;
@@ -2486,13 +2502,13 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==RES*RES)&&(node._demImg||node._demRaw))buildDemFromSource(node);
       if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
-  blend:{cat:"comb",name:"Blend",ins:["A","B","Mask"],desc:"Mix A→B by a factor or a mask input.",
+  blend:{cat:"comb",name:"Blend",ins:["A","B","Mask"],desc:"Mix A→B by a factor or a mask input.",fieldSemantics:"temperature-pair",
     params:[P.slider("factor","Factor",0,1,0.5)],
     eval:(p,ins)=>blendField(ins[0],ins[1],ins[2],p.factor)},
   add:{cat:"comb",name:"Combine",ins:["A","B"],desc:"Arithmetic combine of two fields.",
     params:[P.seg("op","Op",[["add","Add"],["sub","Sub"],["mul","Mul"]],"add"),P.slider("amt","Amount",0,1,0.5)],
     eval:(p,ins)=>combine(ins[0],ins[1],p.op==="add"?(a,b)=>a+b*p.amt:p.op==="sub"?(a,b)=>a-b*p.amt:(a,b)=>a*lerp(1,b,p.amt))},
-  maxmin:{cat:"comb",name:"Max / Min",ins:["A","B"],desc:"Union (max) or intersection (min).",
+  maxmin:{cat:"comb",name:"Max / Min",ins:["A","B"],desc:"Union (max) or intersection (min).",fieldSemantics:"temperature-pair",
     params:[P.seg("op","Op",[["max","Max"],["min","Min"]],"max")],
     eval:(p,ins)=>combine(ins[0],ins[1],p.op==="max"?Math.max:Math.min)},
   stampn:{cat:"comb",name:"Stamp",ins:["Base","Patch","Mask"],
@@ -2518,7 +2534,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
     eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
 
-  warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",
+  warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",fieldSemantics:"preserve-primary",
     params:[P.slider("strength","Strength",0,0.4,0.12),P.slider("freq","Frequency",0.5,8,3,0.1),P.seed("seed","Seed",7)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],gpuReady()?gpuWarp(ins[0],p):warpField(ins[0],p),ins[1]):newField()},
   terrace:{cat:"filt",name:"Terrace",ins:["In","Mask"],desc:"Snap to stratified benches.",
@@ -2534,7 +2550,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   histeq:{cat:"filt",name:"Histogram EQ",ins:["In"],desc:"CDF equalization — spread the tonal range.",
     params:[P.slider("amount","Amount",0,1,1),P.int("bins","Bins",16,256,256)],
     eval:(p,ins)=>ins[0]?histEqualizeField(ins[0],p):newField()},
-  blur:{cat:"filt",name:"Blur",ins:["In","Mask"],desc:"Separable Gaussian smoothing.",
+  blur:{cat:"filt",name:"Blur",ins:["In","Mask"],desc:"Separable Gaussian smoothing.",fieldSemantics:"preserve-primary",
     params:[P.slider("radius","Radius",1,10,2,1,v=>v|0)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],blurField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}),ins[1]):newField()},
   sculpt:{cat:"filt",name:"Sculpt",ins:["In","Mask"],desc:"Merge a masked Raise, Lower, Flatten, or Smooth operation into the incoming terrain. Pair it with Draw Mask for roads and authored regions.",
@@ -2548,7 +2564,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
-  transform:{cat:"filt",name:"Transform",ins:["In","Mask"],desc:"Translate, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",
+  transform:{cat:"filt",name:"Transform",ins:["In","Mask"],desc:"Translate, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",fieldSemantics:"preserve-primary",
     params:[P.tabs("mode","Sampling",[["auto","Exact"],["raster","Raster"]],"auto"),
       P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("aspect","Scale Y",0.25,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
@@ -2636,7 +2652,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.number("falloff","Transition",0,100,3,.5,"°C"),
       P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
     eval:(p,ins)=>{
-      const c=temperatureCFromField(ins[0])||decodeTemperatureField(ins[0]);if(!c)return newField();
+      const c=temperatureCFromField(ins[0]);if(!c)return newField();
       const out=new Float32Array(c.length),lo=Math.min(p.lo,p.hi),hi=Math.max(p.lo,p.hi),f=Math.max(0,p.falloff);
       const ss=(a,b,x)=>{if(b<=a)return x>=b?1:0;const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
       for(let i=0;i<out.length;i++){
@@ -2650,18 +2666,18 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   // ---- DATA MAPS (Gaea's "Derive" channels): grayscale fields to bind a SatMap / mask to ----
   d_slope:{cat:"data",name:"Slope",ins:["In"],desc:"Steepness as a grayscale field (0 flat → 1 vertical). The classic cliff/bench colour driver.",
     params:[],eval:(p,ins)=>ins[0]?normalize(slopeOf(ins[0])):newField()},
-  d_height:{cat:"data",name:"Height",ins:["In"],desc:"Normalized elevation map (0 = lowest point, 1 = highest point). Use it anywhere a reusable height-driven mask or data branch is needed.",
+  d_height:{cat:"data",name:"Height",ins:["In"],desc:"Normalized relative elevation map (0 = tile minimum, 1 = tile maximum). Terrain Definition's Base elevation supplies its physical datum for climate.",
     params:[],eval:(p,ins)=>ins[0]?normalize(ins[0]):newField()},
   d_sunshadow:{cat:"data",name:"Sun Shadow",ins:["Height"],desc:"Deterministic terrain-space solar visibility. White is sunlit; black is occluded by the heightfield horizon. Unlike a viewport cascade shadow, this field is stable, blendable, and exportable.",
     params:[P.slider("reach","Horizon reach",100,10000,2750,25,v=>Math.round(v)+" m"),
       P.slider("softness","Softness",0,3,1,.05,v=>v.toFixed(2)+"×")],
     eval:(p,ins,nd)=>{
       if(!ins[0]){nd._solarShadow=newField();nd._solarExposure=newField();return nd._solarShadow;}
-      const maps=evaluateClimateMaps(ins[0],p);
+      const maps=evaluateSunShadowMap(ins[0],p);
       nd._solarShadow=maps.solarShadow;nd._solarExposure=maps.solarExposure;return maps.solarShadow;
     },
     note:"This node is a <b>terrain-space analysis map</b>: white means the climate sun reaches the surface and black means terrain blocks it. It uses a logarithmic heightfield-horizon march followed by a spatial penumbra filter. A cascaded shadow map is intentionally not used here because cascades are fitted to the current camera frustum and therefore change as the view moves."},
-  d_temperature:{cat:"data",name:"Temperature",ins:["Height","Sun visibility"],desc:"Generates the base surface-temperature field from elevation lapse rate plus solar exposure. The physical Celsius map remains editable downstream.",
+  d_temperature:{cat:"data",name:"Temperature",ins:["Relative height","Sun visibility"],desc:"Generates the base surface-temperature field from datum-aware elevation lapse rate plus solar exposure. The physical Celsius map remains editable downstream.",
     params:[P.slider("seaTemp","Sea-level temperature",-50,50,6,.5,v=>v.toFixed(1)+" °C"),
       P.slider("lapseRate","Altitude lapse rate",-10,15,6.5,.1,v=>v.toFixed(1)+" °C/km"),
       P.slider("warming","Solar warming",0,50,5,.5,v=>v.toFixed(1)+" °C")],
@@ -2670,29 +2686,31 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
         nd._temperatureC=new Float32Array(RES*RES);nd._solarShadow=newField();nd._solarExposure=newField();
         const out=newField();out.fill(encodeTemperatureC(0));return tagTemperatureField(out,nd._temperatureC);
       }
-      const maps=evaluateClimateMaps(ins[0],p,ins[1]||null);
+      const maps=evaluateTemperatureMap(ins[0],p,ins[1]||null);
       nd._temperatureC=maps.temperatureC;nd._solarShadow=maps.solarShadow;nd._solarExposure=maps.solarExposure;
       return tagTemperatureField(maps.encoded,maps.temperatureC,{solarShadow:maps.solarShadow,solarExposure:maps.solarExposure,
         lapseRate:p.lapseRate,heightField:ins[0]});
     },
-    note:"This node creates the <b>base</b> temperature map; it is not a terminal display effect. Its climate sliders stay in useful Earth-scale ranges: sea-level temperature −50…+50 °C, lapse rate −10…+15 °C/km (including inversions), and solar warming 0…50 °C. Its output carries a Celsius field contract through downstream Filter and Combine nodes, and the Snow/ice consumers read the final connected result. The scalar encoding still spans −100…1400 °C so volcanic heat remains representable through <b>Temperature Modify</b>. Connect <b>Sun Shadow</b> to Sun visibility to make terrain occlusion part of the field. Terrain Definition supplies latitude, north, and solar elevation."},
-  d_heat:{cat:"data",name:"Temperature Modify",ins:["Temperature","Source","Mask"],desc:"Modifies a Temperature field in physical °C. Use Source for a biome, lava, geothermal, shade, or authored microclimate map; Mask confines the exchange.",
-    params:[P.tabs("mode","Operation",[["offset","Offset"],["set","Set"],["minimum","Minimum"]],"offset"),
+    note:"This node creates the <b>base</b> temperature map; it is not a terminal display effect. Its climate sliders stay in useful Earth-scale ranges: sea-level temperature −50…+50 °C, lapse rate −10…+15 °C/km (including inversions), and solar warming 0…50 °C. Its Celsius contract survives unit-preserving spatial operations such as Blur, Warp, and Transform; generic tonal/arithmetic nodes deliberately drop it unless both inputs are compatible Temperature fields. Snow and Water read the final physical field wired into them. The scalar encoding still spans −100…1400 °C so volcanic heat remains representable through <b>Temperature Modify</b>. Without a Sun visibility edge, the model assumes open sky while retaining slope/aspect incidence; connect <b>Sun Shadow</b> to make terrain occlusion explicit. Terrain Definition supplies latitude, north, and solar elevation."},
+  d_heat:{cat:"data",name:"Temperature Modify",ins:["Temperature","Driver","Mask"],desc:"Modifies a Temperature field in physical °C. Driver supplies a biome, lava, geothermal, shade, or authored 0–1 footprint; Mask confines the exchange.",
+    params:[P.tabs("mode","Operation",[["offset","Offset"],["set","Set"],["minimum","Minimum"],["maximum","Maximum"]],"offset"),
       WHEN(P.number("offsetC","Temperature offset",-500,1400,0,1,"°C"),"mode","offset"),
-      WHEN(P.number("targetC","Target temperature",-100,1400,900,1,"°C"),"mode","set","minimum"),
+      WHEN(P.number("targetC","Target temperature",-100,1400,900,1,"°C"),"mode","set","minimum","maximum"),
       P.slider("amount","Amount",0,1,1,.01,v=>Math.round(v*100)+"%")],
     eval:(p,ins,nd)=>{
-      const base=ins[0],baseC=temperatureCFromField(base)||decodeTemperatureField(base);
+      const base=ins[0],baseC=temperatureCFromField(base);
       if(!baseC){
-        nd._temperatureC=new Float32Array(RES*RES);const out=newField();out.fill(encodeTemperatureC(0));
-        return tagTemperatureField(out,nd._temperatureC);
+        nd._temperatureC=null;nd._inputError=base?"Temperature input requires a physical Temperature field":"Connect a Temperature field";
+        return newField();
       }
+      nd._inputError=null;
       const source=ins[1],mask=ins[2],outC=new Float32Array(baseC.length),out=new Float32Array(baseC.length);
       for(let i=0;i<out.length;i++){
         const w=clamp((source?source[i]:1)*(mask?mask[i]:1)*(p.amount==null?1:p.amount),0,1),c=baseC[i];
         let q=c;
         if(p.mode==="set")q=lerp(c,p.targetC,w);
         else if(p.mode==="minimum")q=c+Math.max(0,p.targetC-c)*w;
+        else if(p.mode==="maximum")q=c-Math.max(0,c-p.targetC)*w;
         else q=c+p.offsetC*w;
         outC[i]=clamp(q,TEMP_MIN_C,TEMP_MAX_C);out[i]=encodeTemperatureC(outC[i]);
       }
@@ -2700,7 +2718,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       return tagTemperatureField(out,outC,{solarShadow:nd._solarShadow,solarExposure:nd._solarExposure,
         lapseRate:meta.lapseRate,heightField:meta.heightField});
     },
-    note:"Temperature Modify is a physical-field modifier. <b>Offset</b> adds or removes degrees; <b>Set</b> approaches an absolute temperature; <b>Minimum</b> only heats colder cells. Source and Mask multiply the Amount. A future Lava simulation can output a 0–1 heat footprint into Source—or emit a temperature field directly—without special cases in Snow, ice, biome selection, or the viewport. The same node can cool a shaded valley or author a regional microclimate."},
+    note:"Temperature Modify requires a physical Temperature field. <b>Offset</b> adds or removes degrees; <b>Set</b> approaches an absolute temperature; <b>Minimum</b> only heats colder cells; <b>Maximum</b> only cools warmer cells. Driver is a 0–1 spatial footprint, Mask confines the edit, and both multiply Amount. A future Lava simulation can output a heat footprint into Driver—or emit a temperature field directly—without special cases in Snow, ice, biome selection, or the viewport."},
   d_curvature:{cat:"data",name:"Curvature",ins:["In"],desc:"Zevenbergen–Thorne curvature: convex ridges/lips vs concave valley floors (0.5 = flat).",
     params:[P.seg("kind","Kind",[["profile","Profile"],["plan","Plan"],["mean","Mean"]],"profile"),
       P.slider("strength","Strength",0.1,4,1,0.1)],
@@ -2724,7 +2742,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.slider("slopeW","Slope",0,1,0.5),P.slider("soilW","Soil",0,1,0.3),P.slider("flowW","Flow",0,1,0.2)],
     eval:(p,ins)=>ins[0]?textureField(ins[0],p):newField()},
 
-  water:{cat:"effect",name:"Water",ins:["In"],desc:"Defines where fluid exists. Hydrology fills selected basins and routes a configurable river network; Sea adds one flat level. Waves and refraction are global renderer settings.",
+  water:{cat:"effect",name:"Water",ins:["In","Temperature"],desc:"Defines where fluid exists and uses an optional physical Temperature field for its liquid/ice phase. Hydrology fills selected basins; Sea adds one flat level. Waves and refraction are global renderer settings.",
     passthrough:true,effect:"water",
     params:[P.tabs("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
       WHEN(GROUP(P.seg("lakes","Lakes",[["on","On"],["off","Off"]],"on"),"Hydrology"),"mode","hydro"),
@@ -2735,7 +2753,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       GROUP(P.slider("shoreSmooth","Shore smoothing",0,2.5,1.35,.05),"Shoreline"),
       GROUP(P.slider("foam","Shore foam",0,1,.18,.01),"Shoreline")],
     eval:(p,ins)=>ins[0]||newField(),
-    note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br><b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
+    note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br>The optional <b>Temperature</b> input controls phase locally: standing water freezes cell by cell, independent of whether a Snow node exists. Without it, the clearly labelled fallback climate in Terrain Definition is used. <b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
   snow:{cat:"effect",name:"Snow",ins:["In","Temperature"],desc:"A transient snow-depth layer in metres: snowfall accumulates, sun and temperature melt it, and avalanches move it from steep faces into gullies and hollows. Liquid water excludes snow; frozen standing water can receive it.",
     passthrough:true,effect:"snow",
     params:[GROUP(P.slider("snowfall","Snowfall",0,20,3,.1,v=>v.toFixed(2)+" m"),"Accumulation"),
@@ -2746,10 +2764,11 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       GROUP(P.slider("settle","Settling rate",.1,1,.55,.05,v=>v.toFixed(2)),"Avalanche & settling")],
     eval:(p,ins,nd)=>{
       const h=ins[0]||newField(),meta=fieldMetadata(ins[1])||{};
-      const temperature=temperatureCFromField(ins[1])||decodeTemperatureField(ins[1]);
+      const temperature=temperatureCFromField(ins[1]);
+      nd._inputError=ins[1]&&!temperature?"Temperature input requires a physical Temperature field":null;
       nd._snowLayer=evaluateSnowLayer(h,p,temperature,meta.solarShadow,meta.solarExposure);return h;
     },
-    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. <b>Snowfall</b> is settled vertical depth. Terrain Definition supplies the shared sea-level temperature and lapse rate used by both snow and water ice; precipitation transitions from rain to snow around that freezing line, and <b>degree-day melt</b> removes snow above 0 °C. The Temperature input consumes the final field wired into it—including Heat, Blend, Blur, or future Lava processing—not the original climate node hidden upstream.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle. This moves snow off unstable faces and accumulates it in gullies and hollows. The implementation follows the placement/stability split of Fearing (2000) and the temperature, sunlight, melt and avalanche model family of Cordonnier et al. (2018)."},
+    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. The renderer composes that thickness into a solid-surface heightfield, including above frozen water, so lighting, picking, and visible elevation follow the snow top. The underlying terrain output stays unchanged until an explicit bake/export-surface workflow is requested. <b>Snowfall</b> is settled vertical depth; precipitation transitions from rain to snow around freezing, and <b>degree-day melt</b> removes snow above 0 °C. The Temperature input consumes the final physical field wired into it—including Temperature Modify, a valid temperature Blend, Blur, or future Lava processing. Without one, Terrain Definition's fallback climate is used.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle. This moves snow off unstable faces and accumulates it in gullies and hollows. The implementation follows the placement/stability split of Fearing (2000) and the temperature, sunlight, melt and avalanche model family of Cordonnier et al. (2018)."},
   satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Authors one colour gradient, driven by height, slope, or any field wired into Driver. Chain a masked SatMap over another for a simple overlay, or blend separate SatMap branches in Color Blend for explicit biome composition. Height passes through unchanged.",
     passthrough:true,effect:"satmap",
     params:[P.select("gradient","Gradient",null,"Temperate"),
@@ -2844,7 +2863,7 @@ function restoreGraph(snap){
   }
   nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true,
     _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null}));
-  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={scale:5000,height:2600,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,...snap.terrainDef};
+  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,...snap.terrainDef};
   H_SCALE=terrainDef.height/terrainDef.scale;
   selected=snap.selectedId==null?null:nodeById(snap.selectedId);
   selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
@@ -2887,7 +2906,13 @@ function collectScene(root){                        // walk the PRIMARY height/e
   const s={water:null,snow:null,satmap:null};root=root||outputNode();if(!root)return s;
   let nd=root;const seen=new Set();
   while(nd&&!seen.has(nd.id)){seen.add(nd.id);
-    if(nd.type==="water"&&!s.water)s.water={...nd.params,nodeId:nd.id};
+    if(nd.type==="water"&&!s.water){
+      const temperatureEdge=inputEdge(nd.id,1),temperatureNode=temperatureEdge&&nodeById(temperatureEdge.from);
+      const temperatureField=temperatureNode&&fieldMetadata(temperatureNode._field)&&fieldMetadata(temperatureNode._field).kind==="temperature"
+        ?temperatureNode._field:null;
+      nd._inputError=temperatureEdge&&!temperatureField?"Temperature input requires a physical Temperature field":null;
+      s.water={...nd.params,nodeId:nd.id,temperatureField};
+    }
     if(nd.type==="snow"&&!s.snow){
       const temperatureEdge=inputEdge(nd.id,1),temperatureNode=temperatureEdge&&nodeById(temperatureEdge.from);
       s.snow={...nd.params,nodeId:nd.id,layer:nd._snowLayer,temperatureField:temperatureNode&&temperatureNode._field||null};
@@ -3115,6 +3140,7 @@ function drawNode(nd){
   if(nd._thumb){gx.drawImage(nd._thumb,tx,ty,TH,TH);}else{gx.fillStyle=css("--panel3");gx.fillRect(tx,ty,TH,TH);}
   if(nd._lastMs!=null){gx.fillStyle=css("--faint");gx.font="9px "+css("--mono");gx.textBaseline="alphabetic";
     gx.fillText(nd._lastMs<10?nd._lastMs.toFixed(1)+" ms":Math.round(nd._lastMs)+" ms",nd.x+7,nd.y+h-7);}
+  if(nd._inputError){gx.beginPath();gx.arc(nd.x+nd.w-9,nd.y+h-8,4,0,7);gx.fillStyle=css("--bad");gx.fill();}
   gx.strokeStyle=css("--line");gx.lineWidth=1;gx.strokeRect(tx+.5,ty+.5,TH-1,TH-1);
   // ports
   nodeInputs(nd).forEach((nm,s)=>{const p=portPos(nd,"in",s);drawPort(p,cc,hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="in"&&hoverPort.slot===s);
@@ -3480,7 +3506,7 @@ function buildProps(){
       i.oninput=()=>{if(!before)before=graphSnapshot();changed=true;terrainDef[key]=step>=1?Math.round(parseFloat(i.value)):parseFloat(i.value);
         f.querySelector(".val").textContent=show(terrainDef[key]);
         H_SCALE=terrainDef.height/terrainDef.scale;
-        const climateNodes=nodes.filter(n=>n.type==="d_sunshadow"||n.type==="d_temperature"||n.type==="snow");
+        const climateNodes=nodes.filter(n=>n.type==="d_sunshadow"||n.type==="d_temperature"||n.type==="water"||n.type==="snow");
         climateNodes.forEach(n=>{if(n.type==="snow")n._snowLayer=null;markDirtyFrom(n.id);});
         if(climateNodes.length)requestEval();else if(curField)updateViewport(curField);
         tdInfo();syncCompass();};
@@ -3489,9 +3515,10 @@ function buildProps(){
           nodes.filter(n=>n.type==="thermal").forEach(n=>markDirtyFrom(n.id));requestEval();}};
       f.appendChild(i);return f;};
     body.appendChild(mk("scale","Scale (across)",500,20000,1,v=>Math.round(v)+" m"));
-    body.appendChild(mk("height","Height",100,8000,1,v=>Math.round(v)+" m"));
-    body.appendChild(mk("seaTemp","Sea-level temperature",-30,35,.5,v=>v.toFixed(1)+" °C"));
-    body.appendChild(mk("lapseRate","Temperature lapse rate",3,10,.1,v=>v.toFixed(1)+" °C/km"));
+    body.appendChild(mk("height","Relief height",100,8000,1,v=>Math.round(v)+" m"));
+    body.appendChild(mk("baseElevation","Base elevation",-500,9000,1,v=>Math.round(v)+" m ASL"));
+    body.appendChild(mk("seaTemp","Fallback sea-level temperature",-50,50,.5,v=>v.toFixed(1)+" °C"));
+    body.appendChild(mk("lapseRate","Fallback temperature lapse",-10,15,.1,v=>v.toFixed(1)+" °C/km"));
     body.appendChild(mk("solarElevation","Climate sun elevation",3,90,1,v=>Math.round(v)+"°"));
     body.appendChild(mk("latitude","Latitude",-90,90,.5,v=>Math.abs(v).toFixed(1)+"° "+(v<0?"S":v>0?"N":"Equator")));
     body.appendChild(mk("north","Map north",0,359,1,v=>Math.round(v)+"° clockwise from top"));
@@ -3504,6 +3531,9 @@ function buildProps(){
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
+  if(selected._inputError){const warning=document.createElement("div");warning.className="hint";
+    warning.style.cssText="border-color:var(--bad);color:var(--bad);margin-bottom:10px";
+    warning.textContent=selected._inputError;body.appendChild(warning);}
   // Graphs saved by older Studio versions (and concise hand-authored defaults) may not carry
   // parameters introduced later. Hydrate them from the schema before formatting or evaluating.
   def.params.forEach(pr=>{if(!(pr.key in selected.params))selected.params[pr.key]=cloneParams(pr.def);});
@@ -3597,13 +3627,15 @@ function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
   const lat=terrainDef.latitude||0,hemi=lat<0?"Southern":lat>0?"Northern":"Equatorial";
   const freeze=terrainDef.seaTemp<=0?0:terrainDef.seaTemp/(terrainDef.lapseRate||6.5)*1000;
   el.innerHTML=`Vertical ratio <b>${(terrainDef.height/terrainDef.scale).toFixed(2)}</b> (height ÷ scale) ·
-    cell size <b>${cellSizeM().toFixed(1)} m</b> at ${RES}².<br>
+    cell size <b>${cellSizeM().toFixed(1)} m</b> at ${RES}² ·
+    elevation <b>${Math.round(terrainDef.baseElevation)}…${Math.round(terrainDef.baseElevation+terrainDef.height)} m ASL</b>.<br>
     0 °C freezing level <b>${Math.round(freeze)} m</b>${terrainDef.seaTemp<=0?" (sea level and above)":""} ·
-    ${terrainDef.seaTemp.toFixed(1)} °C at sea level, −${terrainDef.lapseRate.toFixed(1)} °C/km ·
+    fallback ${terrainDef.seaTemp.toFixed(1)} °C at sea level, −${terrainDef.lapseRate.toFixed(1)} °C/km ·
     climate sun <b>${Math.round(terrainDef.solarElevation)}°</b>.<br>
     <b>${hemi} hemisphere</b> · map north ${Math.round(terrainDef.north||0)}° clockwise from the top edge.<br>
     Scale drives vertical exaggeration and real-scale nodes. Latitude + map north define the
-    equator-facing aspect used by solar snowmelt and the viewport compass.`;}
+    equator-facing aspect used by solar snowmelt and the viewport compass. Fallback climate is used
+    only when Snow or Water has no valid Temperature input.`;}
 function buildField(pr){
   const f=document.createElement("div");f.className="field";
   f.dataset.paramKey=pr.key;
@@ -3985,7 +4017,7 @@ function resolveColor(nodeId,n,memo,guard){
 // across and 2.6 km tall, giving a vertical ratio of height/scale = 0.52. This is what makes cell
 // size (scale/RES) and therefore slope ANGLES physically meaningful, which nodes with "Real Scale"
 // use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
-let terrainDef={scale:5000,height:2600,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
+let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
 const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell
 let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
 let TEMP_UNIT="C";try{TEMP_UNIT=localStorage.getItem("terrainStudioTempUnit")==="F"?"F":"C";}catch(_){}
@@ -4175,6 +4207,9 @@ function initGL(){
         return c;}
       float Wat(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gW,b).r,c=texture(gW,b+vec2(uWpx,0.)).r,d=texture(gW,b+vec2(0.,uWpx)).r,e=texture(gW,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
       float Ht(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gH,b).r,c=texture(gH,b+vec2(uWpx,0.)).r,d=texture(gH,b+vec2(0.,uWpx)).r,e=texture(gH,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+      float fieldLinear(sampler2D tx,vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;
+        float a=texture(tx,b).r,c=texture(tx,b+vec2(uWpx,0.)).r,d=texture(tx,b+vec2(0.,uWpx)).r,e=texture(tx,b+vec2(uWpx,uWpx)).r;
+        return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
       // per-pixel terrain normal from central differences of the height field (higher-res than the mesh vertex normals)
       vec3 terrainNormal(vec2 uv){float e=uWpx;
         float hl=Ht(uv-vec2(e,0.))*uH,hr=Ht(uv+vec2(e,0.))*uH,hd=Ht(uv-vec2(0.,e))*uH,hu=Ht(uv+vec2(0.,e))*uH;
@@ -4300,13 +4335,13 @@ function initGL(){
         // ---- WATER (screen-space): lit lakebed refraction + Beer–Lambert + Fresnel sky reflection ----
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
         vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
-        float ice=clamp(texture(gIce,wuv).r,0.0,1.0);
-        float iceSnowDepth=texture(gIceSnow,wuv).r;
+        float ice=clamp(fieldLinear(gIce,wuv),0.0,1.0);
+        float iceSnowDepth=fieldLinear(gIceSnow,wuv);
         float iceSnowCov=smoothstep(.015,.10,iceSnowDepth);
-        float sl=wl*uH+texture(gIceSnow,wuv-vec2(uWpx,0.)).r*uH/uTerrainHeight;
-        float sr=wr*uH+texture(gIceSnow,wuv+vec2(uWpx,0.)).r*uH/uTerrainHeight;
-        float sd=wdn*uH+texture(gIceSnow,wuv-vec2(0.,uWpx)).r*uH/uTerrainHeight;
-        float su=wup*uH+texture(gIceSnow,wuv+vec2(0.,uWpx)).r*uH/uTerrainHeight;
+        float sl=wl*uH+fieldLinear(gIceSnow,wuv-vec2(uWpx,0.))*uH/uTerrainHeight;
+        float sr=wr*uH+fieldLinear(gIceSnow,wuv+vec2(uWpx,0.))*uH/uTerrainHeight;
+        float sd=wdn*uH+fieldLinear(gIceSnow,wuv-vec2(0.,uWpx))*uH/uTerrainHeight;
+        float su=wup*uH+fieldLinear(gIceSnow,wuv+vec2(0.,uWpx))*uH/uTerrainHeight;
         vec3 snowN=normalize(vec3((sl-sr)*uRES*.25,1.0,(sd-su)*uRES*.25));
         N=normalize(mix(N,snowN,iceSnowCov));
         float t=uTime*uRippleSpeed;vec3 wave=waveData(Pwater.xz,t);float waveAmt=uRipple*waterCov*(1.0-ice);
@@ -4400,15 +4435,19 @@ function makeProg(vs,fs){function sh(t,s){const o=gl.createShader(t);gl.shaderSo
 function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   const arr=u32?new Uint32Array(cnt):new Uint16Array(cnt);   // fill the typed array directly (a JS array costs ~4x at 1024²)
   let w=0;for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;
-    arr[w++]=i;arr[w++]=i+1;arr[w++]=i+n;arr[w++]=i+1;arr[w++]=i+n+1;arr[w++]=i+n;}
+    // Alternating diagonals remove the long directional zipper produced when every heightmap quad
+    // leans the same way. True height-aware edge spinning belongs in the WebGPU compute mesh path;
+    // this balanced topology is resolution-static and therefore costs nothing on property edits.
+    if((x+y)&1){arr[w++]=i;arr[w++]=i+1;arr[w++]=i+n+1;arr[w++]=i;arr[w++]=i+n+1;arr[w++]=i+n;}
+    else{arr[w++]=i;arr[w++]=i+1;arr[w++]=i+n;arr[w++]=i+1;arr[w++]=i+n+1;arr[w++]=i+n;}}
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arr,gl.STATIC_DRAW);buffers.count=cnt;
-  buffers.u32=u32;
+  buffers.u32=u32;buffers.indexPattern="checkerboard";
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
-let curField=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSnowLayerRef=null;
+let curField=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSolidSurfaceY=null,curSnowLayerRef=null;
 let curTemperatureRef=null,curSunVisibilityRef=null;
-let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curIceSnowSurfaceY=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null;
+let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curIceSnowSurfaceY=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null,lastFallbackClimateSig="";
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
   const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;rootNode=rootNode||activePreviewNode();
@@ -4427,7 +4466,9 @@ function updateViewport(f,rootNode,options){
   }
   const previewTemperatureField=rootNode&&fieldMetadata(rootNode._field)&&fieldMetadata(rootNode._field).kind==="temperature"
     ?rootNode._field:null;
-  const activeTemperatureField=previewTemperatureField||scene.snow&&scene.snow.temperatureField||null;
+  const activeTemperatureField=previewTemperatureField
+    ||scene.snow&&scene.snow.temperatureField
+    ||scene.water&&scene.water.temperatureField||null;
   const activeTemperatureMeta=fieldMetadata(activeTemperatureField)||{};
   const temperatureNode=rootNode&&(rootNode.type==="d_temperature"?rootNode:nearestUpstreamNode("d_temperature",rootNode));
   const shadowNode=rootNode&&(rootNode.type==="d_sunshadow"?rootNode:nearestUpstreamNode("d_sunshadow",rootNode));
@@ -4438,12 +4479,16 @@ function updateViewport(f,rootNode,options){
     ||shadowNode&&shadowNode._solarShadow
     ||temperatureNode&&temperatureNode._solarShadow
     ||scene.snow&&scene.snow.layer&&scene.snow.layer.solarShadow||null;
-  if(baseChanged||temperatureMap!==curTemperatureRef){
+  const fallbackClimateSig=[terrainDef.baseElevation,terrainDef.seaTemp,terrainDef.lapseRate].join("|");
+  const fallbackClimateChanged=fallbackClimateSig!==lastFallbackClimateSig;
+  if(baseChanged||temperatureMap!==curTemperatureRef||(!temperatureMap&&fallbackClimateChanged)){
     const temp=temperatureMap&&temperatureMap.length===n*n?temperatureMap:new Float32Array(n*n);
-    if(!temperatureMap)for(let i=0;i<temp.length;i++)temp[i]=terrainDef.seaTemp-terrainDef.lapseRate*(hgt[i]*terrainDef.height/1000);
+    if(!temperatureMap)for(let i=0;i<temp.length;i++)temp[i]=terrainDef.seaTemp
+      -terrainDef.lapseRate*((terrainDef.baseElevation+hgt[i]*terrainDef.height)/1000);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.temperature);gl.bufferData(gl.ARRAY_BUFFER,temp,gl.DYNAMIC_DRAW);
     curTemperatureRef=temperatureMap;
   }
+  lastFallbackClimateSig=fallbackClimateSig;
   if(baseChanged||sunVisibility!==curSunVisibilityRef){
     const vis=sunVisibility&&sunVisibility.length===n*n?sunVisibility:new Float32Array(n*n).fill(1);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.sunvis);gl.bufferData(gl.ARRAY_BUFFER,vis,gl.DYNAMIC_DRAW);
@@ -4456,9 +4501,10 @@ function updateViewport(f,rootNode,options){
     curFilled=priorityFloodFill(hgt);
     curAccum=d8Accumulation(curFilled);
   }
-  const waterSig=scene.water?JSON.stringify([scene.water,terrainDef.seaTemp,terrainDef.lapseRate,
+  const waterSig=scene.water?JSON.stringify([{...scene.water,temperatureField:undefined},terrainDef.baseElevation,
+    terrainDef.seaTemp,terrainDef.lapseRate,
     scene.snow&&{snowfall:scene.snow.snowfall,meltDays:scene.snow.meltDays,meltRate:scene.snow.meltRate}]):"";
-  const waterTemperatureRef=scene.snow&&scene.snow.layer&&scene.snow.layer.temperatureC||null;
+  const waterTemperatureRef=scene.water&&scene.water.temperatureField||null;
   const waterChanged=baseChanged||waterSig!==lastWaterSig||waterTemperatureRef!==lastWaterTemperatureRef;
   if(waterChanged)refreshWater();
   lastWaterSig=waterSig;lastWaterTemperatureRef=waterTemperatureRef;geometryChanged=geometryChanged||waterChanged;
@@ -4482,6 +4528,12 @@ function updateViewport(f,rootNode,options){
     // Uploading the displaced field here keeps those passes aligned with accumulated snow.
     if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,surfaceTex);}
     curSnowDepthM=snow;curSurfaceY=surface;curSnowLayerRef=layerDepth;
+    // The non-destructive terrain stream remains bedrock/soil, while this composed solid-surface
+    // heightfield is what picking, readouts, and future "bake visible surface" export should use.
+    // Frozen water is solid support; snow on that ice therefore raises the composed height.
+    curSolidSurfaceY=surface.slice();
+    if(curIceSnowSurfaceY&&curWaterIce)for(let i=0;i<curSolidSurfaceY.length;i++)
+      if(curWaterIce[i]>.5)curSolidSurfaceY[i]=Math.max(curSolidSurfaceY[i],curIceSnowSurfaceY[i]);
   }
   curField=f;curGeomKey=geomKey;
   if(baseChanged||!options||options.color!==false){
@@ -4534,7 +4586,7 @@ function d8Accumulation(g){
 function refreshWater(){
   if(!gl||!curHgt)return;
   const n=RES,N=n*n,h=curHgt,filled=curFilled,A=curAccum,H=H_SCALE;
-  const W=new Float32Array(N);
+  const W=new Float32Array(N),wetMask=new Uint8Array(N);
   const wn_=scene.water;                                  // params come from the Water effect node (null = no water)
   const hydroOn=wn_&&wn_.mode!=="sea",seaOn=wn_&&wn_.mode==="sea";
   const thr=(0.02-0.0194*((wn_&&wn_.flow)||0))*N;         // River flow param: high -> denser network (lower area threshold)
@@ -4551,29 +4603,55 @@ function refreshWater(){
         if(h[i]+film>w)w=h[i]+film;}                       // river film follows the routed channel downhill
     }
     if(seaL>w)w=seaL;                                     // flat ocean at a level (Sea mode)
-    W[i]=w;
+    W[i]=w;wetMask[i]=w>h[i]+1e-7?1:0;
   }
-  curWater=W;                                               // exposed to diagnostics and renderer tests
+  // Extend the adjacent wet surface one dry vertex beyond the coverage boundary. Coverage still
+  // comes from signed water depth, but shoreline triangles now stay on the lake/sea plane instead
+  // of climbing to a dry mountain vertex and forming the large saw-tooth fins seen at grazing angles.
+  const waterSurface=W.slice();
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x;if(wetMask[i])continue;
+    let sum=0,count=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      const j=yy*n+xx;if(wetMask[j]){sum+=W[j];count++;}
+    }
+    // Never let the guard create water on a dry sample. Normal shores remain coplanar because their
+    // dry terrain is above the adjacent water; unusual disconnected low samples stay dry.
+    if(count)waterSurface[i]=Math.min(sum/count,h[i]);
+  }
+  curWater=waterSurface;                                    // exposed to diagnostics and renderer tests
   const wn=new Float32Array(N*3);                          // normal of the WATER surface (0 gradient in lakes -> up)
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
-    const wl=W[y*n+clamp(x-1,0,n-1)],wr=W[y*n+clamp(x+1,0,n-1)],wu=W[clamp(y-1,0,n-1)*n+x],wd=W[clamp(y+1,0,n-1)*n+x];
+    const wl=waterSurface[y*n+clamp(x-1,0,n-1)],wr=waterSurface[y*n+clamp(x+1,0,n-1)];
+    const wu=waterSurface[clamp(y-1,0,n-1)*n+x],wd=waterSurface[clamp(y+1,0,n-1)*n+x];
     const sx=(wl-wr)*H*(n-1)/2,sz=(wu-wd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
     wn[i*3]=sx/L;wn[i*3+1]=1/L;wn[i*3+2]=sz/L;}
   // Snow on frozen standing water is another transient thickness layer. It shares the Snow node's
   // event/melt controls but uses the lake/sea elevation and a flatness gate, so flowing river films
   // are not silently converted into raised white ribbons.
   const iceSnow=new Float32Array(N),liquidMask=new Float32Array(N),iceMask=new Float32Array(N),snowP=scene.snow;
-  const climateTemp=snowP&&snowP.layer&&snowP.layer.temperatureC;
-  const temperatureMeta=fieldMetadata(snowP&&snowP.temperatureField),waterLapse=temperatureMeta&&temperatureMeta.lapseRate!=null
+  const climateTemp=temperatureCFromField(wn_&&wn_.temperatureField);
+  const temperatureMeta=fieldMetadata(wn_&&wn_.temperatureField),waterLapse=temperatureMeta&&temperatureMeta.lapseRate!=null
     ?temperatureMeta.lapseRate:terrainDef.lapseRate;
+  const rawIce=new Float32Array(N),waterTemperatureC=new Float32Array(N);
   for(let i=0;i<N;i++){
-    if(W[i]<=h[i]+1e-7)continue;
+    if(!wetMask[i])continue;
     const temp=climateTemp&&climateTemp.length===N
-      ?climateTemp[i]-waterLapse*((W[i]-h[i])*terrainDef.height/1000)
-      :terrainDef.seaTemp-terrainDef.lapseRate*(W[i]*terrainDef.height/1000);
-    const ice=clamp(.5-temp,0,1),standing=clamp((wn[i*3+1]-.997)/.0028,0,1);
-    const frozen=ice*standing;iceMask[i]=frozen;liquidMask[i]=1-frozen;
+      ?climateTemp[i]-waterLapse*((waterSurface[i]-h[i])*terrainDef.height/1000)
+      :terrainDef.seaTemp-terrainDef.lapseRate*((terrainDef.baseElevation+waterSurface[i]*terrainDef.height)/1000);
+    waterTemperatureC[i]=temp;
+    const ice=clamp((1-temp)/3,0,1),standing=clamp((wn[i*3+1]-.997)/.0028,0,1);
+    rawIce[i]=ice*standing;
+  }
+  // The physical three-degree transition keeps coves locally liquid/frozen. The deferred renderer
+  // bilinearly samples this field, avoiding a full-resolution CPU blur on every interactive edit.
+  for(let i=0;i<N;i++){
+    if(!wetMask[i])continue;
+    const frozen=rawIce[i];
+    iceMask[i]=frozen;liquidMask[i]=1-frozen;
     if(!snowP||frozen<=0)continue;
+    const temp=waterTemperatureC[i];
     const snowFraction=clamp((2-temp)/5,0,1);
     const snowfall=snowP.snowfall==null?6*(snowP.amount==null?.5:snowP.amount):snowP.snowfall;
     const meltRate=snowP.meltRate==null?10:snowP.meltRate,meltDays=snowP.meltDays==null?45:snowP.meltDays;
@@ -4585,7 +4663,7 @@ function refreshWater(){
   // terrain < water/ice surface < snow-on-ice top. Its own normal prevents the raised snow
   // geometry from being lit as though it were still the flat ice sheet or submerged bed.
   const iceSnowSurfaceY=new Float32Array(N),iceSnowNrm=new Float32Array(N*3);
-  for(let i=0;i<N;i++)iceSnowSurfaceY[i]=W[i]*H+iceSnow[i]/terrainDef.scale;
+  for(let i=0;i<N;i++)iceSnowSurfaceY[i]=waterSurface[i]*H+iceSnow[i]/terrainDef.scale;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
     const l=iceSnowSurfaceY[y*n+clamp(x-1,0,n-1)],r=iceSnowSurfaceY[y*n+clamp(x+1,0,n-1)];
     const d=iceSnowSurfaceY[clamp(y-1,0,n-1)*n+x],u_=iceSnowSurfaceY[clamp(y+1,0,n-1)*n+x];
@@ -4593,12 +4671,12 @@ function refreshWater(){
     iceSnowNrm[i*3]=sx/L;iceSnowNrm[i*3+1]=1/L;iceSnowNrm[i*3+2]=sz/L;
   }
   curWaterLiquid=liquidMask;curWaterIce=iceMask;curIceSnow=iceSnow;curIceSnowSurfaceY=iceSnowSurfaceY;
-  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,W,gl.DYNAMIC_DRAW);   // forward-path geometry water
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,waterSurface,gl.DYNAMIC_DRAW);   // forward-path geometry water
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wnrm);gl.bufferData(gl.ARRAY_BUFFER,wn,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.ice);gl.bufferData(gl.ARRAY_BUFFER,iceMask,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnow);gl.bufferData(gl.ARRAY_BUFFER,iceSnow,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnowNrm);gl.bufferData(gl.ARRAY_BUFFER,iceSnowNrm,gl.DYNAMIC_DRAW);
-  if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,W);} // deferred-path water-height texture
+  if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,waterSurface);} // deferred-path water-height texture
   if(iTex){gl.bindTexture(gl.TEXTURE_2D,iTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,iceMask);}
   if(isTex){gl.bindTexture(gl.TEXTURE_2D,isTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,iceSnow);}
 }
@@ -4614,11 +4692,10 @@ const norm3=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/
 function cameraEye(){const ce=Math.cos(cam.el);return[cam.target[0]+Math.cos(cam.az)*ce*cam.dist,cam.target[1]+Math.sin(cam.el)*cam.dist,cam.target[2]+Math.sin(cam.az)*ce*cam.dist];}
 function cameraBasis(){const eye=cameraEye(),forward=norm3(sub3(cam.target,eye)),right=norm3(cross3(forward,[0,1,0]));return{eye,forward,right,up:norm3(cross3(right,forward))};}
 function surfaceHeight(wx,wz){
-  const surface=curSurfaceY||curHgt;if(!surface)return cam.target[1];
+  const surface=curSolidSurfaceY||curSurfaceY||curHgt;if(!surface)return cam.target[1];
   const x=(wx*.5+.5)*(RES-1),z=(wz*.5+.5)*(RES-1);
-  const h=sampleBilinear(surface,x,z),terrainY=curSurfaceY?h:h*H_SCALE;
-  const iceSnowY=curIceSnowSurfaceY&&curIceSnowSurfaceY.length===RES*RES?sampleBilinear(curIceSnowSurfaceY,x,z):-Infinity;
-  return Math.max(terrainY,iceSnowY);
+  const h=sampleBilinear(surface,x,z);
+  return curSolidSurfaceY||curSurfaceY?h:h*H_SCALE;
 }
 // Project authored terrain directions into the current camera plane. Unlike a screen-fixed north
 // badge, this needle remains useful after orbiting: it shows where map north and the equator actually
@@ -4643,10 +4720,12 @@ function syncCompass(){
 }
 function syncClimateReadout(){
   const el=$("#climateReadout");if(!el)return;
-  const elevationM=Math.max(0,surfaceHeight(cam.target[0],cam.target[2])*terrainDef.scale);
+  const elevationM=terrainDef.baseElevation+surfaceHeight(cam.target[0],cam.target[2])*terrainDef.scale;
   const root=activePreviewNode(),previewField=root&&fieldMetadata(root._field)&&fieldMetadata(root._field).kind==="temperature"?root._field:null;
   const temperatureNode=root&&(root.type==="d_temperature"?root:nearestUpstreamNode("d_temperature",root));
-  const temperatureMap=temperatureCFromField(previewField||scene.snow&&scene.snow.temperatureField)
+  const temperatureMap=temperatureCFromField(previewField
+      ||scene.snow&&scene.snow.temperatureField
+      ||scene.water&&scene.water.temperatureField)
     ||scene.snow&&scene.snow.layer&&scene.snow.layer.temperatureC||temperatureNode&&temperatureNode._temperatureC;
   const c=temperatureMap&&temperatureMap.length===RES*RES
     ?sampleBilinear(temperatureMap,(cam.target[0]*.5+.5)*(RES-1),(cam.target[2]*.5+.5)*(RES-1))
@@ -5357,6 +5436,7 @@ function defaultGraph(){
   edges.push({from:heightMap.id,to:temperature.id,slot:0});
   edges.push({from:sunShadow.id,to:temperature.id,slot:1});
   edges.push({from:temperature.id,to:temperatureModify.id,slot:0});
+  edges.push({from:temperatureModify.id,to:water.id,slot:1});
   edges.push({from:temperatureModify.id,to:snow.id,slot:1});
   view={x:22,y:28,z:.58};                               // frame the expanded production graph on first launch
   select(sat);                                            // the node owns its visible palette library; the viewport does not

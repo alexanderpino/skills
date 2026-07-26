@@ -16,6 +16,11 @@ const URL='file://'+path.resolve(__dirname,'index.html');
   await page.screenshot({path:path.resolve(__dirname,'_shot_water_surface_settings.png')});
   const result=await page.evaluate(()=>{
     const waterDef=TYPES.water,keys=waterDef.params.map(x=>x.key),linked=p=>!!p&&gl.getProgramParameter(p,gl.LINK_STATUS);
+    // Rendering controls are tested on known liquid water so the independent climate/ice phase does
+    // not reduce the refraction sample area.
+    const warmEncoded=new Float32Array(RES*RES).fill(encodeTemperatureC(12));
+    scene.water.temperatureField=tagTemperatureField(warmEncoded,new Float32Array(RES*RES).fill(12),{lapseRate:6.5});
+    refreshWater();
     const frame=(time,strength,refraction)=>{uTime=time;waterLook.strength=strength;waterLook.refraction=refraction;renderGL();gl.finish();
       const p=new Uint8Array(glc.width*glc.height*4);gl.readPixels(0,0,glc.width,glc.height,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
     const delta=(a,b)=>{let sum=0,changed=0,n=0;for(let i=0;i<a.length;i+=16){const d=Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2]);sum+=d;changed+=d>2;n++;}return{mean:sum/n,changed};};

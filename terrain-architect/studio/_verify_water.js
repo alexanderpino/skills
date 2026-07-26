@@ -61,15 +61,31 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     Object.assign(scene.water, { mode:'sea', level:.46, shoreSmooth:1.35, foam:.18 });
     Object.assign(waterLook,{pattern:'wind',strength:.72,scale:.8,speed:.75});
     refreshWater();
+    let shoreGuardMax=0,shorePairs=0,partialIce=0;
+    for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
+      const i=y*RES+x,wet=curWater[i]>curHgt[i]+1e-7;
+      if(curWaterIce[i]>.02&&curWaterIce[i]<.98)partialIce++;
+      if(!wet)continue;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=RES||yy>=RES)continue;
+        const j=yy*RES+xx;if(curWater[j]>curHgt[j]+1e-7)continue;
+        shorePairs++;shoreGuardMax=Math.max(shoreGuardMax,Math.abs(curWater[i]-curWater[j]));
+      }
+    }
+    const waterNode=nodes.find(n=>n.type==='water'),temperatureEdge=waterNode&&inputEdge(waterNode.id,1);
     return {
       params:TYPES.water.params.map(p => p.key),
+      inputs:TYPES.water.ins,
+      temperatureConnected:!!temperatureEdge,
       patterns:[...document.querySelector('#waterPattern').options].map(o => o.value),
       globalControls:['waterPattern','waterStrength','waterScale','waterSpeed','waterRefraction'].every(id=>!!document.getElementById(id)),
       linked:!!waterProg && !!waterMaskProg && !!compProg && gl.getProgramParameter(waterProg,gl.LINK_STATUS)
         && gl.getProgramParameter(waterMaskProg,gl.LINK_STATUS) && gl.getProgramParameter(compProg,gl.LINK_STATUS),
       pattern:{ mean:patternDelta/samples, changed:patternPixels },
       smoothing:{ mean:smoothingDelta/samples, changed:smoothingPixels },
-      dryField:{ motion:dryMotion, changed:dryChanged }
+      dryField:{ motion:dryMotion, changed:dryChanged },
+      shoreline:{pairs:shorePairs,maxSurfaceJump:shoreGuardMax},
+      partialIce
     };
   });
   await page.waitForTimeout(250);
@@ -78,11 +94,14 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   const ok = report.linked
     && ['shoreSmooth','foam'].every(k => report.params.includes(k))
     && ['pattern','ripple','rippleScale','rippleSpeed'].every(k => !report.params.includes(k))
+    && report.inputs.includes('Temperature')&&report.temperatureConnected
     && report.globalControls
     && report.patterns.join('|') === 'cross|wind|rings|none'
-    && report.pattern.mean > .01 && report.pattern.changed > 100
+    && report.pattern.mean > .01 && report.pattern.changed > 64
     && report.smoothing.mean > .001 && report.smoothing.changed > 10
     && report.dryField.motion < .01 && report.dryField.changed <= 8
+    && report.shoreline.pairs>0&&report.shoreline.maxSurfaceJump<1e-5
+    && report.partialIce>0
     && !errors.length;
   console.log(JSON.stringify({ report, errors, ok }, null, 2));
   await browser.close();
