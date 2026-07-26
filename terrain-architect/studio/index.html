@@ -35,23 +35,85 @@ button{font-family:inherit;color:inherit}
 ::selection{background:var(--accent);color:#12161c}
 
 /* ============================================================= LAYOUT === */
-#app{display:grid;grid-template-rows:46px 1fr 26px;height:100vh;width:100vw}
+#app{display:grid;grid-template-rows:50px 1fr 26px;height:100vh;width:100vw}
 #topbar{
-  display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);
-  border-bottom:1px solid var(--line);z-index:20;
+  position:relative;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--panel);
+  border-bottom:1px solid var(--line);z-index:40;
 }
-.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.2px}
+.brand{display:flex;align-items:center;gap:9px;flex:none;font-weight:600;letter-spacing:.2px}
 .brand .mark{width:22px;height:22px;border-radius:6px;
   background:linear-gradient(150deg,var(--accent),#8a5a2a 70%);position:relative;flex:none;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
 .brand .mark::after{content:"";position:absolute;inset:0;border-radius:6px;
   background:
     repeating-linear-gradient(115deg,transparent 0 3px,rgba(0,0,0,.28) 3px 4px);opacity:.6}
-.brand small{color:var(--muted);font-weight:400;font-size:11px;letter-spacing:0}
+.brand-name{font-size:13px;white-space:nowrap}
 .tspacer{flex:1}
 .tgroup{display:flex;align-items:center;gap:6px}
 .tsep{width:1px;height:22px;background:var(--line);margin:0 4px}
 .lbl{font-size:10px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint)}
+.command-strip{min-width:0;flex:1;display:flex;align-items:center;gap:8px}
+.top-command-group{display:flex;align-items:center;gap:5px;flex:none}
+.top-command-group+.top-command-group{padding-left:8px;border-left:1px solid var(--line)}
+.auto-dot{width:6px;height:6px;border-radius:50%;background:var(--faint);transition:.12s}
+#autoBtn.on .auto-dot{background:var(--good);box-shadow:0 0 0 3px rgba(92,184,122,.1)}
+.top-anchor{position:relative;flex:none}
+.build-profile{height:32px;min-width:194px;display:grid;grid-template-columns:18px minmax(0,1fr) 10px;
+  align-items:center;gap:7px;padding:0 9px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--radius-sm);color:var(--text);cursor:pointer;text-align:left}
+.build-profile:hover,.build-profile[aria-expanded="true"]{background:var(--panel3);border-color:var(--line2)}
+.build-profile[aria-expanded="true"]{box-shadow:inset 0 -2px 0 var(--accent)}
+.build-profile svg{width:16px;height:16px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.build-profile-copy{min-width:0;display:flex;flex-direction:column;line-height:1.1}
+.build-profile-copy small{font-size:8px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint)}
+.build-profile-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 10px var(--mono)}
+.build-profile-caret{color:var(--faint);font-size:9px}
+.top-io .btn svg,.command-trigger svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.command-trigger{height:30px;min-width:42px;padding:0 8px;justify-content:center}
+.command-trigger kbd{font-size:8px;color:var(--faint)}
+.top-popover{position:absolute;top:calc(100% + 9px);padding:10px;background:rgba(18,23,30,.98);
+  border:1px solid var(--line2);border-radius:9px;box-shadow:0 18px 46px rgba(0,0,0,.48);backdrop-filter:blur(14px)}
+:root[data-theme="light"] .top-popover{background:rgba(249,251,253,.98)}
+.top-popover[hidden]{display:none}
+.build-settings{left:0;width:286px}
+.top-popover-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;padding:0 2px}
+.top-popover-head b{font-size:11px}.top-popover-head small{font:8px var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
+.build-setting{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:9px;margin:8px 0}
+.build-setting label{font-size:10px;color:var(--muted)}
+.build-setting .inp{height:27px}
+.setting-toggle{width:100%;justify-content:space-between}
+.setting-toggle::after{content:"Off";color:var(--faint);font:9px var(--mono)}
+.setting-toggle.on::after{content:"On";color:var(--accent)}
+.build-setting-note{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);color:var(--faint);font-size:9.5px;line-height:1.45}
+.command-popover{right:0;width:342px;padding:8px}
+.command-search{width:100%;height:31px;padding:0 9px;background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;outline:none;font:10px var(--mono)}
+.command-search:focus{border-color:var(--accent)}
+.command-list{max-height:min(520px,calc(100vh - 92px));overflow-y:auto;padding:6px 0 1px}
+.command-group-title{padding:7px 7px 4px;color:var(--faint);font:8px var(--mono);letter-spacing:.8px;text-transform:uppercase}
+.command-item{width:100%;min-height:38px;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;
+  gap:7px;padding:5px 7px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;cursor:pointer}
+.command-item:hover,.command-item:focus-visible{background:var(--panel2);outline:none}
+.command-item.hidden{display:none}.command-group-title.hidden{display:none}
+.command-icon{width:22px;height:22px;display:grid;place-items:center;border:1px solid var(--line);border-radius:5px;color:var(--muted);font-size:11px}
+.command-copy{min-width:0;display:flex;flex-direction:column}.command-copy b{font-size:10.5px;font-weight:500}
+.command-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font-size:9px}
+.command-item kbd{font-size:8px;color:var(--faint)}
+.command-empty{display:none;padding:22px;text-align:center;color:var(--faint);font-size:10px}.command-empty.show{display:block}
+@media(max-width:1100px){
+  .brand-name{display:none}.top-io .io-label{display:none}.top-io .btn{width:30px;padding:0;justify-content:center}
+  .build-profile{min-width:168px}
+}
+@media(max-width:820px){
+  #topbar{gap:7px;padding:0 8px}.top-io{display:none}.build-profile{min-width:124px}
+  #profileDetail{display:none}.top-command-group+.top-command-group{padding-left:6px}
+}
+@media(max-width:570px){
+  .auto-label{display:none}#autoBtn{width:29px;padding:0;justify-content:center}
+  .build-profile{min-width:90px}.build-profile-copy small{display:none}
+  .command-trigger kbd{display:none}
+}
 
 .btn{
   display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;
@@ -79,6 +141,38 @@ select.btn{appearance:none;padding-right:22px;
 #graph{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
 #graph.panning{cursor:grabbing}
 #graph.linking{cursor:crosshair}
+.graph-tool-toggle{position:absolute;z-index:32;left:10px;top:10px;height:30px;
+  background:rgba(17,22,29,.84);backdrop-filter:blur(8px);box-shadow:0 4px 14px rgba(0,0,0,.2);
+  transition:left .18s ease,background .12s}
+:root[data-theme="light"] .graph-tool-toggle{background:rgba(248,250,253,.9)}
+#graphwrap.toolbox-open .graph-tool-toggle{left:258px}
+.node-toolbox{position:absolute;z-index:31;inset:0 auto 0 0;width:248px;display:flex;flex-direction:column;
+  background:rgba(17,22,29,.96);border-right:1px solid var(--line2);box-shadow:10px 0 30px rgba(0,0,0,.24);
+  transform:translateX(-102%);transition:transform .18s ease;overflow:hidden;backdrop-filter:blur(12px)}
+:root[data-theme="light"] .node-toolbox{background:rgba(248,250,253,.97)}
+.node-toolbox.open{transform:translateX(0)}
+.node-tool-head{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;
+  border-bottom:1px solid var(--line);font-weight:600;font-size:12px}
+.node-tool-head small{font:10px var(--mono);color:var(--faint);font-weight:400}
+.node-tool-search-wrap{padding:9px 10px;border-bottom:1px solid var(--line)}
+.node-tool-search{width:100%;height:30px;padding:0 9px;background:var(--panel2);color:var(--text);
+  border:1px solid var(--line);border-radius:var(--radius-sm);font:11px var(--mono);outline:none}
+.node-tool-search:focus{border-color:var(--accent)}
+.node-tool-list{min-height:0;overflow-y:auto;padding:6px 7px 12px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.node-tool-cat{margin:4px 0 8px}
+.node-tool-cat-title{display:flex;align-items:center;gap:7px;padding:6px 5px 4px;color:var(--faint);
+  font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.node-tool-cat-title::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--cat-color)}
+.node-tool-item{width:100%;min-height:36px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;
+  align-items:center;gap:8px;padding:5px 7px;margin:1px 0;background:transparent;color:var(--text);
+  border:1px solid transparent;border-radius:5px;text-align:left;cursor:pointer}
+.node-tool-item:hover,.node-tool-item:focus-visible{background:var(--panel2);border-color:var(--line);outline:none}
+.node-tool-item .dot{width:8px;height:8px;border-radius:2px;background:var(--cat-color)}
+.node-tool-copy{min-width:0;display:flex;flex-direction:column}
+.node-tool-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;font-weight:500}
+.node-tool-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font-size:9.5px}
+.node-tool-ports{color:var(--faint);font:9px var(--mono)}
+.node-tool-empty{padding:28px 12px;text-align:center;color:var(--faint);font-size:11px}
 
 #viewport{grid-area:viewport;position:relative;min-width:0;min-height:0;border-left:1px solid var(--line);
   border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1b222c,#0e1319)}
@@ -86,17 +180,42 @@ select.btn{appearance:none;padding-right:22px;
 #main.stacked #graphwrap{border-top:1px solid var(--line)}
 #viewport:fullscreen{width:100vw;height:100vh;border:0;background:#0e1319}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block}
-.vp-overlay{position:absolute;left:10px;top:9px;display:flex;gap:6px;pointer-events:none;flex-wrap:wrap;max-width:80%}
-.vp-chip{pointer-events:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.3px;
-  background:rgba(10,13,18,.6);border:1px solid var(--line);border-radius:4px;padding:3px 7px;color:var(--muted);backdrop-filter:blur(6px)}
+.vp-overlay{position:absolute;left:10px;top:10px;display:flex;pointer-events:none;max-width:calc(100% - 74px)}
+.vp-chip{font-family:var(--mono);font-size:10px;letter-spacing:.25px;
+  background:rgba(10,13,18,.52);border:1px solid rgba(255,255,255,.12);border-radius:5px;
+  padding:4px 7px;color:var(--muted);backdrop-filter:blur(7px);box-shadow:0 3px 12px rgba(0,0,0,.14)}
 .vp-chip b{color:var(--text);font-weight:600}
-.vp-tools{position:absolute;right:10px;top:9px;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;
-  max-width:calc(100% - 20px)}
-.vp-tools .btn{height:24px;padding:0 8px;font-size:11px;background:rgba(10,13,18,.55);backdrop-filter:blur(6px)}
-#main:not(.stacked) .vp-tools{left:8px;right:8px;gap:4px}
-#main:not(.stacked) .vp-tools .btn{height:22px;padding:0 5px;font-size:10px}
-#main:not(.stacked) .vp-tools .btn.icon{width:24px}
-#main:not(.stacked) .vp-overlay{top:38px;max-width:calc(100% - 20px)}
+.vp-rail{position:absolute;z-index:12;right:10px;top:10px;width:38px;padding:4px;display:flex;
+  flex-direction:column;gap:3px;background:rgba(10,13,18,.62);border:1px solid rgba(255,255,255,.13);
+  border-radius:9px;box-shadow:0 8px 22px rgba(0,0,0,.24);backdrop-filter:blur(10px)}
+:root[data-theme="light"] .vp-rail,:root[data-theme="light"] .vp-flyout,:root[data-theme="light"] .vp-chip{
+  background:rgba(247,249,252,.78);border-color:rgba(24,32,42,.18)}
+.vp-tool{position:relative;width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:6px;
+  background:transparent;color:var(--muted);cursor:pointer}
+.vp-tool:hover,.vp-tool:focus-visible{color:var(--text);background:rgba(255,255,255,.09);outline:none}
+.vp-tool.on,.vp-tool[aria-expanded="true"]{color:var(--accent);background:rgba(224,161,74,.13)}
+.vp-tool svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.vp-tool[data-state="selected"]::after,.vp-tool[data-state="plan"]::after{content:"";position:absolute;
+  right:3px;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.vp-rail-sep{height:1px;margin:3px 4px;background:rgba(255,255,255,.12)}
+.vp-flyout{position:absolute;z-index:11;right:57px;top:10px;width:min(250px,calc(100% - 76px));
+  padding:10px;background:rgba(10,13,18,.82);border:1px solid rgba(255,255,255,.14);border-radius:9px;
+  box-shadow:0 12px 32px rgba(0,0,0,.32);backdrop-filter:blur(12px)}
+.vp-flyout[hidden]{display:none}
+.vp-flyout-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.vp-flyout-head b{font-size:11px;font-weight:600;letter-spacing:.2px}
+.vp-flyout-head small{font:9px var(--mono);color:var(--faint)}
+.vp-flyout .field{margin:9px 0}
+.vp-flyout .frow{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.vp-flyout .frow label{font-size:10px;color:var(--muted)}
+.vp-flyout .frow output{font:9px var(--mono);color:var(--text);font-variant-numeric:tabular-nums}
+.vp-flyout input[type=range]{height:3px}
+.vp-display-row{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:9px;
+  padding-top:9px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:var(--muted)}
+.vp-display-row .btn{height:25px;min-width:54px}
+.vp-help{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.vp-help li{display:grid;grid-template-columns:52px 1fr;gap:9px;align-items:center;font-size:10px;color:var(--muted)}
+.vp-help kbd{justify-self:start}
 .sat-picker-swatch{width:72px;height:14px;flex:none;border:1px solid rgba(255,255,255,.28);box-shadow:inset 0 0 0 1px rgba(0,0,0,.16)}
 .sat-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
 .sat-picker-caret{margin-left:auto;color:var(--muted);font-size:9px}
@@ -126,14 +245,6 @@ select.btn{appearance:none;padding-right:22px;
 .mix-layer-head span{margin-right:auto}.mix-layer-head .btn{height:22px;min-width:26px;padding:0 6px}
 .mix-layer-row{display:grid;grid-template-columns:68px 1fr;align-items:center;gap:7px;margin-top:6px;font-size:10px;color:var(--muted)}
 .mix-layer-row input[type=range]{width:100%}
-.vp-render{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;
-  background:rgba(10,13,18,.6);border:1px solid var(--line);border-radius:7px;padding:8px 11px;backdrop-filter:blur(7px)}
-:root[data-theme="light"] .vp-render{background:rgba(255,255,255,.72)}
-.vp-render .rrow{display:flex;align-items:center;gap:8px}
-.vp-render label{font-family:var(--mono);font-size:10px;color:var(--muted);width:34px;letter-spacing:.4px}
-.vp-render .sunico{width:14px;text-align:center;color:var(--accent);font-size:12px}
-.vp-render input[type=range]{width:104px;height:3px}
-
 /* -- properties -- */
 #props{grid-area:props;min-width:0;min-height:0;display:flex;flex-direction:column;
   border-left:1px solid var(--line);background:var(--panel)}
@@ -161,6 +272,17 @@ select.inp{appearance:none}
 .seg button.on{background:var(--panel3);color:var(--accent)}
 .hint{font-size:11px;color:var(--faint);line-height:1.5;margin-top:4px}
 .prop-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+.edge-summary{margin:8px 0 13px;padding:10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
+.edge-route{display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);align-items:center;gap:6px}
+.edge-end{min-width:0}.edge-end small{display:block;margin-bottom:3px;color:var(--faint);font:8px var(--mono);
+  text-transform:uppercase;letter-spacing:.7px}.edge-end b{display:block;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:11px;font-weight:600}.edge-end span{display:block;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:var(--muted);font:9px var(--mono);margin-top:2px}
+.edge-arrow{text-align:center;color:var(--accent);font-size:15px}
+.edge-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.edge-stat small{display:block;color:var(--faint);font:8px var(--mono);text-transform:uppercase}.edge-stat b{font:10px var(--mono);font-weight:500}
+.edge-meter{height:3px;margin-top:8px;border-radius:3px;background:var(--panel3);overflow:hidden}.edge-meter span{display:block;height:100%;background:var(--accent)}
+.edge-note{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);color:var(--faint);font-size:10px;line-height:1.5}
 
 /* -- add-node menu -- */
 #menu{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line2);
@@ -171,6 +293,18 @@ select.inp{appearance:none}
 .menu-item:hover{background:var(--panel2)}
 .menu-item .dot{width:8px;height:8px;border-radius:2px;flex:none}
 .menu-item small{color:var(--faint);margin-left:auto;font-family:var(--mono);font-size:10px}
+#graphMenu{position:fixed;z-index:70;width:224px;padding:6px;display:none;background:var(--panel);
+  border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow)}
+#graphMenu.open{display:block}
+.graph-menu-title{padding:5px 8px 7px;color:var(--faint);font:9px var(--mono);
+  letter-spacing:.8px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.graph-menu-item{width:100%;height:29px;display:flex;align-items:center;gap:8px;padding:0 8px;
+  color:var(--text);background:transparent;border:0;border-radius:var(--radius-sm);font-size:11.5px;text-align:left;cursor:pointer}
+.graph-menu-item:hover,.graph-menu-item:focus-visible{background:var(--panel2);outline:none}
+.graph-menu-item .ico{width:15px;color:var(--muted);text-align:center}
+.graph-menu-item small{margin-left:auto;color:var(--faint);font:9px var(--mono)}
+.graph-menu-item.danger{color:#ed8585}.graph-menu-item.danger .ico{color:#ed8585}
+.graph-menu-sep{height:1px;margin:5px 4px;background:var(--line)}
 
 /* -- status bar -- */
 #status{display:flex;align-items:center;gap:16px;padding:0 14px;background:var(--panel);
@@ -233,63 +367,181 @@ select.sg-btn{appearance:auto}
 
 <div id="app">
   <div id="topbar">
-    <div class="brand"><span class="mark"></span><span>Terrain&nbsp;Studio <small>node&nbsp;· webgl</small></span></div>
-    <div class="tsep"></div>
-    <div class="tgroup">
-      <button class="btn primary" id="addBtn" title="Add node (double-click canvas)">＋ Add node</button>
-      <button class="btn" id="autoBtn" title="Recompute automatically on every edit">Auto ⟳</button>
-      <button class="btn" id="buildBtn" title="Recompute the graph now">Build</button>
-      <button class="btn icon" id="undoBtn" title="Undo (Ctrl/Cmd+Z)" disabled>↶</button>
-      <button class="btn icon" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↷</button>
+    <div class="brand" title="Terrain Studio · node-based WebGL terrain authoring">
+      <span class="mark"></span><span class="brand-name">Terrain Studio</span>
     </div>
-    <div class="tsep"></div>
-    <div class="tgroup">
-      <span class="lbl">Res</span>
-      <select class="btn" id="resSel" title="Working resolution">
-        <option value="128">128²</option><option value="192" selected>192²</option><option value="256">256²</option>
-        <option value="512">512²</option><option value="1024">1024²</option>
-      </select>
-      <select class="btn" id="qualitySel" title="Interactive caps simulation travel for responsive previews; Final uses the full resolution-scaled budget">
-        <option value="interactive" selected>Interactive</option><option value="final">Final</option>
-      </select>
-      <button class="btn" id="gpuBtn" title="Use WebGL2 GPU paths for generators, Warp, thermal and hydraulic erosion">GPU</button>
-      <button class="btn" id="scaleBtn" title="Resolution independence: keep cell-relative params (talus angle, droplet density, radii) constant as RES changes">Res Lock</button>
-    </div>
-    <div class="tspacer"></div>
-    <div class="tgroup">
-      <button class="btn" id="importBtn" title="Load a real heightmap (PNG / .r16 raw) as a base">⭳ Import DEM</button>
-      <button class="btn" id="exportBtn" title="Download the output heightmap as 16-bit PNG">⭱ Export height</button>
-      <div class="tsep"></div>
-      <button class="btn icon" id="layoutBtn" title="Stack rendering above the graph">⬍</button>
-      <button class="btn icon" id="frameBtn" title="Frame terrain">⤢</button>
-      <button class="btn icon" id="themeBtn" title="Toggle theme">◑</button>
+    <div class="command-strip">
+      <div class="top-command-group" aria-label="Build and history">
+        <button class="btn" id="autoBtn" title="Recompute automatically on every edit">
+          <span class="auto-dot"></span><span class="auto-label">Auto</span></button>
+        <button class="btn primary" id="buildBtn" title="Recompute the graph now">Build</button>
+        <button class="btn icon" id="undoBtn" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled>↶</button>
+        <button class="btn icon" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled>↷</button>
+      </div>
+      <div class="top-anchor">
+        <button class="build-profile" id="buildProfileBtn" type="button" aria-controls="buildSettings"
+          aria-expanded="false" title="Working resolution and compute settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+          <span class="build-profile-copy"><small>Build profile</small><b><span id="profileRes">512²</span><span id="profileDetail"> · Interactive · GPU</span></b></span>
+          <span class="build-profile-caret">▾</span>
+        </button>
+        <section class="top-popover build-settings" id="buildSettings" aria-label="Build settings" hidden>
+          <div class="top-popover-head"><b>Build profile</b><small>preview runtime</small></div>
+          <div class="build-setting"><label for="resSel">Working resolution</label>
+            <select class="inp" id="resSel" title="Working resolution">
+              <option value="128">128²</option><option value="192">192²</option><option value="256">256²</option>
+              <option value="512" selected>512²</option><option value="1024">1024²</option>
+              <option value="2048">2048²</option><option value="4096">4096²</option>
+            </select></div>
+          <div class="build-setting"><label for="qualitySel">Simulation quality</label>
+            <select class="inp" id="qualitySel" title="Interactive caps simulation travel for responsive previews; Final uses the full resolution-scaled budget">
+              <option value="interactive" selected>Interactive</option><option value="final">Final</option>
+            </select></div>
+          <div class="build-setting"><label>Compute path</label>
+            <button class="btn setting-toggle" id="gpuBtn" type="button" title="Use WebGL2 GPU paths for generators, Warp, thermal and hydraulic erosion">GPU acceleration</button></div>
+          <div class="build-setting"><label>Scale behavior</label>
+            <button class="btn setting-toggle" id="scaleBtn" type="button" title="Resolution independence: keep cell-relative params constant as resolution changes">Resolution lock</button></div>
+          <div class="build-setting-note">These settings change evaluation cost and fidelity. They do not change graph topology.</div>
+        </section>
+      </div>
+      <div class="tspacer"></div>
+      <div class="top-command-group top-io" aria-label="Import and export">
+        <button class="btn" id="importBtn" title="Load a real heightmap (PNG / .r16 raw) as a base">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg><span class="io-label">Import DEM</span></button>
+        <button class="btn" id="exportBtn" title="Download the output heightmap as 16-bit PNG">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9M7 14l5-5 5 5M4 4h16"/></svg><span class="io-label">Export height</span></button>
+      </div>
+      <div class="top-command-group" aria-label="Workspace">
+        <button class="btn icon" id="layoutBtn" title="Stack rendering above the graph" aria-label="Change workspace layout">⬍</button>
+        <div class="top-anchor">
+          <button class="btn command-trigger" id="commandBtn" type="button" aria-controls="commandMenu"
+            aria-expanded="false" title="Commands (Ctrl/Cmd+K)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><kbd>⌘K</kbd>
+          </button>
+          <section class="top-popover command-popover" id="commandMenu" aria-label="Commands" hidden>
+            <input class="command-search" id="commandSearch" type="search" autocomplete="off"
+              spellcheck="false" placeholder="Find a command…" aria-label="Find a command">
+            <div class="command-list" id="commandList">
+              <div class="command-group-title">Build</div>
+              <button class="command-item" data-command="build terrain recompute graph" data-action="build"><span class="command-icon">▶</span><span class="command-copy"><b>Build terrain</b><small>Recompute the graph now</small></span><kbd>Enter</kbd></button>
+              <button class="command-item" data-command="auto recompute toggle live" data-action="auto"><span class="command-icon">↻</span><span class="command-copy"><b>Toggle Auto</b><small>Live graph recomputation</small></span></button>
+              <div class="command-group-title">Project</div>
+              <button class="command-item" data-command="import dem heightmap png r16" data-action="import"><span class="command-icon">↓</span><span class="command-copy"><b>Import DEM</b><small>PNG or 16-bit raw heightmap</small></span></button>
+              <button class="command-item" data-command="export height heightmap png" data-action="export"><span class="command-icon">↑</span><span class="command-copy"><b>Export height</b><small>Download the Output as PNG</small></span></button>
+              <div class="command-group-title">Find in graph</div>
+              <button class="command-item" data-command="find locate water node hydrology sea shoreline" data-action="find-water"><span class="command-icon">≈</span><span class="command-copy"><b>Locate Water node</b><small>Source of lakes, rivers, and sea level</small></span></button>
+              <button class="command-item" data-command="find locate satmap color node" data-action="find-satmap"><span class="command-icon">◫</span><span class="command-copy"><b>Locate SatMap node</b><small>Active terrain colour source</small></span></button>
+              <button class="command-item" data-command="find locate output node final" data-action="find-output"><span class="command-icon">◎</span><span class="command-copy"><b>Locate Output node</b><small>Final graph result</small></span></button>
+              <div class="command-group-title">Workspace</div>
+              <button class="command-item" data-command="organize arrange layout graph nodes" data-action="organize"><span class="command-icon">⌘</span><span class="command-copy"><b>Organize graph</b><small>Arrange all nodes into layers</small></span></button>
+              <button class="command-item" data-command="node toolbox add node library" data-action="toolbox"><span class="command-icon">＋</span><span class="command-copy"><b>Open node toolbox</b><small>Browse and add node types</small></span></button>
+              <button class="command-item" data-command="layout stacked side split workspace" data-action="layout"><span class="command-icon">↔</span><span class="command-copy"><b>Change workspace layout</b><small>Stacked or side-by-side</small></span></button>
+              <button class="command-item" id="frameBtn" data-command="frame reset hero camera terrain"><span class="command-icon">⤢</span><span class="command-copy"><b>Frame terrain</b><small>Return to the Hero camera</small></span><kbd>F</kbd></button>
+              <button class="command-item" data-command="fullscreen rendering viewport" data-action="fullscreen"><span class="command-icon">⛶</span><span class="command-copy"><b>Fullscreen rendering</b><small>Inspect the viewport without chrome</small></span><kbd>⇧F</kbd></button>
+              <button class="command-item" id="themeBtn" data-command="theme light dark appearance"><span class="command-icon">◐</span><span class="command-copy"><b>Toggle theme</b><small>Switch light and dark appearance</small></span></button>
+              <div class="command-empty" id="commandEmpty">No commands match that search.</div>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 
   <div id="main">
     <div id="graphwrap">
       <canvas id="graph"></canvas>
+      <button class="btn primary graph-tool-toggle" id="nodeToolBtn" type="button"
+        aria-controls="nodeToolbox" aria-expanded="false" title="Open node toolbox">＋ Nodes</button>
+      <aside class="node-toolbox" id="nodeToolbox" aria-label="Node toolbox" aria-hidden="true" inert>
+        <div class="node-tool-head"><span>Node toolbox</span><small id="nodeToolCount"></small></div>
+        <div class="node-tool-search-wrap"><input class="node-tool-search" id="nodeToolSearch"
+          type="search" autocomplete="off" spellcheck="false" placeholder="Search nodes…" aria-label="Search nodes"></div>
+        <div class="node-tool-list" id="nodeToolList"></div>
+      </aside>
     </div>
     <div id="viewport">
       <canvas id="gl"></canvas>
       <div class="vp-overlay" id="vpInfo"></div>
-      <div class="vp-tools">
-        <button class="btn" id="previewBtn" title="Preview the Output or selected node">Output</button>
-        <button class="btn" id="viewBtn" title="Toggle hero and plan inspection cameras">Plan</button>
-        <select class="btn" id="shadeSel" title="Viewport render style">
+      <nav class="vp-rail" aria-label="Viewport tools">
+        <button class="vp-tool" id="previewBtn" type="button" aria-label="Preview selected node"
+          title="Preview selected node">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+        </button>
+        <button class="vp-tool" id="viewBtn" type="button" aria-label="Switch to plan camera"
+          title="Switch to plan camera">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15M15 6v15"/></svg>
+        </button>
+        <button class="vp-tool" id="displayBtn" type="button" aria-label="Display settings"
+          aria-controls="displayPanel" aria-expanded="false" title="Display settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></svg>
+        </button>
+        <button class="vp-tool" id="lookBtn" type="button" aria-label="Lighting and atmosphere"
+          aria-controls="lookPanel" aria-expanded="false" title="Lighting and atmosphere">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="vp-tool" id="waterLookBtn" type="button" aria-label="Water rendering"
+          aria-controls="waterLookPanel" aria-expanded="false" title="Global water rendering">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8c2.2 0 2.2-2 4.4-2s2.2 2 4.4 2 2.2-2 4.4-2 2.2 2 4.8 2M3 13c2.2 0 2.2-2 4.4-2s2.2 2 4.4 2 2.2-2 4.4-2 2.2 2 4.8 2M3 18c2.2 0 2.2-2 4.4-2s2.2 2 4.4 2 2.2-2 4.4-2 2.2 2 4.8 2"/></svg>
+        </button>
+        <div class="vp-rail-sep" aria-hidden="true"></div>
+        <button class="vp-tool" id="helpBtn" type="button" aria-label="Viewport controls"
+          aria-controls="helpPanel" aria-expanded="false" title="Viewport controls">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 3.6 2c-.9.55-1.4 1.1-1.4 2.2M12 17h.01"/></svg>
+        </button>
+        <button class="vp-tool" id="fullscreenBtn" type="button" aria-label="Enter fullscreen"
+          title="Fullscreen rendering (Shift+F)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
+        </button>
+      </nav>
+      <section class="vp-flyout" id="displayPanel" aria-label="Display settings" hidden>
+        <div class="vp-flyout-head"><b>Display</b><small>viewport only</small></div>
+        <div class="frow"><label for="shadeSel">Render style</label></div>
+        <select class="inp" id="shadeSel" title="Viewport render style">
           <option value="0" selected>Realistic</option><option value="1">Clay</option>
           <option value="2">Albedo</option><option value="3">Slope</option><option value="4">Normals</option>
         </select>
-        <button class="btn" id="wireBtn" title="Toggle wireframe">▦</button>
-        <button class="btn icon" id="fullscreenBtn" title="Fullscreen rendering (Shift+F)">⛶</button>
-      </div>
+        <div class="vp-display-row"><span>Wireframe overlay</span>
+          <button class="btn" id="wireBtn" type="button" title="Toggle wireframe"><span id="wireState">Off</span></button></div>
+      </section>
+      <section class="vp-flyout" id="lookPanel" aria-label="Lighting and atmosphere" hidden>
+        <div class="vp-flyout-head"><b>Lighting & atmosphere</b><small>live</small></div>
+        <div class="field"><div class="frow"><label for="sunAz">Sun direction</label><output id="sunAzVal">32°</output></div>
+          <input type="range" id="sunAz" min="0" max="6.28" step="0.02" value="0.55"></div>
+        <div class="field"><div class="frow"><label for="sunEl">Sun elevation</label><output id="sunElVal">49°</output></div>
+          <input type="range" id="sunEl" min="0.08" max="1.5" step="0.01" value="0.85"></div>
+        <div class="field"><div class="frow"><label for="exposure">Exposure</label><output id="exposureVal">−0.15 EV</output></div>
+          <input type="range" id="exposure" min="-2" max="2" step="0.05" value="-0.15"></div>
+        <div class="field"><div class="frow"><label for="haze">Atmospheric haze</label><output id="hazeVal">28%</output></div>
+          <input type="range" id="haze" min="0" max="1" step="0.02" value="0.28"></div>
+      </section>
+      <section class="vp-flyout" id="waterLookPanel" aria-label="Global water rendering" hidden>
+        <div class="vp-flyout-head"><b>Water surface</b><small>global renderer</small></div>
+        <div class="frow"><label for="waterPattern">Wave pattern</label></div>
+        <select class="inp" id="waterPattern" title="Global wave pattern for every Water node">
+          <option value="cross">Cross ripples</option><option value="wind" selected>Wind waves</option>
+          <option value="rings">Interference rings</option><option value="none">None</option>
+        </select>
+        <div class="field"><div class="frow"><label for="waterStrength">Wave strength</label><output id="waterStrengthVal">55%</output></div>
+          <input type="range" id="waterStrength" min="0" max="1" step="0.01" value="0.55"></div>
+        <div class="field"><div class="frow"><label for="waterScale">Wave scale</label><output id="waterScaleVal">1.00×</output></div>
+          <input type="range" id="waterScale" min="0.25" max="3" step="0.01" value="1"></div>
+        <div class="field"><div class="frow"><label for="waterSpeed">Animation speed</label><output id="waterSpeedVal">1.00×</output></div>
+          <input type="range" id="waterSpeed" min="0" max="2" step="0.01" value="1"></div>
+        <div class="field"><div class="frow"><label for="waterRefraction">Refraction</label><output id="waterRefractionVal">55%</output></div>
+          <input type="range" id="waterRefraction" min="0" max="1" step="0.01" value="0.55"></div>
+        <div class="build-setting-note">Surface motion is sampled on the water plane in world space. Water nodes define only where fluid exists.</div>
+      </section>
+      <section class="vp-flyout" id="helpPanel" aria-label="Viewport controls" hidden>
+        <div class="vp-flyout-head"><b>Viewport controls</b><small>inspection</small></div>
+        <ul class="vp-help">
+          <li><kbd>Drag</kbd><span>Orbit around the terrain</span></li>
+          <li><kbd>⇧ Drag</kbd><span>Pan the camera target</span></li>
+          <li><kbd>Wheel</kbd><span>Zoom toward the pointer</span></li>
+          <li><kbd>F</kbd><span>Return to the Hero camera</span></li>
+          <li><kbd>⇧ F</kbd><span>Toggle rendering fullscreen</span></li>
+        </ul>
+      </section>
       <button id="satGenBtn" type="button" hidden aria-hidden="true">Open SatMap Studio</button>
-      <div class="vp-render">
-        <div class="rrow"><span class="sunico">☀</span><label>SUN</label><input type="range" id="sunAz" min="0" max="6.28" step="0.02" value="0.55" title="Sun azimuth"></div>
-        <div class="rrow"><span class="sunico">⤒</span><label>ELEV</label><input type="range" id="sunEl" min="0.08" max="1.5" step="0.01" value="0.85" title="Sun elevation"></div>
-        <div class="rrow"><span class="sunico">◐</span><label>EXP</label><input type="range" id="exposure" min="-2" max="2" step="0.05" value="-0.15" title="Scene exposure (stops)"></div>
-        <div class="rrow"><span class="sunico">≋</span><label>HAZE</label><input type="range" id="haze" min="0" max="1" step="0.02" value="0.28" title="Aerial perspective density"></div>
-      </div>
     </div>
     <div id="props">
       <div class="prop-head"><div class="prop-swatch" id="pSwatch"></div>
@@ -311,6 +563,7 @@ select.sg-btn{appearance:auto}
 </div>
 <input type="file" id="fileInput" accept=".png,.r16,.raw,.bin" style="display:none">
 <div id="menu"></div>
+<div id="graphMenu" role="menu" aria-label="Graph actions"></div>
 <div class="sat-menu" id="satPickerMenu" role="dialog" aria-label="SatMap Library" hidden>
   <div class="sat-menu-head"><span>SatMap Library</span><small id="satPickerCount"></small></div>
   <div class="sat-picker-list" id="satPickerList" role="listbox" aria-label="SatMap colour palettes"></div>
@@ -378,7 +631,8 @@ const smooth=t=>t*t*(3-2*t);
 const fade5=t=>t*t*t*(t*(t*6-15)+10);          // improved Perlin: C2 at lattice boundaries
 const fract=x=>x-Math.floor(x);
 
-let RES=192;                                   // working grid resolution (square)
+let RES=512;                                   // active working grid resolution (square)
+let TARGET_RES=RES;                            // profile target; 2K/4K wait for an explicit Build
 let AUTO=true;
 // SatMap colour LUTs — curated elevation gradients (Gaea's "SatMap" idea). "Dune" is EXTRACTED from a
 // real NASA Terra/ASTER top-down image (reference-impl render.extract_satmap); the rest are authored to
@@ -426,6 +680,7 @@ let satComposite=0;                             // 1 when a SatMap layer stack i
 function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
 let renderLook={exposure:-0.15,haze:0.28};     // scene-linear look development; exposure is in stops
+let waterLook={pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55}; // global renderer, independent of Water nodes
 function sunDir(){const ce=Math.cos(sun.el);return[ce*Math.cos(sun.az),Math.sin(sun.el),ce*Math.sin(sun.az)];}
 // A real, public-domain USGS/SRTM heightmap (Colorado Plateau, 128²) embedded so a real-world area
 // is one click — an in-browser fetch of the AWS SRTM bucket is impossible (the bucket sends no CORS
@@ -491,6 +746,18 @@ function gnoise(x,y,s){ // gradient (perlin-ish) noise in ~[-1,1] -> [0,1]
   const u=fade5(xf),v=fade5(yf);
   const n00=grad(x0,y0,xf,yf),n10=grad(x0+1,y0,xf-1,yf),n01=grad(x0,y0+1,xf,yf-1),n11=grad(x0+1,y0+1,xf-1,yf-1);
   return 0.5+0.5*lerp(lerp(n00,n10,u),lerp(n01,n11,u),v)*1.35;
+}
+function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, normalised to [0,1]
+  const F2=0.3660254037844386,G2=0.21132486540518713;
+  const skew=(x+y)*F2,i=Math.floor(x+skew),j=Math.floor(y+skew),unskew=(i+j)*G2;
+  const x0=x-(i-unskew),y0=y-(j-unskew),i1=x0>y0?1:0,j1=x0>y0?0:1;
+  const x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2;
+  function corner(ix,iy,dx,dy){
+    let t=0.5-dx*dx-dy*dy;if(t<=0)return 0;
+    const a=hash2(ix,iy,s)*6.28318530718;t*=t;
+    return t*t*(Math.cos(a)*dx+Math.sin(a)*dy);
+  }
+  return clamp(0.5+35*(corner(i,j,x0,y0)+corner(i+i1,j+j1,x1,y1)+corner(i+1,j+1,x2,y2)),0,1);
 }
 // fractal sum over a base function
 function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
@@ -595,7 +862,7 @@ const GPU={
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     const o=new Float32Array(n*n);for(let i=0;i<n*n;i++)o[i]=rgba[i*4];return o;},
 };
-// GLSL twin of hash2/gnoise/fbm above — identical uint32 hash, so the same seed gives the same field.
+// GLSL twins of hash2/gnoise/snoise above — identical uint32 hash, so the same seed gives the same field.
 const GLSL_NOISE=`
   float hashf(int x,int y,int s){
     uint h=uint(x)*374761393u+uint(y)*668265263u+uint(s)*1442695041u;
@@ -611,10 +878,23 @@ const GLSL_NOISE=`
     float n01=cos(a01)*xf+sin(a01)*(yf-1.0);
     float n11=cos(a11)*(xf-1.0)+sin(a11)*(yf-1.0);
     float u=sm(xf),v=sm(yf);
-    return 0.5+0.5*mix(mix(n00,n10,u),mix(n01,n11,u),v)*1.35;}`;
+    return 0.5+0.5*mix(mix(n00,n10,u),mix(n01,n11,u),v)*1.35;}
+  float simplexCorner(int ix,int iy,float dx,float dy,int s){
+    float t=0.5-dx*dx-dy*dy;if(t<=0.0)return 0.0;
+    float a=hashf(ix,iy,s)*6.28318530718;t*=t;
+    return t*t*(cos(a)*dx+sin(a)*dy);}
+  float snoise(float x,float y,int s){
+    const float F2=0.3660254037844386,G2=0.21132486540518713;
+    float skew=(x+y)*F2,fi=floor(x+skew),fj=floor(y+skew),unskew=(fi+fj)*G2;
+    int i=int(fi),j=int(fj);float x0=x-(fi-unskew),y0=y-(fj-unskew);
+    int i1=x0>y0?1:0,j1=x0>y0?0:1;
+    float x1=x0-float(i1)+G2,y1=y0-float(j1)+G2;
+    float x2=x0-1.0+2.0*G2,y2=y0-1.0+2.0*G2;
+    float n=simplexCorner(i,j,x0,y0,s)+simplexCorner(i+i1,j+j1,x1,y1,s)+simplexCorner(i+1,j+1,x2,y2,s);
+    return clamp(0.5+35.0*n,0.0,1.0);}`;
 const GPU_FBM_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
-  uniform float uN,uFreq,uLac,uGain,uRidge;uniform int uOct,uSeed;
+  uniform float uN,uFreq,uLac,uGain,uRidge,uSimplex;uniform int uOct,uSeed;
   uniform vec3 uXFa,uXFb;                    // dest-uv -> source-uv affine rows (identity by default)
   `+GLSL_NOISE+`
   void main(){
@@ -625,7 +905,7 @@ const GPU_FBM_FS=`#version 300 es
     for(int k=0;k<32;k++){if(k>=uOct)break;amps+=a;a*=uGain;}
     float sum=0.0,amp=1.0,f=uFreq;
     for(int k=0;k<32;k++){if(k>=uOct)break;
-      float v=gnoise(gu*f,gv*f,uSeed+k*7);
+      float v=uSimplex>0.5?snoise(gu*f,gv*f,uSeed+k*7):gnoise(gu*f,gv*f,uSeed+k*7);
       if(uRidge>0.5){v=1.0-abs(v*2.0-1.0);v=v*v;}
       sum+=v*amp;amp*=uGain;f*=uLac;}
     frag=vec4(sum/amps,0.0,0.0,1.0);}`;
@@ -660,11 +940,11 @@ const GPU_THERMAL_APPLY_FS=`#version 300 es
       vec2 mn=MS(q);if(mn.y<=0.0)continue;
       float e=H(q)-h-uTalus*ND[k];if(e>0.0)gain+=min(mn.x*e/mn.y,0.5*e);}
     frag=vec4(h+gain-lose,0.0,0.0,1.0);}`;
-function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
+function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false,simplex=false}){
   const n=RES,prog=GPU.prog("fbm",GPU_FBM_FS),out=GPU.rt("gen",n);
   GPU.run(prog,n,out,p=>{
     gl.uniform1f(u(p,"uN"),n);gl.uniform1f(u(p,"uFreq"),freq);gl.uniform1f(u(p,"uLac"),lac);
-    gl.uniform1f(u(p,"uGain"),gain);gl.uniform1f(u(p,"uRidge"),ridge?1:0);
+    gl.uniform1f(u(p,"uGain"),gain);gl.uniform1f(u(p,"uRidge"),ridge?1:0);gl.uniform1f(u(p,"uSimplex"),simplex?1:0);
     gl.uniform1i(u(p,"uOct"),octaves|0);gl.uniform1i(u(p,"uSeed"),seed|0);
     const M=XF||[1,0,0,0,1,0];                 // same placement matrix the CPU path uses
     gl.uniform3f(u(p,"uXFa"),M[0],M[1],M[2]);gl.uniform3f(u(p,"uXFb"),M[3],M[4],M[5]);});
@@ -1726,7 +2006,7 @@ const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combi
    whole field (histogram EQ) or has no closed form (an imported DEM), so it exists only as a raster
    and has to be resampled. Honest caveat: Ridged/Voronoi/Gradient self-normalise, a whole-field
    reduction — geometry is exact, but the value range is re-stretched over the new window. */
-const EXACT_TYPES=new Set(["perlin","ridged","worley","gradient","shape","constant",
+const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
 function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
 function exactChain(id,guard){
@@ -1750,6 +2030,10 @@ const TYPES={
     params:[P.seed("seed","Seed",7),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
     eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
+  simplex:{cat:"gen",name:"Simplex fBm",ins:[],desc:"Fractal simplex gradient noise — isotropic, efficient terrain detail without Perlin's square-grid bias.",
+    params:[P.seed("seed","Seed",11),P.slider("freq","Frequency",0.5,12,3,0.1),P.int("octaves","Octaves",1,9,6),
+      P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
+    eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,simplex:true};return gpuReady()?gpuFbm(a):fbmField(snoise,a);}},
   ridged:{cat:"gen",name:"Ridged MF",ins:[],desc:"Ridged multifractal — sharp mountain crests.",
     params:[P.seed("seed","Seed",3),P.slider("freq","Frequency",0.5,12,3.5,0.1),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2.1,0.05),P.slider("gain","Gain",0.3,0.8,0.55,0.01)],
@@ -1990,13 +2274,9 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.seg("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
       P.slider("level","Sea level",0,0.6,0.12),P.slider("flow","River flow",0,1,0.5),
       P.slider("shoreSmooth","Shore smoothing",0,2.5,1.35,.05),
-      P.slider("foam","Shore foam",0,1,.18,.01),
-      P.select("pattern","Surface pattern",[["cross","Cross ripples"],["wind","Wind waves"],["rings","Interference rings"],["none","None"]],"wind"),
-      P.slider("ripple","Pattern strength",0,1,.55,.01),
-      P.slider("rippleScale","Pattern scale",.25,3,1,.01),
-      P.slider("rippleSpeed","Pattern speed",0,2,1,.01)],
+      P.slider("foam","Shore foam",0,1,.18,.01)],
     eval:(p,ins)=>ins[0]||newField()},
-  snow:{cat:"effect",name:"Snow",ins:["In"],desc:"Adds snow: settles on high, gentle ground; steep faces stay bare.",
+  snow:{cat:"effect",name:"Snow",ins:["In"],desc:"Snow accumulation coverage. Low values dust high ground; 1.0 creates a snowy world while leaving only near-vertical rock faces exposed.",
     passthrough:true,effect:"snow",
     params:[P.slider("amount","Amount",0,1,0.5)],
     eval:(p,ins)=>ins[0]||newField()},
@@ -2025,7 +2305,8 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.seg("laminar","Laminar flow",[["off","Off"],["on","On"]],"off"),
       P.slider("diffusion","Diffusion",0,1,0,.01),P.seed("seed","Seed",7),
       P.select("blendMode","Blend mode",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
-    eval:(p,ins,nd)=>{const h=ins[0]||newField();nd._height=h;nd._sediment=ins[1]||null;nd._mask=ins[2]||null;return h;}},
+    eval:(p,ins,nd)=>{const h=ins[0]||newField();nd._height=h;nd._sediment=ins[1]||null;nd._mask=ins[2]||null;return h;},
+    note:"The <b>Mask</b> gates the final colour effect: black preserves the upstream SatMap, white applies the transported pigment, and grey interpolates. It does not alter terrain height or rerun the transport route. Select the Mask connection to inspect its live range and coverage."},
   weathering:{cat:"effect",name:"Weathering",ins:["In","Mask"],desc:"A terrain-aware colour ageing pass: exposed relief can bleach or brighten, while sheltered recesses collect dirt. Includes scale, creep, inversion, HSL post controls, opacity, and blend mode; height passes through unchanged.",
     passthrough:true,effect:"weathering",
     params:[P.slider("scale","Scale",.02,1,.72,.01),P.slider("creep","Creep",0,1,.27,.01),
@@ -2057,7 +2338,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
 /* =====================================================================
    GRAPH MODEL
    ===================================================================== */
-let nodes=[],edges=[],uid=1,selected=null;
+let nodes=[],edges=[],uid=1,selected=null,selectedEdge=null;
 let historyReady=false,undoStack=[],redoStack=[];
 const HISTORY_LIMIT=60;
 const cloneParams=p=>typeof structuredClone==="function"?structuredClone(p):JSON.parse(JSON.stringify(p));
@@ -2065,7 +2346,7 @@ function graphSnapshot(){
   return{
     nodes:nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,w:n.w,params:cloneParams(n.params),
       _inputs:n._inputs?[...n._inputs]:null,_dem:n._dem,_demImg:n._demImg,_demRaw:n._demRaw})),
-    edges:edges.map(e=>({...e})),uid,selectedId:selected?selected.id:null,terrainDef:{...terrainDef}
+    edges:edges.map(e=>({...e})),uid,selectedId:selected?selected.id:null,selectedEdgeKey:selectedEdge,terrainDef:{...terrainDef}
   };
 }
 function updateHistoryButtons(){
@@ -2076,11 +2357,26 @@ function pushUndo(snap){
   undoStack.push(snap);if(undoStack.length>HISTORY_LIMIT)undoStack.shift();redoStack.length=0;updateHistoryButtons();
 }
 function recordHistory(){pushUndo(graphSnapshot());}
+function snapshotIsEditorOnly(snap){
+  if(snap.nodes.length!==nodes.length||snap.edges.length!==edges.length||snap.uid!==uid)return false;
+  if(JSON.stringify(snap.edges)!==JSON.stringify(edges)||JSON.stringify(snap.terrainDef)!==JSON.stringify(terrainDef))return false;
+  return snap.nodes.every(sn=>{const n=nodeById(sn.id);return n&&n.type===sn.type&&n.w===sn.w
+    &&JSON.stringify(n.params)===JSON.stringify(sn.params)
+    &&JSON.stringify(n._inputs||null)===JSON.stringify(sn._inputs)
+    &&n._dem===sn._dem&&n._demImg===sn._demImg&&n._demRaw===sn._demRaw;});
+}
 function restoreGraph(snap){
+  if(snapshotIsEditorOnly(snap)){
+    snap.nodes.forEach(sn=>{const n=nodeById(sn.id);n.x=sn.x;n.y=sn.y;});
+    selected=snap.selectedId==null?null:nodeById(snap.selectedId);
+    selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
+    buildProps();drawGraph();updateHistoryButtons();return;
+  }
   nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true}));
   edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={...snap.terrainDef};
   H_SCALE=terrainDef.height/terrainDef.scale;
   selected=snap.selectedId==null?null:nodeById(snap.selectedId);
+  selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
   buildProps();evalGraph();updateHistoryButtons();
 }
 function undoGraph(){
@@ -2110,7 +2406,9 @@ function makeNode(type,x,y){
   nodes.push(nd);return nd;
 }
 function nodeById(id){return nodes.find(n=>n.id===id);}
-function inputEdge(nodeId,slot){return edges.find(e=>e.to===nodeId&&e.slot===slot);}
+function edgeKey(e){return e?e.from+">"+e.to+":"+e.slot:null;}
+function edgeByKey(key){return edges.find(e=>edgeKey(e)===key);}
+function inputEdge(nodeId,slot){return edges.find(e=>!e.disabled&&e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
 function collectScene(root){                        // walk upstream from the active preview root
   const s={water:null,snow:null,satmap:null};root=root||outputNode();if(!root)return s;
@@ -2120,21 +2418,21 @@ function collectScene(root){                        // walk upstream from the ac
     if(nd.type==="water"&&!s.water)s.water={...nd.params};
     if(nd.type==="snow"&&!s.snow)s.snow={...nd.params};
     if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params};
-    edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
+    edges.filter(e=>!e.disabled&&e.to===id).forEach(e=>q.push(e.from));}
   return s;
 }
 function nearestUpstreamNode(type,root){
   root=root||activePreviewNode()||outputNode();if(!root)return null;
   const q=[root.id],seen=new Set();
   while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);const nd=nodeById(id);if(!nd)continue;
-    if(nd.type===type)return nd;edges.filter(e=>e.to===id).forEach(e=>q.push(e.from));}
+    if(nd.type===type)return nd;edges.filter(e=>!e.disabled&&e.to===id).forEach(e=>q.push(e.from));}
   return null;
 }
 function markDirtyFrom(id){ // mark node and everything downstream dirty
   const stack=[id];const seen=new Set();
   while(stack.length){const cur=stack.pop();if(seen.has(cur))continue;seen.add(cur);
     const nd=nodeById(cur);if(nd)nd._dirty=true;
-    edges.filter(e=>e.from===cur).forEach(e=>stack.push(e.to));}
+    edges.filter(e=>!e.disabled&&e.from===cur).forEach(e=>stack.push(e.to));}
 }
 // Parameter edits on passthrough/effect nodes change colour or scene state, not height.
 // Keep the cached downstream heightfield alive so a SatMap drag does not normalize and
@@ -2244,7 +2542,7 @@ function redrawThumbs(){nodes.forEach(n=>{if(!n._thumb)n._thumb=bakeThumb(n);});
    ===================================================================== */
 const gc=$("#graph"),gx=gc.getContext("2d");
 let view={x:60,y:70,z:1};
-let drag=null,linking=null,hoverPort=null;
+let drag=null,linking=null,hoverPort=null,hoverEdge=null;
 function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 function resizeGraph(){const r=gc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
   gc.width=r.width*dpr;gc.height=r.height*dpr;gc.style.width=r.width+"px";gc.style.height=r.height+"px";gx.setTransform(dpr,0,0,dpr,0,0);drawGraph();}
@@ -2269,17 +2567,56 @@ function drawGraph(){
   gx.save();gx.translate(view.x,view.y);gx.scale(view.z,view.z);
   // edges
   edges.forEach(e=>{const a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)return;
-    const p0=portPos(a,"out"),p1=portPos(b,"in",e.slot);drawWire(p0,p1,(selected&&(selected.id===a.id||selected.id===b.id)));});
-  if(linking){const p0=portPos(nodeById(linking.from),"out");drawWire(p0,linking.cur,true,true);}
+    const p0=portPos(a,"out"),p1=portPos(b,"in",e.slot),key=edgeKey(e);
+    const state=selectedEdge===key?"selected":hoverEdge===key?"hover":(!selectedEdge&&selected&&(selected.id===a.id||selected.id===b.id))?"related":"normal";
+    drawWire(p0,p1,state,!!e.disabled);if(selectedEdge===key)drawEdgeDeleteHandle(p0,p1);});
+  if(linking){const p0=portPos(nodeById(linking.from),"out");drawWire(p0,linking.cur,"selected",true);}
   // nodes
   nodes.forEach(nd=>drawNode(nd));
   gx.restore();
 }
-function drawWire(p0,p1,hot,dashed){
+function wireCurve(p0,p1){
   const dx=Math.max(30,Math.abs(p1.x-p0.x)*0.5);
-  gx.beginPath();gx.moveTo(p0.x,p0.y);gx.bezierCurveTo(p0.x+dx,p0.y,p1.x-dx,p1.y,p1.x,p1.y);
-  gx.lineWidth=hot?2.4:1.8;gx.strokeStyle=hot?css("--accent"):css("--line2");
-  if(dashed){gx.setLineDash([6,5]);}gx.stroke();gx.setLineDash([]);
+  return{p0,p1,c0:{x:p0.x+dx,y:p0.y},c1:{x:p1.x-dx,y:p1.y}};
+}
+function wirePoint(p0,p1,t){
+  const c=wireCurve(p0,p1),u=1-t;
+  return{x:u*u*u*p0.x+3*u*u*t*c.c0.x+3*u*t*t*c.c1.x+t*t*t*p1.x,
+    y:u*u*u*p0.y+3*u*u*t*c.c0.y+3*u*t*t*c.c1.y+t*t*t*p1.y};
+}
+function drawWire(p0,p1,state,dashed){
+  const c=wireCurve(p0,p1),active=state!=="normal";
+  gx.save();
+  if(state==="selected"){gx.shadowColor=css("--accent");gx.shadowBlur=8/view.z;}
+  gx.beginPath();gx.moveTo(p0.x,p0.y);gx.bezierCurveTo(c.c0.x,c.c0.y,c.c1.x,c.c1.y,p1.x,p1.y);
+  gx.lineWidth=(state==="selected"?3.6:state==="hover"?3:active?2.4:1.8)/view.z;
+  gx.strokeStyle=state==="selected"?css("--accent"):state==="hover"?css("--text"):active?css("--accent"):css("--line2");
+  gx.globalAlpha=dashed ? .52 : 1;
+  if(dashed)gx.setLineDash([7/view.z,6/view.z]);gx.stroke();gx.restore();
+}
+function drawEdgeDeleteHandle(p0,p1){
+  const p=wirePoint(p0,p1,.5),r=8.5/view.z;
+  gx.save();gx.beginPath();gx.arc(p.x,p.y,r,0,Math.PI*2);gx.fillStyle=css("--panel");gx.fill();
+  gx.lineWidth=1.5/view.z;gx.strokeStyle=css("--accent");gx.stroke();
+  gx.fillStyle=css("--text");gx.font=`${12/view.z}px ${css("--sans")}`;gx.textAlign="center";gx.textBaseline="middle";
+  gx.fillText("×",p.x,p.y-.5/view.z);gx.restore();
+}
+function pointSegmentDistance(px,py,ax,ay,bx,by){
+  const dx=bx-ax,dy=by-ay,d=dx*dx+dy*dy||1,t=clamp(((px-ax)*dx+(py-ay)*dy)/d,0,1);
+  return Math.hypot(px-(ax+dx*t),py-(ay+dy*t));
+}
+function edgeAt(wx,wy){
+  const tolerance=11/view.z;
+  for(let ei=edges.length-1;ei>=0;ei--){const e=edges[ei],a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)continue;
+    const p0=portPos(a,"out"),p1=portPos(b,"in",e.slot);let prev=p0;
+    for(let i=1;i<=28;i++){const p=wirePoint(p0,p1,i/28);
+      if(pointSegmentDistance(wx,wy,prev.x,prev.y,p.x,p.y)<=tolerance)return e;prev=p;}}
+  return null;
+}
+function edgeDeleteAt(wx,wy){
+  const e=edgeByKey(selectedEdge);if(!e)return null;const a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)return null;
+  const p=wirePoint(portPos(a,"out"),portPos(b,"in",e.slot),.5);
+  return Math.hypot(wx-p.x,wy-p.y)<=11/view.z?e:null;
 }
 function roundRect(x,y,w,h,r){gx.beginPath();gx.moveTo(x+r,y);gx.arcTo(x+w,y,x+w,y+h,r);gx.arcTo(x+w,y+h,x,y+h,r);gx.arcTo(x,y+h,x,y,r);gx.arcTo(x,y,x+w,y,r);gx.closePath();}
 function drawNode(nd){
@@ -2314,9 +2651,10 @@ function drawPort(p,color,hot){gx.beginPath();gx.arc(p.x,p.y,hot?6:4.5,0,7);gx.f
 function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],h=nodeH(nd);
   if(wx>=nd.x&&wx<=nd.x+nd.w&&wy>=nd.y&&wy<=nd.y+h)return nd;}return null;}
 function portAt(wx,wy){
+  const hit=12/view.z;                                        // fixed ~12 px target at every graph zoom
   for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],def=TYPES[nd.type];
-    if(def.cat!=="out"){const p=portPos(nd,"out");if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"out"};}
-    for(let s=0;s<nodeInputs(nd).length;s++){const p=portPos(nd,"in",s);if(Math.hypot(wx-p.x,wy-p.y)<9)return{node:nd.id,which:"in",slot:s};}}
+    if(def.cat!=="out"){const p=portPos(nd,"out");if(Math.hypot(wx-p.x,wy-p.y)<hit)return{node:nd.id,which:"out"};}
+    for(let s=0;s<nodeInputs(nd).length;s++){const p=portPos(nd,"in",s);if(Math.hypot(wx-p.x,wy-p.y)<hit)return{node:nd.id,which:"in",slot:s};}}
   return null;
 }
 
@@ -2324,6 +2662,7 @@ function portAt(wx,wy){
 let spaceDown=false;
 gc.addEventListener("mousedown",e=>{
   const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;const w=toWorld(mx,my);
+  if(e.button===2)return;                                      // right-click belongs to the graph context menu
   if(e.button===1||spaceDown||(e.button===0&&e.altKey)){e.preventDefault();drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");return;}
   const port=portAt(w.x,w.y);
   if(port){
@@ -2331,9 +2670,13 @@ gc.addEventListener("mousedown",e=>{
     else{const ex=inputEdge(port.node,port.slot);if(ex){linking={from:ex.from,cur:w,original:ex};gc.classList.add("linking");}}
     return;
   }
+  const edgeDelete=edgeDeleteAt(w.x,w.y);
+  if(edgeDelete){deleteEdge(edgeDelete);return;}
   const nd=nodeAt(w.x,w.y);
   if(nd){select(nd);drag={node:nd,dx:w.x-nd.x,dy:w.y-nd.y,moved:false,before:graphSnapshot()};}
-  else{select(null);drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");}
+  else{const edge=edgeAt(w.x,w.y);
+    if(edge)selectEdge(edge);
+    else{select(null);drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");}}
   drawGraph();
 });
 const _pk=a=>a?a.node+":"+a.which+":"+(a.slot==null?"":a.slot):"";   // hover-port identity key
@@ -2343,9 +2686,10 @@ window.addEventListener("mousemove",e=>{
   if(drag&&drag.node){drag.node.x=w.x-drag.dx;drag.node.y=w.y-drag.dy;drag.moved=true;drawGraph();return;}
   if(linking){linking.cur=w;drawGraph();return;}
   const inside=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;   // only hover over the graph
-  const hp=inside?portAt(w.x,w.y):null;
-  if(inside)gc.style.cursor=hp?"crosshair":(nodeAt(w.x,w.y)?"move":"grab");
-  if(_pk(hp)!==_pk(hoverPort)){hoverPort=hp;drawGraph();}                 // redraw on enter AND leave
+  const hp=inside?portAt(w.x,w.y):null,nd=inside?nodeAt(w.x,w.y):null;
+  const he=inside&&!hp&&!nd?edgeAt(w.x,w.y):null,deleteHot=inside?edgeDeleteAt(w.x,w.y):null;
+  if(inside)gc.style.cursor=hp?"crosshair":nd?"move":(he||deleteHot)?"pointer":"grab";
+  if(_pk(hp)!==_pk(hoverPort)||edgeKey(he)!==hoverEdge){hoverPort=hp;hoverEdge=edgeKey(he);drawGraph();} // redraw on enter AND leave
 });
 window.addEventListener("mouseup",e=>{
   if(linking){
@@ -2371,23 +2715,165 @@ function wouldCycle(from,to){ // does 'to' already feed 'from'?
     edges.filter(e=>e.to===c).forEach(e=>stack.push(e.from));}
   return false;
 }
+
+/* ---- deterministic layered graph organization (editor-only; never dirties terrain fields) ---- */
+function graphIdsFrom(seedId,mode){
+  if(seedId==null)return new Set(nodes.map(n=>n.id));
+  const found=new Set(),stack=[seedId];
+  while(stack.length){const id=stack.pop();if(found.has(id))continue;found.add(id);
+    if(mode==="up"||mode==="connected")edges.filter(e=>e.to===id).forEach(e=>stack.push(e.from));
+    if(mode==="down"||mode==="connected")edges.filter(e=>e.from===id).forEach(e=>stack.push(e.to));}
+  return found;
+}
+function weakComponents(ids){
+  const left=new Set(ids),out=[];
+  while(left.size){const seed=Math.min(...left),part=new Set(),stack=[seed];
+    while(stack.length){const id=stack.pop();if(part.has(id)||!ids.has(id))continue;part.add(id);left.delete(id);
+      edges.forEach(e=>{if(e.from===id&&ids.has(e.to))stack.push(e.to);if(e.to===id&&ids.has(e.from))stack.push(e.from);});}
+    out.push(part);}
+  return out.sort((a,b)=>Math.min(...a)-Math.min(...b));
+}
+function layoutComponent(ids){
+  const ns=nodes.filter(n=>ids.has(n.id)),rank=new Map(ns.map(n=>[n.id,0])),deg=new Map(ns.map(n=>[n.id,0]));
+  const es=edges.filter(e=>ids.has(e.from)&&ids.has(e.to));
+  es.forEach(e=>deg.set(e.to,deg.get(e.to)+1));
+  const queue=ns.filter(n=>deg.get(n.id)===0).sort((a,b)=>a.id-b.id),topo=[];
+  while(queue.length){const nd=queue.shift();topo.push(nd);
+    es.filter(e=>e.from===nd.id).sort((a,b)=>a.slot-b.slot||a.to-b.to).forEach(e=>{
+      rank.set(e.to,Math.max(rank.get(e.to),rank.get(nd.id)+1));deg.set(e.to,deg.get(e.to)-1);
+      if(deg.get(e.to)===0){queue.push(nodeById(e.to));queue.sort((a,b)=>a.id-b.id);}});}
+  // Cycles are rejected by the editor; this fallback keeps corrupt/imported graphs arrangeable.
+  ns.filter(n=>!topo.includes(n)).sort((a,b)=>a.id-b.id).forEach(n=>topo.push(n));
+  const maxRank=Math.max(0,...rank.values()),layers=Array.from({length:maxRank+1},()=>[]);
+  topo.forEach(n=>layers[rank.get(n.id)].push(n));
+  layers.forEach(L=>L.sort((a,b)=>a.y-b.y||a.id-b.id));
+  const rebuildOrder=()=>{const m=new Map();layers.forEach(L=>L.forEach((n,i)=>m.set(n.id,i)));return m;};
+  const reorder=(L,neighbours,order)=>{
+    const prior=new Map(L.map((n,i)=>[n.id,i]));
+    L.sort((a,b)=>{const av=neighbours(a),bv=neighbours(b);
+      const aa=av.length?av.reduce((s,e)=>s+(order.get(e.id)||0)+((e.slot||0)*.015),0)/av.length:prior.get(a.id);
+      const bb=bv.length?bv.reduce((s,e)=>s+(order.get(e.id)||0)+((e.slot||0)*.015),0)/bv.length:prior.get(b.id);
+      return aa-bb||prior.get(a.id)-prior.get(b.id)||a.id-b.id;});
+  };
+  for(let pass=0;pass<4;pass++){
+    let order=rebuildOrder();
+    for(let l=1;l<layers.length;l++){reorder(layers[l],n=>es.filter(e=>e.to===n.id).map(e=>({id:e.from,slot:e.slot})),order);order=rebuildOrder();}
+    order=rebuildOrder();
+    for(let l=layers.length-2;l>=0;l--){reorder(layers[l],n=>es.filter(e=>e.from===n.id).map(e=>({id:e.to,slot:e.slot})),order);order=rebuildOrder();}
+  }
+  const COL_GAP=82,ROW_GAP=36,widths=layers.map(L=>Math.max(150,...L.map(n=>n.w))),xs=[];let x=0;
+  widths.forEach((w,i)=>{xs[i]=x;x+=w+COL_GAP;});
+  const heights=layers.map(L=>L.reduce((s,n)=>s+nodeH(n),0)+Math.max(0,L.length-1)*ROW_GAP);
+  const H=Math.max(1,...heights),pos=new Map();
+  layers.forEach((L,l)=>{let y=(H-heights[l])*.5;L.forEach(n=>{pos.set(n.id,{x:xs[l],y});y+=nodeH(n)+ROW_GAP;});});
+  return{pos,width:Math.max(1,x-COL_GAP),height:H};
+}
+function frameGraph(ids){
+  ids=ids?new Set(ids):new Set(nodes.map(n=>n.id));const ns=nodes.filter(n=>ids.has(n.id));if(!ns.length)return;
+  const minX=Math.min(...ns.map(n=>n.x)),minY=Math.min(...ns.map(n=>n.y));
+  const maxX=Math.max(...ns.map(n=>n.x+n.w)),maxY=Math.max(...ns.map(n=>n.y+nodeH(n)));
+  const inset=$("#graphwrap").classList.contains("toolbox-open")?248:0,pad=54;
+  const aw=Math.max(80,gc.clientWidth-inset),ah=Math.max(80,gc.clientHeight);
+  view.z=clamp(Math.min((aw-pad*2)/Math.max(1,maxX-minX),(ah-pad*2)/Math.max(1,maxY-minY)),.35,1.35);
+  view.x=inset+(aw-(maxX-minX)*view.z)*.5-minX*view.z;
+  view.y=(ah-(maxY-minY)*view.z)*.5-minY*view.z;drawGraph();
+}
+function organizeGraph(ids,anchorId,label){
+  ids=ids?new Set(ids):new Set(nodes.map(n=>n.id));if(!ids.size)return null;
+  const components=weakComponents(ids),target=new Map();let y=0,maxW=0;
+  components.forEach(comp=>{const z=layoutComponent(comp);z.pos.forEach((p,id)=>target.set(id,{x:p.x,y:p.y+y}));
+    y+=z.height+96;maxW=Math.max(maxW,z.width);});
+  const arranged=nodes.filter(n=>ids.has(n.id)),oldMinX=Math.min(...arranged.map(n=>n.x)),oldMinY=Math.min(...arranged.map(n=>n.y));
+  let dx=oldMinX,dy=oldMinY;
+  if(anchorId!=null&&target.has(anchorId)){const a=nodeById(anchorId),p=target.get(anchorId);dx=a.x-p.x;dy=a.y-p.y;}
+  const before=graphSnapshot();let changed=false;
+  arranged.forEach(n=>{const p=target.get(n.id),nx=Math.round((p.x+dx)*2)/2,ny=Math.round((p.y+dy)*2)/2;
+    if(Math.abs(nx-n.x)>.01||Math.abs(ny-n.y)>.01)changed=true;n.x=nx;n.y=ny;});
+  if(changed)pushUndo(before);frameGraph(ids);toast((label||"Organized graph")+" · "+arranged.length+" nodes");
+  return{changed,count:arranged.length,components:components.length,width:maxW,height:y?y-96:0};
+}
+
+/* ---- graph context menu: occasional graph/node operations without permanent toolbar clutter ---- */
+const graphMenu=$("#graphMenu");let graphMenuPoint=null;
+function closeGraphMenu(){graphMenu.classList.remove("open");graphMenu.innerHTML="";}
+function graphMenuItem(label,icon,action,shortcut,danger){
+  const b=document.createElement("button");b.type="button";b.className="graph-menu-item"+(danger?" danger":"");
+  b.setAttribute("role","menuitem");b.innerHTML=`<span class="ico">${icon}</span><span>${label}</span>${shortcut?`<small>${shortcut}</small>`:""}`;
+  b.onclick=()=>{closeGraphMenu();action();};graphMenu.appendChild(b);
+}
+function graphMenuSep(){const d=document.createElement("div");d.className="graph-menu-sep";d.setAttribute("role","separator");graphMenu.appendChild(d);}
+function openGraphMenu(clientX,clientY,nd,world,edge){
+  closeMenu();closeGraphMenu();graphMenuPoint={clientX,clientY,world,nodeId:nd?nd.id:null,edgeKey:edgeKey(edge)};
+  const title=document.createElement("div");title.className="graph-menu-title";title.textContent=edge?"Connection":nd?TYPES[nd.type].name:"Graph";graphMenu.appendChild(title);
+  if(edge){
+    const from=nodeById(edge.from),to=nodeById(edge.to),input=nodeInputs(to)[edge.slot]||("Input "+(edge.slot+1));
+    graphMenuItem("Connection properties","◎",()=>selectEdge(edge));
+    graphMenuItem(edge.disabled?"Enable connection":"Mute connection",edge.disabled?"▶":"Ⅱ",()=>toggleEdge(edge,!!edge.disabled));
+    graphMenuSep();
+    graphMenuItem("Select source","←",()=>select(from));
+    graphMenuItem("Select target · "+input,"→",()=>select(to));
+    graphMenuSep();
+    graphMenuItem("Disconnect","×",()=>deleteEdge(edge),"Del",true);
+    graphMenuSep();
+  }else if(nd){
+    graphMenuItem("Preview this node","◉",()=>{select(nd);previewMode="selected";refreshPreview();});
+    graphMenuItem("Organize connected branch","⌘",()=>organizeGraph(graphIdsFrom(nd.id,"connected"),nd.id,"Organized connected branch"));
+    graphMenuItem("Organize upstream","←",()=>organizeGraph(graphIdsFrom(nd.id,"up"),nd.id,"Organized upstream"));
+    graphMenuItem("Organize downstream","→",()=>organizeGraph(graphIdsFrom(nd.id,"down"),nd.id,"Organized downstream"));
+    graphMenuItem("Frame connected branch","⤢",()=>frameGraph(graphIdsFrom(nd.id,"connected")));
+    graphMenuSep();
+    graphMenuItem("Duplicate","⧉",()=>{select(nd);duplicateSel();},"Ctrl+D");
+    graphMenuItem("Delete","×",()=>{select(nd);deleteSel();},"Del",true);
+    graphMenuSep();
+  }else{
+    graphMenuItem("Add node here…","＋",()=>openMenu(clientX,clientY,world));
+    graphMenuItem("Open node toolbox","▤",()=>setNodeToolbox(true));
+    graphMenuSep();
+  }
+  graphMenuItem("Organize all nodes","⌘",()=>organizeGraph(null,null,"Organized graph"));
+  graphMenuItem("Frame all nodes","⤢",()=>frameGraph());
+  graphMenu.classList.add("open");
+  const mw=224,mh=graphMenu.offsetHeight;
+  graphMenu.style.left=Math.max(6,Math.min(clientX,window.innerWidth-mw-6))+"px";
+  graphMenu.style.top=Math.max(6,Math.min(clientY,window.innerHeight-mh-6))+"px";
+}
+gc.addEventListener("contextmenu",e=>{e.preventDefault();const r=gc.getBoundingClientRect();
+  const w=toWorld(e.clientX-r.left,e.clientY-r.top),port=portAt(w.x,w.y);
+  let edge=null;if(port&&port.which==="in")edge=edges.find(x=>x.to===port.node&&x.slot===port.slot)||null;
+  else if(port&&port.which==="out"){const outgoing=edges.filter(x=>x.from===port.node);if(outgoing.length===1)edge=outgoing[0];}
+  const nd=edge?null:nodeAt(w.x,w.y);if(!edge&&!nd)edge=edgeAt(w.x,w.y);
+  if(nd)select(nd);else if(edge)selectEdge(edge);
+  openGraphMenu(e.clientX,e.clientY,nd,w,edge);});
+window.addEventListener("mousedown",e=>{if(graphMenu.classList.contains("open")&&!graphMenu.contains(e.target))closeGraphMenu();});
+
 gc.addEventListener("wheel",e=>{e.preventDefault();const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
   const f=e.deltaY<0?1.1:1/1.1;const nz=clamp(view.z*f,0.35,2.4);
   view.x=mx-(mx-view.x)*(nz/view.z);view.y=my-(my-view.y)*(nz/view.z);view.z=nz;drawGraph();},{passive:false});
-gc.addEventListener("dblclick",e=>{const r=gc.getBoundingClientRect();openMenu(e.clientX,e.clientY,toWorld(e.clientX-r.left,e.clientY-r.top));});
+gc.addEventListener("dblclick",e=>{const r=gc.getBoundingClientRect(),w=toWorld(e.clientX-r.left,e.clientY-r.top);
+  if(portAt(w.x,w.y)||nodeAt(w.x,w.y)||edgeAt(w.x,w.y))return;openMenu(e.clientX,e.clientY,w);});
 
 /* =====================================================================
    ADD-NODE MENU
    ===================================================================== */
 const menu=$("#menu");let menuWorld=null;
+function groupedNodeTypes(query){
+  query=(query||"").trim().toLowerCase();const groups={};
+  Object.keys(TYPES).forEach(t=>{const def=TYPES[t],cat=CAT[def.cat];
+    const hay=(def.name+" "+def.desc+" "+(cat?cat.name:"")).toLowerCase();
+    if(query&&!hay.includes(query))return;(groups[def.cat]=groups[def.cat]||[]).push(t);});
+  return groups;
+}
+function addNodeAt(type,world){
+  const nd=makeNode(type,world.x-nd0w(type)/2,world.y-30);select(nd);requestEval();return nd;
+}
 function openMenu(clientX,clientY,world){
   menuWorld=world;menu.innerHTML="";
-  const cats={};Object.keys(TYPES).forEach(t=>{const c=TYPES[t].cat;(cats[c]=cats[c]||[]).push(t);});
+  const cats=groupedNodeTypes();
   Object.keys(CAT).forEach(c=>{if(!cats[c])return;
     const h=document.createElement("div");h.className="menu-cat";h.textContent=CAT[c].name;menu.appendChild(h);
     cats[c].forEach(t=>{const def=TYPES[t];const it=document.createElement("div");it.className="menu-item";
       it.innerHTML=`<span class="dot" style="background:${css(CAT[c].c)}"></span>${def.name}<small>${def.ins.length?def.ins.length+"in":"gen"}</small>`;
-      it.onclick=()=>{const nd=makeNode(t,menuWorld.x-nd0w(t)/2,menuWorld.y-30);select(nd);requestEval();closeMenu();};
+      it.onclick=()=>{addNodeAt(t,menuWorld);closeMenu();};
       menu.appendChild(it);});
   });
   menu.classList.add("open");
@@ -2397,8 +2883,45 @@ function openMenu(clientX,clientY,world){
 }
 function nd0w(t){return 150;}
 function closeMenu(){menu.classList.remove("open");}
-window.addEventListener("mousedown",e=>{if(menu.classList.contains("open")&&!menu.contains(e.target)&&e.target.id!=="addBtn")closeMenu();});
-$("#addBtn").onclick=e=>{const r=gc.getBoundingClientRect();openMenu(r.left+80,r.top+70,toWorld(120,120));};
+window.addEventListener("mousedown",e=>{if(menu.classList.contains("open")&&!menu.contains(e.target))closeMenu();});
+
+/* =====================================================================
+   GRAPH NODE TOOLBOX
+   ===================================================================== */
+const nodeToolbox=$("#nodeToolbox"),nodeToolList=$("#nodeToolList"),nodeToolSearch=$("#nodeToolSearch");
+function toolboxSpawnPoint(){
+  const open=$("#graphwrap").classList.contains("toolbox-open"),w=gc.clientWidth,h=gc.clientHeight;
+  const x=(open?248:0)+(w-(open?248:0))*.5;
+  return toWorld(x,h*.5);
+}
+function renderNodeToolbox(query){
+  const groups=groupedNodeTypes(query);nodeToolList.innerHTML="";let shown=0;
+  Object.keys(CAT).forEach(c=>{const types=groups[c];if(!types||!types.length)return;
+    const group=document.createElement("section");group.className="node-tool-cat";
+    const title=document.createElement("div");title.className="node-tool-cat-title";
+    title.style.setProperty("--cat-color",css(CAT[c].c));title.textContent=CAT[c].name;group.appendChild(title);
+    types.forEach(t=>{const def=TYPES[t],item=document.createElement("button");item.type="button";
+      item.className="node-tool-item";item.dataset.type=t;item.title=def.desc;
+      item.style.setProperty("--cat-color",css(CAT[c].c));
+      const summary=(def.desc||"").split(/[.—]/)[0].trim();
+      item.innerHTML=`<span class="dot"></span><span class="node-tool-copy"><b>${def.name}</b><small>${summary}</small></span><span class="node-tool-ports">${def.ins.length?def.ins.length+" in":"gen"}</span>`;
+      item.onclick=()=>addNodeAt(t,toolboxSpawnPoint());group.appendChild(item);shown++;});
+    nodeToolList.appendChild(group);
+  });
+  if(!shown){const empty=document.createElement("div");empty.className="node-tool-empty";empty.textContent="No nodes match that search.";nodeToolList.appendChild(empty);}
+  $("#nodeToolCount").textContent=shown+"/"+Object.keys(TYPES).length;
+}
+function setNodeToolbox(open,focusSearch){
+  $("#graphwrap").classList.toggle("toolbox-open",open);nodeToolbox.classList.toggle("open",open);
+  nodeToolbox.setAttribute("aria-hidden",open?"false":"true");nodeToolbox.inert=!open;
+  $("#nodeToolBtn").setAttribute("aria-expanded",open?"true":"false");
+  $("#nodeToolBtn").textContent=open?"× Nodes":"＋ Nodes";$("#nodeToolBtn").title=open?"Close node toolbox":"Open node toolbox";
+  if(open&&focusSearch!==false)requestAnimationFrame(()=>nodeToolSearch.focus());
+}
+$("#nodeToolBtn").onclick=()=>setNodeToolbox(!nodeToolbox.classList.contains("open"));
+nodeToolSearch.oninput=()=>renderNodeToolbox(nodeToolSearch.value);
+nodeToolbox.addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();setNodeToolbox(false);$("#nodeToolBtn").focus();}});
+renderNodeToolbox("");
 
 /* =====================================================================
    PROPERTIES PANEL
@@ -2409,21 +2932,64 @@ function activePreviewNode(){
 }
 function updatePreviewInfo(root){
   const name=root?TYPES[root.type].name:"No output";
-  $("#vpInfo").innerHTML=`<span class="vp-chip"><b>${previewMode==="selected"?"Selected":"Output"}</b> · ${name}</span>
-    <span class="vp-chip">drag orbit · ⇧/right-drag pan · wheel deep zoom</span>`;
-  $("#previewBtn").textContent=previewMode==="selected"?"Selected":"Output";
-  $("#previewBtn").classList.toggle("on",previewMode==="selected");
+  const selectedMode=previewMode==="selected",mode=selectedMode?"Selected":"Output";
+  $("#vpInfo").innerHTML=`<span class="vp-chip"><b>${mode}</b>${mode===name?"":" · "+name}</span>`;
+  $("#previewBtn").dataset.state=selectedMode?"selected":"output";
+  $("#previewBtn").classList.toggle("on",selectedMode);
+  $("#previewBtn").setAttribute("aria-label",selectedMode?"Preview final Output":"Preview selected node");
+  $("#previewBtn").title=selectedMode?"Preview final Output":"Preview selected node";
 }
 function refreshPreview(){
   const root=activePreviewNode();scene=collectScene(root);updateViewport(root?root._field:null,root);updatePreviewInfo(root);drawGraph();
 }
+function selectEdge(edge){
+  selectedEdge=edge?edgeKey(edge):null;buildProps();drawGraph();
+}
 function select(nd){
-  if(nd===selected){drawGraph();return;}
-  selected=nd;buildProps();
+  if(nd===selected&&!selectedEdge){drawGraph();return;}
+  selectedEdge=null;selected=nd;buildProps();
   if(previewMode==="selected")refreshPreview();else drawGraph();
+}
+function buildEdgeProps(body,title,sub,sw,edge){
+  const from=nodeById(edge.from),to=nodeById(edge.to),input=nodeInputs(to)[edge.slot]||("Input "+(edge.slot+1));
+  const field=from&&from._field;let min=Infinity,max=-Infinity,mean=0,coverage=0;
+  if(field&&field.length){for(let i=0;i<field.length;i++){const v=field[i];min=Math.min(min,v);max=Math.max(max,v);mean+=v;if(v>.5)coverage++;}
+    mean/=field.length;coverage/=field.length;}else{min=max=mean=coverage=0;}
+  title.firstChild.textContent="Connection";sub.textContent=(from?TYPES[from.type].name:"Missing")+" → "+(to?TYPES[to.type].name:"Missing")+"."+input;
+  sw.style.background=edge.disabled?css("--faint"):css("--accent");body.innerHTML="";
+  const summary=document.createElement("div");summary.className="edge-summary";
+  summary.innerHTML=`<div class="edge-route">
+    <div class="edge-end"><small>Source</small><b>${from?TYPES[from.type].name:"Missing node"}</b><span>Output</span></div>
+    <div class="edge-arrow">→</div>
+    <div class="edge-end"><small>Destination</small><b>${to?TYPES[to.type].name:"Missing node"}</b><span>${input}</span></div>
+    </div><div class="edge-stats"><div class="edge-stat"><small>Min</small><b>${min.toFixed(2)}</b></div>
+      <div class="edge-stat"><small>Mean</small><b>${mean.toFixed(2)}</b></div>
+      <div class="edge-stat"><small>Max</small><b>${max.toFixed(2)}</b></div></div>
+    ${input==="Mask"?`<div class="edge-meter" title="${Math.round(coverage*100)}% above 0.5"><span style="width:${Math.round(coverage*100)}%"></span></div>`:""}
+    <div class="edge-note">${input==="Mask"
+      ?"<b>Mask contract:</b> black (0) bypasses the effect, white (1) applies it fully, and grey blends between."
+      :"Connections route a field without hidden processing. Use Blend, Color Blend, or Color Mixer when the connection needs compositing behavior."}</div>`;
+  body.appendChild(summary);
+  const status=document.createElement("div");status.className="field";
+  status.innerHTML='<div class="frow"><label>Connection state</label></div>';
+  const seg=document.createElement("div");seg.className="seg";
+  [["enabled","Enabled"],["muted","Muted"]].forEach(([value,label])=>{const b=document.createElement("button");b.type="button";b.textContent=label;
+    if((value==="enabled")!==!!edge.disabled)b.classList.add("on");
+    b.onclick=()=>toggleEdge(edge,value==="enabled");seg.appendChild(b);});
+  status.appendChild(seg);body.appendChild(status);
+  const actions=document.createElement("div");actions.className="prop-actions";
+  const source=document.createElement("button");source.className="btn";source.textContent="Select source";source.onclick=()=>select(from);
+  const target=document.createElement("button");target.className="btn";target.textContent="Select target";target.onclick=()=>select(to);
+  const remove=document.createElement("button");remove.className="btn";remove.textContent="Disconnect";remove.onclick=()=>deleteEdge(edge);
+  actions.append(source,target,remove);body.appendChild(actions);
+  const hint=document.createElement("div");hint.className="hint";hint.style.marginTop="12px";
+  hint.innerHTML="Click near a curve—or right-click its connected input port—to select it. Press <kbd>Del</kbd>, use the × handle, or choose Disconnect.";
+  body.appendChild(hint);
 }
 function buildProps(){
   const body=$("#pBody"),title=$("#pTitle"),sub=$("#pSub"),sw=$("#pSwatch");
+  const edge=edgeByKey(selectedEdge);if(edge){buildEdgeProps(body,title,sub,sw,edge);return;}
+  if(selectedEdge)selectedEdge=null;
   if(!selected){ // no node selected -> scene-level TERRAIN DEFINITION (the world the heightfield represents)
     title.firstChild.textContent="Terrain definition";sub.textContent="The real-world size of this terrain";
     sw.style.background=css("--faint");body.innerHTML="";
@@ -2644,14 +3210,24 @@ function duplicateSel(){if(!selected)return;const nd=makeNode(selected.type,sele
   if("seed"in nd.params)nd.params.seed=randomSeed();   // a duplicate is a NEW feature, not a copy
   nd._dem=selected._dem;nd._demImg=selected._demImg;nd._demRaw=selected._demRaw;
   select(nd);requestEval();}
+function toggleEdge(edge,enabled){
+  edge=edgeByKey(edgeKey(edge));if(!edge||(!edge.disabled)===enabled)return;
+  recordHistory();edge.disabled=!enabled;markDirtyFrom(edge.to);buildProps();requestEval();
+  toast(enabled?"Connection enabled":"Connection muted");
+}
+function deleteEdge(edge){
+  edge=edgeByKey(typeof edge==="string"?edge:edgeKey(edge));if(!edge)return;
+  recordHistory();const target=edge.to,key=edgeKey(edge);edges=edges.filter(e=>edgeKey(e)!==key);
+  if(selectedEdge===key)selectedEdge=null;markDirtyFrom(target);buildProps();requestEval();toast("Connection removed");
+}
 function deleteSel(){if(!selected)return;const id=selected.id;
   recordHistory();
-  const incoming=edges.filter(e=>e.to===id),outgoing=edges.filter(e=>e.from===id);
+  const incoming=edges.filter(e=>!e.disabled&&e.to===id),outgoing=edges.filter(e=>!e.disabled&&e.from===id);
   const src=incoming.length===1?incoming[0].from:null;                 // auto-bridge only when the input source is unambiguous
   edges=edges.filter(e=>e.from!==id&&e.to!==id);
   if(src!=null)outgoing.forEach(o=>{if(!edges.some(e=>e.to===o.to&&e.slot===o.slot)&&!wouldCycle(src,o.to))edges.push({from:src,to:o.to,slot:o.slot});});
   nodes=nodes.filter(n=>n.id!==id);nodes.forEach(n=>n._dirty=true);
-  if(previewMode==="selected")previewMode="output";select(null);requestEval();}
+  selectedEdge=null;if(previewMode==="selected")previewMode="output";select(null);requestEval();}
 
 /* =====================================================================
    IMPORT / EXPORT
@@ -2695,7 +3271,7 @@ $("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast(
 /* =====================================================================
    WEBGL 3D VIEWPORT
    ===================================================================== */
-const glc=$("#gl");let gl,terrainProg,waterProg,compProg,buffers,wTex,hTex,satTex,gbuf=null,USE_DEFERRED=false;
+const glc=$("#gl");let gl,terrainProg,waterProg,waterMaskProg,compProg,buffers,wTex,hTex,satTex,gbuf=null,USE_DEFERRED=false;
 const DEFAULT_HERO={az:0.7,el:0.62,dist:2.6,target:[0,.05,0]};
 const copyCam=c=>({az:c.az,el:c.el,dist:c.dist,target:[...c.target]});
 let cam=copyCam(DEFAULT_HERO),shadeMode=0,wire=false;
@@ -2873,8 +3449,8 @@ let terrainDef={scale:5000,height:2600};
 const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell
 let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
-// Water & snow are GRAPH NODES (effect nodes), not global toggles. `scene` is collected each eval by
-// walking upstream from the Output and picking up any Water / Snow effect nodes and their params.
+// Water extent and snow accumulation are GRAPH NODES. Water motion/refraction is a global renderer
+// concern in `waterLook`; `scene` only collects graph-authored terrain/effect data.
 let scene={water:null,snow:null,satmap:null};
 const SHADE=["Realistic","Clay","Albedo","Slope","Normals"];
 function initGL(){
@@ -2926,11 +3502,14 @@ function initGL(){
       float macro=surfaceNoise(vW.xz*8.0+vec2(3.7,11.2))/1.75;
       float grain=surfaceNoise(vW.xz*34.0+vec2(17.1,2.8))/1.75;
       base*=mix(1.0,0.88+0.18*macro+0.08*grain,materialView);
-      // Snow is a high-altitude accumulation material, not a white height ramp. Break up the line and
-      // reject steep faces; amount=.5 now targets roughly the upper quarter rather than half the terrain.
-      float snowLine=mix(.96,.56,uSnow)+(macro-.5)*.10;
-      float gentle=1.0-smoothstep(.15,.48,slope);
-      float snowCov=smoothstep(snowLine,snowLine+.09,vH)*gentle*materialView*step(.001,uSnow);
+      // Amount controls accumulation reach, not whiteness: a mid value remains a mountain snowline,
+      // while 1.0 pushes below the terrain floor and relaxes slope rejection into a snowy world.
+      float snowAmount=clamp(uSnow,0.0,1.0);
+      float snowReach=pow(snowAmount,1.7);
+      float snowLine=mix(.98,-.08,snowReach)+(macro-.5)*.08;
+      float slopeLimit=mix(.28,.82,snowReach);
+      float gentle=1.0-smoothstep(slopeLimit-.12,slopeLimit+.08,slope);
+      float snowCov=smoothstep(snowLine,snowLine+.09,vH)*gentle*materialView*step(.001,snowAmount);
       base=mix(base,srgbToLinear(vec3(.88,.92,.97)),snowCov);
       // Store perceptual roughness directly: soil is broad/rough, rock moderately rough, snow tighter.
       float matRough=mix(mix(.84,.62,rockAmt),.38,snowCov);
@@ -3003,6 +3582,17 @@ function initGL(){
       float alpha=clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0)*coverage;`
     +(g2?`frag=vec4(col,alpha);}`:`gl_FragColor=vec4(col,alpha);}`);
   waterProg=makeProg(wVs,wFs);
+  if(g2){
+    // Rasterise the actual fluid surface into its own depth layer. The compositor can then reconstruct
+    // a water-plane world position instead of pretending the visible lakebed pixel is the surface.
+    const wmVs=`#version 300 es
+      in vec2 axz;in float ah;in float aw;out float vDepth;uniform mat4 uMVP;uniform float uH;
+      void main(){vDepth=(aw-ah)*uH;gl_Position=uMVP*vec4(axz.x,aw*uH,axz.y,1.);}`;
+    const wmFs=`#version 300 es
+      precision highp float;in float vDepth;out vec4 frag;
+      void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,0.0,1.0);}`;
+    waterMaskProg=makeProg(wmVs,wmFs);
+  }
   // ---------- DEFERRED water + analytic sky — the fullscreen-triangle technique (WebGL2) ----------
   // Terrain renders to an offscreen colour+depth G-buffer; then ONE fullscreen triangle reconstructs
   // each pixel's world position from the depth texture and composites sky + screen-space water
@@ -3013,9 +3603,10 @@ function initGL(){
     const cFs=`#version 300 es
       precision highp float;in vec2 vUv;out vec4 frag;
       uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;uniform sampler2D gH;
+      uniform sampler2D gWaterMask;uniform highp sampler2D gWaterDepth;
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;
       uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze;
-      uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
+      uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
       const float PI=3.14159265;
       const vec3 SUNCOL=vec3(1.0,0.92,0.78);                         // warm daylight, scene-linear
       vec3 linearToSrgb(vec3 c){c=max(c,vec3(0.0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
@@ -3131,15 +3722,20 @@ function initGL(){
         float z=texture(gDepth,vUv).r;
         vec4 clip=vec4(vUv*2.-1.,z*2.-1.,1.);vec4 wp=uInvMVP*clip;vec3 Pw=wp.xyz/wp.w;
         vec3 viewDir=normalize(Pw-uCam),S=normalize(uSun);
-        if(z>=0.99999){frag=vec4(displayMap(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
+        float waterMask=texture(gWaterMask,vUv).r;
+        if(z>=0.99999&&waterMask<.5){frag=vec4(displayMap(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
         vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float rough=g.a;
-        vec2 wuv=Pw.xz*0.5+0.5;
-        vec3 Nt=terrainNormal(wuv);
+        vec2 bedUv=Pw.xz*0.5+0.5;
+        vec3 Nt=terrainNormal(bedUv);
         if(uStyle==2||uStyle==3){frag=vec4(linearToSrgb(albedo),1.);return;}
         if(uStyle==4){frag=vec4(Nt*.5+.5,1.);return;}
-        float sh=shadowT(Pw,S),ao=aoT(wuv);                        // cast shadow + ambient occlusion from the height field
+        float sh=shadowT(Pw,S),ao=aoT(bedUv);                       // cast shadow + ambient occlusion from the height field
         vec3 dryCol=shadeSurface(albedo,Nt,Pw,rough,sh,ao);
-        float wSurf=Wat(wuv)*uH;if(uHasSea>0.5)wSurf=max(wSurf,uSeaLevel*uH);
+        if(waterMask<.5){frag=vec4(displayMap(atmos(dryCol,Pw)),1.);return;}
+        float wz=texture(gWaterDepth,vUv).r;
+        vec4 wclip=vec4(vUv*2.-1.,wz*2.-1.,1.);vec4 wwp=uInvMVP*wclip;vec3 Pwater=wwp.xyz/wwp.w;
+        vec2 wuv=Pwater.xz*0.5+0.5;
+        float wSurf=Pwater.y;
         float rawDepth=signedWaterDepth(wuv),thick=max(rawDepth,0.0);
         float shoreDepth=filteredShoreDepth(wuv);
         float shoreAA=max(fwidth(shoreDepth)*1.5,.00035);
@@ -3150,11 +3746,17 @@ function initGL(){
         // ---- WATER (screen-space): lit lakebed refraction + Beer–Lambert + Fresnel sky reflection ----
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
         vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
-        float t=uTime*uRippleSpeed;vec3 wave=waveData(Pw.xz,t);float waveAmt=uRipple*waterCov;
+        float t=uTime*uRippleSpeed;vec3 wave=waveData(Pwater.xz,t);float waveAmt=uRipple*waterCov;
         N=normalize(N+waveAmt*vec3(wave.x,0.,wave.y));
-        vec3 Vd=normalize(uCam-Pw);
-        vec2 refrUv=clamp(vUv+N.xz*uPx*28.*clamp(thick*8.,0.,1.),vec2(0.002),vec2(0.998)); // refract the terrain colour
-        vec3 bedAlb=texture(gColor,refrUv).rgb;
+        vec3 Vd=normalize(uCam-Pwater);
+        float refrDepth=clamp(thick*8.,0.,1.);
+        vec2 refrOff=N.xz*uPx*34.*refrDepth*uRefraction;
+        vec2 refrUv=clamp(vUv+refrOff,vec2(0.002),vec2(0.998));
+        // Three nearby taps add restrained wavelength separation and make the displaced lakebed read
+        // as refraction rather than an animated colour overlay.
+        vec3 bedAlb=vec3(texture(gColor,clamp(refrUv+refrOff*.025,vec2(.002),vec2(.998))).r,
+                         texture(gColor,refrUv).g,
+                         texture(gColor,clamp(refrUv-refrOff*.02,vec2(.002),vec2(.998))).b);
         vec3 bed=shadeSurface(bedAlb,Nt,Pw,0.82,sh,ao);            // light the rough lakebed (albedo was unlit in the g-buffer)
         vec3 sigma=vec3(2.6,1.10,.45);                              // Beer–Lambert: red dies first, blue travels furthest
         vec3 trans=exp(-sigma*thick*5.0);
@@ -3171,7 +3773,7 @@ function initGL(){
         vec3 col=mix(wc,refl,fres)+spec*SUNCOL; col=mix(col,vec3(.78,.86,.92),foam);
         col*=mix(0.65,1.0,sh);                                      // water in cast shadow is darker
         col=mix(dryCol,col,waterCov);                                // analytic coverage removes the binary triangle shoreline
-        frag=vec4(displayMap(atmos(col,Pw)),1.);
+        frag=vec4(displayMap(atmos(col,Pwater)),1.);
       }`;
     compProg=makeProg(cVs,cFs);
     const mkFloatTex=()=>{const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);
@@ -3348,7 +3950,8 @@ function surfaceHeight(wx,wz){if(!curHgt)return cam.target[1];return sampleBilin
 const cameraNear=()=>clamp(cam.dist*.018,.00018,.045);       // deep inspection without slicing the surface
 function ensureGBuffer(){                                    // offscreen colour + depth textures, resized to the canvas
   const w=glc.width,h=glc.height;if(gbuf&&gbuf.w===w&&gbuf.h===h)return;
-  if(gbuf){gl.deleteFramebuffer(gbuf.fbo);gl.deleteTexture(gbuf.color);gl.deleteTexture(gbuf.depth);}
+  if(gbuf){gl.deleteFramebuffer(gbuf.fbo);gl.deleteFramebuffer(gbuf.waterFbo);gl.deleteTexture(gbuf.color);gl.deleteTexture(gbuf.depth);
+    gl.deleteTexture(gbuf.waterMask);gl.deleteTexture(gbuf.waterDepth);}
   const color=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,color);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -3361,7 +3964,19 @@ function ensureGBuffer(){                                    // offscreen colour
   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,color,0);
   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);
   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)USE_DEFERRED=false;
-  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gbuf={fbo,color,depth,w,h};
+  const waterMask=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,waterMask);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  const waterDepth=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,waterDepth);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,w,h,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  const waterFbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,waterFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,waterMask,0);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,waterDepth,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)USE_DEFERRED=false;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gbuf={fbo,color,depth,waterFbo,waterMask,waterDepth,w,h};
 }
 function mat4inv(m){
   const a00=m[0],a01=m[1],a02=m[2],a03=m[3],a10=m[4],a11=m[5],a12=m[6],a13=m[7],a20=m[8],a21=m[9],a22=m[10],a23=m[11],a30=m[12],a31=m[13],a32=m[14],a33=m[15];
@@ -3387,17 +4002,26 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
 }
+function drawWaterDepth(MVP){
+  if(!scene.water||!waterMaskProg)return;
+  gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);gl.useProgram(waterMaskProg);
+  setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);
+  bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+  gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+}
 function renderGL(){
   if(!gl){return;}
   resizeGL();
   const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
   const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
-  const waterRipple=scene.water?(scene.water.ripple==null ? .55 : scene.water.ripple):0;
-  const waterRippleScale=scene.water?(scene.water.rippleScale==null?1:scene.water.rippleScale):1;
-  const waterRippleSpeed=scene.water?(scene.water.rippleSpeed==null?1:scene.water.rippleSpeed):1;
+  const waterRipple=scene.water?waterLook.strength:0;
+  const waterRippleScale=waterLook.scale;
+  const waterRippleSpeed=waterLook.speed;
+  const waterRefraction=scene.water?waterLook.refraction:0;
   const waterShoreSmooth=scene.water?(scene.water.shoreSmooth==null?1.35:scene.water.shoreSmooth):0;
   const waterFoam=scene.water?(scene.water.foam==null?.18:scene.water.foam):0;
-  const waterPattern=scene.water?({cross:0,wind:1,rings:2,none:3}[scene.water.pattern]??0):3;
+  const waterPattern=scene.water?({cross:0,wind:1,rings:2,none:3}[waterLook.pattern]??1):3;
   const V=lookAt(eye,cam.target,[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
   if(USE_DEFERRED&&!wire){
     ensureGBuffer();
@@ -3405,7 +4029,12 @@ function renderGL(){
     gl.bindFramebuffer(gl.FRAMEBUFFER,gbuf.fbo);gl.viewport(0,0,glc.width,glc.height);
     gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     drawTerrain(MVP,M,ex,ey,ez,true);
-    // PASS 2: fullscreen triangle -> screen (sky + screen-space water)
+    // PASS 1.5: copy terrain depth, then rasterise the nearer fluid plane into a distinct surface layer.
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER,gbuf.fbo);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,gbuf.waterFbo);
+    gl.blitFramebuffer(0,0,glc.width,glc.height,0,0,glc.width,glc.height,gl.DEPTH_BUFFER_BIT,gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,gbuf.waterFbo);gl.viewport(0,0,glc.width,glc.height);
+    gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);drawWaterDepth(MVP);
+    // PASS 2: fullscreen triangle -> screen (sky + water-surface refraction)
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,glc.width,glc.height);
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
     gl.useProgram(compProg);setM(compProg,"uInvMVP",mat4inv(MVP));
@@ -3413,6 +4042,7 @@ function renderGL(){
     gl.uniform1i(u(compProg,"uStyle"),shadeMode);gl.uniform1f(u(compProg,"uExposure"),renderLook.exposure);gl.uniform1f(u(compProg,"uHaze"),renderLook.haze);
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
     gl.uniform1f(u(compProg,"uRipple"),waterRipple);gl.uniform1f(u(compProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(compProg,"uRippleSpeed"),waterRippleSpeed);
+    gl.uniform1f(u(compProg,"uRefraction"),waterRefraction);
     gl.uniform1f(u(compProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(compProg,"uFoam"),waterFoam);gl.uniform1i(u(compProg,"uPattern"),waterPattern);
     gl.uniform1f(u(compProg,"uSeaLevel"),0.0);gl.uniform1f(u(compProg,"uHasSea"),0.0);  // sea is baked into the water-height texture (W)
     gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
@@ -3421,6 +4051,8 @@ function renderGL(){
     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,gbuf.depth);gl.uniform1i(u(compProg,"gDepth"),1);
     gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,wTex);gl.uniform1i(u(compProg,"gW"),2);
     gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,hTex);gl.uniform1i(u(compProg,"gH"),3);
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,gbuf.waterMask);gl.uniform1i(u(compProg,"gWaterMask"),4);
+    gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D,gbuf.waterDepth);gl.uniform1i(u(compProg,"gWaterDepth"),5);
     gl.drawArrays(gl.TRIANGLES,0,3);
     gl.enable(gl.DEPTH_TEST);
   }else{
@@ -3454,38 +4086,119 @@ function hex3(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).j
    ===================================================================== */
 function setStat(kind,msg){$("#statMsg").textContent=msg;$("#statDot").style.background=kind==="ok"?css("--good"):kind==="warn"?css("--warn"):css("--bad");}
 let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1900);}
+const topPopovers=["buildSettings","commandMenu"];
+const topPopoverButtons={buildSettings:"buildProfileBtn",commandMenu:"commandBtn"};
+function closeTopPopovers(){
+  topPopovers.forEach(id=>{$("#"+id).hidden=true;$("#"+topPopoverButtons[id]).setAttribute("aria-expanded","false");});
+}
+function setTopPopover(id,force){
+  const panel=$("#"+id),open=force===undefined?panel.hidden:!!force;
+  topPopovers.forEach(pid=>{const on=pid===id&&open;$("#"+pid).hidden=!on;$("#"+topPopoverButtons[pid]).setAttribute("aria-expanded",on?"true":"false");});
+  if(open&&id==="commandMenu")requestAnimationFrame(()=>{$("#commandSearch").focus();$("#commandSearch").select();});
+}
+function syncBuildProfile(){
+  $("#profileRes").textContent=TARGET_RES+"²";
+  const quality=BUILD_QUALITY==="final"?"Final":"Interactive",device=USE_GPU&&!$("#gpuBtn").disabled?"GPU":"CPU";
+  $("#profileDetail").textContent=" · "+quality+" · "+device+(SCALE_RES?" · Lock":"")+(TARGET_RES!==RES?" · Queued":"");
+}
+function filterCommands(query){
+  const q=(query||"").trim().toLowerCase(),items=[...$("#commandList").querySelectorAll(".command-item")];
+  let shown=0;items.forEach(item=>{const match=!q||(item.dataset.command+" "+item.textContent).toLowerCase().includes(q);
+    item.classList.toggle("hidden",!match);if(match)shown++;});
+  [...$("#commandList").querySelectorAll(".command-group-title")].forEach(title=>{
+    let any=false,n=title.nextElementSibling;while(n&&!n.classList.contains("command-group-title")){
+      if(n.classList.contains("command-item")&&!n.classList.contains("hidden"))any=true;n=n.nextElementSibling;}
+    title.classList.toggle("hidden",!any);
+  });
+  $("#commandEmpty").classList.toggle("show",shown===0);return shown;
+}
+function locateNode(type){
+  const nd=nearestUpstreamNode(type,outputNode())||nodes.find(n=>n.type===type);
+  if(!nd){toast(TYPES[type].name+" is not in this graph");return;}
+  select(nd);frameGraph([nd.id]);toast("Located "+TYPES[type].name);
+}
+$("#buildProfileBtn").onclick=()=>setTopPopover("buildSettings");
+$("#commandBtn").onclick=()=>{filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu");};
+$("#commandSearch").oninput=e=>filterCommands(e.target.value);
+$("#commandSearch").onkeydown=e=>{
+  if(e.key==="Enter"||e.key==="ArrowDown"){
+    const first=$("#commandList .command-item:not(.hidden)");if(first){e.preventDefault();first.focus();if(e.key==="Enter")first.click();}
+  }
+};
+const commandActions={
+  build:()=>$("#buildBtn").click(),auto:()=>$("#autoBtn").click(),import:()=>$("#importBtn").click(),export:()=>$("#exportBtn").click(),
+  "find-water":()=>locateNode("water"),"find-satmap":()=>locateNode("satmap"),"find-output":()=>locateNode("output"),
+  organize:()=>organizeGraph(null,null,"Organized graph"),toolbox:()=>setNodeToolbox(true),layout:()=>$("#layoutBtn").click(),
+  fullscreen:()=>toggleFullscreen()
+};
+$("#commandList").addEventListener("click",e=>{
+  const item=e.target.closest(".command-item");if(!item)return;
+  const action=commandActions[item.dataset.action];if(action)action();closeTopPopovers();
+});
+window.addEventListener("mousedown",e=>{if(!e.target.closest(".top-anchor"))closeTopPopovers();});
 $("#autoBtn").classList.toggle("on",AUTO);
 $("#autoBtn").onclick=()=>{AUTO=!AUTO;$("#autoBtn").classList.toggle("on",AUTO);if(AUTO)evalGraph();toast(AUTO?"Auto-recompute on":"Auto-recompute off — use Build");};
-$("#buildBtn").onclick=()=>{nodes.forEach(n=>n._dirty=true);evalGraph();};
-$("#resSel").onchange=e=>{RES=parseInt(e.target.value);nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});
+function applyWorkingResolution(next){
+  RES=next;nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});
   buildIndex();
-  if(RES>=512&&AUTO){AUTO=false;$("#autoBtn").classList.remove("on");toast(RES+"² — Auto off, use Build (heavy)");}
-  else toast("Resolution "+RES+"²");
-  evalGraph();};
+}
+$("#buildBtn").onclick=()=>{if(TARGET_RES!==RES)applyWorkingResolution(TARGET_RES);nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraph();};
+$("#resSel").onchange=e=>{
+  TARGET_RES=parseInt(e.target.value);
+  if(TARGET_RES>=1024){
+    if(AUTO){AUTO=false;$("#autoBtn").classList.remove("on");}
+    syncBuildProfile();toast(TARGET_RES+"² queued — Auto off, use Build");return;
+  }
+  if(TARGET_RES!==RES)applyWorkingResolution(TARGET_RES);
+  syncBuildProfile();toast("Resolution "+RES+"²");evalGraph();};
 $("#qualitySel").onchange=e=>{BUILD_QUALITY=e.target.value;nodes.forEach(n=>n._dirty=true);
   toast(BUILD_QUALITY==="final"?"Final simulation budgets":"Interactive preview budgets");
-  evalGraph();};
+  syncBuildProfile();evalGraph();};
 // GPU fast path toggle. Generators + thermal erosion run as WebGL2 fragment-shader kernels; the CPU
 // implementations stay the reference (see _verify_gpu.js for the GPU-vs-CPU parity check).
 $("#gpuBtn").onclick=()=>{
   if(!GPU.init()){toast("GPU compute unavailable (needs WebGL2 + float render targets)");return;}
   USE_GPU=!USE_GPU;$("#gpuBtn").classList.toggle("on",USE_GPU);
-  nodes.forEach(n=>n._dirty=true);evalGraph();
+  nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraph();
   toast(USE_GPU?"GPU fast path on":"CPU reference path");};
-setTimeout(()=>{if(GPU.init()){$("#gpuBtn").classList.toggle("on",USE_GPU);}else{$("#gpuBtn").disabled=true;$("#gpuBtn").title="WebGL2 float render targets unavailable";}},0);
+setTimeout(()=>{if(GPU.init()){$("#gpuBtn").classList.toggle("on",USE_GPU);}else{USE_GPU=false;$("#gpuBtn").disabled=true;$("#gpuBtn").title="WebGL2 float render targets unavailable";}syncBuildProfile();},0);
 // Resolution independence toggle — off means params stay in raw cell units (and a high-res build goes spiky).
 $("#scaleBtn").classList.toggle("on",SCALE_RES);
 $("#scaleBtn").onclick=()=>{SCALE_RES=!SCALE_RES;$("#scaleBtn").classList.toggle("on",SCALE_RES);
-  nodes.forEach(n=>n._dirty=true);evalGraph();
+  nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraph();
   toast(SCALE_RES?"Res Lock on — params held constant across resolution":"Res Lock off — raw cell-unit params");};
+syncBuildProfile();
 $("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
   document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
+const viewportPanels=["displayPanel","lookPanel","waterLookPanel","helpPanel"];
+const viewportPanelButtons={displayPanel:"displayBtn",lookPanel:"lookBtn",waterLookPanel:"waterLookBtn",helpPanel:"helpBtn"};
+function setViewportPanel(id){
+  viewportPanels.forEach(pid=>{
+    const open=pid===id&&$("#"+pid).hidden;
+    $("#"+pid).hidden=!open;$("#"+viewportPanelButtons[pid]).setAttribute("aria-expanded",open?"true":"false");
+  });
+}
+function closeViewportPanels(){
+  viewportPanels.forEach(pid=>{$("#"+pid).hidden=true;$("#"+viewportPanelButtons[pid]).setAttribute("aria-expanded","false");});
+}
+$("#displayBtn").onclick=()=>setViewportPanel("displayPanel");
+$("#lookBtn").onclick=()=>setViewportPanel("lookPanel");
+$("#waterLookBtn").onclick=()=>setViewportPanel("waterLookPanel");
+$("#helpBtn").onclick=()=>setViewportPanel("helpPanel");
+window.addEventListener("mousedown",e=>{
+  if(!e.target.closest(".vp-rail")&&!e.target.closest(".vp-flyout"))closeViewportPanels();
+});
 let heroCam=copyCam(DEFAULT_HERO),planView=false;
-function frameHero(){planView=false;cam=copyCam(DEFAULT_HERO);heroCam=copyCam(DEFAULT_HERO);$("#viewBtn").textContent="Plan";$("#viewBtn").classList.remove("on");}
+function syncViewButton(){
+  $("#viewBtn").dataset.state=planView?"plan":"hero";$("#viewBtn").classList.toggle("on",planView);
+  $("#viewBtn").setAttribute("aria-label",planView?"Return to hero camera":"Switch to plan camera");
+  $("#viewBtn").title=planView?"Return to hero camera":"Switch to plan camera";
+}
+function frameHero(){planView=false;cam=copyCam(DEFAULT_HERO);heroCam=copyCam(DEFAULT_HERO);syncViewButton();}
 function togglePlanView(){
   if(!planView){heroCam=copyCam(cam);cam={az:0,el:1.535,dist:2.55,target:[...cam.target]};planView=true;}
   else{cam=copyCam(heroCam);planView=false;}
-  $("#viewBtn").textContent=planView?"Hero":"Plan";$("#viewBtn").classList.toggle("on",planView);
+  syncViewButton();
 }
 $("#frameBtn").onclick=frameHero;
 $("#viewBtn").onclick=togglePlanView;
@@ -3514,12 +4227,18 @@ async function toggleFullscreen(){
 $("#fullscreenBtn").onclick=toggleFullscreen;
 document.addEventListener("fullscreenchange",()=>{
   const on=document.fullscreenElement===$("#viewport");
-  $("#fullscreenBtn").classList.toggle("on",on);$("#fullscreenBtn").textContent=on?"×":"⛶";
+  $("#fullscreenBtn").classList.toggle("on",on);
+  $("#fullscreenBtn").setAttribute("aria-label",on?"Exit fullscreen":"Enter fullscreen");
   $("#fullscreenBtn").title=on?"Exit fullscreen (Shift+F)":"Fullscreen rendering (Shift+F)";
   requestAnimationFrame(resizeGL);
 });
-$("#wireBtn").onclick=()=>{wire=!wire;$("#wireBtn").classList.toggle("on",wire);};
-$("#shadeSel").onchange=e=>{shadeMode=parseInt(e.target.value,10)||0;};
+function syncDisplayState(){
+  $("#wireBtn").classList.toggle("on",wire);$("#wireState").textContent=wire?"On":"Off";
+  $("#displayBtn").classList.toggle("on",wire||shadeMode!==0);
+}
+$("#wireBtn").onclick=()=>{wire=!wire;syncDisplayState();};
+$("#shadeSel").onchange=e=>{shadeMode=parseInt(e.target.value,10)||0;syncDisplayState();};
+syncViewButton();syncDisplayState();
 function satGradientCSS(name){
   const stops=SATMAPS[name]||SATMAPS.Temperate;
   return"linear-gradient(90deg,"+stops.map(s=>"rgb("+s[1][0]+","+s[1][1]+","+s[1][2]+") "+(clamp(s[0],0,1)*100).toFixed(1)+"%").join(",")+")";
@@ -3646,10 +4365,10 @@ rebuildSatPicker();
     previousGradient=target?target.params.gradient:satName;studioBefore=historyReady?graphSnapshot():null;
     stops=(SATMAPS[previousGradient]||SATMAPS.Temperate).map(s=>({pos:s[0],col:s[1].slice()}));
     sel=stops.length?0:-1;resetAdj();setSeg("smooth");$("#sgName").value="Custom";
-    prevShade=shadeMode;shadeMode=2;$("#shadeSel").value="2";             // force unlit Albedo so LUT edits are judged without lighting
+    prevShade=shadeMode;shadeMode=2;$("#shadeSel").value="2";syncDisplayState(); // force unlit Albedo so LUT edits are judged without lighting
     computeHist();drawer.classList.add("open");render();
   }
-  function close(revert){drawer.classList.remove("open");shadeMode=prevShade;$("#shadeSel").value=String(shadeMode);
+  function close(revert){drawer.classList.remove("open");shadeMode=prevShade;$("#shadeSel").value=String(shadeMode);syncDisplayState();
     if(revert!==false&&target)target.params.gradient=previousGradient;
     delete SATMAPS[previewKey];
     if(revert!==false){satName=target?target.params.gradient:satName;buildProps();refreshPreview();syncSatPicker(false);}
@@ -3728,17 +4447,42 @@ rebuildSatPicker();
 
   window.addEventListener("resize",()=>{if(drawer.classList.contains("open"))render();});
 })();
-$("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);};
-$("#sunEl").oninput=e=>{sun.el=parseFloat(e.target.value);};
-$("#exposure").oninput=e=>{renderLook.exposure=parseFloat(e.target.value);};
-$("#haze").oninput=e=>{renderLook.haze=parseFloat(e.target.value);};
+const degrees=v=>Math.round(v*180/Math.PI)+"°";
+function syncLookValues(){
+  $("#sunAzVal").textContent=degrees(sun.az);$("#sunElVal").textContent=degrees(sun.el);
+  const ev=renderLook.exposure;$("#exposureVal").textContent=(ev>0?"+":ev<0?"−":"")+Math.abs(ev).toFixed(2)+" EV";
+  $("#hazeVal").textContent=Math.round(renderLook.haze*100)+"%";
+}
+function syncWaterLookValues(){
+  $("#waterStrengthVal").textContent=Math.round(waterLook.strength*100)+"%";
+  $("#waterScaleVal").textContent=waterLook.scale.toFixed(2)+"×";
+  $("#waterSpeedVal").textContent=waterLook.speed.toFixed(2)+"×";
+  $("#waterRefractionVal").textContent=Math.round(waterLook.refraction*100)+"%";
+}
+$("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);syncLookValues();};
+$("#sunEl").oninput=e=>{sun.el=parseFloat(e.target.value);syncLookValues();};
+$("#exposure").oninput=e=>{renderLook.exposure=parseFloat(e.target.value);syncLookValues();};
+$("#haze").oninput=e=>{renderLook.haze=parseFloat(e.target.value);syncLookValues();};
+$("#waterPattern").onchange=e=>{waterLook.pattern=e.target.value;};
+$("#waterStrength").oninput=e=>{waterLook.strength=parseFloat(e.target.value);syncWaterLookValues();};
+$("#waterScale").oninput=e=>{waterLook.scale=parseFloat(e.target.value);syncWaterLookValues();};
+$("#waterSpeed").oninput=e=>{waterLook.speed=parseFloat(e.target.value);syncWaterLookValues();};
+$("#waterRefraction").oninput=e=>{waterLook.refraction=parseFloat(e.target.value);syncWaterLookValues();};
+syncLookValues();syncWaterLookValues();
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu",true);return;}
+  if(e.key==="Escape"&&topPopovers.some(id=>!$("#"+id).hidden)){e.preventDefault();closeTopPopovers();$("#commandBtn").focus();return;}
+  if(e.key==="Escape"&&viewportPanels.some(id=>!$("#"+id).hidden)){e.preventDefault();closeViewportPanels();return;}
+  if(e.key==="Escape"&&graphMenu.classList.contains("open")){e.preventDefault();closeGraphMenu();return;}
   if(typing())return;                                          // don't hijack keys while editing a parameter
+  if(e.key==="Escape"&&selectedEdge){e.preventDefault();selectEdge(null);return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();e.shiftKey?redoGraph():undoGraph();return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redoGraph();return;}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="d"&&selected&&!selectedEdge){e.preventDefault();duplicateSel();return;}
   if(e.code==="Space")spaceDown=true;
-  if(e.key==="Delete"||e.key==="Backspace"){if(selected)deleteSel();}
+  if(e.key==="Delete"||e.key==="Backspace"){
+    if(selectedEdge){e.preventDefault();deleteEdge(selectedEdge);}else if(selected)deleteSel();}
   if((e.key==="f"||e.key==="F")&&e.shiftKey){e.preventDefault();toggleFullscreen();}
   else if(e.key==="f"||e.key==="F")frameHero();});
 window.addEventListener("keyup",e=>{if(e.code==="Space")spaceDown=false;});
@@ -3759,7 +4503,7 @@ function defaultGraph(){
   const colorErosion=makeNode("colorerosion",840,120);colorErosion.params.seed=7;
   const weathering=makeNode("weathering",1000,120);
   const snow=makeNode("snow",1160,120);snow.params={amount:0.5};
-  const water=makeNode("water",1320,120);water.params={mode:"hydro",level:0.12,flow:0.5,shoreSmooth:1.35,foam:.18,pattern:"wind",ripple:.55,rippleScale:1,rippleSpeed:1};
+  const water=makeNode("water",1320,120);water.params={mode:"hydro",level:0.12,flow:0.5,shoreSmooth:1.35,foam:.18};
   const out=makeNode("output",1480,120);out.params={norm:"on"};
   edges.push({from:base.id,to:mix.id,slot:0});
   edges.push({from:ridge.id,to:mix.id,slot:1});
@@ -3781,7 +4525,9 @@ function defaultGraph(){
 /* ------------------------------------------------------------ boot --- */
 function boot(){
   if(!document.documentElement.getAttribute("data-theme"))document.documentElement.setAttribute("data-theme","dark");
-  try{setLayout(localStorage.getItem("terrainStudioLayout")==="stacked");}catch(_){setLayout(false);}
+  try{const savedLayout=localStorage.getItem("terrainStudioLayout");
+    setLayout(savedLayout?savedLayout==="stacked":true);
+  }catch(_){setLayout(true);}
   resizeGraph();initGL();defaultGraph();evalGraph();historyReady=true;updateHistoryButtons();
   window.addEventListener("resize",()=>{resizeGraph();});
   new ResizeObserver(()=>resizeGraph()).observe(gc.parentElement);

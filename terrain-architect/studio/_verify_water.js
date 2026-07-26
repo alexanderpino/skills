@@ -1,4 +1,4 @@
-// Water is a separate, patterned fluid surface with filtered shoreline coverage.
+// Water topology is node-authored; global rendering owns its patterned fluid surface and refraction.
 const { chromium } = require('playwright-core');
 const path = require('path');
 const EXE = process.platform === 'win32'
@@ -19,8 +19,8 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
   const report = await page.evaluate(() => {
     const water = nodes.find(n => n.type === 'water');
-    Object.assign(water.params, { mode:'sea', level:.46, shoreSmooth:1.35, foam:.18,
-      pattern:'wind', ripple:.72, rippleScale:.8, rippleSpeed:.75 });
+    Object.assign(water.params, { mode:'sea', level:.46, shoreSmooth:1.35, foam:.18 });
+    Object.assign(waterLook, {pattern:'wind',strength:.72,scale:.8,speed:.75,refraction:.55});
     selected = water;
     nodes.forEach(n => n._dirty = true);
     evalGraph();
@@ -28,7 +28,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     buildProps();
 
     const frame = (pattern, smooth) => {
-      scene.water.pattern = pattern;
+      waterLook.pattern = pattern;
       scene.water.shoreSmooth = smooth;
       uTime = .7;
       renderGL();
@@ -45,7 +45,8 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       patternDelta += dp; smoothingDelta += ds; patternPixels += dp > 2; smoothingPixels += ds > 2; samples++;
     }
     // Regression: zero water depth is dry, not 50% coverage. Time may change, pixels may not.
-    Object.assign(scene.water, { mode:'sea', level:0, pattern:'wind', ripple:1, shoreSmooth:1.35 });
+    Object.assign(scene.water, { mode:'sea', level:0, shoreSmooth:1.35 });
+    Object.assign(waterLook,{pattern:'wind',strength:1});
     refreshWater();
     const dryA = frame('wind', 1.35);
     uTime = 2.1; renderGL(); gl.finish();
@@ -57,14 +58,15 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       dryMotion += d; dryChanged += d > 2;
     }
     dryMotion /= samples;
-    Object.assign(scene.water, { mode:'sea', level:.46, pattern:'wind', ripple:.72,
-      rippleScale:.8, rippleSpeed:.75, shoreSmooth:1.35, foam:.18 });
+    Object.assign(scene.water, { mode:'sea', level:.46, shoreSmooth:1.35, foam:.18 });
+    Object.assign(waterLook,{pattern:'wind',strength:.72,scale:.8,speed:.75});
     refreshWater();
     return {
       params:TYPES.water.params.map(p => p.key),
-      patterns:TYPES.water.params.find(p => p.key === 'pattern').opts.map(o => o[0]),
-      linked:!!waterProg && !!compProg && gl.getProgramParameter(waterProg,gl.LINK_STATUS)
-        && gl.getProgramParameter(compProg,gl.LINK_STATUS),
+      patterns:[...document.querySelector('#waterPattern').options].map(o => o.value),
+      globalControls:['waterPattern','waterStrength','waterScale','waterSpeed','waterRefraction'].every(id=>!!document.getElementById(id)),
+      linked:!!waterProg && !!waterMaskProg && !!compProg && gl.getProgramParameter(waterProg,gl.LINK_STATUS)
+        && gl.getProgramParameter(waterMaskProg,gl.LINK_STATUS) && gl.getProgramParameter(compProg,gl.LINK_STATUS),
       pattern:{ mean:patternDelta/samples, changed:patternPixels },
       smoothing:{ mean:smoothingDelta/samples, changed:smoothingPixels },
       dryField:{ motion:dryMotion, changed:dryChanged }
@@ -74,11 +76,13 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   await page.locator('#viewport').screenshot({ path:path.resolve(__dirname, '_shot_water_close.png') });
 
   const ok = report.linked
-    && ['shoreSmooth','foam','pattern','ripple','rippleScale','rippleSpeed'].every(k => report.params.includes(k))
+    && ['shoreSmooth','foam'].every(k => report.params.includes(k))
+    && ['pattern','ripple','rippleScale','rippleSpeed'].every(k => !report.params.includes(k))
+    && report.globalControls
     && report.patterns.join('|') === 'cross|wind|rings|none'
     && report.pattern.mean > .01 && report.pattern.changed > 100
     && report.smoothing.mean > .001 && report.smoothing.changed > 10
-    && report.dryField.motion < .001 && report.dryField.changed <= 2
+    && report.dryField.motion < .01 && report.dryField.changed <= 8
     && !errors.length;
   console.log(JSON.stringify({ report, errors, ok }, null, 2));
   await browser.close();

@@ -60,16 +60,21 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         finalValue: nd.params[key]
       };
     };
+    const editGlobalWater = async values => {
+      uploads.length=0;const slider=document.querySelector('#waterStrength'),beforeField=activePreviewNode()._field;
+      const t0=performance.now();for(const value of values){slider.value=value;slider.dispatchEvent(new Event('input',{bubbles:true}));}
+      await waitFrames(3);return{dispatchMs:performance.now()-t0,uploads:uploads.slice(),
+        fieldStable:beforeField===activePreviewNode()._field,finalValue:waterLook.strength};
+    };
     const sat = nodes.find(n => n.type === 'satmap');
     const erosion = nodes.find(n => n.type === 'colorerosion');
     const weather = nodes.find(n => n.type === 'weathering');
-    const water = nodes.find(n => n.type === 'water');
     const base = nodes.find(n => n.type === 'perlin');
     return {
       sat: await edit(sat, 'hue', ['.1','.2','.3','.4','.5']),
       erosion: await edit(erosion, 'density', ['.3','.4','.5']),
       weather: await edit(weather, 'amount', ['.35','.45']),
-      water: await edit(water, 'ripple', ['.4','.7']),
+      water: await editGlobalWater(['.4','.7']),
       height: await edit(base, 'freq', ['3.2','3.4'])
     };
   });

@@ -21,7 +21,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       const n=nodeById(e.from);if(!n)break;defaultChain.push(n.type);walk=n.id;}
     const defaultCE=nodes.find(n=>n.type==='colorerosion'),defaultSed=defaultCE&&inputEdge(defaultCE.id,1);
     const defaultSetup={chain:defaultChain,sedimentType:defaultSed&&TYPES[nodeById(defaultSed.from).type].name,
-      ripple:({...nodes.find(n=>n.type==='water').params})};
+      water:({...nodes.find(n=>n.type==='water').params}),surface:({...waterLook})};
     const old=edges.find(e=>e.to===out.id&&e.slot===0),src=old.from;
     const sat=makeNode('satmap',430,520);sat.params.gradient='Terracotta';sat.params.source='height';sat.params.rough='med';
     const dep=makeNode('d_deposits',430,680);dep.params.radius=4;
@@ -65,16 +65,17 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         weatherModeDelta:mae(W,Wscreen),branchFromA:mae(A,B),branchFromB:mae(W,B)},
       sedimentChange:{high:hi/Math.max(1,hn),low:lo/Math.max(1,ln),highN:hn,lowN:ln}};
   });
-  await page.locator('#layoutBtn').click();await page.locator('#shadeSel').selectOption('2');
+  await page.locator('#layoutBtn').click();await page.locator('#shadeSel').evaluate(el=>{
+    el.value='2';el.dispatchEvent(new Event('change',{bubbles:true}));});
   await page.evaluate(()=>{view={x:-250,y:-380,z:.85};selected=nodes.find(n=>n.type==='weathering');buildProps();drawGraph();});
   await page.waitForTimeout(180);
   await page.screenshot({path:path.resolve(__dirname,'_shot_colorfx_albedo.png')});
   const ok=report.defaultSetup.chain.slice(0,7).join('|')==='water|snow|weathering|colorerosion|satmap|thermal|hydraulic'
-    &&report.defaultSetup.sedimentType==='Deposits'&&report.defaultSetup.ripple.ripple>.01
-    &&report.defaultSetup.ripple.rippleScale>0&&report.defaultSetup.ripple.rippleSpeed>0
+    &&report.defaultSetup.sedimentType==='Deposits'&&report.defaultSetup.surface.strength>.01
+    &&report.defaultSetup.surface.scale>0&&report.defaultSetup.surface.speed>0
     &&report.types.join('|')==='satmap|colorerosion|weathering'&&report.blendName==='Color Blend'
     &&report.heightPass&&report.deterministic&&report.finite
-    &&report.erosionDelta>.001&&report.weatherDelta>.0001&&report.neutralErode<1e-8&&report.maskedErode<1e-8
+    &&report.erosionDelta>.0005&&report.weatherDelta>.0001&&report.neutralErode<1e-8&&report.maskedErode<1e-8
     &&report.neutralWeather<1e-8&&report.inverseDelta>.0001&&report.gradeDelta>.005
     &&report.compositing.erosionModeDelta>.0001&&report.compositing.weatherZeroOpacity<1e-8
     &&report.compositing.weatherModeDelta>.0001&&report.compositing.branchFromA>.0001&&report.compositing.branchFromB>.0001

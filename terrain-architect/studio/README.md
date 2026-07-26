@@ -12,8 +12,9 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 ## What it does
 
-- **Production authoring workspace**: switch between the original side layout and a **stacked layout**
-  with the live rendering above the graph while Properties remains full-height. The rendering has a
+- **Production authoring workspace**: the **stacked vertical layout is the first-run default**,
+  with the live rendering above the graph while Properties remains full-height; switch to the side
+  layout when wanted. The rendering has a
   real browser **fullscreen** control, deliberate **Hero / Plan** cameras, and an **Output / Selected**
   display flag so any intermediate node can drive the viewport without rewiring the graph. Graph edits
   are undoable/redoable (including topology, node moves, parameters and terrain definition), and each
@@ -79,8 +80,9 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
   styles above, orbit + zoom, wireframe), rendered in two passes —
   1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
      and leaves steep faces bare, with a specular snow sheen (driven by a **Snow** effect node).
-  2. **Water composite** — screen-space refraction, absorption, Fresnel reflection, restrained
-     animated ripples, and shoreline foam. It uses a **hydrologically
+  2. **Water surface + composite** — a rasterized fluid-depth layer followed by screen-space
+     refraction, absorption, Fresnel reflection, restrained animated ripples, and shoreline foam.
+     It uses a **hydrologically
      correct water surface**, not a flat cut through the heightmap:
      - **Lakes** (**FLOW** on) fill each closed basin to its own **spill level** via a
        **priority-flood depression fill** (Barnes 2014) — flat lakes whose edges follow the basin
@@ -91,11 +93,11 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
      The water-surface normal is computed from that surface (flat in lakes, sloped along rivers). This
      is the same `priority_flood_fill` + `d8_accumulation` pair the reference-impl uses.
 
-  **Screen-space (deferred) compositing — the fullscreen-triangle technique.** On WebGL2 the water and
-  sky are drawn *without geometry*, the same way a skydome is rendered from one fullscreen triangle:
-  the terrain renders into an offscreen **colour + depth** G-buffer, then a single fullscreen triangle
-  reconstructs each pixel's world position from the depth texture and composites analytically —
-  **sky** on the background, and **water** by sampling the water-height texture. Because it has the
+  **Surface-aware deferred compositing.** On WebGL2 the terrain first renders into an offscreen
+  **colour + depth** G-buffer. The hydrological surface is then rasterized into a separate
+  **water-mask + water-depth** layer, after copying terrain depth so only genuinely visible fluid wins.
+  A fullscreen triangle reconstructs both the lakebed and the actual fluid-plane world positions and
+  composites **sky** and **water** analytically. Because it has the
   depth buffer and the terrain colour, the water gets **refraction** (the lakebed sampled with a
   normal-based offset), **Beer–Lambert depth absorption** from the real view-ray thickness, a
   **Fresnel** sky reflection, sun glint and soft foam — quality a forward transparent plane can't
@@ -114,7 +116,7 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
@@ -123,17 +125,18 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
 | **Output** | Output (drives the viewport / export) |
 
-**Water, snow and colour are nodes, not global switches.** Add and wire them into the pipeline; for example,
+**Water extent, snow and colour are nodes, not global switches.** Add and wire them into the pipeline; for example,
 `… → erosion → SatMap → Color Erosion → Weathering → Output`. The viewport picks up whichever effect nodes
 feed the Output. The **Water** node's **Mode** is either **Hydrology** (basin lakes + downhill rivers) or the
-simple **Sea level** (a flat ocean at a level). **Ripple strength**, **Ripple scale**, and **Ripple speed**
-animate crossing wave trains in the water normal, which moves reflection, refraction, and highlights without
-changing the hydrological water surface or terrain height. Effect nodes pass height through unchanged and add
+simple **Sea level** (a flat ocean at a level). Wave pattern, strength, scale, speed, and refraction are
+**global renderer settings** in the viewport's Water Surface flyout: they describe how every fluid surface
+is viewed, not where water exists. Waves are sampled at the reconstructed water-plane world position—not the
+terrain/lakebed position—so motion cannot look glued to the heightmap. Effect nodes pass height through unchanged and add
 or transform a separate scene/colour stream, so deleting one removes just that effect.
 
 The default terrain ships with the full surface graph already wired:
 `Thermal → SatMap → Color Erosion → Weathering → Snow → Water → Output`, plus
-`Thermal → Deposits → Color Erosion.Sediment`. The default Water node enables subtle animated ripples.
+`Thermal → Deposits → Color Erosion.Sediment`. The renderer supplies subtle animated ripples globally.
 
 **Art direction — Shape masks and the universal Mask input.** A procedural graph that only generates
 *everywhere* can't be directed, so two things make it placeable, mirroring Gaea (where "almost every
@@ -562,21 +565,45 @@ adding directional light or indiscriminate RGB noise to the exported albedo.
 
 ## Controls
 
-- Use **⬍** in the top bar to switch to the stacked layout (rendering above graph); the choice persists.
+- The stacked vertical layout—rendering above the graph—is the first-run default. Use **⬌/⬍** in the
+  top bar to switch between stacked and side layouts; an explicit choice persists.
 - Use **⛶** in the rendering or <kbd>Shift</kbd>+<kbd>F</kbd> for rendering fullscreen.
 - **Output / Selected** moves the viewport display flag between the final Output and the selected
   intermediate node. **Plan / Hero** switches between top-down inspection and the perspective camera.
-- Choose **Realistic / Clay / Albedo / Slope / Normals** in the viewport render-style selector. The lower-left
-  render panel controls sun azimuth, elevation, exposure, and atmospheric haze.
-- The **Water** node owns shoreline and surface-material authoring. **Shore smoothing** filters only
+- The rendering stays visually quiet: a compact right-side **icon rail** owns preview, camera,
+  display, lighting, global water rendering, help, and fullscreen. Flyouts are mutually exclusive;
+  the persistent gesture banner and large look-development panel no longer cover the terrain.
+- The top bar keeps only frequent work visible: **Auto**, **Build**, history, import/export, and layout.
+  The **Build profile** popover owns resolution/quality/GPU/Res Lock, while the searchable
+  **Commands** menu (<kbd>Ctrl/Cmd</kbd>+<kbd>K</kbd>) holds graph locators, organization, toolbox,
+  fullscreen, theme, and other occasional actions. This keeps the toolbar extensible at narrow widths.
+- Choose **Realistic / Clay / Albedo / Slope / Normals** in the Display flyout. The Lighting flyout
+  controls sun azimuth, elevation, exposure, and atmospheric haze.
+- The **Water** node owns fluid extent and shoreline authoring. **Shore smoothing** filters only
   the signed-depth coverage used for rendering, preserving terrain and hydrology data; **Shore foam**
-  controls the transition band. Choose **Cross ripples**, **Wind waves**, **Interference rings**, or
-  **None**, then tune Pattern strength, scale, and speed.
+  controls the transition band. The viewport's global **Water Surface** flyout chooses **Cross ripples**,
+  **Wind waves**, **Interference rings**, or **None**, then controls strength, scale, speed, and refraction
+  for every Water node.
 - Undo/redo with the toolbar buttons or <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> /
   <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>.
-- **Double-click** empty canvas (or **＋ Add node**) to add a node.
+- Open **＋ Nodes** inside the graph view for the searchable, category-grouped node toolbox. Clicking
+  a toolbox item places it in the visible graph area and keeps the toolbox open for building a chain.
+  **Double-click** empty canvas still opens the compact add-node menu at that exact position.
+- **Right-click the graph** for **Organize all**, **Frame all**, Add-at-cursor, and the node toolbox.
+  Right-click a node to organize its **connected branch**, only its **upstream** inputs, or only its
+  **downstream** dependants; the same menu can frame the branch, preview, duplicate, or delete it.
+  Organization uses a deterministic layered DAG layout with crossing-reduction passes, preserves
+  disconnected graph islands, is undoable, and never evaluates or dirties terrain data.
 - Drag a node's **right port** into another node's **left port** to wire them (cycles are rejected).
-- Click a node to edit its parameters on the right; **Duplicate** / **Delete** or press <kbd>Del</kbd>.
+- Connections are first-class selections: click near a curve using its generous hit area to inspect
+  its source, destination port, live field range, and state. A selected link gets a high-contrast
+  stroke and a visible **×** handle; remove it with that handle, <kbd>Del</kbd>, the Properties panel,
+  or its right-click menu. Right-clicking a connected input port opens the same menu, which keeps
+  even very short links easy to reach. Connections can also be **Muted** without deleting them. Mask connections
+  additionally report coverage and restate the `0 = bypass, 1 = apply` contract. Blend behavior stays
+  explicit in Blend / Color Blend / Color Mixer nodes rather than becoming hidden edge processing.
+- Click a node to edit its parameters on the right; **Duplicate** / **Delete**, press
+  <kbd>Ctrl/Cmd</kbd>+<kbd>D</kbd>, or press <kbd>Del</kbd>.
   Deleting a mid-chain node **auto-bridges** its neighbours (its input source reconnects to its outputs)
   when the input is unambiguous, so the pipeline stays connected.
 - Pan with **middle-drag** / space-drag / empty-drag; **wheel** to zoom the graph.
@@ -721,16 +748,18 @@ cell-unit experiments.
 The **CPU kernels remain the reference implementation**. On top of them there is an optional GPU path
 (the **GPU** button in the toolbar) that runs the heavy, embarrassingly-parallel kernels as fragment
 shaders over a fullscreen triangle into `RGBA32F` ping-pong render targets — the same technique as the
-deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Ridged MF**, **Warp**, **thermal
+deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Simplex fBm**, **Ridged MF**, **Warp**, **thermal
 erosion**, and the default **Hydraulic erosion** engine.
 
 It produces the *same* terrain as the CPU because the 32-bit integer hash is reproduced exactly in GLSL
 `uint` (the CPU hash now uses `Math.imul`; plain `*` silently rounded past 2⁵³). `_verify_gpu.js` is the
-parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 1.1e-4 (ridged), 4.8e-7 (thermal)**, i.e. float32
+parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 4.1e-5 (Simplex), 1.1e-4 (ridged), 4.8e-7 (thermal)**, i.e. float32
 -vs-float64 rounding, not algorithmic drift.
 
-This is what makes **512² and 1024²** practical: a 1024² build is 1,048,576 cells / 2.09M triangles.
-Selecting ≥512² switches **Auto** off so you drive it with **Build**.
+The studio opens at **512²**. The build profile also exposes **1024², 2048², and 4096²** targets; selecting
+1024² or above queues the new target and switches **Auto** off so the existing viewport remains usable until
+an explicit **Build**. A 1024² build is already 1,048,576 cells / 2.09M triangles, so 2K/4K are deliberately
+treated as intentional build operations rather than live slider resolutions.
 
 Thermal runs as **two passes** — one memoising each cell's `(move, sum)`, one redistributing — because the
 obvious single-pass version recomputes every neighbour's `moveSum` (72 texture fetches per cell vs ~27).
@@ -768,7 +797,13 @@ node _verify_tectonic.js             # Voronoi plates: warped boundaries, orogen
 node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU parity, GPU hydraulic invariants + timings
+node _verify_simplex.js              # Simplex determinism, Perlin distinction, transform + GPU parity
+node _verify_toolbar.js              # build profile, 512 default, queued 2K/4K, commands, responsive widths
 node _verify_workflow.js             # layouts, fullscreen, selected preview, undo/redo, 1024² smoke
+node _verify_viewport_ui.js          # quiet icon rail, exclusive flyouts, responsive viewport controls
+node _verify_toolbox.js              # graph-owned categorized node toolbox, search, placement, quick menu
+node _verify_organize.js             # deterministic graph layout, branch scopes, context actions, no rebuild
+node _verify_edges.js                # selectable/mutable links, hit target, removal paths, mask contract
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths
 node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² / 768²
@@ -779,6 +814,8 @@ node _verify_satpicker.js            # visual LUT-strip library + graph-bound se
 node _verify_colormixer.js           # dynamic 2–15 layer stack, ordering, modes, opacity
 node _verify_satgen.js               # SatMap Studio extraction + LUT build
 node _verify_render.js               # colour pipeline, PBR/data views, exposure, image contrast
+node _verify_snow.js                 # Amount=1 snowy-world framebuffer coverage
+node _verify_water_surface.js        # global waves/refraction + rasterized fluid-surface depth layer
 node _verify_zoom.js                 # cursor-focused deep zoom, pivot pan, clipping, frame reset
 node _verify_colorfx.js              # SatMap -> Color Erosion -> Weathering node semantics
 node _verify_realtime.js             # coalesced live edits + colour/water/height buffer invalidation
