@@ -270,6 +270,11 @@ select.inp{appearance:none}
 .seg button{flex:1;height:26px;padding:0 4px;background:none;border:none;color:var(--muted);
   font-size:10.5px;cursor:pointer;white-space:nowrap}
 .seg button.on{background:var(--panel3);color:var(--accent)}
+.seg.tabs{border-color:var(--line2);padding:2px;gap:2px;background:var(--bg2)}
+.seg.tabs button{height:29px;border-radius:4px}.seg.tabs button.on{background:var(--panel3);box-shadow:0 1px 3px rgba(0,0,0,.22)}
+.param-group-title{display:flex;align-items:center;gap:7px;margin:15px 0 2px;color:var(--faint);
+  font:600 9px var(--mono);letter-spacing:.7px;text-transform:uppercase}
+.param-group-title::after{content:"";height:1px;flex:1;background:var(--line)}
 .hint{font-size:11px;color:var(--faint);line-height:1.5;margin-top:4px}
 .prop-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
 .edge-summary{margin:8px 0 13px;padding:10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
@@ -362,6 +367,34 @@ select.sg-btn{appearance:auto}
 .sg-help b{color:var(--muted);font-weight:600}
 .sg-mono{font-family:var(--mono);font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 .sg-mini{height:20px;padding:0 8px;font-size:10px}
+
+/* -- Draw Mask: resolution-independent vector painting in terrain space -- */
+.draw-editor[hidden]{display:none}
+.draw-editor{position:fixed;inset:0;z-index:92;display:grid;place-items:center;padding:22px;
+  background:rgba(4,7,11,.76);backdrop-filter:blur(8px)}
+.draw-shell{width:min(1040px,calc(100vw - 44px));height:min(780px,calc(100vh - 44px));display:flex;flex-direction:column;
+  overflow:hidden;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 30px 90px rgba(0,0,0,.65)}
+.draw-head{height:52px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
+.draw-head-copy{display:flex;flex-direction:column;gap:2px}.draw-head-copy b{font-size:13px}.draw-head-copy small{font-size:10px;color:var(--muted)}
+.draw-spacer{flex:1}
+.draw-work{flex:1;min-height:0;display:grid;grid-template-columns:210px minmax(0,1fr)}
+.draw-tools{display:flex;flex-direction:column;gap:12px;padding:14px;border-right:1px solid var(--line);background:var(--bg2);overflow:auto}
+.draw-tools .field{margin:0}.draw-tools .seg{width:100%}.draw-tools .seg button{flex:1}
+.draw-tool-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.draw-tool-actions .btn{justify-content:center}
+.draw-help{margin-top:auto;padding:10px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:10.5px;line-height:1.5;background:var(--panel)}
+.draw-stage{position:relative;min-width:0;min-height:0;display:grid;place-items:center;padding:18px;
+  background-color:#090d12;background-image:linear-gradient(rgba(93,120,150,.08) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(93,120,150,.08) 1px,transparent 1px);background-size:32px 32px}
+#drawCanvas{display:block;max-width:100%;max-height:100%;aspect-ratio:1;border:1px solid var(--line2);border-radius:5px;
+  box-shadow:0 14px 40px rgba(0,0,0,.45);cursor:crosshair;touch-action:none;background:#111}
+.draw-stage-label{position:absolute;left:28px;bottom:25px;padding:4px 7px;border-radius:4px;background:rgba(8,12,17,.76);
+  color:#a9bdd1;font:9px var(--mono);pointer-events:none}
+.draw-empty{position:absolute;top:27px;right:28px;padding:4px 7px;border-radius:4px;background:rgba(8,12,17,.76);
+  color:var(--muted);font:9px var(--mono);pointer-events:none}
+@media(max-width:720px){.draw-editor{padding:8px}.draw-shell{width:100%;height:100%}.draw-work{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .draw-tools{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .draw-help{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -612,6 +645,43 @@ select.sg-btn{appearance:auto}
     <button class="btn sg-mini" id="sgResetAdj">reset</button>
     <span class="sg-spacer"></span>
     <span class="sg-help" style="margin:0">Drag stops = elevation · click the bar to add · click a stop then pick its colour</span>
+  </div>
+</div>
+
+<div class="draw-editor" id="drawEditor" role="dialog" aria-modal="true" aria-labelledby="drawTitle" hidden>
+  <div class="draw-shell">
+    <header class="draw-head">
+      <div class="draw-head-copy"><b id="drawTitle">Draw Mask</b><small>Paint editable paths and regions directly over the terrain</small></div>
+      <span class="draw-spacer"></span>
+      <button class="btn" id="drawCancel" type="button">Close</button>
+      <button class="btn primary" id="drawDone" type="button">Done</button>
+    </header>
+    <div class="draw-work">
+      <aside class="draw-tools">
+        <div class="field"><div class="frow"><label>Brush mode</label></div>
+          <div class="seg tabs" id="drawMode" role="tablist">
+            <button type="button" data-v="add" class="on" aria-selected="true">Draw</button>
+            <button type="button" data-v="erase" aria-selected="false">Erase</button>
+          </div>
+        </div>
+        <div class="field"><div class="frow"><label for="drawWidth">Width</label><span class="val" id="drawWidthVal">4.0%</span></div>
+          <input type="range" id="drawWidth" min="0.003" max="0.25" step="0.001" value="0.04"></div>
+        <div class="field"><div class="frow"><label for="drawHardness">Hardness</label><span class="val" id="drawHardnessVal">70%</span></div>
+          <input type="range" id="drawHardness" min="0" max="1" step="0.01" value="0.7"></div>
+        <div class="field"><div class="frow"><label for="drawOpacity">Opacity</label><span class="val" id="drawOpacityVal">100%</span></div>
+          <input type="range" id="drawOpacity" min="0.01" max="1" step="0.01" value="1"></div>
+        <div class="draw-tool-actions">
+          <button class="btn" id="drawUndoStroke" type="button" title="Remove the most recent stroke">↶ Stroke</button>
+          <button class="btn" id="drawClear" type="button" title="Remove all strokes">Clear</button>
+        </div>
+        <div class="draw-help"><b>Road workflow</b><br>Draw a centreline, then connect this node to a Sculpt Mask input. Use Flatten or Smooth for the road bed, and Blur this mask for softer shoulders.</div>
+      </aside>
+      <div class="draw-stage">
+        <canvas id="drawCanvas" width="768" height="768" aria-label="Terrain mask drawing canvas"></canvas>
+        <div class="draw-stage-label">terrain space · vector strokes · resolution independent</div>
+        <div class="draw-empty" id="drawStrokeCount">0 strokes</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1078,6 +1148,63 @@ function shapeField(p){
     o[y*n+x]=smooth(clamp((fall*0.5-d)/(fall||1e-6),0,1));         // SDF -> soft coverage
   }
   return p.invert==="on"?invertField(o):o;
+}
+function pointSegmentDistance(px,py,ax,ay,bx,by){
+  const vx=bx-ax,vy=by-ay,den=vx*vx+vy*vy;
+  const t=den>1e-12?clamp(((px-ax)*vx+(py-ay)*vy)/den,0,1):0;
+  return Math.hypot(px-(ax+vx*t),py-(ay+vy*t));
+}
+// Vector brush strokes stay in normalised terrain coordinates, so an artist-authored road mask
+// survives every working/build resolution. Strokes alpha-composite in order; Erase is destructive
+// only inside this node and remains fully undoable/serialisable with the graph.
+function drawMaskField(p){
+  const n=RES,N=n*n,out=new Float32Array(N),strokes=Array.isArray(p.strokes)?p.strokes:[];
+  for(const stroke of strokes){
+    const pts=stroke.points||[];if(!pts.length)continue;
+    const radius=Math.max(.0005,(stroke.width||.04)*.5),hard=clamp(stroke.hardness==null?.7:stroke.hardness,0,1);
+    const inner=radius*hard,opacity=clamp(stroke.opacity==null?1:stroke.opacity,0,1),erase=stroke.mode==="erase";
+    const coverage=d=>d>=radius?0:hard>=.999?1:1-smooth(clamp((d-inner)/Math.max(radius-inner,1e-6),0,1));
+    const composite=(i,c)=>{const a=c*opacity;if(a>0)out[i]=erase?out[i]*(1-a):out[i]+(1-out[i])*a;};
+    if(XF){
+      // An exact Transform can move any painted segment across the tile. Scan output cells once
+      // per stroke and find the nearest segment; this avoids a 64 MB Float32 coverage raster at 4K.
+      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+        const u=xfU((x+.5)/n,(y+.5)/n),v=xfV((x+.5)/n,(y+.5)/n);let d=Infinity;
+        if(pts.length===1)d=Math.hypot(u-pts[0][0],v-pts[0][1]);
+        else for(let q=1;q<pts.length;q++)d=Math.min(d,pointSegmentDistance(u,v,pts[q-1][0],pts[q-1][1],pts[q][0],pts[q][1]));
+        composite(y*n+x,coverage(d));
+      }
+      continue;
+    }
+    let minU=pts[0][0],maxU=minU,minV=pts[0][1],maxV=minV;
+    for(const q of pts){minU=Math.min(minU,q[0]);maxU=Math.max(maxU,q[0]);minV=Math.min(minV,q[1]);maxV=Math.max(maxV,q[1]);}
+    const bx0=clamp(Math.floor((minU-radius)*n),0,n-1),bx1=clamp(Math.ceil((maxU+radius)*n),0,n-1);
+    const by0=clamp(Math.floor((minV-radius)*n),0,n-1),by1=clamp(Math.ceil((maxV+radius)*n),0,n-1);
+    const bw=bx1-bx0+1,bh=by1-by0+1,cov=new Uint8Array(bw*bh);
+    const segment=(a,b)=>{
+      const x0=clamp(Math.floor((Math.min(a[0],b[0])-radius)*n),bx0,bx1),x1=clamp(Math.ceil((Math.max(a[0],b[0])+radius)*n),bx0,bx1);
+      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)*n),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)*n),by0,by1);
+      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+        const c=Math.round(coverage(pointSegmentDistance((x+.5)/n,(y+.5)/n,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
+        if(c>cov[i])cov[i]=c;}
+    };
+    if(pts.length===1)segment(pts[0],pts[0]);else for(let i=1;i<pts.length;i++)segment(pts[i-1],pts[i]);
+    for(let y=by0;y<=by1;y++)for(let x=bx0;x<=bx1;x++)composite(y*n+x,cov[(y-by0)*bw+x-bx0]/255);
+  }
+  return out;
+}
+function sculptField(inp,p){
+  const o=new Float32Array(inp.length),strength=clamp(p.strength==null?1:p.strength,0,1);
+  let smoothed=null;if(p.mode==="smooth")smoothed=blurField(inp,{radius:Math.max(1,Math.round(p.radius*resScale()))});
+  for(let i=0;i<o.length;i++){
+    let target=inp[i];
+    if(p.mode==="raise")target=inp[i]+p.amount;
+    else if(p.mode==="lower")target=inp[i]-p.amount;
+    else if(p.mode==="flatten")target=p.target;
+    else if(smoothed)target=smoothed[i];
+    o[i]=lerp(inp[i],target,strength);
+  }
+  return o;
 }
 // Universal MASK rule (Gaea: "connect a mask to a node and it is applied only within the masked
 // area"). Applied as a POST-PROCESS lerp, so changing the mask never re-runs the effect.
@@ -1990,10 +2117,15 @@ const P={
   int:(key,label,min,max,def)=>({key,label,type:"slider",min,max,def,step:1,fmt:v=>v|0}),
   select:(key,label,opts,def)=>({key,label,type:"select",opts,def}),
   seg:(key,label,opts,def)=>({key,label,type:"seg",opts,def}),
+  tabs:(key,label,opts,def)=>({key,label,type:"tabs",opts,def}),
   text:(key,label,def,rows=9)=>({key,label,type:"text",def,rows}),
   curve:(key,label,def)=>({key,label,type:"curve",def}),
   seed:(key,label,def)=>({key,label,type:"seed",def}),
 };
+// Conditional parameters are schema data: hidden values remain serialised and return unchanged when
+// their tab becomes active again. This keeps every node consistent instead of hard-coding UI cases.
+const WHEN=(param,key,...values)=>({...param,when:{key,values:values.flat()}});
+const GROUP=(param,name)=>({...param,group:name});
 const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
   mask:{c:"--cat-mask",name:"Mask"},data:{c:"--cat-data",name:"Data map"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};
@@ -2006,21 +2138,22 @@ const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combi
    whole field (histogram EQ) or has no closed form (an imported DEM), so it exists only as a raster
    and has to be resampled. Honest caveat: Ridged/Voronoi/Gradient self-normalise, a whole-field
    reduction — geometry is exact, but the value range is re-stretched over the new window. */
-const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","constant",
+const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","drawmask","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
 function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
 function exactChain(id,guard){
   guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
   const nd=nodeById(id);if(!nd||!EXACT_TYPES.has(nd.type))return false;
-  return nodeInputs(nd).every((_,s)=>{const e=inputEdge(id,s);return !e||exactChain(e.from,guard);});
+  const refs=TYPES[nd.type].referenceOnly||[];
+  return nodeInputs(nd).every((_,s)=>{if(refs.includes(s))return true;const e=inputEdge(id,s);return !e||exactChain(e.from,guard);});
 }
 // Re-evaluate a chain under the ambient XF. Deliberately does NOT write nd._field: the cached fields
 // are the untransformed ones other branches and the thumbnails still depend on.
 function evalExact(id,guard){
   if(!id||guard.has(id))return null;guard.add(id);
   const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
-  const def=TYPES[nd.type];
-  const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);return e?evalExact(e.from,guard):null;});
+  const def=TYPES[nd.type],refs=def.referenceOnly||[];
+  const ins=nodeInputs(nd).map((_,s)=>{if(refs.includes(s))return nd._reference||null;const e=inputEdge(id,s);return e?evalExact(e.from,guard):null;});
   let f;try{f=def.eval(nd.params,ins,nd);}catch(err){console.error("exact",nd.type,err);f=newField();}
   guard.delete(id);return f;
 }
@@ -2042,7 +2175,8 @@ const TYPES={
     params:[P.seed("seed","Seed",5),P.slider("freq","Cell density",2,16,6,0.5),P.seg("mode","Mode",[["f2f1","F2−F1"],["f1","F1"],["invf1","1−F1"]],"f2f1")],
     eval:(p)=>worleyField({seed:p.seed,freq:p.freq,mode:p.mode})},
   gradient:{cat:"gen",name:"Gradient",ins:[],desc:"Linear or radial ramp — a base slope or falloff.",
-    params:[P.seg("kind","Kind",[["lin","Linear"],["rad","Radial"]],"lin"),P.slider("angle","Angle",0,360,35,1,v=>v|0)],
+    params:[P.tabs("kind","Kind",[["lin","Linear"],["rad","Radial"]],"lin"),
+      WHEN(P.slider("angle","Angle",0,360,35,1,v=>v|0),"kind","lin")],
     eval:(p)=>p.kind==="rad"?radialField():gradientField(p.angle)},
   shape:{cat:"gen",name:"Shape",ins:[],desc:"An SDF placement mask — circle/box/line positioned in the terrain, with a soft edge. Wire it into any node's Mask input to confine that effect, or erode it directly into a landform (Gaea's Mask-as-Primitive).",
     params:[P.seg("kind","Kind",[["circle","Circle"],["box","Box"],["line","Line"]],"circle"),
@@ -2052,9 +2186,12 @@ const TYPES={
       P.slider("falloff","Falloff",0,1,0.25),
       P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
     eval:(p)=>shapeField(p)},
+  drawmask:{cat:"mask",name:"Draw Mask",ins:["Reference"],referenceOnly:[0],desc:"Paint resolution-independent roads, corridors, and regions as editable vector brush strokes. The optional Reference input is shown beneath the drawing; the output is a reusable mask.",
+    params:[],eval:(p,ins,nd)=>{nd._reference=ins[0]||null;return drawMaskField(p);},
+    note:"Draw Mask outputs a regular 0–1 field, so it can drive any Mask input. For a road, connect the pre-road terrain to <b>Reference</b>, draw the corridor, then wire the mask into <b>Sculpt</b> (Smooth/Flatten/Lower), Blur, Blend, or Stamp. Strokes are vectors in terrain space rather than pixels, so 512² authoring survives a 4K build."},
   mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A cellular geological primitive: Mountain creates a hero landform from distorted, modulated Voronoi structure; Mountain range creates a broader multi-crest base. Five mountain types change the generating geometry as well as its weathering.",
-    params:[P.seg("form","Landform",[["peak","Mountain"],["massif","Mountain range"]],"peak"),
-      P.seg("shape","Shape family",[["dominant","Dominant peak"],["compound","Compound peaks"],["ridge","Ridgeline"],["broad","Broad dome"]],"compound"),
+    params:[P.tabs("form","Landform",[["peak","Mountain"],["massif","Mountain range"]],"peak"),
+      WHEN(P.seg("shape","Shape family",[["dominant","Dominant peak"],["compound","Compound peaks"],["ridge","Ridgeline"],["broad","Broad dome"]],"compound"),"form","peak"),
       P.seg("style","Mountain type",[["basic","Basic"],["eroded","Eroded"],["old","Old"],["alpine","Alpine"],["strata","Strata"]],"eroded"),
       P.seed("seed","Seed",7),
       P.slider("x","Position X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
@@ -2063,7 +2200,7 @@ const TYPES={
       P.slider("height","Peak height",0.1,2,0.72,0.01,v=>Math.round(v*terrainDef.height)+" m"),
       P.seg("bulk","Bulk",[["low","Low"],["medium","Medium"],["high","High"]],"medium"),
       P.slider("angle","Trend",0,180,25,1,v=>(v|0)+"\u00b0"),
-      P.int("ridges","Massif crests",1,5,2),
+      WHEN(P.int("ridges","Massif crests",1,5,2),"form","massif"),
       P.slider("detail","Drainage detail",0.4,3.5,2.6,0.1,v=>v.toFixed(1)+"\u00d7"),
       P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("relief","Valley depth",0.1,0.95,0.80,0.01),
@@ -2159,11 +2296,19 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   blur:{cat:"filt",name:"Blur",ins:["In","Mask"],desc:"Separable Gaussian smoothing.",
     params:[P.slider("radius","Radius",1,10,2,1,v=>v|0)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],blurField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}),ins[1]):newField()},
+  sculpt:{cat:"filt",name:"Sculpt",ins:["In","Mask"],desc:"Merge a masked Raise, Lower, Flatten, or Smooth operation into the incoming terrain. Pair it with Draw Mask for roads and authored regions.",
+    params:[P.tabs("mode","Tool",[["raise","Raise"],["lower","Lower"],["flatten","Flatten"],["smooth","Smooth"]],"smooth"),
+      WHEN(P.slider("amount","Height",0,.25,.03,.002,v=>Math.round(v*terrainDef.height)+" m"),"mode","raise","lower"),
+      WHEN(P.slider("target","Target height",0,1,.35,.01,v=>Math.round(v*terrainDef.height)+" m"),"mode","flatten"),
+      WHEN(P.slider("radius","Smooth radius",1,16,4,1,v=>v|0),"mode","smooth"),
+      P.slider("strength","Strength",0,1,1,.01)],
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],sculptField(ins[0],p),ins[1]):newField(),
+    note:"This is a non-destructive merge modifier: <b>In</b> is the base terrain, <b>Mask</b> is the authored region, and the selected tool is blended back by Strength. Raise/Lower use a height delta, Flatten approaches one elevation, and Smooth merges a blurred copy only inside the mask."},
   clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
     params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
     eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
   transform:{cat:"filt",name:"Transform",ins:["In","Mask"],desc:"Translate, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",
-    params:[P.seg("mode","Sampling",[["auto","Exact"],["raster","Raster"]],"auto"),
+    params:[P.tabs("mode","Sampling",[["auto","Exact"],["raster","Raster"]],"auto"),
       P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("aspect","Scale Y",0.25,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
       P.slider("angle","Rotation",0,360,0,1,v=>(v|0)+"\u00b0"),
@@ -2171,7 +2316,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.slider("offY","Move Y",-1,1,0,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("pivX","Pivot X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
       P.slider("pivY","Pivot Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.seg("edge","Edges",[["clamp","Clamp"],["wrap","Wrap"],["mirror","Mirror"]],"clamp")],
+      WHEN(P.seg("edge","Edges",[["clamp","Clamp"],["wrap","Wrap"],["mirror","Mirror"]],"clamp"),"mode","raster")],
     // PLACE BEFORE YOU SAMPLE. If everything upstream is procedural, push this placement down into
     // the generators' coordinates and re-evaluate — exact, and the terrain simply continues past the
     // old tile edge instead of clamping. Otherwise fall back to resampling the finished raster.
@@ -2195,9 +2340,9 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In","Mask"],desc:"Talus: material above repose slides down.",
-    params:[P.seg("realScale","Real Scale",[["off","Off"],["on","On"]],"off"),
-      P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),
-      P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
+    params:[P.tabs("realScale","Units",[["off","Cell units"],["on","Real scale"]],"off"),
+      WHEN(P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),"realScale","on"),
+      WHEN(P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),"realScale","off"),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     // Real Scale ON: `repose` is a true angle, so the per-cell drop is tan(angle) * cellSize / height
@@ -2223,10 +2368,12 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
        uplift:ins[1]||null, Ddt:p.hillslope*0.24}),ins[2]):newField(),
     note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades.<br><br>The shipped defaults are set against <b>real SRTM data</b>, not by eye: driven by a Tectonic uplift they reproduce a real tile's slope distribution to within about one unit at every percentile (p90 9.9 vs 9.3, p99 16.0 vs 15.7, max 24.2 vs 22.8)."},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"GPU virtual-pipe flow or CPU droplets — carves valleys and transports sediment.",
-    params:[P.seg("engine","Engine",[["auto","GPU pipes"],["droplets","CPU droplets"]],"auto"),
-      P.int("pipeIters","Pipe iterations",8,120,48),P.int("droplets","CPU droplets",2000,60000,18000),
+    params:[P.tabs("engine","Engine",[["auto","GPU pipes"],["droplets","CPU droplets"]],"auto"),
+      WHEN(P.int("pipeIters","Pipe iterations",8,120,48),"engine","auto"),
+      WHEN(P.int("droplets","CPU droplets",2000,60000,18000),"engine","droplets"),
       P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
-      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),P.seed("seed","Seed",1),
+      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),
+      WHEN(P.seed("seed","Seed",1),"engine","droplets"),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     const usePipes=p.engine!=="droplets"&&gpuReady();
@@ -2269,13 +2416,18 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.slider("slopeW","Slope",0,1,0.5),P.slider("soilW","Soil",0,1,0.3),P.slider("flowW","Flow",0,1,0.2)],
     eval:(p,ins)=>ins[0]?textureField(ins[0],p):newField()},
 
-  water:{cat:"effect",name:"Water",ins:["In"],desc:"Adds a separate fluid surface to the scene. Hydrology fills basins and routes rivers; Sea adds a flat level. Filtered signed-depth coverage smooths the rendered shoreline without blurring terrain or changing water depth.",
+  water:{cat:"effect",name:"Water",ins:["In"],desc:"Defines where fluid exists. Hydrology fills selected basins and routes a configurable river network; Sea adds one flat level. Waves and refraction are global renderer settings.",
     passthrough:true,effect:"water",
-    params:[P.seg("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
-      P.slider("level","Sea level",0,0.6,0.12),P.slider("flow","River flow",0,1,0.5),
-      P.slider("shoreSmooth","Shore smoothing",0,2.5,1.35,.05),
-      P.slider("foam","Shore foam",0,1,.18,.01)],
-    eval:(p,ins)=>ins[0]||newField()},
+    params:[P.tabs("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
+      WHEN(GROUP(P.seg("lakes","Lakes",[["on","On"],["off","Off"]],"on"),"Hydrology"),"mode","hydro"),
+      WHEN(GROUP(P.slider("lakeMin","Minimum lake depth",0,.03,.001,.0005,v=>Math.round(v*terrainDef.height)+" m"),"Hydrology"),"mode","hydro"),
+      WHEN(GROUP(P.slider("flow","River network",0,1,.5,.01),"Hydrology"),"mode","hydro"),
+      WHEN(GROUP(P.slider("riverDepth","River depth",0,1,.7,.01),"Hydrology"),"mode","hydro"),
+      WHEN(GROUP(P.slider("level","Sea level",0,0.6,0.12,.01,v=>Math.round(v*terrainDef.height)+" m"),"Sea"),"mode","sea"),
+      GROUP(P.slider("shoreSmooth","Shore smoothing",0,2.5,1.35,.05),"Shoreline"),
+      GROUP(P.slider("foam","Shore foam",0,1,.18,.01),"Shoreline")],
+    eval:(p,ins)=>ins[0]||newField(),
+    note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br><b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
   snow:{cat:"effect",name:"Snow",ins:["In"],desc:"Snow accumulation coverage. Low values dust high ground; 1.0 creates a snowy world while leaving only near-vertical rock faces exposed.",
     passthrough:true,effect:"snow",
     params:[P.slider("amount","Amount",0,1,0.5)],
@@ -2402,6 +2554,7 @@ function makeNode(type,x,y){
     nd._inputs=["Layer 1","Layer 2","Layer 3"];
     nd.params.layers=[{opacity:1,blend:"normal"},{opacity:1,blend:"normal"},{opacity:1,blend:"normal"}];
   }
+  if(type==="drawmask")nd.params.strokes=[];
   if("seed"in p)p.seed=randomSeed();
   nodes.push(nd);return nd;
 }
@@ -2474,7 +2627,7 @@ function evalGraph(){
   $("#statOut").textContent=out?TYPES[out.type].name:"—";
   $("#statRange").textContent=outF?rng[0].toFixed(2)+" – "+rng[1].toFixed(2):"—";
   setStat(out?"ok":"warn",out?"Graph evaluated · "+evals+" nodes":"Add an Output node");
-  drawGraph();
+  drawGraph();if(drawTarget&&!$("#drawEditor").hidden){drawBaseField=null;renderDrawEditor();}
 }
 function requestEval(){
   if(!AUTO){drawGraph();return;}
@@ -3015,7 +3168,14 @@ function buildProps(){
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
-  def.params.forEach(pr=>body.appendChild(buildField(pr)));
+  // Graphs saved by older Studio versions (and concise hand-authored defaults) may not carry
+  // parameters introduced later. Hydrate them from the schema before formatting or evaluating.
+  def.params.forEach(pr=>{if(!(pr.key in selected.params))selected.params[pr.key]=cloneParams(pr.def);});
+  let lastGroup=null;
+  def.params.filter(pr=>paramVisible(pr,selected.params)).forEach(pr=>{
+    if(pr.group&&pr.group!==lastGroup){const h=document.createElement("div");h.className="param-group-title";h.textContent=pr.group;body.appendChild(h);}
+    body.appendChild(buildField(pr));lastGroup=pr.group||null;
+  });
   if(selected.type==="colormixer")buildColorMixerProps(body);
   if(selected.type==="satmap"){
     const tools=document.createElement("div");tools.className="prop-actions";tools.style.margin="2px 0 8px";
@@ -3025,6 +3185,13 @@ function buildProps(){
     const studio=document.createElement("button");studio.type="button";studio.className="btn";
     studio.textContent="Open SatMap Studio…";studio.title="Create or edit a SatMap LUT";studio.onclick=()=>$("#satGenBtn").click();
     tools.append(random,studio);body.appendChild(tools);
+  }
+  if(selected.type==="drawmask"){
+    const tools=document.createElement("div");tools.className="prop-actions";tools.style.margin="2px 0 8px";
+    const edit=document.createElement("button");edit.type="button";edit.className="btn primary";edit.style.flex="1";
+    edit.textContent="Draw on terrain…";edit.title="Open the plan-view vector mask editor";edit.onclick=()=>openDrawEditor(selected);
+    const count=document.createElement("span");count.className="hint";count.style.margin="0";count.textContent=(selected.params.strokes||[]).length+" strokes";
+    tools.append(edit,count);body.appendChild(tools);
   }
   const note=def.info?def.info(selected):def.note;
   if(note){const nt=document.createElement("div");nt.className="hint";
@@ -3041,6 +3208,14 @@ function buildProps(){
   const dup=document.createElement("button");dup.className="btn";dup.textContent="Duplicate";dup.onclick=duplicateSel;
   const del=document.createElement("button");del.className="btn";del.textContent="Delete";del.onclick=deleteSel;
   act.appendChild(dup);act.appendChild(del);body.appendChild(act);
+}
+function paramVisible(pr,values){
+  if(!pr.when)return true;
+  const clauses=Array.isArray(pr.when)?pr.when:[pr.when];
+  return clauses.every(c=>c.values.includes(values[c.key]));
+}
+function paramControlsVisibility(type,key){
+  return TYPES[type].params.some(pr=>pr.when&&(Array.isArray(pr.when)?pr.when:[pr.when]).some(c=>c.key===key));
 }
 function buildColorMixerProps(body){
   const nd=selected;if(!nd._inputs)nd._inputs=["Layer 1","Layer 2","Layer 3"];
@@ -3089,6 +3264,7 @@ function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
     (thermal reads its repose angle as a true angle). Gaea's defaults are 5000 m × 2600 m → 0.52.`;}
 function buildField(pr){
   const f=document.createElement("div");f.className="field";
+  f.dataset.paramKey=pr.key;
   if(pr.type==="slider"){
     const val=selected.params[pr.key];
     f.innerHTML=`<div class="frow"><label>${pr.label}</label><span class="val">${fmtVal(pr,val)}</span></div>`;
@@ -3110,7 +3286,8 @@ function buildField(pr){
     }
     const opts=pr.opts||((pr.key==="gradient")?Object.keys(SATMAPS).map(k=>[k,k]):[]);   // null opts -> live SatMap library
     const s=document.createElement("select");s.className="inp";opts.forEach(o=>{const op=document.createElement("option");op.value=o[0]||o;op.textContent=o[1]||o;s.appendChild(op);});
-    s.value=selected.params[pr.key];s.onchange=()=>{recordHistory();selected.params[pr.key]=s.value;markParamDirty(selected);requestEval();};f.appendChild(s);
+    s.value=selected.params[pr.key];s.onchange=()=>{const nd=selected;recordHistory();nd.params[pr.key]=s.value;markParamDirty(nd);
+      if(paramControlsVisibility(nd.type,pr.key))buildProps();requestEval();};f.appendChild(s);
   }else if(pr.type==="seed"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
     const wrap=document.createElement("div");wrap.style.cssText="display:flex;gap:6px";
@@ -3194,11 +3371,16 @@ function buildField(pr){
     ta.value=selected.params[pr.key];
     ta.onchange=()=>{recordHistory();selected.params[pr.key]=ta.value;markParamDirty(selected);requestEval();};
     f.appendChild(ta);
-  }else if(pr.type==="seg"){
+  }else if(pr.type==="seg"||pr.type==="tabs"){
     f.innerHTML=`<div class="frow"><label>${pr.label}</label></div>`;
-    const seg=document.createElement("div");seg.className="seg";
+    const seg=document.createElement("div");seg.className="seg"+(pr.type==="tabs"?" tabs":"");
+    if(pr.type==="tabs")seg.setAttribute("role","tablist");
     pr.opts.forEach(o=>{const b=document.createElement("button");b.textContent=o[1];if(selected.params[pr.key]===o[0])b.classList.add("on");
-      b.onclick=()=>{if(selected.params[pr.key]===o[0])return;recordHistory();selected.params[pr.key]=o[0];[...seg.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");markParamDirty(selected);requestEval();};seg.appendChild(b);});
+      if(pr.type==="tabs"){b.setAttribute("role","tab");b.setAttribute("aria-selected",selected.params[pr.key]===o[0]?"true":"false");}
+      b.onclick=()=>{const nd=selected;if(nd.params[pr.key]===o[0])return;recordHistory();nd.params[pr.key]=o[0];
+        [...seg.children].forEach(c=>{c.classList.remove("on");if(pr.type==="tabs")c.setAttribute("aria-selected","false");});
+        b.classList.add("on");if(pr.type==="tabs")b.setAttribute("aria-selected","true");markParamDirty(nd);
+        if(paramControlsVisibility(nd.type,pr.key))buildProps();requestEval();};seg.appendChild(b);});
     f.appendChild(seg);
   }
   return f;
@@ -3832,7 +4014,7 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
-let curField=null,curHgt=null,curFilled=null,curAccum=null,curGeomKey="",lastWaterSig="";
+let curField=null,curHgt=null,curFilled=null,curAccum=null,curWater=null,curGeomKey="",lastWaterSig="";
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
   const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;
@@ -3884,7 +4066,7 @@ function updateViewport(f,rootNode,options){
 // --- Priority-flood depression fill (Barnes, Lehman & Mulla 2014): every pit fills to the elevation of
 //     its lowest spill point on the basin rim -> filled-h is the standing-water depth, flat per basin. ---
 function priorityFloodFill(h){
-  const n=RES,N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),heap=[];
+  const n=RES,N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),heap=[],flatEpsilon=2e-7;
   const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;const t=heap[p];heap[p]=heap[c];heap[c]=t;c=p;}};
   const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+2-1,s=c;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===c)break;const t=heap[s];heap[s]=heap[c];heap[c]=t;c=s;}}return top;};
   const seed=(x,y)=>{const i=y*n+x;if(!done[i]){done[i]=1;filled[i]=h[i];push(h[i],i);}};
@@ -3893,7 +4075,11 @@ function priorityFloodFill(h){
   const nb=[[-1,0],[1,0],[0,-1],[0,1]];
   while(heap.length){const it=pop(),e=it[0],c=it[1],cy=(c/n)|0,cx=c-cy*n;
     for(const dd of nb){const xx=cx+dd[0],yy=cy+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(done[ni])continue;
-      done[ni]=1;const fv=Math.max(h[ni],e);filled[ni]=fv;push(fv,ni);}}
+      // Epsilon filling resolves otherwise perfectly flat depressions. The invisible monotonic
+      // gradient gives every flooded cell a route back to the spill point, so D8 accumulation
+      // crosses lake flats instead of terminating there. Across an entire 4K tile the maximum
+      // introduced rise is < 0.001 of normalized relief.
+      done[ni]=1;const fv=h[ni]<=e?e+flatEpsilon:h[ni];filled[ni]=fv;push(fv,ni);}}
   return filled;
 }
 // --- D8 flow accumulation on the (pit-free) filled DEM: drainage area per cell -> the river network. ---
@@ -3916,16 +4102,22 @@ function refreshWater(){
   const wn_=scene.water;                                  // params come from the Water effect node (null = no water)
   const hydroOn=wn_&&wn_.mode!=="sea",seaOn=wn_&&wn_.mode==="sea";
   const thr=(0.02-0.0194*((wn_&&wn_.flow)||0))*N;         // River flow param: high -> denser network (lower area threshold)
+  const lakesOn=hydroOn&&(!wn_||wn_.lakes!=="off"),lakeMin=wn_&&wn_.lakeMin!=null?wn_.lakeMin:.001;
+  const riverDepth=wn_&&wn_.riverDepth!=null?wn_.riverDepth:.7;
   const seaL=seaOn?wn_.level:-1;
   for(let i=0;i<N;i++){
     let w=h[i];
     if(hydroOn){
-      if(filled[i]>w)w=filled[i];                         // lake: stand water to the basin spill level
-      if(A[i]>thr){const film=Math.min(0.022,0.007+0.006*Math.log(A[i]/thr));if(h[i]+film>w)w=h[i]+film;} // river film, follows terrain
+      const lakeDepth=filled[i]-h[i];
+      if(lakesOn&&lakeDepth>lakeMin)w=filled[i];           // lake: stand water to the basin spill level
+      if(riverDepth>0&&A[i]>thr){
+        const film=Math.min(.002+.026*riverDepth,.001+.009*riverDepth+.005*riverDepth*Math.log(A[i]/thr));
+        if(h[i]+film>w)w=h[i]+film;}                       // river film follows the routed channel downhill
     }
     if(seaL>w)w=seaL;                                     // flat ocean at a level (Sea mode)
     W[i]=w;
   }
+  curWater=W;                                               // exposed to diagnostics and renderer tests
   const wn=new Float32Array(N*3);                          // normal of the WATER surface (0 gradient in lakes -> up)
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
     const wl=W[y*n+clamp(x-1,0,n-1)],wr=W[y*n+clamp(x+1,0,n-1)],wu=W[clamp(y-1,0,n-1)*n+x],wd=W[clamp(y+1,0,n-1)*n+x];
@@ -4086,6 +4278,111 @@ function hex3(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).j
    ===================================================================== */
 function setStat(kind,msg){$("#statMsg").textContent=msg;$("#statDot").style.background=kind==="ok"?css("--good"):kind==="warn"?css("--warn"):css("--bad");}
 let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1900);}
+
+/* =====================================================================
+   DRAW MASK EDITOR
+   Strokes are authored in normalized terrain coordinates, not viewport
+   pixels. The canvas is only a plan-view editor for the graph-native mask.
+   ===================================================================== */
+let drawTarget=null,drawActive=null,drawBefore=null;
+const drawBrush={mode:"add",width:.04,hardness:.7,opacity:1};
+const drawCanvas=$("#drawCanvas"),drawCtx=drawCanvas.getContext("2d"),drawOverlay=document.createElement("canvas"),drawBase=document.createElement("canvas"),drawTint=document.createElement("canvas");
+drawOverlay.width=drawBase.width=drawTint.width=drawCanvas.width;drawOverlay.height=drawBase.height=drawTint.height=drawCanvas.height;
+let drawBaseField=null,drawBaseResolution=0;
+function drawReferenceField(){
+  if(!drawTarget)return null;
+  return drawTarget._reference||curField||(outputNode()&&outputNode()._field)||null;
+}
+function paintStroke2D(ctx,stroke){
+  const pts=stroke.points||[];if(!pts.length)return;
+  const W=ctx.canvas.width,H=ctx.canvas.height,width=Math.max(1,(stroke.width||.04)*W);
+  const hard=clamp(stroke.hardness==null?.7:stroke.hardness,0,1),op=clamp(stroke.opacity==null?1:stroke.opacity,0,1);
+  ctx.save();ctx.globalCompositeOperation=stroke.mode==="erase"?"destination-out":"source-over";
+  ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="white";ctx.fillStyle="white";
+  const path=()=>{
+    ctx.beginPath();ctx.moveTo(pts[0][0]*W,pts[0][1]*H);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0]*W,pts[i][1]*H);
+    if(pts.length===1){ctx.arc(pts[0][0]*W,pts[0][1]*H,.01,0,Math.PI*2);ctx.fill();}else ctx.stroke();
+  };
+  // Layered preview approximates the evaluator's smooth radial falloff while staying responsive.
+  if(hard<.99){ctx.globalAlpha=op*(.14+.22*hard);ctx.lineWidth=width;path();}
+  ctx.globalAlpha=op;ctx.lineWidth=Math.max(1,width*Math.max(hard,.08));path();ctx.restore();
+}
+function renderDrawEditor(){
+  if(!drawTarget||$("#drawEditor").hidden)return;
+  const W=drawCanvas.width,H=drawCanvas.height,base=drawReferenceField();
+  if(drawBaseField!==base||drawBaseResolution!==RES){
+    const bx=drawBase.getContext("2d"),img=bx.createImageData(W,H),n=RES;
+    let mn=0,mx=1;if(base&&base.length){const r=fieldRange(base);mn=r[0];mx=r[1];}
+    const d=mx-mn||1;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const sx=Math.min(n-1,Math.floor(x/W*n)),sy=Math.min(n-1,Math.floor(y/H*n)),i=(y*W+x)*4;
+      const h=base&&base.length?(base[sy*n+sx]-mn)/d:0;
+      const hx=base&&base.length?(base[sy*n+Math.min(n-1,sx+1)]-base[sy*n+Math.max(0,sx-1)])/d:0;
+      const hy=base&&base.length?(base[Math.min(n-1,sy+1)*n+sx]-base[Math.max(0,sy-1)*n+sx])/d:0;
+      const shade=clamp(.22+h*.66+(hx+hy)*2.8,0,1),v=Math.round(shade*255);
+      img.data[i]=Math.round(v*.88);img.data[i+1]=Math.round(v*.94);img.data[i+2]=v;img.data[i+3]=255;
+    }
+    bx.putImageData(img,0,0);drawBaseField=base;drawBaseResolution=RES;
+  }
+  drawCtx.clearRect(0,0,W,H);drawCtx.drawImage(drawBase,0,0);
+  const ox=drawOverlay.getContext("2d");ox.clearRect(0,0,W,H);
+  (drawTarget.params.strokes||[]).forEach(s=>paintStroke2D(ox,s));
+  const mask=ox.getImageData(0,0,W,H),tx=drawTint.getContext("2d"),tint=tx.createImageData(W,H);
+  for(let i=0;i<mask.data.length;i+=4){const a=mask.data[i+3];tint.data[i]=28;tint.data[i+1]=210;tint.data[i+2]=230;tint.data[i+3]=Math.round(a*.72);}
+  tx.clearRect(0,0,W,H);tx.putImageData(tint,0,0);drawCtx.drawImage(drawTint,0,0);
+  const count=(drawTarget.params.strokes||[]).length;$("#drawStrokeCount").textContent=count+" stroke"+(count===1?"":"s");
+  $("#drawUndoStroke").disabled=!count;$("#drawClear").disabled=!count;
+}
+function syncDrawBrush(){
+  $("#drawWidth").value=drawBrush.width;$("#drawHardness").value=drawBrush.hardness;$("#drawOpacity").value=drawBrush.opacity;
+  $("#drawWidthVal").textContent=(drawBrush.width*100).toFixed(1)+"%";
+  $("#drawHardnessVal").textContent=Math.round(drawBrush.hardness*100)+"%";
+  $("#drawOpacityVal").textContent=Math.round(drawBrush.opacity*100)+"%";
+  document.querySelectorAll("#drawMode button").forEach(b=>{const on=b.dataset.v===drawBrush.mode;b.classList.toggle("on",on);b.setAttribute("aria-selected",on);});
+}
+function openDrawEditor(nd){
+  if(!nd||nd.type!=="drawmask")return;drawTarget=nd;
+  if(!Array.isArray(nd.params.strokes))nd.params.strokes=[];
+  drawBaseField=null;$("#drawEditor").hidden=false;syncDrawBrush();renderDrawEditor();$("#drawDone").focus();
+}
+function closeDrawEditor(){
+  if($("#drawEditor").hidden)return;$("#drawEditor").hidden=true;drawActive=null;drawBefore=null;
+  const nd=drawTarget;drawTarget=null;if(nd&&selected===nd)buildProps();
+}
+function drawPointFromEvent(e){
+  const r=drawCanvas.getBoundingClientRect();
+  return[clamp((e.clientX-r.left)/r.width,0,1),clamp((e.clientY-r.top)/r.height,0,1)];
+}
+drawCanvas.onpointerdown=e=>{
+  if(!drawTarget||e.button!==0)return;e.preventDefault();drawCanvas.setPointerCapture(e.pointerId);
+  drawBefore=graphSnapshot();drawActive={mode:drawBrush.mode,width:drawBrush.width,hardness:drawBrush.hardness,
+    opacity:drawBrush.opacity,points:[drawPointFromEvent(e)]};
+  drawTarget.params.strokes.push(drawActive);renderDrawEditor();
+};
+drawCanvas.onpointermove=e=>{
+  if(!drawActive)return;const p=drawPointFromEvent(e),last=drawActive.points[drawActive.points.length-1];
+  if(Math.hypot(p[0]-last[0],p[1]-last[1])<.0015)return;drawActive.points.push(p);renderDrawEditor();
+};
+function finishDrawStroke(e){
+  if(!drawActive)return;if(drawCanvas.hasPointerCapture(e.pointerId))drawCanvas.releasePointerCapture(e.pointerId);
+  pushUndo(drawBefore);drawBefore=null;drawActive=null;markDirtyFrom(drawTarget.id);requestEval();drawGraph();renderDrawEditor();
+}
+drawCanvas.onpointerup=finishDrawStroke;drawCanvas.onpointercancel=finishDrawStroke;
+$("#drawMode").onclick=e=>{const b=e.target.closest("button[data-v]");if(!b)return;drawBrush.mode=b.dataset.v;syncDrawBrush();};
+$("#drawWidth").oninput=e=>{drawBrush.width=+e.target.value;syncDrawBrush();};
+$("#drawHardness").oninput=e=>{drawBrush.hardness=+e.target.value;syncDrawBrush();};
+$("#drawOpacity").oninput=e=>{drawBrush.opacity=+e.target.value;syncDrawBrush();};
+$("#drawUndoStroke").onclick=()=>{
+  if(!drawTarget||!drawTarget.params.strokes.length)return;recordHistory();drawTarget.params.strokes.pop();
+  markDirtyFrom(drawTarget.id);requestEval();drawGraph();renderDrawEditor();
+};
+$("#drawClear").onclick=()=>{
+  if(!drawTarget||!drawTarget.params.strokes.length)return;recordHistory();drawTarget.params.strokes=[];
+  markDirtyFrom(drawTarget.id);requestEval();drawGraph();renderDrawEditor();
+};
+$("#drawDone").onclick=closeDrawEditor;$("#drawCancel").onclick=closeDrawEditor;
+$("#drawEditor").onpointerdown=e=>{if(e.target===$("#drawEditor"))closeDrawEditor();};
 const topPopovers=["buildSettings","commandMenu"];
 const topPopoverButtons={buildSettings:"buildProfileBtn",commandMenu:"commandBtn"};
 function closeTopPopovers(){
@@ -4471,6 +4768,7 @@ $("#waterRefraction").oninput=e=>{waterLook.refraction=parseFloat(e.target.value
 syncLookValues();syncWaterLookValues();
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&!$("#drawEditor").hidden){e.preventDefault();closeDrawEditor();return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu",true);return;}
   if(e.key==="Escape"&&topPopovers.some(id=>!$("#"+id).hidden)){e.preventDefault();closeTopPopovers();$("#commandBtn").focus();return;}
   if(e.key==="Escape"&&viewportPanels.some(id=>!$("#"+id).hidden)){e.preventDefault();closeViewportPanels();return;}
@@ -4503,7 +4801,7 @@ function defaultGraph(){
   const colorErosion=makeNode("colorerosion",840,120);colorErosion.params.seed=7;
   const weathering=makeNode("weathering",1000,120);
   const snow=makeNode("snow",1160,120);snow.params={amount:0.5};
-  const water=makeNode("water",1320,120);water.params={mode:"hydro",level:0.12,flow:0.5,shoreSmooth:1.35,foam:.18};
+  const water=makeNode("water",1320,120);water.params={mode:"hydro",lakes:"on",lakeMin:.001,flow:.5,riverDepth:.7,level:.12,shoreSmooth:1.35,foam:.18};
   const out=makeNode("output",1480,120);out.params={norm:"on"};
   edges.push({from:base.id,to:mix.id,slot:0});
   edges.push({from:ridge.id,to:mix.id,slot:1});

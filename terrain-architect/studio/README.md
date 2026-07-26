@@ -84,11 +84,12 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
      refraction, absorption, Fresnel reflection, restrained animated ripples, and shoreline foam.
      It uses a **hydrologically
      correct water surface**, not a flat cut through the heightmap:
-     - **Lakes** (**FLOW** on) fill each closed basin to its own **spill level** via a
+     - **Lakes** fill each closed basin to its own **spill level** via a
        **priority-flood depression fill** (Barnes 2014) — flat lakes whose edges follow the basin
        rim, at the right elevation for each basin.
-     - **Rivers** (**River flow** param) are the **flow-accumulation** drainage network (D8 on the
-       filled DEM): a thin water film that **follows the terrain downhill**, widening with catchment.
+     - **Rivers** are the **flow-accumulation** drainage network (D8 on the filled DEM): **River
+       network** changes its catchment threshold and **River depth** changes its visible water film.
+       A sub-visible epsilon gradient routes flow across filled flats instead of terminating in them.
      - **Sea level** mode instead lays a flat ocean at a chosen level — the simple, level-based water.
      The water-surface normal is computed from that surface (flat in lakes, sloped along rivers). This
      is the same `priority_flood_fill` + `d8_accumulation` pair the reference-impl uses.
@@ -118,9 +119,9 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 |---|---|
 | **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
-| **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · Clamp · Invert |
+| **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
-| **Mask** | Slope select · Height select |
+| **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select |
 | **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
 | **Output** | Output (drives the viewport / export) |
@@ -146,7 +147,15 @@ node contains a Mask input port… the processing of that node is applied only w
   rotation and a soft **falloff**, authored as a fraction of the terrain so it stays put when the
   resolution changes. Like Gaea's Mask-as-Primitive it is *both* a mask and a heightfield: wire it into
   a Mask input to confine an effect, or erode it directly into a landform.
-- A **Mask** input on **Thermal**, **Hydraulic**, **Warp**, **Terrace** and **Blur** — the effect runs,
+- A **Draw Mask** node for artist-authored roads, corridors and regions. **Draw on terrain…** opens a
+  plan-view editor over the optional Reference input with Draw/Erase, width, hardness, opacity, stroke
+  undo and clear. Strokes are stored as normalized vectors rather than a fixed-resolution bitmap, so
+  masks painted at 512² remain crisp when the graph builds at 2K or 4K.
+- A mask-aware **Sculpt** merge modifier. Feed the existing terrain into **In**, Draw Mask into
+  **Mask**, then choose **Raise**, **Lower**, **Flatten**, or **Smooth**. The modified copy is blended
+  back only through the mask, so outside the painted road or region stays bit-identical. Blur the mask
+  before Sculpt when a road needs broad, soft shoulders.
+- A **Mask** input on **Thermal**, **Hydraulic**, **Warp**, **Terrace**, **Blur**, and **Sculpt** — the effect runs,
   then applies only where the mask is bright (`base + (modified − base) · mask`). Because it is a
   post-process, changing the mask never re-runs the erosion. Verified: with a circular Shape mask, mean
   change inside the mask is 5.2e-4 and **outside is exactly 0**.
@@ -583,7 +592,14 @@ adding directional light or indiscriminate RGB noise to the exported albedo.
   the signed-depth coverage used for rendering, preserving terrain and hydrology data; **Shore foam**
   controls the transition band. The viewport's global **Water Surface** flyout chooses **Cross ripples**,
   **Wind waves**, **Interference rings**, or **None**, then controls strength, scale, speed, and refraction
-  for every Water node.
+  for every Water node. Hydrology exposes Lakes, Minimum lake depth, River network, and River depth;
+  Sea level hides those controls because it is an independent flat-water mode.
+- Properties use mode tabs and show only settings that affect the active algorithm. This applies to
+  Water, Hydraulic and Thermal erosion, Mountain/Mountain range, Gradient, Transform, and Sculpt;
+  hidden values are preserved when switching modes.
+- Select **Draw Mask** and choose **Draw on terrain…** to paint a reusable mask over its Reference
+  input. For roads, connect terrain to Draw Mask.Reference and Sculpt.In, then Draw Mask to
+  Sculpt.Mask; Flatten or Smooth produces the road bed without destructively editing the source.
 - Undo/redo with the toolbar buttons or <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> /
   <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>.
 - Open **＋ Nodes** inside the graph view for the searchable, category-grouped node toolbox. Clicking
@@ -816,6 +832,9 @@ node _verify_satgen.js               # SatMap Studio extraction + LUT build
 node _verify_render.js               # colour pipeline, PBR/data views, exposure, image contrast
 node _verify_snow.js                 # Amount=1 snowy-world framebuffer coverage
 node _verify_water_surface.js        # global waves/refraction + rasterized fluid-surface depth layer
+node _verify_water_hydrology.js      # lake filter + river density/depth controls and sea separation
+node _verify_mask_draw.js            # resolution-independent vector masks + masked Sculpt merge
+node _verify_param_visibility.js     # active mode tabs hide irrelevant controls and preserve values
 node _verify_zoom.js                 # cursor-focused deep zoom, pivot pan, clipping, frame reset
 node _verify_colorfx.js              # SatMap -> Color Erosion -> Weathering node semantics
 node _verify_realtime.js             # coalesced live edits + colour/water/height buffer invalidation
