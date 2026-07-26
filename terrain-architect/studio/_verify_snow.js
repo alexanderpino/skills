@@ -1,5 +1,5 @@
-// Snow regression: Amount is coverage, not merely an altitude tint. At 1.0 the rendered
-// terrain becomes a snowy world while 0.0 remains unchanged.
+// Physical snow regression: the Snow node owns a world-metre depth field that displaces geometry,
+// conserves avalanche mass, accumulates in hollows, and melts preferentially on equator-facing slopes.
 const { chromium } = require('playwright-core');
 const path = require('path');
 const EXE = process.platform === 'win32'
@@ -8,23 +8,146 @@ const EXE = process.platform === 'win32'
 const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
 (async()=>{
-  const browser=await chromium.launch({executablePath:EXE,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']});
+  const browser=await chromium.launch({executablePath:EXE,args:[
+    '--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'
+  ]});
   const page=await browser.newPage({viewport:{width:1280,height:820}});
-  const errors=[];page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1900);
-  await page.evaluate(()=>{const n=nodes.find(x=>x.type==='snow');select(n);previewMode='selected';refreshPreview();shadeMode=2;});
-  const setSnow=async amount=>{
-    await page.evaluate(v=>{const n=nodes.find(x=>x.type==='snow');n.params.amount=v;markParamDirty(n);evalGraph();},amount);
-    await page.waitForTimeout(180);
-    return page.evaluate(()=>{renderGL();gl.finish();const p=new Uint8Array(glc.width*glc.height*4);gl.readPixels(0,0,glc.width,glc.height,gl.RGBA,gl.UNSIGNED_BYTE,p);
-      let snowy=0,bright=0;for(let i=0;i<p.length;i+=4){if(p[i]>195&&p[i+1]>200&&p[i+2]>205)snowy++;if((p[i]+p[i+1]+p[i+2])/3>185)bright++;}
-      return{snowy,bright,pixels:p.length/4};});
-  };
-  const none=await setSnow(0),full=await setSnow(1);
-  await page.locator('#viewport').screenshot({path:path.resolve(__dirname,'_shot_snow_world.png')});
-  const contract=await page.evaluate(()=>({description:TYPES.snow.desc,amount:nodes.find(x=>x.type==='snow').params.amount}));
-  const ok=full.snowy>none.snowy+full.pixels*.08&&full.bright>none.bright+full.pixels*.08
-    &&contract.description.includes('snowy world')&&contract.amount===1&&!errors.length;
-  console.log(JSON.stringify({none,full,contract,errors,ok},null,2));
-  await browser.close();process.exit(ok?0:1);
+  const errors=[];
+  page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(URL,{waitUntil:'load'});
+  await page.waitForTimeout(2200);
+
+  const result=await page.evaluate(()=>{
+    const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+    const snowNode=nodes.find(n=>n.type==='snow');
+    const waterNode=nodes.find(n=>n.type==='water');
+    const heightNode=nodes.find(n=>n.type==='d_height');
+    const shadowNode=nodes.find(n=>n.type==='d_sunshadow');
+    const temperatureNode=nodes.find(n=>n.type==='d_temperature');
+    const outNode=nodes.find(n=>n.type==='output');
+    const layer=snowNode&&snowNode._snowLayer;
+    let displacement=0;
+    if(curSurfaceY&&curHgt)for(let i=0;i<curSurfaceY.length;i++)
+      displacement=Math.max(displacement,curSurfaceY[i]-curHgt[i]*H_SCALE);
+    const volumeError=layer&&layer.preAvalancheM3
+      ?Math.abs(layer.volumeM3-layer.preAvalancheM3)/layer.preAvalancheM3:1;
+    let liquidSnow=0,liquidCells=0;
+    if(curSnowDepthM&&curWaterLiquid)for(let i=0;i<curSnowDepthM.length;i++)if(curWaterLiquid[i]>.5){
+      liquidCells++;liquidSnow=Math.max(liquidSnow,curSnowDepthM[i]);
+    }
+    const hasEdge=(from,to,slot)=>edges.some(e=>!e.disabled&&e.from===from.id&&e.to===to.id&&e.slot===slot);
+    const defaultGraph={
+      waterToSnow:hasEdge(waterNode,snowNode,0),snowToOutput:hasEdge(snowNode,outNode,0),
+      heightToShadow:hasEdge(heightNode,shadowNode,0),heightToTemperature:hasEdge(heightNode,temperatureNode,0),
+      shadowToTemperature:hasEdge(shadowNode,temperatureNode,1),temperatureToSnow:hasEdge(temperatureNode,snowNode,1)
+    };
+    const mapRange=a=>{let lo=Infinity,hi=-Infinity;for(const v of a||[]){lo=Math.min(lo,v);hi=Math.max(hi,v);}return[lo,hi];};
+
+    // Default north points toward the top of the heightfield. In the northern hemisphere,
+    // a plane falling toward +Y is equator-facing and must lose more snow to solar warming.
+    const n=33,N=n*n,def={scale:320,height:100,latitude:46,north:0,seaTemp:-4,lapseRate:0,solarElevation:45};
+    const south=new Float32Array(N),north=new Float32Array(N);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      south[y*n+x]=1-y/(n-1);
+      north[y*n+x]=y/(n-1);
+    }
+    const aspectParams={snowfall:8,meltDays:60,meltRate:10,
+      solarMelt:6,repose:60,iterations:0,settle:.55};
+    const southLayer=simulateSnowLayer(south,aspectParams,{res:n,terrainDef:def,quality:'interactive',resScale:1});
+    const northLayer=simulateSnowLayer(north,aspectParams,{res:n,terrainDef:def,quality:'interactive',resScale:1});
+    const rotatedLayer=simulateSnowLayer(south,aspectParams,{res:n,terrainDef:{...def,north:180},quality:'interactive',resScale:1});
+
+    // A cold V-shaped valley starts with uniform snowfall. Stability relaxation may move snow,
+    // but not bedrock or total snow mass; the hollow must deepen as its steep walls unload.
+    const valley=new Float32Array(N),mid=(n-1)/2;
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++)valley[y*n+x]=Math.abs(x-mid)/mid;
+    const valleyLayer=simulateSnowLayer(valley,{snowfall:6,seaTemp:-12,lapseRate:0,meltDays:0,
+      meltRate:0,solarMelt:0,repose:25,iterations:60,settle:.7},
+      {res:n,terrainDef:{scale:320,height:120,latitude:46,north:0,seaTemp:-12,lapseRate:0,solarElevation:45},quality:'interactive',resScale:1});
+    let centre=0,edge=0,count=0;
+    for(let y=0;y<n;y++){centre+=valleyLayer.depthM[y*n+mid];edge+=valleyLayer.depthM[y*n]+valleyLayer.depthM[y*n+n-1];count++;}
+    centre/=count;edge/=count*2;
+    const valleyMassError=Math.abs(valleyLayer.volumeM3-valleyLayer.preAvalancheM3)/valleyLayer.preAvalancheM3;
+
+    // Aspect is necessary but insufficient: an equator-facing cell behind a ridge must be colder
+    // than an equally flat, equally high cell on the sunward side.
+    const sn=65,sN=sn*sn,ridge=new Float32Array(sN);
+    for(let x=0;x<sn;x++){ridge[32*sn+x]=1;ridge[31*sn+x]=.65;ridge[33*sn+x]=.65;}
+    const shadowLayer=simulateSnowLayer(ridge,{snowfall:8,meltDays:60,meltRate:12,solarMelt:10,
+      repose:60,iterations:0,settle:.55},{res:sn,terrainDef:{scale:650,height:300,latitude:46,
+        north:0,seaTemp:-4,lapseRate:0,solarElevation:20},quality:'interactive',resScale:1});
+    const shadeI=20*sn+32,openI=45*sn+32;
+
+    // The overlay responds to both camera orbit and authored map orientation.
+    syncCompass();
+    const compassA=$('#compassNorth').style.transform;
+    const savedNorth=terrainDef.north;terrainDef.north=90;syncCompass();
+    const compassB=$('#compassNorth').style.transform;terrainDef.north=savedNorth;syncCompass();
+
+    select(snowNode);
+    const labels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
+    select(null);
+    const terrainLabels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
+
+    // Shared climate freezes standing water; a connected Snow node adds a raised snow-on-ice field.
+    const savedClimate={seaTemp:terrainDef.seaTemp,lapseRate:terrainDef.lapseRate},savedSceneSnow=scene.snow;
+    terrainDef.seaTemp=-20;terrainDef.lapseRate=6.5;scene.snow=savedSceneSnow;refreshWater();
+    let snowOnIce=0;for(const d of curIceSnow)snowOnIce=Math.max(snowOnIce,d);
+    scene.snow=null;refreshWater();
+    let withoutSnow=0;for(const d of curIceSnow)withoutSnow=Math.max(withoutSnow,d);
+    terrainDef.seaTemp=savedClimate.seaTemp;terrainDef.lapseRate=savedClimate.lapseRate;scene.snow=savedSceneSnow;refreshWater();
+
+    TEMP_UNIT='C';syncClimateReadout();const tempC=$('#climateReadout').textContent;
+    $('#climateReadout').click();const tempF=$('#climateReadout').textContent;
+    TEMP_UNIT='C';syncClimateReadout();
+    const boxes=[document.getElementById('viewportCompass'),document.getElementById('climateReadout'),
+      document.querySelector('.vp-rail')].map(el=>el.getBoundingClientRect());
+    const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+    return{
+      layer:{length:layer&&layer.depthM.length,maxDepthM:layer&&layer.maxDepthM,
+        coverage:layer&&layer.coverage,iterationsRun:layer&&layer.iterationsRun,volumeError},
+      rendering:{displacement,snowAttribute:gl.getAttribLocation(terrainProg,'snow'),
+        temperatureAttribute:gl.getAttribLocation(terrainProg,'temperature'),
+        sunVisibilityAttribute:gl.getAttribLocation(terrainProg,'sunvis'),
+        linked:gl.getProgramParameter(terrainProg,gl.LINK_STATUS)},
+      aspect:{south:mean(southLayer.depthM),north:mean(northLayer.depthM),rotated:mean(rotatedLayer.depthM)},
+      insolation:{shadeTemp:shadowLayer.temperatureC[shadeI],openTemp:shadowLayer.temperatureC[openI],
+        shade:shadowLayer.solarShadow[shadeI],open:shadowLayer.solarShadow[openI],
+        mapLength:shadowLayer.temperatureC.length},
+      valley:{centre,edge,massError:valleyMassError,movedM3:valleyLayer.movedM3},
+      compass:{before:compassA,after:compassB,label:$('#viewportCompass').getAttribute('aria-label')},
+      climate:{snowOnIce,withoutSnow,liquidSnow,liquidCells,tempC,tempF,terrainLabels,
+        temperatureRange:mapRange(temperatureNode&&temperatureNode._temperatureC),
+        shadowRange:mapRange(shadowNode&&shadowNode._solarShadow)},
+      defaultGraph,
+      hud:{compassTemperature:overlaps(boxes[0],boxes[1]),compassRail:overlaps(boxes[0],boxes[2]),temperatureRail:overlaps(boxes[1],boxes[2])},
+      labels
+    };
+  });
+
+  const ok=result.layer.length===512*512
+    &&result.layer.maxDepthM>0.1&&result.layer.coverage>.01&&result.layer.volumeError<1e-5
+    &&result.rendering.linked&&result.rendering.snowAttribute>=0&&result.rendering.temperatureAttribute>=0
+    &&result.rendering.sunVisibilityAttribute>=0&&result.rendering.displacement>1e-5
+    &&result.aspect.north>result.aspect.south+1&&result.aspect.rotated>result.aspect.south+1
+    &&result.insolation.openTemp>result.insolation.shadeTemp+3
+    &&result.insolation.open>result.insolation.shade+.35&&result.insolation.mapLength===65*65
+    &&result.valley.centre>6.05&&result.valley.centre>result.valley.edge
+    &&result.valley.movedM3>0&&result.valley.massError<1e-5
+    &&result.compass.before!==result.compass.after&&result.compass.label.includes('Map north')
+    &&['Snowfall','Melt period','Degree-day melt','Solar warming',
+      'Snow repose angle','Settling iterations','Settling rate'].every(label=>result.labels.includes(label))
+    &&['Sea-level temperature','Temperature lapse rate','Climate sun elevation'].every(label=>result.climate.terrainLabels.includes(label))
+    &&result.climate.snowOnIce>.1&&result.climate.withoutSnow===0
+    &&result.climate.liquidCells>0&&result.climate.liquidSnow===0
+    &&result.climate.temperatureRange[1]>result.climate.temperatureRange[0]
+    &&result.climate.shadowRange[1]>result.climate.shadowRange[0]
+    &&result.climate.tempC.includes('°C')&&result.climate.tempF.includes('°F')
+    &&Object.values(result.defaultGraph).every(Boolean)
+    &&!result.hud.compassTemperature&&!result.hud.compassRail&&!result.hud.temperatureRail
+    &&!errors.length;
+  console.log(JSON.stringify({result,errors,ok},null,2));
+  await browser.close();
+  process.exit(ok?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(2);});

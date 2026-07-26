@@ -51,7 +51,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     open: document.querySelector('#nodeToolbox').classList.contains('open'),
     expanded: document.querySelector('#nodeToolBtn').getAttribute('aria-expanded')
   }));
-  await page.locator('#graph').dblclick({ position: { x: 580, y: 220 } });
+  await page.locator('#graph').dblclick({ position: { x: 820, y: 350 } });
   const quickMenu = await page.evaluate(() => ({
     open: document.querySelector('#menu').classList.contains('open'),
     items: document.querySelectorAll('#menu .menu-item').length

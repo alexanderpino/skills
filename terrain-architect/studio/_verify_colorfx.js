@@ -70,7 +70,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   await page.evaluate(()=>{view={x:-250,y:-380,z:.85};selected=nodes.find(n=>n.type==='weathering');buildProps();drawGraph();});
   await page.waitForTimeout(180);
   await page.screenshot({path:path.resolve(__dirname,'_shot_colorfx_albedo.png')});
-  const ok=report.defaultSetup.chain.slice(0,7).join('|')==='water|snow|weathering|colorerosion|satmap|thermal|hydraulic'
+  const ok=report.defaultSetup.chain.slice(0,7).join('|')==='snow|water|weathering|colorerosion|satmap|thermal|hydraulic'
     &&report.defaultSetup.sedimentType==='Deposits'&&report.defaultSetup.surface.strength>.01
     &&report.defaultSetup.surface.scale>0&&report.defaultSetup.surface.speed>0
     &&report.types.join('|')==='satmap|colorerosion|weathering'&&report.blendName==='Color Blend'

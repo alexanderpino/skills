@@ -14,6 +14,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1600);
 
   const r = await p.evaluate(() => {
+    const savedWorkingRes=RES;RES=192; // fixed analysis oracle; independent of the studio's default working resolution
     const n = RES;
 
     // --- TOPOGRAPHIC PROMINENCE via descending flood + union-find ---------------------------
@@ -288,7 +289,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     out.resolutionConsistency={rms:+Math.sqrt(se/(coarse*coarse)).toFixed(5),
       maxAbs:+maxAbs.toFixed(5),rawRms:+rawRms.toFixed(5),rawMaxAbs:+rawMaxAbs.toFixed(5)};
 
-    return out;
+    RES=savedWorkingRes;return out;
   });
 
   console.log(JSON.stringify(r, null, 2));

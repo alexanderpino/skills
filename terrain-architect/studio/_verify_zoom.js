@@ -37,7 +37,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   });
   await page.screenshot({path:path.resolve(__dirname,'_shot_zoom_deep.png')});
 
-  await page.locator('#frameBtn').click();await page.waitForTimeout(80);
+  await page.keyboard.press('f');await page.waitForTimeout(80);
   const framed=await page.evaluate(()=>({dist:cam.dist,target:[...cam.target],az:cam.az,el:cam.el,planView}));
   const panMoved=Math.hypot(afterPan.target[0],afterPan.target[1]-.05,afterPan.target[2])>.01;
   const focusMoved=Math.hypot(deep.target[0]-afterPan.target[0],deep.target[2]-afterPan.target[2])>.01;

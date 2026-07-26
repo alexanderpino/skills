@@ -78,8 +78,10 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
       elevation proxy; the colour picker and eyedropper let you override any stop.)
 - **Live 3D viewport** with **multi-stage rendering**: WebGL2 lit terrain mesh (the five render
   styles above, orbit + zoom, wireframe), rendered in two passes —
-  1. **Opaque terrain + snow** — a snow-accumulation stage that settles snow on high, gentle ground
-     and leaves steep faces bare, with a specular snow sheen (driven by a **Snow** effect node).
+  1. **Opaque terrain + snow** — the **Snow** effect node produces a world-metre thickness field.
+     Its mass-conserving stability pass unloads steep faces into gullies and hollows, physically
+     displaces the mesh, rebuilds its normals, and drives a rough snow material. Temperature, lapse
+     rate, mixed rain/snow, degree-day melt, and equator-facing solar warming determine what remains.
   2. **Water surface + composite** — a rasterized fluid-depth layer followed by screen-space
      refraction, absorption, Fresnel reflection, restrained animated ripples, and shoreline foam.
      It uses a **hydrologically
@@ -122,8 +124,8 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select |
-| **Data map** | **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
-| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
+| **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (−40…+40 °C encoded field) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
+| **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** (metre-depth placement, melt, avalanches) · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
 | **Output** | Output (drives the viewport / export) |
 
 **Water extent, snow and colour are nodes, not global switches.** Add and wire them into the pipeline; for example,
@@ -136,8 +138,12 @@ terrain/lakebed position—so motion cannot look glued to the heightmap. Effect 
 or transform a separate scene/colour stream, so deleting one removes just that effect.
 
 The default terrain ships with the full surface graph already wired:
-`Thermal → SatMap → Color Erosion → Weathering → Snow → Water → Output`, plus
-`Thermal → Deposits → Color Erosion.Sediment`. The renderer supplies subtle animated ripples globally.
+`Thermal → SatMap → Color Erosion → Weathering → Water → Snow → Output`, plus
+`Thermal → Deposits → Color Erosion.Sediment` and the explicit climate branch
+`Weathering → Height → Sun Shadow → Temperature → Snow.Temperature`. Water is deliberately before
+Snow: open liquid masks terrain snow out, while frozen standing water can receive a separate raised
+snow-on-ice layer. Its Snow node starts with a 3 m settled-snow event, temperature/lapse melt, aspect
+warming, and avalanche settling. The renderer supplies subtle animated ripples globally.
 
 **Art direction — Shape masks and the universal Mask input.** A procedural graph that only generates
 *everywhere* can't be directed, so two things make it placeable, mirroring Gaea (where "almost every
@@ -715,7 +721,11 @@ coordinates).
 Deselect everything and the properties panel shows the **Terrain definition** — the world this heightfield
 represents, in metres. Defaults match Gaea's: **5000 m across × 2600 m tall**, a **vertical ratio of 0.52**
 (`height ÷ scale`), which is also the viewport's vertical exaggeration. Cell size is `scale ÷ RES`
-(26 m at 192², 4.9 m at 1024²).
+(26 m at 192², 4.9 m at 1024²). It also owns the shared **sea-level temperature**, **temperature
+lapse rate**, **climate sun elevation**, **latitude**, and **map north**. The panel reports the derived 0 °C freezing altitude.
+North is authored clockwise from the heightfield's top edge; latitude decides which side points toward
+the equator. The viewport compass projects both directions through the orbit camera, and the temperature
+chip reports air temperature at the terrain under the camera focus; click it to toggle °C / °F.
 
 That is what makes slope **angles** physical, so — as in Gaea, where *"the only place the terrain scale
 affects how your terrain is processed is when `Real Scale` is turned ON in the Erosion, Snow, or Thermal
@@ -723,6 +733,56 @@ nodes"* — the **Thermal erosion** node has a **Real Scale** switch. With it on
 angle: the per-cell drop becomes `tan(angle) · cellSize ÷ height`, which is *inherently* resolution
 independent. Verified — a 35° repose stays exactly 35° at 128², 192², 256² and 512², with the per-cell
 drop halving as the cells do.
+
+### Snow, ice, and a shared freezing climate
+
+The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM` in **world metres**:
+
+1. **Placement:** settled snowfall is partitioned between rain and snow across a −3 °C to +2 °C
+   transition. Temperature comes from Terrain Definition: sea-level temperature minus the global
+   lapse rate times elevation.
+2. **Insolation + ablation:** an equator-side climate sun supplies incidence from slope/aspect, then
+   a logarithmic horizon march casts shadows from both nearby and distant terrain. Two separable
+   spatial blur passes turn binary visibility into soft penumbra/diffuse exposure. That spatial map
+   adds solar warming before positive temperature removes depth with a configurable degree-day
+   factor. Rotating map north, changing hemisphere, changing climate sun elevation, or sheltering a
+   slope behind a ridge therefore changes which snow survives. **Height**, **Sun Shadow**, and
+   **Temperature** are explicit Data map nodes, so these fields can be previewed, blended, masked, and
+   reused elsewhere. Temperature outputs the graph-friendly normalized interval −40…+40 °C while
+   retaining physical Celsius values for the viewport readout.
+3. **Stability:** simultaneous, distance-corrected transfers relax the combined
+   `bedrock + snow depth` surface toward the snow repose angle. Only snow moves, and the transfer is
+   volume-conserving, so steep faces unload into real deposits in couloirs and hollows.
+4. **Rendering:** the depth field displaces geometry and normals. The same field controls a
+   high-albedo, rough dielectric material; deferred shadows, AO, water intersection, and terrain
+   normals sample the displaced surface too.
+
+The climate Sun Shadow intentionally is not a cascaded shadow map. A CSM partitions the current
+**camera frustum** to improve perspective shadow-map resolution, so it is view-dependent and can change
+or shimmer as the camera moves ([Microsoft, *Cascaded Shadow Maps*](https://learn.microsoft.com/en-us/windows/win32/dxtecharts/cascaded-shadow-maps)).
+Graph data must instead be deterministic in terrain space; the studio uses logarithmic heightfield
+horizon queries plus a spatial penumbra filter, in the scalable heightfield self-shadowing family
+described by [Timonen & Westerholm (2010)](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-8659.2009.01642.x).
+The viewport may use camera shadow maps for presentation, but they never become simulation input. TAA
+is temporal anti-aliasing and is likewise not a climate signal.
+
+Standing water uses that same altitude temperature. Across a narrow transition around 0 °C, flat lake
+and sea surfaces become **ice**: liquid ripples and refraction stop and a rough, frosted material takes
+over. The renderer removes bed snow anywhere water covers terrain, then adds snow back only where the
+standing-water phase is frozen. There is therefore no floating snow on liquid water; removing the Snow
+node leaves bare ice. The flatness gate avoids converting sloping river films into raised white ribbons.
+
+This placement/stability split follows John Fearing's
+[*Computer Modelling of Fallen Snow*](https://graphics.stanford.edu/courses/cs448-01-spring/papers/fearing.pdf)
+and its [UBC doctoral thesis record](https://www.cs.ubc.ca/labs/imager/th/2000/Fearing2000/).
+Temperature, sun exposure, melt and small avalanche layers follow the model family in Cordonnier et al.,
+[*Interactive Generation of Time-evolving, Snow-Covered Landscapes with Avalanches*](https://www.cs.purdue.edu/cgvlab/www/publications/Cordonier18CGF/).
+The surface-relaxation approach is also consistent with Festenberg's
+[*Diffusive Surface Generation for Realistic Snow Cover Generation in Virtual Worlds*](https://tud.qucosa.de/landing-page/?tx_dlf%5Bid%5D=https%3A%2F%2Ftud.qucosa.de%2Fapi%2Fqucosa%253A25416%2Fmets).
+
+Interactive builds cap the avalanche solve at 512² and reconstruct only the transient depth at the
+working resolution; this keeps 1K–4K property edits bounded while preserving world-scale cell spacing.
+Final quality removes the cap.
 
 ### Resolution independence (the **Res Lock** toggle)
 
@@ -830,7 +890,7 @@ node _verify_satpicker.js            # visual LUT-strip library + graph-bound se
 node _verify_colormixer.js           # dynamic 2–15 layer stack, ordering, modes, opacity
 node _verify_satgen.js               # SatMap Studio extraction + LUT build
 node _verify_render.js               # colour pipeline, PBR/data views, exposure, image contrast
-node _verify_snow.js                 # Amount=1 snowy-world framebuffer coverage
+node _verify_snow.js                 # snow depth/displacement, aspect melt, ice cover, mass, compass
 node _verify_water_surface.js        # global waves/refraction + rasterized fluid-surface depth layer
 node _verify_water_hydrology.js      # lake filter + river density/depth controls and sea separation
 node _verify_mask_draw.js            # resolution-independent vector masks + masked Sculpt merge

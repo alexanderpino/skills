@@ -14,6 +14,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
   await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1600);
 
   const r = await p.evaluate(async () => {
+    const savedWorkingRes=RES;RES=128; // fixed numerical oracle; do not scale with the editor's 512² default
     const n = RES, out = {};
     const noisy = fbmField(gnoise, {seed:5, freq:2, octaves:4, lac:2, gain:0.5});
 
@@ -184,7 +185,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       p99Close: Math.abs(M.p99-R.p99) < 2.5,
       maxNotRazor: M.max < R.max * 1.35,
       notFlat: M.median > R.median * 0.5 };
-    return out;
+    RES=savedWorkingRes;return out;
   });
 
   console.log(JSON.stringify(r, null, 2));

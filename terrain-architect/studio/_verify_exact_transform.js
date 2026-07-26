@@ -22,12 +22,13 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         s+=Math.abs(4*f[y*n+x]-f[y*n+x-1]-f[y*n+x+1]-f[(y-1)*n+x]-f[(y+1)*n+x]);c++;}
       return s/c; };
     const rms = (a,bb) => { let s=0;for(let i=0;i<a.length;i++)s+=(a[i]-bb[i])**2;return Math.sqrt(s/a.length); };
+    const maxDiff = (a,bb) => { let m=0;for(let i=0;i<a.length;i++)m=Math.max(m,Math.abs(a[i]-bb[i]));return m; };
     const withXF = (m, fn) => { const prev=XF; XF=m; try{ return fn(); } finally{ XF=prev; } };
 
     // ---- 1. identity must be bit-for-bit the untransformed field (no silent behaviour change) ----
     const base = fbmField(gnoise, GEN);
     const ident = withXF(xfFromParams({scale:1,aspect:1,angle:0,offX:0,offY:0}), () => fbmField(gnoise, GEN));
-    out.identity = { maxAbsDiff: +Math.max(...Array.from(base, (v,i)=>Math.abs(v-ident[i]))).toExponential(2) };
+    out.identity = { maxAbsDiff: +maxDiff(base,ident).toExponential(2) };
 
     // ---- 2. exact vs raster at 2x magnification ----
     const P2 = {scale:2, aspect:1, angle:0, offX:0, offY:0, edge:"clamp"};
@@ -51,7 +52,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         for(let k=0;k<GEN.octaves;k++){s+=gnoise(u*f,v*f,GEN.seed+k*7)*amp;amp*=GEN.gain;f*=GEN.lac;}
         o[y*n+x]=s/amps;}
       return o; })();
-    out.oracle = { maxAbsDiffVsDirectEval: +Math.max(...Array.from(exact,(v,i)=>Math.abs(v-direct[i]))).toExponential(2),
+    out.oracle = { maxAbsDiffVsDirectEval: +maxDiff(exact,direct).toExponential(2),
                    sanityHalfFreqDiffers: rms(exact,half) > 1e-3 };
 
     // ---- 4. transforms COMPOSE: 2x then 2x == one 4x, in one evaluation ----
@@ -59,7 +60,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const once  = xfFromParams({scale:4});
     const fTwice = withXF(twice, () => fbmField(gnoise, GEN));
     const fOnce  = withXF(once,  () => fbmField(gnoise, GEN));
-    out.compose = { maxAbsDiff:+Math.max(...Array.from(fTwice,(v,i)=>Math.abs(v-fOnce[i]))).toExponential(2),
+    out.compose = { maxAbsDiff:+maxDiff(fTwice,fOnce).toExponential(2),
                     matrixMaxDiff:+Math.max(...twice.map((v,i)=>Math.abs(v-once[i]))).toExponential(2) };
 
     // ---- 5. chained NON-INTEGER moves: each raster hop is another low-pass, exact never degrades ----
@@ -96,7 +97,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       const M = xfFromParams({scale:2, angle:30, offX:0.1});
       const c = withXF(M, () => fbmField(gnoise, GEN));
       const g = withXF(M, () => gpuFbm(GEN));
-      out.gpuParity = { maxAbsDiff:+Math.max(...Array.from(c,(v,i)=>Math.abs(v-g[i]))).toExponential(2) };
+    out.gpuParity = { maxAbsDiff:+maxDiff(c,g).toExponential(2) };
     } else out.gpuParity = "no gpu";
     return out;
   });

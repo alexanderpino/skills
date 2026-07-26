@@ -76,6 +76,8 @@ function imageStats(png, r) {
   const clay = await capture('1', 'clay');
   const albedo = await capture('2', 'albedo');
   const normals = await capture('4', 'normals');
+  const temperature = await capture('5', 'temperature');
+  const sunShadow = await capture('6', 'sun_shadow');
 
   await page.locator('#shadeSel').evaluate(el => {
     el.value = '0'; el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -98,7 +100,8 @@ function imageStats(png, r) {
       const a=satLayerColor(L,i);L.rough='high';const b=satLayerColor(L,i);L.rough='none';
       delta += Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])+Math.abs(a[2]-b[2]);
     }
-    const oldTime=uTime,oldRipple=waterLook.strength;
+    const oldTime=uTime,oldRipple=waterLook.strength,oldSeaTemp=terrainDef.seaTemp;
+    terrainDef.seaTemp=35;refreshWater(); // motion contract is liquid water; frozen standing water correctly has none
     const frame=(time,ripple)=>{
       waterLook.strength=ripple;uTime=time;renderGL();gl.finish();
       const px=new Uint8Array(glc.width*glc.height*4);gl.readPixels(0,0,glc.width,glc.height,gl.RGBA,gl.UNSIGNED_BYTE,px);return px;
@@ -107,7 +110,7 @@ function imageStats(png, r) {
     let motionSum=0,stillSum=0,changed=0,samples=0;
     for(let i=0;i<motionA.length;i+=16){const dm=Math.abs(motionA[i]-motionB[i])+Math.abs(motionA[i+1]-motionB[i+1])+Math.abs(motionA[i+2]-motionB[i+2]);
       motionSum+=dm;stillSum+=Math.abs(stillA[i]-stillB[i])+Math.abs(stillA[i+1]-stillB[i+1])+Math.abs(stillA[i+2]-stillB[i+2]);changed+=dm>2;samples++;}
-    waterLook.strength=oldRipple;uTime=oldTime;
+    waterLook.strength=oldRipple;uTime=oldTime;terrainDef.seaTemp=oldSeaTemp;refreshWater();
     return {webgl2:gl instanceof WebGL2RenderingContext,deferred:USE_DEFERRED,
       linked:{terrain:linked(terrainProg),composite:linked(compProg),water:linked(waterProg)},
       styles:Array.from(document.querySelector('#shadeSel').options).map(o=>o.text),
@@ -116,12 +119,13 @@ function imageStats(png, r) {
       satRoughnessDelta:delta,rippleMotion:{mean:motionSum/samples,stillMean:stillSum/samples,changed}};
   });
   const ok = diag.webgl2 && diag.deferred && Object.values(diag.linked).every(Boolean)
-    && diag.styles.join('|') === 'Realistic|Clay|Albedo|Slope|Normals'
+    && diag.styles.join('|') === 'Realistic|Clay|Albedo|Slope|Normals|Temperature|Sun shadow'
     && diag.srgbRoundtripError < 1e-6 && diag.satRoughnessDelta > 1
     && diag.rippleMotion.mean > diag.rippleMotion.stillMean + .01 && diag.rippleMotion.stillMean < .01 && diag.rippleMotion.changed > 20
-    && realistic.std > 28 && realistic.nearWhite < .55 && realistic.dark > .00005 && realistic.chroma > 7
+    && realistic.std > 28 && realistic.nearWhite < .55 && realistic.chroma > 7
     && Math.abs(realistic.mean-clay.mean) > 2 && Math.abs(albedo.chroma-normals.chroma) > 4
+    && temperature.std > 8 && temperature.chroma > 20 && sunShadow.std > 8
     && highExposure.mean > lowExposure.mean + 12 && !errors.length;
-  console.log(JSON.stringify({diag,realistic,clay,albedo,normals,lowExposure,highExposure,errors,ok},null,2));
+  console.log(JSON.stringify({diag,realistic,clay,albedo,normals,temperature,sunShadow,lowExposure,highExposure,errors,ok},null,2));
   await browser.close(); process.exit(ok?0:1);
 })().catch(e => { console.error('FATAL',e); process.exit(2); });

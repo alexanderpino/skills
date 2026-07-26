@@ -198,6 +198,25 @@ select.btn{appearance:none;padding-right:22px;
 .vp-tool[data-state="selected"]::after,.vp-tool[data-state="plan"]::after{content:"";position:absolute;
   right:3px;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 .vp-rail-sep{height:1px;margin:3px 4px;background:rgba(255,255,255,.12)}
+.vp-compass{position:absolute;z-index:10;left:10px;bottom:10px;width:54px;height:54px;border-radius:50%;
+  pointer-events:none;background:rgba(10,13,18,.58);border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 5px 18px rgba(0,0,0,.25);backdrop-filter:blur(9px);color:var(--muted)}
+:root[data-theme="light"] .vp-compass{background:rgba(247,249,252,.78);border-color:rgba(24,32,42,.18)}
+.vp-compass-ring{position:absolute;inset:5px;border:1px solid rgba(255,255,255,.14);border-radius:50%}
+.vp-compass-axis{position:absolute;left:26px;top:7px;width:2px;height:40px;transform-origin:50% 20px}
+.vp-compass-axis::before,.vp-compass-axis::after{content:"";position:absolute;left:-2px;width:6px;height:18px;
+  clip-path:polygon(50% 0,100% 100%,50% 76%,0 100%)}
+.vp-compass-axis::before{top:0;background:#e6edf5}.vp-compass-axis::after{bottom:0;background:#657386;transform:rotate(180deg)}
+.vp-compass-equator{position:absolute;left:25px;top:8px;width:4px;height:38px;transform-origin:50% 19px}
+.vp-compass-equator::after{content:"";position:absolute;left:0;top:-1px;width:4px;height:8px;border-radius:3px;
+  background:var(--accent);box-shadow:0 0 7px rgba(224,161,74,.72)}
+.vp-compass-n{position:absolute;left:-8px;top:-9px;width:18px;text-align:center;color:#f3f6fa;font:700 8px var(--mono)}
+.vp-compass-eq{position:absolute;left:-7px;top:-10px;width:18px;text-align:center;color:var(--accent);font:700 7px var(--mono);letter-spacing:-.4px}
+.vp-temperature{position:absolute;z-index:11;left:72px;bottom:10px;max-width:calc(100% - 92px);height:25px;padding:0 8px;border-radius:6px;
+  border:1px solid rgba(255,255,255,.14);background:rgba(10,13,18,.66);color:var(--text);
+  font:9px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;backdrop-filter:blur(9px)}
+.vp-temperature:hover,.vp-temperature:focus-visible{border-color:var(--accent);outline:none}
+:root[data-theme="light"] .vp-temperature{background:rgba(247,249,252,.82);border-color:rgba(24,32,42,.18)}
 .vp-flyout{position:absolute;z-index:11;right:57px;top:10px;width:min(250px,calc(100% - 76px));
   padding:10px;background:rgba(10,13,18,.82);border:1px solid rgba(255,255,255,.14);border-radius:9px;
   box-shadow:0 12px 32px rgba(0,0,0,.32);backdrop-filter:blur(12px)}
@@ -526,12 +545,19 @@ select.sg-btn{appearance:auto}
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
         </button>
       </nav>
+      <div class="vp-compass" id="viewportCompass" role="img" aria-label="Terrain compass">
+        <div class="vp-compass-ring"></div>
+        <div class="vp-compass-equator" id="compassEquator"><span class="vp-compass-eq">EQ</span></div>
+        <div class="vp-compass-axis" id="compassNorth"><span class="vp-compass-n">N</span></div>
+      </div>
+      <button class="vp-temperature" id="climateReadout" type="button" title="Temperature at the terrain under the view focus; click to switch °C / °F">— °C</button>
       <section class="vp-flyout" id="displayPanel" aria-label="Display settings" hidden>
         <div class="vp-flyout-head"><b>Display</b><small>viewport only</small></div>
         <div class="frow"><label for="shadeSel">Render style</label></div>
         <select class="inp" id="shadeSel" title="Viewport render style">
           <option value="0" selected>Realistic</option><option value="1">Clay</option>
           <option value="2">Albedo</option><option value="3">Slope</option><option value="4">Normals</option>
+          <option value="5">Temperature</option><option value="6">Sun shadow</option>
         </select>
         <div class="vp-display-row"><span>Wireframe overlay</span>
           <button class="btn" id="wireBtn" type="button" title="Toggle wireframe"><span id="wireState">Off</span></button></div>
@@ -2066,6 +2092,193 @@ function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
   }
   return h;
 }
+// Terrain georeferencing used by climate nodes and the viewport compass.
+// `north` is clockwise from the top edge of the heightfield; the equator lies south of a
+// northern-hemisphere map and north of a southern-hemisphere map.
+function terrainOrientation(def=terrainDef){
+  const a=(def.north==null?0:def.north)*Math.PI/180;
+  const lat=def.latitude==null?46:def.latitude,north=[Math.sin(a),-Math.cos(a)],hemi=lat<0?-1:lat>0?1:0;
+  return{north,equator:hemi>0?[-north[0],-north[1]]:hemi<0?[north[0],north[1]]:[0,0],hemisphere:hemi};
+}
+function blurScalarField(src,n,radius,passes=2){
+  radius=Math.max(0,radius|0);if(!radius)return src.slice();
+  let a=src.slice(),b=new Float32Array(n*n),span=radius*2+1;
+  for(let pass=0;pass<passes;pass++){
+    for(let y=0;y<n;y++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[y*n+clamp(k,0,n-1)];
+      for(let x=0;x<n;x++){b[y*n+x]=sum/span;sum+=a[y*n+clamp(x+radius+1,0,n-1)]-a[y*n+clamp(x-radius,0,n-1)];}}
+    [a,b]=[b,a];
+    for(let x=0;x<n;x++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[clamp(k,0,n-1)*n+x];
+      for(let y=0;y<n;y++){b[y*n+x]=sum/span;sum+=a[clamp(y+radius+1,0,n-1)*n+x]-a[clamp(y-radius,0,n-1)*n+x];}}
+    [a,b]=[b,a];
+  }
+  return a;
+}
+// Spatial solar exposure for climate—not the viewport's cosmetic shadow. A representative
+// equator-side sun supplies incidence; a logarithmic horizon march detects distant blockers, and a
+// short separable diffusion produces penumbra + diffuse sky exposure without temporal accumulation.
+const TEMP_MIN_C=-40,TEMP_MAX_C=40;
+const encodeTemperatureC=c=>clamp((c-TEMP_MIN_C)/(TEMP_MAX_C-TEMP_MIN_C),0,1);
+const decodeTemperatureField=f=>{
+  if(!f)return null;const out=new Float32Array(f.length),span=TEMP_MAX_C-TEMP_MIN_C;
+  for(let i=0;i<f.length;i++)out[i]=TEMP_MIN_C+clamp(f[i],0,1)*span;
+  return out;
+};
+function metricHeightField(inp,n,def){
+  const N=n*n,[mn,mx]=fieldRange(inp),range=mx-mn||1,out=new Float32Array(N),heightM=def.height||2600;
+  for(let i=0;i<N;i++)out[i]=(inp[i]-mn)/range*heightM;
+  return out;
+}
+function climateSolarExposure(baseM,n,def,options={}){
+  const N=n*n,orient=terrainOrientation(def),eq=orient.equator;
+  const elevation=clamp(def.solarElevation==null?45:def.solarElevation,3,90)*Math.PI/180;
+  const sinEl=Math.sin(elevation),cosEl=Math.cos(elevation),tanEl=Math.tan(elevation);
+  const cell=(def.scale||5000)/n,direct=new Float32Array(N),visibility=new Float32Array(N);
+  const suppliedVisibility=options.visibility&&options.visibility.length===N?options.visibility:null;
+  const distances=[];if(!suppliedVisibility&&orient.hemisphere!==0&&cosEl>.01){
+    const reachM=options.reachM==null?(def.scale||5000)*.55:options.reachM;
+    const maxD=Math.max(2,Math.min(n*.95,reachM/cell)),steps=Math.min(32,Math.max(12,Math.round(Math.sqrt(n)*1.35)));
+    let prev=0;for(let k=1;k<=steps;k++){const d=Math.max(1,Math.round(Math.exp(Math.log(maxD+1)*k/steps)-1));
+      if(d!==prev){distances.push(d);prev=d;}}
+  }
+  const sample=(x,y)=>{
+    x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+    const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
+    return lerp(lerp(baseM[i],baseM[i+1],fx),lerp(baseM[i+n],baseM[i+n+1],fx),fy);
+  };
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x,x0=Math.max(0,x-1),x1=Math.min(n-1,x+1),y0=Math.max(0,y-1),y1=Math.min(n-1,y+1);
+    const dzdx=(baseM[y*n+x1]-baseM[y*n+x0])/Math.max((x1-x0)*cell,1e-6);
+    const dzdy=(baseM[y1*n+x]-baseM[y0*n+x])/Math.max((y1-y0)*cell,1e-6);
+    const inv=1/Math.hypot(dzdx,1,dzdy);
+    const incidence=Math.max(0,(-dzdx*eq[0]*cosEl+sinEl-dzdy*eq[1]*cosEl)*inv);
+    direct[i]=clamp(incidence/Math.max(sinEl,.12),0,1);
+    if(suppliedVisibility)visibility[i]=clamp(suppliedVisibility[i],0,1);
+    else{
+      let visible=1;
+      for(const dc of distances){
+        const sx=x+eq[0]*dc,sy=y+eq[1]*dc;
+        if(sx<0||sy<0||sx>n-1||sy>n-1)break;
+        if(sample(sx,sy)>baseM[i]+dc*cell*tanEl+.25){visible=0;break;}
+      }
+      visibility[i]=visible;
+    }
+  }
+  const softness=options.softness==null?1:options.softness;
+  const softShadow=suppliedVisibility?visibility:
+    blurScalarField(visibility,n,Math.min(12,Math.max(0,Math.round(n/192*2*softness))),2);
+  const exposure=new Float32Array(N);
+  for(let i=0;i<N;i++)exposure[i]=clamp(.12+.88*direct[i]*(.08+.92*softShadow[i]),0,1);
+  return{exposure,direct,shadow:softShadow,sunElevationDeg:elevation*180/Math.PI};
+}
+function evaluateClimateMaps(inp,p={},shadowInput=null){
+  const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
+  const h=preview===full?inp:resampleField(inp,full,preview);
+  const supplied=shadowInput?(preview===full?shadowInput:resampleField(shadowInput,full,preview)):null;
+  const baseM=metricHeightField(h,preview,terrainDef);
+  const solar=climateSolarExposure(baseM,preview,terrainDef,{reachM:p.reach,softness:p.softness,visibility:supplied});
+  const rawC=new Float32Array(preview*preview),encoded=new Float32Array(preview*preview);
+  const warming=p.warming==null?5:p.warming,seaTemp=terrainDef.seaTemp==null?6:terrainDef.seaTemp;
+  const lapse=terrainDef.lapseRate==null?6.5:terrainDef.lapseRate;
+  for(let i=0;i<rawC.length;i++){
+    rawC[i]=seaTemp-lapse*(baseM[i]/1000)+warming*solar.exposure[i];
+    encoded[i]=encodeTemperatureC(rawC[i]);
+  }
+  if(preview===full)return{heightM:baseM,temperatureC:rawC,encoded,solarExposure:solar.exposure,solarShadow:solar.shadow};
+  return{
+    heightM:resampleField(baseM,preview,full),
+    temperatureC:resampleField(rawC,preview,full),
+    encoded:resampleField(encoded,preview,full),
+    solarExposure:resampleField(solar.exposure,preview,full),
+    solarShadow:resampleField(solar.shadow,preview,full)
+  };
+}
+// A transient SnowField in WORLD METRES. Fearing 2000 separates placement from stability;
+// Cordonnier et al. 2018 add temperature/sun-driven melt and relax snow over the combined
+// terrain + snow surface. The grid relaxation below is the heightfield form of those small,
+// simultaneous avalanches: only snow moves, every transfer is distance-correct, and mass is
+// conserved. The bedrock/soil height input remains unchanged.
+function simulateSnowLayer(inp,p={},context={}){
+  const n=context.res||RES,N=n*n,def=context.terrainDef||terrainDef;
+  if(!inp||inp.length!==N)return{depthM:new Float32Array(N),volumeM3:0,maxDepthM:0,coverage:0};
+  const scale=def.scale||5000,heightM=def.height||2600,cell=scale/n,cellArea=cell*cell;
+  const baseM=metricHeightField(inp,n,def),depthM=new Float32Array(N);
+  const snowfall=p.snowfall==null?6*(p.amount==null?.5:p.amount):p.snowfall;
+  const seaTemp=def.seaTemp==null?6:def.seaTemp,lapse=def.lapseRate==null?6.5:def.lapseRate;
+  const meltDays=p.meltDays==null?45:p.meltDays,meltRate=(p.meltRate==null?10:p.meltRate)/1000;
+  const solarHeat=p.solarMelt==null?5:p.solarMelt,orient=terrainOrientation(def),eq=orient.equator;
+  const solar=context.solarShadow&&context.solarExposure
+    ?{shadow:context.solarShadow,exposure:context.solarExposure,direct:new Float32Array(N),sunElevationDeg:def.solarElevation}
+    :climateSolarExposure(baseM,n,def);
+  const temperatureC=context.temperatureC||new Float32Array(N);
+  let depositedM3=0,meltedM3=0,preAvalancheM3=0;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x,airTemperature=seaTemp-lapse*(baseM[i]/1000);
+    const temperature=context.temperatureC?temperatureC[i]:airTemperature+solarHeat*solar.exposure[i];
+    if(!context.temperatureC)temperatureC[i]=temperature;
+    // Mixed precipitation transition: all rain above +2 C, all snow below -3 C.
+    const snowFraction=clamp((2-(context.temperatureC?temperature:airTemperature))/5,0,1);
+    const deposited=snowfall*snowFraction;
+    const melted=Math.min(deposited,Math.max(0,temperature)*meltRate*meltDays);
+    depthM[i]=deposited-melted;
+    depositedM3+=deposited*cellArea;meltedM3+=melted*cellArea;preAvalancheM3+=depthM[i]*cellArea;
+  }
+  const repose=(p.repose==null?38:p.repose)*Math.PI/180,talus=Math.tan(repose);
+  const rate=clamp(p.settle==null?.55:p.settle,0,1),authoredIters=Math.max(0,p.iterations==null?12:p.iterations|0);
+  const k=context.resScale==null?(SCALE_RES?n/REF_RES:1):context.resScale;
+  const travel=(context.quality||BUILD_QUALITY)==="final"?k:Math.min(1.5,Math.sqrt(k));
+  const iterations=Math.min(180,Math.round(authoredIters*travel));
+  const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
+  const delta=new Float32Array(N),excess=new Float32Array(8);
+  let movedM3=0,iterationsRun=0;
+  for(let it=0;it<iterations;it++){
+    delta.fill(0);let moved=0;
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const i=y*n+x,available=depthM[i];if(available<=1e-7)continue;
+      const surface=baseM[i]+available;let sum=0,maxExcess=0,kb=0;
+      for(const[dx,dy,dist]of nb){
+        const xx=x+dx,yy=y+dy;
+        if(xx<0||yy<0||xx>=n||yy>=n){excess[kb++]=0;continue;}
+        const j=yy*n+xx,e=surface-(baseM[j]+depthM[j])-talus*cell*dist;
+        const q=e>0?e:0;excess[kb++]=q;sum+=q;if(q>maxExcess)maxExcess=q;
+      }
+      if(sum<=0)continue;
+      const out=Math.min(available,rate*maxExcess*.5);kb=0;
+      for(const[dx,dy]of nb){
+        const q=excess[kb++];if(q<=0)continue;
+        const j=(y+dy)*n+x+dx,transfer=Math.min(out*q/sum,q*.5);
+        delta[i]-=transfer;delta[j]+=transfer;moved+=transfer;
+      }
+    }
+    for(let i=0;i<N;i++)depthM[i]=Math.max(0,depthM[i]+delta[i]);
+    movedM3+=moved*cellArea;iterationsRun=it+1;
+    if(moved*cellArea<Math.max(1e-5,preAvalancheM3*1e-8))break;
+  }
+  let volumeM3=0,maxDepthM=0,covered=0;
+  for(let i=0;i<N;i++){const d=depthM[i];volumeM3+=d*cellArea;if(d>maxDepthM)maxDepthM=d;if(d>.01)covered++;}
+  return{depthM,baseM,temperatureC,solarExposure:context.solarExposure||solar.exposure,solarShadow:context.solarShadow||solar.shadow,
+    volumeM3,depositedM3,meltedM3,preAvalancheM3,movedM3,maxDepthM,
+    coverage:covered/N,iterationsRun,cellSizeM:cell,equator:[...eq],
+    sunElevationDeg:solar.sunElevationDeg,simulationResolution:n};
+}
+// Keep live 1K–4K authoring bounded without changing the physical grid scale: avalanche stability is
+// solved on a 512² preview field (cell size follows that field), then only the transient depth is
+// reconstructed at working resolution. Final quality intentionally removes the cap.
+function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExposure=null){
+  const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
+  if(preview===full)return simulateSnowLayer(inp,p,{temperatureC:temperatureField,solarShadow,solarExposure});
+  const small=resampleField(inp,full,preview);
+  const smallTemp=temperatureField?resampleField(temperatureField,full,preview):null;
+  const smallShadow=solarShadow?resampleField(solarShadow,full,preview):null;
+  const smallExposure=solarExposure?resampleField(solarExposure,full,preview):null;
+  const layer=simulateSnowLayer(small,p,{res:preview,terrainDef,quality:BUILD_QUALITY,
+    resScale:SCALE_RES?preview/REF_RES:1,temperatureC:smallTemp,solarShadow:smallShadow,solarExposure:smallExposure});
+  layer.depthM=resampleField(layer.depthM,preview,full);
+  layer.temperatureC=resampleField(layer.temperatureC,preview,full);
+  layer.solarExposure=resampleField(layer.solarExposure,preview,full);
+  layer.solarShadow=resampleField(layer.solarShadow,preview,full);
+  layer.fullResolution=full;
+  return layer;
+}
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
 function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null}){
@@ -2393,6 +2606,26 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   // ---- DATA MAPS (Gaea's "Derive" channels): grayscale fields to bind a SatMap / mask to ----
   d_slope:{cat:"data",name:"Slope",ins:["In"],desc:"Steepness as a grayscale field (0 flat → 1 vertical). The classic cliff/bench colour driver.",
     params:[],eval:(p,ins)=>ins[0]?normalize(slopeOf(ins[0])):newField()},
+  d_height:{cat:"data",name:"Height",ins:["In"],desc:"Normalized elevation map (0 = lowest point, 1 = highest point). Use it anywhere a reusable height-driven mask or data branch is needed.",
+    params:[],eval:(p,ins)=>ins[0]?normalize(ins[0]):newField()},
+  d_sunshadow:{cat:"data",name:"Sun Shadow",ins:["Height"],desc:"Deterministic terrain-space solar visibility. White is sunlit; black is occluded by the heightfield horizon. Unlike a viewport cascade shadow, this field is stable, blendable, and exportable.",
+    params:[P.slider("reach","Horizon reach",100,10000,2750,25,v=>Math.round(v)+" m"),
+      P.slider("softness","Softness",0,3,1,.05,v=>v.toFixed(2)+"×")],
+    eval:(p,ins,nd)=>{
+      if(!ins[0]){nd._solarShadow=newField();nd._solarExposure=newField();return nd._solarShadow;}
+      const maps=evaluateClimateMaps(ins[0],p);
+      nd._solarShadow=maps.solarShadow;nd._solarExposure=maps.solarExposure;return maps.solarShadow;
+    },
+    note:"This node is a <b>terrain-space analysis map</b>: white means the climate sun reaches the surface and black means terrain blocks it. It uses a logarithmic heightfield-horizon march followed by a spatial penumbra filter. A cascaded shadow map is intentionally not used here because cascades are fitted to the current camera frustum and therefore change as the view moves."},
+  d_temperature:{cat:"data",name:"Temperature",ins:["Height","Sun visibility"],desc:"Surface temperature from elevation lapse rate plus solar exposure. Its normalized output encodes −40 °C to +40 °C and can be blended or used as a mask; the viewport reads the physical Celsius field.",
+    params:[P.slider("warming","Solar warming",0,12,5,.25,v=>v.toFixed(1)+" °C")],
+    eval:(p,ins,nd)=>{
+      if(!ins[0]){nd._temperatureC=new Float32Array(RES*RES);nd._solarShadow=newField();nd._solarExposure=newField();return newField();}
+      const maps=evaluateClimateMaps(ins[0],p,ins[1]||null);
+      nd._temperatureC=maps.temperatureC;nd._solarShadow=maps.solarShadow;nd._solarExposure=maps.solarExposure;
+      return maps.encoded;
+    },
+    note:"The output is normalized so it remains compatible with every mask, Blend, and Combine node: 0 = −40 °C, 0.5 = 0 °C, 1 = +40 °C. Connect <b>Sun Shadow</b> to Sun visibility to make terrain occlusion part of the field. Terrain Definition supplies sea-level temperature, lapse rate, latitude, north, and solar elevation."},
   d_curvature:{cat:"data",name:"Curvature",ins:["In"],desc:"Zevenbergen–Thorne curvature: convex ridges/lips vs concave valley floors (0.5 = flat).",
     params:[P.seg("kind","Kind",[["profile","Profile"],["plan","Plan"],["mean","Mean"]],"profile"),
       P.slider("strength","Strength",0.1,4,1,0.1)],
@@ -2428,10 +2661,21 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       GROUP(P.slider("foam","Shore foam",0,1,.18,.01),"Shoreline")],
     eval:(p,ins)=>ins[0]||newField(),
     note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br><b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
-  snow:{cat:"effect",name:"Snow",ins:["In"],desc:"Snow accumulation coverage. Low values dust high ground; 1.0 creates a snowy world while leaving only near-vertical rock faces exposed.",
+  snow:{cat:"effect",name:"Snow",ins:["In","Temperature"],desc:"A transient snow-depth layer in metres: snowfall accumulates, sun and temperature melt it, and avalanches move it from steep faces into gullies and hollows. Liquid water excludes snow; frozen standing water can receive it.",
     passthrough:true,effect:"snow",
-    params:[P.slider("amount","Amount",0,1,0.5)],
-    eval:(p,ins)=>ins[0]||newField()},
+    params:[GROUP(P.slider("snowfall","Snowfall",0,20,3,.1,v=>v.toFixed(2)+" m"),"Accumulation"),
+      GROUP(P.slider("meltDays","Melt period",0,120,45,1,v=>(v|0)+" days"),"Climate & melt"),
+      GROUP(P.slider("meltRate","Degree-day melt",0,20,10,.25,v=>v.toFixed(2)+" mm/°C/day"),"Climate & melt"),
+      GROUP(P.slider("solarMelt","Solar warming",0,12,5,.25,v=>v.toFixed(1)+" °C"),"Climate & melt"),
+      GROUP(P.slider("repose","Snow repose angle",20,60,38,1,v=>(v|0)+"°"),"Avalanche & settling"),
+      GROUP(P.int("iterations","Settling iterations",0,80,12),"Avalanche & settling"),
+      GROUP(P.slider("settle","Settling rate",.1,1,.55,.05,v=>v.toFixed(2)),"Avalanche & settling")],
+    eval:(p,ins,nd)=>{
+      const h=ins[0]||newField(),te=inputEdge(nd.id,1),source=te?nodeById(te.from):null;
+      const temperature=source&&source._temperatureC||decodeTemperatureField(ins[1]);
+      nd._snowLayer=evaluateSnowLayer(h,p,temperature,source&&source._solarShadow,source&&source._solarExposure);return h;
+    },
+    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. <b>Snowfall</b> is settled vertical depth. Terrain Definition supplies the shared sea-level temperature and lapse rate used by both snow and water ice; precipitation transitions from rain to snow around that freezing line, and <b>degree-day melt</b> removes snow above 0 °C. An optional Temperature input accepts the normalized −40…+40 °C field from a Temperature node or a blended temperature branch.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle. This moves snow off unstable faces and accumulates it in gullies and hollows. The implementation follows the placement/stability split of Fearing (2000) and the temperature, sunlight, melt and avalanche model family of Cordonnier et al. (2018)."},
   satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Authors one colour gradient, driven by height, slope, or any field wired into Driver. Chain a masked SatMap over another for a simple overlay, or blend separate SatMap branches in Color Blend for explicit biome composition. Height passes through unchanged.",
     passthrough:true,effect:"satmap",
     params:[P.select("gradient","Gradient",null,"Temperate"),
@@ -2524,8 +2768,9 @@ function restoreGraph(snap){
     selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
     buildProps();drawGraph();updateHistoryButtons();return;
   }
-  nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true}));
-  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={...snap.terrainDef};
+  nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true,
+    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null}));
+  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={scale:5000,height:2600,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,...snap.terrainDef};
   H_SCALE=terrainDef.height/terrainDef.scale;
   selected=snap.selectedId==null?null:nodeById(snap.selectedId);
   selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
@@ -2549,7 +2794,8 @@ const randomSeed=()=>Math.floor(Math.random()*(SEED_MAX+1));
 function makeNode(type,x,y){
   if(historyReady)recordHistory();
   const def=TYPES[type];const p={};def.params.forEach(pr=>p[pr.key]=pr.def);
-  const nd={id:uid++,type,x,y,w:type==="colormixer"?190:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null};
+  const nd={id:uid++,type,x,y,w:type==="colormixer"?190:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null,
+    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null};
   if(type==="colormixer"){
     nd._inputs=["Layer 1","Layer 2","Layer 3"];
     nd.params.layers=[{opacity:1,blend:"normal"},{opacity:1,blend:"normal"},{opacity:1,blend:"normal"}];
@@ -2563,15 +2809,14 @@ function edgeKey(e){return e?e.from+">"+e.to+":"+e.slot:null;}
 function edgeByKey(key){return edges.find(e=>edgeKey(e)===key);}
 function inputEdge(nodeId,slot){return edges.find(e=>!e.disabled&&e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
-function collectScene(root){                        // walk upstream from the active preview root
+function collectScene(root){                        // walk the PRIMARY height/effect chain only
   const s={water:null,snow:null,satmap:null};root=root||outputNode();if(!root)return s;
-  const q=[root.id],seen=new Set();
-  while(q.length){const id=q.shift();if(seen.has(id))continue;seen.add(id);
-    const nd=nodeById(id);if(!nd)continue;
-    if(nd.type==="water"&&!s.water)s.water={...nd.params};
-    if(nd.type==="snow"&&!s.snow)s.snow={...nd.params};
-    if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params};
-    edges.filter(e=>!e.disabled&&e.to===id).forEach(e=>q.push(e.from));}
+  let nd=root;const seen=new Set();
+  while(nd&&!seen.has(nd.id)){seen.add(nd.id);
+    if(nd.type==="water"&&!s.water)s.water={...nd.params,nodeId:nd.id};
+    if(nd.type==="snow"&&!s.snow)s.snow={...nd.params,nodeId:nd.id,layer:nd._snowLayer};
+    if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params,nodeId:nd.id};
+    const e=inputEdge(nd.id,0);nd=e?nodeById(e.from):null;}
   return s;
 }
 function nearestUpstreamNode(type,root){
@@ -3146,19 +3391,30 @@ function buildProps(){
   if(!selected){ // no node selected -> scene-level TERRAIN DEFINITION (the world the heightfield represents)
     title.firstChild.textContent="Terrain definition";sub.textContent="The real-world size of this terrain";
     sw.style.background=css("--faint");body.innerHTML="";
-    const mk=(key,label,min,max)=>{
+    const mk=(key,label,min,max,step,fmt)=>{
       const f=document.createElement("div");f.className="field";
-      f.innerHTML=`<div class="frow"><label>${label}</label><span class="val">${terrainDef[key]} m</span></div>`;
-      const i=document.createElement("input");i.type="range";i.min=min;i.max=max;i.step=(max-min)/400;i.value=terrainDef[key];
+      const show=v=>fmt?fmt(v):v;
+      f.innerHTML=`<div class="frow"><label>${label}</label><span class="val">${show(terrainDef[key])}</span></div>`;
+      const i=document.createElement("input");i.type="range";i.min=min;i.max=max;i.step=step;i.value=terrainDef[key];
       let before=null,changed=false;
-      i.oninput=()=>{if(!before)before=graphSnapshot();changed=true;terrainDef[key]=Math.round(parseFloat(i.value));
-        f.querySelector(".val").textContent=terrainDef[key]+" m";
-        H_SCALE=terrainDef.height/terrainDef.scale;if(curField)updateViewport(curField);tdInfo();};
-      i.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;if(nodes.some(n=>n.type==="thermal"&&n.params.realScale==="on")){
-        nodes.filter(n=>n.type==="thermal").forEach(n=>markDirtyFrom(n.id));requestEval();}};
+      i.oninput=()=>{if(!before)before=graphSnapshot();changed=true;terrainDef[key]=step>=1?Math.round(parseFloat(i.value)):parseFloat(i.value);
+        f.querySelector(".val").textContent=show(terrainDef[key]);
+        H_SCALE=terrainDef.height/terrainDef.scale;
+        const climateNodes=nodes.filter(n=>n.type==="d_sunshadow"||n.type==="d_temperature"||n.type==="snow");
+        climateNodes.forEach(n=>{if(n.type==="snow")n._snowLayer=null;markDirtyFrom(n.id);});
+        if(climateNodes.length)requestEval();else if(curField)updateViewport(curField);
+        tdInfo();syncCompass();};
+      i.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;
+        if((key==="scale"||key==="height")&&nodes.some(n=>n.type==="thermal"&&n.params.realScale==="on")){
+          nodes.filter(n=>n.type==="thermal").forEach(n=>markDirtyFrom(n.id));requestEval();}};
       f.appendChild(i);return f;};
-    body.appendChild(mk("scale","Scale (across)",500,20000));
-    body.appendChild(mk("height","Height",100,8000));
+    body.appendChild(mk("scale","Scale (across)",500,20000,1,v=>Math.round(v)+" m"));
+    body.appendChild(mk("height","Height",100,8000,1,v=>Math.round(v)+" m"));
+    body.appendChild(mk("seaTemp","Sea-level temperature",-30,35,.5,v=>v.toFixed(1)+" °C"));
+    body.appendChild(mk("lapseRate","Temperature lapse rate",3,10,.1,v=>v.toFixed(1)+" °C/km"));
+    body.appendChild(mk("solarElevation","Climate sun elevation",3,90,1,v=>Math.round(v)+"°"));
+    body.appendChild(mk("latitude","Latitude",-90,90,.5,v=>Math.abs(v).toFixed(1)+"° "+(v<0?"S":v>0?"N":"Equator")));
+    body.appendChild(mk("north","Map north",0,359,1,v=>Math.round(v)+"° clockwise from top"));
     const info=document.createElement("div");info.className="hint";info.id="tdInfo";body.appendChild(info);
     tdInfo();
     const hint=document.createElement("div");hint.className="hint";hint.style.marginTop="10px";
@@ -3258,10 +3514,16 @@ function buildColorMixerProps(body){
   body.appendChild(hint);
 }
 function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
+  const lat=terrainDef.latitude||0,hemi=lat<0?"Southern":lat>0?"Northern":"Equatorial";
+  const freeze=terrainDef.seaTemp<=0?0:terrainDef.seaTemp/(terrainDef.lapseRate||6.5)*1000;
   el.innerHTML=`Vertical ratio <b>${(terrainDef.height/terrainDef.scale).toFixed(2)}</b> (height ÷ scale) ·
     cell size <b>${cellSizeM().toFixed(1)} m</b> at ${RES}².<br>
-    Drives the viewport's vertical exaggeration, and any node with <b>Real Scale</b> on
-    (thermal reads its repose angle as a true angle). Gaea's defaults are 5000 m × 2600 m → 0.52.`;}
+    0 °C freezing level <b>${Math.round(freeze)} m</b>${terrainDef.seaTemp<=0?" (sea level and above)":""} ·
+    ${terrainDef.seaTemp.toFixed(1)} °C at sea level, −${terrainDef.lapseRate.toFixed(1)} °C/km ·
+    climate sun <b>${Math.round(terrainDef.solarElevation)}°</b>.<br>
+    <b>${hemi} hemisphere</b> · map north ${Math.round(terrainDef.north||0)}° clockwise from the top edge.<br>
+    Scale drives vertical exaggeration and real-scale nodes. Latitude + map north define the
+    equator-facing aspect used by solar snowmelt and the viewport compass.`;}
 function buildField(pr){
   const f=document.createElement("div");f.className="field";
   f.dataset.paramKey=pr.key;
@@ -3627,41 +3889,46 @@ function resolveColor(nodeId,n,memo,guard){
 // across and 2.6 km tall, giving a vertical ratio of height/scale = 0.52. This is what makes cell
 // size (scale/RES) and therefore slope ANGLES physically meaningful, which nodes with "Real Scale"
 // use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
-let terrainDef={scale:5000,height:2600};
+let terrainDef={scale:5000,height:2600,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
 const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell
 let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
+let TEMP_UNIT="C";try{TEMP_UNIT=localStorage.getItem("terrainStudioTempUnit")==="F"?"F":"C";}catch(_){}
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water extent and snow accumulation are GRAPH NODES. Water motion/refraction is a global renderer
 // concern in `waterLook`; `scene` only collects graph-authored terrain/effect data.
 let scene={water:null,snow:null,satmap:null};
-const SHADE=["Realistic","Clay","Albedo","Slope","Normals"];
+const SHADE=["Realistic","Clay","Albedo","Slope","Normals","Temperature","Sun Shadow"];
 function initGL(){
   gl=glc.getContext("webgl2",{antialias:true,alpha:false})||glc.getContext("webgl",{antialias:true,alpha:false});
   if(!gl){$("#viewport").insertAdjacentHTML("beforeend",'<div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px">WebGL unavailable</div>');return;}
   const g2=(typeof WebGL2RenderingContext!=="undefined")&&(gl instanceof WebGL2RenderingContext);
   // ---------- STAGE 1: opaque terrain (+ snow accumulation) ----------
   const tVs=(g2?`#version 300 es
-    in vec3 pos;in vec3 nrm;in float hgt;in float drive;in vec3 col;out vec3 vN;out float vH;out float vD;out vec3 vW;out vec3 vCol;
+    in vec3 pos;in vec3 nrm;in float hgt;in float drive;in float snow;in float temperature;in float sunvis;in vec3 col;out vec3 vN;out float vH;out float vD;out float vSnow;out float vTemp;out float vSunVis;out vec3 vW;out vec3 vCol;
     uniform mat4 uMVP;uniform mat4 uM;
-    void main(){vN=nrm;vH=hgt;vD=drive;vCol=col;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
-  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;attribute float drive;attribute vec3 col;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;varying vec3 vCol;
+    void main(){vN=nrm;vH=hgt;vD=drive;vSnow=snow;vTemp=temperature;vSunVis=sunvis;vCol=col;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`
+  :`attribute vec3 pos;attribute vec3 nrm;attribute float hgt;attribute float drive;attribute float snow;attribute float temperature;attribute float sunvis;attribute vec3 col;varying vec3 vN;varying float vH;varying float vD;varying float vSnow;varying float vTemp;varying float vSunVis;varying vec3 vW;varying vec3 vCol;
     uniform mat4 uMVP;uniform mat4 uM;
-    void main(){vN=nrm;vH=hgt;vD=drive;vCol=col;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
+    void main(){vN=nrm;vH=hgt;vD=drive;vSnow=snow;vTemp=temperature;vSunVis=sunvis;vCol=col;vW=(uM*vec4(pos,1.)).xyz;gl_Position=uMVP*vec4(pos,1.);}`);
   const tFs=(g2?`#version 300 es
-    precision highp float;in vec3 vN;in float vH;in float vD;in vec3 vW;in vec3 vCol;out vec4 frag;
+    precision highp float;in vec3 vN;in float vH;in float vD;in float vSnow;in float vTemp;in float vSunVis;in vec3 vW;in vec3 vCol;out vec4 frag;
     #define SAMP texture
     #define OUT frag
-    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform float uExposure;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
-  :`precision highp float;varying vec3 vN;varying float vH;varying float vD;varying vec3 vW;varying vec3 vCol;
+    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uExposure;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`
+  :`precision highp float;varying vec3 vN;varying float vH;varying float vD;varying float vSnow;varying float vTemp;varying float vSunVis;varying vec3 vW;varying vec3 vCol;
     #define SAMP texture2D
     #define OUT gl_FragColor
-    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uSnow;uniform float uExposure;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
+    uniform int uShade;uniform int uDeferred;uniform int uSatComposite;uniform vec3 uSun;uniform vec3 uCam;uniform float uExposure;uniform sampler2D uSat;uniform vec2 uRange;uniform float uShift;uniform float uReverse;`)+`
     vec3 srgbToLinear(vec3 c){return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}
     vec3 linearToSrgb(vec3 c){c=max(c,vec3(0.0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
     float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);}
     float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
       return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
     float surfaceNoise(vec2 p){return vnoise(p)+0.5*vnoise(p*2.03+7.1)+0.25*vnoise(p*4.11+19.7);}
+    vec3 temperatureRamp(float c){
+      vec3 cold=vec3(.06,.18,.58),freeze=vec3(.74,.91,1.0),mild=vec3(.95,.82,.34),hot=vec3(.75,.10,.05);
+      return c<0.0?mix(cold,freeze,smoothstep(-30.0,0.0,c)):mix(mix(freeze,mild,smoothstep(0.0,18.0,c)),hot,smoothstep(18.0,40.0,c));
+    }
     vec3 acesF(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
     void main(){
       vec3 N=normalize(vN);float slope=1.0-N.y;
@@ -3673,6 +3940,8 @@ function initGL(){
       if(uShade==0||uShade==2)baseSrgb=(uSatComposite==1)?vCol:SAMP(uSat,vec2(sc,0.5)).rgb;
       else if(uShade==1)baseSrgb=vec3(.46,.38,.30);                     // neutral clay: inspect form without colour
       else if(uShade==3)baseSrgb=mix(vec3(.12,.34,.70),vec3(.92,.24,.08),smoothstep(.08,.72,slope));
+      else if(uShade==5)baseSrgb=temperatureRamp(vTemp);
+      else if(uShade==6)baseSrgb=mix(vec3(.025,.035,.06),vec3(.98,.84,.46),clamp(vSunVis,0.0,1.0));
       else baseSrgb=vec3(.5);
       vec3 base=srgbToLinear(baseSrgb);
       float materialView=(uShade==0||uShade==2)?1.0:0.0;
@@ -3684,42 +3953,40 @@ function initGL(){
       float macro=surfaceNoise(vW.xz*8.0+vec2(3.7,11.2))/1.75;
       float grain=surfaceNoise(vW.xz*34.0+vec2(17.1,2.8))/1.75;
       base*=mix(1.0,0.88+0.18*macro+0.08*grain,materialView);
-      // Amount controls accumulation reach, not whiteness: a mid value remains a mountain snowline,
-      // while 1.0 pushes below the terrain floor and relaxes slope rejection into a snowy world.
-      float snowAmount=clamp(uSnow,0.0,1.0);
-      float snowReach=pow(snowAmount,1.7);
-      float snowLine=mix(.98,-.08,snowReach)+(macro-.5)*.08;
-      float slopeLimit=mix(.28,.82,snowReach);
-      float gentle=1.0-smoothstep(slopeLimit-.12,slopeLimit+.08,slope);
-      float snowCov=smoothstep(snowLine,snowLine+.09,vH)*gentle*materialView*step(.001,snowAmount);
-      base=mix(base,srgbToLinear(vec3(.88,.92,.97)),snowCov);
-      // Store perceptual roughness directly: soil is broad/rough, rock moderately rough, snow tighter.
-      float matRough=mix(mix(.84,.62,rockAmt),.38,snowCov);
+      // Snow coverage comes from the simulated WORLD-METRE thickness attribute. Geometry and normals
+      // are already displaced by the same SnowField, so the material cannot masquerade as accumulation.
+      float snowCov=smoothstep(.015,.10,vSnow)*materialView;
+      vec3 snowAlb=srgbToLinear(vec3(.94,.965,.985))*mix(.93,1.04,.65*macro+.35*grain);
+      base=mix(base,snowAlb,snowCov);
+      // Fresh snow is a rough dielectric with a broad forward-scattering sheen, not polished plastic.
+      float matRough=mix(mix(.84,.62,rockAmt),.62,snowCov);
       if(uDeferred==1){OUT=vec4(clamp(base,0.,1.),matRough);return;}
       // ---- FORWARD fallback (WebGL1 / wireframe): light here with sun + hemispheric sky irradiance ----
-      if(uShade==2||uShade==3){OUT=vec4(linearToSrgb(base),1.);return;}
+      if(uShade==2||uShade==3||uShade==5||uShade==6){OUT=vec4(linearToSrgb(base),1.);return;}
       if(uShade==4){OUT=vec4(N*.5+.5,1.);return;}
       vec3 S=normalize(uSun);float d=max(dot(N,S),0.0);
       float hemi=N.y*0.5+0.5;vec3 ambIrr=mix(vec3(.12,.10,.08),vec3(.28,.38,.58),hemi);
       vec3 col=base*(ambIrr+vec3(1.0,.955,.86)*d*1.2);
       vec3 V=normalize(uCam-vW);vec3 Hh=normalize(V+S);
-      col+=pow(max(dot(N,Hh),0.0),80.0)*snowCov*.32;
+      col+=pow(max(dot(N,Hh),0.0),42.0)*snowCov*.12;
       OUT=vec4(linearToSrgb(acesF(col*exp2(uExposure))),1.);}`;
   terrainProg=makeProg(tVs,tFs);
   // ---------- STAGE 2: translucent water ----------
   const wVs=(g2?`#version 300 es
-    in vec2 axz;in float ah;in float aw;in vec3 awn;out float vDepth;out vec3 vW;out vec2 vXZ;out vec3 vWN;
-    uniform mat4 uMVP;uniform float uH;
-    void main(){vDepth=(aw-ah)*uH;vW=vec3(axz.x,aw*uH,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`
-  :`attribute vec2 axz;attribute float ah;attribute float aw;attribute vec3 awn;varying float vDepth;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
-    uniform mat4 uMVP;uniform float uH;
-    void main(){vDepth=(aw-ah)*uH;vW=vec3(axz.x,aw*uH,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`);
+    in vec2 axz;in float ah;in float aw;in float ais;in vec3 awn;out float vDepth;out float vIceSnow;out vec3 vW;out vec2 vXZ;out vec3 vWN;
+    uniform mat4 uMVP;uniform float uH;uniform float uScale;
+    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`
+  :`attribute vec2 axz;attribute float ah;attribute float aw;attribute float ais;attribute vec3 awn;varying float vDepth;varying float vIceSnow;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
+    uniform mat4 uMVP;uniform float uH;uniform float uScale;
+    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
-    precision highp float;in float vDepth;in vec3 vW;in vec2 vXZ;in vec3 vWN;out vec4 frag;
+    precision highp float;in float vDepth;in float vIceSnow;in vec3 vW;in vec2 vXZ;in vec3 vWN;out vec4 frag;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
+    uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
-  :`precision highp float;varying float vDepth;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
+  :`precision highp float;varying float vDepth;varying float vIceSnow;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
+    uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
     vec3 waveData(vec2 p,float t){
       float s=max(uRippleScale,.05);
@@ -3748,7 +4015,10 @@ function initGL(){
       // made every dry fragment 50% water and leaked animated normals across the whole terrain.
       float coverage=vDepth>0.0?smoothstep(0.0,shoreAA,vDepth):0.0;
       if(coverage<=.005)discard;
-      float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage;vec3 wave=waveData(vXZ,t);
+      float temp=uSeaTemp-uLapseRate*((vW.y-vIceSnow/uScale)/uH*uTerrainHeight/1000.0);
+      float ice=(1.0-smoothstep(-.5,.5,temp))*smoothstep(.997,.9998,vWN.y);
+      float snowCov=smoothstep(.015,.10,vIceSnow)*ice;
+      float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage*(1.0-ice);vec3 wave=waveData(vXZ,t);
       vec3 N=normalize(vWN+waveAmt*vec3(wave.x,0.,wave.y));   // pattern perturbs the fluid normal, never its depth
       vec3 V=normalize(uCam-vW);vec3 S=normalize(uSun);
       float fres=pow(1.0-max(dot(N,V),0.0),3.0);             // Fresnel — reflective at grazing angles
@@ -3760,16 +4030,20 @@ function initGL(){
       float crest=smoothstep(.68,.92,wave.z)*waveAmt;
       col+=vec3(.035,.065,.085)*crest*(.35+.65*fres);      // restrained bright wavelets make the pattern legible
       float foam=(1.0-smoothstep(0.0,.022+uShoreSmooth*.006,max(vDepth,0.)))*uFoam*coverage;
-      col=mix(col,vec3(0.9,0.95,1.0),foam);
-      float alpha=clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0)*coverage;`
+      col=mix(col,vec3(0.9,0.95,1.0),foam*(1.0-ice));
+      float frost=.5+.5*sin(vXZ.x*91.0+sin(vXZ.y*47.0)*2.0);
+      vec3 iceCol=mix(vec3(.38,.55,.68),vec3(.63,.76,.84),.35+.25*frost);
+      col=mix(col,iceCol,ice);
+      col=mix(col,vec3(.91,.95,.98),snowCov);
+      float alpha=mix(clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0),.98,max(ice,snowCov))*coverage;`
     +(g2?`frag=vec4(col,alpha);}`:`gl_FragColor=vec4(col,alpha);}`);
   waterProg=makeProg(wVs,wFs);
   if(g2){
     // Rasterise the actual fluid surface into its own depth layer. The compositor can then reconstruct
     // a water-plane world position instead of pretending the visible lakebed pixel is the surface.
     const wmVs=`#version 300 es
-      in vec2 axz;in float ah;in float aw;out float vDepth;uniform mat4 uMVP;uniform float uH;
-      void main(){vDepth=(aw-ah)*uH;gl_Position=uMVP*vec4(axz.x,aw*uH,axz.y,1.);}`;
+      in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;uniform mat4 uMVP;uniform float uH;uniform float uScale;
+      void main(){vDepth=(aw-ah)*uH;gl_Position=uMVP*vec4(axz.x,aw*uH+ais/uScale,axz.y,1.);}`;
     const wmFs=`#version 300 es
       precision highp float;in float vDepth;out vec4 frag;
       void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,0.0,1.0);}`;
@@ -3788,6 +4062,7 @@ function initGL(){
       uniform sampler2D gWaterMask;uniform highp sampler2D gWaterDepth;
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;
       uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze;
+      uniform float uTerrainHeight,uSeaTemp,uLapseRate,uSnowfall,uSnowMeltDays,uSnowMeltRate,uHasSnow;
       uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
       const float PI=3.14159265;
       const vec3 SUNCOL=vec3(1.0,0.92,0.78);                         // warm daylight, scene-linear
@@ -3909,7 +4184,7 @@ function initGL(){
         vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float rough=g.a;
         vec2 bedUv=Pw.xz*0.5+0.5;
         vec3 Nt=terrainNormal(bedUv);
-        if(uStyle==2||uStyle==3){frag=vec4(linearToSrgb(albedo),1.);return;}
+        if(uStyle==2||uStyle==3||uStyle==5||uStyle==6){frag=vec4(linearToSrgb(albedo),1.);return;}
         if(uStyle==4){frag=vec4(Nt*.5+.5,1.);return;}
         float sh=shadowT(Pw,S),ao=aoT(bedUv);                       // cast shadow + ambient occlusion from the height field
         vec3 dryCol=shadeSurface(albedo,Nt,Pw,rough,sh,ao);
@@ -3928,11 +4203,17 @@ function initGL(){
         // ---- WATER (screen-space): lit lakebed refraction + Beer–Lambert + Fresnel sky reflection ----
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
         vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
-        float t=uTime*uRippleSpeed;vec3 wave=waveData(Pwater.xz,t);float waveAmt=uRipple*waterCov;
+        float waterTemp=uSeaTemp-uLapseRate*(Wat(wuv)*uTerrainHeight/1000.0);
+        float standing=smoothstep(.997,.9998,N.y);
+        float ice=(1.0-smoothstep(-.5,.5,waterTemp))*standing;
+        float snowFraction=clamp((2.0-waterTemp)/5.0,0.0,1.0);
+        float iceSnowDepth=max(0.0,uSnowfall*snowFraction-max(waterTemp,0.0)*uSnowMeltRate/1000.0*uSnowMeltDays)*uHasSnow*ice;
+        float iceSnowCov=smoothstep(.015,.10,iceSnowDepth);
+        float t=uTime*uRippleSpeed;vec3 wave=waveData(Pwater.xz,t);float waveAmt=uRipple*waterCov*(1.0-ice);
         N=normalize(N+waveAmt*vec3(wave.x,0.,wave.y));
         vec3 Vd=normalize(uCam-Pwater);
         float refrDepth=clamp(thick*8.,0.,1.);
-        vec2 refrOff=N.xz*uPx*34.*refrDepth*uRefraction;
+        vec2 refrOff=N.xz*uPx*34.*refrDepth*uRefraction*(1.0-ice);
         vec2 refrUv=clamp(vUv+refrOff,vec2(0.002),vec2(0.998));
         // Three nearby taps add restrained wavelength separation and make the displaced lakebed read
         // as refraction rather than an animated colour overlay.
@@ -3951,9 +4232,17 @@ function initGL(){
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
         vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*sh;
         float edgeW=max(shoreAA*5.0,.0015);
-        float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov;
+        float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov*(1.0-ice);
         vec3 col=mix(wc,refl,fres)+spec*SUNCOL; col=mix(col,vec3(.78,.86,.92),foam);
         col*=mix(0.65,1.0,sh);                                      // water in cast shadow is darker
+        float frost=vnoise(wuv*83.0)+.5*vnoise(wuv*211.0+19.0);
+        float cracks=1.0-smoothstep(.015,.055,abs(fract((wuv.x+wuv.y*.37)*37.0+frost*.18)-.5));
+        vec3 iceAlb=mix(vec3(.34,.51,.64),vec3(.58,.70,.77),clamp(frost*.55,0.,1.));
+        vec3 iceCol=shadeSurface(iceAlb,N,Pwater,.56,sh,ao)*(1.0-cracks*.18);
+        col=mix(col,iceCol,ice);
+        vec3 iceSnowAlb=vec3(.88,.93,.97)*mix(.94,1.04,clamp(frost*.55,0.,1.));
+        vec3 iceSnowCol=shadeSurface(iceSnowAlb,N,Pwater,.66,sh,ao);
+        col=mix(col,iceSnowCol,iceSnowCov);
         col=mix(dryCol,col,waterCov);                                // analytic coverage removes the binary triangle shoreline
         frag=vec4(displayMap(atmos(col,Pwater)),1.);
       }`;
@@ -3966,8 +4255,9 @@ function initGL(){
     USE_DEFERRED=true;
   }
   buildSatLUT(satName);
-  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),drive:gl.createBuffer(),col:gl.createBuffer(),gridXZ:gl.createBuffer(),
-           wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),idx:gl.createBuffer(),count:0};
+  buffers={pos:gl.createBuffer(),nrm:gl.createBuffer(),hgt:gl.createBuffer(),drive:gl.createBuffer(),snow:gl.createBuffer(),
+           temperature:gl.createBuffer(),sunvis:gl.createBuffer(),col:gl.createBuffer(),gridXZ:gl.createBuffer(),
+           wsurf:gl.createBuffer(),wnrm:gl.createBuffer(),iceSnow:gl.createBuffer(),idx:gl.createBuffer(),count:0};
   buildIndex();
   gl.enable(gl.DEPTH_TEST);
   glc.addEventListener("contextmenu",e=>e.preventDefault());
@@ -4014,34 +4304,80 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
-let curField=null,curHgt=null,curFilled=null,curAccum=null,curWater=null,curGeomKey="",lastWaterSig="";
+let curField=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSnowLayerRef=null;
+let curTemperatureRef=null,curSunVisibilityRef=null;
+let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curGeomKey="",lastWaterSig="";
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
-  const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;
-  const geometryChanged=curField!==f||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
+  const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;rootNode=rootNode||activePreviewNode();
+  const baseChanged=curField!==f||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
+  const layerDepth=scene.snow&&scene.snow.layer&&scene.snow.layer.depthM&&scene.snow.layer.depthM.length===n*n
+    ?scene.snow.layer.depthM:null;
+  const snowChanged=curSnowLayerRef!==layerDepth;let geometryChanged=baseChanged||snowChanged;
   let hgt=curHgt;
-  if(geometryChanged){
-    const[mn,mx]=fieldRange(field),d=mx-mn||1,H=H_SCALE;
-    const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3);hgt=new Float32Array(n*n);
+  if(baseChanged){
+    const[mn,mx]=fieldRange(field),d=mx-mn||1;hgt=new Float32Array(n*n);
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,h=(field[i]-mn)/d;
-      pos[i*3]=(x/(n-1)-0.5)*2;pos[i*3+1]=h*H;pos[i*3+2]=(y/(n-1)-0.5)*2;hgt[i]=h;}
+      hgt[i]=h;}
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
+    curHgt=hgt;curFilled=null;curAccum=null;
+  }
+  const temperatureNode=rootNode&&(rootNode.type==="d_temperature"?rootNode:nearestUpstreamNode("d_temperature",rootNode));
+  const shadowNode=rootNode&&(rootNode.type==="d_sunshadow"?rootNode:nearestUpstreamNode("d_sunshadow",rootNode));
+  const temperatureMap=temperatureNode&&temperatureNode._temperatureC
+    ||scene.snow&&scene.snow.layer&&scene.snow.layer.temperatureC||null;
+  const sunVisibility=shadowNode&&shadowNode._solarShadow
+    ||temperatureNode&&temperatureNode._solarShadow
+    ||scene.snow&&scene.snow.layer&&scene.snow.layer.solarShadow||null;
+  if(baseChanged||temperatureMap!==curTemperatureRef){
+    const temp=temperatureMap&&temperatureMap.length===n*n?temperatureMap:new Float32Array(n*n);
+    if(!temperatureMap)for(let i=0;i<temp.length;i++)temp[i]=terrainDef.seaTemp-terrainDef.lapseRate*(hgt[i]*terrainDef.height/1000);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.temperature);gl.bufferData(gl.ARRAY_BUFFER,temp,gl.DYNAMIC_DRAW);
+    curTemperatureRef=temperatureMap;
+  }
+  if(baseChanged||sunVisibility!==curSunVisibilityRef){
+    const vis=sunVisibility&&sunVisibility.length===n*n?sunVisibility:new Float32Array(n*n).fill(1);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.sunvis);gl.bufferData(gl.ARRAY_BUFFER,vis,gl.DYNAMIC_DRAW);
+    curSunVisibilityRef=sunVisibility;
+  }
+  // Resolve water before constructing the visible solid surface. This lets snow obey the phase
+  // boundary: submerged terrain receives no displayed snow, while frozen standing water gets its
+  // own surface snow layer in refreshWater().
+  if(scene.water&&scene.water.mode!=="sea"&&(!curFilled||!curAccum)){
+    curFilled=priorityFloodFill(hgt);
+    curAccum=d8Accumulation(curFilled);
+  }
+  const waterSig=scene.water?JSON.stringify([scene.water,terrainDef.seaTemp,terrainDef.lapseRate,
+    scene.snow&&{snowfall:scene.snow.snowfall,meltDays:scene.snow.meltDays,meltRate:scene.snow.meltRate}]):"";
+  const waterChanged=baseChanged||waterSig!==lastWaterSig;
+  if(waterChanged)refreshWater();
+  lastWaterSig=waterSig;geometryChanged=geometryChanged||waterChanged;
+  if(geometryChanged){
+    const H=H_SCALE,snow=layerDepth?Float32Array.from(layerDepth):new Float32Array(n*n);
+    if(curWater)for(let i=0;i<snow.length;i++)if(curWater[i]>hgt[i]+1e-7)snow[i]=0;
+    const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),surface=new Float32Array(n*n),surfaceTex=new Float32Array(n*n);
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
-      const hl=(field[y*n+clamp(x-1,0,n-1)]-mn)/d,hr=(field[y*n+clamp(x+1,0,n-1)]-mn)/d;
-      const hu=(field[clamp(y-1,0,n-1)*n+x]-mn)/d,hd=(field[clamp(y+1,0,n-1)*n+x]-mn)/d;
-      const sx=(hl-hr)*H*(n-1)/2,sz=(hu-hd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
+      surface[i]=hgt[i]*H+snow[i]/terrainDef.scale;
+      surfaceTex[i]=hgt[i]+snow[i]/terrainDef.height;
+      pos[i*3]=(x/(n-1)-0.5)*2;pos[i*3+1]=surface[i];pos[i*3+2]=(y/(n-1)-0.5)*2;}
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+      const hl=surface[y*n+clamp(x-1,0,n-1)],hr=surface[y*n+clamp(x+1,0,n-1)];
+      const hu=surface[clamp(y-1,0,n-1)*n+x],hd=surface[clamp(y+1,0,n-1)*n+x];
+      const sx=(hl-hr)*(n-1)/2,sz=(hu-hd)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
       nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
-    if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,hgt);}
-    curHgt=hgt;curFilled=null;curAccum=null;
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.snow);gl.bufferData(gl.ARRAY_BUFFER,snow,gl.DYNAMIC_DRAW);
+    // Deferred terrain normals, shadows, AO and water depth all read the visible solid surface.
+    // Uploading the displaced field here keeps those passes aligned with accumulated snow.
+    if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,surfaceTex);}
+    curSnowDepthM=snow;curSurfaceY=surface;curSnowLayerRef=layerDepth;
   }
   curField=f;curGeomKey=geomKey;
-  if(geometryChanged||!options||options.color!==false){
+  if(baseChanged||!options||options.color!==false){
     // SatMap colouring. Resolve the colour graph (SatMap ramps composite/branch/blend) to a per-vertex RGB buffer;
     // if there is no colour node, drive the global LUT by elevation (backward-compatible fallback).
-    rootNode=rootNode||activePreviewNode();
     const colorRoot=rootNode?(rootNode.type==="output"?inEdgeFrom(rootNode.id,0):rootNode.id):null;
     const colorMemo={},colField=colorRoot?resolveColor(colorRoot,n,colorMemo):null;
     // Graph-native colour nodes must preview their actual albedo output, not a misleading duplicate height thumbnail.
@@ -4053,15 +4389,6 @@ function updateViewport(f,rootNode,options){
     if(!satDrawerOpen()&&!satComposite)buildSatLUT("Pewter"); // no SatMap node: neutral inspection material, never a hidden palette choice
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
   }
-  // The priority-flood + D8 pair is the one sequential (CPU-only) stage and the costliest at high
-  // resolution, so only pay for it when hydrology needs a new terrain surface.
-  if(scene.water&&scene.water.mode!=="sea"&&(!curFilled||!curAccum)){
-    curFilled=priorityFloodFill(hgt);                       // lakes: each basin filled to its pour point (Barnes 2014)
-    curAccum=d8Accumulation(curFilled);                     // rivers: drainage area on the filled DEM
-  }
-  const waterSig=scene.water?JSON.stringify(scene.water):"";
-  if(geometryChanged||waterSig!==lastWaterSig)refreshWater();
-  lastWaterSig=waterSig;
 }
 // --- Priority-flood depression fill (Barnes, Lehman & Mulla 2014): every pit fills to the elevation of
 //     its lowest spill point on the basin rim -> filled-h is the standing-water depth, flat per basin. ---
@@ -4123,8 +4450,30 @@ function refreshWater(){
     const wl=W[y*n+clamp(x-1,0,n-1)],wr=W[y*n+clamp(x+1,0,n-1)],wu=W[clamp(y-1,0,n-1)*n+x],wd=W[clamp(y+1,0,n-1)*n+x];
     const sx=(wl-wr)*H*(n-1)/2,sz=(wu-wd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
     wn[i*3]=sx/L;wn[i*3+1]=1/L;wn[i*3+2]=sz/L;}
+  // Snow on frozen standing water is another transient thickness layer. It shares the Snow node's
+  // event/melt controls but uses the lake/sea elevation and a flatness gate, so flowing river films
+  // are not silently converted into raised white ribbons.
+  const iceSnow=new Float32Array(N),liquidMask=new Float32Array(N),iceMask=new Float32Array(N),snowP=scene.snow;
+  const climateTemp=snowP&&snowP.layer&&snowP.layer.temperatureC;
+  for(let i=0;i<N;i++){
+    if(W[i]<=h[i]+1e-7)continue;
+    const temp=climateTemp&&climateTemp.length===N
+      ?climateTemp[i]-terrainDef.lapseRate*((W[i]-h[i])*terrainDef.height/1000)
+      :terrainDef.seaTemp-terrainDef.lapseRate*(W[i]*terrainDef.height/1000);
+    const ice=clamp(.5-temp,0,1),standing=clamp((wn[i*3+1]-.997)/.0028,0,1);
+    const frozen=ice*standing;iceMask[i]=frozen;liquidMask[i]=1-frozen;
+    if(!snowP||frozen<=0)continue;
+    const snowFraction=clamp((2-temp)/5,0,1);
+    const snowfall=snowP.snowfall==null?6*(snowP.amount==null?.5:snowP.amount):snowP.snowfall;
+    const meltRate=snowP.meltRate==null?10:snowP.meltRate,meltDays=snowP.meltDays==null?45:snowP.meltDays;
+    const deposited=snowfall*snowFraction;
+    const melted=Math.min(deposited,Math.max(0,temp)*meltRate/1000*meltDays);
+    iceSnow[i]=(deposited-melted)*frozen;
+  }
+  curWaterLiquid=liquidMask;curWaterIce=iceMask;curIceSnow=iceSnow;
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wsurf);gl.bufferData(gl.ARRAY_BUFFER,W,gl.DYNAMIC_DRAW);   // forward-path geometry water
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.wnrm);gl.bufferData(gl.ARRAY_BUFFER,wn,gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnow);gl.bufferData(gl.ARRAY_BUFFER,iceSnow,gl.DYNAMIC_DRAW);
   if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,W);} // deferred-path water-height texture
 }
 function resizeGL(){const r=glc.parentElement.getBoundingClientRect();
@@ -4138,7 +4487,50 @@ const sub3=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],cross3=(a,b)=>[a[1]*b[2]-a[2]*
 const norm3=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
 function cameraEye(){const ce=Math.cos(cam.el);return[cam.target[0]+Math.cos(cam.az)*ce*cam.dist,cam.target[1]+Math.sin(cam.el)*cam.dist,cam.target[2]+Math.sin(cam.az)*ce*cam.dist];}
 function cameraBasis(){const eye=cameraEye(),forward=norm3(sub3(cam.target,eye)),right=norm3(cross3(forward,[0,1,0]));return{eye,forward,right,up:norm3(cross3(right,forward))};}
-function surfaceHeight(wx,wz){if(!curHgt)return cam.target[1];return sampleBilinear(curHgt,(wx*.5+.5)*(RES-1),(wz*.5+.5)*(RES-1))*H_SCALE;}
+function surfaceHeight(wx,wz){
+  const surface=curSurfaceY||curHgt;if(!surface)return cam.target[1];
+  const h=sampleBilinear(surface,(wx*.5+.5)*(RES-1),(wz*.5+.5)*(RES-1));
+  return curSurfaceY?h:h*H_SCALE;
+}
+// Project authored terrain directions into the current camera plane. Unlike a screen-fixed north
+// badge, this needle remains useful after orbiting: it shows where map north and the equator actually
+// lie across the visible terrain.
+function syncCompass(){
+  const root=$("#viewportCompass"),northEl=$("#compassNorth"),eqEl=$("#compassEquator");
+  if(!root||!northEl||!eqEl)return;
+  const orient=terrainOrientation(),basis=cameraBasis();
+  const screenAngle=v=>{
+    const world=[v[0],0,v[1]],sx=dot3(world,basis.right),sy=dot3(world,basis.up);
+    return Math.atan2(sx,sy)*180/Math.PI;
+  };
+  const northAngle=screenAngle(orient.north),eqAngle=screenAngle(orient.equator);
+  northEl.style.transform=`rotate(${northAngle}deg)`;
+  eqEl.style.display=orient.hemisphere===0?"none":"block";
+  eqEl.style.transform=`rotate(${eqAngle}deg)`;
+  northEl.querySelector(".vp-compass-n").style.transform=`rotate(${-northAngle}deg)`;
+  eqEl.querySelector(".vp-compass-eq").style.transform=`rotate(${-eqAngle}deg)`;
+  const lat=terrainDef.latitude||0,latLabel=lat===0?"equator":Math.abs(lat).toFixed(1)+"° "+(lat<0?"S":"N");
+  const label=`Map north ${Math.round(terrainDef.north||0)}° clockwise from top; latitude ${latLabel}`;
+  root.setAttribute("aria-label",label);root.title=label;
+}
+function syncClimateReadout(){
+  const el=$("#climateReadout");if(!el)return;
+  const elevationM=Math.max(0,surfaceHeight(cam.target[0],cam.target[2])*terrainDef.scale);
+  const root=activePreviewNode(),temperatureNode=root&&(root.type==="d_temperature"?root:nearestUpstreamNode("d_temperature",root));
+  const temperatureMap=temperatureNode&&temperatureNode._temperatureC
+    ||scene.snow&&scene.snow.layer&&scene.snow.layer.temperatureC;
+  const c=temperatureMap&&temperatureMap.length===RES*RES
+    ?sampleBilinear(temperatureMap,(cam.target[0]*.5+.5)*(RES-1),(cam.target[2]*.5+.5)*(RES-1))
+    :terrainDef.seaTemp-terrainDef.lapseRate*elevationM/1000;
+  const value=TEMP_UNIT==="F"?c*9/5+32:c,unit=TEMP_UNIT==="F"?"°F":"°C";
+  el.textContent=`T ${value.toFixed(1)} ${unit} · ${Math.round(elevationM)} m`;
+  el.setAttribute("aria-label",`${temperatureMap?"Snow surface":"Air"} temperature at view focus: ${value.toFixed(1)} degrees ${TEMP_UNIT==="F"?"Fahrenheit":"Celsius"}, elevation ${Math.round(elevationM)} metres. Click to change units.`);
+}
+$("#climateReadout").onclick=()=>{
+  TEMP_UNIT=TEMP_UNIT==="C"?"F":"C";
+  try{localStorage.setItem("terrainStudioTempUnit",TEMP_UNIT);}catch(_){}
+  syncClimateReadout();
+};
 const cameraNear=()=>clamp(cam.dist*.018,.00018,.045);       // deep inspection without slicing the surface
 function ensureGBuffer(){                                    // offscreen colour + depth textures, resized to the canvas
   const w=glc.width,h=glc.height;if(gbuf&&gbuf.w===w&&gbuf.h===h)return;
@@ -4184,27 +4576,28 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);
   gl.useProgram(terrainProg);setM(terrainProg,"uMVP",MVP);setM(terrainProg,"uM",M);
   {const sd=sunDir();gl.uniform3f(u(terrainProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(terrainProg,"uCam"),ex,ey,ez);
-  gl.uniform1i(u(terrainProg,"uShade"),shadeMode);gl.uniform1f(u(terrainProg,"uSnow"),scene.snow?scene.snow.amount:0.0);
+  gl.uniform1i(u(terrainProg,"uShade"),shadeMode);
   gl.uniform1f(u(terrainProg,"uExposure"),renderLook.exposure);
   gl.uniform1i(u(terrainProg,"uDeferred"),deferred?1:0);
   gl.uniform2f(u(terrainProg,"uRange"),satUniform.lo,satUniform.hi);gl.uniform1f(u(terrainProg,"uShift"),satUniform.shift);gl.uniform1f(u(terrainProg,"uReverse"),satUniform.reverse);
   gl.uniform1i(u(terrainProg,"uSatComposite"),satComposite);
   gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,satTex);gl.uniform1i(u(terrainProg,"uSat"),3);
-  bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);bindAttr(terrainProg,"drive",1,buffers.drive);bindAttr(terrainProg,"col",3,buffers.col);
+  bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);bindAttr(terrainProg,"drive",1,buffers.drive);bindAttr(terrainProg,"snow",1,buffers.snow);
+  bindAttr(terrainProg,"temperature",1,buffers.temperature);bindAttr(terrainProg,"sunvis",1,buffers.sunvis);bindAttr(terrainProg,"col",3,buffers.col);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
 }
 function drawWaterDepth(MVP){
   if(!scene.water||!waterMaskProg)return;
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);gl.useProgram(waterMaskProg);
-  setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);
-  bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);
+  setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);gl.uniform1f(u(waterMaskProg,"uScale"),terrainDef.scale);
+  bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
 }
 function renderGL(){
   if(!gl){return;}
-  resizeGL();
+  resizeGL();syncCompass();syncClimateReadout();
   const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
   const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
   const waterRipple=scene.water?waterLook.strength:0;
@@ -4214,6 +4607,10 @@ function renderGL(){
   const waterShoreSmooth=scene.water?(scene.water.shoreSmooth==null?1.35:scene.water.shoreSmooth):0;
   const waterFoam=scene.water?(scene.water.foam==null?.18:scene.water.foam):0;
   const waterPattern=scene.water?({cross:0,wind:1,rings:2,none:3}[waterLook.pattern]??1):3;
+  const snowEffect=scene.snow||null;
+  const snowfall=snowEffect?(snowEffect.snowfall==null?6*(snowEffect.amount==null?.5:snowEffect.amount):snowEffect.snowfall):0;
+  const snowMeltDays=snowEffect?(snowEffect.meltDays==null?45:snowEffect.meltDays):0;
+  const snowMeltRate=snowEffect?(snowEffect.meltRate==null?10:snowEffect.meltRate):0;
   const V=lookAt(eye,cam.target,[0,1,0]);const M=identity();const MVP=mat4mul(P,mat4mul(V,M));
   if(USE_DEFERRED&&!wire){
     ensureGBuffer();
@@ -4236,6 +4633,8 @@ function renderGL(){
     gl.uniform1f(u(compProg,"uRipple"),waterRipple);gl.uniform1f(u(compProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(compProg,"uRippleSpeed"),waterRippleSpeed);
     gl.uniform1f(u(compProg,"uRefraction"),waterRefraction);
     gl.uniform1f(u(compProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(compProg,"uFoam"),waterFoam);gl.uniform1i(u(compProg,"uPattern"),waterPattern);
+    gl.uniform1f(u(compProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(compProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(compProg,"uLapseRate"),terrainDef.lapseRate);
+    gl.uniform1f(u(compProg,"uSnowfall"),snowfall);gl.uniform1f(u(compProg,"uSnowMeltDays"),snowMeltDays);gl.uniform1f(u(compProg,"uSnowMeltRate"),snowMeltRate);gl.uniform1f(u(compProg,"uHasSnow"),snowEffect?1:0);
     gl.uniform1f(u(compProg,"uSeaLevel"),0.0);gl.uniform1f(u(compProg,"uHasSea"),0.0);  // sea is baked into the water-height texture (W)
     gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
     gl.uniform2f(u(compProg,"uPx"),1/glc.width,1/glc.height);
@@ -4253,12 +4652,13 @@ function renderGL(){
     drawTerrain(MVP,M,ex,ey,ez);
     if(scene.water&&!wire){
       gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
-      setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uTime"),uTime);
+      setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uScale"),terrainDef.scale);gl.uniform1f(u(waterProg,"uTime"),uTime);
+      gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
       gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
-      bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"awn",3,buffers.wnrm);
+      bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"ais",1,buffers.iceSnow);bindAttr(waterProg,"awn",3,buffers.wnrm);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
       gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
       gl.depthMask(true);gl.disable(gl.BLEND);
@@ -4800,8 +5200,11 @@ function defaultGraph(){
   const sat=makeNode("satmap",680,120);sat.params.gradient="Temperate";sat.params.source="height";sat.params.rough="med";
   const colorErosion=makeNode("colorerosion",840,120);colorErosion.params.seed=7;
   const weathering=makeNode("weathering",1000,120);
-  const snow=makeNode("snow",1160,120);snow.params={amount:0.5};
-  const water=makeNode("water",1320,120);water.params={mode:"hydro",lakes:"on",lakeMin:.001,flow:.5,riverDepth:.7,level:.12,shoreSmooth:1.35,foam:.18};
+  const heightMap=makeNode("d_height",840,330);
+  const sunShadow=makeNode("d_sunshadow",1000,330);
+  const water=makeNode("water",1160,120);water.params={mode:"hydro",lakes:"on",lakeMin:.001,flow:.5,riverDepth:.7,level:.12,shoreSmooth:1.35,foam:.18};
+  const temperature=makeNode("d_temperature",1160,330);
+  const snow=makeNode("snow",1320,120);snow.params={snowfall:3,meltDays:45,meltRate:10,solarMelt:5,repose:38,iterations:12,settle:.55};
   const out=makeNode("output",1480,120);out.params={norm:"on"};
   edges.push({from:base.id,to:mix.id,slot:0});
   edges.push({from:ridge.id,to:mix.id,slot:1});
@@ -4813,10 +5216,15 @@ function defaultGraph(){
   edges.push({from:sat.id,to:colorErosion.id,slot:0});
   edges.push({from:deposits.id,to:colorErosion.id,slot:1});
   edges.push({from:colorErosion.id,to:weathering.id,slot:0});
-  edges.push({from:weathering.id,to:snow.id,slot:0});   // colour ageing -> transient snow -> water overlay
-  edges.push({from:snow.id,to:water.id,slot:0});
-  edges.push({from:water.id,to:out.id,slot:0});
-  view={x:22,y:28,z:.64};                               // frame the expanded production graph on first launch
+  edges.push({from:weathering.id,to:water.id,slot:0});       // water phase is established before snow placement
+  edges.push({from:water.id,to:snow.id,slot:0});             // snow is excluded from liquid and may accumulate on ice
+  edges.push({from:snow.id,to:out.id,slot:0});
+  edges.push({from:weathering.id,to:heightMap.id,slot:0});   // reusable deterministic climate-data branch
+  edges.push({from:heightMap.id,to:sunShadow.id,slot:0});
+  edges.push({from:heightMap.id,to:temperature.id,slot:0});
+  edges.push({from:sunShadow.id,to:temperature.id,slot:1});
+  edges.push({from:temperature.id,to:snow.id,slot:1});
+  view={x:22,y:28,z:.58};                               // frame the expanded production graph on first launch
   select(sat);                                            // the node owns its visible palette library; the viewport does not
 }
 
