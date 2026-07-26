@@ -25,6 +25,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const heightNode=nodes.find(n=>n.type==='d_height');
     const shadowNode=nodes.find(n=>n.type==='d_sunshadow');
     const temperatureNode=nodes.find(n=>n.type==='d_temperature');
+    const temperatureModifyNode=nodes.find(n=>n.type==='d_heat');
     const outNode=nodes.find(n=>n.type==='output');
     const layer=snowNode&&snowNode._snowLayer;
     let displacement=0;
@@ -40,7 +41,9 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     const defaultGraph={
       waterToSnow:hasEdge(waterNode,snowNode,0),snowToOutput:hasEdge(snowNode,outNode,0),
       heightToShadow:hasEdge(heightNode,shadowNode,0),heightToTemperature:hasEdge(heightNode,temperatureNode,0),
-      shadowToTemperature:hasEdge(shadowNode,temperatureNode,1),temperatureToSnow:hasEdge(temperatureNode,snowNode,1)
+      shadowToTemperature:hasEdge(shadowNode,temperatureNode,1),
+      temperatureToModify:hasEdge(temperatureNode,temperatureModifyNode,0),
+      modifyToSnow:hasEdge(temperatureModifyNode,snowNode,1)
     };
     const mapRange=a=>{let lo=Infinity,hi=-Infinity;for(const v of a||[]){lo=Math.min(lo,v);hi=Math.max(hi,v);}return[lo,hi];};
 
@@ -87,6 +90,10 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
 
     select(snowNode);
     const labels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
+    select(temperatureNode);
+    const temperatureLabels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
+    const temperatureEditors={numbers:document.querySelectorAll('#props input[type="number"]').length,
+      ranges:document.querySelectorAll('#props input[type="range"]').length};
     select(null);
     const terrainLabels=Array.from(document.querySelectorAll('#props label')).map(e=>e.textContent.trim());
 
@@ -101,6 +108,25 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     TEMP_UNIT='C';syncClimateReadout();const tempC=$('#climateReadout').textContent;
     $('#climateReadout').click();const tempF=$('#climateReadout').textContent;
     TEMP_UNIT='C';syncClimateReadout();
+
+    // The temperature is a modifiable graph field, not metadata stranded on its generator.
+    // A localized "lava" source heats the connected Temperature Modify node to 900 °C; Snow and
+    // the viewport scene must consume that modified field while cells outside the source stay cold.
+    const lava=makeNode('shape',1040,510);Object.assign(lava.params,{kind:'circle',x:.5,y:.5,size:.2,aspect:1,falloff:.12,invert:'off'});
+    temperatureModifyNode.params.mode='minimum';temperatureModifyNode.params.targetC=900;temperatureModifyNode.params.amount=1;
+    edges.push({from:lava.id,to:temperatureModifyNode.id,slot:1});markDirtyFrom(lava.id);evalGraph();
+    const modifierC=temperatureCFromField(temperatureModifyNode._field),centreI=((RES/2)|0)*RES+((RES/2)|0),cornerI=2*RES+2;
+    const soften=makeNode('blur',1200,510);soften.params.radius=2;soften.params.strength=1;
+    edges=edges.filter(e=>!(e.to===snowNode.id&&e.slot===1));
+    edges.push({from:temperatureModifyNode.id,to:soften.id,slot:0},{from:soften.id,to:snowNode.id,slot:1});
+    markDirtyFrom(soften.id);evalGraph();
+    const modifiedC=temperatureCFromField(soften._field);
+    const biomeMask=TYPES.tempmask.eval({lo:850,hi:1000,falloff:10,invert:'off'},[soften._field]);
+    const modification={kind:fieldMetadata(soften._field)&&fieldMetadata(soften._field).kind,
+      sourceCentreC:modifierC[centreI],centreC:modifiedC[centreI],cornerC:modifiedC[cornerI],
+      baseCornerC:temperatureNode._temperatureC[cornerI],biomeCentre:biomeMask[centreI],biomeCorner:biomeMask[cornerI],
+      snowReadsModified:Math.abs(snowNode._snowLayer.temperatureC[centreI]-modifiedC[centreI])<1e-4,
+      sceneReadsModified:scene.snow&&scene.snow.temperatureField===soften._field};
     const boxes=[document.getElementById('viewportCompass'),document.getElementById('climateReadout'),
       document.querySelector('.vp-rail')].map(el=>el.getBoundingClientRect());
     const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
@@ -121,6 +147,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         temperatureRange:mapRange(temperatureNode&&temperatureNode._temperatureC),
         shadowRange:mapRange(shadowNode&&shadowNode._solarShadow)},
       defaultGraph,
+      temperatureField:{...modification,labels:temperatureLabels,editors:temperatureEditors},
       hud:{compassTemperature:overlaps(boxes[0],boxes[1]),compassRail:overlaps(boxes[0],boxes[2]),temperatureRail:overlaps(boxes[1],boxes[2])},
       labels
     };
@@ -136,7 +163,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     &&result.valley.centre>6.05&&result.valley.centre>result.valley.edge
     &&result.valley.movedM3>0&&result.valley.massError<1e-5
     &&result.compass.before!==result.compass.after&&result.compass.label.includes('Map north')
-    &&['Snowfall','Melt period','Degree-day melt','Solar warming',
+    &&['Snowfall','Melt period','Degree-day melt',
       'Snow repose angle','Settling iterations','Settling rate'].every(label=>result.labels.includes(label))
     &&['Sea-level temperature','Temperature lapse rate','Climate sun elevation'].every(label=>result.climate.terrainLabels.includes(label))
     &&result.climate.snowOnIce>.1&&result.climate.withoutSnow===0
@@ -145,6 +172,12 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
     &&result.climate.shadowRange[1]>result.climate.shadowRange[0]
     &&result.climate.tempC.includes('°C')&&result.climate.tempF.includes('°F')
     &&Object.values(result.defaultGraph).every(Boolean)
+    &&result.temperatureField.kind==='temperature'&&result.temperatureField.sourceCentreC>899&&result.temperatureField.centreC>850
+    &&Math.abs(result.temperatureField.cornerC-result.temperatureField.baseCornerC)<2
+    &&result.temperatureField.biomeCentre>.9&&result.temperatureField.biomeCorner<.01
+    &&result.temperatureField.snowReadsModified&&result.temperatureField.sceneReadsModified
+    &&['Sea-level temperature','Altitude lapse rate','Solar warming'].every(label=>result.temperatureField.labels.includes(label))
+    &&result.temperatureField.editors.numbers===3&&result.temperatureField.editors.ranges===0
     &&!result.hud.compassTemperature&&!result.hud.compassRail&&!result.hud.temperatureRail
     &&!errors.length;
   console.log(JSON.stringify({result,errors,ok},null,2));

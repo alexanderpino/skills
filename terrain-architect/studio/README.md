@@ -123,8 +123,8 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
-| **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select |
-| **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (−40…+40 °C encoded field) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
+| **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select · **Temperature select** (physical °C biome band) |
+| **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (base climate field) · **Temperature Modify** (localized heat/cooling) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** (metre-depth placement, melt, avalanches) · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
 | **Output** | Output (drives the viewport / export) |
 
@@ -140,7 +140,7 @@ or transform a separate scene/colour stream, so deleting one removes just that e
 The default terrain ships with the full surface graph already wired:
 `Thermal → SatMap → Color Erosion → Weathering → Water → Snow → Output`, plus
 `Thermal → Deposits → Color Erosion.Sediment` and the explicit climate branch
-`Weathering → Height → Sun Shadow → Temperature → Snow.Temperature`. Water is deliberately before
+`Weathering → Height → Sun Shadow → Temperature → Temperature Modify → Snow.Temperature`. Water is deliberately before
 Snow: open liquid masks terrain snow out, while frozen standing water can receive a separate raised
 snow-on-ice layer. Its Snow node starts with a 3 m settled-snow event, temperature/lapse melt, aspect
 warming, and avalanche settling. The renderer supplies subtle animated ripples globally.
@@ -748,12 +748,23 @@ The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM`
    factor. Rotating map north, changing hemisphere, changing climate sun elevation, or sheltering a
    slope behind a ridge therefore changes which snow survives. **Height**, **Sun Shadow**, and
    **Temperature** are explicit Data map nodes, so these fields can be previewed, blended, masked, and
-   reused elsewhere. Temperature outputs the graph-friendly normalized interval −40…+40 °C while
-   retaining physical Celsius values for the viewport readout.
-3. **Stability:** simultaneous, distance-corrected transfers relax the combined
+   reused elsewhere. The Temperature node owns editable numeric fields for **sea-level temperature**,
+   **altitude lapse rate**, and **solar warming**; it combines those with Height and Sun Shadow to
+   generate the base map. These are edit boxes with physical units, not narrow look-development
+   sliders.
+3. **Temperature composition:** the map is not metadata attached to its generator. Its physical
+   Celsius contract follows the field through downstream Filter and Combine nodes. **Temperature
+   Modify** adds/removes degrees, approaches a target, or enforces a minimum through an optional
+   Source and Mask. A lava simulation can therefore heat its footprint, a shadow/microclimate branch
+   can cool a valley, and every downstream consumer sees the edited result. The scalar transport
+   encoding spans −100…1400 °C; physical Celsius values remain available to nodes and the viewport.
+   **Temperature Select** converts Celsius intervals into ordinary 0–1 masks, allowing the same
+   climate field to drive tundra, alpine, temperate, arid, and volcanic SatMap/Color Mixer biome
+   branches.
+4. **Stability:** simultaneous, distance-corrected transfers relax the combined
    `bedrock + snow depth` surface toward the snow repose angle. Only snow moves, and the transfer is
    volume-conserving, so steep faces unload into real deposits in couloirs and hollows.
-4. **Rendering:** the depth field displaces geometry and normals. The same field controls a
+5. **Rendering:** the depth field displaces geometry and normals. The same field controls a
    high-albedo, rough dielectric material; deferred shadows, AO, water intersection, and terrain
    normals sample the displaced surface too.
 
