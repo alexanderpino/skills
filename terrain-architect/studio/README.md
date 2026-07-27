@@ -922,7 +922,12 @@ drop halving as the cells do.
 The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM` in **world metres**:
 
 1. **Placement:** settled snowfall is partitioned between rain and snow across a −3 °C to +2 °C
-   transition. Temperature comes from the physical field connected to Snow. Terrain Definition's
+   transition. **Snowfall and degree-day melt use logarithmic sliders** with decade tick marks
+   rendered under the track: their useful ranges span decades (a dusting is 5 cm, a heavy winter
+   10 m), and on a linear 0–20 m track everything interesting lived in the first few pixels.
+   Params always store the real value — only the track is warped, so serialisation, digests and the
+   mouse-wheel step (which becomes multiplicative, as it should be on a log scale) are unaffected.
+   Temperature comes from the physical field connected to Snow. Terrain Definition's
    clearly labelled fallback temperature/lapse values apply only when that input is absent or invalid.
    Relative Height is converted to altitude with both **Base elevation** (datum) and **Relief height**,
    so an artist can keep a cropped alpine tile above sea level by authoring its datum. Imported
@@ -953,12 +958,75 @@ The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM`
    branches.
 4. **Stability:** simultaneous, distance-corrected transfers relax the combined
    `bedrock + snow depth` surface toward the snow repose angle. Only snow moves, and the transfer is
-   volume-conserving, so steep faces unload into real deposits in couloirs and hollows.
-5. **Rendering:** the depth field displaces geometry and normals. A composed solid-surface heightfield
+   volume-conserving, so steep faces unload into real deposits in couloirs and hollows. Transport
+   acts only on the **mobile surplus above a holding depth** — the snow that adheres to the ground.
+   This term is load-bearing, and its absence was a measured defect: the instability term contains
+   the bedrock drop, which removing snow cannot reduce, so on ground steeper than repose the only
+   equilibrium was ZERO depth, approached as a drain front — on a planar over-steep face transport
+   is a conveyor, so only the topmost divergent cell net-drains, then its neighbour, one cell per
+   iteration. Ridges stripped bare with a band exactly `iterations x cellSize` wide, symmetric on
+   both flanks (a pattern real ridges never show), and snow cover moved ~15 pp with build quality
+   alone. The holding depth is a **repose-anchored taper**, `H0 * min(1, tan(repose)/slope) *
+   roughness`, where roughness comes from the terrain's own Laplacian (ledgy ground holds more,
+   smooth slab sheds sooner). The corpus's 50–60° shed band was tried as the retention law first
+   and rejected with numbers: in the viewport's autoleveled frame ~90% of this map exceeds 60°, so
+   a band law left 23.7% of the most-convex decile below the render-opaque threshold — streaks
+   where the reference look needs cover. The taper keeps the **repose slider physical** (it now
+   drives both transport and retention), thins to translucent streaks by ~80°, and `Adhesion depth
+   = 0` restores the strip-to-bare behaviour exactly. Measured, uniform cold: convex-decile bare
+   **81.7% → 0.0%**, cover change between build qualities **15.6 pp → 0.0 pp**. Coverage is now
+   convergent; drift depths above the hold keep maturing with iterations (the deferred
+   deposition-bound work), which is why the claim is scoped to coverage.
+5. **Wind:** the corpus `snowStep`'s fifth step, previously absent. Snow scours where the snow
+   surface rises into the wind — capped at a **0.5 m transportable surface layer per pass**, because
+   saltation moves loose surface snow, not the consolidated pack — and each scoured parcel walks
+   downwind to the **shadow zone**: the first cell where the surface stops rising into the wind,
+   just past the local drift crest (walk capped at ~30 m regardless of grid). Both refinements were
+   forced by face-integrated measurement, not taste: the reference port's fixed one-cell deposit,
+   on terrain whose settled drifts decouple from bedrock, landed mass on still-windward ground and
+   produced the exact inversion of the process (windward faces **gained** 9.3%); uncapped, single
+   20 m drift shoulders donated 8 m per pass and swamped every face budget. Final measured
+   signature, wind 0.7 vs calm: windward bedrock faces **−2.6%**, lee faces **+2.5%**, crest-line
+   cornice 4.04 m lee vs 3.67 m brow. Event duration scales with strength (3–8 passes); wind
+   deliberately ignores the holding depth — scour is precisely the process that strips adhered
+   snow — and cornices are not re-settled afterwards, because a cornice IS an over-steepened lee
+   deposit.
+6. **Frame consistency:** the climate stack simulates the **same terrain the viewport draws** —
+   and establishing which frame that actually is consumed one full review cycle, so it is recorded
+   here. The viewport **autolevels** every displayed field to the full `[datum, datum + height]`
+   span, and its climate readout and fallback temperature derive from that normalised height.
+   `metricHeightField` matches it. During this work the opposite "physical" contract
+   (`datum + field*height`, no renormalisation) was briefly shipped, on the strength of two
+   independent investigations that both mis-read the renderer — they saw `hgt*height` consumers
+   downstream of an already-normalised `hgt` and missed the normalisation at fill time. That
+   change made the solver simulate a world 2.12× *flatter* than drawn: the exact inversion of the
+   defect it claimed to fix, caught by a cross-model review before commit. The moral is encoded as
+   `_verify_snow_physics.js` gate **G0**, which mirrors the viewport's composition independently
+   rather than trusting anyone's reading of it — including this paragraph's.
+7. **Rendering:** the depth field displaces geometry and normals. A composed solid-surface heightfield
    also includes frozen-water support plus snow-on-ice, while the underlying bedrock stream stays
    non-destructive for downstream geology/hydrology. The same field controls a
    high-albedo, rough dielectric material; deferred shadows, AO, water intersection, and terrain
-   normals sample the displaced surface too.
+   normals sample the displaced surface too. Two display-only treatments (the physics depth field is
+   never modified): a **depth-weighted drape** relaxes the snow top toward a smoothed composite —
+   snow is a blanket, and a surface deep enough to bury a feature cannot also express that feature,
+   so thin dustings follow the ground exactly while deep pack rounds it off, with displacement
+   bounded symmetrically at 0.6× the local depth because a blanket redistributes within its own
+   thickness — unbounded lift filled couloirs with metres of displayed snow that had no mass behind
+   it, and on a crag whose curvature exceeds the local pack the clamp binds, correctly: a 3 m
+   blanket cannot bury a 7 m spike — and the coverage edge
+   is modulated by the same surface noise the ground albedo uses, because a pure depth threshold
+   draws the snowline as a clean painted rim where real melt edges are patchy at grain scale.
+
+`_verify_snow_physics.js` gates all of this and was landed **red on the unmodified build**: convex-
+decile bare 81.7% → **0.0%**; quality delta 15.6 → **0.0 pp**; synthetic 45°/75° roofs, crest stripped
+to 0.000 → retained **0.96 m**, identical at 18 and 72 iterations, with flanks genuinely thinned (so
+retention cannot be satisfied by a dead avalanche mechanism); wind absent → windward faces **−2.6%**
+/ lee faces **+2.5%** vs a calm run, mass conserved to 5e-9. Three of its own metrics were discarded
+during development for measuring the wrong thing — a face-mean diluted by the saltation conveyor, and
+two crest-line selections biased by which surface detected the crest — each replaced by one that
+fails on the defect it names. Deposition remains unbounded (max drift grows ~37% between 18 and 32
+iterations; reported, not gated) — bounding it needs its own design.
 
 The climate Sun Shadow intentionally is not a cascaded shadow map. A CSM partitions the current
 **camera frustum** to improve perspective shadow-map resolution, so it is view-dependent and can change

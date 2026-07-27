@@ -48,7 +48,7 @@
     "slopemask": "4b5b0f7e:ea4482a9",
     "smax": "cede0425:d179d43a",
     "smin": "c38c148d:6fb96636",
-    "snow": "263bdef7:bcf4a390|snowLayer_depthM=c4d3ded0:942606f4|snowLayer_volumeM3=30764049.680926424|snowLayer_depositedM3=32156128.085425403|snowLayer_meltedM3=1392078.4119288097|snowLayer_movedM3=143345450.57868516|snowLayer_maxDepthM=59.18733215332031|snowLayer_coverage=0.3546600341796875|snowLayer_iterationsRun=14",
+    "snow": "263bdef7:bcf4a390|snowLayer_depthM=c4d3da68:b6b077f1|snowLayer_volumeM3=30764049.627772294|snowLayer_depositedM3=32156128.085425403|snowLayer_meltedM3=1392078.4119288097|snowLayer_movedM3=125429754.42304227|snowLayer_maxDepthM=55.53508377075195|snowLayer_coverage=0.7271575927734375|snowLayer_iterationsRun=14",
     "stampn": "4e87387a:3e4f65d7",
     "streampower": "88db1934:bdfb34c4",
     "tectonic": "6490b46c:75aeb0ab",

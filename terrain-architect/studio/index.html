@@ -321,6 +321,10 @@ select.btn{appearance:none;padding-right:22px;
 .field .frow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
 .field label{font-size:11px;color:var(--muted);letter-spacing:.2px}
 .field .val{font-family:var(--mono);font-size:11px;color:var(--text);font-variant-numeric:tabular-nums}
+.logticks{position:relative;height:11px;margin-top:-2px}
+.logticks span{position:absolute;transform:translateX(-50%);font-size:9px;color:#777;font-family:var(--mono)}
+.logticks span:first-child{transform:none}
+.logticks span:last-child{transform:translateX(-100%)}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;
   background:var(--panel3);outline:none;margin:2px 0}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
@@ -2903,6 +2907,19 @@ function propagateFieldMetadata(field,inputs,def){
   return field;
 }
 function metricHeightField(inp,n,def){
+  // EXACTLY the viewport's frame: autolevel to the full [datum, datum+height] span. The viewport
+  // unconditionally renormalises whatever field it displays (see the `(field[i]-mn)/d` fill in
+  // updateViewport), so "Relief height" is the vertical span OF WHAT IS DRAWN, the climate readout
+  // and fallback temperature use that normalised height, and the climate stack must live in the
+  // same frame or the snowline sits at elevations the user cannot see.
+  // A CORRECTION RECORDED SO IT IS NOT RE-DISCOVERED: this function was briefly changed to the
+  // "physical" contract (datum + f*height, no renormalisation) on the theory that the renderer
+  // used that transform. It does not - two separate investigations mis-read the renderer by
+  // looking at `hgt*height` consumers downstream of an ALREADY-normalised hgt and missing the
+  // normalisation at fill time. That change made the solver simulate a world 2.12x FLATTER than
+  // drawn - the exact inversion of the defect it claimed to fix. If a field-value-is-absolute
+  // elevation contract is ever wanted, the viewport autolevel must change in the same commit,
+  // with the display consequences for non-normalised graphs accepted deliberately.
   const N=n*n,[mn,mx]=fieldRange(inp),range=mx-mn||1,out=new Float32Array(N),heightM=def.height||2600;
   const datum=def.baseElevation||0;
   for(let i=0;i<N;i++)out[i]=datum+(inp[i]-mn)/range*heightM;
@@ -3015,6 +3032,66 @@ function simulateSnowLayer(inp,p={},context={}){
     depositedM3+=deposited*cellArea;meltedM3+=melted*cellArea;preAvalancheM3+=depthM[i]*cellArea;
   }
   const repose=(p.repose==null?38:p.repose)*Math.PI/180,talus=Math.tan(repose);
+  // HOLDING DEPTH: the snow that adheres to the ground and is not available to avalanche. Without
+  // it, the only equilibrium on ground steeper than repose is ZERO depth - the instability term
+  // contains the bedrock drop, which removing snow cannot reduce - and the approach to it is a
+  // drain front: on a planar over-steep face transport is a conveyor (each cell receives what its
+  // upslope neighbour loses), so only the topmost divergent cell net-drains, then its neighbour,
+  // one cell per iteration. Ridges and spurs therefore stripped bare with a bare band exactly
+  // iterations x cellSize wide - no physical quantity in it - and snow COVER changed ~15 pp with
+  // build quality alone, because quality scales the iteration count. The holding depth changes
+  // that terminal value from zero to an adhered residual, which is what makes the covered/bare
+  // classification convergent. Depths above the hold keep maturing with more iterations; that
+  // remaining trend is the deferred deposition-bound work, not this mechanism.
+  //   hold = H0 * min(1, tan(repose)/slope) * roughness
+  // A repose-anchored taper - the law actually implemented below; see the block above the formula
+  // for why the corpus's 50-60 deg shed band was measured and REJECTED as the retention law on
+  // this terrain class. `roughness` is the answer to "what does snow stick TO": micro-relief
+  // measured from the terrain itself (|Laplacian| against its own interior mean), so ledgy, blocky
+  // ground holds more and smooth slab sheds sooner - cliffs strip in streaks, not uniformly. H0
+  // and the 0.6-1.6 range are AUTHORED look controls (the corpus has no adhesion-depth row); H0=0
+  // restores the strip-to-bare behaviour exactly. Slope from the TERRAIN, one-sided differences at
+  // the border ring - a zeroed ring reads as flat, holds a full deposit, and rims the map.
+  const holdH0=clamp(p.adhesion==null?.6:p.adhesion,0,2);   // fallback MUST equal the schema default: a node evaluated before hydration and after must produce the same terrain
+  const hold=new Float32Array(N);
+  if(holdH0>0){
+    const tanRepose=Math.tan(repose);
+    // Laplacian on the INTERIOR only, rim copied from the nearest interior cell. A clamped-index
+    // stencil at the rim folds the cell's own rise back into itself, reading a planar slope as
+    // curvature - the border ring then clamps to maximum roughness and the map grows a one-cell
+    // frame that holds ~45% more snow than the ground beside it. The mean is interior-only for the
+    // same reason.
+    const lap=new Float32Array(N);let lapSum=0,lapCount=0;
+    for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+      const i=y*n+x;
+      const l=Math.abs(baseM[i-1]+baseM[i+1]+baseM[i-n]+baseM[i+n]-4*baseM[i]);
+      lap[i]=l;lapSum+=l;lapCount++;
+    }
+    for(let x=0;x<n;x++){lap[x]=lap[n+Math.min(Math.max(x,1),n-2)];
+      lap[(n-1)*n+x]=lap[(n-2)*n+Math.min(Math.max(x,1),n-2)];}
+    for(let y=0;y<n;y++){lap[y*n]=lap[Math.min(Math.max(y,1),n-2)*n+1];
+      lap[y*n+n-1]=lap[Math.min(Math.max(y,1),n-2)*n+n-2];}
+    const lapMean=Math.max(lapSum/Math.max(lapCount,1),1e-6);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const i=y*n+x,xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+      const gx=(baseM[y*n+xp]-baseM[y*n+xm])/((xp-xm)*cell);
+      const gy=(baseM[yp*n+x]-baseM[ym*n+x])/((yp-ym)*cell);
+      const s=Math.hypot(gx,gy);
+      const rough=clamp(.6+.5*lap[i]/lapMean,.6,1.6);
+      // Repose-anchored retention taper: full adhesion at or below the repose angle, decaying as
+      // tan(repose)/slope above it - never exactly zero, so every cell has a fixed point and the
+      // covered/bare classification is convergent. The corpus's 50-60 deg shed band was evaluated
+      // as the retention law first and REJECTED FOR THIS TERRAIN CLASS with numbers: in the
+      // viewport's autoleveled frame ~90% of this map's cells exceed 60 deg, so a band law leaves
+      // streak-only cover on most convex ground - measured 23.7% of the most-convex decile below
+      // the render-opaque threshold. Real alpine ridges at 60-70 deg hold wind-packed, rime-bonded
+      // snow; the taper reproduces that, thins to translucent streaks by ~80 deg, and keeps the
+      // REPOSE SLIDER physical (it now moves both transport and retention). Authored law in the
+      // holding-depth family - the corpus has no adhesion row; magnitude and roughness range are
+      // look controls, and adhesion 0 restores the strip-to-bare behaviour exactly.
+      hold[i]=holdH0*Math.min(1,tanRepose/Math.max(s,1e-6))*rough;
+    }
+  }
   const rate=clamp(p.settle==null?.55:p.settle,0,1),authoredIters=Math.max(0,p.iterations==null?12:p.iterations|0);
   const k=context.resScale==null?(SCALE_RES?n/REF_RES:1):context.resScale;
   const travel=(context.quality||BUILD_QUALITY)==="final"?k:Math.min(1.5,Math.sqrt(k));
@@ -3026,6 +3103,9 @@ function simulateSnowLayer(inp,p={},context={}){
     delta.fill(0);let moved=0;
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
       const i=y*n+x,available=depthM[i];if(available<=1e-7)continue;
+      // Only the surplus above the holding depth is mobile. The FULL column still loads neighbours
+      // (surface below is unchanged): adhered snow is not transportable, but it is not weightless.
+      const mobile=available-hold[i];if(mobile<=1e-7)continue;
       const surface=baseM[i]+available;let sum=0,maxExcess=0,kb=0;
       for(const[dx,dy,dist]of nb){
         const xx=x+dx,yy=y+dy;
@@ -3034,7 +3114,7 @@ function simulateSnowLayer(inp,p={},context={}){
         const q=e>0?e:0;excess[kb++]=q;sum+=q;if(q>maxExcess)maxExcess=q;
       }
       if(sum<=0)continue;
-      const out=Math.min(available,rate*maxExcess*.5);kb=0;
+      const out=Math.min(mobile,rate*maxExcess*.5);kb=0;
       for(const[dx,dy]of nb){
         const q=excess[kb++];if(q<=0)continue;
         const j=(y+dy)*n+x+dx,transfer=Math.min(out*q/sum,q*.5);
@@ -3044,6 +3124,73 @@ function simulateSnowLayer(inp,p={},context={}){
     for(let i=0;i<N;i++)depthM[i]=Math.max(0,depthM[i]+delta[i]);
     movedM3+=moved*cellArea;iterationsRun=it+1;
     if(moved*cellArea<Math.max(1e-5,preAvalancheM3*1e-8))break;
+  }
+  // WIND REDISTRIBUTION - corpus snowStep step 5, grounded on reference-impl/snow.py
+  // wind_redistribute: scour snow where the SNOW SURFACE rises into the wind; deposit it in the
+  // SHADOW ZONE. This is the process gravity settling cannot imitate: windward ground strips while
+  // the sheltered lee past a crest becomes the most heavily loaded ground on the mountain - a
+  // cornice. Runs LAST, per the corpus ordering, and cornices are deliberately not re-settled
+  // afterwards: a cornice is an over-steepened lee deposit, and a relaxation pass to repose would
+  // remove exactly the feature the wind built. Wind ignores the holding depth on purpose - wind
+  // scour is precisely the process that strips adhered snow.
+  // TWO DOCUMENTED DEVIATIONS FROM THE REFERENCE PORT, both found by measurement:
+  //  - Deposit target: the reference drops scoured mass at a FIXED one-cell offset. On terrain
+  //    whose settled drifts decouple from the bedrock (20 m drifts on 10 m cells), that lands mass
+  //    on ground that is still windward - measured face-integrated result: windward faces GAINED
+  //    9.3% and lee faces LOST 4.4%, the exact inversion of the process being modelled. The corpus
+  //    names this logic "the dune shadow-zone logic" (05), and the dune model deposits in the
+  //    SHELTERED zone: here each scoured parcel walks downwind to the first cell where the surface
+  //    stops rising into the wind (just past the local drift crest), capped at ~30 m of reach.
+  //  - Border: numpy's roll WRAPS, teleporting mass to the far edge; here it stays in place.
+  const windStrength=clamp(p.windStrength==null?.35:p.windStrength,0,1); // fallback = schema default, same reason as adhesion
+  if(windStrength>0){
+    const dirRad=((p.windDirection==null?300:p.windDirection)%360)*Math.PI/180;
+    // "Wind from" bearing, map-relative (0 = from map-top, clockwise). Blowing-toward vector:
+    const wx=-Math.sin(dirRad),wy=Math.cos(dirRad);
+    // sign*round(abs), NOT Math.round: JS rounds half UP, so Math.round(0.5)=1 but
+    // Math.round(-0.5)=-0, and mirrored bearings (240 vs 300) would transport on different axes.
+    const dj=Math.sign(wx)*Math.round(Math.abs(wx)),di=Math.sign(wy)*Math.round(Math.abs(wy));
+    // The walk cap is a DISTANCE (~30 m of saltation reach along a cardinal; ~42 m diagonal, an
+    // accepted stretch), not a cell count, so cornice scale does not depend on the sim grid.
+    const walkCap=clamp(Math.round(30/cell),2,24);
+    // Pass count is the event-duration proxy: with the transportable layer capped per pass, a
+    // fixed 3 passes moves the same volume at every strength and the slider only reshapes WHERE
+    // it goes. Strength now scales both the per-pass rate and how long the event blows (3-8).
+    const windPasses=Math.round(3+5*windStrength);
+    const wRate=.45*windStrength,scour=new Float32Array(N),expo=new Float32Array(N);
+    for(let pass=0;pass<windPasses;pass++){
+      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+        const i=y*n+x;
+        const xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+        const sx=(baseM[y*n+xp]+depthM[y*n+xp]-baseM[y*n+xm]-depthM[y*n+xm])/((xp-xm)*cell);
+        const sy=(baseM[yp*n+x]+depthM[yp*n+x]-baseM[ym*n+x]-depthM[ym*n+x])/((yp-ym)*cell);
+        expo[i]=wx*sx+wy*sy;                             // >0: surface rising INTO the wind
+        // Saltation moves the LOOSE SURFACE LAYER, not the consolidated pack: uncapped, a 20 m
+        // drift shoulder donates ~8 m per pass and that single flux swamps every face budget
+        // (measured: windward faces NET GAINED because gully-drift outflow landed on their toes).
+        // 0.5 m per pass is an authored transportable-layer cap, documented as such.
+        scour[i]=depthM[i]<=1e-7?0:wRate*Math.min(depthM[i],.5)*Math.tanh(5*Math.max(0,expo[i]));
+      }
+      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+        const i=y*n+x,q=scour[i];if(q<=0)continue;
+        // Walk downwind to shelter: the first cell no longer rising into the wind, i.e. just past
+        // the local drift crest. If nothing shelters within the cap, drop at the cap (suspension
+        // limit). Off-grid at any step: mass stays where it is (no wrap).
+        let tx=x,ty=y,sheltered=false,offGrid=false;
+        for(let step2=0;step2<walkCap;step2++){
+          const nx2=tx+dj,ny2=ty+di;
+          if(nx2<0||ny2<0||nx2>=n||ny2>=n){offGrid=true;break;}
+          tx=nx2;ty=ny2;
+          if(expo[ty*n+tx]<=0){sheltered=true;break;}
+        }
+        // Deposit when sheltered or at the suspension cap. A walk that runs OFF the grid leaves
+        // the parcel where it started - otherwise every unsheltered parcel within reach of the
+        // downwind edge piles onto the border cell and the map grows a snow rim (the same class
+        // of artefact as the Laplacian rim above).
+        if(offGrid)continue;
+        depthM[i]-=q;depthM[ty*n+tx]+=q;movedM3+=q*cellArea;
+      }
+    }
   }
   let volumeM3=0,maxDepthM=0,covered=0;
   for(let i=0;i<N;i++){const d=depthM[i];volumeM3+=d*cellArea;if(d>maxDepthM)maxDepthM=d;if(d>.01)covered++;}
@@ -3192,6 +3339,12 @@ function hydroFixField(inp,p){
    ===================================================================== */
 const P={
   slider:(key,label,min,max,def,step=0.01,fmt)=>({key,label,type:"slider",min,max,def,step,fmt}),
+  // Logarithmic slider for quantities whose useful range spans decades (snowfall: a dusting is
+  // 0.05 m, a heavy winter 10 m - on a linear 0-20 m track everything interesting lives in the
+  // first few pixels). `floor` is the smallest non-zero value; position 0 is exactly zero when
+  // `zero` is set. The value stored in params is always the REAL quantity, so serialisation,
+  // digests and every consumer are unaffected by how the track is warped.
+  log:(key,label,floor,max,def,fmt,zero=true)=>({key,label,type:"slider",scale:"log",floor,max,def,fmt,zero,min:0,step:.0025}),
   number:(key,label,min,max,def,step=0.01,unit="",fmt)=>({key,label,type:"number",min,max,def,step,unit,fmt}),
   int:(key,label,min,max,def)=>({key,label,type:"slider",min,max,def,step:1,fmt:v=>v|0}),
   select:(key,label,opts,def)=>({key,label,type:"select",opts,def}),
@@ -3615,19 +3768,22 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br>The optional <b>Temperature</b> input controls phase locally: standing water freezes cell by cell, independent of whether a Snow node exists. Without it, the clearly labelled fallback climate in Terrain Definition is used. <b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
   snow:{cat:"effect",name:"Snow",ins:["In","Temperature"],desc:"A transient snow-depth layer in metres: snowfall accumulates, sun and temperature melt it, and avalanches move it from steep faces into gullies and hollows. Liquid water excludes snow; frozen standing water can receive it.",
     passthrough:true,effect:"snow",
-    params:[GROUP(P.slider("snowfall","Snowfall",0,20,3,.1,v=>v.toFixed(2)+" m"),"Accumulation"),
+    params:[GROUP(P.log("snowfall","Snowfall",.02,20,3,v=>v<.995?(v*100).toFixed(0)+" cm":v.toFixed(2)+" m"),"Accumulation"),
       GROUP(P.slider("meltDays","Melt period",0,120,45,1,v=>(v|0)+" days"),"Climate & melt"),
-      GROUP(P.slider("meltRate","Degree-day melt",0,20,10,.25,v=>v.toFixed(2)+" mm/°C/day"),"Climate & melt"),
+      GROUP(P.log("meltRate","Degree-day melt",.05,20,10,v=>v.toFixed(2)+" mm/°C/day"),"Climate & melt"),
       GROUP(P.slider("repose","Snow repose angle",20,60,38,1,v=>(v|0)+"°"),"Avalanche & settling"),
+      GROUP(P.slider("adhesion","Adhesion depth",0,2,.6,.05,v=>v.toFixed(2)+" m"),"Avalanche & settling"),
       GROUP(P.int("iterations","Settling iterations",0,80,12),"Avalanche & settling"),
-      GROUP(P.slider("settle","Settling rate",.1,1,.55,.05,v=>v.toFixed(2)),"Avalanche & settling")],
+      GROUP(P.slider("settle","Settling rate",.1,1,.55,.05,v=>v.toFixed(2)),"Avalanche & settling"),
+      GROUP(P.slider("windStrength","Wind strength",0,1,.35,.05,v=>v.toFixed(2)),"Wind"),
+      GROUP(P.slider("windDirection","Wind from",0,360,300,5,v=>(v|0)+"° map"),"Wind")],
     eval:(p,ins,nd)=>{
       const h=ins[0]||newField(),meta=fieldMetadata(ins[1])||{};
       const temperature=temperatureCFromField(ins[1]);
       nd._inputError=ins[1]&&!temperature?"Temperature input requires a physical Temperature field":null;
       nd._snowLayer=evaluateSnowLayer(h,p,temperature,meta.solarShadow,meta.solarExposure);return h;
     },
-    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. The renderer composes that thickness into a solid-surface heightfield, including above frozen water, so lighting, picking, and visible elevation follow the snow top. The underlying terrain output stays unchanged until an explicit bake/export-surface workflow is requested. <b>Snowfall</b> is settled vertical depth; precipitation transitions from rain to snow around freezing, and <b>degree-day melt</b> removes snow above 0 °C. The Temperature input consumes the final physical field wired into it—including Temperature Modify, a valid temperature Blend, Blur, or future Lava processing. Without one, Terrain Definition's fallback climate is used.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle. This moves snow off unstable faces and accumulates it in gullies and hollows. The implementation follows the placement/stability split of Fearing (2000) and the temperature, sunlight, melt and avalanche model family of Cordonnier et al. (2018)."},
+    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. The renderer composes that thickness into a solid-surface heightfield, including above frozen water, so lighting, picking, and visible elevation follow the snow top. The underlying terrain output stays unchanged until an explicit bake/export-surface workflow is requested. <b>Snowfall</b> is settled vertical depth; precipitation transitions from rain to snow around freezing, and <b>degree-day melt</b> removes snow above 0 °C. The Temperature input consumes the final physical field wired into it—including Temperature Modify, a valid temperature Blend, Blur, or future Lava processing. Without one, Terrain Definition's fallback climate is used.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle, and transports only the surplus above a slope- and roughness-dependent <b>Adhesion depth</b> — the snow that clings to ledges and rough ground. Ridges and spurs therefore hold cover, cliffs thin to streaks rather than stripping bare, and snow COVERAGE no longer depends on iteration count or build quality (drift depths keep maturing with more iterations; only the covered/bare classification is convergent). <b>Wind</b> then scours windward brows and loads the first lee cells — cornices — and deliberately is not re-relaxed afterwards, since a cornice is an over-steepened lee deposit by definition. The implementation follows the placement/stability split of Fearing (2000) and the five-step accumulate/melt/shed/avalanche/wind model of Cordonnier et al. (2018); adhesion magnitude and its micro-roughness modulation are authored controls, not corpus constants."},
   satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Authors one colour gradient, driven by height, slope, or any field wired into Driver. Chain a masked SatMap over another for a simple overlay, or blend separate SatMap branches in Color Blend for explicit biome composition. Height passes through unchanged.",
     passthrough:true,effect:"satmap",
     params:[P.select("gradient","Gradient",null,"Temperate"),
@@ -4576,12 +4732,37 @@ function buildField(pr){
   if(pr.type==="slider"){
     const val=selected.params[pr.key];
     f.innerHTML=`<div class="frow"><label>${pr.label}</label><span class="val">${fmtVal(pr,val)}</span></div>`;
-    const inp=document.createElement("input");inp.type="range";inp.min=pr.min;inp.max=pr.max;inp.step=pr.step;inp.value=val;
+    const inp=document.createElement("input");inp.type="range";
+    const isLog=pr.scale==="log";
+    // Log track: the INPUT runs in position space [0,1]; params always hold the real value. The
+    // wheel handler needs no special case - a fixed position step is multiplicative in value.
+    const logSpan=isLog?Math.log(pr.max/pr.floor):0;
+    const toPos=v=>v<=(pr.zero?0:pr.floor)?0:clamp(Math.log(Math.max(v,pr.floor)/pr.floor)/logSpan,0,1);
+    const fromPos=t=>(pr.zero&&t<=0)?0:pr.floor*Math.exp(clamp(t,0,1)*logSpan);
+    if(isLog){inp.min=0;inp.max=1;inp.step=pr.step;inp.value=toPos(val);}
+    else{inp.min=pr.min;inp.max=pr.max;inp.step=pr.step;inp.value=val;}
     let before=null,changed=false;
-    inp.oninput=()=>{if(!before)before=graphSnapshot();changed=true;selected.params[pr.key]=parseFloat(inp.value);f.querySelector(".val").textContent=fmtVal(pr,selected.params[pr.key]);
+    inp.oninput=()=>{if(!before)before=graphSnapshot();changed=true;
+      selected.params[pr.key]=isLog?fromPos(parseFloat(inp.value)):parseFloat(inp.value);
+      f.querySelector(".val").textContent=fmtVal(pr,selected.params[pr.key]);
       markParamDirty(selected);requestEval();};
     inp.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;};
     f.appendChild(inp);
+    if(isLog){
+      // The indication the warped track needs: without it a knob two-thirds along reading "1.2 m"
+      // on a 0-20 track is disorienting. Decade labels sit at their true track positions.
+      const ticks=document.createElement("div");ticks.className="logticks";
+      const marks=[];if(pr.zero)marks.push([0,"0"]);
+      for(let d=Math.ceil(Math.log10(pr.floor));Math.pow(10,d)<=pr.max*1.0001;d++){
+        const v=Math.pow(10,d);if(v<pr.floor)continue;
+        marks.push([toPos(v),String(v)]);
+      }
+      // Max label only when it will not collide with the last decade label.
+      if(!marks.some(m=>m[0]>.92))marks.push([1,String(pr.max)]);
+      ticks.innerHTML=marks.map(([t,lab])=>
+        `<span style="left:${(t*100).toFixed(1)}%">${lab}</span>`).join("");
+      f.appendChild(ticks);
+    }
   }else if(pr.type==="number"){
     const row=document.createElement("div");row.className="frow";const label=document.createElement("label");label.textContent=pr.label;
     const unit=document.createElement("span");unit.className="val";unit.textContent=pr.unit||"";
@@ -5020,7 +5201,13 @@ function initGL(){
       base*=mix(1.0,0.88+0.18*macro+0.08*grain,materialView);
       // Snow coverage comes from the simulated WORLD-METRE thickness attribute. Geometry and normals
       // are already displaced by the same SnowField, so the material cannot masquerade as accumulation.
-      float snowCov=smoothstep(.015,.10,vSnow)*materialView;
+      // Coverage edge modulated by the same surface noise the ground albedo uses (~70 m features
+      // at the default extent - sub-cell for the sim, coarse for a boot print). A pure depth
+      // threshold follows the depth field's smooth contours and draws the snowline as a clean
+      // painted rim; retention actually varies with micro-roughness the depth field cannot
+      // resolve, so the 1-15 cm transition band is broken up. Deeper snow is unaffected: the
+      // multiplier spans [0.65, 1.45), so full opacity moves at most to ~0.154 m.
+      float snowCov=smoothstep(.015,.10,vSnow*(.65+.55*grain+.25*macro))*materialView;
       vec3 snowAlb=srgbToLinear(vec3(.94,.965,.985))*mix(.93,1.04,.65*macro+.35*grain);
       base=mix(base,snowAlb,snowCov);
       // Fresh snow is a rough dielectric with a broad forward-scattering sheen, not polished plastic.
@@ -5514,6 +5701,49 @@ function updateViewport(f,rootNode,options){
   if(geometryChanged){
     const H=H_SCALE,snow=layerDepth?Float32Array.from(layerDepth):new Float32Array(n*n);
     if(curWater)for(let i=0;i<snow.length;i++)if(curWater[i]>hgt[i]+1e-7)snow[i]=0;
+    // SNOW DRAPE - display only; the physics depth field is untouched (this is already a copy).
+    // Snow is a blanket: a surface deep enough to bury a feature cannot also express that feature.
+    // Composing snowTop = terrain + depth verbatim keeps every crag knife-sharp under metres of
+    // cover, which reads as white-painted rock - the single strongest "cartoon" tell. So the snow
+    // TOP is relaxed toward a smoothed composite, weighted by local depth: thin dustings follow the
+    // ground exactly, deep pack rounds it off. The top never dips below ground, and never below 35%
+    // of the physical depth, so coverage classification in the shader stays honest.
+    {
+      let hasSnow=false;for(let i=0;i<snow.length;i++)if(snow[i]>1e-6){hasSnow=true;break;}
+      if(hasSnow){
+        const invH=1/Math.max(terrainDef.height,1e-6);
+        const comp=new Float32Array(n*n),tmp=new Float32Array(n*n);
+        for(let i=0;i<n*n;i++)comp[i]=hgt[i]+snow[i]*invH;
+        const blur=(src,dst)=>{ // separable 3-tap box, border-replicated
+          for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+            dst[i]=(src[y*n+Math.max(0,x-1)]+src[i]+src[y*n+Math.min(n-1,x+1)])/3;}
+          for(let x=0;x<n;x++)for(let y=0;y<n;y++){const i=y*n+x;
+            tmp[i]=(dst[Math.max(0,y-1)*n+x]+dst[i]+dst[Math.min(n-1,y+1)*n+x])/3;}
+          dst.set(tmp);
+        };
+        // Two passes into DISTINCT buffers. blur(b,b) would alias src and dst in the horizontal
+        // sweep, turning the box filter into a one-sided recursive filter with an exponential tail
+        // in +x only - an east-biased drape that lifts cells from content up to five cells west.
+        const b=new Float32Array(n*n),b2=new Float32Array(n*n);
+        blur(comp,b);blur(b,b2);                         // [1,2,3,2,1]/9 per axis, ~5-cell blanket
+        for(let i=0;i<n*n;i++){
+          const dM=snow[i];if(dM<=1e-6)continue;
+          const w=smooth(clamp((dM-.3)/1.7,0,1));        // drape from 0.3 m, full by 2 m of pack
+          // Displacement bounded SYMMETRICALLY by the local pack: a blanket redistributes within
+          // its own thickness, so the top may deviate from terrain+depth by at most 0.6 x depth in
+          // either direction. Unbounded lift filled couloirs with metres of displayed snow that
+          // had no physical mass behind it; and on a crag whose 5-cell curvature exceeds the local
+          // pack this clamp binds - correctly: a 3 m blanket CANNOT bury a 7 m spike, so sharp
+          // ground is only partially rounded. That is the physical behaviour, not a compromise.
+          // The symmetric clamp is also the floor: top >= comp - 0.6*dM = ground + 0.4*dM, so a
+          // draped cell keeps >= 40% of its physical depth and a covered cell can never read bare.
+          // (Below 0.3 m of pack w = 0 and the drape is exactly a no-op, which is what actually
+          // protects the 1-15 cm coverage band.)
+          const lim=.6*dM*invH,disp=clamp((b2[i]-comp[i])*w,-lim,lim);
+          snow[i]=(comp[i]+disp-hgt[i])/invH;
+        }
+      }
+    }
     const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),surface=new Float32Array(n*n),surfaceTex=new Float32Array(n*n);
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
       surface[i]=hgt[i]*H+snow[i]/terrainDef.scale;
@@ -6521,7 +6751,7 @@ function defaultGraph(){
   const water=makeNode("water",1160,120);water.params={mode:"hydro",lakes:"on",lakeMin:.001,flow:.5,riverDepth:.7,level:.12,shoreSmooth:1.35,foam:.18};
   const temperature=makeNode("d_temperature",1160,330);
   const temperatureModify=makeNode("d_heat",1320,330);
-  const snow=makeNode("snow",1320,120);snow.params={snowfall:3,meltDays:45,meltRate:10,repose:38,iterations:12,settle:.55};
+  const snow=makeNode("snow",1320,120);Object.assign(snow.params,{snowfall:3,meltDays:45,meltRate:10,repose:38,iterations:12,settle:.55}); // assign, never replace: wholesale replacement dropped adhesion/wind, so the default document shipped WITHOUT the new physics and merely CLICKING the node re-hydrated the keys and changed the terrain
   const out=makeNode("output",1480,120);out.params={norm:"on"};
   edges.push({from:base.id,to:mix.id,slot:0});
   edges.push({from:ridge.id,to:mix.id,slot:1});
