@@ -65,7 +65,14 @@ def thermal_on_layer(base, layer, repose_slope, iters=4, cellsize=1.0, factor=0.
 def wind_redistribute(h, snow, wind, *, cellsize=1.0, rate=0.4, iters=3):
     """Scour snow from windward-exposed cells and deposit it one cell downwind — the dune shadow-zone
     logic (`05`), which strips crests and builds lee cornices. `wind=(u, v)` in (col, row) components.
-    Conserves snow (scoured mass is re-deposited, not lost)."""
+    Conserves snow (scoured mass is re-deposited, not lost).
+
+    PRODUCTION CAVEATS, measured 2026 (see 13): np.roll WRAPS at the border, teleporting scoured
+    mass to the far edge of the tile - clamp in production. And the fixed one-cell deposit assumes
+    the snow surface tracks the bedrock; on deep settled drifts that decouple from it, parcels land
+    on still-windward ground and the face-integrated effect INVERTS (windward +9.3% measured).
+    Production form: walk each parcel downwind to the first sheltered cell (surface no longer
+    rising into the wind), cap the walk in metres, and cap the transportable layer per pass."""
     u, v = wind
     mag = float(np.hypot(u, v)) + 1e-30
     u, v = u / mag, v / mag

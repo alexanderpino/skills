@@ -209,6 +209,9 @@ then re-cut a shallow version after.
 
 ## Filtering
 
+(On a hexagonal lattice, note, separability is lost along the lattice axes - iterate the
+7-point isotropic Laplacian or pay a true 2D kernel; `26`.)
+
 The general rule: **Gaussian blur is wrong for terrain.** It smooths ridges and cliffs — the
 exact features you want to keep — and leaves the noise you wanted to remove roughly where it
 was. Everything below is a better default.

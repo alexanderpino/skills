@@ -304,6 +304,32 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 
 ### The grid-anisotropy family
 
+A fourth cure joined the three below: **change the lattice** so no preferred axis exists
+(`26`). It removes the *metric* inconsistency (the √2 bug class) and the 4-fold mode -
+rows here for missing-√2 weighting, thermal-not-per-neighbour and the 4-pipe stencil become
+structurally impossible on hex - but single-receiver parallel lines and depression-fill rows
+survive on any lattice. Two hex oracles: C6-vs-C4 cone symmetry (geometric floors √2 vs
+2/√3; the win is the surviving mode changing ORDER), and index-buffer hash invariance under
+height edits - an assertion impossible to satisfy on an edge-spun square mesh.
+
+Two failure rows earned by measurement in a production snow stack (`13`):
+
+- **Snow cover changes with build quality / iteration count** -> the settling loop has no
+  fixed point above repose: the instability term contains the bedrock drop, which removing
+  snow cannot reduce, so the only equilibrium is zero and a drain front strips divergences
+  one cell per iteration (bare band = iterations x cellSize, symmetric on both flanks - a
+  pattern real ridges never show). Fix family: a HOLDING DEPTH (retention residual), which
+  makes the covered/bare classification convergent. Authored constants - no corpus row.
+- **Sim frame != display frame** -> one side renormalises heights and the other does not, so
+  every slope-gated process fires at angles that do not exist on screen and the snowline
+  sits at invisible elevations. The oracle must pin the sim's metric transform to the LIVE
+  renderer buffer, not to a transcription of either formula - two independent reviews
+  mis-read a renderer the same way and shipped the inversion of the fix.
+- **Wind/cornice metrics**: face-integrated windward-loss / lee-gain versus a calm run,
+  classified on the BEDROCK, is the only stable statistic found; face means are diluted by
+  the saltation conveyor, and crest-line selections are biased by whichever surface detected
+  the crest (measured 0.751 'lee loss' from selection bias alone).
+
 Many rows above are one disease: **a discrete stencil printing its directions through the
 physics**. Every grid algorithm quantises direction — to 8 neighbours, to 4 pipes, to lattice
 axes — and wherever the physics should be isotropic, that quantisation leaks into the output as

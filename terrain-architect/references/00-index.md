@@ -371,6 +371,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Map-projection distortion (scale factor `h`) | P | Snyder 1987 — divide gradients by `h` or erosion biases (`08`) |
 | Equirectangular / plate carrée (planetary interchange & delivery) | P (proj.) / F (resample) | Snyder 1987 — the lat-long DEM lingua franca (MOLA/LOLA/SRTM/GEBCO); an I/O format, **not** a sim grid — generate on cube-sphere/HEALPix, resample out with `cosφ` weighting (`08`, `25`) |
 | Flow routing on a spherical / DGGS grid | P | Liao et al. 2020 (hex); Liao et al. 2025 (ISEA equal-area) (`08`, `03`) |
+| Hexagonal sampling lattice (flat heightfields) | P | Petersen & Middleton 1962 (disc-band-limited optimality, exact 13.4%); Middleton & Sivaswamy 2005 (book) (`26`) |
+| D6 flow routing on hex DEMs | P | Wang & Ai 2018; Wang, Ai, Shen & Li 2020 - D8's diagonal-distance inconsistency named and removed; still single-receiver (`26`, `03`) |
+| Lattice cure for transport anisotropy (FHP) | P | Hardy, Pomeau & de Pazzis 1973; Frisch, Hasslacher & Pomeau 1986; Wolfram 1986 - C6 makes the 4th-rank moment tensor isotropic (`26`) |
+| Hex erosion for CG heightfields | ? | No published paper found (verified absence, 2026); F-tier translation of `04`/`05` via `26`'s kernels |
 | Cube-face-seam flow routing | F | Halo cells + per-face rotation tables; no canonical paper (`08`) |
 | DEM hydrological enforcement / pit removal | P | Hutchinson 1989 (ANUDEM); priority-flood + stream burning (`08`, `03`) |
 | SRTM void filling (delta-surface) | P | Reuter, Nelson & Jarvis 2007 (`08`) |

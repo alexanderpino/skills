@@ -874,6 +874,38 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
 
 ### DEM & sensor realism
 
+- **Petersen, D.P. & Middleton, D. (1962).** *Sampling and reconstruction of wave-number-limited
+  functions in N-dimensional Euclidean spaces.* Information and Control 5(4), 279-323. The
+  multidimensional Nyquist result; for disc band-limits the hexagonal lattice is minimum-density
+  (exactly 1 - sqrt(3)/2 = 13.4% fewer samples). Crossref-verified. (`26`)
+- **Mersereau, R.M. (1979).** *The processing of hexagonally sampled two-dimensional signals.*
+  Proc. IEEE 67(6), 930-949. Classic restatement; metadata Crossref-verified, TEXT NOT READ at
+  entry time (paywalled) - do not quote verbatim without pulling the paper. (`26`)
+- **Middleton, L. & Sivaswamy, J. (2005).** *Hexagonal Image Processing: A Practical Approach.*
+  Springer, ISBN 9781852339142. Addressing, convolution, square<->hex resampling. Cite the ISBN;
+  the series name was rebranded between printings. (`26`)
+- **Ehrhardt, J.C. (1993).** *Hexagonal fast Fourier transform with rectangular output.* IEEE
+  Trans. Signal Processing 41(3), 1469-1472. (`26`)
+- **Van De Ville, D., Philips, W. & Lemahieu, I. (2002).** *Least-squares spline resampling to a
+  hexagonal lattice.* Signal Processing: Image Communication 17(5), 393-408. The proper
+  square->hex resample; nearest/bilinear alias. (`26`)
+- **Wang, L. & Ai, T. (2018).** *The comparison of drainage network extraction between square and
+  hexagonal grid-based DEM.* ISPRS Archives XLII-4, 687-692. Introduces D6 by analogy with D8;
+  hex DEMs hold network shape better at coarse resolution. (`26`, `03`)
+- **Wang, L., Ai, T., Shen, Y. & Li, J. (2020).** *The isotropic organization of DEM structure and
+  extraction of valley lines using hexagonal grid.* Transactions in GIS 24(2), 483-507. Names
+  D8's orthogonal-vs-diagonal distance inconsistency as the anisotropy cause; hex removes it.
+  Best single citation for hex-fixes-D8 in a terrain context. (`26`)
+- **Hardy, J., Pomeau, Y. & de Pazzis, O. (1973).** *Time evolution of a two-dimensional model
+  system I.* J. Math. Phys. 14(12), 1746-1759. HPP: square lattice gas, anisotropic. (`26`)
+- **Frisch, U., Hasslacher, B. & Pomeau, Y. (1986).** *Lattice-gas automata for the Navier-Stokes
+  equation.* Phys. Rev. Lett. 56(14), 1505-1508. FHP: triangular lattice restores isotropy - THE
+  precedent for hex fixing square-grid transport anisotropy. APS text not independently read;
+  the moment-tensor argument is re-derived in `26`. (`26`)
+- **Wolfram, S. (1986).** *Cellular automaton fluids 1: Basic theory.* J. Stat. Phys. 45(3-4),
+  471-526. (`26`)
+- **Magillo, P. (2025).** *Non-square grids: A new trend in imaging and modeling?* Computer
+  Science Review 56, 100695. Survey; single entry point for further reading. (`26`)
 - **Hutchinson, M.F. (1989).** *A new procedure for gridding elevation and stream line data with
   automatic removal of spurious pits.* Journal of Hydrology 106(3–4), 211–232. — ANUDEM; drainage-
   enforced interpolation that removes pits during gridding (`08`, `03`).

@@ -218,6 +218,22 @@ ignores that snow *moves*.
 lee — the same shadow-zone logic as dunes (`05`). Reuse Werner's shadow-zone test with a snow
 field. Cornices are lee-side deposits at a crest.
 
+**Two production findings, measured (2026), that this pseudocode does not warn about.**
+(1) Step 4's thermal-on-layer has NO FIXED POINT on bedrock steeper than snowRepose: the excess
+term contains the bedrock drop, which removing snow cannot reduce, so the only equilibrium is
+zero depth and a drain front strips every divergence (ridge, spur) one cell per iteration - the
+bare band is literally `iterations x cellSize` wide and the result depends on iteration count.
+Production fix family: transport only the surplus above a HOLDING DEPTH (adhesion residual,
+authored - no corpus row; a repose-anchored taper measured well where the 50-60 deg band left
+streak-only cover on terrain that is mostly steeper than 60 deg). (2) Step 5's one-cell-downwind
+deposit assumes the snow surface tracks the bedrock; once settled drifts decouple (20 m drifts
+on 10 m cells), scoured parcels land on still-windward ground and the process measurably
+INVERTS (windward faces gained 9.3%). Deposit in the SHADOW ZONE instead - walk downwind to the
+first cell whose surface no longer rises into the wind (the `05` dune logic), cap the walk in
+metres, and cap the transportable layer per pass (saltation moves loose surface snow, not the
+consolidated pack). Also: `wind_redistribute`'s `np.roll` WRAPS at the border, teleporting mass
+to the far edge - clamp instead in production.
+
 *Runnable reference: `reference-impl/snow.py` (`snow_step` = this `snowStep`; the avalanche is
 `thermal_on_layer` — talus relaxation of the snow layer on a fixed base, the chapter's
 `thermal(field=snowDepth, base=h)`; plus `wind_redistribute`), verified by `tests/test_snow.py`.

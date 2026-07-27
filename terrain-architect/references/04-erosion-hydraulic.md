@@ -131,7 +131,8 @@ step(Δt):
   **8-pipe variant** with a per-pipe length — `l = cellSize` cardinal, `cellSize·√2` diagonal
   in the `Δh/l` flux term — the same distance correction D8 (`03`) and thermal erosion (`05`)
   require; the velocity field then sums all 8 fluxes componentwise (diagonal fluxes project
-  onto x/y with a `1/√2` factor). If you stay with 4 pipes for cost, know the artefact and
+  onto x/y with a `1/√2` factor). On a hexagonal lattice this constraint does not arise - six
+  pipes, one length (`26`). If you stay with 4 pipes for cost, know the artefact and
   review under a sun sweep (`09`) — the grid-anisotropy family table there lists its siblings.
 
 ## Št'ava et al. (2008) extensions

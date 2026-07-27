@@ -131,6 +131,12 @@ depression handling present*, **and** *are the legitimate basins masked out of i
 
 All flow from a cell goes to the single steepest downslope neighbour.
 
+> Hex counterpart: D6 removes the orthogonal-vs-diagonal distance inconsistency entirely
+> (all six neighbours at one distance - Wang & Ai 2018/2020, `26`) but remains single-receiver,
+> so the parallel-lines artefact survives; the cure is still MFD (MFD6: Freeman weights, and
+> Quinn's contour-length term collapses because all faces are equal).
+
+
 ```
 d8(dem, c):
     best = -INF; receiver = NONE
