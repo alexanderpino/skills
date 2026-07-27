@@ -8,11 +8,11 @@
 // Usage: node _verify_canyon_identity.js [page.html]   (default index.html)
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 const PAGE = process.argv[2] || 'index.html';
-const URL = 'file://' + path.resolve(__dirname, PAGE);
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, PAGE));
 
 (async()=>{
   const browser=await chromium.launch({executablePath:EXE,args:['--use-gl=angle','--use-angle=swiftshader',

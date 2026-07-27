@@ -3,10 +3,10 @@
 // neutral settings, post grading, blend modes/opacity, branch blending, and finite [0,1] color output.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const URL = 'file://' + path.resolve(__dirname, 'index.html');
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 
 (async()=>{
   const browser=await chromium.launch({executablePath:EXE,

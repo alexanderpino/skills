@@ -1,0 +1,22 @@
+{
+  "name": "skills-workspace",
+  "private": true,
+  "description": "Workspace root for buildable apps that live alongside the skills. Skills themselves stay buildless and install straight from their directory.",
+  "//type": "Deliberately NOT \"module\". This package.json sits at the repo root, so its type field governs every .js file beneath it - including the 51 CommonJS verification scripts in terrain-architect/studio, which use require() and would all fail with 'require is not defined in ES module scope'. ESM is declared in apps/terrain-studio/package.json instead, where it only governs the app.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @skills/terrain-studio",
+    "build": "npm run build --workspace @skills/terrain-studio",
+    "build:single": "npm run build:single --workspace @skills/terrain-studio",
+    "typecheck": "npm run typecheck --workspace @skills/terrain-studio",
+    "lint": "npm run lint --workspace @skills/terrain-studio",
+    "test": "npm run test --workspace @skills/terrain-studio",
+    "test:e2e": "npm run test:e2e --workspace @skills/terrain-studio",
+    "verify": "npm run verify --workspace @skills/terrain-studio"
+  }
+}

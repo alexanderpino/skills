@@ -74,9 +74,9 @@ const { chromium } = require('playwright-core');
 const path = require('path');
 const fs = require('fs');
 
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 
 const argv = process.argv.slice(2);
 const flag = name => argv.some(a => a === '--' + name || a.startsWith('--' + name + '='));
@@ -85,7 +85,7 @@ const flagVal = (name, dflt) => {
   return hit ? hit.slice(name.length + 3) : dflt;
 };
 const PAGE = argv.find(a => !a.startsWith('--')) || 'index.html';
-const URL = 'file://' + path.resolve(__dirname, PAGE);
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, PAGE));
 const WRITE = flag('write');
 const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);

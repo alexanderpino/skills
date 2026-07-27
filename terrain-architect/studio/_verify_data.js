@@ -1,10 +1,10 @@
 // Verify the Data Map nodes (Gaea "Derive" channels) evaluate, and that a SatMap can bind to each.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const URL = 'file://' + path.resolve(__dirname, 'index.html');
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,

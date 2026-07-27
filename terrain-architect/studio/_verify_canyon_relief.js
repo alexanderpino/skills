@@ -5,10 +5,10 @@
 // 32-87 m against a 21 m cut meant no bed was ever exposed, so lithology could not express.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const URL = 'file://' + path.resolve(__dirname, 'index.html');
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 const H = 2600; // terrainDef.height; h and the composed field share this normalised unit
 
 (async()=>{

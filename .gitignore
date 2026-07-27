@@ -1,3 +1,7 @@
 terrain-architect-workspace/
 __pycache__/
 *.py[cod]
+
+# Build tooling for apps/ — the skills themselves stay buildless.
+node_modules/
+apps/*/dist/

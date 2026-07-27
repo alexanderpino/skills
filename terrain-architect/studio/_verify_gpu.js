@@ -1,10 +1,10 @@
 // GPU-vs-CPU parity: the CPU kernels are the reference; the GPU fast path must match them.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const URL = 'file://' + path.resolve(__dirname, 'index.html');
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,

@@ -3,10 +3,10 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
 const zlib = require('zlib');
-const EXE = process.platform === 'win32'
+const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const URL = 'file://' + path.resolve(__dirname, 'index.html');
+  : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 
 function decodePng(buf) {
   if (buf.toString('ascii', 1, 4) !== 'PNG') throw new Error('not a PNG');
