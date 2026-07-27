@@ -306,6 +306,23 @@ manifest terms is `(√3/2)·cellSize² ≈ 0.866·cellSize²` (equivalently `(3
 same lattice-density constant as the sampling result above) — you need it for drainage area in m² and
 every per-area rate, and the `SKILL.md` world-unit invariants hold unchanged.
 
+**Cell centres are computed, never stored.** A centre is a pure function of index and manifest —
+exactly as `x = origin + i·cellSize` on a square raster — and this formula is where the row-parity bug
+lives, so print it rather than improvising it. Pointy-top axial:
+
+```
+centre(q, r):
+    x = origin.x + cellSize · (q + r/2)      # cellSize = √3·s — the neighbour spacing
+    y = origin.y + (√3/2)·cellSize · r       # (√3/2)·cellSize = (3/2)·s — the row pitch
+```
+
+Flat-top swaps the roles of the axes. From offset coordinates convert to axial *first* (odd-r:
+`q = col − (row − (row & 1))/2`, `r = row`), then apply the formula; computing centres directly from
+offset indices with the wrong parity shifts alternate rows by half a cell — the half-texel bug's hex
+twin, invisible until two systems disagree about where a cell is. Everything positional — sampling a
+raster at hex centres on import, meshing hex tiles, scatter placement (`07`) — goes through this one
+function, which is why it must exist exactly once.
+
 **Flow routing on hex is D6 — cleaner than D8, not finer.** Steepest descent picks the lowest of 6
 equidistant edge-neighbours — no √2 rescaling, no 4-versus-8 decision, no metric bias tilting the
 choice of receiver. What D6 does *not* buy is angular resolution: 6 directions at 60° is **coarser**
@@ -338,6 +355,33 @@ so re-derive the stability (CFL-style) bound rather than carrying the square gri
 and other cellular automata (`19`) shed most of their lattice-aligned lobing. The parameters stay
 world-unit-denominated — the stencil, the metric, *and the normalisation* change.
 
+**Gradients, slope and normals use the same six samples — and the same constant.** `06`'s central
+differences, Horn and Sobel are square-stencil machinery; the hex replacement is one ring and
+*simpler*. For the six world-space unit vectors `eₖ` to the neighbours, `Σeₖ = 0` and `Σeₖeₖᵀ = 3I`
+(the same identity as the Laplacian above), so the least-squares gradient at neighbour spacing
+`d = cellSize` is
+
+```
+grad(c):
+    g = Σₖ h[nₖ] · eₖ                  # eₖ = unit vector to neighbour k — from centre(), above
+    return g / (3 · d)                 # Σeₖeₖᵀ = 3I; the centre height h₀ drops out (Σeₖ = 0)
+
+slope  = |g|                           # tan, as in 06 — same downstream conventions
+aspect = atan2(−g.y, −g.x)             # 06's downslope-negation rule holds verbatim
+normal = normalize( (−g.x, −g.y, 1) )  # z-up; z = 1, not cellSize — g already has d in it
+```
+
+Three properties fall out. The centre height never appears, and all six samples contribute — the
+noise-averaging that makes Horn/Sobel preferable on a square grid comes free, without a second ring.
+It is second-order accurate — the quadratic Taylor term cancels exactly because the six directions are
+three antipodal pairs. And the leading error term is **isotropic**: six evenly spaced directions have
+isotropic moments up to order 5, so lattice anisotropy enters the gradient two orders down — central
+differences' leading error is already axis-aligned. Lighting built from these normals is what the `09`
+sun sweep actually probes, so this is the anisotropy story landing where it is most visible. `06`'s
+other warnings transfer unchanged: bake normals from R32F, and if you deliver a raster, bake on the
+delivery grid after resampling (below) — the analytic hex normal is for shading hex tiles directly and
+for `06`'s analysis masks on the working grid.
+
 **Interchange: hex is a working grid; deliver a raster.** Engines, meshers and every DCC import expect a
 square raster (or, on a planet, an equirectangular one), so — exactly like equirectangular below — hex
 is a grid you **simulate on and resample out of**, not usually one you ship. Resample square→hex on
@@ -360,7 +404,9 @@ tables applied with the wrong parity, pointy/flat orientation mismatch, and the 
 
 **Tier.** Hexagonal-lattice sampling optimality is **P** (Petersen & Middleton 1962; Mersereau 1979);
 the axial/cube/offset coordinate machinery is **F** (Red Blob Games — the standard, no paper); D6/MFD
-routing on a hex mesh is **P** (Liao et al. 2020, 2025). The *engineering* of resampling between hex and
+routing on a hex mesh is **P** (Liao et al. 2020, 2025). The centre formula and the one-ring
+gradient/normal stencil are textbook lattice-moment identities (`Σeₖ = 0`, `Σeₖeₖᵀ = 3I`) — **F** as
+engineering, derivable in four lines. The *engineering* of resampling between hex and
 square rasters is **F**. Everything above is a **flat-grid** story and stands on its own; the sphere
 (next section) is one *further* domain the hex grid closes onto — via the icosahedral hex DGGS — not the
 reason it exists.
