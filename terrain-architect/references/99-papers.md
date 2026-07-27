@@ -861,7 +861,29 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   Physics 124(1), 93–114. — The **equiangular** gnomonic cubed sphere; near-uniform cell area (`08`).
 - **Górski, K.M., Hivon, E., Banday, A.J. et al. (2005).** *HEALPix: a framework for high-resolution
   discretization and fast analysis of data distributed on the sphere.* The Astrophysical Journal
-  622(2), 759–771. — The equal-area, iso-latitude spherical pixelisation; a seam-free alternative (`08`).
+  622(2), 759–771. — The equal-area, iso-latitude *quadrilateral*-pixel spherical pixelisation; a
+  seam-free alternative, and **not** a hexagonal grid — don't conflate the two (`08`).
+- **Petersen, D.P. & Middleton, D. (1962).** *Sampling and reconstruction of wave-number-limited
+  functions in N-dimensional Euclidean spaces.* Information and Control 5(4), 279–323. — The
+  multidimensional sampling theorem; the **hexagonal lattice is the optimal 2D sampler** for an
+  isotropically band-limited signal (~13.4% fewer samples than square) — the theoretical basis of the
+  hexagonal heightfield (`08`).
+- **Mersereau, R.M. (1979).** *The processing of hexagonally sampled two-dimensional signals.*
+  Proceedings of the IEEE 67(6), 930–949. — The DSP-standard treatment of hexagonal sampling,
+  reconstruction, and filtering; the practical companion to Petersen & Middleton (`08`).
+- **Goldberg, M. (1937).** *A class of multi-symmetric polyhedra.* Tôhoku Mathematical Journal 43,
+  104–108. — The **Goldberg polyhedron**: hexagons + **exactly twelve pentagons** by Euler's formula —
+  why a hexagonal grid cannot close on a sphere without 12 pentagonal defects, the geometry every
+  icosahedral hex DGGS (and every "hex planet") inherits (`08`, `25`).
+- **Snyder, J.P. (1992).** *An equal-area map projection for polyhedral globes.* Cartographica 29(1),
+  10–21. — The **ISEA** (Icosahedral Snyder Equal-Area) projection; makes the icosahedral hex DGGS
+  equal-area (`08`, `25`).
+- **Sahr, K., White, D. & Kimerling, A.J. (2003).** *Geodesic Discrete Global Grid Systems.* Cartography
+  and Geographic Information Science 30(2), 121–134. — The reference survey of DGGS families (ISEA hex,
+  aperture-3/4/7 hierarchies); the taxonomy behind the hex-planet grid (`08`, `25`).
+- **Uber Technologies (2018).** *H3: Uber's Hexagonal Hierarchical Spatial Index.* Open-source library
+  (github.com/uber/h3). — The production icosahedral hex DGGS: aperture-7, 122 base cells (110 hexagons +
+  12 pentagons). A documented open system, not a paper — **F/N**, cite as such (`08`, `25`).
 - **Snyder, J.P. (1987).** *Map Projections — A Working Manual.* USGS Professional Paper 1395,
   383 pp. — Projection scale factors and distortion; divide gradients by the scale factor `h` or
   erosion biases toward high-distortion regions (`08`).
