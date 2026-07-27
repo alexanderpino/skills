@@ -42,7 +42,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, PAGE)
     return{digests,keyChanges,keyRestores};
   });
   const ok=result.keyChanges===true&&result.keyRestores===true&&!errors.length;
-  console.log(JSON.stringify({page:PAGE,...result,errors,ok},null,2));
+  // Report the URL actually loaded, not the page argument: STUDIO_URL overrides PAGE, so printing
+  // PAGE would label the output with a file this run never opened.
+  console.log(JSON.stringify({page:URL,...result,errors,ok},null,2));
   await browser.close();
   process.exit(ok?0:1);
 })().catch(e=>{console.error("FATAL",e);process.exit(2);});
