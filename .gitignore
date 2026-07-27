@@ -5,3 +5,6 @@ __pycache__/
 # Build tooling for apps/ — the skills themselves stay buildless.
 node_modules/
 apps/*/dist/
+apps/*/playwright-report/
+apps/*/test-results/
+apps/*/.playwright/

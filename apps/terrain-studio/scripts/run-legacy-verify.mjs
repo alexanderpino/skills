@@ -49,12 +49,25 @@ if (usePreview) {
   if (b.status !== 0) process.exit(b.status ?? 1)
 }
 
-const server = spawn('npx', ['vite', usePreview ? 'preview' : '', '--port', String(port), '--strictPort']
-  .filter(Boolean), { cwd: app, stdio: 'ignore', shell: true, detached: false })
+// Reuse a server that is already serving this app rather than failing on --strictPort. Playwright's
+// webServer binds the same port, so running `npm run test:e2e` and `npm run verify` back to back
+// would otherwise race: the second one cannot bind, every page load fails, and the suite reports a
+// wall of assertion failures that look like terrain regressions but are a port collision. Mirrors
+// Playwright's own `reuseExistingServer`.
+const alreadyServing = await fetch(url, { method: 'HEAD' })
+  .then((r) => r.ok)
+  .catch(() => false)
+
+const server = alreadyServing
+  ? null
+  : spawn('npx', ['vite', usePreview ? 'preview' : '', '--port', String(port), '--strictPort']
+      .filter(Boolean), { cwd: app, stdio: 'ignore', shell: true, detached: false })
+
+if (alreadyServing) console.log(`Reusing the server already answering at ${url}`)
 
 let stopped = false
 const stop = () => {
-  if (stopped) return
+  if (stopped || !server) return   // never tear down a server we did not start
   stopped = true
   // Vite spawns through a shell on Windows, so killing the shell alone can orphan the server and
   // hold the port. Kill the tree.

@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# One run per ref. A second push to the same branch supersedes the first, and the
+# first is cancelled — the WebGL suites are the slowest thing in this repo and
+# there is no value in finishing a run whose result is already stale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build, e2e, and legacy verification
+    runs-on: ubuntu-latest
+    # Budget: e2e (<=20) + legacy canyon suite (<=25) + install/build overhead.
+    # See the per-step timeouts below for where the numbers come from.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # Root install. npm workspaces hoists every dependency of apps/terrain-studio
+      # into the ROOT node_modules — including playwright-core, which is what makes
+      # the legacy step below work. See "Legacy verification" for the full argument.
+      - name: Install dependencies
+        run: npm ci
+
+      # Chromium + the system libraries ANGLE/SwiftShader needs. Both suites launch
+      # with --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader
+      # --no-sandbox, which rasterises WebGL on the CPU; without --with-deps the
+      # browser starts and then fails to create a GL context.
+      - name: Install Playwright chromium (+ system deps)
+        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+
+      # The ~50 legacy _verify_*.js scripts hardcode a browser path:
+      #   process.env.STUDIO_CHROME
+      #     || (win32 ? 'C:\Program Files\Google\Chrome\...'
+      #               : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
+      # The Linux fallback is a dead path on a runner AND pinned to a chromium
+      # revision that no longer matches (playwright-core 1.49 ships chromium-1148,
+      # 1.62 ships chromium-1234 — neither is 1194). So resolve the real path from
+      # the SAME playwright-core the scripts will require, and export it.
+      - name: Point the legacy scripts at the Playwright chromium
+        run: |
+          set -euo pipefail
+          CHROME="$(node -p "require('playwright-core').chromium.executablePath()")"
+          if [ ! -x "$CHROME" ]; then
+            echo "::error::playwright-core reported '$CHROME' but it is not executable."
+            exit 1
+          fi
+          echo "STUDIO_CHROME=$CHROME" >> "$GITHUB_ENV"
+          echo "Legacy scripts will launch: $CHROME"
+
+      # Cheap smoke check (~0.2s locally). Catches a broken vite config or a
+      # malformed index.html before the slow suites spend 20 minutes finding out.
+      - name: Build
+        run: npm run build
+
+      # @playwright/test. The config owns its own vite dev server on 127.0.0.1:5173
+      # (reuseExistingServer is false under CI) and tears it down afterwards.
+      - name: Run e2e tests
+        run: npm run test:e2e
+        timeout-minutes: 20
+
+      # The legacy suite. `npm run verify` -> scripts/run-legacy-verify.mjs, which
+      # starts vite, exports STUDIO_URL=http://127.0.0.1:5173/index.html, runs the
+      # script, and kills the tree.
+      #
+      # NOTE: the default target is _verify_all_canyon.js, which fans out to 11 of
+      # the ~50 scripts (8 canyon + render/realtime/build_progress). It is NOT all
+      # 50. To run more, add explicit steps: `npm run verify -- _verify_gpu.js`.
+      #
+      # Runs AFTER the e2e step because both bind 127.0.0.1:5173 with strictPort.
+      - name: Run legacy verification suite (canyon)
+        run: npm run verify
+        timeout-minutes: 25
+
+      # Paths are workspace-relative: playwright.config.ts sets outputDir and the
+      # html reporter's outputFolder to apps/terrain-studio/{test-results,playwright-report}.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            apps/terrain-studio/playwright-report/
+            apps/terrain-studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # The legacy scripts write _shot_*.png next to themselves; on a failure these
+      # are usually the fastest way to see what the renderer actually produced.
+      - name: Upload legacy verification screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-shots-${{ github.run_id }}
+          path: terrain-architect/studio/_shot_*.png
+          retention-days: 14
+          if-no-files-found: ignore

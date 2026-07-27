@@ -1,0 +1,103 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_path:
+        description: >-
+          Override Vite's base. Leave empty to derive it from the repository name
+          (e.g. "skills" -> "/skills/"). Set to "/" for a user/org site or a custom
+          domain. Must have a leading AND trailing slash.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy that is already talking to the Pages API — a half-applied
+# deployment is worse than a queued one. Supersede at the queue, not mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: actions/configure-pages@v5
+
+      # DERIVATION of the base path
+      # ---------------------------
+      # The remote is https://github.com/alexanderpino/skills.git, and there is no
+      # CNAME file anywhere in the tree, so this is a PROJECT site, not a user site.
+      # A project site is served from the repository subpath:
+      #
+      #   https://<owner>.github.io/<repo>/  ->  https://alexanderpino.github.io/skills/
+      #
+      # so Vite's base must be "/skills/". That is derived here rather than written
+      # down: GITHUB_REPOSITORY is "owner/repo", and "${GITHUB_REPOSITORY#*/}" strips
+      # the owner. Rename the repo, transfer it, or build from a fork and the base
+      # follows automatically.
+      #
+      # TO CHANGE IT: run this workflow via "Run workflow" and set base_path — use
+      # "/" for a user/org site (<owner>.github.io) or once a custom domain/CNAME is
+      # added, since both serve from the domain root.
+      - name: Derive the Pages base path
+        env:
+          BASE_INPUT: ${{ inputs.base_path }}
+        run: |
+          set -euo pipefail
+          BASE="${BASE_INPUT:-}"
+          if [ -z "$BASE" ]; then
+            BASE="/${GITHUB_REPOSITORY#*/}/"
+          fi
+          case "$BASE" in
+            /*/) ;;
+            /)   ;;
+            *)   echo "::error::base_path must start and end with '/': got '$BASE'"; exit 1 ;;
+          esac
+          echo "PAGES_BASE=$BASE" >> "$GITHUB_ENV"
+          echo "Building with base: $BASE"
+
+      # The --base flag MUST be forwarded through the workspace-scoped script.
+      # Verified locally: `npm run build -- --base=X` at the ROOT silently DROPS the
+      # flag (the root script re-delegates via `npm run --workspace`, which eats it)
+      # and builds with the config's './' with no error. The `--workspace` form below
+      # does forward it. Do not "simplify" this to `npm run build -- --base=...`.
+      - name: Build
+        run: npm run build --workspace @skills/terrain-studio -- --base="$PAGES_BASE"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/terrain-studio/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
