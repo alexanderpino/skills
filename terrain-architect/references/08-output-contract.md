@@ -253,6 +253,23 @@ less memory. That is the theory; the two practical reasons are structural:
   collapse and axis-aligned lobes of `05`/`19` shrink. It does not vanish (6-fold symmetry is still not
   continuous), but the sun-sweep test (`09`) strobes far less.
 
+**The advantage over a square grid, at a glance** — a *flat-terrain* comparison, no sphere involved:
+
+| | Square raster | Hexagonal grid |
+|---|---|---|
+| Neighbours | 4 edge + 4 corner — the D4/D8 fork | **6, all edge-adjacent and equidistant** |
+| Diagonal metric | √2 correction, easy to forget → 45° drainage bias | **none — there is no diagonal to weight** |
+| Sampling | baseline | **~13.4% fewer samples** for the same isotropic bandwidth |
+| Flow routing | D8: √2 weights, ambiguous receiver | **D6: uniform weight, unambiguous receiver** |
+| Erosion / CA isotropy | 45°/90° leakage — plus-shapes, axis-aligned lobes | **60° leakage — markedly cleaner** |
+| Storage | 2D array | 2D array (axial / offset) — **unchanged** |
+| Engine / DEM interchange | native everywhere | **the one cost:** resample to a raster to deliver |
+
+Where a hex heightfield actually earns its place is **flat terrain**, not planets: hex-native strategy /
+4X and city-builder maps, erosion and cellular-automata sims where directional artefacts *are* the
+problem, and DEM / watershed analysis on hex meshes (HexWatershed, `03`) — none of which touch a sphere.
+The globe (next section) is one *further* place the same grid applies, not what the hex grid is for.
+
 **Coordinates: still a 2D array, new indexing.** Three coordinate systems; the practical, de-facto
 reference is Amit Patel's *Red Blob Games — Hexagonal Grids* (**F** — engineering, no paper, but *the*
 standard):
@@ -303,7 +320,9 @@ wrong.
 **Tier.** Hexagonal-lattice sampling optimality is **P** (Petersen & Middleton 1962; Mersereau 1979);
 the axial/cube/offset coordinate machinery is **F** (Red Blob Games — the standard, no paper); D6/MFD
 routing on a hex mesh is **P** (Liao et al. 2020, 2025). The *engineering* of resampling between hex and
-square rasters is **F**. Its sphere-scale continuation — the icosahedral hex DGGS — is the next section.
+square rasters is **F**. Everything above is a **flat-grid** story and stands on its own; the sphere
+(next section) is one *further* domain the hex grid closes onto — via the icosahedral hex DGGS — not the
+reason it exists.
 
 ## Planetary / spherical domains
 

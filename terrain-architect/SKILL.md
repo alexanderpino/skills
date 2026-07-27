@@ -426,6 +426,17 @@ radii. A graph that does not know its cell size cannot have correct parameters, 
 graph tuned at 4 m/px will fall apart at 1 m/px unless the parameters are expressed in
 world units.
 
+**And decide the grid topology here — this is a *flat-terrain* choice, not a planetary one.** The
+default is a square raster, but the **hexagonal grid is a first-class alternative for ordinary flat
+heightfields**, with concrete advantages over the square grid: it is the optimal 2D sampling lattice
+(~13.4% fewer samples for the same detail), its 6 equidistant edge-neighbours erase the D4/D8 √2
+ambiguity, its D6 flow routing is cleaner and unambiguous, and its erosion/CA are markedly less
+direction-biased (no 45°/90° striping). The cost is interchange — engines and DEMs want a raster, so
+you resample out. Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
+every downstream parameter exactly as cellSize does. See `references/08-output-contract.md`, *Hexagonal
+grids*. This is entirely separate from — and applies with or without — the spherical-grid choice a
+*planet* forces (`08`/`25`); a hex grid is for flat terrain first, the sphere only later.
+
 **3. Choose the erosion backbone by scale.** This is the highest-leverage decision:
 
 | World extent | Backbone | Why |
