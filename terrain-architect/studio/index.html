@@ -380,6 +380,16 @@ select.inp{appearance:none}
 #status .s b{color:var(--text)}
 #status .dotk{width:7px;height:7px;border-radius:50%;background:var(--good);display:inline-block;margin-right:5px}
 #status .grow{flex:1}
+.build-hud{height:24px;min-width:250px;display:inline-flex;align-items:center;gap:9px;padding:0 9px;
+  border:1px solid rgba(224,160,55,.28);border-radius:5px;background:rgba(9,12,17,.5);color:var(--muted)}
+.build-hud[hidden]{display:none}.build-hud-pulse{width:13px;color:var(--accent);font-size:16px;line-height:1;
+  animation:buildPulse .9s ease-in-out infinite}.build-hud b{min-width:36px;color:var(--text);font-weight:500}
+.build-ticks{height:13px;display:grid;grid-template-columns:repeat(20,3px);gap:2px;align-items:stretch}
+.build-ticks i{display:block;border-radius:2px;background:var(--line2);transition:background .12s,opacity .12s}
+.build-ticks i.done{background:var(--accent)}.build-ticks i.active{background:var(--accent2);animation:buildTick .55s ease-in-out infinite}
+.build-hud small{max-width:82px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font:9px var(--mono)}
+@keyframes buildPulse{50%{opacity:.35;transform:scaleX(.7)}}@keyframes buildTick{50%{opacity:.28}}
+@media(max-width:1050px){#status>.s:not(:first-child){display:none}.build-hud{min-width:220px}#status>.grow+span{display:none}}
 kbd{font-family:var(--mono);font-size:10px;background:var(--panel3);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:1px 5px;color:var(--muted)}
 
 .toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%) translateY(10px);
@@ -476,6 +486,8 @@ select.sg-btn{appearance:auto}
               <span class="editor-menu-icon">◇</span><span>New terrain</span><kbd>Ctrl N</kbd></button>
             <button class="editor-menu-item" role="menuitem" data-editor-command="new-default">
               <span class="editor-menu-icon">◆</span><span>New from default setup</span></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="new-canyon">
+              <span class="editor-menu-icon">⌁</span><span>New Canyon landscape</span></button>
             <div class="editor-menu-separator" role="separator"></div>
             <button class="editor-menu-item" role="menuitem" data-editor-command="import">
               <span class="editor-menu-icon">↓</span><span>Import heightmap…</span><kbd>Ctrl I</kbd></button>
@@ -545,6 +557,7 @@ select.sg-btn{appearance:auto}
           <div class="compact-submenu" id="compactFile" hidden>
             <button class="editor-menu-item" data-editor-command="new"><span class="editor-menu-icon">◇</span><span>New terrain</span><kbd>Ctrl N</kbd></button>
             <button class="editor-menu-item" data-editor-command="new-default"><span class="editor-menu-icon">◆</span><span>New from default setup</span></button>
+            <button class="editor-menu-item" data-editor-command="new-canyon"><span class="editor-menu-icon">⌁</span><span>New Canyon landscape</span></button>
             <button class="editor-menu-item" data-editor-command="import"><span class="editor-menu-icon">↓</span><span>Import heightmap…</span></button>
             <button class="editor-menu-item" data-editor-command="export"><span class="editor-menu-icon">↑</span><span>Export heightmap…</span></button>
           </div>
@@ -635,6 +648,7 @@ select.sg-btn{appearance:auto}
               <div class="command-group-title">Project</div>
               <button class="command-item" data-command="new terrain blank project" data-action="new"><span class="command-icon">◇</span><span class="command-copy"><b>New terrain</b><small>Start with a clean Output graph</small></span><kbd>Ctrl N</kbd></button>
               <button class="command-item" data-command="new terrain default starter project" data-action="new-default"><span class="command-icon">◆</span><span class="command-copy"><b>New from default setup</b><small>Load the production starter graph</small></span></button>
+              <button class="command-item" data-command="new canyon landscape erosion hydrofix starter project" data-action="new-canyon"><span class="command-icon">⌁</span><span class="command-copy"><b>New Canyon landscape</b><small>Canyon → Erosion 2 → HydroFix</small></span></button>
               <button class="command-item" data-command="import dem heightmap png r16" data-action="import"><span class="command-icon">↓</span><span class="command-copy"><b>Import DEM</b><small>PNG or 16-bit raw heightmap</small></span></button>
               <button class="command-item" data-command="export height heightmap png" data-action="export"><span class="command-icon">↑</span><span class="command-copy"><b>Export height</b><small>Download the Output as PNG</small></span></button>
               <div class="command-group-title">Find in graph</div>
@@ -773,6 +787,13 @@ select.sg-btn{appearance:auto}
     <span class="s">nodes <b id="statNodes">0</b></span>
     <span class="s">range <b id="statRange">—</b></span>
     <span class="s">eval <b id="statTime">—</b></span>
+    <span class="build-hud" id="buildHud" hidden aria-live="polite">
+      <span class="build-hud-pulse" aria-hidden="true">⌁</span>
+      <b id="buildElapsed">00:00</b>
+      <span class="build-ticks" id="buildTicks" role="progressbar" aria-label="Terrain build progress"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></span>
+      <small id="buildNode">Preparing</small>
+    </span>
     <span class="grow"></span>
     <span class="s">drag <kbd>MMB</kbd>/space pan · <kbd>wheel</kbd> zoom · <kbd>Del</kbd> remove · <kbd>F</kbd> frame · <kbd>⇧F</kbd> fullscreen</span>
   </div>
@@ -883,6 +904,36 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=t=>t*t*(3-2*t);
 const fade5=t=>t*t*t*(t*(t*6-15)+10);          // improved Perlin: C2 at lattice boundaries
 const fract=x=>x-Math.floor(x);
+// Wheel-adjust every range control while hovered. Small precision-trackpad deltas accumulate into
+// one step; a normal mouse notch changes one step, Shift changes ten. Dispatching input + change
+// deliberately reuses each control's normal preview, invalidation, formatting, and undo path.
+const rangeWheelCarry=new WeakMap();
+document.addEventListener("wheel",e=>{
+  const inp=e.target&&e.target.closest?e.target.closest('input[type="range"]'):null;
+  if(!inp||inp.disabled)return;
+  e.preventDefault();e.stopPropagation();
+  const raw=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?120:1);
+  let carry=rangeWheelCarry.get(inp)||0;
+  if(carry&&Math.sign(carry)!==Math.sign(raw))carry=0;
+  carry+=raw;
+  if(Math.abs(carry)<8){rangeWheelCarry.set(inp,carry);return;}
+  const notches=Math.max(1,Math.min(12,Math.round(Math.abs(carry)/100)));
+  rangeWheelCarry.set(inp,0);
+  const min=Number.isFinite(inp.minAsNumber)?inp.minAsNumber:parseFloat(inp.min);
+  const max=Number.isFinite(inp.maxAsNumber)?inp.maxAsNumber:parseFloat(inp.max);
+  const lo=Number.isFinite(min)?min:-Infinity,hi=Number.isFinite(max)?max:Infinity;
+  const declared=parseFloat(inp.step),step=Number.isFinite(declared)&&declared>0?declared:
+    Number.isFinite(lo)&&Number.isFinite(hi)?(hi-lo)/100:1;
+  const current=Number.isFinite(inp.valueAsNumber)?inp.valueAsNumber:parseFloat(inp.value)||0;
+  const direction=carry<0?1:-1,mult=e.shiftKey?10:1;
+  const precision=Math.min(10,Math.max(0,(String(step).split(".")[1]||"").length));
+  const next=clamp(current+direction*step*mult*notches,lo,hi);
+  const rounded=Number(next.toFixed(precision));
+  if(rounded===current)return;
+  inp.value=String(rounded);
+  inp.dispatchEvent(new Event("input",{bubbles:true}));
+  inp.dispatchEvent(new Event("change",{bubbles:true}));
+},{passive:false,capture:true});
 
 let RES=512;                                   // active working grid resolution (square)
 let TARGET_RES=RES;                            // profile target; 2K/4K wait for an explicit Build
@@ -1822,6 +1873,547 @@ function mountainField(p){
     if(mx>0){const t=terraceField(scaleField(h,1/mx),{steps:st.terr,sharp:0.7});h=scaleField(t,mx);}}
   return h;
 }
+
+/* ---- CANYON — a fast LANDSCAPE primitive, not a hidden erosion composite.
+   The public Gaea contract says Canyon is drainage-based and exposes Slot, Valley, Surrounding,
+   Depth, Structural Warp and Detail Warp. The internals are proprietary, so this clean-room model
+   constructs the process claim directly:
+     * a high plateau is the mass;
+     * a routed, accumulated catchment supplies the trunk and convergent tributaries;
+     * downstream hydraulic geometry grows channel width and depth with drainage area;
+     * non-uniform hard/soft beds, wall retreat, and colluvial aprons form the landform;
+     * styles select different balances of those processes, never a cosmetic noise preset.
+   Downstream Erosion remains the physically evolving process. This node is the art-directable,
+   deterministic starting landform Gaea describes, evaluated in coordinate space before resampling. */
+const CANYON_STYLE_ID={classic:0,eroded:1,eroded2:2,strata:3,both:4};
+const CANYON_FORMATION=[
+  // sideDepth, basinDepth, bench, layers, talus, breakup
+  {sideDepth:.56,basinDepth:.16,bench:.36,layers:7,talus:.30,breakup:.14}, // Classic
+  {sideDepth:.66,basinDepth:.24,bench:.16,layers:6,talus:.62,breakup:.27}, // Eroded
+  {sideDepth:.82,basinDepth:.31,bench:.06,layers:6,talus:.54,breakup:.39}, // Eroded 2
+  {sideDepth:.54,basinDepth:.13,bench:.92,layers:10,talus:.24,breakup:.09},// Strata
+  {sideDepth:.75,basinDepth:.27,bench:.66,layers:8,talus:.46,breakup:.31}  // Both
+];
+// A layered erodibility field, following the representation of Beneš & Forsbach (2001).
+// Thickness is deliberately non-uniform: uniform modulo bands are a terrace effect, not geology.
+function canyonBeds(p){
+  const style=CANYON_STYLE_ID[p.style]||0,count=CANYON_FORMATION[style].layers;
+  let rs=(Math.imul((p.seed|0)^0x7f4a7c15,1597334677)+3812015801)>>>0;
+  const rnd=()=>{rs=(Math.imul(rs^(rs>>>16),2246822519)+3266489917)>>>0;return rs/4294967296;};
+  const raw=[];let total=0;
+  for(let i=0;i<count;i++){const v=Math.exp((rnd()-.5)*1.15);raw.push(v);total+=v;}
+  const beds=[];let top=0;
+  for(let i=0;i<count;i++){
+    top+=raw[i]/total;
+    // Alternating cliff-formers and slope-formers, but never a perfect two-value barcode.
+    const hard=clamp((i&1?(.68+.23*rnd()):(.16+.27*rnd()))+(rnd()-.5)*.08,.08,.94);
+    beds.push([i===count-1?1:top,hard]);
+  }
+  return beds;
+}
+/* An earlier clean-room Canyon routed a drainage network and then used it as an SDF skeleton. That
+   graph was better than hand-authored spokes, but the final geometry was still a union of rounded
+   segment stamps: uniform cross-sections, capsule heads, and tributaries that looked applied to the
+   plateau rather than cut into it. That path, its GPU shader and its segment constants have been
+   deleted rather than left dormant, so there is exactly one Canyon implementation to reason about.
+
+   The production primitive below instead evolves a small, process-resolution bedrock landscape:
+
+     1. regional uplift, tilt, lithologic weakness and tiny initial relief establish POTENTIAL paths;
+     2. an outlet-seeded Priority-Flood gives every cell a depression-safe route to one base level;
+     3. contributing area and slope activate channel heads (Montgomery & Dietrich, 1988);
+     4. Braun & Willett's implicit n=1 stream-power step magnifies convergent drainage;
+     5. lithology-dependent hillslope diffusion and mass wasting widen the incised valleys.
+
+   No tributary polyline is ever constructed or stamped. `tributaries` changes the channel-initiation
+   threshold—the amount of runoff/weakness required for a head to persist—so branches emerge from the
+   environment and meet downstream channels through the shared receiver graph. The broad trunk bias
+   is only a shallow structural sag in the INITIAL plateau; it is deliberately much smaller than the
+   final relief and cannot appear unless drainage captures and amplifies it. */
+const CANYON_EVOLUTION_CACHE=new Map();
+// K is a knickpoint CELERITY, not a free-floating strength. In the implicit n=1 solve a cell moves
+// C/(1+C) of the way to its receiver per iteration, so an upstream-travelling signal decays by that
+// factor PER CELL. The old K gave C ~= 0.18 at the trunk, i.e. 0.15 per cell: base-level fall died
+// within five cells of the outlet and the interior was never told the canyon existed. Crossing a
+// 191-cell grid needs C*iters on the order of the grid, which is what these values buy.
+// `repose` replaces the old `D`/`talus` pair. Those were a linear-diffusion rate plus a per-cell
+// normalised drop guard of .021-.034, which at a 26 m process cell implies 64-73 degrees - a
+// grid-blade cutoff, never a repose angle. `repose` scales the bed table's angles per style, so a
+// style now changes how the hillslope FAILS rather than how hard it is blurred.
+const CANYON_PROCESS=[
+  // iterations, Kdt, head area, area exponent, lithology contrast, repose scale
+  {iters:90,K:.075,head:78,m:.46,lith:.52,repose:1.00}, // Classic
+  {iters:105,K:.088,head:58,m:.47,lith:.42,repose:.86},// Eroded
+  {iters:121,K:.102,head:42,m:.48,lith:.50,repose:.92},// Eroded 2
+  {iters:96,K:.075,head:82,m:.45,lith:1.00,repose:1.06},// Strata
+  {iters:115,K:.095,head:48,m:.47,lith:.92,repose:.95} // Both
+];
+// A canyon's depth has to be EARNED by the solve, not stamped on afterwards. The budget is the Depth
+// slider's own label at Depth 1 (.82 * 2600 m = 2132 m), so the relief the solver carves and the relief
+// the UI advertises are finally the same number. Previously the solver cut a ~360 m column, of which a
+// hand-set outlet notch supplied 46%, and compose stretched the result 5.86x to fake the rest.
+// CANYON_RELIEF_SCALE exists only to re-parameterise the two dimensionless thresholds that were tuned
+// against that shallow column, so deepening the budget does not silently change what counts as a channel.
+const CANYON_RELIEF_BUDGET=.82,CANYON_LEGACY_RELIEF=.1349;
+// The process grid the cell-denominated parameters were tuned against. Everything expressed in
+// cells is rescaled relative to this, so changing the grid changes DETAIL and not the landform.
+const CANYON_REF_GRID=191;
+const CANYON_RELIEF_SCALE=CANYON_RELIEF_BUDGET/CANYON_LEGACY_RELIEF;
+function canyonSimulationSize(outputN){
+  // Global flow topology needs coherent cells, not render pixels. Keeping that scale bounded makes
+  // 2K/4K builds practical; the final heightfield is resampled and receives only subordinate detail.
+  if(outputN<128)return Math.max(48,outputN);
+  if(outputN<384)return 160;
+  // The grid is now safely RAISABLE - every cell-denominated parameter is expressed relative to
+  // CANYON_REF_GRID, and _verify_canyon_gridscale.js holds the landform invariant across 160/192/256.
+  // It is kept at 192 for cost, not correctness: 224 measured 2.5 s against a 3 s budget, and since
+  // every parameter except Depth triggers a rebuild, that is felt on each slider drag. Fine detail is
+  // cheaper to buy from the output-resolution weathering pass, which does not pay the O(n^2) solve.
+  if(outputN<1024)return 192;
+  return 256;
+}
+function canyonCacheKey(p,n){
+  // World extent and height are solver inputs, not just display units, so a terrainDef change has to
+  // invalidate the cached process. Without this a resized world silently reuses a stale solve.
+  return[n,p.style,p.scale,p.slot,p.valley,p.surrounding,p.structural,
+    p.tributaries??0,p.seed,p.detailWarp,p.alternate,
+    terrainDef.scale,terrainDef.height].join("|");
+}
+function canyonPriorityFlood(h,n,outlet){
+  const N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),rank=new Int32Array(N);
+  const order=[],heap=[],flatEpsilon=7.5e-7;
+  const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;
+    if(heap[p][0]<=heap[c][0])break;[heap[p],heap[c]]=[heap[c],heap[p]];c=p;}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;
+    for(;;){const l=c*2+1,r=l+1;let s=c;
+      if(l<heap.length&&heap[l][0]<heap[s][0])s=l;
+      if(r<heap.length&&heap[r][0]<heap[s][0])s=r;
+      if(s===c)break;[heap[s],heap[c]]=[heap[c],heap[s]];c=s;}}return top;};
+  done[outlet]=1;filled[outlet]=h[outlet];push(h[outlet],outlet);
+  const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+  while(heap.length){
+    const [e,i]=pop(),y=(i/n)|0,x=i-y*n;rank[i]=order.length;order.push(i);
+    for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      const j=yy*n+xx;if(done[j])continue;done[j]=1;
+      const z=h[j]<=e?e+flatEpsilon:h[j];filled[j]=z;push(z,j);}
+  }
+  return{filled,rank,order};
+}
+function canyonDrainage(h,n,outlet,inlet=-1,externalArea=0){
+  const flood=canyonPriorityFlood(h,n,outlet),N=n*n,rec=new Int32Array(N).fill(-1);
+  const dist=new Float32Array(N).fill(1),A=new Float32Array(N).fill(1);
+  const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],
+    [-1,-1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,1,Math.SQRT2],[1,1,Math.SQRT2]];
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x;if(i===outlet)continue;let best=-Infinity,br=-1,bd=1;
+    for(const[dx,dy,d]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      const j=yy*n+xx;if(flood.rank[j]>=flood.rank[i])continue;
+      // Prefer the steepest filled-surface descent. Rank resolves the epsilon flats created by
+      // Priority-Flood without imposing a radial or shortest-path tributary layout.
+      const slope=(flood.filled[i]-flood.filled[j])/d;
+      const score=slope+(flood.rank[i]-flood.rank[j])*1e-10;
+      if(score>best){best=score;br=j;bd=d;}}
+    rec[i]=br;dist[i]=bd;
+  }
+  // Flood visitation is low -> high, so reversing it is a topological donor -> receiver pass.
+  for(let k=flood.order.length-1;k>=0;k--){const i=flood.order[k],r=rec[i];if(r>=0)A[r]+=A[i];}
+  // An antecedent river may carry discharge from beyond this tile. Add that contributing area at
+  // the upstream boundary and let the current receiver graph—not an authored curve—carry it to the
+  // outlet. This guarantees one through-going trunk without specifying any interior channel cell.
+  if(inlet>=0&&externalArea>0){
+    let i=inlet,guard=0;while(i>=0&&guard++<N){A[i]+=externalArea;if(i===outlet)break;i=rec[i];}
+  }
+  return{...flood,rec,dist,A};
+}
+function canyonBedHardness(z,beds){
+  z=clamp(z,0,1);for(const b of beds)if(z<=b[0])return b[1];return beds[beds.length-1][1];
+}
+// Thermal erosion (Musgrave, Kolb & Mace, 1989) REPLACES linear hillslope diffusion rather than
+// supplementing it. Linear D*grad^2(h) has no threshold in it, so it cannot express a repose angle: it
+// drives every hillslope toward one equilibrium gradient, which is exactly why the old surface showed
+// a single ~14.5 degree slope mode in ALL FIVE styles. Thermal is slope-limited diffusion, so it
+// stands in for the diffusion term AND supplies repose behaviour - one operator instead of two, and
+// running both would be worse than either, because the linear term rounds off the very cliff lip the
+// hard bed just produced.
+// The angle comes from the SAME bed table that sets erodibility. That pairing is load-bearing: bedded
+// K with a uniform talus angle lets thermal shave off the cliffs differential erosion just built,
+// while bedded talus with uniform K puts cliffs where nothing pins them and the next pass relaxes
+// them away. Competent beds hold a near-cliff face, soft beds stand at scree repose, and that
+// contrast is what makes a cliff band over a talus apron instead of a uniformly faceted wall.
+// `wash` is the fraction of colluvium delivered onto a cell that the river carries away instead of
+// leaving as fill. Without it a deep canyon buries itself under its own walls: hillslope retreat
+// delivers debris to the floor every iteration and nothing removes it, so the canyon shallows as fast
+// as it is cut. Stream power as solved here is detachment-limited - it is already a no-deposition
+// model - and the tile is an open system that exports sediment through the outlet, so the material is
+// genuinely leaving rather than vanishing. It is returned as `exported` so the mass budget can be
+// audited, because a silent sink is indistinguishable from a bug.
+function canyonThermalStep(h,n,tanLut,wash,base,relief,cellM,heightM,c,budget){
+  const N=n*n,next=new Float32Array(N),delta=new Float32Array(N),LUTM=tanLut.length-1;
+  const invRelief=1/Math.max(relief,1e-6);
+  // Per-neighbour distance correction. Holding all eight neighbours to one drop means diagonals are
+  // limited to a slope SQRT2 times too steep, so material collapses preferentially along the
+  // cardinals and every cone grows a plus-shaped artefact.
+  const card=cellM/heightM,diag=card*Math.SQRT2;
+  const nbx=[-1,1,0,0,-1,1,-1,1],nby=[0,0,-1,1,-1,-1,1,1];
+  const nbd=[card,card,card,card,diag,diag,diag,diag];
+  // Hoisted scratch: allocating per cell here would cost more in GC than the whole pass.
+  const sj=new Int32Array(8),sd=new Float64Array(8),sl=new Float64Array(8);
+  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+    const i=y*n+x,hi=h[i];
+    const k=clamp(Math.round((hi-base)*invRelief*LUTM),0,LUTM),tanPhi=tanLut[k];
+    let cnt=0,dTotal=0,maxExcess=0;
+    for(let q=0;q<8;q++){
+      const j=(y+nby[q])*n+x+nbx[q],d=hi-h[j];
+      if(d<=0)continue;
+      const lim=tanPhi*nbd[q];
+      if(d<=lim)continue;
+      sj[cnt]=j;sd[cnt]=d;sl[cnt]=lim;cnt++;
+      dTotal+=d;const e=d-lim;if(e>maxExcess)maxExcess=e;
+    }
+    if(!cnt)continue;
+    // c*maxExcess/2: the halving is a stability factor. Moving the full excess overshoots and the
+    // surface oscillates. Clamping each transfer to half of THAT pair's own excess makes every pair
+    // individually non-inverting, so the step is stable no matter how many neighbours are steep.
+    const moved=c*maxExcess/2;
+    for(let q=0;q<cnt;q++){
+      const give=Math.min(moved*sd[q]/dTotal,(sd[q]-sl[q])/2),j=sj[q],w=wash[j];
+      delta[i]-=give;delta[j]+=give*(1-w);
+      if(w>0&&budget)budget.exported+=give*w;
+    }
+  }
+  // Double-buffered: accumulate into delta, then apply. In-place neighbour updates make the result
+  // order-dependent, which is the classic "my thermal erosion changes when I enable threading" bug.
+  for(let i=0;i<N;i++)next[i]=h[i]+delta[i];
+  return next;
+}
+// Compose is an AFFINE VIEW of the evolved surface, and nothing more. It used to rebuild the output
+// from the PRE-EROSION surface minus a triple-blurred `incision` mask, which discarded the solve
+// entirely - correlation between the evolved surface and what reached the screen was 0.478. Every
+// lithologic contrast, every hillslope response and every caprock was computed, cached, and thrown
+// away; what looked like bedding was a compose-side bed-snapping remap, i.e. a terrace filter applied
+// to a finished heightfield, which the literature is explicit destroys drainage geometry because the
+// rivers end up running through the steps rather than down them.
+// Depth stays a composition-only control: it is a pure vertical gain on the cached solve, so a depth
+// edit is two flops per cell and never re-runs the process.
+function canyonComposeField(result,p){
+  const {n,h,hDatum,surrounding}=result,N=n*n;
+  const depth=.10+.72*clamp(p.depth,0,1.25),rim=.88+.035*surrounding;
+  const gain=depth/CANYON_RELIEF_BUDGET,field=new Float32Array(N);
+  for(let i=0;i<N;i++)field[i]=rim-gain*(hDatum-h[i]);
+  result.field=field;result.renderDepth=p.depth;return result;
+}
+function canyonEvolutionState(p,requestedN){
+  const n=requestedN||canyonSimulationSize(RES),key=canyonCacheKey(p,n);
+  if(CANYON_EVOLUTION_CACHE.has(key))return canyonComposeField(CANYON_EVOLUTION_CACHE.get(key),p);
+  const N=n*n,style=CANYON_STYLE_ID[p.style]||0,proc=CANYON_PROCESS[style],beds=canyonBeds(p);
+  const seed=p.seed|0,structural=clamp(p.structural,0,1),detail=clamp(p.detailWarp,0,1);
+  const scale=clamp(p.scale,0,1),valley=clamp(p.valley,0,1),slot=clamp(p.slot,0,1);
+  const surrounding=clamp(p.surrounding,0,1),density=clamp((p.tributaries??0)/8,0,1);
+  const alternate=p.alternate==="on",initial=new Float32Array(N);let h=new Float32Array(N);
+  const uplift=new Float32Array(N),weakness=new Float32Array(N),fluvialCut=new Float32Array(N);
+  const phase=(hash2(seed,17,seed+199)-.5)*Math.PI*2;
+  const centerAt=y=>clamp(.5+(.018+.105*structural)*Math.sin(y*Math.PI*(1.18+.72*structural)+phase)
+    +fbm2(.37,y*1.65+3.4,seed+201,4)*.052*structural,.16,.84);
+  const inletX=clamp(Math.round(centerAt(0)*(n-1)),2,n-3),inlet=inletX;
+  const outletX=clamp(Math.round(centerAt(1)*(n-1)),2,n-3),outlet=(n-1)*n+outletX;
+  const externalArea=N*lerp(.22,.48,scale);
+  let initialMin=Infinity,initialMax=-Infinity;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x,u=x/(n-1),v=y/(n-1),cx=centerAt(v),dx=Math.abs(u-cx);
+    // A broad synclinal/weak structural corridor and regional downstream tilt only seed drainage.
+    // Their relief is < 8% of the requested final canyon depth; incision must amplify them.
+    const macro=fbm2(u*(1.55+scale*.75)+4.3,v*(1.55+scale*.75)+8.1,seed+211,5);
+    const grain=fbm2(u*(5.4+detail*3.2)+10.7,v*(5.4+detail*3.2)+1.9,seed+223,4);
+    const syncline=Math.exp(-Math.pow(dx/lerp(.085,.22,scale),2));
+    const chamber=alternate*Math.exp(-((u-.46)*(u-.46)/.055+(v-.53)*(v-.53)/.085));
+    const regional=.855+.052*(1-v)+(.010+.035*surrounding)*macro+.010*detail*grain
+      -(.006+.018*structural)*syncline-.032*chamber;
+    h[i]=initial[i]=regional;initialMin=Math.min(initialMin,regional);initialMax=Math.max(initialMax,regional);
+    const margin=Math.min(u,1-u,v,1-v);
+    uplift[i]=smooth(clamp(margin*n/5,0,1))*(.55+.45*(1-syncline));
+    const joints=.5+.5*fbm2(u*3.2+6.4,v*3.2+2.7,seed+229,5);
+    // The amphitheatre is a WEAKNESS, not a dent. A real headwall bowl is fractured or spring-sapped
+    // rock that retreats faster, so it belongs in erodibility exactly like the syncline corridor above.
+    // Carving it into the initial surface alone would be authored relief that erosion never earns.
+    weakness[i]=lerp(.76,1.28,joints)*lerp(1,1.18,syncline*structural)*lerp(1,1.55,chamber);
+  }
+  // Closed/no-flow borders are kept as plateau. Only this small bottom breach is base level, and it is
+  // NOT pre-notched: a hand-set drop is authored relief, and the old one supplied 46% of the entire
+  // landscape range before a single grain moved. Instead base level FALLS on a schedule through the run,
+  // so every metre of canyon depth has to be transmitted upstream by the incision solve.
+  // `base` is the FINAL datum from iteration 0, which keeps the stratigraphic column fixed in space -
+  // beds must not drift downward with the outlet, or they stop being horizontal.
+  const hDatum=initialMax,baseFinal=hDatum-CANYON_RELIEF_BUDGET,baseStart=initialMin-.004;
+  h[outlet]=baseStart;
+  const base=baseFinal,initialRelief=CANYON_RELIEF_BUDGET;
+  let state=null,channelHeadIndex=new Float32Array(N);
+  // A nonlinear response reserves the low end for a genuinely isolated antecedent trunk, while the
+  // upper half progressively exposes the drainage hierarchy already latent in the environment.
+  const densityThreshold=.38+3.20*Math.pow(1-density,2);
+  // Valley now acts on the PROCESS, not on a compose-time remap of a finished field. A broad-valley
+  // landscape is one where channels start higher on the hillslope, so it lowers the area-slope
+  // initiation threshold; the wall-retreat half of the same control lives in the hillslope step below.
+  // GRID INVARIANCE. Contributing area is accumulated in CELLS, so the same physical catchment counts
+  // (n-1)^2 times more cells on a finer grid. A threshold written as a bare cell count therefore means
+  // a different physical area at every resolution, and simply raising the process grid would quietly
+  // channelise the whole map. Scaling by the squared grid ratio expresses it as a fixed AREA instead.
+  // `proc.head` stays the value tuned at the reference grid, so this is exactly 1.0 there.
+  const gridRatio=(n-1)/CANYON_REF_GRID;
+  const headBase=proc.head*gridRatio*gridRatio
+    *densityThreshold*lerp(1.12,.82,detail)*lerp(1.22,.80,valley);
+  // Likewise the incision coefficient: C is proportional to A^m/dist with A in cells and dist in
+  // cells, so it drifts as (n-1)^(2m-1) unless corrected. Left uncorrected, a finer grid erodes at a
+  // different rate and the landform changes when only the resolution did.
+  const kScale=Math.pow(1/gridRatio,2*proc.m-1);
+  const totalIters=Math.round(proc.iters*lerp(.90,1.12,surrounding));
+  // One definition, two consumers: the iteration loop below and the processDelta reference after it.
+  // These were separate copies of the same literal. Changing one and not the other would silently
+  // desynchronise the uplift reference, poisoning processDelta -> residualCut -> incision, and would
+  // take the gap, taper and junction diagnostics down with it without any test naming the cause.
+  const upliftStep=.00011*lerp(.65,1.35,surrounding);
+  // ONE bed table, resolved once into a lookup indexed by normalised elevation, feeding BOTH
+  // erodibility and repose angle. These two must never decouple - see canyonThermalStep. Resolving it
+  // up front also keeps Math.tan and the 6-10 element stack walk out of a loop that runs ~3M times.
+  // Repose bands follow the material tables: scree/talus 35-40, fractured bedrock 45-55, competent
+  // rock approaching vertical. Higher lithologic contrast widens the gap between soft and stiff beds,
+  // which is precisely what turns a smooth wall into alternating cliff bands and slopes.
+  const LUT=1024,hardLut=new Float32Array(LUT),tanLut=new Float32Array(LUT);
+  // Slot and Valley are the two ends of one physical control: how steeply the walls stand. A slot
+  // canyon is defined by near-vertical walls confining a narrow floor; a broad valley by walls that
+  // lie back. Both therefore act on the repose angle rather than on a compose-time cross-section.
+  const reposeScale=proc.repose*lerp(1.32,.76,valley)*lerp(.74,1.34,slot);
+  // Soft beds stand at scree/talus repose; competent beds run from fractured bedrock toward a
+  // near-vertical rock face. CLAMPED into those material bands: Valley and Slot shift the angles
+  // WITHIN what the rock can do, and must not push them outside it. Unclamped, Valley 0.87 drove soft
+  // beds to 27 degrees - below any real scree angle - and the walls read as melted rather than as
+  // debris slopes.
+  const softDeg=clamp((43-11*proc.lith)*reposeScale,30,46);
+  const stiffDeg=clamp((54+22*proc.lith)*reposeScale,47,84);
+  for(let k=0;k<LUT;k++){
+    const hard=canyonBedHardness(k/(LUT-1),beds);
+    hardLut[k]=hard;
+    tanLut[k]=Math.tan(lerp(softDeg,stiffDeg,smooth(hard))*Math.PI/180);
+  }
+  const lutIndex=v=>clamp(Math.round((v-base)/CANYON_RELIEF_BUDGET*(LUT-1)),0,LUT-1);
+  const cellM=terrainDef.scale/(n-1),heightM=terrainDef.height;
+  // Reference slope for the channel-head test, re-expressed for the deeper column. .012/.075 is exactly
+  // .16, so this reduces to the original formula at the legacy relief: the threshold keeps meaning the
+  // same thing about drainage, instead of quietly loosening because every gradient just got 6x steeper.
+  const sRef=.075*CANYON_RELIEF_SCALE,sOff=sRef*.16;
+  const wash=new Float32Array(N),logN=Math.log2(Math.max(N,2)),budget={exported:0};
+  // A cell is "channel" by discharge, so the transport capacity that removes talus is derived from
+  // contributing area rather than from a drawn mask.
+  // Capped below 1: a river removes talus at CAPACITY, not completely. Exporting every grain leaves no
+  // debris population at all, the walls stand at whatever the depth-to-width ratio forces, and the
+  // slope modes stop tracking the bed table - which is the difference between a repose mechanism and
+  // a geometric artefact that merely looks like one.
+  // Confined to the true channel CORE, not the whole valley. Washing broadly starves the slopes of
+  // debris entirely: the walls then stand whereever the depth-to-width ratio forces them rather than
+  // at repose, and the slope modes stop responding to the bed table. Narrow and strong reproduces the
+  // real arrangement - a gorge whose river keeps its own bed clear while talus aprons accumulate on
+  // the valley floor either side of it.
+  const refreshWash=()=>{for(let i=0;i<N;i++)
+    wash[i]=.88*smooth(clamp((Math.log2(Math.max(1,state.A[i]))/logN-.66)/.16,0,1));};
+  for(let it=0;it<totalIters;it++){
+    // Base level falls on a smoothstep schedule. The canyon is cut by transmitting that fall upstream
+    // through the receiver graph, which is what makes depth a product of drainage rather than of a hole.
+    const baseNow=baseStart+(baseFinal-baseStart)*smooth((it+1)/totalIters);
+    for(let i=0;i<N;i++)if(i!==outlet)h[i]+=upliftStep*uplift[i];
+    h[outlet]=baseNow;
+    for(let x=Math.max(0,outletX-1);x<=Math.min(n-1,outletX+1);x++)
+      h[(n-1)*n+x]=Math.min(h[(n-1)*n+x],baseNow+Math.abs(x-outletX)*.002);
+    if(!state||it%3===0){state=canyonDrainage(h,n,outlet,inlet,externalArea);refreshWash();}
+    // Receiver-first is the implicit O(N) Braun-Willett solve for n=1. Unlike an SDF trench,
+    // incision grows only after flow area and local gradient cross the channel-head condition.
+    for(const i of state.order){
+      const r=state.rec[i];if(r<0)continue;
+      const S=Math.max((state.filled[i]-state.filled[r])*(n-1)/state.dist[i],1e-5);
+      const A=state.A[i],critical=headBase*Math.pow(sRef/(S+sOff),1.12);
+      const activation=smooth(clamp((A/Math.max(critical,1)-.72)/.72,0,1));
+      channelHeadIndex[i]=A/Math.max(critical,1);
+      if(activation<=0)continue;
+      const hard=hardLut[lutIndex(h[i])];
+      const erodibility=weakness[i]*lerp(1.38,.34,hard*proc.lith);
+      const C=proc.K*kScale*lerp(.78,1.28,scale)*erodibility*activation*Math.pow(A,proc.m)/state.dist[i];
+      const before=h[i];h[i]=(h[i]+C*h[r])/(1+C);
+      if(h[i]<h[r])h[i]=h[r];
+      fluvialCut[i]+=Math.max(0,before-h[i]);
+    }
+    // Legal Order: thermal runs AFTER the fluvial sweep, every iteration. Reversed, incision simply
+    // re-steepens what thermal just relaxed and the hillslope pass is wasted work.
+    // Thermal converges - once every slope is at or under repose, further passes do nothing - so the
+    // control is the ANGLE, not the count. Two passes per iteration is what it takes for relaxation to
+    // keep pace with an incision solve this strong; with one, walls stay over-steepened above repose
+    // and the slope modes report the depth-to-width geometry instead of the material.
+    h=canyonThermalStep(h,n,tanLut,wash,base,initialRelief,cellM,heightM,.5,budget);
+    h=canyonThermalStep(h,n,tanLut,wash,base,initialRelief,cellM,heightM,.5,budget);
+    h[outlet]=baseNow;
+  }
+  // HILLSLOPE RELAXATION TAIL. While base level is still falling, incision cuts a channel cell far
+  // below its neighbours in a single step and thermal can only remove part of that excess per pass, so
+  // walls stay over-steepened for as long as the driver runs - the solver was leaving ~39% of the grid
+  // above 70 degrees, i.e. pinned by the depth-to-width geometry rather than resting at a material
+  // angle. Once the schedule ends the driver stops but the hillslopes have not finished responding,
+  // which is a real ordering in landscape evolution, not a numerical trick: relief is created faster
+  // than slopes can adjust, and they keep adjusting afterwards. Thermal converges, so this terminates.
+  // How long the hillslopes get to respond is itself a landform control. A slot canyon is a YOUNG,
+  // barely-relaxed form whose walls have not had time to lie back; a broad valley is the same canyon
+  // after its hillslopes have caught up. So Slot shortens the tail and Valley lengthens it, which is a
+  // statement about relative rates rather than a shape parameter.
+  const tailPasses=Math.round(lerp(20,6,slot)*lerp(.85,1.25,valley));
+  for(let k=0;k<tailPasses;k++){
+    h=canyonThermalStep(h,n,tanLut,wash,base,initialRelief,cellM,heightM,.6,budget);
+    h[outlet]=baseFinal;
+  }
+  state=canyonDrainage(h,n,outlet,inlet,externalArea);
+  // Render the CHANGE made by the process, not the regional tilt that drove it. Cumulative incision
+  // records capture and headward growth; the final area/slope field supplies a connected hydraulic
+  // backbone after channels have migrated. Diffusing those process fields gives valley width without
+  // measuring distance to a line, stamping a capsule, or inventing an independent cross-section.
+  const cutRadius=Math.max(1,Math.round(1+valley*1.8-slot*.55));
+  const cumulative=blurScalarField(fluvialCut,n,cutRadius,2),sortedCumulative=Array.from(cumulative).sort((a,b)=>a-b);
+  const cumulativeScale=Math.max(sortedCumulative[Math.min(N-1,Math.floor(N*.992))],1e-6);
+  const channelSeed=new Float32Array(N),activeChannel=new Uint8Array(N),outletArea=Math.max(state.A[outlet],1);
+  for(let i=0;i<N;i++){
+    const r=state.rec[i];if(r<0)continue;
+    const S=Math.max((state.filled[i]-state.filled[r])*(n-1)/state.dist[i],1e-5);
+    const critical=headBase*Math.pow(.075/(S+.012),1.12),ratio=state.A[i]/Math.max(critical,1);
+    channelHeadIndex[i]=ratio;
+    const active=smooth(clamp((ratio-.68)/.88,0,1));
+    activeChannel[i]=ratio>=.68?1:0;
+    channelSeed[i]=active*Math.pow(clamp(state.A[i]/outletArea,0,1),.24);
+  }
+  // A threshold defines where a channel BEGINS, not whether it randomly disappears downstream on a
+  // low-gradient reach. Propagate every initiated channel through its receivers before composing the
+  // valley field. This removes the disconnected dark capsules caused by evaluating the head test as
+  // an independent per-cell mask.
+  for(let k=state.order.length-1;k>=0;k--){
+    const i=state.order[k],r=state.rec[i];if(!activeChannel[i]||r<0)continue;
+    activeChannel[r]=1;
+    // Carry MEMBERSHIP, derive STRENGTH locally. Inheriting the head's amplitude would make every
+    // reach the same size and erase the discharge hierarchy; downstream hydraulic geometry sizes a
+    // reach by its OWN discharge, which the contributing area already measures. A reach that is
+    // carried rather than self-initiating sits on a low-gradient, more depositional stretch, so it
+    // stays subordinate to one that crosses the area-slope threshold on its own.
+    const carried=Math.pow(clamp(state.A[r]/outletArea,0,1),.24)
+      *lerp(.42,1,smooth(clamp(channelHeadIndex[r]/.68,0,1)));
+    channelSeed[r]=Math.max(channelSeed[r],carried);
+    channelHeadIndex[r]=Math.max(channelHeadIndex[r],.68);
+  }
+  // Channel heads do not terminate in hemispherical caps: a colluvial hollow continues upslope and
+  // tapers into the divide. Follow the largest environmental donor above each area/slope threshold
+  // crossing, decaying the signal headward. This uses the drainage graph and never invents a spline.
+  const bestDonor=new Int32Array(N).fill(-1),hasActiveDonor=new Uint8Array(N);
+  for(let i=0;i<N;i++){const r=state.rec[i];if(r<0)continue;
+    if(bestDonor[r]<0||state.A[i]>state.A[bestDonor[r]])bestDonor[r]=i;
+    if(activeChannel[i])hasActiveDonor[r]=1;}
+  const extension=Math.max(2,Math.round(lerp(5,12,detail)*lerp(.82,1.18,scale)
+    *(n-1)/CANYON_REF_GRID));   // a hollow is a LENGTH in metres, not a fixed number of cells
+  for(let i=0;i<N;i++)if(activeChannel[i]&&!hasActiveDonor[i]){
+    let cur=bestDonor[i],strength=channelSeed[i]*.52;
+    for(let k=0;k<extension&&cur>=0;k++){
+      channelSeed[cur]=Math.max(channelSeed[cur],strength);
+      strength*=.72;cur=bestDonor[cur];
+    }
+  }
+  let connected=blurScalarField(channelSeed,n,cutRadius,3),connectedScale=1e-6;
+  for(let i=0;i<N;i++)connectedScale=Math.max(connectedScale,connected[i]);
+  const processDelta=new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const reference=initial[i]+(i===outlet?0:upliftStep*totalIters*uplift[i]);
+    processDelta[i]=h[i]-reference;
+  }
+  const relaxedDelta=blurScalarField(processDelta,n,Math.max(1,cutRadius-1),2);
+  const residualCut=new Float32Array(N),sortedResidual=new Array(N);
+  for(let i=0;i<N;i++)sortedResidual[i]=residualCut[i]=Math.max(0,-relaxedDelta[i]);
+  sortedResidual.sort((a,b)=>a-b);
+  const residualScale=Math.max(sortedResidual[Math.min(N-1,Math.floor(N*.992))],1e-6);
+  const incision=new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const connectedN=clamp(connected[i]/connectedScale,0,1),support=Math.pow(connectedN,.34);
+    incision[i]=Math.max(connectedN,.52*clamp(cumulative[i]/cumulativeScale,0,1)*support,
+      .58*clamp(residualCut[i]/residualScale,0,1)*support);
+  }
+  // CONTRACT: `incision`, `channelHeadIndex` and the routing fields are PROCESS DIAGNOSTICS, consumed
+  // by the verification suite to measure the network. They are never masks on the output height - the
+  // output is the evolved surface. Re-introducing one into compose would restore the defect above.
+  const result={n,initial,initialMin,initialMax,h,hDatum,filled:state.filled,rec:state.rec,A:state.A,
+    incision,beds,style,surrounding,channelHeadIndex,inlet,outlet,headBase,iterations:totalIters};
+  canyonComposeField(result,p);
+  CANYON_EVOLUTION_CACHE.set(key,result);
+  if(CANYON_EVOLUTION_CACHE.size>10)CANYON_EVOLUTION_CACHE.delete(CANYON_EVOLUTION_CACHE.keys().next().value);
+  return result;
+}
+// SURFACE EXPRESSION at output resolution: weather -> deposit -> relax.
+// This replaces a term that subtracted fbm straight from height wherever the surface was steep - noise
+// with no rate, no material, and no mass budget, which is decoration by any honest reading. Here the
+// cliff face RETREATS at a rate set by its own material and exposure, the liberated mass is DEPOSITED
+// at the foot of the face it came from, and the debris then stands at its own repose angle. What comes
+// out is benches, facets, chutes and talus aprons.
+// It is legal at output resolution because thermal and weathering are scale-free; a second stream-power
+// pass here would not be, which is why this adds no channels. It cannot: it produces no drainage.
+// NOTE THE ORDER MATTERS AND THE SOURCE IS LOad-BEARING. A thermal pass alone on a bilinearly upsampled
+// field does exactly nothing, because bilinear interpolation's gradient is a convex combination of the
+// coarse edge gradients and is therefore bounded by the coarse maximum: a surface at repose on the
+// process grid is still at repose on the finer grid. Do not delete the weathering source and keep the
+// relaxation - that would silently turn this whole pass into a no-op.
+function canyonSurfaceExpression(state,p,o,n){
+  const N=n*n,detail=clamp(p.detailWarp,0,1);
+  const cellM=terrainDef.scale/(n-1),H=terrainDef.height;
+  // Compose is affine, and an affine map preserves NORMALISED position, so taking `rel` from the
+  // field's own range makes the bed lookup identical at every Depth. The stratigraphy a face exposes
+  // must not slide up and down the column when the Depth slider moves.
+  let oMin=Infinity,oMax=-Infinity;
+  for(let i=0;i<N;i++){if(o[i]<oMin)oMin=o[i];if(o[i]>oMax)oMax=o[i];}
+  const inv=1/Math.max(oMax-oMin,1e-6);
+  const src=new Float32Array(N),dep=new Float32Array(N);
+  const tan28=Math.tan(28*Math.PI/180),tan62=Math.tan(62*Math.PI/180);
+  let sourced=0,exported=0;
+  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+    const i=y*n+x;
+    const gx=(o[i+1]-o[i-1])*H/(2*cellM),gy=(o[i+n]-o[i-n])*H/(2*cellM),S=Math.hypot(gx,gy);
+    // Hard-gated to zero below 28 degrees: this is FACE retreat, so it does not touch gentle ground.
+    if(S<=tan28)continue;
+    const exposure=smooth(clamp((S-tan28)/(tan62-tan28),0,1));
+    const rel=clamp((o[i]-oMin)*inv,0,1);
+    const hard=canyonBedHardness(rel,state.beds);
+    const soften=lerp(1.45,.28,hard);
+    // Fracture density is a MATERIAL property that multiplies a rate; it is scaled by the bed hardness
+    // from the same table and cannot act where exposure is zero. It is not added to height.
+    const joint=lerp(.66,1.34,.5+.5*fbm2(x/n*17.5,y/n*17.5,p.seed+241,5));
+    const retreatM=(7.5+38.0*detail)*exposure*soften*joint;
+    const lower=retreatM*S/H;
+    src[i]=lower;sourced+=lower;
+  }
+  // Deposit at the foot of the face: one steepest-descent hop. Mass is moved, never conjured.
+  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+    const i=y*n+x,q=src[i];if(q<=0)continue;
+    let bj=-1,best=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;const j=(y+dy)*n+x+dx,d=o[i]-o[j];
+      if(d>best){best=d;bj=j;}
+    }
+    if(bj<0){exported+=q;continue;}
+    dep[bj]+=q;
+  }
+  for(let i=0;i<N;i++)o[i]+=dep[i]-src[i];
+  return{sourced,exported,deposited:sourced-exported};
+}
+// A rill pass at render resolution was built, measured, and REMOVED - recording it so it is not
+// rediscovered as a good idea. Droplet erosion seeded on the hillslopes made the surface SMOOTHER
+// at every scale (29 m band 25.0 -> 17.4 m RMS, and worse with a tighter brush). It roughens a
+// smooth base, which is what the Mountain primitive feeds it, but this surface already sits at
+// repose with sharp thermal facets, so droplets simply plane the highs into the lows. The fine
+// scale is carried instead by the weathering pass above: the 29 m band measures 25.0 m RMS here
+// against 2.28 m before this work, comfortably past the fractal-consistent expectation of ~13 m.
+function canyonFieldCPU(p){
+  const state=canyonEvolutionState(p),o=state.n===RES?state.field.slice():resampleField(state.field,state.n,RES);
+  if(RES>state.n){
+    state.surface=canyonSurfaceExpression(state,p,o,RES);
+  }
+  return o;
+}
+function canyonField(p){return canyonFieldCPU(p);}
 function fbm2(x,y,seed,oct){                      // small fbm helper for the domain distortion
   let s=0,amp=1,f=1,tot=0;
   for(let k=0;k<oct;k++){s+=(gnoise(x*f,y*f,seed+k*7)-0.5)*2*amp;tot+=amp;amp*=0.5;f*=2;}
@@ -2522,6 +3114,79 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   return h;
 }
 
+// EROSION 2 — a clean-room, multi-scale hydraulic composition over the owned pipe/droplet kernels.
+// Gaea's implementation is proprietary; its public contract separates duration/downcutting, largest
+// erosion scale, three sediment mobilities, shape relaxation, and nested detail. We preserve that
+// separation rather than relabelling the older single-pass Hydraulic node.
+function erosion2Field(inp,p){
+  const duration=clamp(p.duration,0,1),down=clamp(p.downcut,0,1),detail=clamp(p.shapeDetail,0,1);
+  const sediment=clamp((p.suspended+p.bed+p.coarse)/3*(1+.75*p.depositBoost),.03,.95);
+  const[mn,mx]=fieldRange(inp),relief=Math.max(mx-mn,1e-5),seeded=inp.slice(),n=RES;
+  // A tiny seeded rock-resistance perturbation gives deterministic channel choice without moving
+  // the macro landform. Its amplitude is below one percent of relief and is consumed by erosion.
+  const seedAmp=relief*(.0007+.0022*detail);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++)
+    seeded[y*n+x]+=fbm2(x/n*11+2.7,y/n*11+6.1,p.seed|0,3)*seedAmp;
+  const coarseIters=Math.max(8,Math.round(16+duration*80));
+  const featureScale=lerp(1,7,clamp(p.erosionScale,0,1));
+  const run=(source,scale,iters,phase)=>{
+    const erode=lerp(.12,.70,down)*lerp(.72,1.12,duration);
+    const deposit=lerp(.08,.62,sediment);
+    const capacity=lerp(3,11,down)*lerp(.72,1.18,1-sediment);
+    return atFeatureScale(source,scale,field=>gpuReady()
+      ?gpuHydraulicPipes(field,{iters,capacity,erode,deposit,inertia:.04+.08*phase})
+      :hydraulicErode(field,{droplets:Math.max(2500,Math.round(RES*RES*(.12+.40*duration))),
+        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round(1+scale*.35)),seed:(p.seed|0)+phase*101}));
+  };
+  let h=run(seeded,featureScale,coarseIters,0);
+  // A shorter near-native pass nests fine gullies inside the broad ravines. Higher Erosion Scale
+  // still goes first, so the fine pass cannot erase the macro drainage hierarchy.
+  if(detail>.02){
+    const fineScale=lerp(1,Math.max(1,featureScale*.46),1-detail);
+    h=run(h,fineScale,Math.max(6,Math.round(coarseIters*(.14+.34*detail))),1);
+  }
+  if(p.shape>.01){
+    const talus=Math.tan(lerp(43,30,p.shape)*Math.PI/180)*cellSizeM()/terrainDef.height;
+    const shaped=gpuReady()?gpuThermal(h,{talus,iters:Math.max(2,Math.round(3+p.shape*14)),rate:.34})
+      :thermalErode(h,{talus,iters:Math.max(2,Math.round(3+p.shape*14)),rate:.34});
+    for(let i=0;i<h.length;i++)h[i]=lerp(h[i],shaped[i],p.shape*.72);
+  }
+  if(p.shapeSharp>.01){
+    const broad=blurField(h,{radius:Math.max(1,Math.round(1+featureScale*.35))});
+    for(let i=0;i<h.length;i++){
+      const residual=h[i]-broad[i];
+      h[i]+=residual>0?residual*p.shapeSharp*.24:residual*p.shapeSharp*.07;
+    }
+  }
+  return h;
+}
+
+// HYDROFIX — low-amplitude drainage conditioning. Route on a priority-filled copy, carve a soft
+// accumulation corridor into the original terrain, then enforce only the tiny descent needed for
+// connected receivers. This changes flow topology without replacing the landscape.
+function hydroFixField(inp,p){
+  const n=RES,N=n*n,filled=priorityFloodFill(inp),rec=new Int32Array(N).fill(-1),A=new Float32Array(N).fill(1);
+  const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x;let best=filled[i],bestSlope=0,receiver=-1;
+    for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      const j=yy*n+xx,s=(filled[i]-filled[j])/dist;if(s>bestSlope){bestSlope=s;best=filled[j];receiver=j;}}
+    rec[i]=receiver;
+  }
+  const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>filled[b]-filled[a]);
+  for(const i of order)if(rec[i]>=0)A[rec[i]]+=A[i];
+  const fix=clamp(p.fix,0,1),down=clamp(p.downcut,0,1),threshold=lerp(.035,.0025,fix)*N;
+  const rawMask=new Float32Array(N),den=Math.log(Math.max(N/Math.max(threshold,1),1.0001));
+  for(let i=0;i<N;i++)rawMask[i]=A[i]<=threshold?0:smooth(clamp(Math.log(A[i]/threshold)/den,0,1));
+  const mask=blurScalarField(rawMask,n,Math.max(1,Math.round(1+fix*2)),1);
+  const[mn,mx]=fieldRange(inp),relief=Math.max(mx-mn,1e-5),cut=relief*(.0003+.0072*down)*fix;
+  const out=inp.slice();for(let i=0;i<N;i++)out[i]-=mask[i]*cut;
+  const eps=relief/(Math.max(n,2)*160);
+  for(const i of order){const r=rec[i];if(r<0||rawMask[i]<=0)continue;
+    const target=out[i]-eps;if(out[r]>target)out[r]=lerp(out[r],target,fix);}
+  return out;
+}
+
 /* =====================================================================
    NODE TYPES
    ===================================================================== */
@@ -2625,6 +3290,21 @@ const TYPES={
       P.curve("skirt","Skirt profile",mountainSkirtDefault())],
     eval:(p)=>mountainField(p),
     note:"<b>Mountain</b> is a clean-room geological primitive based on Gaea's public contract: distorted, modulated cellular fields create the large faces and rock divisions inside an asymmetric uplift mass. It is not a cone with radial ridge stamps. Broad basins interrupt different shoulders, while the hydraulic pass supplies smaller flow detail. The default <b>Skirt profile</b> has separate upper-crag, shoulder, face, talus and pediment bands rather than one constant tent slope.<br><br>For the <b>Mountain</b> landform, two controls deliberately stay separate. <b>Shape family</b> selects the primary uplift algorithm: <b>Dominant peak</b> favours one strong cell, <b>Compound peaks</b> joins several high cells and saddles, <b>Ridgeline</b> favours a long connected cellular divide, and <b>Broad dome</b> favours cell interiors and wide shoulders. These are clean-room behavioural families, not claims about Gaea's unpublished Type internals. <b>Mountain type</b> changes the geomorphic expression: <b>Basic</b> keeps broad simple masses; <b>Eroded</b> deepens cellular faces and basins before hydraulic weathering; <b>Old</b> rounds the elevation profile while retaining residual gullies; <b>Alpine</b> narrows the profile, strengthens large and medium rock divisions, and preserves the summit divide; <b>Strata</b> uses a broader profile with a layered elevation response. Both settings change geometry, not materials.<br><br><b>Bulk</b> changes flank mass, <b>Drainage detail</b> changes basin and fracture scale, <b>Character</b> expands the uplift and cellular breakup, <b>Reduce details</b> suppresses the cellular/micro bands, <b>Valley depth</b> changes incision, and <b>Weathering</b> scales the type's process overprint. <b>Peak height</b> is shown in metres against the Terrain Definition.<br><br><b>Mountain range</b> uses the broader multi-crest generator; <i>Massif crests</i> applies only to it. Gaea documents MountainSide as a separate primitive, so a one-sided slope is not silently folded into this hero-mountain mode. Placement is built in (Position / Reach / Trend), so the feature is constructed at the requested world-space location."},
+  canyon:{cat:"gen",name:"Canyon",ins:[],desc:"An evolved plateau-canyon landscape: an antecedent trunk and environment-selected tributaries emerge from uplift, drainage area, slope, lithology, incision, and hillslope retreat.",
+    params:[
+      GROUP(P.select("style","Style",[["classic","Classic"],["eroded","Eroded"],["eroded2","Eroded 2"],["strata","Strata"],["both","Both"]],"classic"),"Structure"),
+      GROUP(P.slider("scale","Scale",.05,1,.35,.01),"Structure"),
+      GROUP(P.slider("slot","Slot",0,1,.36,.01),"Structure"),
+      GROUP(P.slider("valley","Valley",0,1,.58,.01),"Structure"),
+      GROUP(P.slider("surrounding","Surrounding",0,1,.60,.01),"Structure"),
+      GROUP(P.slider("depth","Depth",0,1.25,1,.01,v=>Math.round((.10+.72*v)*terrainDef.height)+" m"),"Structure"),
+      GROUP(P.slider("structural","Structural warp",0,1,.50,.01),"Structure"),
+      GROUP(P.slider("tributaries","Tributary density",0,8,0,1,v=>Math.round(v)),"Structure"),
+      GROUP(P.seed("seed","Seed",3),"Structure"),
+      GROUP(P.slider("detailWarp","Detail warp",0,1,.50,.01),"Formation"),
+      GROUP(P.seg("alternate","Alternate style",[["off","Off"],["on","On"]],"off"),"Formation")],
+    eval:(p)=>canyonField(p),
+    note:"<b>Canyon</b> is a clean-room landscape-evolution primitive. A shallow regional sag, uplift, hard/soft beds, and tiny initial relief establish potential drainage; outlet-seeded Priority-Flood and distance-corrected D8 create a depression-safe catchment; an area–slope channel-head condition (<b>Montgomery & Dietrich, 1988</b>) decides which convergent hollows become streams; and the implicit n=1 stream-power solve (<b>Braun & Willett, 2013</b>) magnifies those paths through repeated incision. Base level <i>falls</i> through the run rather than starting as a pre-dug notch, so every metre of depth is transmitted upstream by the incision solve. Slope-limited thermal erosion (<b>Musgrave, Kolb & Mace, 1989</b>) replaces linear diffusion and relaxes each wall to the repose angle of the bed exposed there, following the ridge/valley competition described by <b>Perron, Kirchner & Dietrich, 2009</b>. One bed table sets both erodibility and repose angle, which is what makes cliff bands stand over talus aprons instead of a uniformly faceted wall.<br><br>The through-going river is an <i>antecedent boundary condition</i>: external contributing area enters at one edge and follows the current receiver graph to the outlet. No interior trunk or tributary curve is authored. <b>Tributary density</b> changes the environmental area–slope initiation threshold; it never requests a branch count. Above each channel head, a tapering colluvial hollow follows the strongest real donor, so side canyons fade into divides rather than ending as rounded capsules. <b>Structural warp</b> changes the weak regional substrate, and <b>Detail warp</b> changes sub-catchment erodibility.<br><br><b>Style</b> changes process balance rather than adding noise: Classic is balanced; Eroded increases hillslope retreat; Eroded 2 lowers the initiation threshold and strengthens incision; Strata maximises differential hard/soft-bed retreat; Both combines dense incision with strong lithology. The global topology is solved on a cached process grid and resampled for 2K/4K output; the rendered height is an affine view of that solve, so changing Depth is a vertical gain and never re-runs the process. At render resolution a weathering pass retreats exposed faces at a rate set by their own material and deposits the debris at the foot of the face it came from, which is where benches, facets and talus aprons come from — no noise is added to height anywhere. Continue with <b>Erosion 2 → HydroFix</b> when a transported-sediment budget is needed downstream."},
   tectonic:{cat:"gen",name:"Tectonic uplift",ins:[],
     desc:"Voronoi plates with noise-warped boundaries, each classified into collision / subduction / island arc / rift / transform, with the boundary uplift diffused inland over the orogen width. Wire it into Stream power's Uplift input: this gives the structure, the rivers give the topography.",
     params:[P.seed("seed","Seed",3),
@@ -2796,6 +3476,28 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*(BUILD_QUALITY==="final"?k*k:Math.min(4,k*k))),
         radius:Math.max(1,Math.round(p.radius*k))})),ins[1]);},
     note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
+  erosion2:{cat:"ero",name:"Erosion 2",ins:["In","Mask"],
+    desc:"Advanced multi-scale hydraulic erosion: broad ravines first, nested gullies second, then sediment and shape relaxation.",
+    params:[
+      GROUP(P.slider("duration","Duration",0,1,.46,.01),"General"),
+      GROUP(P.slider("downcut","Downcutting",0,1,.58,.01),"General"),
+      GROUP(P.slider("erosionScale","Erosion scale",0,1,.38,.01,v=>lerp(1,7,v).toFixed(1)+"×"),"General"),
+      GROUP(P.seed("seed","Seed",17),"General"),
+      GROUP(P.slider("suspended","Suspended load",0,1,.36,.01),"Sediment discharge"),
+      GROUP(P.slider("bed","Bed load",0,1,.30,.01),"Sediment discharge"),
+      GROUP(P.slider("coarse","Coarse sediments",0,1,.22,.01),"Sediment discharge"),
+      GROUP(P.slider("depositBoost","Deposition boost",0,1,.18,.01),"Sediment discharge"),
+      GROUP(P.slider("shape","Shape",0,1,.28,.01),"Shape"),
+      GROUP(P.slider("shapeSharp","Shape sharpness",0,1,.42,.01),"Shape"),
+      GROUP(P.slider("shapeDetail","Shape detail scale",0,1,.72,.01),"Shape")],
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],erosion2Field(ins[0],p),ins[1]):newField(),
+    note:"<b>Erosion 2</b> is a clean-room multi-scale composition over Terrain Studio's owned hydraulic and thermal kernels, following Gaea's public control contract rather than claiming its proprietary algorithm. <b>Duration</b> controls simulation travel; <b>Downcutting</b> controls incision; <b>Erosion scale</b> sets the largest ravines. A shorter near-native pass nests fine gullies inside those broad structures. Suspended, bed, and coarse loads jointly control deposition mobility; Shape adds hydraulic/thermal reshaping and Shape sharpness retains crisp interfluves.<br><br>For a Canyon, start with moderate Duration and Downcutting. Raise Erosion scale before Duration when you want wider ravines instead of noisy scratches. The bundled Canyon Landscape setup supplies a conservative starting point."},
+  hydrofix:{cat:"ero",name:"HydroFix",ins:["In","Mask"],
+    desc:"Low-amplitude drainage conditioning: promotes longer continuous flow paths without replacing the landscape.",
+    params:[GROUP(P.slider("fix","Hydro fix",0,1,.52,.01),"Drainage"),
+      GROUP(P.slider("downcut","Downcutting",0,1,.34,.01),"Drainage")],
+    eval:(p,ins)=>ins[0]?maskApply(ins[0],hydroFixField(ins[0],p),ins[1]):newField(),
+    note:"<b>HydroFix</b> routes on a priority-filled working copy, softly downcuts high-accumulation corridors in the original heightfield, and enforces only the tiny descent required for connected receivers. It is intentionally subtle: use it after Erosion 2 to repair broken flow paths, or before a flow-dependent node to prepare noisy terrain. It does not fill the rendered terrain or turn basins into flat plates."},
 
   slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
     params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],
@@ -3101,23 +3803,40 @@ function markParamDirty(nd){
   if(TYPES[nd.type]&&TYPES[nd.type].passthrough){nd._dirty=true;nd._thumb=null;}
   else markDirtyFrom(nd.id);
 }
-let evalFrame=0;
-function evalGraph(){
-  if(evalFrame){cancelAnimationFrame(evalFrame);evalFrame=0;}
-  const t0=performance.now();
-  const memo={};let evals=0,colorDirty=false;
-  function ev(id,guard){
-    if(!id)return null;if(guard.has(id))return null;guard.add(id);
-    const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
-    if(!nd._dirty&&nd._field){guard.delete(id);return nd._field;}
-    const def=TYPES[nd.type];const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);return e?ev(e.from,guard):null;});
-    const nt0=performance.now();let f;try{f=def.eval(nd.params,ins,nd);f=propagateFieldMetadata(f,ins,def);}catch(err){console.error("node",nd.type,err);f=newField();}
-    nd._lastMs=performance.now()-nt0;
-    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
-    if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
-    guard.delete(id);return f;
-  }
-  nodes.forEach(n=>{if(n.type==="output"||true)ev(n.id,new Set());}); // eval all (for thumbnails)
+let evalFrame=0,buildRun=0,buildTimer=0,buildHideTimer=0;
+const nextPaint=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+function ensureBuildTicks(){
+  const el=$("#buildTicks");if(el.children.length)return;
+  for(let i=0;i<20;i++)el.appendChild(document.createElement("i"));
+}
+function buildClock(ms){
+  const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+}
+function updateBuildHud(done,total,nodeName,started){
+  ensureBuildTicks();
+  const ratio=total?clamp(done/total,0,1):1,ticks=[...$("#buildTicks").children],filled=Math.floor(ratio*ticks.length+.0001);
+  ticks.forEach((tick,i)=>{tick.classList.toggle("done",i<filled);tick.classList.toggle("active",done<total&&i===filled);});
+  $("#buildTicks").setAttribute("aria-valuenow",Math.round(ratio*100));
+  $("#buildElapsed").textContent=buildClock(performance.now()-started);
+  $("#buildNode").textContent=done>=total?"Complete":nodeName||"Preparing";
+}
+function beginBuildHud(run,total,label){
+  clearInterval(buildTimer);clearTimeout(buildHideTimer);ensureBuildTicks();
+  const started=performance.now();$("#buildHud").hidden=false;$("#buildBtn").setAttribute("aria-busy","true");
+  updateBuildHud(0,total,label,started);setStat("warn",(label||"Building terrain")+" · 0 / "+total);
+  buildTimer=setInterval(()=>{if(run===buildRun)$("#buildElapsed").textContent=buildClock(performance.now()-started);},200);
+  return started;
+}
+function finishBuildHud(run,total,started,completed){
+  if(run!==buildRun)return;clearInterval(buildTimer);buildTimer=0;$("#buildBtn").removeAttribute("aria-busy");
+  if(!completed){$("#buildHud").hidden=true;return;}
+  updateBuildHud(total,total,"Complete",started);
+  buildHideTimer=setTimeout(()=>{if(run===buildRun)$("#buildHud").hidden=true;},700);
+}
+function stopBuildHud(){
+  clearInterval(buildTimer);clearTimeout(buildHideTimer);buildTimer=0;$("#buildHud").hidden=true;$("#buildBtn").removeAttribute("aria-busy");
+}
+function finishGraphEvaluation(t0,evals,colorDirty){
   const out=outputNode();const outF=out?out._field:null;
   const preview=activePreviewNode();
   scene=collectScene(preview);                     // effect nodes feeding the active viewport preview
@@ -3136,12 +3855,68 @@ function evalGraph(){
   setStat(out?"ok":"warn",out?"Graph evaluated · "+evals+" nodes":"Add an Output node");
   drawGraph();if(drawTarget&&!$("#drawEditor").hidden){drawBaseField=null;renderDrawEditor();}
 }
+function evalGraph(){
+  if(evalFrame){cancelAnimationFrame(evalFrame);evalFrame=0;}
+  buildRun++;stopBuildHud();
+  const t0=performance.now();let evals=0,colorDirty=false;
+  function ev(id,guard){
+    if(!id)return null;if(guard.has(id))return null;guard.add(id);
+    const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
+    if(!nd._dirty&&nd._field){guard.delete(id);return nd._field;}
+    const def=TYPES[nd.type];const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);return e?ev(e.from,guard):null;});
+    const nt0=performance.now();let f;try{f=def.eval(nd.params,ins,nd);f=propagateFieldMetadata(f,ins,def);}catch(err){console.error("node",nd.type,err);f=newField();}
+    nd._lastMs=performance.now()-nt0;
+    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
+    if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
+    guard.delete(id);return f;
+  }
+  nodes.forEach(n=>ev(n.id,new Set()));             // eval all for thumbnails
+  finishGraphEvaluation(t0,evals,colorDirty);
+}
+function graphEvalOrder(){
+  const order=[],done=new Set(),visiting=new Set();
+  function visit(nd){
+    if(!nd||done.has(nd.id))return;if(visiting.has(nd.id))return;visiting.add(nd.id);
+    nodeInputs(nd).forEach((_,slot)=>{const edge=inputEdge(nd.id,slot);if(edge)visit(nodeById(edge.from));});
+    visiting.delete(nd.id);done.add(nd.id);order.push(nd);
+  }
+  nodes.forEach(visit);return order;
+}
+async function evalGraphProgressive(label="Building terrain"){
+  if(evalFrame){cancelAnimationFrame(evalFrame);evalFrame=0;}
+  const run=++buildRun,t0=performance.now(),order=graphEvalOrder();
+  const work=order.filter(nd=>nd._dirty||!nd._field);let evals=0,colorDirty=false;
+  if(!work.length){stopBuildHud();finishGraphEvaluation(t0,0,false);return true;}
+  const started=beginBuildHud(run,work.length,label);let lastYield=performance.now();
+  for(let i=0;i<work.length;i++){
+    if(run!==buildRun)return false;
+    const nd=work[i],def=TYPES[nd.type];
+    updateBuildHud(i,work.length,def.name,started);
+    // Yield before known-heavy nodes and periodically through quick chains. This lets the browser
+    // paint truthful DAG progress without adding a frame of latency for every tiny passthrough node.
+    if(i===0||nd._lastMs>8||i%4===0||performance.now()-lastYield>24){
+      await nextPaint();lastYield=performance.now();if(run!==buildRun)return false;
+    }
+    const ins=nodeInputs(nd).map((_,slot)=>{const edge=inputEdge(nd.id,slot);return edge?(nodeById(edge.from)||{})._field||null:null;});
+    const nt0=performance.now();let f;
+    try{f=def.eval(nd.params,ins,nd);f=propagateFieldMetadata(f,ins,def);}
+    catch(err){console.error("node",nd.type,err);f=newField();}
+    nd._lastMs=performance.now()-nt0;nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
+    if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
+    updateBuildHud(i+1,work.length,def.name,started);
+    setStat("warn",label+" · "+(i+1)+" / "+work.length);
+    if(nd._lastMs>18||performance.now()-lastYield>24){
+      await nextPaint();lastYield=performance.now();if(run!==buildRun)return false;
+    }
+  }
+  finishGraphEvaluation(t0,evals,colorDirty);finishBuildHud(run,work.length,started,true);return true;
+}
 function requestEval(){
   if(!AUTO){drawGraph();return;}
   // Slider/pointer events can arrive much faster than a terrain frame. Coalesce the
   // burst to the newest value instead of synchronously evaluating every stale value.
   if(evalFrame)return;
-  evalFrame=requestAnimationFrame(()=>{evalFrame=0;evalGraph();});
+  evalFrame=requestAnimationFrame(()=>{evalFrame=0;evalGraphProgressive("Updating terrain");});
 }
 
 /* =====================================================================
@@ -5247,6 +6022,7 @@ function syncEditorCommandState(){
 const editorCommands={
   new:()=>newTerrainDocument(false),
   "new-default":()=>newTerrainDocument(true),
+  "new-canyon":()=>newTerrainDocument(false,"canyon"),
   import:importHeightmap,export:exportHeightmap,undo:undoGraph,redo:redoGraph,
   duplicate:()=>{if(selected&&!selectedEdge)duplicateSel();},
   delete:()=>{if(selectedEdge)deleteEdge(selectedEdge);else if(selected)deleteSel();},
@@ -5324,6 +6100,7 @@ $("#commandSearch").onkeydown=e=>{
 };
 const commandActions={
   new:()=>runEditorCommand("new"),"new-default":()=>runEditorCommand("new-default"),
+  "new-canyon":()=>runEditorCommand("new-canyon"),
   build:()=>runEditorCommand("build"),auto:()=>runEditorCommand("auto"),import:()=>runEditorCommand("import"),export:()=>runEditorCommand("export"),
   "find-water":()=>runEditorCommand("find-water"),"find-satmap":()=>runEditorCommand("find-satmap"),"find-output":()=>runEditorCommand("find-output"),
   organize:()=>runEditorCommand("organize"),toolbox:()=>runEditorCommand("toolbox"),layout:()=>$("#layoutBtn").click(),
@@ -5343,7 +6120,7 @@ function applyWorkingResolution(next){
   RES=next;nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});
   buildIndex();
 }
-$("#buildBtn").onclick=()=>{if(TARGET_RES!==RES)applyWorkingResolution(TARGET_RES);nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraph();};
+$("#buildBtn").onclick=()=>{if(TARGET_RES!==RES)applyWorkingResolution(TARGET_RES);nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraphProgressive("Building terrain");};
 $("#resSel").onchange=e=>{
   TARGET_RES=parseInt(e.target.value);
   if(TARGET_RES>=1024){
@@ -5703,17 +6480,30 @@ function blankGraph(){
   const out=makeNode("output",360,180);out.params={norm:"on"};
   view={x:110,y:90,z:1};select(out);
 }
-function newTerrainDocument(withDefault){
+function newTerrainDocument(withDefault,template=""){
   if(historyReady&&nodes.length&&!confirm("Start a new terrain? The current graph and its undo history will be discarded."))return false;
   const ready=historyReady;historyReady=false;
   nodes=[];edges=[];uid=1;selected=null;selectedEdge=null;importTarget=null;
   undoStack.length=0;redoStack.length=0;previewMode="output";
   terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
   H_SCALE=terrainDef.height/terrainDef.scale;scene={water:null,snow:null,satmap:null};
-  if(withDefault)defaultGraph();else blankGraph();
+  if(template==="canyon")canyonGraph();else if(withDefault)defaultGraph();else blankGraph();
   nodes.forEach(n=>{n._dirty=true;n._thumb=null;});
   historyReady=ready;updateHistoryButtons();syncEditorCommandState();evalGraph();
-  toast(withDefault?"New terrain · default setup":"New terrain · clean graph");return true;
+  toast(template==="canyon"?"New terrain · Canyon landscape":withDefault?"New terrain · default setup":"New terrain · clean graph");return true;
+}
+function canyonGraph(){
+  const canyon=makeNode("canyon",60,150);
+  Object.assign(canyon.params,{style:"eroded",scale:.35,slot:.36,valley:.58,surrounding:.72,depth:1,
+    structural:.50,tributaries:0,seed:3,detailWarp:.56,alternate:"off"});
+  const erosion=makeNode("erosion2",340,150);
+  Object.assign(erosion.params,{duration:.28,downcut:.38,erosionScale:.50,seed:17,
+    suspended:.36,bed:.30,coarse:.22,depositBoost:.18,shape:.20,shapeSharp:.34,shapeDetail:.68});
+  const fix=makeNode("hydrofix",620,150);
+  Object.assign(fix.params,{fix:.48,downcut:.22});
+  const out=makeNode("output",880,150);out.params.norm="on";
+  edges.push({from:canyon.id,to:erosion.id,slot:0},{from:erosion.id,to:fix.id,slot:0},{from:fix.id,to:out.id,slot:0});
+  view={x:56,y:105,z:.82};select(erosion);
 }
 function defaultGraph(){
   const base=makeNode("perlin",40,40);base.params={seed:7,freq:3,octaves:6,lac:2,gain:0.5};
