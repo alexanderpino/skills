@@ -119,10 +119,10 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 
 | Group | Nodes |
 |---|---|
-| **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
+| **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Canyon** (cached landscape evolution: uplift, drainage competition, stream-power incision, lithology and hillslope retreat; five formation styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
-| **Erosion** | Thermal (talus) · Hydraulic (droplet sim, brush-distributed scour) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
+| **Erosion** | Thermal (talus) · Hydraulic (GPU pipes / CPU droplets) · **Erosion 2** (multi-scale hydraulic, sediment discharge, shape) · **HydroFix** (low-amplitude drainage repair) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select · **Temperature select** (physical °C biome band) |
 | **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (base climate field) · **Temperature Modify** (localized heat/cooling) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** (metre-depth placement, melt, avalanches) · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
@@ -515,6 +515,175 @@ peak height, the union is **4 disconnected components**. After a thermal pass it
 component of 20,833 cells. Erosion is what knits separate massifs into one connected landform, which is
 also why the primitive is documented as *"ready for further erosion"* rather than finished.
 
+#### Canyon: drainage competition and landscape evolution
+
+Gaea publicly describes [Canyon](https://docs.gaea.app/reference/nodes/terrain/canyon.html) as a fast,
+drainage-based river-canyon landscape with **Classic, Eroded, Eroded 2, Strata, and Both** styles.
+Its implementation is proprietary, so Terrain Studio follows that public control contract with a
+clean-room, research-grounded landform rather than claiming to reproduce hidden internals. The landform
+claim is the terrain-architect **Grand Canyon-type plateau canyon** composition: an antecedent river
+incises a broad uplifted plateau made from alternating resistant and weak beds. **Structural warp**
+changes the weak regional substrate, while **Detail warp** changes sub-catchment erodibility.
+
+The implementation stages now have explicit provenance:
+
+- A shallow regional sag, tectonic uplift, non-uniform lithologic weakness, and tiny initial relief
+  establish *potential* drainage. They are initial conditions, not rendered channel curves.
+- An outlet-seeded Priority-Flood gives every cell a depression-safe route, followed by
+  distance-corrected **D8** (O’Callaghan & Mark, 1984) and contributing-area accumulation.
+- Channel heads activate from an area–slope condition rather than a branch count, following
+  [Montgomery & Dietrich's field relation](https://www.nature.com/articles/336232a0) (1988):
+  the source area needed for a channel decreases as the local valley gradient increases.
+- Repeated implicit `n = 1` stream-power steps magnify the drainage winners using
+  [Braun & Willett's O(N) solver](https://www.sciencedirect.com/science/article/pii/S0169555X12004618)
+  (2013). External contributing area enters at one boundary and follows the current receiver graph
+  to the outlet, giving one through-going antecedent trunk without specifying an interior path.
+- Base level **falls on a schedule** rather than starting as a pre-dug notch, so canyon depth is
+  transmitted upstream by the incision solve instead of being present before anything erodes. `K` is
+  therefore a knickpoint *celerity*: in the implicit `n = 1` solve a cell moves `C/(1+C)` of the way to
+  its receiver per step, so an upstream-travelling signal decays by that factor **per cell**, and a
+  value too small for the grid leaves the interior untouched no matter how long it runs.
+- Slope-limited **thermal erosion** ([Musgrave, Kolb & Mace, 1989](https://dl.acm.org/doi/10.1145/74334.74337))
+  replaces linear hillslope diffusion — it does not supplement it. Linear `D·∇²h` has no threshold in
+  it and so cannot express a repose angle; it drove every hillslope toward one equilibrium gradient,
+  which is why the surface previously showed a single ~14.5° slope mode in *all five* styles.
+  This competition between convergent incision and hillslope transport follows the
+  mechanism in [Perron, Kirchner & Dietrich](https://www.nature.com/articles/nature08174) (2009),
+  where initially irregular valleys compete for drainage area and develop an emergent spacing.
+- **One bed table sets both erodibility and repose angle.** That pairing is load-bearing: bedded `K`
+  with a uniform talus angle lets thermal shave off the cliffs differential erosion just built, while
+  bedded talus with uniform `K` puts cliffs where nothing pins them. Together they produce cliff bands
+  standing over debris slopes. Talus delivered onto a channel is carried away at the river's capacity,
+  because otherwise a deep canyon buries itself under its own walls faster than it can cut.
+- The rock column is a non-uniform hard/soft bed table using the layered terrain representation
+  of **Beneš & Forsbach (2001)**. Bed thickness and erodibility vary; equal contour bands and the
+  cylindrical ellipse “remnants” have been removed.
+- A channel head continues upslope as a decaying colluvial hollow along its strongest real donor.
+  It therefore tapers into the divide instead of ending in the rounded capsule left by segment SDFs.
+  Natural confluences emerge from the shared receiver tree; no branch spline, ellipse, cylinder, or
+  distance-to-line trench is constructed anywhere in the production path.
+- The area–slope test decides where a channel *begins*, not whether it survives each cell downstream,
+  so channel **membership** is propagated along the receiver graph: once initiated, a channel stays a
+  channel to base level. Its **strength is derived locally** from that reach's own contributing area
+  rather than inherited from its head. This distinction is load-bearing. Copying the head's amplitude
+  downstream saturates every reach to the same size, erases the discharge hierarchy, and flattens the
+  central amphitheatre until it is no wider than the canyon ends. Downstream hydraulic geometry sizes a
+  reach by its own discharge, and a carried reach — one crossing a low-gradient, more depositional
+  stretch — stays subordinate to a reach that crosses the initiation threshold on its own.
+
+The result is fractal-like over its resolved scale range, but fractal noise is not the generator.
+Rainfall-fed drainage trees exhibit fractal scaling and are commonly measured with Horton–Strahler
+hierarchy ([Stepinski et al., 2004](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2003JE002098)).
+More importantly, [Perron et al. (2012)](https://www.nature.com/articles/nature11672) found that the
+fine branching pattern is an organized signature of coupled valley-widening and channel-incision
+instabilities—not random topology. Terrain Studio therefore verifies stream order and branching on
+the evolved receiver tree; noise only supplies small substrate/initial-condition heterogeneity that
+the environmental process may amplify or erase.
+
+**Classic** and **Tributary density = 0** remain the defaults and favor one principal antecedent canyon.
+Values 1–8 progressively lower the area–slope initiation threshold; they do not request that many
+branches. This is also why two seeds need not produce the same count: uplift, slope, weak beds and
+catchment capture decide which hollows survive.
+
+Style selects a geomorphic regime rather than a surface preset. **Classic** balances scarps, benches,
+side valleys, hard/soft scarps, and talus. **Eroded** broadens its headwater basins, increases wall
+retreat, and builds a rounder colluvial toe. **Eroded 2** carries the densest, deepest drainage
+hierarchy. **Strata** most strongly preserves the non-uniform hard/soft bed response.
+**Both** keeps that lithologic response while applying stronger
+drainage and retreat. These are formation modes inside the primitive—not aliases for a downstream
+erosion node and not five noise amplitudes over one shared trench.
+
+For the demonstrated production graph, choose **File → New Canyon landscape** (also available from the
+compact menu and command palette). It creates `Canyon → Erosion 2 → HydroFix → Output`: Erosion 2 applies
+broad hydraulic ravines before a nested fine pass, exposes separate Duration, Downcutting, Erosion Scale,
+sediment-discharge, and Shape controls, while HydroFix uses priority-flood routing and low-amplitude
+accumulation downcutting to reconnect drainage without replacing the landform. This remains clean-room:
+Gaea's [Erosion 2](https://docs.gaea.app/reference/nodes/simulate/erosion2.html) and
+[HydroFix](https://docs.gaea.app/reference/nodes/simulate/hydrofix.html) documentation defines the public
+roles and controls, not the proprietary implementation.
+
+The primitive remains a starting landscape, consistent with Gaea's description of
+[geological primitives](https://docs.gaea.app/using/using-gaea/crafting-the-surface/noises-primitives-and-landscapes.html):
+put Erosion 2 downstream when the canyon needs a fully evolved sediment budget. The primitive performs
+global topology on a bounded, cached process grid (192² for a 512² viewport; 256² for 2K/4K builds),
+then resamples the evolved surface. The rendered height is an **affine view** of that solve — compose
+subtracts a gain from a datum and does nothing else — so Depth is a vertical gain that never re-runs the
+process, and no compose-time operator can invent structure the solve did not produce. Compose previously
+rebuilt the output from the *pre-erosion* surface minus a triple-blurred incision mask, plus a bed-snapping
+remap that was a terrace filter applied to a finished heightfield; both are gone.
+It is a dimensionless, art-directable landscape-evolution model, not a calibrated claim about years or
+rock units.
+
+`_verify_canyon_evolution.js` verifies the geomorphology rather than a screenshot. Every active channel
+cell in the density-4 reference reaches the single outlet; the antecedent trunk crosses the tile at
+**206** cells; the network reaches **Strahler order 7**; density 7 produces more active drainage and
+heads than density 0; the median immediate junction angle is **90°** on the D8 grid but well under
+**0.3%** are T-like (>150°); and the median headward continuation tapers to a small fraction of
+channel-head incision. On the verification machine the first 512² build takes about **1.6 s**, while a
+depth-only edit is a **0.6 ms** affine remap of the cached solve.
+
+`_verify_canyon_relief.js` guards the property the primitive nearly lost: **depth must be cut by the
+solve, not stamped on afterwards.** Before it existed, the evolution loop cut 99% of the map by under
+**21 m** into a 185 m plateau, a hand-set outlet notch supplied **46%** of the entire landscape range
+before anything eroded, and compose invented the remaining **94%** of the advertised depth with a 5.86×
+vertical stretch — correlation between the evolved surface and what reached the screen was **0.478**.
+Every downstream mechanism was inert for the same reason: with bed thicknesses of 32–87 m against a
+21 m cut, no bed was ever cut through, so lithology had nothing to express on. It now measures p99
+fluvial cut **1,760 m**, median cross-section relief **1,741 m**, **6 of 7** beds exposed across more
+than 5% of the map, plateau preserved at **66%**, and `composeCorr` **1.000**. It also audits the
+weathering pass's mass budget — source must equal deposit plus what leaves the tile — because the
+published form of that recipe *adds* material, and a silent sink is indistinguishable from a bug.
+
+`_verify_canyon_gridscale.js` holds the landform invariant under a resolution change — the skill calls
+this the cheapest possible detector of the most pervasive defect in terrain graphs, which is a length or
+an area written in *cells* rather than in metres. Contributing area accumulates in cells, so a bare
+cell-count channel threshold means a different physical area at every resolution and simply raising the
+process grid would have channelised the whole map; the incision coefficient drifts as `(n−1)^(2m−1)` for
+the same reason, and the colluvial hollow was a fixed number of cells rather than a length. All three are
+now expressed relative to a reference grid. Solving the same world at 160², 192² and 256² gives a
+coarse-landform correlation of **0.93** and **0.94**, relief identical to **0%**, and drainage density —
+reported in **1/m**, never in cells, because a count carries the grid inside it — stable within **12.7%**.
+
+The process grid stays at 192² (256² for 2K/4K) for **cost, not correctness**. 224² measured 2.5 s against
+a 3 s budget, and since every parameter except Depth triggers a rebuild that is felt on every slider drag.
+Because the parameters are now non-dimensional, raising it is a one-line change whenever the budget allows,
+and the oracle above is what makes that safe. Note also what this pass deliberately does **not** buy:
+facets, benches and talus aprons at 20–120 m, yes — but not rills. A rill is a *fluvial* feature, and
+producing one at 9.8 m would require flow routing and stream power at output resolution, which is the
+second global erosion pass the doctrine forbids. Raising the process grid is the legitimate route there.
+
+`_verify_canyon_slopes.js` is the cliff-and-talus oracle, and its design matters more than its numbers.
+A bimodal slope histogram is only meaningful if it is traceable to two entries in the *material* table;
+one produced by a height threshold looks identical in a screenshot and is a known defect. So the
+decisive assertion is not "is it bimodal" but **"do the modes move when the bed table moves"** — they
+shift **49°**. The distribution now peaks at **40.5°** (debris) and **75.5°** (rock face) with a
+prominence ratio of **0.74**, where linear diffusion gave a single mode at 13.5–14.5° in all five
+styles at a ratio of 0.013. The debris mode is further required to land inside a bracket the bed table
+itself predicts, so the test recalibrates with the material instead of against a fixed band.
+
+Two of that file's channel-continuity oracles deserve comment, because one of them was quietly useless.
+The original `connectivity` metric walks the receiver graph from each active cell to the outlet — but
+the receiver graph reaches base level from *every* cell by construction, so the metric reported 100%
+even with channel propagation completely disabled. It could not fail, which is why disconnected
+channels shipped. It is retained as a routing sanity check and is no longer the continuity gate.
+**`activeChainFraction`** is: it requires that every cell on an initiated channel's path to the outlet
+is *itself* still a channel. It reads **1.0**, and drops to **0.0** when the propagation pass is
+disabled, so it is a real oracle rather than a tautology. **`gapMaxAreaFrac`** complements it on the
+rendered field, reporting the largest share of outlet discharge carried by any reach that goes visually
+faint between two visible reaches: **0.0008** at density 4, so effectively nothing above a fraction of a
+percent of trunk discharge ever breaks up. The remaining faint reaches are the intended headward taper.
+
+`depthSpread` is reported but deliberately **not** asserted. It was added to guard against channels
+saturating to a uniform depth, and measurement showed it moves the *wrong* way under exactly that
+regression (6.7 healthy vs 12.7 saturated), because saturation lifts the high percentile while faint
+heads hold the low one. The discriminating oracle for that failure is the central-amphitheatre width
+ratio in `_verify_canyon_classic.js` (**1.53** healthy vs **1.06** saturated). A statistic that cannot
+distinguish the defect it names is worse than no statistic, so it carries a comment saying as much.
+
+`_verify_canyon.js` covers independent controls, all five style responses, deterministic output and
+grouped UI; `_verify_canyon_process.js` covers the recommended `Canyon → Erosion 2 → HydroFix`
+production chain.
+
 **Smooth Max vs Smooth Min.** These are not interchangeable, and the studio previously had only the
 wrong one — `smin` was labelled "crease-free smooth union", which it is not for a heightfield. `smin`
 takes the *lower* envelope: applied to three peaks it produced a mean height of **−0.037** and collapsed
@@ -639,6 +808,9 @@ adding directional light or indiscriminate RGB noise to the exported albedo.
   Deleting a mid-chain node **auto-bridges** its neighbours (its input source reconnects to its outputs)
   when the input is unambiguous, so the pipeline stays connected.
 - Pan with **middle-drag** / space-drag / empty-drag; **wheel** to zoom the graph.
+- Hover any numeric slider and use the **wheel** for one-step adjustment; hold <kbd>Shift</kbd> for
+  ten steps. This follows the normal edit path, so preview invalidation and undo behave exactly like
+  dragging the slider.
 - In the 3D view: **drag** to orbit, <kbd>Shift</kbd>-drag or right-drag to pan, and **wheel**
   to cursor-focused deep zoom. The camera can dolly from a full-terrain view down to roughly
   `0.012` world units (about 30 m at the default 5 km extent); its near plane scales with distance
@@ -880,6 +1052,12 @@ shaders over a fullscreen triangle into `RGBA32F` ping-pong render targets — t
 deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Simplex fBm**, **Ridged MF**, **Warp**, **thermal
 erosion**, and the default **Hydraulic erosion** engine.
 
+Canyon is intentionally not in that list. WebGL2 fragment shaders do not provide the global mutable
+queue/graph synchronization needed by Priority-Flood, flow accumulation, and receiver-first implicit
+incision. Its bounded CPU topology solve is cached; the full-resolution resample, mesh upload and
+rendering remain GPU work. This avoids pretending that a one-pass fragment shader is geological
+evolution while keeping 2K/4K output practical.
+
 It produces the *same* terrain as the CPU because the 32-bit integer hash is reproduced exactly in GLSL
 `uint` (the CPU hash now uses `Math.imul`; plain `*` silently rounded past 2⁵³). `_verify_gpu.js` is the
 parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 4.1e-5 (Simplex), 1.1e-4 (ridged), 4.8e-7 (thermal)**, i.e. float32
@@ -889,6 +1067,14 @@ The studio opens at **512²**. The build profile also exposes **1024², 2048², 
 1024² or above queues the new target and switches **Auto** off so the existing viewport remains usable until
 an explicit **Build**. A 1024² build is already 1,048,576 cells / 2.09M triangles, so 2K/4K are deliberately
 treated as intentional build operations rather than live slider resolutions.
+
+Build and live recomputation use a progressive DAG evaluator. The compact status HUD reports elapsed
+time, the active node, and completed dirty nodes as a segmented bar; cached nodes do not inflate the
+total. Evaluation yields between measured-heavy nodes and periodically through cheap chains, allowing
+the browser to repaint without adding a full animation frame to every passthrough. Starting a newer
+edit cancels the older run at the next yield, preventing a stale graph from replacing the newest result.
+A single long simulation is still one honest segment—its clock and active-node pulse continue, but the
+studio does not invent sub-step percentages the kernel cannot report.
 
 Thermal runs as **two passes** — one memoising each cell's `(move, sum)`, one redistributing — because the
 obvious single-pass version recomputes every neighbour's `moveSum` (72 texture fetches per cell vs ~27).
@@ -927,6 +1113,14 @@ node _verify_curve.js                # skirt curve: monotone bake, LUT contract,
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU parity, GPU hydraulic invariants + timings
 node _verify_simplex.js              # Simplex determinism, Perlin distinction, transform + GPU parity
+node _verify_all_canyon.js           # whole Canyon suite, one summary line per test (--quick to skip shared)
+node _verify_canyon.js               # drainage primitive, controls/styles, determinism
+node _verify_canyon_relief.js        # depth is cut by the solve; compose is affine; weathering mass budget
+node _verify_canyon_slopes.js        # cliff/talus modes must track the bed table, not the geometry
+node _verify_canyon_gridscale.js     # landform must survive a process-resolution change
+node _verify_canyon_identity.js      # cache-key correctness + build-to-build digest for refactors
+node _verify_canyon_process.js       # Erosion 2/HydroFix invariants, starter graph, hero/plan evidence
+node _verify_build_progress.js       # elapsed clock, dirty-node progress, active node, completion/dismissal
 node _verify_toolbar.js              # build profile, 512 default, queued 2K/4K, commands, responsive widths
 node _verify_menubar.js              # File/Edit/View/Help, New Terrain resets, responsive hamburger
 node _verify_workflow.js             # layouts, fullscreen, selected preview, undo/redo, 1024² smoke
