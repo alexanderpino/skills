@@ -429,10 +429,13 @@ world units.
 **And decide the grid topology here — this is a *flat-terrain* choice, not a planetary one.** The
 default is a square raster, but the **hexagonal grid is a first-class alternative for ordinary flat
 heightfields**, with concrete advantages over the square grid: it is the optimal 2D sampling lattice
-(~13.4% fewer samples for the same detail), its 6 equidistant edge-neighbours erase the D4/D8 √2
-ambiguity, its D6 flow routing is cleaner and unambiguous, and its erosion/CA are markedly less
-direction-biased (no 45°/90° striping). The cost is interchange — engines and DEMs want a raster, so
-you resample out. Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
+(~13.4% fewer samples for the same detail — realised via ~15% coarser spacing, not at equal cellSize),
+its 6 equidistant edge-neighbours erase the D4/D8 √2 ambiguity, its D6 flow routing has no metric bias
+(though it quantises coarser — 6 directions, not 8, so striping shrinks rather than vanishes), and its
+erosion/CA are markedly less direction-biased (no 45°/90° striping; a smaller 60° residual remains).
+The costs are interchange — engines and DEMs want a raster, so you resample out — and a renormalised
+stencil (the 6-neighbour Laplacian constant differs by 3/2; keep the square one and diffusivity is
+silently 1.5× high). Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
 every downstream parameter exactly as cellSize does. See `references/08-output-contract.md`, *Hexagonal
 grids*. This is entirely separate from — and applies with or without — the spherical-grid choice a
 *planet* forces (`08`/`25`); a hex grid is for flat terrain first, the sphere only later.

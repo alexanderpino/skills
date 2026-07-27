@@ -33,6 +33,9 @@ Plus a manifest, and the manifest is not optional:
   "extent":        [w, h],        // metres
   "resolution":    [px, py],
   "cellSize":      float,         // metres — extent / (resolution - 1) or extent / resolution?  STATE IT
+  "grid":          "square"|"hex",// working lattice — default square; the hex fields apply only when "hex"
+  "hexOrientation":"pointy"|"flat",   // hex only — neighbour offsets and row pitch depend on it
+  "hexCoords":     "axial"|"offset-odd-r"|"offset-even-r"|"offset-odd-q"|"offset-even-q", // hex only — how the 2D array indexes cells
   "heightRange":   [min, max],    // metres, for R16 dequantisation
   "seaLevel":      float,
   "rootSeed":      uint64,
@@ -238,16 +241,23 @@ anisotropy family.
 **Why hex is not a gimmick — it is the better sampling lattice.** For an isotropically band-limited 2D
 signal the hexagonal lattice is the *optimal* sampling arrangement: it reconstructs the same bandwidth
 with **~13.4% fewer samples** than the square lattice (**Petersen & Middleton 1962**; the DSP-standard
-treatment is **Mersereau 1979**). A heightfield is such a signal, so a hex grid holds the same detail in
-less memory. That is the theory; the two practical reasons are structural:
+treatment is **Mersereau 1979**). Be precise about how that saving is realised, because it is a trap:
+it comes from taking a **~15% coarser `cellSize`** (hex spacing `0.577/W` against square `0.5/W` for
+radial band-limit `W`) — at *equal* `cellSize` a hex grid has **15.5% *more* cells** per unit area
+(density `2/√3`), not fewer. Carry the square grid's `cellSize` over unchanged and the "memory saving"
+is a memory *cost*. And the theorem is a motivation, not a derivation: its precondition is *isotropic*
+band-limiting, and real terrain spectra are power-law and anisotropic (tectonic strike, ridge
+lineation), so treat the 13.4% as the direction of the advantage, not a budget line. The two practical
+reasons are structural:
 
 - **Every neighbour is equidistant and edge-adjacent.** A hex cell has exactly **6 neighbours**, all one
   cell-spacing away, each sharing an *edge*. The square grid's fork — 4-connectivity (ignores the
   diagonals) versus 8-connectivity (diagonals are √2 farther and share only a *corner*) — **does not
-  exist on hex**. The two most common members of the `09` anisotropy family, *D8 single-receiver
-  striping* and the *missing-√2 diagonal weighting*, are not bugs you fix on a hex grid; they are bugs
-  that **cannot be written**, because there is no diagonal and no unequal neighbour distance to get
-  wrong.
+  exist on hex**. Of the two most common members of the `09` anisotropy family, the *missing-√2
+  diagonal weighting* genuinely **cannot be written** — there is no diagonal and no unequal neighbour
+  distance to get wrong. *Single-receiver striping* is different: it is a **quantisation** artefact,
+  not a metric one, and D6 still quantises — hex removes the metric bias and shrinks the striping, but
+  does not delete it (the routing paragraph below is precise about this).
 - **It is more isotropic.** Six directions at 60° instead of four/eight at 45°/90° means cellular
   automata, diffusion, and talus/flow stencils leak far less preferred direction — the plus-shaped
   collapse and axis-aligned lobes of `05`/`19` shrink. It does not vanish (6-fold symmetry is still not
@@ -259,10 +269,10 @@ less memory. That is the theory; the two practical reasons are structural:
 |---|---|---|
 | Neighbours | 4 edge + 4 corner — the D4/D8 fork | **6, all edge-adjacent and equidistant** |
 | Diagonal metric | √2 correction, easy to forget → 45° drainage bias | **none — there is no diagonal to weight** |
-| Sampling | baseline | **~13.4% fewer samples** for the same isotropic bandwidth |
-| Flow routing | D8: √2 weights, ambiguous receiver | **D6: uniform weight, unambiguous receiver** |
-| Erosion / CA isotropy | 45°/90° leakage — plus-shapes, axis-aligned lobes | **60° leakage — markedly cleaner** |
-| Storage | 2D array | 2D array (axial / offset) — **unchanged** |
+| Sampling | baseline | **~13.4% fewer samples** for the same isotropic bandwidth — via a **~15% coarser `cellSize`**; at equal `cellSize`, +15.5% cells |
+| Flow routing | D8: √2 weights biasing receiver choice | **D6: uniform weight, no metric bias** — but coarser quantisation (6 directions vs 8) |
+| Erosion / CA isotropy | 45°/90° leakage — plus-shapes, axis-aligned lobes | **60° leakage — markedly cleaner**, not zero |
+| Storage | 2D array | 2D array (axial / offset) — same shape, **different index→world map** (row-parity offsets) |
 | Engine / DEM interchange | native everywhere | **the one cost:** resample to a raster to deliver |
 
 Where a hex heightfield actually earns its place is **flat terrain**, not planets: hex-native strategy /
@@ -275,21 +285,33 @@ reference is Amit Patel's *Red Blob Games — Hexagonal Grids* (**F** — engine
 standard):
 
 - **Axial `(q, r)`** — two axes 60°/120° apart, stored in a rhombic or offset-rectangular 2D array. This
-  is the storage layout: memory is unchanged from a square raster, only the six neighbour offsets differ.
+  is the storage layout: the array *shape* is unchanged from a square raster, but the index→world map is
+  not — an axial rhombus over a rectangular world extent wastes corner cells, and packing rectangularly
+  means offset coordinates, whose neighbour offsets are **row-parity dependent** (*the* classic hex bug).
 - **Cube `(x, y, z)` with `x + y + z = 0`** — the symmetric three-axis view; the cleanest coordinates for
   distance, rotation and line-drawing, because hex distance is `(|x|+|y|+|z|)/2`.
 - **Offset (odd-r / even-r / odd-q / even-q)** — a square array with alternate rows/columns shifted half a
   cell; convenient for I/O, painful for arithmetic. Convert to axial/cube before doing any geometry.
 
-Pick **pointy-top or flat-top** once and record it in the manifest beside `cellSize`; the neighbour
-offsets and the row/column spacing depend on it, and mixing the two is the hex analogue of the
-vertex-vs-pixel-centring bug above. For a regular hexagon of circumradius `s` the apothem
-(centre-to-flat) is `(√3/2)·s`, so cells sit `√3·s` apart along the flat axis and `(3/2)·s` along the
-other; `cellSize` is the centre-to-centre spacing, and cell **area** is `(3√3/2)·s²` — you need it for
-drainage area in m² and every per-area rate, and the `SKILL.md` world-unit invariants hold unchanged.
+Pick **pointy-top or flat-top** once and record it in the manifest (the `grid` / `hexOrientation` /
+`hexCoords` fields in the schema at the top of this file); the neighbour offsets and the row/column
+spacing depend on it, and mixing the two is the hex analogue of the vertex-vs-pixel-centring bug above.
+The metric, precisely — there are two spacings in play and only one is a neighbour distance. For a
+regular hexagon of circumradius `s` the apothem (centre-to-flat) is `(√3/2)·s`, and **all six
+neighbours are exactly `√3·s` away** — twice the apothem, *including* the adjacent-row neighbours
+(`√((√3/2)² + (3/2)²)·s = √3·s`). The `(3/2)·s` figure you also need is the **row pitch** — the spacing
+between row centrelines — and is *not* a centre-to-centre neighbour distance; confuse the two and every
+world-space position is wrong. `cellSize` is the neighbour spacing `√3·s`, and cell **area** in
+manifest terms is `(√3/2)·cellSize² ≈ 0.866·cellSize²` (equivalently `(3√3/2)·s²`; the `√3/2` is the
+same lattice-density constant as the sampling result above) — you need it for drainage area in m² and
+every per-area rate, and the `SKILL.md` world-unit invariants hold unchanged.
 
-**Flow routing on hex is D6, and it is *cleaner* than D8.** Steepest descent picks the lowest of 6
-equidistant edge-neighbours — no √2 rescaling, no 4-versus-8 decision, and the receiver is unambiguous.
+**Flow routing on hex is D6 — cleaner than D8, not finer.** Steepest descent picks the lowest of 6
+equidistant edge-neighbours — no √2 rescaling, no 4-versus-8 decision, no metric bias tilting the
+choice of receiver. What D6 does *not* buy is angular resolution: 6 directions at 60° is **coarser**
+than D8's 8 at 45° (max aspect error 30° against 22.5°), so single-receiver flow on a planar slope
+still collapses onto the nearest lattice direction — parallel drainage along the 60° family, smaller
+than D8's but present — and ties between equal-drop neighbours still need a rule (`03`, *D6*).
 Dispersive quantities (MFD) spread over up to 6 receivers with equal geometric weight. Everything else
 in `03` is unchanged: **depression handling still comes first** (the Legal Order does not care about the
 lattice), accumulation is the same recurrence over the new neighbour set, and channels threshold `A`.
@@ -297,11 +319,24 @@ This is not hand-waving — mesh-independent flow routing on a hex mesh is publi
 HexWatershed; `03`), which is exactly why hex is the *low-anisotropy* grid to reach for when hydrology is
 the point.
 
-**Erosion, thermal and CA port by swapping the stencil.** Thermal talus redistributes to the 6
-neighbours with a single per-neighbour distance (no square-grid √2 split); the pipe model becomes a
-**6-pipe** model with one pipe length; lava and other cellular automata (`19`) shed most of their
-lattice-aligned lobing. The parameters stay world-unit-denominated — only the stencil and the metric
-change.
+**Erosion, thermal and CA port by swapping the stencil — and renormalising it.** "Swap 4 neighbours
+for 6" is not the whole port: the stencil's **normalisation constant changes**, and keeping the square
+one is a silent 1.5× error. For unit neighbour vectors `Σₖ eₖeₖᵀ = 3I` on the hex lattice against `2I`
+on the square 4-stencil, so the discrete Laplacian at neighbour spacing `d` is
+
+```
+square (4-neighbour):  ∇²h ≈ Σ(hᵢ − h₀) / d²
+hex    (6-neighbour):  ∇²h ≈ Σ(hᵢ − h₀) · 2 / (3·d²)
+```
+
+Port `05`'s hillslope diffusion (or the diffusion term coupled into stream power) with the square
+constant and the effective diffusivity is quietly **1.5× too high** — it reads as a tuning problem,
+not a bug. Thermal talus redistributes to the 6 neighbours with a single per-neighbour distance (no
+square-grid √2 split) and the pipe model becomes a **6-pipe** model with one pipe length — but both
+inherit an *analogous* rescaling, not the exact 3/2: six outflow paths per step drain a cell faster,
+so re-derive the stability (CFL-style) bound rather than carrying the square grid's maximum step. Lava
+and other cellular automata (`19`) shed most of their lattice-aligned lobing. The parameters stay
+world-unit-denominated — the stencil, the metric, *and the normalisation* change.
 
 **Interchange: hex is a working grid; deliver a raster.** Engines, meshers and every DCC import expect a
 square raster (or, on a planet, an equirectangular one), so — exactly like equirectangular below — hex
@@ -312,10 +347,16 @@ half-cell offset creeps back in. If the renderer takes hex tiles directly (many 
 any DGGS pipeline), skip the round-trip and mesh the hexes.
 
 **Verify.** The cone and constant-slope controls of `09` still apply, and hex should *beat* the square
-grid on them: a radial vent produces no plus-shaped collapse, a constant slope produces no 45°-biased
-drainage. Cell areas sum to the domain area (`Σ (3√3/2)s² = extent`), and a hex height resampled to a
-raster and back is within interpolation error — a large drift means the offset/centring convention is
-wrong.
+grid on them — beat, not ace: a radial vent shows no plus-shaped collapse (the residual lobing is
+6-fold and smaller), and a constant slope shows no 45°-biased drainage — but expect **residual
+60°-family alignment** from D6's quantisation; the pass criterion is *smaller than the square grid's*,
+not *absent*. Cell areas sum to the domain area — `N · (√3/2)·cellSize² ≈ w·h` (the manifest `extent`
+is `[w, h]`), exact only up to the ragged partial row of boundary cells, since staggered rows do not
+tile a rectangle — and a hex height resampled to a raster and back is within interpolation error; a
+large drift means the offset/centring convention is wrong. The hex grid also **adds rows to the `09`
+failure catalogue** rather than only deleting them: axial-vs-offset mixing, row-parity neighbour
+tables applied with the wrong parity, pointy/flat orientation mismatch, and the un-renormalised
+6-neighbour Laplacian above.
 
 **Tier.** Hexagonal-lattice sampling optimality is **P** (Petersen & Middleton 1962; Mersereau 1979);
 the axial/cube/offset coordinate machinery is **F** (Red Blob Games — the standard, no paper); D6/MFD
@@ -350,16 +391,23 @@ finite-difference lineage is Sadourny 1972. The **six faces are six of the tiles
 is the planar hexagonal grid of the section above, wrapped around the globe — and the one **procedural
 planet** grid where the whole low-anisotropy story carries onto the sphere intact. You cannot tile a
 sphere with hexagons alone: Euler's formula forces **exactly twelve pentagons**, one at each icosahedron
-vertex (**Goldberg 1937**; the same reason a football has 12 pentagonal panels). Away from those 12
-defects every cell is a hexagon with **6 equidistant edge-neighbours**, so D6 routing with no √2,
-isotropic diffusion, and the optimal-sampling advantage all hold on the planet, and the *only*
-special-casing is the twelve 5-neighbour pentagons. Made **equal-area** by the **ISEA** (Icosahedral
-Snyder Equal-Area) projection (**Snyder 1992**); the family and its aperture-3/4/7 hierarchies are
-surveyed in **Sahr, White & Kimerling 2003**, and **Uber's H3** is the production instance — an
-aperture-7 icosahedral hex DGGS, 122 base cells (110 hexagons + 12 pentagons). Reach for it when a planet
-wants uniform cells and seam-free hydrology: flow routing on it is published (Liao et al. 2020, 2025),
-the pentagons are the only irregularity, and `25` stacks Euler-pole tectonics, latitude climate and
-erosion on top of it.
+vertex (**Goldberg 1937**; the same reason a football has 12 pentagonal panels). The pentagons are the
+only **topological** irregularity: away from them every cell has 6 edge-neighbours, so D6 routing with
+no √2 carries over and the only stencil special case is the twelve 5-neighbour cells. The **metric**,
+though, is irregular *everywhere* — Goldberg hexagons are not congruent or regular; edge lengths and
+areas vary continuously across each icosahedral face — so "equidistant neighbours" holds only
+approximately on the sphere, and per-cell areas must come from the grid library, never from
+`(√3/2)·cellSize²`. How much they vary is a **projection choice**: the **ISEA** (Icosahedral Snyder
+Equal-Area) projection (**Snyder 1992**) makes every cell **exactly equal-area**; the family and its
+aperture-3/4/7 hierarchies are surveyed in **Sahr, White & Kimerling 2003**, with **ISEA7H** the
+equal-area aperture-7 instance. **Uber's H3** is the production system — aperture-7, 122 base cells
+(110 hexagons + 12 pentagons) — but it is **not equal-area**: H3 projects through a **gnomonic**
+projection per icosahedron face, and cell areas vary by **~1.6×** between largest and smallest at a
+given resolution. On H3, drainage area and every per-area rate must use the per-cell true area (the
+library provides it), or the distortion correction below bites exactly as on any other projected grid.
+Reach for the hex DGGS when a planet wants near-uniform cells and seam-free hydrology: flow routing on
+it is published (Liao et al. 2020; Liao et al. 2025 — the 2025 datasets are on ISEA, the equal-area
+branch), and `25` stacks Euler-pole tectonics, latitude climate and erosion on top of it.
 
 **HEALPix — equal-area *pixels*, not hexagons.** A different seam-free grid, and not to be conflated with
 the hex DGGS: `N_pix = 12·N_side²` exactly-equal-area, iso-latitude **quadrilateral** pixels (every pixel
