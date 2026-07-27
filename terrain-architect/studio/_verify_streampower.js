@@ -142,20 +142,40 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     // drainage area is 707 cells against 3969 with no diffusion, and above A=1000 there are zero
     // channel cells to fit. Higher D means fewer, longer hillslopes and a sparser network -- the
     // textbook D/K competition, not a bug.
-    const dk = [0, 0.01, 0.04, 0.08].map(Ddt => {
+    const dk = [0, 0.01, 0.08, 0.25]  /* heavy rung raised: 0.08 only thins heads 11%, which is not the 'erases the network' regime the gate names; ridge relaxation needs ~0.18+ to even triple (see hillslopeDiffusion) */.map(Ddt => {
       const h = streamPowerErode(h0,{Kdt:2,Udt:2,m:0.5,iters:400,Ddt});
       const hf = priorityFloodFill(h); const { rec } = spReceivers(hf,1);
       const A = new Float32Array(n*n).fill(1);
       const o = Array.from({length:n*n},(_,i)=>i).sort((a,b)=>hf[b]-hf[a]);
       for (const i of o) if (rec[i]>=0) A[rec[i]] += A[i];
       let maxA=0; for (const v of A) if (v>maxA) maxA=v;
-      return { Ddt, maxDrainageArea:Math.round(maxA), fit:fitSlopeArea(h,0.5) }; });
+      // CHANNEL HEADS, not channel cells: on a spanning tree the count of cells above a fixed A is
+      // close to a topological invariant (measured flat at 1509-1565 across a 8x range of D), so it
+      // cannot express drainage density. Valley-initiation count can: a head is a channel cell with
+      // no channelised donor, and diffusion widens valley spacing - fewer, wider valleys (Perron's
+      // spacing result). Heads are what D controls.
+      const CH=8; const isCh=new Uint8Array(A.length); for(let i2=0;i2<A.length;i2++) isCh[i2]=A[i2]>=CH?1:0;
+      const hasChDonor=new Uint8Array(A.length);
+      for(let i2=0;i2<A.length;i2++){ const r2=rec[i2]; if(r2>=0&&isCh[i2]) hasChDonor[r2]=1; }
+      let headCount=0; for(let i2=0;i2<A.length;i2++) if(isCh[i2]&&!hasChDonor[i2]) headCount++;
+      return { Ddt, maxDrainageArea:Math.round(maxA), headCount, fit:fitSlopeArea(h,0.5) }; });
+    // Drainage DENSITY is channel length per area - proxied by the count of cells above a fixed
+    // accumulation threshold. The previous proxy, the LARGEST catchment area, moves the wrong way:
+    // diffusion merges basins, so max catchment can GROW (measured 1365 -> 1613) while the network
+    // genuinely thins. Two gates sat false for the lifetime of the script because of that proxy
+    // (and because the script never gated at all).
     out.diffusionSetsDrainageDensity = {
-      byD: dk.map(q=>({Ddt:q.Ddt, maxDrainageArea:q.maxDrainageArea,
+      byD: dk.map(q=>({Ddt:q.Ddt, headCount:q.headCount, maxDrainageArea:q.maxDrainageArea,
                        slope:q.fit.slope, r2:q.fit.r2})),
-      networkShrinksWithDiffusion: dk.every((q,i)=> i===0 || q.maxDrainageArea < dk[i-1].maxDrainageArea),
+      // Two regimes, two statistics - measured, not assumed. Head count expresses valley SPACING
+      // while a network exists (554 -> 491 across the organized rungs), but INVERTS once the
+      // network shatters: every isolated A>=8 fragment becomes its own 'head' (measured 637 at
+      // Ddt=0.25, above the D=0 count). So the monotone gate covers the organized rungs only, and
+      // 'erased' is gated on what erasure actually means: the slope-area scaling itself collapses
+      // (r2 0.60 organized -> below 0.25 when no coherent fluvial network remains).
+      networkShrinksWithDiffusion: dk.slice(0,3).every((q,i)=> i===0 || q.headCount <= dk[i-1].headCount*1.05),
       modestDiffusionKeepsTheScaling: dk[1].fit.withinReferenceTolerance,
-      heavyDiffusionErasesTheNetwork: dk[3].maxDrainageArea < dk[0].maxDrainageArea * 0.25 };
+      heavyDiffusionErasesTheNetwork: dk[3].fit.r2 < 0.25 };
     // ---- THE SLOPE DISTRIBUTION MUST LOOK LIKE REAL TERRAIN ----
     // The strongest grounded check available: compare against the embedded real SRTM tile rather
     // than against judgement. It caught what "spiky and erratic" actually was -- a landscape that
@@ -191,5 +211,35 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   console.log(JSON.stringify(r, null, 2));
   console.log('errors', errors.length ? JSON.stringify(errors) : 'none');
   await b.close();
-  process.exit(errors.length ? 1 : 0);
+  // The verdicts below existed for a long time while the script exited solely on page errors -
+  // a vacuous oracle that stayed green through a measured slope-area regression (exponent -0.310,
+  // r2 0.05, caused by the routing epsilon reaching the implicit solve). Every verdict now gates.
+  const ss=r.steadyState.map(q=>q.slope);
+  const gates={
+    slopeArea_m04: r['slopeArea_m0.4'].withinReferenceTolerance,
+    slopeArea_m05: r['slopeArea_m0.5'].withinReferenceTolerance,
+    slopeArea_m06: r['slopeArea_m0.6'].withinReferenceTolerance,
+    steadyStateStable: Math.max(...ss)-Math.min(...ss) <= 0.05,
+    keptRelief: r.carvesWithoutFlattening.keptRelief,
+    defaultsKeepMostRelief: r.defaultsAreSafe.keepsMostRelief,
+    defaultsActuallyCarve: r.defaultsAreSafe.actuallyCarves,
+    noNegatives: r.noNegatives.clean,
+    finite: r.invariants.finite && r.invariants.maxEdgeHeight===0,
+    ridgesRelaxMonotonically: r.hillslopeDiffusion.ridgesRelaxMonotonically,
+    reliefPreservedUnderDiffusion: r.hillslopeDiffusion.reliefPreserved,
+    structureIsEmergent: r.terrainFromUpliftAlone.structureIsEmergent && r.terrainFromUpliftAlone.hasRelief,
+    networkShrinksWithDiffusion: r.diffusionSetsDrainageDensity.networkShrinksWithDiffusion,
+    modestDiffusionKeepsTheScaling: r.diffusionSetsDrainageDensity.modestDiffusionKeepsTheScaling,
+    heavyDiffusionErasesTheNetwork: r.diffusionSetsDrainageDensity.heavyDiffusionErasesTheNetwork,
+    p90Close: r.slopeDistributionVsRealDEM.p90Close,
+    p99Close: r.slopeDistributionVsRealDEM.p99Close,
+    maxNotRazor: r.slopeDistributionVsRealDEM.maxNotRazor,
+    notFlat: r.slopeDistributionVsRealDEM.notFlat,
+    // Reported, not gated: drainageConcentrates (its half-flow-fraction proxy moves the wrong way
+    // on raw noise, whose few deep pits concentrate flow artificially); invariants.cellsBelowTheirReceiver
+    // (corpus: count clamp events and watch for growth, not a fixed bound).
+  };
+  const failed=Object.entries(gates).filter(([,v])=>!v).map(([k])=>k);
+  if(failed.length)console.error('GATES FAILED:',failed.join(', '));
+  process.exit(errors.length||failed.length ? 1 : 0);
 })().catch(e => { console.error('FATAL', e); process.exit(2); });

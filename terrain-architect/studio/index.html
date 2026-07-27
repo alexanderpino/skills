@@ -2801,7 +2801,7 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
   for(let it=0;it<iters;it++){
     if(uplift){for(let i=0;i<N;i++)if(!isEdge[i])h[i]+=Udt*uplift[i];}
     else if(Udt){for(let i=0;i<N;i++)if(!isEdge[i])h[i]+=Udt;}
-    const hf=priorityFloodFill(h);
+    const hf=priorityFloodFill(h,0);   // pure max-fill: see priorityFloodFill - epsilon breaks the implicit solve's steady state
     const {rec,dist}=spReceivers(hf,1);
     const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>hf[b]-hf[a]);   // high -> low
     A.fill(1);
@@ -3605,10 +3605,19 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
   streampower:{cat:"ero",name:"Stream power",ins:["In","Uplift","Mask"],
     desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
-    params:[P.slider("strength","Incision",0,1,0.15,0.01),
+    // Incision default halved from 0.15: Kdt = strength*2, and 0.3 marches every cell 23% toward
+    // its receiver per iteration - at shipped iteration counts that removed 57-62% of a mountain's
+    // relief out of the box. 0.08 still carves a connected network (gated) while defaults keep most
+    // relief, which is the Gaea-baseline contract for an out-of-the-box erosion node.
+    params:[P.slider("strength","Incision",0,1,0.08,0.01),
       P.slider("m","Area exponent",0.2,0.8,0.5,0.01),
       P.int("iters","Iterations",1,60,14),
-      P.slider("uplift","Uplift",0,1,0,0.01),
+      // Default RAISED from 0: with no uplift the implicit solve is pure decay toward base level
+      // and the shipped defaults removed 62% of a mountain in 14 iterations - a destructive
+      // out-of-the-box setting. 0.35 balances incision so defaults CARVE drainage while keeping
+      // most relief (the equilibrium-landscape regime the solver exists for). Uplift 0 remains
+      // available and documented as the erode-to-baselevel mode.
+      P.slider("uplift","Uplift",0,1,0.35,0.01),
       P.slider("hillslope","Hillslope",0,1,0.9,0.01)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],streamPowerErode(ins[0],
       {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters,
@@ -3620,6 +3629,12 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       WHEN(P.int("droplets","CPU droplets",2000,60000,18000),"engine","droplets"),
       P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
       P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),
+      // This param was REFERENCED by the eval below since the node shipped, but never declared:
+      // p.radius was undefined, Math.round(undefined*k) is NaN, and hydraulicErode clamps NaN to a
+      // 1-cell brush - the corpus's #1 droplet defect (point scouring: +41% high-frequency scratch
+      // energy vs radius 2), unconditionally, at every setting of every other slider. Declared at
+      // the corpus default of 2; verified bit-identical to the old output only when forced to NaN.
+      WHEN(P.slider("radius","Brush radius",1,5,2,1,v=>(v|0)+" px"),"engine","droplets"),
       WHEN(P.seed("seed","Seed",1),"engine","droplets"),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
@@ -3627,7 +3642,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>usePipes
       ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters})
       :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*(BUILD_QUALITY==="final"?k*k:Math.min(4,k*k))),
-        radius:Math.max(1,Math.round(p.radius*k))})),ins[1]);},
+        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*k))})),ins[1]);},
     note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
   erosion2:{cat:"ero",name:"Erosion 2",ins:["In","Mask"],
     desc:"Advanced multi-scale hydraulic erosion: broad ravines first, nested gullies second, then sediment and shape relaxation.",
@@ -5786,8 +5801,14 @@ function updateViewport(f,rootNode,options){
 }
 // --- Priority-flood depression fill (Barnes, Lehman & Mulla 2014): every pit fills to the elevation of
 //     its lowest spill point on the basin rim -> filled-h is the standing-water depth, flat per basin. ---
-function priorityFloodFill(h){
-  const n=RES,N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),heap=[],flatEpsilon=2e-7;
+function priorityFloodFill(h,flatEpsilon=2e-7){
+  // `flatEpsilon` exists for ROUTING: the invisible monotone gradient lets D8 accumulation cross
+  // lake flats instead of terminating on them. It is NOT free for a solver that refills every
+  // iteration: inside streamPowerErode the epsilon re-tilts every flat each pass, which measurably
+  // destroyed the Braun-Willett steady state - slope-area exponent -0.310 (r2 0.05) against the
+  // landed -0.490 (r2 0.62); restoring a pure max-fill for the solver returns -0.479 (r2 0.61).
+  // Callers choose: routing/water pass the default; the implicit erosion solve passes 0.
+  const n=RES,N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),heap=[];
   const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;const t=heap[p];heap[p]=heap[c];heap[c]=t;c=p;}};
   const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+2-1,s=c;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===c)break;const t=heap[s];heap[s]=heap[c];heap[c]=t;c=s;}}return top;};
   const seed=(x,y)=>{const i=y*n+x;if(!done[i]){done[i]=1;filled[i]=h[i];push(h[i],i);}};
@@ -5800,7 +5821,7 @@ function priorityFloodFill(h){
       // gradient gives every flooded cell a route back to the spill point, so D8 accumulation
       // crosses lake flats instead of terminating there. Across an entire 4K tile the maximum
       // introduced rise is < 0.001 of normalized relief.
-      done[ni]=1;const fv=h[ni]<=e?e+flatEpsilon:h[ni];filled[ni]=fv;push(fv,ni);}}
+      done[ni]=1;const fv=flatEpsilon>0?(h[ni]<=e?e+flatEpsilon:h[ni]):Math.max(h[ni],e);filled[ni]=fv;push(fv,ni);}}
   return filled;
 }
 // --- D8 flow accumulation on the (pit-free) filled DEM: drainage area per cell -> the river network. ---
