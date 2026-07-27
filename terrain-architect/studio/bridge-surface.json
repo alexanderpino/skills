@@ -1,0 +1,3641 @@
+{
+  "meta": {
+    "purpose": "Frozen contract: the exact page-global surface the _verify_* suite reaches into. A test bridge for the ES-module build must re-expose every symbol below whose kind is not \"dom-id\".",
+    "generator": "_verify_bridge.js",
+    "method": "acorn AST parse + scope walker (exact); no regex identifier scanning",
+    "acornVersion": "8.17.0",
+    "deterministic": true,
+    "app": {
+      "file": "index.html",
+      "inlineClassicScripts": 1,
+      "moduleScripts": 0,
+      "scriptLines": "894-6562",
+      "topLevelDeclarations": 453,
+      "elementIds": 153
+    },
+    "tests": {
+      "files": 50,
+      "fileList": [
+        "_verify.js",
+        "_verify_all_canyon.js",
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_data.js",
+        "_verify_digest.js",
+        "_verify_edge_spin.js",
+        "_verify_edges.js",
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_highres.js",
+        "_verify_layout.js",
+        "_verify_mask_draw.js",
+        "_verify_menubar.js",
+        "_verify_organize.js",
+        "_verify_param_visibility.js",
+        "_verify_peak.js",
+        "_verify_placement.js",
+        "_verify_range.js",
+        "_verify_realscale.js",
+        "_verify_realtime.js",
+        "_verify_render.js",
+        "_verify_resparity.js",
+        "_verify_satgen.js",
+        "_verify_satnode.js",
+        "_verify_satpicker.js",
+        "_verify_simplex.js",
+        "_verify_snow.js",
+        "_verify_streampower.js",
+        "_verify_tectonic.js",
+        "_verify_toolbar.js",
+        "_verify_toolbox.js",
+        "_verify_trs.js",
+        "_verify_viewport_ui.js",
+        "_verify_water.js",
+        "_verify_water_hydrology.js",
+        "_verify_water_surface.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "pageSideCallbacks": 151,
+      "indirectCallbacks": 1,
+      "methodsScanned": [
+        "$$eval",
+        "$eval",
+        "addInitScript",
+        "evaluate",
+        "evaluateAll",
+        "evaluateHandle",
+        "waitForFunction"
+      ],
+      "parseErrors": [],
+      "unresolvedCallSites": [],
+      "windowPropertyAccess": [
+        {
+          "prop": "__D",
+          "appGlobal": false,
+          "files": [
+            "_verify_digest.js"
+          ]
+        },
+        {
+          "prop": "__satTest",
+          "appGlobal": false,
+          "files": [
+            "_verify_satnode.js"
+          ]
+        }
+      ]
+    },
+    "caveats": [
+      "refCount counts identifier occurrences across all page-side callbacks; fileCount counts distinct test files.",
+      "\"written\" means the symbol is the target of an assignment or ++/-- inside a page-side callback -> the bridge needs a SETTER, not just a getter.",
+      "\"patched\" means a property was assigned through the symbol (e.g. gl.bindBuffer=, TYPES.blur.eval=) -> the bridge must expose the LIVE object, never a copy.",
+      "Identifiers declared at index.html top level always win over the builtin deny-list, so app globals that shadow a DOM name (e.g. GPU) are never lost.",
+      "Page-side callbacks passed by NAME (page.evaluate(installHarness, arg)) are resolved to their Node-side declaration and analysed like inline ones.",
+      "meta.tests.unresolvedCallSites lists page-side calls with no analysable function argument (string bodies, handles). It must stay empty, or the surface is incomplete.",
+      "meta.tests.windowPropertyAccess lists every window.X touched from a page-side callback, flagged with whether X is an index.html global."
+    ]
+  },
+  "summary": {
+    "totalSymbols": 172,
+    "needsBridge": 161,
+    "byKind": {
+      "mutable-global": 53,
+      "const-global": 20,
+      "function": 88,
+      "dom-id": 11
+    },
+    "written": 25,
+    "patched": 10,
+    "writtenNeedingBridge": 25,
+    "patchedNeedingBridge": 10,
+    "unknown": 0,
+    "builtinsFiltered": 34
+  },
+  "unknown": [],
+  "domIdCollisions": [
+    "gl",
+    "graphMenu"
+  ],
+  "builtinsFiltered": [
+    "Array",
+    "ArrayBuffer",
+    "Error",
+    "Event",
+    "Float32Array",
+    "Float64Array",
+    "Infinity",
+    "Int32Array",
+    "JSON",
+    "Math",
+    "NaN",
+    "Number",
+    "Object",
+    "Promise",
+    "Set",
+    "String",
+    "Uint16Array",
+    "Uint32Array",
+    "Uint8Array",
+    "WebGL2RenderingContext",
+    "WheelEvent",
+    "cancelAnimationFrame",
+    "clearInterval",
+    "document",
+    "getComputedStyle",
+    "innerHeight",
+    "innerWidth",
+    "isFinite",
+    "localStorage",
+    "performance",
+    "requestAnimationFrame",
+    "setInterval",
+    "undefined",
+    "window"
+  ],
+  "symbols": [
+    {
+      "name": "RES",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 195,
+      "fileCount": 39,
+      "files": [
+        "_verify.js",
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_edge_spin.js",
+        "_verify_edges.js",
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_highres.js",
+        "_verify_layout.js",
+        "_verify_mask_draw.js",
+        "_verify_peak.js",
+        "_verify_placement.js",
+        "_verify_range.js",
+        "_verify_realscale.js",
+        "_verify_render.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js",
+        "_verify_simplex.js",
+        "_verify_snow.js",
+        "_verify_streampower.js",
+        "_verify_tectonic.js",
+        "_verify_toolbar.js",
+        "_verify_trs.js",
+        "_verify_water.js",
+        "_verify_water_surface.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "let",
+      "declLine": 938,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_gpu.js",
+        "_verify_highres.js",
+        "_verify_mask_draw.js",
+        "_verify_peak.js",
+        "_verify_realscale.js",
+        "_verify_resparity.js",
+        "_verify_simplex.js",
+        "_verify_streampower.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "writeExamples": [
+        "RES = 192",
+        "RES = cfg.res",
+        "RES = n",
+        "RES=1024"
+      ],
+      "reads": 164,
+      "writes": 31
+    },
+    {
+      "name": "nodes",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": true,
+      "refCount": 103,
+      "fileCount": 29,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_data.js",
+        "_verify_digest.js",
+        "_verify_edges.js",
+        "_verify_featurescale.js",
+        "_verify_highres.js",
+        "_verify_mask_draw.js",
+        "_verify_menubar.js",
+        "_verify_organize.js",
+        "_verify_param_visibility.js",
+        "_verify_placement.js",
+        "_verify_range.js",
+        "_verify_realscale.js",
+        "_verify_realtime.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js",
+        "_verify_simplex.js",
+        "_verify_snow.js",
+        "_verify_toolbox.js",
+        "_verify_water.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "let",
+      "declLine": 3689,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_edges.js",
+        "_verify_highres.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js"
+      ],
+      "writeExamples": [
+        "nodes = nodes.filter(n => n.id !== maskNode.id)",
+        "nodes=[]",
+        "nodes=nodes.filter(n=>!colorTypes.has(n.type))",
+        "nodes=nodes.filter(n=>n.id!==BL.id)"
+      ],
+      "patchFiles": [
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_range.js"
+      ],
+      "patchExamples": [
+        "nodes.length = 0",
+        "nodes.length=0"
+      ],
+      "reads": 94,
+      "writes": 9
+    },
+    {
+      "name": "edges",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": true,
+      "refCount": 87,
+      "fileCount": 22,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_data.js",
+        "_verify_digest.js",
+        "_verify_edges.js",
+        "_verify_exact_transform.js",
+        "_verify_highres.js",
+        "_verify_mask_draw.js",
+        "_verify_menubar.js",
+        "_verify_organize.js",
+        "_verify_placement.js",
+        "_verify_range.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js",
+        "_verify_snow.js",
+        "_verify_trs.js"
+      ],
+      "declKind": "let",
+      "declLine": 3689,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_data.js",
+        "_verify_edges.js",
+        "_verify_highres.js",
+        "_verify_mask_draw.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js",
+        "_verify_snow.js"
+      ],
+      "writeExamples": [
+        "edges = edges.filter(e => e.from !== maskNode.id && e.to !== maskNode...",
+        "edges = edges.filter(e=>!(e.to===out.id&&e.slot===0))",
+        "edges=[]",
+        "edges=edges.filter(e=>!(e.to===out.id&&e.slot===0))"
+      ],
+      "patchFiles": [
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_range.js"
+      ],
+      "patchExamples": [
+        "edges.length = 0",
+        "edges.length=0"
+      ],
+      "reads": 71,
+      "writes": 16
+    },
+    {
+      "name": "TYPES",
+      "kind": "const-global",
+      "written": false,
+      "patched": true,
+      "refCount": 78,
+      "fileCount": 28,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_colorfx.js",
+        "_verify_curve.js",
+        "_verify_data.js",
+        "_verify_digest.js",
+        "_verify_layout.js",
+        "_verify_peak.js",
+        "_verify_placement.js",
+        "_verify_range.js",
+        "_verify_realtime.js",
+        "_verify_satnode.js",
+        "_verify_satpicker.js",
+        "_verify_simplex.js",
+        "_verify_snow.js",
+        "_verify_streampower.js",
+        "_verify_tectonic.js",
+        "_verify_toolbox.js",
+        "_verify_trs.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "const",
+      "declLine": 3240,
+      "patchFiles": [
+        "_verify_build_progress.js"
+      ],
+      "patchExamples": [
+        "TYPES.blur.eval=(...args)=>{const start=performance.now();while(perfo..."
+      ],
+      "reads": 78,
+      "writes": 0
+    },
+    {
+      "name": "gl",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": true,
+      "refCount": 69,
+      "fileCount": 8,
+      "files": [
+        "_verify.js",
+        "_verify_edge_spin.js",
+        "_verify_realtime.js",
+        "_verify_render.js",
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_surface.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "patchFiles": [
+        "_verify_realtime.js"
+      ],
+      "patchExamples": [
+        "gl.bindBuffer = function(target, buffer) { if (target === gl.ARRAY_BU...",
+        "gl.bufferData = function(target, data, usage) { const entry = Object...."
+      ],
+      "reads": 69,
+      "writes": 0
+    },
+    {
+      "name": "makeNode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 48,
+      "fileCount": 20,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_data.js",
+        "_verify_edges.js",
+        "_verify_exact_transform.js",
+        "_verify_layout.js",
+        "_verify_mask_draw.js",
+        "_verify_param_visibility.js",
+        "_verify_range.js",
+        "_verify_satnode.js",
+        "_verify_simplex.js",
+        "_verify_snow.js",
+        "_verify_streampower.js",
+        "_verify_trs.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 3748,
+      "valueIsFunction": true,
+      "reads": 48,
+      "writes": 0
+    },
+    {
+      "name": "terrainDef",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": true,
+      "refCount": 42,
+      "fileCount": 8,
+      "files": [
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_edge_spin.js",
+        "_verify_realscale.js",
+        "_verify_render.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 4957,
+      "patchFiles": [
+        "_verify_canyon_identity.js",
+        "_verify_render.js",
+        "_verify_snow.js"
+      ],
+      "patchExamples": [
+        "terrainDef.baseElevation=0",
+        "terrainDef.baseElevation=1000",
+        "terrainDef.baseElevation=3000",
+        "terrainDef.baseElevation=savedDatum"
+      ],
+      "reads": 42,
+      "writes": 0
+    },
+    {
+      "name": "evalGraph",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 29,
+      "fileCount": 18,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_data.js",
+        "_verify_edges.js",
+        "_verify_exact_transform.js",
+        "_verify_highres.js",
+        "_verify_layout.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js",
+        "_verify_snow.js",
+        "_verify_trs.js",
+        "_verify_water.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "function",
+      "declLine": 3858,
+      "valueIsFunction": true,
+      "reads": 29,
+      "writes": 0
+    },
+    {
+      "name": "scene",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": true,
+      "refCount": 28,
+      "fileCount": 6,
+      "files": [
+        "_verify_data.js",
+        "_verify_edge_spin.js",
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_hydrology.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "let",
+      "declLine": 4964,
+      "patchFiles": [
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_hydrology.js",
+        "_verify_water_surface.js"
+      ],
+      "patchExamples": [
+        "scene.snow=null",
+        "scene.snow=savedFallbackSnow",
+        "scene.snow=savedSceneSnow",
+        "scene.water.shoreSmooth = smooth"
+      ],
+      "reads": 28,
+      "writes": 0
+    },
+    {
+      "name": "cam",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": true,
+      "refCount": 26,
+      "fileCount": 7,
+      "files": [
+        "_verify.js",
+        "_verify_data.js",
+        "_verify_highres.js",
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "let",
+      "declLine": 4786,
+      "writeFiles": [
+        "_verify_water.js"
+      ],
+      "writeExamples": [
+        "cam = { target:[0,.24,0], dist:1.48, az:.62, el:.38 }"
+      ],
+      "patchFiles": [
+        "_verify.js",
+        "_verify_data.js",
+        "_verify_highres.js",
+        "_verify_render.js"
+      ],
+      "patchExamples": [
+        "cam.az = .72",
+        "cam.az=0.85",
+        "cam.az=0.9",
+        "cam.dist = 2.15"
+      ],
+      "reads": 25,
+      "writes": 1
+    },
+    {
+      "name": "selected",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 26,
+      "fileCount": 17,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js",
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_mask_draw.js",
+        "_verify_menubar.js",
+        "_verify_param_visibility.js",
+        "_verify_range.js",
+        "_verify_realtime.js",
+        "_verify_toolbar.js",
+        "_verify_toolbox.js",
+        "_verify_water.js"
+      ],
+      "declKind": "let",
+      "declLine": 3689,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_colorfx.js",
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_mask_draw.js",
+        "_verify_param_visibility.js",
+        "_verify_range.js",
+        "_verify_realtime.js",
+        "_verify_water.js"
+      ],
+      "writeExamples": [
+        "selected = nd",
+        "selected = null",
+        "selected = orig",
+        "selected = water"
+      ],
+      "reads": 13,
+      "writes": 13
+    },
+    {
+      "name": "glc",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 20,
+      "fileCount": 3,
+      "files": [
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "const",
+      "declLine": 4783,
+      "reads": 20,
+      "writes": 0
+    },
+    {
+      "name": "outputNode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 20,
+      "fileCount": 11,
+      "files": [
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_data.js",
+        "_verify_edges.js",
+        "_verify_highres.js",
+        "_verify_menubar.js",
+        "_verify_organize.js",
+        "_verify_placement.js",
+        "_verify_resparity.js",
+        "_verify_satnode.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 3765,
+      "valueIsFunction": true,
+      "reads": 20,
+      "writes": 0
+    },
+    {
+      "name": "canyonFieldCPU",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 19,
+      "fileCount": 5,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js"
+      ],
+      "declKind": "function",
+      "declLine": 2409,
+      "valueIsFunction": true,
+      "reads": 19,
+      "writes": 0
+    },
+    {
+      "name": "fbmField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 19,
+      "fileCount": 6,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_peak.js",
+        "_verify_simplex.js",
+        "_verify_streampower.js"
+      ],
+      "declKind": "function",
+      "declLine": 1067,
+      "valueIsFunction": true,
+      "reads": 19,
+      "writes": 0
+    },
+    {
+      "name": "nodeById",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 19,
+      "fileCount": 8,
+      "files": [
+        "_verify_canyon_process.js",
+        "_verify_colorfx.js",
+        "_verify_data.js",
+        "_verify_digest.js",
+        "_verify_edges.js",
+        "_verify_organize.js",
+        "_verify_placement.js",
+        "_verify_satnode.js"
+      ],
+      "declKind": "function",
+      "declLine": 3761,
+      "valueIsFunction": true,
+      "reads": 19,
+      "writes": 0
+    },
+    {
+      "name": "resolveColor",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 19,
+      "fileCount": 5,
+      "files": [
+        "_verify_colorfx.js",
+        "_verify_colormixer.js",
+        "_verify_digest.js",
+        "_verify_edges.js",
+        "_verify_satnode.js"
+      ],
+      "declKind": "function",
+      "declLine": 4926,
+      "valueIsFunction": true,
+      "reads": 19,
+      "writes": 0
+    },
+    {
+      "name": "TARGET_RES",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 19,
+      "fileCount": 13,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_mask_draw.js",
+        "_verify_simplex.js",
+        "_verify_toolbar.js"
+      ],
+      "declKind": "let",
+      "declLine": 939,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_mask_draw.js",
+        "_verify_simplex.js"
+      ],
+      "writeExamples": [
+        "TARGET_RES = cfg.res",
+        "TARGET_RES=128",
+        "TARGET_RES=192",
+        "TARGET_RES=256"
+      ],
+      "reads": 4,
+      "writes": 15
+    },
+    {
+      "name": "view",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 19,
+      "fileCount": 4,
+      "files": [
+        "_verify_colorfx.js",
+        "_verify_edges.js",
+        "_verify_organize.js",
+        "_verify_toolbox.js"
+      ],
+      "declKind": "let",
+      "declLine": 3979,
+      "writeFiles": [
+        "_verify_colorfx.js"
+      ],
+      "writeExamples": [
+        "view={x:-250,y:-380,z:.85}"
+      ],
+      "reads": 18,
+      "writes": 1
+    },
+    {
+      "name": "gnoise",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 17,
+      "fileCount": 6,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_peak.js",
+        "_verify_simplex.js",
+        "_verify_streampower.js"
+      ],
+      "declKind": "function",
+      "declLine": 1047,
+      "valueIsFunction": true,
+      "reads": 17,
+      "writes": 0
+    },
+    {
+      "name": "select",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 14,
+      "fileCount": 8,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_colormixer.js",
+        "_verify_realscale.js",
+        "_verify_satpicker.js",
+        "_verify_snow.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 4385,
+      "valueIsFunction": true,
+      "reads": 14,
+      "writes": 0
+    },
+    {
+      "name": "buildIndex",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 13,
+      "fileCount": 7,
+      "files": [
+        "_verify_gpu.js",
+        "_verify_highres.js",
+        "_verify_mask_draw.js",
+        "_verify_resparity.js",
+        "_verify_simplex.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "function",
+      "declLine": 5437,
+      "valueIsFunction": true,
+      "reads": 13,
+      "writes": 0
+    },
+    {
+      "name": "selectedEdge",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 13,
+      "fileCount": 6,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_digest.js",
+        "_verify_edges.js"
+      ],
+      "declKind": "let",
+      "declLine": 3689,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_digest.js"
+      ],
+      "writeExamples": [
+        "selectedEdge = null",
+        "selectedEdge=null"
+      ],
+      "reads": 8,
+      "writes": 5
+    },
+    {
+      "name": "USE_GPU",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 13,
+      "fileCount": 10,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_simplex.js"
+      ],
+      "declKind": "let",
+      "declLine": 1130,
+      "writeFiles": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_simplex.js"
+      ],
+      "writeExamples": [
+        "USE_GPU = false",
+        "USE_GPU=false",
+        "USE_GPU=oldGpu",
+        "USE_GPU=true"
+      ],
+      "reads": 1,
+      "writes": 12
+    },
+    {
+      "name": "CANYON_EVOLUTION_CACHE",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 12,
+      "fileCount": 7,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js"
+      ],
+      "declKind": "const",
+      "declLine": 1933,
+      "reads": 12,
+      "writes": 0
+    },
+    {
+      "name": "historyReady",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 12,
+      "fileCount": 5,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "let",
+      "declLine": 3690,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js"
+      ],
+      "writeExamples": [
+        "historyReady=false",
+        "historyReady=true"
+      ],
+      "reads": 0,
+      "writes": 12
+    },
+    {
+      "name": "waterLook",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": true,
+      "refCount": 12,
+      "fileCount": 5,
+      "files": [
+        "_verify_colorfx.js",
+        "_verify_realtime.js",
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "let",
+      "declLine": 987,
+      "patchFiles": [
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "patchExamples": [
+        "waterLook.pattern = pattern",
+        "waterLook.refraction=refraction",
+        "waterLook.strength=oldRipple",
+        "waterLook.strength=ripple"
+      ],
+      "reads": 12,
+      "writes": 0
+    },
+    {
+      "name": "buildProps",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 11,
+      "fileCount": 9,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_colorfx.js",
+        "_verify_curve.js",
+        "_verify_mask_draw.js",
+        "_verify_param_visibility.js",
+        "_verify_realscale.js",
+        "_verify_realtime.js",
+        "_verify_water.js"
+      ],
+      "declKind": "function",
+      "declLine": 4427,
+      "valueIsFunction": true,
+      "reads": 11,
+      "writes": 0
+    },
+    {
+      "name": "canyonEvolutionState",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 11,
+      "fileCount": 6,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js"
+      ],
+      "declKind": "function",
+      "declLine": 2105,
+      "valueIsFunction": true,
+      "reads": 11,
+      "writes": 0
+    },
+    {
+      "name": "curWater",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 11,
+      "fileCount": 3,
+      "files": [
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_hydrology.js"
+      ],
+      "declKind": "let",
+      "declLine": 5449,
+      "reads": 11,
+      "writes": 0
+    },
+    {
+      "name": "undoStack",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 11,
+      "fileCount": 5,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_menubar.js",
+        "_verify_organize.js"
+      ],
+      "declKind": "let",
+      "declLine": 3690,
+      "writeFiles": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js"
+      ],
+      "writeExamples": [
+        "undoStack=[]"
+      ],
+      "reads": 8,
+      "writes": 3
+    },
+    {
+      "name": "streamPowerErode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 10,
+      "fileCount": 2,
+      "files": [
+        "_verify_streampower.js",
+        "_verify_tectonic.js"
+      ],
+      "declKind": "function",
+      "declLine": 2789,
+      "valueIsFunction": true,
+      "reads": 10,
+      "writes": 0
+    },
+    {
+      "name": "uid",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 10,
+      "fileCount": 7,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_range.js"
+      ],
+      "declKind": "let",
+      "declLine": 3689,
+      "writeFiles": [
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_curve.js",
+        "_verify_digest.js",
+        "_verify_range.js"
+      ],
+      "writeExamples": [
+        "uid = 1",
+        "uid++",
+        "uid=1"
+      ],
+      "reads": 0,
+      "writes": 10
+    },
+    {
+      "name": "activePreviewNode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 9,
+      "fileCount": 4,
+      "files": [
+        "_verify_edge_spin.js",
+        "_verify_realtime.js",
+        "_verify_snow.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 4366,
+      "valueIsFunction": true,
+      "reads": 9,
+      "writes": 0
+    },
+    {
+      "name": "buffers",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 9,
+      "fileCount": 5,
+      "files": [
+        "_verify_edge_spin.js",
+        "_verify_highres.js",
+        "_verify_realtime.js",
+        "_verify_render.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 9,
+      "writes": 0
+    },
+    {
+      "name": "cloneParams",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 9,
+      "fileCount": 9,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js"
+      ],
+      "declKind": "const",
+      "declLine": 3692,
+      "valueIsFunction": true,
+      "reads": 9,
+      "writes": 0
+    },
+    {
+      "name": "markDirtyFrom",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 9,
+      "fileCount": 6,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_edges.js",
+        "_verify_exact_transform.js",
+        "_verify_snow.js",
+        "_verify_trs.js"
+      ],
+      "declKind": "function",
+      "declLine": 3792,
+      "valueIsFunction": true,
+      "reads": 9,
+      "writes": 0
+    },
+    {
+      "name": "topbar",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 9,
+      "fileCount": 2,
+      "files": [
+        "_verify_menubar.js",
+        "_verify_toolbar.js"
+      ],
+      "reads": 9,
+      "writes": 0
+    },
+    {
+      "name": "curField",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 4,
+      "files": [
+        "_verify_edge_spin.js",
+        "_verify_mask_draw.js",
+        "_verify_snow.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5447,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "curHgt",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 4,
+      "files": [
+        "_verify_edge_spin.js",
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_hydrology.js"
+      ],
+      "declKind": "let",
+      "declLine": 5447,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "graphMenu",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 2,
+      "files": [
+        "_verify_edges.js",
+        "_verify_organize.js"
+      ],
+      "declKind": "const",
+      "declLine": 4233,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "newField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 6,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_layout.js",
+        "_verify_peak.js",
+        "_verify_streampower.js",
+        "_verify_tectonic.js",
+        "_verify_trs.js"
+      ],
+      "declKind": "function",
+      "declLine": 996,
+      "valueIsFunction": true,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "planView",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 7,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js",
+        "_verify_viewport_ui.js",
+        "_verify_workflow.js",
+        "_verify_zoom.js"
+      ],
+      "declKind": "let",
+      "declLine": 6170,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "refreshWater",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 5,
+      "files": [
+        "_verify_render.js",
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_hydrology.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "function",
+      "declLine": 5589,
+      "valueIsFunction": true,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "transformField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 3,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_trs.js"
+      ],
+      "declKind": "function",
+      "declLine": 2449,
+      "valueIsFunction": true,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "xfFromParams",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 1,
+      "files": [
+        "_verify_exact_transform.js"
+      ],
+      "declKind": "function",
+      "declLine": 1025,
+      "valueIsFunction": true,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "compProg",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 5,
+      "files": [
+        "_verify.js",
+        "_verify_render.js",
+        "_verify_snow.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 7,
+      "writes": 0
+    },
+    {
+      "name": "curIceSnow",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5449,
+      "reads": 7,
+      "writes": 0
+    },
+    {
+      "name": "sun",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": true,
+      "refCount": 7,
+      "fileCount": 3,
+      "files": [
+        "_verify.js",
+        "_verify_data.js",
+        "_verify_highres.js"
+      ],
+      "declKind": "let",
+      "declLine": 985,
+      "patchFiles": [
+        "_verify.js",
+        "_verify_data.js",
+        "_verify_highres.js"
+      ],
+      "patchExamples": [
+        "sun.az = a",
+        "sun.az=0.9",
+        "sun.az=1.1",
+        "sun.el = e"
+      ],
+      "reads": 7,
+      "writes": 0
+    },
+    {
+      "name": "terrainProg",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 3,
+      "files": [
+        "_verify.js",
+        "_verify_render.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 7,
+      "writes": 0
+    },
+    {
+      "name": "$",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "const",
+      "declLine": 901,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "curWaterIce",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 2,
+      "files": [
+        "_verify_snow.js",
+        "_verify_water.js"
+      ],
+      "declKind": "let",
+      "declLine": 5449,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "fieldMetadata",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "const",
+      "declLine": 2885,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "H_SCALE",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 3,
+      "files": [
+        "_verify_digest.js",
+        "_verify_realscale.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 4959,
+      "writeFiles": [
+        "_verify_digest.js"
+      ],
+      "writeExamples": [
+        "H_SCALE = terrainDef.height / terrainDef.scale"
+      ],
+      "reads": 5,
+      "writes": 1
+    },
+    {
+      "name": "inputEdge",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 4,
+      "files": [
+        "_verify_colorfx.js",
+        "_verify_digest.js",
+        "_verify_edges.js",
+        "_verify_water.js"
+      ],
+      "declKind": "function",
+      "declLine": 3764,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "portPos",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 2,
+      "files": [
+        "_verify_colormixer.js",
+        "_verify_edges.js"
+      ],
+      "declKind": "function",
+      "declLine": 3986,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "priorityFloodFill",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 3,
+      "files": [
+        "_verify_digest.js",
+        "_verify_streampower.js",
+        "_verify_tectonic.js"
+      ],
+      "declKind": "function",
+      "declLine": 5559,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "terrainQuadFitDelta",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 1,
+      "files": [
+        "_verify_edge_spin.js"
+      ],
+      "declKind": "function",
+      "declLine": 5372,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "updateViewport",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 2,
+      "files": [
+        "_verify_edge_spin.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "function",
+      "declLine": 5450,
+      "valueIsFunction": true,
+      "reads": 6,
+      "writes": 0
+    },
+    {
+      "name": "uTime",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 3,
+      "files": [
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "let",
+      "declLine": 4959,
+      "writeFiles": [
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "writeExamples": [
+        "uTime = .7",
+        "uTime = 2.1",
+        "uTime=oldTime",
+        "uTime=time"
+      ],
+      "reads": 1,
+      "writes": 5
+    },
+    {
+      "name": "XF",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 3,
+      "files": [
+        "_verify_digest.js",
+        "_verify_exact_transform.js",
+        "_verify_mask_draw.js"
+      ],
+      "declKind": "let",
+      "declLine": 1021,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_exact_transform.js",
+        "_verify_mask_draw.js"
+      ],
+      "writeExamples": [
+        "XF = null",
+        "XF=m",
+        "XF=null",
+        "XF=prev"
+      ],
+      "reads": 1,
+      "writes": 5
+    },
+    {
+      "name": "CANYON_PROCESS",
+      "kind": "const-global",
+      "written": false,
+      "patched": true,
+      "refCount": 5,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_slopes.js"
+      ],
+      "declKind": "const",
+      "declLine": 1943,
+      "patchFiles": [
+        "_verify_canyon_slopes.js"
+      ],
+      "patchExamples": [
+        "CANYON_PROCESS[0].repose=saved",
+        "CANYON_PROCESS[0].repose=saved*0.72",
+        "CANYON_PROCESS[0].repose=saved*1.28"
+      ],
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "erosion2Field",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 3121,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "frameHero",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 4,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 6176,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "GPU",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 5,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_gpu.js",
+        "_verify_highres.js",
+        "_verify_simplex.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "const",
+      "declLine": 1131,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "gpuFbm",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 3,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_gpu.js",
+        "_verify_simplex.js"
+      ],
+      "declKind": "function",
+      "declLine": 1247,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "nearestUpstreamNode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 2,
+      "files": [
+        "_verify_satgen.js",
+        "_verify_satpicker.js"
+      ],
+      "declKind": "function",
+      "declLine": 3785,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "nodeInputs",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 2,
+      "files": [
+        "_verify_colormixer.js",
+        "_verify_digest.js"
+      ],
+      "declKind": "function",
+      "declLine": 3222,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "previewMode",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 4,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_evolution.js",
+        "_verify_viewport_ui.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "let",
+      "declLine": 4365,
+      "writeFiles": [
+        "_verify_canyon.js",
+        "_verify_canyon_evolution.js",
+        "_verify_workflow.js"
+      ],
+      "writeExamples": [
+        "previewMode=\"output\"",
+        "previewMode='output'",
+        "previewMode='selected'"
+      ],
+      "reads": 1,
+      "writes": 4
+    },
+    {
+      "name": "satComposite",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 2,
+      "files": [
+        "_verify_data.js",
+        "_verify_satnode.js"
+      ],
+      "declKind": "let",
+      "declLine": 983,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "shadeMode",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 5,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js",
+        "_verify_viewport_ui.js"
+      ],
+      "declKind": "let",
+      "declLine": 4786,
+      "writeFiles": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js"
+      ],
+      "writeExamples": [
+        "shadeMode=1"
+      ],
+      "reads": 1,
+      "writes": 4
+    },
+    {
+      "name": "simulateSnowLayer",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "function",
+      "declLine": 2992,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "spReceivers",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 2,
+      "files": [
+        "_verify_streampower.js",
+        "_verify_tectonic.js"
+      ],
+      "declKind": "function",
+      "declLine": 2761,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "togglePlanView",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 4,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 6177,
+      "valueIsFunction": true,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "waterProg",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 5,
+      "fileCount": 3,
+      "files": [
+        "_verify_render.js",
+        "_verify_snow.js",
+        "_verify_water.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 5,
+      "writes": 0
+    },
+    {
+      "name": "canyonCacheKey",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 2,
+      "files": [
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_identity.js"
+      ],
+      "declKind": "function",
+      "declLine": 1975,
+      "valueIsFunction": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "evalFrame",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 2,
+      "files": [
+        "_verify_digest.js",
+        "_verify_realtime.js"
+      ],
+      "declKind": "let",
+      "declLine": 3806,
+      "writeFiles": [
+        "_verify_digest.js"
+      ],
+      "writeExamples": [
+        "evalFrame = 0"
+      ],
+      "reads": 3,
+      "writes": 1
+    },
+    {
+      "name": "exactChain",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 3,
+      "files": [
+        "_verify_exact_transform.js",
+        "_verify_mask_draw.js",
+        "_verify_simplex.js"
+      ],
+      "declKind": "function",
+      "declLine": 3223,
+      "valueIsFunction": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "fieldRange",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 3,
+      "files": [
+        "_verify_canyon_classic.js",
+        "_verify_canyon_process.js",
+        "_verify_simplex.js"
+      ],
+      "declKind": "function",
+      "declLine": 1003,
+      "valueIsFunction": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "redoStack",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 4,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_menubar.js"
+      ],
+      "declKind": "let",
+      "declLine": 3690,
+      "writeFiles": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js"
+      ],
+      "writeExamples": [
+        "redoStack=[]"
+      ],
+      "reads": 1,
+      "writes": 3
+    },
+    {
+      "name": "renderGL",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 3,
+      "files": [
+        "_verify_render.js",
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "function",
+      "declLine": 5809,
+      "valueIsFunction": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "SATMAPS",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 3,
+      "files": [
+        "_verify.js",
+        "_verify_satgen.js",
+        "_verify_satpicker.js"
+      ],
+      "declKind": "const",
+      "declLine": 951,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "satName",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 4,
+      "files": [
+        "_verify.js",
+        "_verify_highres.js",
+        "_verify_satgen.js",
+        "_verify_satpicker.js"
+      ],
+      "declKind": "let",
+      "declLine": 981,
+      "writeFiles": [
+        "_verify.js",
+        "_verify_highres.js"
+      ],
+      "writeExamples": [
+        "satName = sn",
+        "satName='Terracotta'"
+      ],
+      "reads": 2,
+      "writes": 2
+    },
+    {
+      "name": "syncDisplayState",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 4,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 6216,
+      "valueIsFunction": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "weatherColorField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 1,
+      "files": [
+        "_verify_colorfx.js"
+      ],
+      "declKind": "function",
+      "declLine": 4901,
+      "valueIsFunction": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "bakeCurve",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 2,
+      "files": [
+        "_verify_curve.js",
+        "_verify_peak.js"
+      ],
+      "declKind": "function",
+      "declLine": 1465,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "BUILD_QUALITY",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 3,
+      "files": [
+        "_verify_digest.js",
+        "_verify_resparity.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "let",
+      "declLine": 1129,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_resparity.js",
+        "_verify_workflow.js"
+      ],
+      "writeExamples": [
+        "BUILD_QUALITY = 'interactive'",
+        "BUILD_QUALITY='interactive'"
+      ],
+      "reads": 0,
+      "writes": 3
+    },
+    {
+      "name": "buildSatLUT",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 2,
+      "files": [
+        "_verify.js",
+        "_verify_highres.js"
+      ],
+      "declKind": "function",
+      "declLine": 4787,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "cellSizeM",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_realscale.js"
+      ],
+      "declKind": "const",
+      "declLine": 4958,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "commandMenu",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbar.js"
+      ],
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "curIceSnowSurfaceY",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5449,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "curSnowDepthM",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5447,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "curSurfaceY",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5447,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "edgeByKey",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_edges.js"
+      ],
+      "declKind": "function",
+      "declLine": 3763,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "EXACT_TYPES",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 3,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_mask_draw.js",
+        "_verify_simplex.js"
+      ],
+      "declKind": "const",
+      "declLine": 3220,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "organizeGraph",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_organize.js"
+      ],
+      "declKind": "function",
+      "declLine": 4217,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "SCALE_RES",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 2,
+      "files": [
+        "_verify_digest.js",
+        "_verify_resparity.js"
+      ],
+      "declKind": "let",
+      "declLine": 1126,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_resparity.js"
+      ],
+      "writeExamples": [
+        "SCALE_RES = scaled",
+        "SCALE_RES = true"
+      ],
+      "reads": 0,
+      "writes": 3
+    },
+    {
+      "name": "snoise",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_simplex.js"
+      ],
+      "declKind": "function",
+      "declLine": 1054,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "syncCompass",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "function",
+      "declLine": 5706,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "thermalErode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 3,
+      "files": [
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_range.js"
+      ],
+      "declKind": "function",
+      "declLine": 2822,
+      "valueIsFunction": true,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "USE_DEFERRED",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 2,
+      "files": [
+        "_verify.js",
+        "_verify_render.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "waterMaskProg",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 3,
+      "fileCount": 2,
+      "files": [
+        "_verify_water.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 3,
+      "writes": 0
+    },
+    {
+      "name": "AUTO",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_build_progress.js",
+        "_verify_toolbar.js"
+      ],
+      "declKind": "let",
+      "declLine": 940,
+      "writeFiles": [
+        "_verify_build_progress.js"
+      ],
+      "writeExamples": [
+        "AUTO=false"
+      ],
+      "reads": 1,
+      "writes": 1
+    },
+    {
+      "name": "blendFields",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_colormixer.js"
+      ],
+      "declKind": "function",
+      "declLine": 4832,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "buildSettings",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbar.js"
+      ],
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "canyonBeds",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_relief.js"
+      ],
+      "declKind": "function",
+      "declLine": 1899,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "colorErodeField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_colorfx.js"
+      ],
+      "declKind": "function",
+      "declLine": 4855,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "combine",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_range.js"
+      ],
+      "declKind": "function",
+      "declLine": 2519,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "compactFile",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_menubar.js"
+      ],
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "curSolidSurfaceY",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5447,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "curveFromExponent",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_curve.js"
+      ],
+      "declKind": "function",
+      "declLine": 1491,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "curWaterLiquid",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5449,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "drawMaskField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_mask_draw.js"
+      ],
+      "declKind": "function",
+      "declLine": 1394,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "drawTarget",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_mask_draw.js"
+      ],
+      "declKind": "let",
+      "declLine": 5901,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "edgeKey",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_edges.js"
+      ],
+      "declKind": "function",
+      "declLine": 3762,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "encodeTemperatureC",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_snow.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "const",
+      "declLine": 2872,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "fileMenu",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_menubar.js"
+      ],
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "mainMenu",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_menubar.js"
+      ],
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "maskApply",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_mask_draw.js"
+      ],
+      "declKind": "function",
+      "declLine": 1445,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "nodeH",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_colormixer.js",
+        "_verify_organize.js"
+      ],
+      "declKind": "function",
+      "declLine": 3985,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "propagateFieldMetadata",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_digest.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "function",
+      "declLine": 2894,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "redoGraph",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_organize.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 3736,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "refreshPreview",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 4378,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "renderLook",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_render.js"
+      ],
+      "declKind": "let",
+      "declLine": 986,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "satLayerColor",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_render.js"
+      ],
+      "declKind": "function",
+      "declLine": 4804,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "sculptField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_mask_draw.js"
+      ],
+      "declKind": "function",
+      "declLine": 1430,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "smax",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_range.js"
+      ],
+      "declKind": "function",
+      "declLine": 2526,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "smin",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_range.js"
+      ],
+      "declKind": "function",
+      "declLine": 2523,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "syncClimateReadout",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "function",
+      "declLine": 5724,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "tagTemperatureField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_snow.js",
+        "_verify_water_surface.js"
+      ],
+      "declKind": "function",
+      "declLine": 2878,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "TEMP_UNIT",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 4960,
+      "writeFiles": [
+        "_verify_snow.js"
+      ],
+      "writeExamples": [
+        "TEMP_UNIT='C'"
+      ],
+      "reads": 0,
+      "writes": 2
+    },
+    {
+      "name": "temperatureCFromField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "function",
+      "declLine": 2886,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "undoGraph",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_organize.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "function",
+      "declLine": 3733,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "wirePoint",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_edges.js"
+      ],
+      "declKind": "function",
+      "declLine": 4017,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "xfMul",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_exact_transform.js"
+      ],
+      "declKind": "function",
+      "declLine": 1034,
+      "valueIsFunction": true,
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "atFeatureScale",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_featurescale.js"
+      ],
+      "declKind": "function",
+      "declLine": 2437,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "blurField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_featurescale.js"
+      ],
+      "declKind": "function",
+      "declLine": 2501,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "buildRun",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_digest.js"
+      ],
+      "declKind": "let",
+      "declLine": 3806,
+      "writeFiles": [
+        "_verify_digest.js"
+      ],
+      "writeExamples": [
+        "buildRun++"
+      ],
+      "reads": 0,
+      "writes": 1
+    },
+    {
+      "name": "cameraEye",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_zoom.js"
+      ],
+      "declKind": "function",
+      "declLine": 5695,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "cameraNear",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_zoom.js"
+      ],
+      "declKind": "const",
+      "declLine": 5745,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "CANYON_STYLE_ID",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_slopes.js"
+      ],
+      "declKind": "const",
+      "declLine": 1888,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "canyonField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 2416,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "CAT",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbox.js"
+      ],
+      "declKind": "const",
+      "declLine": 3208,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "clamp",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_evolution.js"
+      ],
+      "declKind": "const",
+      "declLine": 902,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "commandBtn",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbar.js"
+      ],
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "curveAt",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_peak.js"
+      ],
+      "declKind": "function",
+      "declLine": 1487,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "d8Accumulation",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_digest.js"
+      ],
+      "declKind": "function",
+      "declLine": 5577,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "drawGraph",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_colorfx.js"
+      ],
+      "declKind": "function",
+      "declLine": 3993,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "duplicateSel",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_range.js"
+      ],
+      "declKind": "function",
+      "declLine": 4713,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "gbuf",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_water_surface.js"
+      ],
+      "declKind": "let",
+      "declLine": 4783,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "gpuHydraulicPipes",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_gpu.js"
+      ],
+      "declKind": "function",
+      "declLine": 1340,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "gpuThermal",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_gpu.js"
+      ],
+      "declKind": "function",
+      "declLine": 1258,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "gpuWarp",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_gpu.js"
+      ],
+      "declKind": "function",
+      "declLine": 1286,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "graphIdsFrom",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_organize.js"
+      ],
+      "declKind": "function",
+      "declLine": 4156,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "hydroFixField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 3167,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "lastFallbackClimateSig",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5449,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "loadImageAsDEM",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_streampower.js"
+      ],
+      "declKind": "function",
+      "declLine": 4758,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "newTerrainDocument",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_canyon_process.js"
+      ],
+      "declKind": "function",
+      "declLine": 6483,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "normalize",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_colorfx.js"
+      ],
+      "declKind": "function",
+      "declLine": 1004,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "openDrawEditor",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_mask_draw.js"
+      ],
+      "declKind": "function",
+      "declLine": 5958,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "parseLayout",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_layout.js"
+      ],
+      "declKind": "function",
+      "declLine": 1543,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "profileDetail",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbar.js"
+      ],
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "profileRes",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbar.js"
+      ],
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "REAL_DEM_SAMPLE",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_streampower.js"
+      ],
+      "declKind": "const",
+      "declLine": 992,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "resSel",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_toolbar.js"
+      ],
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "SEED_MAX",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_range.js"
+      ],
+      "declKind": "const",
+      "declLine": 3746,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "SKIRT_PRESETS",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_curve.js"
+      ],
+      "declKind": "const",
+      "declLine": 1495,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "snapshotIsEditorOnly",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_organize.js"
+      ],
+      "declKind": "function",
+      "declLine": 3710,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "surfaceHeight",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_zoom.js"
+      ],
+      "declKind": "function",
+      "declLine": 5697,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "warpField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_gpu.js"
+      ],
+      "declKind": "function",
+      "declLine": 2467,
+      "valueIsFunction": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "waterLookPanel",
+      "kind": "dom-id",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_water_surface.js"
+      ],
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "wire",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_viewport_ui.js"
+      ],
+      "declKind": "let",
+      "declLine": 4786,
+      "reads": 1,
+      "writes": 0
+    }
+  ]
+}

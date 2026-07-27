@@ -36,6 +36,14 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
       const next = () => n-- > 0 ? requestAnimationFrame(next) : resolve();
       requestAnimationFrame(next);
     });
+    const waitBuild = async () => {
+      // Progressive evaluation starts on the next frame and may span several more.
+      // Wait for that run to begin, then for its aria-busy contract to clear.
+      await waitFrames(2);
+      const deadline = performance.now() + 12000;
+      while ((evalFrame || document.querySelector('#buildBtn').hasAttribute('aria-busy')) && performance.now() < deadline)
+        await waitFrames(1);
+    };
     const edit = async (nd, key, values) => {
       selected = nd; buildProps(); uploads.length = 0;
       const fields = [...document.querySelectorAll('#pBody .field')];
@@ -50,7 +58,7 @@ const URL = 'file://' + path.resolve(__dirname, 'index.html');
         slider.dispatchEvent(new Event('input', { bubbles: true }));
       }
       const dispatchMs = performance.now() - t0;
-      await waitFrames(3);
+      await waitBuild();
       return {
         dispatchMs,
         settleMs: performance.now() - t0,
