@@ -590,7 +590,15 @@ adding directional light or indiscriminate RGB noise to the exported albedo.
 - The rendering stays visually quiet: a compact right-side **icon rail** owns preview, camera,
   display, lighting, global water rendering, help, and fullscreen. Flyouts are mutually exclusive;
   the persistent gesture banner and large look-development panel no longer cover the terrain.
-- The top bar keeps only frequent work visible: **Auto**, **Build**, history, import/export, and layout.
+- The application menubar owns **File / Edit / View / Help**. **File → New terrain**
+  (<kbd>Ctrl/Cmd</kbd>+<kbd>N</kbd>) starts a clean graph containing only Output; **New from default
+  setup** restores the production climate/water/snow starter. Starting either document asks before
+  discarding the current graph and clears the old document's undo history. Import/export also live
+  under File instead of consuming permanent toolbar space.
+- Below 940 px the menubar becomes one hamburger menu with the same command set and expandable
+  sections. Desktop menus, the hamburger, keyboard shortcuts, toolbar controls, and command search
+  share one command dispatcher, so adding a command does not create divergent implementations.
+- The top bar keeps only frequent work visible: **Auto**, **Build**, history, build profile, and layout.
   The **Build profile** popover owns resolution/quality/GPU/Res Lock, while the searchable
   **Commands** menu (<kbd>Ctrl/Cmd</kbd>+<kbd>K</kbd>) holds graph locators, organization, toolbox,
   fullscreen, theme, and other occasional actions. This keeps the toolbar extensible at narrow widths.
@@ -802,10 +810,20 @@ triangles on the water plane; signed depth still clips coverage, eliminating mou
 The fallback Water model is intentionally lapse-only; connect the Temperature graph for the same solar/shadow
 climate used by Snow.
 
-The render mesh alternates heightmap-quad diagonals in a balanced checkerboard. This removes the repeating
-directional ridge zipper of a single fixed split without rebuilding a 4K index buffer on every edit. Fully
-height-aware edge spinning requires topology generation, which WebGL2 vertex/fragment shaders cannot perform;
-the scalable follow-up is a WebGPU compute-generated mesh/clipmap rather than a CPU per-edit triangulation.
+The render mesh now performs **height-aware edge spinning**. For every heightmap quad it fits both candidate
+triangle pairs to reference gradients estimated from the surrounding 3×3 height samples. This preserves
+ridge and valley creases that a simple shortest-diagonal rule can erase when both diagonal endpoints happen
+to have similar elevations. Perfectly planar or genuinely ambiguous cells retain a deterministic checkerboard
+tie-break, so terrain stays stable without camera-dependent topology flicker. Accumulated snow participates
+because it is displaced geometry; water level, colour, climate, and camera-only changes do not rebuild terrain
+topology.
+
+WebGL2 vertex/fragment shaders cannot write an element buffer, and expanding every quad into an instanced
+six-vertex draw would discard indexed vertex reuse at exactly the resolutions where it matters most. The studio
+therefore streams the edge decisions directly into a GPU indexed buffer in bounded row batches. Rasterization
+remains GPU-indexed, while even a 4096² mesh uses less than 3 MiB of temporary CPU staging instead of a roughly
+384 MiB monolithic index array. A future WebGPU clipmap can move topology generation fully into compute without
+changing this normal-fit contract.
 
 This placement/stability split follows John Fearing's
 [*Computer Modelling of Fallen Snow*](https://graphics.stanford.edu/courses/cs448-01-spring/papers/fearing.pdf)
@@ -910,6 +928,7 @@ node _verify_layout.js               # Layout: per-vertex elevation, falloff pro
 node _verify_gpu.js                  # CPU/GPU parity, GPU hydraulic invariants + timings
 node _verify_simplex.js              # Simplex determinism, Perlin distinction, transform + GPU parity
 node _verify_toolbar.js              # build profile, 512 default, queued 2K/4K, commands, responsive widths
+node _verify_menubar.js              # File/Edit/View/Help, New Terrain resets, responsive hamburger
 node _verify_workflow.js             # layouts, fullscreen, selected preview, undo/redo, 1024² smoke
 node _verify_viewport_ui.js          # quiet icon rail, exclusive flyouts, responsive viewport controls
 node _verify_toolbox.js              # graph-owned categorized node toolbox, search, placement, quick menu
@@ -925,6 +944,7 @@ node _verify_satpicker.js            # visual LUT-strip library + graph-bound se
 node _verify_colormixer.js           # dynamic 2–15 layer stack, ordering, modes, opacity
 node _verify_satgen.js               # SatMap Studio extraction + LUT build
 node _verify_render.js               # colour pipeline, PBR/data views, exposure, image contrast
+node _verify_edge_spin.js            # ridge/valley-aware topology + bounded GPU index streaming
 node _verify_snow.js                 # snow depth/displacement, aspect melt, ice cover, mass, compass
 node _verify_water_surface.js        # global waves/refraction + rasterized fluid-surface depth layer
 node _verify_water_hydrology.js      # lake filter + river density/depth controls and sea separation

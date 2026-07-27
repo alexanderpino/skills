@@ -48,6 +48,46 @@ button{font-family:inherit;color:inherit}
   background:
     repeating-linear-gradient(115deg,transparent 0 3px,rgba(0,0,0,.28) 3px 4px);opacity:.6}
 .brand-name{font-size:13px;white-space:nowrap}
+.editor-menu-shell{display:flex;align-items:center;flex:none}
+.desktop-menu{display:flex;align-items:center;gap:1px}
+.editor-menu-anchor,.compact-menu-wrap{position:relative}
+.editor-menu-trigger,.compact-menu-trigger{
+  height:30px;padding:0 9px;border:1px solid transparent;border-radius:5px;background:transparent;
+  color:var(--muted);font-size:11.5px;cursor:pointer
+}
+.editor-menu-trigger:hover,.editor-menu-trigger[aria-expanded="true"],.compact-menu-trigger:hover,
+.compact-menu-trigger[aria-expanded="true"]{background:var(--panel2);border-color:var(--line);color:var(--text)}
+.editor-menu-popover{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:70;width:238px;padding:6px;
+  background:rgba(18,23,30,.985);border:1px solid var(--line2);border-radius:8px;
+  box-shadow:0 18px 46px rgba(0,0,0,.48);backdrop-filter:blur(14px)
+}
+:root[data-theme="light"] .editor-menu-popover{background:rgba(249,251,253,.985)}
+.editor-menu-popover[hidden]{display:none}
+.editor-menu-item,.compact-menu-section{
+  width:100%;min-height:32px;display:grid;grid-template-columns:18px minmax(0,1fr) auto;
+  align-items:center;gap:8px;padding:4px 8px;border:0;border-radius:5px;background:transparent;
+  color:var(--text);font-size:11.5px;text-align:left;cursor:pointer
+}
+.editor-menu-item:hover,.editor-menu-item:focus-visible,.compact-menu-section:hover,.compact-menu-section:focus-visible{
+  background:var(--panel3);outline:none
+}
+.editor-menu-item:disabled{opacity:.38;cursor:default;background:transparent}
+.editor-menu-icon{width:18px;color:var(--muted);text-align:center}
+.editor-menu-item kbd{color:var(--faint);font:8.5px var(--mono)}
+.editor-menu-separator{height:1px;margin:5px 7px;background:var(--line)}
+.editor-menu-check{visibility:hidden;color:var(--accent)}
+.editor-menu-item[aria-checked="true"] .editor-menu-check{visibility:visible}
+.compact-menu-wrap{display:none}
+.compact-menu-trigger{width:34px;padding:0;display:grid;place-items:center}
+.compact-menu-trigger svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.compact-menu{width:282px}
+.compact-menu-section{grid-template-columns:20px minmax(0,1fr) 12px;min-height:38px;font-size:13px}
+.compact-menu-section .chevron{color:var(--faint);transition:transform .12s}
+.compact-menu-section[aria-expanded="true"] .chevron{transform:rotate(90deg)}
+.compact-submenu{margin:2px 0 7px 28px;padding-left:6px;border-left:1px solid var(--line)}
+.compact-submenu[hidden]{display:none}
+.compact-submenu .editor-menu-item{min-height:31px}
 .tspacer{flex:1}
 .tgroup{display:flex;align-items:center;gap:6px}
 .tsep{width:1px;height:22px;background:var(--line);margin:0 4px}
@@ -68,6 +108,7 @@ button{font-family:inherit;color:inherit}
 .build-profile-copy small{font-size:8px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint)}
 .build-profile-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 10px var(--mono)}
 .build-profile-caret{color:var(--faint);font-size:9px}
+.top-io{display:none}
 .top-io .btn svg,.command-trigger svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round}
 .command-trigger{height:30px;min-width:42px;padding:0 8px;justify-content:center}
@@ -104,6 +145,9 @@ button{font-family:inherit;color:inherit}
 @media(max-width:1100px){
   .brand-name{display:none}.top-io .io-label{display:none}.top-io .btn{width:30px;padding:0;justify-content:center}
   .build-profile{min-width:168px}
+}
+@media(max-width:940px){
+  .desktop-menu{display:none}.compact-menu-wrap{display:block}
 }
 @media(max-width:820px){
   #topbar{gap:7px;padding:0 8px}.top-io{display:none}.build-profile{min-width:124px}
@@ -422,6 +466,117 @@ select.sg-btn{appearance:auto}
     <div class="brand" title="Terrain Studio · node-based WebGL terrain authoring">
       <span class="mark"></span><span class="brand-name">Terrain Studio</span>
     </div>
+    <nav class="editor-menu-shell" aria-label="Application menu">
+      <div class="desktop-menu" role="menubar">
+        <div class="editor-menu-anchor">
+          <button class="editor-menu-trigger" id="fileMenuBtn" type="button" role="menuitem"
+            aria-controls="fileMenu" aria-expanded="false">File</button>
+          <section class="editor-menu-popover" id="fileMenu" role="menu" aria-label="File" hidden>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="new">
+              <span class="editor-menu-icon">◇</span><span>New terrain</span><kbd>Ctrl N</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="new-default">
+              <span class="editor-menu-icon">◆</span><span>New from default setup</span></button>
+            <div class="editor-menu-separator" role="separator"></div>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="import">
+              <span class="editor-menu-icon">↓</span><span>Import heightmap…</span><kbd>Ctrl I</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="export">
+              <span class="editor-menu-icon">↑</span><span>Export heightmap…</span></button>
+          </section>
+        </div>
+        <div class="editor-menu-anchor">
+          <button class="editor-menu-trigger" id="editMenuBtn" type="button" role="menuitem"
+            aria-controls="editMenu" aria-expanded="false">Edit</button>
+          <section class="editor-menu-popover" id="editMenu" role="menu" aria-label="Edit" hidden>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="undo">
+              <span class="editor-menu-icon">↶</span><span>Undo</span><kbd>Ctrl Z</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="redo">
+              <span class="editor-menu-icon">↷</span><span>Redo</span><kbd>Ctrl ⇧ Z</kbd></button>
+            <div class="editor-menu-separator" role="separator"></div>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="duplicate">
+              <span class="editor-menu-icon">⧉</span><span>Duplicate selected node</span><kbd>Ctrl D</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="delete">
+              <span class="editor-menu-icon">×</span><span>Delete selection</span><kbd>Del</kbd></button>
+            <div class="editor-menu-separator" role="separator"></div>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="organize">
+              <span class="editor-menu-icon">⌘</span><span>Organize graph</span></button>
+          </section>
+        </div>
+        <div class="editor-menu-anchor">
+          <button class="editor-menu-trigger" id="viewMenuBtn" type="button" role="menuitem"
+            aria-controls="viewMenu" aria-expanded="false">View</button>
+          <section class="editor-menu-popover" id="viewMenu" role="menu" aria-label="View" hidden>
+            <button class="editor-menu-item" role="menuitemradio" data-editor-command="layout-stacked">
+              <span class="editor-menu-check">✓</span><span>Vertical split</span></button>
+            <button class="editor-menu-item" role="menuitemradio" data-editor-command="layout-side">
+              <span class="editor-menu-check">✓</span><span>Side-by-side</span></button>
+            <div class="editor-menu-separator" role="separator"></div>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="toolbox">
+              <span class="editor-menu-icon">＋</span><span>Node toolbox</span></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="frame">
+              <span class="editor-menu-icon">⤢</span><span>Frame terrain</span><kbd>F</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="fullscreen">
+              <span class="editor-menu-icon">⛶</span><span>Fullscreen rendering</span><kbd>⇧ F</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="theme">
+              <span class="editor-menu-icon">◐</span><span>Toggle theme</span></button>
+          </section>
+        </div>
+        <div class="editor-menu-anchor">
+          <button class="editor-menu-trigger" id="helpMenuBtn" type="button" role="menuitem"
+            aria-controls="helpMenu" aria-expanded="false">Help</button>
+          <section class="editor-menu-popover" id="helpMenu" role="menu" aria-label="Help" hidden>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="controls">
+              <span class="editor-menu-icon">?</span><span>Viewport controls</span></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="commands">
+              <span class="editor-menu-icon">⌕</span><span>Find a command…</span><kbd>Ctrl K</kbd></button>
+            <div class="editor-menu-separator" role="separator"></div>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="about">
+              <span class="editor-menu-icon">ⓘ</span><span>About Terrain Studio</span></button>
+          </section>
+        </div>
+      </div>
+      <div class="compact-menu-wrap">
+        <button class="compact-menu-trigger" id="mainMenuBtn" type="button" aria-label="Application menu"
+          aria-controls="mainMenu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <section class="editor-menu-popover compact-menu" id="mainMenu" aria-label="Application menu" hidden>
+          <button class="compact-menu-section" type="button" data-compact-section="compactFile" aria-expanded="false">
+            <span class="editor-menu-icon">▱</span><span>File</span><span class="chevron">›</span></button>
+          <div class="compact-submenu" id="compactFile" hidden>
+            <button class="editor-menu-item" data-editor-command="new"><span class="editor-menu-icon">◇</span><span>New terrain</span><kbd>Ctrl N</kbd></button>
+            <button class="editor-menu-item" data-editor-command="new-default"><span class="editor-menu-icon">◆</span><span>New from default setup</span></button>
+            <button class="editor-menu-item" data-editor-command="import"><span class="editor-menu-icon">↓</span><span>Import heightmap…</span></button>
+            <button class="editor-menu-item" data-editor-command="export"><span class="editor-menu-icon">↑</span><span>Export heightmap…</span></button>
+          </div>
+          <button class="compact-menu-section" type="button" data-compact-section="compactEdit" aria-expanded="false">
+            <span class="editor-menu-icon">✎</span><span>Edit</span><span class="chevron">›</span></button>
+          <div class="compact-submenu" id="compactEdit" hidden>
+            <button class="editor-menu-item" data-editor-command="undo"><span class="editor-menu-icon">↶</span><span>Undo</span></button>
+            <button class="editor-menu-item" data-editor-command="redo"><span class="editor-menu-icon">↷</span><span>Redo</span></button>
+            <button class="editor-menu-item" data-editor-command="duplicate"><span class="editor-menu-icon">⧉</span><span>Duplicate selected node</span></button>
+            <button class="editor-menu-item" data-editor-command="delete"><span class="editor-menu-icon">×</span><span>Delete selection</span></button>
+            <button class="editor-menu-item" data-editor-command="organize"><span class="editor-menu-icon">⌘</span><span>Organize graph</span></button>
+          </div>
+          <button class="compact-menu-section" type="button" data-compact-section="compactView" aria-expanded="false">
+            <span class="editor-menu-icon">▣</span><span>View</span><span class="chevron">›</span></button>
+          <div class="compact-submenu" id="compactView" hidden>
+            <button class="editor-menu-item" data-editor-command="layout-stacked"><span class="editor-menu-check">✓</span><span>Vertical split</span></button>
+            <button class="editor-menu-item" data-editor-command="layout-side"><span class="editor-menu-check">✓</span><span>Side-by-side</span></button>
+            <button class="editor-menu-item" data-editor-command="toolbox"><span class="editor-menu-icon">＋</span><span>Node toolbox</span></button>
+            <button class="editor-menu-item" data-editor-command="frame"><span class="editor-menu-icon">⤢</span><span>Frame terrain</span></button>
+            <button class="editor-menu-item" data-editor-command="fullscreen"><span class="editor-menu-icon">⛶</span><span>Fullscreen rendering</span></button>
+            <button class="editor-menu-item" data-editor-command="theme"><span class="editor-menu-icon">◐</span><span>Toggle theme</span></button>
+          </div>
+          <button class="compact-menu-section" type="button" data-compact-section="compactHelp" aria-expanded="false">
+            <span class="editor-menu-icon">?</span><span>Help</span><span class="chevron">›</span></button>
+          <div class="compact-submenu" id="compactHelp" hidden>
+            <button class="editor-menu-item" data-editor-command="controls"><span class="editor-menu-icon">?</span><span>Viewport controls</span></button>
+            <button class="editor-menu-item" data-editor-command="commands"><span class="editor-menu-icon">⌕</span><span>Find a command…</span></button>
+            <button class="editor-menu-item" data-editor-command="about"><span class="editor-menu-icon">ⓘ</span><span>About Terrain Studio</span></button>
+          </div>
+        </section>
+      </div>
+    </nav>
     <div class="command-strip">
       <div class="top-command-group" aria-label="Build and history">
         <button class="btn" id="autoBtn" title="Recompute automatically on every edit">
@@ -478,6 +633,8 @@ select.sg-btn{appearance:auto}
               <button class="command-item" data-command="build terrain recompute graph" data-action="build"><span class="command-icon">▶</span><span class="command-copy"><b>Build terrain</b><small>Recompute the graph now</small></span><kbd>Enter</kbd></button>
               <button class="command-item" data-command="auto recompute toggle live" data-action="auto"><span class="command-icon">↻</span><span class="command-copy"><b>Toggle Auto</b><small>Live graph recomputation</small></span></button>
               <div class="command-group-title">Project</div>
+              <button class="command-item" data-command="new terrain blank project" data-action="new"><span class="command-icon">◇</span><span class="command-copy"><b>New terrain</b><small>Start with a clean Output graph</small></span><kbd>Ctrl N</kbd></button>
+              <button class="command-item" data-command="new terrain default starter project" data-action="new-default"><span class="command-icon">◆</span><span class="command-copy"><b>New from default setup</b><small>Load the production starter graph</small></span></button>
               <button class="command-item" data-command="import dem heightmap png r16" data-action="import"><span class="command-icon">↓</span><span class="command-copy"><b>Import DEM</b><small>PNG or 16-bit raw heightmap</small></span></button>
               <button class="command-item" data-command="export height heightmap png" data-action="export"><span class="command-icon">↑</span><span class="command-copy"><b>Export height</b><small>Download the Output as PNG</small></span></button>
               <div class="command-group-title">Find in graph</div>
@@ -2840,6 +2997,8 @@ function graphSnapshot(){
 }
 function updateHistoryButtons(){
   $("#undoBtn").disabled=!undoStack.length;$("#redoBtn").disabled=!redoStack.length;
+  document.querySelectorAll('[data-editor-command="undo"]').forEach(b=>b.disabled=!undoStack.length);
+  document.querySelectorAll('[data-editor-command="redo"]').forEach(b=>b.disabled=!redoStack.length);
 }
 function pushUndo(snap){
   if(!historyReady||!snap)return;
@@ -3446,12 +3605,12 @@ function refreshPreview(){
   updateViewport(root?(meta&&meta.heightField||root._field):null,root);updatePreviewInfo(root);drawGraph();
 }
 function selectEdge(edge){
-  selectedEdge=edge?edgeKey(edge):null;buildProps();drawGraph();
+  selectedEdge=edge?edgeKey(edge):null;buildProps();drawGraph();syncEditorCommandState();
 }
 function select(nd){
   if(nd===selected&&!selectedEdge){drawGraph();return;}
   selectedEdge=null;selected=nd;buildProps();
-  if(previewMode==="selected")refreshPreview();else drawGraph();
+  if(previewMode==="selected")refreshPreview();else drawGraph();syncEditorCommandState();
 }
 function buildEdgeProps(body,title,sub,sw,edge){
   const from=nodeById(edge.from),to=nodeById(edge.to),input=nodeInputs(to)[edge.slot]||("Input "+(edge.slot+1));
@@ -3805,10 +3964,12 @@ function deleteSel(){if(!selected)return;const id=selected.id;
    IMPORT / EXPORT
    ===================================================================== */
 let importTarget=null;
-$("#importBtn").onclick=()=>{
+function importHeightmap(){
   importTarget=(selected&&selected.type==="import")?selected:nodes.find(n=>n.type==="import")||null;
   if(!importTarget){importTarget=makeNode("import",toWorld(80,80).x,toWorld(80,80).y);select(importTarget);}
-  $("#fileInput").click();};
+  $("#fileInput").click();
+}
+$("#importBtn").onclick=importHeightmap;
 $("#fileInput").onchange=e=>{const file=e.target.files[0];if(!file||!importTarget)return;
   const nd=importTarget,name=file.name.toLowerCase();
   if(name.endsWith(".r16")||name.endsWith(".raw")||name.endsWith(".bin")){
@@ -3835,10 +3996,11 @@ function resampleTo(src,side,map){const f=newField();for(let y=0;y<RES;y++)for(l
   const sx=Math.min(side-1,(x/RES*side)|0),sy=Math.min(side-1,(y/RES*side)|0);f[y*RES+x]=map(src[sy*side+sx]);}return normalize(f);}
 function finishDem(nd){markDirtyFrom(nd.id);buildProps();requestEval();}
 
-$("#exportBtn").onclick=()=>{const out=outputNode();if(!out||!out._field){toast("No output to export");return;}
+function exportHeightmap(){const out=outputNode();if(!out||!out._field){toast("No output to export");return;}
   const f=normalize(out._field);const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
   const img=cx.createImageData(RES,RES);for(let i=0;i<RES*RES;i++){const v=Math.round(f[i]*255);img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;}
-  cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG");};
+  cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG");}
+$("#exportBtn").onclick=exportHeightmap;
 
 /* =====================================================================
    WEBGL 3D VIEWPORT
@@ -4432,16 +4594,78 @@ function makeProg(vs,fs){function sh(t,s){const o=gl.createShader(t);gl.shaderSo
   if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o),s);return o;}
   const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(p));return p;}
+function terrainQuadFitDelta(h00,h10,h01,h11,g00x,g00y,g10x,g10y,g01x,g01y,g11x,g11y){
+  // Fit both candidate pairs of triangle planes to the heightfield gradients estimated from
+  // the surrounding 3x3 samples. Unlike "shortest diagonal", this sees whether a diagonal
+  // follows a ridge/valley crease instead of merely connecting two similar elevations.
+  const topX=h10-h00,bottomX=h11-h01,leftY=h01-h00,rightY=h11-h10;
+  const err=(gx,gy,rx,ry)=>{const dx=gx-rx,dy=gy-ry;return dx*dx+dy*dy;};
+  const main=err(topX,rightY,g00x,g00y)+err(topX,rightY,g10x,g10y)+err(topX,rightY,g11x,g11y)
+    +err(bottomX,leftY,g00x,g00y)+err(bottomX,leftY,g11x,g11y)+err(bottomX,leftY,g01x,g01y);
+  const anti=err(topX,leftY,g00x,g00y)+err(topX,leftY,g10x,g10y)+err(topX,leftY,g01x,g01y)
+    +err(bottomX,rightY,g10x,g10y)+err(bottomX,rightY,g11x,g11y)+err(bottomX,rightY,g01x,g01y);
+  return(main-anti)/(1+main+anti);                           // normalized: stable threshold across relief scales
+}
+function streamTerrainIndices(height,snowDepth){
+  const n=RES,adaptive=!!(height&&height.length===n*n),u32=buffers.u32,bytes=u32?4:2;
+  // A full 4096² Uint32 index staging array is ~384 MiB. Stream row batches instead:
+  // topology stays indexed on the GPU while CPU scratch memory remains below ~3 MiB.
+  const batchRows=Math.max(1,Math.min(32,Math.floor(786432/Math.max(6*(n-1),1))));
+  const batch=u32?new Uint32Array((n-1)*batchRows*6):new Uint16Array((n-1)*batchRows*6);
+  const snowScale=snowDepth&&snowDepth.length===n*n?1/Math.max(terrainDef.height,1e-6):0;
+  const started=performance.now();let elementOffset=0,mainCount=0,antiCount=0,tieCount=0,flips=0;
+  let fitGain=0,fitStrength=0;
+  let grad0=adaptive?new Float32Array(n*2):null,grad1=adaptive?new Float32Array(n*2):null;
+  const sample=i=>height[i]+(snowScale?snowDepth[i]*snowScale:0);
+  const fillGradientRow=(y,out)=>{
+    const ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+    for(let x=0;x<n;x++){const xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),j=x*2;
+      out[j]=(sample(y*n+xp)-sample(y*n+xm))*.5;
+      out[j+1]=(sample(yp*n+x)-sample(ym*n+x))*.5;}
+  };
+  if(adaptive){fillGradientRow(0,grad0);fillGradientRow(Math.min(1,n-1),grad1);}
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+  let w=0;
+  for(let y=0;y<n-1;y++){
+    for(let x=0;x<n-1;x++){
+      const i=y*n+x,checkerMain=!!((x+y)&1);let useMain=checkerMain;
+      if(adaptive){
+        const h00=sample(i),h10=sample(i+1),h01=sample(i+n),h11=sample(i+n+1),j=x*2;
+        const fitDelta=terrainQuadFitDelta(h00,h10,h01,h11,
+          grad0[j],grad0[j+1],grad0[j+2],grad0[j+3],
+          grad1[j],grad1[j+1],grad1[j+2],grad1[j+3]);
+        if(Math.abs(fitDelta)<=1e-6){tieCount++;useMain=checkerMain;}
+        else useMain=fitDelta<0;
+        fitStrength+=Math.abs(fitDelta);
+        fitGain+=checkerMain?Math.max(0,fitDelta):Math.max(0,-fitDelta);
+        if(useMain!==checkerMain)flips++;
+      }
+      if(useMain){
+        batch[w++]=i;batch[w++]=i+1;batch[w++]=i+n+1;
+        batch[w++]=i;batch[w++]=i+n+1;batch[w++]=i+n;mainCount++;
+      }else{
+        batch[w++]=i;batch[w++]=i+1;batch[w++]=i+n;
+        batch[w++]=i+1;batch[w++]=i+n+1;batch[w++]=i+n;antiCount++;
+      }
+    }
+    if(w===batch.length||y===n-2){
+      gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,elementOffset*bytes,batch.subarray(0,w));elementOffset+=w;w=0;
+    }
+    if(adaptive&&y<n-2){const old=grad0;grad0=grad1;grad1=old;fillGradientRow(y+2,grad1);}
+  }
+  const revision=(buffers.edgeSpin&&buffers.edgeSpin.revision||0)+1;
+  buffers.indexPattern=adaptive?"adaptive-normal-fit-diagonal":"checkerboard";
+  buffers.edgeSpin={adaptive,quadCount:(n-1)*(n-1),mainCount,antiCount,tieCount,flipsFromCheckerboard:flips,
+    fitGain,fitStrength,batchRows,stagingBytes:batch.byteLength+(adaptive?(grad0.byteLength+grad1.byteLength):0),
+    durationMs:performance.now()-started,revision};
+}
 function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
-  const arr=u32?new Uint32Array(cnt):new Uint16Array(cnt);   // fill the typed array directly (a JS array costs ~4x at 1024²)
-  let w=0;for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;
-    // Alternating diagonals remove the long directional zipper produced when every heightmap quad
-    // leans the same way. True height-aware edge spinning belongs in the WebGPU compute mesh path;
-    // this balanced topology is resolution-static and therefore costs nothing on property edits.
-    if((x+y)&1){arr[w++]=i;arr[w++]=i+1;arr[w++]=i+n+1;arr[w++]=i;arr[w++]=i+n+1;arr[w++]=i+n;}
-    else{arr[w++]=i;arr[w++]=i+1;arr[w++]=i+n;arr[w++]=i+1;arr[w++]=i+n+1;arr[w++]=i+n;}}
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,arr,gl.STATIC_DRAW);buffers.count=cnt;
-  buffers.u32=u32;buffers.indexPattern="checkerboard";
+  buffers.count=cnt;buffers.u32=u32;
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cnt*(u32?4:2),gl.DYNAMIC_DRAW);
+  // boot() and resolution changes evaluate the graph synchronously before the next frame, so do
+  // not waste a second full-buffer upload on placeholder checkerboard indices.
+  buffers.indexPattern="pending";buffers.edgeSpin=null;
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
@@ -4464,6 +4688,10 @@ function updateViewport(f,rootNode,options){
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
     curHgt=hgt;curFilled=null;curAccum=null;
   }
+  // Edge topology depends only on the terrain's solid geometry. Water level, colour, climate,
+  // and camera edits therefore never rebuild the index buffer. Accumulated snow participates
+  // because it is genuine displacement rather than a material-only effect.
+  if(baseChanged||snowChanged)streamTerrainIndices(hgt,layerDepth);
   const previewTemperatureField=rootNode&&fieldMetadata(rootNode._field)&&fieldMetadata(rootNode._field).kind==="temperature"
     ?rootNode._field:null;
   const activeTemperatureField=previewTemperatureField
@@ -4994,6 +5222,67 @@ $("#drawClear").onclick=()=>{
 };
 $("#drawDone").onclick=closeDrawEditor;$("#drawCancel").onclick=closeDrawEditor;
 $("#drawEditor").onpointerdown=e=>{if(e.target===$("#drawEditor"))closeDrawEditor();};
+const editorMenuPanels=["fileMenu","editMenu","viewMenu","helpMenu","mainMenu"];
+const editorMenuButtons={fileMenu:"fileMenuBtn",editMenu:"editMenuBtn",viewMenu:"viewMenuBtn",helpMenu:"helpMenuBtn",mainMenu:"mainMenuBtn"};
+let lastEditorMenuButton=null;
+function closeEditorMenus(){
+  editorMenuPanels.forEach(id=>{$("#"+id).hidden=true;$("#"+editorMenuButtons[id]).setAttribute("aria-expanded","false");});
+  document.querySelectorAll(".compact-menu-section").forEach(b=>{b.setAttribute("aria-expanded","false");$("#"+b.dataset.compactSection).hidden=true;});
+}
+function setEditorMenu(id,force){
+  const panel=$("#"+id),open=force===undefined?panel.hidden:!!force;closeEditorMenus();
+  if(open){
+    closeTopPopovers();panel.hidden=false;$("#"+editorMenuButtons[id]).setAttribute("aria-expanded","true");
+    lastEditorMenuButton=$("#"+editorMenuButtons[id]);
+  }
+}
+function syncEditorCommandState(){
+  const hasNode=!!selected&&!selectedEdge,hasSelection=!!selectedEdge||!!selected;
+  document.querySelectorAll('[data-editor-command="duplicate"]').forEach(b=>b.disabled=!hasNode);
+  document.querySelectorAll('[data-editor-command="delete"]').forEach(b=>b.disabled=!hasSelection);
+  const stacked=$("#main").classList.contains("stacked");
+  document.querySelectorAll('[data-editor-command="layout-stacked"]').forEach(b=>b.setAttribute("aria-checked",stacked?"true":"false"));
+  document.querySelectorAll('[data-editor-command="layout-side"]').forEach(b=>b.setAttribute("aria-checked",stacked?"false":"true"));
+}
+const editorCommands={
+  new:()=>newTerrainDocument(false),
+  "new-default":()=>newTerrainDocument(true),
+  import:importHeightmap,export:exportHeightmap,undo:undoGraph,redo:redoGraph,
+  duplicate:()=>{if(selected&&!selectedEdge)duplicateSel();},
+  delete:()=>{if(selectedEdge)deleteEdge(selectedEdge);else if(selected)deleteSel();},
+  organize:()=>organizeGraph(null,null,"Organized graph"),
+  "layout-stacked":()=>setLayout(true),"layout-side":()=>setLayout(false),
+  toolbox:()=>setNodeToolbox(true),frame:frameHero,fullscreen:toggleFullscreen,theme:toggleTheme,
+  controls:()=>setViewportPanel("helpPanel"),
+  commands:()=>{filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu",true);},
+  about:()=>toast("Terrain Studio · procedural terrain authoring"),
+  build:()=>$("#buildBtn").click(),auto:()=>$("#autoBtn").click(),
+  "find-water":()=>locateNode("water"),"find-satmap":()=>locateNode("satmap"),"find-output":()=>locateNode("output")
+};
+function runEditorCommand(id){
+  const action=editorCommands[id];if(!action)return false;
+  closeEditorMenus();action();syncEditorCommandState();return true;
+}
+document.querySelectorAll(".editor-menu-trigger").forEach(button=>{
+  button.onclick=()=>setEditorMenu(button.getAttribute("aria-controls"));
+  button.onmouseenter=()=>{if(editorMenuPanels.slice(0,4).some(id=>!$("#"+id).hidden))setEditorMenu(button.getAttribute("aria-controls"),true);};
+});
+$("#mainMenuBtn").onclick=()=>setEditorMenu("mainMenu");
+$(".editor-menu-shell").addEventListener("click",e=>{
+  const section=e.target.closest(".compact-menu-section");
+  if(section){const panel=$("#"+section.dataset.compactSection),open=panel.hidden;
+    document.querySelectorAll(".compact-menu-section").forEach(b=>{const on=b===section&&open;b.setAttribute("aria-expanded",on?"true":"false");$("#"+b.dataset.compactSection).hidden=!on;});
+    return;
+  }
+  const item=e.target.closest("[data-editor-command]");if(item&&!item.disabled)runEditorCommand(item.dataset.editorCommand);
+});
+$(".editor-menu-shell").addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.preventDefault();closeEditorMenus();if(lastEditorMenuButton)lastEditorMenuButton.focus();return;}
+  if(e.key==="ArrowDown"){
+    const trigger=e.target.closest(".editor-menu-trigger");if(trigger){e.preventDefault();const id=trigger.getAttribute("aria-controls");setEditorMenu(id,true);
+      requestAnimationFrame(()=>$("#"+id).querySelector(".editor-menu-item:not(:disabled)")?.focus());}
+  }
+});
 const topPopovers=["buildSettings","commandMenu"];
 const topPopoverButtons={buildSettings:"buildProfileBtn",commandMenu:"commandBtn"};
 function closeTopPopovers(){
@@ -5034,16 +5323,20 @@ $("#commandSearch").onkeydown=e=>{
   }
 };
 const commandActions={
-  build:()=>$("#buildBtn").click(),auto:()=>$("#autoBtn").click(),import:()=>$("#importBtn").click(),export:()=>$("#exportBtn").click(),
-  "find-water":()=>locateNode("water"),"find-satmap":()=>locateNode("satmap"),"find-output":()=>locateNode("output"),
-  organize:()=>organizeGraph(null,null,"Organized graph"),toolbox:()=>setNodeToolbox(true),layout:()=>$("#layoutBtn").click(),
-  fullscreen:()=>toggleFullscreen()
+  new:()=>runEditorCommand("new"),"new-default":()=>runEditorCommand("new-default"),
+  build:()=>runEditorCommand("build"),auto:()=>runEditorCommand("auto"),import:()=>runEditorCommand("import"),export:()=>runEditorCommand("export"),
+  "find-water":()=>runEditorCommand("find-water"),"find-satmap":()=>runEditorCommand("find-satmap"),"find-output":()=>runEditorCommand("find-output"),
+  organize:()=>runEditorCommand("organize"),toolbox:()=>runEditorCommand("toolbox"),layout:()=>$("#layoutBtn").click(),
+  fullscreen:()=>runEditorCommand("fullscreen")
 };
 $("#commandList").addEventListener("click",e=>{
   const item=e.target.closest(".command-item");if(!item)return;
   const action=commandActions[item.dataset.action];if(action)action();closeTopPopovers();
 });
-window.addEventListener("mousedown",e=>{if(!e.target.closest(".top-anchor"))closeTopPopovers();});
+window.addEventListener("mousedown",e=>{
+  if(!e.target.closest(".top-anchor"))closeTopPopovers();
+  if(!e.target.closest(".editor-menu-shell"))closeEditorMenus();
+});
 $("#autoBtn").classList.toggle("on",AUTO);
 $("#autoBtn").onclick=()=>{AUTO=!AUTO;$("#autoBtn").classList.toggle("on",AUTO);if(AUTO)evalGraph();toast(AUTO?"Auto-recompute on":"Auto-recompute off — use Build");};
 function applyWorkingResolution(next){
@@ -5076,8 +5369,9 @@ $("#scaleBtn").onclick=()=>{SCALE_RES=!SCALE_RES;$("#scaleBtn").classList.toggle
   nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraph();
   toast(SCALE_RES?"Res Lock on — params held constant across resolution":"Res Lock off — raw cell-unit params");};
 syncBuildProfile();
-$("#themeBtn").onclick=()=>{const cur=document.documentElement.getAttribute("data-theme");const next=cur==="light"?"dark":"light";
-  document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();};
+function toggleTheme(){const cur=document.documentElement.getAttribute("data-theme"),next=cur==="light"?"dark":"light";
+  document.documentElement.setAttribute("data-theme",next);drawGraph();nodes.forEach(n=>n._thumb=null);redrawThumbs();}
+$("#themeBtn").onclick=toggleTheme;
 const viewportPanels=["displayPanel","lookPanel","waterLookPanel","helpPanel"];
 const viewportPanelButtons={displayPanel:"displayBtn",lookPanel:"lookBtn",waterLookPanel:"waterLookBtn",helpPanel:"helpBtn"};
 function setViewportPanel(id){
@@ -5123,6 +5417,7 @@ function setLayout(stacked){
   $("#layoutBtn").textContent=stacked?"⬌":"⬍";
   $("#layoutBtn").title=stacked?"Use side-by-side graph and rendering":"Stack rendering above the graph";
   try{localStorage.setItem("terrainStudioLayout",stacked?"stacked":"side");}catch(_){}
+  syncEditorCommandState();
   requestAnimationFrame(()=>{resizeGraph();resizeGL();});
 }
 $("#layoutBtn").onclick=()=>setLayout(!$("#main").classList.contains("stacked"));
@@ -5138,6 +5433,7 @@ document.addEventListener("fullscreenchange",()=>{
   $("#fullscreenBtn").classList.toggle("on",on);
   $("#fullscreenBtn").setAttribute("aria-label",on?"Exit fullscreen":"Enter fullscreen");
   $("#fullscreenBtn").title=on?"Exit fullscreen (Shift+F)":"Fullscreen rendering (Shift+F)";
+  document.querySelectorAll('[data-editor-command="fullscreen"]').forEach(b=>b.setAttribute("aria-checked",on?"true":"false"));
   requestAnimationFrame(resizeGL);
 });
 function syncDisplayState(){
@@ -5381,6 +5677,9 @@ function typing(){const t=document.activeElement&&document.activeElement.tagName
 window.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&!$("#drawEditor").hidden){e.preventDefault();closeDrawEditor();return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu",true);return;}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="n"){e.preventDefault();runEditorCommand("new");return;}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="i"){e.preventDefault();runEditorCommand("import");return;}
+  if(e.key==="Escape"&&editorMenuPanels.some(id=>!$("#"+id).hidden)){e.preventDefault();closeEditorMenus();if(lastEditorMenuButton)lastEditorMenuButton.focus();return;}
   if(e.key==="Escape"&&topPopovers.some(id=>!$("#"+id).hidden)){e.preventDefault();closeTopPopovers();$("#commandBtn").focus();return;}
   if(e.key==="Escape"&&viewportPanels.some(id=>!$("#"+id).hidden)){e.preventDefault();closeViewportPanels();return;}
   if(e.key==="Escape"&&graphMenu.classList.contains("open")){e.preventDefault();closeGraphMenu();return;}
@@ -5400,6 +5699,22 @@ updatePreviewInfo(activePreviewNode());
 /* =====================================================================
    DEFAULT GRAPH — a good-looking starting point
    ===================================================================== */
+function blankGraph(){
+  const out=makeNode("output",360,180);out.params={norm:"on"};
+  view={x:110,y:90,z:1};select(out);
+}
+function newTerrainDocument(withDefault){
+  if(historyReady&&nodes.length&&!confirm("Start a new terrain? The current graph and its undo history will be discarded."))return false;
+  const ready=historyReady;historyReady=false;
+  nodes=[];edges=[];uid=1;selected=null;selectedEdge=null;importTarget=null;
+  undoStack.length=0;redoStack.length=0;previewMode="output";
+  terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
+  H_SCALE=terrainDef.height/terrainDef.scale;scene={water:null,snow:null,satmap:null};
+  if(withDefault)defaultGraph();else blankGraph();
+  nodes.forEach(n=>{n._dirty=true;n._thumb=null;});
+  historyReady=ready;updateHistoryButtons();syncEditorCommandState();evalGraph();
+  toast(withDefault?"New terrain · default setup":"New terrain · clean graph");return true;
+}
 function defaultGraph(){
   const base=makeNode("perlin",40,40);base.params={seed:7,freq:3,octaves:6,lac:2,gain:0.5};
   const ridge=makeNode("ridged",40,220);ridge.params={seed:12,freq:4,octaves:6,lac:2.1,gain:0.55};

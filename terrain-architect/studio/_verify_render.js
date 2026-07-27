@@ -119,7 +119,7 @@ function imageStats(png, r) {
       satRoughnessDelta:delta,rippleMotion:{mean:motionSum/samples,stillMean:stillSum/samples,changed}};
   });
   const ok = diag.webgl2 && diag.deferred && Object.values(diag.linked).every(Boolean)
-    && diag.indexPattern==='checkerboard'
+    && diag.indexPattern==='adaptive-normal-fit-diagonal'
     && diag.styles.join('|') === 'Realistic|Clay|Albedo|Slope|Normals|Temperature|Sun shadow'
     && diag.srgbRoundtripError < 1e-6 && diag.satRoughnessDelta > 1
     && diag.rippleMotion.mean > diag.rippleMotion.stillMean + .01 && diag.rippleMotion.stillMean < .01 && diag.rippleMotion.changed > 20
