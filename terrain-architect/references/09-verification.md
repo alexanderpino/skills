@@ -330,6 +330,16 @@ member of this family strobes as the light azimuth rotates — and the universal
 clean baseline are the cone and constant-slope synthetic inputs, whose correct outputs have no
 preferred direction at all.
 
+There is a fourth, structural cure the table doesn't list: **change the lattice.** The **hexagonal
+grid** (`08`) *deletes* two whole rows of this family rather than fixing them — with 6 equidistant
+edge-neighbours there is no diagonal to under-weight (the *missing-√2* row) and no 4-versus-8 choice to
+get wrong (the *D8-striping* row), and its 60° symmetry leaks far less than the square grid's 45°/90°.
+It is not free (engines want a square raster, so you resample out) and not total (6-fold is still not
+continuous — the sun sweep still catches gross errors), but when directional artefacts are endemic and
+the grid is yours to choose, the lattice itself is the fix rather than a per-node correction. On a
+sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the only residual stencil
+irregularity is the 12 pentagons.
+
 The contrast case worth knowing: **droplet erosion is largely immune** — positions are
 continuous and gradients bilinear, so there is no stencil to print through. If a droplet result
 shows grid-aligned structure, the anisotropy came in with the height field (usually the noise,

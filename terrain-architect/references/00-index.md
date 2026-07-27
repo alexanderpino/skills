@@ -366,8 +366,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Learned material from a photo (SVBRDF) | ? | Deschaintre et al. 2018 — verify; moving fast (`08`) |
 | Emissive material channel (incandescent cracks) | F | crackMask (Worley F2−F1, `01`) × blackbody temperature ramp (`08`) |
 | Floating origin / large-world coords | F | Thorne 2005 — widely cited but not a strong result; the technique is folklore |
+| Hexagonal grid (planar working grid, in its own right) | P (sampling) / F (coords) | Optimal 2D sampling lattice — ~13.4% fewer samples than square (Petersen & Middleton 1962; Mersereau 1979); 6 equidistant edge-neighbours ⇒ **no D4/D8 √2 ambiguity**, D6 flow routing, more isotropic CA/diffusion; axial/cube/offset coords (Red Blob Games, F). A grid system, not the square raster's poor cousin (`08`, `09`) |
 | Cube-sphere grid (equidistant / equiangular) | P | Chan & O'Neill 1975 (QSC / COBE); Sadourny 1972; Ronchi et al. 1996 (equiangular) (`08`) |
-| Geodesic / HEALPix spherical grid | P | Górski et al. 2005 (HEALPix); icosahedral geodesic — no seams (`08`) |
+| Icosahedral hexagonal DGGS (Goldberg polyhedron) | P | The planar hex grid closed onto the sphere: hexagons + **exactly 12 pentagons** (Euler; Goldberg 1937); equal-area via ISEA (Snyder 1992); DGGS survey Sahr, White & Kimerling 2003; Uber H3 (aperture-7, F/N). The low-anisotropy **procedural-planet** grid (`08`, `25`) |
+| HEALPix spherical grid | P | Górski et al. 2005 — equal-area, iso-latitude *quadrilateral pixels* (not hexagons); no seams (`08`) |
 | Map-projection distortion (scale factor `h`) | P | Snyder 1987 — divide gradients by `h` or erosion biases (`08`) |
 | Equirectangular / plate carrée (planetary interchange & delivery) | P (proj.) / F (resample) | Snyder 1987 — the lat-long DEM lingua franca (MOLA/LOLA/SRTM/GEBCO); an I/O format, **not** a sim grid — generate on cube-sphere/HEALPix, resample out with `cosφ` weighting (`08`, `25`) |
 | Flow routing on a spherical / DGGS grid | P | Liao et al. 2020 (hex); Liao et al. 2025 (ISEA equal-area) (`08`, `03`) |
