@@ -402,11 +402,56 @@ fibre over it — but it decides which vertices exist:
   grid rather than something the player sees.
 - **Visible hex tiles (strategy/4X, DGGS) — mesh the tile itself**, which forks again into a
   **6-triangle centre fan** or a **4-triangle corner-only** triangulation (next paragraph — the
-  choice is not about triangle count). The default, the 6-fan, is symmetric unlike the square quad's
-  arbitrary diagonal, and its centre vertex already holds the sampled height rather than an invented
-  one. This mesh carries **two vertex classes**, and both are first-class: `N` **centres** and `2N`
+  choice is not about triangle count). The default, the 6-fan, is symmetric, and unlike the square
+  quad's arbitrary diagonal it is *derived* rather than picked — the rhombille paragraph below shows
+  the split is forced. Its centre vertex already holds the sampled height rather than an invented one. This mesh carries **two vertex classes**, and both are first-class: `N` **centres** and `2N`
   **corners**. The two meshes can also coexist over one field — a smooth dual mesh to render, a fan
   or its edge loops for tile borders and gameplay pick.
+
+**All of it is one tiling — the rhombille — and the three meshes are its three projections.** Join every
+cell centre to the six corners around it and the plane partitions into **60°–120° rhombi**: the
+**rhombille tiling** (Conway's name; the dual of the trihexagonal/kagome tiling, the *dice lattice* in
+physics, the *tumbling blocks* quilt pattern). This is the cleanest way to hold the whole meshing
+question in one picture, because **one rhombus is exactly one neighbour pair**: its four vertices are two
+adjacent centres `A, B` and the two corners `p, q` they share, all four sides are `s = cellSize/√3`, and
+its two diagonals are the two things a hex grid is made of — the **long diagonal `AB` = `cellSize`** is
+the neighbour link, the **short diagonal `pq` = `s`** is the shared tile edge. Per `N` cells there are
+`3N` rhombi, which is precisely the `3N` edges of the hex adjacency graph, over the same `3N` vertices
+the two classes already gave you (`N` degree-6 centres, `2N` degree-3 corners). Each rhombus is also a
+*diamond* in the polyiamond sense — two equilateral triangles glued along `pq`.
+
+| Mesh | Vertices kept | In rhombille terms | Per `N` cells |
+|---|---|---|---|
+| Dual mesh | centres only | the rhombi's **long diagonals**; one triangle per corner | `N` v, `2N` tri |
+| Fan, 6 triangles | both classes | **split every rhombus on its short diagonal** — the two equilateral halves *are* the fan wedges of `A` and of `B` | `3N` v, `6N` tri |
+| Corner-only, 4 triangles | corners only | the rhombi's **short diagonals** — the honeycomb, whose `N` hexagonal faces each take 4 triangles | `2N` v, `4N` tri |
+
+Three things fall out that are hard to see any other way. **The "which diagonal" problem does have a hex
+analogue — and here it has a right answer.** A rhombus carries four heights and is non-coplanar, so it
+must be split, and there are two ways. On a square grid the two diagonals of a quad are exchanged by a
+symmetry of the lattice, which is exactly why that choice is arbitrary and permanent. On the rhombille
+they are not exchangeable: one joins centres, one joins corners, and they differ in length by `√3`.
+Split on the **short** diagonal and both halves come out **equilateral** and every tile boundary stays a
+mesh edge — that is the centre fan, derived rather than chosen. Split on the long one and you get
+`30°–120°–30°` slivers *and* the hex outline vanishes from the geometry, so tile borders and per-tile
+flat shading lose their crisp edge. Identical triangle count, worse on both axes.
+
+**It is also why the 4- and 6-triangle meshes are watertight against each other.** Both contain all `3N`
+short diagonals as mesh edges — the fan because that is where it splits, the corner-only mesh because
+its edges *are* the short diagonals — so the tile boundary is literally the same set of segments in
+both. That is the structural reason the LOD mixing below needs no stitching.
+
+**And the rhombi are where *edge* quantities belong.** D6 flux, pipe-model flow, any per-neighbour-pair
+scalar (`03`, `04`) is one value per rhombus — `3N`, not the `6N` you get storing six directions per
+cell. Halving that buffer also deletes the class of bug where the two copies of one flux disagree.
+
+**One trap the tiling suggests, and you should decline it: quads.** The *other* rhombic decomposition —
+cut each hexagon on its own into 3 rhombi meeting at its centre — is the isometric cube (a cube viewed
+down its body diagonal projects to exactly this figure), and it tempts you to emit **3 quads per tile**
+instead of 6 triangles. Don't. Those four heights are non-coplanar too, so the GPU splits each quad on a
+diagonal *you did not choose* — reintroducing the arbitrary-diagonal problem inside the tile, the one
+thing the fan exists to avoid — and it saves nothing, because the hardware rasterises triangles either
+way.
 
 **Triangulating one visible tile — 6 triangles or 4, and the cell's own sample is what is at stake.**
 Once the hexes are rendered as tiles there is a second fork *inside* each cell, and it is not
@@ -459,10 +504,10 @@ corner-only triangulation can fix: every polygon triangulation has at least two 
 regular hexagon is `30°–120°–30°`, so **min angle 30° is the ceiling for all 14** — against the centre
 fan's 60°.
 
-**Mixing the two is crack-free — no skirts, no stitching.** Both triangulations leave the cell boundary
-as the *same* six straight corner-to-corner edges, and neither inserts a vertex on an edge, so a
-4-triangle tile abutting a 6-triangle one is watertight by construction: **there is no T-junction**,
-which is not true of a quadtree square heightfield. That makes the fork a per-cell LOD knob — 6 near
+**Mixing the two is crack-free — no skirts, no stitching.** Both meshes carry the same `3N` short
+diagonals as edges (the rhombille argument above) and neither inserts a vertex on one, so a 4-triangle
+tile abutting a 6-triangle one is watertight by construction: **there is no T-junction**, which is not
+true of a quadtree square heightfield. That makes the fork a per-cell LOD knob — 6 near
 the camera, 4 in the distance, decided per tile with no transition geometry. Normals *are* discontinuous
 across the seam, so cross-fade or switch where the cell subtends about a pixel, and remember the `H/3`
 attenuation is a **biased** filter: it pulls extrema toward the local mean, so ridgelines lose height
@@ -636,7 +681,11 @@ control that distinguishes them.
 the axial/cube/offset coordinate machinery is **F** (Red Blob Games — the standard, no paper); D6/MFD
 routing on a hex mesh is **P** (Liao et al. 2020, 2025). The centre formula and the one-ring
 gradient/normal stencil are textbook lattice-moment identities (`Σeₖ = 0`, `Σeₖeₖᵀ = 3I`, and
-`Σuₘuₘᵀ = (3/2)I` for the 3-cell corner) — **F** as engineering, derivable in four lines. The *engineering* of resampling between hex and
+`Σuₘuₘᵀ = (3/2)I` for the 3-cell corner) — **F** as engineering, derivable in four lines. The rhombille
+identification and the mesh counts that hang off it are **F** and elementary — the tiling is classical
+(Conway; dual of the trihexagonal tiling) and the counts are Euler's formula on three meshes — but it is
+a *framing*, not a result: its value is holding the vertex classes, the mesh fork and the split rule in
+one picture. The *engineering* of resampling between hex and
 square rasters is **F**. Everything above is a **flat-grid** story and stands on its own; the sphere
 (next section) is one *further* domain the hex grid closes onto — via the icosahedral hex DGGS — not the
 reason it exists.
