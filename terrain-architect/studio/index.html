@@ -1165,9 +1165,10 @@ const GPU={
   uploadState(key,n,bed){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);
     for(let i=0;i<n*n;i++){rgba[i*4]=bed[i];rgba[i*4+3]=1;}
     gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
-  read(target,n){this.bind(target,n);
+  readRGBA(target,n){this.bind(target,n);
     const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);return rgba;},
+  read(target,n){const rgba=this.readRGBA(target,n);
     const o=new Float32Array(n*n);for(let i=0;i<n*n;i++)o[i]=rgba[i*4];return o;},
 };
 // GLSL twins of hash2/gnoise/snoise above — identical uint32 hash, so the same seed gives the same field.
@@ -1341,6 +1342,13 @@ const GPU_PIPE_STATE_FS=`#version 300 es
     float er=cap>sediment?min(uErode*(cap-sediment),0.0025):0.0;
     float dep=cap<=sediment?min(uDeposit*(sediment-cap),sediment):0.0;
     frag=vec4(b+dep-er,water,sediment+er-dep,1.0);}`;
+// One mass ledger per KERNEL run (raw engine, last-run-wins), top-level so verification can read
+// it from page.evaluate (_verify_erosion_mass.js). The budget it must close: sumIn - sumOut =
+// exported (+ lost, only when a caller opts out of settling). It is NOT a node ledger: erosion2
+// runs the kernel twice on an atFeatureScale-coarsened grid and post-shapes the result, and
+// maskApply rescales any kernel's output after the fact - read it only immediately after a
+// direct kernel call. Erosion and deposition are one budget, not two nodes.
+let hydroMassDiag=null;
 function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,inertia=0.05}){
   const n=RES,pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
   let state=GPU.uploadState("pipeStateA",n,inp),next=GPU.rt("pipeStateB",n);
@@ -1360,7 +1368,23 @@ function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,iner
       gl.uniform1f(u(p,"uDeposit"),deposit*0.22);});
     let t=state;state=next;next=t;t=flux;flux=nextFlux;nextFlux=t;
   }
-  return GPU.read(state,n);
+  // Terminal settle. The state texture's blue channel is sediment still suspended when the
+  // iterations end, in the SAME normalized-height units as bed (the state shader exchanges the
+  // two strictly 1:1). GPU.read keeps only red, so this load used to vanish at readback - 92% of
+  // net-eroded volume at reference settings - which is why the production hydraulic path could
+  // never finish a fan or a delta. Settle it where it stands, rim included: a rim exclusion was
+  // tried and REJECTED by measurement - the -0.03 edge head FLUSHES suspension off-grid, so the
+  // rim carries the LEAST of any ring (mean 0.0025 vs 0.0064 interior) and its max suspension is
+  // half its mean net erosion, making a deposit lip geometrically impossible; excluding it only
+  // deepened the existing one-cell border trench ~15%. Green (water) is never added - it is rain.
+  const rgba=GPU.readRGBA(state,n);
+  const o=new Float32Array(n*n);let sumIn=0,sumOut=0,settled=0;
+  for(let i=0;i<n*n;i++){o[i]=rgba[i*4]+rgba[i*4+2];settled+=rgba[i*4+2];sumIn+=inp[i];sumOut+=o[i];}
+  // With everything settled, the only bed-mass sink left is in-sim outflow through the edge
+  // pipes, so `exported` is exact by elimination - but DERIVED, not independently itemized.
+  // exportedDerived tells a closure gate not to accept it as evidence (the CPU ledger's is).
+  hydroMassDiag={engine:"pipes",settle:true,sumIn,sumOut,settled,exported:sumIn-sumOut,exportedDerived:true,lost:0};
+  return o;
 }
 const gpuReady=()=>USE_GPU&&GPU.init();
 
@@ -3220,7 +3244,7 @@ function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExp
 }
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
-function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null}){
+function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false}){
   const n=RES;let h=inp.slice();
   const R=Math.max(1,radius|0);const brush=[];let bw=0;
   for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const dd=Math.hypot(dx,dy);if(dd<=R){const w=1-dd/(R+1);brush.push([dx,dy,w]);bw+=w;}}
@@ -3235,18 +3259,25 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   };
   const deposit1=(g,amt)=>{const i=g.y0*n+g.x0;
     h[i]+=amt*(1-g.fx)*(1-g.fy);h[i+1]+=amt*g.fx*(1-g.fy);h[i+n]+=amt*(1-g.fx)*g.fy;h[i+n+1]+=amt*g.fx*g.fy;};
-  const erode1=(g,amt)=>{for(const[dx,dy,w]of brush){const xx=g.x0+dx,yy=g.y0+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;h[yy*n+xx]-=amt*w;}};
+  // A brush cell clipped at the border removes nothing from h while the droplet still credits
+  // itself the full amt - mass appears from nowhere (0.8% of the budget at radius 2; the clipped
+  // band is `radius` cells wide, so a radius-5 brush grows the term several-fold). Ledger it so
+  // the budget closes exactly instead of hiding the gain inside a tolerance.
+  let brushClip=0;
+  const erode1=(g,amt)=>{for(const[dx,dy,w]of brush){const xx=g.x0+dx,yy=g.y0+dy;
+    if(xx<0||yy<0||xx>=n||yy>=n){brushClip+=amt*w;continue;}h[yy*n+xx]-=amt*w;}};
+  let settled=0,exported=0,lost=0;
   for(let d=0;d<droplets;d++){
     let px=rnd()*(n-1),py=rnd()*(n-1);
     if(spawn)for(let tries=0;tries<16&&spawn[clamp(py|0,0,n-1)*n+clamp(px|0,0,n-1)]<=0;tries++){
       px=rnd()*(n-1);py=rnd()*(n-1);}
-    let dx=0,dy=0,speed=1,water=1,sed=0;
+    let dx=0,dy=0,speed=1,water=1,sed=0,leftGrid=false;
     for(let life=0;life<n*0.7;life++){
       const g=at(px,py);const hOld=g.hh;
       dx=dx*inertia-g.gx*(1-inertia);dy=dy*inertia-g.gy*(1-inertia);
       const len=Math.hypot(dx,dy);if(len<1e-5){dx=rnd()-0.5;dy=rnd()-0.5;}else{dx/=len;dy/=len;}
       const nx=px+dx,ny=py+dy;
-      if(nx<0||ny<0||nx>=n-1||ny>=n-1)break;
+      if(nx<0||ny<0||nx>=n-1||ny>=n-1){leftGrid=true;break;}
       const dH=at(nx,ny).hh-hOld;
       const cap=Math.max(-dH,minSlope)*speed*water*capacity;
       if(sed>cap||dH>0){                                   // over capacity, or going uphill -> deposit
@@ -3257,7 +3288,23 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
       speed=Math.sqrt(Math.max(0,speed*speed-dH*gravity));water*=(1-evap);
       px=nx;py=ny;if(water<0.008)break;
     }
+    // The droplet's remaining suspended load is real eroded mass. Off-grid it is export (the
+    // boundary is base level; on open terrain that is MOST of the budget - measured 41% of
+    // net-eroded volume, and legitimate); on-grid (dried out or life-capped) it settles where
+    // the droplet stopped - dry-out in a pan IS the pan filling, and in closed basins the
+    // settled share grows accordingly. Before this, the on-grid remainder vanished and the
+    // budget was unauditable: no closure between erosion, deposition and export was provable.
+    // `settle` is opt-in because the mountain/peak macro-weathering callers predate the fix:
+    // the digest suite pins them byte-identical - the mountain node's default "peak" form via
+    // its baseline digest, the "massif" form via its ex= exercise digest.
+    if(leftGrid)exported+=sed;
+    else if(settle&&sed>0){deposit1(at(px,py),sed);settled+=sed;}
+    else lost+=sed;
   }
+  // Closure identity: sumIn - sumOut = exported + lost - brushClipGain (the last term is mass
+  // the border-clipped brush created; see erode1).
+  let sumIn=0,sumOut=0;for(let i=0;i<n*n;i++){sumIn+=inp[i];sumOut+=h[i];}
+  hydroMassDiag={engine:"droplets",settle:!!settle,sumIn,sumOut,settled,exported,exportedDerived:false,lost,brushClipGain:brushClip};
   return h;
 }
 
@@ -3283,7 +3330,7 @@ function erosion2Field(inp,p){
     return atFeatureScale(source,scale,field=>gpuReady()
       ?gpuHydraulicPipes(field,{iters,capacity,erode,deposit,inertia:.04+.08*phase})
       :hydraulicErode(field,{droplets:Math.max(2500,Math.round(RES*RES*(.12+.40*duration))),
-        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round(1+scale*.35)),seed:(p.seed|0)+phase*101}));
+        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round(1+scale*.35)),seed:(p.seed|0)+phase*101,settle:true}));
   };
   let h=run(seeded,featureScale,coarseIters,0);
   // A shorter near-native pass nests fine gullies inside the broad ravines. Higher Erosion Scale
@@ -3642,7 +3689,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>usePipes
       ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters})
       :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*(BUILD_QUALITY==="final"?k*k:Math.min(4,k*k))),
-        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*k))})),ins[1]);},
+        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*k)),settle:true})),ins[1]);},
     note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
   erosion2:{cat:"ero",name:"Erosion 2",ins:["In","Mask"],
     desc:"Advanced multi-scale hydraulic erosion: broad ravines first, nested gullies second, then sediment and shape relaxation.",

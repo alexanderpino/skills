@@ -284,6 +284,9 @@ function installHarness(cfg) {
     transform: { mode: 'raster', scale: 1.3, aspect: 0.8, angle: 37, offX: 0.11, offY: -0.07,
       pivX: 0.4, pivY: 0.6, edge: 'mirror' },
     d_heat: { mode: 'set', targetC: 900, amount: 0.6 },
+    // Not identity-shaped, but the default form:"peak" never reaches the massif branch — and
+    // with it the second hydraulicErode call, which must stay settle-free (opt-out contract).
+    mountain: { form: 'massif' },
   };
 
   // A fixed stroke: drawmask ships with strokes:[] and would otherwise digest an all-zero field.

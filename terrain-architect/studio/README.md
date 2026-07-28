@@ -1153,8 +1153,40 @@ Hydraulic now has two honest engines. **GPU pipes** is a Mei-style four-neighbou
 bed, water, suspended sediment and directional flux stay in `RGBA32F` textures for the whole simulation,
 with outflow clamped to available water and sediment transported by the same flux field. **CPU droplets**
 keeps the older scatter-write particle reference for comparisons. At 192² under SwiftShader, GPU pipes
-finish 48 iterations in **47 ms**, produce both erosion (30,514 cells) and deposition (6,350 cells), and
+finish 48 iterations in **47 ms**, produce both erosion (20,350 cells) and deposition (16,514 cells), and
 remain finite; Warp matches its CPU reference to max |Δ| **4.4e-5**.
+
+**What erodes must deposit — or be counted as export.** Both engines used to leak their terminal
+suspended load, and the two leaks turned out to be different stories. The GPU readback kept only the
+bed channel, discarding every unit of sediment still in transport when iterations end — **91.9% of
+net-eroded volume vanished** at reference settings, which is why the node could never finish a fan or
+a delta: the sediment sliders modulated a sink. The fix settles the blue channel where it stands (bed
+and suspended sediment are exchanged strictly 1:1, same units), **rim included** — a rim exclusion was
+tried first, on the theory that the flux shader's permanent −0.03 edge head concentrates suspension
+there, and was **rejected by measurement** in cross-model review: the edge head *flushes* suspension
+off-grid, the rim carries the least suspended load of any ring (mean 0.0025 vs 0.0064 interior), a
+deposit lip is geometrically impossible (rim max suspension is half the rim's mean net erosion), and
+the exclusion only deepened the existing one-cell border trench by ~15%. Measured after the fix:
+deficit **0.919 → 0.345**, deposition-to-erosion ratio **0.08 → 0.65**, 231 units settled, max
+single-cell rise 0.033 (no beading); the remaining deficit is genuine in-sim export through the edge
+pipes — exact by elimination, so the GPU ledger flags it `exportedDerived` and no closure gate accepts
+it as evidence. The CPU droplet ledger read differently: most of its apparent **42.9%** loss was
+droplets *legitimately* exporting off-grid with their load (the boundary is base level); the true
+interior leak — dry-out and life-cap exits — was ~2% of eroded volume on open terrain (closed basins
+should raise the settled share *by mechanism* — a drying droplet is the pan filling — though the
+oracle measures open fbm only). Both engines now write a `hydroMassDiag` ledger
+(`{sumIn, sumOut, settled, exported, exportedDerived, lost, brushClipGain}`); the first closure form
+tolerated 5% mismatch, and re-review found that tolerance absorbing a real unnamed mass *source* —
+border-clipped brush cells remove nothing from the terrain while the droplet credits itself in full
+(+1.25 units at radius 2, growing with the radius slider). Named in the ledger, the budget closes to
+**5.7e-8** — float accumulation, not tolerance. `_verify_erosion_mass.js` (10 gates) also proves the
+settle flag is **opt-in**: Mountain/Peak macro-weathering callers stay byte-identical — the mountain
+node's massif form is now digest-pinned via an `ex=` exercise entry, closing the one opt-out call
+the baseline digest never reached — and the digest was re-baselined for exactly `hydraulic`,
+`erosion2`, and that coverage extension; 55 of 57 node types unchanged. Two honest
+caveats: the ledger is a *kernel* property, not a node property (Erosion 2 runs the kernel twice on a
+feature-scale-coarsened grid and post-shapes; a wired mask rescales the kernel's output — recovered
+mass included — per cell), and the ledger records only the most recent kernel run.
 
 On the default graph, the combined GPU-pipe + GPU-warp + Interactive-tier change cut a 1024² evaluation
 under the software-GPU harness from **14.7 s to 3.6 s (4.1×)**. Real hardware should be faster; these
@@ -1180,6 +1212,7 @@ node _verify_tectonic.js             # Voronoi plates: warped boundaries, orogen
 node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU parity, GPU hydraulic invariants + timings
+node _verify_erosion_mass.js         # erosion mass budget: terminal settle, export ledger, opt-in contract
 node _verify_simplex.js              # Simplex determinism, Perlin distinction, transform + GPU parity
 node _verify_all_canyon.js           # whole Canyon suite, one summary line per test (--quick to skip shared)
 node _verify_canyon.js               # drainage primitive, controls/styles, determinism
