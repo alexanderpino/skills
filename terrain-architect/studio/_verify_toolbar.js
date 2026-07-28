@@ -32,12 +32,30 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   const compact=await page.evaluate(()=>{const r=topbar.getBoundingClientRect();return{overflow:topbar.scrollWidth-topbar.clientWidth,
     commandRight:commandBtn.getBoundingClientRect().right<=r.right+1,ioDisplay:getComputedStyle(document.querySelector('.top-io')).display};});
   await page.screenshot({path:path.resolve(__dirname,'_shot_toolbar_compact.png')});
+  // The build-profile chip is the ONLY always-visible readout of the active lattice (the Grid
+  // lattice toggle lives inside the Terrain-definition panel), so it has to track every path
+  // that can change it - not just the toggle button. It reads buffers.builtLattice, which
+  // buildIndex() owns, so undo/redo/New/restoreGraph are covered by construction. The device
+  // segment must also tell the truth: gpuReady() forces the CPU path on hex.
+  const lattice=await page.evaluate(()=>{
+    const chip=()=>profileDetail.textContent,out={square:chip()};
+    const before=graphSnapshot();
+    terrainDef.lattice='hex';pushUndo(before);buildIndex();out.hex=chip();
+    undoGraph();updateViewport(curField);out.undone=chip();
+    redoGraph();updateViewport(curField);out.redone=chip();
+    if((terrainDef.lattice||'square')!=='square'){terrainDef.lattice='square';buildIndex();updateViewport(curField);}
+    out.restored=chip();
+    return out;
+  });
   const ok=initial.res===512&&initial.target===512&&initial.profile==='512²'&&initial.overflow<=1
+    &&!lattice.square.includes('Hex')&&lattice.hex.includes('Hex')
+    &&!lattice.undone.includes('Hex')&&lattice.redone.includes('Hex')&&!lattice.restored.includes('Hex')
+    &&lattice.hex.includes('CPU')&&lattice.redone.includes('CPU')   /* hex forces the CPU path */
     &&[512,1024,2048,4096].every(n=>initial.resolutions.includes(n))
     &&profileOpen.open&&profileOpen.controls&&queued.active===512&&queued.target===2048&&!queued.auto&&queued.detail.includes('Queued')
     &&filtered.profileClosed&&filtered.menu&&filtered.visible.length===1&&filtered.visible[0]==='find-water'
     &&located.selected==='water'&&located.menuClosed&&keyboardOpen
     &&compact.overflow<=1&&compact.commandRight&&compact.ioDisplay==='none'&&!errors.length;
-  console.log(JSON.stringify({initial,profileOpen,queued,filtered,located,keyboardOpen,compact,errors,ok},null,2));
+  console.log(JSON.stringify({initial,profileOpen,queued,filtered,located,keyboardOpen,compact,lattice,errors,ok},null,2));
   await browser.close();process.exit(ok?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(2);});

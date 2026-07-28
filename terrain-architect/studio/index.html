@@ -6252,8 +6252,50 @@ function terrainQuadFitDelta(h00,h10,h01,h11,g00x,g00y,g10x,g10y,g01x,g01y,g11x,
     +err(bottomX,rightY,g10x,g10y)+err(bottomX,rightY,g11x,g11y)+err(bottomX,rightY,g01x,g01y);
   return(main-anti)/(1+main+anti);                           // normalized: stable threshold across relief scales
 }
+/* ---- WIREFRAME EDGE BUFFER ------------------------------------------------------------------
+   The overlay used to draw by reinterpreting the TRIANGLE index buffer as a LINE_STRIP, which
+   connects every consecutive pair in buffer order: the 3 real edges of each triangle PLUS a
+   spurious stitch from each triangle's last vertex to the next triangle's first. Those stitches
+   are not mesh edges, and they are why the hex topology was unreadable on screen (the user could
+   not tell hex mode was working). A triangle LIST cannot be drawn as lines without its own
+   deduplicated EDGE buffer, so build one.
+
+   Edge ownership, to emit each edge exactly once: quad (x,y) owns its TOP edge (i -> i+1), its
+   LEFT edge (i -> i+n) and its diagonal; the final row's bottom edges and the final column's
+   right edges are emitted separately. Total = 3*(n-1)^2 + 2*(n-1) edges, which is exactly the
+   unique-edge count of the triangulation (horizontals n(n-1) + verticals n(n-1) + one diagonal
+   per quad). Lazily built: at 4096 square the buffer is ~400 MB, so it is only allocated when the
+   wireframe is actually switched on, and invalidated whenever the topology changes.            */
+let wireDiagArr=null,wireDiagN=0;
+function wireQuadDiag(n){
+  if(wireDiagN!==n||!wireDiagArr){wireDiagArr=new Uint8Array((n-1)*(n-1));wireDiagN=n;}
+  return wireDiagArr;
+}
+function wireEdgeCount(n){return 3*(n-1)*(n-1)+2*(n-1);}
+function buildWireIndex(){
+  const n=RES,u32=buffers.u32,cnt=wireEdgeCount(n)*2;
+  const idx=u32?new Uint32Array(cnt):new Uint16Array(cnt);let w=0;
+  // Hex diagonals are a pure function of row parity (the unique equilateral triangulation);
+  // square diagonals come from the fit recorded by streamTerrainIndices, falling back to the
+  // deterministic checkerboard if the stream has not run yet.
+  const hex=isHex(),diag=(wireDiagN===n&&!hex)?wireDiagArr:null;
+  for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){
+    const i=y*n+x;
+    idx[w++]=i;idx[w++]=i+1;                                   // top edge of this quad
+    idx[w++]=i;idx[w++]=i+n;                                   // left edge of this quad
+    const useMain=hex?!!(y&1):(diag?!!diag[y*(n-1)+x]:!!((x+y)&1));
+    if(useMain){idx[w++]=i;idx[w++]=i+n+1;}else{idx[w++]=i+1;idx[w++]=i+n;}
+  }
+  for(let x=0;x<n-1;x++){const i=(n-1)*n+x;idx[w++]=i;idx[w++]=i+1;}   // bottom row
+  for(let y=0;y<n-1;y++){const i=y*n+n-1;idx[w++]=i;idx[w++]=i+n;}     // right column
+  if(!buffers.lineIdx)buffers.lineIdx=gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.lineIdx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,idx,gl.STATIC_DRAW);
+  buffers.lineCount=cnt;buffers.lineReady=true;buffers.lineLattice=terrainDef.lattice||"square";
+}
 function streamTerrainIndices(height,snowDepth){
   const n=RES,adaptive=!!(height&&height.length===n*n),u32=buffers.u32,bytes=u32?4:2;
+  const quadDiag=wireQuadDiag(n);
   // A full 4096² Uint32 index staging array is ~384 MiB. Stream row batches instead:
   // topology stays indexed on the GPU while CPU scratch memory remains below ~3 MiB.
   const batchRows=Math.max(1,Math.min(32,Math.floor(786432/Math.max(6*(n-1),1))));
@@ -6300,6 +6342,10 @@ function streamTerrainIndices(height,snowDepth){
         batch[w++]=i;batch[w++]=i+1;batch[w++]=i+n;
         batch[w++]=i+1;batch[w++]=i+n+1;batch[w++]=i+n;antiCount++;
       }
+      // Record the diagonal so the wireframe edge buffer can be rebuilt without re-deriving the
+      // fit (buildWireIndex). One byte per quad, reused across rebuilds - negligible beside the
+      // triangle buffer it accompanies.
+      if(quadDiag)quadDiag[y*(n-1)+x]=useMain?1:0;
     }
     if(w===batch.length||y===n-2){
       gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,elementOffset*bytes,batch.subarray(0,w));elementOffset+=w;w=0;
@@ -6307,13 +6353,14 @@ function streamTerrainIndices(height,snowDepth){
     if(adaptive&&y<n-2){const old=grad0;grad0=grad1;grad1=old;fillGradientRow(y+2,grad1);}
   }
   const revision=(buffers.edgeSpin&&buffers.edgeSpin.revision||0)+1;
+  buffers.lineReady=false;                       // diagonals just moved: edge buffer is stale
   buffers.indexPattern=adaptive?"adaptive-normal-fit-diagonal":"checkerboard";
   buffers.edgeSpin={adaptive,quadCount:(n-1)*(n-1),mainCount,antiCount,tieCount,flipsFromCheckerboard:flips,
     fitGain,fitStrength,batchRows,stagingBytes:batch.byteLength+(adaptive?(grad0.byteLength+grad1.byteLength):0),
     durationMs:performance.now()-started,revision};
 }
 function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
-  buffers.count=cnt;buffers.u32=u32;
+  buffers.count=cnt;buffers.u32=u32;buffers.lineReady=false;   // resolution/lattice changed
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cnt*(u32?4:2),gl.DYNAMIC_DRAW);
   if(isHex()){
@@ -6345,6 +6392,9 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   // hex water plane (shoreline detached) and redo drew hex vertices under the leftover square
   // adaptive index buffer (sliver strips map-wide).
   buffers.builtLattice=terrainDef.lattice||"square";
+  // buildIndex is the ONE place the built lattice changes, whatever drove it (toggle, undo,
+  // redo, New, restoreGraph), so refresh the always-visible toolbar chip from here.
+  if(typeof syncBuildProfile==="function"&&$("#profileDetail"))syncBuildProfile();
 }
 let curField=null,curHeightSource=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSolidSurfaceY=null,curSnowLayerRef=null;
 let curTemperatureRef=null,curSunVisibilityRef=null;
@@ -6845,8 +6895,15 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
   gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,satTex);gl.uniform1i(u(terrainProg,"uSat"),3);
   bindAttr(terrainProg,"pos",3,buffers.pos);bindAttr(terrainProg,"nrm",3,buffers.nrm);bindAttr(terrainProg,"hgt",1,buffers.hgt);bindAttr(terrainProg,"drive",1,buffers.drive);bindAttr(terrainProg,"snow",1,buffers.snow);
   bindAttr(terrainProg,"temperature",1,buffers.temperature);bindAttr(terrainProg,"sunvis",1,buffers.sunvis);bindAttr(terrainProg,"col",3,buffers.col);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
-  gl.drawElements(wire?gl.LINE_STRIP:gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+  if(wire){
+    // Real mesh edges from the deduplicated edge buffer (built lazily on first wireframe use).
+    if(!buffers.lineReady||buffers.lineLattice!==(terrainDef.lattice||"square"))buildWireIndex();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.lineIdx);
+    gl.drawElements(gl.LINES,buffers.lineCount,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+  }else{
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+    gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+  }
 }
 function drawWaterDepth(MVP){
   if(!scene.water||!waterMaskProg)return;
@@ -7121,8 +7178,17 @@ function setTopPopover(id,force){
 }
 function syncBuildProfile(){
   $("#profileRes").textContent=TARGET_RES+"²";
-  const quality=BUILD_QUALITY==="final"?"Final":"Interactive",device=USE_GPU&&!$("#gpuBtn").disabled?"GPU":"CPU";
-  $("#profileDetail").textContent=" · "+quality+" · "+device+(SCALE_RES?" · Lock":"")+(TARGET_RES!==RES?" · Queued":"");
+  const quality=BUILD_QUALITY==="final"?"Final":"Interactive";
+  // Lattice reads off buffers.builtLattice, not terrainDef.lattice: buildIndex() owns that tag,
+  // and undo/redo/New/restoreGraph all change the definition WITHOUT going through the toggle,
+  // so the built mesh is the honest answer to "which grid am I actually looking at". Hex is
+  // called out; square is the default and stays unlabelled to keep the chip short.
+  const hexBuilt=!!(buffers&&buffers.builtLattice==="hex"),lattice=hexBuilt?" · Hex":"";
+  // The device label must report what compute ACTUALLY runs, not what the button is set to:
+  // gpuReady() forces the CPU path on hex (the kernels are square-texture end to end), so a chip
+  // reading "GPU" there was simply false.
+  const device=(USE_GPU&&!$("#gpuBtn").disabled&&!hexBuilt)?"GPU":"CPU";
+  $("#profileDetail").textContent=" · "+quality+" · "+device+lattice+(SCALE_RES?" · Lock":"")+(TARGET_RES!==RES?" · Queued":"");
 }
 function filterCommands(query){
   const q=(query||"").trim().toLowerCase(),items=[...$("#commandList").querySelectorAll(".command-item")];
