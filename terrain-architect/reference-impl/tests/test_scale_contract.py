@@ -60,6 +60,11 @@ PIXEL_OR_CALLER_SPACE = {
     ("erosion_droplet", "droplet_erode"):
         "cell-space particle walk (droplets step one cell, brush_radius counts cells). The exposure "
         "is documented on the function and `resolution_matched()` carries settings between grids.",
+    **{("hex_grid", f):
+       "pure lattice topology in index space — cell adjacency and hex graph distance, which no "
+       "cellsize can change (the metric enters only through `basis`, and every hex_grid function "
+       "that touches world space does take cellsize)."
+       for f in ("ring", "disc")},
 }
 
 

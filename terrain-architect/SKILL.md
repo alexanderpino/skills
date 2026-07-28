@@ -5,8 +5,8 @@ description: >-
   procedural landscapes, heightfields, terrain node graphs, and their GPU/runtime substrate.
   Use as the self-contained terrain-algorithm source for advanced offline/pre-cooked, runtime,
   or hybrid game-engine/world generators: design, implement, review, debug, or attribute
-  erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD, and
-  realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then
+  erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD,
+  square or hexagonal working grids (hex maps, hex tiles), and realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then
   redesigns allocation, CPU/GPU scheduling, streaming, determinism, and serialisation for
   engine-native runtime fit; source-independent and clean-room modes remain available when
   policy requires them. Do not use for generic geology teaching, GIS plotting, hiking,

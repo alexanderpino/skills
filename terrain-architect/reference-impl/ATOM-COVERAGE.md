@@ -84,6 +84,17 @@ the Voronoi-plate boundary-classification uplift field; F-tier). The meander sol
 **centreline (polyline)**, not the height field — an agent model (`07`) — and its migration physics
 is the upstream-lagged near-bank velocity (Ikeda–Parker–Sawai 1981), documented in chapter `03`.
 
+**Hexagonal working grid (`hex_grid.py`, chapter `26`):** `basis` (the 2×2 shear matrix; the metric
+`G = BᵀB` and cell area `det B` route through it), `cell_at` (point→cell by cube rounding — per-axis
+rounding is wrong ~17% of the time), `sample` (barycentric over the dual triangle; there is no
+bilinear on this lattice), `ring` / `disc` (6k / 1+3k(k+1) neighbourhoods — the box loop has no hex
+analogue), `laplacian6` (renormalised `2/(3d²)` constant) and `gradient6` (one-ring world-space
+gradient — the shear is inside the stencil, so the `B⁻ᵀ` normal rule cannot be forgotten). These are
+the hex-native forms of chapter `26`'s *What does not port* section; the chapter's measured claims
+(the 16.8% wrong-cell rate, the 30.5° naive-normal error, the √3 separable-blur anisotropy, the H/3
+corner-mean plateau, the 1.5× un-renormalised Laplacian) are pinned by
+`tests/test_hex_grid.py`.
+
 ## Documented but NOT implemented (deferred)
 
 These are discussed in the chapter pseudocode / grounding but are **not** in the reference impl — the

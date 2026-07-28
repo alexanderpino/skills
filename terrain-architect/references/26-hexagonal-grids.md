@@ -693,6 +693,13 @@ any DGGS pipeline), skip the round-trip and mesh the hexes.
 
 ## Verify
 
+**The measured claims in this chapter are pinned by tests.** The 16.8% wrong-cell rate of per-axis
+rounding, the 30.5° naive-normal error and its `√3` magnitude spread, the `√3` anisotropy of a
+two-axis "separable" blur, the `H/3` corner-mean plateau and its `(1/3, 1/9)` kernel, and the 1.5×
+un-renormalised Laplacian are all measured — not asserted — in
+`reference-impl/tests/test_hex_grid.py`, against the executable forms in `reference-impl/hex_grid.py`
+(`basis`, `cell_at`, `sample`, `ring`/`disc`, `laplacian6`, `gradient6`).
+
 **Verify.** The cone and constant-slope controls of `09` still apply, and hex should *beat* the square
 grid on them — beat, not ace: a radial vent shows no plus-shaped collapse (the residual lobing is
 6-fold and smaller), and a constant slope shows no 45°-biased drainage — but expect **residual
