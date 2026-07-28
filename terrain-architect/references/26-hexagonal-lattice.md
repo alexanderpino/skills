@@ -1,7 +1,11 @@
 # 26 — Hexagonal lattice heightfields
 
-The flat-domain sibling of `08`'s spherical hex-DGGS section, and the **fourth cure** in `09`'s
-grid-anisotropy family: change the lattice so no preferred axis exists.
+The implementation depth behind `08`'s hexagonal-grids section — `08` owns the grid-system case
+(why and when to choose hex, interchange, and the spherical hex-DGGS closure); this chapter owns
+building on it — and the **fourth cure** in `09`'s grid-anisotropy family: change the lattice so
+no preferred axis exists. Symbol note: `08` writes `s` for the hexagon circumradius; here `s` is
+the centre-to-centre spacing (`√3 ×` the circumradius) — the `cellSize` contract is the same,
+the formulas are not interchangeable without converting.
 
 **What it is for — and the expectation to correct first.** A hexagonal sampling lattice is a real,
 citable fix for one specific defect class: **stencil-printed 4-fold anisotropy** and the diagonal

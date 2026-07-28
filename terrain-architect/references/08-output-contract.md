@@ -301,7 +301,7 @@ the point.
 neighbours with a single per-neighbour distance (no square-grid √2 split); the pipe model becomes a
 **6-pipe** model with one pipe length; lava and other cellular automata (`19`) shed most of their
 lattice-aligned lobing. The parameters stay world-unit-denominated — only the stencil and the metric
-change.
+change (the kernels and re-derived constants live in `26`).
 
 **Interchange: hex is a working grid; deliver a raster.** Engines, meshers and every DCC import expect a
 square raster (or, on a planet, an equirectangular one), so — exactly like equirectangular below — hex
@@ -323,6 +323,16 @@ routing on a hex mesh is **P** (Liao et al. 2020, 2025). The *engineering* of re
 square rasters is **F**. Everything above is a **flat-grid** story and stands on its own; the sphere
 (next section) is one *further* domain the hex grid closes onto — via the icosahedral hex DGGS — not the
 reason it exists.
+
+**Implementation depth → `26-hexagonal-lattice.md`.** This section owns the grid-system case — why
+and when to choose hex; `26` owns building on it: storage on a plain W×H array (odd-r offset, zero
+memory cost), the branchless D6 kernel, the re-derived stencil constants (the hex Laplacian is
+`2/(3s²)`, not `1/s²`), the **unique equilateral triangulation** (edge spinning ceases to exist —
+the index buffer becomes a pure function of `(W, H)`), staggered mips, barycentric GPU sampling,
+and the C4-vs-C6 verification signatures. **Symbol warning when crossing:** this section writes `s`
+for the hexagon *circumradius*; `26` writes `s` for the *centre-to-centre spacing* (`√3 ×` the
+circumradius). The `cellSize` contract — centre-to-centre spacing — is identical in both; the
+formulas are not interchangeable without converting `s`.
 
 ## Planetary / spherical domains
 

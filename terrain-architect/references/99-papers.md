@@ -863,14 +863,6 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   discretization and fast analysis of data distributed on the sphere.* The Astrophysical Journal
   622(2), 759–771. — The equal-area, iso-latitude *quadrilateral*-pixel spherical pixelisation; a
   seam-free alternative, and **not** a hexagonal grid — don't conflate the two (`08`).
-- **Petersen, D.P. & Middleton, D. (1962).** *Sampling and reconstruction of wave-number-limited
-  functions in N-dimensional Euclidean spaces.* Information and Control 5(4), 279–323. — The
-  multidimensional sampling theorem; the **hexagonal lattice is the optimal 2D sampler** for an
-  isotropically band-limited signal (~13.4% fewer samples than square) — the theoretical basis of the
-  hexagonal heightfield (`08`).
-- **Mersereau, R.M. (1979).** *The processing of hexagonally sampled two-dimensional signals.*
-  Proceedings of the IEEE 67(6), 930–949. — The DSP-standard treatment of hexagonal sampling,
-  reconstruction, and filtering; the practical companion to Petersen & Middleton (`08`).
 - **Goldberg, M. (1937).** *A class of multi-symmetric polyhedra.* Tôhoku Mathematical Journal 43,
   104–108. — The **Goldberg polyhedron**: hexagons + **exactly twelve pentagons** by Euler's formula —
   why a hexagonal grid cannot close on a sphere without 12 pentagonal defects, the geometry every
@@ -894,15 +886,18 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   system-based flow routing datasets in the Amazon and Yukon basins.* Earth System Science Data 17,
   2035–2062. — Flow routing on an icosahedral equal-area (ISEA) DGGS (`08`, `03`).
 
-### DEM & sensor realism
+### Hexagonal lattice (planar working grid)
 
 - **Petersen, D.P. & Middleton, D. (1962).** *Sampling and reconstruction of wave-number-limited
   functions in N-dimensional Euclidean spaces.* Information and Control 5(4), 279-323. The
-  multidimensional Nyquist result; for disc band-limits the hexagonal lattice is minimum-density
-  (exactly 1 - sqrt(3)/2 = 13.4% fewer samples). Crossref-verified. (`26`)
+  multidimensional sampling theorem: for disc band-limits the **hexagonal lattice is
+  minimum-density** (exactly 1 - sqrt(3)/2 = 13.4% fewer samples than square) — the theoretical
+  basis of the hexagonal heightfield. Crossref-verified. (`08`, `26`)
 - **Mersereau, R.M. (1979).** *The processing of hexagonally sampled two-dimensional signals.*
-  Proc. IEEE 67(6), 930-949. Classic restatement; metadata Crossref-verified, TEXT NOT READ at
-  entry time (paywalled) - do not quote verbatim without pulling the paper. (`26`)
+  Proceedings of the IEEE 67(6), 930-949. The DSP-standard treatment of hexagonal sampling,
+  reconstruction and filtering; the practical companion to Petersen & Middleton. Metadata
+  Crossref-verified, TEXT NOT READ at entry time (paywalled) - do not quote verbatim without
+  pulling the paper. (`08`, `26`)
 - **Middleton, L. & Sivaswamy, J. (2005).** *Hexagonal Image Processing: A Practical Approach.*
   Springer, ISBN 9781852339142. Addressing, convolution, square<->hex resampling. Cite the ISBN;
   the series name was rebranded between printings. (`26`)
@@ -928,6 +923,9 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   471-526. (`26`)
 - **Magillo, P. (2025).** *Non-square grids: A new trend in imaging and modeling?* Computer
   Science Review 56, 100695. Survey; single entry point for further reading. (`26`)
+
+### DEM & sensor realism
+
 - **Hutchinson, M.F. (1989).** *A new procedure for gridding elevation and stream line data with
   automatic removal of spurious pits.* Journal of Hydrology 106(3–4), 211–232. — ANUDEM; drainage-
   enforced interpolation that removes pits during gridding (`08`, `03`).
