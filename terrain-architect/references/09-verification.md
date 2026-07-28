@@ -403,6 +403,10 @@ avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the separ
 order of magnitude, which is plenty. Pinned by
 `reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`.
 
+![anisotropy anatomy](../reference-impl/anisotropy_anatomy.png)
+
+*The test, and its trap, in one figure — regenerate with `reference-impl/anisotropy_anatomy.py`.*
+
 **A cure for one does nothing for the other, which is the proof they are different.** Swapping to
 a hex lattice (`26`) shrinks lattice anisotropy and leaves field anisotropy completely untouched —
 a strike-controlled valley network is just as directional on hex, because its direction never came

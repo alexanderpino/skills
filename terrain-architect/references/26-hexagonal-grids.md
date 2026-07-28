@@ -10,6 +10,12 @@ grids in `08` and `25`. The grid *choice* is recorded in the manifest and the *d
 output-contract matter, so both stay in `08`; everything else is here. Read it when the requested output
 is hex-native, or when grid anisotropy (`09`) is the problem you are trying to structurally remove.
 
+![hex anatomy](../reference-impl/hex_anatomy.png)
+
+*The geometry of this chapter in one figure — lattice and vertex classes, the rhombille, the
+two easily-conflated diamonds, the three meshes, the tile triangulations, and the `×1/3` cost.
+Regenerate with `reference-impl/hex_anatomy.py`.*
+
 Contents: [Why hex is not a gimmick](#why-hex-is-not-a-gimmick--it-is-the-better-sampling-lattice) ·
 [Coordinates and the metric](#coordinates-and-the-metric) · [Stencils](#stencils-routing-diffusion-gradients) ·
 [Meshing](#meshing) · [The rhombille tiling](#the-rhombille-tiling) ·
