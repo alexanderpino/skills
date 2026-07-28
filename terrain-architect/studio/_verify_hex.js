@@ -90,6 +90,14 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     const wanted = new Float32Array(n * n), got = new Float32Array(n * n),
       naive = new Float32Array(n * n);
     let m = 0;
+    // sqF is a SQUARE-lattice field: its cell (X,Y) holds the value at world point (X,Y), so it
+    // must be probed with square semantics. sampleBilinear is now lattice-aware, and leaving
+    // terrainDef.lattice='hex' during these probes would apply the odd-r parity shift and the
+    // sqrt(3)/2 row compression a SECOND time, on data that never had them - which reads as a
+    // seed-contract failure when the contract is actually being met. Probe under 'square' and
+    // restore; `got` is already-computed hex output and is unaffected either way.
+    const latHeld = terrainDef.lattice;
+    terrainDef.lattice = 'square';
     for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
       const u = (x + 0.5 * (y & 1)), v = y * HEXR;          // hex world point in CELL units
       if (v >= n - 1 || u >= n - 1) continue;
@@ -98,6 +106,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
       naive[m] = sampleBilinear(sqF, x, y);                  // NO shift/compression (the trap)
       m++;
     }
+    terrainDef.lattice = latHeld;
     out.seedContract = { corr: +pearson(wanted.subarray(0, m), got.subarray(0, m)).toFixed(4),
       naiveCorr: +pearson(naive.subarray(0, m), got.subarray(0, m)).toFixed(4) };
 

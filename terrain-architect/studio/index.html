@@ -1020,8 +1020,24 @@ const REAL_DEM_SAMPLE="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAA
 /* ------------------------------------------------------------ Field --- */
 // A heightfield is a Float32Array of RES*RES, values nominally in [0,1].
 function newField(v=0){const a=new Float32Array(RES*RES);if(v)a.fill(v);return a;}
-function sampleBilinear(f,x,y){            // x,y in grid coords
-  const n=RES;x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+function sampleBilinear(f,x,y){            // x,y in grid coords (= world position in cell units)
+  const n=RES;
+  if(terrainDef.lattice==="hex"){
+    // Odd-r storage (26): cell (c,r) sits at world ( c + 0.5*(r&1), r*sqrt(3)/2 ) in cell units,
+    // and every caller means a WORLD position by (x,y) - warpField displaces by noise offsets in
+    // cells, pickers convert from world. Square bilinear on that data reads i+n as "directly
+    // below" when it is half a cell across and sqrt(3)/2 down, so it blends the wrong points:
+    // this is what made the DEFAULT graph's terrain change on a lattice toggle far beyond the
+    // expected seed-contract resample. Undo each row's OWN parity shift before interpolating
+    // along it, then blend between rows - exact for a linear field, still four taps. (Using one
+    // row's parity for both rows, the cheap shear correction, leaves up to half a cell of error
+    // on alternating rows.)
+    const r=clamp(y/HEX_ROW,0,n-1.001),r0=r|0,fr=r-r0;
+    const rowAt=rr=>{const cx=clamp(x-0.5*(rr&1),0,n-1.001),c0=cx|0,i=rr*n+c0;
+      return lerp(f[i],f[i+1],cx-c0);};
+    return lerp(rowAt(r0),rowAt(r0+1),fr);
+  }
+  x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
   const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
   const a=f[i],b=f[i+1],c=f[i+n],d=f[i+n+1];
   return lerp(lerp(a,b,fx),lerp(c,d,fx),fy);
@@ -2556,10 +2572,20 @@ function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,piv
 /* ------------------------------------------------------- modifiers ---- */
 function warpField(inp,{strength=0.12,freq=3,seed=7}){
   const o=newField();const n=RES,s=strength*n;
+  // Seed contract AND world-space displacement (26). Two separate hex defects lived here, and
+  // together they were the largest single reason the DEFAULT graph's terrain changed on a
+  // lattice toggle (warp sits early in perlin -> blend -> warp -> hydraulic -> thermal, and is
+  // height-critical): the driving noise was sampled at raw grid indices, and the displaced
+  // lookup handed raw indices to a sampler that reads world positions. On hex, cell (x,y) lives
+  // at ( x + 0.5*(y&1), y*sqrt(3)/2 ) in cell units - so both must use that. The offsets are
+  // already in cell units, so displacing the world point by them is correct on either lattice.
+  // hxs=0, rzs=1 on square: byte-identical there.
+  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const ox=(gnoise(x/n*freq,y/n*freq,seed)-.5)*2*s;
-    const oy=(gnoise(x/n*freq,y/n*freq,seed+53)-.5)*2*s;
-    o[y*n+x]=sampleBilinear(inp,x+ox,y+oy);
+    const wx=x+hxs*(y&1),wy=y*rzs;
+    const ox=(gnoise(wx/n*freq,wy/n*freq,seed)-.5)*2*s;
+    const oy=(gnoise(wx/n*freq,wy/n*freq,seed+53)-.5)*2*s;
+    o[y*n+x]=sampleBilinear(inp,wx+ox,wy+oy);
   }
   return o;
 }
@@ -4670,8 +4696,13 @@ function bakeThumb(nd){
   const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
   const img=ctx.createImageData(TH,TH);const n=RES;
   const[mn,mx]=fieldRange(f);const d=mx-mn||1;
+  // sampleBilinear reads WORLD position in cell units. The hex world is only (n-1)*sqrt(3)/2
+  // cells tall, so walking sy over raw grid indices runs 13.4% past the bottom and clamps onto
+  // the last lattice row - measured: 6 of 48 thumbnail rows came back byte-identical on hex,
+  // 0 of 48 on square.
+  const rowScale=isHex()?HEX_ROW:1;
   for(let y=0;y<TH;y++)for(let x=0;x<TH;x++){
-    const sx=x/TH*(n-1),sy=y/TH*(n-1);
+    const sx=x/TH*(n-1),sy=y/TH*(n-1)*rowScale;
     const h=(sampleBilinear(f,sx,sy)-mn)/d;
     const hl=(sampleBilinear(f,sx-1,sy)-mn)/d,hr=(sampleBilinear(f,sx+1,sy)-mn)/d;
     const hu=(sampleBilinear(f,sx,sy-1)-mn)/d,hd=(sampleBilinear(f,sx,sy+1)-mn)/d;
@@ -4693,14 +4724,18 @@ function bakeColorThumb(nd,col){
     const b=col[(y1*n+x0)*3+ch]*(1-tx)+col[(y1*n+x1)*3+ch]*tx;
     return a*(1-ty)+b*ty;
   };
+  // Two coordinate spaces here, and they are NOT the same on hex: sampleBilinear takes a WORLD
+  // position in cell units, while rgbAt above indexes the colour array by grid ROW. Keep them
+  // apart - conflating them shifts the shading against the colour by 13.4% of the image.
+  const rowScale=isHex()?HEX_ROW:1;
   for(let y=0;y<TH;y++)for(let x=0;x<TH;x++){
-    const sx=x/(TH-1)*(n-1),sy=y/(TH-1)*(n-1);
+    const sx=x/(TH-1)*(n-1),syRow=y/(TH-1)*(n-1),sy=syRow*rowScale;
     const hl=(sampleBilinear(f,sx-1,sy)-mn)/d,hr=(sampleBilinear(f,sx+1,sy)-mn)/d;
     const hu=(sampleBilinear(f,sx,sy-1)-mn)/d,hd=(sampleBilinear(f,sx,sy+1)-mn)/d;
     const nx=hl-hr,ny=hu-hd,nz=.16,L=Math.hypot(nx,ny,nz)||1;
     const sh=.62+.52*clamp((nx*.5+ny*.6+nz*.6)/L,0,1),i=(y*TH+x)*4;
-    img.data[i]=Math.round(clamp(rgbAt(sx,sy,0)*sh,0,1)*255);
-    img.data[i+1]=Math.round(clamp(rgbAt(sx,sy,1)*sh,0,1)*255);
+    img.data[i]=Math.round(clamp(rgbAt(sx,syRow,0)*sh,0,1)*255);
+    img.data[i+1]=Math.round(clamp(rgbAt(sx,syRow,1)*sh,0,1)*255);
     img.data[i+2]=Math.round(clamp(rgbAt(sx,sy,2)*sh,0,1)*255);
     img.data[i+3]=255;
   }
@@ -5580,15 +5615,49 @@ function loadImageAsDEM(nd,src,label){
 function buildDemFromSource(nd){
   if(nd._demImg){const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
     cx.drawImage(nd._demImg,0,0,RES,RES);const d=cx.getImageData(0,0,RES,RES).data;const f=newField();
-    for(let i=0;i<RES*RES;i++)f[i]=(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;nd._dem=f;}
+    const lum=i=>(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;
+    if(terrainDef.lattice==="hex"){
+      // The canvas gives a SQUARE raster; place it on the hex lattice by reading each hex cell's
+      // own world x (odd rows +0.5 cell). Row compression cancels under normalisation - see
+      // resampleTo - so this is a pure per-row half-cell resample along x.
+      for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
+        const sx=x+0.5*(y&1),x0=Math.min(RES-1,sx|0),x1=Math.min(RES-1,x0+1),fx=sx-x0;
+        f[y*RES+x]=lum(y*RES+x0)*(1-fx)+lum(y*RES+x1)*fx;}
+    }else for(let i=0;i<RES*RES;i++)f[i]=lum(i);
+    nd._dem=f;}
   else if(nd._demRaw){nd._dem=resampleTo(nd._demRaw.u16,nd._demRaw.side,v=>v/65535);}
 }
-function resampleTo(src,side,map){const f=newField();for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
-  const sx=Math.min(side-1,(x/RES*side)|0),sy=Math.min(side-1,(y/RES*side)|0);f[y*RES+x]=map(src[sy*side+sx]);}return normalize(f);}
+// Square raster -> working lattice. On hex the destination cell (x,y) sits at world
+// ( x + 0.5*(y&1), y*sqrt(3)/2 ) in cell units; normalised against the hex world's own extent
+// (scale x scale*sqrt(3)/2) the row compression CANCELS - v = y*HEX_ROW/((n-1)*HEX_ROW) = y/(n-1)
+// - so the only correction an import needs is the odd-row half-cell shift in x. Without it an
+// imported DEM lands sheared against every generator that already honours the seed contract.
+function resampleTo(src,side,map){const f=newField();
+  const hex=terrainDef.lattice==="hex";
+  for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
+    const sy=Math.min(side-1,(y/RES*side)|0);
+    if(hex){
+      // Interpolate along x, do NOT snap: the whole correction here is a HALF cell, and
+      // nearest-neighbour truncation (`|0`) discards exactly that - measured, the parity comb
+      // came back 0 with a 0.5-cell residual error until this became a lerp. Square keeps its
+      // shipped nearest-neighbour behaviour untouched.
+      const fx=(x+0.5*(y&1))/RES*side,x0=Math.min(side-1,fx|0),x1=Math.min(side-1,x0+1),t=fx-x0;
+      f[y*RES+x]=map(src[sy*side+x0])*(1-t)+map(src[sy*side+x1])*t;
+    }else f[y*RES+x]=map(src[sy*side+Math.min(side-1,(x/RES*side)|0)]);
+  }return normalize(f);}
 function finishDem(nd){markDirtyFrom(nd.id);buildProps();requestEval();}
 
 function exportHeightmap(){const out=outputNode();if(!out||!out._field){toast("No output to export");return;}
-  const f=normalize(out._field);const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
+  let f=normalize(out._field);const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
+  if(terrainDef.lattice==="hex"){
+    // Interchange (26): hex is a grid you SIMULATE on and RESAMPLE OUT of - every engine, DCC and
+    // DEM consumer expects a square raster. Writing the odd-r array straight to PNG ships a
+    // sheared terrain (alternate rows displaced half a cell). Resample to square through the
+    // lattice-aware sampler: output pixel (X,Y) is the hex field at world ( X, Y*sqrt(3)/2 ).
+    const sq=newField();
+    for(let y=0;y<RES;y++)for(let x=0;x<RES;x++)sq[y*RES+x]=sampleBilinear(f,x,y*HEX_ROW);
+    f=sq;
+  }
   const img=cx.createImageData(RES,RES);for(let i=0;i<RES*RES;i++){const v=Math.round(f[i]*255);img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;}
   cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG");}
 $("#exportBtn").onclick=exportHeightmap;
@@ -6754,18 +6823,14 @@ function cameraEye(){const ce=Math.cos(cam.el);return[cam.target[0]+Math.cos(cam
 function cameraBasis(){const eye=cameraEye(),forward=norm3(sub3(cam.target,eye)),right=norm3(cross3(forward,[0,1,0]));return{eye,forward,right,up:norm3(cross3(right,forward))};}
 function surfaceHeight(wx,wz){
   const surface=curSolidSurfaceY||curSurfaceY||curHgt;if(!surface)return cam.target[1];
-  let x,z;
-  if(isHex()){
-    // Shear-corrected sample on the odd-r lattice: rows sit at sqrt(3)/2 device spacing and odd
-    // rows are drawn half a cell right. Bilinear on the sheared basis is a documented
-    // approximation (error <= half a cell across the odd rows); the exact form is 26's
-    // barycentric 3-tap, queued with the wider sampling work.
-    z=((wz/HEX_ROW)*.5+.5)*(RES-1);
-    x=(wx*.5+.5)*(RES-1)-((Math.round(z)&1)?0.5:0);
-  }else{
-    x=(wx*.5+.5)*(RES-1);z=(wz*.5+.5)*(RES-1);
-  }
-  const h=sampleBilinear(surface,x,z);
+  // Device space -> world position in CELL units, which is exactly what sampleBilinear takes on
+  // either lattice. On hex the mesh places rows at sqrt(3)/2 device spacing, so recover the
+  // fractional row first and hand back row*sqrt(3)/2 - the sampler then applies each row's own
+  // parity shift, exactly. (This used to carry its own shear approximation, up to half a cell of
+  // error on the odd rows.)
+  const x=(wx*.5+.5)*(RES-1);
+  const row=(isHex()?(wz/HEX_ROW):wz)*.5*(RES-1)+.5*(RES-1);
+  const h=sampleBilinear(surface,x,isHex()?row*HEX_ROW:row);
   return curSolidSurfaceY||curSurfaceY?h:h*H_SCALE;
 }
 // Project authored terrain directions into the current camera plane. Unlike a screen-fixed north
@@ -6795,7 +6860,11 @@ function windAtViewFocus(){
   const sceneField=scene.snow&&scene.snow.windField,sceneWind=windVectorFromField(sceneField);
   const wind=preview||sceneWind;
   if(wind&&wind.u.length===RES*RES&&wind.v.length===RES*RES){
-    const x=(cam.target[0]*.5+.5)*(RES-1),y=(cam.target[2]*.5+.5)*(RES-1);
+    // Device -> world cell units, the same recovery surfaceHeight does: on hex the mesh puts
+    // rows at sqrt(3)/2 device spacing, so reading device z as a row samples ~13% of the map
+    // away from the point under the camera focus.
+    const x=(cam.target[0]*.5+.5)*(RES-1);
+    const y=((isHex()?cam.target[2]/HEX_ROW:cam.target[2])*.5+.5)*(RES-1)*(isHex()?HEX_ROW:1);
     const u=sampleBilinear(wind.u,x,y),v=sampleBilinear(wind.v,x,y);
     return{u,v,speed:Math.hypot(u,v),source:"field"};
   }
@@ -6830,8 +6899,10 @@ function syncClimateReadout(){
       ||scene.snow&&scene.snow.temperatureField
       ||scene.water&&scene.water.temperatureField)
     ||scene.snow&&scene.snow.layer&&scene.snow.layer.temperatureC||temperatureNode&&temperatureNode._temperatureC;
+  // Device -> world cell units on either lattice (see windAtViewFocus / surfaceHeight).
   const c=temperatureMap&&temperatureMap.length===RES*RES
-    ?sampleBilinear(temperatureMap,(cam.target[0]*.5+.5)*(RES-1),(cam.target[2]*.5+.5)*(RES-1))
+    ?sampleBilinear(temperatureMap,(cam.target[0]*.5+.5)*(RES-1),
+      ((isHex()?cam.target[2]/HEX_ROW:cam.target[2])*.5+.5)*(RES-1)*(isHex()?HEX_ROW:1))
     :terrainDef.seaTemp-terrainDef.lapseRate*elevationM/1000;
   const value=TEMP_UNIT==="F"?c*9/5+32:c,unit=TEMP_UNIT==="F"?"°F":"°C";
   el.textContent=`T ${value.toFixed(1)} ${unit} · ${Math.round(elevationM)} m`;
