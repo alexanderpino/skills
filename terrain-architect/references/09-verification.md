@@ -341,7 +341,12 @@ grid* as the pass criterion, not *none*. The lattice swap also brings its **own 
 axial-vs-offset coordinate mixing, row-parity neighbour tables applied with the wrong parity,
 pointy-top/flat-top orientation mismatch, and the un-renormalised 6-neighbour Laplacian (the hex
 constant is `2/(3d²)`, not `1/d²` — keep the square constant and diffusivity is silently 1.5× high;
-`08`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
+`08`). One of the new rows is invisible to the sun sweep: meshing visible hex tiles **corner-only**
+(4 triangles) instead of fanning through the centre (6) drops the cell's own sample from the mesh
+entirely and attenuates one-cell extrema by **exactly 1/3** — correct and free on flat prism tops or a
+far LOD tier, a silent amplitude bug anywhere else. Both meshes reproduce affine fields exactly, so
+the ramp and cone controls cannot see it; the detector is an **impulse** — raise one cell by `H` and
+measure the rendered peak (`08`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
 still not continuous), but when directional artefacts are endemic and the grid is yours to choose, the
 lattice itself is the highest-leverage fix — it trades the family for a smaller one, not for zero. On
 a sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the residual stencil

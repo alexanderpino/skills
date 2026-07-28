@@ -437,8 +437,12 @@ erosion/CA are markedly less direction-biased (no 45°/90° striping; a smaller 
 The costs are interchange — engines and DEMs want a raster, so you resample out — and a renormalised
 stencil (the 6-neighbour Laplacian constant differs by 3/2; keep the square one and diffusivity is
 silently 1.5× high). Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
-every downstream parameter exactly as cellSize does. See `references/08-output-contract.md`, *Hexagonal
-grids*. This is entirely separate from — and applies with or without — the spherical-grid choice a
+every downstream parameter exactly as cellSize does. Rendering hex is a separate, later fork — the
+dual mesh (centres only, ~2 triangles per cell) when the hexes are a working grid, and when the tiles
+are meant to be seen, a **6-triangle fan through the centre** or the minimal **4-triangle corner-only**
+triangulation, which is a third cheaper but drops the cell's own sample and attenuates one-cell extrema
+to `1/3` (free on flat prism tops and far LOD, a silent bug elsewhere). See
+`references/08-output-contract.md`, *Hexagonal grids*. This is entirely separate from — and applies with or without — the spherical-grid choice a
 *planet* forces (`08`/`25`); a hex grid is for flat terrain first, the sphere only later.
 
 **3. Choose the erosion backbone by scale.** This is the highest-leverage decision:
@@ -492,7 +496,7 @@ truth, above).
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport (Bagnold threshold + cubic flux law → Exner flux-divergence bed change, saturation length), Werner dune model, anchored/obstacle dunes (echo, climbing, falling, sand ramps, shadow dunes), dune hierarchy (draa), vegetation-anchored dunes (parabolics, blowouts) |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, **hexagonal grids (a grid system in their own right — optimal sampling lattice, D6 routing, no D4/D8 √2 ambiguity; meshing, per-vertex normals, and the hex-prism/"pillar" stepped-tile look)**, planetary/spherical domains (cube-sphere, icosahedral hexagonal DGGS / Goldberg polyhedron, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
+| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, **hexagonal grids (a grid system in their own right — optimal sampling lattice, D6 routing, no D4/D8 √2 ambiguity; meshing — dual mesh vs the 6-triangle centre fan vs the 4-triangle corner-only tile, and the ×1/3 amplitude loss the latter costs — per-vertex normals, and the hex-prism/"pillar" stepped-tile look)**, planetary/spherical domains (cube-sphere, icosahedral hexagonal DGGS / Goldberg polyhedron, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
 | `references/11-geological.md` | Strata, terracing, folding, salt & mud diapirism (salt domes/walls, namakiers, mud volcanoes), lithology, outcrops, karst (incl. tower/cone karst, dolines/uvalas/poljes/cenotes, karren), weathering & soil production, weathering microforms (tors, tafoni/honeycomb, exfoliation/sheeting domes), volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |

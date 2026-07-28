@@ -400,11 +400,83 @@ fibre over it — but it decides which vertices exist:
   per-vertex normal is the 6-neighbour formula above, unchanged. **3× cheaper** — `N` vertices and
   `~2N` triangles against the fan's `3N` and `6N`. Reach for this whenever the hexes are a working
   grid rather than something the player sees.
-- **Visible hex tiles (strategy/4X, DGGS) — fan through the centre**, six triangles per cell.
-  Symmetric, unlike the square quad's arbitrary diagonal, and the centre vertex already holds the
-  sampled height rather than an invented one. This mesh carries **two vertex classes**, and both are
-  first-class: `N` **centres** and `2N` **corners**. The two meshes can also coexist over one field —
-  a smooth dual mesh to render, a fan or its edge loops for tile borders and gameplay pick.
+- **Visible hex tiles (strategy/4X, DGGS) — mesh the tile itself**, which forks again into a
+  **6-triangle centre fan** or a **4-triangle corner-only** triangulation (next paragraph — the
+  choice is not about triangle count). The default, the 6-fan, is symmetric unlike the square quad's
+  arbitrary diagonal, and its centre vertex already holds the sampled height rather than an invented
+  one. This mesh carries **two vertex classes**, and both are first-class: `N` **centres** and `2N`
+  **corners**. The two meshes can also coexist over one field — a smooth dual mesh to render, a fan
+  or its edge loops for tile borders and gameplay pick.
+
+**Triangulating one visible tile — 6 triangles or 4, and the cell's own sample is what is at stake.**
+Once the hexes are rendered as tiles there is a second fork *inside* each cell, and it is not
+primarily a triangle-count decision. A simple `n`-gon triangulates into `n − 2` triangles from its own
+corners, so **4 triangles is the minimal triangulation of a hexagon** — three diagonals, six vertices,
+no interior vertex. Adding an interior vertex to any triangulation adds exactly two triangles, which
+is where the **6-triangle centre fan** comes from. So the fork is `4` against `6` triangles and `2N`
+against `3N` vertices — and the real difference is that the fan's seventh vertex **is `h(q,r)`
+itself**, while the 4-triangle mesh has nowhere to put it.
+
+- **6 triangles — fan through the centre.** The default for smooth visible tiles. Invariant under the
+  cell's full 6-fold symmetry, and the six triangles are **equilateral** (centre-to-corner and
+  corner-to-corner are both `s = cellSize/√3`) — the best-conditioned triangles any triangulation of
+  this cell can have. `3N` vertices (`N` centres + `2N` corners), `6N` triangles, 18 indices per cell.
+- **4 triangles — corner-only.** Drop the centre vertex and triangulate the six corners: `2N`
+  vertices — the corner buffer alone, with the cell array demoted to index data — `4N` triangles, 12
+  indices per cell, **a third off both counts**. Exact and lossless precisely when the six corners are
+  coplanar or nearly so: flat-top prisms (below), water-plane tiles, board/UI tiles, and any cell
+  whose height is constant by construction. On smooth terrain it is a **lossy** simplification, and
+  the amount is not small.
+
+**What the 4-triangle mesh costs: the cell's own height, at a factor of 3.** Corner heights are means
+of three cell heights, so with the centre vertex gone a cell reaches the surface only through its six
+corners, at weight `1/3` each. Every ring neighbour is shared by exactly 2 of those corners, so
+
+```
+mean of the 6 corners of cell A  =  (1/3)·hᴀ  +  (1/9)·Σ h(ring)        # weights sum to 1
+```
+
+— a normalised low-pass. It preserves constants, and because the ring is symmetric it reproduces an
+**affine field exactly**: a plane and a constant-slope ramp come out identical to the 6-fan, which is
+why the `09` slope control cannot tell the two meshes apart. Curvature is what it eats, and the
+extreme case is exact and worth memorising: an **isolated one-cell spike of height `H` renders as a
+flat plateau at `H/3`** — all six of its corners evaluate to `(H + 0 + 0)/3`, so the tile has no relief
+at all. Peaks, pits and one-cell ridges lose two thirds of their amplitude; the 6-fan renders the same
+spike at full `H` as a correct cone. That impulse is the test that separates them — the sun sweep will
+not.
+
+**Which 4-triangle mesh — the fan is the asymmetric one.** A convex hexagon has **14** triangulations
+(Catalan `C₄`) against a quad's 2: the "which diagonal" problem, seven times over. Six of the fourteen
+are corner fans — `(v₀v₁v₂), (v₀v₂v₃), (v₀v₃v₄), (v₀v₄v₅)` — and a fan is a weak choice among them,
+because it keeps only a single mirror of the cell's symmetry and its long diagonal `v₀v₃` runs through
+the tile centre, so **the height rendered at the middle of the tile is the mean of just two opposite
+corners** and the other four do not enter. Prefer the **ear-and-core** triangulation — three ears
+`(v₀v₁v₂), (v₂v₃v₄), (v₄v₅v₀)` plus the core `(v₀v₂v₄)` — which keeps 3-fold rotational symmetry and
+puts an **equilateral** core over the tile centre, blending three alternating corners there. It has two
+variants (core `v₀v₂v₄` or `v₁v₃v₅`); pick one, apply it to **every** cell, and record it, because a
+position-dependent choice prints a directional pattern straight into `09`'s anisotropy family. What no
+corner-only triangulation can fix: every polygon triangulation has at least two ears, an ear of a
+regular hexagon is `30°–120°–30°`, so **min angle 30° is the ceiling for all 14** — against the centre
+fan's 60°.
+
+**Mixing the two is crack-free — no skirts, no stitching.** Both triangulations leave the cell boundary
+as the *same* six straight corner-to-corner edges, and neither inserts a vertex on an edge, so a
+4-triangle tile abutting a 6-triangle one is watertight by construction: **there is no T-junction**,
+which is not true of a quadtree square heightfield. That makes the fork a per-cell LOD knob — 6 near
+the camera, 4 in the distance, decided per tile with no transition geometry. Normals *are* discontinuous
+across the seam, so cross-fade or switch where the cell subtends about a pixel, and remember the `H/3`
+attenuation is a **biased** filter: it pulls extrema toward the local mean, so ridgelines lose height
+as they recede. That is a low-pass you often want at distance and a pop you must not let the player
+watch happen.
+
+| Tile mesh (per `N` cells) | Vertices | Triangles | Cell's own sample | Symmetry | Min angle |
+|---|---|---|---|---|---|
+| Dual mesh — centres only, no tiles | `N` | `~2N` | every vertex **is** a sample | — | 60° |
+| Fan through the centre — 6 triangles | `3N` | `6N` | **rendered at full amplitude** | full 6-fold | **60°** |
+| Corner-only — 4 triangles | `2N` | `4N` | **not a vertex — attenuated ×1/3** | 3-fold (ear-and-core) / 1 mirror (fan) | 30° |
+
+The dual mesh stays cheapest by a wide margin; the 4-versus-6 fork only arises once the tiles must be
+visible as tiles.
 
 **Corner ownership: every cell owns exactly two.** Corners are the triangles of the centre lattice, in
 two orientations, so a clean bijection assigns each cell one of each — no dedup pass, no hashing, and a
@@ -513,8 +585,11 @@ terrain legible.
 
 # B. welded surface with culled walls — minimal geometry, needs a build pass
 wallQuad(A, B) emitted only when hᴀ > hᴃ, of height (hᴀ − hᴃ)      # Minecraft's hidden-face removal
-top(A)         = 4 triangles (a hexagon is a 4-triangle fan; no centre vertex needed — it is flat),
-                 all six corners at h — corner heights are never computed, only the 6 constant offsets
+top(A)         = 4 triangles — the corner-only triangulation above, and here it is *exact*, not a
+                 simplification: the top is flat, so its six corners are coplanar by construction and
+                 the centre vertex would carry no information. All six sit at h; no corner heights are
+                 computed, only the 6 constant offsets. (Fan or ear-and-core — on a flat top they
+                 render identically, so take whichever your index buffer already emits.)
 ```
 
 Budget: worst case ~16 triangles per cell (4 top + 6 walls × 2), against the smooth dual mesh's ~2 —
@@ -550,7 +625,12 @@ tile a rectangle — and a hex height resampled to a raster and back is within i
 large drift means the offset/centring convention is wrong. The hex grid also **adds rows to the `09`
 failure catalogue** rather than only deleting them: axial-vs-offset mixing, row-parity neighbour
 tables applied with the wrong parity, pointy/flat orientation mismatch, and the un-renormalised
-6-neighbour Laplacian above.
+6-neighbour Laplacian above. One more, if the tiles are meshed: **impulse in, measure the peak.** A
+single cell raised by `H` on an otherwise flat field must render at `H` through a 6-triangle centre fan
+and at exactly `H/3` through a 4-triangle corner-only one. Anything else is a meshing bug; `H/3` when
+you expected `H` means the centre vertex was dropped. The ramp and cone controls pass either way — they
+are affine and near-affine, and both meshes reproduce affine fields exactly — so this is the only
+control that distinguishes them.
 
 **Tier.** Hexagonal-lattice sampling optimality is **P** (Petersen & Middleton 1962; Mersereau 1979);
 the axial/cube/offset coordinate machinery is **F** (Red Blob Games — the standard, no paper); D6/MFD
