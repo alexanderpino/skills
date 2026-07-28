@@ -54,7 +54,10 @@ lines.forEach((L, i) => {
     r.re.lastIndex = 0;
     if (r.re.test(L)) {
       if (MARKER.test(L)) {
-        const m = L.match(/shape-ok:\s*([^*\/]*)/);
+        // Take the rest of the line. An earlier form stopped at `*` or `/`, which mangled almost
+        // every real reason - reasons on n*n and (n-1)*(n-1) lines contain `*` by definition - and
+        // the printed reason IS the audit for this gate.
+        const m = L.match(/shape-ok:\s*(.*)$/);
         exemptions.push({ line: i + 1, rule: r.id, reason: (m && m[1] || '').trim().slice(0, 90) });
         continue;
       }

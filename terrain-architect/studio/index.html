@@ -1078,12 +1078,12 @@ function sampleBilinear(f,x,y){            // x,y in grid coords (= world positi
     // along it, then blend between rows - exact for a linear field, still four taps. (Using one
     // row's parity for both rows, the cheap shear correction, leaves up to half a cell of error
     // on alternating rows.)
-    const r=clamp(y/HEX_ROW,0,n-1.001),r0=r|0,fr=r-r0;
+    const r=clamp(y/HEX_ROW,0,nh-1.001),r0=r|0,fr=r-r0;
     const rowAt=rr=>{const cx=clamp(x-0.5*(rr&1),0,n-1.001),c0=cx|0,i=rr*n+c0;
       return lerp(f[i],f[i+1],cx-c0);};
     return lerp(rowAt(r0),rowAt(r0+1),fr);
   }
-  x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+  x=clamp(x,0,n-1.001);y=clamp(y,0,nh-1.001);
   const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
   const a=f[i],b=f[i+1],c=f[i+n],d=f[i+n+1];
   return lerp(lerp(a,b,fx),lerp(c,d,fx),fy);
@@ -1157,7 +1157,7 @@ function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   // Authoring DOMAIN, not world metres (the AUTHORING DOMAIN note at isHex()). hxs=0 on square.
   const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const gu=xfU((x+hxs*(y&1))/n,y/n),gv=xfV((x+hxs*(y&1))/n,y/n);   // placement folded into the coordinates, not the raster
+    const gu=xfU((x+hxs*(y&1))/n,y/nh),gv=xfV((x+hxs*(y&1))/n,y/nh);   // placement folded into the coordinates, not the raster
     let sum=0,amp=1,f=freq;
     for(let k=0;k<octaves;k++){
       let v=base(gu*f,gv*f,seed+k*7);
@@ -1172,7 +1172,7 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
   const o=newField();const n=fieldW(),nh=fieldH(),cells=Math.max(2,Math.round(freq));
   const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const px=xfU((x+hxs*(y&1))/n,y/n)*cells,py=xfV((x+hxs*(y&1))/n,y/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
+    const px=xfU((x+hxs*(y&1))/n,y/nh)*cells,py=xfV((x+hxs*(y&1))/n,y/nh)*cells,cx=Math.floor(px),cy=Math.floor(py);
     let f1=9,f2=9;
     for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
       const gx=cx+i,gy=cy+j;
@@ -1188,13 +1188,13 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
 function gradientField(angleDeg){
   const o=newField();const n=fieldW(),nh=fieldH(),a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y/n)*cx+xfV((x+hxs*(y&1))/n,y/n)*cy);}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y/nh)*cx+xfV((x+hxs*(y&1))/n,y/nh)*cy);}
   return normalize(o);
 }
 function radialField(){
   const o=newField();const n=fieldW(),nh=fieldH();
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y/n)-.5,dy=xfV((x+hxs*(y&1))/n,y/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y/nh)-.5,dy=xfV((x+hxs*(y&1))/n,y/nh)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
   return o;
 }
 
@@ -1248,20 +1248,20 @@ const GPU={
     gl.useProgram(prog);if(setup)setup(prog);
     gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,null);},
   clear(target,n){this.bind(target,n);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.bindFramebuffer(gl.FRAMEBUFFER,null);},
-  upload(key,n,data){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);
-    for(let i=0;i<n*n;i++)rgba[i*4]=data[i];
+  upload(key,n,data){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);   // shape-ok: staging buffer for the square texture above, not a field
+    for(let i=0;i<n*n;i++)rgba[i*4]=data[i];   // shape-ok: fills that square texture
     gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
-  uploadState(key,n,bed){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);
-    for(let i=0;i<n*n;i++){rgba[i*4]=bed[i];rgba[i*4+3]=1;}
+  uploadState(key,n,bed){const t=this.rt(key,n),rgba=new Float32Array(n*n*4);   // shape-ok: staging buffer for the square texture above, not a field
+    for(let i=0;i<n*n;i++){rgba[i*4]=bed[i];rgba[i*4+3]=1;}   // shape-ok: fills that square texture
     gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
   readRGBA(target,n){this.bind(target,n);
-    const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);
+    const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);   // shape-ok: readback must match the square texture it reads
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);return rgba;},
-  // n*n, NOT n*nh: this reads back a GPU TEXTURE, and the textures allocated above are square.
+  // shape-ok: reads back a GPU TEXTURE and the textures allocated above are square, so the readback must keep matching what was uploaded - it stays n*n, NOT n*nh.
   // Making hex textures n x latticeRows(n) belongs with the GPU hex kernels, not here - the readback
   // must keep matching whatever was actually uploaded.
   read(target,n){const rgba=this.readRGBA(target,n);
-    const o=new Float32Array(n*n);for(let i=0;i<n*n;i++)o[i]=rgba[i*4];return o;},
+    const o=new Float32Array(n*n);for(let i=0;i<n*n;i++)o[i]=rgba[i*4];return o;},   // shape-ok: square texture readback
 };
 // GLSL twins of hash2/gnoise/snoise above — identical uint32 hash, so the same seed gives the same field.
 const GLSL_NOISE=`
@@ -1317,7 +1317,7 @@ const GPU_FBM_FS=`#version 300 es
 const GPU_THERMAL_NB=`
   const ivec2 NB[8]=ivec2[8](ivec2(-1,0),ivec2(1,0),ivec2(0,-1),ivec2(0,1),ivec2(-1,-1),ivec2(1,1),ivec2(-1,1),ivec2(1,-1));
   const float ND[8]=float[8](1.,1.,1.,1.,1.41421356,1.41421356,1.41421356,1.41421356);  // diagonal distance correction
-  bool inb(ivec2 p,int n){return p.x>=0&&p.y>=0&&p.x<n&&p.y<n;}`;
+  bool inb(ivec2 p,int n){return p.x>=0&&p.y>=0&&p.x<n&&p.y<n;}`;   // shape-ok: GLSL bound over those same square textures
 const GPU_THERMAL_MS_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
   uniform sampler2D uH;uniform float uTalus,uRate;uniform int uN;`+GPU_THERMAL_NB+`
@@ -1488,7 +1488,7 @@ function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,iner
   // deepened the existing one-cell border trench ~15%. Green (water) is never added - it is rain.
   const rgba=GPU.readRGBA(state,n);
   const o=new Float32Array(n*nh);let sumIn=0,sumOut=0,settled=0;
-  for(let i=0;i<n*n;i++){o[i]=rgba[i*4]+rgba[i*4+2];settled+=rgba[i*4+2];sumIn+=inp[i];sumOut+=o[i];}
+  for(let i=0;i<n*nh;i++){o[i]=rgba[i*4]+rgba[i*4+2];settled+=rgba[i*4+2];sumIn+=inp[i];sumOut+=o[i];}
   // With everything settled, the only bed-mass sink left is in-sim outflow through the edge
   // pipes, so `exported` is exact by elimination - but DERIVED, not independently itemized.
   // exportedDerived tells a closure gate not to accept it as evidence (the CPU ledger's is).
@@ -1511,7 +1511,7 @@ function shapeField(p){
   const a=-p.angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const half=Math.max(rad*p.aspect,cs);
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const U=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,V=(y+0.5)/n; // authoring domain (note at isHex())
+    const U=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,V=(y+0.5)/nh; // authoring domain (note at isHex())
     let dx=xfU(U,V)*terrainDef.scale-cx,dy=xfV(U,V)*terrainDef.scale-cy;
     const rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;                          // rotate into object space
     let d;
@@ -1550,7 +1550,7 @@ function drawMaskField(p){
       // An exact Transform can move any painted segment across the tile. Scan output cells once
       // per stroke and find the nearest segment; this avoids a 64 MB Float32 coverage raster at 4K.
       for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-        const su=(x+.5+hxs*(y&1))/n,sv=(y+.5)/n;
+        const su=(x+.5+hxs*(y&1))/n,sv=(y+.5)/nh;
         const u=xfU(su,sv),v=xfV(su,sv);let d=Infinity;
         if(pts.length===1)d=Math.hypot(u-pts[0][0],v-pts[0][1]);
         else for(let q=1;q<pts.length;q++)d=Math.min(d,pointSegmentDistance(u,v,pts[q-1][0],pts[q-1][1],pts[q][0],pts[q][1]));
@@ -1562,13 +1562,13 @@ function drawMaskField(p){
     for(const q of pts){minU=Math.min(minU,q[0]);maxU=Math.max(maxU,q[0]);minV=Math.min(minV,q[1]);maxV=Math.max(maxV,q[1]);}
     // Bounding boxes pad x by the odd-row shift; v is already a row fraction in the domain.
     const bx0=clamp(Math.floor((minU-radius)*n-hxs),0,n-1),bx1=clamp(Math.ceil((maxU+radius)*n),0,n-1);
-    const by0=clamp(Math.floor((minV-radius)*n),0,n-1),by1=clamp(Math.ceil((maxV+radius)*n),0,n-1);
+    const by0=clamp(Math.floor((minV-radius)*nh),0,nh-1),by1=clamp(Math.ceil((maxV+radius)*nh),0,nh-1);
     const bw=bx1-bx0+1,bh=by1-by0+1,cov=new Uint8Array(bw*bh);
     const segment=(a,b)=>{
       const x0=clamp(Math.floor((Math.min(a[0],b[0])-radius)*n-hxs),bx0,bx1),x1=clamp(Math.ceil((Math.max(a[0],b[0])+radius)*n),bx0,bx1);
-      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)*n),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)*n),by0,by1);
+      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)*nh),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)*nh),by0,by1);
       for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
-        const c=Math.round(coverage(pointSegmentDistance((x+.5+hxs*(y&1))/n,(y+.5)/n,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
+        const c=Math.round(coverage(pointSegmentDistance((x+.5+hxs*(y&1))/n,(y+.5)/nh,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
         if(c>cov[i])cov[i]=c;}
     };
     if(pts.length===1)segment(pts[0],pts[0]);else for(let i=1;i<pts.length;i++)segment(pts[i-1],pts[i]);
@@ -1714,7 +1714,7 @@ function layoutField(shapes,base){
     const prof=FALLOFF[sh.profile]||FALLOFF.scurve;
     const fall=Math.max(sh.falloff,1e-4),half=(sh.width||0)*0.5;
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-      const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/n;
+      const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/nh;
       let {d,e}=polylineNearest(u,v,sh.pts);
       // inside a closed polygon the distance is zero, so the interior sits at the shape's elevation
       if(sh.kind==="poly"&&sh.pts.length>2&&pointInPoly(u,v,sh.pts))d=0;
@@ -1862,7 +1862,7 @@ function peakField(p){
   const w0x=fbm2(4.2,1.7,p.seed+31,4),w0y=fbm2(8.3,5.1,p.seed+32,4);
   let h=newField(0);const cover=newField(0);
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/n,dx=u-p.x,dy=v-p.y;
+    const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/nh,dx=u-p.x,dy=v-p.y;
     let qx=( dx*ca+dy*sa)/sx,qy=(-dx*sa+dy*ca)/sy;
     // Subtract the warp at the origin: Character can move shoulders and contours without moving
     // the authored summit away from Position X/Y.
@@ -1952,7 +1952,7 @@ function peakField(p){
       *detailGain*(1-reduce)*rf;
     h[i]=Math.max(0,env*(1+rock*faceGain)*(1-clamp(fineCut,0,.52)));
   }
-  if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*n),
+  if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*nh),   // shape-ok: droplet COUNT (a cell-count proxy), not a field shape
     seed:p.seed+11,radius:Math.max(2,Math.round(resScale()*2)),spawn:cover});
   if(st.talus&&weather>0)h=thermalOn(h,{talus:st.repose*0.012/resScale(),
     iters:Math.max(1,Math.round(st.talus*weather)),rate:0.5});
@@ -1975,10 +1975,10 @@ function mountainField(p){
   const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
   // The SAME domain cell-units for both skeleton steps (review caught them disagreeing once:
   // Position Y meant two different places in the envelope and the ridge network). Domain, not
-  // world - cy0 = p.y*n is a row index, so Position Y=1 must reach the last row, which it does
+  // world - cy0 = p.y*nh is a row index, so Position Y=1 must reach the last row, which it does
   // not if the field is measured down a world axis only 0.866n tall. hxs is 0 on square.
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  const cx0=p.x*n,cy0=p.y*n,reach=Math.max(p.size,0.02)*n;
+  const cx0=p.x*n,cy0=p.y*nh,reach=Math.max(p.size,0.02)*n;
   const rot=p.angle*Math.PI/180;
 
   // 1) crest-skeleton envelope
@@ -2003,7 +2003,7 @@ function mountainField(p){
   // 2) modulated-Voronoi ridge network
   const netA=new Float32Array(n*nh),netB=new Float32Array(n*nh);
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const u=(x+hxs*(y&1))/n*ncell,v=y/n*ncell;
+    const u=(x+hxs*(y&1))/n*ncell,v=y/nh*ncell;
     const wx=fbm2(u*0.35,v*0.35,p.seed+3,4)+0.5*fbm2(u*0.9,v*0.9,p.seed+13,4);
     const wy=fbm2(u*0.35+4.7,v*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*0.9+1.9,v*0.9+6.1,p.seed+14,4);
     const u2=u+warpamt*wx,v2=v+warpamt*wy,i=y*n+x;
@@ -2019,7 +2019,7 @@ function mountainField(p){
     h[i]=Math.pow(lerp(env[i]*((1-relief)+relief*ridges),env[i],reduce),bulkExp);}
 
   // 4) bake in the weathering the style implies
-  if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*n),
+  if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*nh),   // shape-ok: droplet COUNT (a cell-count proxy), not a field shape
     seed:p.seed+11,radius:Math.max(2,Math.round(resScale()*2)),spawn:env});
   if(st.talus&&weather>0)h=thermalOn(h,{talus:st.repose*0.012/resScale(),
     iters:Math.max(1,Math.round(st.talus*weather)),rate:0.5});
@@ -2148,7 +2148,7 @@ function canyonPriorityFlood(h,n,outlet){const nh=latticeRows(n);
   const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
   while(heap.length){
     const [e,i]=pop(),y=(i/n)|0,x=i-y*n;rank[i]=order.length;order.push(i);
-    for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+    for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=nh)continue;
       const j=yy*n+xx;if(done[j])continue;done[j]=1;
       const z=h[j]<=e?e+flatEpsilon:h[j];filled[j]=z;push(z,j);}
   }
@@ -2161,7 +2161,7 @@ function canyonDrainage(h,n,outlet,inlet=-1,externalArea=0){const nh=latticeRows
     [-1,-1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,1,Math.SQRT2],[1,1,Math.SQRT2]];
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;if(i===outlet)continue;let best=-Infinity,br=-1,bd=1;
-    for(const[dx,dy,d]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+    for(const[dx,dy,d]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=nh)continue;
       const j=yy*n+xx;if(flood.rank[j]>=flood.rank[i])continue;
       // Prefer the steepest filled-surface descent. Rank resolves the epsilon flats created by
       // Priority-Flood without imposing a radial or shortest-path tributary layout.
@@ -2270,11 +2270,11 @@ function canyonEvolutionState(p,requestedN){
   const centerAt=y=>clamp(.5+(.018+.105*structural)*Math.sin(y*Math.PI*(1.18+.72*structural)+phase)
     +fbm2(.37,y*1.65+3.4,seed+201,4)*.052*structural,.16,.84);
   const inletX=clamp(Math.round(centerAt(0)*(n-1)),2,n-3),inlet=inletX;
-  const outletX=clamp(Math.round(centerAt(1)*(n-1)),2,n-3),outlet=(n-1)*n+outletX;
+  const outletX=clamp(Math.round(centerAt(1)*(n-1)),2,n-3),outlet=(nh-1)*n+outletX;
   const externalArea=N*lerp(.22,.48,scale);
   let initialMin=Infinity,initialMax=-Infinity;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const i=y*n+x,u=x/(n-1),v=y/(n-1),cx=centerAt(v),dx=Math.abs(u-cx);
+    const i=y*n+x,u=x/(n-1),v=y/(nh-1),cx=centerAt(v),dx=Math.abs(u-cx);
     // A broad synclinal/weak structural corridor and regional downstream tilt only seed drainage.
     // Their relief is < 8% of the requested final canyon depth; incision must amplify them.
     const macro=fbm2(u*(1.55+scale*.75)+4.3,v*(1.55+scale*.75)+8.1,seed+211,5);
@@ -2376,7 +2376,7 @@ function canyonEvolutionState(p,requestedN){
     for(let i=0;i<N;i++)if(i!==outlet)h[i]+=upliftStep*uplift[i];
     h[outlet]=baseNow;
     for(let x=Math.max(0,outletX-1);x<=Math.min(n-1,outletX+1);x++)
-      h[(n-1)*n+x]=Math.min(h[(n-1)*n+x],baseNow+Math.abs(x-outletX)*.002);
+      h[(nh-1)*n+x]=Math.min(h[(nh-1)*n+x],baseNow+Math.abs(x-outletX)*.002);
     if(!state||it%3===0){state=canyonDrainage(h,n,outlet,inlet,externalArea);refreshWash();}
     // Receiver-first is the implicit O(N) Braun-Willett solve for n=1. Unlike an SDF trench,
     // incision grows only after flow area and local gradient cross the channel-head condition.
@@ -2535,7 +2535,7 @@ function canyonSurfaceExpression(state,p,o,n){const nh=latticeRows(n);
     const soften=lerp(1.45,.28,hard);
     // Fracture density is a MATERIAL property that multiplies a rate; it is scaled by the bed hardness
     // from the same table and cannot act where exposure is zero. It is not added to height.
-    const joint=lerp(.66,1.34,.5+.5*fbm2(x/n*17.5,y/n*17.5,p.seed+241,5));
+    const joint=lerp(.66,1.34,.5+.5*fbm2(x/n*17.5,y/nh*17.5,p.seed+241,5));
     const retreatM=(7.5+38.0*detail)*exposure*soften*joint;
     const lower=retreatM*S/H;
     src[i]=lower;sourced+=lower;
@@ -2562,7 +2562,7 @@ function canyonSurfaceExpression(state,p,o,n){const nh=latticeRows(n);
 // scale is carried instead by the weathering pass above: the 29 m band measures 25.0 m RMS here
 // against 2.28 m before this work, comfortably past the fractal-consistent expectation of ~13 m.
 function canyonFieldCPU(p){
-  const state=canyonEvolutionState(p),o=state.n===RES?state.field.slice():resampleField(state.field,state.n,RES);
+  const state=canyonEvolutionState(p),o=state.n===RES?state.field.slice():resampleRect(state.field,state.n,latticeRows(state.n),RES,fieldH());
   if(RES>state.n){
     state.surface=canyonSurfaceExpression(state,p,o,RES);
   }
@@ -2586,17 +2586,31 @@ function resampleField(f,fromN,toN){            // bilinear resample between two
     o[y*toN+x]=lerp(lerp(g(x0,y0),g(x0+1,y0),fx),lerp(g(x0,y0+1),g(x0+1,y0+1),fx),fy);}
   return o;
 }
+// Rectangular twin of resampleField, for grids whose ROW COUNT is not their width. Each axis
+// rescales independently and the row clamp uses the SOURCE row count, so a W x H field resamples
+// without cropping its bottom band. resampleField keeps its square-in-square-out contract for the
+// callers that genuinely mean a square grid; this is line-for-line identical to it whenever
+// fromH===fromW and toH===toW, which is every call while latticeRows(w)===w.
+function resampleRect(f,fromW,fromH,toW,toH){
+  const o=new Float32Array(toW*toH);
+  const g=(xx,yy)=>f[clamp(yy,0,fromH-1)*fromW+clamp(xx,0,fromW-1)];
+  for(let y=0;y<toH;y++)for(let x=0;x<toW;x++){
+    const sx=(x+0.5)*fromW/toW-0.5,sy=(y+0.5)*fromH/toH-0.5;
+    const x0=Math.floor(sx),y0=Math.floor(sy),fx=sx-x0,fy=sy-y0;
+    o[y*toW+x]=lerp(lerp(g(x0,y0),g(x0+1,y0),fx),lerp(g(x0,y0+1),g(x0+1,y0+1),fx),fy);}
+  return o;
+}
 // FEATURE SCALE — run `fn` on a grid k times coarser so its features come out k times WIDER, then add
 // the change back at full resolution (fine detail is preserved; only the erosion's footprint grows).
 // Coarse cell size is k * cellSizeM() metres, which is the lateral size the simulation actually sees.
 function atFeatureScale(inp,k,fn){
   if(!(k>1.02))return fn(inp);
-  const full=RES,w=Math.max(16,Math.round(RES/k));
-  const small=resampleField(inp,full,w);
+  const full=RES,fullH=latticeRows(full),w=Math.max(16,Math.round(RES/k)),wH=latticeRows(w);
+  const small=resampleRect(inp,full,fullH,w,wH);
   const prev=RES;let out;
   RES=w;try{out=fn(small);}finally{RES=prev;}   // the kernels read the global RES
-  const d=new Float32Array(w*w);for(let i=0;i<w*w;i++)d[i]=out[i]-small[i];
-  const up=resampleField(d,w,full),o=newField();
+  const d=new Float32Array(w*wH);for(let i=0;i<w*wH;i++)d[i]=out[i]-small[i];
+  const up=resampleRect(d,w,wH,full,fullH),o=newField();
   for(let i=0;i<o.length;i++)o[i]=inp[i]+up[i];
   return o;
 }
@@ -2604,17 +2618,18 @@ function atFeatureScale(inp,k,fn){
 function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5,edge="clamp"}){
   const n=fieldW(),nh=fieldH(),o=newField(),a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
-  const wrap=(t)=>edge==="wrap"?((t%n)+n)%n
-    :edge==="mirror"?(()=>{const p=((t%(2*n))+2*n)%(2*n);return p<n?p:2*n-1-p;})()
-    :clamp(t,0,n-1);
+  // Edge handling is per AXIS: columns wrap/mirror/clamp over the WIDTH, rows over the ROW COUNT.
+  const wrapAt=(t,m)=>edge==="wrap"?((t%m)+m)%m
+    :edge==="mirror"?(()=>{const p=((t%(2*m))+2*m)%(2*m);return p<m?p:2*m-1-p;})()
+    :clamp(t,0,m-1);
   const samp=(fx,fy)=>{const x0=Math.floor(fx),y0=Math.floor(fy),tx=fx-x0,ty=fy-y0;
-    const g=(xx,yy)=>inp[wrap(yy)*n+wrap(xx)];
+    const g=(xx,yy)=>inp[wrapAt(yy,nh)*n+wrapAt(xx,n)];
     return lerp(lerp(g(x0,y0),g(x0+1,y0),tx),lerp(g(x0,y0+1),g(x0+1,y0+1),tx),ty);};
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const u=(x+0.5)/n-pivX,v=(y+0.5)/n-pivY;
+    const u=(x+0.5)/n-pivX,v=(y+0.5)/nh-pivY;
     let ru=(u*ca-v*sa)/sX,rv=(u*sa+v*ca)/sY;    // inverse map: sample a smaller region to magnify
     ru+=pivX-offX;rv+=pivY-offY;
-    o[y*n+x]=samp(ru*n-0.5,rv*n-0.5);}
+    o[y*n+x]=samp(ru*n-0.5,rv*nh-0.5);}
   return o;
 }
 
@@ -2635,8 +2650,8 @@ function warpField(inp,{strength=0.12,freq=3,seed=7}){
   const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const du=x+hxs*(y&1),dv=y;
-    const ox=(gnoise(du/n*freq,dv/n*freq,seed)-.5)*2*s;
-    const oy=(gnoise(du/n*freq,dv/n*freq,seed+53)-.5)*2*s;
+    const ox=(gnoise(du/nh*freq,dv/n*freq,seed)-.5)*2*s;
+    const oy=(gnoise(du/n*freq,dv/nh*freq,seed+53)-.5)*2*s;
     o[y*n+x]=sampleBilinear(inp,du+ox,(dv+oy)*rzs);
   }
   return o;
@@ -2671,7 +2686,7 @@ function blurField(inp,{radius=2}){
   const w=[];let ws=0;for(let k=-r;k<=r;k++){const g=Math.exp(-(k*k)/(2*(r*0.6)*(r*0.6)));w.push(g);ws+=g;}
   for(let i=0;i<w.length;i++)w[i]/=ws;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=inp[y*n+clamp(x+k,0,n-1)]*w[k+r];tmp[y*n+x]=s;}
-  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,n-1)*n+x]*w[k+r];o[y*n+x]=s;}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,nh-1)*n+x]*w[k+r];o[y*n+x]=s;}
   return o;
 }
 function histEqualizeField(inp,{bins=256,amount=1}){
@@ -2726,7 +2741,7 @@ function slopeOf(inp){
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const nb=hexNb(y);let gx=0,gy=0;
       for(let k=0;k<6;k++){
-        const h=inp[clamp(y+nb[k][1],0,n-1)*n+clamp(x+nb[k][0],0,n-1)];
+        const h=inp[clamp(y+nb[k][1],0,nh-1)*n+clamp(x+nb[k][0],0,n-1)];
         gx+=h*HEX_EX[k];gy+=h*HEX_EY[k];
       }
       o[y*n+x]=Math.hypot(gx,gy)/3*n;
@@ -2735,7 +2750,7 @@ function slopeOf(inp){
   }
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const l=inp[y*n+clamp(x-1,0,n-1)],r=inp[y*n+clamp(x+1,0,n-1)];
-    const u=inp[clamp(y-1,0,n-1)*n+x],d=inp[clamp(y+1,0,n-1)*n+x];
+    const u=inp[clamp(y-1,0,nh-1)*n+x],d=inp[clamp(y+1,0,nh-1)*n+x];
     o[y*n+x]=Math.hypot((r-l)*0.5,(d-u)*0.5)*n;
   }
   return o;
@@ -2744,7 +2759,7 @@ function slopeOf(inp){
    DATA MAPS (Gaea's "Derive" channels) — grayscale fields you can bind a
    SatMap (or any mask input) to. Mirrors reference-impl/analysis.py.
    --------------------------------------------------------------------- */
-const gAt=(f,x,y)=>f[clamp(y,0,RES-1)*RES+clamp(x,0,RES-1)];
+const gAt=(f,x,y)=>f[clamp(y,0,fieldH()-1)*RES+clamp(x,0,RES-1)];
 // Zevenbergen-Thorne curvature on the 3x3 window (analysis.curvature). profile: +ve concave valley floor.
 function curvatureField(inp,{kind="profile",strength=1}){
   const n=fieldW(),nh=fieldH(),o=newField(),L=1/n,eps=1e-12,hex=isHex();
@@ -2856,12 +2871,12 @@ function depositsField(inp,{radius=3,refDepth=25}){
   // the D6 one-ring. Iterating the ring is exact - a radius-r hexagonal SE is the r-fold
   // Minkowski sum of the one-ring - so dilate r times then erode r times is the closing.
   const oct=isHex()?(f,mx)=>{
-    const nn=RES;let a=f;
+    const nn=RES,nnh=fieldH();let a=f;
     for(let it=0;it<r;it++){const o2=newField();
-      for(let y=0;y<nn;y++)for(let x=0;x<nn;x++){
+      for(let y=0;y<nnh;y++)for(let x=0;x<nn;x++){
         const nb=hexNb(y);let v=a[y*nn+x];
         for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
-          if(xx<0||yy<0||xx>=nn||yy>=nn)continue;
+          if(xx<0||yy<0||xx>=nn||yy>=nnh)continue;
           const s=a[yy*nn+xx];v=mx?Math.max(v,s):Math.min(v,s);}
         o2[y*nn+x]=v;}
       a=o2;}
@@ -3027,7 +3042,7 @@ function spReceivers(g,cellsize){
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const i=y*n+x,nb=hexNb(y);let best=0,bi=-1;
       for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
-        if(xx<0||yy<0||xx>=n||yy>=n)continue;
+        if(xx<0||yy<0||xx>=n||yy>=nh)continue;
         const ni=yy*n+xx,sl=(g[i]-g[ni])/cellsize;
         if(sl>best){best=sl;bi=ni;}}
       rec[i]=bi;dist[i]=cellsize;}
@@ -3037,7 +3052,7 @@ function spReceivers(g,cellsize){
             [-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;let best=0,bi=-1,bd=cellsize;
-    for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
+    for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;
       const ni=yy*n+xx,sl=(g[i]-g[ni])/(d[2]*cellsize);
       if(sl>best){best=sl;bi=ni;bd=d[2]*cellsize;}}
     rec[i]=bi;dist[i]=bd;}
@@ -3063,7 +3078,7 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
   const n=fieldW(),nh=fieldH(),N=n*nh;
   let h=inp.slice();
   const isEdge=new Uint8Array(N);
-  for(let x=0;x<n;x++){isEdge[x]=1;isEdge[(n-1)*n+x]=1;}
+  for(let x=0;x<n;x++){isEdge[x]=1;isEdge[(nh-1)*n+x]=1;}
   for(let y=0;y<nh;y++){isEdge[y*n]=1;isEdge[y*n+n-1]=1;}
   for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
   const A=new Float32Array(N);
@@ -3117,7 +3132,7 @@ function thermalErodeHex(inp,{talus=0.012,iters=30,rate=0.5}){
     const dh=new Float32Array(n*nh);
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const nb=(y&1)?nbOdd:nbEven,c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
-      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
+      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=nh){diffs.push(0);continue;}
         const d=c-h[yy*n+xx];const e=d-talus;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
       if(sum<=0)continue;
       const move=rate*maxd*0.5;let k=0;
@@ -3142,7 +3157,7 @@ function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
     const dh=new Float32Array(n*nh);
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
-      for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
+      for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=nh){diffs.push(0);continue;}
         const d=c-h[yy*n+xx];const e=d-talus*dist;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
       if(sum<=0)continue;
       const move=rate*maxd*0.5;let k=0;                 // /2 keeps the steepest pair stable
@@ -3169,8 +3184,8 @@ function blurScalarField(src,n,radius,passes=2){const nh=latticeRows(n);
     for(let y=0;y<nh;y++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[y*n+clamp(k,0,n-1)];
       for(let x=0;x<n;x++){b[y*n+x]=sum/span;sum+=a[y*n+clamp(x+radius+1,0,n-1)]-a[y*n+clamp(x-radius,0,n-1)];}}
     [a,b]=[b,a];
-    for(let x=0;x<n;x++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[clamp(k,0,n-1)*n+x];
-      for(let y=0;y<nh;y++){b[y*n+x]=sum/span;sum+=a[clamp(y+radius+1,0,n-1)*n+x]-a[clamp(y-radius,0,n-1)*n+x];}}
+    for(let x=0;x<n;x++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[clamp(k,0,nh-1)*n+x];
+      for(let y=0;y<nh;y++){b[y*n+x]=sum/span;sum+=a[clamp(y+radius+1,0,nh-1)*n+x]-a[clamp(y-radius,0,nh-1)*n+x];}}
     [a,b]=[b,a];
   }
   return a;
@@ -3247,12 +3262,12 @@ function climateSolarExposure(baseM,n,def,options={}){const nh=latticeRows(n);
       if(d!==prev){distances.push(d);prev=d;}}
   }
   const sample=(x,y)=>{
-    x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+    x=clamp(x,0,n-1.001);y=clamp(y,0,nh-1.001);
     const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
     return lerp(lerp(baseM[i],baseM[i+1],fx),lerp(baseM[i+n],baseM[i+n+1],fx),fy);
   };
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const i=y*n+x,x0=Math.max(0,x-1),x1=Math.min(n-1,x+1),y0=Math.max(0,y-1),y1=Math.min(n-1,y+1);
+    const i=y*n+x,x0=Math.max(0,x-1),x1=Math.min(n-1,x+1),y0=Math.max(0,y-1),y1=Math.min(nh-1,y+1);
     const dzdx=(baseM[y*n+x1]-baseM[y*n+x0])/Math.max((x1-x0)*cell,1e-6);
     const dzdy=(baseM[y1*n+x]-baseM[y0*n+x])/Math.max((y1-y0)*cell,1e-6);
     const inv=1/Math.hypot(dzdx,1,dzdy);
@@ -3263,7 +3278,7 @@ function climateSolarExposure(baseM,n,def,options={}){const nh=latticeRows(n);
       let visible=1;
       for(const dc of distances){
         const sx=x+eq[0]*dc,sy=y+eq[1]*dc;
-        if(sx<0||sy<0||sx>n-1||sy>n-1)break;
+        if(sx<0||sy<0||sx>n-1||sy>nh-1)break;
         if(sample(sx,sy)>baseM[i]+dc*cell*tanEl+.25){visible=0;break;}
       }
       visibility[i]=visible;
@@ -3293,7 +3308,7 @@ function evaluateTemperatureMap(inp,p={},shadowInput=null){
   // No visibility edge means open sky. Terrain occlusion is an explicit Sun Shadow graph input;
   // slope/aspect incidence remains part of the base temperature model.
   const solar=climateSolarExposure(baseM,preview,terrainDef,{visibility:supplied,skipHorizon:!supplied});
-  const rawC=new Float32Array(preview*preview),encoded=new Float32Array(preview*preview);
+  const rawC=new Float32Array(preview*latticeRows(preview)),encoded=new Float32Array(preview*latticeRows(preview));
   const warming=p.warming==null?5:p.warming;
   const seaTemp=p.seaTemp==null?(terrainDef.seaTemp==null?6:terrainDef.seaTemp):p.seaTemp;
   const lapse=p.lapseRate==null?(terrainDef.lapseRate==null?6.5:terrainDef.lapseRate):p.lapseRate;
@@ -3357,10 +3372,11 @@ function projectWindMassConsistent(u0,v0,n,cell,iterations=56){const nh=latticeR
   for(let y=0;y<nh-1;y++)for(let x=0;x<n-1;x++){
     const i=y*n+x;rhs[i]=(u0[i+1]-u0[i]+v0[i+n]-v0[i])/cell;
   }
-  const jacobi=(lam0,rhs2,m,cellM,iters)=>{
-    let src=lam0,dst=new Float32Array(m*m);const c2=cellM*cellM;
+  const jacobi=(lam0,rhs2,m,cellM,iters,mh)=>{
+    const rows=mh||latticeRows(m);
+    let src=lam0,dst=new Float32Array(m*rows);const c2=cellM*cellM;
     for(let it=0;it<iters;it++){
-      for(let y=1;y<m-1;y++)for(let x=1;x<m-1;x++){
+      for(let y=1;y<rows-1;y++)for(let x=1;x<m-1;x++){
         const i=y*m+x;dst[i]=(src[i-1]+src[i+1]+src[i-m]+src[i+m]-rhs2[i]*c2)*.25;
       }
       const q=src;src=dst;dst=q;
@@ -3375,41 +3391,42 @@ function projectWindMassConsistent(u0,v0,n,cell,iterations=56){const nh=latticeR
   const cycles=m>=8?2:1;
   for(let cyc=0;cyc<cycles;cyc++){
     if(m>=8){
-      const rc=new Float32Array(m*m);
-      for(let Y=0;Y<m;Y++)for(let X=0;X<m;X++){
+      const mh=Math.max(1,Math.ceil(nh/f));
+      const rc=new Float32Array(m*mh);
+      for(let Y=0;Y<mh;Y++)for(let X=0;X<m;X++){
         let s2=0,c3=0;
         for(let dy=0;dy<f;dy++)for(let dx=0;dx<f;dx++){
-          const yy=Y*f+dy,xx=X*f+dx;if(yy>=n||xx>=n)continue;
+          const yy=Y*f+dy,xx=X*f+dx;if(yy>=nh||xx>=n)continue;
           const i=yy*n+xx;
           // residual of the compact 5-point operator against the accumulated lambda
-          const L=(yy>0&&yy<n-1&&xx>0&&xx<n-1)
+          const L=(yy>0&&yy<nh-1&&xx>0&&xx<n-1)
             ?(lam[i-1]+lam[i+1]+lam[i-n]+lam[i+n]-4*lam[i])/cell2:0;
           s2+=rhs[i]-L;c3++;}
         rc[Y*m+X]=c3?s2/c3:0;
       }
-      const lamC=jacobi(new Float32Array(m*m),rc,m,cell*f,Math.min(600,m*m));
+      const lamC=jacobi(new Float32Array(m*mh),rc,m,cell*f,Math.min(600,m*mh),mh);
       for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++)
-        lam[y*n+x]+=sampleGridBilinear(lamC,m,x/f,y/f);
+        lam[y*n+x]+=sampleGridBilinear(lamC,m,x/f,y/f,mh);
     }
-    lam=jacobi(lam,rhs,n,cell,iterations);
+    lam=jacobi(lam,rhs,n,cell,iterations,nh);
   }
   const src=lam;
   const u=u0.slice(),v=v0.slice();
   for(let y=0;y<nh;y++)for(let x=1;x<n;x++){const i=y*n+x;u[i]-=(src[i]-src[i-1])/cell;}
-  for(let y=1;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;v[i]-=(src[i]-src[i-n])/cell;}
+  for(let y=1;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;v[i]-=(src[i]-src[i-n])/cell;}
   return{u,v};
 }
-function sampleGridBilinear(field,n,x,y){
+function sampleGridBilinear(field,n,x,y,rows){const nh=rows||latticeRows(n);
   // Takes an explicit n because the wind model runs on a preview grid, so it cannot use the
   // global sampleBilinear. Same lattice contract though: (x,y) is a WORLD position in cell
   // units, and on hex each row's own parity shift is undone before interpolating along it.
   if(terrainDef.lattice==="hex"){
-    const r=clamp(y/HEX_ROW,0,n-1.001),r0=r|0,fr=r-r0;
+    const r=clamp(y/HEX_ROW,0,nh-1.001),r0=r|0,fr=r-r0;
     const rowAt=rr=>{const cx=clamp(x-0.5*(rr&1),0,n-1.001),c0=cx|0,i=rr*n+c0;
       return lerp(field[i],field[i+1],cx-c0);};
     return lerp(rowAt(r0),rowAt(r0+1),fr);
   }
-  x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+  x=clamp(x,0,n-1.001);y=clamp(y,0,nh-1.001);
   const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
   return lerp(lerp(field[i],field[i+1],fx),lerp(field[i+n],field[i+n+1],fx),fy);
 }
@@ -3480,7 +3497,7 @@ function simulateTerrainWind(inp,p={},context={}){
       localSpeed*=1-.75*shelterAmount*shadow;
     }
     let dirU=baseU,dirV=baseV;
-    if(channeling>0&&x>0&&x<n-1&&y>0&&y<n-1){
+    if(channeling>0&&x>0&&x<n-1&&y>0&&y<nh-1){
       const a=structure[i-1]-2*structure[i]+structure[i+1];
       const c=structure[i-n]-2*structure[i]+structure[i+n];
       const b=(structure[i+n+1]-structure[i+n-1]-structure[i-n+1]+structure[i-n-1])*.25;
@@ -3522,10 +3539,10 @@ function evaluateTerrainWind(inp,p={}){
   for(let i=0;i<speed.length;i++){speed[i]=Math.min(WIND_MAX_MPS,Math.hypot(u[i],v[i]));encoded[i]=speed[i]/WIND_MAX_MPS;}
   return{...result,u,v,speed,encoded,simulationResolution:preview,fullResolution:full};
 }
-function windColorField(wind,n){
-  if(!wind||!wind.u||wind.u.length!==n*n)return null;
-  const out=new Float32Array(n*n*3);
-  for(let i=0;i<n*n;i++){
+function windColorField(wind,n){const nh=latticeRows(n);
+  if(!wind||!wind.u||wind.u.length!==n*nh)return null;
+  const out=new Float32Array(n*nh*3);
+  for(let i=0;i<n*nh;i++){
     const angle=(Math.atan2(wind.v[i],wind.u[i])/(Math.PI*2)+1)%1;
     const h=angle*6,k=~~h,f=h-k,q=1-f;
     const rgb=[[1,f,0],[q,1,0],[0,1,f],[0,q,1],[f,0,1],[1,0,q]][k%6];
@@ -3601,12 +3618,12 @@ function simulateSnowLayer(inp,p={},context={}){
       lap[i]=l;lapSum+=l;lapCount++;
     }
     for(let x=0;x<n;x++){lap[x]=lap[n+Math.min(Math.max(x,1),n-2)];
-      lap[(n-1)*n+x]=lap[(n-2)*n+Math.min(Math.max(x,1),n-2)];}
-    for(let y=0;y<nh;y++){lap[y*n]=lap[Math.min(Math.max(y,1),n-2)*n+1];
-      lap[y*n+n-1]=lap[Math.min(Math.max(y,1),n-2)*n+n-2];}
+      lap[(nh-1)*n+x]=lap[(nh-2)*n+Math.min(Math.max(x,1),n-2)];}
+    for(let y=0;y<nh;y++){lap[y*n]=lap[Math.min(Math.max(y,1),nh-2)*n+1];
+      lap[y*n+n-1]=lap[Math.min(Math.max(y,1),nh-2)*n+n-2];}
     const lapMean=Math.max(lapSum/Math.max(lapCount,1),1e-6);
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-      const i=y*n+x,xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+      const i=y*n+x,xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(nh-1,y+1);
       const gx=(baseM[y*n+xp]-baseM[y*n+xm])/((xp-xm)*cell);
       const gy=(baseM[yp*n+x]-baseM[ym*n+x])/((yp-ym)*cell);
       const s=Math.hypot(gx,gy);
@@ -3642,7 +3659,7 @@ function simulateSnowLayer(inp,p={},context={}){
       const surface=baseM[i]+available;let sum=0,maxExcess=0,kb=0;
       for(const[dx,dy,dist]of nb){
         const xx=x+dx,yy=y+dy;
-        if(xx<0||yy<0||xx>=n||yy>=n){excess[kb++]=0;continue;}
+        if(xx<0||yy<0||xx>=n||yy>=nh){excess[kb++]=0;continue;}
         const j=yy*n+xx,e=surface-(baseM[j]+depthM[j])-talus*cell*dist;
         const q=e>0?e:0;excess[kb++]=q;sum+=q;if(q>maxExcess)maxExcess=q;
       }
@@ -3705,7 +3722,7 @@ function simulateSnowLayer(inp,p={},context={}){
         const wx=physicalWind&&s>1e-6?physicalWind.u[i]/s:fallback[0];
         const wy=physicalWind&&s>1e-6?physicalWind.v[i]/s:fallback[1];
         const localStrength=physicalWind?clamp(s/30,0,1):windStrength,wRate=.45*localStrength;
-        const xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+        const xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(nh-1,y+1);
         const sx=(baseM[y*n+xp]+depthM[y*n+xp]-baseM[y*n+xm]-depthM[y*n+xm])/((xp-xm)*cell);
         const sy=(baseM[yp*n+x]+depthM[yp*n+x]-baseM[ym*n+x]-depthM[ym*n+x])/((yp-ym)*cell);
         expo[i]=wx*sx+wy*sy;                             // >0: surface rising INTO the wind
@@ -3742,7 +3759,7 @@ function simulateSnowLayer(inp,p={},context={}){
           let nx2,ny2;
           if(hexSnow){const off=hexNb(ty)[hexK];nx2=tx+off[0];ny2=ty+off[1];}
           else{nx2=tx+dj;ny2=ty+di;}
-          if(nx2<0||ny2<0||nx2>=n||ny2>=n){offGrid=true;break;}
+          if(nx2<0||ny2<0||nx2>=n||ny2>=nh){offGrid=true;break;}
           tx=nx2;ty=ny2;
           if(expo[ty*n+tx]<=0){sheltered=true;break;}
         }
@@ -3811,7 +3828,7 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   // the droplet along a sheared basis and splat its load onto the wrong cells.
   const hexL=isHex();
   const at=hexL?(px,py)=>{
-    const r=clamp(py/HEX_ROW,0,n-1.001),r0=r|0,fr=r-r0;
+    const r=clamp(py/HEX_ROW,0,nh-1.001),r0=r|0,fr=r-r0;
     const cx0=clamp(px-0.5*(r0&1),0,n-2),c0=cx0|0,f0=cx0-c0;
     const cx1=clamp(px-0.5*((r0+1)&1),0,n-2),c1=cx1|0,f1=cx1-c1;
     const i0=r0*n+c0,i1=(r0+1)*n+c1;
@@ -3837,15 +3854,15 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   // the budget closes exactly instead of hiding the gain inside a tolerance.
   let brushClip=0;
   const erode1=(g,amt)=>{for(const[dx,dy,w]of brush){const xx=g.x0+dx,yy=g.y0+dy;
-    if(xx<0||yy<0||xx>=n||yy>=n){brushClip+=amt*w;continue;}h[yy*n+xx]-=amt*w;}};
+    if(xx<0||yy<0||xx>=n||yy>=nh){brushClip+=amt*w;continue;}h[yy*n+xx]-=amt*w;}};
   let settled=0,exported=0,lost=0;
-  // World extent in cell units. The hex domain is only (n-1)*sqrt(3)/2 tall, so spawning and
+  // World extent in cell units. The hex domain is (nh-1)*sqrt(3)/2 tall, so spawning and
   // bounds-checking against n-1 would seed droplets outside the terrain and retire every one
   // that crossed y=n-1 - clipping the bottom 13.4% of the map out of the simulation.
-  const wH=hexL?(n-1)*HEX_ROW:n-1,wW=n-1;
-  const spawnIdx=hexL?(px,py)=>{const r=clamp(Math.round(py/HEX_ROW),0,n-1);
+  const wH=hexL?(nh-1)*HEX_ROW:nh-1,wW=n-1;
+  const spawnIdx=hexL?(px,py)=>{const r=clamp(Math.round(py/HEX_ROW),0,nh-1);
       return r*n+clamp(Math.round(px-0.5*(r&1)),0,n-1);}
-    :(px,py)=>clamp(py|0,0,n-1)*n+clamp(px|0,0,n-1);
+    :(px,py)=>clamp(py|0,0,nh-1)*n+clamp(px|0,0,n-1);
   for(let d=0;d<droplets;d++){
     let px=rnd()*wW,py=rnd()*wH;
     if(spawn)for(let tries=0;tries<16&&spawn[spawnIdx(px,py)]<=0;tries++){
@@ -3882,7 +3899,7 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   }
   // Closure identity: sumIn - sumOut = exported + lost - brushClipGain (the last term is mass
   // the border-clipped brush created; see erode1).
-  let sumIn=0,sumOut=0;for(let i=0;i<n*n;i++){sumIn+=inp[i];sumOut+=h[i];}
+  let sumIn=0,sumOut=0;for(let i=0;i<n*nh;i++){sumIn+=inp[i];sumOut+=h[i];}
   hydroMassDiag={engine:"droplets",settle:!!settle,sumIn,sumOut,settled,exported,exportedDerived:false,lost,brushClipGain:brushClip};
   return h;
 }
@@ -3917,7 +3934,7 @@ function erosion2Field(inp,p){
     const capacity=lerp(3,11,down)*lerp(.72,1.18,1-sediment);
     return atFeatureScale(source,scale*tier,field=>gpuReady()
       ?gpuHydraulicPipes(field,{iters,capacity,erode,deposit,inertia:.04+.08*phase,gridK:gk})
-      :hydraulicErode(field,{droplets:Math.max(2500,Math.round(RES*RES*(.12+.40*duration))),
+      :hydraulicErode(field,{droplets:Math.max(2500,Math.round(fieldLen()*(.12+.40*duration))),  // shape-ok: a droplet COUNT proportional to cell count, not a field shape
         capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round((1+scale*.35)*gk)),seed:(p.seed|0)+phase*101,settle:true,gridK:gk}));
   };
   let h=run(seeded,featureScale,coarseIters,0);
@@ -3956,7 +3973,7 @@ function hydroFixField(inp,p){
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;let best=filled[i],bestSlope=0,receiver=-1;
     const nb=hex?hexNb(y):nbSq;
-    for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
+    for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;
       const j=yy*n+xx,s=(filled[i]-filled[j])/(hex?1:d[2]);if(s>bestSlope){bestSlope=s;best=filled[j];receiver=j;}}
     rec[i]=receiver;
   }
@@ -4147,7 +4164,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     // logarithmic track makes attenuation and amplification equally addressable around 1x.
     params:[P.log("scale","Height multiplier",.01,100,1,
       v=>(v<.1?v.toFixed(2):v<10?v.toFixed(1):v.toFixed(0))+"\u00d7",false)],
-    eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==RES*RES)&&(node._demImg||node._demRaw))buildDemFromSource(node);
+    eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==fieldLen())&&(node._demImg||node._demRaw))buildDemFromSource(node);
       if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
   blend:{cat:"comb",name:"Blend",ins:["A","B","Mask"],desc:"Mix A→B by a factor or a mask input.",fieldSemantics:"temperature-pair",
@@ -4421,7 +4438,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.slider("warming","Solar warming",0,50,5,.5,v=>v.toFixed(1)+" °C")],
     eval:(p,ins,nd)=>{
       if(!ins[0]){
-        nd._temperatureC=new Float32Array(RES*RES);nd._solarShadow=newField();nd._solarExposure=newField();
+        nd._temperatureC=new Float32Array(fieldLen());nd._solarShadow=newField();nd._solarExposure=newField();
         const out=newField();out.fill(encodeTemperatureC(0));return tagTemperatureField(out,nd._temperatureC);
       }
       const maps=evaluateTemperatureMap(ins[0],p,ins[1]||null);
@@ -4892,7 +4909,7 @@ function bakeThumb(nd){
   // 0 of 48 on square.
   const rowScale=isHex()?HEX_ROW:1;
   for(let y=0;y<TH;y++)for(let x=0;x<TH;x++){
-    const sx=x/TH*(n-1),sy=y/TH*(n-1)*rowScale;
+    const sx=x/TH*(n-1),sy=y/TH*(nh-1)*rowScale;
     const h=(sampleBilinear(f,sx,sy)-mn)/d;
     const hl=(sampleBilinear(f,sx-1,sy)-mn)/d,hr=(sampleBilinear(f,sx+1,sy)-mn)/d;
     const hu=(sampleBilinear(f,sx,sy-1)-mn)/d,hd=(sampleBilinear(f,sx,sy+1)-mn)/d;
@@ -4906,10 +4923,10 @@ function bakeThumb(nd){
 function bakeColorThumb(nd,col){
   const f=nd._field;if(!f||!col)return null;
   const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
-  const img=ctx.createImageData(TH,TH),n=RES,[mn,mx]=fieldRange(f),d=mx-mn||1;
+  const img=ctx.createImageData(TH,TH),n=fieldW(),nh=fieldH(),[mn,mx]=fieldRange(f),d=mx-mn||1;
   const rgbAt=(sx,sy,ch)=>{
-    sx=clamp(sx,0,n-1);sy=clamp(sy,0,n-1);
-    const x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(x0+1,n-1),y1=Math.min(y0+1,n-1),tx=sx-x0,ty=sy-y0;
+    sx=clamp(sx,0,n-1);sy=clamp(sy,0,nh-1);
+    const x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(x0+1,n-1),y1=Math.min(y0+1,nh-1),tx=sx-x0,ty=sy-y0;
     const a=col[(y0*n+x0)*3+ch]*(1-tx)+col[(y0*n+x1)*3+ch]*tx;
     const b=col[(y1*n+x0)*3+ch]*(1-tx)+col[(y1*n+x1)*3+ch]*tx;
     return a*(1-ty)+b*ty;
@@ -4919,7 +4936,7 @@ function bakeColorThumb(nd,col){
   // apart - conflating them shifts the shading against the colour by 13.4% of the image.
   const rowScale=isHex()?HEX_ROW:1;
   for(let y=0;y<TH;y++)for(let x=0;x<TH;x++){
-    const sx=x/(TH-1)*(n-1),syRow=y/(TH-1)*(n-1),sy=syRow*rowScale;
+    const sx=x/(TH-1)*(n-1),syRow=y/(TH-1)*(nh-1),sy=syRow*rowScale;
     const hl=(sampleBilinear(f,sx-1,sy)-mn)/d,hr=(sampleBilinear(f,sx+1,sy)-mn)/d;
     const hu=(sampleBilinear(f,sx,sy-1)-mn)/d,hd=(sampleBilinear(f,sx,sy+1)-mn)/d;
     const nx=hl-hr,ny=hu-hd,nz=.16,L=Math.hypot(nx,ny,nz)||1;
@@ -5821,7 +5838,7 @@ function loadImageAsDEM(nd,src,label){
 }
 // (re)build a node's imported heightfield at the CURRENT resolution from its retained source, so changing
 // the working resolution re-resamples cleanly instead of reading a stale, wrong-sized array.
-function buildDemFromSource(nd){
+function buildDemFromSource(nd){const nh=fieldH();
   if(nd._demImg){const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
     cx.drawImage(nd._demImg,0,0,RES,RES);const d=cx.getImageData(0,0,RES,RES).data;const f=newField();
     const lum=i=>(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;
@@ -5829,10 +5846,11 @@ function buildDemFromSource(nd){
       // The canvas gives a SQUARE raster; place it on the hex lattice by reading each hex cell's
       // own world x (odd rows +0.5 cell). Row compression cancels under normalisation - see
       // resampleTo - so this is a pure per-row half-cell resample along x.
-      for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
+      for(let y=0;y<nh;y++)for(let x=0;x<RES;x++){
+        const sy=Math.min(RES-1,Math.round(y/Math.max(1,nh-1)*(RES-1)));   // dest row -> square source raster row
         const sx=x+0.5*(y&1),x0=Math.min(RES-1,sx|0),x1=Math.min(RES-1,x0+1),fx=sx-x0;
-        f[y*RES+x]=lum(y*RES+x0)*(1-fx)+lum(y*RES+x1)*fx;}
-    }else for(let i=0;i<RES*RES;i++)f[i]=lum(i);
+        f[y*RES+x]=lum(sy*RES+x0)*(1-fx)+lum(sy*RES+x1)*fx;}
+    }else for(let i=0;i<f.length;i++)f[i]=lum(i);
     nd._dem=f;}
   else if(nd._demRaw){nd._dem=resampleTo(nd._demRaw.u16,nd._demRaw.side,v=>v/65535);}
 }
@@ -5841,10 +5859,10 @@ function buildDemFromSource(nd){
 // (scale x scale*sqrt(3)/2) the row compression CANCELS - v = y*HEX_ROW/((n-1)*HEX_ROW) = y/(n-1)
 // - so the only correction an import needs is the odd-row half-cell shift in x. Without it an
 // imported DEM lands sheared against every generator that already honours the seed contract.
-function resampleTo(src,side,map){const f=newField();
+function resampleTo(src,side,map){const f=newField(),nh=fieldH();
   const hex=terrainDef.lattice==="hex";
-  for(let y=0;y<RES;y++)for(let x=0;x<RES;x++){
-    const sy=Math.min(side-1,(y/RES*side)|0);
+  for(let y=0;y<nh;y++)for(let x=0;x<RES;x++){
+    const sy=Math.min(side-1,(y/nh*side)|0);
     if(hex){
       // Interpolate along x, do NOT snap: the whole correction here is a HALF cell, and
       // nearest-neighbour truncation (`|0`) discards exactly that - measured, the parity comb
@@ -5863,11 +5881,12 @@ function exportHeightmap(){const out=outputNode();if(!out||!out._field){toast("N
     // DEM consumer expects a square raster. Writing the odd-r array straight to PNG ships a
     // sheared terrain (alternate rows displaced half a cell). Resample to square through the
     // lattice-aware sampler: output pixel (X,Y) is the hex field at world ( X, Y*sqrt(3)/2 ).
-    const sq=newField();
-    for(let y=0;y<RES;y++)for(let x=0;x<RES;x++)sq[y*RES+x]=sampleBilinear(f,x,y*HEX_ROW);
+    const sq=newField(),rowSpan=(fieldH()-1)/(RES-1);
+    for(let y=0;y<RES;y++)for(let x=0;x<RES;x++)sq[y*RES+x]=sampleBilinear(f,x,y*HEX_ROW*rowSpan);   // shape-ok: RESxRES square interchange raster by design; rowSpan maps the output rows onto the field's full world height
     f=sq;
   }
-  const img=cx.createImageData(RES,RES);for(let i=0;i<RES*RES;i++){const v=Math.round(f[i]*255);img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;}
+  const img=cx.createImageData(RES,RES);   // shape-ok: exported PNG is a square RESxRES interchange raster, not the working lattice
+  /* shape-ok: the export PNG is a square RES x RES interchange raster by design; hex rows are resampled into it above */ for(let i=0;i<RES*RES;i++){const v=Math.round(f[i]*255);img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;}
   cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG");}
 $("#exportBtn").onclick=exportHeightmap;
 
@@ -5919,23 +5938,23 @@ function satBlend(dst,src,m,mode){const o=[0,0,0];
     else if(mode==="power")s=Math.pow(clamp(dst[c],0,1),.25+clamp(src[c],0,1)*3.75);
     o[c]=clamp(dst[c]+(s-dst[c])*m,0,1);}
   return o;}
-function satNodeColorField(nd,n){                     // a single SatMap node's colour as a per-vertex field
-  const L={...nd.params,driver:nd._driver},col=new Float32Array(n*n*3);
-  for(let i=0;i<n*n;i++){const c=satLayerColor(L,i);col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];}
+function satNodeColorField(nd,n){const nh=latticeRows(n);                     // a single SatMap node's colour as a per-vertex field
+  const L={...nd.params,driver:nd._driver},col=new Float32Array(n*nh*3);
+  for(let i=0;i<n*nh;i++){const c=satLayerColor(L,i);col[i*3]=c[0];col[i*3+1]=c[1];col[i*3+2]=c[2];}
   return col;}
-function blendFields(base,over,nd,n){                 // composite `over` onto `base` by (nd mask × opacity) with nd blend mode
+function blendFields(base,over,nd,n){const nh=latticeRows(n);                 // composite `over` onto `base` by (nd mask × opacity) with nd blend mode
   if(!base)return over;if(!over)return base;
-  const col=new Float32Array(n*n*3),mask=nd._mask,op=(nd.params.opacity!=null?nd.params.opacity:1),mode=nd.params.blend||"normal";
-  for(let i=0;i<n*n;i++){const m=(mask?clamp(mask[i],0,1):1)*op;
+  const col=new Float32Array(n*nh*3),mask=nd._mask,op=(nd.params.opacity!=null?nd.params.opacity:1),mode=nd.params.blend||"normal";
+  for(let i=0;i<n*nh;i++){const m=(mask?clamp(mask[i],0,1):1)*op;
     const o=satBlend([base[i*3],base[i*3+1],base[i*3+2]],[over[i*3],over[i*3+1],over[i*3+2]],m,mode);
     col[i*3]=o[0];col[i*3+1]=o[1];col[i*3+2]=o[2];}
   return col;}
 function boxBlurScalar(src,n,r){const nh=latticeRows(n);                       // summed-area box filter: O(N), independent of radius
   if(r<=0)return Float32Array.from(src);
-  const s=n+1,ii=new Float64Array(s*s),out=new Float32Array(n*nh);
+  const s=n+1,ii=new Float64Array(s*(nh+1)),out=new Float32Array(n*nh);
   for(let y=0;y<nh;y++){let row=0,ir=(y+1)*s,prev=y*s,si=y*n;
     for(let x=0;x<n;x++){row+=src[si+x];ii[ir+x+1]=ii[prev+x+1]+row;}}
-  for(let y=0;y<nh;y++){const ya=Math.max(0,y-r),yb=Math.min(n,y+r+1);
+  for(let y=0;y<nh;y++){const ya=Math.max(0,y-r),yb=Math.min(nh,y+r+1);
     for(let x=0;x<n;x++){const xa=Math.max(0,x-r),xb=Math.min(n,x+r+1);
       out[y*n+x]=(ii[yb*s+xb]-ii[ya*s+xb]-ii[yb*s+xa]+ii[ya*s+xa])/((xb-xa)*(yb-ya));}}
   return out;
@@ -5966,7 +5985,7 @@ function colorErodeField(base,h,p,mask,n,owner){const nh=latticeRows(n);       /
     recv=new Int32Array(N);
     const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x,hi=hr[i];let best=i,bv=hi;
-      for(let k=0;k<8;k++){const xx=x+nb[k][0],yy=y+nb[k][1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      for(let k=0;k<8;k++){const xx=x+nb[k][0],yy=y+nb[k][1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;
         const j=yy*n+xx,hj=hr[j];if(hj>=hi-1e-8)continue;
         const score=hj+(laminar?0:(hash2(x+k*17,y-k*13,seed)-.5)*2e-5);
         if(score<bv){bv=score;best=j;}}
@@ -6523,7 +6542,7 @@ function initGL(){
       }`;
     compProg=makeProg(cVs,cFs);
     const mkFloatTex=()=>{const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);
-      gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,RES,RES,0,gl.RED,gl.FLOAT,new Float32Array(RES*RES));
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,RES,RES,0,gl.RED,gl.FLOAT,new Float32Array(RES*RES));  // shape-ok: placeholder allocation only - every upload re-specifies the dimensions, and the compositor texture shape is owned by the deferred-rendering item
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return tx;};
     wTex=mkFloatTex();hTex=mkFloatTex();iTex=mkFloatTex();isTex=mkFloatTex(); // water surface, terrain, ice phase, snow-on-ice
@@ -6598,11 +6617,11 @@ function terrainQuadFitDelta(h00,h10,h01,h11,g00x,g00y,g10x,g10y,g01x,g01y,g11x,
    per quad). Lazily built: at 4096 square the buffer is ~400 MB, so it is only allocated when the
    wireframe is actually switched on, and invalidated whenever the topology changes.            */
 let wireDiagArr=null,wireDiagN=0;
-function wireQuadDiag(n){
-  if(wireDiagN!==n||!wireDiagArr){wireDiagArr=new Uint8Array((n-1)*(n-1));wireDiagN=n;}
+function wireQuadDiag(n){const nh=latticeRows(n);
+  if(wireDiagN!==n||!wireDiagArr){wireDiagArr=new Uint8Array((n-1)*(nh-1));wireDiagN=n;}
   return wireDiagArr;
 }
-function wireEdgeCount(n){return 3*(n-1)*(n-1)+2*(n-1);}
+function wireEdgeCount(n){const nh=latticeRows(n);return 3*(n-1)*(nh-1)+(n-1)+(nh-1);}
 function buildWireIndex(){
   const n=fieldW(),nh=fieldH(),u32=buffers.u32,cnt=wireEdgeCount(n)*2;
   const idx=u32?new Uint32Array(cnt):new Uint16Array(cnt);let w=0;
@@ -6617,7 +6636,7 @@ function buildWireIndex(){
     const useMain=hex?!!(y&1):(diag?!!diag[y*(n-1)+x]:!!((x+y)&1));
     if(useMain){idx[w++]=i;idx[w++]=i+n+1;}else{idx[w++]=i+1;idx[w++]=i+n;}
   }
-  for(let x=0;x<n-1;x++){const i=(n-1)*n+x;idx[w++]=i;idx[w++]=i+1;}   // bottom row
+  for(let x=0;x<n-1;x++){const i=(nh-1)*n+x;idx[w++]=i;idx[w++]=i+1;}   // bottom row
   for(let y=0;y<nh-1;y++){const i=y*n+n-1;idx[w++]=i;idx[w++]=i+n;}     // right column
   if(!buffers.lineIdx)buffers.lineIdx=gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.lineIdx);
@@ -6625,19 +6644,19 @@ function buildWireIndex(){
   buffers.lineCount=cnt;buffers.lineReady=true;buffers.lineLattice=terrainDef.lattice||"square";
 }
 function streamTerrainIndices(height,snowDepth){
-  const n=fieldW(),nh=fieldH(),adaptive=!!(height&&height.length===n*n),u32=buffers.u32,bytes=u32?4:2;
+  const n=fieldW(),nh=fieldH(),adaptive=!!(height&&height.length===n*nh),u32=buffers.u32,bytes=u32?4:2;
   const quadDiag=wireQuadDiag(n);
   // A full 4096² Uint32 index staging array is ~384 MiB. Stream row batches instead:
   // topology stays indexed on the GPU while CPU scratch memory remains below ~3 MiB.
   const batchRows=Math.max(1,Math.min(32,Math.floor(786432/Math.max(6*(n-1),1))));
   const batch=u32?new Uint32Array((n-1)*batchRows*6):new Uint16Array((n-1)*batchRows*6);
-  const snowScale=snowDepth&&snowDepth.length===n*n?1/Math.max(terrainDef.height,1e-6):0;
+  const snowScale=snowDepth&&snowDepth.length===n*nh?1/Math.max(terrainDef.height,1e-6):0;
   const started=performance.now();let elementOffset=0,mainCount=0,antiCount=0,tieCount=0,flips=0;
   let fitGain=0,fitStrength=0;
   let grad0=adaptive?new Float32Array(n*2):null,grad1=adaptive?new Float32Array(n*2):null;
   const sample=i=>height[i]+(snowScale?snowDepth[i]*snowScale:0);
   const fillGradientRow=(y,out)=>{
-    const ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+    const ym=Math.max(0,y-1),yp=Math.min(nh-1,y+1);
     for(let x=0;x<n;x++){const xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),j=x*2;
       out[j]=(sample(y*n+xp)-sample(y*n+xm))*.5;
       out[j+1]=(sample(yp*n+x)-sample(ym*n+x))*.5;}
@@ -6678,19 +6697,19 @@ function streamTerrainIndices(height,snowDepth){
       // triangle buffer it accompanies.
       if(quadDiag)quadDiag[y*(n-1)+x]=useMain?1:0;
     }
-    if(w===batch.length||y===n-2){
+    if(w===batch.length||y===nh-2){
       gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,elementOffset*bytes,batch.subarray(0,w));elementOffset+=w;w=0;
     }
-    if(adaptive&&y<n-2){const old=grad0;grad0=grad1;grad1=old;fillGradientRow(y+2,grad1);}
+    if(adaptive&&y<nh-2){const old=grad0;grad0=grad1;grad1=old;fillGradientRow(y+2,grad1);}
   }
   const revision=(buffers.edgeSpin&&buffers.edgeSpin.revision||0)+1;
   buffers.lineReady=false;                       // diagonals just moved: edge buffer is stale
   buffers.indexPattern=adaptive?"adaptive-normal-fit-diagonal":"checkerboard";
-  buffers.edgeSpin={adaptive,quadCount:(n-1)*(n-1),mainCount,antiCount,tieCount,flipsFromCheckerboard:flips,
+  buffers.edgeSpin={adaptive,quadCount:(n-1)*(nh-1),mainCount,antiCount,tieCount,flipsFromCheckerboard:flips,
     fitGain,fitStrength,batchRows,stagingBytes:batch.byteLength+(adaptive?(grad0.byteLength+grad1.byteLength):0),
     durationMs:performance.now()-started,revision};
 }
-function buildIndex(){const n=fieldW(),nh=fieldH(),cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
+function buildIndex(){const n=fieldW(),nh=fieldH(),cnt=(n-1)*(nh-1)*6,u32=(n*nh>65000);
   buffers.count=cnt;buffers.u32=u32;buffers.lineReady=false;   // resolution/lattice changed
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cnt*(u32?4:2),gl.DYNAMIC_DRAW);
@@ -6715,7 +6734,7 @@ function buildIndex(){const n=fieldW(),nh=fieldH(),cnt=(n-1)*(n-1)*6,u32=(n*n>65
   // Water plane shares the vertex lattice with the terrain (same index buffer draws both), so
   // its XZ MUST use the same hex offsets or shorelines tear along the odd rows.
   const hx=isHex()?0.5:0,rz=isHex()?HEX_ROW:1;
-  const xz=new Float32Array(n*n*2);for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
+  const xz=new Float32Array(n*nh*2);for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
     xz[i*2]=((x+hx*(y&1))/(n-1)-0.5)*2;xz[i*2+1]=((y/(n-1)-0.5)*2)*rz;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
   // Review B3: undo/redo/New/restoreGraph change terrainDef.lattice WITHOUT the toggle button;
@@ -6764,8 +6783,8 @@ function updateViewport(f,rootNode,options){
   const heightFrame=viewportHeightFrame(field,rootNode),heightSource=heightFrame.source;
   const geomKey=n+"|"+H_SCALE+"|"+(terrainDef.lattice||"square")+"|"+(heightFrame.absolute?"absolute":"autolevel");
   if(buffers.idx&&buffers.builtLattice!==(terrainDef.lattice||"square"))buildIndex();
-  const baseChanged=curField!==f||curHeightSource!==heightSource||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
-  const layerDepth=scene.snow&&scene.snow.layer&&scene.snow.layer.depthM&&scene.snow.layer.depthM.length===n*n
+  const baseChanged=curField!==f||curHeightSource!==heightSource||!curHgt||curHgt.length!==n*nh||curGeomKey!==geomKey;
+  const layerDepth=scene.snow&&scene.snow.layer&&scene.snow.layer.depthM&&scene.snow.layer.depthM.length===n*nh
     ?scene.snow.layer.depthM:null;
   const snowChanged=curSnowLayerRef!==layerDepth;let geometryChanged=baseChanged||snowChanged;
   let hgt=curHgt;
@@ -6801,7 +6820,7 @@ function updateViewport(f,rootNode,options){
   const fallbackClimateSig=[terrainDef.baseElevation,terrainDef.seaTemp,terrainDef.lapseRate].join("|");
   const fallbackClimateChanged=fallbackClimateSig!==lastFallbackClimateSig;
   if(baseChanged||temperatureMap!==curTemperatureRef||(!temperatureMap&&fallbackClimateChanged)){
-    const temp=temperatureMap&&temperatureMap.length===n*n?temperatureMap:new Float32Array(n*nh);
+    const temp=temperatureMap&&temperatureMap.length===n*nh?temperatureMap:new Float32Array(n*nh);
     if(!temperatureMap)for(let i=0;i<temp.length;i++)temp[i]=terrainDef.seaTemp
       -terrainDef.lapseRate*((terrainDef.baseElevation+hgt[i]*terrainDef.height)/1000);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.temperature);gl.bufferData(gl.ARRAY_BUFFER,temp,gl.DYNAMIC_DRAW);
@@ -6809,7 +6828,7 @@ function updateViewport(f,rootNode,options){
   }
   lastFallbackClimateSig=fallbackClimateSig;
   if(baseChanged||sunVisibility!==curSunVisibilityRef){
-    const vis=sunVisibility&&sunVisibility.length===n*n?sunVisibility:new Float32Array(n*nh).fill(1);
+    const vis=sunVisibility&&sunVisibility.length===n*nh?sunVisibility:new Float32Array(n*nh).fill(1);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.sunvis);gl.bufferData(gl.ARRAY_BUFFER,vis,gl.DYNAMIC_DRAW);
     curSunVisibilityRef=sunVisibility;
   }
@@ -6842,12 +6861,12 @@ function updateViewport(f,rootNode,options){
       if(hasSnow){
         const invH=1/Math.max(terrainDef.height,1e-6);
         const comp=new Float32Array(n*nh),tmp=new Float32Array(n*nh);
-        for(let i=0;i<n*n;i++)comp[i]=hgt[i]+snow[i]*invH;
+        for(let i=0;i<n*nh;i++)comp[i]=hgt[i]+snow[i]*invH;
         const blur=(src,dst)=>{ // separable 3-tap box, border-replicated
           for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
             dst[i]=(src[y*n+Math.max(0,x-1)]+src[i]+src[y*n+Math.min(n-1,x+1)])/3;}
           for(let x=0;x<n;x++)for(let y=0;y<nh;y++){const i=y*n+x;
-            tmp[i]=(dst[Math.max(0,y-1)*n+x]+dst[i]+dst[Math.min(n-1,y+1)*n+x])/3;}
+            tmp[i]=(dst[Math.max(0,y-1)*n+x]+dst[i]+dst[Math.min(nh-1,y+1)*n+x])/3;}
           dst.set(tmp);
         };
         // Two passes into DISTINCT buffers. blur(b,b) would alias src and dst in the horizontal
@@ -6855,7 +6874,7 @@ function updateViewport(f,rootNode,options){
         // in +x only - an east-biased drape that lifts cells from content up to five cells west.
         const b=new Float32Array(n*nh),b2=new Float32Array(n*nh);
         blur(comp,b);blur(b,b2);                         // [1,2,3,2,1]/9 per axis, ~5-cell blanket
-        for(let i=0;i<n*n;i++){
+        for(let i=0;i<n*nh;i++){
           const dM=snow[i];if(dM<=1e-6)continue;
           const w=smooth(clamp((dM-.3)/1.7,0,1));        // drape from 0.3 m, full by 2 m of pack
           // Displacement bounded SYMMETRICALLY by the local pack: a blanket redistributes within
@@ -6873,7 +6892,7 @@ function updateViewport(f,rootNode,options){
         }
       }
     }
-    const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),surface=new Float32Array(n*nh),surfaceTex=new Float32Array(n*nh);
+    const pos=new Float32Array(n*nh*3),nrm=new Float32Array(n*nh*3),surface=new Float32Array(n*nh),surfaceTex=new Float32Array(n*nh);
     const hexOn=isHex(),hx=hexOn?0.5:0,rz=hexOn?HEX_ROW:1;
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
       surface[i]=hgt[i]*H+snow[i]/terrainDef.scale;
@@ -6888,7 +6907,7 @@ function updateViewport(f,rootNode,options){
       const EX=[1,-1,.5,-.5,.5,-.5],EY=[0,0,HEX_ROW,HEX_ROW,-HEX_ROW,-HEX_ROW];
       const xc=k2=>clamp(k2,0,n-1);   // hoisted: a per-vertex closure was ~1M allocations/frame at 1024
       for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x,par=y&1;
-        const yu=clamp(y-1,0,n-1),yd=clamp(y+1,0,n-1);
+        const yu=clamp(y-1,0,nh-1),yd=clamp(y+1,0,nh-1);
         const off=par?0:-1; // even rows look left for their diagonal pair, odd rows look right
         const hE=surface[y*n+xc(x+1)],hW=surface[y*n+xc(x-1)];
         const hDE=surface[yd*n+xc(x+off+1)],hDW=surface[yd*n+xc(x+off)];
@@ -6900,7 +6919,7 @@ function updateViewport(f,rootNode,options){
     }else{
       for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
         const hl=surface[y*n+clamp(x-1,0,n-1)],hr=surface[y*n+clamp(x+1,0,n-1)];
-        const hu=surface[clamp(y-1,0,n-1)*n+x],hd=surface[clamp(y+1,0,n-1)*n+x];
+        const hu=surface[clamp(y-1,0,nh-1)*n+x],hd=surface[clamp(y+1,0,nh-1)*n+x];
         const sx=(hl-hr)*(n-1)/2,sz=(hu-hd)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
         nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
     }
@@ -6909,7 +6928,7 @@ function updateViewport(f,rootNode,options){
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.snow);gl.bufferData(gl.ARRAY_BUFFER,snow,gl.DYNAMIC_DRAW);
     // Deferred terrain normals, shadows, AO and water depth all read the visible solid surface.
     // Uploading the displaced field here keeps those passes aligned with accumulated snow.
-    if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,surfaceTex);}
+    if(hTex){gl.bindTexture(gl.TEXTURE_2D,hTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,nh,0,gl.RED,gl.FLOAT,surfaceTex);}
     curSnowDepthM=snow;curSurfaceY=surface;curSnowLayerRef=layerDepth;
     // The non-destructive terrain stream remains bedrock/soil, while this composed solid-surface
     // heightfield is what picking, readouts, and future "bake visible surface" export should use.
@@ -6931,7 +6950,7 @@ function updateViewport(f,rootNode,options){
     // Bake the tiny canvases now, then release the full intermediate RGB fields with colorMemo after this update.
     for(const id in colorMemo){const nd=nodeById(+id),rgb=colorMemo[id];if(nd&&rgb)nd._thumb=bakeColorThumb(nd,rgb);}
     satComposite=windCol||colField?1:0;
-    const col=windCol||colField||new Float32Array(n*n*3);
+    const col=windCol||colField||new Float32Array(n*nh*3);
     satUniform={lo:0,hi:1,shift:0,reverse:0};               // driver attribute = elevation for the fallback shader path
     if(!satDrawerOpen()&&!satComposite)buildSatLUT("Pewter"); // no SatMap node: neutral inspection material, never a hidden palette choice
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
@@ -6950,7 +6969,7 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
   const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;const t=heap[p];heap[p]=heap[c];heap[c]=t;c=p;}};
   const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+2-1,s=c;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===c)break;const t=heap[s];heap[s]=heap[c];heap[c]=t;c=s;}}return top;};
   const seed=(x,y)=>{const i=y*n+x;if(!done[i]){done[i]=1;filled[i]=h[i];push(h[i],i);}};
-  for(let x=0;x<n;x++){seed(x,0);seed(x,n-1);}
+  for(let x=0;x<n;x++){seed(x,0);seed(x,nh-1);}
   for(let y=0;y<nh;y++){seed(0,y);seed(n-1,y);}
   // The flood must walk the lattice's OWN connectivity. On hex that is the D6 one-ring: the
   // square 4-offset set covers only 4 of the 6 true neighbours (it misses the (x-1,y±1) pair on
@@ -6959,7 +6978,7 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
   const nbSq=[[-1,0],[1,0],[0,-1],[0,1]],hex=isHex();
   while(heap.length){const it=pop(),e=it[0],c=it[1],cy=(c/n)|0,cx=c-cy*n;
     const nb=hex?hexNb(cy):nbSq;
-    for(const dd of nb){const xx=cx+dd[0],yy=cy+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(done[ni])continue;
+    for(const dd of nb){const xx=cx+dd[0],yy=cy+dd[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;const ni=yy*n+xx;if(done[ni])continue;
       // Epsilon filling resolves otherwise perfectly flat depressions. The invisible monotonic
       // gradient gives every flooded cell a route back to the spill point, so D8 accumulation
       // crosses lake flats instead of terminating there. Across an entire 4K tile the maximum
@@ -6976,7 +6995,7 @@ function d8Accumulation(g){
   const nbSq=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]],hex=isHex();
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=g[i],bi=-1;
     const nb=hex?hexNb(y):nbSq;
-    for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(g[ni]<best){best=g[ni];bi=ni;}}
+    for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;const ni=yy*n+xx;if(g[ni]<best){best=g[ni];bi=ni;}}
     rec[i]=bi;}
   const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>g[b]-g[a]);   // upstream (high) before downstream (low)
   for(const i of order){if(rec[i]>=0)A[rec[i]]+=A[i];}
@@ -7019,10 +7038,10 @@ function refreshWater(){
     if(isHex()){
       const nb=hexNb(y);
       for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
-        if(xx<0||yy<0||xx>=n||yy>=n)continue;
+        if(xx<0||yy<0||xx>=n||yy>=nh)continue;
         const j=yy*n+xx;if(wetMask[j]){sum+=W[j];count++;}}
     }else for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-      if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=nh)continue;
       const j=yy*n+xx;if(wetMask[j]){sum+=W[j];count++;}
     }
     // Never let the guard create water on a dry sample. Normal shores remain coplanar because their
@@ -7033,7 +7052,7 @@ function refreshWater(){
   const wn=new Float32Array(N*3);                          // normal of the WATER surface (0 gradient in lakes -> up)
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
     const wl=waterSurface[y*n+clamp(x-1,0,n-1)],wr=waterSurface[y*n+clamp(x+1,0,n-1)];
-    const wu=waterSurface[clamp(y-1,0,n-1)*n+x],wd=waterSurface[clamp(y+1,0,n-1)*n+x];
+    const wu=waterSurface[clamp(y-1,0,nh-1)*n+x],wd=waterSurface[clamp(y+1,0,nh-1)*n+x];
     const sx=(wl-wr)*H*(n-1)/2,sz=(wu-wd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
     wn[i*3]=sx/L;wn[i*3+1]=1/L;wn[i*3+2]=sz/L;}
   // Snow on frozen standing water is another transient thickness layer. It shares the Snow node's
@@ -7075,7 +7094,7 @@ function refreshWater(){
   for(let i=0;i<N;i++)iceSnowSurfaceY[i]=waterSurface[i]*H+iceSnow[i]/terrainDef.scale;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
     const l=iceSnowSurfaceY[y*n+clamp(x-1,0,n-1)],r=iceSnowSurfaceY[y*n+clamp(x+1,0,n-1)];
-    const d=iceSnowSurfaceY[clamp(y-1,0,n-1)*n+x],u_=iceSnowSurfaceY[clamp(y+1,0,n-1)*n+x];
+    const d=iceSnowSurfaceY[clamp(y-1,0,nh-1)*n+x],u_=iceSnowSurfaceY[clamp(y+1,0,nh-1)*n+x];
     const sx=(l-r)*(n-1)/2,sz=(d-u_)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
     iceSnowNrm[i*3]=sx/L;iceSnowNrm[i*3+1]=1/L;iceSnowNrm[i*3+2]=sz/L;
   }
@@ -7085,9 +7104,9 @@ function refreshWater(){
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.ice);gl.bufferData(gl.ARRAY_BUFFER,iceMask,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnow);gl.bufferData(gl.ARRAY_BUFFER,iceSnow,gl.DYNAMIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.iceSnowNrm);gl.bufferData(gl.ARRAY_BUFFER,iceSnowNrm,gl.DYNAMIC_DRAW);
-  if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,waterSurface);} // deferred-path water-height texture
-  if(iTex){gl.bindTexture(gl.TEXTURE_2D,iTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,iceMask);}
-  if(isTex){gl.bindTexture(gl.TEXTURE_2D,isTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,n,0,gl.RED,gl.FLOAT,iceSnow);}
+  if(wTex){gl.bindTexture(gl.TEXTURE_2D,wTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,nh,0,gl.RED,gl.FLOAT,waterSurface);} // deferred-path water-height texture
+  if(iTex){gl.bindTexture(gl.TEXTURE_2D,iTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,nh,0,gl.RED,gl.FLOAT,iceMask);}
+  if(isTex){gl.bindTexture(gl.TEXTURE_2D,isTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,n,nh,0,gl.RED,gl.FLOAT,iceSnow);}
 }
 function resizeGL(){const r=glc.parentElement.getBoundingClientRect();
   const ss=Math.min(2.0,(devicePixelRatio||1)*1.35);          // supersample the whole render -> anti-aliased silhouettes
@@ -7138,7 +7157,7 @@ function windAtViewFocus(){
   const root=activePreviewNode(),preview=root&&windVectorFromField(root._field);
   const sceneField=scene.snow&&scene.snow.windField,sceneWind=windVectorFromField(sceneField);
   const wind=preview||sceneWind;
-  if(wind&&wind.u.length===RES*RES&&wind.v.length===RES*RES){
+  if(wind&&wind.u.length===fieldLen()&&wind.v.length===fieldLen()){
     // Device -> world cell units, the same recovery surfaceHeight does: on hex the mesh puts
     // rows at sqrt(3)/2 device spacing, so reading device z as a row samples ~13% of the map
     // away from the point under the camera focus.
@@ -7179,7 +7198,7 @@ function syncClimateReadout(){
       ||scene.water&&scene.water.temperatureField)
     ||scene.snow&&scene.snow.layer&&scene.snow.layer.temperatureC||temperatureNode&&temperatureNode._temperatureC;
   // Device -> world cell units on either lattice (see windAtViewFocus / surfaceHeight).
-  const c=temperatureMap&&temperatureMap.length===RES*RES
+  const c=temperatureMap&&temperatureMap.length===fieldLen()
     ?sampleBilinear(temperatureMap,(cam.target[0]*.5+.5)*(RES-1),
       ((isHex()?cam.target[2]/HEX_ROW:cam.target[2])*.5+.5)*(RES-1)*(isHex()?HEX_ROW:1))
     :terrainDef.seaTemp-terrainDef.lapseRate*elevationM/1000;
@@ -7392,7 +7411,7 @@ function renderDrawEditor(){
       const sx=Math.min(n-1,Math.floor(x/W*n)),sy=Math.min(n-1,Math.floor(y/H*n)),i=(y*W+x)*4;
       const h=base&&base.length?(base[sy*n+sx]-mn)/d:0;
       const hx=base&&base.length?(base[sy*n+Math.min(n-1,sx+1)]-base[sy*n+Math.max(0,sx-1)])/d:0;
-      const hy=base&&base.length?(base[Math.min(n-1,sy+1)*n+sx]-base[Math.max(0,sy-1)*n+sx])/d:0;
+      const hy=base&&base.length?(base[Math.min(latticeRows(n)-1,sy+1)*n+sx]-base[Math.max(0,sy-1)*n+sx])/d:0;
       const shade=clamp(.22+h*.66+(hx+hy)*2.8,0,1),v=Math.round(shade*255);
       img.data[i]=Math.round(v*.88);img.data[i+1]=Math.round(v*.94);img.data[i+2]=v;img.data[i+3]=255;
     }
