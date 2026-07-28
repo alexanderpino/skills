@@ -1906,7 +1906,7 @@ function peakField(p){
   }
   if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*n),
     seed:p.seed+11,radius:Math.max(2,Math.round(resScale()*2)),spawn:cover});
-  if(st.talus&&weather>0)h=thermalErode(h,{talus:st.repose*0.012/resScale(),
+  if(st.talus&&weather>0)h=thermalOn(h,{talus:st.repose*0.012/resScale(),
     iters:Math.max(1,Math.round(st.talus*weather)),rate:0.5});
   for(let i=0;i<h.length;i++)if(cover[i]<=0||h[i]<0)h[i]=0;   // open base-level footprint
   if(st.terr){const[,mx]=fieldRange(h);
@@ -1972,7 +1972,7 @@ function mountainField(p){
   // 4) bake in the weathering the style implies
   if(st.erode>0&&weather>0)h=hydraulicErode(h,{droplets:Math.round(st.erode*weather*n*n),
     seed:p.seed+11,radius:Math.max(2,Math.round(resScale()*2)),spawn:env});
-  if(st.talus&&weather>0)h=thermalErode(h,{talus:st.repose*0.012/resScale(),
+  if(st.talus&&weather>0)h=thermalOn(h,{talus:st.repose*0.012/resScale(),
     iters:Math.max(1,Math.round(st.talus*weather)),rate:0.5});
   for(let i=0;i<h.length;i++)h[i]=env[i]>0?Math.max(0,h[i])*height:0;
   if(st.terr){const[,mx]=fieldRange(h);
@@ -3062,6 +3062,9 @@ function thermalErodeHex(inp,{talus=0.012,iters=30,rate=0.5}){
   }
   return h;
 }
+// One dispatcher so no caller can silently keep the square kernel on a hex build. On square this
+// is exactly thermalErode, so the digest-pinned mountain/peak weathering is byte-identical.
+const thermalOn=(inp,opt)=>(isHex()?thermalErodeHex:thermalErode)(inp,opt);
 function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
   const n=RES;let h=inp.slice();
   // 8-neighbour offsets with their DISTANCE (diagonals are sqrt(2) away). The repose threshold must
@@ -3707,13 +3710,32 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   for(const b of brush)b[2]/=bw;
   let rng=Math.imul(seed|0,2654435761)>>>0;
   const rnd=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967295);
-  const at=(px,py)=>{ // bilinear height + gradient
+  // Droplet position (px,py) is a WORLD position in cell units on either lattice, so a unit step
+  // is one cell of world distance in every direction. On hex that means resolving the two rows
+  // straddling py with THEIR OWN parity shifts - the same construction as sampleBilinear - and
+  // splatting back onto those four lattice cells. Reading (px,py) as raw grid indices would walk
+  // the droplet along a sheared basis and splat its load onto the wrong cells.
+  const hexL=isHex();
+  const at=hexL?(px,py)=>{
+    const r=clamp(py/HEX_ROW,0,n-1.001),r0=r|0,fr=r-r0;
+    const cx0=clamp(px-0.5*(r0&1),0,n-2),c0=cx0|0,f0=cx0-c0;
+    const cx1=clamp(px-0.5*((r0+1)&1),0,n-2),c1=cx1|0,f1=cx1-c1;
+    const i0=r0*n+c0,i1=(r0+1)*n+c1;
+    const a=h[i0],b=h[i0+1],c=h[i1],d=h[i1+1];
+    const top=a+(b-a)*f0,bot=c+(d-c)*f1;
+    return{gx:(b-a)*(1-fr)+(d-c)*fr,gy:(bot-top)/HEX_ROW,hh:top+(bot-top)*fr,
+      i0,f0,i1,f1,fr,x0:c0,y0:r0};
+  }:(px,py)=>{ // bilinear height + gradient
     const x0=clamp(px|0,0,n-2),y0=clamp(py|0,0,n-2),fx=px-x0,fy=py-y0,i=y0*n+x0;
     const a=h[i],b=h[i+1],c=h[i+n],d=h[i+n+1];
     return{gx:(b-a)*(1-fy)+(d-c)*fy,gy:(c-a)*(1-fx)+(d-b)*fx,
       hh:a*(1-fx)*(1-fy)+b*fx*(1-fy)+c*(1-fx)*fy+d*fx*fy,x0,y0,fx,fy};
   };
-  const deposit1=(g,amt)=>{const i=g.y0*n+g.x0;
+  // Both splats carry weights summing to exactly 1, so the mass ledger closes on either lattice.
+  const deposit1=hexL?(g,amt)=>{
+    h[g.i0]+=amt*(1-g.f0)*(1-g.fr);h[g.i0+1]+=amt*g.f0*(1-g.fr);
+    h[g.i1]+=amt*(1-g.f1)*g.fr;h[g.i1+1]+=amt*g.f1*g.fr;
+  }:(g,amt)=>{const i=g.y0*n+g.x0;
     h[i]+=amt*(1-g.fx)*(1-g.fy);h[i+1]+=amt*g.fx*(1-g.fy);h[i+n]+=amt*(1-g.fx)*g.fy;h[i+n+1]+=amt*g.fx*g.fy;};
   // A brush cell clipped at the border removes nothing from h while the droplet still credits
   // itself the full amt - mass appears from nowhere (0.8% of the budget at radius 2; the clipped
@@ -3723,17 +3745,24 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
   const erode1=(g,amt)=>{for(const[dx,dy,w]of brush){const xx=g.x0+dx,yy=g.y0+dy;
     if(xx<0||yy<0||xx>=n||yy>=n){brushClip+=amt*w;continue;}h[yy*n+xx]-=amt*w;}};
   let settled=0,exported=0,lost=0;
+  // World extent in cell units. The hex domain is only (n-1)*sqrt(3)/2 tall, so spawning and
+  // bounds-checking against n-1 would seed droplets outside the terrain and retire every one
+  // that crossed y=n-1 - clipping the bottom 13.4% of the map out of the simulation.
+  const wH=hexL?(n-1)*HEX_ROW:n-1,wW=n-1;
+  const spawnIdx=hexL?(px,py)=>{const r=clamp(Math.round(py/HEX_ROW),0,n-1);
+      return r*n+clamp(Math.round(px-0.5*(r&1)),0,n-1);}
+    :(px,py)=>clamp(py|0,0,n-1)*n+clamp(px|0,0,n-1);
   for(let d=0;d<droplets;d++){
-    let px=rnd()*(n-1),py=rnd()*(n-1);
-    if(spawn)for(let tries=0;tries<16&&spawn[clamp(py|0,0,n-1)*n+clamp(px|0,0,n-1)]<=0;tries++){
-      px=rnd()*(n-1);py=rnd()*(n-1);}
+    let px=rnd()*wW,py=rnd()*wH;
+    if(spawn)for(let tries=0;tries<16&&spawn[spawnIdx(px,py)]<=0;tries++){
+      px=rnd()*wW;py=rnd()*wH;}
     let dx=0,dy=0,speed=1,water=1,sed=0,leftGrid=false;
     for(let life=0;life<n*0.7;life++){
       const g=at(px,py);const hOld=g.hh;
       dx=dx*inertia-g.gx*(1-inertia);dy=dy*inertia-g.gy*(1-inertia);
       const len=Math.hypot(dx,dy);if(len<1e-5){dx=rnd()-0.5;dy=rnd()-0.5;}else{dx/=len;dy/=len;}
       const nx=px+dx,ny=py+dy;
-      if(nx<0||ny<0||nx>=n-1||ny>=n-1){leftGrid=true;break;}
+      if(nx<0||ny<0||nx>=wW||ny>=wH){leftGrid=true;break;}
       const dH=at(nx,ny).hh-hOld;
       const cap=Math.max(-dH*gk,minSlope)*speed*water*capacity;
       if(sed>cap||dH>0){                                   // over capacity, or going uphill -> deposit
@@ -3809,7 +3838,7 @@ function erosion2Field(inp,p){
   if(p.shape>.01){
     const talus=Math.tan(lerp(43,30,p.shape)*Math.PI/180)*cellSizeM()/terrainDef.height;
     const shaped=gpuReady()?gpuThermal(h,{talus,iters:Math.max(2,Math.round(3+p.shape*14)),rate:.34})
-      :thermalErode(h,{talus,iters:Math.max(2,Math.round(3+p.shape*14)),rate:.34});
+      :thermalOn(h,{talus,iters:Math.max(2,Math.round(3+p.shape*14)),rate:.34});
     for(let i=0;i<h.length;i++)h[i]=lerp(h[i],shaped[i],p.shape*.72);
   }
   if(p.shapeSharp>.01){
@@ -4151,8 +4180,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     const travel=BUILD_QUALITY==="final"?k:Math.min(1.5,Math.sqrt(k));
     const q={...p,talus,iters:Math.max(1,Math.round(p.iters*travel))};
     // Hex: the D6 kernel (one distance, one threshold); gpuReady() is already false on hex.
-    const kern=isHex()?thermalErodeHex:thermalErode;
-    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):kern(f,q)),ins[1]);}},
+    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalOn(f,q)),ins[1]);}},
   streampower:{cat:"ero",name:"Stream power",ins:["In","Uplift","Mask"],
     desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
     // Incision default halved from 0.15: Kdt = strength*2, and 0.3 marches every cell 23% toward

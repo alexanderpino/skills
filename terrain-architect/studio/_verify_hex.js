@@ -257,6 +257,29 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     out.analysisSquare = analysisOn('square');
     terrainDef.lattice = 'hex';
 
+    // ---- H7: droplet erosion works the WHOLE hex domain, and its mass ledger still closes ----
+    // The droplet walks a world position, so its spawn box and retirement bounds have to be the
+    // world extent: the hex domain is only (n-1)*sqrt(3)/2 tall, and checking against n-1 sends
+    // droplets past the last lattice row where at() clamps them. Coverage catches that; the
+    // ledger catches a mis-weighted splat (the four hex weights must still sum to 1).
+    const dropOn = lat => { terrainDef.lattice = lat;
+      const base = fbmField(gnoise, A);
+      const o = hydraulicErode(base, { droplets: 9000, capacity: 4, erode: .3, deposit: .3,
+        inertia: .05, radius: 2, seed: 1, settle: true });
+      let lastRow = -1, rows = 0;
+      for (let y = 0; y < n; y++) { let t = false;
+        for (let x = 0; x < n; x++) if (Math.abs(o[y * n + x] - base[y * n + x]) > 1e-9) { t = true; break; }
+        if (t) { rows++; lastRow = y; } }
+      const d = hydroMassDiag;
+      return { lastRow, rowFrac: +(rows / n).toFixed(4), lost: d.lost,
+        closure: +(Math.abs((d.sumIn - d.sumOut) - (d.exported + d.lost - d.brushClipGain))
+          / Math.max(1e-6, d.sumIn - d.sumOut + d.settled)).toExponential(2) };
+    };
+    out.n = n;
+    out.dropHex = dropOn('hex');
+    out.dropSquare = dropOn('square');
+    terrainDef.lattice = 'hex';
+
     // ---- H5: toggling back leaves square byte-identical ----
     terrainDef.lattice = 'square'; buildIndex();
     const sq2 = fbmField(gnoise, A);
@@ -296,6 +319,13 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     + `occ=${r.analysisHex && r.analysisHex.occSpread} `
     + `[square curv=${r.analysisSquare && r.analysisSquare.curvSpread} `
     + `occ=${r.analysisSquare && r.analysisSquare.occSpread}]`);
+  gate('H7 droplets-cover-hex-domain',
+    r.dropHex && r.dropSquare
+    && r.dropHex.lastRow >= r.n - 2 && r.dropHex.rowFrac > 0.95
+    && +r.dropHex.closure < 1e-5 && r.dropHex.lost === 0,
+    `hex lastTouchedRow=${r.dropHex && r.dropHex.lastRow}/${r.n - 1} rowFrac=${r.dropHex && r.dropHex.rowFrac} `
+    + `massClosure=${r.dropHex && r.dropHex.closure} lost=${r.dropHex && r.dropHex.lost} `
+    + `[square lastRow=${r.dropSquare && r.dropSquare.lastRow} closure=${r.dropSquare && r.dropSquare.closure}]`);
   gate('H5 square-safety', r.squareSafety && r.squareSafety.identical,
     `squareByteIdentical=${r.squareSafety && r.squareSafety.identical} pattern=${r.squareSafety && r.squareSafety.pattern}`);
 
