@@ -323,6 +323,13 @@ twin, invisible until two systems disagree about where a cell is. Everything pos
 raster at hex centres on import, meshing hex tiles, scatter placement (`07`) — goes through this one
 function, which is why it must exist exactly once.
 
+**This formula is planar-only.** It assumes a flat domain, where the lattice is exact and every cell is
+congruent. On a spherical hex DGGS neither holds: cells are spherical polygons, they are not congruent,
+and "the centre" is no longer one thing — the spherical centroid, the projection of the planar
+centroid, and the projection preimage of the cell centre are three different points that a shading or
+scatter pipeline will happily mix. Take centres from the grid library there, exactly as you must take
+per-cell areas (see the DGGS paragraph below), and do not carry the axial formula onto the sphere.
+
 **Flow routing on hex is D6 — cleaner than D8, not finer.** Steepest descent picks the lowest of 6
 equidistant edge-neighbours — no √2 rescaling, no 4-versus-8 decision, no metric bias tilting the
 choice of receiver. What D6 does *not* buy is angular resolution: 6 directions at 60° is **coarser**
@@ -382,6 +389,41 @@ other warnings transfer unchanged: bake normals from R32F, and if you deliver a 
 delivery grid after resampling (below) — the analytic hex normal is for shading hex tiles directly and
 for `06`'s analysis masks on the working grid.
 
+**Meshing and per-vertex normals — two paths, and picking the wrong one triples your geometry.** A hex
+cell carrying a height is **not a planar facet**: attach heights to six corners and they are
+non-coplanar, exactly as a square heightfield quad's four corners are (the "which diagonal" problem).
+That is a *meshing* question, never a centre or normal question — the lattice is 2D and height is a
+fibre over it — but it forks the mesh:
+
+- **Smooth terrain — mesh the dual, and there are no corners.** Hex centres *are* a triangular lattice,
+  so triangulate them directly: every mesh vertex is a real sample, no heights are invented, and the
+  per-vertex normal is the 6-neighbour formula above, unchanged. This is the default. It is also **3×
+  cheaper** — `N` vertices and `~2N` triangles against the fan's `3N` and `6N`.
+- **Visible hex tiles (strategy/4X, DGGS) — fan through the centre.** Six triangles per cell around the
+  centre vertex; symmetric, unlike the square quad's arbitrary diagonal, and the centre vertex already
+  holds the sampled height rather than an invented one. Now you have a second vertex class — the tiling
+  **corners** — and they need heights and normals.
+
+**Corner vertices are exactly determined; do not average face normals.** Each tiling corner is shared by
+exactly **3** mutually-adjacent cells, and it sits at their **centroid**, `s = cellSize/√3` from each
+centre. Three points define a unique plane, so both corner quantities are closed-form — and the
+mean-of-3 height lands *exactly* on that plane, so height and normal agree by construction:
+
+```
+corner(i,j,k):                                  # the 3 cells meeting at this corner
+    h = (hᵢ + hⱼ + hₖ) / 3                       # exact: the plane's value at the centroid
+    g = (2 / (√3 · cellSize)) · Σ hₘ·uₘ          # uₘ = unit vector corner→centre m; Σuuᵀ = (3/2)I
+    normal = normalize( (−g.x, −g.y, 1) )
+```
+
+Same construction as the centre stencil, one ring smaller: `Σuₘ = 0` kills the constant, `Σuₘuₘᵀ =
+(3/2)I` sets the `2/(3s)` scale (`s = cellSize/√3` gives the `2/(√3·cellSize)` above). Both stencils are
+second-order samples of the *same* gradient field and agree exactly on a plane, which is what makes
+shading continuous where a fan's corners meet its neighbours' — area-weighted face-normal averaging is
+the generic fallback and is both slower and less accurate here, since the exact plane is known. If you
+instead want **flat-shaded plates** (the boardgame look), you want one normal per *cell*, not per vertex,
+and the corner machinery does not apply.
+
 **Interchange: hex is a working grid; deliver a raster.** Engines, meshers and every DCC import expect a
 square raster (or, on a planet, an equirectangular one), so — exactly like equirectangular below — hex
 is a grid you **simulate on and resample out of**, not usually one you ship. Resample square→hex on
@@ -405,8 +447,8 @@ tables applied with the wrong parity, pointy/flat orientation mismatch, and the 
 **Tier.** Hexagonal-lattice sampling optimality is **P** (Petersen & Middleton 1962; Mersereau 1979);
 the axial/cube/offset coordinate machinery is **F** (Red Blob Games — the standard, no paper); D6/MFD
 routing on a hex mesh is **P** (Liao et al. 2020, 2025). The centre formula and the one-ring
-gradient/normal stencil are textbook lattice-moment identities (`Σeₖ = 0`, `Σeₖeₖᵀ = 3I`) — **F** as
-engineering, derivable in four lines. The *engineering* of resampling between hex and
+gradient/normal stencil are textbook lattice-moment identities (`Σeₖ = 0`, `Σeₖeₖᵀ = 3I`, and
+`Σuₘuₘᵀ = (3/2)I` for the 3-cell corner) — **F** as engineering, derivable in four lines. The *engineering* of resampling between hex and
 square rasters is **F**. Everything above is a **flat-grid** story and stands on its own; the sphere
 (next section) is one *further* domain the hex grid closes onto — via the icosahedral hex DGGS — not the
 reason it exists.
@@ -442,8 +484,8 @@ only **topological** irregularity: away from them every cell has 6 edge-neighbou
 no √2 carries over and the only stencil special case is the twelve 5-neighbour cells. The **metric**,
 though, is irregular *everywhere* — Goldberg hexagons are not congruent or regular; edge lengths and
 areas vary continuously across each icosahedral face — so "equidistant neighbours" holds only
-approximately on the sphere, and per-cell areas must come from the grid library, never from
-`(√3/2)·cellSize²`. How much they vary is a **projection choice**: the **ISEA** (Icosahedral Snyder
+approximately on the sphere, and per-cell **areas and centres** must both come from the grid library —
+never from `(√3/2)·cellSize²` or the planar axial centre formula above. How much they vary is a **projection choice**: the **ISEA** (Icosahedral Snyder
 Equal-Area) projection (**Snyder 1992**) makes every cell **exactly equal-area**; the family and its
 aperture-3/4/7 hierarchies are surveyed in **Sahr, White & Kimerling 2003**, with **ISEA7H** the
 equal-area aperture-7 instance. **Uber's H3** is the production system — aperture-7, 122 base cells
