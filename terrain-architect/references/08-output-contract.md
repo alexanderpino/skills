@@ -412,6 +412,50 @@ fibre over it — but it decides which vertices exist:
   **corners**. The two meshes can also coexist over one field — a smooth dual mesh to render, a fan
   or its edge loops for tile borders and gameplay pick.
 
+**Corner ownership: every cell owns exactly two.** Corners are the triangles of the centre lattice, in
+two orientations, so a clean bijection assigns each cell one of each — no dedup pass, no hashing, and a
+corner buffer the same shape as the cell array:
+
+```
+cornerA(q,r) = { (q,r), (q+1,r), (q,r+1) }        # "up"    — index (0,q,r)
+cornerB(q,r) = { (q,r), (q,r+1), (q-1,r+1) }      # "down"  — index (1,q,r)
+```
+
+Each triple is 3 mutually adjacent cells; each corner sits at their **centroid**, `s = cellSize/√3`
+from all three; every interior cell is ringed by exactly 6 corners; every interior corner is shared by
+exactly 3 cells — hence `2N`.
+
+**Corner vertices are exactly determined; do not average face normals.** Three points define a unique
+plane, and the mean-of-3 height lands *exactly* on it, so height and normal agree by construction:
+
+```
+corner(i,j,k):                                  # the 3 cells meeting at this corner
+    h = (hᵢ + hⱼ + hₖ) / 3                       # exact: the plane's value at the centroid
+    g = (2 / (√3 · cellSize)) · Σ hₘ·uₘ          # uₘ = unit vector corner→centre m; Σuuᵀ = (3/2)I
+    normal = normalize( (−g.x, −g.y, 1) )
+```
+
+Same construction as the centre stencil, one ring smaller: `Σuₘ = 0` kills the constant, `Σuₘuₘᵀ =
+(3/2)I` sets the `2/(3s)` scale (`s = cellSize/√3` gives the `2/(√3·cellSize)` above). Both are the
+same least-squares estimator — `g = (Σ vₘvₘᵀ)⁻¹ Σ hₘvₘ`, with the `3I` and `(3/2)I` constants being
+just the complete-ring cases — so they are second-order samples of one gradient field and agree
+exactly on a plane. That agreement is what makes shading continuous where a fan meets its neighbours'.
+Area-weighted face-normal averaging is the generic fallback and is both slower and less accurate here,
+since the exact plane is known.
+
+**Both classes are shared, so compute each once.** A corner belongs to 3 cells and a centre to 6 fan
+triangles; write them into the two buffers above and have every triangle *index* them. Recomputing a
+corner per-fan gives three values differing in the last bit — the **Edge vertex sharing** rule at the
+top of this file, and it produces the same pinhole and the same lighting seam.
+
+**Boundaries need the apron, for both classes.** The formulas assume a complete ring: a centre missing
+neighbours and a corner missing cells are both under-determined (two cells leave a pencil of planes;
+one leaves nothing). Take the `+1`-cell apron already mandated for normal baking above — on hex it is a
+ring of 6·k cells, not a rectangular border — and derive both classes from it, or emit only vertices
+whose ring is complete and let the mesh stop one cell short. The general least-squares form above also
+degrades gracefully on a partial ring if you invert the actual `Σ vₘvₘᵀ`; do not silently apply the
+complete-ring constants to a truncated stencil, which flattens the domain edge.
+
 **All of it is one tiling — the rhombille — and the three meshes are its three projections.** Join every
 cell centre to the six corners around it and the plane partitions into **60°–120° rhombi**: the
 **rhombille tiling** (Conway's name; the dual of the trihexagonal/kagome tiling, the *dice lattice* in
@@ -457,12 +501,23 @@ diagonal *you did not choose* — reintroducing the arbitrary-diagonal problem i
 thing the fan exists to avoid — and it saves nothing, because the hardware rasterises triangles either
 way.
 
-**A diamond is a sheared square — so the storage really is a 2D array, exactly.** The rhombille settles
-the storage question too, because the *index-space* quad is one of its rhombi: take the four plain-array
-neighbours `(q,r), (q+1,r), (q,r+1), (q+1,r+1)` and in world space they are a 60°–120° rhombus of four
-cell centres, all sides `cellSize`, diagonals `cellSize` and `√3·cellSize`. A hex heightfield is
-therefore **a square-grid heightfield under a shear** — an identity, not an analogy — and the
-adjustments are exactly three.
+**A diamond is a sheared square — so the storage really is a 2D array, exactly.** The same shape settles
+the storage question, but be exact about *which* diamond, because it is **not** one of the rhombille's.
+Take the four plain-array neighbours `(q,r), (q+1,r), (q,r+1), (q+1,r+1)`: in world space they are again
+a 60°–120° rhombus, but one with **four centres** for vertices rather than the rhombille's
+centre–corner–centre–corner. It is the same shape `√3` larger and turned 30°, sides `cellSize`, and its
+area is a whole cell's rather than a third of one. So there are **two diamond tilings over one field**,
+and they answer different questions:
+
+| | Count | Side | Vertices | Diagonals | What it structures |
+|---|---|---|---|---|---|
+| **Rhombille** diamonds | `3N` | `s = cellSize/√3` | centre, corner, centre, corner | long `cellSize` = the neighbour link; short `s` = the tile edge | the **tiles** — one per neighbour pair |
+| **Array** diamonds | `N` | `cellSize` | four centres | short `cellSize` = the anti-diagonal, a neighbour link; long `√3·cellSize` = adjacent to nothing | the **storage** — one per array element, two dual-mesh triangles |
+
+Both are sheared squares, and one rule covers both: **split a diamond on its short diagonal** and the
+halves come out equilateral (the rhombille's give the fan wedges, the array's give the dual mesh). It is
+the second family that makes the storage claim exact — a hex heightfield is **a square-grid heightfield
+under a shear**, an identity rather than an analogy — and the adjustments are exactly three.
 
 1. **`cellSize` stops being a scalar and becomes a 2×2 shear matrix `B`.** This is the single object the
    whole hex pipeline hangs on, so carry it explicitly rather than open-coding the trigonometry at each
@@ -642,50 +697,6 @@ watch happen.
 
 The dual mesh stays cheapest by a wide margin; the 4-versus-6 fork only arises once the tiles must be
 visible as tiles.
-
-**Corner ownership: every cell owns exactly two.** Corners are the triangles of the centre lattice, in
-two orientations, so a clean bijection assigns each cell one of each — no dedup pass, no hashing, and a
-corner buffer the same shape as the cell array:
-
-```
-cornerA(q,r) = { (q,r), (q+1,r), (q,r+1) }        # "up"    — index (0,q,r)
-cornerB(q,r) = { (q,r), (q,r+1), (q-1,r+1) }      # "down"  — index (1,q,r)
-```
-
-Each triple is 3 mutually adjacent cells; each corner sits at their **centroid**, `s = cellSize/√3`
-from all three; every interior cell is ringed by exactly 6 corners; every interior corner is shared by
-exactly 3 cells — hence `2N`.
-
-**Corner vertices are exactly determined; do not average face normals.** Three points define a unique
-plane, and the mean-of-3 height lands *exactly* on it, so height and normal agree by construction:
-
-```
-corner(i,j,k):                                  # the 3 cells meeting at this corner
-    h = (hᵢ + hⱼ + hₖ) / 3                       # exact: the plane's value at the centroid
-    g = (2 / (√3 · cellSize)) · Σ hₘ·uₘ          # uₘ = unit vector corner→centre m; Σuuᵀ = (3/2)I
-    normal = normalize( (−g.x, −g.y, 1) )
-```
-
-Same construction as the centre stencil, one ring smaller: `Σuₘ = 0` kills the constant, `Σuₘuₘᵀ =
-(3/2)I` sets the `2/(3s)` scale (`s = cellSize/√3` gives the `2/(√3·cellSize)` above). Both are the
-same least-squares estimator — `g = (Σ vₘvₘᵀ)⁻¹ Σ hₘvₘ`, with the `3I` and `(3/2)I` constants being
-just the complete-ring cases — so they are second-order samples of one gradient field and agree
-exactly on a plane. That agreement is what makes shading continuous where a fan meets its neighbours'.
-Area-weighted face-normal averaging is the generic fallback and is both slower and less accurate here,
-since the exact plane is known.
-
-**Both classes are shared, so compute each once.** A corner belongs to 3 cells and a centre to 6 fan
-triangles; write them into the two buffers above and have every triangle *index* them. Recomputing a
-corner per-fan gives three values differing in the last bit — the **Edge vertex sharing** rule at the
-top of this file, and it produces the same pinhole and the same lighting seam.
-
-**Boundaries need the apron, for both classes.** The formulas assume a complete ring: a centre missing
-neighbours and a corner missing cells are both under-determined (two cells leave a pencil of planes;
-one leaves nothing). Take the `+1`-cell apron already mandated for normal baking above — on hex it is a
-ring of 6·k cells, not a rectangular border — and derive both classes from it, or emit only vertices
-whose ring is complete and let the mesh stop one cell short. The general least-squares form above also
-degrades gracefully on a partial ring if you invert the actual `Σ vₘvₘᵀ`; do not silently apply the
-complete-ring constants to a truncated stencil, which flattens the domain edge.
 
 **Hex prisms — the "pillar" / stepped-tile look.** The third representation, and the one the two vertex
 classes above do *not* serve: quantise height to discrete levels and extrude each cell into a
