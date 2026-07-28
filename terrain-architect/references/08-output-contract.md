@@ -459,6 +459,23 @@ This is still a heightfield: one column per cell, one height per column, no over
 occupancy grid, no chunk streaming. You keep the entire pipeline of this skill and change only how the
 final surface is built.
 
+**One scalar per cell is the whole of it — there are no corner heights.** All six top corners sit at
+the cell's single quantised height, so everything the smooth meshes derive per vertex simply does not
+exist here: no `2N` corner buffer, no mean-of-3 corner height, no corner normal, no per-vertex
+anything. The cell array *is* the vertex data. Two consequences follow, and both are why this
+representation is so cheap:
+
+- **Every prism is the same solid.** The six top-corner offsets are constant — `s = cellSize/√3` at six
+  fixed azimuths from `centre(q,r)` — identical for every cell, so a prism differs from its neighbour
+  only by an xy translate and a z extent. That is exactly the shape of a GPU instance, which is why
+  strategy (A) below is the default: the per-instance payload is `(x, y, h, material)`, one float of
+  height.
+- **No apron.** The smooth classes need a complete ring because they *estimate a gradient*; a prism
+  derives nothing, so it needs no neighbour data to build its own geometry. The single cross-cell read
+  is the six neighbour heights for wall culling — and a missing neighbour there is not a degenerate
+  case the way an incomplete gradient ring is. It just means "emit the full wall", which is precisely
+  the boundary skirt you want.
+
 **Quantise last — this is the load-bearing rule.** `stepHeight` is a *presentation* transform, applied
 after everything, exactly as `06`'s analysis must sit downstream of the last height edit. Simulate on
 the continuous hex field; snap at mesh-build time. Quantise early and every process downstream breaks
@@ -477,8 +494,8 @@ buildability — so the count is authored and coarse (a handful of levels, not h
 chosen for visual fidelity.
 
 **Normals are enumerated, not computed.** Every face falls into **7 classes** and each has a constant
-normal: the top is exactly `+Z` (all six corners share one quantised height, so it is flat by
-construction), and the six walls are vertical planes with fixed horizontal azimuths. The gradient
+normal: the top is exactly `+Z` (flat by construction — one height for the whole prism), and the six
+walls are vertical planes with fixed horizontal azimuths. The gradient
 stencils above are bypassed entirely — there is no derivative to estimate. Two consequences invert
 earlier rules. Every edge is a **hard** edge, so vertices must **not** be shared between top and wall
 or between adjacent walls; duplicate them, each carrying its face normal, which is the exact opposite
@@ -491,12 +508,13 @@ terrain legible.
 
 ```
 # A. instanced full-depth columns — simplest, GPU-friendly, some hidden overdraw
-#    one prism mesh, per-instance (centre.x, centre.y, quantisedHeight, material)
+#    ONE prism mesh for the whole terrain; per-instance (centre.x, centre.y, h, material)
 #    columns run down to a base plane; buried walls are never seen (the physical-model look)
 
 # B. welded surface with culled walls — minimal geometry, needs a build pass
 wallQuad(A, B) emitted only when hᴀ > hᴃ, of height (hᴀ − hᴃ)      # Minecraft's hidden-face removal
-top(A)         = 4 triangles (a hexagon is a 4-triangle fan; no centre vertex needed — it is flat)
+top(A)         = 4 triangles (a hexagon is a 4-triangle fan; no centre vertex needed — it is flat),
+                 all six corners at h — corner heights are never computed, only the 6 constant offsets
 ```
 
 Budget: worst case ~16 triangles per cell (4 top + 6 walls × 2), against the smooth dual mesh's ~2 —
