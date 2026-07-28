@@ -235,7 +235,7 @@ threshold. This costs almost nothing and is what most good terrain tools do.
 
 ## D6 (hexagonal grids)
 
-On a hexagonal working grid (`08`, *Hexagonal grids*) the routing family above simplifies: every
+On a hexagonal working grid (`26`) the routing family above simplifies: every
 cell has **6 neighbours, all edge-adjacent at the same centre distance**, so the diagonal branch
 and the √2 disappear from the stencil.
 

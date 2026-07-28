@@ -331,7 +331,7 @@ clean baseline are the cone and constant-slope synthetic inputs, whose correct o
 preferred direction at all.
 
 There is a fourth, structural cure the table doesn't list: **change the lattice.** The **hexagonal
-grid** (`08`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
+grid** (`26`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
 edge-neighbours there is no diagonal to under-weight and no 4-versus-8 choice to get wrong — and
 *shrinks* the *D8-striping* row rather than deleting it: single-receiver striping is a
 **quantisation** artefact, not a metric one, and D6 still quantises (6 directions at 60°, max aspect
@@ -341,12 +341,12 @@ grid* as the pass criterion, not *none*. The lattice swap also brings its **own 
 axial-vs-offset coordinate mixing, row-parity neighbour tables applied with the wrong parity,
 pointy-top/flat-top orientation mismatch, and the un-renormalised 6-neighbour Laplacian (the hex
 constant is `2/(3d²)`, not `1/d²` — keep the square constant and diffusivity is silently 1.5× high;
-`08`). One of the new rows is invisible to the sun sweep: meshing visible hex tiles **corner-only**
+`26`). One of the new rows is invisible to the sun sweep: meshing visible hex tiles **corner-only**
 (4 triangles) instead of fanning through the centre (6) drops the cell's own sample from the mesh
 entirely and attenuates one-cell extrema by **exactly 1/3** — correct and free on flat prism tops or a
 far LOD tier, a silent amplitude bug anywhere else. Both meshes reproduce affine fields exactly, so
 the ramp and cone controls cannot see it; the detector is an **impulse** — raise one cell by `H` and
-measure the rendered peak (`08`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
+measure the rendered peak (`26`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
 still not continuous), but when directional artefacts are endemic and the grid is yours to choose, the
 lattice itself is the highest-leverage fix — it trades the family for a smaller one, not for zero. On
 a sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the residual stencil

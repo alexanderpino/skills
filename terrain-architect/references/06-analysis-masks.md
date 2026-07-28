@@ -52,7 +52,7 @@ dzdy = ((h[i-1,j+1] + 2*h[i,j+1] + h[i+1,j+1]) - (h[i-1,j-1] + 2*h[i,j-1] + h[i+
 
 Use Horn if the height field is noisy or quantised, central differences if it's clean R32F. On a
 **hexagonal working grid** neither applies — use the one-ring 6-point gradient
-(`∇h ≈ Σhₖeₖ / (3·cellSize)`; `08`, *Hexagonal grids*), which has Horn's noise-averaging built in and
+(`∇h ≈ Σhₖeₖ / (3·cellSize)`; `26`), which has Horn's noise-averaging built in and
 an isotropic leading error. The slope/aspect conventions above hold unchanged.
 
 **Slope is resolution-dependent.** The same terrain sampled at 1 m/px and 8 m/px gives
@@ -210,8 +210,8 @@ as a terrain that's uniformly too flat or too steep under lighting and is madden
 diagnose.
 
 Sobel is the standard for normal maps (more robust than central differences), same kernels as
-Horn's slope above. On a hexagonal working grid, both are replaced by the 6-point gradient (`08`,
-*Hexagonal grids*) — same negation and same `z = 1` rule.
+Horn's slope above. On a hexagonal working grid, both are replaced by the 6-point gradient
+(`26`) — same negation and same `z = 1` rule.
 
 **Bake normals from R32F, always.** This is the single clearest case for the precision rule:
 a normal map derived from an R16 heightfield across a large vertical range shows visible
