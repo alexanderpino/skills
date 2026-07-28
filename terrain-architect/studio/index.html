@@ -1318,7 +1318,7 @@ const GPU_PIPE_FLUX_FS=`#version 300 es
 const GPU_PIPE_STATE_FS=`#version 300 es
   precision highp float;precision highp int;out vec4 frag;
   uniform sampler2D uS,uF;uniform int uN;
-  uniform float uRain,uEvap,uCapacity,uErode,uDeposit;
+  uniform float uRain,uEvap,uCapacity,uErode,uDeposit,uKS,uErCap;
   bool inside(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
   vec3 S(ivec2 p){return texelFetch(uS,clamp(p,ivec2(0),ivec2(uN-1)),0).rgb;}
   vec4 F(ivec2 p){return inside(p)?texelFetch(uF,p,0):vec4(0.0);}
@@ -1335,11 +1335,11 @@ const GPU_PIPE_STATE_FS=`#version 300 es
                +S(p+ivec2(0,1)).b/max(S(p+ivec2(0,1)).g+uRain,0.0001)*inB;
     float sediment=max(0.0,s.b+sedIn-c*outflow);
     float b=s.r;
-    float slope=max(max(abs(b-S(p+ivec2(-1,0)).r),abs(b-S(p+ivec2(1,0)).r)),
-                    max(abs(b-S(p+ivec2(0,-1)).r),abs(b-S(p+ivec2(0,1)).r)));
+    float slope=uKS*max(max(abs(b-S(p+ivec2(-1,0)).r),abs(b-S(p+ivec2(1,0)).r)),
+                        max(abs(b-S(p+ivec2(0,-1)).r),abs(b-S(p+ivec2(0,1)).r)));
     float speed=min(8.0,(inflow+outflow)/max(0.001,0.5*(water0+water)));
     float cap=uCapacity*max(slope,0.0005)*speed*(water0>0.0002?1.0:0.0);
-    float er=cap>sediment?min(uErode*(cap-sediment),0.0025):0.0;
+    float er=cap>sediment?min(uErode*(cap-sediment),uErCap):0.0;
     float dep=cap<=sediment?min(uDeposit*(sediment-cap),sediment):0.0;
     frag=vec4(b+dep-er,water,sediment+er-dep,1.0);}`;
 // One mass ledger per KERNEL run (raw engine, last-run-wins), top-level so verification can read
@@ -1349,23 +1349,40 @@ const GPU_PIPE_STATE_FS=`#version 300 es
 // maskApply rescales any kernel's output after the fact - read it only immediately after a
 // direct kernel call. Erosion and deposition are one budget, not two nodes.
 let hydroMassDiag=null;
-function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,inertia=0.05}){
+function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,inertia=0.05,gridK=1}){
   const n=RES,pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
   let state=GPU.uploadState("pipeStateA",n,inp),next=GPU.rt("pipeStateB",n);
   let flux=GPU.rt("pipeFluxA",n),nextFlux=GPU.rt("pipeFluxB",n);GPU.clear(flux,n);
-  const rain=0.0012,evap=0.985,momentum=clamp(0.35+inertia,0.2,0.82);
-  for(let i=0;i<iters;i++){
+  // Res Lock (gridK = node-level RES/REF_RES; 1 = legacy behaviour, bit-exact). Water crosses one
+  // cell per iteration, so the same world transport takes k x the iterations; everything the
+  // solver does PER ITERATION is a per-cell rate and rescales accordingly: rain/erosion-cap by
+  // 1/k (same totals over k x iterations), fractional relaxation rates by 1-(1-r)^(1/k),
+  // survival factors (evap, momentum) by ^(1/k), and the head-difference terms (slope in the
+  // capacity law, flux gain) back UP to reference-cell magnitude by k, because a per-cell head
+  // drop halves when cells halve. All identities at k=1. Regime note: steady-state flux grows
+  // ~k under these scalings, so at large k the water-limited clamp in the flux shader engages
+  // more often and Inertia's influence flattens - bounded (the clamp is a hard limiter, not an
+  // instability; cross-model review measured depth ratio 1.025 at k=3 Final), but a different
+  // regime than k=1.
+  const gk=gridK>0?gridK:1,itersEff=Math.max(1,Math.round(iters*gk));
+  const rain=0.0012/gk,evap=gk===1?0.985:Math.pow(0.985,1/gk);
+  const momentum0=clamp(0.35+inertia,0.2,0.82),momentum=gk===1?momentum0:Math.pow(momentum0,1/gk);
+  const flow=0.42*gk;
+  const er0=erode*0.16,erRate=gk===1?er0:1-Math.pow(1-er0,1/gk);
+  const dp0=deposit*0.22,dpRate=gk===1?dp0:1-Math.pow(1-dp0,1/gk);
+  for(let i=0;i<itersEff;i++){
     GPU.run(pF,n,nextFlux,p=>{
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uS"),0);
       gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,flux);gl.uniform1i(u(p,"uPrevF"),1);
       gl.uniform1i(u(p,"uN"),n);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uMomentum"),momentum);
-      gl.uniform1f(u(p,"uFlow"),0.42);});
+      gl.uniform1f(u(p,"uFlow"),flow);});
     GPU.run(pS,n,next,p=>{
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uS"),0);
       gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,nextFlux);gl.uniform1i(u(p,"uF"),1);
       gl.uniform1i(u(p,"uN"),n);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uEvap"),evap);
-      gl.uniform1f(u(p,"uCapacity"),capacity*0.075);gl.uniform1f(u(p,"uErode"),erode*0.16);
-      gl.uniform1f(u(p,"uDeposit"),deposit*0.22);});
+      gl.uniform1f(u(p,"uCapacity"),capacity*0.075);gl.uniform1f(u(p,"uErode"),erRate);
+      gl.uniform1f(u(p,"uDeposit"),dpRate);
+      gl.uniform1f(u(p,"uKS"),gk);gl.uniform1f(u(p,"uErCap"),0.0025/gk);});
     let t=state;state=next;next=t;t=flux;flux=nextFlux;nextFlux=t;
   }
   // Terminal settle. The state texture's blue channel is sediment still suspended when the
@@ -2837,11 +2854,24 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
       h[i]=(h[i]+C*h[rec[i]])/(1+C);
       if(h[i]<h[rec[i]])h[i]=h[rec[i]];                   // never incise below your own receiver
     }
-    if(Ddt>0){                                          // explicit 5-point Laplacian
-      const c=Math.min(Ddt,0.24);                       // dt <= 0.25*cellsize^2/D or it blows up
-      const t=h.slice();
-      for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
-        h[i]=t[i]+c*(-4*t[i]+t[i-1]+t[i+1]+t[i-n]+t[i+n]);}
+    if(Ddt>0){
+      // Explicit 5-point Laplacian, SUBSTEPPED: dt <= ~0.25*cell^2/D or it blows up, so a dose
+      // above the stability bound splits into stable substeps instead of being silently clamped
+      // (the clamp under-diffused exactly when Res Lock scales the dose with the grid). The
+      // substep bound is 1/6, NOT 0.24: c in (0.125, 0.25) is the RINGING corner of the
+      // stability region - Nyquist amplification |1-8c| approaches 1 with a sign flip each pass,
+      // and a 0.24 bound made grid-scale damping a sawtooth in the dose (measured: channel-head
+      // count 627 -> 335 crossing Ddt 0.24 -> 0.25). At c <= 1/6 the amplification is <= 1/3.
+      // Ddt <= 0.24 stays ONE substep with c = Ddt - byte-identical to the old clamp, the k=1
+      // pin; the single discontinuity at the legacy boundary is the price of that pin. Scratch
+      // buffer hoisted: a per-substep slice() was ~385 GB of allocation churn at 4096 square.
+      const sub=Ddt<=0.24?1:Math.ceil(Ddt*6),c=Ddt/sub;
+      const t=new Float32Array(h.length);
+      for(let s2=0;s2<sub;s2++){
+        t.set(h);
+        for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
+          h[i]=t[i]+c*(-4*t[i]+t[i-1]+t[i+1]+t[i-n]+t[i+n]);}
+      }
     }
     for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
   }
@@ -3244,8 +3274,18 @@ function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExp
 }
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
-function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false}){
+function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false,gridK=1}){
   const n=RES;let h=inp.slice();
+  // Res Lock (gridK = node-level RES/REF_RES; default 1 = legacy cell-unit behaviour, which the
+  // mountain/peak callers rely on byte-for-byte). A step is one cell, so per-step rates are
+  // per-CELL rates: the same world distance takes k x the steps at k x resolution, so the
+  // fractional rates become 1-(1-r)^(1/k) (identical total effect over k steps) and the
+  // capacity's slope term is restored to reference-cell units (dH*k). Speed/gravity need no
+  // change: energy already sums the same total drop along the same world path.
+  const gk=gridK>0?gridK:1;
+  const evapK=gk===1?evap:1-Math.pow(1-evap,1/gk);
+  const erodeK=gk===1?erode:1-Math.pow(1-erode,1/gk);
+  const depositK=gk===1?deposit:1-Math.pow(1-deposit,1/gk);
   const R=Math.max(1,radius|0);const brush=[];let bw=0;
   for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const dd=Math.hypot(dx,dy);if(dd<=R){const w=1-dd/(R+1);brush.push([dx,dy,w]);bw+=w;}}
   for(const b of brush)b[2]/=bw;
@@ -3279,13 +3319,13 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
       const nx=px+dx,ny=py+dy;
       if(nx<0||ny<0||nx>=n-1||ny>=n-1){leftGrid=true;break;}
       const dH=at(nx,ny).hh-hOld;
-      const cap=Math.max(-dH,minSlope)*speed*water*capacity;
+      const cap=Math.max(-dH*gk,minSlope)*speed*water*capacity;
       if(sed>cap||dH>0){                                   // over capacity, or going uphill -> deposit
-        const amt=dH>0?Math.min(dH,sed):(sed-cap)*deposit;deposit1(g,amt);sed-=amt;
+        const amt=dH>0?Math.min(dH,sed):(sed-cap)*depositK;deposit1(g,amt);sed-=amt;
       }else{                                               // under capacity -> scour (brush-distributed)
-        const amt=Math.min((cap-sed)*erode,-dH);erode1(g,amt);sed+=amt;
+        const amt=Math.min((cap-sed)*erodeK,-dH);erode1(g,amt);sed+=amt;
       }
-      speed=Math.sqrt(Math.max(0,speed*speed-dH*gravity));water*=(1-evap);
+      speed=Math.sqrt(Math.max(0,speed*speed-dH*gravity));water*=(1-evapK);
       px=nx;py=ny;if(water<0.008)break;
     }
     // The droplet's remaining suspended load is real eroded mass. Off-grid it is export (the
@@ -3323,14 +3363,21 @@ function erosion2Field(inp,p){
     seeded[y*n+x]+=fbm2(x/n*11+2.7,y/n*11+6.1,p.seed|0,3)*seedAmp;
   const coarseIters=Math.max(8,Math.round(16+duration*80));
   const featureScale=lerp(1,7,clamp(p.erosionScale,0,1));
+  // Res Lock: gk is the NODE-level grid ratio, measured before atFeatureScale coarsens RES, so
+  // it is exactly 1 at the 192 reference (the tuned look is preserved by construction) and it
+  // matches the coarse pass's own between-build grid ratio at any working resolution.
+  // Interactive caps the travel multiplier at 2 (tier policy); Final removes the cap.
+  // gw is for WIDTHS (brush, blur) - geometry, not travel, so it never gets the tier cap
+  // (same policy as the hydraulic node's brush radius).
+  const gk=BUILD_QUALITY==="final"?resScale():Math.min(resScale(),2),gw=resScale();
   const run=(source,scale,iters,phase)=>{
     const erode=lerp(.12,.70,down)*lerp(.72,1.12,duration);
     const deposit=lerp(.08,.62,sediment);
     const capacity=lerp(3,11,down)*lerp(.72,1.18,1-sediment);
     return atFeatureScale(source,scale,field=>gpuReady()
-      ?gpuHydraulicPipes(field,{iters,capacity,erode,deposit,inertia:.04+.08*phase})
+      ?gpuHydraulicPipes(field,{iters,capacity,erode,deposit,inertia:.04+.08*phase,gridK:gk})
       :hydraulicErode(field,{droplets:Math.max(2500,Math.round(RES*RES*(.12+.40*duration))),
-        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round(1+scale*.35)),seed:(p.seed|0)+phase*101,settle:true}));
+        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round((1+scale*.35)*gw)),seed:(p.seed|0)+phase*101,settle:true,gridK:gk}));
   };
   let h=run(seeded,featureScale,coarseIters,0);
   // A shorter near-native pass nests fine gullies inside the broad ravines. Higher Erosion Scale
@@ -3346,7 +3393,7 @@ function erosion2Field(inp,p){
     for(let i=0;i<h.length;i++)h[i]=lerp(h[i],shaped[i],p.shape*.72);
   }
   if(p.shapeSharp>.01){
-    const broad=blurField(h,{radius:Math.max(1,Math.round(1+featureScale*.35))});
+    const broad=blurField(h,{radius:Math.max(1,Math.round((1+featureScale*.35)*gw))});
     for(let i=0;i<h.length;i++){
       const residual=h[i]-broad[i];
       h[i]+=residual>0?residual*p.shapeSharp*.24:residual*p.shapeSharp*.07;
@@ -3372,7 +3419,15 @@ function hydroFixField(inp,p){
   const fix=clamp(p.fix,0,1),down=clamp(p.downcut,0,1),threshold=lerp(.035,.0025,fix)*N;
   const rawMask=new Float32Array(N),den=Math.log(Math.max(N/Math.max(threshold,1),1.0001));
   for(let i=0;i<N;i++)rawMask[i]=A[i]<=threshold?0:smooth(clamp(Math.log(A[i]/threshold)/den,0,1));
-  const mask=blurScalarField(rawMask,n,Math.max(1,Math.round(1+fix*2)),1);
+  // Corridor width is a WORLD width: the blur radius follows the grid, and the amplitude is
+  // restored by the box-dilution factor - a 1-cell-wide raster channel line spread over a
+  // (2R+1)-cell band loses exactly that factor, which made the soft cut fade ~1/sqrt(k) as the
+  // grid doubled. At the 192 reference R=R0 and the factor is exactly 1. (The descent
+  // ENFORCEMENT below stays one cell wide on purpose: it is a breach, a lattice operation like
+  // depression breaching itself, not a landform.)
+  const R0=Math.max(1,Math.round(1+fix*2)),R=Math.max(1,Math.round((1+fix*2)*resScale()));
+  const mask=blurScalarField(rawMask,n,R,1);
+  if(R!==R0){const amp=(2*R+1)/(2*R0+1);for(let i=0;i<N;i++)mask[i]=Math.min(1,mask[i]*amp);}
   const[mn,mx]=fieldRange(inp),relief=Math.max(mx-mn,1e-5),cut=relief*(.0003+.0072*down)*fix;
   const out=inp.slice();for(let i=0;i<N;i++)out[i]-=mask[i]*cut;
   const eps=relief/(Math.max(n,2)*160);
@@ -3666,9 +3721,28 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       // available and documented as the erode-to-baselevel mode.
       P.slider("uplift","Uplift",0,1,0.35,0.01),
       P.slider("hillslope","Hillslope",0,1,0.9,0.01)],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],streamPowerErode(ins[0],
-      {Kdt:p.strength*2.0, Udt:p.uplift*0.004, m:p.m, iters:p.iters,
-       uplift:ins[1]||null, Ddt:p.hillslope*0.24}),ins[2]):newField(),
+    // Res Lock mapping (k = RES/REF_RES): the solver's length scales live in cells, so the
+    // slider->physical mapping is where world units get restored. Iterations do NOT scale:
+    // this is the Braun-Willett implicit cascade - receivers are solved before donors in one
+    // ordered sweep, so a base-level signal crosses the whole network in a single iteration and
+    // the "one cell per iteration" travel intuition is false for this kernel (K's per-cell decay
+    // is real - which is exactly why K needs boosting beyond the steady-state exponent). The
+    // steady-state theory alone (K*k^(1-2m), U fixed) under-erodes the 14-iteration TRANSIENT
+    // the shipped defaults run, so K carries a CALIBRATED exponent, fitted by sweep over m in
+    // {.2,.5,.8} x k in {2,3} on the reference input (phi*(m) ~ 1.018m - 1.198, re-fitted after
+    // the diffusion substep bound moved the m=0.8 root - the calibration harness
+    // _verify_streampower_calibration.js re-derives the roots live and gates the line) and gated
+    // across m and k by _verify_erosion_gridscale.js. Calibration, not derivation - stated as
+    // such. Uplift is untouched (same iterations = same total). Incision cost is resolution-
+    // independent (iterations unchanged); the diffusion DOSE k^2 is the one k-growing cost term
+    // (k^4 total Laplacian work - measured 41.6 s of diffusion at 2048 square Final), so the
+    // DOSE takes the Interactive tier cap of 2 and Final pays it in full.
+    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
+      const kd=BUILD_QUALITY==="final"?k:Math.min(k,2);
+      return maskApply(ins[0],streamPowerErode(ins[0],
+      {Kdt:p.strength*2.0*Math.pow(k,1.198-1.018*p.m), Udt:p.uplift*0.004, m:p.m,
+       iters:p.iters,
+       uplift:ins[1]||null, Ddt:p.hillslope*0.24*kd*kd}),ins[2]);},
     note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades.<br><br>The shipped defaults are set against <b>real SRTM data</b>, not by eye: driven by a Tectonic uplift they reproduce a real tile's slope distribution to within about one unit at every percentile (p90 9.9 vs 9.3, p99 16.0 vs 15.7, max 24.2 vs 22.8)."},
   hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"GPU virtual-pipe flow or CPU droplets — carves valleys and transports sediment.",
     params:[P.tabs("engine","Engine",[["auto","GPU pipes"],["droplets","CPU droplets"]],"auto"),
@@ -3686,10 +3760,14 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     const usePipes=p.engine!=="droplets"&&gpuReady();
+    // gridK follows the tier policy (Interactive caps travel at k=2, Final full parity) -
+    // matching the droplet count's existing min(4,k^2) cap; the brush radius stays full-k
+    // because width is geometry, not travel.
+    const ke=BUILD_QUALITY==="final"?k:Math.min(k,2);
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>usePipes
-      ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters})
+      ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters,gridK:ke})
       :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*(BUILD_QUALITY==="final"?k*k:Math.min(4,k*k))),
-        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*k)),settle:true})),ins[1]);},
+        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*k)),settle:true,gridK:ke})),ins[1]);},
     note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
   erosion2:{cat:"ero",name:"Erosion 2",ins:["In","Mask"],
     desc:"Advanced multi-scale hydraulic erosion: broad ravines first, nested gullies second, then sediment and shape relaxation.",

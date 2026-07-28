@@ -168,11 +168,14 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
       byD: dk.map(q=>({Ddt:q.Ddt, headCount:q.headCount, maxDrainageArea:q.maxDrainageArea,
                        slope:q.fit.slope, r2:q.fit.r2})),
       // Two regimes, two statistics - measured, not assumed. Head count expresses valley SPACING
-      // while a network exists (554 -> 491 across the organized rungs), but INVERTS once the
-      // network shatters: every isolated A>=8 fragment becomes its own 'head' (measured 637 at
-      // Ddt=0.25, above the D=0 count). So the monotone gate covers the organized rungs only, and
-      // 'erased' is gated on what erasure actually means: the slope-area scaling itself collapses
-      // (r2 0.60 organized -> below 0.25 when no coherent fluvial network remains).
+      // while a network exists (554 -> 491 across the organized rungs). When first armed, the
+      // 0.24-clamped kernel measured 637 heads at Ddt=0.25 (shatter: every isolated A>=8
+      // fragment its own 'head', ABOVE the D=0 count); the substepped kernel delivers the full
+      // 0.25 dose (2 x 0.125 instead of one clamped 0.24) and now measures ~307 - heavy
+      // diffusion genuinely SMOOTHS the network away rather than shattering it. Either way the
+      // headcount is regime-dependent, which is why the monotone gate covers the organized rungs
+      // only, and 'erased' is gated on what erasure actually means: the slope-area scaling
+      // itself collapses (r2 0.60 organized -> below 0.25 when no coherent network remains).
       networkShrinksWithDiffusion: dk.slice(0,3).every((q,i)=> i===0 || q.headCount <= dk[i-1].headCount*1.05),
       modestDiffusionKeepsTheScaling: dk[1].fit.withinReferenceTolerance,
       heavyDiffusionErasesTheNetwork: dk[3].fit.r2 < 0.25 };

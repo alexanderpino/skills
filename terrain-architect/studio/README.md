@@ -1088,8 +1088,10 @@ density (a fixed count spread over `RES²` cells) and blur/deposit/peak radii ha
 **Res Lock** (on by default) converts these to resolution-independent quantities against a 192² reference.
 The toolbar's **Interactive / Final** tier separates iteration latency from final parity:
 
-- **Interactive** (default) keeps physical talus scaling but caps simulation travel to at most 1.5×
-  the authored iteration count. It is the live authoring tier.
+- **Interactive** (default) keeps physical talus scaling but caps simulation travel — at most 1.5×
+  the authored iteration count for the thermal/snow family, and a travel multiplier of at most 2
+  for the erosion kernels (see *Res Lock inside the erosion solvers* below). It is the live
+  authoring tier.
 - **Final** uses the full resolution-scaled iteration/droplet budget when the export needs the
   longer-travel simulation rather than the responsive preview.
 
@@ -1111,6 +1113,90 @@ build is a **Build**, not an Auto-recompute. (Gaea documents the same goal: a 51
 parity for all major erosion features"* with a 4K/8K build.) Use **Interactive** for authoring and
 **Final** when longer settling is worth the cost; turning **Res Lock** off is still available for raw
 cell-unit experiments.
+
+### Res Lock inside the erosion solvers (grid-scale invariance)
+
+The scalings above are what a node eval can fix from *outside* the kernel — talus, counts, radii. The
+four erosion solvers also carried length scales **inside** their loops, and those drifted the same way:
+the same node on the same world-space input modified the terrain **less** the finer the grid. Measured
+by `_verify_erosion_gridscale.js` (each node's pure eval on a world-coherent fbm source, 192² vs 384²,
+Res Lock on; depthRatio = rms modification depth at 384 over 192, target 1.0):
+
+| node (case) | depthRatio before | after | modification corr after |
+|---|---|---|---|
+| Stream power (m=0.5) | 0.719 | **1.004** | 0.992 |
+| Stream power (m=0.2 / m=0.8) | — | **0.991 / 1.004** | 0.999 / 0.971 |
+| Stream power at k=3, Final (576²) | — | **1.010** | 0.989 |
+| Hydraulic (CPU droplets) | 0.809 | **1.021** | 0.966 |
+| Hydraulic (GPU pipes) | **0.383** | **1.020** | 0.940 |
+| Erosion 2 (GPU) | 0.499 | **1.077** | 0.984 |
+| HydroFix (corridor-dominated, pre-filled input) | ~0.70 | **0.934** | 0.908 |
+
+The landform gate correlates the **modifications** (`out − in`) across the grid change, not the
+outputs: an untouched fbm field already correlates 0.9991 with its own downsample, so an absolute
+gate would pass an identity node — the first form of this suite did exactly that on four of its
+gates and was replaced in review. An identity guard (`depth ≥ 2·10⁻⁵`) backs it.
+
+Per-kernel mechanism, each an application of "express the length scale in world units":
+
+- **Stream power** — the first mapping shipped a plausible derivation ("K is a celerity; the
+  incision signal travels one cell per iteration, so iterations scale k×") whose *travel half*
+  cross-model review dismantled by measurement: this solver is the Braun–Willett *implicit
+  cascade* — receivers are solved before donors in one ordered sweep, so a base-level signal
+  crosses the entire network in a **single** iteration. (K's per-cell decay is real — it is why K
+  needs boosting beyond the steady-state exponent at all.) That mapping was also a single-point
+  fit that read 1.30 by 768² while its celerity term sat at exponent zero (a no-op) in every gate,
+  because the default `m=0.5` makes `2m−1 = 0`. The shipped form keeps **iterations unchanged**
+  (incision cost is resolution-independent) and carries a **calibrated** K exponent,
+  `k^(1.198−1.018m)`, fitted by sweeping `m ∈ {0.2, 0.5, 0.8} × k ∈ {2, 3}` on the reference
+  input and gated across both axes; uplift is untouched (same iterations, same total). The
+  diffusion *dose* scales `k²`, absorbed by the kernel substepping past its per-pass stability
+  bound — with the substep bound at **1/6**, not the 0.25 stability edge, because c ∈ (0.125,
+  0.25) is the explicit scheme's *ringing corner* (Nyquist amplification near 1 with sign flips;
+  a 0.24 bound made grid-scale damping a sawtooth in the dose, measured as a 627→335 channel-head
+  jump crossing Ddt 0.24→0.25). That dose is the one k-growing cost term (k⁴ total Laplacian
+  work — 41.6 s of diffusion measured at 2048² Final), so the **dose takes the Interactive tier
+  cap of 2** and Final pays it in full. The calibration itself is **live evidence, not memory**:
+  `_verify_streampower_calibration.js` re-derives the per-m roots each run and gates the shipped
+  line within ±0.12 — and it has already done its job once: tightening the substep bound moved
+  the m=0.8 root by 0.17, the harness went red, and the line was re-fitted (residuals ≤ 0.02 at
+  all three m). Calibration, not derivation — the code says so.
+- **CPU droplets** — a step is one cell, so per-step fractional rates (erode, deposit, evaporation)
+  become `1−(1−r)^(1/k)` — identical total effect over the `k×` steps that now cover the same world
+  distance — and the capacity's slope term is restored to reference-cell units. Speed and gravity need
+  nothing: energy already sums the same total drop along the same world path.
+- **GPU pipes** — water crosses one cell per iteration, so iterations scale `k×`; per-iteration
+  quantities rescale accordingly (rain and the erosion cap by `1/k`, relaxation rates by the
+  exponential form, evaporation and momentum by `^(1/k)`), and the head-difference terms — slope in
+  the capacity law, flux gain — go back *up* by `k`, because a per-cell head drop halves when cells
+  halve.
+- **HydroFix** — two mechanisms with different lattice contracts. The soft accumulation *corridor* is
+  a landform: its blur radius follows the grid and its amplitude is restored by the box-dilution
+  factor (a 1-cell-wide channel line spread over a `(2R+1)` band loses exactly that factor — the
+  `1/√k` fade the table shows). The descent *enforcement* stays one cell wide on purpose: it is a
+  breach, a lattice operation like depression breaching itself, so its rms contribution shrinks
+  `~1/√k` by design — the oracle reports it and refuses to gate it, because a band wide enough to
+  pass it would be vacuous. The gated corridor case is corridor-*dominated*, not pure (~15% of its
+  delta energy is the eps-descent across fill-flats, carrying the breach signature); deconvolved,
+  the pure corridor sits at ~0.97, so the reported 0.934 under-states the fix.
+
+Everything anchors to the **node-level** `k = RES/192`, measured before `atFeatureScale` coarsens the
+grid — so `k=1` at the reference and the tuned look is preserved *by construction*; every factor is
+exactly 1 there. The mountain/peak macro-weathering callers invoke the kernels without `gridK` and
+stay byte-identical (digest re-baselined for exactly the compensated nodes, including the massif
+exercise pin). Two per-node policies, stated once: **widths** (brush and blur radii) always follow
+the full grid ratio — geometry, not travel; **travel** multipliers (pipe/droplet transport) take the
+**Interactive** tier cap of 2 — the same trade as the droplet count's `min(4, k²)` — and **Final**
+removes the cap. Stream power's incision has no travel multiplier (iterations unchanged), so only
+its diffusion *dose* takes the cap. Invariance is *certified at the measured points* — k=2 for every
+node, k=3 (Final) and the m-axis for stream power, inside the [0.80, 1.25] band — not claimed "at
+any grid"; the exponential-family compensations should drift slowly beyond, and the oracle is where
+that claim gets extended, not this paragraph. The oracle also REPORTS, live, what the tier cap
+costs at the app-default 512² (pipes depth ratio 0.669 under Interactive's gk=2-of-2.667 — Final
+restores the band) and what the legacy path drifts (`SCALE_RES` off: depth 0.680, modification corr
+0.779 at k=2), so the armed thresholds stay measurements, not memories. On the whole default graph, `_verify_resparity.js` now reads scaled rms 0.0462
+(unscaled 0.0586) with the 768² build at 0.7× the reference's slope roughness (unscaled: 2.5×
+spikier).
 
 ### GPU fast path (WebGL2 GPGPU)
 
@@ -1179,7 +1265,7 @@ oracle measures open fbm only). Both engines now write a `hydroMassDiag` ledger
 tolerated 5% mismatch, and re-review found that tolerance absorbing a real unnamed mass *source* —
 border-clipped brush cells remove nothing from the terrain while the droplet credits itself in full
 (+1.25 units at radius 2, growing with the radius slider). Named in the ledger, the budget closes to
-**5.7e-8** — float accumulation, not tolerance. `_verify_erosion_mass.js` (10 gates) also proves the
+**5.7e-8** — float accumulation, not tolerance. `_verify_erosion_mass.js` (9 gates) also proves the
 settle flag is **opt-in**: Mountain/Peak macro-weathering callers stay byte-identical — the mountain
 node's massif form is now digest-pinned via an `ex=` exercise entry, closing the one opt-out call
 the baseline digest never reached — and the digest was re-baselined for exactly `hydraulic`,
@@ -1232,6 +1318,8 @@ node _verify_edges.js                # selectable/mutable links, hit target, rem
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths
 node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² / 768²
+node _verify_erosion_gridscale.js    # erosion-family grid invariance: modification depth + landform, 192 vs 384
+node _verify_streampower_calibration.js  # re-derives the stream-power K-exponent roots; gates the shipped line
 node _verify_realscale.js            # Real Scale: repose angle in degrees, resolution independent
 node _verify_data.js                 # the eight Data Map channels
 node _verify_satnode.js              # one-gradient SatMap: stacking + explicit biome branch/blend
