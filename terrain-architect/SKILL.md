@@ -553,6 +553,21 @@ level (water leaves, erosion cuts inward), a wall (water pools, terrain bulges),
 The default of "whatever the loop happens to do at index 0" produces a visible frame of
 artefacts. State it in the graph spec.
 
+**The sediment budget closes, or the leak is named.** Erosion and deposition are one budget, not
+two unrelated nodes: under pure transport — no uplift, no sources, closed boundaries —
+`Σ(bedrock + sediment)` is invariant. `SedimentField` is a **depth in metres**, like height, so the
+budget is that sum times the cell area, and on a hexagonal grid that area is `(√3/2)·cellSize²`
+(`26`) — carry the square `cellSize²` over and a closed budget reads as a drifting one. Every real
+model leaks somewhere, so the invariant is not *no leak*; it is that **the leak is measured and
+named** rather than discovered later. The usual sites: a droplet expiring with load still in it,
+the flux caps and clamps in the pipe model (`04`) and the lava CA (`19`), thermal's per-pair clamp
+(`05`), open boundaries, and — the quiet one — an erosion node given an *effect* mask instead of a
+*process* mask, which silently discards everything transported out of the masked region. `09` calls
+this the single most under-used terrain assertion, and `reference-impl` mechanises it: fourteen
+solver tests assert conservation of the transported material (bed, water, snow, ice, sand), four of
+them through the shared `reference-impl/tests/asserts.py` helper `assert_mass_conserved`. When a
+graph only erodes, ask where the sediment went; when it only deposits, ask where it came from.
+
 **Build the mass before you dissect it.** A feature primitive written as `envelope(r) × texture`
 with a *radial* envelope is a solid of revolution, and stays one however good the texture — it
 renders as a tipi tent while satisfying every obvious assertion, because a cone satisfies them too
@@ -580,6 +595,8 @@ Look for these in order — they account for most real defects:
 5. Is there an apron on tiled erosion, and is it wider than the maximum transport distance?
 6. Is the field quantised before its derivatives are taken?
 7. Is thermal downstream of hydraulic?
+8. Does the sediment budget close — and if it leaks, is the leak measured rather than assumed?
+   (A graph that only erodes, or only deposits, is the tell.)
 
 State findings as: **symptom → mechanism → minimal fix**. Do not rewrite a graph that has one
 misordered node.

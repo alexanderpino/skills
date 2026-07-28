@@ -370,6 +370,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Erosion backbone matched to world extent? (droplet <2 km, pipe 2–50, stream power >50)
 - [ ] Parameters in world units, not magic numbers tuned at one resolution?
 - [ ] Thermal downstream of hydraulic?
+- [ ] Sediment budget closed, or its leak measured and named? (erode-only or deposit-only is the tell; the usual sites are droplet expiry, flux caps/clamps, open boundaries, and an *effect* mask on an erosion node)
 - [ ] `A` reported in m², not cell counts?
 - [ ] MFD (not D8) feeding any hillslope quantity (wetness, dispersive masks)?
 - [ ] Quantisation to R16 after all derivatives?
