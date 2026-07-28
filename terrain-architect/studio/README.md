@@ -1447,9 +1447,8 @@ output still differs by 8.4% of range — a different draw from the same process
 point.
 
 Honest limits, also stated in the toggle's hint: GPU compute is square-texture end to end and is
-forced off on hex, so hex runs the CPU path throughout (the toolbar chip says so). The compositor
-work is verified structurally and by non-regression rather than by a numerical GLSL-vs-CPU oracle,
-which is still owed. Sampling uses a two-row lerp — exact on linear fields, differing from 26's
+forced off on hex, so hex runs the CPU path throughout (the toolbar chip says so). Sampling uses a
+two-row lerp — exact on linear fields, differing from 26's
 true barycentric 3-tap only on high-frequency content. Single-receiver D6 is the bar here; MFD6
 (multi-receiver dispersion) is the chapter's own further step, and D∞ has no hex analogue at all.
 And one
@@ -1498,6 +1497,7 @@ node _verify_erosion_gridscale.js    # erosion-family grid invariance: modificat
 node _verify_streampower_calibration.js  # re-derives the stream-power K-exponent roots; gates the shipped line
 node _verify_hex.js                  # hexagonal lattice: static topology hash, D6 mass + ring isotropy, seed contract, square byte-safety
 node _verify_hex_parity.js           # close-out: default graph toggled square<->hex differs only by the seed contract, not by lattice misreads
+node _verify_hex_deferred.js         # compositor GLSL sampler vs the CPU sampler at matched world points (probe lifted from the shipped shader)
 node _verify_hex_sampling.js         # the shared bilinear sampler is exact on hex; callers pass world units
 node _verify_hex_dem.js              # DEM import places cells at their world point; export resamples back to square
 node _verify_hex_flow.js             # D6 routing: receiver adjacency, reported distances, slope ring isotropy
