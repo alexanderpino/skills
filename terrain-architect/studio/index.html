@@ -2665,6 +2665,22 @@ function percentileOf(f,q){                       // q in [0,1]
 /* ----------------------------------------------------- selectors ------ */
 function slopeOf(inp){
   const n=RES,o=newField();
+  if(isHex()){
+    // D6 least-squares gradient. Square central differences on hex data span sqrt(3) world units
+    // between rows y-1 and y+1 but still divide by 2, so a world-space CONE - which has one slope
+    // at every azimuth - reads 2/sqrt(3) = 1.1547x steeper N-S than E-W. Measured on that cone:
+    // ring anisotropy 1.147 before (square control 1.000), and the E-W/N-S ratio came out 1.1499
+    // against the 1.1547 the mechanism predicts.
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const nb=hexNb(y);let gx=0,gy=0;
+      for(let k=0;k<6;k++){
+        const h=inp[clamp(y+nb[k][1],0,n-1)*n+clamp(x+nb[k][0],0,n-1)];
+        gx+=h*HEX_EX[k];gy+=h*HEX_EY[k];
+      }
+      o[y*n+x]=Math.hypot(gx,gy)/3*n;
+    }
+    return o;
+  }
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const l=inp[y*n+clamp(x-1,0,n-1)],r=inp[y*n+clamp(x+1,0,n-1)];
     const u=inp[clamp(y-1,0,n-1)*n+x],d=inp[clamp(y+1,0,n-1)*n+x];
@@ -2679,13 +2695,36 @@ function slopeOf(inp){
 const gAt=(f,x,y)=>f[clamp(y,0,RES-1)*RES+clamp(x,0,RES-1)];
 // Zevenbergen-Thorne curvature on the 3x3 window (analysis.curvature). profile: +ve concave valley floor.
 function curvatureField(inp,{kind="profile",strength=1}){
-  const n=RES,o=newField(),L=1/n,eps=1e-12;
+  const n=RES,o=newField(),L=1/n,eps=1e-12,hex=isHex();
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const z1=gAt(inp,x-1,y-1),z2=gAt(inp,x,y-1),z3=gAt(inp,x+1,y-1);
-    const z4=gAt(inp,x-1,y),z5=gAt(inp,x,y),z6=gAt(inp,x+1,y);
-    const z7=gAt(inp,x-1,y+1),z8=gAt(inp,x,y+1),z9=gAt(inp,x+1,y+1);
-    const D=((z4+z6)/2-z5)/(L*L),E=((z2+z8)/2-z5)/(L*L),F=(-z1+z3+z7-z9)/(4*L*L);
-    const G=(-z4+z6)/(2*L),H=(z2-z8)/(2*L),q=G*G+H*H;
+    let D,E,F,G,H;
+    if(hex){
+      // The 3x3 Zevenbergen-Thorne window is square machinery; the exactly analogous hex fit is a
+      // quadratic least-squares over the D6 one-ring plus the centre (7 points, 6 coefficients).
+      // With dz = z_k - z_centre and the six unit vectors e_k (y measured UP, as ZT's surface
+      // does), the odd moments vanish and the normal equations collapse to a closed form:
+      //   sum(e_x^4)=9/4, sum(e_x^2 e_y^2)=3/4, sum(e_x^3 e_y)=0
+      //   P=sum(dz e_x^2), Q=sum(dz e_y^2), R=sum(dz e_x e_y)
+      //   d=(3P-Q)/6, e=(3Q-P)/6, f=4R/3     [coefficients of x^2, y^2, xy in CELL units]
+      // Consistency check that anchors the whole derivation: sum(dz)/3 = d+e, i.e. the Laplacian
+      // is 2*sum(dz)/(3s^2) - exactly the 2/(3s^2) constant 26 warns is NOT 1/s^2.
+      const nb=hexNb(y),z5=inp[y*n+x];
+      let P=0,Q=0,R=0,gx=0,gy=0;
+      for(let k=0;k<6;k++){
+        const zk=gAt(inp,x+nb[k][0],y+nb[k][1]),dz=zk-z5;
+        const ex=HEX_EX[k],ey=-HEX_EY[k];          // ey flipped: ZT measures y upward
+        P+=dz*ex*ex;Q+=dz*ey*ey;R+=dz*ex*ey;gx+=zk*ex;gy+=zk*ey;
+      }
+      D=(3*P-Q)/6/(L*L);E=(3*Q-P)/6/(L*L);F=4*R/3/(L*L);
+      G=gx/3/L;H=gy/3/L;
+    }else{
+      const z1=gAt(inp,x-1,y-1),z2=gAt(inp,x,y-1),z3=gAt(inp,x+1,y-1);
+      const z4=gAt(inp,x-1,y),z5=gAt(inp,x,y),z6=gAt(inp,x+1,y);
+      const z7=gAt(inp,x-1,y+1),z8=gAt(inp,x,y+1),z9=gAt(inp,x+1,y+1);
+      D=((z4+z6)/2-z5)/(L*L);E=((z2+z8)/2-z5)/(L*L);F=(-z1+z3+z7-z9)/(4*L*L);
+      G=(-z4+z6)/(2*L);H=(z2-z8)/(2*L);
+    }
+    const q=G*G+H*H;
     let c;
     if(kind==="mean")c=((1+G*G)*E*2-2*G*H*F+(1+H*H)*D*2)/(2*Math.pow(1+G*G+H*H,1.5));
     else if(q<eps)c=0;
@@ -2703,12 +2742,21 @@ function flowField(inp,{gain=1}){
 }
 // Horizon-based ambient occlusion: occl = 1 - mean(cos^2 theta) over n dirs (analysis.horizon_ao).
 function occlusionField(inp,{radius=0.06,dirs=8}){
-  const n=RES,o=newField(),maxD=Math.max(2,radius*n);
+  const n=RES,o=newField(),maxD=Math.max(2,radius*n),hex=isHex();
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const h0=inp[y*n+x];let occ=0;
+    // March in WORLD space. Stepping the grid indices instead walks sqrt(3)/2 world units per
+    // row step while dividing by the index distance, so the horizon is scanned along a sheared
+    // set of rays and the N-S ones come out short - the same 2/sqrt(3) family of error slopeOf
+    // had. Convert the world sample point back to a row/column to read the field.
+    const wx0=x+(hex?0.5*(y&1):0),wy0=y*(hex?HEX_ROW:1);
     for(let k=0;k<dirs;k++){
       const a=2*Math.PI*k/dirs,dx=Math.cos(a),dy=Math.sin(a);let mt=0,d=1;
-      while(d<maxD){const s=gAt(inp,Math.round(x+dx*d),Math.round(y+dy*d));
+      while(d<maxD){
+        let sx,sy;
+        if(hex){const row=Math.round((wy0+dy*d)/HEX_ROW);sy=row;sx=Math.round(wx0+dx*d-0.5*(row&1));}
+        else{sx=Math.round(x+dx*d);sy=Math.round(y+dy*d);}
+        const s=gAt(inp,sx,sy);
         mt=Math.max(mt,(s-h0)*n/d);d*=1.35;}
       const c=Math.cos(Math.atan(mt));occ+=c*c;
     }
@@ -2902,6 +2950,22 @@ function plateUplift(p){
    a log-log slope/area plot, which is the decisive verification (see _verify_streampower.js). */
 function spReceivers(g,cellsize){
   const n=RES,N=n*n,rec=new Int32Array(N).fill(-1),dist=new Float32Array(N).fill(cellsize);
+  if(isHex()){
+    // D6 steepest descent: six candidates, ONE distance, no sqrt(2) case. Run with the square D8
+    // table this measured 40.4% of interior receivers landing on cells that are not lattice
+    // neighbours at all (max step sqrt(3) - two rings out, with an undrained cell in between)
+    // and 54.1% reporting dist=sqrt(2)*cellsize, a distance no pair of hex cells has. Note the
+    // square table is a SUPERSET of the hex one-ring, so pure connectivity never showed this:
+    // flow still reached the edge, it just took steps the lattice does not have.
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const i=y*n+x,nb=hexNb(y);let best=0,bi=-1;
+      for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
+        if(xx<0||yy<0||xx>=n||yy>=n)continue;
+        const ni=yy*n+xx,sl=(g[i]-g[ni])/cellsize;
+        if(sl>best){best=sl;bi=ni;}}
+      rec[i]=bi;dist[i]=cellsize;}
+    return {rec,dist};
+  }
   const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],
             [-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
@@ -3763,11 +3827,14 @@ function erosion2Field(inp,p){
 // connected receivers. This changes flow topology without replacing the landscape.
 function hydroFixField(inp,p){
   const n=RES,N=n*n,filled=priorityFloodFill(inp),rec=new Int32Array(N).fill(-1),A=new Float32Array(N).fill(1);
-  const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
+  // Same one-ring contract as spReceivers: D6 on hex (one distance), D8 with sqrt(2) on square.
+  const nbSq=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
+  const hex=isHex();
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const i=y*n+x;let best=filled[i],bestSlope=0,receiver=-1;
-    for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
-      const j=yy*n+xx,s=(filled[i]-filled[j])/dist;if(s>bestSlope){bestSlope=s;best=filled[j];receiver=j;}}
+    const nb=hex?hexNb(y):nbSq;
+    for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
+      const j=yy*n+xx,s=(filled[i]-filled[j])/(hex?1:d[2]);if(s>bestSlope){bestSlope=s;best=filled[j];receiver=j;}}
     rec[i]=receiver;
   }
   const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>filled[b]-filled[a]);
@@ -5889,6 +5956,19 @@ const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the cen
 // would be silent metric anisotropy (the chapter's flagged first bug).
 const isHex=()=>terrainDef.lattice==="hex";
 const HEX_ROW=Math.sqrt(3)/2;
+// The D6 one-ring, odd-r (26). All six neighbours sit at EXACTLY one cell spacing: the two
+// lateral ones trivially, the four oblique ones at (+-0.5, +-sqrt(3)/2), whose length is
+// sqrt(0.25+0.75)=1. There is no diagonal and no sqrt(2) to correct - the D4/D8 fork, and the
+// whole class of bugs where a diagonal relaxes at a shallower true angle, cannot be written on
+// this lattice. Offsets depend on row parity; every hex kernel shares these tables so the
+// convention is defined once (thermalErodeHex established it).
+const HEX_NB_EVEN=[[-1,0],[1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
+const HEX_NB_ODD =[[-1,0],[1,0],[0,-1],[1,-1],[0,1],[1,1]];
+const hexNb=y=>(y&1)?HEX_NB_ODD:HEX_NB_EVEN;
+// Unit vectors to those six neighbours, in the SAME order the tables list them, for the
+// least-squares gradient: sum(e_k)=0 and sum(e_k e_k^T)=3I, so g = sum(h_k*e_k)/3 is exact for
+// a plane and isotropic to leading order. The centre height drops out entirely.
+const HEX_EX=[-1,1,-.5,.5,-.5,.5],HEX_EY=[0,0,-HEX_ROW,-HEX_ROW,HEX_ROW,HEX_ROW];
 let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
 let TEMP_UNIT="C";try{TEMP_UNIT=localStorage.getItem("terrainStudioTempUnit")==="F"?"F":"C";}catch(_){}
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -6690,8 +6770,13 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
   const seed=(x,y)=>{const i=y*n+x;if(!done[i]){done[i]=1;filled[i]=h[i];push(h[i],i);}};
   for(let x=0;x<n;x++){seed(x,0);seed(x,n-1);}
   for(let y=0;y<n;y++){seed(0,y);seed(n-1,y);}
-  const nb=[[-1,0],[1,0],[0,-1],[0,1]];
+  // The flood must walk the lattice's OWN connectivity. On hex that is the D6 one-ring: the
+  // square 4-offset set covers only 4 of the 6 true neighbours (it misses the (x-1,y±1) pair on
+  // even rows and (x+1,y±1) on odd rows), so a basin whose only spill runs through one of those
+  // would flood spuriously.
+  const nbSq=[[-1,0],[1,0],[0,-1],[0,1]],hex=isHex();
   while(heap.length){const it=pop(),e=it[0],c=it[1],cy=(c/n)|0,cx=c-cy*n;
+    const nb=hex?hexNb(cy):nbSq;
     for(const dd of nb){const xx=cx+dd[0],yy=cy+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(done[ni])continue;
       // Epsilon filling resolves otherwise perfectly flat depressions. The invisible monotonic
       // gradient gives every flooded cell a route back to the spill point, so D8 accumulation
@@ -6703,8 +6788,12 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
 // --- D8 flow accumulation on the (pit-free) filled DEM: drainage area per cell -> the river network. ---
 function d8Accumulation(g){
   const n=RES,N=n*n,rec=new Int32Array(N),A=new Float32Array(N).fill(1);
-  const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
+  // D6 on hex (the name is kept: this is the accumulation pass, whichever one-ring it walks).
+  // Six equidistant candidates mean the receiver is unambiguous with no sqrt(2) weighting to
+  // forget - 26's cleanest single win over D8.
+  const nbSq=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]],hex=isHex();
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=g[i],bi=-1;
+    const nb=hex?hexNb(y):nbSq;
     for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(g[ni]<best){best=g[ni];bi=ni;}}
     rec[i]=bi;}
   const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>g[b]-g[a]);   // upstream (high) before downstream (low)

@@ -220,6 +220,43 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     };
     out.magIso = { hex: magAniso(hexT, true), square: magAniso(sqT, false) };
 
+    // ---- H6: the ANALYSIS operators read isotropically on a world-space paraboloid ----
+    // slopeOf is gated by _verify_hex_flow.js F1; curvature and occlusion are the other two
+    // stencil operators a hex build feeds to masks, and both were square-only. A paraboloid has
+    // a constant mean curvature and a rotationally symmetric horizon near its axis, so azimuthal
+    // spread on an annulus is the discriminator - the same shape as H3's ring test.
+    const paraboloid = hexGeom => { const f = new Float32Array(n * n), K = 2e-5;
+      const cx2 = n / 2, cy2 = (hexGeom ? n * HEXR : n) / 2;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const wx = x + (hexGeom ? 0.5 * (y & 1) : 0), wy = y * (hexGeom ? HEXR : 1);
+        f[y * n + x] = K * ((wx - cx2) ** 2 + (wy - cy2) ** 2);
+      } return f; };
+    const ringSpread = (fld, hexGeom) => {
+      const bins = new Float32Array(24), cnt = new Float32Array(24);
+      const cx2 = n / 2, cy2 = (hexGeom ? n * HEXR : n) / 2, R0 = n * 0.18, R1 = n * 0.34;
+      for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) {
+        const wx = x + (hexGeom ? 0.5 * (y & 1) : 0), wy = y * (hexGeom ? HEXR : 1);
+        const dx = wx - cx2, dy = wy - cy2, rr = Math.hypot(dx, dy);
+        if (rr < R0 || rr > R1) continue;
+        const th = ((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 24 | 0;
+        bins[Math.min(23, th)] += fld[y * n + x]; cnt[Math.min(23, th)]++;
+      }
+      let mx = -1e9, mn = 1e9, sum = 0, k = 0;
+      for (let d2 = 0; d2 < 24; d2++) { if (!cnt[d2]) continue; const v = bins[d2] / cnt[d2];
+        if (v > mx) mx = v; if (v < mn) mn = v; sum += v; k++; }
+      return { spread: mx - mn, mean: sum / k };
+    };
+    const analysisOn = lat => { terrainDef.lattice = lat; const hg = lat === 'hex';
+      const par = paraboloid(hg);
+      const cv = ringSpread(curvatureField(par, { kind: 'mean', strength: 1 }), hg);
+      const oc = ringSpread(occlusionField(par, { radius: 0.06, dirs: 8 }), hg);
+      return { curvMean: +cv.mean.toFixed(6), curvSpread: +cv.spread.toExponential(3),
+        occSpread: +oc.spread.toExponential(3) };
+    };
+    out.analysisHex = analysisOn('hex');
+    out.analysisSquare = analysisOn('square');
+    terrainDef.lattice = 'hex';
+
     // ---- H5: toggling back leaves square byte-identical ----
     terrainDef.lattice = 'square'; buildIndex();
     const sq2 = fbmField(gnoise, A);
@@ -246,6 +283,19 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   gate('H4 seed-contract', r.seedContract && r.seedContract.corr >= 0.97
     && r.seedContract.corr > r.seedContract.naiveCorr + 0.01,
     `worldCorr=${r.seedContract && r.seedContract.corr} vs naive(no shift)=${r.seedContract && r.seedContract.naiveCorr} — the live negative control`);
+  // Curvature: the hex fit must land on the SAME physical answer as ZT does on square (both see
+  // the same paraboloid), and read isotropically around the ring. Armed against the square
+  // control rather than an absolute number, so it tracks if the paraboloid probe ever changes.
+  gate('H6 analysis-isotropy',
+    r.analysisHex && r.analysisSquare
+    && Math.abs(r.analysisHex.curvMean - r.analysisSquare.curvMean) < 1e-4
+    && r.analysisHex.curvSpread < 5e-5 && r.analysisHex.occSpread < 0.12,
+    `hex curvMean=${r.analysisHex && r.analysisHex.curvMean} vs square `
+    + `${r.analysisSquare && r.analysisSquare.curvMean} (same surface => same curvature); `
+    + `hex ring spread curv=${r.analysisHex && r.analysisHex.curvSpread} `
+    + `occ=${r.analysisHex && r.analysisHex.occSpread} `
+    + `[square curv=${r.analysisSquare && r.analysisSquare.curvSpread} `
+    + `occ=${r.analysisSquare && r.analysisSquare.occSpread}]`);
   gate('H5 square-safety', r.squareSafety && r.squareSafety.identical,
     `squareByteIdentical=${r.squareSafety && r.squareSafety.identical} pattern=${r.squareSafety && r.squareSafety.pattern}`);
 
