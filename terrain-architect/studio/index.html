@@ -1058,12 +1058,16 @@ const REAL_DEM_SAMPLE="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAA
 // so every square expression is numerically identical and the digest holds throughout.
 const HEX_SQUARE_WORLD=false;
 const HEX_ROWS_FOR=w=>Math.round(w*2/Math.sqrt(3));   // rows that make the world square
+// Row count for a grid of a GIVEN width. Helpers that take n as a parameter (the canyon working
+// grid, blurScalarField, climateSolarExposure, the wind projector) run on their own grid, not
+// necessarily the full field, so they must derive rows from THEIR n rather than from RES.
+const latticeRows=w=>(HEX_SQUARE_WORLD&&terrainDef.lattice==="hex")?HEX_ROWS_FOR(w):w;
 const fieldW=()=>RES;                                  // field WIDTH in cells - always RES
-const fieldH=()=>(HEX_SQUARE_WORLD&&terrainDef.lattice==="hex")?HEX_ROWS_FOR(RES):RES;
+const fieldH=()=>latticeRows(RES);                     // field HEIGHT in ROWS
 const fieldLen=()=>fieldW()*fieldH();
 function newField(v=0){const a=new Float32Array(fieldLen());if(v)a.fill(v);return a;}
 function sampleBilinear(f,x,y){            // x,y in grid coords (= world position in cell units)
-  const n=RES;
+  const n=fieldW(),nh=fieldH();
   if(terrainDef.lattice==="hex"){
     // Odd-r storage (26): cell (c,r) sits at world ( c + 0.5*(r&1), r*sqrt(3)/2 ) in cell units,
     // and every caller means a WORLD position by (x,y) - warpField displaces by noise offsets in
@@ -1149,10 +1153,10 @@ function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, no
 }
 // fractal sum over a base function
 function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
-  const o=newField();const n=RES;let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
+  const o=newField();const n=fieldW(),nh=fieldH();let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
   // Authoring DOMAIN, not world metres (the AUTHORING DOMAIN note at isHex()). hxs=0 on square.
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const gu=xfU((x+hxs*(y&1))/n,y/n),gv=xfV((x+hxs*(y&1))/n,y/n);   // placement folded into the coordinates, not the raster
     let sum=0,amp=1,f=freq;
     for(let k=0;k<octaves;k++){
@@ -1165,9 +1169,9 @@ function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   return ridge?normalize(o):o;
 }
 function worleyField({seed=1,freq=5,mode="f2f1"}){
-  const o=newField();const n=RES,cells=Math.max(2,Math.round(freq));
+  const o=newField();const n=fieldW(),nh=fieldH(),cells=Math.max(2,Math.round(freq));
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const px=xfU((x+hxs*(y&1))/n,y/n)*cells,py=xfV((x+hxs*(y&1))/n,y/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
     let f1=9,f2=9;
     for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
@@ -1182,15 +1186,15 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
   return normalize(o);
 }
 function gradientField(angleDeg){
-  const o=newField();const n=RES,a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
+  const o=newField();const n=fieldW(),nh=fieldH(),a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y/n)*cx+xfV((x+hxs*(y&1))/n,y/n)*cy);}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y/n)*cx+xfV((x+hxs*(y&1))/n,y/n)*cy);}
   return normalize(o);
 }
 function radialField(){
-  const o=newField();const n=RES;
+  const o=newField();const n=fieldW(),nh=fieldH();
   const hxs=terrainDef.lattice==="hex"?0.5:0;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y/n)-.5,dy=xfV((x+hxs*(y&1))/n,y/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y/n)-.5,dy=xfV((x+hxs*(y&1))/n,y/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
   return o;
 }
 
@@ -1253,6 +1257,9 @@ const GPU={
   readRGBA(target,n){this.bind(target,n);
     const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);return rgba;},
+  // n*n, NOT n*nh: this reads back a GPU TEXTURE, and the textures allocated above are square.
+  // Making hex textures n x latticeRows(n) belongs with the GPU hex kernels, not here - the readback
+  // must keep matching whatever was actually uploaded.
   read(target,n){const rgba=this.readRGBA(target,n);
     const o=new Float32Array(n*n);for(let i=0;i<n*n;i++)o[i]=rgba[i*4];return o;},
 };
@@ -1335,7 +1342,7 @@ const GPU_THERMAL_APPLY_FS=`#version 300 es
       float e=H(q)-h-uTalus*ND[k];if(e>0.0)gain+=min(mn.x*e/mn.y,0.5*e);}
     frag=vec4(h+gain-lose,0.0,0.0,1.0);}`;
 function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false,simplex=false}){
-  const n=RES,prog=GPU.prog("fbm",GPU_FBM_FS),out=GPU.rt("gen",n);
+  const n=fieldW(),nh=fieldH(),prog=GPU.prog("fbm",GPU_FBM_FS),out=GPU.rt("gen",n);
   GPU.run(prog,n,out,p=>{
     gl.uniform1f(u(p,"uN"),n);gl.uniform1f(u(p,"uFreq"),freq);gl.uniform1f(u(p,"uLac"),lac);
     gl.uniform1f(u(p,"uGain"),gain);gl.uniform1f(u(p,"uRidge"),ridge?1:0);gl.uniform1f(u(p,"uSimplex"),simplex?1:0);
@@ -1346,7 +1353,7 @@ function gpuFbm({seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false,simplex=fa
   return ridge?normalize(f):f;                 // ridged normalises on the CPU (a reduction), as before
 }
 function gpuThermal(inp,{talus=0.012,iters=30,rate=0.5}){
-  const n=RES,pMS=GPU.prog("thermalMS",GPU_THERMAL_MS_FS),pAp=GPU.prog("thermalApply",GPU_THERMAL_APPLY_FS);
+  const n=fieldW(),nh=fieldH(),pMS=GPU.prog("thermalMS",GPU_THERMAL_MS_FS),pAp=GPU.prog("thermalApply",GPU_THERMAL_APPLY_FS);
   let src=GPU.upload("thA",n,inp),dst=GPU.rt("thB",n);const ms=GPU.rt("thMS",n);
   for(let i=0;i<iters;i++){
     GPU.run(pMS,n,ms,p=>{                      // pass 1: per-cell (move, sum)
@@ -1374,7 +1381,7 @@ const GPU_WARP_FS=`#version 300 es
     float oy=(gnoise(p.x/uN*uFreq,p.y/uN*uFreq,uSeed+53)-0.5)*2.0*s;
     frag=vec4(bilinear(p+vec2(ox,oy)),0.0,0.0,1.0);}`;
 function gpuWarp(inp,{strength=0.12,freq=3,seed=7}){
-  const n=RES,src=GPU.upload("warpIn",n,inp),dst=GPU.rt("warpOut",n),p=GPU.prog("warp",GPU_WARP_FS);
+  const n=fieldW(),nh=fieldH(),src=GPU.upload("warpIn",n,inp),dst=GPU.rt("warpOut",n),p=GPU.prog("warp",GPU_WARP_FS);
   GPU.run(p,n,dst,q=>{
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(u(q,"uH"),0);
     gl.uniform1f(u(q,"uN"),n);gl.uniform1f(u(q,"uStrength"),strength);gl.uniform1f(u(q,"uFreq"),freq);
@@ -1435,7 +1442,7 @@ const GPU_PIPE_STATE_FS=`#version 300 es
 // direct kernel call. Erosion and deposition are one budget, not two nodes.
 let hydroMassDiag=null;
 function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,inertia=0.05,gridK=1}){
-  const n=RES,pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
+  const n=fieldW(),nh=fieldH(),pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
   let state=GPU.uploadState("pipeStateA",n,inp),next=GPU.rt("pipeStateB",n);
   let flux=GPU.rt("pipeFluxA",n),nextFlux=GPU.rt("pipeFluxB",n);GPU.clear(flux,n);
   // Res Lock (gridK = node-level RES/REF_RES; 1 = legacy behaviour, bit-exact). Water crosses one
@@ -1480,7 +1487,7 @@ function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,iner
   // half its mean net erosion, making a deposit lip geometrically impossible; excluding it only
   // deepened the existing one-cell border trench ~15%. Green (water) is never added - it is rain.
   const rgba=GPU.readRGBA(state,n);
-  const o=new Float32Array(n*n);let sumIn=0,sumOut=0,settled=0;
+  const o=new Float32Array(n*nh);let sumIn=0,sumOut=0,settled=0;
   for(let i=0;i<n*n;i++){o[i]=rgba[i*4]+rgba[i*4+2];settled+=rgba[i*4+2];sumIn+=inp[i];sumOut+=o[i];}
   // With everything settled, the only bed-mass sink left is in-sim outflow through the edge
   // pipes, so `exported` is exact by elimination - but DERIVED, not independently itemized.
@@ -1498,12 +1505,12 @@ const gpuReady=()=>USE_GPU&&terrainDef.lattice!=="hex"&&GPU.init();
    reference-impl/placement.py. A Shape is both a mask (wire it into any node's Mask input to
    confine an effect) and a heightfield (erode it into a landform) — Gaea's Mask-as-Primitive. ---- */
 function shapeField(p){
-  const n=RES,o=newField(),cs=cellSizeM();
+  const n=fieldW(),nh=fieldH(),o=newField(),cs=cellSizeM();
   const cx=p.x*terrainDef.scale,cy=p.y*terrainDef.scale;          // 0..1 of the terrain -> metres
   const rad=p.size*terrainDef.scale*0.5,fall=Math.max(p.falloff*terrainDef.scale*0.5,cs);
   const a=-p.angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const half=Math.max(rad*p.aspect,cs);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const U=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,V=(y+0.5)/n; // authoring domain (note at isHex())
     let dx=xfU(U,V)*terrainDef.scale-cx,dy=xfV(U,V)*terrainDef.scale-cy;
     const rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;                          // rotate into object space
@@ -1526,7 +1533,7 @@ function pointSegmentDistance(px,py,ax,ay,bx,by){
 // survives every working/build resolution. Strokes alpha-composite in order; Erase is destructive
 // only inside this node and remains fully undoable/serialisable with the graph.
 function drawMaskField(p){
-  const n=RES,N=n*n,out=new Float32Array(N),strokes=Array.isArray(p.strokes)?p.strokes:[];
+  const n=fieldW(),nh=fieldH(),N=n*nh,out=new Float32Array(N),strokes=Array.isArray(p.strokes)?p.strokes:[];
   for(const stroke of strokes){
     const pts=stroke.points||[];if(!pts.length)continue;
     const radius=Math.max(.0005,(stroke.width||.04)*.5),hard=clamp(stroke.hardness==null?.7:stroke.hardness,0,1);
@@ -1542,7 +1549,7 @@ function drawMaskField(p){
     if(XF){
       // An exact Transform can move any painted segment across the tile. Scan output cells once
       // per stroke and find the nearest segment; this avoids a 64 MB Float32 coverage raster at 4K.
-      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
         const su=(x+.5+hxs*(y&1))/n,sv=(y+.5)/n;
         const u=xfU(su,sv),v=xfV(su,sv);let d=Infinity;
         if(pts.length===1)d=Math.hypot(u-pts[0][0],v-pts[0][1]);
@@ -1702,11 +1709,11 @@ function parseLayout(text){
   return shapes.filter(sh=>sh.pts.length>0);
 }
 function layoutField(shapes,base){
-  const n=RES,o=base?base.slice():newField(0);
+  const n=fieldW(),nh=fieldH(),o=base?base.slice():newField(0);
   for(const sh of shapes){
     const prof=FALLOFF[sh.profile]||FALLOFF.scurve;
     const fall=Math.max(sh.falloff,1e-4),half=(sh.width||0)*0.5;
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/n;
       let {d,e}=polylineNearest(u,v,sh.pts);
       // inside a closed polygon the distance is zero, so the interior sits at the shape's elevation
@@ -1836,7 +1843,7 @@ function smoothMaxHeight(a,b,k){
   return lerp(b,a,t)+k*t*(1-t);
 }
 function peakField(p){
-  const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
+  const n=fieldW(),nh=fieldH(),st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
   const variation=Math.max(p.variation||0,0),hs=k=>hash2(p.seed|0,k,9137);
   const vr=(k,amt)=>1+(hs(k)*2-1)*amt*variation;
   const reach=Math.max(p.size,0.02)*vr(1,.22);
@@ -1854,7 +1861,7 @@ function peakField(p){
   const warpAmp=(.035+.075*char)*(.72+.28*variation);
   const w0x=fbm2(4.2,1.7,p.seed+31,4),w0y=fbm2(8.3,5.1,p.seed+32,4);
   let h=newField(0);const cover=newField(0);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/n,dx=u-p.x,dy=v-p.y;
     let qx=( dx*ca+dy*sa)/sx,qy=(-dx*sa+dy*ca)/sy;
     // Subtract the warp at the origin: Character can move shoulders and contours without moving
@@ -1959,7 +1966,7 @@ function peakField(p){
 }
 function mountainField(p){
   if(p.form==="peak")return peakField(p);
-  const n=RES,st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
+  const n=fieldW(),nh=fieldH(),st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
   const relief=p.relief,ncell=st.cells,warpamt=st.warp;
   const weather=Math.max(p.weather==null?1:p.weather,0),height=Math.max(p.height==null?1:p.height,0);
   const reduce=clamp(p.reduce==null?0:p.reduce,0,1),bulkExp=p.bulk==="low"?1.28:p.bulk==="high"?.72:1;
@@ -1985,7 +1992,7 @@ function mountainField(p){
       cxp.push(cx0+0.9*reach*Math.cos(ang)*t+px*(wob[a]-wm)*n);
       cyp.push(cy0+0.9*reach*Math.sin(ang)*t+py*(wob[a]-wm)*n);}
     const amp=0.7+0.6*rnd();
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const xw=x+hxs*(y&1),yw=y;
       let d=Infinity;
       for(let a=0;a<k-1;a++)d=Math.min(d,sdSegment(xw,yw,cxp[a],cyp[a],cxp[a+1],cyp[a+1]));
@@ -1994,8 +2001,8 @@ function mountainField(p){
   }
 
   // 2) modulated-Voronoi ridge network
-  const netA=new Float32Array(n*n),netB=new Float32Array(n*n);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  const netA=new Float32Array(n*nh),netB=new Float32Array(n*nh);
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const u=(x+hxs*(y&1))/n*ncell,v=y/n*ncell;
     const wx=fbm2(u*0.35,v*0.35,p.seed+3,4)+0.5*fbm2(u*0.9,v*0.9,p.seed+13,4);
     const wy=fbm2(u*0.35+4.7,v*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*0.9+1.9,v*0.9+6.1,p.seed+14,4);
@@ -2127,8 +2134,8 @@ function canyonCacheKey(p,n){
     p.tributaries??0,p.seed,p.detailWarp,p.alternate,
     terrainDef.scale,terrainDef.height].join("|");
 }
-function canyonPriorityFlood(h,n,outlet){
-  const N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),rank=new Int32Array(N);
+function canyonPriorityFlood(h,n,outlet){const nh=latticeRows(n);
+  const N=n*nh,filled=new Float32Array(N),done=new Uint8Array(N),rank=new Int32Array(N);
   const order=[],heap=[],flatEpsilon=7.5e-7;
   const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;
     if(heap[p][0]<=heap[c][0])break;[heap[p],heap[c]]=[heap[c],heap[p]];c=p;}};
@@ -2147,12 +2154,12 @@ function canyonPriorityFlood(h,n,outlet){
   }
   return{filled,rank,order};
 }
-function canyonDrainage(h,n,outlet,inlet=-1,externalArea=0){
-  const flood=canyonPriorityFlood(h,n,outlet),N=n*n,rec=new Int32Array(N).fill(-1);
+function canyonDrainage(h,n,outlet,inlet=-1,externalArea=0){const nh=latticeRows(n);
+  const flood=canyonPriorityFlood(h,n,outlet),N=n*nh,rec=new Int32Array(N).fill(-1);
   const dist=new Float32Array(N).fill(1),A=new Float32Array(N).fill(1);
   const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],
     [-1,-1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,1,Math.SQRT2],[1,1,Math.SQRT2]];
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;if(i===outlet)continue;let best=-Infinity,br=-1,bd=1;
     for(const[dx,dy,d]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
       const j=yy*n+xx;if(flood.rank[j]>=flood.rank[i])continue;
@@ -2195,8 +2202,8 @@ function canyonBedHardness(z,beds){
 // model - and the tile is an open system that exports sediment through the outlet, so the material is
 // genuinely leaving rather than vanishing. It is returned as `exported` so the mass budget can be
 // audited, because a silent sink is indistinguishable from a bug.
-function canyonThermalStep(h,n,tanLut,wash,base,relief,cellM,heightM,c,budget){
-  const N=n*n,next=new Float32Array(N),delta=new Float32Array(N),LUTM=tanLut.length-1;
+function canyonThermalStep(h,n,tanLut,wash,base,relief,cellM,heightM,c,budget){const nh=latticeRows(n);
+  const N=n*nh,next=new Float32Array(N),delta=new Float32Array(N),LUTM=tanLut.length-1;
   const invRelief=1/Math.max(relief,1e-6);
   // Per-neighbour distance correction. Holding all eight neighbours to one drop means diagonals are
   // limited to a slope SQRT2 times too steep, so material collapses preferentially along the
@@ -2206,7 +2213,7 @@ function canyonThermalStep(h,n,tanLut,wash,base,relief,cellM,heightM,c,budget){
   const nbd=[card,card,card,card,diag,diag,diag,diag];
   // Hoisted scratch: allocating per cell here would cost more in GC than the whole pass.
   const sj=new Int32Array(8),sd=new Float64Array(8),sl=new Float64Array(8);
-  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+  for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
     const i=y*n+x,hi=h[i];
     const k=clamp(Math.round((hi-base)*invRelief*LUTM),0,LUTM),tanPhi=tanLut[k];
     let cnt=0,dTotal=0,maxExcess=0;
@@ -2244,16 +2251,16 @@ function canyonThermalStep(h,n,tanLut,wash,base,relief,cellM,heightM,c,budget){
 // Depth stays a composition-only control: it is a pure vertical gain on the cached solve, so a depth
 // edit is two flops per cell and never re-runs the process.
 function canyonComposeField(result,p){
-  const {n,h,hDatum,surrounding}=result,N=n*n;
+  const {n,h,hDatum,surrounding}=result,nh=latticeRows(n),N=n*nh;
   const depth=.10+.72*clamp(p.depth,0,1.25),rim=.88+.035*surrounding;
   const gain=depth/CANYON_RELIEF_BUDGET,field=new Float32Array(N);
   for(let i=0;i<N;i++)field[i]=rim-gain*(hDatum-h[i]);
   result.field=field;result.renderDepth=p.depth;return result;
 }
 function canyonEvolutionState(p,requestedN){
-  const n=requestedN||canyonSimulationSize(RES),key=canyonCacheKey(p,n);
+  const n=requestedN||canyonSimulationSize(RES),nh=latticeRows(n),key=canyonCacheKey(p,n);
   if(CANYON_EVOLUTION_CACHE.has(key))return canyonComposeField(CANYON_EVOLUTION_CACHE.get(key),p);
-  const N=n*n,style=CANYON_STYLE_ID[p.style]||0,proc=CANYON_PROCESS[style],beds=canyonBeds(p);
+  const N=n*nh,style=CANYON_STYLE_ID[p.style]||0,proc=CANYON_PROCESS[style],beds=canyonBeds(p);
   const seed=p.seed|0,structural=clamp(p.structural,0,1),detail=clamp(p.detailWarp,0,1);
   const scale=clamp(p.scale,0,1),valley=clamp(p.valley,0,1),slot=clamp(p.slot,0,1);
   const surrounding=clamp(p.surrounding,0,1),density=clamp((p.tributaries??0)/8,0,1);
@@ -2266,7 +2273,7 @@ function canyonEvolutionState(p,requestedN){
   const outletX=clamp(Math.round(centerAt(1)*(n-1)),2,n-3),outlet=(n-1)*n+outletX;
   const externalArea=N*lerp(.22,.48,scale);
   let initialMin=Infinity,initialMax=-Infinity;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x,u=x/(n-1),v=y/(n-1),cx=centerAt(v),dx=Math.abs(u-cx);
     // A broad synclinal/weak structural corridor and regional downstream tilt only seed drainage.
     // Their relief is < 8% of the requested final canyon depth; incision must amplify them.
@@ -2505,8 +2512,8 @@ function canyonEvolutionState(p,requestedN){
 // coarse edge gradients and is therefore bounded by the coarse maximum: a surface at repose on the
 // process grid is still at repose on the finer grid. Do not delete the weathering source and keep the
 // relaxation - that would silently turn this whole pass into a no-op.
-function canyonSurfaceExpression(state,p,o,n){
-  const N=n*n,detail=clamp(p.detailWarp,0,1);
+function canyonSurfaceExpression(state,p,o,n){const nh=latticeRows(n);
+  const N=n*nh,detail=clamp(p.detailWarp,0,1);
   const cellM=terrainDef.scale/(n-1),H=terrainDef.height;
   // Compose is affine, and an affine map preserves NORMALISED position, so taking `rel` from the
   // field's own range makes the bed lookup identical at every Depth. The stratigraphy a face exposes
@@ -2517,7 +2524,7 @@ function canyonSurfaceExpression(state,p,o,n){
   const src=new Float32Array(N),dep=new Float32Array(N);
   const tan28=Math.tan(28*Math.PI/180),tan62=Math.tan(62*Math.PI/180);
   let sourced=0,exported=0;
-  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+  for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
     const i=y*n+x;
     const gx=(o[i+1]-o[i-1])*H/(2*cellM),gy=(o[i+n]-o[i-n])*H/(2*cellM),S=Math.hypot(gx,gy);
     // Hard-gated to zero below 28 degrees: this is FACE retreat, so it does not touch gentle ground.
@@ -2534,7 +2541,7 @@ function canyonSurfaceExpression(state,p,o,n){
     src[i]=lower;sourced+=lower;
   }
   // Deposit at the foot of the face: one steepest-descent hop. Mass is moved, never conjured.
-  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+  for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
     const i=y*n+x,q=src[i];if(q<=0)continue;
     let bj=-1,best=0;
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
@@ -2595,7 +2602,7 @@ function atFeatureScale(inp,k,fn){
 }
 // TRANSFORM — move / rotate / scale the terrain itself (Gaea's Transform node). scale>1 magnifies.
 function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5,edge="clamp"}){
-  const n=RES,o=newField(),a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
+  const n=fieldW(),nh=fieldH(),o=newField(),a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
   const wrap=(t)=>edge==="wrap"?((t%n)+n)%n
     :edge==="mirror"?(()=>{const p=((t%(2*n))+2*n)%(2*n);return p<n?p:2*n-1-p;})()
@@ -2603,7 +2610,7 @@ function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,piv
   const samp=(fx,fy)=>{const x0=Math.floor(fx),y0=Math.floor(fy),tx=fx-x0,ty=fy-y0;
     const g=(xx,yy)=>inp[wrap(yy)*n+wrap(xx)];
     return lerp(lerp(g(x0,y0),g(x0+1,y0),tx),lerp(g(x0,y0+1),g(x0+1,y0+1),tx),ty);};
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const u=(x+0.5)/n-pivX,v=(y+0.5)/n-pivY;
     let ru=(u*ca-v*sa)/sX,rv=(u*sa+v*ca)/sY;    // inverse map: sample a smaller region to magnify
     ru+=pivX-offX;rv+=pivY-offY;
@@ -2613,7 +2620,7 @@ function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,piv
 
 /* ------------------------------------------------------- modifiers ---- */
 function warpField(inp,{strength=0.12,freq=3,seed=7}){
-  const o=newField();const n=RES,s=strength*n;
+  const o=newField();const n=fieldW(),nh=fieldH(),s=strength*n;
   // Seed contract AND world-space displacement (26). Two separate hex defects lived here, and
   // together they were the largest single reason the DEFAULT graph's terrain changed on a
   // lattice toggle (warp sits early in perlin -> blend -> warp -> hydraulic -> thermal, and is
@@ -2626,7 +2633,7 @@ function warpField(inp,{strength=0.12,freq=3,seed=7}){
   // reads WORLD positions, so the displaced point converts on the way in - and only there.
   // hxs=0, rzs=1 on square: byte-identical there.
   const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const du=x+hxs*(y&1),dv=y;
     const ox=(gnoise(du/n*freq,dv/n*freq,seed)-.5)*2*s;
     const oy=(gnoise(du/n*freq,dv/n*freq,seed+53)-.5)*2*s;
@@ -2660,11 +2667,11 @@ function levelsField(inp,{inLo=0,inHi=1,gamma=1,outLo=0,outHi=1}){
 function clampField(inp,{lo=0,hi=1}){const o=newField();for(let i=0;i<inp.length;i++)o[i]=clamp(inp[i],lo,hi);return o;}
 function invertField(inp){const o=newField();for(let i=0;i<inp.length;i++)o[i]=1-inp[i];return o;}
 function blurField(inp,{radius=2}){
-  const n=RES,r=Math.max(1,Math.round(radius));const tmp=newField(),o=newField();
+  const n=fieldW(),nh=fieldH(),r=Math.max(1,Math.round(radius));const tmp=newField(),o=newField();
   const w=[];let ws=0;for(let k=-r;k<=r;k++){const g=Math.exp(-(k*k)/(2*(r*0.6)*(r*0.6)));w.push(g);ws+=g;}
   for(let i=0;i<w.length;i++)w[i]/=ws;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=inp[y*n+clamp(x+k,0,n-1)]*w[k+r];tmp[y*n+x]=s;}
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,n-1)*n+x]*w[k+r];o[y*n+x]=s;}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=inp[y*n+clamp(x+k,0,n-1)]*w[k+r];tmp[y*n+x]=s;}
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,n-1)*n+x]*w[k+r];o[y*n+x]=s;}
   return o;
 }
 function histEqualizeField(inp,{bins=256,amount=1}){
@@ -2709,14 +2716,14 @@ function percentileOf(f,q){                       // q in [0,1]
 
 /* ----------------------------------------------------- selectors ------ */
 function slopeOf(inp){
-  const n=RES,o=newField();
+  const n=fieldW(),nh=fieldH(),o=newField();
   if(isHex()){
     // D6 least-squares gradient. Square central differences on hex data span sqrt(3) world units
     // between rows y-1 and y+1 but still divide by 2, so a world-space CONE - which has one slope
     // at every azimuth - reads 2/sqrt(3) = 1.1547x steeper N-S than E-W. Measured on that cone:
     // ring anisotropy 1.147 before (square control 1.000), and the E-W/N-S ratio came out 1.1499
     // against the 1.1547 the mechanism predicts.
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const nb=hexNb(y);let gx=0,gy=0;
       for(let k=0;k<6;k++){
         const h=inp[clamp(y+nb[k][1],0,n-1)*n+clamp(x+nb[k][0],0,n-1)];
@@ -2726,7 +2733,7 @@ function slopeOf(inp){
     }
     return o;
   }
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const l=inp[y*n+clamp(x-1,0,n-1)],r=inp[y*n+clamp(x+1,0,n-1)];
     const u=inp[clamp(y-1,0,n-1)*n+x],d=inp[clamp(y+1,0,n-1)*n+x];
     o[y*n+x]=Math.hypot((r-l)*0.5,(d-u)*0.5)*n;
@@ -2740,8 +2747,8 @@ function slopeOf(inp){
 const gAt=(f,x,y)=>f[clamp(y,0,RES-1)*RES+clamp(x,0,RES-1)];
 // Zevenbergen-Thorne curvature on the 3x3 window (analysis.curvature). profile: +ve concave valley floor.
 function curvatureField(inp,{kind="profile",strength=1}){
-  const n=RES,o=newField(),L=1/n,eps=1e-12,hex=isHex();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  const n=fieldW(),nh=fieldH(),o=newField(),L=1/n,eps=1e-12,hex=isHex();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     let D,E,F,G,H;
     if(hex){
       // The 3x3 Zevenbergen-Thorne window is square machinery; the exactly analogous hex fit is a
@@ -2787,8 +2794,8 @@ function flowField(inp,{gain=1}){
 }
 // Horizon-based ambient occlusion: occl = 1 - mean(cos^2 theta) over n dirs (analysis.horizon_ao).
 function occlusionField(inp,{radius=0.06,dirs=8}){
-  const n=RES,o=newField(),maxD=Math.max(2,radius*n),hex=isHex();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  const n=fieldW(),nh=fieldH(),o=newField(),maxD=Math.max(2,radius*n),hex=isHex();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const h0=inp[y*n+x];let occ=0;
     // March in WORLD space. Stepping the grid indices instead walks sqrt(3)/2 world units per
     // row step while dividing by the index distance, so the horizon is scanned along a sheared
@@ -2811,10 +2818,10 @@ function occlusionField(inp,{radius=0.06,dirs=8}){
 }
 // Separable grayscale dilate/erode (square SE) -> morphological closing, for deposits.
 function morph1D(inp,r,mx){
-  const n=RES,t=newField(),o=newField();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=inp[y*n+x];
+  const n=fieldW(),nh=fieldH(),t=newField(),o=newField();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let v=inp[y*n+x];
     for(let k=-r;k<=r;k++){const s=gAt(inp,x+k,y);v=mx?Math.max(v,s):Math.min(v,s);}t[y*n+x]=v;}
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=t[y*n+x];
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let v=t[y*n+x];
     for(let k=-r;k<=r;k++){const s=gAt(t,x,y+k);v=mx?Math.max(v,s):Math.min(v,s);}o[y*n+x]=v;}
   return o;
 }
@@ -2823,10 +2830,10 @@ function morph1D(inp,r,mx){
 // (sqrt(2)*(r1+rd)), removing the square SE's C4 print-through (fills read wider along the
 // diagonals than along the axes - the plus-shaped bias family of 09).
 function morphDiag1D(inp,r,mx){
-  const n=RES,t=newField(),o=newField();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=inp[y*n+x];
+  const n=fieldW(),nh=fieldH(),t=newField(),o=newField();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let v=inp[y*n+x];
     for(let k=-r;k<=r;k++){const s=gAt(inp,x+k,y+k);v=mx?Math.max(v,s):Math.min(v,s);}t[y*n+x]=v;}
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=t[y*n+x];
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let v=t[y*n+x];
     for(let k=-r;k<=r;k++){const s=gAt(t,x+k,y-k);v=mx?Math.max(v,s):Math.min(v,s);}o[y*n+x]=v;}
   return o;
 }
@@ -2915,7 +2922,7 @@ function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
    Its purpose is to drive Stream power's Uplift input: this gives the structure, the rivers give the
    topography. F-tier -- a plausible planar plate sketch, not plate physics. */
 function plateUplift(p){
-  const n=RES,N=n*n,P=Math.max(3,Math.round(p.plates));
+  const n=fieldW(),nh=fieldH(),N=n*nh,P=Math.max(3,Math.round(p.plates));
   let rs=((p.seed|0)*2654435761)>>>0;
   const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
   const gauss=()=>{let u=0,v=0;while(u<=1e-9)u=rnd();v=rnd();
@@ -2925,12 +2932,12 @@ function plateUplift(p){
     for(let k=0;k<P;k++){const d=(x-cx[k])**2+(y-cy[k])**2;if(d<bd){bd=d;bi=k;}}return bi;};
   for(let it=0;it<2;it++){                          // Lloyd relaxation -> evenly sized plates
     const sx=new Float64Array(P),sy=new Float64Array(P),c=new Float64Array(P);
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const k=nearest(x,y);sx[k]+=x;sy[k]+=y;c[k]++;}
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const k=nearest(x,y);sx[k]+=x;sy[k]+=y;c[k]++;}
     for(let k=0;k<P;k++)if(c[k]>0){cx[k]=sx[k]/c[k];cy[k]=sy[k]/c[k];}
   }
   const warp=p.warp*n*0.06;
   const pid=new Int32Array(N);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){        // assign on WARPED coordinates
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){        // assign on WARPED coordinates
     // Warp FREQUENCY matters more than amplitude here. The reference uses warp_freq 0.045, i.e. ~8.6
     // cycles across a 192 tile; at 3.2 cycles the noise is so smooth it translates whole boundaries
     // rigidly instead of bending them, and they stay recognisably straight. Measured, the low
@@ -2944,7 +2951,7 @@ function plateUplift(p){
   for(let k=0;k<P;k++){vx.push(gauss());vy.push(gauss());isOcean.push(rnd()<p.ocean);}
   const boundary=newField(0);
   const NB=[[-1,0],[1,0],[0,-1],[0,1]];
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x,a=pid[i];
     for(const d of NB){
       const xx=Math.min(n-1,Math.max(0,x+d[0])),yy=Math.min(n-1,Math.max(0,y+d[1]));
@@ -3009,7 +3016,7 @@ function plateUplift(p){
    there is nothing to incise toward. At steady state S ~ A^(-m/n) -- a straight line of slope -m on
    a log-log slope/area plot, which is the decisive verification (see _verify_streampower.js). */
 function spReceivers(g,cellsize){
-  const n=RES,N=n*n,rec=new Int32Array(N).fill(-1),dist=new Float32Array(N).fill(cellsize);
+  const n=fieldW(),nh=fieldH(),N=n*nh,rec=new Int32Array(N).fill(-1),dist=new Float32Array(N).fill(cellsize);
   if(isHex()){
     // D6 steepest descent: six candidates, ONE distance, no sqrt(2) case. Run with the square D8
     // table this measured 40.4% of interior receivers landing on cells that are not lattice
@@ -3017,7 +3024,7 @@ function spReceivers(g,cellsize){
     // and 54.1% reporting dist=sqrt(2)*cellsize, a distance no pair of hex cells has. Note the
     // square table is a SUPERSET of the hex one-ring, so pure connectivity never showed this:
     // flow still reached the edge, it just took steps the lattice does not have.
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const i=y*n+x,nb=hexNb(y);let best=0,bi=-1;
       for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
         if(xx<0||yy<0||xx>=n||yy>=n)continue;
@@ -3028,7 +3035,7 @@ function spReceivers(g,cellsize){
   }
   const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],
             [-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;let best=0,bi=-1,bd=cellsize;
     for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
       const ni=yy*n+xx,sl=(g[i]-g[ni])/(d[2]*cellsize);
@@ -3053,11 +3060,11 @@ function spReceivers(g,cellsize){
 // sharpened for 200 iterations. reference-impl has hillslope_diffuse but never couples the two,
 // which is a gap there as well.
 function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
-  const n=RES,N=n*n;
+  const n=fieldW(),nh=fieldH(),N=n*nh;
   let h=inp.slice();
   const isEdge=new Uint8Array(N);
   for(let x=0;x<n;x++){isEdge[x]=1;isEdge[(n-1)*n+x]=1;}
-  for(let y=0;y<n;y++){isEdge[y*n]=1;isEdge[y*n+n-1]=1;}
+  for(let y=0;y<nh;y++){isEdge[y*n]=1;isEdge[y*n+n-1]=1;}
   for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
   const A=new Float32Array(N);
   for(let it=0;it<iters;it++){
@@ -3090,7 +3097,7 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
       const t=new Float32Array(h.length);
       for(let s2=0;s2<sub;s2++){
         t.set(h);
-        for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
+        for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
           h[i]=t[i]+c*(-4*t[i]+t[i-1]+t[i+1]+t[i-n]+t[i+n]);}
       }
     }
@@ -3103,12 +3110,12 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
 // does not exist here, which is the point. Offsets depend on row parity (odd-r); the excess
 // scan, stable-pair budget and proportional distribution are thermalErode's own, unchanged.
 function thermalErodeHex(inp,{talus=0.012,iters=30,rate=0.5}){
-  const n=RES;let h=inp.slice();
+  const n=fieldW(),nh=fieldH();let h=inp.slice();
   const nbEven=[[-1,0],[1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
   const nbOdd =[[-1,0],[1,0],[0,-1],[1,-1],[0,1],[1,1]];
   for(let it=0;it<iters;it++){
-    const dh=new Float32Array(n*n);
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const dh=new Float32Array(n*nh);
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const nb=(y&1)?nbOdd:nbEven,c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
       for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
         const d=c-h[yy*n+xx];const e=d-talus;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
@@ -3126,14 +3133,14 @@ function thermalErodeHex(inp,{talus=0.012,iters=30,rate=0.5}){
 // is exactly thermalErode, so the digest-pinned mountain/peak weathering is byte-identical.
 const thermalOn=(inp,opt)=>(isHex()?thermalErodeHex:thermalErode)(inp,opt);
 function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
-  const n=RES;let h=inp.slice();
+  const n=fieldW(),nh=fieldH();let h=inp.slice();
   // 8-neighbour offsets with their DISTANCE (diagonals are sqrt(2) away). The repose threshold must
   // scale with distance or diagonals relax at a shallower true angle — the plus-shaped grid artefact.
   // Mirrors reference-impl/erosion_thermal.py's `distance_correct`.
   const nb=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
   for(let it=0;it<iters;it++){
-    const dh=new Float32Array(n*n);
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const dh=new Float32Array(n*nh);
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
       for(const[dx,dy,dist]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
         const d=c-h[yy*n+xx];const e=d-talus*dist;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
@@ -3155,15 +3162,15 @@ function terrainOrientation(def=terrainDef){
   const lat=def.latitude==null?46:def.latitude,north=[Math.sin(a),-Math.cos(a)],hemi=lat<0?-1:lat>0?1:0;
   return{north,equator:hemi>0?[-north[0],-north[1]]:hemi<0?[north[0],north[1]]:[0,0],hemisphere:hemi};
 }
-function blurScalarField(src,n,radius,passes=2){
+function blurScalarField(src,n,radius,passes=2){const nh=latticeRows(n);
   radius=Math.max(0,radius|0);if(!radius)return src.slice();
-  let a=src.slice(),b=new Float32Array(n*n),span=radius*2+1;
+  let a=src.slice(),b=new Float32Array(n*nh),span=radius*2+1;
   for(let pass=0;pass<passes;pass++){
-    for(let y=0;y<n;y++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[y*n+clamp(k,0,n-1)];
+    for(let y=0;y<nh;y++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[y*n+clamp(k,0,n-1)];
       for(let x=0;x<n;x++){b[y*n+x]=sum/span;sum+=a[y*n+clamp(x+radius+1,0,n-1)]-a[y*n+clamp(x-radius,0,n-1)];}}
     [a,b]=[b,a];
     for(let x=0;x<n;x++){let sum=0;for(let k=-radius;k<=radius;k++)sum+=a[clamp(k,0,n-1)*n+x];
-      for(let y=0;y<n;y++){b[y*n+x]=sum/span;sum+=a[clamp(y+radius+1,0,n-1)*n+x]-a[clamp(y-radius,0,n-1)*n+x];}}
+      for(let y=0;y<nh;y++){b[y*n+x]=sum/span;sum+=a[clamp(y+radius+1,0,n-1)*n+x]-a[clamp(y-radius,0,n-1)*n+x];}}
     [a,b]=[b,a];
   }
   return a;
@@ -3208,7 +3215,7 @@ function propagateFieldMetadata(field,inputs,def){
     lapseRate:source.lapseRate,heightField:source.heightField});
   return field;
 }
-function metricHeightField(inp,n,def){
+function metricHeightField(inp,n,def){const nh=latticeRows(n);
   // EXACTLY the viewport's frame: autolevel to the full [datum, datum+height] span. The viewport
   // unconditionally renormalises whatever field it displays (see the `(field[i]-mn)/d` fill in
   // updateViewport), so "Relief height" is the vertical span OF WHAT IS DRAWN, the climate readout
@@ -3222,13 +3229,13 @@ function metricHeightField(inp,n,def){
   // drawn - the exact inversion of the defect it claimed to fix. If a field-value-is-absolute
   // elevation contract is ever wanted, the viewport autolevel must change in the same commit,
   // with the display consequences for non-normalised graphs accepted deliberately.
-  const N=n*n,[mn,mx]=fieldRange(inp),range=mx-mn||1,out=new Float32Array(N),heightM=def.height||2600;
+  const N=n*nh,[mn,mx]=fieldRange(inp),range=mx-mn||1,out=new Float32Array(N),heightM=def.height||2600;
   const datum=def.baseElevation||0;
   for(let i=0;i<N;i++)out[i]=datum+(inp[i]-mn)/range*heightM;
   return out;
 }
-function climateSolarExposure(baseM,n,def,options={}){
-  const N=n*n,orient=terrainOrientation(def),eq=orient.equator;
+function climateSolarExposure(baseM,n,def,options={}){const nh=latticeRows(n);
+  const N=n*nh,orient=terrainOrientation(def),eq=orient.equator;
   const elevation=clamp(def.solarElevation==null?45:def.solarElevation,3,90)*Math.PI/180;
   const sinEl=Math.sin(elevation),cosEl=Math.cos(elevation),tanEl=Math.tan(elevation);
   const cell=(def.scale||5000)/n,direct=new Float32Array(N),visibility=new Float32Array(N);
@@ -3244,7 +3251,7 @@ function climateSolarExposure(baseM,n,def,options={}){
     const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
     return lerp(lerp(baseM[i],baseM[i+1],fx),lerp(baseM[i+n],baseM[i+n+1],fx),fy);
   };
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x,x0=Math.max(0,x-1),x1=Math.min(n-1,x+1),y0=Math.max(0,y-1),y1=Math.min(n-1,y+1);
     const dzdx=(baseM[y*n+x1]-baseM[y*n+x0])/Math.max((x1-x0)*cell,1e-6);
     const dzdy=(baseM[y1*n+x]-baseM[y0*n+x])/Math.max((y1-y0)*cell,1e-6);
@@ -3325,10 +3332,10 @@ function windVectorFromField(field){
   const m=fieldMetadata(field);
   return m&&m.kind==="wind"&&m.u&&m.v&&m.speed?m:null;
 }
-function windDivergenceRms(u,v,n,cell){
+function windDivergenceRms(u,v,n,cell){const nh=latticeRows(n);
   if(!u||!v||n<3)return 0;
   let sum=0,count=0;
-  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+  for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
     const i=y*n+x,d=(u[i+1]-u[i-1]+v[i+n]-v[i-n])/(2*cell);
     sum+=d*d;count++;
   }
@@ -3345,9 +3352,9 @@ function windDivergenceRms(u,v,n,cell){
 // reference-impl uses one spectral operator for div/Laplacian/grad for exactly this reason and
 // gates after < 0.05*before). A coarse-grid pre-solve (4x block-mean restriction, solved deep,
 // prolonged as the initial guess) carries the long-wavelength part a bounded fine sweep cannot.
-function projectWindMassConsistent(u0,v0,n,cell,iterations=56){
-  const N=n*n,rhs=new Float32Array(N);
-  for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){
+function projectWindMassConsistent(u0,v0,n,cell,iterations=56){const nh=latticeRows(n);
+  const N=n*nh,rhs=new Float32Array(N);
+  for(let y=0;y<nh-1;y++)for(let x=0;x<n-1;x++){
     const i=y*n+x;rhs[i]=(u0[i+1]-u0[i]+v0[i+n]-v0[i])/cell;
   }
   const jacobi=(lam0,rhs2,m,cellM,iters)=>{
@@ -3381,14 +3388,14 @@ function projectWindMassConsistent(u0,v0,n,cell,iterations=56){
         rc[Y*m+X]=c3?s2/c3:0;
       }
       const lamC=jacobi(new Float32Array(m*m),rc,m,cell*f,Math.min(600,m*m));
-      for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++)
+      for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++)
         lam[y*n+x]+=sampleGridBilinear(lamC,m,x/f,y/f);
     }
     lam=jacobi(lam,rhs,n,cell,iterations);
   }
   const src=lam;
   const u=u0.slice(),v=v0.slice();
-  for(let y=0;y<n;y++)for(let x=1;x<n;x++){const i=y*n+x;u[i]-=(src[i]-src[i-1])/cell;}
+  for(let y=0;y<nh;y++)for(let x=1;x<n;x++){const i=y*n+x;u[i]-=(src[i]-src[i-1])/cell;}
   for(let y=1;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;v[i]-=(src[i]-src[i-n])/cell;}
   return{u,v};
 }
@@ -3415,7 +3422,7 @@ function sampleGridBilinear(field,n,x,y){
 // of scale); the confinement denominator height*0.005; and the /30 m/s saturation used for the
 // display value and snow coupling (winds above 30 read as full strength; the vector cap is 80).
 function simulateTerrainWind(inp,p={},context={}){
-  const n=context.res||RES,N=n*n,def=context.terrainDef||terrainDef;
+  const n=context.res||RES,nh=latticeRows(n),N=n*nh,def=context.terrainDef||terrainDef;
   const direction=def.windDirection==null?300:def.windDirection;
   const baseSpeed=clamp(def.windSpeed==null?10:def.windSpeed,0,WIND_MAX_MPS);
   const[baseU,baseV]=windBearingVector(direction),cell=(def.scale||5000)/n;
@@ -3440,7 +3447,7 @@ function simulateTerrainWind(inp,p={},context={}){
   const structure=channeling>0?blurScalarField(baseM,n,channelRadius,2):baseM;
   const u0=new Float32Array(N),v0=new Float32Array(N),speed0=new Float32Array(N);
   const tanLow=Math.tan(3*Math.PI/180),tanHigh=Math.tan(15*Math.PI/180);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;
     // FETCH SECANT, per references/13 and reference-impl/winds.py:upwind_slope - the hill's
     // aspect ratio H/L seen looking UPWIND: (h[p] - h[p - fetch*dir]) / (fetch*cell). NOT the
@@ -3533,7 +3540,7 @@ function windColorField(wind,n){
 // simultaneous avalanches: only snow moves, every transfer is distance-correct, and mass is
 // conserved. The bedrock/soil height input remains unchanged.
 function simulateSnowLayer(inp,p={},context={}){
-  const n=context.res||RES,N=n*n,def=context.terrainDef||terrainDef;
+  const n=context.res||RES,nh=latticeRows(n),N=n*nh,def=context.terrainDef||terrainDef;
   if(!inp||inp.length!==N)return{depthM:new Float32Array(N),volumeM3:0,maxDepthM:0,coverage:0};
   const scale=def.scale||5000,heightM=def.height||2600,cell=scale/n,cellArea=cell*cell;
   const baseM=metricHeightField(inp,n,def),depthM=new Float32Array(N);
@@ -3546,7 +3553,7 @@ function simulateSnowLayer(inp,p={},context={}){
     :climateSolarExposure(baseM,n,def);
   const temperatureC=context.temperatureC||new Float32Array(N);
   let depositedM3=0,meltedM3=0,preAvalancheM3=0;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x,airTemperature=seaTemp-lapse*(baseM[i]/1000);
     const temperature=context.temperatureC?temperatureC[i]:airTemperature+solarHeat*solar.exposure[i];
     if(!context.temperatureC)temperatureC[i]=temperature;
@@ -3588,17 +3595,17 @@ function simulateSnowLayer(inp,p={},context={}){
     // frame that holds ~45% more snow than the ground beside it. The mean is interior-only for the
     // same reason.
     const lap=new Float32Array(N);let lapSum=0,lapCount=0;
-    for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+    for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
       const i=y*n+x;
       const l=Math.abs(baseM[i-1]+baseM[i+1]+baseM[i-n]+baseM[i+n]-4*baseM[i]);
       lap[i]=l;lapSum+=l;lapCount++;
     }
     for(let x=0;x<n;x++){lap[x]=lap[n+Math.min(Math.max(x,1),n-2)];
       lap[(n-1)*n+x]=lap[(n-2)*n+Math.min(Math.max(x,1),n-2)];}
-    for(let y=0;y<n;y++){lap[y*n]=lap[Math.min(Math.max(y,1),n-2)*n+1];
+    for(let y=0;y<nh;y++){lap[y*n]=lap[Math.min(Math.max(y,1),n-2)*n+1];
       lap[y*n+n-1]=lap[Math.min(Math.max(y,1),n-2)*n+n-2];}
     const lapMean=Math.max(lapSum/Math.max(lapCount,1),1e-6);
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const i=y*n+x,xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
       const gx=(baseM[y*n+xp]-baseM[y*n+xm])/((xp-xm)*cell);
       const gy=(baseM[yp*n+x]-baseM[ym*n+x])/((yp-ym)*cell);
@@ -3627,7 +3634,7 @@ function simulateSnowLayer(inp,p={},context={}){
   let movedM3=0,iterationsRun=0;
   for(let it=0;it<iterations;it++){
     delta.fill(0);let moved=0;
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
       const i=y*n+x,available=depthM[i];if(available<=1e-7)continue;
       // Only the surplus above the holding depth is mobile. The FULL column still loads neighbours
       // (surface below is unchanged): adhered snow is not transportable, but it is not weightless.
@@ -3692,7 +3699,7 @@ function simulateSnowLayer(inp,p={},context={}){
     const windPasses=Math.round(3+5*eventStrength);
     const scour=new Float32Array(N),expo=new Float32Array(N);
     for(let pass=0;pass<windPasses;pass++){
-      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
         const i=y*n+x;
         const s=physicalWind?physicalWind.speed[i]:1;
         const wx=physicalWind&&s>1e-6?physicalWind.u[i]/s:fallback[0];
@@ -3708,7 +3715,7 @@ function simulateSnowLayer(inp,p={},context={}){
         // 0.5 m per pass is an authored transportable-layer cap, documented as such.
         scour[i]=depthM[i]<=1e-7?0:wRate*Math.min(depthM[i],.5)*Math.tanh(5*Math.max(0,expo[i]));
       }
-      for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
         const i=y*n+x,q=scour[i];if(q<=0)continue;
         const s=physicalWind?physicalWind.speed[i]:1;
         const wx=physicalWind&&s>1e-6?physicalWind.u[i]/s:fallback[0];
@@ -3781,7 +3788,7 @@ function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExp
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
 function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false,gridK=1}){
-  const n=RES;let h=inp.slice();
+  const n=fieldW(),nh=fieldH();let h=inp.slice();
   // Res Lock (gridK = node-level RES/REF_RES; default 1 = legacy cell-unit behaviour, which the
   // mountain/peak callers rely on byte-for-byte). A step is one cell, so per-step rates are
   // per-CELL rates: the same world distance takes k x the steps at k x resolution, so the
@@ -3887,11 +3894,11 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
 function erosion2Field(inp,p){
   const duration=clamp(p.duration,0,1),down=clamp(p.downcut,0,1),detail=clamp(p.shapeDetail,0,1);
   const sediment=clamp((p.suspended+p.bed+p.coarse)/3*(1+.75*p.depositBoost),.03,.95);
-  const[mn,mx]=fieldRange(inp),relief=Math.max(mx-mn,1e-5),seeded=inp.slice(),n=RES;
+  const[mn,mx]=fieldRange(inp),relief=Math.max(mx-mn,1e-5),seeded=inp.slice(),n=RES,nh=latticeRows(n);
   // A tiny seeded rock-resistance perturbation gives deterministic channel choice without moving
   // the macro landform. Its amplitude is below one percent of relief and is consumed by erosion.
   const seedAmp=relief*(.0007+.0022*detail);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++)
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++)
     seeded[y*n+x]+=fbm2(x/n*11+2.7,y/n*11+6.1,p.seed|0,3)*seedAmp;
   const coarseIters=Math.max(8,Math.round(16+duration*80));
   const featureScale=lerp(1,7,clamp(p.erosionScale,0,1));
@@ -3942,11 +3949,11 @@ function erosion2Field(inp,p){
 // accumulation corridor into the original terrain, then enforce only the tiny descent needed for
 // connected receivers. This changes flow topology without replacing the landscape.
 function hydroFixField(inp,p){
-  const n=RES,N=n*n,filled=priorityFloodFill(inp),rec=new Int32Array(N).fill(-1),A=new Float32Array(N).fill(1);
+  const n=fieldW(),nh=fieldH(),N=n*nh,filled=priorityFloodFill(inp),rec=new Int32Array(N).fill(-1),A=new Float32Array(N).fill(1);
   // Same one-ring contract as spReceivers: D6 on hex (one distance), D8 with sqrt(2) on square.
   const nbSq=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
   const hex=isHex();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;let best=filled[i],bestSlope=0,receiver=-1;
     const nb=hex?hexNb(y):nbSq;
     for(const d of nb){const xx=x+d[0],yy=y+d[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
@@ -4877,7 +4884,7 @@ const TH=48;
 function bakeThumb(nd){
   const f=nd._field;if(!f)return null;
   const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
-  const img=ctx.createImageData(TH,TH);const n=RES;
+  const img=ctx.createImageData(TH,TH);const n=fieldW(),nh=fieldH();
   const[mn,mx]=fieldRange(f);const d=mx-mn||1;
   // sampleBilinear reads WORLD position in cell units. The hex world is only (n-1)*sqrt(3)/2
   // cells tall, so walking sy over raw grid indices runs 13.4% past the bottom and clamps onto
@@ -5923,24 +5930,24 @@ function blendFields(base,over,nd,n){                 // composite `over` onto `
     const o=satBlend([base[i*3],base[i*3+1],base[i*3+2]],[over[i*3],over[i*3+1],over[i*3+2]],m,mode);
     col[i*3]=o[0];col[i*3+1]=o[1];col[i*3+2]=o[2];}
   return col;}
-function boxBlurScalar(src,n,r){                       // summed-area box filter: O(N), independent of radius
+function boxBlurScalar(src,n,r){const nh=latticeRows(n);                       // summed-area box filter: O(N), independent of radius
   if(r<=0)return Float32Array.from(src);
-  const s=n+1,ii=new Float64Array(s*s),out=new Float32Array(n*n);
-  for(let y=0;y<n;y++){let row=0,ir=(y+1)*s,prev=y*s,si=y*n;
+  const s=n+1,ii=new Float64Array(s*s),out=new Float32Array(n*nh);
+  for(let y=0;y<nh;y++){let row=0,ir=(y+1)*s,prev=y*s,si=y*n;
     for(let x=0;x<n;x++){row+=src[si+x];ii[ir+x+1]=ii[prev+x+1]+row;}}
-  for(let y=0;y<n;y++){const ya=Math.max(0,y-r),yb=Math.min(n,y+r+1);
+  for(let y=0;y<nh;y++){const ya=Math.max(0,y-r),yb=Math.min(n,y+r+1);
     for(let x=0;x<n;x++){const xa=Math.max(0,x-r),xb=Math.min(n,x+r+1);
       out[y*n+x]=(ii[yb*s+xb]-ii[ya*s+xb]-ii[yb*s+xa]+ii[ya*s+xa])/((xb-xa)*(yb-ya));}}
   return out;
 }
-function blurColorMass(rgb,mass,n,r){
-  if(r<=0)return{rgb,mass};const N=n*n,out=new Float32Array(N*3);
+function blurColorMass(rgb,mass,n,r){const nh=latticeRows(n);
+  if(r<=0)return{rgb,mass};const N=n*nh,out=new Float32Array(N*3);
   for(let c=0;c<3;c++){const ch=new Float32Array(N);for(let i=0;i<N;i++)ch[i]=rgb[i*3+c];
     const b=boxBlurScalar(ch,n,r);for(let i=0;i<N;i++)out[i*3+c]=b[i];}
   return{rgb:out,mass:boxBlurScalar(mass,n,r)};
 }
-function colorErodeField(base,h,p,mask,n,owner){       // owned colour-advection/deposition model; height is unchanged
-  const N=n*n,laminar=p.laminar==="on",seed=p.seed|0;
+function colorErodeField(base,h,p,mask,n,owner){const nh=latticeRows(n);       // owned colour-advection/deposition model; height is unchanged
+  const N=n*nh,laminar=p.laminar==="on",seed=p.seed|0;
   // Transport is a WORLD distance: the old min(resScale(),2.5) cap froze it in cells above 480
   // square, so reach silently shrank as resolution grew. The 96-step clamp is the cost guard -
   // note it saturates the top of the slider at high grids (above ~0.34 at 4096) rather than
@@ -5958,7 +5965,7 @@ function colorErodeField(base,h,p,mask,n,owner){       // owned colour-advection
     const hr=priorityFloodFill(h);
     recv=new Int32Array(N);
     const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,hi=hr[i];let best=i,bv=hi;
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x,hi=hr[i];let best=i,bv=hi;
       for(let k=0;k<8;k++){const xx=x+nb[k][0],yy=y+nb[k][1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
         const j=yy*n+xx,hj=hr[j];if(hj>=hi-1e-8)continue;
         const score=hj+(laminar?0:(hash2(x+k*17,y-k*13,seed)-.5)*2e-5);
@@ -5995,10 +6002,10 @@ function gradeWeatherColor(r,g,b,hue,sat,light){
   if(light>=0){r+= (1-r)*light;g+=(1-g)*light;b+=(1-b)*light;}else{r*=1+light;g*=1+light;b*=1+light;}
   return[clamp(r,0,1),clamp(g,0,1),clamp(b,0,1)];
 }
-function weatherColorField(base,h,p,mask,n,owner){       // exposed relief + sheltered dirt; operates on sRGB colour data
+function weatherColorField(base,h,p,mask,n,owner){const nh=latticeRows(n);       // exposed relief + sheltered dirt; operates on sRGB colour data
   // Signal radius is a WIDTH (geometry): full grid ratio, same policy as Color Erosion above -
   // the old min(resScale(),2.5) cap froze it in cells above 480 square.
-  const N=n*n,r=Math.max(1,Math.round((1+Math.pow(2,p.scale*4.5))*resScale()));
+  const N=n*nh,r=Math.max(1,Math.round((1+Math.pow(2,p.scale*4.5))*resScale()));
   let cached=owner&&owner._weatherSignal,signal;
   if(cached&&cached.h===h&&cached.n===n&&cached.r===r&&cached.creep===p.creep)signal=cached.signal;
   else{
@@ -6597,13 +6604,13 @@ function wireQuadDiag(n){
 }
 function wireEdgeCount(n){return 3*(n-1)*(n-1)+2*(n-1);}
 function buildWireIndex(){
-  const n=RES,u32=buffers.u32,cnt=wireEdgeCount(n)*2;
+  const n=fieldW(),nh=fieldH(),u32=buffers.u32,cnt=wireEdgeCount(n)*2;
   const idx=u32?new Uint32Array(cnt):new Uint16Array(cnt);let w=0;
   // Hex diagonals are a pure function of row parity (the unique equilateral triangulation);
   // square diagonals come from the fit recorded by streamTerrainIndices, falling back to the
   // deterministic checkerboard if the stream has not run yet.
   const hex=isHex(),diag=(wireDiagN===n&&!hex)?wireDiagArr:null;
-  for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){
+  for(let y=0;y<nh-1;y++)for(let x=0;x<n-1;x++){
     const i=y*n+x;
     idx[w++]=i;idx[w++]=i+1;                                   // top edge of this quad
     idx[w++]=i;idx[w++]=i+n;                                   // left edge of this quad
@@ -6611,14 +6618,14 @@ function buildWireIndex(){
     if(useMain){idx[w++]=i;idx[w++]=i+n+1;}else{idx[w++]=i+1;idx[w++]=i+n;}
   }
   for(let x=0;x<n-1;x++){const i=(n-1)*n+x;idx[w++]=i;idx[w++]=i+1;}   // bottom row
-  for(let y=0;y<n-1;y++){const i=y*n+n-1;idx[w++]=i;idx[w++]=i+n;}     // right column
+  for(let y=0;y<nh-1;y++){const i=y*n+n-1;idx[w++]=i;idx[w++]=i+n;}     // right column
   if(!buffers.lineIdx)buffers.lineIdx=gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.lineIdx);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,idx,gl.STATIC_DRAW);
   buffers.lineCount=cnt;buffers.lineReady=true;buffers.lineLattice=terrainDef.lattice||"square";
 }
 function streamTerrainIndices(height,snowDepth){
-  const n=RES,adaptive=!!(height&&height.length===n*n),u32=buffers.u32,bytes=u32?4:2;
+  const n=fieldW(),nh=fieldH(),adaptive=!!(height&&height.length===n*n),u32=buffers.u32,bytes=u32?4:2;
   const quadDiag=wireQuadDiag(n);
   // A full 4096² Uint32 index staging array is ~384 MiB. Stream row batches instead:
   // topology stays indexed on the GPU while CPU scratch memory remains below ~3 MiB.
@@ -6638,7 +6645,7 @@ function streamTerrainIndices(height,snowDepth){
   if(adaptive){fillGradientRow(0,grad0);fillGradientRow(Math.min(1,n-1),grad1);}
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   let w=0;
-  for(let y=0;y<n-1;y++){
+  for(let y=0;y<nh-1;y++){
     for(let x=0;x<n-1;x++){
       const i=y*n+x,checkerMain=!!((x+y)&1);let useMain=checkerMain;
       if(adaptive){
@@ -6683,7 +6690,7 @@ function streamTerrainIndices(height,snowDepth){
     fitGain,fitStrength,batchRows,stagingBytes:batch.byteLength+(adaptive?(grad0.byteLength+grad1.byteLength):0),
     durationMs:performance.now()-started,revision};
 }
-function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
+function buildIndex(){const n=fieldW(),nh=fieldH(),cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   buffers.count=cnt;buffers.u32=u32;buffers.lineReady=false;   // resolution/lattice changed
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cnt*(u32?4:2),gl.DYNAMIC_DRAW);
@@ -6695,7 +6702,7 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
     // the index buffer is a pure, height-independent function of (n) - static upload once,
     // hash-assertable by _verify_hex.js, never streamed again.
     const idx=u32?new Uint32Array(cnt):new Uint16Array(cnt);let w=0;
-    for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;
+    for(let y=0;y<nh-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;
       if(y&1){idx[w++]=i;idx[w++]=i+1;idx[w++]=i+n+1;idx[w++]=i;idx[w++]=i+n+1;idx[w++]=i+n;}
       else{idx[w++]=i;idx[w++]=i+1;idx[w++]=i+n;idx[w++]=i+1;idx[w++]=i+n+1;idx[w++]=i+n;}}
     gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,idx);
@@ -6708,7 +6715,7 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   // Water plane shares the vertex lattice with the terrain (same index buffer draws both), so
   // its XZ MUST use the same hex offsets or shorelines tear along the odd rows.
   const hx=isHex()?0.5:0,rz=isHex()?HEX_ROW:1;
-  const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+  const xz=new Float32Array(n*n*2);for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
     xz[i*2]=((x+hx*(y&1))/(n-1)-0.5)*2;xz[i*2+1]=((y/(n-1)-0.5)*2)*rz;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
   // Review B3: undo/redo/New/restoreGraph change terrainDef.lattice WITHOUT the toggle button;
@@ -6753,7 +6760,7 @@ function viewportHeightFrame(field,rootNode){
 }
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
-  const n=RES,field=f||newField();rootNode=rootNode||activePreviewNode();
+  const n=fieldW(),nh=fieldH(),field=f||newField();rootNode=rootNode||activePreviewNode();
   const heightFrame=viewportHeightFrame(field,rootNode),heightSource=heightFrame.source;
   const geomKey=n+"|"+H_SCALE+"|"+(terrainDef.lattice||"square")+"|"+(heightFrame.absolute?"absolute":"autolevel");
   if(buffers.idx&&buffers.builtLattice!==(terrainDef.lattice||"square"))buildIndex();
@@ -6763,8 +6770,8 @@ function updateViewport(f,rootNode,options){
   const snowChanged=curSnowLayerRef!==layerDepth;let geometryChanged=baseChanged||snowChanged;
   let hgt=curHgt;
   if(baseChanged){
-    const[mn,mx]=fieldRange(heightSource),d=mx-mn||1;hgt=new Float32Array(n*n);
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,h=heightFrame.absolute?heightSource[i]:(heightSource[i]-mn)/d;
+    const[mn,mx]=fieldRange(heightSource),d=mx-mn||1;hgt=new Float32Array(n*nh);
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x,h=heightFrame.absolute?heightSource[i]:(heightSource[i]-mn)/d;
       hgt[i]=h;}
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
@@ -6794,7 +6801,7 @@ function updateViewport(f,rootNode,options){
   const fallbackClimateSig=[terrainDef.baseElevation,terrainDef.seaTemp,terrainDef.lapseRate].join("|");
   const fallbackClimateChanged=fallbackClimateSig!==lastFallbackClimateSig;
   if(baseChanged||temperatureMap!==curTemperatureRef||(!temperatureMap&&fallbackClimateChanged)){
-    const temp=temperatureMap&&temperatureMap.length===n*n?temperatureMap:new Float32Array(n*n);
+    const temp=temperatureMap&&temperatureMap.length===n*n?temperatureMap:new Float32Array(n*nh);
     if(!temperatureMap)for(let i=0;i<temp.length;i++)temp[i]=terrainDef.seaTemp
       -terrainDef.lapseRate*((terrainDef.baseElevation+hgt[i]*terrainDef.height)/1000);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.temperature);gl.bufferData(gl.ARRAY_BUFFER,temp,gl.DYNAMIC_DRAW);
@@ -6802,7 +6809,7 @@ function updateViewport(f,rootNode,options){
   }
   lastFallbackClimateSig=fallbackClimateSig;
   if(baseChanged||sunVisibility!==curSunVisibilityRef){
-    const vis=sunVisibility&&sunVisibility.length===n*n?sunVisibility:new Float32Array(n*n).fill(1);
+    const vis=sunVisibility&&sunVisibility.length===n*n?sunVisibility:new Float32Array(n*nh).fill(1);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.sunvis);gl.bufferData(gl.ARRAY_BUFFER,vis,gl.DYNAMIC_DRAW);
     curSunVisibilityRef=sunVisibility;
   }
@@ -6821,7 +6828,7 @@ function updateViewport(f,rootNode,options){
   if(waterChanged)refreshWater();
   lastWaterSig=waterSig;lastWaterTemperatureRef=waterTemperatureRef;geometryChanged=geometryChanged||waterChanged;
   if(geometryChanged){
-    const H=H_SCALE,snow=layerDepth?Float32Array.from(layerDepth):new Float32Array(n*n);
+    const H=H_SCALE,snow=layerDepth?Float32Array.from(layerDepth):new Float32Array(n*nh);
     if(curWater)for(let i=0;i<snow.length;i++)if(curWater[i]>hgt[i]+1e-7)snow[i]=0;
     // SNOW DRAPE - display only; the physics depth field is untouched (this is already a copy).
     // Snow is a blanket: a surface deep enough to bury a feature cannot also express that feature.
@@ -6834,19 +6841,19 @@ function updateViewport(f,rootNode,options){
       let hasSnow=false;for(let i=0;i<snow.length;i++)if(snow[i]>1e-6){hasSnow=true;break;}
       if(hasSnow){
         const invH=1/Math.max(terrainDef.height,1e-6);
-        const comp=new Float32Array(n*n),tmp=new Float32Array(n*n);
+        const comp=new Float32Array(n*nh),tmp=new Float32Array(n*nh);
         for(let i=0;i<n*n;i++)comp[i]=hgt[i]+snow[i]*invH;
         const blur=(src,dst)=>{ // separable 3-tap box, border-replicated
-          for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+          for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
             dst[i]=(src[y*n+Math.max(0,x-1)]+src[i]+src[y*n+Math.min(n-1,x+1)])/3;}
-          for(let x=0;x<n;x++)for(let y=0;y<n;y++){const i=y*n+x;
+          for(let x=0;x<n;x++)for(let y=0;y<nh;y++){const i=y*n+x;
             tmp[i]=(dst[Math.max(0,y-1)*n+x]+dst[i]+dst[Math.min(n-1,y+1)*n+x])/3;}
           dst.set(tmp);
         };
         // Two passes into DISTINCT buffers. blur(b,b) would alias src and dst in the horizontal
         // sweep, turning the box filter into a one-sided recursive filter with an exponential tail
         // in +x only - an east-biased drape that lifts cells from content up to five cells west.
-        const b=new Float32Array(n*n),b2=new Float32Array(n*n);
+        const b=new Float32Array(n*nh),b2=new Float32Array(n*nh);
         blur(comp,b);blur(b,b2);                         // [1,2,3,2,1]/9 per axis, ~5-cell blanket
         for(let i=0;i<n*n;i++){
           const dM=snow[i];if(dM<=1e-6)continue;
@@ -6866,9 +6873,9 @@ function updateViewport(f,rootNode,options){
         }
       }
     }
-    const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),surface=new Float32Array(n*n),surfaceTex=new Float32Array(n*n);
+    const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),surface=new Float32Array(n*nh),surfaceTex=new Float32Array(n*nh);
     const hexOn=isHex(),hx=hexOn?0.5:0,rz=hexOn?HEX_ROW:1;
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+    for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
       surface[i]=hgt[i]*H+snow[i]/terrainDef.scale;
       surfaceTex[i]=hgt[i]+snow[i]/terrainDef.height;
       pos[i*3]=((x+hx*(y&1))/(n-1)-0.5)*2;pos[i*3+1]=surface[i];pos[i*3+2]=((y/(n-1)-0.5)*2)*rz;}
@@ -6880,7 +6887,7 @@ function updateViewport(f,rootNode,options){
       // because the row step is already sqrt(3)/2.
       const EX=[1,-1,.5,-.5,.5,-.5],EY=[0,0,HEX_ROW,HEX_ROW,-HEX_ROW,-HEX_ROW];
       const xc=k2=>clamp(k2,0,n-1);   // hoisted: a per-vertex closure was ~1M allocations/frame at 1024
-      for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,par=y&1;
+      for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x,par=y&1;
         const yu=clamp(y-1,0,n-1),yd=clamp(y+1,0,n-1);
         const off=par?0:-1; // even rows look left for their diagonal pair, odd rows look right
         const hE=surface[y*n+xc(x+1)],hW=surface[y*n+xc(x-1)];
@@ -6891,7 +6898,7 @@ function updateViewport(f,rootNode,options){
         const sx=-gx*(n-1),sz=-gy*(n-1),L=Math.hypot(sx,1,sz)||1;
         nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
     }else{
-      for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+      for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
         const hl=surface[y*n+clamp(x-1,0,n-1)],hr=surface[y*n+clamp(x+1,0,n-1)];
         const hu=surface[clamp(y-1,0,n-1)*n+x],hd=surface[clamp(y+1,0,n-1)*n+x];
         const sx=(hl-hr)*(n-1)/2,sz=(hu-hd)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
@@ -6939,12 +6946,12 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
   // destroyed the Braun-Willett steady state - slope-area exponent -0.310 (r2 0.05) against the
   // landed -0.490 (r2 0.62); restoring a pure max-fill for the solver returns -0.479 (r2 0.61).
   // Callers choose: routing/water pass the default; the implicit erosion solve passes 0.
-  const n=RES,N=n*n,filled=new Float32Array(N),done=new Uint8Array(N),heap=[];
+  const n=fieldW(),nh=fieldH(),N=n*nh,filled=new Float32Array(N),done=new Uint8Array(N),heap=[];
   const push=(e,i)=>{heap.push([e,i]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;const t=heap[p];heap[p]=heap[c];heap[c]=t;c=p;}};
   const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+2-1,s=c;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===c)break;const t=heap[s];heap[s]=heap[c];heap[c]=t;c=s;}}return top;};
   const seed=(x,y)=>{const i=y*n+x;if(!done[i]){done[i]=1;filled[i]=h[i];push(h[i],i);}};
   for(let x=0;x<n;x++){seed(x,0);seed(x,n-1);}
-  for(let y=0;y<n;y++){seed(0,y);seed(n-1,y);}
+  for(let y=0;y<nh;y++){seed(0,y);seed(n-1,y);}
   // The flood must walk the lattice's OWN connectivity. On hex that is the D6 one-ring: the
   // square 4-offset set covers only 4 of the 6 true neighbours (it misses the (x-1,y±1) pair on
   // even rows and (x+1,y±1) on odd rows), so a basin whose only spill runs through one of those
@@ -6962,12 +6969,12 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
 }
 // --- D8 flow accumulation on the (pit-free) filled DEM: drainage area per cell -> the river network. ---
 function d8Accumulation(g){
-  const n=RES,N=n*n,rec=new Int32Array(N),A=new Float32Array(N).fill(1);
+  const n=fieldW(),nh=fieldH(),N=n*nh,rec=new Int32Array(N),A=new Float32Array(N).fill(1);
   // D6 on hex (the name is kept: this is the accumulation pass, whichever one-ring it walks).
   // Six equidistant candidates mean the receiver is unambiguous with no sqrt(2) weighting to
   // forget - 26's cleanest single win over D8.
   const nbSq=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]],hex=isHex();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=g[i],bi=-1;
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=g[i],bi=-1;
     const nb=hex?hexNb(y):nbSq;
     for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=n)continue;const ni=yy*n+xx;if(g[ni]<best){best=g[ni];bi=ni;}}
     rec[i]=bi;}
@@ -6979,7 +6986,7 @@ function d8Accumulation(g){
 // cached fill/accumulation and the current sea/hydro controls. Cheap O(N) -> runs live on slider drags.
 function refreshWater(){
   if(!gl||!curHgt)return;
-  const n=RES,N=n*n,h=curHgt,filled=curFilled,A=curAccum,H=H_SCALE;
+  const n=fieldW(),nh=fieldH(),N=n*nh,h=curHgt,filled=curFilled,A=curAccum,H=H_SCALE;
   const W=new Float32Array(N),wetMask=new Uint8Array(N);
   const wn_=scene.water;                                  // params come from the Water effect node (null = no water)
   const hydroOn=wn_&&wn_.mode!=="sea",seaOn=wn_&&wn_.mode==="sea";
@@ -7003,7 +7010,7 @@ function refreshWater(){
   // comes from signed water depth, but shoreline triangles now stay on the lake/sea plane instead
   // of climbing to a dry mountain vertex and forming the large saw-tooth fins seen at grazing angles.
   const waterSurface=W.slice();
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;if(wetMask[i])continue;
     let sum=0,count=0;
     // Shoreline extension over the lattice's OWN one-ring: the 3x3 square window is 8 cells at
@@ -7024,7 +7031,7 @@ function refreshWater(){
   }
   curWater=waterSurface;                                    // exposed to diagnostics and renderer tests
   const wn=new Float32Array(N*3);                          // normal of the WATER surface (0 gradient in lakes -> up)
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
     const wl=waterSurface[y*n+clamp(x-1,0,n-1)],wr=waterSurface[y*n+clamp(x+1,0,n-1)];
     const wu=waterSurface[clamp(y-1,0,n-1)*n+x],wd=waterSurface[clamp(y+1,0,n-1)*n+x];
     const sx=(wl-wr)*H*(n-1)/2,sz=(wu-wd)*H*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
@@ -7066,7 +7073,7 @@ function refreshWater(){
   // geometry from being lit as though it were still the flat ice sheet or submerged bed.
   const iceSnowSurfaceY=new Float32Array(N),iceSnowNrm=new Float32Array(N*3);
   for(let i=0;i<N;i++)iceSnowSurfaceY[i]=waterSurface[i]*H+iceSnow[i]/terrainDef.scale;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
     const l=iceSnowSurfaceY[y*n+clamp(x-1,0,n-1)],r=iceSnowSurfaceY[y*n+clamp(x+1,0,n-1)];
     const d=iceSnowSurfaceY[clamp(y-1,0,n-1)*n+x],u_=iceSnowSurfaceY[clamp(y+1,0,n-1)*n+x];
     const sx=(l-r)*(n-1)/2,sz=(d-u_)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
