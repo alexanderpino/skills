@@ -3333,6 +3333,15 @@ function projectWindMassConsistent(u0,v0,n,cell,iterations=56){
   return{u,v};
 }
 function sampleGridBilinear(field,n,x,y){
+  // Takes an explicit n because the wind model runs on a preview grid, so it cannot use the
+  // global sampleBilinear. Same lattice contract though: (x,y) is a WORLD position in cell
+  // units, and on hex each row's own parity shift is undone before interpolating along it.
+  if(terrainDef.lattice==="hex"){
+    const r=clamp(y/HEX_ROW,0,n-1.001),r0=r|0,fr=r-r0;
+    const rowAt=rr=>{const cx=clamp(x-0.5*(rr&1),0,n-1.001),c0=cx|0,i=rr*n+c0;
+      return lerp(field[i],field[i+1],cx-c0);};
+    return lerp(rowAt(r0),rowAt(r0+1),fr);
+  }
   x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
   const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
   return lerp(lerp(field[i],field[i+1],fx),lerp(field[i+n],field[i+n+1],fx),fy);
@@ -3365,6 +3374,8 @@ function simulateTerrainWind(inp,p={},context={}){
   // gives the same speed-up at any working resolution. Floor of 2 cells keeps the secant a
   // secant on coarse previews; the reference requires fetch*cell to span the upwind hill.
   const fetchCells=Math.max(2,Math.min(n*.75,reachM/cell));
+  // World extent in cell units, for the fetch/horizon walks below.
+  const hexW=terrainDef.lattice==="hex",wWid=n-1,wHgt=hexW?(n-1)*HEX_ROW:n-1;
   const channelRadius=Math.max(1,Math.min(n>>3,Math.round(Math.min(400,(def.scale||5000)*.07)/cell)));
   const structure=channeling>0?blurScalarField(baseM,n,channelRadius,2):baseM;
   const u0=new Float32Array(N),v0=new Float32Array(N),speed0=new Float32Array(N);
@@ -3384,14 +3395,18 @@ function simulateTerrainWind(inp,p={},context={}){
     // and keeps one "how far upwind do we look" world-scale slider. sampleGridBilinear clamps at
     // the border, which shortens the effective rise and UNDER-states the speed-up - the graceful
     // direction per the reference, not an artefact.
-    const upH=sampleGridBilinear(baseM,n,x-baseU*fetchCells,y-baseV*fetchCells);
+    // Both walks start from this cell's WORLD position and step in world cell units, so a fetch
+    // or a horizon ray covers the same ground in every direction on either lattice. Walking the
+    // grid indices instead shortens every N-S ray by sqrt(3)/2 on hex.
+    const wx0=x+(hexW?0.5*(y&1):0),wy0=y*(hexW?HEX_ROW:1);
+    const upH=sampleGridBilinear(baseM,n,wx0-baseU*fetchCells,wy0-baseV*fetchCells);
     const lift=(baseM[i]-upH)/(fetchCells*cell);
     let localSpeed=baseSpeed*(1+speedUp*Math.tanh(2.5*Math.max(0,lift)));
     if(shelterAmount>0&&baseSpeed>0){
       let horizon=-Infinity;
       for(const d of distances){
-        const sx=x-baseU*d,sy=y-baseV*d;
-        if(sx<0||sy<0||sx>=n-1||sy>=n-1)break;
+        const sx=wx0-baseU*d,sy=wy0-baseV*d;
+        if(sx<0||sy<0||sx>=wWid||sy>=wHgt)break;
         horizon=Math.max(horizon,(sampleGridBilinear(baseM,n,sx,sy)-baseM[i])/(d*cell));
       }
       const shadow=smooth(clamp((horizon-tanLow)/Math.max(1e-6,tanHigh-tanLow),0,1));
@@ -3610,7 +3625,7 @@ function simulateSnowLayer(inp,p={},context={}){
     }
     // The walk cap is a DISTANCE (~30 m of saltation reach along a cardinal; ~42 m diagonal, an
     // accepted stretch), not a cell count, so cornice scale does not depend on the sim grid.
-    const walkCap=clamp(Math.round(30/cell),2,24);
+    const walkCap=clamp(Math.round(30/cell),2,24),hexSnow=terrainDef.lattice==="hex";
     // Pass count is the event-duration proxy: with the transportable layer capped per pass, a
     // fixed 3 passes moves the same volume at every strength and the slider only reshapes WHERE
     // it goes. Strength now scales both the per-pass rate and how long the event blows (3-8).
@@ -3638,16 +3653,28 @@ function simulateSnowLayer(inp,p={},context={}){
         const s=physicalWind?physicalWind.speed[i]:1;
         const wx=physicalWind&&s>1e-6?physicalWind.u[i]/s:fallback[0];
         const wy=physicalWind&&s>1e-6?physicalWind.v[i]/s:fallback[1];
-        // sign*round(abs), NOT Math.round: JS rounds half UP, so Math.round(0.5)=1 but
-        // Math.round(-0.5)=-0, and mirrored bearings would transport on different axes.
-        let dj=Math.sign(wx)*Math.round(Math.abs(wx)),di=Math.sign(wy)*Math.round(Math.abs(wy));
-        if(!dj&&!di){if(Math.abs(wx)>=Math.abs(wy))dj=Math.sign(wx)||1;else di=Math.sign(wy)||1;}
+        // Snap the local wind to a LATTICE azimuth, then walk one neighbour per step. On square
+        // that is sign*round(abs) - NOT Math.round: JS rounds half UP, so Math.round(0.5)=1 but
+        // Math.round(-0.5)=-0, and mirrored bearings would transport on different axes. On hex
+        // the eight square directions do not exist; pick the closest of the SIX one-ring azimuths
+        // by dot product and step with that row's own parity offsets, re-read each step because
+        // the offsets alternate as the walk crosses rows.
+        let dj=0,di=0,hexK=-1;
+        if(hexSnow){
+          let bestDot=-Infinity;
+          for(let k=0;k<6;k++){const dot=wx*HEX_EX[k]+wy*HEX_EY[k];if(dot>bestDot){bestDot=dot;hexK=k;}}
+        }else{
+          dj=Math.sign(wx)*Math.round(Math.abs(wx));di=Math.sign(wy)*Math.round(Math.abs(wy));
+          if(!dj&&!di){if(Math.abs(wx)>=Math.abs(wy))dj=Math.sign(wx)||1;else di=Math.sign(wy)||1;}
+        }
         // Walk downwind to shelter: the first cell no longer rising into the wind, i.e. just past
         // the local drift crest. If nothing shelters within the cap, drop at the cap (suspension
         // limit). Off-grid at any step: mass stays where it is (no wrap).
         let tx=x,ty=y,sheltered=false,offGrid=false;
         for(let step2=0;step2<walkCap;step2++){
-          const nx2=tx+dj,ny2=ty+di;
+          let nx2,ny2;
+          if(hexSnow){const off=hexNb(ty)[hexK];nx2=tx+off[0];ny2=ty+off[1];}
+          else{nx2=tx+dj;ny2=ty+di;}
           if(nx2<0||ny2<0||nx2>=n||ny2>=n){offGrid=true;break;}
           tx=nx2;ty=ny2;
           if(expo[ty*n+tx]<=0){sheltered=true;break;}
@@ -6859,7 +6886,15 @@ function refreshWater(){
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
     const i=y*n+x;if(wetMask[i])continue;
     let sum=0,count=0;
-    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    // Shoreline extension over the lattice's OWN one-ring: the 3x3 square window is 8 cells at
+    // two different distances, and on hex two of them are not neighbours at all - which reads as
+    // a row-parity tear along the shore.
+    if(isHex()){
+      const nb=hexNb(y);
+      for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
+        if(xx<0||yy<0||xx>=n||yy>=n)continue;
+        const j=yy*n+xx;if(wetMask[j]){sum+=W[j];count++;}}
+    }else for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
       if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n)continue;
       const j=yy*n+xx;if(wetMask[j]){sum+=W[j];count++;}
     }
