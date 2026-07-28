@@ -1246,6 +1246,22 @@ spikier).
   composite *driver* is a relative mix by contract), so only its soil term carries the physical
   units.
 
+### Cross-engine honesty: what the hydraulic "auto" tab actually costs
+
+The Hydraulic node's two engines are two different simulations behind one tab, and at identical
+sliders the pipe engine modifies the terrain at **~0.37×** the droplet engine's depth
+(modification correlation ~0.59 — broad pipe valley systems vs dendritic particle tracks). A
+parity retune was attempted and **reverted, with the numbers kept**: raising pipe iterations to
+~160 reaches depth parity (0.89–1.0) but breaks the grid invariance above (1.42 at k=2), and
+scaling the per-iteration erosion cap leaves cross-engine depth *flat* while the grid ratio runs
+to ~2.0 — the pipe engine's resolution invariance partly *rests on* that k-scaled cap clamping
+the fine grid, so dose and invariance are coupled and no cheap knob buys both. What ships
+instead: the measured relationship is **gated** in `_verify_gpu.js` (depth band [0.25, 0.55],
+correlation floor 0.40 — a drift stop, explicitly not a parity claim), the Pipe iterations slider
+maximum is raised to 360 so the depth-parity trade is available *by choice*, and closing the gap
+properly — re-deriving the pipe dose family under clamp saturation — is queued kernel work, not
+something to force through a defaults change that trades one measured invariant for another.
+
 ### GPU fast path (WebGL2 GPGPU)
 
 The **CPU kernels remain the reference implementation**. On top of them there is an optional GPU path

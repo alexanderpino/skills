@@ -43,6 +43,30 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     for(let i=0;i<base.length;i++){const d=hp.v[i]-base[i];if(!Number.isFinite(hp.v[i]))finite=false;
       if(d<0){eroded++;maxDrop=Math.max(maxDrop,-d);}if(d>0){deposited++;maxRise=Math.max(maxRise,d);}}
     res.hydraulic={gpuMs:hp.ms,finite,eroded,deposited,maxDrop:+maxDrop.toFixed(5),maxRise:+maxRise.toFixed(5)};
+    // --- cross-ENGINE record of the hydraulic node: pipes vs droplets are two different
+    // simulations behind one "auto" tab. The gap is MEASURED AND GATED, not closed: at the
+    // shipped defaults the pipe engine runs ~0.37x the droplet depth (band [0.25, 0.55]) with
+    // modification corr ~0.59 (floor 0.40). A parity retune was attempted and REVERTED: iters
+    // ~160 reach depth parity but break grid invariance (1.42 at k=2), and cap-scaling moves
+    // gridRatio to ~2.0 while cross-depth stays flat - the invariance partly rests on the
+    // k-scaled erosion cap, so dose and invariance are coupled. These gates stop SILENT DRIFT
+    // of the documented relationship; closing the gap is queued kernel work.
+    {
+      const mk=t=>{const q={};TYPES[t].params.forEach(pr=>{q[pr.key]=cloneParams(pr.def);});return q;};
+      const rms=(a,b2)=>{let se=0;for(let i=0;i<a.length;i++){const d=b2[i]-a[i];se+=d*d;}return Math.sqrt(se/a.length);};
+      const pearson=(a,b2)=>{let sa=0,sb=0;const n2=a.length;
+        for(let i=0;i<n2;i++){sa+=a[i];sb+=b2[i];}const ma=sa/n2,mb=sb/n2;
+        let num=0,da=0,db=0;for(let i=0;i<n2;i++){const x=a[i]-ma,y=b2[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+        return num/Math.max(1e-12,Math.sqrt(da*db));};
+      const del=(x,y)=>{const d=new Float32Array(x.length);for(let i=0;i<d.length;i++)d[i]=y[i]-x[i];return d;};
+      const held=USE_GPU;
+      USE_GPU=true; const eng1=TYPES.hydraulic.eval(mk('hydraulic'),[base,null]);
+      USE_GPU=false; const prm=mk('hydraulic');prm.engine='droplets';
+      const eng2=TYPES.hydraulic.eval(prm,[base,null]);
+      USE_GPU=held;
+      res.crossEngine={depthRatio:+(rms(base,eng1)/rms(base,eng2)).toFixed(3),
+        deltaCorr:+pearson(del(base,eng1),del(base,eng2)).toFixed(4)};
+    }
 
     // --- scaling: how long does a 512^2 / 1024^2 generator take on each path? ---
     res.scale = {};
@@ -57,15 +81,23 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     return res;
   });
 
+  let crossFail = 0;
   if (!r.gpuAvailable) { console.log('GPU NOT AVAILABLE'); }
   else {
     for (const k of ['perlin','ridged','thermal','warp'])
       console.log(`${k.padEnd(8)} maxAbs=${r[k].maxAbs} meanAbs=${r[k].meanAbs}   cpu=${r[k].cpuMs}ms gpu=${r[k].gpuMs}ms`);
     console.log('hydraulic',JSON.stringify(r.hydraulic));
+    console.log('crossEngine',JSON.stringify(r.crossEngine));
+    if (!(r.crossEngine && r.crossEngine.depthRatio >= 0.25 && r.crossEngine.depthRatio <= 0.55
+        && r.crossEngine.deltaCorr >= 0.40)) {
+      console.log('FAIL cross-engine record: depthRatio in [0.25,0.55] (measured 0.37 — the gap '
+        + 'is documented, not closed) and deltaCorr >= 0.40. This stops silent drift only.');
+      crossFail = 1;
+    }
     for (const [n,v] of Object.entries(r.scale))
       console.log(`fbm@${n}^2  gpu=${v.gpuMs}ms cpu=${v.cpuMs===null?'(skipped)':v.cpuMs+'ms'}`);
   }
   console.log('errors', errors.length?JSON.stringify(errors):'none');
   await b.close();
-  process.exit(errors.length?1:0);
+  process.exit(errors.length || crossFail ? 1 : 0);
 })().catch(e => { console.error('FATAL', e); process.exit(2); });
