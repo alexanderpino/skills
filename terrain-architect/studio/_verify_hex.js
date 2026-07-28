@@ -7,10 +7,12 @@
 //   H3 lattice signature  a thermally-relaxed cone prints LESS azimuthal anisotropy on C6 than
 //                         on C4 — measured against the square kernel on the same cone, live,
 //                         so the gate self-arms instead of trusting a recorded number.
-//   H4 seed contract      hex noise samples WORLD coordinates (odd rows +s/2, rows sqrt(3)/2
-//                         apart): the hex build of an fbm node must match the square build
-//                         sampled at those world points. The unshifted comparison is computed
-//                         live as the negative control (the half-cell zig-zag it would print).
+//   H4a domain contract   generators are authored in the DOMAIN, so toggling the lattice must
+//                         not re-roll the terrain: hex fbm must match square fbm at matched
+//                         domain points. (This replaced a world-point contract, which cropped
+//                         the noise and was the terrain re-roll users hit — see H4's own note.)
+//   H4b half-cell shift   the odd-row shift is still alive, controlled by D6 Laplacian rather
+//                         than correlation, which cannot see a half-cell and would pass vacuously.
 //   H5 square-safety      toggling hex on and back leaves a square build BYTE-identical.
 const { chromium } = require('playwright-core');
 const path = require('path');
@@ -81,7 +83,22 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     out.idxStable = hash1 === hashIdx() && hash1 === hash2;
     out.idxHash = hash1;
 
-    // ---- H4: seed contract (hex noise == square noise at the hex world points) ----
+    // ---- H4: the authoring-domain contract, and the live control on the half-cell shift ----
+    // The contract this gate asserts CHANGED, on measurement, and the reasoning is worth keeping.
+    // It used to assert that hex noise equals square noise at matched WORLD points. That is
+    // self-consistent but it makes a lattice toggle re-roll the terrain (correlation 0.57 on the
+    // default graph), because a hex map is only 0.866 as tall: sampling the same noise down a
+    // shorter axis CROPS it. Generators now work in the authoring domain instead, so the same
+    // graph draws the same terrain on either lattice (correlation 0.999) - the trade being a
+    // 13.4% aspect squash of the pattern, which is unavoidable either way and is the cheaper
+    // half (see the AUTHORING DOMAIN note in index.html).
+    //
+    // That change also DEMOTES this gate's old negative control. `naive` drops the odd-row
+    // half-cell shift, which under the new contract differs from the real build by half a cell -
+    // invisible to correlation, which now reads 0.999 for the broken build too. A control that
+    // passes on the defect is worth nothing, so the shift gets a metric that can actually see
+    // what it is FOR: the odd-row zig-zag. Dropping the shift offsets consecutive rows by half a
+    // cell in world, injecting a row-parity component that the D6 Laplacian picks up directly.
     // Square field sampled at the hex cells' world coordinates, bilinear:
     terrainDef.lattice = 'square';
     const sqF = fbmField(gnoise, A);
@@ -99,16 +116,49 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     const latHeld = terrainDef.lattice;
     terrainDef.lattice = 'square';
     for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
-      const u = (x + 0.5 * (y & 1)), v = y * HEXR;          // hex world point in CELL units
+      const u = (x + 0.5 * (y & 1)), v = y * HEXR;          // hex WORLD point in CELL units
       if (v >= n - 1 || u >= n - 1) continue;
       wanted[m] = sampleBilinear(sqF, u, v);                 // square build at that world point
       got[m] = hexNoise[y * n + x];                          // hex build's own sample there
-      naive[m] = sampleBilinear(sqF, x, y);                  // NO shift/compression (the trap)
+      naive[m] = sampleBilinear(sqF, x + 0.5 * (y & 1), y);  // matched DOMAIN point: the contract
       m++;
     }
     terrainDef.lattice = latHeld;
-    out.seedContract = { corr: +pearson(wanted.subarray(0, m), got.subarray(0, m)).toFixed(4),
-      naiveCorr: +pearson(naive.subarray(0, m), got.subarray(0, m)).toFixed(4) };
+    out.seedContract = { worldCorr: +pearson(wanted.subarray(0, m), got.subarray(0, m)).toFixed(4),
+      domainCorr: +pearson(naive.subarray(0, m), got.subarray(0, m)).toFixed(4) };
+
+    // The half-cell shift's live control. Build the SAME noise with the shift suppressed, and
+    // measure each build's D6 Laplacian magnitude - the row-parity zig-zag the shift exists to
+    // prevent shows up there and essentially nowhere else. Both numbers are printed, so the
+    // bound below sits between a MEASURED broken build and a MEASURED correct one rather than
+    // being asserted.
+    // Built here rather than behind a flag in index.html: a production test hook to disable a
+    // correctness feature is a worse thing to own than fifteen lines of duplicated accumulation.
+    terrainDef.lattice = 'hex';
+    const unshifted = (() => {
+      const f = new Float32Array(n * n);
+      let amps = 0, a2 = 1; for (let k = 0; k < A.octaves; k++) { amps += a2; a2 *= A.gain; }
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const gu = x / n, gv = y / n;        // domain, but WITHOUT the odd-row half-cell shift
+        let sum = 0, amp = 1, fr = A.freq;
+        for (let k = 0; k < A.octaves; k++) {
+          sum += gnoise(gu * fr, gv * fr, A.seed + k * 7) * amp; amp *= A.gain; fr *= A.lac;
+        }
+        f[y * n + x] = sum / amps;
+      }
+      return f;
+    })();
+    const d6lap = f => {                     // |sum(neighbour) - 6*centre| over the D6 one-ring
+      let s = 0, k = 0;
+      for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) {
+        const nb = hexNb(y); let acc = 0;
+        for (let q = 0; q < 6; q++) acc += f[(y + nb[q][1]) * n + x + nb[q][0]];
+        s += Math.abs(acc - 6 * f[y * n + x]); k++;
+      }
+      return s / k;
+    };
+    out.shiftControl = { shifted: +d6lap(hexNoise).toFixed(6), unshifted: +d6lap(unshifted).toFixed(6) };
+    out.shiftControl.ratio = +(out.shiftControl.unshifted / Math.max(1e-9, out.shiftControl.shifted)).toFixed(3);
 
     // ---- H2 + H3: D6 thermal on a WORLD-SPACE cone (one per lattice: a cone built in raw
     // grid coordinates is an ellipse-with-row-wobble in hex world space, and the first form of
@@ -303,9 +353,28 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     + `tap families (6 vs 8), so the corrected-D8 kernel prints LESS facet concentration than D6 on `
     + `this metric; hex thermal's win is exactness (one distance, no sqrt(2) correction to forget), `
     + `not facet diversity. Upstreamed to references/26.`);
-  gate('H4 seed-contract', r.seedContract && r.seedContract.corr >= 0.97
-    && r.seedContract.corr > r.seedContract.naiveCorr + 0.01,
-    `worldCorr=${r.seedContract && r.seedContract.corr} vs naive(no shift)=${r.seedContract && r.seedContract.naiveCorr} — the live negative control`);
+  // H4a: the contract a user can feel. Toggling the lattice must not re-roll their terrain, so
+  // the hex build must match the square build at matched DOMAIN points. worldCorr is reported
+  // alongside because it is the number this gate used to assert, and its collapse is the whole
+  // reason the contract moved - not a regression.
+  gate('H4a domain-contract', r.seedContract && r.seedContract.domainCorr >= 0.99,
+    `domainCorr=${r.seedContract && r.seedContract.domainCorr} (>=0.99: same seed, same terrain `
+    + `on either lattice) · worldCorr=${r.seedContract && r.seedContract.worldCorr} REPORTED not `
+    + `gated — a hex map is 0.866 as tall, so agreeing at world points means CROPPING the noise, `
+    + `which is exactly the terrain re-roll this contract replaced`);
+  // H4b: the odd-row half-cell shift, controlled by a metric that can see what it is for. Under
+  // the domain contract, dropping the shift barely moves the correlation (a half-cell is
+  // sub-pixel), so correlation would pass on the broken build - the vacuous-gate failure mode
+  // this suite keeps finding. The D6 Laplacian sees the row-parity zig-zag the shift prevents.
+  // Both endpoints measured before arming, and they bracket the bound from opposite sides:
+  // a build whose shift is DEAD reads ratio 1.000 (the two fields are then the same field), and
+  // this build reads 1.313. 1.15 sits between them with margin either way. The first bound tried
+  // here was a guessed 1.5, which the correct build failed - the guess, not the code, was wrong.
+  const sc = r.shiftControl;
+  gate('H4b half-cell-shift-alive', sc && sc.ratio >= 1.15,
+    `D6 |Laplacian| shifted=${sc && sc.shifted} vs shift-suppressed=${sc && sc.unshifted} `
+    + `=> ratio ${sc && sc.ratio} (1.000 = shift dead, 1.313 = shift alive as measured; correlation `
+    + `reads ~0.999 for BOTH builds and would pass vacuously, which is why this is not a corr gate)`);
   // Curvature: the hex fit must land on the SAME physical answer as ZT does on square (both see
   // the same paraboloid), and read isotropically around the ring. Armed against the square
   // control rather than an absolute number, so it tracks if the paraboloid probe ever changes.

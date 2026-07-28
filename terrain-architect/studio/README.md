@@ -1414,11 +1414,28 @@ nothing about the node graph changes. What changes, and what `_verify_hex.js` ho
   row-parity alternation of the two quad patterns the square mesh already used — so edge spinning
   ceases to exist: `buildIndex()` uploads the index buffer once and it is hash-identical across
   any height edit (gate H1). The water plane shares the same lattice, or shorelines would tear.
-- **Seed contract in world coordinates.** Odd rows sample half a cell right; rows sit √3/2 apart;
-  the world footprint is truthfully rectangular (`scale × scale·√3/2` m — squashing rows to keep a
-  square footprint would be silent metric anisotropy). A hex build of an fbm node matches the
-  square build sampled at those world points to **corr 0.9999**; without the shift it reads
-  **0.57** — the half-cell zig-zag, computed live as the gate's negative control (H4).
+- **Toggling the lattice does not re-roll your terrain.** Two coordinate systems, kept apart.
+  Everything *authored* — generators, Position X/Y, shapes, painted strokes, warp displacement —
+  lives in the **domain** (`u = (x + ½(y&1))/n`, `v = y/n`), so the same seed draws the same
+  landscape on either lattice: **corr 0.9999** on a single fbm node, **0.992** end-to-end on the
+  default graph. Everything *physical* — erosion, routing, wind, snow, normals, AO, picking, DEM —
+  reads **world metres**, where rows sit √3/2 apart and the footprint is truthfully rectangular
+  (`scale × scale·√3/2` m).
+
+  This replaced a world-point seed contract, and the reasoning is the useful part. Agreeing at
+  matched world points is self-consistent, but a hex map is only 0.866 as tall, so it means
+  *cropping* the noise — measured **corr 0.574**, which is the "why did my terrain change?" users
+  actually hit. The unit domain cannot map isotropically onto a non-square world, so the real
+  choice is **squash or crop**, and squash is the cheaper half: a 13.4% aspect squash of an FBM
+  field is indistinguishable from a slightly different frequency (noise has no canonical aspect
+  ratio), whereas a crop is a different draw. The **lattice** stays isotropic under either choice,
+  so every D6 kernel keeps its correctness untouched.
+
+  The contract change also *demoted the old gate's negative control*, which is worth recording:
+  with generators in the domain, dropping the odd-row half-cell shift is a sub-pixel change that
+  correlation cannot see — it reads **0.999 for the broken build too**. H4b therefore controls the
+  shift with the D6 Laplacian, which sees the row-parity zig-zag the shift exists to prevent:
+  **1.000 = shift dead, 1.313 = shift alive**, bound at 1.15 between two measured endpoints.
 - **D6 thermal** — six equidistant neighbours, one distance, one threshold (the √2 distance split
   the square kernel must correct simply does not exist). Mass conserved to 2·10⁻¹⁰; the relaxed
   cone's talus ring reaches repose uniformly to **0.3%** azimuthal anisotropy (H2, H3).
@@ -1438,13 +1455,13 @@ nothing about the node graph changes. What changes, and what `_verify_hex.js` ho
 - **Byte-safety:** on the square lattice everything is bit-identical (H5, plus the 60/60 digest).
 
 **The close-out check** (`_verify_hex_parity.js`) is the one tied to what started this work —
-toggling the lattice on the *default* graph changed the terrain far more than it should. A correct
-hex build *must* differ from square (generators sample different world points), so the gate
-separates the two causes: a seed-contract difference is smooth, while a kernel misreading the
-lattice leaves **row-parity structure**. Measuring each node's odd/even row comb against its own
-column comb, the worst node now sits at **1.044×** its square character (bound 1.15), and the
-output still differs by 8.4% of range — a different draw from the same process, which is the
-point.
+toggling the lattice on the *default* graph changed the terrain far more than it should. Some
+difference is legitimate: the map is a different shape, and D6 erosion genuinely routes water
+differently from D8. What is *not* legitimate is a kernel misreading the lattice, and the two
+separate cleanly — a geometric difference is smooth, while a misread leaves **row-parity
+structure**. Measuring each node's odd/even row comb against its own column comb, the worst node
+sits at **1.105×** its square character (bound 1.15). End to end the default graph now toggles at
+**corr 0.992**, mean **2.4%** of range, down from 10.9% before the domain contract.
 
 Honest limits, also stated in the toggle's hint: GPU compute is square-texture end to end and is
 forced off on hex, so hex runs the CPU path throughout (the toolbar chip says so). Sampling uses a

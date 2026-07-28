@@ -379,6 +379,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | D6 flow routing on hex DEMs | P | Wang & Ai 2018; Wang, Ai, Shen & Li 2020 - D8's diagonal-distance inconsistency named and removed; still single-receiver (`26`, `03`) |
 | Lattice cure for transport anisotropy (FHP) | P | Hardy, Pomeau & de Pazzis 1973; Frisch, Hasslacher & Pomeau 1986; Wolfram 1986 - C6 makes the 4th-rank moment tensor isotropic (`26`) |
 | Hex erosion for CG heightfields | ? | No published paper found (verified absence, 2026); F-tier translation of `04`/`05` via `26`'s kernels |
+| Authoring domain vs world metric (offset-lattice seed contract) | F | Production experience, **no paper**: authored fields (noise, placement, shapes, strokes, warp) evaluate in the normalised domain `u=(q+½(r&1))/W, v=r/H`; physical kernels (erosion, routing, wind, snow, normals, AO, DEM) in world metres. Sampling authored fields at world points *crops* the noise on a map only √3/2 as tall — measured corr 0.574 vs 0.9999 (one fbm node) / 0.992 (full graph) under the domain contract. Squash-or-crop is the whole choice; the lattice stays isotropic either way (`26`) |
 | Cube-face-seam flow routing | F | Halo cells + per-face rotation tables; no canonical paper (`08`) |
 | DEM hydrological enforcement / pit removal | P | Hutchinson 1989 (ANUDEM); priority-flood + stream burning (`08`, `03`) |
 | SRTM void filling (delta-surface) | P | Reuter, Nelson & Jarvis 2007 (`08`) |

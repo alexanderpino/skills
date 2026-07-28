@@ -63,7 +63,8 @@ at 15.5% eccentricity instead of a 4-fold one at 41.4% (`C4` lock = √2 ≈ 1.4
 storage    : h = Float32Array(W*H), h[r*W + q]          # unchanged from a square port
 lattice    : pointy-top, odd rows shifted +s/2           # "odd-r"
 s          : cellSize = nearest-neighbour spacing (m)    # THE one distance
-world(q,r) : x = (q + 0.5*(r & 1)) * s ;  y = r * s * (√3/2)
+world(q,r) : x = (q + 0.5*(r & 1)) * s ;  y = r * s * (√3/2)   # PHYSICAL kernels
+domain(q,r): u = (q + 0.5*(r & 1)) / W ;  v = r / H             # AUTHORED fields — see §below
 cellArea   : (√3/2) s²                                   # for A in m² (SKILL.md invariant)
 axial      : q_ax = q − ((r − (r&1)) >> 1)               # shear; store offset, never pay twice
 ```
@@ -73,14 +74,85 @@ a stated choice (`SKILL.md` "derive the cell size and state it"): equal memory �
 coarser; equal spacing ⇒ 15.47% more samples (`H = round(N·2/√3)` for a square world); equal
 alias-free disc bandwidth ⇒ 13.4% fewer.
 
-**The seed-contract trap (the loud one).** Noise must be evaluated at true world `(x,y)` — the
-half-row shear lives in the coordinate transform, **never** in the field function. Feed `(q,r)` to
-noise and every field acquires a half-cell zig-zag: the hex instance of the `01` tile-local defect.
-Corollary: because the corpus already mandates world-space evaluation, noise/warp/ops/droplet nodes
-port with **zero changes**. Make the lattice a property of the field
+**The seed-contract trap (the loud one).** Never feed raw `(q,r)` to a field function: the half-row
+shear lives in the coordinate transform, **never** in the field function, and skipping it gives every
+field a half-cell zig-zag — the hex instance of the `01` tile-local defect. But the corpus's
+square-grid mandate to *evaluate in world metres*, which earlier revisions of this chapter carried
+across unchanged, is **not** the right contract for authored fields on a lattice whose array is not
+square: it crops the noise, and the measurement is the next section. Authored fields evaluate in the
+**authoring domain**; physical kernels evaluate in **world metres**. Porting corollary: noise / warp /
+ops / droplet nodes stay lattice-agnostic in *structure*, but each one's coordinate line gains the
+odd-row half-cell term (`+0.5·(r&1)` on hex, `0` on square, so square stays byte-identical) — one
+line per generator, **not zero**. Make the lattice a property of the field
 (`{data, W, H, cellSize, lattice}`), not a fork of the graph; nodes partition into lattice-agnostic
 (no change), stencil (swap iterator + re-derive constants), and raster-specific (D∞, separable
 blur, hardware filtering — rewrite or no analogue).
+
+## The authoring domain vs the world metric (F — production experience, no paper)
+
+**Tier first, because this section corrects the one above it.** Everything here is measured
+implementation experience from one production build (Terrain Studio, 2026-07), not a published
+result. It is **F** by `00`'s table — practice with no canonical source — and it must not acquire a
+citation. Oracles: `studio/_verify_hex.js` gates H4a/H4b, and `studio/_verify_hex_parity.js` for the
+end-to-end numbers.
+
+**The trap.** Storing an odd-r lattice in the same `W×H` array a square grid would use puts cell
+`(q,r)` at world `((q + 0.5·(r&1))·s, r·s·√3/2)`, so the footprint is `W·s × H·s·(√3/2)` — only
+0.866 as tall as the square map over the same array. It is then natural to make every generator
+sample noise at the **world** point, on the reasoning that the seed contract should be "the same
+noise field, sampled where the cells actually are". That reasoning is self-consistent, which is why
+it is the attractive mistake rather than a careless one, and it is the wrong *product* contract:
+sampling one field down an axis 0.866 as long **crops** it in `v`. Measured on a production terrain
+graph, toggling square→hex under the world-point contract gave Pearson `r = 0.574` against the square
+build, mean absolute difference 10.9% of range. What the user sees is a grid setting silently
+re-rolling terrain they authored; what they report is that the maths is broken.
+
+**The fix — two coordinate systems, and every operator states which one it is in.**
+
+```
+domain(q,r) : u = (q + 0.5*(r&1))/W ;  v = r/H            # AUTHORED — dimensionless, [0,1]²
+world(q,r)  : x = (q + 0.5*(r&1))*s ;  y = r * s * (√3/2) # PHYSICAL — metres
+```
+
+The **authoring domain** holds everything a user authored — noise generators, placement parameters
+(Position X/Y), shapes, painted strokes, warp displacement. Note `v = r/H` and **not** `r·(√3/2)/H`:
+leaving the row compression out is the whole point. The odd-row half-cell term is **retained**,
+because it is a sub-cell offset *within* a row rather than a metric, and dropping it prints the
+row-parity zig-zag. The **world metric** holds every physical kernel — erosion, flow routing, wind,
+snow, normals, AO, picking, DEM interchange — and must never be "corrected" back to the domain.
+Measured after the split: `0.9999` on a single fbm node, `0.992` end to end on the full default graph,
+mean difference 2.4% of range against 10.9% before. On a square lattice the two systems differ only
+by the uniform factor `s`, which is why the corpus's world-space seed rule (`SKILL.md`, `01`) has
+never had to distinguish them; the offset lattice is where they come apart.
+
+**The trade, stated rather than hidden.** A unit square cannot map isotropically onto a non-square
+world, so the choice is **squash or crop, and there is no third option**. Domain normalisation
+squashes the generated *pattern* by 13.4% in world `y`. That is the cheaper half of the trade: a
+squashed FBM is indistinguishable from one at a slightly different frequency — noise has no canonical
+aspect ratio — whereas a crop is a genuinely different draw, which is exactly the complaint being
+fixed. Critically the **lattice** stays perfectly isotropic under either choice — all six neighbours
+remain at exactly one cell spacing — so the D6 erosion, flow and thermal kernels below keep their
+correctness either way. Only the pattern's aspect is affected.
+
+**The same defect's quieter symptom, worth recognising by shape.** Under the world-point contract a
+placement parameter authored as a `[0,1]` fraction — Position Y — did not reach the last row, because
+it was compared against an axis only `0.866·H` tall. Any authored quantity normalised to `[0,1]` and
+then measured down the world axis behaves this way: the last 13.4% of the map becomes unreachable
+from the UI. If a lattice toggle re-rolls the terrain, expect the placement sliders to be short too.
+
+**The verification lesson: a contract change demotes the negative controls derived from the old
+contract.** The existing gate proved the seed contract by comparing the real build against one with
+the odd-row half-cell shift removed. Under the domain contract that comparison is a sub-pixel change
+and correlation cannot resolve it — the *broken* build reads `0.999` as well, so the control had gone
+vacuous and would have passed on the defect it existed to catch. The replacement controls the shift
+with the **D6 Laplacian magnitude**, `|Σₖ h[nₖ] − 6h[c]|` averaged over the field, which sees the
+row-parity zig-zag directly: the shift-suppressed build's magnitude over the real build's reads
+`1.000×` when the shift is dead in the product (the two fields are then the same field) against
+`1.313×` when it is alive, so the bound sits at `1.15` between two **measured** endpoints instead of
+a guessed one — the first bound tried here was a guessed `1.5`, which the *correct* build failed.
+The durable part is not about hex: **when a contract changes, re-derive its negative controls.** A
+control inherited from the superseded contract can start silently passing on the defect, and a suite
+that still reports green is worse than no suite.
 
 ## Kernels (all six neighbours at exactly `s` — the point of the exercise)
 
@@ -139,8 +211,13 @@ rows `[(q,r),(q+1,r),(q+1,r+1)]` + `[(q,r),(q+1,r+1),(q,r+1)]`. Every edge is a 
 5. **Resample round-trip** (square→hex→square on a real DEM): gate on **slope RMS** and "the same
    rivers route", never on height RMS (reassuring and wrong).
 6. **Topology invariance** — `hash(indexBuffer)` bit-identical under any height/snow/water edit.
-7. **Lattice invariance of world-space nodes** — same seed, square vs hex, sampled at identical
-   world (x,y): equal to interpolation error. Fails loudly if anyone fed `(q,r)` to noise.
+7. **Lattice invariance of authored nodes** — same seed, square vs hex, compared at matched
+   **domain** `(u,v)`, not matched world `(x,y)`: production build reads `0.9999` on one fbm node and
+   `0.992` end to end. Report the world-point correlation beside it (`0.574`) and do **not** gate it —
+   agreeing at world points *is* the crop. The half-cell shift needs a separate control that
+   correlation cannot provide: D6 Laplacian magnitude, bound `1.15` between the measured `1.000`
+   (shift dead) and `1.313` (shift alive). See §The authoring domain for why the old form of this
+   check went vacuous.
 8. Existing invariants re-based: `cellArea = (√3/2)s²`; mass; determinism; resolution consistency.
 
 ## Limits — what does not get better
@@ -148,14 +225,17 @@ rows `[(q,r),(q+1,r),(q+1,r+1)]` + `[(q,r),(q+1,r+1),(q,r+1)]`. Every edge is a 
 Single-receiver parallel-line artefacts survive (D6 quantises to 6 azimuths vs D8's 8; hex removes
 the *metric* inconsistency, not the discretisation — the cure is still MFD). **D∞ has no published
 hex analogue** (a 6-facet version would be F-tier; say so). Noise anisotropy (Perlin creases,
-diamond-square axes) is a world-space property of the noise itself — untouched. Droplet erosion
+diamond-square axes) is a property of the noise function itself, in whichever space it is
+evaluated — untouched. Droplet erosion
 gains nothing (already stencil-free) and pays barycentric sampling. Braun–Willett is
 lattice-neutral but its stack/donor/fill machinery all need iterator rewrites, and it stays global
 and untileable (`08`). Separable blur is lost (iterate the 7-point Laplacian, or pay O(k²));
 naive FFT on offset storage is sheared (Ehrhardt 1993 or shear-correct); spectral isostasy (`02`)
 is affected. The boundary zig-zags by `s/2` per row and the `(r&1)` parity term is the entire new
 bug surface. A W×H array covers a non-square world (`4096 × 3547·s`) — silent aspect drift is the
-likely first bug. And the ecosystem — PNG/R16, SRTM, GeoTIFF, engine importers, RichDEM, pysheds,
+likely first bug, and its authored-field half is §The authoring domain: the *footprint* stays
+truthfully rectangular; what is deliberately squashed is the generated pattern. And the ecosystem
+— PNG/R16, SRTM, GeoTIFF, engine importers, RichDEM, pysheds,
 this corpus's own reference-impl cross-checks — is square end to end (Landlab the verified
 exception), so export always ends in one hex→square resample at exactly the point `08` says
 "export last, once": bake normals/AO on the hex field and resample the *maps*, not the other way

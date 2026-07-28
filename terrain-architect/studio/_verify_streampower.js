@@ -3,7 +3,7 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
 const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
-  ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 (async () => {

@@ -162,20 +162,30 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
     // ---- S4 : warpField end to end on the analytic ramp -----------------------------------------
     // warpField sits at perlin -> blend -> WARP -> hydraulic -> thermal in the DEFAULT graph and is
     // height-critical. Displacing a LINEAR field by a known offset has a closed form, so caller and
-    // sampler are gated together with no reference implementation in the loop at all: output at
-    // cell (x,y) must be exactly ramp(worldPoint + offset). Cells whose displaced target leaves the
-    // footprint are skipped - the sampler legitimately clamps there.
+    // sampler are gated together with no reference implementation in the loop at all. Cells whose
+    // displaced target leaves the footprint are skipped - the sampler legitimately clamps there.
+    //
+    // Warp is the one node that straddles the authoring domain and the world metric, so its closed
+    // form has to be written carefully. The driving noise and the displacement are AUTHORED, so
+    // both live in the domain: offsets are domain cell units applied to the domain point. Only the
+    // final lookup is a world position, so only there does the row pitch enter. Truth at cell
+    // (x,y) is therefore ramp( du+ox , (dv+oy)*sqrt(3)/2 ), NOT ramp(worldPoint + offset) - the
+    // latter is what this gate asserted while generators still sampled world v, and it is a real
+    // contract change rather than a retuned tolerance. Square is untouched: H=1, du=x, dv=y.
     const WS = { strength: 0.12, freq: 3, seed: 7 };
-    const warpRampErr = hex => {
+    const warpRampErr = (hex, dropConversion) => {
       terrainDef.lattice = hex ? 'hex' : 'square';
+      const RS = hex ? H : 1;
       const f = mkRamp(1, 1, hex), range = rng(f), o = warpField(f, WS), s = WS.strength * n;
       const yMax = hex ? (n - 1) * H : n - 1;
       let mx = 0, s2 = 0, m = 0, worst = null;
       for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-        const W = cw(x, y, hex);
-        const ox = (gnoise(W[0] / n * WS.freq, W[1] / n * WS.freq, WS.seed) - .5) * 2 * s;
-        const oy = (gnoise(W[0] / n * WS.freq, W[1] / n * WS.freq, WS.seed + 53) - .5) * 2 * s;
-        const X = W[0] + ox, Y = W[1] + oy;
+        const du = x + (hex ? 0.5 * (y & 1) : 0), dv = y;           // authoring domain
+        const ox = (gnoise(du / n * WS.freq, dv / n * WS.freq, WS.seed) - .5) * 2 * s;
+        const oy = (gnoise(du / n * WS.freq, dv / n * WS.freq, WS.seed + 53) - .5) * 2 * s;
+        // dropConversion models the specific slip this straddle invites: displacing in the domain
+        // and then handing the domain row straight to a world-space sampler.
+        const X = du + ox, Y = (dv + oy) * (dropConversion ? 1 : RS);
         if (X < 1 || X > n - 2 || Y < 1 || Y > yMax - 1) continue;    // clamp zone, not a defect
         const e = Math.abs(o[y * n + x] - (X + Y));
         if (e > mx) { mx = e; worst = { cell: [x, y], world: [+X.toFixed(2), +Y.toFixed(2)],
@@ -186,8 +196,9 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
         relMax: +(mx / range).toExponential(3), relRms: +(Math.sqrt(s2 / m) / range).toExponential(3),
         cells: m, range: +range.toFixed(2), worst };
     };
-    out.warpHex = warpRampErr(true);
-    out.warpSquare = warpRampErr(false);
+    out.warpHex = warpRampErr(true, false);
+    out.warpSquare = warpRampErr(false, false);
+    out.warpNoConvert = warpRampErr(true, true);
 
     // ---- S5 : the caller contract, measured through a real call site ----------------------------
     // bakeThumb walks sx,sy over 0..RES-1 in GRID INDEX space and hands them straight to the
@@ -270,8 +281,10 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
     + `reference implementation in the loop: hex maxErr=${r.warpHex.maxAbs} rmsErr=${r.warpHex.rmsAbs} `
     + `over range ${r.warpHex.range} => relMax=${r.warpHex.relMax} relRms=${r.warpHex.relRms} `
     + `on ${r.warpHex.cells} unclamped cells (tol ${TOL}). Square control relMax=${r.warpSquare.relMax}. `
-    + `A stale caller handing grid indices to the world-space sampler reads relMax=`
-    + `${r.staleCaller.relMax} on the same ramp - that is the size of what S4 holds shut.`);
+    + `TWO live negative controls, both on this same ramp: a stale caller handing grid indices to `
+    + `the world-space sampler reads relMax=${r.staleCaller.relMax}, and warp displacing in the `
+    + `domain but skipping the world conversion at the lookup reads relMax=${r.warpNoConvert.relMax} `
+    + `- that is the size of what S4 holds shut.`);
 
   gate('S5 callers-pass-world-units', r.thumbHex && r.thumbHex.dup === 0,
     `bakeThumb walks sx,sy over grid indices 0..RES-1 and hands them to the world-space sampler. `

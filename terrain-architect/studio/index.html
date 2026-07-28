@@ -1116,11 +1116,10 @@ function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, no
 // fractal sum over a base function
 function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   const o=newField();const n=RES;let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
-  // Seed contract on hex (26): odd rows SAMPLE half a cell right and rows sit sqrt(3)/2 apart,
-  // or every noise field prints the half-cell zig-zag. hxs=0, rzs=1 on square - bit-identical.
-  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
+  // Authoring DOMAIN, not world metres (the AUTHORING DOMAIN note at isHex()). hxs=0 on square.
+  const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const gu=xfU((x+hxs*(y&1))/n,y*rzs/n),gv=xfV((x+hxs*(y&1))/n,y*rzs/n);   // placement folded into the coordinates, not the raster
+    const gu=xfU((x+hxs*(y&1))/n,y/n),gv=xfV((x+hxs*(y&1))/n,y/n);   // placement folded into the coordinates, not the raster
     let sum=0,amp=1,f=freq;
     for(let k=0;k<octaves;k++){
       let v=base(gu*f,gv*f,seed+k*7);
@@ -1133,9 +1132,9 @@ function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
 }
 function worleyField({seed=1,freq=5,mode="f2f1"}){
   const o=newField();const n=RES,cells=Math.max(2,Math.round(freq));
-  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
+  const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const px=xfU((x+hxs*(y&1))/n,y*rzs/n)*cells,py=xfV((x+hxs*(y&1))/n,y*rzs/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
+    const px=xfU((x+hxs*(y&1))/n,y/n)*cells,py=xfV((x+hxs*(y&1))/n,y/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
     let f1=9,f2=9;
     for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
       const gx=cx+i,gy=cy+j;
@@ -1150,14 +1149,14 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
 }
 function gradientField(angleDeg){
   const o=newField();const n=RES,a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
-  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y*rzs/n)*cx+xfV((x+hxs*(y&1))/n,y*rzs/n)*cy);}
+  const hxs=terrainDef.lattice==="hex"?0.5:0;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y/n)*cx+xfV((x+hxs*(y&1))/n,y/n)*cy);}
   return normalize(o);
 }
 function radialField(){
   const o=newField();const n=RES;
-  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y*rzs/n)-.5,dy=xfV((x+hxs*(y&1))/n,y*rzs/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
+  const hxs=terrainDef.lattice==="hex"?0.5:0;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y/n)-.5,dy=xfV((x+hxs*(y&1))/n,y/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
   return o;
 }
 
@@ -1471,7 +1470,7 @@ function shapeField(p){
   const a=-p.angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const half=Math.max(rad*p.aspect,cs);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const U=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,V=(y+0.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n; // (x+0.5)*cs === U*terrainDef.scale
+    const U=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,V=(y+0.5)/n; // authoring domain (note at isHex())
     let dx=xfU(U,V)*terrainDef.scale-cx,dy=xfV(U,V)*terrainDef.scale-cy;
     const rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;                          // rotate into object space
     let d;
@@ -1500,17 +1499,17 @@ function drawMaskField(p){
     const inner=radius*hard,opacity=clamp(stroke.opacity==null?1:stroke.opacity,0,1),erase=stroke.mode==="erase";
     const coverage=d=>d>=radius?0:hard>=.999?1:1-smooth(clamp((d-inner)/Math.max(radius-inner,1e-6),0,1));
     const composite=(i,c)=>{const a=c*opacity;if(a>0)out[i]=erase?out[i]*(1-a):out[i]+(1-out[i])*a;};
-    // Seed contract (26): strokes are authored in WORLD uv, cells sample world uv - on hex that
-    // means the odd-row half-cell shift and sqrt(3)/2 row compression on BOTH branches. Review
-    // caught the default (non-Transform) branch unconverted: a stroke at v=0.8 landed 15.5% of
-    // the map away from a Shape authored at the same coordinate, and inserting an identity
-    // Transform silently moved every stroke.
-    const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
+    // Strokes are authored in the DOMAIN (note at isHex()) - the brush writes uv straight from the
+    // pick, and a Shape at the same uv must land in the same place. Review caught the default
+    // (non-Transform) branch unconverted once already: a stroke at v=0.8 landed 15.5% of the map
+    // away from a Shape at the same coordinate, and inserting an identity Transform silently
+    // moved every stroke. BOTH branches convert, and both convert the same way.
+    const hxs=terrainDef.lattice==="hex"?0.5:0;
     if(XF){
       // An exact Transform can move any painted segment across the tile. Scan output cells once
       // per stroke and find the nearest segment; this avoids a 64 MB Float32 coverage raster at 4K.
       for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-        const su=(x+.5+hxs*(y&1))/n,sv=(y+.5)*rzs/n;
+        const su=(x+.5+hxs*(y&1))/n,sv=(y+.5)/n;
         const u=xfU(su,sv),v=xfV(su,sv);let d=Infinity;
         if(pts.length===1)d=Math.hypot(u-pts[0][0],v-pts[0][1]);
         else for(let q=1;q<pts.length;q++)d=Math.min(d,pointSegmentDistance(u,v,pts[q-1][0],pts[q-1][1],pts[q][0],pts[q][1]));
@@ -1520,15 +1519,15 @@ function drawMaskField(p){
     }
     let minU=pts[0][0],maxU=minU,minV=pts[0][1],maxV=minV;
     for(const q of pts){minU=Math.min(minU,q[0]);maxU=Math.max(maxU,q[0]);minV=Math.min(minV,q[1]);maxV=Math.max(maxV,q[1]);}
-    // Bounding boxes convert world v to ROW range (/rzs) and pad x by the odd-row shift.
+    // Bounding boxes pad x by the odd-row shift; v is already a row fraction in the domain.
     const bx0=clamp(Math.floor((minU-radius)*n-hxs),0,n-1),bx1=clamp(Math.ceil((maxU+radius)*n),0,n-1);
-    const by0=clamp(Math.floor((minV-radius)/rzs*n),0,n-1),by1=clamp(Math.ceil((maxV+radius)/rzs*n),0,n-1);
+    const by0=clamp(Math.floor((minV-radius)*n),0,n-1),by1=clamp(Math.ceil((maxV+radius)*n),0,n-1);
     const bw=bx1-bx0+1,bh=by1-by0+1,cov=new Uint8Array(bw*bh);
     const segment=(a,b)=>{
       const x0=clamp(Math.floor((Math.min(a[0],b[0])-radius)*n-hxs),bx0,bx1),x1=clamp(Math.ceil((Math.max(a[0],b[0])+radius)*n),bx0,bx1);
-      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)/rzs*n),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)/rzs*n),by0,by1);
+      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)*n),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)*n),by0,by1);
       for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
-        const c=Math.round(coverage(pointSegmentDistance((x+.5+hxs*(y&1))/n,(y+.5)*rzs/n,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
+        const c=Math.round(coverage(pointSegmentDistance((x+.5+hxs*(y&1))/n,(y+.5)/n,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
         if(c>cov[i])cov[i]=c;}
     };
     if(pts.length===1)segment(pts[0],pts[0]);else for(let i=1;i<pts.length;i++)segment(pts[i-1],pts[i]);
@@ -1674,7 +1673,7 @@ function layoutField(shapes,base){
     const prof=FALLOFF[sh.profile]||FALLOFF.scurve;
     const fall=Math.max(sh.falloff,1e-4),half=(sh.width||0)*0.5;
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-      const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n;
+      const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/n;
       let {d,e}=polylineNearest(u,v,sh.pts);
       // inside a closed polygon the distance is zero, so the interior sits at the shape's elevation
       if(sh.kind==="poly"&&sh.pts.length>2&&pointInPoly(u,v,sh.pts))d=0;
@@ -1822,7 +1821,7 @@ function peakField(p){
   const w0x=fbm2(4.2,1.7,p.seed+31,4),w0y=fbm2(8.3,5.1,p.seed+32,4);
   let h=newField(0);const cover=newField(0);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n,dx=u-p.x,dy=v-p.y;
+    const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)/n,dx=u-p.x,dy=v-p.y;
     let qx=( dx*ca+dy*sa)/sx,qy=(-dx*sa+dy*ca)/sy;
     // Subtract the warp at the origin: Character can move shoulders and contours without moving
     // the authored summit away from Position X/Y.
@@ -1933,10 +1932,11 @@ function mountainField(p){
   // deterministic per-seed stream, so the same seed always builds the same massif
   let rs=Math.imul(p.seed|0,2654435761)>>>0;
   const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
-  // World cell-units for BOTH skeleton steps (review caught the envelope in raw grid units: on
-  // hex a grid circle is a world ellipse 15.5% wider than deep, and Position Y meant two
-  // different places in the envelope and the ridge network). hxs/rzs are 0/1 on square.
-  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
+  // The SAME domain cell-units for both skeleton steps (review caught them disagreeing once:
+  // Position Y meant two different places in the envelope and the ridge network). Domain, not
+  // world - cy0 = p.y*n is a row index, so Position Y=1 must reach the last row, which it does
+  // not if the field is measured down a world axis only 0.866n tall. hxs is 0 on square.
+  const hxs=terrainDef.lattice==="hex"?0.5:0;
   const cx0=p.x*n,cy0=p.y*n,reach=Math.max(p.size,0.02)*n;
   const rot=p.angle*Math.PI/180;
 
@@ -1952,7 +1952,7 @@ function mountainField(p){
       cyp.push(cy0+0.9*reach*Math.sin(ang)*t+py*(wob[a]-wm)*n);}
     const amp=0.7+0.6*rnd();
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-      const xw=x+hxs*(y&1),yw=y*rzs;
+      const xw=x+hxs*(y&1),yw=y;
       let d=Infinity;
       for(let a=0;a<k-1;a++)d=Math.min(d,sdSegment(xw,yw,cxp[a],cyp[a],cxp[a+1],cyp[a+1]));
       const e=amp*Math.pow(clamp(1-d/reach,0,1),1.6);
@@ -1962,7 +1962,7 @@ function mountainField(p){
   // 2) modulated-Voronoi ridge network
   const netA=new Float32Array(n*n),netB=new Float32Array(n*n);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=(x+hxs*(y&1))/n*ncell,v=y*rzs/n*ncell;
+    const u=(x+hxs*(y&1))/n*ncell,v=y/n*ncell;
     const wx=fbm2(u*0.35,v*0.35,p.seed+3,4)+0.5*fbm2(u*0.9,v*0.9,p.seed+13,4);
     const wy=fbm2(u*0.35+4.7,v*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*0.9+1.9,v*0.9+6.1,p.seed+14,4);
     const u2=u+warpamt*wx,v2=v+warpamt*wy,i=y*n+x;
@@ -2584,16 +2584,19 @@ function warpField(inp,{strength=0.12,freq=3,seed=7}){
   // together they were the largest single reason the DEFAULT graph's terrain changed on a
   // lattice toggle (warp sits early in perlin -> blend -> warp -> hydraulic -> thermal, and is
   // height-critical): the driving noise was sampled at raw grid indices, and the displaced
-  // lookup handed raw indices to a sampler that reads world positions. On hex, cell (x,y) lives
-  // at ( x + 0.5*(y&1), y*sqrt(3)/2 ) in cell units - so both must use that. The offsets are
-  // already in cell units, so displacing the world point by them is correct on either lattice.
+  // lookup handed raw indices to a sampler that reads world positions.
+  //
+  // Warp is the one node that straddles both coordinate systems (the note at isHex()), so it is worth
+  // being explicit. The driving noise and the displacement are AUTHORED, so they live in the
+  // domain: du,dv are domain cell units and the offsets displace a domain point. sampleBilinear
+  // reads WORLD positions, so the displaced point converts on the way in - and only there.
   // hxs=0, rzs=1 on square: byte-identical there.
   const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const wx=x+hxs*(y&1),wy=y*rzs;
-    const ox=(gnoise(wx/n*freq,wy/n*freq,seed)-.5)*2*s;
-    const oy=(gnoise(wx/n*freq,wy/n*freq,seed+53)-.5)*2*s;
-    o[y*n+x]=sampleBilinear(inp,wx+ox,wy+oy);
+    const du=x+hxs*(y&1),dv=y;
+    const ox=(gnoise(du/n*freq,dv/n*freq,seed)-.5)*2*s;
+    const oy=(gnoise(du/n*freq,dv/n*freq,seed+53)-.5)*2*s;
+    o[y*n+x]=sampleBilinear(inp,du+ox,(dv+oy)*rzs);
   }
   return o;
 }
@@ -5421,14 +5424,14 @@ function buildProps(){
       f.appendChild(seg);
       const note=document.createElement("div");note.className="hint";note.style.marginTop="6px";
       // Say the footprint consequence plainly here, because it is the thing that surprises: the
-      // terrain looks different on toggle, and the reason is geometric, not a bug.
+      // map really does change shape, and the reason is geometric, not a bug.
       note.innerHTML="<b>Hexagonal</b>: 6 equidistant neighbours, so there is no diagonal to weight "
         +"and no 45° drainage bias; static equilateral mesh (no edge spinning); D6 thermal, routing "
-        +"and analysis.<br><b>Footprint changes.</b> A true hex lattice puts rows √3/2 apart, so on "
-        +"the same square grid the world becomes <b>scale × scale·√3/2</b> — you are looking at the "
-        +"same terrain over a 13.4% shorter map, re-levelled to fit. The noise itself is unchanged: "
-        +"at matched world points the two lattices agree to 0.2%. GPU compute runs on the CPU path "
-        +"in hex mode.";
+        +"and analysis.<br><b>Your terrain is kept.</b> Generators are authored in graph space, so "
+        +"the same seed draws the same landscape on either lattice (correlation <b>0.99</b> on the "
+        +"default graph). What changes is the <i>map</i>: a true hex lattice puts rows √3/2 apart, "
+        +"so the world becomes <b>scale × scale·√3/2</b> and the terrain is fitted to a 13.4% "
+        +"shorter footprint. GPU compute runs on the CPU path in hex mode.";
       f.appendChild(note);
       body.appendChild(f);
     }
@@ -6053,6 +6056,28 @@ const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the cen
 // would be silent metric anisotropy (the chapter's flagged first bug).
 const isHex=()=>terrainDef.lattice==="hex";
 const HEX_ROW=Math.sqrt(3)/2;
+// ---- THE AUTHORING DOMAIN vs THE WORLD METRIC -------------------------------------------
+// Two coordinate systems, and conflating them is what made a lattice toggle re-roll the terrain.
+//
+//   DOMAIN   u,v in [0,1] over the raster: u = (x + 0.5*(y&1))/n, v = y/n. Everything AUTHORED
+//            lives here - generators, Position X/Y, shapes, painted strokes, warp displacement -
+//            so the same graph draws the same terrain on either lattice. Measured on the default
+//            graph: correlation 0.999 against square, versus 0.574 when the generators measured
+//            v down the world axis. The odd-row half-cell shift stays: it is a sub-cell offset
+//            WITHIN the row, and dropping it prints the zig-zag every noise field used to show.
+//
+//   WORLD    metres. Rows sit sqrt(3)/2 apart, so a hex map is scale x scale*sqrt(3)/2. Every
+//            PHYSICAL kernel - erosion, flow routing, wind, snow, normals, AO, picking, DEM
+//            interchange - reads this and must never be "corrected" to the domain.
+//
+// The cost, stated plainly rather than buried: mapping the unit domain onto a map 0.866 as tall
+// squashes the generated PATTERN 13.4% in world y on hex. That is unavoidable - a unit square
+// cannot map isotropically onto a non-square world - so the real choice is squash or crop, and
+// squash is the better half. A squashed FBM is indistinguishable from a slightly different
+// frequency (noise has no canonical aspect ratio), whereas a crop is a different draw, which is
+// exactly the "why did my terrain change?" this replaces. The LATTICE itself stays isotropic
+// under either choice, so every D6 erosion and flow kernel keeps its correctness untouched.
+// warpField is the only node that straddles both; it is commented in place.
 // The D6 one-ring, odd-r (26). All six neighbours sit at EXACTLY one cell spacing: the two
 // lateral ones trivially, the four oblique ones at (+-0.5, +-sqrt(3)/2), whose length is
 // sqrt(0.25+0.75)=1. There is no diagonal and no sqrt(2) to correct - the D4/D8 fork, and the
