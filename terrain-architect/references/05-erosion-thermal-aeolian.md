@@ -3,7 +3,9 @@
 Contents: [Thermal](#thermal-erosion-musgrave-et-al-1989) · [Repose angles](#repose-angles) ·
 [Talus](#talus--scree-olsen-2004) · [Mass wasting](#mass-wasting-landslides--debris-flows) ·
 [Aeolian overview](#aeolian-erosion) ·
-[Bagnold physics](#bagnold-1941--the-physics) · [Werner dunes](#werner-1995--the-implementable-model) ·
+[Bagnold physics](#bagnold-1941--the-physics) ·
+[Speed → flux → bed change](#wind-speed--sand-flux--bed-change) ·
+[Werner dunes](#werner-1995--the-implementable-model) ·
 [Anchored dunes](#anchored-dunes--when-sand-meets-an-obstacle)
 
 ## Thermal erosion (Musgrave et al. 1989)
@@ -212,14 +214,24 @@ physics is **P-tier** (Iverson 1997) but *not implementable as written* — like
 
 ## Aeolian erosion
 
-Two separable effects, and most graphs only need the second:
+**Every model below takes a wind field, not a wind direction.** Build it first (`13`
+`windField` — a per-cell speed *and* direction); the transport model is the easy half, and a
+constant vector silently disables most of what follows.
 
-1. **Deflation** — wind stripping fines from exposed surfaces. Slow, subtle, mostly affects
-   material masks rather than height.
-2. **Dune formation** — sand transport and deposition. This is the one with visual payoff.
+Three separable effects:
 
-Wind erosion is ★★★★ mostly because the physics reference (Bagnold) is not implementable as
-written and the implementable model (Werner) is rarely cited.
+1. **Deflation** — wind stripping loose material from exposed surfaces. As a *bulk* lowering it is
+   slow and mostly a material-mask effect; but as the **divergence of the sand flux** under a
+   spatially varying wind it moves real height, and it is what strips a windward face
+   (*Wind speed → sand flux → bed change*, below).
+2. **Dune formation** — sand transport and deposition. This is the one with visual payoff, and it
+   has two interchangeable formulations: the **continuum** flux/Exner model (below) and Werner's
+   **cellular automaton** (further below).
+3. **Abrasion** — wind-driven sand cutting *bedrock* into streamlined ridges (yardangs). Far
+   slower, and the only one that touches rock rather than the sand layer; worked in `16`.
+
+Wind erosion is ★★★★ mostly because the physics reference (Bagnold) is not implementable *as
+written* and the implementable model (Werner) is rarely cited.
 
 ## Bagnold (1941) — the physics
 
@@ -246,8 +258,77 @@ q = C * sqrt(d / D) * (ρ_a / g) * u*³
 The `u*³` is the important part: transport scales with the *cube* of shear velocity. Doubling
 the wind moves eight times the sand. This is why dunes form where they form.
 
-You will not integrate this over a heightfield. Use it to justify parameter choices and to
-tell the user why a linear wind-strength slider feels wrong.
+You will not integrate Bagnold's *saltation-cloud* physics over a heightfield — the grain-scale
+momentum exchange is not a heightfield operation. But the two results above **are** two lines of
+arithmetic per cell, and coupling them to the wind field of `13` is what makes wind an agent that
+moves terrain rather than a direction label. That coupling is the next section.
+
+## Wind speed → sand flux → bed change
+
+This is the continuum branch of aeolian transport, and the one that consumes a **wind field**
+(`13`) directly. Werner's cellular automaton (below) is the discrete branch; they model the same
+physics and you pick by what you need — the CA for emergent dune *types*, this for a bed that
+responds to a spatially varying wind.
+
+Four steps, each a single expression:
+
+```
+aeolianStep(bed, sand, windField, dt):
+    u*  = speed(windField) · κ / ln(z/z₀)              # 1. law of the wall (κ = 0.4), 13
+    q   = (u* > u*_t) ? C·√(d/D)·(ρ_a/g)·u*³ : 0        # 2. Bagnold: threshold-gated, CUBIC
+    q⃗   = q · normalize(windField)                     # 3. flux vector, pointing downwind
+    bed −= dt·∇·q⃗ / ρ_bed                              # 4. Exner: sediment continuity
+```
+
+**Step 4 is the whole point, and it is worth stating as a rule: `∇·q⃗` is what changes the
+terrain, not `q` itself.** Flux *diverges* (the wind is speeding up) → the bed is **deflated**;
+flux *converges* (the wind is slowing) → sand is **deposited**. Feed it the `13` field and the
+anatomy falls out with no authoring: the windward face is stripped because the flow accelerates up
+it (Jackson & Hunt speed-up), and the lee fills because the flow separates and stalls (the 15°
+shadow zone). Feed it a **constant** wind vector and `∇·q⃗ ≡ 0` — *nothing happens, ever, at any wind
+speed*. That is the sharpest possible statement of why the wind field is not optional, and it is
+also the failure signature: if your aeolian pass does nothing, check whether the wind varies in
+space before checking anything else.
+
+**Details that matter:**
+
+- **The threshold is a hard gate, not a soft ramp.** `u* < u*_t` gives *exactly* zero. A field
+  uniformly just-below-threshold moves nothing; just-above moves a lot. This is why **averaging or
+  smoothing the wind field destroys the result** — and why a wind *rose* (a few discrete strong
+  events) transports far more than its mean speed suggests. Bagnold's cubic law has no threshold
+  subtraction in it; **Owen 1964** / Lettau's `q ∝ u*²(u* − u*_t)` is the smoother variant near
+  threshold if the hard gate reads as a hard edge.
+- **Limit deflation to the sand that is there.** Wind strips the *sand layer*; it does not
+  excavate bedrock. Keep `sandDepth` as its own field (the same separation the dune section
+  recommends below) and clamp the erosion term to it. Bedrock removal by wind is **abrasion** —
+  yardangs (`16`) — and it is orders of magnitude slower.
+- **Saturation length — why dunes have a minimum size (Sauermann et al. 2001).** The saltation
+  cloud does not reach capacity instantly; the flux relaxes toward its saturated value over a
+  length `L_sat` (~0.5–2 m for sand in air, longer at coarse grain sizes):
+  `dq/ds = (q_sat − q)/L_sat` along the wind. Two consequences, both visible: a bump shorter than
+  `L_sat` cannot grow, which sets the **minimum dune size** and is why sand does not simply
+  roughen into noise; and the deposition maximum is **shifted downwind** of the crest, the exact
+  aeolian twin of the orographic fallout lag (`13`). *Sauermann, Kroy & Herrmann 2001*, *A
+  continuum saltation model for sand dunes* (Phys. Rev. E 64) is the canonical continuum model and
+  the reference for this branch.
+- **Gate on availability.** Vegetation cover, a surface crust, moisture or a gravel lag all hold
+  sand down — the same `(1 − cover)` switch as `13`'s erosion coupling, applied to the flux. It is
+  what decides a stable nebkha field vs. mobile barchans (`16`).
+- **Off Earth**, `g` and `ρ_a` both move: thin Martian air *raises* the threshold sharply while low
+  gravity lowers it, and the net is that Mars needs rare, strong winds to move sand at all
+  (**Kok et al. 2012**; `SKILL.md`). The constants are parameters here, not literals — which is the
+  point of writing the formula out rather than hard-coding an Earth number.
+
+**Tier.** The threshold and the cubic flux are **P** (Bagnold 1941); the continuum coupling with a
+saturation length is **P** (Sauermann et al. 2001); the wind field it eats is **F** (`13`).
+
+*Runnable reference: `reference-impl/aeolian.py` (`shear_velocity`, `threshold_shear`,
+`saltation_flux`, `transport_field`, `saturate`, `exner_step`), verified by
+`tests/test_aeolian.py`. The threshold (~0.2 m/s for 250 µm quartz) and the exact cubic scaling get
+arithmetic oracles; the coupling is invariant-checked — a windward face is stripped while its lee
+fills, sand is **conserved**, deflation never cuts into bedrock, a nonzero saturation length shifts
+the deposition maximum downwind, and — the load-bearing one — a **spatially uniform wind changes
+nothing at all** (`09`).*
 
 ## Werner (1995) — the implementable model
 
@@ -255,7 +336,12 @@ tell the user why a linear wind-strength slider feels wrong.
 (all three ideas below): slabs conserved exactly; the `p_sand > p_bare` instability sweeps ground
 bare (shown on the minimal variant, `shadow=False, avalanche=False`); the lee **shadow zone** +
 **avalanching** organise **transverse dunes** (ridge signal ≫ the minimal variant); deterministic
-(`09`). `hop` is the saltation length (≈3 cells); a longer hop sets a longer dune wavelength.*
+(`09`). `hop` is the saltation length (≈3 cells); a longer hop sets a longer dune wavelength.
+`wind_field=(u, v)` swaps the constant direction for the per-cell field of `13`, so each slab is
+transported along the **local** wind and each shadow test walks the **local** upwind — the transport
+path bends through the steered flow, which is what makes a valley dune field trend with the valley
+and what banks sand against an obstacle as an anchored dune (below). Checked: a constant field
+reproduces the constant-vector result exactly, and slabs stay conserved when the field converges.*
 
 *Eolian dunes: computer simulations and attractor interpretation.* A cellular automaton with
 sand "slabs". This is what to actually build. It is remarkably short and it produces barchans,

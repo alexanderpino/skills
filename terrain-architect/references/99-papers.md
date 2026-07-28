@@ -150,8 +150,21 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   of Southern Denmark. — Fast approximations for thermal/talus, including the sweep-based
   variant.
 - **Bagnold, R.A. (1941).** *The Physics of Blown Sand and Desert Dunes.* Methuen, London. —
-  The physics. Threshold friction velocity, the `u*³` saltation law. Not directly
-  implementable; cite it for *why*, not *how*.
+  The physics. Threshold friction velocity, the `u*³` saltation law. The *saltation-cloud* physics
+  is not directly implementable over a heightfield — cite it for *why*, not *how* — but the two
+  headline results are one expression each per cell and, coupled to a wind field, are the whole
+  speed→transport chain (`05`). **Constants** (`reference-impl/aeolian.py`): `A ≈ 0.1` (turbulent
+  threshold coefficient), `ρ_s ≈ 2650 kg/m³` (quartz), `ρ_a ≈ 1.22 kg/m³` (sea-level air),
+  reference grain `D = 250 µm` → `u*_t ≈ 0.2 m/s`.
+- **Owen, P.R. (1964).** *Saltation of uniform grains in air.* J. Fluid Mech. 20(2), 225–242. —
+  The near-threshold refinement of Bagnold's cubic, `q ∝ u*²(u* − u*_t)`; reach for it when the
+  hard on/off gate reads as a hard edge (`05`).
+- **Sauermann, G., Kroy, K. & Herrmann, H.J. (2001).** *A continuum saltation model for sand
+  dunes.* Physical Review E 64, 031305. — **The continuum branch of aeolian transport**, and the
+  counterpart to Werner's CA: sand flux relaxes toward saturation over a **saturation length**
+  `L_sat`, and the bed follows the flux DIVERGENCE (Exner). `L_sat` is what gives dunes a minimum
+  size and shifts deposition downwind of the crest. This is the model that consumes a spatially
+  varying wind field (`13`) directly, where the CA consumes a direction (`05`).
 - **Werner, B.T. (1995).** *Eolian dunes: Computer simulations and attractor interpretation.*
   Geology 23(12), 1107–1110. — **The implementable dune model.** Slab CA with shadow zone and
   differential deposition probability. Produces barchan/transverse/linear/star dunes from wind

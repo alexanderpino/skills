@@ -65,7 +65,18 @@ height-field realisation `meander.burn_channel`), braided/anastomosing rivers
 multi-thread channels; reduced-complexity tier — statistically braided, not a photoreal planform),
 glacial erosion (`glacier.glacier_carve` —
 SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier), the dynamic
-snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), aeolian
+snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), the
+terrain-aware **wind flow field** (`winds.wind_field` — the whole `13` recipe; its stages are
+`winds.terrain_speedup` over the fetch-secant `winds.upwind_slope` (Jackson & Hunt crest speed-up),
+`winds.lee_shelter` (Werner's 15° separation shadow at landscape scale), `winds.valley_channel` over
+the structure-tensor `winds.terrain_axis` (channelling along a confining valley), and
+`winds.terrain_adjust` composing the three; F-tier — plus `winds.mass_consistent`, the
+Helmholtz–Hodge projection, which is exact), **aeolian transport** under that field
+(`aeolian.shear_velocity` law-of-the-wall, `aeolian.threshold_shear` and `aeolian.saltation_flux` —
+Bagnold's threshold and cubic law, P-tier with arithmetic oracles — composed by
+`aeolian.transport_field`, lagged by `aeolian.saturate` over a Sauermann saturation length, and
+coupled to the bed by `aeolian.exner_step`, sediment continuity: flux divergence deflates, flux
+convergence deposits), aeolian
 abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier), and structural
 tectonics (`tectonics.fault_scarp` displacement fractal + `tectonics.fault_weakness` — the fault-as-
 `K(x,y)` coupling that feeds stream power so valleys follow structure — and `tectonics.plate_uplift`,
