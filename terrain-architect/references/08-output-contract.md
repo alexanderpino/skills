@@ -464,12 +464,27 @@ cell centres, all sides `cellSize`, diagonals `cellSize` and `√3·cellSize`. A
 therefore **a square-grid heightfield under a shear** — an identity, not an analogy — and the
 adjustments are exactly three.
 
-1. **`cellSize` becomes a 2×2 matrix.** Index → world is `x = B·(q,r)`, with (pointy-top)
-   `B = cellSize·[[1, ½], [0, √3/2]]`. Everything metric routes through it: distance via the metric
-   tensor `G = BᵀB = cellSize²·[[1, ½], [½, 1]]`, whose off-diagonal `½ = cos 60°` is precisely the term
-   a square-grid code assumes is zero; world gradients via `∇ₓh = B⁻ᵀ·∇₍q,r₎h`; cell area via
-   `det B = (√3/2)·cellSize²`. The 6-neighbour Laplacian constant `2/(3d²)` above is the same
-   non-orthogonality arriving by a different route — through the stencil moments rather than through `G`.
+1. **`cellSize` stops being a scalar and becomes a 2×2 shear matrix `B`.** This is the single object the
+   whole hex pipeline hangs on, so carry it explicitly rather than open-coding the trigonometry at each
+   call site. Index → world is `x = B·(q,r)`:
+
+   ```
+   pointy-top:  B = cellSize · [[1, ½],  [0, √3/2]]        # the manifest's hexOrientation picks which
+   flat-top:    B = cellSize · [[√3/2, 0], [½, 1]]         # they differ by a 30° rotation, nothing more
+   in 3D:       diag(B, 1) — the shear is purely lateral; height is never sheared (it is a fibre)
+   ```
+
+   Everything metric routes through it. Distance uses the **metric tensor**
+   `G = BᵀB = cellSize²·[[1, ½], [½, 1]]`, whose off-diagonal `½ = cos 60°` is exactly the term a
+   square-grid code assumes is zero — and `G` is the *same for both orientations*, since they are one
+   lattice rotated, so every metric consequence in this section is orientation-independent even though
+   `B` is not. Area and handedness come from `det B = (√3/2)·cellSize²`: positive, so triangle winding
+   and backface culling are unaffected — and note that the "cell areas sum to the domain area" check in
+   *Verify* below **is** a `det B` check, which is the cheapest way to catch a wrong `B`. World
+   gradients use `∇ₓh = B⁻ᵀ·∇₍q,r₎h` (next trap). The 6-neighbour Laplacian constant `2/(3d²)` above is
+   the same non-orthogonality arriving by another route — through the stencil moments rather than
+   through `G`. Do not store `B` in the manifest as an independent field: `cellSize` and
+   `hexOrientation` already determine it, and a second copy is a thing that can drift out of agreement.
 2. **The quad diagonal is pinned, not chosen.** Of the index quad's two diagonals, only the
    **anti-diagonal** `(q+1,r)–(q,r+1)` is a neighbour link (direction `(−1,+1)`); the main diagonal
    `(q,r)–(q+1,r+1)` spans `√3·cellSize` and is adjacent to nothing. Split every quad that same way and
@@ -495,8 +510,18 @@ hex mip pyramid is plain array decimation), cache-coherent row traversal, and up
 `R16`/`R32F` 2D texture with `B` in the shader. If the renderer meshes hex tiles directly, that removes
 the square-raster round-trip entirely: the array *is* the texture and the shear is three multiplies.
 
-**What does not transfer — three traps, the first expensive.**
+**What does not transfer — four traps, and the first is the one that bites everybody.**
 
+- **A shear does not preserve normals.** This is *the* classic shear-matrix bug and it is easy to walk
+  into here, because the tempting pipeline — build the mesh on integer indices, apply `B` in the vertex
+  shader — leaves every normal and every slope computed in index space, where they are simply wrong.
+  Directions transform by the **inverse transpose**, `∇ₓh = B⁻ᵀ·∇₍q,r₎h` (equivalently
+  `normal ∝ (−∇ₓh, 1)`, normalised *after* the transform); the usual GPU spelling is
+  `transpose(inverse(mat3(M)))`, never `mat3(M)`. Skip it and the error is not subtle: on the hex `B`
+  the gradient **direction** is off by up to **30.5°** and the slope **magnitude** by a factor between
+  `0.82` and `1.41` — a `√3` spread. That lands on lighting (`09`'s sun sweep sees it immediately), on
+  every slope mask in `06`, and on any repose or talus threshold in `05`, which is the same class of
+  silent-scale-factor bug as the un-renormalised Laplacian above.
 - **Hardware bilinear on that texture is not hex interpolation.** `texture()` returns a bilinear patch
   over the sheared rhombus above, which is neither the dual mesh's two triangles nor symmetric under the
   lattice — it privileges the one vertex pair that is not even adjacent. It is affine-exact, so a ramp

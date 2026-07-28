@@ -437,7 +437,12 @@ erosion/CA are markedly less direction-biased (no 45°/90° striping; a smaller 
 The costs are interchange — engines and DEMs want a raster, so you resample out — and a renormalised
 stencil (the 6-neighbour Laplacian constant differs by 3/2; keep the square one and diffusivity is
 silently 1.5× high). Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
-every downstream parameter exactly as cellSize does. Rendering hex is a separate, later fork — the
+every downstream parameter exactly as cellSize does. The practical shape of the choice is that **`cellSize` stops being a scalar and becomes a 2×2 shear
+matrix** `B` (a hex field is a square array under a shear — the index quad is a rhombus): distances go
+through `G = BᵀB`, whose off-diagonal `cos 60° = ½` is the term square-grid code assumes is zero, and
+**gradients and normals go through `B⁻ᵀ`, not `B`** — the classic shear bug, worth up to 30° of normal
+error and a `√3` slope-scale error if you skip it. Carry `B`, not trigonometry at each call site.
+Rendering hex is a separate, later fork — the
 dual mesh (centres only, ~2 triangles per cell) when the hexes are a working grid, and when the tiles
 are meant to be seen, a **6-triangle fan through the centre** or the minimal **4-triangle corner-only**
 triangulation, which is a third cheaper but drops the cell's own sample and attenuates one-cell extrema
