@@ -105,6 +105,10 @@ swim in. Bake only what is genuinely static; keep live whatever melts, migrates,
   2001, `11`): erosion eats the cover before the bedrock, which is what gives rock-above-scree.
 - **Fluid** (water) has a dynamic surface — tides (`12`), waves and flow (`03`, `04`), lake spill
   level (`03`) — and a depth you traverse. It is never part of the collision height.
+- **Sea ice** (`12`) is the one case that lands *on the fluid layer rather than the solid one*: a
+  transient crust carried by `waterSurface`, with its own thickness field. It never enters
+  `solidTop` — it has no bathymetry and it melts — and its terrain effect is to gate the coastal
+  loop, not to add relief.
 - **Transient** (snow `13`) accumulates and melts on top of everything, sliding off steep ground by
   its own thermal pass.
 

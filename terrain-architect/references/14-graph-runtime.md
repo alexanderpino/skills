@@ -179,6 +179,59 @@ With Merkle keys, "dirty" is just "key changed". What remains is scheduling:
   recursive. Runtimes with hand-rolled dirty flags invariably leak invalidation upstream or —
   worse — fail to propagate down.
 
+## Side-channel masks & the accumulator pattern
+
+Simulations emit more than their primary field. A snow sim (`13`) also produces a snow-cover mask, a
+water sim (`03`, `12`) a water mask, debris (`05`, `07`) a debris mask, vegetation (`13`) a canopy
+mask — and the consumers are always the same three: splatmap assembly (`08`), material selection
+(`06`), and scatter suppression (`07`). Wired directly that is `N` producers × `M` consumers of long
+edges, and adding one simulation means rewiring every consumer. Tools therefore ship a **registry
+node** — Gaea calls it an Accumulator — that collects these masks by convention and updates itself
+as simulations are added or removed. It is good ergonomics and it is a **hole in the node model**
+unless two things are handled.
+
+**It has an undeclared input set, which silently breaks the cache.** The whole of caching above rests
+on the key enumerating a node's dependencies, and the recursion walks `node.inPorts`. A node whose
+real dependency is "every simulation currently in the graph" has inputs that appear in no port list,
+so **adding a simulation does not change the accumulator's key** — and every downstream consumer
+serves a stale cache entry that is missing the new mask. Nothing crashes; the splatmap is just
+quietly wrong, and it stays wrong until something unrelated evicts the entry. The rule that fixes it
+is the one the chapter already implies: **the accumulator is editor sugar and must be desugared
+before evaluation.** Resolve the collection at plan time into explicit edges, and fold the resolved
+set into the identity:
+
+```
+cacheKey(accumulator, ctx) += hash( sorted( (producerNodeId, outPortName)
+                                            for each collected mask ) )     # the RESOLVED set
+```
+
+Then adding, removing or renaming a producer changes the key, and normal Merkle invalidation does
+the rest. Hash the *identities*, not the buffers — the upstream keys already cover the contents.
+
+**Precedence must be explicit, or the output depends on node insertion order.** Collected masks
+overlap: snow lies on debris, water sits over both. A registry that sums or `max`es its inputs
+produces coverage above 1 and violates the partition rule (`06`, `09`'s checklist). Resolving by
+traversal order is worse — it makes the result depend on the order nodes were created, so a reorder
+or a copy/paste changes the terrain and determinism is gone. Carry a **documented total order** on
+the registry (a sensible default being snow → water → vegetation → debris → base, top-down through
+the layer stack of `08`) and resolve overlaps by it. It is the same `10` discipline as any other
+combiner: never a bare `max`.
+
+Two consequences worth stating because they surprise people:
+
+- **The accumulator is `LOCAL`, but its cone is the whole graph.** The node itself just combines
+  masks. Its *upstream* includes every simulation, so it can tile no better than its worst producer
+  (`GLOBAL` if any producer is), region invalidation (below) stops being local, and cache pinning
+  (Memory & scheduling) now pins nearly everything whenever a consumer is being viewed. Give it the
+  tiling contract of its worst upstream, not its own.
+- **It is a fan-in, so it is also the natural place for the partition assertion.** Since every
+  coverage mask passes through one node, assert `Σ masks ≤ 1` there once, rather than hoping each
+  consumer checks.
+
+**Tier.** **F** — an editor-ergonomics pattern, not a result. The correctness rules are not
+discretionary though: they are the purity contract at the top of this chapter applied to a node that
+appears to escape it.
+
 ## Preview & the resolution pyramid
 
 The tool above the substrate lives or dies on preview latency, and preview correctness is a
