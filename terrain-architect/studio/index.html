@@ -1070,8 +1070,11 @@ function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, no
 // fractal sum over a base function
 function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   const o=newField();const n=RES;let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
+  // Seed contract on hex (26): odd rows SAMPLE half a cell right and rows sit sqrt(3)/2 apart,
+  // or every noise field prints the half-cell zig-zag. hxs=0, rzs=1 on square - bit-identical.
+  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const gu=xfU(x/n,y/n),gv=xfV(x/n,y/n);   // placement folded into the coordinates, not the raster
+    const gu=xfU((x+hxs*(y&1))/n,y*rzs/n),gv=xfV((x+hxs*(y&1))/n,y*rzs/n);   // placement folded into the coordinates, not the raster
     let sum=0,amp=1,f=freq;
     for(let k=0;k<octaves;k++){
       let v=base(gu*f,gv*f,seed+k*7);
@@ -1084,8 +1087,9 @@ function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
 }
 function worleyField({seed=1,freq=5,mode="f2f1"}){
   const o=newField();const n=RES,cells=Math.max(2,Math.round(freq));
+  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const px=xfU(x/n,y/n)*cells,py=xfV(x/n,y/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
+    const px=xfU((x+hxs*(y&1))/n,y*rzs/n)*cells,py=xfV((x+hxs*(y&1))/n,y*rzs/n)*cells,cx=Math.floor(px),cy=Math.floor(py);
     let f1=9,f2=9;
     for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
       const gx=cx+i,gy=cy+j;
@@ -1100,12 +1104,14 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
 }
 function gradientField(angleDeg){
   const o=newField();const n=RES,a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU(x/n,y/n)*cx+xfV(x/n,y/n)*cy);}
+  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y*rzs/n)*cx+xfV((x+hxs*(y&1))/n,y*rzs/n)*cy);}
   return normalize(o);
 }
 function radialField(){
   const o=newField();const n=RES;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=xfU(x/n,y/n)-.5,dy=xfV(x/n,y/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
+  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y*rzs/n)-.5,dy=xfV((x+hxs*(y&1))/n,y*rzs/n)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
   return o;
 }
 
@@ -1403,7 +1409,11 @@ function gpuHydraulicPipes(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,iner
   hydroMassDiag={engine:"pipes",settle:true,sumIn,sumOut,settled,exported:sumIn-sumOut,exportedDerived:true,lost:0};
   return o;
 }
-const gpuReady=()=>USE_GPU&&GPU.init();
+// GPU compute is square-texture end to end: every kernel taps ivec2 +-(1,0) neighbours and the
+// noise shaders sample grid-uv x/uN, so on the hex lattice they would print the half-cell
+// zig-zag and square-stencil anisotropy silently (26's seed-contract trap). Hex forces the CPU
+// path wholesale; the GPU button stays honest on the square lattice.
+const gpuReady=()=>USE_GPU&&terrainDef.lattice!=="hex"&&GPU.init();
 
 /* ---- PLACEMENT (art direction): SDF shape masks positioned in METRES, mirroring
    reference-impl/placement.py. A Shape is both a mask (wire it into any node's Mask input to
@@ -1415,7 +1425,7 @@ function shapeField(p){
   const a=-p.angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const half=Math.max(rad*p.aspect,cs);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const U=(x+0.5)/n,V=(y+0.5)/n;                                 // (x+0.5)*cs === U*terrainDef.scale
+    const U=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,V=(y+0.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n; // (x+0.5)*cs === U*terrainDef.scale
     let dx=xfU(U,V)*terrainDef.scale-cx,dy=xfV(U,V)*terrainDef.scale-cy;
     const rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;                          // rotate into object space
     let d;
@@ -1448,7 +1458,7 @@ function drawMaskField(p){
       // An exact Transform can move any painted segment across the tile. Scan output cells once
       // per stroke and find the nearest segment; this avoids a 64 MB Float32 coverage raster at 4K.
       for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-        const u=xfU((x+.5)/n,(y+.5)/n),v=xfV((x+.5)/n,(y+.5)/n);let d=Infinity;
+        const u=xfU((x+.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,(y+.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n),v=xfV((x+.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,(y+.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n);let d=Infinity;
         if(pts.length===1)d=Math.hypot(u-pts[0][0],v-pts[0][1]);
         else for(let q=1;q<pts.length;q++)d=Math.min(d,pointSegmentDistance(u,v,pts[q-1][0],pts[q-1][1],pts[q][0],pts[q][1]));
         composite(y*n+x,coverage(d));
@@ -1610,7 +1620,7 @@ function layoutField(shapes,base){
     const prof=FALLOFF[sh.profile]||FALLOFF.scurve;
     const fall=Math.max(sh.falloff,1e-4),half=(sh.width||0)*0.5;
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-      const u=(x+0.5)/n,v=(y+0.5)/n;
+      const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n;
       let {d,e}=polylineNearest(u,v,sh.pts);
       // inside a closed polygon the distance is zero, so the interior sits at the shape's elevation
       if(sh.kind==="poly"&&sh.pts.length>2&&pointInPoly(u,v,sh.pts))d=0;
@@ -1758,7 +1768,7 @@ function peakField(p){
   const w0x=fbm2(4.2,1.7,p.seed+31,4),w0y=fbm2(8.3,5.1,p.seed+32,4);
   let h=newField(0);const cover=newField(0);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=(x+0.5)/n,v=(y+0.5)/n,dx=u-p.x,dy=v-p.y;
+    const u=(x+0.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,v=(y+0.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n,dx=u-p.x,dy=v-p.y;
     let qx=( dx*ca+dy*sa)/sx,qy=(-dx*sa+dy*ca)/sy;
     // Subtract the warp at the origin: Character can move shoulders and contours without moving
     // the authored summit away from Position X/Y.
@@ -1893,7 +1903,7 @@ function mountainField(p){
   // 2) modulated-Voronoi ridge network
   const netA=new Float32Array(n*n),netB=new Float32Array(n*n);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=x/n*ncell,v=y/n*ncell;
+    const u=(x+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n*ncell,v=y*(terrainDef.lattice==="hex"?HEX_ROW:1)/n*ncell;
     const wx=fbm2(u*0.35,v*0.35,p.seed+3,4)+0.5*fbm2(u*0.9,v*0.9,p.seed+13,4);
     const wy=fbm2(u*0.35+4.7,v*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*0.9+1.9,v*0.9+6.1,p.seed+14,4);
     const u2=u+warpamt*wx,v2=v+warpamt*wy,i=y*n+x;
@@ -2903,6 +2913,30 @@ function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
   }
   return h;
 }
+// D6 thermal for the hex lattice (26): six equidistant edge-neighbours, ONE distance, ONE
+// threshold - the sqrt(2) diagonal split that thermalErode below must distance-correct simply
+// does not exist here, which is the point. Offsets depend on row parity (odd-r); the excess
+// scan, stable-pair budget and proportional distribution are thermalErode's own, unchanged.
+function thermalErodeHex(inp,{talus=0.012,iters=30,rate=0.5}){
+  const n=RES;let h=inp.slice();
+  const nbEven=[[-1,0],[1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
+  const nbOdd =[[-1,0],[1,0],[0,-1],[1,-1],[0,1],[1,1]];
+  for(let it=0;it<iters;it++){
+    const dh=new Float32Array(n*n);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const nb=(y&1)?nbOdd:nbEven,c=h[y*n+x];let maxd=0,sum=0;const diffs=[];
+      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=n){diffs.push(0);continue;}
+        const d=c-h[yy*n+xx];const e=d-talus;if(e>0){diffs.push(e);sum+=e;if(e>maxd)maxd=e;}else diffs.push(0);}
+      if(sum<=0)continue;
+      const move=rate*maxd*0.5;let k=0;
+      for(const[dx,dy]of nb){const xx=x+dx,yy=y+dy;if(diffs[k]>0){
+        const q=Math.min(move*diffs[k]/sum,diffs[k]*0.5);
+        dh[y*n+x]-=q;dh[yy*n+xx]+=q;}k++;}
+    }
+    for(let i=0;i<h.length;i++)h[i]+=dh[i];
+  }
+  return h;
+}
 function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
   const n=RES;let h=inp.slice();
   // 8-neighbour offsets with their DISTANCE (diagonals are sqrt(2) away). The repose threshold must
@@ -3745,7 +3779,9 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     // 1024² property edit does not launch 117+ simulation steps. Final retains full scaled travel.
     const travel=BUILD_QUALITY==="final"?k:Math.min(1.5,Math.sqrt(k));
     const q={...p,talus,iters:Math.max(1,Math.round(p.iters*travel))};
-    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalErode(f,q)),ins[1]);}},
+    // Hex: the D6 kernel (one distance, one threshold); gpuReady() is already false on hex.
+    const kern=isHex()?thermalErodeHex:thermalErode;
+    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):kern(f,q)),ins[1]);}},
   streampower:{cat:"ero",name:"Stream power",ins:["In","Uplift","Mask"],
     desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
     // Incision default halved from 0.15: Kdt = strength*2, and 0.3 marches every cell 23% toward
@@ -4816,6 +4852,29 @@ function buildProps(){
     body.appendChild(mk("solarElevation","Climate sun elevation",3,90,1,v=>Math.round(v)+"°"));
     body.appendChild(mk("latitude","Latitude",-90,90,.5,v=>Math.abs(v).toFixed(1)+"° "+(v<0?"S":v>0?"N":"Equator")));
     body.appendChild(mk("north","Map north",0,359,1,v=>Math.round(v)+"° clockwise from top"));
+    {
+      // Lattice toggle (references/26): square raster or hexagonal (odd-r). Everything is
+      // re-evaluated on switch - the seed contract, mesh topology and metric all change.
+      const f=document.createElement("div");f.className="field";
+      f.innerHTML=`<div class="frow"><label>Grid lattice</label></div>`;
+      const seg=document.createElement("div");seg.className="seg";
+      for(const[val,lab]of[["square","Square"],["hex","Hexagonal"]]){
+        const b2=document.createElement("button");b2.type="button";b2.className="seg-btn";b2.textContent=lab;
+        if((terrainDef.lattice||"square")===val)b2.classList.add("active");
+        b2.onclick=()=>{if((terrainDef.lattice||"square")===val)return;
+          const before=graphSnapshot();terrainDef.lattice=val;pushUndo(before);
+          buildIndex();nodes.forEach(nd=>{nd._dirty=true;nd._thumb=null;});
+          requestEval();buildProps();tdInfo();};
+        seg.appendChild(b2);
+      }
+      f.appendChild(seg);
+      const note=document.createElement("div");note.className="hint";note.style.marginTop="4px";
+      note.textContent="Hexagonal: 6 equidistant neighbours (no diagonal ambiguity), static "
+        +"equilateral mesh, D6 thermal; footprint becomes "+"scale × scale·√3/2 m. GPU compute "
+        +"and the square-stencil water/snow sims run in square approximation — see README.";
+      f.appendChild(note);
+      body.appendChild(f);
+    }
     const info=document.createElement("div");info.className="hint";info.id="tdInfo";body.appendChild(info);
     tdInfo();
     const hint=document.createElement("div");hint.className="hint";hint.style.marginTop="10px";
@@ -4920,7 +4979,7 @@ function buildColorMixerProps(body){
 function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
   const lat=terrainDef.latitude||0,hemi=lat<0?"Southern":lat>0?"Northern":"Equatorial";
   const freeze=terrainDef.seaTemp<=0?0:terrainDef.seaTemp/(terrainDef.lapseRate||6.5)*1000;
-  el.innerHTML=`Vertical ratio <b>${(terrainDef.height/terrainDef.scale).toFixed(2)}</b> (height ÷ scale) ·
+  el.innerHTML=`${isHex()?`<b>Hexagonal lattice</b> (odd-r) · footprint <b>${Math.round(terrainDef.scale)} × ${Math.round(terrainDef.scale*HEX_ROW)} m</b> (rows sit √3/2 apart — the metric never lies) ·<br>`:""}Vertical ratio <b>${(terrainDef.height/terrainDef.scale).toFixed(2)}</b> (height ÷ scale) ·
     cell size <b>${cellSizeM().toFixed(1)} m</b> at ${RES}² ·
     elevation <b>${Math.round(terrainDef.baseElevation)}…${Math.round(terrainDef.baseElevation+terrainDef.height)} m ASL</b>.<br>
     0 °C freezing level <b>${Math.round(freeze)} m</b>${terrainDef.seaTemp<=0?" (sea level and above)":""} ·
@@ -5351,8 +5410,16 @@ function resolveColor(nodeId,n,memo,guard){
 // across and 2.6 km tall, giving a vertical ratio of height/scale = 0.52. This is what makes cell
 // size (scale/RES) and therefore slope ANGLES physically meaningful, which nodes with "Real Scale"
 // use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
-let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
-const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell
+let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,lattice:"square"};
+const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the centre-to-centre spacing s)
+// Hexagonal lattice mode (references/26-hexagonal-lattice.md). Storage stays the same W x H
+// Float32Array in odd-r offset layout: odd rows are drawn (and sampled) half a cell to the
+// right, rows sit sqrt(3)/2 apart. Every check is strictly === "hex" so absent/old documents
+// mean square and stay byte-identical. The world footprint is TRUTHFULLY rectangular in hex
+// mode - scale x scale*sqrt(3)/2 metres - because squashing rows to keep a square footprint
+// would be silent metric anisotropy (the chapter's flagged first bug).
+const isHex=()=>terrainDef.lattice==="hex";
+const HEX_ROW=Math.sqrt(3)/2;
 let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
 let TEMP_UNIT="C";try{TEMP_UNIT=localStorage.getItem("terrainStudioTempUnit")==="F"?"F":"C";}catch(_){}
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -5841,10 +5908,29 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   buffers.count=cnt;buffers.u32=u32;
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,cnt*(u32?4:2),gl.DYNAMIC_DRAW);
-  // boot() and resolution changes evaluate the graph synchronously before the next frame, so do
-  // not waste a second full-buffer upload on placeholder checkerboard indices.
-  buffers.indexPattern="pending";buffers.edgeSpin=null;
-  const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;xz[i*2]=(x/(n-1)-0.5)*2;xz[i*2+1]=(y/(n-1)-0.5)*2;}
+  if(isHex()){
+    // The hex lattice has a UNIQUE equilateral triangulation (26): between an even row and the
+    // shifted odd row below, the short diagonal is forced, and it alternates by ROW parity -
+    // which is exactly a per-row alternation of the two quad patterns streamTerrainIndices
+    // already emits. There is nothing to choose per quad, so edge spinning ceases to exist and
+    // the index buffer is a pure, height-independent function of (n) - static upload once,
+    // hash-assertable by _verify_hex.js, never streamed again.
+    const idx=u32?new Uint32Array(cnt):new Uint16Array(cnt);let w=0;
+    for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){const i=y*n+x;
+      if(y&1){idx[w++]=i;idx[w++]=i+1;idx[w++]=i+n+1;idx[w++]=i;idx[w++]=i+n+1;idx[w++]=i+n;}
+      else{idx[w++]=i;idx[w++]=i+1;idx[w++]=i+n;idx[w++]=i+1;idx[w++]=i+n+1;idx[w++]=i+n;}}
+    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,idx);
+    buffers.indexPattern="hex-static";buffers.edgeSpin=null;
+  }else{
+    // boot() and resolution changes evaluate the graph synchronously before the next frame, so do
+    // not waste a second full-buffer upload on placeholder checkerboard indices.
+    buffers.indexPattern="pending";buffers.edgeSpin=null;
+  }
+  // Water plane shares the vertex lattice with the terrain (same index buffer draws both), so
+  // its XZ MUST use the same hex offsets or shorelines tear along the odd rows.
+  const hx=isHex()?0.5:0,rz=isHex()?HEX_ROW:1;
+  const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+    xz[i*2]=((x+hx*(y&1))/(n-1)-0.5)*2;xz[i*2+1]=((y/(n-1)-0.5)*2)*rz;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
 }
 let curField=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSolidSurfaceY=null,curSnowLayerRef=null;
@@ -5852,7 +5938,7 @@ let curTemperatureRef=null,curSunVisibilityRef=null;
 let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curIceSnowSurfaceY=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null,lastFallbackClimateSig="";
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
-  const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE;rootNode=rootNode||activePreviewNode();
+  const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE+"|"+(terrainDef.lattice||"square");rootNode=rootNode||activePreviewNode();
   const baseChanged=curField!==f||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
   const layerDepth=scene.snow&&scene.snow.layer&&scene.snow.layer.depthM&&scene.snow.layer.depthM.length===n*n
     ?scene.snow.layer.depthM:null;
@@ -5869,7 +5955,9 @@ function updateViewport(f,rootNode,options){
   // Edge topology depends only on the terrain's solid geometry. Water level, colour, climate,
   // and camera edits therefore never rebuild the index buffer. Accumulated snow participates
   // because it is genuine displacement rather than a material-only effect.
-  if(baseChanged||snowChanged)streamTerrainIndices(hgt,layerDepth);
+  // Hex topology is static (unique equilateral triangulation, uploaded by buildIndex once);
+  // only the square lattice adaptively re-streams diagonals as the height changes.
+  if((baseChanged||snowChanged)&&!isHex())streamTerrainIndices(hgt,layerDepth);
   const previewTemperatureField=rootNode&&fieldMetadata(rootNode._field)&&fieldMetadata(rootNode._field).kind==="temperature"
     ?rootNode._field:null;
   const activeTemperatureField=previewTemperatureField
@@ -5961,15 +6049,35 @@ function updateViewport(f,rootNode,options){
       }
     }
     const pos=new Float32Array(n*n*3),nrm=new Float32Array(n*n*3),surface=new Float32Array(n*n),surfaceTex=new Float32Array(n*n);
+    const hexOn=isHex(),hx=hexOn?0.5:0,rz=hexOn?HEX_ROW:1;
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
       surface[i]=hgt[i]*H+snow[i]/terrainDef.scale;
       surfaceTex[i]=hgt[i]+snow[i]/terrainDef.height;
-      pos[i*3]=(x/(n-1)-0.5)*2;pos[i*3+1]=surface[i];pos[i*3+2]=(y/(n-1)-0.5)*2;}
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
-      const hl=surface[y*n+clamp(x-1,0,n-1)],hr=surface[y*n+clamp(x+1,0,n-1)];
-      const hu=surface[clamp(y-1,0,n-1)*n+x],hd=surface[clamp(y+1,0,n-1)*n+x];
-      const sx=(hl-hr)*(n-1)/2,sz=(hu-hd)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
-      nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
+      pos[i*3]=((x+hx*(y&1))/(n-1)-0.5)*2;pos[i*3+1]=surface[i];pos[i*3+2]=((y/(n-1)-0.5)*2)*rz;}
+    if(hexOn){
+      // Six-neighbour least-squares gradient (26): for the unit vectors to the D6 neighbours,
+      // sum(e_k) = 0 and sum(e_k e_k^T) = 3I, so g = sum(h_k * e_k)/3 is exact for planes and
+      // isotropic to leading order - the centre height drops out. Offsets depend on row parity
+      // (odd-r); the six unit vectors are the same for both parities and all sit at distance 1,
+      // because the row step is already sqrt(3)/2.
+      const EX=[1,-1,.5,-.5,.5,-.5],EY=[0,0,HEX_ROW,HEX_ROW,-HEX_ROW,-HEX_ROW];
+      for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,par=y&1;
+        const xc=k2=>clamp(k2,0,n-1),yu=clamp(y-1,0,n-1),yd=clamp(y+1,0,n-1);
+        const off=par?0:-1; // even rows look left for their diagonal pair, odd rows look right
+        const hE=surface[y*n+xc(x+1)],hW=surface[y*n+xc(x-1)];
+        const hDE=surface[yd*n+xc(x+off+1)],hDW=surface[yd*n+xc(x+off)];
+        const hUE=surface[yu*n+xc(x+off+1)],hUW=surface[yu*n+xc(x+off)];
+        const gx=(hE*EX[0]+hW*EX[1]+hDE*EX[2]+hDW*EX[3]+hUE*EX[4]+hUW*EX[5])/3;
+        const gy=(hDE*EY[2]+hDW*EY[3]+hUE*EY[4]+hUW*EY[5])/3;
+        const sx=-gx*(n-1),sz=-gy*(n-1),L=Math.hypot(sx,1,sz)||1;
+        nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
+    }else{
+      for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
+        const hl=surface[y*n+clamp(x-1,0,n-1)],hr=surface[y*n+clamp(x+1,0,n-1)];
+        const hu=surface[clamp(y-1,0,n-1)*n+x],hd=surface[clamp(y+1,0,n-1)*n+x];
+        const sx=(hl-hr)*(n-1)/2,sz=(hu-hd)*(n-1)/2,L=Math.hypot(sx,1,sz)||1;
+        nrm[i*3]=sx/L;nrm[i*3+1]=1/L;nrm[i*3+2]=sz/L;}
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);gl.bufferData(gl.ARRAY_BUFFER,pos,gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.nrm);gl.bufferData(gl.ARRAY_BUFFER,nrm,gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.snow);gl.bufferData(gl.ARRAY_BUFFER,snow,gl.DYNAMIC_DRAW);
@@ -6148,7 +6256,17 @@ function cameraEye(){const ce=Math.cos(cam.el);return[cam.target[0]+Math.cos(cam
 function cameraBasis(){const eye=cameraEye(),forward=norm3(sub3(cam.target,eye)),right=norm3(cross3(forward,[0,1,0]));return{eye,forward,right,up:norm3(cross3(right,forward))};}
 function surfaceHeight(wx,wz){
   const surface=curSolidSurfaceY||curSurfaceY||curHgt;if(!surface)return cam.target[1];
-  const x=(wx*.5+.5)*(RES-1),z=(wz*.5+.5)*(RES-1);
+  let x,z;
+  if(isHex()){
+    // Shear-corrected sample on the odd-r lattice: rows sit at sqrt(3)/2 device spacing and odd
+    // rows are drawn half a cell right. Bilinear on the sheared basis is a documented
+    // approximation (error <= half a cell across the odd rows); the exact form is 26's
+    // barycentric 3-tap, queued with the wider sampling work.
+    z=((wz/HEX_ROW)*.5+.5)*(RES-1);
+    x=(wx*.5+.5)*(RES-1)-((Math.round(z)&1)?0.5:0);
+  }else{
+    x=(wx*.5+.5)*(RES-1);z=(wz*.5+.5)*(RES-1);
+  }
   const h=sampleBilinear(surface,x,z);
   return curSolidSurfaceY||curSurfaceY?h:h*H_SCALE;
 }

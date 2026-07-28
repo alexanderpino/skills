@@ -1346,6 +1346,37 @@ The priority-flood + D8 pair behind displayed lakes/rivers is inherently sequent
 skipped unless a Water node needs it. GPU nodes still read their result back to a `Float32Array` between
 nodes, so a fully texture-resident graph runtime is the next large architectural win.
 
+## Hexagonal lattice mode
+
+The Terrain definition panel's **Grid lattice** toggle switches the working grid to the hexagonal
+lattice of `references/26-hexagonal-lattice.md` — odd-r offset storage on the same Float32Array,
+nothing about the node graph changes. What changes, and what `_verify_hex.js` holds:
+
+- **Static equilateral topology.** The hex lattice has a *unique* equilateral triangulation — a
+  row-parity alternation of the two quad patterns the square mesh already used — so edge spinning
+  ceases to exist: `buildIndex()` uploads the index buffer once and it is hash-identical across
+  any height edit (gate H1). The water plane shares the same lattice, or shorelines would tear.
+- **Seed contract in world coordinates.** Odd rows sample half a cell right; rows sit √3/2 apart;
+  the world footprint is truthfully rectangular (`scale × scale·√3/2` m — squashing rows to keep a
+  square footprint would be silent metric anisotropy). A hex build of an fbm node matches the
+  square build sampled at those world points to **corr 0.9999**; without the shift it reads
+  **0.57** — the half-cell zig-zag, computed live as the gate's negative control (H4).
+- **D6 thermal** — six equidistant neighbours, one distance, one threshold (the √2 distance split
+  the square kernel must correct simply does not exist). Mass conserved to 2·10⁻¹⁰; the relaxed
+  cone's talus ring reaches repose uniformly to **0.3%** azimuthal anisotropy (H2, H3).
+- **Six-neighbour normals** (`Σh·eₖ/(3d)` — the centre height drops out) and shear-corrected
+  picking.
+- **Byte-safety:** on the square lattice everything is bit-identical (H5, plus the 57/57 digest).
+
+Honest limits, also stated in the toggle's hint: GPU compute is square-texture end to end and is
+forced off on hex (every CPU path runs); the square-stencil sims — water, snow, the erosion
+family's D8/flux kernels — run in *square approximation* on hex data. The D6 thermal is the
+demonstrator kernel; porting the rest is the chapter's F-tier translation, queued. And one
+measured finding that *corrects* the naive chapter reading: against a well-implemented
+distance-corrected D8 thermal, D6's win is **exactness**, not facet diversity — the corrected D8
+has 8 facet families to D6's 6 (facet-direction concentration 1.41 vs 1.17, reported in H3's
+REPORT line and upstreamed to `references/26`).
+
 ## Verification
 
 Every measured number in this file comes from a headless script that anyone can re-run — they ship
@@ -1384,6 +1415,7 @@ node _verify_featurescale.js         # Transform against an analytic sine oracle
 node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² / 768²
 node _verify_erosion_gridscale.js    # erosion-family grid invariance: modification depth + landform, 192 vs 384
 node _verify_streampower_calibration.js  # re-derives the stream-power K-exponent roots; gates the shipped line
+node _verify_hex.js                  # hexagonal lattice: static topology hash, D6 mass + ring isotropy, seed contract, square byte-safety
 node _verify_realscale.js            # Real Scale: repose angle in degrees, resolution independent
 node _verify_data.js                 # the eight Data Map channels
 node _verify_satnode.js              # one-gradient SatMap: stacking + explicit biome branch/blend
