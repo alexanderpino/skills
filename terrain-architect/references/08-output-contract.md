@@ -389,25 +389,37 @@ other warnings transfer unchanged: bake normals from R32F, and if you deliver a 
 delivery grid after resampling (below) — the analytic hex normal is for shading hex tiles directly and
 for `06`'s analysis masks on the working grid.
 
-**Meshing and per-vertex normals — two paths, and picking the wrong one triples your geometry.** A hex
-cell carrying a height is **not a planar facet**: attach heights to six corners and they are
+**Meshing — a hex cell is not a planar facet.** Attach heights to six corners and they are
 non-coplanar, exactly as a square heightfield quad's four corners are (the "which diagonal" problem).
 That is a *meshing* question, never a centre or normal question — the lattice is 2D and height is a
-fibre over it — but it forks the mesh:
+fibre over it — but it decides which vertices exist:
 
-- **Smooth terrain — mesh the dual, and there are no corners.** Hex centres *are* a triangular lattice,
-  so triangulate them directly: every mesh vertex is a real sample, no heights are invented, and the
-  per-vertex normal is the 6-neighbour formula above, unchanged. This is the default. It is also **3×
-  cheaper** — `N` vertices and `~2N` triangles against the fan's `3N` and `6N`.
-- **Visible hex tiles (strategy/4X, DGGS) — fan through the centre.** Six triangles per cell around the
-  centre vertex; symmetric, unlike the square quad's arbitrary diagonal, and the centre vertex already
-  holds the sampled height rather than an invented one. Now you have a second vertex class — the tiling
-  **corners** — and they need heights and normals.
+- **Smooth terrain — mesh the dual; there are no corners.** Hex centres *are* a triangular lattice, so
+  triangulate them directly: every mesh vertex is a real sample, no heights are invented, and the
+  per-vertex normal is the 6-neighbour formula above, unchanged. **3× cheaper** — `N` vertices and
+  `~2N` triangles against the fan's `3N` and `6N`. Reach for this whenever the hexes are a working
+  grid rather than something the player sees.
+- **Visible hex tiles (strategy/4X, DGGS) — fan through the centre**, six triangles per cell.
+  Symmetric, unlike the square quad's arbitrary diagonal, and the centre vertex already holds the
+  sampled height rather than an invented one. This mesh carries **two vertex classes**, and both are
+  first-class: `N` **centres** and `2N` **corners**. The two meshes can also coexist over one field —
+  a smooth dual mesh to render, a fan or its edge loops for tile borders and gameplay pick.
 
-**Corner vertices are exactly determined; do not average face normals.** Each tiling corner is shared by
-exactly **3** mutually-adjacent cells, and it sits at their **centroid**, `s = cellSize/√3` from each
-centre. Three points define a unique plane, so both corner quantities are closed-form — and the
-mean-of-3 height lands *exactly* on that plane, so height and normal agree by construction:
+**Corner ownership: every cell owns exactly two.** Corners are the triangles of the centre lattice, in
+two orientations, so a clean bijection assigns each cell one of each — no dedup pass, no hashing, and a
+corner buffer the same shape as the cell array:
+
+```
+cornerA(q,r) = { (q,r), (q+1,r), (q,r+1) }        # "up"    — index (0,q,r)
+cornerB(q,r) = { (q,r), (q,r+1), (q-1,r+1) }      # "down"  — index (1,q,r)
+```
+
+Each triple is 3 mutually adjacent cells; each corner sits at their **centroid**, `s = cellSize/√3`
+from all three; every interior cell is ringed by exactly 6 corners; every interior corner is shared by
+exactly 3 cells — hence `2N`.
+
+**Corner vertices are exactly determined; do not average face normals.** Three points define a unique
+plane, and the mean-of-3 height lands *exactly* on it, so height and normal agree by construction:
 
 ```
 corner(i,j,k):                                  # the 3 cells meeting at this corner
@@ -417,12 +429,28 @@ corner(i,j,k):                                  # the 3 cells meeting at this co
 ```
 
 Same construction as the centre stencil, one ring smaller: `Σuₘ = 0` kills the constant, `Σuₘuₘᵀ =
-(3/2)I` sets the `2/(3s)` scale (`s = cellSize/√3` gives the `2/(√3·cellSize)` above). Both stencils are
-second-order samples of the *same* gradient field and agree exactly on a plane, which is what makes
-shading continuous where a fan's corners meet its neighbours' — area-weighted face-normal averaging is
-the generic fallback and is both slower and less accurate here, since the exact plane is known. If you
-instead want **flat-shaded plates** (the boardgame look), you want one normal per *cell*, not per vertex,
-and the corner machinery does not apply.
+(3/2)I` sets the `2/(3s)` scale (`s = cellSize/√3` gives the `2/(√3·cellSize)` above). Both are the
+same least-squares estimator — `g = (Σ vₘvₘᵀ)⁻¹ Σ hₘvₘ`, with the `3I` and `(3/2)I` constants being
+just the complete-ring cases — so they are second-order samples of one gradient field and agree
+exactly on a plane. That agreement is what makes shading continuous where a fan meets its neighbours'.
+Area-weighted face-normal averaging is the generic fallback and is both slower and less accurate here,
+since the exact plane is known.
+
+**Both classes are shared, so compute each once.** A corner belongs to 3 cells and a centre to 6 fan
+triangles; write them into the two buffers above and have every triangle *index* them. Recomputing a
+corner per-fan gives three values differing in the last bit — the **Edge vertex sharing** rule at the
+top of this file, and it produces the same pinhole and the same lighting seam.
+
+**Boundaries need the apron, for both classes.** The formulas assume a complete ring: a centre missing
+neighbours and a corner missing cells are both under-determined (two cells leave a pencil of planes;
+one leaves nothing). Take the `+1`-cell apron already mandated for normal baking above — on hex it is a
+ring of 6·k cells, not a rectangular border — and derive both classes from it, or emit only vertices
+whose ring is complete and let the mesh stop one cell short. The general least-squares form above also
+degrades gracefully on a partial ring if you invert the actual `Σ vₘvₘᵀ`; do not silently apply the
+complete-ring constants to a truncated stencil, which flattens the domain edge.
+
+If you instead want **flat-shaded plates** (the boardgame look), you want one normal per *cell*, not per
+vertex, and neither vertex class applies.
 
 **Interchange: hex is a working grid; deliver a raster.** Engines, meshers and every DCC import expect a
 square raster (or, on a planet, an equirectangular one), so — exactly like equirectangular below — hex
