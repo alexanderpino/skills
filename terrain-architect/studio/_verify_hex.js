@@ -57,6 +57,22 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     terrainDef.lattice = 'hex'; buildIndex();
     out.hexPattern = buffers.indexPattern;
     const hash1 = hashIdx();
+    // Geometry, not just stability: every emitted triangle must be near-equilateral in world
+    // cells (max edge ~1). A swapped row-parity pattern would take the sqrt(3) diagonal on
+    // every quad and still hash stably — the hash alone cannot fail it.
+    {
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.idx);
+      const buf = buffers.u32 ? new Uint32Array(buffers.count) : new Uint16Array(buffers.count);
+      gl.getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, buf);
+      let maxEdge = 0;
+      const HEXR2 = Math.sqrt(3) / 2;
+      const px = i2 => (i2 % n) + 0.5 * (((i2 / n) | 0) & 1), py = i2 => ((i2 / n) | 0) * HEXR2;
+      for (let t = 0; t < buf.length; t += 3) for (let e = 0; e < 3; e++) {
+        const a2 = buf[t + e], b3 = buf[t + (e + 1) % 3];
+        maxEdge = Math.max(maxEdge, Math.hypot(px(a2) - px(b3), py(a2) - py(b3)));
+      }
+      out.maxEdge = +maxEdge.toFixed(4);
+    }
     const hexNoise = fbmField(gnoise, A);
     updateViewport(hexNoise);                      // a real height change through the renderer
     const hash2 = hashIdx();
@@ -136,8 +152,10 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     };
     // The defect class 26 cures is the UNCORRECTED square kernel (D4 / no distance correction -
     // the plus-cone). This studio's square thermal is the distance-corrected D8 kernel, which
-    // has MORE facet families than D6 (8 at 45 deg vs 6 at 60 deg) - so hex is gated against
-    // the defect class, and the corrected-D8 comparison is REPORTED as a finding.
+    // has MORE facet families than D6 (8 at 45 deg vs 6 at 60 deg). The D4 kernel is measured
+    // for CONTEXT in the REPORT line - none of the three facet-direction numbers is gated,
+    // because every gradient estimator quantizes directions toward its own tap families; the
+    // gate that holds is the ring magnitude-isotropy below.
     const d4Thermal = (inp, { talus, iters, rate }) => {
       let f = inp.slice();
       for (let it = 0; it < iters; it++) {
@@ -202,8 +220,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
 
   const gates = [];
   const gate = (name, pass, detail) => gates.push({ name, pass: !!pass, detail });
-  gate('H1 hex-static-topology', r.hexPattern === 'hex-static' && r.idxStable,
-    `pattern=${r.hexPattern} idxStableAcrossHeightEdits=${r.idxStable} hash=${r.idxHash}`);
+  gate('H1 hex-static-topology', r.hexPattern === 'hex-static' && r.idxStable && r.maxEdge <= 1.01,
+    `pattern=${r.hexPattern} idxStableAcrossHeightEdits=${r.idxStable} hash=${r.idxHash} `
+    + `maxEdge=${r.maxEdge} (equilateral: a parity-swapped pattern would read ~1.73)`);
   gate('H2 d6-mass', r.d6Mass && +r.d6Mass.rel <= 1e-4 && r.d6Mass.acted > 0.01,
     `massRel=${r.d6Mass && r.d6Mass.rel} acted=${r.d6Mass && r.d6Mass.acted}`);
   gate('H3 d6-ring-isotropy', r.magIso && r.magIso.hex <= 1.10,

@@ -121,10 +121,10 @@ equalisation, slope/height masks, real-DEM import) exposed as a graph you build 
 |---|---|
 | **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Canyon** (cached landscape evolution: uplift, drainage competition, stream-power incision, lithology and hillslope retreat; five formation styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
-| **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
+| **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · **Normalize** (maskable) · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
 | **Erosion** | Thermal (talus) · Hydraulic (GPU pipes / CPU droplets) · **Erosion 2** (multi-scale hydraulic, sediment discharge, shape) · **HydroFix** (low-amplitude drainage repair) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select · **Temperature select** (physical °C biome band) |
-| **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (base climate field) · **Temperature Modify** (localized heat/cooling) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
+| **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (base climate field) · **Temperature Modify** (localized heat/cooling) · **Wind** (terrain-adjusted physical vectors) · **Wind Modify** (masked regional circulation) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** (metre-depth placement, melt, avalanches) · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
 | **Output** | Output (drives the viewport / export) |
 
@@ -141,8 +141,9 @@ or transform a separate scene/colour stream, so deleting one removes just that e
 The default terrain ships with the full surface graph already wired:
 `Thermal → SatMap → Color Erosion → Weathering → Water → Snow → Output`, plus
 `Thermal → Deposits → Color Erosion.Sediment` and the explicit climate branch
-`Weathering → Height → Sun Shadow → Temperature → Temperature Modify`, with that final physical field wired to
-both `Water.Temperature` and `Snow.Temperature`. Water is deliberately before
+`Weathering → Height → Sun Shadow → Temperature → Temperature Modify`, plus
+`Height → Wind`, with those final physical fields wired to Water/Snow temperature and Snow wind.
+Water is deliberately before
 Snow: open liquid masks terrain snow out, while frozen standing water can receive a separate raised
 snow-on-ice layer. Its Snow node starts with a 3 m settled-snow event, temperature/lapse melt, aspect
 warming, and avalanche settling. The renderer supplies subtle animated ripples globally.
@@ -733,12 +734,20 @@ and **Enhance** (None / Autolevel / Equalize), matching Gaea's documented public
   Weathering has physical **Amount** plus **Opacity** and **Blend mode**. SatMap, Color Erosion, and
   Weathering all accept masks; any output can feed **Color Blend**. **Color Mixer** is the layer-oriented
   convenience node: add, remove, and reorder from 2 up to 15 color inputs, with opacity and blend method
-  per layer. Per-layer biome masks stay explicit in the upstream SatMap / Color Blend branch.
+  per layer. Layer 1 is the base; a standalone masked SatMap connected to a higher layer carries that
+  mask as biome alpha. Black remains bit-identical to the layers below, white applies the biome, and
+  the per-layer **Edge** control adds a world-space transition band without blending biome interiors.
 - **One SatMap, one gradient; biomes stay explicit.** A SatMap can receive another SatMap through **In**
   when the second node is a masked overlay. For a true biome split, branch the height into one SatMap per
-  biome, derive a biome mask from slope / height / flow / climate, and merge the colour branches in
-  **Color Blend**. Its Mask, Opacity, and full blend-method set make
-  the transition visible and configurable instead of hiding a second gradient inside one SatMap node.
+  biome, derive or draw a biome mask, and connect the masked branches to Color Mixer. The same result can
+  be expressed explicitly in **Color Blend**, whose Mask, Opacity, and full blend-method set make the
+  transition visible and configurable instead of hiding a second gradient inside one SatMap node.
+- **One authored region, reused everywhere.** For art-directed worlds such as a hot desert beside an
+  arctic province, create one Draw Mask per region and fan its output into both the region's SatMap Mask
+  and Temperature Modify Mask—and into Wind Modify when that region has a distinct circulation regime.
+  Chain those regional edits over the one global Temperature and Wind fields, then feed the final fields
+  into Snow and Water. The material boundary and physical freeze/melt/wind boundaries therefore use the
+  same footprint; soften the drawn mask or Color Mixer Edge to form an ecotone rather than a hard line.
 - **Visual SatMap library lives on the node.** The SatMap Gradient property opens a scrollable palette
   library rendered directly from the LUT stops that feed that node. The viewport has no global SatMap
   selector. Newly authored LUTs appear immediately after **Apply**.
@@ -904,11 +913,50 @@ Deselect everything and the properties panel shows the **Terrain definition** �
 represents, in metres. Defaults are **5000 m across × 2600 m relief** above a **0 m ASL base elevation**,
 a **vertical ratio of 0.52** (`relief ÷ scale`), which is also the viewport's vertical exaggeration.
 Cell size is `scale ÷ RES` (9.8 m at the default 512², 4.9 m at 1024²). It also owns the
-**fallback sea-level temperature/lapse rate**, **climate sun elevation**, **latitude**, and **map north**.
+**fallback sea-level temperature/lapse rate**, **climate sun elevation**, **latitude**, **map north**,
+and the prevailing **wind-from direction and speed**.
 The fallback is used only by unconnected Snow/Water consumers. The panel reports the derived 0 °C freezing altitude.
 North is authored clockwise from the heightfield's top edge; latitude decides which side points toward
-the equator. The viewport compass projects both directions through the orbit camera, and the temperature
-chip reports air temperature at the terrain under the camera focus; click it to toggle °C / °F.
+the equator. The viewport compass projects both directions through the orbit camera. Beside it, the
+wind indicator projects the local flow arrow through the same camera and reports speed plus the
+meteorological **from** bearing; it samples a previewed/connected Wind field at the terrain under the
+view focus, or uses a dashed Terrain Definition fallback when no physical field is active. The temperature
+chip reports air temperature at that focus; click it to toggle °C / °F.
+
+### Terrain-aware wind
+
+Prevailing wind belongs to Terrain Definition rather than to a biome: air crosses material and
+climate borders, so one continuous regional circulation is the source of truth. The **Wind** node
+takes Height and emits a physical horizontal vector field (`u`, `v`, and speed in m/s, capped at 80 —
+the cap applies to the *vector*, not just the display scalar, or consumers deriving unit directions
+got "unit" vectors up to 1.875 long and snow's saltation reach silently doubled; cross-model
+review). It accelerates flow up windward slopes and *onto* crests (the raw upwind-slope form left
+the ridge line an exactly-unaccelerated notch — the windward face's lift is carried ~60 m onto the
+crest, and the corpus's own pseudocode note was corrected upstream), detects terrain on the upwind
+horizon to shelter lee cells, and turns wind toward concave valley axes. The bounded
+Helmholtz–Hodge projection **reduces divergence ~4×** (measured 0.24 ratio; gate armed at 0.35):
+its first form paired central div/grad with a compact Laplacian — a Nyquist-blind combination that
+*converged* at ~2× while claiming mass consistency — and now runs an exact-adjoint stencil pair
+(forward div, compact Laplacian, backward grad, whose composition *is* that Laplacian) with two
+V-cycles. Honest label: a strong divergence reducer, not the reference-impl's spectral
+machine-precision projection. This is a terrain-adjusted climate approximation, not CFD; the
+shaping constants (tanh 2.5, the 3–15° shelter band, 0.75 max shelter — above 13's 0.2–0.5 range —
+and the /30 m/s coupling saturation) are authored and flagged as such in the code.
+
+Biomes may still author regional circulation. Chain **Wind Modify** nodes over the base field and
+reuse each biome's Draw Mask in the Modify Mask input. The masked boundary rotates direction along
+the shortest angular path and blends speed, so an ecotone remains continuous — and the node's
+**Mass consistency** tab chooses the price: **Project** (default) re-projects after the override,
+so a hard biome seam *lowers* divergence instead of raising it 39% (measured pre-fix, with the
+diagnostics stamped inverted), at the cost of flow bleeding across the seam; **Preserve exactly**
+holds the authored values to 1e-3 everywhere and knowingly keeps the seam divergence. Display →
+**Wind** renders direction as hue and speed as brightness. Snow consumes the final vector field
+directly, per cell (event duration from the p95 of field speed — a max let one gusty DEM cell
+double the whole map's transport); with no Wind connection its legacy strength/direction controls
+remain a backward-compatible fallback, and note the shipped default graph *does* wire Wind → Snow,
+which changed the default terrain's snow (5 → 6 transport passes). The same physical field is
+intended for future orographic precipitation, dune transport, fire spread, vegetation exposure,
+and wave fetch rather than duplicating a direction knob in every consumer.
 
 That is what makes slope **angles** physical, so — as in Gaea, where *"the only place the terrain scale
 affects how your terrain is processed is when `Real Scale` is turned ON in the Erosion, Snow, or Thermal
@@ -977,8 +1025,9 @@ The Snow node keeps bedrock unchanged and computes a separate `SnowField.depthM`
    **81.7% → 0.0%**, cover change between build qualities **15.6 pp → 0.0 pp**. Coverage is now
    convergent; drift depths above the hold keep maturing with iterations (the deferred
    deposition-bound work), which is why the claim is scoped to coverage.
-5. **Wind:** the corpus `snowStep`'s fifth step, previously absent. Snow scours where the snow
-   surface rises into the wind — capped at a **0.5 m transportable surface layer per pass**, because
+5. **Wind:** Snow consumes the terrain-adjusted physical Wind field cell by cell (or its legacy
+   local fallback when unconnected). It scours where the snow surface rises into the local vector —
+   capped at a **0.5 m transportable surface layer per pass**, because
    saltation moves loose surface snow, not the consolidated pack — and each scoured parcel walks
    downwind to the **shadow zone**: the first cell where the surface stops rising into the wind,
    just past the local drift crest (walk capped at ~30 m regardless of grid). Both refinements were
@@ -1294,6 +1343,15 @@ edit cancels the older run at the next yield, preventing a stale graph from repl
 A single long simulation is still one honest segment—its clock and active-node pulse continue, but the
 studio does not invent sub-step percentages the kernel cannot report.
 
+**The diamond-plate artifact (fixed).** Smooth snow faces rendered with soft rhombus-shaped plates
+outlined by creases — reported from a live session, diagnosed as the adaptive mesh diagonal's tie
+band: on a drape-smoothed surface the normal-fit signal collapses (median |fitDelta| 6.8·10⁻⁶
+against the old 1·10⁻⁶ tie threshold), so *noise* chose the diagonal and the wins clustered into
+~100-quad same-diagonal patches (measured: 37% of all quads flipped from the checkerboard, 36,608
+patches). The band is now decisive-only at 1·10⁻⁴: flips fall to 2.4%, the largest patch is 31
+quads and elongated along genuine creases (the real-crease signal is p99 2·10⁻³, 20× above the
+band), and every ridge/valley case in `_verify_edge_spin.js` still chooses the fitted diagonal.
+
 Thermal runs as **two passes** — one memoising each cell's `(move, sum)`, one redistributing — because the
 obvious single-pass version recomputes every neighbour's `moveSum` (72 texture fetches per cell vs ~27).
 Profiling a 1024² build showed thermal at **84% of total time**; the split cut the whole build from
@@ -1425,6 +1483,7 @@ node _verify_satgen.js               # SatMap Studio extraction + LUT build
 node _verify_render.js               # colour pipeline, PBR/data views, exposure, image contrast
 node _verify_edge_spin.js            # ridge/valley-aware topology + bounded GPU index streaming
 node _verify_snow.js                 # snow depth/displacement, aspect melt, ice cover, mass, compass
+node _verify_wind.js                 # terrain wind physics, regional masks, Snow input, HUD direction/readout
 node _verify_water_surface.js        # global waves/refraction + rasterized fluid-surface depth layer
 node _verify_water_hydrology.js      # lake filter + river density/depth controls and sea separation
 node _verify_mask_draw.js            # resolution-independent vector masks + masked Sculpt merge

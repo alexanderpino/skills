@@ -120,7 +120,7 @@ function imageStats(png, r) {
   });
   const ok = diag.webgl2 && diag.deferred && Object.values(diag.linked).every(Boolean)
     && diag.indexPattern==='adaptive-normal-fit-diagonal'
-    && diag.styles.join('|') === 'Realistic|Clay|Albedo|Slope|Normals|Temperature|Sun shadow'
+    && diag.styles.join('|') === 'Realistic|Clay|Albedo|Slope|Normals|Temperature|Sun shadow|Wind'
     && diag.srgbRoundtripError < 1e-6 && diag.satRoughnessDelta > 1
     && diag.rippleMotion.mean > diag.rippleMotion.stillMean + .01 && diag.rippleMotion.stillMean < .01 && diag.rippleMotion.changed > 20
     && realistic.std > 28 && realistic.nearWhite < .55 && realistic.chroma > 7

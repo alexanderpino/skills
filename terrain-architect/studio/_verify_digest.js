@@ -154,11 +154,12 @@ function installHarness(cfg) {
     def.params.forEach(pr => { p[pr.key] = cloneParams(pr.def); });
     const nd = { id: uid++, type, x: 0, y: 0, w: type === 'colormixer' ? 190 : 150, params: p,
       _field: null, _thumb: null, _dirty: true, _dem: null,
-      _snowLayer: null, _temperatureC: null, _solarShadow: null, _solarExposure: null };
+      _snowLayer: null, _temperatureC: null, _solarShadow: null, _solarExposure: null, _wind: null };
     if (type === 'colormixer') {
       nd._inputs = ['Layer 1', 'Layer 2', 'Layer 3'];
-      nd.params.layers = [{ opacity: 1, blend: 'normal' }, { opacity: 1, blend: 'normal' },
-        { opacity: 1, blend: 'normal' }];
+      nd.params.layers = [{ opacity: 1, blend: 'normal', edgeBlend: 0 },
+        { opacity: 1, blend: 'normal', edgeBlend: 0 },
+        { opacity: 1, blend: 'normal', edgeBlend: 0 }];
     }
     if (type === 'drawmask') nd.params.strokes = [];
     if (over) Object.assign(nd.params, over);
@@ -206,6 +207,8 @@ function installHarness(cfg) {
       else if (key === 'S') { nd = mk('d_sunshadow'); wire(get('A'), nd, 0); }
       else if (key === 'T') {                       // a REAL physical Temperature field
         nd = mk('d_temperature'); wire(get('H'), nd, 0); wire(get('S'), nd, 1);
+      } else if (key === 'W') {                     // a REAL physical Wind vector field
+        nd = mk('d_wind'); wire(get('A'), nd, 0);
       } else if (key === 'SAT' || key === 'SAT2' || key === 'SAT3') {
         // a real colour branch, so resolveColor() has something authored to work on
         const h = { SAT: 'A', SAT2: 'B', SAT3: 'C' }[key];
@@ -229,7 +232,7 @@ function installHarness(cfg) {
     blend: ['A', 'B', 'M'], add: ['A', 'B'], maxmin: ['A', 'B'],
     stampn: ['A', 'B', 'M'], smax: ['A', 'B'], smin: ['A', 'B'],
     // --- filters ---
-    warp: ['A', 'M'], terrace: ['A', 'M'], levels: ['A'], curve: ['A'], histeq: ['A'],
+    warp: ['A', 'M'], terrace: ['A', 'M'], normalizen: ['A', 'M'], levels: ['A'], curve: ['A'], histeq: ['A'],
     blur: ['A', 'M'], sculpt: ['A', 'M'], clampn: ['A'], transform: ['A', 'M'], invert: ['A'],
     // --- erosion ---
     thermal: ['A', 'M'], streampower: ['A', 'B', 'M'], hydraulic: ['A', 'M'],
@@ -239,10 +242,11 @@ function installHarness(cfg) {
     // --- data maps ---
     d_slope: ['A'], d_height: ['A'], d_sunshadow: ['A'],
     d_temperature: ['H', 'S'], d_heat: ['T', 'D', 'M'],
+    d_wind: ['A'], d_windmodify: ['W', 'D', 'M'],
     d_curvature: ['A'], d_flow: ['A'], d_occlusion: ['A'], d_deposits: ['A'],
     d_wear: ['A'], d_peaks: ['A'], d_texture: ['A'],
     // --- effects (passthrough) ---
-    water: ['A', 'T'], snow: ['A', 'T'], satmap: ['A', 'D', 'M'],
+    water: ['A', 'T'], snow: ['A', 'T', 'W'], satmap: ['A', 'D', 'M'],
     colorerosion: ['SAT', 'D', 'M'], weathering: ['SAT', 'M'],
     satmapblend: ['SAT', 'SAT2', 'M'], colormixer: ['SAT', 'SAT2', 'SAT3'],
     // --- output ---
@@ -256,6 +260,8 @@ function installHarness(cfg) {
     d_sunshadow: ['_solarExposure'],
     d_temperature: ['_temperatureC', '_solarShadow', '_solarExposure'],
     d_heat: ['_temperatureC'],
+    d_wind: ['_wind.u', '_wind.v', '_wind.speed'],
+    d_windmodify: ['_wind.u', '_wind.v', '_wind.speed'],
     snow: ['_snowLayer.depthM'],
     satmap: ['_driver'],
   };
@@ -278,12 +284,14 @@ function installHarness(cfg) {
   // also gets ONE documented non-default evaluation folded in as `ex=`, chosen to enter the code
   // path defaults skip — including Transform's raster resample, which the exact path never runs.
   const EXERCISE = {
+    normalizen: { amount: 0.35 },
     levels: { inLo: 0.18, inHi: 0.82, gamma: 1.7, outLo: 0.05, outHi: 0.95 },
     curve: { bias: 0.3, gain: 0.72 },
     clampn: { lo: 0.35, hi: 0.62 },
     transform: { mode: 'raster', scale: 1.3, aspect: 0.8, angle: 37, offX: 0.11, offY: -0.07,
       pivX: 0.4, pivY: 0.6, edge: 'mirror' },
     d_heat: { mode: 'set', targetC: 900, amount: 0.6 },
+    d_windmodify: { direction: 45, speed: 26, amount: 0.65 },
     // Not identity-shaped, but the default form:"peak" never reaches the massif branch — and
     // with it the second hydraulicErode call, which must stay settle-free (opt-out contract).
     mountain: { form: 'massif' },

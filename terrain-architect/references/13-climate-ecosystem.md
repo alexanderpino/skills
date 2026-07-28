@@ -70,6 +70,11 @@ windField(h, baseDir, baseSpeed):
     for each cell p:
         # 1. Speed-up over windward slopes and crests — Jackson & Hunt 1975:
         #    fractional speed-up scales with the hill's slope (Δu/u ∝ h/L), peaking at the crest
+        #    PRODUCTION CORRECTION (Terrain Studio, 2026-07): this raw form is ZERO exactly at
+        #    the crest (grad h = 0 there), leaving the ridge line a 1-3 cell band of
+        #    unaccelerated air bracketed by sped-up and sheltered cells — measured 12 m/s between
+        #    22 and 5. J&H's speed-up peaks AT the hill top: carry the windward face's lift onto
+        #    the crest (sample upwindSlope a short distance — ~60 m — upwind and keep the larger).
         s = 1 + k_su * max(0, upwindSlope(h, p, baseDir))       # cap; k_su gives ~1.5–2× at steep crests
         # 2. Lee shelter — Werner's dune shadow zone (05), at landscape scale
         if inShadowZone(h, p, baseDir, ~15°): s *= shelter       # ~0.2–0.5

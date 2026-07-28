@@ -47,6 +47,14 @@ test.describe('@correctness application menu', () => {
       redo: redoStack.length,
       selected: selected && selected.type,
       outputReady: !!(outputNode() && outputNode()!._field),
+      organization: (() => {
+        const n = nodes[0]
+        return {
+          zoom: view.z,
+          centerErrorX: Math.abs(view.x + (n.x + n.w / 2) * view.z - gc.clientWidth / 2),
+          centerErrorY: Math.abs(view.y + (n.y + nodeH(n) / 2) * view.z - gc.clientHeight / 2),
+        }
+      })(),
     }))
     expect(blank.types).toEqual(['output'])
     expect(blank.edges).toBe(0)
@@ -54,6 +62,9 @@ test.describe('@correctness application menu', () => {
     expect(blank.redo).toBeFalsy()
     expect(blank.selected).toBe('output')
     expect(blank.outputReady).toBe(true)
+    expect(blank.organization.zoom).toBe(1.35)
+    expect(blank.organization.centerErrorX).toBeLessThanOrEqual(0.5)
+    expect(blank.organization.centerErrorY).toBeLessThanOrEqual(0.5)
 
     /* --- File > New from default setup: the production starter graph is back -- */
     await page.locator('#fileMenuBtn').click()

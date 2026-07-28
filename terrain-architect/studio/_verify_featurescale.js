@@ -21,7 +21,48 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
         for(let x=0;x<n;x++){ const d=f[y*n+x]-lo[y*n+x]; if(x&&Math.sign(d)!==Math.sign(prev)&&prev!==0)cross++; prev=d; samples++; }}
       return cross? samples/cross : 0;
     };
-    const out = { transform:{}, featureScale:{} };
+    const out = { transform:{}, featureScale:{}, logControls:{}, importViewport:{} };
+
+    // --- Control contract: logarithmic presentation, real stored values, stable parameter keys. ---
+    const descriptor=(type,key)=>TYPES[type].params.find(pr=>pr.key===key);
+    const importScale=descriptor('import','scale');
+    const thermalScale=descriptor('thermal','feat');
+    const hydraulicScale=descriptor('hydraulic','feat');
+    const savedSelected=selected;
+    selected={id:-1,type:'import',params:{scale:importScale.def}};
+    const importTrack=buildField(importScale).querySelector('input[type="range"]');
+    selected={id:-2,type:'thermal',params:{feat:thermalScale.def}};
+    const thermalTrack=buildField(thermalScale).querySelector('input[type="range"]');
+    selected=savedSelected;
+
+    const demNode={_dem:new Float32Array(RES*RES).fill(.25)};
+    const attenuated=TYPES.import.eval({scale:.1},[],demNode)[0];
+    const amplified=TYPES.import.eval({scale:10},[],demNode)[0];
+    out.logControls={
+      import:{scale:importScale.scale,floor:importScale.floor,max:importScale.max,
+        def:importScale.def,zero:importScale.zero,defaultTrack:+importTrack.value},
+      thermal:{scale:thermalScale.scale,floor:thermalScale.floor,max:thermalScale.max,
+        def:thermalScale.def,zero:thermalScale.zero,defaultTrack:+thermalTrack.value},
+      hydraulic:{scale:hydraulicScale.scale,floor:hydraulicScale.floor,max:hydraulicScale.max,
+        def:hydraulicScale.def,zero:hydraulicScale.zero},
+      demMultiplicationRatio:+(amplified/attenuated).toFixed(1)
+    };
+
+    // The Output node may normalize its encoded samples, but that must not cancel the physical
+    // amplitude of a DEM-derived graph in the 3D viewport.
+    const savedNodes=nodes,savedEdges=edges;
+    const rawDem=new Float32Array(RES*RES);
+    for(let i=0;i<rawDem.length;i++)rawDem[i]=(i%(RES+1))/(RES||1);
+    const importedField=TYPES.import.eval({scale:10},[],{_dem:rawDem});
+    const importNode={id:91001,type:'import',params:{scale:10},_field:importedField};
+    const outputField=normalize(importedField);
+    const output={id:91002,type:'output',params:{norm:'on'},_field:outputField};
+    nodes=[importNode,output];edges=[{from:importNode.id,to:output.id,slot:0}];
+    const frame=viewportHeightFrame(outputField,output);
+    const sourceRange=fieldRange(frame.source),encodedRange=fieldRange(outputField);
+    out.importViewport={absolute:frame.absolute,sourceMax:+sourceRange[1].toFixed(3),
+      encodedMax:+encodedRange[1].toFixed(3),usesPreNormalizeField:frame.source===importedField};
+    nodes=savedNodes;edges=savedEdges;
 
     // --- Transform: exact test on an analytic sine. Magnifying by k must multiply the PERIOD by k. ---
     const n0=RES, CYC=8;
@@ -63,7 +104,19 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   for (const [k,v] of Object.entries(r.transform)) console.log(`  scale ${k.padEnd(3)} period=${v.period} cells   max err vs oracle = ${v.maxErrVsOracle}`);
   console.log('Erosion Feature Scale (width of the erosion delta):');
   for (const [k,v] of Object.entries(r.featureScale)) console.log(`  feat ${k.padEnd(3)} width=${v.deltaWidth} cells  ${v.ms}ms`);
+  console.log('Logarithmic controls:', JSON.stringify(r.logControls));
+  console.log('Import viewport:', JSON.stringify(r.importViewport));
   console.log('errors', errors.length?JSON.stringify(errors):'none');
   await b.close();
-  process.exit(errors.length?1:0);
+  const logs=r.logControls;
+  const ok=logs.import.scale==='log'&&logs.import.floor===.01&&logs.import.max===100
+    &&logs.import.def===1&&logs.import.zero===false&&Math.abs(logs.import.defaultTrack-.5)<.001
+    &&logs.thermal.scale==='log'&&logs.thermal.floor===1&&logs.thermal.max===8
+    &&logs.thermal.def===1&&logs.thermal.zero===false&&logs.thermal.defaultTrack===0
+    &&logs.hydraulic.scale==='log'&&logs.hydraulic.floor===1&&logs.hydraulic.max===8
+    &&logs.hydraulic.def===1&&logs.hydraulic.zero===false
+    &&logs.demMultiplicationRatio===100
+    &&r.importViewport.absolute&&r.importViewport.sourceMax>9.9
+    &&r.importViewport.encodedMax===1&&r.importViewport.usesPreNormalizeField;
+  process.exit(errors.length||!ok?1:0);
 })().catch(e => { console.error('FATAL', e); process.exit(2); });

@@ -165,9 +165,11 @@ around.
 On a repose-relaxed world-space cone, the D6 thermal kernel's talus ring is magnitude-isotropic
 to 0.3% (max/min 1.003 across azimuth; the distance-corrected D8 square kernel reads 1.005 — both
 excellent). But facet-*direction* concentration measured the OTHER way from the naive reading of
-this chapter: hex 1.41 vs corrected-D8 1.17 (36-bin direction histogram, each lattice measured
-with its own one-ring gradient estimator, which quantizes directions toward its tap families —
-6 at 60° vs 8 at 45°). The C4-vs-C6 lock comparison in this chapter describes the **uncorrected /
+this chapter: hex 1.41 vs corrected-D8 1.17 — and the D4 *defect* kernel itself reads 1.23
+(36-bin direction histogram, each lattice measured with its own one-ring gradient estimator,
+which quantizes directions toward its tap families — 6 at 60° vs 8 at 45°; that estimator
+coupling is why facet-direction is reported, never gated, and the gated quantity is ring
+magnitude-isotropy: 1.003). The C4-vs-C6 lock comparison in this chapter describes the **uncorrected /
 D4 defect class**; against a *well-implemented* distance-corrected D8 thermal, D6's win is
 **exactness** — one neighbour distance, one threshold, no √2 correction to forget — not facet
 diversity, and a well-corrected D8 actually offers more facet families. Claiming otherwise

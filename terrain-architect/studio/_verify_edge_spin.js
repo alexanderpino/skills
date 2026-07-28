@@ -18,7 +18,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   await page.waitForTimeout(1400);
 
   const report = await page.evaluate(() => {
-    const choose = (delta,x,y) => Math.abs(delta) <= 1e-6 ? !!((x+y)&1) : delta < 0;
+    // Threshold mirrors streamTerrainIndices: 1e-4 decisive-only band. The original 1e-6 band
+    // let noise-scale wins cluster into ~100-quad diamond-plate patches on drape-smoothed snow
+    // (measured flipShare 37%); at 1e-4 flips fall to 2.4% with the largest patch 31 quads,
+    // elongated along real creases, and every synthetic ridge/valley choice below still holds.
+    const choose = (delta,x,y) => Math.abs(delta) <= 1e-4 ? !!((x+y)&1) : delta < 0;
     const mainRidgeDelta = terrainQuadFitDelta(0,-1,-1,0, 0,0,-1,1,1,-1,0,0);
     const antiRidgeDelta = terrainQuadFitDelta(-1,0,0,-1, 1,1,0,0,0,0,-1,-1);
     const mainValleyDelta = terrainQuadFitDelta(0,1,1,0, 0,0,1,-1,-1,1,0,0);

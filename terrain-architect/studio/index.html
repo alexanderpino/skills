@@ -256,6 +256,23 @@ select.btn{appearance:none;padding-right:22px;
   background:var(--accent);box-shadow:0 0 7px rgba(224,161,74,.72)}
 .vp-compass-n{position:absolute;left:-8px;top:-9px;width:18px;text-align:center;color:#f3f6fa;font:700 8px var(--mono)}
 .vp-compass-eq{position:absolute;left:-7px;top:-10px;width:18px;text-align:center;color:var(--accent);font:700 7px var(--mono);letter-spacing:-.4px}
+.vp-wind{position:absolute;z-index:11;left:72px;bottom:43px;max-width:calc(100% - 92px);height:27px;
+  display:flex;align-items:center;gap:7px;padding:0 8px 0 5px;border-radius:7px;pointer-events:none;
+  border:1px solid rgba(113,211,226,.28);background:rgba(10,13,18,.66);color:var(--text);
+  box-shadow:0 5px 18px rgba(0,0,0,.2);backdrop-filter:blur(9px);font:9px var(--mono);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+:root[data-theme="light"] .vp-wind{background:rgba(247,249,252,.82);border-color:rgba(16,123,145,.28)}
+.vp-wind-dial{position:relative;flex:0 0 19px;width:19px;height:19px;border-radius:50%;
+  border:1px solid rgba(113,211,226,.34);background:rgba(113,211,226,.06)}
+.vp-wind-arrow{position:absolute;left:8px;top:2px;width:3px;height:15px;transform-origin:50% 7.5px;
+  filter:drop-shadow(0 0 3px rgba(113,211,226,.58))}
+.vp-wind-arrow::before{content:"";position:absolute;left:1px;top:3px;width:1px;height:11px;background:#71d3e2}
+.vp-wind-arrow::after{content:"";position:absolute;left:-2px;top:0;border-left:2.5px solid transparent;
+  border-right:2.5px solid transparent;border-top:0;border-bottom:5px solid #71d3e2}
+.vp-wind-copy{display:flex;align-items:baseline;gap:6px;overflow:hidden;text-overflow:ellipsis}
+.vp-wind-copy b{font-weight:600;color:#a7edf5}.vp-wind-copy small{font:8px var(--mono);color:var(--muted)}
+.vp-wind[data-source="fallback"]{border-style:dashed}.vp-wind[data-calm="true"] .vp-wind-arrow{opacity:.35}
+@media(max-width:720px){.vp-wind-copy small{display:none}.vp-wind{padding-right:7px}}
 .vp-temperature{position:absolute;z-index:11;left:72px;bottom:10px;max-width:calc(100% - 92px);height:25px;padding:0 8px;border-radius:6px;
   border:1px solid rgba(255,255,255,.14);background:rgba(10,13,18,.66);color:var(--text);
   font:9px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;backdrop-filter:blur(9px)}
@@ -725,6 +742,10 @@ select.sg-btn{appearance:auto}
         <div class="vp-compass-equator" id="compassEquator"><span class="vp-compass-eq">EQ</span></div>
         <div class="vp-compass-axis" id="compassNorth"><span class="vp-compass-n">N</span></div>
       </div>
+      <div class="vp-wind" id="windReadout" role="img" aria-label="Wind direction and speed">
+        <span class="vp-wind-dial" aria-hidden="true"><span class="vp-wind-arrow" id="windIndicatorArrow"></span></span>
+        <span class="vp-wind-copy"><b id="windSpeed">W — m/s</b><small id="windBearing">—° from</small></span>
+      </div>
       <button class="vp-temperature" id="climateReadout" type="button" title="Temperature at the terrain under the view focus; click to switch °C / °F">— °C</button>
       <section class="vp-flyout" id="displayPanel" aria-label="Display settings" hidden>
         <div class="vp-flyout-head"><b>Display</b><small>viewport only</small></div>
@@ -733,6 +754,7 @@ select.sg-btn{appearance:auto}
           <option value="0" selected>Realistic</option><option value="1">Clay</option>
           <option value="2">Albedo</option><option value="3">Slope</option><option value="4">Normals</option>
           <option value="5">Temperature</option><option value="6">Sun shadow</option>
+          <option value="7">Wind</option>
         </select>
         <div class="vp-display-row"><span>Wireframe overlay</span>
           <button class="btn" id="wireBtn" type="button" title="Toggle wireframe"><span id="wireState">Off</span></button></div>
@@ -1454,11 +1476,18 @@ function drawMaskField(p){
     const inner=radius*hard,opacity=clamp(stroke.opacity==null?1:stroke.opacity,0,1),erase=stroke.mode==="erase";
     const coverage=d=>d>=radius?0:hard>=.999?1:1-smooth(clamp((d-inner)/Math.max(radius-inner,1e-6),0,1));
     const composite=(i,c)=>{const a=c*opacity;if(a>0)out[i]=erase?out[i]*(1-a):out[i]+(1-out[i])*a;};
+    // Seed contract (26): strokes are authored in WORLD uv, cells sample world uv - on hex that
+    // means the odd-row half-cell shift and sqrt(3)/2 row compression on BOTH branches. Review
+    // caught the default (non-Transform) branch unconverted: a stroke at v=0.8 landed 15.5% of
+    // the map away from a Shape authored at the same coordinate, and inserting an identity
+    // Transform silently moved every stroke.
+    const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
     if(XF){
       // An exact Transform can move any painted segment across the tile. Scan output cells once
       // per stroke and find the nearest segment; this avoids a 64 MB Float32 coverage raster at 4K.
       for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-        const u=xfU((x+.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,(y+.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n),v=xfV((x+.5+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n,(y+.5)*(terrainDef.lattice==="hex"?HEX_ROW:1)/n);let d=Infinity;
+        const su=(x+.5+hxs*(y&1))/n,sv=(y+.5)*rzs/n;
+        const u=xfU(su,sv),v=xfV(su,sv);let d=Infinity;
         if(pts.length===1)d=Math.hypot(u-pts[0][0],v-pts[0][1]);
         else for(let q=1;q<pts.length;q++)d=Math.min(d,pointSegmentDistance(u,v,pts[q-1][0],pts[q-1][1],pts[q][0],pts[q][1]));
         composite(y*n+x,coverage(d));
@@ -1467,14 +1496,15 @@ function drawMaskField(p){
     }
     let minU=pts[0][0],maxU=minU,minV=pts[0][1],maxV=minV;
     for(const q of pts){minU=Math.min(minU,q[0]);maxU=Math.max(maxU,q[0]);minV=Math.min(minV,q[1]);maxV=Math.max(maxV,q[1]);}
-    const bx0=clamp(Math.floor((minU-radius)*n),0,n-1),bx1=clamp(Math.ceil((maxU+radius)*n),0,n-1);
-    const by0=clamp(Math.floor((minV-radius)*n),0,n-1),by1=clamp(Math.ceil((maxV+radius)*n),0,n-1);
+    // Bounding boxes convert world v to ROW range (/rzs) and pad x by the odd-row shift.
+    const bx0=clamp(Math.floor((minU-radius)*n-hxs),0,n-1),bx1=clamp(Math.ceil((maxU+radius)*n),0,n-1);
+    const by0=clamp(Math.floor((minV-radius)/rzs*n),0,n-1),by1=clamp(Math.ceil((maxV+radius)/rzs*n),0,n-1);
     const bw=bx1-bx0+1,bh=by1-by0+1,cov=new Uint8Array(bw*bh);
     const segment=(a,b)=>{
-      const x0=clamp(Math.floor((Math.min(a[0],b[0])-radius)*n),bx0,bx1),x1=clamp(Math.ceil((Math.max(a[0],b[0])+radius)*n),bx0,bx1);
-      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)*n),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)*n),by0,by1);
+      const x0=clamp(Math.floor((Math.min(a[0],b[0])-radius)*n-hxs),bx0,bx1),x1=clamp(Math.ceil((Math.max(a[0],b[0])+radius)*n),bx0,bx1);
+      const y0=clamp(Math.floor((Math.min(a[1],b[1])-radius)/rzs*n),by0,by1),y1=clamp(Math.ceil((Math.max(a[1],b[1])+radius)/rzs*n),by0,by1);
       for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
-        const c=Math.round(coverage(pointSegmentDistance((x+.5)/n,(y+.5)/n,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
+        const c=Math.round(coverage(pointSegmentDistance((x+.5+hxs*(y&1))/n,(y+.5)*rzs/n,a[0],a[1],b[0],b[1]))*255),i=(y-by0)*bw+x-bx0;
         if(c>cov[i])cov[i]=c;}
     };
     if(pts.length===1)segment(pts[0],pts[0]);else for(let i=1;i<pts.length;i++)segment(pts[i-1],pts[i]);
@@ -1879,6 +1909,10 @@ function mountainField(p){
   // deterministic per-seed stream, so the same seed always builds the same massif
   let rs=Math.imul(p.seed|0,2654435761)>>>0;
   const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
+  // World cell-units for BOTH skeleton steps (review caught the envelope in raw grid units: on
+  // hex a grid circle is a world ellipse 15.5% wider than deep, and Position Y meant two
+  // different places in the envelope and the ridge network). hxs/rzs are 0/1 on square.
+  const hxs=terrainDef.lattice==="hex"?0.5:0,rzs=terrainDef.lattice==="hex"?HEX_ROW:1;
   const cx0=p.x*n,cy0=p.y*n,reach=Math.max(p.size,0.02)*n;
   const rot=p.angle*Math.PI/180;
 
@@ -1894,8 +1928,9 @@ function mountainField(p){
       cyp.push(cy0+0.9*reach*Math.sin(ang)*t+py*(wob[a]-wm)*n);}
     const amp=0.7+0.6*rnd();
     for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+      const xw=x+hxs*(y&1),yw=y*rzs;
       let d=Infinity;
-      for(let a=0;a<k-1;a++)d=Math.min(d,sdSegment(x,y,cxp[a],cyp[a],cxp[a+1],cyp[a+1]));
+      for(let a=0;a<k-1;a++)d=Math.min(d,sdSegment(xw,yw,cxp[a],cyp[a],cxp[a+1],cyp[a+1]));
       const e=amp*Math.pow(clamp(1-d/reach,0,1),1.6);
       const i=y*n+x;if(e>env[i])env[i]=e;}
   }
@@ -1903,7 +1938,7 @@ function mountainField(p){
   // 2) modulated-Voronoi ridge network
   const netA=new Float32Array(n*n),netB=new Float32Array(n*n);
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const u=(x+(terrainDef.lattice==="hex"?0.5*(y&1):0))/n*ncell,v=y*(terrainDef.lattice==="hex"?HEX_ROW:1)/n*ncell;
+    const u=(x+hxs*(y&1))/n*ncell,v=y*rzs/n*ncell;
     const wx=fbm2(u*0.35,v*0.35,p.seed+3,4)+0.5*fbm2(u*0.9,v*0.9,p.seed+13,4);
     const wy=fbm2(u*0.35+4.7,v*0.35+2.3,p.seed+4,4)+0.5*fbm2(u*0.9+1.9,v*0.9+6.1,p.seed+14,4);
     const u2=u+warpamt*wx,v2=v+warpamt*wy,i=y*n+x;
@@ -3115,6 +3150,212 @@ function evaluateTemperatureMap(inp,p={},shadowInput=null){
     solarShadow:resampleField(solar.shadow,preview,full)
   };
 }
+// A Wind field is physically two horizontal velocity components in m/s. The scalar carrier is
+// only a graph thumbnail / generic-mask view of speed; the vector contract travels in FIELD_META,
+// exactly as physical Celsius travels beside Temperature's encoded scalar field. "Wind from"
+// bearings are map-relative: 0° arrives from map-top and therefore blows toward +row.
+const WIND_MAX_MPS=80;
+function windBearingVector(direction){
+  const r=((direction||0)%360+360)%360*Math.PI/180;
+  return[-Math.sin(r),Math.cos(r)];
+}
+function tagWindField(field,u,v,speed,extras={}){
+  if(!field)return field;
+  FIELD_META.set(field,{kind:"wind",unit:"m/s",u,v,speed,heightField:extras.heightField||null,
+    baseDirection:extras.baseDirection==null?null:extras.baseDirection,
+    baseSpeed:extras.baseSpeed==null?null:extras.baseSpeed,
+    divergenceRmsBefore:extras.divergenceRmsBefore==null?null:extras.divergenceRmsBefore,
+    divergenceRmsAfter:extras.divergenceRmsAfter==null?null:extras.divergenceRmsAfter});
+  return field;
+}
+function windVectorFromField(field){
+  const m=fieldMetadata(field);
+  return m&&m.kind==="wind"&&m.u&&m.v&&m.speed?m:null;
+}
+function windDivergenceRms(u,v,n,cell){
+  if(!u||!v||n<3)return 0;
+  let sum=0,count=0;
+  for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++){
+    const i=y*n+x,d=(u[i+1]-u[i-1]+v[i+n]-v[i-n])/(2*cell);
+    sum+=d*d;count++;
+  }
+  return Math.sqrt(sum/Math.max(1,count));
+}
+// Bounded-domain Helmholtz-Hodge projection (Sherman 1978 / MATHEW family): solve
+// laplacian(lambda)=div(u0) with lambda=0 at the open tile edge, then subtract grad(lambda) -
+// on an EXACT-ADJOINT stencil pair: FORWARD-difference divergence, compact 5-point Laplacian,
+// BACKWARD-difference gradient, whose composition IS that Laplacian, so the projection cancels
+// exactly up to solver residual. The first version paired central div/grad with the compact
+// Laplacian: that pair's symbol is cos^2(theta/2) - ZERO at Nyquist - so grid-scale divergence
+// was invisible to the solve, which CONVERGED at a ~2x reduction while the comment blamed the
+// iteration budget (cross-model review, measured at 200x iterations: under 2% change; the
+// reference-impl uses one spectral operator for div/Laplacian/grad for exactly this reason and
+// gates after < 0.05*before). A coarse-grid pre-solve (4x block-mean restriction, solved deep,
+// prolonged as the initial guess) carries the long-wavelength part a bounded fine sweep cannot.
+function projectWindMassConsistent(u0,v0,n,cell,iterations=56){
+  const N=n*n,rhs=new Float32Array(N);
+  for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++){
+    const i=y*n+x;rhs[i]=(u0[i+1]-u0[i]+v0[i+n]-v0[i])/cell;
+  }
+  const jacobi=(lam0,rhs2,m,cellM,iters)=>{
+    let src=lam0,dst=new Float32Array(m*m);const c2=cellM*cellM;
+    for(let it=0;it<iters;it++){
+      for(let y=1;y<m-1;y++)for(let x=1;x<m-1;x++){
+        const i=y*m+x;dst[i]=(src[i-1]+src[i+1]+src[i-m]+src[i+m]-rhs2[i]*c2)*.25;
+      }
+      const q=src;src=dst;dst=q;
+    }
+    return src;
+  };
+  // Two V-cycles: coarse-solve the RESIDUAL (4x block-mean restriction, deep cheap Jacobi),
+  // prolong the correction, then a fine sweep for the high frequencies the coarse grid cannot
+  // represent. One cycle measured 0.245 of the incoming divergence; two reach the mid-band.
+  const f=4,m=Math.floor(n/f),cell2=cell*cell;
+  let lam=new Float32Array(N);
+  const cycles=m>=8?2:1;
+  for(let cyc=0;cyc<cycles;cyc++){
+    if(m>=8){
+      const rc=new Float32Array(m*m);
+      for(let Y=0;Y<m;Y++)for(let X=0;X<m;X++){
+        let s2=0,c3=0;
+        for(let dy=0;dy<f;dy++)for(let dx=0;dx<f;dx++){
+          const yy=Y*f+dy,xx=X*f+dx;if(yy>=n||xx>=n)continue;
+          const i=yy*n+xx;
+          // residual of the compact 5-point operator against the accumulated lambda
+          const L=(yy>0&&yy<n-1&&xx>0&&xx<n-1)
+            ?(lam[i-1]+lam[i+1]+lam[i-n]+lam[i+n]-4*lam[i])/cell2:0;
+          s2+=rhs[i]-L;c3++;}
+        rc[Y*m+X]=c3?s2/c3:0;
+      }
+      const lamC=jacobi(new Float32Array(m*m),rc,m,cell*f,Math.min(600,m*m));
+      for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++)
+        lam[y*n+x]+=sampleGridBilinear(lamC,m,x/f,y/f);
+    }
+    lam=jacobi(lam,rhs,n,cell,iterations);
+  }
+  const src=lam;
+  const u=u0.slice(),v=v0.slice();
+  for(let y=0;y<n;y++)for(let x=1;x<n;x++){const i=y*n+x;u[i]-=(src[i]-src[i-1])/cell;}
+  for(let y=1;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;v[i]-=(src[i]-src[i-n])/cell;}
+  return{u,v};
+}
+function sampleGridBilinear(field,n,x,y){
+  x=clamp(x,0,n-1.001);y=clamp(y,0,n-1.001);
+  const x0=x|0,y0=y|0,fx=x-x0,fy=y-y0,i=y0*n+x0;
+  return lerp(lerp(field[i],field[i+1],fx),lerp(field[i+n],field[i+n+1],fx),fy);
+}
+// Terrain-adjusted middle-ground wind model (real boundary-layer CFD is intentionally out of
+// scope): Jackson-Hunt-family crest speed-up, directional lee shelter, Hessian valley channeling,
+// followed by an optional mass-consistency projection. All distances are derived from world metres.
+// AUTHORED CONSTANTS, flagged per 09 (no corpus row backs the specific numbers): the tanh(2.5*lift)
+// speed-up shaping; the 3-15 deg shelter band (13 sanctions ~15 deg); the 0.75 maximum shelter
+// depth (ABOVE 13's 0.2-0.5 range - a deliberate look deviation); channelRadius = min(400 m, 7%
+// of scale); the confinement denominator height*0.005; and the /30 m/s saturation used for the
+// display value and snow coupling (winds above 30 read as full strength; the vector cap is 80).
+function simulateTerrainWind(inp,p={},context={}){
+  const n=context.res||RES,N=n*n,def=context.terrainDef||terrainDef;
+  const direction=def.windDirection==null?300:def.windDirection;
+  const baseSpeed=clamp(def.windSpeed==null?10:def.windSpeed,0,WIND_MAX_MPS);
+  const[baseU,baseV]=windBearingVector(direction),cell=(def.scale||5000)/n;
+  const baseM=metricHeightField(inp&&inp.length===N?inp:new Float32Array(N),n,def);
+  const speedUp=clamp(p.speedUp==null?.65:p.speedUp,0,1.5);
+  const shelterAmount=clamp(p.shelter==null?.7:p.shelter,0,1);
+  const channeling=clamp(p.channeling==null?.55:p.channeling,0,1);
+  const reachM=clamp(p.reach==null?1500:p.reach,Math.max(cell,50),Math.max(cell,def.scale||5000));
+  const maxD=Math.max(1,Math.min(n*.75,reachM/cell)),steps=Math.min(26,Math.max(8,Math.round(Math.sqrt(n))));
+  const distances=[];let last=0;
+  for(let k=1;k<=steps;k++){
+    const d=Math.max(1,Math.round(Math.exp(Math.log(maxD+1)*k/steps)-1));
+    if(d!==last){distances.push(d);last=d;}
+  }
+  const channelRadius=Math.max(1,Math.min(n>>3,Math.round(Math.min(400,(def.scale||5000)*.07)/cell)));
+  const structure=channeling>0?blurScalarField(baseM,n,channelRadius,2):baseM;
+  const u0=new Float32Array(N),v0=new Float32Array(N),speed0=new Float32Array(N);
+  const tanLow=Math.tan(3*Math.PI/180),tanHigh=Math.tan(15*Math.PI/180);
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=y*n+x,xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
+    const gx=(baseM[y*n+xp]-baseM[y*n+xm])/Math.max(cell*(xp-xm),cell);
+    const gy=(baseM[yp*n+x]-baseM[ym*n+x])/Math.max(cell*(yp-ym),cell);
+    let lift=baseU*gx+baseV*gy;
+    // Crest carry: Jackson & Hunt's fractional speed-up peaks AT the hill top, but grad(h)=0
+    // there, so the raw max(0, upwindSlope) form leaves the ridge line a 1-3 cell band of
+    // exactly unaccelerated air bracketed by 22 and 5 m/s (measured; 13's own pseudocode has
+    // the same defect - upstream note filed). Carry the windward face's lift onto the crest by
+    // sampling the gradient ~2 cells upwind and keeping the larger.
+    {
+      const dCarry=clamp(Math.round(60/cell),1,8),ux2=Math.round(x-baseU*dCarry),uy2=Math.round(y-baseV*dCarry);
+      if(ux2>=1&&uy2>=1&&ux2<n-1&&uy2<n-1){
+        const gxu=(baseM[uy2*n+ux2+1]-baseM[uy2*n+ux2-1])/(2*cell);
+        const gyu=(baseM[(uy2+1)*n+ux2]-baseM[(uy2-1)*n+ux2])/(2*cell);
+        lift=Math.max(lift,baseU*gxu+baseV*gyu);
+      }
+    }
+    let localSpeed=baseSpeed*(1+speedUp*Math.tanh(2.5*Math.max(0,lift)));
+    if(shelterAmount>0&&baseSpeed>0){
+      let horizon=-Infinity;
+      for(const d of distances){
+        const sx=x-baseU*d,sy=y-baseV*d;
+        if(sx<0||sy<0||sx>=n-1||sy>=n-1)break;
+        horizon=Math.max(horizon,(sampleGridBilinear(baseM,n,sx,sy)-baseM[i])/(d*cell));
+      }
+      const shadow=smooth(clamp((horizon-tanLow)/Math.max(1e-6,tanHigh-tanLow),0,1));
+      localSpeed*=1-.75*shelterAmount*shadow;
+    }
+    let dirU=baseU,dirV=baseV;
+    if(channeling>0&&x>0&&x<n-1&&y>0&&y<n-1){
+      const a=structure[i-1]-2*structure[i]+structure[i+1];
+      const c=structure[i-n]-2*structure[i]+structure[i+n];
+      const b=(structure[i+n+1]-structure[i+n-1]-structure[i-n+1]+structure[i-n-1])*.25;
+      const disc=Math.hypot(a-c,2*b),hi=(a+c+disc)*.5,lo=(a+c-disc)*.5;
+      if(hi>0){
+        let ax=b,ay=lo-a,norm=Math.hypot(ax,ay);
+        if(norm<1e-7){if(Math.abs(a)>Math.abs(c)){ax=0;ay=1;}else{ax=1;ay=0;}norm=1;}
+        ax/=norm;ay/=norm;if(ax*baseU+ay*baseV<0){ax=-ax;ay=-ay;}
+        const crossRelief=hi*channelRadius*channelRadius;
+        const confinement=smooth(clamp(crossRelief/Math.max(1,(def.height||2600)*.005),0,1));
+        const w=channeling*confinement;
+        dirU=lerp(baseU,ax,w);dirV=lerp(baseV,ay,w);
+        const q=Math.hypot(dirU,dirV)||1;dirU/=q;dirV/=q;
+      }
+    }
+    speed0[i]=localSpeed;u0[i]=dirU*localSpeed;v0[i]=dirV*localSpeed;
+  }
+  const divergenceRmsBefore=windDivergenceRms(u0,v0,n,cell);
+  const projected=p.consistency==="off"?{u:u0,v:v0}
+    :projectWindMassConsistent(u0,v0,n,cell,Math.min(96,Math.max(36,Math.round(Math.sqrt(n)*6))));
+  const u=projected.u,v=projected.v,speed=new Float32Array(N),encoded=new Float32Array(N);
+  // The cap is part of the VECTOR contract: clamp u,v together with speed, or every consumer
+  // deriving a unit direction as (u/speed, v/speed) gets a "unit" vector up to 1.875 long
+  // (review: snow's saltation walk stepped 2 cells per step - the documented ~30 m reach
+  // silently became ~60 - and the HUD read 150 m/s against a display field saying 80).
+  for(let i=0;i<N;i++){let sp=Math.hypot(u[i],v[i]);
+    if(sp>WIND_MAX_MPS){const f2=WIND_MAX_MPS/sp;u[i]*=f2;v[i]*=f2;sp=WIND_MAX_MPS;}
+    speed[i]=sp;encoded[i]=sp/WIND_MAX_MPS;}
+  const divergenceRmsAfter=windDivergenceRms(u,v,n,cell);
+  return{u,v,speed,encoded,heightM:baseM,baseDirection:direction,baseSpeed,
+    divergenceRmsBefore,divergenceRmsAfter,simulationResolution:n};
+}
+function evaluateTerrainWind(inp,p={}){
+  const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
+  if(preview===full)return simulateTerrainWind(inp,p,{res:full,terrainDef});
+  const result=simulateTerrainWind(resampleField(inp,full,preview),p,{res:preview,terrainDef});
+  const u=resampleField(result.u,preview,full),v=resampleField(result.v,preview,full);
+  const speed=new Float32Array(full*full),encoded=new Float32Array(full*full);
+  for(let i=0;i<speed.length;i++){speed[i]=Math.min(WIND_MAX_MPS,Math.hypot(u[i],v[i]));encoded[i]=speed[i]/WIND_MAX_MPS;}
+  return{...result,u,v,speed,encoded,simulationResolution:preview,fullResolution:full};
+}
+function windColorField(wind,n){
+  if(!wind||!wind.u||wind.u.length!==n*n)return null;
+  const out=new Float32Array(n*n*3);
+  for(let i=0;i<n*n;i++){
+    const angle=(Math.atan2(wind.v[i],wind.u[i])/(Math.PI*2)+1)%1;
+    const h=angle*6,k=~~h,f=h-k,q=1-f;
+    const rgb=[[1,f,0],[q,1,0],[0,1,f],[0,q,1],[f,0,1],[1,0,q]][k%6];
+    const value=.28+.72*clamp(wind.speed[i]/30,0,1),j=i*3;
+    out[j]=rgb[0]*value;out[j+1]=rgb[1]*value;out[j+2]=rgb[2]*value;
+  }
+  return out;
+}
 // A transient SnowField in WORLD METRES. Fearing 2000 separates placement from stability;
 // Cordonnier et al. 2018 add temperature/sun-driven melt and relax snow over the combined
 // terrain + snow surface. The grid relaxation below is the heightfield form of those small,
@@ -3256,25 +3497,36 @@ function simulateSnowLayer(inp,p={},context={}){
   //    SHELTERED zone: here each scoured parcel walks downwind to the first cell where the surface
   //    stops rising into the wind (just past the local drift crest), capped at ~30 m of reach.
   //  - Border: numpy's roll WRAPS, teleporting mass to the far edge; here it stays in place.
+  const physicalWind=context.wind&&context.wind.u&&context.wind.v&&context.wind.speed
+    &&context.wind.u.length===N?context.wind:null;
   const windStrength=clamp(p.windStrength==null?.35:p.windStrength,0,1); // fallback = schema default, same reason as adhesion
-  if(windStrength>0){
-    const dirRad=((p.windDirection==null?300:p.windDirection)%360)*Math.PI/180;
-    // "Wind from" bearing, map-relative (0 = from map-top, clockwise). Blowing-toward vector:
-    const wx=-Math.sin(dirRad),wy=Math.cos(dirRad);
-    // sign*round(abs), NOT Math.round: JS rounds half UP, so Math.round(0.5)=1 but
-    // Math.round(-0.5)=-0, and mirrored bearings (240 vs 300) would transport on different axes.
-    const dj=Math.sign(wx)*Math.round(Math.abs(wx)),di=Math.sign(wy)*Math.round(Math.abs(wy));
+  if(physicalWind||windStrength>0){
+    const fallback=windBearingVector(p.windDirection==null?300:p.windDirection);
+    let eventStrength=windStrength;
+    if(physicalWind){
+      // p95, not max: with max, ONE gusty cell (a DEM spike, a single channeled throat) doubles
+      // the event duration of the entire map (measured: injecting one 40 m/s cell into a calm
+      // 6 m/s field took the pass count 4 -> 8). The /30 saturation is the documented snow
+      // coupling scale - winds above 30 m/s all read as a full-strength event.
+      const smp=[];for(let i=0;i<N;i+=7)smp.push(physicalWind.speed[i]);
+      smp.sort((a2,b2)=>a2-b2);
+      eventStrength=clamp(smp[Math.min(smp.length-1,(smp.length*0.95)|0)]/30,0,1);
+    }
     // The walk cap is a DISTANCE (~30 m of saltation reach along a cardinal; ~42 m diagonal, an
     // accepted stretch), not a cell count, so cornice scale does not depend on the sim grid.
     const walkCap=clamp(Math.round(30/cell),2,24);
     // Pass count is the event-duration proxy: with the transportable layer capped per pass, a
     // fixed 3 passes moves the same volume at every strength and the slider only reshapes WHERE
     // it goes. Strength now scales both the per-pass rate and how long the event blows (3-8).
-    const windPasses=Math.round(3+5*windStrength);
-    const wRate=.45*windStrength,scour=new Float32Array(N),expo=new Float32Array(N);
+    const windPasses=Math.round(3+5*eventStrength);
+    const scour=new Float32Array(N),expo=new Float32Array(N);
     for(let pass=0;pass<windPasses;pass++){
       for(let y=0;y<n;y++)for(let x=0;x<n;x++){
         const i=y*n+x;
+        const s=physicalWind?physicalWind.speed[i]:1;
+        const wx=physicalWind&&s>1e-6?physicalWind.u[i]/s:fallback[0];
+        const wy=physicalWind&&s>1e-6?physicalWind.v[i]/s:fallback[1];
+        const localStrength=physicalWind?clamp(s/30,0,1):windStrength,wRate=.45*localStrength;
         const xm=Math.max(0,x-1),xp=Math.min(n-1,x+1),ym=Math.max(0,y-1),yp=Math.min(n-1,y+1);
         const sx=(baseM[y*n+xp]+depthM[y*n+xp]-baseM[y*n+xm]-depthM[y*n+xm])/((xp-xm)*cell);
         const sy=(baseM[yp*n+x]+depthM[yp*n+x]-baseM[ym*n+x]-depthM[ym*n+x])/((yp-ym)*cell);
@@ -3287,6 +3539,13 @@ function simulateSnowLayer(inp,p={},context={}){
       }
       for(let y=0;y<n;y++)for(let x=0;x<n;x++){
         const i=y*n+x,q=scour[i];if(q<=0)continue;
+        const s=physicalWind?physicalWind.speed[i]:1;
+        const wx=physicalWind&&s>1e-6?physicalWind.u[i]/s:fallback[0];
+        const wy=physicalWind&&s>1e-6?physicalWind.v[i]/s:fallback[1];
+        // sign*round(abs), NOT Math.round: JS rounds half UP, so Math.round(0.5)=1 but
+        // Math.round(-0.5)=-0, and mirrored bearings would transport on different axes.
+        let dj=Math.sign(wx)*Math.round(Math.abs(wx)),di=Math.sign(wy)*Math.round(Math.abs(wy));
+        if(!dj&&!di){if(Math.abs(wx)>=Math.abs(wy))dj=Math.sign(wx)||1;else di=Math.sign(wy)||1;}
         // Walk downwind to shelter: the first cell no longer rising into the wind, i.e. just past
         // the local drift crest. If nothing shelters within the cap, drop at the cap (suspension
         // limit). Off-grid at any step: mass stays where it is (no wrap).
@@ -3311,20 +3570,24 @@ function simulateSnowLayer(inp,p={},context={}){
   return{depthM,baseM,temperatureC,solarExposure:context.solarExposure||solar.exposure,solarShadow:context.solarShadow||solar.shadow,
     volumeM3,depositedM3,meltedM3,preAvalancheM3,movedM3,maxDepthM,
     coverage:covered/N,iterationsRun,cellSizeM:cell,equator:[...eq],
-    sunElevationDeg:solar.sunElevationDeg,simulationResolution:n};
+    sunElevationDeg:solar.sunElevationDeg,simulationResolution:n,windSource:physicalWind?"field":"fallback"};
 }
 // Keep live 1K–4K authoring bounded without changing the physical grid scale: avalanche stability is
 // solved on a 512² preview field (cell size follows that field), then only the transient depth is
 // reconstructed at working resolution. Final quality intentionally removes the cap.
-function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExposure=null){
+function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExposure=null,wind=null){
   const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
-  if(preview===full)return simulateSnowLayer(inp,p,{temperatureC:temperatureField,solarShadow,solarExposure});
+  if(preview===full)return simulateSnowLayer(inp,p,{temperatureC:temperatureField,solarShadow,solarExposure,wind});
   const small=resampleField(inp,full,preview);
   const smallTemp=temperatureField?resampleField(temperatureField,full,preview):null;
   const smallShadow=solarShadow?resampleField(solarShadow,full,preview):null;
   const smallExposure=solarExposure?resampleField(solarExposure,full,preview):null;
+  let smallWind=null;
+  if(wind)smallWind={...wind,u:resampleField(wind.u,full,preview),v:resampleField(wind.v,full,preview),
+    speed:resampleField(wind.speed,full,preview)};
   const layer=simulateSnowLayer(small,p,{res:preview,terrainDef,quality:BUILD_QUALITY,
-    resScale:SCALE_RES?preview/REF_RES:1,temperatureC:smallTemp,solarShadow:smallShadow,solarExposure:smallExposure});
+    resScale:SCALE_RES?preview/REF_RES:1,temperatureC:smallTemp,solarShadow:smallShadow,
+    solarExposure:smallExposure,wind:smallWind});
   layer.depthM=resampleField(layer.depthM,preview,full);
   layer.temperatureC=resampleField(layer.temperatureC,preview,full);
   layer.solarExposure=resampleField(layer.solarExposure,preview,full);
@@ -3512,11 +3775,11 @@ function hydroFixField(inp,p){
    ===================================================================== */
 const P={
   slider:(key,label,min,max,def,step=0.01,fmt)=>({key,label,type:"slider",min,max,def,step,fmt}),
-  // Logarithmic slider for quantities whose useful range spans decades (snowfall: a dusting is
-  // 0.05 m, a heavy winter 10 m - on a linear 0-20 m track everything interesting lives in the
-  // first few pixels). `floor` is the smallest non-zero value; position 0 is exactly zero when
-  // `zero` is set. The value stored in params is always the REAL quantity, so serialisation,
-  // digests and every consumer are unaffected by how the track is warped.
+  // Logarithmic slider for quantities whose useful range spans ratios or decades (snowfall: a
+  // dusting is 0.05 m and a heavy winter 10 m; a DEM height multiplier may span 0.01x-100x).
+  // `floor` is the smallest non-zero value; position 0 is exactly zero when `zero` is set. The
+  // value stored in params is always the REAL quantity, so serialisation, digests and every
+  // consumer are unaffected by how the track is warped.
   log:(key,label,floor,max,def,fmt,zero=true)=>({key,label,type:"slider",scale:"log",floor,max,def,fmt,zero,min:0,step:.0025}),
   number:(key,label,min,max,def,step=0.01,unit="",fmt)=>({key,label,type:"number",min,max,def,step,unit,fmt}),
   int:(key,label,min,max,def)=>({key,label,type:"slider",min,max,def,step:1,fmt:v=>v|0}),
@@ -3593,7 +3856,7 @@ const TYPES={
     eval:(p)=>shapeField(p)},
   drawmask:{cat:"mask",name:"Draw Mask",ins:["Reference"],referenceOnly:[0],desc:"Paint resolution-independent roads, corridors, and regions as editable vector brush strokes. The optional Reference input is shown beneath the drawing; the output is a reusable mask.",
     params:[],eval:(p,ins,nd)=>{nd._reference=ins[0]||null;return drawMaskField(p);},
-    note:"Draw Mask outputs a regular 0–1 field, so it can drive any Mask input. For a road, connect the pre-road terrain to <b>Reference</b>, draw the corridor, then wire the mask into <b>Sculpt</b> (Smooth/Flatten/Lower), Blur, Blend, or Stamp. Strokes are vectors in terrain space rather than pixels, so 512² authoring survives a 4K build."},
+    note:"Draw Mask outputs a reusable 0–1 region field and may fan out to any number of Mask inputs. For an authored biome, use one Draw Mask for that region and connect it to its masked <b>SatMap</b>, <b>Temperature Modify</b>, and—when regional circulation differs—<b>Wind Modify</b>; material and climate then share the same footprint. For a road, connect the pre-road terrain to <b>Reference</b>, draw the corridor, then wire the mask into Sculpt, Blur, Blend, or Stamp. Strokes are vectors in terrain space rather than pixels, so 512² authoring survives a 4K build."},
   mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A cellular geological primitive: Mountain creates a hero landform from distorted, modulated Voronoi structure; Mountain range creates a broader multi-crest base. Five mountain types change the generating geometry as well as its weathering.",
     params:[P.tabs("form","Landform",[["peak","Mountain"],["massif","Mountain range"]],"peak"),
       WHEN(P.seg("shape","Shape family",[["dominant","Dominant peak"],["compound","Compound peaks"],["ridge","Ridgeline"],["broad","Broad dome"]],"compound"),"form","peak"),
@@ -3661,7 +3924,10 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
     params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
   import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
-    params:[P.slider("scale","Height",0,1,1)],
+    // Keep the stable `scale` key: old documents retain their exact real multiplier while the
+    // logarithmic track makes attenuation and amplification equally addressable around 1x.
+    params:[P.log("scale","Height multiplier",.01,100,1,
+      v=>(v<.1?v.toFixed(2):v<10?v.toFixed(1):v.toFixed(0))+"\u00d7",false)],
     eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==RES*RES)&&(node._demImg||node._demRaw))buildDemFromSource(node);
       if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
@@ -3703,6 +3969,15 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   terrace:{cat:"filt",name:"Terrace",ins:["In","Mask"],desc:"Snap to stratified benches.",
     params:[P.int("steps","Steps",2,24,8),P.slider("sharp","Sharpness",0,1,0.6)],
     eval:(p,ins)=>ins[0]?maskApply(ins[0],terraceField(ins[0],p),ins[1]):newField()},
+  normalizen:{cat:"filt",name:"Normalize",ins:["In","Mask"],desc:"Remap the field minimum to 0 and maximum to 1, optionally through a biome mask.",
+    params:[P.slider("amount","Amount",0,1,1,.01)],
+    eval:(p,ins)=>{
+      if(!ins[0])return newField();
+      const base=ins[0],normal=normalize(base);
+      if(p.amount<1)for(let i=0;i<normal.length;i++)normal[i]=lerp(base[i],normal[i],p.amount);
+      return maskApply(base,normal,ins[1]);
+    },
+    note:"The range is measured over the whole input field, then blended through <b>Mask</b>: black preserves the original height, white applies the normalized height, and grey makes a soft transition. Keeping range measurement independent of the mask prevents biome borders from changing the normalization whenever their falloff is edited."},
   levels:{cat:"filt",name:"Levels",ins:["In"],desc:"Clip range + gamma + output range.",
     params:[P.slider("inLo","In low",0,1,0),P.slider("inHi","In high",0,1,1),P.slider("gamma","Gamma",0.2,3,1),
       P.slider("outLo","Out low",0,1,0),P.slider("outHi","Out high",0,1,1)],
@@ -3767,7 +4042,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.tabs("realScale","Units",[["off","Cell units"],["on","Real scale"]],"on"),
       WHEN(P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),"realScale","on"),
       WHEN(P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),"realScale","off"),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
-      P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
+      P.log("feat","Feature scale",1,8,1,v=>v.toFixed(1)+"\u00d7",false)],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     // Real Scale ON: `repose` is a true angle, so the per-cell drop is tan(angle) * cellSize / height
     // — physically meaningful AND inherently resolution independent (it already carries the 1/RES).
@@ -3844,7 +4119,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       // the corpus default of 2; verified bit-identical to the old output only when forced to NaN.
       WHEN(P.slider("radius","Brush radius",1,5,2,1,v=>(v|0)+" px"),"engine","droplets"),
       WHEN(P.seed("seed","Seed",1),"engine","droplets"),
-      P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
+      P.log("feat","Feature scale",1,8,1,v=>v.toFixed(1)+"\u00d7",false)],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     const usePipes=p.engine!=="droplets"&&gpuReady();
     // Interactive tier = a FULL-QUALITY simulation on a capped grid (<= 384), its delta
@@ -3962,7 +4237,66 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       return tagTemperatureField(out,outC,{solarShadow:nd._solarShadow,solarExposure:nd._solarExposure,
         lapseRate:meta.lapseRate,heightField:meta.heightField});
     },
-    note:"Temperature Modify requires a physical Temperature field. <b>Offset</b> adds or removes degrees; <b>Set</b> approaches an absolute temperature; <b>Minimum</b> only heats colder cells; <b>Maximum</b> only cools warmer cells. Driver is a 0–1 spatial footprint, Mask confines the edit, and both multiply Amount. A future Lava simulation can output a heat footprint into Driver—or emit a temperature field directly—without special cases in Snow, ice, biome selection, or the viewport."},
+    note:"Temperature Modify requires a physical Temperature field. <b>Offset</b> adds or removes degrees; <b>Set</b> approaches an absolute temperature; <b>Minimum</b> only heats colder cells; <b>Maximum</b> only cools warmer cells. Driver is a 0–1 spatial footprint, Mask confines the edit, and both multiply Amount. For authored climate regions, reuse the same Draw Mask that feeds the biome's SatMap layer: Set/Maximum can force an arctic cap, while Set/Minimum can force a hot desert. Chain regional edits over one global Temperature field so Snow and Water consume the final shared climate. A future Lava simulation can output a heat footprint into Driver—or emit a temperature field directly—without special cases in Snow, ice, biome selection, or the viewport."},
+  d_wind:{cat:"data",name:"Wind",ins:["Height"],desc:"Builds a physical horizontal wind-vector field from Terrain Definition's prevailing wind, then adjusts it for windward speed-up, lee shelter, and valley channeling.",
+    params:[P.slider("speedUp","Crest speed-up",0,1.5,.65,.05,v=>v.toFixed(2)+"×"),
+      P.slider("shelter","Lee shelter",0,1,.7,.05,v=>Math.round(v*100)+"%"),
+      P.slider("channeling","Valley channeling",0,1,.55,.05,v=>Math.round(v*100)+"%"),
+      P.slider("reach","Terrain reach",100,5000,1500,25,v=>Math.round(v)+" m"),
+      P.seg("consistency","Mass consistency",[["on","On"],["off","Off"]],"on")],
+    eval:(p,ins,nd)=>{
+      const h=ins[0]||newField(),wind=evaluateTerrainWind(h,p);nd._wind=wind;
+      return tagWindField(wind.encoded,wind.u,wind.v,wind.speed,{heightField:h,
+        baseDirection:wind.baseDirection,baseSpeed:wind.baseSpeed,
+        divergenceRmsBefore:wind.divergenceRmsBefore,divergenceRmsAfter:wind.divergenceRmsAfter});
+    },
+    note:"Prevailing direction and speed belong to <b>Terrain Definition</b>, because air crosses biome borders. Wind modifies that regional flow using the heightfield: slopes and crests accelerate wind, upwind relief shelters lee cells, and concave relief turns flow toward valley axes. <b>Mass consistency</b> removes artificial sources and sinks with a bounded Helmholtz–Hodge projection; it is a terrain-climate approximation, not CFD. The scalar thumbnail shows speed, while Display → Wind shows direction as hue and speed as brightness."},
+  d_windmodify:{cat:"data",name:"Wind Modify",ins:["Wind","Driver","Mask"],desc:"Sets a regional wind direction and speed inside a biome, weather, or authored mask while preserving the physical vector field outside it.",
+    params:[P.slider("direction","Target wind from",0,359,300,1,v=>(v|0)+"° map"),
+      P.slider("speed","Target speed",0,60,10,.5,v=>v.toFixed(1)+" m/s"),
+      P.slider("amount","Amount",0,1,1,.01,v=>Math.round(v*100)+"%"),
+      // Project (default): mass consistency survives the override, at the cost of flow bleeding
+      // across the mask seam (a hard half-map override measured -22% on the far side - that IS
+      // conservation talking). Preserve exactly: the authored values hold to 1e-3 everywhere,
+      // and the divergence the seam introduces (+39% measured) is knowingly kept.
+      P.tabs("consistency","Mass consistency",[["on","Project"],["off","Preserve exactly"]],"on")],
+    eval:(p,ins,nd)=>{
+      const base=ins[0],meta=windVectorFromField(base);
+      if(!meta){
+        nd._wind=null;nd._inputError=base?"Wind input requires a physical Wind field":"Connect a Wind field";
+        return newField();
+      }
+      nd._inputError=null;
+      const source=ins[1],mask=ins[2],N=base.length,u=new Float32Array(N),v=new Float32Array(N);
+      const speed=new Float32Array(N),encoded=new Float32Array(N),target=windBearingVector(p.direction);
+      for(let i=0;i<N;i++){
+        const w=clamp((source?source[i]:1)*(mask?mask[i]:1)*(p.amount==null?1:p.amount),0,1);
+        const s0=meta.speed[i],a0=s0>1e-6?Math.atan2(meta.v[i],meta.u[i]):Math.atan2(target[1],target[0]);
+        const a1=Math.atan2(target[1],target[0]),da=Math.atan2(Math.sin(a1-a0),Math.cos(a1-a0));
+        const a=a0+da*w,s=lerp(s0,p.speed,w);
+        u[i]=Math.cos(a)*s;v[i]=Math.sin(a)*s;speed[i]=s;encoded[i]=s/WIND_MAX_MPS;
+      }
+      // The override reintroduces divergence at every mask seam (+39% measured at a hard
+      // half-map mask - the exact biome workflow the note prescribes), so RE-PROJECT after the
+      // blend: mass consistency must survive regional editing. The diagnostics are stamped with
+      // THIS projection's before/after - the first version stamped before=inherited and
+      // after=post-override, an inverted signal under the shared key names.
+      const n2=Math.round(Math.sqrt(N)),cell=terrainDef.scale/n2;
+      const before=windDivergenceRms(u,v,n2,cell);
+      const doProject=p.consistency!=="off";
+      const proj=doProject?projectWindMassConsistent(u,v,n2,cell,Math.min(96,Math.max(36,Math.round(Math.sqrt(n2)*6)))):{u,v};
+      const uP=proj.u,vP=proj.v;
+      for(let i=0;i<N;i++){let sp=Math.hypot(uP[i],vP[i]);
+        if(sp>WIND_MAX_MPS){const f2=WIND_MAX_MPS/sp;uP[i]*=f2;vP[i]*=f2;sp=WIND_MAX_MPS;}
+        speed[i]=sp;encoded[i]=sp/WIND_MAX_MPS;}
+      const after=windDivergenceRms(uP,vP,n2,cell);
+      nd._wind={u:uP,v:vP,speed,encoded,baseDirection:meta.baseDirection,baseSpeed:meta.baseSpeed,
+        divergenceRmsBefore:before,divergenceRmsAfter:after,simulationResolution:n2};
+      return tagWindField(encoded,uP,vP,speed,{heightField:meta.heightField,
+        baseDirection:meta.baseDirection,baseSpeed:meta.baseSpeed,
+        divergenceRmsBefore:before,divergenceRmsAfter:after});
+    },
+    note:"Use this for a regional circulation override, not as a property baked into a SatMap. Reuse the biome's Draw Mask in <b>Mask</b>, set its local wind, and chain further Wind Modify nodes for other regions. Direction follows the shortest angular path through soft mask edges, so an ecotone rotates the flow rather than snapping it."},
   d_curvature:{cat:"data",name:"Curvature",ins:["In"],desc:"Zevenbergen–Thorne curvature: convex ridges/lips vs concave valley floors (0.5 = flat).",
     params:[P.seg("kind","Kind",[["profile","Profile"],["plan","Plan"],["mean","Mean"]],"profile"),
       P.slider("strength","Strength",0.1,4,1,0.1)],
@@ -4002,7 +4336,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       GROUP(P.slider("foam","Shore foam",0,1,.18,.01),"Shoreline")],
     eval:(p,ins)=>ins[0]||newField(),
     note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br>The optional <b>Temperature</b> input controls phase locally: standing water freezes cell by cell, independent of whether a Snow node exists. Without it, the clearly labelled fallback climate in Terrain Definition is used. <b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
-  snow:{cat:"effect",name:"Snow",ins:["In","Temperature"],desc:"A transient snow-depth layer in metres: snowfall accumulates, sun and temperature melt it, and avalanches move it from steep faces into gullies and hollows. Liquid water excludes snow; frozen standing water can receive it.",
+  snow:{cat:"effect",name:"Snow",ins:["In","Temperature","Wind"],desc:"A transient snow-depth layer in metres: snowfall accumulates, sun and temperature melt it, avalanches settle it, and an optional physical Wind field scours windward faces into lee cornices.",
     passthrough:true,effect:"snow",
     params:[GROUP(P.log("snowfall","Snowfall",.02,20,3,v=>v<.995?(v*100).toFixed(0)+" cm":v.toFixed(2)+" m"),"Accumulation"),
       GROUP(P.slider("meltDays","Melt period",0,120,45,1,v=>(v|0)+" days"),"Climate & melt"),
@@ -4011,15 +4345,17 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       GROUP(P.slider("adhesion","Adhesion depth",0,2,.6,.05,v=>v.toFixed(2)+" m"),"Avalanche & settling"),
       GROUP(P.int("iterations","Settling iterations",0,80,12),"Avalanche & settling"),
       GROUP(P.slider("settle","Settling rate",.1,1,.55,.05,v=>v.toFixed(2)),"Avalanche & settling"),
-      GROUP(P.slider("windStrength","Wind strength",0,1,.35,.05,v=>v.toFixed(2)),"Wind"),
-      GROUP(P.slider("windDirection","Wind from",0,360,300,5,v=>(v|0)+"° map"),"Wind")],
+      GROUP(P.slider("windStrength","Fallback wind strength",0,1,.35,.05,v=>v.toFixed(2)),"Wind"),
+      GROUP(P.slider("windDirection","Fallback wind from",0,360,300,5,v=>(v|0)+"° map"),"Wind")],
     eval:(p,ins,nd)=>{
       const h=ins[0]||newField(),meta=fieldMetadata(ins[1])||{};
-      const temperature=temperatureCFromField(ins[1]);
-      nd._inputError=ins[1]&&!temperature?"Temperature input requires a physical Temperature field":null;
-      nd._snowLayer=evaluateSnowLayer(h,p,temperature,meta.solarShadow,meta.solarExposure);return h;
+      const temperature=temperatureCFromField(ins[1]),wind=windVectorFromField(ins[2]),errors=[];
+      if(ins[1]&&!temperature)errors.push("Temperature input requires a physical Temperature field");
+      if(ins[2]&&!wind)errors.push("Wind input requires a physical Wind field");
+      nd._inputError=errors.length?errors.join(" · "):null;
+      nd._snowLayer=evaluateSnowLayer(h,p,temperature,meta.solarShadow,meta.solarExposure,wind);return h;
     },
-    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. The renderer composes that thickness into a solid-surface heightfield, including above frozen water, so lighting, picking, and visible elevation follow the snow top. The underlying terrain output stays unchanged until an explicit bake/export-surface workflow is requested. <b>Snowfall</b> is settled vertical depth; precipitation transitions from rain to snow around freezing, and <b>degree-day melt</b> removes snow above 0 °C. The Temperature input consumes the final physical field wired into it—including Temperature Modify, a valid temperature Blend, Blur, or future Lava processing. Without one, Terrain Definition's fallback climate is used.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle, and transports only the surplus above a slope- and roughness-dependent <b>Adhesion depth</b> — the snow that clings to ledges and rough ground. Ridges and spurs therefore hold cover, cliffs thin to streaks rather than stripping bare, and snow COVERAGE no longer depends on iteration count or build quality (drift depths keep maturing with more iterations; only the covered/bare classification is convergent). <b>Wind</b> then scours windward brows and loads the first lee cells — cornices — and deliberately is not re-relaxed afterwards, since a cornice is an over-steepened lee deposit by definition. The implementation follows the placement/stability split of Fearing (2000) and the five-step accumulate/melt/shed/avalanche/wind model of Cordonnier et al. (2018); adhesion magnitude and its micro-roughness modulation are authored controls, not corpus constants."},
+    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. The renderer composes that thickness into a solid-surface heightfield, including above frozen water, so lighting, picking, and visible elevation follow the snow top. The underlying terrain output stays unchanged until an explicit bake/export-surface workflow is requested. <b>Snowfall</b> is settled vertical depth; precipitation transitions from rain to snow around freezing, and <b>degree-day melt</b> removes snow above 0 °C. Temperature consumes the final physical field wired into it. Wind consumes the final physical Wind field—including masked Wind Modify regions—and falls back to the local sliders only when no Wind edge exists.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle, and transports only the surplus above a slope- and roughness-dependent <b>Adhesion depth</b> — the snow that clings to ledges and rough ground. Ridges and spurs therefore hold cover, cliffs thin to streaks rather than stripping bare, and snow COVERAGE no longer depends on iteration count. <b>Wind</b> then scours each cell along its local terrain-adjusted vector and loads the first lee cells—cornices—and deliberately is not re-relaxed afterwards. The implementation follows the placement/stability split of Fearing (2000), the five-step accumulate/melt/shed/avalanche/wind model of Cordonnier et al. (2018), and the shared terrain-wind field's Jackson–Hunt / Sherman-family approximation."},
   satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Authors one colour gradient, driven by height, slope, or any field wired into Driver. Chain a masked SatMap over another for a simple overlay, or blend separate SatMap branches in Color Blend for explicit biome composition. Height passes through unchanged.",
     passthrough:true,effect:"satmap",
     params:[P.select("gradient","Gradient",null,"Temperate"),
@@ -4066,7 +4402,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.slider("opacity","Opacity",0,1,1)],
     eval:(p,ins,nd)=>{nd._mask=ins[2]||null;return ins[0]||newField();}},
   colormixer:{cat:"effect",name:"Color Mixer",ins:["Layer 1","Layer 2","Layer 3"],
-    desc:"Ordered color-layer stack with 2–15 dynamic inputs. Each layer has its own opacity and blend method; mask a layer in its upstream SatMap or Color Blend branch. Height passes through from Layer 1.",
+    desc:"Ordered 2–15 layer biome/material stack. Layer 1 is the base; a standalone masked SatMap on a higher layer applies only inside its region, with a world-space edge blend. Height passes through from Layer 1.",
     passthrough:true,effect:"colormixer",params:[],
     eval:(p,ins)=>ins[0]||newField()},
 
@@ -4115,8 +4451,10 @@ function restoreGraph(snap){
     buildProps();drawGraph();updateHistoryButtons();return;
   }
   nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true,
-    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null}));
-  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,...snap.terrainDef};
+    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null,_wind:null}));
+  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={scale:5000,height:2600,baseElevation:0,
+    latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,windDirection:300,windSpeed:10,
+    lattice:"square",...snap.terrainDef};
   H_SCALE=terrainDef.height/terrainDef.scale;
   selected=snap.selectedId==null?null:nodeById(snap.selectedId);
   selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
@@ -4141,10 +4479,11 @@ function makeNode(type,x,y){
   if(historyReady)recordHistory();
   const def=TYPES[type];const p={};def.params.forEach(pr=>p[pr.key]=pr.def);
   const nd={id:uid++,type,x,y,w:type==="colormixer"?190:150,params:p,_field:null,_thumb:null,_dirty:true,_dem:null,
-    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null};
+    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null,_wind:null};
   if(type==="colormixer"){
     nd._inputs=["Layer 1","Layer 2","Layer 3"];
-    nd.params.layers=[{opacity:1,blend:"normal"},{opacity:1,blend:"normal"},{opacity:1,blend:"normal"}];
+    nd.params.layers=[{opacity:1,blend:"normal",edgeBlend:0},{opacity:1,blend:"normal",edgeBlend:0},
+      {opacity:1,blend:"normal",edgeBlend:0}];
   }
   if(type==="drawmask")nd.params.strokes=[];
   if("seed"in p)p.seed=randomSeed();
@@ -4168,7 +4507,15 @@ function collectScene(root){                        // walk the PRIMARY height/e
     }
     if(nd.type==="snow"&&!s.snow){
       const temperatureEdge=inputEdge(nd.id,1),temperatureNode=temperatureEdge&&nodeById(temperatureEdge.from);
-      s.snow={...nd.params,nodeId:nd.id,layer:nd._snowLayer,temperatureField:temperatureNode&&temperatureNode._field||null};
+      const windEdge=inputEdge(nd.id,2),windNode=windEdge&&nodeById(windEdge.from);
+      const windField=windNode&&windVectorFromField(windNode._field)?windNode._field:null;
+      const errors=[];
+      if(temperatureEdge&&!(temperatureNode&&temperatureCFromField(temperatureNode._field)))
+        errors.push("Temperature input requires a physical Temperature field");
+      if(windEdge&&!windField)errors.push("Wind input requires a physical Wind field");
+      nd._inputError=errors.length?errors.join(" · "):null;
+      s.snow={...nd.params,nodeId:nd.id,layer:nd._snowLayer,
+        temperatureField:temperatureNode&&temperatureNode._field||null,windField};
     }
     if(nd.type==="satmap"&&!s.satmap)s.satmap={...nd.params,nodeId:nd.id};
     const e=inputEdge(nd.id,0);nd=e?nodeById(e.from):null;}
@@ -4480,10 +4827,13 @@ function nodeAt(wx,wy){for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],h=no
   if(wx>=nd.x&&wx<=nd.x+nd.w&&wy>=nd.y&&wy<=nd.y+h)return nd;}return null;}
 function portAt(wx,wy){
   const hit=12/view.z;                                        // fixed ~12 px target at every graph zoom
+  let best=null,bestDistance=hit;
   for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],def=TYPES[nd.type];
-    if(def.cat!=="out"){const p=portPos(nd,"out");if(Math.hypot(wx-p.x,wy-p.y)<hit)return{node:nd.id,which:"out"};}
-    for(let s=0;s<nodeInputs(nd).length;s++){const p=portPos(nd,"in",s);if(Math.hypot(wx-p.x,wy-p.y)<hit)return{node:nd.id,which:"in",slot:s};}}
-  return null;
+    if(def.cat!=="out"){const p=portPos(nd,"out"),d=Math.hypot(wx-p.x,wy-p.y);
+      if(d<bestDistance){bestDistance=d;best={node:nd.id,which:"out"};}}
+    for(let s=0;s<nodeInputs(nd).length;s++){const p=portPos(nd,"in",s),d=Math.hypot(wx-p.x,wy-p.y);
+      if(d<bestDistance){bestDistance=d;best={node:nd.id,which:"in",slot:s};}}}
+  return best;
 }
 
 /* ---- interaction ---- */
@@ -4781,10 +5131,11 @@ function select(nd){
 }
 function buildEdgeProps(body,title,sub,sw,edge){
   const from=nodeById(edge.from),to=nodeById(edge.to),input=nodeInputs(to)[edge.slot]||("Input "+(edge.slot+1));
-  const field=from&&from._field,temperatureC=temperatureCFromField(field),values=temperatureC||field;let min=Infinity,max=-Infinity,mean=0,coverage=0;
-  if(values&&values.length){for(let i=0;i<values.length;i++){const v=values[i];min=Math.min(min,v);max=Math.max(max,v);mean+=v;if(!temperatureC&&v>.5)coverage++;}
+  const field=from&&from._field,temperatureC=temperatureCFromField(field),wind=windVectorFromField(field);
+  const values=temperatureC||wind&&wind.speed||field;let min=Infinity,max=-Infinity,mean=0,coverage=0;
+  if(values&&values.length){for(let i=0;i<values.length;i++){const v=values[i];min=Math.min(min,v);max=Math.max(max,v);mean+=v;if(!temperatureC&&!wind&&v>.5)coverage++;}
     mean/=values.length;coverage/=values.length;}else{min=max=mean=coverage=0;}
-  const stat=v=>temperatureC?v.toFixed(1)+"°C":v.toFixed(2);
+  const stat=v=>temperatureC?v.toFixed(1)+"°C":wind?v.toFixed(1)+" m/s":v.toFixed(2);
   title.firstChild.textContent="Connection";sub.textContent=(from?TYPES[from.type].name:"Missing")+" → "+(to?TYPES[to.type].name:"Missing")+"."+input;
   sw.style.background=edge.disabled?css("--faint"):css("--accent");body.innerHTML="";
   const summary=document.createElement("div");summary.className="edge-summary";
@@ -4832,7 +5183,8 @@ function buildProps(){
       i.oninput=()=>{if(!before)before=graphSnapshot();changed=true;terrainDef[key]=step>=1?Math.round(parseFloat(i.value)):parseFloat(i.value);
         f.querySelector(".val").textContent=show(terrainDef[key]);
         H_SCALE=terrainDef.height/terrainDef.scale;
-        const climateNodes=nodes.filter(n=>n.type==="d_sunshadow"||n.type==="d_temperature"||n.type==="water"||n.type==="snow");
+        const climateNodes=nodes.filter(n=>n.type==="d_sunshadow"||n.type==="d_temperature"
+          ||n.type==="d_wind"||n.type==="d_windmodify"||n.type==="water"||n.type==="snow");
         climateNodes.forEach(n=>{if(n.type==="snow")n._snowLayer=null;markDirtyFrom(n.id);});
         if(climateNodes.length)requestEval();else if(curField)updateViewport(curField);
         tdInfo();syncCompass();};
@@ -4852,6 +5204,8 @@ function buildProps(){
     body.appendChild(mk("solarElevation","Climate sun elevation",3,90,1,v=>Math.round(v)+"°"));
     body.appendChild(mk("latitude","Latitude",-90,90,.5,v=>Math.abs(v).toFixed(1)+"° "+(v<0?"S":v>0?"N":"Equator")));
     body.appendChild(mk("north","Map north",0,359,1,v=>Math.round(v)+"° clockwise from top"));
+    body.appendChild(mk("windDirection","Prevailing wind from",0,359,1,v=>Math.round(v)+"° map"));
+    body.appendChild(mk("windSpeed","Prevailing wind speed",0,60,.5,v=>v.toFixed(1)+" m/s"));
     {
       // Lattice toggle (references/26): square raster or hexagonal (odd-r). Everything is
       // re-evaluated on switch - the seed contract, mesh topology and metric all change.
@@ -4864,7 +5218,8 @@ function buildProps(){
         b2.onclick=()=>{if((terrainDef.lattice||"square")===val)return;
           const before=graphSnapshot();terrainDef.lattice=val;pushUndo(before);
           buildIndex();nodes.forEach(nd=>{nd._dirty=true;nd._thumb=null;});
-          requestEval();buildProps();tdInfo();};
+          requestEval();buildProps();tdInfo();
+          if(!AUTO)toast("Lattice changed — press Build to re-simulate on the new grid");};
         seg.appendChild(b2);
       }
       f.appendChild(seg);
@@ -4938,8 +5293,9 @@ function paramControlsVisibility(type,key){
 }
 function buildColorMixerProps(body){
   const nd=selected;if(!nd._inputs)nd._inputs=["Layer 1","Layer 2","Layer 3"];
-  if(!Array.isArray(nd.params.layers))nd.params.layers=nd._inputs.map(()=>({opacity:1,blend:"normal"}));
-  while(nd.params.layers.length<nd._inputs.length)nd.params.layers.push({opacity:1,blend:"normal"});
+  if(!Array.isArray(nd.params.layers))nd.params.layers=nd._inputs.map(()=>({opacity:1,blend:"normal",edgeBlend:0}));
+  while(nd.params.layers.length<nd._inputs.length)nd.params.layers.push({opacity:1,blend:"normal",edgeBlend:0});
+  nd.params.layers.forEach(cfg=>{if(cfg.edgeBlend==null)cfg.edgeBlend=0;});
   const relabel=()=>{nd._inputs=nd._inputs.map((_,i)=>"Layer "+(i+1));};
   const changed=()=>{relabel();markDirtyFrom(nd.id);buildProps();requestEval();};
   const swap=(a,b)=>{if(b<0||b>=nd._inputs.length)return;recordHistory();
@@ -4965,15 +5321,26 @@ function buildColorMixerProps(body){
       const slider=document.createElement("input");slider.type="range";slider.min=0;slider.max=1;slider.step=.01;slider.value=cfg.opacity==null?1:cfg.opacity;
       let before=null,dirty=false;slider.oninput=()=>{if(!before)before=graphSnapshot();dirty=true;cfg.opacity=+slider.value;lab.textContent="Opacity "+cfg.opacity.toFixed(2);markParamDirty(nd);requestEval();};
       slider.onchange=()=>{if(dirty)pushUndo(before);before=null;dirty=false;};opRow.append(lab,slider);card.appendChild(opRow);
+      const edgeRow=document.createElement("div");edgeRow.className="mix-layer-row";
+      const edgeLabel=document.createElement("span");
+      const formatEdge=v=>v<1000?Math.round(v)+" m":(v/1000).toFixed(2)+" km";
+      edgeLabel.textContent="Edge "+formatEdge(cfg.edgeBlend||0);
+      const edgeSlider=document.createElement("input"),edgeMax=Math.max(terrainDef.scale*.1,cfg.edgeBlend||0,100);
+      edgeSlider.type="range";edgeSlider.min=0;edgeSlider.max=edgeMax;edgeSlider.step=Math.max(1,edgeMax/200);edgeSlider.value=cfg.edgeBlend||0;
+      let edgeBefore=null,edgeDirty=false;edgeSlider.oninput=()=>{if(!edgeBefore)edgeBefore=graphSnapshot();edgeDirty=true;
+        cfg.edgeBlend=+edgeSlider.value;edgeLabel.textContent="Edge "+formatEdge(cfg.edgeBlend);markParamDirty(nd);requestEval();};
+      edgeSlider.onchange=()=>{if(edgeDirty)pushUndo(edgeBefore);edgeBefore=null;edgeDirty=false;};
+      edgeRow.append(edgeLabel,edgeSlider);card.appendChild(edgeRow);
     }
     body.appendChild(card);
   });
   const add=document.createElement("button");add.className="btn";add.style.width="100%";add.disabled=nd._inputs.length>=15;
   add.textContent=nd._inputs.length>=15?"15-layer limit reached":"＋ Add color layer ("+nd._inputs.length+"/15)";
-  add.onclick=()=>{if(nd._inputs.length>=15)return;recordHistory();nd._inputs.push("Layer "+(nd._inputs.length+1));nd.params.layers.push({opacity:1,blend:"normal"});changed();};
+  add.onclick=()=>{if(nd._inputs.length>=15)return;recordHistory();nd._inputs.push("Layer "+(nd._inputs.length+1));
+    nd.params.layers.push({opacity:1,blend:"normal",edgeBlend:0});changed();};
   body.appendChild(add);
   const hint=document.createElement("div");hint.className="hint";hint.style.marginTop="8px";
-  hint.innerHTML="For a per-layer biome mask, feed that layer through a masked <b>SatMap</b> or <b>Color Blend</b> before the Mixer. Layer 1 supplies the height stream.";
+  hint.innerHTML="Layer 1 is the base. A standalone masked <b>SatMap</b> connected to any higher layer is a biome: black preserves the layers below, white applies this layer, and <b>Edge</b> adds a world-space ecotone at the boundary. A Color Blend branch arrives already composited.";
   body.appendChild(hint);
 }
 function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
@@ -4984,7 +5351,9 @@ function tdInfo(){const el=document.getElementById("tdInfo");if(!el)return;
     elevation <b>${Math.round(terrainDef.baseElevation)}…${Math.round(terrainDef.baseElevation+terrainDef.height)} m ASL</b>.<br>
     0 °C freezing level <b>${Math.round(freeze)} m</b>${terrainDef.seaTemp<=0?" (sea level and above)":""} ·
     fallback ${terrainDef.seaTemp.toFixed(1)} °C at sea level, −${terrainDef.lapseRate.toFixed(1)} °C/km ·
-    climate sun <b>${Math.round(terrainDef.solarElevation)}°</b>.<br>
+    climate sun <b>${Math.round(terrainDef.solarElevation)}°</b> · prevailing wind
+    <b>${Math.round(terrainDef.windDirection==null?300:terrainDef.windDirection)}° from</b> at
+    <b>${(terrainDef.windSpeed==null?10:terrainDef.windSpeed).toFixed(1)} m/s</b>.<br>
     <b>${hemi} hemisphere</b> · map north ${Math.round(terrainDef.north||0)}° clockwise from the top edge.<br>
     Scale drives vertical exaggeration and real-scale nodes. Latitude + map north define the
     equator-facing aspect used by solar snowmelt and the viewport compass. Fallback climate is used
@@ -5376,6 +5745,32 @@ function weatherColorField(base,h,p,mask,n,owner){       // exposed relief + she
   return out;
 }
 const inEdgeFrom=(id,slot)=>{const e=inputEdge(id,slot);return e?e.from:null;};
+function primaryColorAuthor(nodeId){
+  const seen=new Set();
+  while(nodeId&&!seen.has(nodeId)){seen.add(nodeId);const nd=nodeById(nodeId);if(!nd)return null;
+    if(nd.type==="satmap"||nd.type==="satmapblend"||nd.type==="colormixer")return nd;
+    nodeId=inEdgeFrom(nodeId,0);}
+  return null;
+}
+// A standalone masked SatMap is a material-layer packet: its RGB is the biome surface and its
+// mask is the layer alpha. Effects/height passthroughs above it preserve that alpha. If a SatMap
+// already has authored colour on its In chain, its mask was consumed there as an ordinary overlay.
+function pendingBiomeMask(nodeId){
+  const seen=new Set();
+  while(nodeId&&!seen.has(nodeId)){seen.add(nodeId);const nd=nodeById(nodeId);if(!nd)return null;
+    if(nd.type==="satmap")return nd._mask&&!primaryColorAuthor(inEdgeFrom(nd.id,0))?nd._mask:null;
+    if(nd.type==="satmapblend"||nd.type==="colormixer")return null;
+    nodeId=inEdgeFrom(nodeId,0);}
+  return null;
+}
+function colorMixerLayerMask(mixer,slot,sourceId,n){
+  const mask=pendingBiomeMask(sourceId);if(!mask)return null;
+  const cfg=(mixer.params.layers||[])[slot]||{},radius=Math.min(n>>2,Math.max(0,Math.round((cfg.edgeBlend||0)/cellSizeM())));
+  if(!radius)return mask;
+  const cache=mixer._biomeMaskCache||(mixer._biomeMaskCache=[]),hit=cache[slot];
+  if(hit&&hit.source===mask&&hit.radius===radius&&hit.n===n)return hit.field;
+  const field=blurScalarField(mask,n,radius,2);cache[slot]={source:mask,radius,n,field};return field;
+}
 // Resolve the per-vertex terrain COLOUR by walking the graph: SatMap authors colour, Color Erosion transports it,
 // Weathering ages it, SatMap Blend merges branches, and height-only nodes pass it through. Height remains a separate
 // field throughout. Returns a colour field, or null if no upstream node has authored colour.
@@ -5396,9 +5791,10 @@ function resolveColor(nodeId,n,memo,guard){
         col=blendFields(base,raw,{_mask:nd._mask,params:{opacity:nd.params.opacity==null?1:nd.params.opacity,blend:nd.params.blendMode||"normal"}},n);}}
     else if(nd.type==="colormixer"){
       const cfg=nd.params.layers||[];
-      for(let s=0;s<nodeInputs(nd).length;s++){const layer=resolveColor(inEdgeFrom(nodeId,s),n,memo,guard);if(!layer)continue;
+      for(let s=0;s<nodeInputs(nd).length;s++){const sourceId=inEdgeFrom(nodeId,s),layer=resolveColor(sourceId,n,memo,guard);if(!layer)continue;
         if(!col)col=layer;else{const q=cfg[s]||{opacity:1,blend:"normal"};
-          col=blendFields(col,layer,{_mask:null,params:{opacity:q.opacity==null?1:q.opacity,blend:q.blend||"normal"}},n);}}
+          col=blendFields(col,layer,{_mask:colorMixerLayerMask(nd,s,sourceId,n),
+            params:{opacity:q.opacity==null?1:q.opacity,blend:q.blend||"normal"}},n);}}
     }
     else if(nd.type==="satmapblend"){const a=resolveColor(inEdgeFrom(nodeId,0),n,memo,guard),b=resolveColor(inEdgeFrom(nodeId,1),n,memo,guard);
       col=(!a&&!b)?null:!a?b:!b?a:blendFields(a,b,nd,n);}
@@ -5410,7 +5806,8 @@ function resolveColor(nodeId,n,memo,guard){
 // across and 2.6 km tall, giving a vertical ratio of height/scale = 0.52. This is what makes cell
 // size (scale/RES) and therefore slope ANGLES physically meaningful, which nodes with "Real Scale"
 // use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
-let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,lattice:"square"};
+let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,
+  solarElevation:45,windDirection:300,windSpeed:10,lattice:"square"};
 const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the centre-to-centre spacing s)
 // Hexagonal lattice mode (references/26-hexagonal-lattice.md). Storage stays the same W x H
 // Float32Array in odd-r offset layout: odd rows are drawn (and sampled) half a cell to the
@@ -5426,7 +5823,7 @@ const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-moti
 // Water extent and snow accumulation are GRAPH NODES. Water motion/refraction is a global renderer
 // concern in `waterLook`; `scene` only collects graph-authored terrain/effect data.
 let scene={water:null,snow:null,satmap:null};
-const SHADE=["Realistic","Clay","Albedo","Slope","Normals","Temperature","Sun Shadow"];
+const SHADE=["Realistic","Clay","Albedo","Slope","Normals","Temperature","Sun Shadow","Wind"];
 function initGL(){
   gl=glc.getContext("webgl2",{antialias:true,alpha:false})||glc.getContext("webgl",{antialias:true,alpha:false});
   if(!gl){$("#viewport").insertAdjacentHTML("beforeend",'<div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:12px">WebGL unavailable</div>');return;}
@@ -5471,6 +5868,7 @@ function initGL(){
       else if(uShade==3)baseSrgb=mix(vec3(.12,.34,.70),vec3(.92,.24,.08),smoothstep(.08,.72,slope));
       else if(uShade==5)baseSrgb=temperatureRamp(vTemp);
       else if(uShade==6)baseSrgb=mix(vec3(.025,.035,.06),vec3(.98,.84,.46),clamp(vSunVis,0.0,1.0));
+      else if(uShade==7)baseSrgb=vCol;
       else baseSrgb=vec3(.5);
       vec3 base=srgbToLinear(baseSrgb);
       float materialView=(uShade==0||uShade==2)?1.0:0.0;
@@ -5497,7 +5895,7 @@ function initGL(){
       float matRough=mix(mix(.84,.62,rockAmt),.62,snowCov);
       if(uDeferred==1){OUT=vec4(clamp(base,0.,1.),matRough);return;}
       // ---- FORWARD fallback (WebGL1 / wireframe): light here with sun + hemispheric sky irradiance ----
-      if(uShade==2||uShade==3||uShade==5||uShade==6){OUT=vec4(linearToSrgb(base),1.);return;}
+      if(uShade==2||uShade==3||uShade==5||uShade==6||uShade==7){OUT=vec4(linearToSrgb(base),1.);return;}
       if(uShade==4){OUT=vec4(N*.5+.5,1.);return;}
       vec3 S=normalize(uSun);float d=max(dot(N,S),0.0);
       float hemi=N.y*0.5+0.5;vec3 ambIrr=mix(vec3(.12,.10,.08),vec3(.28,.38,.58),hemi);
@@ -5879,7 +6277,14 @@ function streamTerrainIndices(height,snowDepth){
         const fitDelta=terrainQuadFitDelta(h00,h10,h01,h11,
           grad0[j],grad0[j+1],grad0[j+2],grad0[j+3],
           grad1[j],grad1[j+1],grad1[j+2],grad1[j+3]);
-        if(Math.abs(fitDelta)<=1e-6){tieCount++;useMain=checkerMain;}
+        // Decisive-only adaptivity. On drape-smoothed snow the fit signal collapses (measured
+        // median |fitDelta| 6.8e-6 against the old 1e-6 tie band), so noise picked the diagonal
+        // and the wins clustered into ~100-quad same-diagonal patches - the diamond-plate
+        // shading artifact on every smooth face (user screenshot; flipShare 37%). At 1e-4 the
+        // flips fall to 2.4% of quads, largest patch 31 and elongated along real creases (the
+        // p99 crease signal is 2e-3, 20x above the band): ridges keep their fitted diagonals,
+        // smooth ground holds the deterministic checkerboard.
+        if(Math.abs(fitDelta)<=1e-4){tieCount++;useMain=checkerMain;}
         else useMain=fitDelta<0;
         fitStrength+=Math.abs(fitDelta);
         fitGain+=checkerMain?Math.max(0,fitDelta):Math.max(0,-fitDelta);
@@ -5932,21 +6337,57 @@ function buildIndex(){const n=RES,cnt=(n-1)*(n-1)*6,u32=(n*n>65000);
   const xz=new Float32Array(n*n*2);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x;
     xz[i*2]=((x+hx*(y&1))/(n-1)-0.5)*2;xz[i*2+1]=((y/(n-1)-0.5)*2)*rz;}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
+  // Review B3: undo/redo/New/restoreGraph change terrainDef.lattice WITHOUT the toggle button;
+  // updateViewport compares this tag and rebuilds, or a hex session undone to square kept the
+  // hex water plane (shoreline detached) and redo drew hex vertices under the leftover square
+  // adaptive index buffer (sliver strips map-wide).
+  buffers.builtLattice=terrainDef.lattice||"square";
 }
-let curField=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSolidSurfaceY=null,curSnowLayerRef=null;
+let curField=null,curHeightSource=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSolidSurfaceY=null,curSnowLayerRef=null;
 let curTemperatureRef=null,curSunVisibilityRef=null;
 let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curIceSnowSurfaceY=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null,lastFallbackClimateSig="";
+function primaryImportedHeight(rootNode){
+  let node=rootNode;const seen=new Set();
+  while(node&&!seen.has(node.id)){
+    seen.add(node.id);
+    if(node.type==="import")return node;
+    const def=TYPES[node.type];
+    // Masks and diagnostic/data maps convert height into a different quantity. An Import DEM on
+    // their ancestry (or on an effect's side input) must not make that non-height field absolute.
+    if(!def||def.cat==="mask"||def.cat==="data")return null;
+    const edge=inputEdge(node.id,0);node=edge&&nodeById(edge.from);
+  }
+  return null;
+}
+function viewportHeightFrame(field,rootNode){
+  let source=field,absolute=false;
+  const imported=rootNode&&primaryImportedHeight(rootNode);
+  const outputRaw=rootNode&&rootNode.type==="output"&&rootNode.params.norm==="off";
+  if(imported||outputRaw){
+    absolute=true;
+    // Output normalisation is an encoding operation. For a DEM-derived graph, render the evaluated
+    // input field so normalising its output samples cannot erase the Import DEM height multiplier.
+    if(imported&&rootNode.type==="output"&&rootNode.params.norm==="on"){
+      const edge=inputEdge(rootNode.id,0),input=edge&&nodeById(edge.from);
+      if(input&&input._field&&input._field.length===field.length)source=input._field;
+    }
+  }
+  return{source,absolute};
+}
 function updateViewport(f,rootNode,options){
   if(!gl){return;}
-  const n=RES,field=f||newField(),geomKey=n+"|"+H_SCALE+"|"+(terrainDef.lattice||"square");rootNode=rootNode||activePreviewNode();
-  const baseChanged=curField!==f||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
+  const n=RES,field=f||newField();rootNode=rootNode||activePreviewNode();
+  const heightFrame=viewportHeightFrame(field,rootNode),heightSource=heightFrame.source;
+  const geomKey=n+"|"+H_SCALE+"|"+(terrainDef.lattice||"square")+"|"+(heightFrame.absolute?"absolute":"autolevel");
+  if(buffers.idx&&buffers.builtLattice!==(terrainDef.lattice||"square"))buildIndex();
+  const baseChanged=curField!==f||curHeightSource!==heightSource||!curHgt||curHgt.length!==n*n||curGeomKey!==geomKey;
   const layerDepth=scene.snow&&scene.snow.layer&&scene.snow.layer.depthM&&scene.snow.layer.depthM.length===n*n
     ?scene.snow.layer.depthM:null;
   const snowChanged=curSnowLayerRef!==layerDepth;let geometryChanged=baseChanged||snowChanged;
   let hgt=curHgt;
   if(baseChanged){
-    const[mn,mx]=fieldRange(field),d=mx-mn||1;hgt=new Float32Array(n*n);
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,h=(field[i]-mn)/d;
+    const[mn,mx]=fieldRange(heightSource),d=mx-mn||1;hgt=new Float32Array(n*n);
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,h=heightFrame.absolute?heightSource[i]:(heightSource[i]-mn)/d;
       hgt[i]=h;}
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.hgt);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.drive);gl.bufferData(gl.ARRAY_BUFFER,hgt,gl.DYNAMIC_DRAW);
@@ -6061,8 +6502,9 @@ function updateViewport(f,rootNode,options){
       // (odd-r); the six unit vectors are the same for both parities and all sit at distance 1,
       // because the row step is already sqrt(3)/2.
       const EX=[1,-1,.5,-.5,.5,-.5],EY=[0,0,HEX_ROW,HEX_ROW,-HEX_ROW,-HEX_ROW];
+      const xc=k2=>clamp(k2,0,n-1);   // hoisted: a per-vertex closure was ~1M allocations/frame at 1024
       for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,par=y&1;
-        const xc=k2=>clamp(k2,0,n-1),yu=clamp(y-1,0,n-1),yd=clamp(y+1,0,n-1);
+        const yu=clamp(y-1,0,n-1),yd=clamp(y+1,0,n-1);
         const off=par?0:-1; // even rows look left for their diagonal pair, odd rows look right
         const hE=surface[y*n+xc(x+1)],hW=surface[y*n+xc(x-1)];
         const hDE=surface[yd*n+xc(x+off+1)],hDW=surface[yd*n+xc(x+off)];
@@ -6092,17 +6534,20 @@ function updateViewport(f,rootNode,options){
     if(curIceSnowSurfaceY&&curWaterIce)for(let i=0;i<curSolidSurfaceY.length;i++)
       if(curWaterIce[i]>.5)curSolidSurfaceY[i]=Math.max(curSolidSurfaceY[i],curIceSnowSurfaceY[i]);
   }
-  curField=f;curGeomKey=geomKey;
+  curField=f;curHeightSource=heightSource;curGeomKey=geomKey;
   if(baseChanged||!options||options.color!==false){
     // SatMap colouring. Resolve the colour graph (SatMap ramps composite/branch/blend) to a per-vertex RGB buffer;
     // if there is no colour node, drive the global LUT by elevation (backward-compatible fallback).
     const colorRoot=rootNode?(rootNode.type==="output"?inEdgeFrom(rootNode.id,0):rootNode.id):null;
     const colorMemo={},colField=colorRoot?resolveColor(colorRoot,n,colorMemo):null;
+    const previewWind=rootNode&&windVectorFromField(rootNode._field);
+    const sceneWind=scene.snow&&windVectorFromField(scene.snow.windField);
+    const windCol=shadeMode===7?windColorField(previewWind||sceneWind,n):null;
     // Graph-native colour nodes must preview their actual albedo output, not a misleading duplicate height thumbnail.
     // Bake the tiny canvases now, then release the full intermediate RGB fields with colorMemo after this update.
     for(const id in colorMemo){const nd=nodeById(+id),rgb=colorMemo[id];if(nd&&rgb)nd._thumb=bakeColorThumb(nd,rgb);}
-    satComposite=colField?1:0;
-    const col=colField||new Float32Array(n*n*3);
+    satComposite=windCol||colField?1:0;
+    const col=windCol||colField||new Float32Array(n*n*3);
     satUniform={lo:0,hi:1,shift:0,reverse:0};               // driver attribute = elevation for the fallback shader path
     if(!satDrawerOpen()&&!satComposite)buildSatLUT("Pewter"); // no SatMap node: neutral inspection material, never a hidden palette choice
     gl.bindBuffer(gl.ARRAY_BUFFER,buffers.col);gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
@@ -6273,15 +6718,16 @@ function surfaceHeight(wx,wz){
 // Project authored terrain directions into the current camera plane. Unlike a screen-fixed north
 // badge, this needle remains useful after orbiting: it shows where map north and the equator actually
 // lie across the visible terrain.
+function terrainVectorScreenAngle(v,basis=cameraBasis()){
+  const world=[v[0],0,v[1]],sx=dot3(world,basis.right),sy=dot3(world,basis.up);
+  return Math.atan2(sx,sy)*180/Math.PI;
+}
 function syncCompass(){
   const root=$("#viewportCompass"),northEl=$("#compassNorth"),eqEl=$("#compassEquator");
   if(!root||!northEl||!eqEl)return;
   const orient=terrainOrientation(),basis=cameraBasis();
-  const screenAngle=v=>{
-    const world=[v[0],0,v[1]],sx=dot3(world,basis.right),sy=dot3(world,basis.up);
-    return Math.atan2(sx,sy)*180/Math.PI;
-  };
-  const northAngle=screenAngle(orient.north),eqAngle=screenAngle(orient.equator);
+  const northAngle=terrainVectorScreenAngle(orient.north,basis);
+  const eqAngle=terrainVectorScreenAngle(orient.equator,basis);
   northEl.style.transform=`rotate(${northAngle}deg)`;
   eqEl.style.display=orient.hemisphere===0?"none":"block";
   eqEl.style.transform=`rotate(${eqAngle}deg)`;
@@ -6289,6 +6735,37 @@ function syncCompass(){
   eqEl.querySelector(".vp-compass-eq").style.transform=`rotate(${-eqAngle}deg)`;
   const lat=terrainDef.latitude||0,latLabel=lat===0?"equator":Math.abs(lat).toFixed(1)+"° "+(lat<0?"S":"N");
   const label=`Map north ${Math.round(terrainDef.north||0)}° clockwise from top; latitude ${latLabel}`;
+  root.setAttribute("aria-label",label);root.title=label;
+}
+function windAtViewFocus(){
+  const root=activePreviewNode(),preview=root&&windVectorFromField(root._field);
+  const sceneField=scene.snow&&scene.snow.windField,sceneWind=windVectorFromField(sceneField);
+  const wind=preview||sceneWind;
+  if(wind&&wind.u.length===RES*RES&&wind.v.length===RES*RES){
+    const x=(cam.target[0]*.5+.5)*(RES-1),y=(cam.target[2]*.5+.5)*(RES-1);
+    const u=sampleBilinear(wind.u,x,y),v=sampleBilinear(wind.v,x,y);
+    return{u,v,speed:Math.hypot(u,v),source:"field"};
+  }
+  const from=((terrainDef.windDirection==null?300:terrainDef.windDirection)%360+360)%360;
+  const flow=windBearingVector(from);
+  return{u:flow[0],v:flow[1],speed:Math.max(0,terrainDef.windSpeed==null?10:terrainDef.windSpeed),
+    source:"fallback",from};
+}
+function syncWindReadout(){
+  const root=$("#windReadout"),arrow=$("#windIndicatorArrow"),speedEl=$("#windSpeed"),bearingEl=$("#windBearing");
+  if(!root||!arrow||!speedEl||!bearingEl)return;
+  const local=windAtViewFocus(),calm=local.speed<1e-4;
+  const from=local.from==null
+    ?((Math.atan2(-local.u,local.v)*180/Math.PI)%360+360)%360
+    :local.from;
+  const flow=calm?windBearingVector(from):[local.u/local.speed,local.v/local.speed];
+  const screenAngle=terrainVectorScreenAngle(flow),fromDeg=Math.round(from)%360,toDeg=(fromDeg+180)%360;
+  arrow.style.transform=`rotate(${screenAngle}deg)`;
+  speedEl.textContent=`W ${local.speed.toFixed(1)} m/s`;
+  bearingEl.textContent=`${fromDeg}° from`;
+  root.dataset.source=local.source;root.dataset.calm=calm?"true":"false";
+  const source=local.source==="field"?"Graph wind at view focus":"Prevailing fallback wind";
+  const label=`${source}: ${local.speed.toFixed(1)} metres per second from ${fromDeg} degrees, blowing toward ${toDeg} degrees.`;
   root.setAttribute("aria-label",label);root.title=label;
 }
 function syncClimateReadout(){
@@ -6378,7 +6855,7 @@ function drawWaterDepth(MVP){
 }
 function renderGL(){
   if(!gl){return;}
-  resizeGL();syncCompass();syncClimateReadout();
+  resizeGL();syncCompass();syncWindReadout();syncClimateReadout();
   const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
   const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
   const waterRipple=scene.water?waterLook.strength:0;
@@ -6788,7 +7265,9 @@ function syncDisplayState(){
   $("#displayBtn").classList.toggle("on",wire||shadeMode!==0);
 }
 $("#wireBtn").onclick=()=>{wire=!wire;syncDisplayState();};
-$("#shadeSel").onchange=e=>{shadeMode=parseInt(e.target.value,10)||0;syncDisplayState();};
+$("#shadeSel").onchange=e=>{shadeMode=parseInt(e.target.value,10)||0;syncDisplayState();
+  const root=activePreviewNode(),meta=root&&fieldMetadata(root._field);
+  if(root&&root._field)updateViewport(meta&&meta.heightField||root._field,root,{color:true});};
 syncViewButton();syncDisplayState();
 function satGradientCSS(name){
   const stops=SATMAPS[name]||SATMAPS.Temperate;
@@ -7048,14 +7527,19 @@ updatePreviewInfo(activePreviewNode());
    ===================================================================== */
 function blankGraph(){
   const out=makeNode("output",360,180);out.params={norm:"on"};
-  view={x:110,y:90,z:1};select(out);
+  select(out);
+  // A clean document follows the same layout contract as every authored graph. This currently
+  // frames one Output node, and automatically keeps working when the starter grows more nodes.
+  // newTerrainDocument() disables history around construction, so this cannot create a phantom undo.
+  organizeGraph(null,null,"Organized new terrain");
 }
 function newTerrainDocument(withDefault,template=""){
   if(historyReady&&nodes.length&&!confirm("Start a new terrain? The current graph and its undo history will be discarded."))return false;
   const ready=historyReady;historyReady=false;
   nodes=[];edges=[];uid=1;selected=null;selectedEdge=null;importTarget=null;
   undoStack.length=0;redoStack.length=0;previewMode="output";
-  terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45};
+  terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,
+    solarElevation:45,windDirection:300,windSpeed:10,lattice:"square"};
   H_SCALE=terrainDef.height/terrainDef.scale;scene={water:null,snow:null,satmap:null};
   if(template==="canyon")canyonGraph();else if(withDefault)defaultGraph();else blankGraph();
   nodes.forEach(n=>{n._dirty=true;n._thumb=null;});
@@ -7092,6 +7576,7 @@ function defaultGraph(){
   const weathering=makeNode("weathering",1000,120);
   const heightMap=makeNode("d_height",840,330);
   const sunShadow=makeNode("d_sunshadow",1000,330);
+  const wind=makeNode("d_wind",1000,500);
   const water=makeNode("water",1160,120);water.params={mode:"hydro",lakes:"on",lakeMin:.001,flow:.5,riverDepth:.7,level:.12,shoreSmooth:1.35,foam:.18};
   const temperature=makeNode("d_temperature",1160,330);
   const temperatureModify=makeNode("d_heat",1320,330);
@@ -7112,11 +7597,13 @@ function defaultGraph(){
   edges.push({from:snow.id,to:out.id,slot:0});
   edges.push({from:weathering.id,to:heightMap.id,slot:0});   // reusable deterministic climate-data branch
   edges.push({from:heightMap.id,to:sunShadow.id,slot:0});
+  edges.push({from:heightMap.id,to:wind.id,slot:0});
   edges.push({from:heightMap.id,to:temperature.id,slot:0});
   edges.push({from:sunShadow.id,to:temperature.id,slot:1});
   edges.push({from:temperature.id,to:temperatureModify.id,slot:0});
   edges.push({from:temperatureModify.id,to:water.id,slot:1});
   edges.push({from:temperatureModify.id,to:snow.id,slot:1});
+  edges.push({from:wind.id,to:snow.id,slot:2});
   view={x:22,y:28,z:.58};                               // frame the expanded production graph on first launch
   select(sat);                                            // the node owns its visible palette library; the viewport does not
 }
