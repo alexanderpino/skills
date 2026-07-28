@@ -55,6 +55,23 @@ const HEIGHTMAP_SIZE = Number(process.env.STUDIO_HEIGHTMAP_SIZE || 0);
     const upstream = mean(ridgeWind.speed, x => x > 8 && x < 23);
     const windward = mean(ridgeWind.speed, x => x > 34 && x < 45);
     const lee = mean(ridgeWind.speed, x => x > 52 && x < 68);
+    // Jackson & Hunt: the speed-up peaks AT THE CREST. Measured on the speed-up term in
+    // isolation (no shelter/channeling/projection, which all move the argmax for their own
+    // reasons). The pre-fix local-gradient + crest-carry-max form peaked 10 cells UPWIND of the
+    // crest with the crest itself slower than the flank; the fetch secant peaks on the crest.
+    // Gate: argmax within 2 cells of the crest column. Grid parity makes an exact tie possible
+    // (a Gaussian centred at (n-1)/2 straddles two columns), hence the tolerance.
+    const crestCol = Math.round((n - 1) / 2);
+    const speedUpOnly = simulateTerrainWind(ridge, { ...ridgeParams, shelter: 0, channeling: 0,
+      consistency: 'off' }, { res: n, terrainDef: def });
+    const row = n >> 1;
+    let crestArgmax = 0;
+    for (let x = 0; x < n; x++) {
+      if (speedUpOnly.speed[row * n + x] > speedUpOnly.speed[row * n + crestArgmax]) crestArgmax = x;
+    }
+    const crestPeak = { crestCol, argmax: crestArgmax, offBy: Math.abs(crestArgmax - crestCol),
+      atCrest: +speedUpOnly.speed[row * n + crestCol].toFixed(3),
+      atArgmax: +speedUpOnly.speed[row * n + crestArgmax].toFixed(3) };
 
     // A north-south valley should turn an oblique regional wind toward its long axis.
     const valley = new Float32Array(N);
@@ -169,6 +186,7 @@ const HEIGHTMAP_SIZE = Number(process.env.STUDIO_HEIGHTMAP_SIZE || 0);
         meanSpeed: mean(flatWind.speed, () => true),
       },
       ridge: { upstream, windward, lee },
+      crestPeak,
       valley: { centreU, centreV, alignment: Math.abs(centreV) / Math.max(.001, Math.abs(centreU)) },
       consistency: {
         before: projected.divergenceRmsBefore,
@@ -303,6 +321,7 @@ const HEIGHTMAP_SIZE = Number(process.env.STUDIO_HEIGHTMAP_SIZE || 0);
     && Math.abs(report.flat.meanSpeed - 12) < 1e-4
     && report.ridge.windward > report.ridge.upstream * 1.05
     && report.ridge.lee < report.ridge.upstream * .85
+    && report.crestPeak.offBy <= 2 /* J&H peaks at the crest; pre-fix local-gradient form was 10 off */
     && report.valley.alignment > 1.2
     && report.consistency.before > 1e-5
     && report.consistency.after < report.consistency.before * .35 /* exact-adjoint + 2 V-cycles:
