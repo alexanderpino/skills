@@ -536,6 +536,43 @@ the square-raster round-trip entirely: the array *is* the texture and the shear 
   exactly and hand you the row-parity neighbour table — *the* classic hex bug (above). Choose
   deliberately; the wasted memory is often the cheaper of the two.
 
+**Engine machinery: keep the tree in index space, put the shear in the transform.** `B` is affine, so
+every index-only spatial structure a square-terrain engine already owns stays valid over the axial
+array — **quadtrees**, Morton/Z-order keys, chunked LOD, geometry clipmaps, streaming pages. Subdivision,
+nesting and containment are affine-invariant: a quadtree node is an index rectangle and its world
+footprint is that rectangle, sheared. Four notes, and the last is the one people get wrong.
+
+- **Cull in index space — exact, and free.** Points map `x = B·p`, so a world plane `n·x = d` pulls back
+  to `(Bᵀn)·p = d`: transform the frustum's plane normals by **`Bᵀ`** once per frame and every stock
+  axis-aligned node test is then exact. Mind that the two transposes are different rules — pushing an
+  index-space gradient *out* to world is `B⁻ᵀ`, pulling a world covector *back* in is `Bᵀ`. Keep
+  world-space AABBs around sheared nodes instead and you pay a constant **1.5× area slack**, which is
+  scale-invariant and so does not wash out at any depth of the tree.
+- **LOD distance is world distance.** Select on `G`, never on index-space Euclid: an index circle is a
+  **`√3`-elongated ellipse** in world (semi-axes are `B`'s singular values, `1.22` and `0.71·cellSize`),
+  so an index-metric LOD ring transitions markedly nearer along one lattice direction than another.
+- **Folding `B` into the model matrix costs nothing at draw time — and is exactly where the normal trap
+  bites.** The GPU does not care that the world transform shears, but the normal matrix must then be
+  `transpose(inverse(M))`, and engines that assume rigid transforms take a `mat3(M)` fast path *because
+  for rigid and uniformly-scaled transforms it is correct*. Under shear it is the 30.5° bug above,
+  arriving through the renderer rather than through your mesher.
+- **The quadtree refines the lattice, not the hexagons.** 2× subdivision nests the *centres* perfectly
+  (basis `2B`, still triangular), which is all render LOD needs. It does **not** nest the *cells*: a
+  coarse hex has 4× the area of a fine one but is not the union of four of them, because hexagons do not
+  tile a hexagon. So an array quadtree buys free render LOD and **no** gameplay hierarchy — "this
+  province contains those tiles" is a hex **aperture** hierarchy instead (aperture-3/4/7; H3's rotated
+  aperture-7, below), where children do not cleanly tile parents either. Do not conflate the two.
+
+Nor should you over-extend the crack-free result above — it says the 4- and 6-triangle *tile* meshes
+agree at one resolution. Quadtree LOD decimates vertices *between* levels, so it produces ordinary
+T-junctions at level boundaries and wants the usual skirts, stitching strips or geomorphing.
+
+**Physics is the exception, and it is why the raster round-trip below is not optional.** Engine
+heightfield colliders take a rigid transform plus per-axis scale; there is no shear parameter, because a
+shear breaks the penetration and normal maths they are built on. So even when the renderer eats hex
+tiles directly and you skip the resample for geometry, **collision still wants a square raster** — or an
+explicit triangle-mesh collider fed the already-sheared vertices, at a mesh collider's usual cost.
+
 **Triangulating one visible tile — 6 triangles or 4, and the cell's own sample is what is at stake.**
 Once the hexes are rendered as tiles there is a second fork *inside* each cell, and it is not
 primarily a triangle-count decision. A simple `n`-gon triangulates into `n − 2` triangles from its own
@@ -768,7 +805,9 @@ gradient/normal stencil are textbook lattice-moment identities (`Σeₖ = 0`, `�
 identification and the mesh counts that hang off it are **F** and elementary — the tiling is classical
 (Conway; dual of the trihexagonal tiling) and the counts are Euler's formula on three meshes — but it is
 a *framing*, not a result: its value is holding the vertex classes, the mesh fork and the split rule in
-one picture. The *engineering* of resampling between hex and
+one picture. The sheared-array formulation and the engine integration that follows from it (index-space
+quadtrees and culling, the `B⁻ᵀ` normal rule, the collider's missing shear parameter) are **F** —
+engineering, with the geometry elementary and the constants measurable in a few lines. The *engineering* of resampling between hex and
 square rasters is **F**. Everything above is a **flat-grid** story and stands on its own; the sphere
 (next section) is one *further* domain the hex grid closes onto — via the icosahedral hex DGGS — not the
 reason it exists.
