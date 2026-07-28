@@ -97,10 +97,17 @@ const BASELINE = process.argv.includes('--baseline');
         }
       }
 
-      // Render-path buffers: the mesh/wire counts and the vertex arrays, which no node _field
-      // reaches. Guarded - a throw here is reported, never swallowed.
+      // Render-path buffers: the mesh/wire counts, which no node _field reaches. Guarded - a throw
+      // here is reported, never swallowed.
+      //
+      // buildWireIndex() must be called EXPLICITLY. Its only caller is the `if(wire)` branch of the
+      // draw path, and `wire` is false until the overlay button is pressed, so updateViewport()
+      // alone never builds the edge buffer: buffers.lineCount would read undefined at baseline AND
+      // after a perfect conversion, making this sub-gate impossible to satisfy. A gate that cannot
+      // go green gets waived, and a waived gate is how vacuity gets back in.
       try {
         updateViewport();
+        buildWireIndex();
         const wantVerts = n * nh;
         out.buffers = {
           count: buffers.count, wantCount: (n - 1) * (nh - 1) * 6,
