@@ -6201,7 +6201,7 @@ function initGL(){
       uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;uniform sampler2D gH;uniform sampler2D gIce;uniform sampler2D gIceSnow;
       uniform sampler2D gWaterMask;uniform highp sampler2D gWaterDepth;
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;
-      uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze;
+      uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze,uRowScale;
       uniform float uTerrainHeight,uSeaTemp,uLapseRate,uSnowfall,uSnowMeltDays,uSnowMeltRate,uHasSnow;
       uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
       const float PI=3.14159265;
@@ -6217,11 +6217,29 @@ function initGL(){
         c+=vec3(1.2,0.72,0.38)*pow(sd,10.)*0.20;                    // aureole
         c+=vec3(0.8,0.42,0.20)*pow(sd,3.5)*0.10*(1.0-t);           // warm horizon scatter toward the sun
         return c;}
-      float Wat(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gW,b).r,c=texture(gW,b+vec2(uWpx,0.)).r,d=texture(gW,b+vec2(0.,uWpx)).r,e=texture(gW,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
-      float Ht(vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;float a=texture(gH,b).r,c=texture(gH,b+vec2(uWpx,0.)).r,d=texture(gH,b+vec2(0.,uWpx)).r,e=texture(gH,b+vec2(uWpx,uWpx)).r;return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
-      float fieldLinear(sampler2D tx,vec2 uv){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;
-        float a=texture(tx,b).r,c=texture(tx,b+vec2(uWpx,0.)).r,d=texture(tx,b+vec2(0.,uWpx)).r,e=texture(tx,b+vec2(uWpx,uWpx)).r;
-        return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+      // World xz -> field uv. On hex the mesh puts rows at sqrt(3)/2 device spacing, so the
+      // z half of this is NOT the identity it is on square: reading device z directly walked
+      // ~6.7% of the map off in v, on every per-pixel normal, shadow, AO and water lookup.
+      vec2 worldUV(vec2 pxz){return vec2(pxz.x*0.5+0.5,(pxz.y/uRowScale)*0.5+0.5);}
+      // Odd-r parity: row r sits half a cell right when r is odd. Interpolate along each row with
+      // ITS OWN shift, then blend rows - the same construction the CPU sampler uses, exact for a
+      // linear field. On square uRowScale==1.0 and this is the original bilinear, bit-for-bit.
+      float latTap(sampler2D tx,vec2 uv){
+        if(uRowScale==1.0){vec2 tt=uv*uRES-0.5,f=fract(tt),b=(floor(tt)+0.5)/uRES;
+          float a=texture(tx,b).r,c=texture(tx,b+vec2(uWpx,0.)).r,d=texture(tx,b+vec2(0.,uWpx)).r,e=texture(tx,b+vec2(uWpx,uWpx)).r;
+          return mix(mix(a,c,f.x),mix(d,e,f.x),f.y);}
+        float r=uv.y*uRES-0.5,r0=floor(r),fr=r-r0;
+        float sx=uv.x*uRES-0.5;
+        float c0=sx-0.5*mod(r0,2.0),c1=sx-0.5*mod(r0+1.0,2.0);
+        float f0=fract(c0),f1=fract(c1);
+        vec2 b0=(vec2(floor(c0),r0)+0.5)/uRES,b1=(vec2(floor(c1),r0+1.0)+0.5)/uRES;
+        float t0=mix(texture(tx,b0).r,texture(tx,b0+vec2(uWpx,0.)).r,f0);
+        float t1=mix(texture(tx,b1).r,texture(tx,b1+vec2(uWpx,0.)).r,f1);
+        return mix(t0,t1,fr);
+      }
+      float Wat(vec2 uv){return latTap(gW,uv);}
+      float Ht(vec2 uv){return latTap(gH,uv);}
+      float fieldLinear(sampler2D tx,vec2 uv){return latTap(tx,uv);}
       // per-pixel terrain normal from central differences of the height field (higher-res than the mesh vertex normals)
       vec3 terrainNormal(vec2 uv){float e=uWpx;
         float hl=Ht(uv-vec2(e,0.))*uH,hr=Ht(uv+vec2(e,0.))*uH,hd=Ht(uv-vec2(0.,e))*uH,hu=Ht(uv+vec2(0.,e))*uH;
@@ -6233,7 +6251,7 @@ function initGL(){
         float hstep=length(S.xz)/max(S.y,1e-3);                    // horizontal advance per unit rise
         vec2 dir=normalize(S.xz+vec2(1e-5));vec2 duv=dir*(2.6/uRES);
         float dry=length(duv)/max(hstep,1e-3);                     // ray height gain per step (world)
-        vec2 uv=P.xz*0.5+0.5+duv; float ry=P.y+dry; float occ=0.0;
+        vec2 uv=worldUV(P.xz)+duv; float ry=P.y+dry; float occ=0.0;
         for(int i=0;i<24;i++){ if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.)break;
           occ=max(occ,clamp((Ht(uv)*uH-ry)/(0.03*uH),0.,1.)); uv+=duv; ry+=dry; }
         return 1.0-occ*0.92;
@@ -6326,7 +6344,7 @@ function initGL(){
         float waterMask=texture(gWaterMask,vUv).r;
         if(z>=0.99999&&waterMask<.5){frag=vec4(displayMap(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
         vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float rough=g.a;
-        vec2 bedUv=Pw.xz*0.5+0.5;
+        vec2 bedUv=worldUV(Pw.xz);
         vec3 Nt=terrainNormal(bedUv);
         if(uStyle==2||uStyle==3||uStyle==5||uStyle==6){frag=vec4(linearToSrgb(albedo),1.);return;}
         if(uStyle==4){frag=vec4(Nt*.5+.5,1.);return;}
@@ -6335,7 +6353,7 @@ function initGL(){
         if(waterMask<.5){frag=vec4(displayMap(atmos(dryCol,Pw)),1.);return;}
         float wz=texture(gWaterDepth,vUv).r;
         vec4 wclip=vec4(vUv*2.-1.,wz*2.-1.,1.);vec4 wwp=uInvMVP*wclip;vec3 Pwater=wwp.xyz/wwp.w;
-        vec2 wuv=Pwater.xz*0.5+0.5;
+        vec2 wuv=worldUV(Pwater.xz);
         float wSurf=Pwater.y;
         float rawDepth=signedWaterDepth(wuv),thick=max(rawDepth,0.0);
         float shoreDepth=filteredShoreDepth(wuv);
@@ -7178,6 +7196,8 @@ function renderGL(){
     gl.uniform1f(u(compProg,"uSnowfall"),snowfall);gl.uniform1f(u(compProg,"uSnowMeltDays"),snowMeltDays);gl.uniform1f(u(compProg,"uSnowMeltRate"),snowMeltRate);gl.uniform1f(u(compProg,"uHasSnow"),snowEffect?1:0);
     gl.uniform1f(u(compProg,"uSeaLevel"),0.0);gl.uniform1f(u(compProg,"uHasSea"),0.0);  // sea is baked into the water-height texture (W)
     gl.uniform1f(u(compProg,"uWScale"),H_SCALE*RES*0.5);gl.uniform1f(u(compProg,"uWpx"),1/RES);gl.uniform1f(u(compProg,"uRES"),RES);
+    // 1.0 on square, so worldUV/latTap stay bit-for-bit the original bilinear there.
+    gl.uniform1f(u(compProg,"uRowScale"),isHex()?HEX_ROW:1);
     gl.uniform2f(u(compProg,"uPx"),1/glc.width,1/glc.height);
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gbuf.color);gl.uniform1i(u(compProg,"gColor"),0);
     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,gbuf.depth);gl.uniform1i(u(compProg,"gDepth"),1);
