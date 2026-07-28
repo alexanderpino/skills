@@ -357,14 +357,22 @@ clean baseline are the cone and constant-slope synthetic inputs, whose correct o
 preferred direction at all.
 
 There is a fourth, structural cure the table doesn't list: **change the lattice.** The **hexagonal
-grid** (`08`) *deletes* two whole rows of this family rather than fixing them — with 6 equidistant
-edge-neighbours there is no diagonal to under-weight (the *missing-√2* row) and no 4-versus-8 choice to
-get wrong (the *D8-striping* row), and its 60° symmetry leaks far less than the square grid's 45°/90°.
-It is not free (engines want a square raster, so you resample out) and not total (6-fold is still not
-continuous — the sun sweep still catches gross errors), but when directional artefacts are endemic and
-the grid is yours to choose, the lattice itself is the fix rather than a per-node correction. On a
-sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the only residual stencil
-irregularity is the 12 pentagons.
+grid** (`08`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
+edge-neighbours there is no diagonal to under-weight and no 4-versus-8 choice to get wrong — and
+*shrinks* the *D8-striping* row rather than deleting it: single-receiver striping is a
+**quantisation** artefact, not a metric one, and D6 still quantises (6 directions at 60°, max aspect
+error 30° against D8's 22.5°), so a planar slope still collects parallel flow lines along the hex
+axes. The sun sweep and the constant-slope control still apply on hex, with *less than the square
+grid* as the pass criterion, not *none*. The lattice swap also brings its **own failure rows**:
+axial-vs-offset coordinate mixing, row-parity neighbour tables applied with the wrong parity,
+pointy-top/flat-top orientation mismatch, and the un-renormalised 6-neighbour Laplacian (the hex
+constant is `2/(3d²)`, not `1/d²` — keep the square constant and diffusivity is silently 1.5× high;
+`08`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
+still not continuous), but when directional artefacts are endemic and the grid is yours to choose, the
+lattice itself is the highest-leverage fix — it trades the family for a smaller one, not for zero. On
+a sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the residual stencil
+irregularity is the 12 pentagons — a *topological* residue — plus the continuous metric distortion any
+projected spherical grid carries (`08`).
 
 The contrast case worth knowing: **droplet erosion is largely immune** — positions are
 continuous and gradients bilinear, so there is no stencil to print through. If a droplet result

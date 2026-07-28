@@ -875,7 +875,9 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   aperture-3/4/7 hierarchies); the taxonomy behind the hex-planet grid (`08`, `25`).
 - **Uber Technologies (2018).** *H3: Uber's Hexagonal Hierarchical Spatial Index.* Open-source library
   (github.com/uber/h3). — The production icosahedral hex DGGS: aperture-7, 122 base cells (110 hexagons +
-  12 pentagons). A documented open system, not a paper — **F/N**, cite as such (`08`, `25`).
+  12 pentagons). **Gnomonic per-face projection, so *not* equal-area** — cell areas vary ~1.6× between
+  largest and smallest at a given resolution; the equal-area aperture-7 instance is ISEA7H (Snyder 1992;
+  Sahr et al. 2003). A documented open system, not a paper — **F/N**, cite as such (`08`, `25`).
 - **Snyder, J.P. (1987).** *Map Projections — A Working Manual.* USGS Professional Paper 1395,
   383 pp. — Projection scale factors and distortion; divide gradients by the scale factor `h` or
   erosion biases toward high-distortion regions (`08`).

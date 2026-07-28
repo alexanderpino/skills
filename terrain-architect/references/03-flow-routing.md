@@ -239,6 +239,39 @@ diffuse and rivers look like broad damp smears rather than lines. The standard f
 **hybrid**: MFD where `A` is small (hillslope), D8 or D∞ where `A` exceeds a channelisation
 threshold. This costs almost nothing and is what most good terrain tools do.
 
+## D6 (hexagonal grids)
+
+On a hexagonal working grid (`08`, *Hexagonal grids*) the routing family above simplifies: every
+cell has **6 neighbours, all edge-adjacent at the same centre distance**, so the diagonal branch
+and the √2 disappear from the stencil.
+
+```
+d6(dem, c):
+    best = -INF; receiver = NONE
+    for n in 6 neighbours:
+        s = (dem[c] - dem[n]) / cellSize      // one distance — no diagonal test, no SQRT2
+        if s > best: best = s; receiver = n
+    return receiver                            // NONE if best <= 0 → c is a pit
+```
+
+MFD ports the same way: drop the distance fork *and* the contour-length split — all six shared
+edges have the same length (`cellSize/√3`), so only the slope exponent remains. Break equal-drop
+ties explicitly (epsilon or randomised choice, as in `09`'s cures) — equidistant neighbours make
+exact ties more common, not less.
+
+**What D6 fixes and what it doesn't.** The √2 weighting bug and the 4-versus-8 fork *cannot be
+written* — that branch of `09`'s anisotropy family is gone. But D6 is single-receiver over a
+**coarser** angular set than D8 — 6 directions at 60° (max aspect error 30°) against 8 at 45°
+(22.5°) — so the planar-hillslope artefact of D8 survives: parallel flow lines along the hex
+axes, smaller than D8's but present. The D8 advice transfers unchanged: single-flow for
+channels, dispersive flow for hillslopes, hybrid by an `A` threshold.
+
+**Everything else in this chapter is lattice-independent.** Depression handling still comes
+first and Priority-Flood runs on any graph; accumulation is the same recurrence over 6
+neighbours; stack ordering, lakes and channel morphology do not care. Published grounding:
+**Liao et al. 2020** (HexWatershed — flow routing on a hexagonal mesh) and **Liao et al. 2025**
+(routing datasets on the equal-area ISEA DGGS); see `99`.
+
 ## Flow accumulation
 
 Drainage area `A` at a cell = its own area plus everything routed into it.
