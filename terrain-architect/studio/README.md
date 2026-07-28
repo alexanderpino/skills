@@ -1186,17 +1186,65 @@ exactly 1 there. The mountain/peak macro-weathering callers invoke the kernels w
 stay byte-identical (digest re-baselined for exactly the compensated nodes, including the massif
 exercise pin). Two per-node policies, stated once: **widths** (brush and blur radii) always follow
 the full grid ratio — geometry, not travel; **travel** multipliers (pipe/droplet transport) take the
-**Interactive** tier cap of 2 — the same trade as the droplet count's `min(4, k²)` — and **Final**
-removes the cap. Stream power's incision has no travel multiplier (iterations unchanged), so only
-its diffusion *dose* takes the cap. Invariance is *certified at the measured points* — k=2 for every
-node, k=3 (Final) and the m-axis for stream power, inside the [0.80, 1.25] band — not claimed "at
-any grid"; the exponential-family compensations should drift slowly beyond, and the oracle is where
-that claim gets extended, not this paragraph. The oracle also REPORTS, live, what the tier cap
-costs at the app-default 512² (pipes depth ratio 0.669 under Interactive's gk=2-of-2.667 — Final
-restores the band) and what the legacy path drifts (`SCALE_RES` off: depth 0.680, modification corr
-0.779 at k=2), so the armed thresholds stay measurements, not memories. On the whole default graph, `_verify_resparity.js` now reads scaled rms 0.0462
+**Interactive** tier, which since the preview-parity fix below runs each hydraulic/Erosion 2 pass as
+a *full-quality simulation on a 384-capped grid, delta-upsampled* (algebraically identical to the
+old caps at RES ≤ 384), and **Final**, which simulates on the working grid. Stream power's incision
+has no travel multiplier (iterations unchanged), so only its diffusion *dose* takes the Interactive
+cap of 2. Invariance is *certified at the measured points* — k=2 for every node, k=3 (Final) and
+the m-axis for stream power, inside the [0.80, 1.25] band — not claimed "at any grid"; the
+exponential-family compensations should drift slowly beyond, and the oracle is where that claim
+gets extended, not this paragraph. The oracle also REPORTS, live, the Interactive tier's parity at
+the app-default 512² (pipes depth ratio **0.978** under the tier-grid contract — it read 0.669
+under the old starve-the-sim caps) and what the legacy path drifts (`SCALE_RES` off: depth 0.680,
+modification corr 0.779 at k=2), so the armed thresholds stay measurements, not memories. On the whole default graph, `_verify_resparity.js` now reads scaled rms 0.0462
 (unscaled 0.0586) with the 768² build at 0.7× the reference's slope roughness (unscaled: 2.5×
 spikier).
+
+### Five targeted fixes, each measured red-first
+
+- **Color Erosion routed pigment with no depression handling** — the Legal Order's most common
+  defect, in miniature: on the shipped defaults, **98.8% of all deposited pigment mass landed on
+  the 1.2% of cells that are pits** (an 80× concentration) and the channels got nothing. Routing
+  now fills first (for *routing only* — deposition and the visual pass still read the real
+  surface): capture factor 80.6 → **3.1**. The `min(resScale(), 2.5)` cap that froze transport in
+  cells above 480² is gone; the 96-step clamp is the cost guard.
+- **Deposits normalized away its own units** — a half-amplitude terrain produced the *identical*
+  deposit mask (measured ratio 1.000): `normalize()` laundered a depth field into a self-scaled
+  mask, reference `10`'s defect verbatim. The mask is now physical: fill depth in metres against a
+  **Full-mask depth** slider (default 25 m — the old normalize implicitly saturated at whatever the
+  map's own max was, 224 m on the default mountain, so masks read near-black *and* meant nothing
+  across terrains). The closing also ran a square structuring element; an octagonal one (square
+  `r1 = √2·rd` plus diagonal `rd = r/(2+√2)` passes equalize axis and diagonal reach) takes the
+  directional bias on a radial-groove probe from 1.153 to **1.086**.
+- **HydroFix's shipped default did nothing** — at fix = 0.52 it removed 10 of 750 pits
+  (rms 2.3·10⁻⁴). The mechanism was the tell: enforcement was `lerp(out, target, fix)`, and **52%
+  of a breach is a dam**. `fix` now controls *where* the node acts (channel extent, exponential
+  across the slider), never *how much* — a breach always fully connects. The default now removes
+  61 pits at 12× the action, the slider is smooth across its range (36/61/95/158 pits removed at
+  .25/.52/.75/1.0), fix = 0 is an exact bypass, and fix = 1 is continuous with the old top end
+  (enforcement identical; the threshold differs at the 10⁻¹⁶ relative level).
+- **Thermal's only physical control was unreachable** — Real scale shipped default-off, so a fresh
+  node had no Repose slider at all, and repose 25° vs 45° measured *identical* slope percentiles.
+  Real scale is now the default (cell units remain the escape hatch; saved graphs keep their
+  stored value). Stated honestly: repose now steers (p75 50.2° vs 52.3° at 30 iterations on
+  mountain-grade relief) but convergence toward the target is slow on big terrain — 80 iterations
+  buy only ~2° more. That is mass conservation doing its job (the talus apron has to go
+  somewhere); the full cure is a wash/export term like the Canyon's Musgrave pass, which is queued
+  work, not something to smuggle into a defaults fix.
+- **The Interactive preview starved the simulation instead of shrinking it** — the old dose caps
+  (droplet count `min(4,k²)`, gridK `min(k,2)`, applied on the *full* grid) previewed at **0.64×**
+  of Final's depth at the default 512², and rate compensation cannot close that gap
+  (capacity-limited dynamics saturate; measured 0.647). Interactive is now a **full-quality
+  simulation on a 384-capped grid, delta-upsampled** — exactly what A2's grid invariance licenses:
+  preview/Final depth **0.92 (droplets) / 0.94 (pipes) / 1.00 (Erosion 2)** with modification
+  correlation ≥ 0.96, and the droplet preview got 1.9× *faster* (a coarse grid is cheaper than a
+  starved fine one). At RES ≤ 384 the new arithmetic equals the old caps exactly — digest-verified
+  bit-identical below the cap. Honest limits: the parity is *amplitude* parity — the preview keeps
+  base-terrain fine detail Final would erode (high-frequency energy 1.18–1.45× at 1024²) and
+  cannot contain sub-tier structure at 2048²+, and Erosion 2's fine gully pass rides the 384 grid
+  on Interactive; Deposits' sibling `Texture` still self-normalizes its composite (kept: a
+  composite *driver* is a relative mix by contract), so only its soil term carries the physical
+  units.
 
 ### GPU fast path (WebGL2 GPGPU)
 

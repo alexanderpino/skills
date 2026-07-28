@@ -9,12 +9,12 @@
       "file": "index.html",
       "inlineClassicScripts": 1,
       "moduleScripts": 0,
-      "scriptLines": "898-6851",
-      "topLevelDeclarations": 454,
+      "scriptLines": "898-7008",
+      "topLevelDeclarations": 455,
       "elementIds": 153
     },
     "tests": {
-      "files": 52,
+      "files": 54,
       "fileList": [
         "_verify.js",
         "_verify_all_canyon.js",
@@ -34,6 +34,7 @@
         "_verify_digest.js",
         "_verify_edge_spin.js",
         "_verify_edges.js",
+        "_verify_erosion_gridscale.js",
         "_verify_erosion_mass.js",
         "_verify_exact_transform.js",
         "_verify_featurescale.js",
@@ -58,6 +59,7 @@
         "_verify_snow.js",
         "_verify_snow_physics.js",
         "_verify_streampower.js",
+        "_verify_streampower_calibration.js",
         "_verify_tectonic.js",
         "_verify_toolbar.js",
         "_verify_toolbox.js",
@@ -69,7 +71,7 @@
         "_verify_workflow.js",
         "_verify_zoom.js"
       ],
-      "pageSideCallbacks": 153,
+      "pageSideCallbacks": 155,
       "indirectCallbacks": 1,
       "methodsScanned": [
         "$$eval",
@@ -172,8 +174,8 @@
       "kind": "mutable-global",
       "written": true,
       "patched": false,
-      "refCount": 196,
-      "fileCount": 40,
+      "refCount": 206,
+      "fileCount": 42,
       "files": [
         "_verify.js",
         "_verify_build_progress.js",
@@ -191,6 +193,7 @@
         "_verify_digest.js",
         "_verify_edge_spin.js",
         "_verify_edges.js",
+        "_verify_erosion_gridscale.js",
         "_verify_erosion_mass.js",
         "_verify_exact_transform.js",
         "_verify_featurescale.js",
@@ -208,6 +211,7 @@
         "_verify_simplex.js",
         "_verify_snow.js",
         "_verify_streampower.js",
+        "_verify_streampower_calibration.js",
         "_verify_tectonic.js",
         "_verify_toolbar.js",
         "_verify_trs.js",
@@ -229,6 +233,7 @@
         "_verify_canyon_relief.js",
         "_verify_canyon_slopes.js",
         "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
         "_verify_erosion_mass.js",
         "_verify_gpu.js",
         "_verify_highres.js",
@@ -238,17 +243,18 @@
         "_verify_resparity.js",
         "_verify_simplex.js",
         "_verify_streampower.js",
+        "_verify_streampower_calibration.js",
         "_verify_workflow.js",
         "_verify_zoom.js"
       ],
       "writeExamples": [
         "RES = 192",
-        "RES = cfg.res",
-        "RES = n",
-        "RES=1024"
+        "RES = 192 * k",
+        "RES = HI",
+        "RES = cfg.res"
       ],
-      "reads": 164,
-      "writes": 32
+      "reads": 169,
+      "writes": 37
     },
     {
       "name": "nodes",
@@ -290,7 +296,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 3898,
+      "declLine": 4035,
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -351,7 +357,7 @@
         "_verify_trs.js"
       ],
       "declKind": "let",
-      "declLine": 3898,
+      "declLine": 4035,
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -390,8 +396,8 @@
       "kind": "const-global",
       "written": false,
       "patched": true,
-      "refCount": 80,
-      "fileCount": 29,
+      "refCount": 83,
+      "fileCount": 30,
       "files": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -406,6 +412,7 @@
         "_verify_curve.js",
         "_verify_data.js",
         "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
         "_verify_layout.js",
         "_verify_peak.js",
         "_verify_placement.js",
@@ -424,14 +431,14 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 3431,
+      "declLine": 3532,
       "patchFiles": [
         "_verify_build_progress.js"
       ],
       "patchExamples": [
         "TYPES.blur.eval=(...args)=>{const start=performance.now();while(perfo..."
       ],
-      "reads": 80,
+      "reads": 83,
       "writes": 0
     },
     {
@@ -452,7 +459,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "patchFiles": [
         "_verify_realtime.js"
       ],
@@ -461,6 +468,41 @@
         "gl.bufferData = function(target, data, usage) { const entry = Object...."
       ],
       "reads": 69,
+      "writes": 0
+    },
+    {
+      "name": "terrainDef",
+      "kind": "mutable-global",
+      "written": false,
+      "patched": true,
+      "refCount": 50,
+      "fileCount": 10,
+      "files": [
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_edge_spin.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_realscale.js",
+        "_verify_render.js",
+        "_verify_snow.js",
+        "_verify_snow_physics.js"
+      ],
+      "declKind": "let",
+      "declLine": 5344,
+      "patchFiles": [
+        "_verify_canyon_identity.js",
+        "_verify_render.js",
+        "_verify_snow.js"
+      ],
+      "patchExamples": [
+        "terrainDef.baseElevation=0",
+        "terrainDef.baseElevation=1000",
+        "terrainDef.baseElevation=3000",
+        "terrainDef.baseElevation=savedDatum"
+      ],
+      "reads": 50,
       "writes": 0
     },
     {
@@ -493,43 +535,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3957,
+      "declLine": 4094,
       "valueIsFunction": true,
       "reads": 48,
-      "writes": 0
-    },
-    {
-      "name": "terrainDef",
-      "kind": "mutable-global",
-      "written": false,
-      "patched": true,
-      "refCount": 47,
-      "fileCount": 9,
-      "files": [
-        "_verify_canyon_gridscale.js",
-        "_verify_canyon_identity.js",
-        "_verify_canyon_slopes.js",
-        "_verify_digest.js",
-        "_verify_edge_spin.js",
-        "_verify_realscale.js",
-        "_verify_render.js",
-        "_verify_snow.js",
-        "_verify_snow_physics.js"
-      ],
-      "declKind": "let",
-      "declLine": 5191,
-      "patchFiles": [
-        "_verify_canyon_identity.js",
-        "_verify_render.js",
-        "_verify_snow.js"
-      ],
-      "patchExamples": [
-        "terrainDef.baseElevation=0",
-        "terrainDef.baseElevation=1000",
-        "terrainDef.baseElevation=3000",
-        "terrainDef.baseElevation=savedDatum"
-      ],
-      "reads": 47,
       "writes": 0
     },
     {
@@ -560,7 +568,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 4067,
+      "declLine": 4204,
       "valueIsFunction": true,
       "reads": 29,
       "writes": 0
@@ -581,7 +589,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5198,
+      "declLine": 5351,
       "patchFiles": [
         "_verify_snow.js",
         "_verify_water.js",
@@ -614,7 +622,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 5020,
+      "declLine": 5161,
       "writeFiles": [
         "_verify_water.js"
       ],
@@ -663,7 +671,7 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 3898,
+      "declLine": 4035,
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -688,6 +696,54 @@
       "writes": 13
     },
     {
+      "name": "fbmField",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 25,
+      "fileCount": 9,
+      "files": [
+        "_verify_erosion_gridscale.js",
+        "_verify_erosion_mass.js",
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_peak.js",
+        "_verify_simplex.js",
+        "_verify_streampower.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "declKind": "function",
+      "declLine": 1071,
+      "valueIsFunction": true,
+      "reads": 25,
+      "writes": 0
+    },
+    {
+      "name": "gnoise",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 23,
+      "fileCount": 9,
+      "files": [
+        "_verify_erosion_gridscale.js",
+        "_verify_erosion_mass.js",
+        "_verify_exact_transform.js",
+        "_verify_featurescale.js",
+        "_verify_gpu.js",
+        "_verify_peak.js",
+        "_verify_simplex.js",
+        "_verify_streampower.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "declKind": "function",
+      "declLine": 1051,
+      "valueIsFunction": true,
+      "reads": 23,
+      "writes": 0
+    },
+    {
       "name": "outputNode",
       "kind": "function",
       "written": false,
@@ -709,31 +765,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3974,
+      "declLine": 4111,
       "valueIsFunction": true,
       "reads": 21,
-      "writes": 0
-    },
-    {
-      "name": "fbmField",
-      "kind": "function",
-      "written": false,
-      "patched": false,
-      "refCount": 20,
-      "fileCount": 7,
-      "files": [
-        "_verify_erosion_mass.js",
-        "_verify_exact_transform.js",
-        "_verify_featurescale.js",
-        "_verify_gpu.js",
-        "_verify_peak.js",
-        "_verify_simplex.js",
-        "_verify_streampower.js"
-      ],
-      "declKind": "function",
-      "declLine": 1071,
-      "valueIsFunction": true,
-      "reads": 20,
       "writes": 0
     },
     {
@@ -749,7 +783,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 20,
       "writes": 0
     },
@@ -768,7 +802,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "function",
-      "declLine": 2437,
+      "declLine": 2454,
       "valueIsFunction": true,
       "reads": 19,
       "writes": 0
@@ -791,7 +825,7 @@
         "_verify_satnode.js"
       ],
       "declKind": "function",
-      "declLine": 3970,
+      "declLine": 4107,
       "valueIsFunction": true,
       "reads": 19,
       "writes": 0
@@ -811,7 +845,7 @@
         "_verify_satnode.js"
       ],
       "declKind": "function",
-      "declLine": 5160,
+      "declLine": 5313,
       "valueIsFunction": true,
       "reads": 19,
       "writes": 0
@@ -877,7 +911,7 @@
         "_verify_toolbox.js"
       ],
       "declKind": "let",
-      "declLine": 4188,
+      "declLine": 4325,
       "writeFiles": [
         "_verify_colorfx.js"
       ],
@@ -888,26 +922,52 @@
       "writes": 1
     },
     {
-      "name": "gnoise",
-      "kind": "function",
-      "written": false,
+      "name": "USE_GPU",
+      "kind": "mutable-global",
+      "written": true,
       "patched": false,
-      "refCount": 18,
-      "fileCount": 7,
+      "refCount": 17,
+      "fileCount": 13,
       "files": [
-        "_verify_erosion_mass.js",
-        "_verify_exact_transform.js",
-        "_verify_featurescale.js",
-        "_verify_gpu.js",
-        "_verify_peak.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
         "_verify_simplex.js",
-        "_verify_streampower.js"
+        "_verify_snow_physics.js",
+        "_verify_streampower_calibration.js"
       ],
-      "declKind": "function",
-      "declLine": 1051,
-      "valueIsFunction": true,
-      "reads": 18,
-      "writes": 0
+      "declKind": "let",
+      "declLine": 1134,
+      "writeFiles": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_simplex.js",
+        "_verify_snow_physics.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "writeExamples": [
+        "USE_GPU = c.gpu",
+        "USE_GPU = false",
+        "USE_GPU = true",
+        "USE_GPU=false"
+      ],
+      "reads": 1,
+      "writes": 16
     },
     {
       "name": "buildIndex",
@@ -927,7 +987,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 5677,
+      "declLine": 5830,
       "valueIsFunction": true,
       "reads": 14,
       "writes": 0
@@ -950,54 +1010,10 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4594,
+      "declLine": 4731,
       "valueIsFunction": true,
       "reads": 14,
       "writes": 0
-    },
-    {
-      "name": "USE_GPU",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 14,
-      "fileCount": 11,
-      "files": [
-        "_verify_canyon.js",
-        "_verify_canyon_classic.js",
-        "_verify_canyon_evolution.js",
-        "_verify_canyon_gridscale.js",
-        "_verify_canyon_identity.js",
-        "_verify_canyon_process.js",
-        "_verify_canyon_relief.js",
-        "_verify_canyon_slopes.js",
-        "_verify_digest.js",
-        "_verify_simplex.js",
-        "_verify_snow_physics.js"
-      ],
-      "declKind": "let",
-      "declLine": 1134,
-      "writeFiles": [
-        "_verify_canyon.js",
-        "_verify_canyon_classic.js",
-        "_verify_canyon_evolution.js",
-        "_verify_canyon_gridscale.js",
-        "_verify_canyon_identity.js",
-        "_verify_canyon_process.js",
-        "_verify_canyon_relief.js",
-        "_verify_canyon_slopes.js",
-        "_verify_digest.js",
-        "_verify_simplex.js",
-        "_verify_snow_physics.js"
-      ],
-      "writeExamples": [
-        "USE_GPU = false",
-        "USE_GPU=false",
-        "USE_GPU=oldGpu",
-        "USE_GPU=true"
-      ],
-      "reads": 1,
-      "writes": 13
     },
     {
       "name": "selectedEdge",
@@ -1015,7 +1031,7 @@
         "_verify_edges.js"
       ],
       "declKind": "let",
-      "declLine": 3898,
+      "declLine": 4035,
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1047,7 +1063,7 @@
         "_verify_digest.js"
       ],
       "declKind": "const",
-      "declLine": 1961,
+      "declLine": 1978,
       "reads": 12,
       "writes": 0
     },
@@ -1066,7 +1082,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "let",
-      "declLine": 3899,
+      "declLine": 4036,
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1130,7 +1146,7 @@
         "_verify_water.js"
       ],
       "declKind": "function",
-      "declLine": 4636,
+      "declLine": 4773,
       "valueIsFunction": true,
       "reads": 11,
       "writes": 0
@@ -1151,7 +1167,33 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "function",
-      "declLine": 2133,
+      "declLine": 2150,
+      "valueIsFunction": true,
+      "reads": 11,
+      "writes": 0
+    },
+    {
+      "name": "cloneParams",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 11,
+      "fileCount": 11,
+      "files": [
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_snow_physics.js"
+      ],
+      "declKind": "const",
+      "declLine": 4038,
       "valueIsFunction": true,
       "reads": 11,
       "writes": 0
@@ -1171,7 +1213,7 @@
         "_verify_water_hydrology.js"
       ],
       "declKind": "let",
-      "declLine": 5687,
+      "declLine": 5840,
       "reads": 11,
       "writes": 0
     },
@@ -1188,7 +1230,25 @@
         "_verify_water_hydrology.js"
       ],
       "declKind": "let",
-      "declLine": 5689,
+      "declLine": 5842,
+      "reads": 11,
+      "writes": 0
+    },
+    {
+      "name": "streamPowerErode",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 11,
+      "fileCount": 3,
+      "files": [
+        "_verify_streampower.js",
+        "_verify_streampower_calibration.js",
+        "_verify_tectonic.js"
+      ],
+      "declKind": "function",
+      "declLine": 2860,
+      "valueIsFunction": true,
       "reads": 11,
       "writes": 0
     },
@@ -1207,7 +1267,7 @@
         "_verify_organize.js"
       ],
       "declKind": "let",
-      "declLine": 3899,
+      "declLine": 4036,
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -1218,48 +1278,6 @@
       ],
       "reads": 8,
       "writes": 3
-    },
-    {
-      "name": "cloneParams",
-      "kind": "const-global",
-      "written": false,
-      "patched": false,
-      "refCount": 10,
-      "fileCount": 10,
-      "files": [
-        "_verify_canyon.js",
-        "_verify_canyon_classic.js",
-        "_verify_canyon_evolution.js",
-        "_verify_canyon_gridscale.js",
-        "_verify_canyon_identity.js",
-        "_verify_canyon_process.js",
-        "_verify_canyon_relief.js",
-        "_verify_canyon_slopes.js",
-        "_verify_digest.js",
-        "_verify_snow_physics.js"
-      ],
-      "declKind": "const",
-      "declLine": 3901,
-      "valueIsFunction": true,
-      "reads": 10,
-      "writes": 0
-    },
-    {
-      "name": "streamPowerErode",
-      "kind": "function",
-      "written": false,
-      "patched": false,
-      "refCount": 10,
-      "fileCount": 2,
-      "files": [
-        "_verify_streampower.js",
-        "_verify_tectonic.js"
-      ],
-      "declKind": "function",
-      "declLine": 2817,
-      "valueIsFunction": true,
-      "reads": 10,
-      "writes": 0
     },
     {
       "name": "uid",
@@ -1278,7 +1296,7 @@
         "_verify_range.js"
       ],
       "declKind": "let",
-      "declLine": 3898,
+      "declLine": 4035,
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1310,7 +1328,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4575,
+      "declLine": 4712,
       "valueIsFunction": true,
       "reads": 9,
       "writes": 0
@@ -1330,7 +1348,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 9,
       "writes": 0
     },
@@ -1350,7 +1368,7 @@
         "_verify_trs.js"
       ],
       "declKind": "function",
-      "declLine": 4001,
+      "declLine": 4138,
       "valueIsFunction": true,
       "reads": 9,
       "writes": 0
@@ -1383,7 +1401,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 5687,
+      "declLine": 5840,
       "reads": 8,
       "writes": 0
     },
@@ -1399,7 +1417,7 @@
         "_verify_organize.js"
       ],
       "declKind": "const",
-      "declLine": 4442,
+      "declLine": 4579,
       "reads": 8,
       "writes": 0
     },
@@ -1441,7 +1459,26 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 6459,
+      "declLine": 6612,
+      "reads": 8,
+      "writes": 0
+    },
+    {
+      "name": "priorityFloodFill",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 4,
+      "files": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_streampower.js",
+        "_verify_tectonic.js"
+      ],
+      "declKind": "function",
+      "declLine": 5995,
+      "valueIsFunction": true,
       "reads": 8,
       "writes": 0
     },
@@ -1460,7 +1497,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 5878,
+      "declLine": 6031,
       "valueIsFunction": true,
       "reads": 8,
       "writes": 0
@@ -1478,10 +1515,42 @@
         "_verify_trs.js"
       ],
       "declKind": "function",
-      "declLine": 2477,
+      "declLine": 2494,
       "valueIsFunction": true,
       "reads": 8,
       "writes": 0
+    },
+    {
+      "name": "XF",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 8,
+      "fileCount": 5,
+      "files": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_exact_transform.js",
+        "_verify_mask_draw.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "declKind": "let",
+      "declLine": 1025,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_exact_transform.js",
+        "_verify_mask_draw.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "writeExamples": [
+        "XF = null",
+        "XF=m",
+        "XF=null",
+        "XF=prev"
+      ],
+      "reads": 1,
+      "writes": 7
     },
     {
       "name": "xfFromParams",
@@ -1514,7 +1583,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 7,
       "writes": 0
     },
@@ -1529,9 +1598,108 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5689,
+      "declLine": 5842,
       "reads": 7,
       "writes": 0
+    },
+    {
+      "name": "evalFrame",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 3,
+      "files": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_realtime.js"
+      ],
+      "declKind": "let",
+      "declLine": 4152,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js"
+      ],
+      "writeExamples": [
+        "evalFrame = 0"
+      ],
+      "reads": 5,
+      "writes": 2
+    },
+    {
+      "name": "GPU",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 7,
+      "files": [
+        "_verify_erosion_gridscale.js",
+        "_verify_erosion_mass.js",
+        "_verify_exact_transform.js",
+        "_verify_gpu.js",
+        "_verify_highres.js",
+        "_verify_simplex.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "const",
+      "declLine": 1135,
+      "reads": 7,
+      "writes": 0
+    },
+    {
+      "name": "H_SCALE",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 4,
+      "files": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_realscale.js",
+        "_verify_snow.js"
+      ],
+      "declKind": "let",
+      "declLine": 5346,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js"
+      ],
+      "writeExamples": [
+        "H_SCALE = terrainDef.height / terrainDef.scale"
+      ],
+      "reads": 5,
+      "writes": 2
+    },
+    {
+      "name": "SCALE_RES",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 7,
+      "fileCount": 4,
+      "files": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_resparity.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "declKind": "let",
+      "declLine": 1130,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_resparity.js",
+        "_verify_streampower_calibration.js"
+      ],
+      "writeExamples": [
+        "SCALE_RES = c.scaleRes !== false",
+        "SCALE_RES = scaled",
+        "SCALE_RES = true"
+      ],
+      "reads": 0,
+      "writes": 7
     },
     {
       "name": "simulateSnowLayer",
@@ -1545,7 +1713,7 @@
         "_verify_snow_physics.js"
       ],
       "declKind": "function",
-      "declLine": 3033,
+      "declLine": 3089,
       "valueIsFunction": true,
       "reads": 7,
       "writes": 0
@@ -1591,7 +1759,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 7,
       "writes": 0
     },
@@ -1612,6 +1780,37 @@
       "writes": 0
     },
     {
+      "name": "BUILD_QUALITY",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 6,
+      "fileCount": 5,
+      "files": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_resparity.js",
+        "_verify_streampower_calibration.js",
+        "_verify_workflow.js"
+      ],
+      "declKind": "let",
+      "declLine": 1133,
+      "writeFiles": [
+        "_verify_digest.js",
+        "_verify_erosion_gridscale.js",
+        "_verify_resparity.js",
+        "_verify_streampower_calibration.js",
+        "_verify_workflow.js"
+      ],
+      "writeExamples": [
+        "BUILD_QUALITY = 'interactive'",
+        "BUILD_QUALITY = c.quality || 'interactive'",
+        "BUILD_QUALITY='interactive'"
+      ],
+      "reads": 0,
+      "writes": 6
+    },
+    {
       "name": "curWaterIce",
       "kind": "mutable-global",
       "written": false,
@@ -1623,7 +1822,7 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 5689,
+      "declLine": 5842,
       "reads": 6,
       "writes": 0
     },
@@ -1638,53 +1837,10 @@
         "_verify_snow.js"
       ],
       "declKind": "const",
-      "declLine": 2913,
+      "declLine": 2969,
       "valueIsFunction": true,
       "reads": 6,
       "writes": 0
-    },
-    {
-      "name": "GPU",
-      "kind": "const-global",
-      "written": false,
-      "patched": false,
-      "refCount": 6,
-      "fileCount": 6,
-      "files": [
-        "_verify_erosion_mass.js",
-        "_verify_exact_transform.js",
-        "_verify_gpu.js",
-        "_verify_highres.js",
-        "_verify_simplex.js",
-        "_verify_workflow.js"
-      ],
-      "declKind": "const",
-      "declLine": 1135,
-      "reads": 6,
-      "writes": 0
-    },
-    {
-      "name": "H_SCALE",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 6,
-      "fileCount": 3,
-      "files": [
-        "_verify_digest.js",
-        "_verify_realscale.js",
-        "_verify_snow.js"
-      ],
-      "declKind": "let",
-      "declLine": 5193,
-      "writeFiles": [
-        "_verify_digest.js"
-      ],
-      "writeExamples": [
-        "H_SCALE = terrainDef.height / terrainDef.scale"
-      ],
-      "reads": 5,
-      "writes": 1
     },
     {
       "name": "inputEdge",
@@ -1700,7 +1856,7 @@
         "_verify_water.js"
       ],
       "declKind": "function",
-      "declLine": 3973,
+      "declLine": 4110,
       "valueIsFunction": true,
       "reads": 6,
       "writes": 0
@@ -1717,25 +1873,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 4195,
-      "valueIsFunction": true,
-      "reads": 6,
-      "writes": 0
-    },
-    {
-      "name": "priorityFloodFill",
-      "kind": "function",
-      "written": false,
-      "patched": false,
-      "refCount": 6,
-      "fileCount": 3,
-      "files": [
-        "_verify_digest.js",
-        "_verify_streampower.js",
-        "_verify_tectonic.js"
-      ],
-      "declKind": "function",
-      "declLine": 5842,
+      "declLine": 4332,
       "valueIsFunction": true,
       "reads": 6,
       "writes": 0
@@ -1751,7 +1889,7 @@
         "_verify_edge_spin.js"
       ],
       "declKind": "function",
-      "declLine": 5612,
+      "declLine": 5765,
       "valueIsFunction": true,
       "reads": 6,
       "writes": 0
@@ -1768,7 +1906,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 5690,
+      "declLine": 5843,
       "valueIsFunction": true,
       "reads": 6,
       "writes": 0
@@ -1786,7 +1924,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5193,
+      "declLine": 5346,
       "writeFiles": [
         "_verify_render.js",
         "_verify_water.js",
@@ -1802,34 +1940,6 @@
       "writes": 5
     },
     {
-      "name": "XF",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 6,
-      "fileCount": 3,
-      "files": [
-        "_verify_digest.js",
-        "_verify_exact_transform.js",
-        "_verify_mask_draw.js"
-      ],
-      "declKind": "let",
-      "declLine": 1025,
-      "writeFiles": [
-        "_verify_digest.js",
-        "_verify_exact_transform.js",
-        "_verify_mask_draw.js"
-      ],
-      "writeExamples": [
-        "XF = null",
-        "XF=m",
-        "XF=null",
-        "XF=prev"
-      ],
-      "reads": 1,
-      "writes": 5
-    },
-    {
       "name": "CANYON_PROCESS",
       "kind": "const-global",
       "written": false,
@@ -1840,7 +1950,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "const",
-      "declLine": 1971,
+      "declLine": 1988,
       "patchFiles": [
         "_verify_canyon_slopes.js"
       ],
@@ -1863,7 +1973,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 3306,
+      "declLine": 3381,
       "valueIsFunction": true,
       "reads": 5,
       "writes": 0
@@ -1882,7 +1992,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 6465,
+      "declLine": 6618,
       "valueIsFunction": true,
       "reads": 5,
       "writes": 0
@@ -1917,7 +2027,7 @@
         "_verify_satpicker.js"
       ],
       "declKind": "function",
-      "declLine": 3994,
+      "declLine": 4131,
       "valueIsFunction": true,
       "reads": 5,
       "writes": 0
@@ -1934,7 +2044,7 @@
         "_verify_digest.js"
       ],
       "declKind": "function",
-      "declLine": 3413,
+      "declLine": 3514,
       "valueIsFunction": true,
       "reads": 5,
       "writes": 0
@@ -1953,7 +2063,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 4574,
+      "declLine": 4711,
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_evolution.js",
@@ -1998,7 +2108,7 @@
         "_verify_viewport_ui.js"
       ],
       "declKind": "let",
-      "declLine": 5020,
+      "declLine": 5161,
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -2023,7 +2133,7 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 2789,
+      "declLine": 2832,
       "valueIsFunction": true,
       "reads": 5,
       "writes": 0
@@ -2042,7 +2152,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 6466,
+      "declLine": 6619,
       "valueIsFunction": true,
       "reads": 5,
       "writes": 0
@@ -2060,7 +2170,7 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 5,
       "writes": 0
     },
@@ -2076,32 +2186,10 @@
         "_verify_canyon_identity.js"
       ],
       "declKind": "function",
-      "declLine": 2003,
+      "declLine": 2020,
       "valueIsFunction": true,
       "reads": 4,
       "writes": 0
-    },
-    {
-      "name": "evalFrame",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 4,
-      "fileCount": 2,
-      "files": [
-        "_verify_digest.js",
-        "_verify_realtime.js"
-      ],
-      "declKind": "let",
-      "declLine": 4015,
-      "writeFiles": [
-        "_verify_digest.js"
-      ],
-      "writeExamples": [
-        "evalFrame = 0"
-      ],
-      "reads": 3,
-      "writes": 1
     },
     {
       "name": "exactChain",
@@ -2116,7 +2204,7 @@
         "_verify_simplex.js"
       ],
       "declKind": "function",
-      "declLine": 3414,
+      "declLine": 3515,
       "valueIsFunction": true,
       "reads": 4,
       "writes": 0
@@ -2153,7 +2241,7 @@
         "_verify_menubar.js"
       ],
       "declKind": "let",
-      "declLine": 3899,
+      "declLine": 4036,
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -2178,7 +2266,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 6098,
+      "declLine": 6251,
       "valueIsFunction": true,
       "reads": 4,
       "writes": 0
@@ -2240,7 +2328,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 6505,
+      "declLine": 6658,
       "valueIsFunction": true,
       "reads": 4,
       "writes": 0
@@ -2256,7 +2344,7 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 5135,
+      "declLine": 5286,
       "valueIsFunction": true,
       "reads": 4,
       "writes": 0
@@ -2273,13 +2361,13 @@
         "_verify_peak.js"
       ],
       "declKind": "function",
-      "declLine": 1493,
+      "declLine": 1510,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
     },
     {
-      "name": "BUILD_QUALITY",
+      "name": "buildRun",
       "kind": "mutable-global",
       "written": true,
       "patched": false,
@@ -2287,19 +2375,18 @@
       "fileCount": 3,
       "files": [
         "_verify_digest.js",
-        "_verify_resparity.js",
-        "_verify_workflow.js"
+        "_verify_erosion_gridscale.js",
+        "_verify_streampower_calibration.js"
       ],
       "declKind": "let",
-      "declLine": 1133,
+      "declLine": 4152,
       "writeFiles": [
         "_verify_digest.js",
-        "_verify_resparity.js",
-        "_verify_workflow.js"
+        "_verify_erosion_gridscale.js",
+        "_verify_streampower_calibration.js"
       ],
       "writeExamples": [
-        "BUILD_QUALITY = 'interactive'",
-        "BUILD_QUALITY='interactive'"
+        "buildRun++"
       ],
       "reads": 0,
       "writes": 3
@@ -2316,7 +2403,7 @@
         "_verify_highres.js"
       ],
       "declKind": "function",
-      "declLine": 5021,
+      "declLine": 5162,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
@@ -2332,7 +2419,7 @@
         "_verify_realscale.js"
       ],
       "declKind": "const",
-      "declLine": 5192,
+      "declLine": 5345,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
@@ -2361,7 +2448,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5689,
+      "declLine": 5842,
       "reads": 3,
       "writes": 0
     },
@@ -2376,7 +2463,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5687,
+      "declLine": 5840,
       "reads": 3,
       "writes": 0
     },
@@ -2391,7 +2478,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5687,
+      "declLine": 5840,
       "reads": 3,
       "writes": 0
     },
@@ -2406,7 +2493,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 3972,
+      "declLine": 4109,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
@@ -2424,7 +2511,7 @@
         "_verify_simplex.js"
       ],
       "declKind": "const",
-      "declLine": 3411,
+      "declLine": 3512,
       "reads": 3,
       "writes": 0
     },
@@ -2454,34 +2541,10 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 4426,
+      "declLine": 4563,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
-    },
-    {
-      "name": "SCALE_RES",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 3,
-      "fileCount": 2,
-      "files": [
-        "_verify_digest.js",
-        "_verify_resparity.js"
-      ],
-      "declKind": "let",
-      "declLine": 1130,
-      "writeFiles": [
-        "_verify_digest.js",
-        "_verify_resparity.js"
-      ],
-      "writeExamples": [
-        "SCALE_RES = scaled",
-        "SCALE_RES = true"
-      ],
-      "reads": 0,
-      "writes": 3
     },
     {
       "name": "snoise",
@@ -2510,7 +2573,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 5995,
+      "declLine": 6148,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
@@ -2528,7 +2591,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2850,
+      "declLine": 2906,
       "valueIsFunction": true,
       "reads": 3,
       "writes": 0
@@ -2545,7 +2608,7 @@
         "_verify_render.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 3,
       "writes": 0
     },
@@ -2561,7 +2624,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 3,
       "writes": 0
     },
@@ -2598,7 +2661,7 @@
         "_verify_colormixer.js"
       ],
       "declKind": "function",
-      "declLine": 5066,
+      "declLine": 5207,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2628,7 +2691,7 @@
         "_verify_canyon_relief.js"
       ],
       "declKind": "function",
-      "declLine": 1927,
+      "declLine": 1944,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2644,7 +2707,7 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 5089,
+      "declLine": 5230,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2660,7 +2723,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2547,
+      "declLine": 2564,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2689,7 +2752,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5687,
+      "declLine": 5840,
       "reads": 2,
       "writes": 0
     },
@@ -2704,7 +2767,7 @@
         "_verify_curve.js"
       ],
       "declKind": "function",
-      "declLine": 1519,
+      "declLine": 1536,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2720,7 +2783,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5689,
+      "declLine": 5842,
       "reads": 2,
       "writes": 0
     },
@@ -2735,7 +2798,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 1422,
+      "declLine": 1439,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2751,7 +2814,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "let",
-      "declLine": 6190,
+      "declLine": 6343,
       "reads": 2,
       "writes": 0
     },
@@ -2766,7 +2829,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 3971,
+      "declLine": 4108,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2783,7 +2846,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 2900,
+      "declLine": 2956,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2829,7 +2892,7 @@
         "_verify_erosion_mass.js"
       ],
       "declKind": "function",
-      "declLine": 3247,
+      "declLine": 3303,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2858,7 +2921,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 1473,
+      "declLine": 1490,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2875,7 +2938,7 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 4194,
+      "declLine": 4331,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2892,7 +2955,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 2922,
+      "declLine": 2978,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2909,7 +2972,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3945,
+      "declLine": 4082,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2925,7 +2988,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4587,
+      "declLine": 4724,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2956,7 +3019,7 @@
         "_verify_render.js"
       ],
       "declKind": "function",
-      "declLine": 5038,
+      "declLine": 5179,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2972,7 +3035,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 1458,
+      "declLine": 1475,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -2988,7 +3051,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2554,
+      "declLine": 2571,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3004,7 +3067,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2551,
+      "declLine": 2568,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3020,7 +3083,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 6013,
+      "declLine": 6166,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3037,7 +3100,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 2906,
+      "declLine": 2962,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3053,7 +3116,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5194,
+      "declLine": 5347,
       "writeFiles": [
         "_verify_snow.js"
       ],
@@ -3074,7 +3137,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 2914,
+      "declLine": 2970,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3091,7 +3154,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3942,
+      "declLine": 4079,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3107,7 +3170,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 4226,
+      "declLine": 4363,
       "valueIsFunction": true,
       "reads": 2,
       "writes": 0
@@ -3139,7 +3202,7 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 2465,
+      "declLine": 2482,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3155,31 +3218,10 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 2529,
+      "declLine": 2546,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
-    },
-    {
-      "name": "buildRun",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 1,
-      "fileCount": 1,
-      "files": [
-        "_verify_digest.js"
-      ],
-      "declKind": "let",
-      "declLine": 4015,
-      "writeFiles": [
-        "_verify_digest.js"
-      ],
-      "writeExamples": [
-        "buildRun++"
-      ],
-      "reads": 0,
-      "writes": 1
     },
     {
       "name": "cameraEye",
@@ -3192,7 +3234,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 5984,
+      "declLine": 6137,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3208,7 +3250,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "const",
-      "declLine": 6034,
+      "declLine": 6187,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3224,7 +3266,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "const",
-      "declLine": 1916,
+      "declLine": 1933,
       "reads": 1,
       "writes": 0
     },
@@ -3239,7 +3281,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 2444,
+      "declLine": 2461,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3255,7 +3297,7 @@
         "_verify_toolbox.js"
       ],
       "declKind": "const",
-      "declLine": 3399,
+      "declLine": 3500,
       "reads": 1,
       "writes": 0
     },
@@ -3299,7 +3341,7 @@
         "_verify_peak.js"
       ],
       "declKind": "function",
-      "declLine": 1515,
+      "declLine": 1532,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3315,7 +3357,7 @@
         "_verify_digest.js"
       ],
       "declKind": "function",
-      "declLine": 5866,
+      "declLine": 6019,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3331,7 +3373,7 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 4202,
+      "declLine": 4339,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3347,7 +3389,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 4947,
+      "declLine": 5088,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3363,7 +3405,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5017,
+      "declLine": 5158,
       "reads": 1,
       "writes": 0
     },
@@ -3410,7 +3452,7 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 4365,
+      "declLine": 4502,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3426,7 +3468,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 3352,
+      "declLine": 3438,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3442,7 +3484,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5689,
+      "declLine": 5842,
       "reads": 1,
       "writes": 0
     },
@@ -3457,7 +3499,7 @@
         "_verify_streampower.js"
       ],
       "declKind": "function",
-      "declLine": 4992,
+      "declLine": 5133,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3473,7 +3515,7 @@
         "_verify_snow_physics.js"
       ],
       "declKind": "function",
-      "declLine": 2933,
+      "declLine": 2989,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3489,7 +3531,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 6772,
+      "declLine": 6925,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3521,7 +3563,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 6247,
+      "declLine": 6400,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3537,7 +3579,7 @@
         "_verify_layout.js"
       ],
       "declKind": "function",
-      "declLine": 1571,
+      "declLine": 1588,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3607,7 +3649,7 @@
         "_verify_range.js"
       ],
       "declKind": "const",
-      "declLine": 3955,
+      "declLine": 4092,
       "reads": 1,
       "writes": 0
     },
@@ -3622,7 +3664,7 @@
         "_verify_curve.js"
       ],
       "declKind": "const",
-      "declLine": 1523,
+      "declLine": 1540,
       "reads": 1,
       "writes": 0
     },
@@ -3637,7 +3679,7 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 3919,
+      "declLine": 4056,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3653,7 +3695,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 5986,
+      "declLine": 6139,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3669,7 +3711,7 @@
         "_verify_gpu.js"
       ],
       "declKind": "function",
-      "declLine": 2495,
+      "declLine": 2512,
       "valueIsFunction": true,
       "reads": 1,
       "writes": 0
@@ -3698,7 +3740,7 @@
         "_verify_viewport_ui.js"
       ],
       "declKind": "let",
-      "declLine": 5020,
+      "declLine": 5161,
       "reads": 1,
       "writes": 0
     }

@@ -158,7 +158,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
         + (k.endsWith('rawcells')
           ? `legacy raw-cell path (SCALE_RES off), the live measurement of the drift the gates are armed against`
           : k.includes('512')
-            ? `the app-default 512 working resolution under the Interactive travel cap (gk = 2 of 2.667) — the documented tier trade, measured live; Final restores the band`
+            ? `the app-default 512 working resolution under the Interactive tier — a full-quality sim on a 384-capped grid, delta-upsampled (was 0.6688 under the old starve-the-sim dose caps; the tier-grid contract holds near-parity)`
             : `the 1-cell breach shrinks ~1/sqrt(k) by design (expected ~0.70 at k=2); a band wide enough to pass it would be vacuous`));
       gate(`${k} modified`, v.depth192 >= 2e-5,
         `depth192=${v.depth192} (identity guard: a node that modifies nothing proves nothing)`);

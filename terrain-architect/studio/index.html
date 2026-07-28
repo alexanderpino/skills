@@ -2654,11 +2654,37 @@ function morph1D(inp,r,mx){
     for(let k=-r;k<=r;k++){const s=gAt(t,x,y+k);v=mx?Math.max(v,s):Math.min(v,s);}o[y*n+x]=v;}
   return o;
 }
+// Diagonal companion to morph1D. Composing the two builds an OCTAGONAL structuring element:
+// with square radius r1 = sqrt(2)*rd the axis reach (r1+2rd) equals the diagonal reach
+// (sqrt(2)*(r1+rd)), removing the square SE's C4 print-through (fills read wider along the
+// diagonals than along the axes - the plus-shaped bias family of 09).
+function morphDiag1D(inp,r,mx){
+  const n=RES,t=newField(),o=newField();
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=inp[y*n+x];
+    for(let k=-r;k<=r;k++){const s=gAt(inp,x+k,y+k);v=mx?Math.max(v,s):Math.min(v,s);}t[y*n+x]=v;}
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){let v=t[y*n+x];
+    for(let k=-r;k<=r;k++){const s=gAt(t,x+k,y-k);v=mx?Math.max(v,s):Math.min(v,s);}o[y*n+x]=v;}
+  return o;
+}
 // Deposits / soil: closing(h) - h, the depth loose material piles into hollows (analysis.deposit_fill).
-function depositsField(inp,{radius=3}){
-  const r=Math.max(1,Math.round(radius)),closed=morph1D(morph1D(inp,r,true),r,false),o=newField();
-  for(let i=0;i<o.length;i++)o[i]=Math.max(closed[i]-inp[i],0);
-  return normalize(o);
+// The closing runs an octagonal SE (see morphDiag1D), and the fill depth is kept PHYSICAL:
+// normalize() made a half-amplitude terrain produce the IDENTICAL deposit mask (measured ratio
+// 1.000) - a HeightField laundered into a MaskField, 10's normalize defect verbatim. The mask is
+// now depth-in-metres against refDepth (the fill depth that saturates the mask), so "how much
+// soil" survives as information and two terrains stop reading identically.
+function depositsField(inp,{radius=3,refDepth=25}){
+  const r=Math.max(1,Math.round(radius));
+  // rd from the isotropy optimum r*(1-1/sqrt2), r1 as the RESIDUAL r-2rd - so the axis reach is
+  // exactly r for every r and the slider stays monotone (a double round() of both radii made
+  // r=1..5 bit-identical: three distinct outputs across a 1..10 slider, the same dead-control
+  // defect class this tranche exists to remove). At r=1 this degenerates to the old square
+  // closing exactly; small radii cannot be isotropic on a lattice and do not pretend to be.
+  const rd=Math.round(r*(1-1/Math.SQRT2)),r1=Math.max(0,r-2*rd);
+  const oct=(f,mx)=>{const t=r1>0?morph1D(f,r1,mx):f;return rd>0?morphDiag1D(t,rd,mx):t;};
+  const closed=oct(oct(inp,true),false);
+  const o=newField(),toM=terrainDef.height/Math.max(1e-6,refDepth);
+  for(let i=0;i<o.length;i++)o[i]=Math.min(Math.max(closed[i]-inp[i],0)*toM,1);
+  return o;
 }
 // Peaks: prominence above the local mean (h - blur(h), positive part).
 function peaksField(inp,{radius=4}){
@@ -3366,22 +3392,26 @@ function erosion2Field(inp,p){
   // Res Lock: gk is the NODE-level grid ratio, measured before atFeatureScale coarsens RES, so
   // it is exactly 1 at the 192 reference (the tuned look is preserved by construction) and it
   // matches the coarse pass's own between-build grid ratio at any working resolution.
-  // Interactive caps the travel multiplier at 2 (tier policy); Final removes the cap.
-  // gw is for WIDTHS (brush, blur) - geometry, not travel, so it never gets the tier cap
-  // (same policy as the hydraulic node's brush radius).
-  const gk=BUILD_QUALITY==="final"?resScale():Math.min(resScale(),2),gw=resScale();
+  // The Interactive tier runs each pass as a FULL-QUALITY sim on a further-coarsened grid
+  // (tier = RES/384, folded into the feature scale) with ke = k/tier - identical to the old
+  // min(k,2) cap at RES <= 384, full-parity physics on the capped grid above it (same contract
+  // as the hydraulic node). gw is for WIDTHS at the FULL grid (shapeSharp blur) - geometry.
+  const kN=resScale(),tier=BUILD_QUALITY==="final"?1:Math.max(1,RES/384);
+  const gk=kN/tier,gw=kN;
   const run=(source,scale,iters,phase)=>{
     const erode=lerp(.12,.70,down)*lerp(.72,1.12,duration);
     const deposit=lerp(.08,.62,sediment);
     const capacity=lerp(3,11,down)*lerp(.72,1.18,1-sediment);
-    return atFeatureScale(source,scale,field=>gpuReady()
+    return atFeatureScale(source,scale*tier,field=>gpuReady()
       ?gpuHydraulicPipes(field,{iters,capacity,erode,deposit,inertia:.04+.08*phase,gridK:gk})
       :hydraulicErode(field,{droplets:Math.max(2500,Math.round(RES*RES*(.12+.40*duration))),
-        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round((1+scale*.35)*gw)),seed:(p.seed|0)+phase*101,settle:true,gridK:gk}));
+        capacity,erode,deposit,inertia:.04+.08*phase,radius:Math.max(1,Math.round((1+scale*.35)*gk)),seed:(p.seed|0)+phase*101,settle:true,gridK:gk}));
   };
   let h=run(seeded,featureScale,coarseIters,0);
-  // A shorter near-native pass nests fine gullies inside the broad ravines. Higher Erosion Scale
-  // still goes first, so the fine pass cannot erase the macro drainage hierarchy.
+  // A shorter fine pass nests gullies inside the broad ravines. Higher Erosion Scale still goes
+  // first, so the fine pass cannot erase the macro drainage hierarchy. On the Interactive tier
+  // above 384 the fine pass rides the 384-capped grid (fineScale*tier), so it is near-native
+  // only on Final - the preview matches the landform, not the sub-tier detail.
   if(detail>.02){
     const fineScale=lerp(1,Math.max(1,featureScale*.46),1-detail);
     h=run(h,fineScale,Math.max(6,Math.round(coarseIters*(.14+.34*detail))),1);
@@ -3416,7 +3446,14 @@ function hydroFixField(inp,p){
   }
   const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>filled[b]-filled[a]);
   for(const i of order)if(rec[i]>=0)A[rec[i]]+=A[i];
-  const fix=clamp(p.fix,0,1),down=clamp(p.downcut,0,1),threshold=lerp(.035,.0025,fix)*N;
+  // `fix` controls WHERE the node acts (channel extent, exponential across the slider - the
+  // linear form left the shipped default .52 inert: 10 of 750 pits removed, rms 2.3e-4), never
+  // HOW MUCH: the descent enforcement below is always full, because 52% of a breach is a dam.
+  // fix = 0 is an exact bypass - with unconditional enforcement the trunk network would
+  // otherwise still be breached at the slider's OFF position.
+  const fix=clamp(p.fix,0,1);
+  if(fix<=0)return inp.slice();
+  const down=clamp(p.downcut,0,1),threshold=.035*Math.pow(.0025/.035,fix)*N;
   const rawMask=new Float32Array(N),den=Math.log(Math.max(N/Math.max(threshold,1),1.0001));
   for(let i=0;i<N;i++)rawMask[i]=A[i]<=threshold?0:smooth(clamp(Math.log(A[i]/threshold)/den,0,1));
   // Corridor width is a WORLD width: the blur radius follows the grid, and the amplitude is
@@ -3432,7 +3469,7 @@ function hydroFixField(inp,p){
   const out=inp.slice();for(let i=0;i<N;i++)out[i]-=mask[i]*cut;
   const eps=relief/(Math.max(n,2)*160);
   for(const i of order){const r=rec[i];if(r<0||rawMask[i]<=0)continue;
-    const target=out[i]-eps;if(out[r]>target)out[r]=lerp(out[r],target,fix);}
+    const target=out[i]-eps;if(out[r]>target)out[r]=target;}
   return out;
 }
 
@@ -3689,7 +3726,11 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In","Mask"],desc:"Talus: material above repose slides down.",
-    params:[P.tabs("realScale","Units",[["off","Cell units"],["on","Real scale"]],"off"),
+    // Real scale is the DEFAULT: with cell units shipping as default, the Repose slider did not
+    // exist on a fresh node and repose 25 vs 45 measured IDENTICAL slope percentiles - the
+    // node's only physical control was unreachable out of the box. Cell units stay as the
+    // escape hatch (existing saved graphs keep their stored value).
+    params:[P.tabs("realScale","Units",[["off","Cell units"],["on","Real scale"]],"on"),
       WHEN(P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),"realScale","on"),
       WHEN(P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),"realScale","off"),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
@@ -3760,14 +3801,19 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       P.slider("feat","Feature scale",1,8,1,0.1,v=>v.toFixed(1)+"\u00d7")],
     eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
     const usePipes=p.engine!=="droplets"&&gpuReady();
-    // gridK follows the tier policy (Interactive caps travel at k=2, Final full parity) -
-    // matching the droplet count's existing min(4,k^2) cap; the brush radius stays full-k
-    // because width is geometry, not travel.
-    const ke=BUILD_QUALITY==="final"?k:Math.min(k,2);
-    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>usePipes
+    // Interactive tier = a FULL-QUALITY simulation on a capped grid (<= 384), its delta
+    // upsampled - NOT a starved simulation on the full grid. A2's grid invariance is the
+    // contract that makes this a preview: a capped-grid sim lands within a few percent of the
+    // full-res landform, where the old dose caps (droplet count min(4,k^2) + gridK min(k,2) on
+    // the full grid) previewed at 0.64x of Final's depth at the default 512 (measured; rate
+    // compensation cannot close it - capacity-limited dynamics saturate). ke = k/tier keeps the
+    // node-level anchoring: at RES <= 384 it equals the old caps exactly (digest-identical),
+    // at 192 it is exactly 1, and Final (tier=1) is byte-identical to before.
+    const tier=BUILD_QUALITY==="final"?1:Math.max(1,RES/384),ke=k/tier;
+    return maskApply(ins[0],atFeatureScale(ins[0],p.feat*tier,f=>usePipes
       ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters,gridK:ke})
-      :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*(BUILD_QUALITY==="final"?k*k:Math.min(4,k*k))),
-        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*k)),settle:true,gridK:ke})),ins[1]);},
+      :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*ke*ke),
+        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*ke)),settle:true,gridK:ke})),ins[1]);},
     note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
   erosion2:{cat:"ero",name:"Erosion 2",ins:["In","Mask"],
     desc:"Advanced multi-scale hydraulic erosion: broad ravines first, nested gullies second, then sediment and shape relaxation.",
@@ -3882,8 +3928,12 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     params:[P.slider("radius","Radius",0.01,0.2,0.06,0.01),P.int("dirs","Directions",4,16,8)],
     eval:(p,ins)=>ins[0]?occlusionField(ins[0],p):newField()},
   d_deposits:{cat:"data",name:"Deposits",ins:["In"],desc:"Soil / sediment: the depth loose material piles into hollows (morphological closing − surface).",
-    params:[P.int("radius","Radius",1,10,3)],
-    eval:(p,ins)=>ins[0]?depositsField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}):newField()},
+    // refDepth is what keeps the mask PHYSICAL: the fill depth (metres) that saturates it.
+    // The old normalize() output was identical for a terrain at any amplitude.
+    params:[P.int("radius","Radius",1,10,3),
+      P.slider("refDepth","Full-mask depth",5,120,25,1,v=>(v|0)+" m")],
+    eval:(p,ins)=>ins[0]?depositsField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale())),
+      refDepth:p.refDepth==null?25:p.refDepth}):newField()},
   d_wear:{cat:"data",name:"Wear",ins:["In"],desc:"Exposed, convex, steep ground — the edges erosion strips first.",
     params:[P.slider("strength","Strength",0.2,3,1,0.1)],
     eval:(p,ins)=>ins[0]?wearField(ins[0],p):newField()},
@@ -4741,8 +4791,12 @@ function buildProps(){
         if(climateNodes.length)requestEval();else if(curField)updateViewport(curField);
         tdInfo();syncCompass();};
       i.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;
-        if((key==="scale"||key==="height")&&nodes.some(n=>n.type==="thermal"&&n.params.realScale==="on")){
-          nodes.filter(n=>n.type==="thermal").forEach(n=>markDirtyFrom(n.id));requestEval();}};
+        // Every node whose output READS the terrain definition must re-evaluate when it moves:
+        // thermal (Real scale repose), and deposits/texture (fill depth is metres / refDepth).
+        if(key==="scale"||key==="height"){
+          const affected=nodes.filter(n=>(n.type==="thermal"&&n.params.realScale==="on")
+            ||n.type==="d_deposits"||n.type==="d_texture");
+          if(affected.length){affected.forEach(n=>markDirtyFrom(n.id));requestEval();}}};
       f.appendChild(i);return f;};
     body.appendChild(mk("scale","Scale (across)",500,20000,1,v=>Math.round(v)+" m"));
     body.appendChild(mk("height","Relief height",100,8000,1,v=>Math.round(v)+" m"));
@@ -5175,16 +5229,26 @@ function blurColorMass(rgb,mass,n,r){
 }
 function colorErodeField(base,h,p,mask,n,owner){       // owned colour-advection/deposition model; height is unchanged
   const N=n*n,laminar=p.laminar==="on",seed=p.seed|0;
-  const steps=clamp(Math.round((2+p.transport*10)*Math.min(resScale(),2.5)),1,96);
+  // Transport is a WORLD distance: the old min(resScale(),2.5) cap froze it in cells above 480
+  // square, so reach silently shrank as resolution grew. The 96-step clamp is the cost guard -
+  // note it saturates the top of the slider at high grids (above ~0.34 at 4096) rather than
+  // shrinking the world reach, which is the honest direction to fail in.
+  const steps=clamp(Math.round((2+p.transport*10)*resScale()),1,96);
   let route=owner&&owner._colorErosionRoute,recv,jumps;
   if(route&&route.h===h&&route.n===n&&route.steps===steps&&route.laminar===laminar&&route.seed===seed){
     recv=route.recv;jumps=route.jumps;
   }else{
+    // Depression handling BEFORE flow routing - the Legal Order's first law applies to pigment
+    // too. Routed on raw h, 98.8% of all deposited mass landed on the 1.2% of cells that are
+    // pits (measured: an 80x concentration) and the channels got nothing. Fill for ROUTING
+    // only; deposition and the visual pass still read the real surface. (priorityFloodFill
+    // reads global RES - callers must pass n === RES, which resolveColor guarantees.)
+    const hr=priorityFloodFill(h);
     recv=new Int32Array(N);
     const nb=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]];
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,hi=h[i];let best=i,bv=hi;
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=y*n+x,hi=hr[i];let best=i,bv=hi;
       for(let k=0;k<8;k++){const xx=x+nb[k][0],yy=y+nb[k][1];if(xx<0||yy<0||xx>=n||yy>=n)continue;
-        const j=yy*n+xx,hj=h[j];if(hj>=hi-1e-8)continue;
+        const j=yy*n+xx,hj=hr[j];if(hj>=hi-1e-8)continue;
         const score=hj+(laminar?0:(hash2(x+k*17,y-k*13,seed)-.5)*2e-5);
         if(score<bv){bv=score;best=j;}}
       recv[i]=best;}
@@ -5204,7 +5268,7 @@ function colorErodeField(base,h,p,mask,n,owner){       // owned colour-advection
     const mr=lum*.92,mg=lum*.82,mb=lum*.70,pr=mr+(r-mr)*hold,pg=mg+(g-mg)*hold,pb=mb+(b-mb)*hold;
     for(let q=0;q<3;q++){const d=advance(i,Math.max(1,Math.round(steps*fr[q]))),w=w0*fw[q];
       dep[d*3]+=pr*w;dep[d*3+1]+=pg*w;dep[d*3+2]+=pb*w;mass[d]+=w;}}
-  const br=Math.round(clamp(p.diffusion,0,1)*6*Math.min(resScale(),2.5));if(br>0){const z=blurColorMass(dep,mass,n,br);dep=z.rgb;mass=z.mass;}
+  const br=Math.round(clamp(p.diffusion,0,1)*6*resScale());if(br>0){const z=blurColorMass(dep,mass,n,br);dep=z.rgb;mass=z.mass;}
   const out=new Float32Array(N*3);
   for(let i=0;i<N;i++){const m=mass[i],fm=m>1e-7?1-Math.exp(-m*(4+flow*7)):0,msk=mask?clamp(mask[i],0,1):1;
     const a=clamp(p.blend*fm*msk,0,1),j=i*3;
@@ -5220,7 +5284,9 @@ function gradeWeatherColor(r,g,b,hue,sat,light){
   return[clamp(r,0,1),clamp(g,0,1),clamp(b,0,1)];
 }
 function weatherColorField(base,h,p,mask,n,owner){       // exposed relief + sheltered dirt; operates on sRGB colour data
-  const N=n*n,r=Math.max(1,Math.round((1+Math.pow(2,p.scale*4.5))*Math.min(resScale(),2.5)));
+  // Signal radius is a WIDTH (geometry): full grid ratio, same policy as Color Erosion above -
+  // the old min(resScale(),2.5) cap froze it in cells above 480 square.
+  const N=n*n,r=Math.max(1,Math.round((1+Math.pow(2,p.scale*4.5))*resScale()));
   let cached=owner&&owner._weatherSignal,signal;
   if(cached&&cached.h===h&&cached.n===n&&cached.r===r&&cached.creep===p.creep)signal=cached.signal;
   else{
@@ -6887,7 +6953,11 @@ function defaultGraph(){
   const mix=makeNode("blend",200,120);mix.params={factor:0.5};
   const warp=makeNode("warp",200,300);warp.params={strength:0.08,freq:3,seed:5};
   const hyd=makeNode("hydraulic",360,120);hyd.params={engine:"auto",pipeIters:48,droplets:16000,erode:0.35,deposit:0.28,capacity:6,inertia:0.05,seed:1,feat:1};
-  const th=makeNode("thermal",520,120);th.params={talus:0.014,iters:22,rate:0.5};
+  // assign, never replace (see the snow node below): a replaced params object loses schema keys
+  // and the next property-panel hydration writes the schema defaults back in SILENTLY - here
+  // that would flip the node to Real scale and change the shipped terrain by 4.3 m rms on a
+  // click. The default document keeps its tuned CELL-UNIT look, explicitly.
+  const th=makeNode("thermal",520,120);Object.assign(th.params,{realScale:"off",talus:0.014,iters:22,rate:0.5});
   const deposits=makeNode("d_deposits",520,300);deposits.params.radius=4;
   const sat=makeNode("satmap",680,120);sat.params.gradient="Temperate";sat.params.source="height";sat.params.rough="med";
   const colorErosion=makeNode("colorerosion",840,120);colorErosion.params.seed=7;
