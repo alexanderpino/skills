@@ -76,6 +76,11 @@ above — it's the obvious synthesis.
 
 The height op. Fine when you want the look.
 
+The **hex-prism / pillar** render style (`08`) is this op by another name, applied at mesh-build
+time — so it inherits the tell above (steps track absolute elevation and cut across valleys),
+deliberately. Keep it downstream of everything: quantise the field before simulating and slope
+becomes `0`-or-infinite, which breaks flow routing and erosion outright.
+
 ```
 terrace(h, levels, sharpness):
     q = h * levels

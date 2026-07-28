@@ -36,6 +36,7 @@ Plus a manifest, and the manifest is not optional:
   "grid":          "square"|"hex",// working lattice — default square; the hex fields apply only when "hex"
   "hexOrientation":"pointy"|"flat",   // hex only — neighbour offsets and row pitch depend on it
   "hexCoords":     "axial"|"offset-odd-r"|"offset-even-r"|"offset-odd-q"|"offset-even-q", // hex only — how the 2D array indexes cells
+  "stepHeight":    float,         // metres — prism/pillar rendering only; RENDER-TIME quantisation, never applied to the simulated field
   "heightRange":   [min, max],    // metres, for R16 dequantisation
   "seaLevel":      float,
   "rootSeed":      uint64,
@@ -449,8 +450,69 @@ whose ring is complete and let the mesh stop one cell short. The general least-s
 degrades gracefully on a partial ring if you invert the actual `Σ vₘvₘᵀ`; do not silently apply the
 complete-ring constants to a truncated stencil, which flattens the domain edge.
 
-If you instead want **flat-shaded plates** (the boardgame look), you want one normal per *cell*, not per
-vertex, and neither vertex class applies.
+**Hex prisms — the "pillar" / stepped-tile look.** The third representation, and the one the two vertex
+classes above do *not* serve: quantise height to discrete levels and extrude each cell into a
+flat-topped hexagonal prism, so the terrain reads as a field of columns with visible vertical walls.
+It is the signature look of hex strategy games and of physical/3D-printed relief models. It looks like
+Minecraft, and it is **not** — `24`'s voxel paradigm and everything it suspends does not apply here.
+This is still a heightfield: one column per cell, one height per column, no overhangs, no 3D
+occupancy grid, no chunk streaming. You keep the entire pipeline of this skill and change only how the
+final surface is built.
+
+**Quantise last — this is the load-bearing rule.** `stepHeight` is a *presentation* transform, applied
+after everything, exactly as `06`'s analysis must sit downstream of the last height edit. Simulate on
+the continuous hex field; snap at mesh-build time. Quantise early and every process downstream breaks
+in the same way: on a stepped field slope is either exactly `0` (on a top) or infinite (at a wall), so
+flow routing has no gradient to follow, erosion has no transport term, and talus has nothing to
+compare against repose. The stepping is also the **terrace node** of `11` under another name, so it
+inherits that section's tell — steps track *absolute elevation* and therefore cut straight across
+valleys rather than following bed geometry. That is fine, even desirable, as a deliberate style; it is
+a bug if you were hoping for geology.
+
+Record `stepHeight` in the manifest beside `cellSize` — it is a **third quantisation axis** alongside
+horizontal `cellSize` and the R16 vertical precision above, and note the inversion it creates: the
+staircase that the precision rules call a defect ("the derivative of a staircase is a comb") is here
+the intent. In a game the levels are usually gameplay state as well — movement cost, line of sight,
+buildability — so the count is authored and coarse (a handful of levels, not hundreds) rather than
+chosen for visual fidelity.
+
+**Normals are enumerated, not computed.** Every face falls into **7 classes** and each has a constant
+normal: the top is exactly `+Z` (all six corners share one quantised height, so it is flat by
+construction), and the six walls are vertical planes with fixed horizontal azimuths. The gradient
+stencils above are bypassed entirely — there is no derivative to estimate. Two consequences invert
+earlier rules. Every edge is a **hard** edge, so vertices must **not** be shared between top and wall
+or between adjacent walls; duplicate them, each carrying its face normal, which is the exact opposite
+of the shared-float rule for the smooth meshes. And because every top is identically lit by a
+directional light, the tops carry no shading variation at all — the form is read entirely from the
+wall shading and from AO, so `06`'s horizon AO stops being polish and becomes the thing that makes the
+terrain legible.
+
+**Two build strategies**, mirroring the fork above:
+
+```
+# A. instanced full-depth columns — simplest, GPU-friendly, some hidden overdraw
+#    one prism mesh, per-instance (centre.x, centre.y, quantisedHeight, material)
+#    columns run down to a base plane; buried walls are never seen (the physical-model look)
+
+# B. welded surface with culled walls — minimal geometry, needs a build pass
+wallQuad(A, B) emitted only when hᴀ > hᴃ, of height (hᴀ − hᴃ)      # Minecraft's hidden-face removal
+top(A)         = 4 triangles (a hexagon is a 4-triangle fan; no centre vertex needed — it is flat)
+```
+
+Budget: worst case ~16 triangles per cell (4 top + 6 walls × 2), against the smooth dual mesh's ~2 —
+roughly an order of magnitude, which is why (A) plus instancing is the usual answer at scale. Strategy
+(B) pays for itself only on flat-ish terrain, where most walls cull.
+
+**Materials go per-cell, and the layer stack still holds.** There is no splatmap blending on a flat
+top — take the dominant material per cell (argmax over `06`'s masks) and colour the prism, walls
+included or separately for a cliff material. The three surfaces of the layer stack are unchanged, but
+they need not all be quantised: the usual treatment leaves `waterSurface` a **smooth plane** at sea or
+lake level cutting across the stepped solid, which is what gives the style its characteristic
+crisp shoreline.
+
+**Tier.** **F** throughout — a rendering and art-direction convention, not a result; there is no paper
+and none is needed. The underlying quantisation is `11`'s terrace op, the culling is standard
+hidden-face removal, and the AO is `06`.
 
 **Interchange: hex is a working grid; deliver a raster.** Engines, meshers and every DCC import expect a
 square raster (or, on a planet, an equirectangular one), so — exactly like equirectangular below — hex
