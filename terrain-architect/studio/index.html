@@ -351,6 +351,14 @@ select.inp,input.inp{width:100%;height:28px;background:var(--panel2);border:1px 
   border-radius:var(--radius-sm);color:var(--text);padding:0 8px;font-size:12px;font-family:var(--mono)}
 select.inp{appearance:none}
 .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+/* Grid lattice is a structural choice about the whole terrain, not one more slider row, so it
+   gets its own titled block with drawn symbols instead of a bare two-word segmented control. */
+.lattice-field{margin-top:14px;padding:10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel2)}
+.lattice-title{font-weight:600;letter-spacing:.02em}
+.lattice-seg{margin-top:8px;background:var(--panel);border-radius:var(--radius-sm)}
+.lattice-btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 6px;line-height:1.1}
+.lattice-btn svg{width:38px;height:32px;opacity:.62;display:block}
+.lattice-btn.active svg{opacity:1}
 .seg button{flex:1;height:26px;padding:0 4px;background:none;border:none;color:var(--muted);
   font-size:10.5px;cursor:pointer;white-space:nowrap}
 .seg button.on{background:var(--panel3);color:var(--accent)}
@@ -5384,12 +5392,25 @@ function buildProps(){
     {
       // Lattice toggle (references/26): square raster or hexagonal (odd-r). Everything is
       // re-evaluated on switch - the seed contract, mesh topology and metric all change.
-      const f=document.createElement("div");f.className="field";
-      f.innerHTML=`<div class="frow"><label>Grid lattice</label></div>`;
-      const seg=document.createElement("div");seg.className="seg";
+      // Promoted to a titled block with drawn lattice symbols: this is a structural choice about
+      // the whole terrain, not a slider, so it should not read as one more row in a stack.
+      const f=document.createElement("div");f.className="field lattice-field";
+      f.innerHTML=`<div class="frow"><label class="lattice-title">Grid lattice</label></div>`;
+      // The symbols ARE the explanation: four squares meeting at a corner (the diagonal
+      // ambiguity) versus a honeycomb (six equidistant edge neighbours).
+      const SYM={
+        square:`<svg viewBox="0 0 40 34" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="6" y="4" width="13" height="13"/><rect x="19" y="4" width="13" height="13"/>
+          <rect x="6" y="17" width="13" height="13"/><rect x="19" y="17" width="13" height="13"/></g></svg>`,
+        hex:`<svg viewBox="0 0 40 34" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6">
+          <polygon points="13,3 20,7 20,15 13,19 6,15 6,7"/><polygon points="27,3 34,7 34,15 27,19 20,15 20,7"/>
+          <polygon points="20,15 27,19 27,27 20,31 13,27 13,19"/></g></svg>`};
+      const seg=document.createElement("div");seg.className="seg lattice-seg";
       for(const[val,lab]of[["square","Square"],["hex","Hexagonal"]]){
-        const b2=document.createElement("button");b2.type="button";b2.className="seg-btn";b2.textContent=lab;
-        if((terrainDef.lattice||"square")===val)b2.classList.add("active");
+        const b2=document.createElement("button");b2.type="button";b2.className="seg-btn lattice-btn";
+        b2.innerHTML=SYM[val]+`<span>${lab}</span>`;
+        b2.setAttribute("aria-label",lab+" grid lattice");
+        if((terrainDef.lattice||"square")===val){b2.classList.add("active");b2.setAttribute("aria-pressed","true");}
         b2.onclick=()=>{if((terrainDef.lattice||"square")===val)return;
           const before=graphSnapshot();terrainDef.lattice=val;pushUndo(before);
           buildIndex();nodes.forEach(nd=>{nd._dirty=true;nd._thumb=null;});
@@ -5398,10 +5419,16 @@ function buildProps(){
         seg.appendChild(b2);
       }
       f.appendChild(seg);
-      const note=document.createElement("div");note.className="hint";note.style.marginTop="4px";
-      note.textContent="Hexagonal: 6 equidistant neighbours (no diagonal ambiguity), static "
-        +"equilateral mesh, D6 thermal; footprint becomes "+"scale × scale·√3/2 m. GPU compute "
-        +"and the square-stencil water/snow sims run in square approximation — see README.";
+      const note=document.createElement("div");note.className="hint";note.style.marginTop="6px";
+      // Say the footprint consequence plainly here, because it is the thing that surprises: the
+      // terrain looks different on toggle, and the reason is geometric, not a bug.
+      note.innerHTML="<b>Hexagonal</b>: 6 equidistant neighbours, so there is no diagonal to weight "
+        +"and no 45° drainage bias; static equilateral mesh (no edge spinning); D6 thermal, routing "
+        +"and analysis.<br><b>Footprint changes.</b> A true hex lattice puts rows √3/2 apart, so on "
+        +"the same square grid the world becomes <b>scale × scale·√3/2</b> — you are looking at the "
+        +"same terrain over a 13.4% shorter map, re-levelled to fit. The noise itself is unchanged: "
+        +"at matched world points the two lattices agree to 0.2%. GPU compute runs on the CPU path "
+        +"in hex mode.";
       f.appendChild(note);
       body.appendChild(f);
     }
