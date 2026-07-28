@@ -113,6 +113,24 @@ quantised R16 field, curvature is essentially a picture of the quantisation stai
 it on R32F, before export. If the field is noisy, pre-smooth with a small Gaussian (σ ≈ 1 cell)
 — the alternative is a mask made of speckle.
 
+**On a hexagonal grid, the 3×3 quadratic fit is replaced by three second differences** (`26`).
+Zevenbergen–Thorne's `D, E, F` are the Hessian read off a 3×3 square window; the hex one-ring
+determines the same Hessian in closed form, from the **three antipodal pairs**:
+
+```
+D_k = h[+e_k] + h[−e_k] − 2·h[0]                 # second difference along lattice direction k
+[Hxx, Hxy, Hyy] = M⁻¹ · [D_0, D_1, D_2] / cellSize²   # M_k = (uₖ.x², 2·uₖ.x·uₖ.y, uₖ.y²),
+                                                       # uₖ = world unit dir of pair k — fixed 3×3
+```
+
+Exact on quadratics, like the fit it replaces, and `Hxx + Hyy` reproduces the renormalised
+6-neighbour Laplacian (`2/(3d²)`, `26`) — one consistency check for free. Profile, plan and
+mean curvature then follow from `(Hxx, Hxy, Hyy)` and the 6-point gradient by the *same*
+formulas above (they only need `D…H`, not the window they came from). The world directions
+`uₖ` come through the shear matrix `B`, so the orientation is baked in — do not build `M` from
+the index offsets. Runnable: `reference-impl/hex_grid.py` `hessian6`, pinned by
+`reference-impl/tests/test_hex_grid.py`.
+
 ## Horizon-based ambient occlusion
 
 For each of `N` azimuth directions, march outward and track the maximum horizon elevation
@@ -137,6 +155,10 @@ ao(h, p, N, maxDist):
         v += cos(θ)²                             # ← see derivation below
     return 1 - v / N                             # occlusion; visibility = v/N
 ```
+
+(On a hexagonal grid the march is unchanged — azimuths are world-space, and `N` should *not* be
+snapped to 6 — but `sample(h, q)` at a continuous position is the barycentric dual-triangle
+sample, since there is no bilinear on this lattice; `26`.)
 
 **Where `cos²θ` comes from.** Cosine-weighted visibility over the hemisphere with an up-facing
 normal, with the horizon at elevation `θ` blocking everything below it:
@@ -194,6 +216,13 @@ negative.
 TWI needs **MFD**, not D8 (`03`). TWI is a hillslope quantity and D8's parallel-lines artefact
 prints straight into it as stripes. This is the canonical reason to have MFD in the graph at
 all.
+
+On a hexagonal grid two constants shift together (`26`): `A` seeds from the hex cell area
+`(√3/2)·cellSize²` (`03`), and the contour width is the shared hex **edge**, `cellSize/√3` —
+uniform across all six directions, which is the simplification that lets D6-MFD drop Quinn's
+cardinal/diagonal contour-length split entirely. So `A_specific = A / (cellSize/√3)`. Use both
+hex constants or neither: mixing the hex area with the square width (or vice versa) shifts
+every TWI threshold silently.
 
 Typical range 3–20. Remap with a measured histogram, not an assumed range.
 

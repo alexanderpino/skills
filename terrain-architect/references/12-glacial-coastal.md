@@ -341,7 +341,9 @@ exposure(p):
 
 This is structurally the same sweep as horizon AO (`06`) — and it can use the same
 Timonen & Westerholm O(1) machinery. Exposed headlands get high fetch, sheltered bays get low.
-That asymmetry drives everything.
+That asymmetry drives everything. (On a hexagonal grid the sweep is unchanged — the azimuths
+are world-space and must stay so — but every `isOcean(p − dir·d)` lookup at a continuous
+position goes through `cube_round`, never per-axis rounding; `26`.)
 
 One refinement the sweep misses: real waves **refract** — shoaling bends crests toward shallow
 water, *focusing* energy onto headlands and spreading it in bays, which sharpens the same

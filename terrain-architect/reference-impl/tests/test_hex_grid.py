@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 
 import hex_grid
-from hex_grid import NEIGHBOURS, basis, cell_at, disc, gradient6, laplacian6, ring, sample
+from hex_grid import (NEIGHBOURS, basis, cell_at, disc, gradient6, hessian6, laplacian6,
+                      ring, sample)
 
 CS = 1.7  # deliberately non-unit: catches any formula that silently assumes cellsize == 1
 
@@ -131,6 +132,22 @@ def test_laplacian6_exact_on_quadratic_and_square_constant_is_1p5x():
     # keep the square grid's 1/d^2 constant instead and the answer is exactly 1.5x high
     unrenormalised = lap * (3.0 / 2.0)
     assert np.allclose(unrenormalised, 6.0, atol=1e-9)
+
+
+def test_hessian6_exact_on_quadratic_and_consistent_with_laplacian():
+    """Three antipodal second differences determine the full world-space Hessian in closed
+    form — the hex replacement for Zevenbergen-Thorne's 3x3 quadratic fit (`06`)."""
+    Hxx, Hxy, Hyy = 0.7, -0.4, 1.3
+    n = 24
+    h = _world_field(lambda x, y: 0.5 * (Hxx * x * x + Hyy * y * y) + Hxy * x * y
+                     + 0.3 * x - 0.8 * y + 2.0, n, CS)
+    hxx, hxy, hyy = hessian6(h, CS)
+    sl = np.s_[8:16, 8:16]
+    assert np.allclose(hxx[sl], Hxx, atol=1e-9)
+    assert np.allclose(hxy[sl], Hxy, atol=1e-9)
+    assert np.allclose(hyy[sl], Hyy, atol=1e-9)
+    # trace(H) must agree with the renormalised 6-neighbour Laplacian — same moments
+    assert np.allclose((hxx + hyy)[sl], laplacian6(h, CS)[sl], atol=1e-9)
 
 
 def test_gradient6_is_affine_exact_in_world_space():

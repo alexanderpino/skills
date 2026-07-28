@@ -35,7 +35,8 @@ IMPLEMENTED = {
     "aeolian": ["yardang", "shear_velocity", "threshold_shear", "saltation_flux",
                 "transport_field", "saturate", "exner_step"],
     "tectonics": ["fault_scarp", "fault_weakness", "plate_uplift"],
-    "hex_grid": ["basis", "cell_at", "sample", "ring", "disc", "laplacian6", "gradient6"],
+    "hex_grid": ["basis", "cell_at", "sample", "ring", "disc", "laplacian6", "gradient6",
+                 "hessian6"],
     "placement": ["disc", "rect", "capsule", "polygon", "path_mask", "apply_masked", "stamp",
                   "place_coords", "affine", "compose", "transform_coords", "sample_coords"],
 }

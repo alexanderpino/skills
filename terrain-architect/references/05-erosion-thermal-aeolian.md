@@ -77,6 +77,16 @@ Reversed, hydraulic just re-steepens what thermal fixed and the thermal pass is 
 layer, run inside the hydraulic loop. Same code, different input field, much lower talus angle
 (loose sediment ~30° vs bedrock ~45°).
 
+**On a hexagonal grid, the distance-correction bug cannot be written** (`26`). All six
+neighbours sit at one `cellSize`, so there is a single `dLimit = tan(talusAngle)·cellSize` for
+every pair — the diagonal branch, the √2, and the mixed-limit volume bug above all vanish
+rather than needing care. Everything that is *not* the metric survives unchanged, because it
+was never about the lattice: double-buffering, `c·maxExcess/2`, the per-pair clamp, and
+convergence. The plus-shaped collapse becomes a smaller 6-fold residual — the cone test (`09`)
+still applies, with *less than the square grid* as the pass criterion. Do not "port" the 8-way
+loop by keeping 8 entries: the neighbour table is 6, fixed, and in offset coordinates it is
+row-parity dependent (`26`).
+
 ## Repose angles
 
 Use real numbers. They are the difference between a landscape and a lumpy noise field.
@@ -396,7 +406,16 @@ inShadowZone(h, p, windDir):
 3. **Avalanching after every move.** Keeps slip faces at repose. Without it the dune crest
    grows into a spike.
 
-**Wind regime determines dune type** — this is Werner's actual result and it's free:
+**On a hexagonal grid, keep the wind in world space and let `cube_round` land the slab** (`26`).
+The wind direction must *not* be quantised to the 6 lattice directions — that would print a
+60°-locked dune orientation, the exact artefact hex is chosen to avoid. Hop in world
+coordinates, `p_world = c_world + wind·L·cellSize`, and convert to a cell with `cube_round`
+(never per-axis rounding); walk the shadow test the same way, stepping `−wind·k·cellSize` in
+world space and looking up each cell as you go. The avalanche call is the D6 thermal step above
+— single distance, no correction. What changes in behaviour: nothing intended — dune type still
+comes from the wind regime — but the lattice's residual imprint on ridge orientation drops from
+the square grid's 45°/90° family to a weaker 60° one, which is visible in the FFT of the ridge
+signal (`09`'s sun sweep equivalent for dunes).
 
 | Wind regime | Dune type |
 |---|---|

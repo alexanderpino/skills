@@ -111,6 +111,34 @@ def laplacian6(h, cellsize):
     return acc * (2.0 / (3.0 * cellsize * cellsize))
 
 
+def hessian6(h, cellsize, orientation="pointy"):
+    """Full world-space Hessian (Hxx, Hxy, Hyy) from the 3 antipodal second differences.
+
+    Each antipodal pair k gives D_k = h(+e_k) + h(-e_k) - 2h = d^2 * u_k^T H u_k, a second
+    difference along one lattice direction; three directions determine the three Hessian
+    components in closed form (a fixed 3x3 solve). Exact on quadratics — this is the hex
+    replacement for Zevenbergen-Thorne's 3x3 quadratic fit (`06`), and profile/plan/mean
+    curvature follow from (Hxx, Hxy, Hyy) and `gradient6` by the same formulas.
+    """
+    h = np.asarray(h, dtype=float)
+    B = basis(cellsize, orientation)
+    M = np.empty((3, 3))
+    for k in range(3):
+        u = B @ np.array(NEIGHBOURS[k], dtype=float)
+        u /= np.linalg.norm(u)
+        M[k] = (u[0] * u[0], 2.0 * u[0] * u[1], u[1] * u[1])
+    Minv = np.linalg.inv(M)
+    D = np.empty((3,) + h.shape)
+    for k in range(3):
+        dq, dr = NEIGHBOURS[k]
+        D[k] = (np.roll(np.roll(h, -dq, axis=0), -dr, axis=1)
+                + np.roll(np.roll(h, dq, axis=0), dr, axis=1) - 2.0 * h)
+    D /= cellsize * cellsize
+    return (Minv[0, 0] * D[0] + Minv[0, 1] * D[1] + Minv[0, 2] * D[2],
+            Minv[1, 0] * D[0] + Minv[1, 1] * D[1] + Minv[1, 2] * D[2],
+            Minv[2, 0] * D[0] + Minv[2, 1] * D[1] + Minv[2, 2] * D[2])
+
+
 def gradient6(h, cellsize, orientation="pointy"):
     """World-space gradient from the one-ring stencil: g = sum(h_k * e_k) / (3 d).
 

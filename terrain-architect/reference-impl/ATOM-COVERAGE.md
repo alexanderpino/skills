@@ -88,8 +88,10 @@ is the upstream-lagged near-bank velocity (Ikeda–Parker–Sawai 1981), documen
 `G = BᵀB` and cell area `det B` route through it), `cell_at` (point→cell by cube rounding — per-axis
 rounding is wrong ~17% of the time), `sample` (barycentric over the dual triangle; there is no
 bilinear on this lattice), `ring` / `disc` (6k / 1+3k(k+1) neighbourhoods — the box loop has no hex
-analogue), `laplacian6` (renormalised `2/(3d²)` constant) and `gradient6` (one-ring world-space
-gradient — the shear is inside the stencil, so the `B⁻ᵀ` normal rule cannot be forgotten). These are
+analogue), `laplacian6` (renormalised `2/(3d²)` constant), `gradient6` (one-ring world-space
+gradient — the shear is inside the stencil, so the `B⁻ᵀ` normal rule cannot be forgotten) and
+`hessian6` (full world-space Hessian from the 3 antipodal second differences — the hex replacement
+for Zevenbergen–Thorne's 3×3 quadratic fit, exact on quadratics, trace-consistent with `laplacian6`). These are
 the hex-native forms of chapter `26`'s *What does not port* section; the chapter's measured claims
 (the 16.8% wrong-cell rate, the 30.5° naive-normal error, the √3 separable-blur anisotropy, the H/3
 corner-mean plateau, the 1.5× un-renormalised Laplacian) are pinned by

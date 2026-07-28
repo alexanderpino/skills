@@ -175,6 +175,17 @@ For most terrain: option 2 for ground cover, option 3 for props (there are few e
 that generating them globally is cheap), option 4 only if you genuinely need streamed
 blue-noise props.
 
+**On a hexagonal grid** (`26`) the samplers themselves are untouched — Poisson disc, Ulichney
+masks and dart throwing live in world coordinates and never see the lattice. Only option 2
+changes: "uniform jitter within the cell" now means **uniform in a hexagon**, and the clean way
+is the cell's own 3-rhombi decomposition (the tumbling-blocks figure, `26`): pick `k ∈ {0,1,2}`
+and two uniforms `u, v ∈ [0,1)`, then `p = centre + u·c₂ₖ + v·c₂ₖ₊₂` where `cᵢ` are the six
+corner offsets — each rhombus is spanned by two alternate corners (their sum is the corner
+between them), so the three parallelograms tile the hexagon exactly and the sample is uniform
+with no rejection loop. Jittering in a *square* of side `cellSize` instead leaks samples into
+the six neighbouring cells, which breaks the per-cell determinism that is the whole point of
+option 2. Density bookkeeping uses the hex cell area `(√3/2)·cellSize²` (`26`).
+
 ## Rule-based scatter
 
 The layer above the sampler. The sampler gives you positions; the rules decide what survives

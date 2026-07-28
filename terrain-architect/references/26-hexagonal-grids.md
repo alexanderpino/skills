@@ -479,6 +479,33 @@ vertex with exactly one segment. **No ambiguous case exists.** Coastline and con
 `12`) is strictly simpler here, which is worth knowing because the rest of this section is a list of
 things that get harder.
 
+**The porting map — where each family's hex form lives.** Every simulation and analysis chapter that
+touches the lattice carries its own hex note; this table is the router. The pattern behind all of them:
+*world-space quantities stay world-space* (wind, azimuths, radii, samplers), *cell lookups go through
+`cube_round`*, *continuous sampling is barycentric*, *the two constants that change are the cell area
+`(√3/2)·cellSize²` and the edge/contour width `cellSize/√3`*, and *distance-correction bugs vanish
+rather than needing care*.
+
+| Family | Hex form | Where |
+|---|---|---|
+| Flow routing | D6 steepest descent / D6-MFD, uniform weights, Quinn's contour-length split gone; `A` seeds from `(√3/2)·cellSize²` | `03` |
+| Pipe-model hydraulics | 6 pipes, one length, no projection factor; cell area in every volume↔depth conversion and in the flux limiter | `04` |
+| Droplet erosion | barycentric height sample; gradient = per-centre `gradient6` interpolated barycentrically (continuous, no per-triangle kinks); deposit over the 3 dual vertices; brush via `disc` | `04` |
+| Thermal / talus | one `dLimit` for all 6 — the √2 bug cannot be written; per-pair clamp and convergence unchanged | `05` |
+| Aeolian / dunes (Werner) | wind stays world-space (never snapped to 6 directions); hop and shadow walk land via `cube_round`; avalanche = D6 thermal | `05` |
+| Slope / normals | one-ring 6-point gradient, shear inside the stencil (`gradient6`) | `06`, above |
+| Curvature | full Hessian from the 3 antipodal second differences (`hessian6`); Zevenbergen–Thorne formulas then apply unchanged | `06` |
+| TWI | cell area *and* contour width change together: `A_specific = A / (cellSize/√3)` | `06` |
+| Horizon AO / fetch sweeps | azimuths world-space, unchanged; continuous lookups via barycentric sample / `cube_round` | `06`, `12` |
+| Scatter | samplers untouched (world-space); per-cell jitter = uniform-in-hexagon via the 3-rhombi decomposition; density uses hex cell area | `07` |
+| Lava CA | 6 neighbours, one distance; keep Monte Carlo selection — quantisation remains even though metric bias is gone | `19` |
+| Diffusion / Laplacian | renormalised `2/(3d²)` constant (`laplacian6`) | above |
+| Contours / coastline extraction | marching triangles on the dual — 8 cases, no ambiguous saddle | above, `03`, `12` |
+
+Stream power's solver is graph-based and needs no port — it consumes the D6 receiver graph exactly as
+it consumes D8's (`04`); noise and SDF primitives sample world coordinates and never see the lattice
+(`01`, `10`).
+
 **Tier.** **F** — engineering. The coordinate machinery is Red Blob Games' (`cube_round`, ring walks,
 cube lerp lines); the barycentric sampler, the `16.8%` and the `√3` separability figure are measured in
 a few lines, and the marching-triangles ambiguity claim is a `2³` enumeration.
