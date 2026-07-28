@@ -18,9 +18,17 @@ import numpy as np
 
 
 def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=1, wind=(0, 1),
-                 shadow=True, shadow_tan=0.268, avalanche=True, repose=2):
+                 shadow=True, shadow_tan=0.268, avalanche=True, repose=2, wind_field=None):
     """Return the slab-count grid after `iters` sweeps (each sweep = n*m slab moves).
     sand: integer slab counts. wind: (di, dj) downwind direction, periodic domain.
+
+    `wind_field=(u, v)` (the standard (col, row) components from `winds.wind_field`) overrides
+    `wind` with a per-cell direction: each slab is transported along the LOCAL wind and each
+    shadow test walks the LOCAL upwind, so the path BENDS through the terrain-steered flow. This
+    is what makes a valley-floor dune field trend along the valley rather than along the regional
+    wind, and what banks sand against an obstacle as an anchored dune (`05`). Directions are
+    rounded to the 8 grid neighbours (a unit vector always has a component >= 1/sqrt(2), so the
+    step is never degenerate).
 
     Full Werner (1995) slab model — all THREE ideas that make real dunes emerge:
       1. **Deposition instability** — a saltating slab deposits with probability `p_sand`
@@ -44,12 +52,22 @@ def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=1, wind=(0, 1)
     sand = np.asarray(sand).astype(np.int64).copy()
     n, m = sand.shape
     rng = np.random.default_rng(seed)
-    wi, wj = wind
+    if wind_field is None:
+        wi_f = np.full((n, m), int(wind[0]), dtype=np.int64)
+        wj_f = np.full((n, m), int(wind[1]), dtype=np.int64)
+    else:                                             # (u, v) = (col, row) -> per-cell (di, dj)
+        u, v = wind_field
+        u = np.broadcast_to(np.asarray(u, dtype=np.float64), (n, m))
+        v = np.broadcast_to(np.asarray(v, dtype=np.float64), (n, m))
+        mag = np.hypot(u, v) + 1e-30
+        wi_f = np.rint(v / mag).astype(np.int64)      # row step
+        wj_f = np.rint(u / mag).astype(np.int64)      # col step
     reach = 16                                        # upwind cells to test for a shadow caster
     hmax = int(sand.max())                            # refreshed each sweep; bounds the shadow walk
 
     def shadowed(ci, cj):
         h = sand[ci, cj]
+        wi, wj = int(wi_f[ci, cj]), int(wj_f[ci, cj])
         kmax = min(reach, int((hmax + 2 - h) / shadow_tan) + 1)   # no caster can shadow past here
         for k in range(1, kmax + 1):                  # walk upwind; is any caster's shadow line above us?
             if sand[(ci - wi * k) % n, (cj - wj * k) % m] - k * shadow_tan > h:
@@ -83,8 +101,8 @@ def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=1, wind=(0, 1)
                 relax(i, j)
             ci, cj = i, j
             while True:                               # transport downwind until it deposits
-                ci = (ci + wi * hop) % n
-                cj = (cj + wj * hop) % m
+                ci, cj = ((ci + int(wi_f[ci, cj]) * hop) % n,     # step along the LOCAL wind
+                          (cj + int(wj_f[ci, cj]) * hop) % m)
                 if shadow and shadowed(ci, cj):       # shadow zone captures the slab (slip-face build)
                     sand[ci, cj] += 1
                     if avalanche:

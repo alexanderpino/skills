@@ -1,7 +1,9 @@
 # Climate & Ecosystem
 
 Contents: [Why climate is in the graph](#why-climate-is-in-the-graph) · [Temperature](#temperature) ·
-[Wind fields](#wind-fields) ·
+[Wind fields](#wind-fields) · [The three details that decide whether it works](#the-three-details-that-decide-whether-it-works) ·
+[What the field does to terrain](#what-the-field-then-does-to-the-terrain) ·
+[Mass-consistent adjustment](#mass-consistent-adjustment-sherman-1978-mathew) ·
 [Orographic precipitation](#orographic-precipitation-smith--barstad-2004) · [Rain shadow](#the-rain-shadow-result) ·
 [Snow & avalanches](#snow--avalanches-cordonnier-et-al-2018) · [Moisture](#moisture--soil-water) ·
 [Biomes](#biome-classification) · [Ecosystem simulation](#ecosystem-simulation-deussen-et-al-1998) ·
@@ -60,17 +62,25 @@ below 0. Both are thresholds on this field, not separate algorithms.
 
 ## Wind fields
 
-Wind is consumed by **four** systems — dunes (`05`), orographic precipitation (below), snow drift
-and cornices (below), wave fetch (`12`) — so it deserves better than a constant vector, and real
-CFD remains out of scope. The middle ground is a **terrain-adjusted wind field**: author the
-regional wind (direction + speed, possibly a seasonal rose), then let the terrain modulate it.
+**Wind is a flow field, not a parameter.** It is consumed by **six** systems — dunes and aeolian
+transport (`05`), yardang abrasion (`16`), orographic precipitation (below), snow drift and cornices
+(below), wave fetch (`12`), fire spread (below) — and every one of them reads it *locally*, so it
+has to be a per-cell **vector field** `(u, v)`: a **speed** and a **direction** at each cell, exactly
+like the flow-routing field of `03` but for air rather than water. A single global `windDir`
+constant is the single most common under-modelling in a terrain graph, and the tell is specific:
+under a spatially constant wind the sand flux is uniform, its divergence is identically zero, and
+**wind cannot change the terrain at all** — every aeolian effect has to be faked by a mask.
+
+Real boundary-layer CFD stays out of scope (say so). The middle ground is a **terrain-adjusted wind
+field**: author the regional wind (direction + speed, possibly a seasonal rose), then let the terrain
+modulate it.
 
 ```
 windField(h, baseDir, baseSpeed):
     for each cell p:
         # 1. Speed-up over windward slopes and crests — Jackson & Hunt 1975:
-        #    fractional speed-up scales with the hill's slope (Δu/u ∝ h/L), peaking at the crest
-        s = 1 + k_su * max(0, upwindSlope(h, p, baseDir))       # cap; k_su gives ~1.5–2× at steep crests
+        #    fractional speed-up scales with the hill's ASPECT RATIO (Δu/u ∝ H/L), peaking at the crest
+        s = 1 + k_su * max(0, upwindSlope(h, p, baseDir, fetch))  # cap; k_su gives ~1.5–2× at steep crests
         # 2. Lee shelter — Werner's dune shadow zone (05), at landscape scale
         if inShadowZone(h, p, baseDir, ~15°): s *= shelter       # ~0.2–0.5
         # 3. Channelling: rotate toward the valley axis where relief confines the flow
@@ -88,7 +98,64 @@ dune fields point along the valley, not the regional wind) and bank against obst
 dunes** — echo, climbing, falling, sand ramps (`05`, `16`); cornices form on the *actual* lee,
 fetch responds to channelled winds down a fjord, and precipitation sees the speed-up. **Tier:** the
 recipe is F — a look built from two P-tier anchors (Jackson & Hunt 1975 for the crest speed-up;
-Sherman 1978 for mass-consistency). Real boundary-layer CFD stays out of scope, and say so.
+Sherman 1978 for mass-consistency).
+
+### The three details that decide whether it works
+
+Each of these is a place the obvious implementation is quietly wrong, and each has a visible tell.
+
+**1. `upwindSlope` is a FETCH SECANT, not the local gradient.** Write step 1 as
+`dot(baseDir, ∇h)` — the one-cell along-wind gradient — and the speed-up peaks at the windward
+**inflection** and falls to *exactly zero at the crest*, because that is where the gradient is zero.
+The wind maximum ends up halfway up the hill. Jackson & Hunt's perturbation scales with the hill's
+**aspect ratio `H/L`**, which is a fetch-scale quantity, so the right discrete form is the secant
+over the whole fetch — "how far have I climbed above the ground one fetch upwind":
+
+```
+upwindSlope(h, p, dir, fetch) = (h[p] − h[p − fetch·dir]) / (fetch · cellSize)
+```
+
+A max over intermediate `k` does not rescue it — that is ≥ the local gradient everywhere, so the
+inflection still wins. **`fetch` is a scale choice and it must span the upwind hill**
+(`fetch · cellSize` ≳ twice the hill's half-length). Too short and the maximum slides back onto the
+flank; much too long merely *under*-states the speed-up, which is the graceful direction and the
+physically right answer for a low bump on a wide plain. **The tell:** snow scoured and dunes
+flattened on the flank instead of the crest — the wind is fastest in the wrong place.
+
+**2. The 15° shadow line is physics — do not shelter every lee slope.** A lee face *gentler* than
+`tan(15°) = 0.268` keeps the flow attached and is **not** sheltered. Sheltering by aspect ("this
+face points away from the wind") instead of by the shadow line is the common shortcut and it kills
+the effect it is imitating: separation is what makes the lee a depositional trap, and it only
+happens past the separation angle. **The tell:** deposition behind every gentle rise, and no
+distinction between a dune slip face and a hillside.
+
+**3. The valley axis needs a STRUCTURE TENSOR, not the contour direction.** The tempting axis is
+the contour direction (perpendicular to `∇h`) — but on the **thalweg** `∇h` vanishes by symmetry,
+so the axis is undefined *exactly along the valley floor*, which is the one place channelling
+matters. Take instead the minor eigenvector of the smoothed structure tensor
+`J = blur(∇h ⊗ ∇h)`: the outer product is sign-blind, so the two opposing walls reinforce rather
+than cancel and `J` stays well-conditioned on the floor. Its anisotropy
+`(λ_max − λ_min)/(λ_max + λ_min)` is a ready-made **coherence**, which vetoes rotation where there is
+no linear structure to rotate toward (a round basin is concave in every direction but has no axis).
+Gate on **cross-wind concavity**, too: only concave relief channels — air is deflected *around* a
+ridge, not steered along it. **The tell:** wind snapping back to the regional direction along the
+valley floor while the walls steer correctly, giving a dune field that trends with the valley on the
+flanks and across it in the middle.
+
+### What the field then does to the terrain
+
+Direction alone is half the model. The **speed** matters because aeolian transport is
+threshold-gated and **cubic** in it, and because it is the *divergence* of the resulting flux that
+raises and lowers the bed:
+
+```
+speed ─▶ u*  (law of the wall, κ = 0.4) ─▶ q = 0 below u*_t, else ∝ u*³ ─▶ ∂h/∂t = −∇·q / ρ_bed
+```
+
+The windward face is stripped because the flow accelerates up it (step 1), so `q` grows and
+diverges; the lee fills because the flow separates and stalls (step 2), so `q` converges. That chain
+is worked in `05` (*Wind speed → sand flux → bed change*) and it is the concrete answer to "what
+does the wind field actually buy me".
 
 ### Mass-consistent adjustment (Sherman 1978, MATHEW)
 
@@ -125,8 +192,15 @@ Anisotropic precision moduli ($\alpha_1\neq\alpha_2$, horizontal vs vertical) ma
 momentum. Verify by re-checking $\nabla\cdot\vec{u}\to 0$ and that no streamline dead-ends into a
 slope.
 
-*Runnable reference: `reference-impl/winds.py`, verified by `tests/test_winds.py` — the corrected
-field's divergence drops by orders of magnitude (`09`).*
+*Runnable reference: `reference-impl/winds.py`, verified by `tests/test_winds.py`. `wind_field` is
+all four steps end to end; `terrain_speedup` (with the fetch-secant `upwind_slope`), `lee_shelter`,
+`valley_channel` (with the structure-tensor `terrain_axis`) and `mass_consistent` are the stages,
+usable alone. The projection is checked to machine precision — the corrected field's divergence
+drops by orders of magnitude, and a solenoidal field passes through unchanged. The adjustment is
+F-tier, invariant-checked against exactly the three failure modes above: speed-up peaks **at the
+crest** and not on the flank, a lee gentler than `tan(15°)` is **not** sheltered, the wind turns to
+follow a confining valley **on the floor** but is left alone on a ridge and on a plain, and flat
+terrain returns the authored regional wind untouched (`09`).*
 
 ## Orographic precipitation (Smith & Barstad 2004)
 

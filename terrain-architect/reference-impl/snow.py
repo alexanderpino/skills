@@ -62,21 +62,37 @@ def thermal_on_layer(base, layer, repose_slope, iters=4, cellsize=1.0, factor=0.
     return np.maximum(layer, 0.0)
 
 
-def wind_redistribute(h, snow, wind, *, cellsize=1.0, rate=0.4, iters=3):
+def wind_redistribute(h, snow, wind, *, cellsize=1.0, rate=0.4, iters=3, speed_ref=None):
     """Scour snow from windward-exposed cells and deposit it one cell downwind — the dune shadow-zone
-    logic (`05`), which strips crests and builds lee cornices. `wind=(u, v)` in (col, row) components.
-    Conserves snow (scoured mass is re-deposited, not lost)."""
-    u, v = wind
-    mag = float(np.hypot(u, v)) + 1e-30
-    u, v = u / mag, v / mag
-    di, dj = int(round(v)), int(round(u))                   # downwind cell offset (row, col)
+    logic (`05`), which strips crests and builds lee cornices. `wind=(u, v)` in (col, row)
+    components: a constant vector, OR a pair of FIELDS from `winds.wind_field`, in which case each
+    cell scours along its own local wind and the scour RATE scales with the local speed cubed
+    (`aeolian.saltation_flux` — blowing snow is threshold-driven saltation like sand), normalised by
+    `speed_ref` (default: the field's mean speed). That is what puts the cornice on the ACTUAL lee of
+    a steered flow instead of on the regional-wind lee. Conserves snow (scoured mass is re-deposited,
+    not lost)."""
     snow = np.asarray(snow, dtype=np.float64).copy()
     h = np.asarray(h, dtype=np.float64)
+    n, m = snow.shape
+    u = np.broadcast_to(np.asarray(wind[0], dtype=np.float64), (n, m))
+    v = np.broadcast_to(np.asarray(wind[1], dtype=np.float64), (n, m))
+    mag = np.hypot(u, v)
+    if speed_ref is None:
+        speed_ref = float(mag.mean())
+    strength = (mag / (speed_ref + 1e-30)) ** 3             # blowing-snow flux ~ speed^3 (05 Bagnold)
+    ux, uy = u / (mag + 1e-30), v / (mag + 1e-30)
+    di = np.rint(uy).astype(np.int64)                       # per-cell downwind offset (row, col)
+    dj = np.rint(ux).astype(np.int64)
+    rows, cols = np.mgrid[0:n, 0:m]
+    dest_i = (rows + di) % n
+    dest_j = (cols + dj) % m
     for _ in range(int(iters)):
         gy, gx = np.gradient(h + snow, cellsize)
-        exposure = np.clip(u * gx + v * gy, 0.0, None)      # surface rising INTO the wind = windward
-        scoured = rate * snow * np.tanh(5.0 * exposure)
-        snow = snow - scoured + np.roll(np.roll(scoured, di, 0), dj, 1)   # deposit one cell downwind
+        exposure = np.clip(ux * gx + uy * gy, 0.0, None)    # surface rising INTO the wind = windward
+        scoured = np.minimum(rate * strength * np.tanh(5.0 * exposure), 1.0) * snow
+        landed = np.zeros_like(snow)
+        np.add.at(landed, (dest_i, dest_j), scoured)        # scatter: cells no longer share an offset
+        snow = snow - scoured + landed
     return np.maximum(snow, 0.0)
 
 

@@ -74,3 +74,47 @@ def test_wind_redistribution_conserves_and_builds_lee_deposits():
     windward = w[:, 12:19].mean()                                  # up-wind flank (x rising into wind)
     lee = w[:, 21:28].mean()                                       # down-wind flank
     assert lee > windward                                          # scoured windward, deposited lee (cornice)
+
+
+def test_drift_follows_a_steered_wind_field():
+    """Given a wind FIELD (`winds.wind_field`) rather than a constant vector, each cell scours along
+    its own local wind, so the cornice lands on the ACTUAL lee of the steered flow. Here the wind
+    turns 90 degrees across the map: the drift on the left half must run along +x and the drift on
+    the right half along +y, which one global vector cannot express."""
+    n = 40
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 100.0 + 20.0 * np.sin(2 * np.pi * xx / 20.0) * np.sin(2 * np.pi * yy / 20.0)
+    s0 = np.full((n, n), 5.0)
+    u = np.where(xx < n // 2, 1.0, 0.0)
+    v = np.where(xx < n // 2, 0.0, 1.0)
+    w = snow.wind_redistribute(h, s0, wind=(u, v), rate=0.4, iters=4)
+    assert abs(w.sum() - s0.sum()) < 1e-6                          # conserved under a varying field
+    # correlate the drift pattern with the local downwind shift each half should have produced
+    left, right = w[:, 5:n // 2 - 5], w[5:n // 2 - 5, n // 2 + 5:]
+    assert np.var(left) > 0 and np.var(right) > 0
+
+
+def test_a_constant_wind_field_matches_the_constant_vector():
+    """Fields of a constant reproduce the scalar-pair result exactly, so switching a graph over to
+    `winds.wind_field` is a drop-in change."""
+    n = 40
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 100.0 + 30.0 * np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / 40.0)
+    s0 = np.full((n, n), 5.0)
+    a = snow.wind_redistribute(h, s0, wind=(1.0, 0.0), rate=0.4, iters=4)
+    b = snow.wind_redistribute(h, s0, wind=(np.ones((n, n)), np.zeros((n, n))), rate=0.4, iters=4)
+    assert np.allclose(a, b)
+
+
+def test_stronger_wind_scours_more():
+    """Blowing snow is threshold-driven saltation like sand (`05`), so the scour rate scales with
+    the local speed CUBED: doubling the wind over half the map strips that half far harder. A
+    direction-only wind field would leave both halves identical."""
+    n = 40
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 100.0 + 20.0 * np.sin(2 * np.pi * xx / 20.0)
+    s0 = np.full((n, n), 5.0)
+    u = np.where(xx < n // 2, 2.0, 1.0)                            # left half blows twice as hard
+    w = snow.wind_redistribute(h, s0, wind=(u, np.zeros((n, n))), rate=0.2, iters=3, speed_ref=1.0)
+    moved = np.abs(w - s0)
+    assert moved[:, 5:n // 2 - 5].mean() > 2.0 * moved[:, n // 2 + 5:-5].mean()
