@@ -1056,7 +1056,7 @@ const REAL_DEM_SAMPLE="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAA
 // its bottom rows untouched. So this stays false while the call sites are converted, and every
 // intermediate state remains shippable. Square is unaffected either way - fieldH() === RES there,
 // so every square expression is numerically identical and the digest holds throughout.
-const HEX_SQUARE_WORLD=false;
+const HEX_SQUARE_WORLD=true;
 const HEX_ROWS_FOR=w=>Math.round(w*2/Math.sqrt(3));   // rows that make the world square
 // Row count for a grid of a GIVEN width. Helpers that take n as a parameter (the canyon working
 // grid, blurScalarField, climateSolarExposure, the wind projector) run on their own grid, not
@@ -6733,9 +6733,10 @@ function buildIndex(){const n=fieldW(),nh=fieldH(),cnt=(n-1)*(nh-1)*6,u32=(n*nh>
   }
   // Water plane shares the vertex lattice with the terrain (same index buffer draws both), so
   // its XZ MUST use the same hex offsets or shorelines tear along the odd rows.
-  const hx=isHex()?0.5:0,rz=isHex()?HEX_ROW:1;
+  const hx=isHex()?0.5:0,rz=isHex()?HEX_ROW:1,hexOn=isHex(),xHalf=(n-1)/2,zHalf=(nh-1)*rz/2;
   const xz=new Float32Array(n*nh*2);for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
-    xz[i*2]=((x+hx*(y&1))/(n-1)-0.5)*2;xz[i*2+1]=((y/(n-1)-0.5)*2)*rz;}
+    if(hexOn){xz[i*2]=(x+hx*(y&1)-xHalf)/xHalf;xz[i*2+1]=(y*rz-zHalf)/xHalf;}
+    else{xz[i*2]=((x/(n-1)-0.5)*2);xz[i*2+1]=((y/(n-1)-0.5)*2);}}
   gl.bindBuffer(gl.ARRAY_BUFFER,buffers.gridXZ);gl.bufferData(gl.ARRAY_BUFFER,xz,gl.STATIC_DRAW);   // water plane XZ (static)
   // Review B3: undo/redo/New/restoreGraph change terrainDef.lattice WITHOUT the toggle button;
   // updateViewport compares this tag and rebuilds, or a hex session undone to square kept the
@@ -6893,11 +6894,13 @@ function updateViewport(f,rootNode,options){
       }
     }
     const pos=new Float32Array(n*nh*3),nrm=new Float32Array(n*nh*3),surface=new Float32Array(n*nh),surfaceTex=new Float32Array(n*nh);
-    const hexOn=isHex(),hx=hexOn?0.5:0,rz=hexOn?HEX_ROW:1;
+    const hexOn=isHex(),hx=hexOn?0.5:0,rz=hexOn?HEX_ROW:1,xHalf=(n-1)/2,zHalf=(nh-1)*rz/2;
     for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;
       surface[i]=hgt[i]*H+snow[i]/terrainDef.scale;
       surfaceTex[i]=hgt[i]+snow[i]/terrainDef.height;
-      pos[i*3]=((x+hx*(y&1))/(n-1)-0.5)*2;pos[i*3+1]=surface[i];pos[i*3+2]=((y/(n-1)-0.5)*2)*rz;}
+      pos[i*3+1]=surface[i];
+      if(hexOn){pos[i*3]=(x+hx*(y&1)-xHalf)/xHalf;pos[i*3+2]=(y*rz-zHalf)/xHalf;}
+      else{pos[i*3]=((x/(n-1)-0.5)*2);pos[i*3+2]=((y/(n-1)-0.5)*2);}}
     if(hexOn){
       // Six-neighbour least-squares gradient (26): for the unit vectors to the D6 neighbours,
       // sum(e_k) = 0 and sum(e_k e_k^T) = 3I, so g = sum(h_k * e_k)/3 is exact for planes and
@@ -7126,8 +7129,9 @@ function surfaceHeight(wx,wz){
   // fractional row first and hand back row*sqrt(3)/2 - the sampler then applies each row's own
   // parity shift, exactly. (This used to carry its own shear approximation, up to half a cell of
   // error on the odd rows.)
-  const x=(wx*.5+.5)*(RES-1);
-  const row=(isHex()?(wz/HEX_ROW):wz)*.5*(RES-1)+.5*(RES-1);
+  const n2=fieldW(),nh2=fieldH(),rz2=isHex()?HEX_ROW:1,xH=(n2-1)/2,zH=(nh2-1)*rz2/2;
+  const x=wx*xH+xH;
+  const row=(wz*xH+zH)/rz2;
   const h=sampleBilinear(surface,x,isHex()?row*HEX_ROW:row);
   return curSolidSurfaceY||curSurfaceY?h:h*H_SCALE;
 }

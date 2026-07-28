@@ -196,7 +196,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
       const G = groundTruth(), n = G.n;
       const M = { lattice, n, pattern: buffers.indexPattern, triIndexCount: buffers.count,
         uniqueRealEdges: G.uniqueRealEdges, offLatticeTriangleEdges: G.offLatticeTriangleEdges,
-        analyticEdges: 3 * (n - 1) * (n - 1) + 2 * (n - 1) };
+        analyticEdges: (rows => 3 * (n - 1) * (rows - 1) + (n - 1) + (rows - 1))(fieldH()) };
       M.analyticLineCount = 2 * M.analyticEdges;
       // ---- W0 controls: prove the metric can tell a real edge from a plausible fake ----
       let triEdgeFake = 0;
@@ -229,7 +229,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     let spun = 0; for (let k = 0; k < diagA.length; k++) if (diagA[k] !== diagB[k]) spun++;
     out.stale = inspectWireDraw(renderBoth(), GB, { lattice: 'square-after-height-edit',
       n: GB.n, pattern: buffers.indexPattern, uniqueRealEdges: GB.uniqueRealEdges,
-      analyticEdges: 3 * (GB.n - 1) * (GB.n - 1) + 2 * (GB.n - 1), diagonalsSpunByTheEdit: spun });
+      analyticEdges: (rows => 3 * (GB.n - 1) * (rows - 1) + (GB.n - 1) + (rows - 1))(fieldH()), diagonalsSpunByTheEdit: spun });
     out.stale.analyticLineCount = 2 * out.stale.analyticEdges;
 
     terrainDef.lattice = 'square';

@@ -40,6 +40,8 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     SCALE_RES = true; XF = null; USE_GPU = false; BUILD_QUALITY = 'interactive';
     RES = 192; TARGET_RES = 192;
     const n = RES, out = { nodes: [] };
+    // Post-flip a hex field is n x fieldH(), so a filter keyed on n*n selects NOTHING and the
+    // gate reads "worst node: undefined" - a pass-shaped failure. Keyed on the real shape.
 
     // Row comb: mean |f[y] - f[y+1]| at matched x, over the interior. Compared against the
     // field's own COLUMN comb (mean |f[x] - f[x+1]|), which is the same surface's natural
@@ -60,7 +62,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
         nd._temperatureC = null; nd._solarShadow = null; nd._solarExposure = null; nd._wind = null; });
       evalGraph();
       const m = {};
-      for (const nd of nodes) if (nd._field && nd._field.length === n * n) {
+      for (const nd of nodes) if (nd._field && nd._field.length === n * fieldH()) {
         m[nd.type] = combRatio(nd._field);
       }
       return m;

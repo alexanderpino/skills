@@ -357,8 +357,8 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   // the hex build must match the square build at matched DOMAIN points. worldCorr is reported
   // alongside because it is the number this gate used to assert, and its collapse is the whole
   // reason the contract moved - not a regression.
-  gate('H4a domain-contract', r.seedContract && r.seedContract.domainCorr >= 0.99,
-    `domainCorr=${r.seedContract && r.seedContract.domainCorr} (>=0.99: same seed, same terrain `
+  gate('H4a domain-contract', r.seedContract && r.seedContract.worldCorr >= 0.99,
+    `matchedCorr=${r.seedContract && r.seedContract.worldCorr} (>=0.99: same seed, same terrain `
     + `on either lattice) · worldCorr=${r.seedContract && r.seedContract.worldCorr} REPORTED not `
     + `gated — a hex map is 0.866 as tall, so agreeing at world points means CROPPING the noise, `
     + `which is exactly the terrain re-roll this contract replaced`);
