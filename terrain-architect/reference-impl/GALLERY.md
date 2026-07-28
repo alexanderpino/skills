@@ -67,8 +67,9 @@ lengths that get confused — `cellSize` centre-to-centre against `s = cellSize/
 make the tumbling-blocks cube; **c** the two diamonds side by side, which exists because they are
 genuinely easy to conflate — the rhombille diamond (side `s`, centre·corner·centre·corner) against
 the **array** diamond of the sheared 2D storage (side `cellSize`, *four centres*, `√3` larger and
-turned 30°); **d** the three meshes and their counts; **e** the tile triangulations, the centre fan's
-six equilaterals against the corner-only families whose min angle is 30° for all fourteen; **f** the
+turned 30°); **d** the three meshes and their counts; **e** the tile triangulations — the centre fan's six
+equilaterals against all three corner-only families (6 fan + 6 zigzag + 2 ear-and-core = 14), whose
+min angle is exactly 30° for every one of them; **f** the
 `×1/3` result in cross-section — a one-cell spike rendered at full `H` by the fan and as a flat
 plateau at `H/3` by corner-only, with the reminder that both reproduce an affine field exactly, so a
 ramp cannot tell them apart.

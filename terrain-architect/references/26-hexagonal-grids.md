@@ -594,19 +594,34 @@ at all. Peaks, pits and one-cell ridges lose two thirds of their amplitude; the 
 spike at full `H` as a correct cone. That impulse is the test that separates them — the sun sweep will
 not.
 
-**Which 4-triangle mesh — the fan is the asymmetric one.** A convex hexagon has **14** triangulations
-(Catalan `C₄`) against a quad's 2: the "which diagonal" problem, seven times over. Six of the fourteen
-are corner fans — `(v₀v₁v₂), (v₀v₂v₃), (v₀v₃v₄), (v₀v₄v₅)` — and a fan is a weak choice among them,
-because it keeps only a single mirror of the cell's symmetry and its long diagonal `v₀v₃` runs through
-the tile centre, so **the height rendered at the middle of the tile is the mean of just two opposite
-corners** and the other four do not enter. Prefer the **ear-and-core** triangulation — three ears
-`(v₀v₁v₂), (v₂v₃v₄), (v₄v₅v₀)` plus the core `(v₀v₂v₄)` — which keeps 3-fold rotational symmetry and
-puts an **equilateral** core over the tile centre, blending three alternating corners there. It has two
-variants (core `v₀v₂v₄` or `v₁v₃v₅`); pick one, apply it to **every** cell, and record it, because a
-position-dependent choice prints a directional pattern straight into `09`'s anisotropy family. What no
-corner-only triangulation can fix: every polygon triangulation has at least two ears, an ear of a
-regular hexagon is `30°–120°–30°`, so **min angle 30° is the ceiling for all 14** — against the centre
-fan's 60°.
+**Which 4-triangle mesh — there are three families, and only one is symmetric.** A convex hexagon has
+**14** triangulations (Catalan `C₄`) against a quad's 2: the "which diagonal" problem, seven times
+over. Enumerated and classified by how the three diagonals meet, they are exactly:
+
+| Family | Count | Diagonals | Symmetry kept | Value at the tile centre |
+|---|---|---|---|---|
+| **Corner fan** — all three from one vertex | **6** | `v₀v₂, v₀v₃, v₀v₄` | one mirror | mean of **2** opposite corners (`v₀v₃` runs through the centre) |
+| **Zigzag / strip** — two share a vertex, one does not | **6** | e.g. `v₀v₂, v₂v₅, v₃v₅` | one mirror | mean of 2 corners (its long diagonal also crosses the centre) |
+| **Ear-and-core** — the three diagonals form a triangle | **2** | `v₀v₂, v₂v₄, v₄v₀` | **3-fold rotation** | barycentric over **3** alternating corners |
+
+`6 + 6 + 2 = 14`, which is the whole set — worth stating because it is easy to name the fan and the
+core and quietly leave a third of the space unaccounted for. The two asymmetric families are asymmetric
+in the same way: a **corner fan** `(v₀v₁v₂), (v₀v₂v₃), (v₀v₃v₄), (v₀v₄v₅)` keeps a single mirror and its
+long diagonal `v₀v₃` passes through the tile centre, so **the height rendered at the middle of the tile
+is the mean of just two opposite corners** and the other four never enter; a zigzag has the same defect
+by a different route. Prefer the **ear-and-core** — three ears `(v₀v₁v₂), (v₂v₃v₄), (v₄v₅v₀)` plus the
+core `(v₀v₂v₄)` — which keeps 3-fold rotational symmetry and puts an **equilateral** core over the tile
+centre, blending three alternating corners there. It has the two variants above (core `v₀v₂v₄` or
+`v₁v₃v₅`); pick one, apply it to **every** cell, and record it, because a position-dependent choice
+prints a directional pattern straight into `09`'s anisotropy family.
+
+What **no** corner-only triangulation can fix: every polygon triangulation has at least two ears, an ear
+of a regular hexagon is `30°–120°–30°`, so `30°` bounds them — and enumerating all 14 confirms the
+bound is *attained by every one of them*, fan, zigzag and core alike. Min angle is exactly `30°` across
+the whole space, against the centre fan's `60°`. That is the real argument for the centre fan: it is not
+better than the best corner-only triangulation, it is better than **all fourteen**, and the choice among
+them is therefore about symmetry and which corners reach the tile centre, never about triangle quality.
+Enumeration pinned by `reference-impl/tests/test_hex_grid.py::test_hexagon_triangulation_taxonomy`.
 
 **Mixing the two is crack-free — no skirts, no stitching.** Both meshes carry the same `3N` short
 diagonals as edges (the rhombille argument above) and neither inserts a vertex on one, so a 4-triangle

@@ -270,22 +270,26 @@ def _panel_d(dr, ox, oy):
                     _dot(dr, (p[0] + cx0, p[1] + cy0), 2.2, CORNER_C)
         _text(dr, (cx0, oy + 330), title, 14, INK, "ma")
         _text(dr, (cx0, oy + 352), sub, 13, MID, "ma")
+        if i == 2:
+            _text(dr, (cx0, oy + 372), "(ear-and-core shown; see e)", 12, MID, "ma")
     _text(dr, (ox, oy + 400), "the cell's own sample is a VERTEX in the first two, and", 13, INK)
     _text(dr, (ox, oy + 422), "absent from the third — which is what panel f measures", 13, INK)
 
 
 def _panel_e(dr, ox, oy):
     _text(dr, (ox, oy), "e.  triangulating one visible tile", 17)
-    _text(dr, (ox, oy + 24), "14 corner-only triangulations (Catalan C₄); 6 are fans", 13, MID)
-    s = 74.0
+    _text(dr, (ox, oy + 24), "14 corner-only triangulations (Catalan C₄) = 6 fan + 6 zigzag + 2 core",
+          13, MID)
+    s = 56.0
     _, corners, _ = _geom(s)
     cc0 = corners(0, 0)
     for i, (title, diags, ang) in enumerate([
-            ("centre fan", None, "min angle 60°"),
-            ("ear-and-core", ((0, 2), (2, 4), (4, 0)), "min angle 30°"),
-            ("corner fan", ((0, 2), (0, 3), (0, 4)), "min angle 30°")]):
-        cx0 = ox + 105 + i * 200
-        cy0 = oy + 175
+            ("centre fan", None, "60° · 6 tris"),
+            ("ear-and-core", ((0, 2), (2, 4), (4, 0)), "30° · 2 of 14"),
+            ("corner fan", ((0, 2), (0, 3), (0, 4)), "30° · 6 of 14"),
+            ("zigzag / strip", ((0, 2), (2, 5), (3, 5)), "30° · 6 of 14")]):
+        cx0 = ox + 80 + i * 152
+        cy0 = oy + 150
         cc = _off(cc0, cx0, cy0)
         _poly(dr, cc, outline=INK, w=2.0)
         if diags is None:
@@ -297,13 +301,15 @@ def _panel_e(dr, ox, oy):
                 _line(dr, cc[a], cc[b], CORNER_C, 1.6)
         for p in cc:
             _dot(dr, p, 3.0, CORNER_C)
-        _text(dr, (cx0, oy + 278), title, 14, INK, "ma")
-        _text(dr, (cx0, oy + 300), ang, 13, CENTRE_C if diags is None else MID, "ma")
-    _text(dr, (ox, oy + 344), "the fan's six triangles are EQUILATERAL — the best any", 13, INK)
-    _text(dr, (ox, oy + 366), "triangulation of this cell can do. Every corner-only one", 13, INK)
-    _text(dr, (ox, oy + 388), "contains at least two 30°–120°–30° ears, so 30° is the", 13, INK)
-    _text(dr, (ox, oy + 410), "ceiling for all 14. Ear-and-core keeps 3-fold symmetry;", 13, INK)
-    _text(dr, (ox, oy + 432), "a corner fan keeps one mirror.", 13, INK)
+        _text(dr, (cx0, oy + 232), title, 13, INK, "ma")
+        _text(dr, (cx0, oy + 252), ang, 12, CENTRE_C if diags is None else MID, "ma")
+    _text(dr, (ox, oy + 300), "min angle is exactly 30° for ALL FOURTEEN — enumerated, not", 13, INK)
+    _text(dr, (ox, oy + 322), "argued: every one contains a 30°–120°–30° ear. So the centre", 13, INK)
+    _text(dr, (ox, oy + 344), "fan's six equilaterals beat not the best of them but ALL of", 13, INK)
+    _text(dr, (ox, oy + 366), "them, and the choice among the 14 is about symmetry, never", 13, INK)
+    _text(dr, (ox, oy + 388), "triangle quality. Only ear-and-core keeps 3-fold rotation;", 13, INK)
+    _text(dr, (ox, oy + 410), "fan and zigzag keep one mirror, and both put a long diagonal", 13, INK)
+    _text(dr, (ox, oy + 432), "through the centre — so it reads just 2 of the 6 corners.", 13, INK)
 
 
 def _panel_f(dr, ox, oy):

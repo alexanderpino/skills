@@ -186,6 +186,73 @@ def test_corner_mean_kernel_and_impulse_plateau():
 
 
 # --------------------------------------------------------------------------- #
+# The 14 corner-only triangulations of a tile: three families, and one min angle
+
+def _triangulations(poly):
+    """Every triangulation of a convex polygon given as a tuple of vertex indices."""
+    if len(poly) < 3:
+        return [[]]
+    if len(poly) == 3:
+        return [[tuple(poly)]]
+    out, a, b = [], poly[0], poly[-1]
+    for i in range(1, len(poly) - 1):
+        for L in _triangulations(poly[:i + 1]):
+            for R in _triangulations(poly[i:]):
+                out.append(L + R + [(a, poly[i], b)])
+    return out
+
+
+def test_hexagon_triangulation_taxonomy():
+    """`26` claims 14 triangulations splitting 6 fan / 6 zigzag / 2 ear-and-core, and min angle
+    exactly 30 degrees for ALL of them against the centre fan's 60. Enumerated, not argued —
+    the ear argument only proves 30 is a *bound*; this proves every one attains it, which is
+    what makes 'the centre fan beats all fourteen' a statement rather than a hope."""
+    import itertools
+    from collections import Counter
+
+    n = 6
+    pts = [(math.cos(math.radians(30 + 60 * k)), math.sin(math.radians(30 + 60 * k)))
+           for k in range(n)]
+    boundary = {tuple(sorted((i, (i + 1) % n))) for i in range(n)}
+
+    def diagonals(tri):
+        e = {tuple(sorted(p)) for t in tri for p in itertools.combinations(t, 2)}
+        return sorted(e - boundary)
+
+    def family(diags):
+        deg = Counter(v for d in diags for v in d)
+        if max(deg.values()) == 3:
+            return "fan"                       # all three diagonals from one corner
+        if set(deg.values()) == {2}:
+            return "ear-and-core"              # the diagonals form a triangle
+        return "zigzag"
+
+    def min_angle(tri, P):
+        m = 180.0
+        for t in tri:
+            for i in range(3):
+                v, a, b = P[t[i]], P[t[(i + 1) % 3]], P[t[(i + 2) % 3]]
+                u1 = (a[0] - v[0], a[1] - v[1])
+                u2 = (b[0] - v[0], b[1] - v[1])
+                c = ((u1[0] * u2[0] + u1[1] * u2[1])
+                     / (math.hypot(*u1) * math.hypot(*u2)))
+                m = min(m, math.degrees(math.acos(max(-1.0, min(1.0, c)))))
+        return m
+
+    tris = _triangulations(tuple(range(n)))
+    assert len(tris) == 14                                      # Catalan C4
+    fams = Counter(family(diagonals(t)) for t in tris)
+    assert fams == {"fan": 6, "zigzag": 6, "ear-and-core": 2}, fams
+    assert sum(fams.values()) == 14                             # the space is fully accounted for
+    for t in tris:
+        assert math.isclose(min_angle(t, pts), 30.0, abs_tol=1e-9)
+
+    # the centre fan is NOT one of the 14 — it adds a 7th vertex — and it is equilateral
+    centre_fan = [(6, k, (k + 1) % 6) for k in range(6)]
+    assert math.isclose(min_angle(centre_fan, pts + [(0.0, 0.0)]), 60.0, abs_tol=1e-9)
+
+
+# --------------------------------------------------------------------------- #
 # Separable filters do not port: two axes print sqrt(3), three axes are isotropic
 
 def _blur_axis(a, d, k):
