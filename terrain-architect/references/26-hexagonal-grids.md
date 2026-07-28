@@ -13,7 +13,9 @@ is hex-native, or when grid anisotropy (`09`) is the problem you are trying to s
 Contents: [Why hex is not a gimmick](#why-hex-is-not-a-gimmick--it-is-the-better-sampling-lattice) ·
 [Coordinates and the metric](#coordinates-and-the-metric) · [Stencils](#stencils-routing-diffusion-gradients) ·
 [Meshing](#meshing) · [The rhombille tiling](#the-rhombille-tiling) ·
-[Storage: a sheared 2D array](#storage-a-sheared-2d-array) · [Engine integration](#engine-integration) ·
+[Storage: a sheared 2D array](#storage-a-sheared-2d-array) ·
+[What does not port — hex-native operations](#what-does-not-port--hex-native-operations) ·
+[Engine integration](#engine-integration) ·
 [Triangulating a tile: 6 or 4](#triangulating-a-tile-6-or-4) · [Hex prisms](#hex-prisms) ·
 [Interchange](#interchange) · [Verify](#verify) · [Tier](#tier)
 
@@ -364,6 +366,9 @@ space it is the ordinary one-cell array border, even though in world space it is
 hex mip pyramid is plain array decimation), cache-coherent row traversal, and upload as an ordinary
 `R16`/`R32F` 2D texture with `B` in the shader. If the renderer meshes hex tiles directly, that removes
 the square-raster round-trip entirely: the array *is* the texture and the shear is three multiplies.
+Read that list as deliberately bounded — **index-only**. Operations that are *not* index-only mostly do
+not port at all, however convenient the matrix makes them look; *What does not port*, below, draws that
+line and gives the hex-native forms.
 
 **What does not transfer — four traps, and the first is the one that bites everybody.**
 
@@ -390,6 +395,93 @@ the square-raster round-trip entirely: the array *is* the texture and the shear 
   on a square domain, ~25% at 16:9. The alternative is offset coordinates, which pack the rectangle
   exactly and hand you the row-parity neighbour table — *the* classic hex bug (above). Choose
   deliberately; the wasted memory is often the cheaper of the two.
+
+## What does not port — hex-native operations
+
+**The shear is a licence to reuse *storage and geometry*, not algorithms.** Everything above is true and
+it is seductive: one 2×2 matrix and a hex field is a square field, so the temptation is to keep writing
+square-grid code and let `B` clean up after it. Draw the line precisely. **If an operation needs only
+positions and linear interpolation, the shear carries it** — culling, chunking, transforms, affine
+sampling, anything that is a matrix multiply away from the square case. **If it branches on neighbour
+structure, on distance, on rounding, or on axis-separability, there is nothing to port**: those idioms
+encode the square lattice's own structure, and the hex form is a different algorithm, not the same one
+in new coordinates. This failure mode is quiet — the square version usually returns *plausible* answers
+and is wrong on a few percent of inputs, or wrong only in a direction nobody sun-sweeps for.
+
+| Square idiom | On hex |
+|---|---|
+| `for dx, dy in −1..1` | a fixed **6-entry direction table**; in offset coords it is **row-parity dependent** — convert to axial/cube before any geometry |
+| branch on 4- vs 8-connectivity | **delete the branch.** There is no diagonal; this is a removal, not a port |
+| Manhattan or Chebyshev distance | `(|x|+|y|+|z|)/2` in cube coords — *neither* square metric is a hex metric |
+| `floor(p / cellSize)` to find the cell | **`cube_round`** — per-axis rounding picks the wrong cell for ~17% of points |
+| bilinear sample | **barycentric on the dual triangle** — no bilinear form exists on this lattice |
+| Bresenham / DDA | **cube lerp + `cube_round`** per step |
+| box loop for a neighbourhood | **ring** = `6k` cells, **disc** = `1 + 3k(k+1)` |
+| separable 1D×1D blur | **not separable on two axes** — pass along all three lattice directions |
+| 90° rotation | 60° rotation, and it is an exact **cube-coordinate permutation** |
+| marching squares | marching **triangles** on the dual — 8 cases and **no ambiguous saddle** |
+
+**Point → cell. Not `floor`, and not per-axis `round`.** The cell boundaries are hexagons; rounding each
+axial coordinate independently draws *rhombi*, which is a different partition of the plane. Round in
+cube space and repair the worst axis so the `x + y + z = 0` constraint survives:
+
+```
+cell_at(p):
+    u    = B⁻¹ · p                          # fractional axial (q, r)
+    x, z = u.q, u.r ;  y = −x − z           # fractional cube, x + y + z = 0
+    rx, ry, rz = round(x), round(y), round(z)
+    dx, dy, dz = |rx−x|, |ry−y|, |rz−z|
+    if   dx > dy and dx > dz:  rx = −ry − rz     # re-derive whichever axis moved
+    elif dy > dz:              ry = −rx − rz     # furthest, so the sum stays 0
+    else:                      rz = −rx − ry
+    return axial(rx, rz)
+```
+
+Measured against brute-force nearest-centre over 20 000 uniform points: `cube_round` is exact;
+per-axis rounding of the fractional axial coordinates picks the **wrong cell 16.8% of the time**. That is
+the shape of every bug in this section — right most of the time, wrong near every boundary.
+
+**Point → value. There is no bilinear.** Interpolate barycentrically over the dual triangle, and the
+triangle is found by the pinned anti-diagonal from *Storage* above, so what you sample is exactly what
+you render:
+
+```
+sample(p):
+    u = B⁻¹ · p ;   qi, ri = floor(u.q), floor(u.r) ;   fq, fr = u.q − qi, u.r − ri
+    if fq + fr ≤ 1:                                        # lower dual triangle
+        return (1−fq−fr)·h[qi,ri]  + fq·h[qi+1,ri] + fr·h[qi,ri+1]
+    else:                                                  # upper dual triangle
+        return (1−fr)·h[qi+1,ri] + (1−fq)·h[qi,ri+1] + (fq+fr−1)·h[qi+1,ri+1]
+```
+
+Weights are non-negative, sum to 1, and reproduce an affine field exactly (verified to `4e−15`). Note
+that `cell_at` and `sample` answer **different questions** — one cell ("which tile did the player
+click") against three ("what is the height here"). Conveniently the nearest centre is always the
+heaviest of the three weights, because the dual triangles are equilateral; so `cell_at` is a sound
+shortcut for the first question and tells you nothing about the other two cells you need for the second.
+
+**Neighbourhoods are rings, not boxes.** A ring is `6k` cells and a disc `1 + 3k(k+1)`; walk `k` steps
+out along any direction `dᵢ`, then `k` steps along each of `dᵢ₊₂, dᵢ₊₃, …` cyclically (verified closed
+and distance-exact for every starting index). Lines are cube `lerp` plus `cube_round` per step — a DDA
+over the array steps through rhombi and will skip and repeat cells.
+
+**Separable filters do not port, and the error is the familiar one.** Blurring 1D along `q` and then 1D
+along `r` is the square-grid reflex, but the axes are 60° apart, so the composite kernel is sheared.
+Measured on an impulse, that gives a world-space aspect ratio of **`√3`** — the same `√3` as everywhere
+else here. The hex-native form is a pass along **all three** lattice directions, which measures as
+exactly isotropic (`1.0000`). The same argument condemns any row-then-column sweep: on hex there are
+three axis families, not two, and using two of them prints the third.
+
+**Contouring is the case where hex *gains*.** Marching squares carries the ambiguous saddle — two
+diagonal corners in, two out, topology genuinely undecided. On the dual triangulation each triangle has
+`2³ = 8` sign patterns, and every one is either uniform (no segment) or a 2–1 split cutting off the odd
+vertex with exactly one segment. **No ambiguous case exists.** Coastline and contour extraction (`03`,
+`12`) is strictly simpler here, which is worth knowing because the rest of this section is a list of
+things that get harder.
+
+**Tier.** **F** — engineering. The coordinate machinery is Red Blob Games' (`cube_round`, ring walks,
+cube lerp lines); the barycentric sampler, the `16.8%` and the `√3` separability figure are measured in
+a few lines, and the marching-triangles ambiguity claim is a `2³` enumeration.
 
 ## Engine integration
 
