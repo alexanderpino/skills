@@ -294,6 +294,10 @@ standard):
 - **Offset (odd-r / even-r / odd-q / even-q)** — a square array with alternate rows/columns shifted half a
   cell; convenient for I/O, painful for arithmetic. Convert to axial/cube before doing any geometry.
 
+"Still a 2D array" is worth stating sharply, because it is exact rather than approximate: a hex field is
+a **sheared** square array, the shear being a single 2×2 matrix. That is easiest to see once the
+rhombille tiling is on the table — *A diamond is a sheared square*, below.
+
 Pick **pointy-top or flat-top** once and record it in the manifest (the `grid` / `hexOrientation` /
 `hexCoords` fields in the schema at the top of this file); the neighbour offsets and the row/column
 spacing depend on it, and mixing the two is the hex analogue of the vertex-vs-pixel-centring bug above.
@@ -452,6 +456,60 @@ instead of 6 triangles. Don't. Those four heights are non-coplanar too, so the G
 diagonal *you did not choose* — reintroducing the arbitrary-diagonal problem inside the tile, the one
 thing the fan exists to avoid — and it saves nothing, because the hardware rasterises triangles either
 way.
+
+**A diamond is a sheared square — so the storage really is a 2D array, exactly.** The rhombille settles
+the storage question too, because the *index-space* quad is one of its rhombi: take the four plain-array
+neighbours `(q,r), (q+1,r), (q,r+1), (q+1,r+1)` and in world space they are a 60°–120° rhombus of four
+cell centres, all sides `cellSize`, diagonals `cellSize` and `√3·cellSize`. A hex heightfield is
+therefore **a square-grid heightfield under a shear** — an identity, not an analogy — and the
+adjustments are exactly three.
+
+1. **`cellSize` becomes a 2×2 matrix.** Index → world is `x = B·(q,r)`, with (pointy-top)
+   `B = cellSize·[[1, ½], [0, √3/2]]`. Everything metric routes through it: distance via the metric
+   tensor `G = BᵀB = cellSize²·[[1, ½], [½, 1]]`, whose off-diagonal `½ = cos 60°` is precisely the term
+   a square-grid code assumes is zero; world gradients via `∇ₓh = B⁻ᵀ·∇₍q,r₎h`; cell area via
+   `det B = (√3/2)·cellSize²`. The 6-neighbour Laplacian constant `2/(3d²)` above is the same
+   non-orthogonality arriving by a different route — through the stencil moments rather than through `G`.
+2. **The quad diagonal is pinned, not chosen.** Of the index quad's two diagonals, only the
+   **anti-diagonal** `(q+1,r)–(q,r+1)` is a neighbour link (direction `(−1,+1)`); the main diagonal
+   `(q,r)–(q+1,r+1)` spans `√3·cellSize` and is adjacent to nothing. Split every quad that same way and
+   the two triangles come out **equilateral** and are exactly `cornerA(q,r)` and `cornerB(q+1,r)` from
+   the ownership rule above — the dual mesh, obtained from stock square-heightmap meshing code by
+   shearing the vertex positions and fixing the diagonal. Split the other way and your mesh edges are
+   not adjacencies at all: unlike the square grid's arbitrary diagonal, this one has a wrong answer.
+3. **One plain array per class.** Cells are `Q×R`, corners `2×Q×R` (two owned per cell, above), and
+   rhombi — i.e. **edges** — are `3×Q×R`, because each cell owns exactly three, one per antipodal pair:
+
+```
+rhombus(k, q, r) = { (q,r), (q,r) + eₖ }          e₀ = (1,0)   e₁ = (1,−1)   e₂ = (0,1)
+```
+
+A bijection onto the `3N` adjacencies — no dedup, no hashing — and `k` is also the rhombus's
+**orientation** (long diagonals at 0°/60°/120°: the three faces of the tumbling-blocks cube). This is
+the buffer D6 flux and pipe-model flow belong in (`03`, `04`).
+
+**What transfers for free: everything index-only.** Rectangular chunking, the `+1` apron (in *index*
+space it is the ordinary one-cell array border, even though in world space it is the hex ring), LOD by
+2× decimation (take both indices even — the sublattice basis is `2B`, still a triangular lattice, so a
+hex mip pyramid is plain array decimation), cache-coherent row traversal, and upload as an ordinary
+`R16`/`R32F` 2D texture with `B` in the shader. If the renderer meshes hex tiles directly, that removes
+the square-raster round-trip entirely: the array *is* the texture and the shear is three multiplies.
+
+**What does not transfer — three traps, the first expensive.**
+
+- **Hardware bilinear on that texture is not hex interpolation.** `texture()` returns a bilinear patch
+  over the sheared rhombus above, which is neither the dual mesh's two triangles nor symmetric under the
+  lattice — it privileges the one vertex pair that is not even adjacent. It is affine-exact, so a ramp
+  will not catch it (the same blind spot as the mesh controls above) and the error is the second-order
+  cross term. Where it matters, interpolate by hand: locate the containing dual triangle (the 3 nearest
+  centres) and go barycentric — already what the hex↔square resampling below prescribes.
+- **Index-space box filters are anisotropic.** A `2×2` box averages a rhombus whose corner distances
+  from its centroid are `0.5` and `0.866·cellSize` — a `√3` aspect ratio. Low-pass with the **7-cell**
+  kernel (centre + ring) and *then* decimate; the decimation is isotropic, the box filter is not.
+- **A parallelogram array over a rectangular world wastes its corners**, and not by a little: **~37%**
+  on a square domain, ~25% at 16:9. The alternative is offset coordinates, which pack the rectangle
+  exactly and hand you the row-parity neighbour table — *the* classic hex bug (above). Choose
+  deliberately; the wasted memory is often the cheaper of the two.
 
 **Triangulating one visible tile — 6 triangles or 4, and the cell's own sample is what is at stake.**
 Once the hexes are rendered as tiles there is a second fork *inside* each cell, and it is not
