@@ -54,3 +54,34 @@ def test_shadow_zone_and_avalanching_organize_transverse_dunes():
 def test_deterministic():
     s0 = _seed_field(n=24, seed=4)
     asserts.assert_deterministic(lambda: dunes.werner_dunes(s0, iters=6, seed=42, hop=3))
+
+
+def test_constant_wind_field_matches_the_constant_vector():
+    """`wind_field=(u, v)` as full fields of a constant must reproduce the `wind=(di, dj)` result
+    exactly — so a graph can swap the regional constant for `winds.wind_field` without any other
+    change. Note the convention shift the override handles: (u, v) is (col, row), `wind` is
+    (di, dj) = (row, col)."""
+    s0 = _seed_field()
+    n, m = s0.shape
+    kw = dict(iters=6, seed=3, p_sand=0.6, p_bare=0.2, hop=3)
+    base = dunes.werner_dunes(s0.copy(), wind=(0, 1), **kw)
+    field = dunes.werner_dunes(s0.copy(), wind_field=(np.ones((n, m)), np.zeros((n, m))), **kw)
+    assert np.array_equal(base, field)
+
+
+def test_slabs_follow_a_steered_wind_and_pile_at_a_convergence():
+    """The point of a per-cell wind: transport paths BEND with the flow. Under a field whose two
+    halves blow toward each other, slabs are carried to the convergence line and pile up there —
+    a place a single regional wind vector could never single out. (This is the same steering that
+    banks sand against an obstacle as an anchored dune, `05`.)"""
+    s0 = _seed_field()
+    n, m = s0.shape
+    u = np.where(np.arange(m)[None, :] < m // 2, 1.0, -1.0) * np.ones((n, 1))
+    out = dunes.werner_dunes(s0.copy(), iters=12, seed=1, p_sand=0.6, p_bare=0.2, hop=1,
+                             wind_field=(u, np.zeros((n, m))))
+    assert out.sum() == s0.sum()                      # slabs still conserved
+    col = out.mean(axis=0)
+    seam = m // 2
+    near = col[seam - 3:seam + 3].mean()
+    far = np.concatenate([col[:seam // 2], col[seam + m // 4:]]).mean()
+    assert near > 1.5 * far                           # sand heaps on the convergence line

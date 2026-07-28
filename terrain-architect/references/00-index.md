@@ -267,7 +267,8 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Shallow-water erosion | P | Beneš et al. 2006, *Hydraulic Erosion*, CAVW 17(2) |
 | Thermal erosion / talus-angle | P | Musgrave et al. 1989 |
 | Talus fast approximation | P | Olsen 2004, tech report, Univ. of Southern Denmark |
-| Wind erosion physics | P | Bagnold 1941, *The Physics of Blown Sand and Desert Dunes* — physics, **not implementable as written** |
+| Wind erosion physics | P | Bagnold 1941, *The Physics of Blown Sand and Desert Dunes* — the saltation-cloud physics is **not implementable as written**, but the threshold `u*_t` and the cubic `u*³` flux law are one expression each per cell (`05`) |
+| Aeolian transport → bed change (continuum) | P | **Sauermann et al. 2001**, Phys. Rev. E 64 — flux saturation length + Exner: `∇·q` deflates/deposits. The branch that consumes a wind FIELD, vs. Werner's CA which consumes a direction (`05`). Near-threshold variant: Owen 1964, JFM 20 |
 | Dune formation (implementable) | P | **Werner 1995**, Geology 23(12) — the slab CA. Under-cited relative to usefulness. |
 | Dune size hierarchy / draa (mega-dunes) | P | Wilson 1972, Sedimentology 19 — ripple/dune/draa orders; compound & complex by superimposition (`05`) |
 | Parabolic dunes & blowouts (vegetation-anchored) | P (blowout) / F (parabolic form) | Hesp 2002, Geomorphology 48 — blowout initiation; arms trail upwind, no canonical parabolic paper (`05`, `13`) |
@@ -389,7 +390,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Orographic rainfall / rain shadow | P | **Smith & Barstad 2004**, *A Linear Theory of Orographic Precipitation*, J. Atmos. Sci. 61 |
 | Elevation lapse rate | P | Standard atmospheric physics — 6.5 °C/km environmental |
 | Latitude temperature, seasonality, continentality | F | — |
-| Wind fields (terrain-adjusted) | F | Authored base + crest speed-up (Jackson & Hunt 1975), lee shelter (`05` shadow), channelling, mass-consistent cleanup (Sherman 1978) (`13`). Real CFD out of scope. |
+| Wind fields (terrain-adjusted) | F | A per-cell **flow field** (speed + direction), not a constant: authored base + crest speed-up (Jackson & Hunt 1975 — over a fetch secant, so it peaks AT the crest), lee shelter (`05` 15° separation shadow), channelling along a structure-tensor valley axis, mass-consistent cleanup (Sherman 1978) (`13`). Under a constant wind `∇·q ≡ 0` and wind moves no terrain at all. Real CFD out of scope. |
 | Snow line, permafrost, aridity index | F | Threshold definitions |
 | Climate zones / biome classification | P | Köppen–Geiger (Köppen 1900; Peel et al. 2007 for the modern map); Whittaker 1975 biome diagram |
 | Altitudinal life zones (explicit elevation belts) | P | Holdridge 1947 (Science 105(2727)), 1967 (*Life Zone Ecology*) — biotemperature + precip + PET; named montane→alpine→nival belts up a mountain (`13`) |

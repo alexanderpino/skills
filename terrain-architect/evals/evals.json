@@ -289,6 +289,32 @@
         "Specifies decisive arid and periglacial process oracles including gates and source/sink conservation",
         "Requires material weights to partition, layer depths to remain non-negative and physical/appearance versions to invalidate correctly"
       ]
+    },
+    {
+      "id": 23,
+      "axis": "diagnosis",
+      "prompt": "I added an aeolian pass to my terrain graph — Bagnold flux, sediment continuity, the works — and ran it for a million years of sim time with a 30 m/s wind. The heightfield comes out bit-identical to the input. What's wrong?",
+      "expected_output": "The wind is a single global direction/speed constant, so the sand flux q is spatially uniform, its divergence is identically zero, and an Exner update dh = -div(q)/rho can never change anything, at any wind speed or duration. The fix is a terrain-adjusted wind FIELD (13 windField: crest speed-up, lee shelter, valley channelling, mass-consistent projection) so q varies in space. Answer diagnoses the uniform-wind/zero-divergence cause rather than suggesting bigger timesteps, more iterations, or a stronger wind.",
+      "files": [],
+      "expectations": [
+        "Identifies that a spatially CONSTANT wind gives a uniform flux whose divergence is zero, so the bed cannot change",
+        "States that it is the DIVERGENCE of the flux that moves the bed, not the flux magnitude",
+        "Prescribes a per-cell terrain-adjusted wind field (13) as the fix, not a larger dt / more iterations / higher wind speed",
+        "Does NOT blame the Bagnold threshold alone as the sole cause without addressing the uniform-field issue"
+      ]
+    },
+    {
+      "id": 24,
+      "axis": "implementation",
+      "prompt": "Implementing the terrain-adjusted wind field. For the Jackson & Hunt crest speed-up I'm using s = 1 + k*max(0, dot(windDir, grad(h))). My dunes and snow keep getting scoured hardest halfway up the windward slope instead of on the ridgeline. Is my formula right?",
+      "expected_output": "No. The along-wind gradient is maximal at the windward INFLECTION and exactly zero at the crest, so a gradient-driven speed-up puts the wind maximum on the flank — precisely the symptom described. Jackson & Hunt's perturbation scales with the hill's aspect ratio H/L, a fetch-scale quantity, so the discrete form is a SECANT over the fetch: (h[p] - h[p - fetch*dir]) / (fetch*cellSize), with fetch spanning the upwind hill. A max over intermediate k does not fix it either, since that is >= the local gradient everywhere.",
+      "files": [],
+      "expectations": [
+        "Says the formula is wrong and explains that the along-wind gradient is ZERO at the crest and maximal at the inflection",
+        "Gives the fetch-secant form (h[p] - h[p - fetch*dir]) / (fetch*cellSize) as the correction",
+        "Notes that fetch is a scale choice that must span the upwind hill",
+        "Connects the symptom (scour on the flank, not the ridgeline) to the formula rather than to a tuning constant"
+      ]
     }
   ]
 }

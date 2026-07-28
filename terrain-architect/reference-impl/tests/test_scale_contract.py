@@ -33,6 +33,12 @@ _SCALE_FREE = (
     "decided purely by comparison and ordering of elevations; no length scale enters the algorithm, "
     "so the result is identical under any cellsize."
 )
+_SI_POINTWISE = (
+    "point physics in SI units, evaluated per cell with no spatial derivative or neighbourhood: "
+    "grain size in metres, speed in m/s, flux in kg/m/s. There is no distance for cellsize to "
+    "convert — the grid first enters at `exner_step`, which differentiates the flux and does take "
+    "cellsize. (Rescaling these for another world is a matter of `g` and `rho_a`, not of cell size.)"
+)
 PIXEL_OR_CALLER_SPACE = {
     **{("noise", f): _CALLER_COORDS for f in
        ("perlin", "value", "simplex", "worley", "fbm", "ridged_mf", "hybrid_mf",
@@ -45,6 +51,8 @@ PIXEL_OR_CALLER_SPACE = {
     **{("placement", f): _VALUE_ONLY for f in ("apply_masked", "stamp")},
     **{("placement", f): _CALLER_COORDS for f in
        ("place_coords", "affine", "compose", "transform_coords", "sample_coords")},
+    **{("aeolian", f): _SI_POINTWISE for f in
+       ("shear_velocity", "threshold_shear", "saltation_flux", "transport_field")},
     ("flow", "priority_flood_fill"): _SCALE_FREE,
     ("meander", "migrate"):
         "evolves a centreline, not a grid: ds/dt/cutoff_dist are all in the caller's units, so the "
