@@ -2799,7 +2799,22 @@ function depositsField(inp,{radius=3,refDepth=25}){
   // defect class this tranche exists to remove). At r=1 this degenerates to the old square
   // closing exactly; small radii cannot be isotropic on a lattice and do not pretend to be.
   const rd=Math.round(r*(1-1/Math.SQRT2)),r1=Math.max(0,r-2*rd);
-  const oct=(f,mx)=>{const t=r1>0?morph1D(f,r1,mx):f;return rd>0?morphDiag1D(t,rd,mx):t;};
+  // On hex the octagon is built from square and diagonal passes that do not exist as such: the
+  // isotropic structuring element the lattice actually offers is the HEXAGON, r iterations of
+  // the D6 one-ring. Iterating the ring is exact - a radius-r hexagonal SE is the r-fold
+  // Minkowski sum of the one-ring - so dilate r times then erode r times is the closing.
+  const oct=isHex()?(f,mx)=>{
+    const nn=RES;let a=f;
+    for(let it=0;it<r;it++){const o2=newField();
+      for(let y=0;y<nn;y++)for(let x=0;x<nn;x++){
+        const nb=hexNb(y);let v=a[y*nn+x];
+        for(let k=0;k<6;k++){const xx=x+nb[k][0],yy=y+nb[k][1];
+          if(xx<0||yy<0||xx>=nn||yy>=nn)continue;
+          const s=a[yy*nn+xx];v=mx?Math.max(v,s):Math.min(v,s);}
+        o2[y*nn+x]=v;}
+      a=o2;}
+    return a;
+  }:(f,mx)=>{const t=r1>0?morph1D(f,r1,mx):f;return rd>0?morphDiag1D(t,rd,mx):t;};
   const closed=oct(oct(inp,true),false);
   const o=newField(),toM=terrainDef.height/Math.max(1e-6,refDepth);
   for(let i=0;i<o.length;i++)o[i]=Math.min(Math.max(closed[i]-inp[i],0)*toM,1);

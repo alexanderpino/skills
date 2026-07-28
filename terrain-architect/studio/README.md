@@ -1422,14 +1422,37 @@ nothing about the node graph changes. What changes, and what `_verify_hex.js` ho
 - **D6 thermal** — six equidistant neighbours, one distance, one threshold (the √2 distance split
   the square kernel must correct simply does not exist). Mass conserved to 2·10⁻¹⁰; the relaxed
   cone's talus ring reaches repose uniformly to **0.3%** azimuthal anisotropy (H2, H3).
-- **Six-neighbour normals** (`Σh·eₖ/(3d)` — the centre height drops out) and shear-corrected
-  picking.
-- **Byte-safety:** on the square lattice everything is bit-identical (H5, plus the 57/57 digest).
+- **Six-neighbour normals** (`Σh·eₖ/(3d)` — the centre height drops out) and exact picking.
+- **A real wireframe.** The overlay used to reinterpret the triangle index buffer as a
+  `LINE_STRIP`, which invents a segment from each triangle's last vertex to the next triangle's
+  first: ~**131,000 fake segments** (8.4%) and 511 real edges never drawn, *on both lattices*. A
+  deduplicated edge buffer now carries exactly `3(n−1)²+2(n−1)` = 784,385 edges at 512², zero
+  fakes, zero duplicates — which is what makes the hex topology checkable by eye.
+- **Everything else that touches the lattice.** The shared bilinear sampler (relative error
+  **6.07e-2 → 4.06e-8** on a world-linear ramp, where correct interpolation is exact), `warpField`,
+  DEM import/export (**2.6e-3 → 5.4e-8**), D6 flow routing (**40.4% → 0.00%** of receivers that
+  were not lattice neighbours), `slopeOf` (cone ring anisotropy **1.147 → 1.000**, against the
+  2/√3 = 1.1547 the mechanism predicts), curvature, occlusion, droplet erosion, water shoreline,
+  wind fetch/horizon, snow saltation, the Deposits structuring element, and the deferred
+  compositor's per-pixel sampling.
+- **Byte-safety:** on the square lattice everything is bit-identical (H5, plus the 60/60 digest).
+
+**The close-out check** (`_verify_hex_parity.js`) is the one tied to what started this work —
+toggling the lattice on the *default* graph changed the terrain far more than it should. A correct
+hex build *must* differ from square (generators sample different world points), so the gate
+separates the two causes: a seed-contract difference is smooth, while a kernel misreading the
+lattice leaves **row-parity structure**. Measuring each node's odd/even row comb against its own
+column comb, the worst node now sits at **1.044×** its square character (bound 1.15), and the
+output still differs by 8.4% of range — a different draw from the same process, which is the
+point.
 
 Honest limits, also stated in the toggle's hint: GPU compute is square-texture end to end and is
-forced off on hex (every CPU path runs); the square-stencil sims — water, snow, the erosion
-family's D8/flux kernels — run in *square approximation* on hex data. The D6 thermal is the
-demonstrator kernel; porting the rest is the chapter's F-tier translation, queued. And one
+forced off on hex, so hex runs the CPU path throughout (the toolbar chip says so). The compositor
+work is verified structurally and by non-regression rather than by a numerical GLSL-vs-CPU oracle,
+which is still owed. Sampling uses a two-row lerp — exact on linear fields, differing from 26's
+true barycentric 3-tap only on high-frequency content. Single-receiver D6 is the bar here; MFD6
+(multi-receiver dispersion) is the chapter's own further step, and D∞ has no hex analogue at all.
+And one
 measured finding that *corrects* the naive chapter reading: against a well-implemented
 distance-corrected D8 thermal, D6's win is **exactness**, not facet diversity — the corrected D8
 has 8 facet families to D6's 6 (facet-direction concentration 1.41 vs 1.17, reported in H3's
@@ -1474,6 +1497,11 @@ node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² /
 node _verify_erosion_gridscale.js    # erosion-family grid invariance: modification depth + landform, 192 vs 384
 node _verify_streampower_calibration.js  # re-derives the stream-power K-exponent roots; gates the shipped line
 node _verify_hex.js                  # hexagonal lattice: static topology hash, D6 mass + ring isotropy, seed contract, square byte-safety
+node _verify_hex_parity.js           # close-out: default graph toggled square<->hex differs only by the seed contract, not by lattice misreads
+node _verify_hex_sampling.js         # the shared bilinear sampler is exact on hex; callers pass world units
+node _verify_hex_dem.js              # DEM import places cells at their world point; export resamples back to square
+node _verify_hex_flow.js             # D6 routing: receiver adjacency, reported distances, slope ring isotropy
+node _verify_wireframe.js            # wireframe draws real mesh edges (both lattices), no invented segments
 node _verify_realscale.js            # Real Scale: repose angle in degrees, resolution independent
 node _verify_data.js                 # the eight Data Map channels
 node _verify_satnode.js              # one-gradient SatMap: stacking + explicit biome branch/blend
