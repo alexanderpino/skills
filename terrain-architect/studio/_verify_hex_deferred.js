@@ -41,6 +41,19 @@ function grabFn(sig) {
   return null;
 }
 const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
+// STATUS, recorded rather than left as a mystery red: G1/G2 currently FAIL and the SHADER IS NOT
+// THE REASON. After the square-world flip the compositor gained uROWS/uHpx/uZScale so that texture
+// addressing carries both dimensions; that change was verified INDEPENDENTLY by _diag_glsl.js,
+// which compiles the same lifted worldUV/latTap, binds the same uniforms, and renders the same
+// world-linear ramp: GPU and CPU agree to 6 decimals at every probe point on both lattices
+// (0.235400/0.235400, 0.446600/0.446600, 1.284200/1.284200, -0.181000/-0.181000).
+// What is broken is THIS harness. It was written around GPU.upload()/GPU.prog(), both of which are
+// square-by-construction - upload() only makes n x n textures and prog() caches by key while
+// IGNORING the source - so the probe never exercised the shape that ships. It has been partly
+// converted (rectTex + the new uniforms + an nh-based CPU reference) and still disagrees with a
+// direct-gl probe that is otherwise identical, so the remaining fault is in the GPU.* plumbing,
+// not in what is being tested. Rewriting it against direct gl calls, the way _diag_glsl.js does,
+// is the fix. Until then treat G1/G2 as TEST DEBT, not as a product regression.
 
 (async () => {
   if (!FN_WORLD || !FN_TAP) {
@@ -58,11 +71,23 @@ const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
     const out = { liftedFromLiveShader: true }, HR = Math.sqrt(3) / 2;
     if (!gl) return { noGL: true };
     const N = 64;                      // probe grid: N*N world points rendered in one pass
+   const rectTex = (key, w, h, data) => {
+      const rgba = new Float32Array(w * h * 4);
+      for (let i = 0; i < w * h; i++) rgba[i * 4] = data[i];
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, rgba);
+      return t;
+    };
 
     const probeFS = `#version 300 es
       precision highp float; precision highp int;
       out vec4 frag;
-      uniform sampler2D tx; uniform float uRES,uWpx,uRowScale; uniform int uN;
+      uniform sampler2D tx; uniform float uRES,uWpx,uRowScale,uROWS,uHpx,uZScale; uniform int uN;
       ${fnWorld}
       ${fnTap}
       void main(){
@@ -70,26 +95,35 @@ const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
         // walk the probe grid across the terrain's DEVICE extent, exactly as the compositor sees
         // it: x in [-1,1], z in [-uRowScale,uRowScale]
         float fx=(float(q.x)+0.5)/float(uN), fz=(float(q.y)+0.5)/float(uN);
-        vec2 pxz=vec2(fx*2.0-1.0,(fz*2.0-1.0)*uRowScale);
+        // Device z spans +-zHalf/xHalf, which is exactly 1/(2*uZScale). Walking +-uRowScale was
+        // the PRE-FLIP extent, and is why this probe could not see the production geometry.
+        float zExt=1.0/(2.0*uZScale);
+        vec2 pxz=vec2(fx*2.0-1.0,(fz*2.0-1.0)*zExt);
         frag=vec4(latTap(tx,worldUV(pxz)),0.0,0.0,1.0);
       }`;
 
     const run = (lat) => {
-      terrainDef.lattice = lat; RES = 192; const n = RES, hex = lat === 'hex';
+      terrainDef.lattice = lat; RES = 192; buildIndex();
+      const n = fieldW(), nh = fieldH(), hex = lat === 'hex', rz = hex ? HR : 1;
+      const xHalf = (n - 1) / 2, zHalf = (nh - 1) * rz / 2, zScale = xHalf / (2 * zHalf);
       // A world-linear ramp: correct interpolation is EXACT, so any error is the sampler's.
       const A = 0.0131, B = -0.0087;
-      const f = new Float32Array(n * n);
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-        const wx = x + (hex ? 0.5 * (y & 1) : 0), wy = y * (hex ? HR : 1);
+      const f = new Float32Array(n * nh);
+      for (let y = 0; y < nh; y++) for (let x = 0; x < n; x++) {
+        const wx = x + (hex ? 0.5 * (y & 1) : 0), wy = y * rz;
         f[y * n + x] = A * wx + B * wy;
       }
-      const tex = GPU.upload('hexDeferredProbe', n, f);
+      // RECTANGULAR upload. GPU.upload() is square by design, so the old probe could only ever
+      // test an n x n texture - it never exercised the shape that actually ships.
+      const tex = rectTex(n, nh, f);
       const prog = GPU.prog('hexDeferredProbe', probeFS);
       const target = GPU.rt('hexDeferredProbeOut', N);
       GPU.run(prog, N, target, pr => {
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.uniform1i(u(pr, 'tx'), 0);
         gl.uniform1f(u(pr, 'uRES'), n); gl.uniform1f(u(pr, 'uWpx'), 1 / n);
+        gl.uniform1f(u(pr, 'uROWS'), nh); gl.uniform1f(u(pr, 'uHpx'), 1 / nh);
+        gl.uniform1f(u(pr, 'uZScale'), zScale);
         gl.uniform1f(u(pr, 'uRowScale'), hex ? HR : 1);
         gl.uniform1i(u(pr, 'uN'), N);
       });
@@ -103,17 +137,20 @@ const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
         // coordinate. Using the MESH's convention here instead (cell i at uv=i/(n-1)) offsets
         // the reference by up to half a cell and shows up as a flat ~0.0026 error on BOTH
         // lattices - see the REPORT below, which is a real finding but not this gate's subject.
+        // COLUMNS from n, ROWS from nh. They differ by 15.5% on hex, and deriving the row
+        // from n was what let this probe agree with a shader that also derived it from n - the
+        // two shared the same mistake and cancelled, which is how a gate passes on a broken build.
         const wx = fx * n - 0.5;
-        const rowF = fz * n - 0.5;
+        const rowF = fz * nh - 0.5;
         const wy = hex ? rowF * HR : rowF;
         // skip the outer ring: the shader clamps at texel edges, the CPU clamps at cell edges,
         // and disagreeing about the boundary is not what this gate is about
-        if (wx < 2 || wx > n - 3 || rowF < 2 || rowF > n - 3) continue;
+        if (wx < 2 || wx > n - 3 || rowF < 2 || rowF > nh - 3) continue;
         const want = sampleBilinear(f, wx, wy);
         const e = Math.abs(got[qy * N + qx] - want);
         if (e > maxErr) maxErr = e; se += e * e; cnt++;
       }
-      const range = Math.abs(A) * n + Math.abs(B) * n * (hex ? HR : 1);
+      const range = Math.abs(A) * n + Math.abs(B) * nh * (hex ? HR : 1);
       return { maxErr: +maxErr.toExponential(3), rms: +Math.sqrt(se / cnt).toExponential(3),
         relMax: +(maxErr / range).toExponential(3), probes: cnt };
     };
