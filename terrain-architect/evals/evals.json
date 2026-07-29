@@ -370,6 +370,45 @@
         "Requires correlated colour/normal/AO/roughness from shared or explicitly related fields",
         "Keeps material wavelengths in metres and ties the cutoff to the view envelope"
       ]
+    },
+    {
+      "id": 29,
+      "axis": "design",
+      "prompt": "Our terrain tool currently bakes final diffuse/albedo textures and per-pixel material IDs, and the game engine just renders them. The art director now wants seasons, dynamic weather, and snow that melts at runtime. What should our export contract to the engine look like?",
+      "expected_output": "The Masking Doctrine of 27: the runtime handoff contains NO baked diffuse/colour maps and NO predefined materials. The tool exports raw R32F physical fields (moisture, temperature, insolation, wind vectors, soil depth, strata hardness, wetness, flow velocity, curvature, AO) and the engine resolves materials, weather, snow, and foliage per-frame from those masks/drivers. A baked albedo freezes one season/weather/art decision and destroys the cause the engine needs. The satmap/colour map survives only as a preview/review product.",
+      "files": [],
+      "expectations": [
+        "States the runtime handoff must not contain baked diffuse/albedo or predefined material IDs",
+        "Prescribes exporting raw physical data layers (e.g. moisture, temperature, insolation, wetness, soil depth) as R32F buffers the engine consumes as masks/drivers",
+        "Explains the cause-vs-effect rationale: baking freezes one season/weather state and the engine can no longer melt snow or change seasons",
+        "Keeps a colour/satmap only as a preview or review product, not something engine systems depend on"
+      ]
+    },
+    {
+      "id": 30,
+      "axis": "review",
+      "prompt": "Code review: our hydraulic erosion node outputs only the new heightfield. A separate later pass then paints soilDepth and wetness maps from the final slope and curvature so the engine has something to read. Is there anything wrong with this design?",
+      "expected_output": "Violates 27's co-evolution rule. Soil depth and wetness are STATE maps - path-dependent, encoding the simulation's history - and cannot be reconstructed from final geometry; the erosion node must co-update them in the same pass (parallel pipelines, not appended hacks). Painting them afterwards from slope/curvature is the retrofitted-afterthought defect the chapter exists to prevent. Derived maps (curvature, AO, insolation) ARE legitimately recomputed from final geometry - the reviewer should name the state-vs-derived distinction.",
+      "files": [],
+      "expectations": [
+        "Identifies the design as a violation of the co-evolution rule / first-class auxiliary map doctrine (27)",
+        "Explains soilDepth and wetness are path-dependent state maps that cannot be recovered from final geometry",
+        "Requires the erosion node to update these maps in the same pass it alters height",
+        "Distinguishes state maps from derived maps (curvature/AO/insolation), which are correctly recomputed after the last height write"
+      ]
+    },
+    {
+      "id": 31,
+      "axis": "review",
+      "prompt": "My sim shows deep snow drifts in a bone-dry rain-shadowed valley - drifts banked below the lee side of the ridge crest, and a tongue of ice running down the valley floor. My moisture map is ~0 there. Is this a bug?",
+      "expected_output": "Not necessarily. The Snow Rule (27) says no moisture = no NEW snow, but snow may legitimately exist in dry areas via exactly three displacement channels: wind-loading (scoured from the windward side, deposited leeward of the crest - matching the described drifts), avalanches (gravity runout below failed slopes), and glacial flow (ice compressed upslope in the wet accumulation zone flowing down into the dry valley - matching the tongue). The check: every dry-snow cell must be attributable to one of the three (leeward of the wind field / below a failed slope / connected to an accumulation zone); reference-impl's dry_snow_attribution mechanises it. Unattributed dry snow (e.g. painted by altitude alone) IS a broken Snow Rule.",
+      "files": [],
+      "expectations": [
+        "States the Snow Rule: no moisture means no new snowfall, but displaced snow can legitimately exist in dry areas",
+        "Names the three (and only three) displacement channels: wind-loading, avalanches, glacial flow",
+        "Maps the described evidence to the channels (lee drifts = wind-loading; valley tongue = glacial flow)",
+        "Describes an attribution check (trace to wind lee / runout / accumulation zone) rather than declaring it fine or a bug outright"
+      ]
     }
   ]
 }

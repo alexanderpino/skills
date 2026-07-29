@@ -162,3 +162,16 @@ def test_dry_snow_attribution_flags_painted_summit():
     s = np.where(h > 80.0, 3.0, 0.0)                        # altitude-only painted snowcap
     dry, attributed = snow.dry_snow_attribution(h, s, moisture, wind=(1.0, 0.0), reach=4)
     assert np.any(dry & ~attributed)                        # the painted cap is flagged
+
+
+def test_melt_scales_with_insolation():
+    """Sun-facing ground clears first; a shadowed ravine (low insolation) holds its snow (06/27).
+    Without the insolation field, both sides melt identically — the T-only crude form."""
+    h = _gentle()
+    insol = np.where(np.arange(40)[None, :] < 20, 0.1, 1.0) + 0.0 * h    # left shaded, right sunny
+    s0 = np.full_like(h, 6.0)
+    s = snow.snow_step(h, s0, T=5.0, precip=0.0, dt=1.0, melt_factor=0.6,
+                       avalanche_iters=0, insolation=insol)
+    assert s[:, :20].min() > s[:, 20:].max()            # shaded side retains more, everywhere
+    flat = snow.snow_step(h, s0, T=5.0, precip=0.0, dt=1.0, melt_factor=0.6, avalanche_iters=0)
+    assert np.isclose(flat.mean(), 6.0 - 0.6 * 5.0, atol=1e-6)   # default unchanged: T-only melt

@@ -227,6 +227,7 @@ not the terrain.
 | **Normal RGB** | `normal` as RGB (or aspect as hue) | Faceting, quantisation combs, lighting seams between tiles — the "normals view" | Macro shape; it's a derivative, all high-frequency |
 | **Curvature** | profile/plan curvature, *diverging* ramp centred at 0 | Ridge vs valley structure, deposition zones, mask inputs; speckle = quantisation (`06`) | Absolute height and slope |
 | **AO** | long-radius horizon AO (`06`) | Macro relief — valleys darken, peaks catch light; concentric rings = R16 (`08`) | Fine detail at large radius |
+| **Insolation** | sun-arc received fraction (`06`) | The melt driver by eye: aspect asymmetry (equator-facing bright), shadowed ravines that hold snow; identical-looking to AO = the sun-arc test was skipped and one map was shipped twice (`27`) | Sky openness — that's AO's integral; a sun-shadowed but sky-open wall reads dark here and bright there, which is the point |
 | **Flow / wetness overlay** | `log(A)` or TWI over hillshade | Connectivity, channel network, where water lingers (check 1) | — |
 | **Diff / A–B** | two fields subtracted, diverging ramp | Before/after erosion; monolithic vs tiled; CPU vs GPU — must match where the invariants say it must | — |
 | **False-colour clip** | height with out-of-range flagged | NaN/Inf (flag magenta), below sea, above cap — *before* they spread | Everything else |

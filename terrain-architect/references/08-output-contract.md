@@ -50,7 +50,15 @@ Plus a manifest, and the manifest is not optional:
   "seaLevel":      float,
   "rootSeed":      uint64,
   "tileIndex":     [i, j],
-  "apron":         int            // cells of overlap included, if any
+  "apron":         int,           // cells of overlap included, if any
+  "layers": [                     // one entry per exported auxiliary map (27)
+    { "name":   "moisture",       // wire name from 27's registry
+      "unit":   "mm/yr",
+      "range":  [min, max],       // declared, not assumed (insolation can exceed 1)
+      "format": "R32F",           // RG32F for vector maps
+      "kind":   "state" | "derived",
+      "parentHash": "..." }       // derived maps only: content hash of the source field
+  ]
 }
 ```
 

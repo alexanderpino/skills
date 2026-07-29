@@ -149,15 +149,21 @@ def dry_snow_attribution(h, snow, moisture, wind=None, *, reach=None,
 
 def snow_step(h, snow_depth, T, precip, *, dt=1.0, melt_factor=0.6, snow_repose_deg=37.0,
               shed_lo_deg=50.0, shed_hi_deg=60.0, cellsize=1.0, avalanche_iters=4,
-              wind=None, wind_rate=0.4):
+              wind=None, wind_rate=0.4, insolation=None):
     """One `snowStep` (13): accumulate cold -> degree-day melt -> shed steep -> avalanche (thermal on
     the snow layer) -> optional wind redistribution. `T` and `precip` may be scalars or fields (a
-    lapse-rate temperature field `T0 - lapse*h` is the usual driver). Returns the new snow depth."""
+    lapse-rate temperature field `T0 - lapse*h` is the usual driver). `insolation` (optional, scalar
+    or field: 06's sun-arc map, 1 = flat unshadowed ground) modulates the melt — sun-facing ground
+    clears first, shadowed ravines hold snow (13/27); omit for the T-only crude form. Returns the
+    new snow depth."""
     snow = np.asarray(snow_depth, dtype=np.float64).copy()
     T = np.asarray(T, dtype=np.float64)
     precip = np.asarray(precip, dtype=np.float64)
     snow = snow + precip * (T < 0.0) * dt                              # 1. accumulate where cold
-    snow = snow - np.maximum(0.0, melt_factor * T) * dt               # 2. degree-day melt
+    melt = np.maximum(0.0, melt_factor * T)                            # 2. degree-day melt...
+    if insolation is not None:                                         # ...sun-exposure modulated
+        melt = melt * np.asarray(insolation, dtype=np.float64)
+    snow = snow - melt * dt
     snow = np.maximum(snow, 0.0)
     slope = analysis.slope(h, cellsize)                               # 3. shed steep ground
     snow = snow * (1.0 - _smoothstep(np.tan(np.radians(shed_lo_deg)),

@@ -172,6 +172,9 @@ defects:
    height — and is the bake free of anything that should move at runtime (waves, foam,
    spray, particles)? The tool exports causes and drivers; the engine renders motion
    (Part 2, "Water is caused, not carved"; Part 3, "The hydrology handoff").
+10. Does every terrain-altering node co-update the auxiliary maps its process touches — soil,
+    wetness, sediment, snow (`27`)? Height written with untouched companion maps is the tell;
+    that state is path-dependent and unrecoverable afterwards.
 
 State findings as **symptom → mechanism → minimal fix**. Do not rewrite a graph that has one
 misordered node.
@@ -446,7 +449,8 @@ order before you check the maths.
   4  Depression handling      fill or breach (MANDATORY)           → 03
   5  Flow routing             D8 / D∞ / MFD → drainage area A      → 03
   5b Climate fields           temperature + orographic moisture
-                              (the rainfall term of 6)             → 13
+                              (rainfall term of 6; uses the authored
+                              regional wind — 7b's field comes later) → 13
   6  Fluvial erosion          stream power / pipe / droplet        → 04
   6b Glacial (if glaciated)   SIA ice flow, ALONGSIDE fluvial      → 12
   7  Hillslope erosion        thermal / talus / mass wasting       → 05
