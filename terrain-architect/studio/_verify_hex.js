@@ -316,12 +316,16 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
       const base = fbmField(gnoise, A);
       const o = hydraulicErode(base, { droplets: 9000, capacity: 4, erode: .3, deposit: .3,
         inertia: .05, radius: 2, seed: 1, settle: true });
+      // Bound by the ROW COUNT, not the width. This gate calls itself 'droplets-cover-hex-domain'
+      // but read only rows < n, so post-flip it certified full coverage while never looking at rows
+      // n..nh-1 - exactly the rows the square-world change added. Found by cross-model review.
+      const rowsTotal = fieldH();
       let lastRow = -1, rows = 0;
-      for (let y = 0; y < n; y++) { let t = false;
+      for (let y = 0; y < rowsTotal; y++) { let t = false;
         for (let x = 0; x < n; x++) if (Math.abs(o[y * n + x] - base[y * n + x]) > 1e-9) { t = true; break; }
         if (t) { rows++; lastRow = y; } }
       const d = hydroMassDiag;
-      return { lastRow, rowFrac: +(rows / n).toFixed(4), lost: d.lost,
+      return { lastRow, rows: rowsTotal, rowFrac: +(rows / rowsTotal).toFixed(4), lost: d.lost,
         closure: +(Math.abs((d.sumIn - d.sumOut) - (d.exported + d.lost - d.brushClipGain))
           / Math.max(1e-6, d.sumIn - d.sumOut + d.settled)).toExponential(2) };
     };
@@ -358,10 +362,13 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
   // alongside because it is the number this gate used to assert, and its collapse is the whole
   // reason the contract moved - not a regression.
   gate('H4a domain-contract', r.seedContract && r.seedContract.worldCorr >= 0.99,
-    `matchedCorr=${r.seedContract && r.seedContract.worldCorr} (>=0.99: same seed, same terrain `
-    + `on either lattice) · worldCorr=${r.seedContract && r.seedContract.worldCorr} REPORTED not `
-    + `gated — a hex map is 0.866 as tall, so agreeing at world points means CROPPING the noise, `
-    + `which is exactly the terrain re-roll this contract replaced`);
+    `matchedCorr=${r.seedContract && r.seedContract.worldCorr} (>=0.99: the same seed draws the `
+    + `same terrain on either lattice) - rawRowIndexCorr=${r.seedContract && r.seedContract.domainCorr} `
+    + `reported, NOT gated. Third revision of this contract: now that the world is SQUARE, `
+    + `(nh-1)*sqrt(3)/2 equals n-1 to within 0.2%, so probing row y*sqrt(3)/2 of the square field IS `
+    + `probing the same domain fraction - the world-point and matched-domain probes have converged `
+    + `and this gate reads that one. What now means nothing is the raw same-row-index probe, because `
+    + `the two lattices no longer share a row count (192 vs 222 at preview).`);
   // H4b: the odd-row half-cell shift, controlled by a metric that can see what it is for. Under
   // the domain contract, dropping the shift barely moves the correlation (a half-cell is
   // sub-pixel), so correlation would pass on the broken build - the vacuous-gate failure mode
@@ -390,9 +397,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'inde
     + `occ=${r.analysisSquare && r.analysisSquare.occSpread}]`);
   gate('H7 droplets-cover-hex-domain',
     r.dropHex && r.dropSquare
-    && r.dropHex.lastRow >= r.n - 2 && r.dropHex.rowFrac > 0.95
+    && r.dropHex.lastRow >= r.dropHex.rows - 2 && r.dropHex.rowFrac > 0.95
     && +r.dropHex.closure < 1e-5 && r.dropHex.lost === 0,
-    `hex lastTouchedRow=${r.dropHex && r.dropHex.lastRow}/${r.n - 1} rowFrac=${r.dropHex && r.dropHex.rowFrac} `
+    `hex lastTouchedRow=${r.dropHex && r.dropHex.lastRow}/${r.dropHex && r.dropHex.rows - 1} rowFrac=${r.dropHex && r.dropHex.rowFrac} `
     + `massClosure=${r.dropHex && r.dropHex.closure} lost=${r.dropHex && r.dropHex.lost} `
     + `[square lastRow=${r.dropSquare && r.dropSquare.lastRow} closure=${r.dropSquare && r.dropSquare.closure}]`);
   gate('H5 square-safety', r.squareSafety && r.squareSafety.identical,

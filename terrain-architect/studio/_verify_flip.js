@@ -21,6 +21,9 @@ const path = require('path');
 const EXE = process.env.STUDIO_CHROME || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, 'index.html'));
 const BASELINE = process.argv.includes('--baseline');
+// Pinned from the recorded red baseline (evidence/MC-1/red-baseline.md): 18 node fields plus 11
+// side channels. --baseline mode does not pin it, because that run is what establishes the number.
+const EXPECT_RECORDS = BASELINE ? 0 : +(process.env.FLIP_EXPECT_RECORDS || 29);
 
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,
@@ -74,6 +77,14 @@ const BASELINE = process.argv.includes('--baseline');
             const bot = band(f, n, nh), mid = band(f, m0, m0 + h);
             rec.ratio = mid > 1e-12 ? +(bot / mid).toFixed(4) : null;
             if (mid > 1e-12 && bot / mid < 0.1) fails.push('deadBottom ratio=' + rec.ratio);
+            // A band average hides a PARTLY dead band: half the extra rows frozen still averages
+            // above the threshold. Check the worst individual row too.
+            if (mid > 1e-12) { let worst = Infinity, worstRow = -1;
+              for (let y = n; y < nh - 1; y++) { const e = band(f, y, y + 2);
+                if (e < worst) { worst = e; worstRow = y; } }
+              rec.worstRow = worstRow; rec.worstRatio = +(worst / mid).toFixed(4);
+              if (worst / mid < 0.02) fails.push('deadRow ' + worstRow + ' ratio=' + rec.worstRatio);
+            }
           }
         } else fails.push('len=' + f.length + ' not a multiple of n=' + n);
         if (fails.length) rec.fail = fails.join(' | ');
@@ -148,6 +159,15 @@ const BASELINE = process.argv.includes('--baseline');
   if (errors.length) unhealthy.push(errors.length + ' pageerror(s)');
   if (!allRecs.length) unhealthy.push('inspected nothing');
   if (r.gateTrue !== true) unhealthy.push('gate is not true - wrong file under test');
+  // The gate being true is not the same as the gate DOING anything. If latticeRows() ever regresses
+  // to returning w, nh===n and every shape check below is trivially satisfied while the feature is
+  // absent. Require the field to actually be taller.
+  if (!(r.nh > r.n)) unhealthy.push('nh (' + r.nh + ') is not greater than n (' + r.n + ') - the square-world row count is not in effect');
+  // Vacuity by ABSENCE: side-channel records are only collected when the channel EXISTS, so a build
+  // that silently stops computing wind, snow or temperature loses those records and the remaining
+  // ones still pass. Pin the count. This is the same class d2f6769 closed for lineCount.
+  if (EXPECT_RECORDS && allRecs.length !== EXPECT_RECORDS)
+    unhealthy.push('record count ' + allRecs.length + ' != expected ' + EXPECT_RECORDS + ' - a node or side channel stopped being produced');
   if (r.buffers && r.buffers.error) unhealthy.push('buffer probe threw');
 
   let bad = 0;

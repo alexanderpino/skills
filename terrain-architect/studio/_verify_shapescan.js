@@ -80,6 +80,18 @@ console.log('\nexemptions (' + exemptions.length + '):');
 for (const e of exemptions) console.log('  ' + pad(e.line) + '  ' + e.rule.padEnd(12) + e.reason);
 if (!exemptions.length) console.log('  (none)');
 
+// A marker that sits on a line no rule fires on is FREE-FLOATING: it documents nothing the
+// scanner checked, and it silently pre-approves that line if a future rule ever reaches it.
+// A cross-model review counted 15 markers against 11 real exemptions. Report the difference.
+const markerLines = [];
+lines.forEach((L2, i) => { if (/shape-ok/.test(L2)) markerLines.push(i + 1); });
+const firing = new Set(exemptions.map(e => e.line));
+const floating = markerLines.filter(l => !firing.has(l));
+if (floating.length) {
+  console.log('\nFREE-FLOATING shape-ok markers (no rule fires on these lines):');
+  for (const l of floating) console.log('  ' + pad(l) + '  ' + (lines[l - 1] || '').trim().slice(0, 100));
+}
+
 if (bare.length) {
   console.log('\nBARE MARKERS - `shape-ok` with no reason, not accepted:');
   for (const b of bare) console.log('  ' + pad(b.line) + '  ' + b.rule.padEnd(12) + b.src);
@@ -94,6 +106,12 @@ let bad = 0;
 if (bare.length) {
   console.log('\nFAIL  exemption-reasons  ' + bare.length + ' site(s) carry a bare `shape-ok`. '
     + 'Write `shape-ok: <why this is legitimately square>` - the reason is the audit.');
+  bad++;
+}
+if (floating.length) {
+  console.log('\nFAIL  free-floating-markers  ' + floating.length
+    + ' shape-ok marker(s) sit on lines no rule fires on. Remove them, or move them to the line the '
+    + 'scanner actually flags - an unaudited marker is a pre-approval nobody reviewed.');
   bad++;
 }
 if (found.length) {
