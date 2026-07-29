@@ -224,6 +224,21 @@ tell the engine what to walk on, what to swim in, or what will be gone by summer
 stack needs **voids** (overhangs, sea caves) rather than stacked thicknesses, the per-column
 material stack of `11` replaces the field stack.
 
+## Auxiliary maps are first-class citizens
+
+Climate, geology, hydrology, and geometry maps — moisture, insolation, temperature, wind vectors,
+soil depth, strata hardness, wetness, flow velocity, curvature, AO — are **first-class fields of
+the DAG, never afterthoughts**: each travels the graph as a persistent `R32F` buffer on a typed
+port, and any node that alters the terrain must co-update every auxiliary map its physical process
+touches, in the same pass — parallel pipelines, not appended hacks (an erosion node that lowers
+height but leaves `soilDepth` and `wetness` untouched is discarding path-dependent state no
+analysis pass can recover). At the boundary the Masking Doctrine governs: the tool exports the raw
+physical fields as causes; the engine consumes them as masks and drivers for real-time materials,
+weather, foliage, and fluids — **no baked diffuse/colour maps and no predefined materials in the
+runtime handoff**. The registry of standard maps, the state-vs-derived lifecycle rules, the Snow
+Rule ("no moisture = no new snow", displaced only by wind-loading, avalanches, and glacial flow),
+and the export contract live in `27`.
+
 ## Water is caused, not carved — the fluid boundary
 
 The single most common separation-of-concerns failure in terrain tooling is letting the
@@ -718,5 +733,6 @@ they are easy to get subtly wrong, and the versions here have been checked.
 | `references/24-voxel-streaming-generation.md` | **Voxel/streaming chunk worlds.** Chunked, seeded, streamed, editable voxel worlds (the Minecraft family); representation, multi-noise biomes, proto-chunk stages, meshing — and the *doctrine ledger* of which invariants this regime deliberately suspends. F/N-tier sources |
 | `references/25-planetary-spherical.md` | **Whole-planet / spherical worlds.** Euler-pole tectonics, global circulation & latitude climate bands, geoid sea level, 3D/4D noise on the sphere, planet-scale precision/LOD/streaming, alien-world regime knobs. **Routes to `08`** for the grid/seam substrate |
 | `references/26-hexagonal-grids.md` | **The hexagonal lattice, end to end.** Optimal 2D sampling, 6-neighbour topology and D6 routing, renormalised stencils, sheared-array storage and the metric/gradient corrections, meshing options and their amplitude trade-offs, what does and does not port from square grids, engine integration, interchange, verification. Serves both the flat deployment and (via `08`/`25`) the spherical DGGS deployment. **Routes to `08`** for manifest fields and the deliver-a-raster rule |
+| `references/27-engine-data-handoff.md` | **First-class auxiliary maps & the engine data handoff.** The standard map registry (climate / geology / hydrology / geometry layers), the co-evolution rule, state-vs-derived lifecycle, the Masking Doctrine (raw `R32F` causes out, no baked materials), the Snow Rule and its displacement exceptions, manifest/precision/tiling handoff mechanics, verification hooks |
 | `references/99-papers.md` | Bibliography with attribution notes |
 | `reference-impl/` | **Runnable, test-verified** numpy mirrors of the sim pseudocode — noise, droplet/pipe/thermal/stream-power erosion, flow routing, meandering, braiding, diffusion, dunes, flexure, wind fields, runout, impacts, analysis, scatter, and more — each checked against its `09` oracle, plus a segregated, clearly-labelled illustrative tier where no decisive oracle exists. Optional tests cross-validate flow operations against richdem and pysheds, and stream power, D8 accumulation and hillslope diffusion against Landlab. A dependency-free graph+render sandbox (`reference-impl/graph_demo.py`, `reference-impl/render.py`) wires the nodes into a Legal-Order DAG with content-addressed caching and renders the `09` review modes. Real heightmaps are a first-class base via `reference-impl/heightfield_io.py` (loads common DEM formats, fetches real SRTM tiles). `reference-impl/archetypes.py` and `reference-impl/screen_worlds.py` lift the sandbox to the archetype altitude of `20`. Provenance and licences per node: `reference-impl/GROUNDING.md` |
