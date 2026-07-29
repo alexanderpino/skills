@@ -110,14 +110,22 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     // family, or whose bit was never set (a quad's OTHER diagonal, a row-wrapping "delta 1" jump, a
     // leap across the mesh), is not an edge of this mesh.
     const groundTruth = () => {
-      const n = RES, tri = readIdx(buffers.idx, buffers.count);
+      const n = RES, rows = fieldH(), tri = readIdx(buffers.idx, buffers.count);
       const slot = d => d === 1 ? 1 : d === n - 1 ? 2 : d === n ? 4 : d === n + 1 ? 8 : 0;
-      const mask = new Uint8Array(n * n);
-      let offLattice = 0;
+      // n * rows, NOT n * n. The field is RES wide and latticeRows(RES) tall - equal on square,
+      // but round(RES*2/sqrt(3)) on hex, so a square-sized mask cannot address the last
+      // (rows - n) rows AT ALL. An out-of-range Uint8Array write is silently discarded, so the
+      // loss surfaces as a plausible shortfall instead of an error: this gate reported hex
+      // covered=785408/905571, and 785408 is exactly (n-1)n + n*n + n(n-1) - the three edge
+      // families restricted to rows 0..n-1. The denominator was always right; 13.3% of the
+      // lattice simply had nowhere to be recorded. indexOutOfRange makes it loud if it recurs.
+      const mask = new Uint8Array(n * rows);
+      let offLattice = 0, oob = 0;
       for (let t = 0; t + 2 < tri.length; t += 3) for (let e = 0; e < 3; e++) {
         const u = tri[t + e], v = tri[t + (e + 1) % 3];
         const a = u < v ? u : v, s = slot(u < v ? v - u : u - v);
         if (!s) { offLattice++; continue; }
+        if (a >= mask.length) { oob++; continue; }
         mask[a] |= s;
       }
       const uniqueRealEdges = popcount(mask);
@@ -125,7 +133,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
         const a = u < v ? u : v, s = slot(u < v ? v - u : u - v);
         return !!s && !!(mask[a] & s); };
       const classify = seg => {
-        const seen = new Uint8Array(n * n);
+        const seen = new Uint8Array(n * rows);
         let real = 0, fake = 0, dup = 0; const ex = [];
         for (let k = 0; k < seg.length; k++) {
           const u = seg.u(k), v = seg.v(k);
@@ -141,10 +149,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
           coveredRealEdges: covered, missingRealEdges: uniqueRealEdges - covered, fakeExamples: ex };
       };
       // The diagonal each quad chose, so a later build can be compared against this one.
-      const diagSig = () => { const q = (n - 1) * (n - 1), d = new Uint8Array(q);
+      const diagSig = () => { const q = (n - 1) * (rows - 1), d = new Uint8Array(q);
         for (let k = 0; k < q; k++) { const i = ((k / (n - 1)) | 0) * n + (k % (n - 1));
           d[k] = tri[k * 6 + 2] === i + n + 1 ? 1 : 0; } return d; };
-      return { n, tri, uniqueRealEdges, offLatticeTriangleEdges: offLattice, isReal, classify, diagSig };
+      return { n, rows, tri, uniqueRealEdges, offLatticeTriangleEdges: offLattice,
+        indexOutOfRange: oob, isReal, classify, diagSig };
     };
 
     // Render once with the wireframe off and once with it on, capturing every element draw.
@@ -193,10 +202,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     const measure = lattice => {
       terrainDef.lattice = lattice;
       updateViewport(curField || newField(), activePreviewNode(), { color: false });
-      const G = groundTruth(), n = G.n;
-      const M = { lattice, n, pattern: buffers.indexPattern, triIndexCount: buffers.count,
+      const G = groundTruth(), n = G.n, rows = G.rows;
+      const M = { lattice, n, rows, pattern: buffers.indexPattern, triIndexCount: buffers.count,
         uniqueRealEdges: G.uniqueRealEdges, offLatticeTriangleEdges: G.offLatticeTriangleEdges,
-        analyticEdges: (rows => 3 * (n - 1) * (rows - 1) + (n - 1) + (rows - 1))(fieldH()) };
+        indexOutOfRange: G.indexOutOfRange,
+        analyticEdges: 3 * (n - 1) * (rows - 1) + (n - 1) + (rows - 1) };
       M.analyticLineCount = 2 * M.analyticEdges;
       // ---- W0 controls: prove the metric can tell a real edge from a plausible fake ----
       let triEdgeFake = 0;
@@ -207,7 +217,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
         quad0MainDiagonalReal: mainD, quad0AntiDiagonalReal: antiD,
         quad0DiagonalsExclusive: mainD !== antiD,       // exactly one exists => the other is rejected
         rowWrapPairRejected: !G.isReal(n - 1, n),       // delta 1, but it wraps a row
-        farLeapRejected: !G.isReal(0, n * n - 1), skipPairRejected: !G.isReal(0, 2) };
+        // n * rows - 1, not n * n - 1: on hex the latter is no longer the far corner, and a
+        // control that has drifted off the end of the mesh is testing something other than a leap.
+        farLeapRejected: !G.isReal(0, n * rows - 1), skipPairRejected: !G.isReal(0, 2) };
       return inspectWireDraw(renderBoth(), G, M);
     };
 
@@ -228,8 +240,10 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     const GB = groundTruth(), diagB = GB.diagSig();
     let spun = 0; for (let k = 0; k < diagA.length; k++) if (diagA[k] !== diagB[k]) spun++;
     out.stale = inspectWireDraw(renderBoth(), GB, { lattice: 'square-after-height-edit',
-      n: GB.n, pattern: buffers.indexPattern, uniqueRealEdges: GB.uniqueRealEdges,
-      analyticEdges: (rows => 3 * (GB.n - 1) * (rows - 1) + (GB.n - 1) + (rows - 1))(fieldH()), diagonalsSpunByTheEdit: spun });
+      n: GB.n, rows: GB.rows, pattern: buffers.indexPattern, uniqueRealEdges: GB.uniqueRealEdges,
+      indexOutOfRange: GB.indexOutOfRange,
+      analyticEdges: 3 * (GB.n - 1) * (GB.rows - 1) + (GB.n - 1) + (GB.rows - 1),
+      diagonalsSpunByTheEdit: spun });
     out.stale.analyticLineCount = 2 * out.stale.analyticEdges;
 
     terrainDef.lattice = 'square';
@@ -257,7 +271,12 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const countOk = m => m && m.hasLineIdx && m.lineCount === m.analyticLineCount;
   const drawOk = m => m && m.wireDraw && m.wireDraw.mode === 'LINES'
     && m.wireDraw.src === 'buffers.lineIdx' && m.lineDrawsWithWireOff === 0 && m.trianglesWithWireOff > 0;
-  const coverOk = m => m && m.source && m.source.missingRealEdges === 0
+  // indexOutOfRange === 0 is not decoration. Without it the mask can be under-sized and the loss
+  // is invisible: out-of-range Uint8Array writes are dropped in silence, so the gate reports a
+  // believable shortfall (785408/905571 on hex) rather than an error. Assert that the recorder
+  // could physically address every vertex before believing anything it says about coverage.
+  const coverOk = m => m && m.source && m.indexOutOfRange === 0
+    && m.source.missingRealEdges === 0
     && m.source.coveredRealEdges === m.analyticEdges;
 
   gate('W0 metric-discriminates', controlsOk(sq) && controlsOk(hx),
@@ -288,10 +307,13 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     + `linesWhenWireOff=${hx && hx.lineDrawsWithWireOff} trianglesWhenWireOff=${hx && hx.trianglesWithWireOff}`);
 
   gate('W4 edge-coverage', coverOk(sq) && coverOk(hx),
-    `square covered=${src(sq).coveredRealEdges}/${sq && sq.analyticEdges} missing=${src(sq).missingRealEdges} | `
-    + `hex covered=${src(hx).coveredRealEdges}/${hx && hx.analyticEdges} missing=${src(hx).missingRealEdges} `
+    `square ${sq && sq.n}x${sq && sq.rows} covered=${src(sq).coveredRealEdges}/${sq && sq.analyticEdges} `
+    + `missing=${src(sq).missingRealEdges} oob=${sq && sq.indexOutOfRange} | `
+    + `hex ${hx && hx.n}x${hx && hx.rows} covered=${src(hx).coveredRealEdges}/${hx && hx.analyticEdges} `
+    + `missing=${src(hx).missingRealEdges} oob=${hx && hx.indexOutOfRange} `
     + `-- a strip OMITS edges too: a triangle's third edge is drawn only if a stitch lands on it, and `
-    + `nothing ever reaches the left-column verticals (broken build missed 511 on both lattices)`);
+    + `nothing ever reaches the left-column verticals (broken build missed 511 on both lattices). `
+    + `oob>0 means the recorder could not address the whole field and NOTHING else here is meaningful`);
 
   gate('W5 no-stale-edges', st && st.diagonalsSpunByTheEdit > 0 && cleanSrc(st) && coverOk(st),
     `height edit spun ${st && st.diagonalsSpunByTheEdit} adaptive diagonals (must be >0 or this gate `

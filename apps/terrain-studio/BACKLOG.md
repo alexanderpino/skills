@@ -16,13 +16,20 @@ Status: **TODO** · **WIP** · **DONE** · **BLOCKED** · **WONTFIX**
 (`~/.claude/skills/terrain-architect/`) is the source of truth for doctrine, and every `27`/`26`
 citation in this file is read from it. The copy under `terrain-architect/` in this repo lags on this
 branch and catches up when `origin/main` is pulled in — so a chapter being absent *here* says
-nothing about whether the doctrine exists. Two consequences worth remembering:
+nothing about whether the doctrine exists.
 
-- Nothing in the auxiliary-map work is blocked on the merge; the doctrine is readable now.
-- Chapter numbering differs between the two right now — the installed copy has `26-hexagonal-grids.md`
-  (split) plus `27-engine-data-handoff.md`; this branch still has the older single
-  `26-hexagonal-lattice.md`. **Author corpus corrections (W7) against the installed/main version**,
-  after the merge, or they will be written into a file that main has already replaced.
+**That merge has now happened** (`a7cc8f8`). The repo copy carries `26-hexagonal-grids.md` and
+`27-engine-data-handoff.md`, matching the installed one, and the older single
+`26-hexagonal-lattice.md` is **gone** — never cite it. Corpus corrections (W7) are writable now,
+against the merged filenames.
+
+Two things the merge settled, worth keeping because they will recur on the next one:
+
+- Nothing in the auxiliary-map work was ever blocked on it; the doctrine was readable from the
+  installed copy throughout. An earlier revision of this file claimed otherwise and was wrong.
+- Edits authored against a superseded filename do not survive. Both of this branch's `SKILL.md`
+  edits pointed at `26-hexagonal-lattice.md` and had to be discarded wholesale — a routing-table
+  row naming a file that no longer exists is worse than no row at all.
 
 ---
 
@@ -244,23 +251,43 @@ Related dead code: `.effect` is declared on 7 node types (`:4567, :4579, :4599, 
 :4645`) and read **zero** times.
 
 ### C8 — Oracle debt from the square-world flip · TODO
-- `_verify_hex_sampling.js` S4/S5 — closed form encodes the pre-flip warp world extent.
-- `_verify_wireframe.js` W0/W1/W3/W4 — edge-recovery walk validates against a **square adjacency
-  model** (hex `covered=785408/905571`). Structural rework, not a retune — but **narrower than it
-  looks, and the denominator is not the problem**. The two edge counts are algebraically identical:
 
-      square, one diagonal per quad :  (W-1)H + W(H-1) + (W-1)(H-1)
-      hex, odd-r offset             :  (W-1)H +        (2W-1)(H-1)
+- `_verify_wireframe.js` W4 — **FIXED**. Now 6/6 on both lattices: square `512×512
+  covered=784385/784385 missing=0 oob=0`, hex `512×591 covered=905571/905571 missing=0 oob=0`,
+  W5 spun 130 288 diagonals so it is not vacuous.
 
-  and these are the same expression, because `W(H-1) + (W-1)(H-1) = (H-1)(2W-1)`. Both evaluate to
-  **905 571** at 512×591 — so the oracle's denominator is already right for hex, and no recount is
-  needed. Three edges per interior cell either way; the lattices differ in *which* pairs are edges,
-  not *how many*. The fix is therefore a **re-pairing**, not a re-count: replace the fixed
-  neighbour offsets with the parity-dependent odd-r ones (SE/SW shift by row parity), and W4 should
-  close without touching the total.
-  Caution when reading the failure: the uncovered share is `120163/905571 = 13.27%`, which is
-  *not* the 13.4% hex-sampling figure and has nothing to do with it. Two unrelated quantities that
-  round to the same number is exactly the kind of coincidence this file exists to stop us acting on.
+  It was never an adjacency model, a re-count, or a re-pairing — I guessed all three before
+  measuring, and all three were wrong. The whole defect was **one allocation**:
+
+      const mask = new Uint8Array(n * n);     // vertex indices run to n * rows
+
+  On square `rows === n` and it is correct. On hex `rows = round(n·2/√3) = 591`, so the mask can
+  address rows 0..511 and **nothing else** — and an out-of-range `Uint8Array` write is *silently
+  discarded*, no throw, no NaN, no warning. So the recorder dropped every edge whose lower endpoint
+  lay in rows ≥ 512 and reported a believable shortfall instead of an error.
+
+  The arithmetic identifies it beyond doubt. Restricting each edge family to rows 0..n−1:
+
+      horizontal (n−1)·n  +  vertical n·n  +  diagonal n·(n−1)  =  785 408
+
+  which is the observed `covered` **to the unit**. The `slot()` delta family `{1, n−1, n, n+1}` was
+  already correct for hex (odd-r's row-parity neighbours land on `n−1`/`n` for even rows and
+  `n`/`n+1` for odd), and `analyticEdges` already used `fieldH()`. Only the buffer was square.
+
+  Correction to my earlier note here: the 13.27% uncovered **is** the same geometric constant as the
+  13.4% — both are `1 − √3/2`, since the unaddressable rows are exactly `rows − n` out of `rows`.
+  I had written it off as a misleading coincidence. It was the signature.
+
+  Guard added so it cannot recur quietly: `indexOutOfRange` counts writes the mask could not
+  accept, and `coverOk` now requires it to be zero — *a coverage number from a recorder that cannot
+  address the whole field means nothing.* It earned its keep immediately, catching a second object
+  (W5's stale-path record) that wasn't reporting the field at all.
+
+  **The general lesson, and the reason this sat undiagnosed:** a typed-array OOB write is the
+  perfect vacuity engine. It removes evidence without producing any. Prefer `n * rows` derived from
+  the field contract over any `n * n` written from habit, and assert addressability before believing
+  a count.
+- `_verify_hex_sampling.js` S4/S5 — still open; closed form encodes the pre-flip warp world extent.
 - `_verify_hex_deferred.js` G1/G2 — harness built on `GPU.upload()`/`GPU.prog()`, which are
   square-by-construction (`upload` only makes `n×n`; `prog` caches by key and **ignores the
   source**). The shader itself is verified correct to six decimals by `_verify_glsl_probe.js`; this
