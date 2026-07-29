@@ -12,6 +12,18 @@ Two rules for this file, because a backlog that lies is worse than none:
 
 Status: **TODO** · **WIP** · **DONE** · **BLOCKED** · **WONTFIX**
 
+**Which corpus is authoritative.** The **installed** skill
+(`~/.claude/skills/terrain-architect/`) is the source of truth for doctrine, and every `27`/`26`
+citation in this file is read from it. The copy under `terrain-architect/` in this repo lags on this
+branch and catches up when `origin/main` is pulled in — so a chapter being absent *here* says
+nothing about whether the doctrine exists. Two consequences worth remembering:
+
+- Nothing in the auxiliary-map work is blocked on the merge; the doctrine is readable now.
+- Chapter numbering differs between the two right now — the installed copy has `26-hexagonal-grids.md`
+  (split) plus `27-engine-data-handoff.md`; this branch still has the older single
+  `26-hexagonal-lattice.md`. **Author corpus corrections (W7) against the installed/main version**,
+  after the merge, or they will be written into a file that main has already replaced.
+
 ---
 
 ## 1. Decisions taken
@@ -252,8 +264,8 @@ Related dead code: `.effect` is declared on 7 node types (`:4567, :4579, :4599, 
 | W4 | Auxiliary-map registry | The three lenses above. Lazily materialised — 12 R32F maps at 4K is ~930 MB, so allocate only what a graph reads; `wetness` could be R8. |
 | W5 | Water sources + flow field + ice chain | D5 + C2 + the ice node. |
 | W6 | Export profiles + manifest | D6. Includes the final-vs-initial-state contract and driver-completeness check. |
-| W7 | Corpus corrections | `26` still frames squash-or-crop as fundamental (D1 dissolved it). Also upstream: the 3-axis blur finding, the 6-pipe CFL derivation, and salinity as a proposed registry extension. |
-| W8 | Merge `origin/main` — **blocks W4/W5/W6** | 26 commits: the `26` split and the **new chapter `27`**. ⚠️ **`27-engine-data-handoff.md` is not in this working tree** — it exists only on `origin/main` and in the installed skill. Everything this file says about the auxiliary-map registry, the co-evolution rule and the Masking Doctrine is cited from the *installed* copy, so the repo cannot yet be checked against it. Locally the hex chapter is still `26-hexagonal-lattice.md`, not `26-hexagonal-grids.md`. Main's deletion of `terrain-architect/studio` now *agrees* with our move, so it should merge cleanly. **Not yet run.** |
+| W7 | Corpus corrections — **after W8** | The squash-or-crop framing D1 dissolved; the 3-axis blur finding; the 6-pipe CFL derivation; salinity as a proposed registry extension. ⚠️ An earlier edit this session added an "authoring domain vs world metric" section to *this branch's* `26-hexagonal-lattice.md`. Main has since **split that chapter**, so that edit is both superseded (the square world dissolved the dilemma it described) and written into a file main replaced. Re-author against the merged `26-hexagonal-grids.md`; do not try to carry the old text across. |
+| W8 | Merge `origin/main` | 26 commits: the `26` split and the new chapter `27`. Main's deletion of `terrain-architect/studio` now *agrees* with our move, so it should merge cleanly. **Not yet run.** Housekeeping, not a blocker — see the note below. |
 | W9 | Weathering defaults | C7's real finding: `dirt` ships at 0.01, effectively off. Defaults change → digest re-bless. |
 
 ---
