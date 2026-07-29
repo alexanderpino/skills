@@ -284,7 +284,7 @@ all in `26`.
 The planetary version of the same lattice — the icosahedral hexagonal DGGS — is a spherical grid and
 stays in the next section.
 
-**Implementation depth → `26-hexagonal-lattice.md`.** This section owns the grid-system case — why
+**Implementation depth → `26-hexagonal-grids.md`.** This section owns the grid-system case — why
 and when to choose hex; `26` owns building on it: storage on a plain W×H array (odd-r offset, zero
 memory cost), the branchless D6 kernel, the re-derived stencil constants (the hex Laplacian is
 `2/(3s²)`, not `1/s²`), the **unique equilateral triangulation** (edge spinning ceases to exist —

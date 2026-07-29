@@ -765,6 +765,67 @@ you expected `H` means the centre vertex was dropped. The ramp and cone controls
 are affine and near-affine, and both meshes reproduce affine fields exactly — so this is the only
 control that distinguishes them.
 
+## Provenance beyond the Tier note
+
+The paragraph below covers the geometry and the engineering. Four citation families sit outside it
+and are recorded here because the claims they support are made in this chapter.
+
+- **The sampling caveat, and the hex image-processing literature** — P. Petersen & Middleton 1962
+  (*Information and Control* 5(4):279–323) is optimality **for a signal band-limited to a disc**,
+  and that qualifier is the one that gets dropped: for square-band-limited content — dune fields,
+  foliated strata (`05`, `18`) — the square lattice wins instead. Terrain after FBM is
+  approximately isotropic, so the assumption usually holds, but it is an assumption. Practical
+  square↔hex resampling: Van De Ville, Philips & Lemahieu 2002 (*Signal Processing: Image
+  Communication* 17(5):393–408); hex FFT with rectangular output: Ehrhardt 1993 (*IEEE TSP*
+  41(3):1469–1472); book-length treatment: Middleton & Sivaswamy 2005 (*Hexagonal Image
+  Processing*, Springer, ISBN 9781852339142 — cite the ISBN, the series was rebranded); survey:
+  Magillo 2025 (*Computer Science Review* 56). Mersereau 1979 (*Proc. IEEE* 67(6):930–949) is the
+  classic restatement — metadata verified, text paywalled at verification time, so the 13.4% here
+  is **re-derived, not quoted**.
+
+- **The transport-isotropy precedent is a physics result, and the transfer to terrain is not** —
+  P for the papers, **F for the transfer**. Lattice-gas automata ran this experiment first: HPP on
+  the square lattice (Hardy, Pomeau & de Pazzis 1973, *J. Math. Phys.* 14(12):1746–1759) does not
+  reproduce isotropic Navier–Stokes; moving the automaton to the **triangular lattice — hexagonal
+  cells, six velocities at 60°** fixes it (FHP: Frisch, Hasslacher & Pomeau 1986, *PRL*
+  56(14):1505–1508; Wolfram 1986, *J. Stat. Phys.* 45:471–526 gives the general lattice-symmetry
+  treatment). The mechanism is the moment identity of this chapter one rank up: transport carries a
+  **4th-rank** tensor `Σₖ eₖ⊗eₖ⊗eₖ⊗eₖ`, and six-fold symmetry makes it isotropic where four-fold
+  does not. Two things that phrasing must not be allowed to slide into: the square lattice fails
+  **at rank 4 specifically** — its rank-2 moment `Σeₖeₖᵀ = 2I` is already isotropic, so this is not
+  a blanket claim that square is anisotropic; and six-fold is the **smallest symmetry a periodic 2D
+  lattice can realise** that suffices, not the only one that would (five-fold suffices too, and is
+  excluded by the crystallographic restriction, not by fluid mechanics). These are
+  Navier–Stokes results; carrying them onto talus, pipe flow and lava CA (`19`) is an **analogy**,
+  and the tier drops to F when you do. Same lineage as the corpus's *randomise* cure
+  (Miyamoto & Sasaki, `19`) — hex is the *lattice* cure rather than the stochastic one.
+
+- **D6 drainage on hex DEMs** — P. Wang, Ai, Shen & Li 2020 (*Transactions in GIS*
+  24(2):483–507) names the cause outright: square grids with eight-neighbourhood adjacency "have
+  inconsistent distance measurements between orthogonal and diagonal neighborhoods, resulting in
+  valley lines extracted by the D8 algorithm not guaranteeing isotropy characteristics" — which is
+  exactly the term a hex lattice has no way to write. Compared against D8 in Wang & Ai 2018 (ISPRS
+  Archives XLII-4:687–692), where hex DEMs hold drainage-network shape better at coarse resolution.
+  **Do not credit either with introducing D6**: de Sousa, Nery, Sousa & Matos 2006 (Accuracy 2006,
+  Lisbon) already routes steepest-descent on a hex-resampled DEM. Note also what these buy and what
+  they do not — their routing is **single-receiver**, one lowest neighbour per hexagon, and both are
+  drainage-*structure* results (network and valley-line extraction), so they ground the routing
+  claim and nothing downstream of it. Production hydrology: Liao et al. 2020. **Landlab** ships
+  first-class hex grids (Hobley 2017; Barnhart 2020, *ESurf* 8:379) — FlowDirectorSteepest (= D6),
+  MFD, accumulation, and the grid-agnostic stream-power and diffusion components all run on hex,
+  while **D8 and D∞ do not exist there** at all, being raster-specific by their own documentation.
+
+- **CG erosion on a hex heightfield — ? / absent, and deliberately not hardened.** No graphics paper
+  running hydraulic, thermal or stream-power erosion on a hexagonal heightfield **could be verified
+  to exist**. That is weaker than proof of absence and is all that is claimed. The near misses are
+  named so the gap stays legible rather than lazy: Tucker, McCoy & Hobley 2018 (*A lattice grain
+  model of hillslope evolution*, *ESurf* 6:563–582) does evolve landforms on a hexagonal lattice,
+  but as a grain-state cellular automaton in geomorphology — no height array is being eroded — and
+  Liao et al. 2020 routes and delineates on hex meshes with no erosion component at all. So: **?**
+  on the literature, **F** on any implementation — an engineering translation standing on P-tier
+  hydrology, which does not lend it its tier. **Do not imply a paper.**
+
+
 ## Tier
 
 **Tier.** Hexagonal-lattice sampling optimality is **P** (Petersen & Middleton 1962; Mersereau 1979);
