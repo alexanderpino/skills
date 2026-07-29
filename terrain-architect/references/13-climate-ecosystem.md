@@ -56,6 +56,9 @@ shaded ones. `T -= insolationAmp * northness` where `northness = dot(aspectVec, 
 north faces (`06`'s downslope-aspect convention), which must therefore *cool* in the northern
 hemisphere; flip the sign south of the equator. Cheap,
 and it's one of those details that makes a landscape read as real without anyone noticing why.
+`northness` is the cheap proxy for the real **insolation map** (`06`) — it knows the slope's own
+aspect but nothing about the ridge across the valley; swap in the sun-arc field when the budget
+allows (it also drives the snow melt term below, and ships in `27`'s registry).
 
 **Snow line** = the elevation where `T = 0`. **Permafrost** = where the *annual mean* stays
 below 0. Both are thresholds on this field, not separate algorithms.
@@ -271,12 +274,14 @@ The practical core is short, because **avalanching is thermal erosion on the sno
 (`05`) — the same code, a different field, a lower talus angle:
 
 ```
-snowStep(h, snowDepth, T, precip):
+snowStep(h, snowDepth, T, precip, insol = 1):
     # 1. Accumulate where it's cold
     snowDepth += precip * (T < 0) * dt
 
-    # 2. Melt where it's warm  (degree-day model — crude and standard)
-    snowDepth -= max(0, meltFactor * T) * dt
+    # 2. Melt where it's warm (degree-day model — crude and standard), modulated by
+    #    insolation: insol = 06's sun-arc map (1 = flat unshadowed ground);
+    #    leave at 1 for the T-only crude form
+    snowDepth -= max(0, meltFactor * T) * insol * dt
     snowDepth = max(snowDepth, 0)
 
     # 3. Snow doesn't stick to steep ground
@@ -290,6 +295,12 @@ Step 4 is the one that matters. Snow relaxed on `h + snowDepth` slides off steep
 accumulates in gullies and at the base of slopes — which is where snow actually is. Without it,
 snow is a slope-thresholded mask painted uniformly, which reads as fake instantly because it
 ignores that snow *moves*.
+
+**Melt is where insolation enters** (`06`). The aspect-corrected temperature of the Temperature
+section knows which *slope* is sunny, but only the sun-arc insolation map knows about the ridge
+across the valley — the shadowed ravine that holds snow into summer. Feed it to the melt term
+(step 2); it is the same field `27`'s registry ships to the engine so runtime melt agrees with
+the baked pack.
 
 **Wind redistribution** is the other half: snow scours from windward crests and deposits in the
 lee — the same shadow-zone logic as dunes (`05`). Reuse Werner's shadow-zone test with a snow
@@ -329,6 +340,26 @@ soilMoisture = normalize(TWI) * precipFactor * (1 - drainageFactor(permeability)
 
 `permeability` comes from the material field (`11`) — sand drains, clay holds. Add distance to
 water bodies if you have them.
+
+**State wetness (puddling) — the residual the sim already knows.** TWI is a *prediction* — the
+topographic potential for wetness. If a hydraulic simulation ran (`04`), the graph also holds
+*evidence*: where water actually stood, flowed, and soaked in. That is a **state map** in `27`'s
+sense — path-dependent, co-evolved, unrecoverable from final geometry — and it costs two lines
+inside or immediately after the water loop:
+
+```
+wetnessStep(wetness, waterDepth, T, insolation, permeability, dt):
+    wetness = min(1, wetness + soakRate * (waterDepth > 0) * dt)     # soak wherever water stands or flows
+    drying  = dryRate * max(0, T) * insolation * permeability        # warm, sunny, well-drained ground dries
+    return max(0, wetness - drying * dt)
+```
+
+For droplet erosion, "water present" is the cells the droplet traversed this pass; for the pipe
+model it is `waterDepth > 0` directly. The drying term is deliberately the same trio that melts
+snow — temperature, insolation (`06`), drainage — so puddles linger exactly where snow would:
+shaded, cold, clay-floored hollows. F-tier, like the proxy above. **Ship state wetness and TWI as
+separate maps and never average them** (`27`): the state map drives puddle shaders and mud where
+water demonstrably went; TWI drives where the *engine's* rain should pool next.
 
 **Wetlands (swamps, marshes, bogs)** are where this machinery saturates, and they are a **mask,
 not a height**: flat ground + high TWI + an impermeable or frozen substrate (clay `18`, permafrost

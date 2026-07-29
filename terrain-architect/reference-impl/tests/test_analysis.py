@@ -137,3 +137,20 @@ def test_material_masks_partition():
     assert np.allclose(total, 1.0, atol=1e-6)          # partition
     idx = A.dominant_material(stack)
     assert idx.min() >= 0 and idx.max() < len(stack)
+
+
+def test_derive_substances_moisture_gates_snow():
+    """27's Snow Rule in the static sandbox placement: with a moisture supply field in `climate`,
+    snow vanishes from the dry half no matter how cold/high it is."""
+    n = 48
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 30.0 * np.exp(-((xx - 24) ** 2 + (yy - 24) ** 2) / 600.0)        # one broad, gentle summit
+    s = A.slope(h, 1.0)
+    a = np.ones_like(h)
+    clim = {"has_water": False, "has_snow": True, "snowline": 0.4, "has_veg": False}
+    wet = dict(clim, moisture=np.where(xx < 24, 1.0, 0.0))               # moist west, bone-dry east
+    sub_un = dict(A.derive_substances(h, s, a, 1.0, climate=clim))
+    sub_gt = dict(A.derive_substances(h, s, a, 1.0, climate=wet))
+    assert sub_un["snow"][:, 30:].max() > 0.1                            # ungated: snow on the dry side
+    assert sub_gt["snow"][:, 30:].max() == 0.0                           # gated: none ("no moisture = no new snow")
+    assert sub_gt["snow"][:, :20].max() > 0.1                            # supply side keeps its cap

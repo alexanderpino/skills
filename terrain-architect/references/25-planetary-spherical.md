@@ -49,7 +49,7 @@ trade-offs, and this chapter assumes you have chosen one:
 - **Cube-sphere** — six flat face-grids; the twelve cube edges are seams with a *rotation* between
   faces; flow routing crosses them with halo cells + per-face rotation tables (**F**; no canonical
   paper — say so). Six faces = six of `08`'s tiles.
-- **Icosahedral hexagonal DGGS (Goldberg polyhedron)** — the planar hex grid (`08`) closed onto the
+- **Icosahedral hexagonal DGGS (Goldberg polyhedron)** — the planar hex grid (`26`) closed onto the
   sphere: hexagons everywhere except **exactly 12 pentagons** at the icosahedron vertices (Euler forces
   them; Goldberg 1937). Equal-area **only with the right projection**: ISEA (Snyder 1992; family survey
   Sahr, White & Kimerling 2003; ISEA7H is the equal-area aperture-7 instance) — **Uber H3, the

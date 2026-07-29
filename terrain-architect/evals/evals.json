@@ -1,6 +1,6 @@
 {
   "skill_name": "terrain-architect",
-  "description": "Capability evals for the terrain-architect skill, across four answer-quality axes: attribution & tier discipline, diagnosis, design/ordering, and trap-resistance. The fifth axis (triggering) lives in trigger-evals.json. Passing bar: >=0.85 mean pass rate with-skill, and a clear positive delta over baseline on the attribution and trap-resistance axes (where the skill's provenance discipline is the whole point).",
+  "description": "Capability evals for the terrain-architect skill, across five answer-quality axes: attribution & tier discipline, diagnosis, design/ordering, trap-resistance, and owned implementation. The sixth axis (triggering) lives in trigger-evals.json. Passing bar: >=0.85 mean pass rate with-skill, and a clear positive delta over baseline on the attribution and trap-resistance axes (where the skill's provenance discipline is the whole point).",
   "evals": [
     {
       "id": 1,
@@ -314,6 +314,100 @@
         "Gives the fetch-secant form (h[p] - h[p - fetch*dir]) / (fetch*cellSize) as the correction",
         "Notes that fetch is a scale choice that must span the upwind hill",
         "Connects the symptom (scour on the flank, not the ridgeline) to the formula rather than to a tuning constant"
+      ]
+    },
+    {
+      "id": 25,
+      "axis": "trap-resistance",
+      "prompt": "Which exact terrain algorithm is Vue's Terrain Fractal, and which paper proves what MetaScale, Largest Feature and Smallest Feature do internally?",
+      "expected_output": "Do not claim a proprietary internal or invent a paper. Treat Terrain Fractal and its controls as N-tier documented tool behavior that maps to multiscale noise/frequency-band controls: domain scale, largest feature wavelength and a lower detail cutoff. It can be an initial condition but is not physical erosion or a mountain-range process.",
+      "files": [],
+      "expectations": [
+        "Refuses to claim an undocumented proprietary algorithm or a paper proving Vue's internals",
+        "Classifies Terrain Fractal and its controls as N-tier documented tool behavior",
+        "Maps MetaScale/Largest Feature/Smallest Feature to multiscale noise or wavelength-band controls",
+        "States that the result is an initial condition/look rather than physical erosion or tectonic mountain formation"
+      ]
+    },
+    {
+      "id": 26,
+      "axis": "design",
+      "prompt": "This terrain must work from a 2 m gameplay camera out to a 20 km vista. How should I divide macro terrain, displacement, material normals and scatter so it reads at both distances?",
+      "expected_output": "Declare the 2 m to 20 km view envelope and reference viewport/FOV. Keep drainage, collision and silhouette in height/mesh geometry; use displacement or explicit geometry for near relief with visible parallax; use material microheight/normals/AO/roughness for subpixel/few-pixel relief; use material plus representative instancing for dense tiny debris. Author all wavelengths and instance sizes in metres, preserve macro silhouette through LOD, derive related material channels from the same microheight, and verify at both envelope ends with correctly sized scale cues.",
+      "files": [],
+      "expectations": [
+        "Declares the near/far view envelope and a reference viewing condition",
+        "Assigns drainage, collision and silhouette-changing relief to geometry",
+        "Assigns near parallax relief to displacement/geometry and fine relief to material channels",
+        "Keeps wavelengths and scatter sizes in world units rather than camera-relative tuning",
+        "Requires far silhouette/LOD and near grounding/material-coherence checks with real-size scale cues"
+      ]
+    },
+    {
+      "id": 27,
+      "axis": "design",
+      "prompt": "My grass should avoid roads and water, grow close to some boulders, and stay out of mature tree canopies. How should those scatter layers be wired so tiles and reruns stay deterministic?",
+      "expected_output": "Generate structural layers first and expose stable PointSet/footprint DistanceField outputs. Gate grass with feathered obstacle clearances, use a distance-band/ring for boulder affinity, and use footprint-aware canopy repulsion for trees (sum centre radii, or compare the candidate radius with distance to an existing-canopy boundary). Record layer dependencies in the DAG/cache key, include an apron at least as wide as the largest interaction radius, and never query a partially built renderer scene.",
+      "files": [],
+      "expectations": [
+        "Uses stable point/footprint distance fields rather than independent random scatter layers",
+        "Uses exclusion for roads/water, a distance band for affinity, and footprint-aware repulsion for canopies",
+        "Requires explicit DAG/cache dependencies so insertion or completion order cannot change output",
+        "Requires a cross-tile interaction apron sized to the largest clearance/affinity radius",
+        "Rejects querying partially generated renderer state as the source of placement rules"
+      ]
+    },
+    {
+      "id": 28,
+      "axis": "diagnosis",
+      "prompt": "I scaled up a rock material until its cracks look hand-sized, but the object's outline stays perfectly smooth and the colour, normal and roughness patterns no longer line up. What is the mechanism and minimal fix?",
+      "expected_output": "The relief band has outgrown bump/normal representation: normal maps cannot change silhouette or true parallax. Promote the hand-sized band to displacement or geometry, leave finer relief in the material, and derive colour variation, detail normal, cavity/AO and roughness from one shared microheight or explicitly related fields. Keep the wavelengths in metres and band-limit them for the declared view envelope.",
+      "files": [],
+      "expectations": [
+        "Diagnoses a representation mismatch rather than merely weak bump strength",
+        "States that normal/bump mapping cannot change silhouette or true parallax",
+        "Promotes the large relief band to displacement/geometry while retaining finer material detail",
+        "Requires correlated colour/normal/AO/roughness from shared or explicitly related fields",
+        "Keeps material wavelengths in metres and ties the cutoff to the view envelope"
+      ]
+    },
+    {
+      "id": 29,
+      "axis": "design",
+      "prompt": "Our terrain tool currently bakes final diffuse/albedo textures and per-pixel material IDs, and the game engine just renders them. The art director now wants seasons, dynamic weather, and snow that melts at runtime. What should our export contract to the engine look like?",
+      "expected_output": "The Masking Doctrine of 27: the runtime handoff contains NO baked diffuse/colour maps and NO predefined materials. The tool exports raw R32F physical fields (moisture, temperature, insolation, wind vectors, soil depth, strata hardness, wetness, flow velocity, curvature, AO) and the engine resolves materials, weather, snow, and foliage per-frame from those masks/drivers. A baked albedo freezes one season/weather/art decision and destroys the cause the engine needs. The satmap/colour map survives only as a preview/review product.",
+      "files": [],
+      "expectations": [
+        "States the runtime handoff must not contain baked diffuse/albedo or predefined material IDs",
+        "Prescribes exporting raw physical data layers (e.g. moisture, temperature, insolation, wetness, soil depth) as R32F buffers the engine consumes as masks/drivers",
+        "Explains the cause-vs-effect rationale: baking freezes one season/weather state and the engine can no longer melt snow or change seasons",
+        "Keeps a colour/satmap only as a preview or review product, not something engine systems depend on"
+      ]
+    },
+    {
+      "id": 30,
+      "axis": "review",
+      "prompt": "Code review: our hydraulic erosion node outputs only the new heightfield. A separate later pass then paints soilDepth and wetness maps from the final slope and curvature so the engine has something to read. Is there anything wrong with this design?",
+      "expected_output": "Violates 27's co-evolution rule. Soil depth and wetness are STATE maps - path-dependent, encoding the simulation's history - and cannot be reconstructed from final geometry; the erosion node must co-update them in the same pass (parallel pipelines, not appended hacks). Painting them afterwards from slope/curvature is the retrofitted-afterthought defect the chapter exists to prevent. Derived maps (curvature, AO, insolation) ARE legitimately recomputed from final geometry - the reviewer should name the state-vs-derived distinction.",
+      "files": [],
+      "expectations": [
+        "Identifies the design as a violation of the co-evolution rule / first-class auxiliary map doctrine (27)",
+        "Explains soilDepth and wetness are path-dependent state maps that cannot be recovered from final geometry",
+        "Requires the erosion node to update these maps in the same pass it alters height",
+        "Distinguishes state maps from derived maps (curvature/AO/insolation), which are correctly recomputed after the last height write"
+      ]
+    },
+    {
+      "id": 31,
+      "axis": "review",
+      "prompt": "My sim shows deep snow drifts in a bone-dry rain-shadowed valley - drifts banked below the lee side of the ridge crest, and a tongue of ice running down the valley floor. My moisture map is ~0 there. Is this a bug?",
+      "expected_output": "Not necessarily. The Snow Rule (27) says no moisture = no NEW snow, but snow may legitimately exist in dry areas via exactly three displacement channels: wind-loading (scoured from the windward side, deposited leeward of the crest - matching the described drifts), avalanches (gravity runout below failed slopes), and glacial flow (ice compressed upslope in the wet accumulation zone flowing down into the dry valley - matching the tongue). The check: every dry-snow cell must be attributable to one of the three (leeward of the wind field / below a failed slope / connected to an accumulation zone); reference-impl's dry_snow_attribution mechanises it. Unattributed dry snow (e.g. painted by altitude alone) IS a broken Snow Rule.",
+      "files": [],
+      "expectations": [
+        "States the Snow Rule: no moisture means no new snowfall, but displaced snow can legitimately exist in dry areas",
+        "Names the three (and only three) displacement channels: wind-loading, avalanches, glacial flow",
+        "Maps the described evidence to the channels (lee drifts = wind-loading; valley tongue = glacial flow)",
+        "Describes an attribution check (trace to wind lee / runout / accumulation zone) rather than declaring it fine or a bug outright"
       ]
     }
   ]

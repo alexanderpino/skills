@@ -272,6 +272,13 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   *Efficient Maximal Poisson-Disk Sampling.* ACM TOG 30(4), SIGGRAPH '11.
 - **Wei, L.-Y. (2008).** *Parallel Poisson disk sampling.* ACM TOG 27(3), SIGGRAPH '08.
 
+## Practitioner tools & workflows
+
+- **Pandhi, D. (2011).** *Realism in Vue.* e-on software. — Practitioner documentation for Vue's
+  Terrain Fractal, Strata Filter, HyperTerrain/MetaBlob displacement, EcoSystem constraints and
+  viewing-scale practice. **N/F-tier only:** useful for mapping documented tool controls and artist
+  failure modes, not evidence of proprietary internals, physical algorithms or portable constants.
+
 ## Rendering & output
 
 - **Max, N. (1988).** *Horizon mapping: shadows for bump-mapped surfaces.* The Visual Computer 4(2),

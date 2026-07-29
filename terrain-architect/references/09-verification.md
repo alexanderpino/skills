@@ -199,6 +199,7 @@ quantitative, and loud on the one wrongness that a hero shot hides.
 | **Avulsion** (`03`) | Superelevation `SE` at the avulsion step | `SE ≈ 1` when it fires (one channel depth above the floodplain). Firing at `SE≪1`, or never, = the setup threshold is wrong |
 | **Coral cover** (`12`) | Growth-form / density vs depth & wave energy | Zonation **monotone** — branching/encrusting on the high-energy crest, massive on the flat, plate/foliose deep; cover **stops** above water and below the photic depth |
 | **Planetary grid** (`08`) | `A` and height across a cube-face seam; cell-area ratio | Continuous across the seam (metric-corrected `Δs`); resolution-consistent; no pole pinch. A drainage discontinuity at a face edge = seam routing missing |
+| **Auxiliary maps / engine handoff** (`27`) | Layer-stack mass budget; dry-snow attribution; derived-map re-derivation | Under pure transport `Σ(Δheight + Δsoil + Δsediment [+ Δsnow])` closes as **one** budget even while layers exchange mass, or the leak is named (`assert_layer_budget`); every cell with `snowDepth > 0` and `moisture ≈ 0` traces to a wind lee, an avalanche runout, or ice flow (`snow.dry_snow_attribution`); every derived map re-derives bit-equal from the final R32F fields. Unattributed dry snow = a broken Snow Rule; a re-derivation mismatch = a patched or pre-final-geometry map |
 
 The pattern is the file's thesis applied to each new family: **find the one measurement that makes the
 bug loud.** A tephra blanket that ignores distance, a caldera with a central peak, terraces that slope
@@ -226,6 +227,7 @@ not the terrain.
 | **Normal RGB** | `normal` as RGB (or aspect as hue) | Faceting, quantisation combs, lighting seams between tiles — the "normals view" | Macro shape; it's a derivative, all high-frequency |
 | **Curvature** | profile/plan curvature, *diverging* ramp centred at 0 | Ridge vs valley structure, deposition zones, mask inputs; speckle = quantisation (`06`) | Absolute height and slope |
 | **AO** | long-radius horizon AO (`06`) | Macro relief — valleys darken, peaks catch light; concentric rings = R16 (`08`) | Fine detail at large radius |
+| **Insolation** | sun-arc received fraction (`06`) | The melt driver by eye: aspect asymmetry (equator-facing bright), shadowed ravines that hold snow; identical-looking to AO = the sun-arc test was skipped and one map was shipped twice (`27`) | Sky openness — that's AO's integral; a sun-shadowed but sky-open wall reads dark here and bright there, which is the point |
 | **Flow / wetness overlay** | `log(A)` or TWI over hillshade | Connectivity, channel network, where water lingers (check 1) | — |
 | **Diff / A–B** | two fields subtracted, diverging ramp | Before/after erosion; monolithic vs tiled; CPU vs GPU — must match where the invariants say it must | — |
 | **False-colour clip** | height with out-of-range flagged | NaN/Inf (flag magenta), below sea, above cap — *before* they spread | Everything else |
@@ -247,6 +249,22 @@ substitute one for the other.** A rotating sun over a plan-view hillshade plus o
 render catches more real defects in thirty seconds than any amount of turntable-ing the hero
 shot.
 
+**Review the whole declared view envelope (`08`).** The plan/hero pair is necessary but not enough
+for an asset that must work from a known camera range:
+
+- At the **far end**, inspect silhouette, macro material breakup, haze-free structure and correctly
+  sized scale cues. Peaks must survive LOD and the terrain must not depend on close-up noise to read.
+- At the **near end**, inspect whether relief that affects parallax or silhouette is real geometry,
+  whether material channels describe the same microstructure, and whether scatter instances are
+  grounded and clear of obstacles.
+- Use atmosphere and depth of field only after these passes. They can communicate depth, but they
+  must not hide tiling, missing geometry, broken scale or intersection defects.
+
+A useful scale-cue render includes one or more objects with known world dimensions (tree height,
+boulder diameter, road width, doorway) and no camera trick that miniaturises the scene. If the cue
+looks wrong, first check metres, material wavelengths and scatter sizes; do not "fix" it by scaling
+the atmosphere or terrain independently.
+
 ## Failure catalogue
 
 Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
@@ -260,6 +278,10 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Terracing on gentle slopes | R16 quantised too early | Work R32F, quantise at export (`08`) |
 | Faceted normals / ringed AO | Baked from quantised height | Bake from R32F (`06`, `08`) |
 | Speckled curvature mask | 2nd derivative of noisy/quantised field | Pre-smooth σ≈1 cell; compute from R32F (`06`) |
+| Terrain reads as a miniature | Detail/material/scatter frequencies disagree with world scale, or macro-style depth of field is used on a vista | Restore metre-based feature bands and correctly-sized scale cues; review at the declared view envelope (`08`) |
+| Close rock relief vanishes at the silhouette | Feature exists only in bump/normal although it is large enough to affect parallax/edge shape | Promote that band to displacement/geometry; keep finer relief in the material (`08`) |
+| Rocks float or disappear into the ground as size varies | Fixed embedding offset applied to every instance | Embed from the asset support radius with clamped bounds (`07`) |
+| Vegetation intersects water, roads, rocks or neighbouring canopies | Scatter layers generated independently with no footprint distance constraints | Stage layers and feed exclusion/affinity/repulsion distance fields with an interaction apron (`07`) |
 | Pipe erosion → NaN spikes | Missing outflow scaling factor `K` | Add step 3 of the pipe model (`04`) |
 | Pipe erosion → channels align to grid axes | 4-pipe von Neumann stencil | 8-pipe variant with per-pipe length (`04`) |
 | Droplet erosion → 1px scratches | Eroding point-wise instead of with a brush | Erode with disc radius 2–4 (`04`) |
@@ -357,7 +379,7 @@ clean baseline are the cone and constant-slope synthetic inputs, whose correct o
 preferred direction at all.
 
 There is a fourth, structural cure the table doesn't list: **change the lattice.** The **hexagonal
-grid** (`08`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
+grid** (`26`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
 edge-neighbours there is no diagonal to under-weight and no 4-versus-8 choice to get wrong — and
 *shrinks* the *D8-striping* row rather than deleting it: single-receiver striping is a
 **quantisation** artefact, not a metric one, and D6 still quantises (6 directions at 60°, max aspect
@@ -367,7 +389,12 @@ grid* as the pass criterion, not *none*. The lattice swap also brings its **own 
 axial-vs-offset coordinate mixing, row-parity neighbour tables applied with the wrong parity,
 pointy-top/flat-top orientation mismatch, and the un-renormalised 6-neighbour Laplacian (the hex
 constant is `2/(3d²)`, not `1/d²` — keep the square constant and diffusivity is silently 1.5× high;
-`08`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
+`26`). One of the new rows is invisible to the sun sweep: meshing visible hex tiles **corner-only**
+(4 triangles) instead of fanning through the centre (6) drops the cell's own sample from the mesh
+entirely and attenuates one-cell extrema by **exactly 1/3** — correct and free on flat prism tops or a
+far LOD tier, a silent amplitude bug anywhere else. Both meshes reproduce affine fields exactly, so
+the ramp and cone controls cannot see it; the detector is an **impulse** — raise one cell by `H` and
+measure the rendered peak (`26`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
 still not continuous), but when directional artefacts are endemic and the grid is yours to choose, the
 lattice itself is the highest-leverage fix — it trades the family for a smaller one, not for zero. On
 a sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the residual stencil
@@ -378,6 +405,66 @@ The contrast case worth knowing: **droplet erosion is largely immune** — posit
 continuous and gradients bilinear, so there is no stencil to print through. If a droplet result
 shows grid-aligned structure, the anisotropy came in with the height field (usually the noise,
 `01`), not the simulation.
+
+### "Anisotropy" names two different things — never conflate them
+
+Everything above is **lattice anisotropy**: the discretisation printing through. It is *always*
+a defect, and the reason is not aesthetic — the direction it prefers is a property of the
+**array**, not of the terrain. Nothing in the world put it there, so there is no parameter value
+that makes it correct.
+
+**Field anisotropy is the opposite, and terrain without it looks generic.** Real landscapes are
+full of direction, and every bit of it is sourced from a *cause*: bedding, strike and dip, joint
+sets and differential erodibility (`11`); fault fabric and tectonic grain (`02`); the wind, in
+yardangs, dune orientation and ventifacts (`05`, `16`); ice-flow direction, in striations,
+drumlins and U-valley alignment (`12`); slope aspect and insolation, in asymmetric valleys
+(`13`). Trellis drainage, hogbacks and strike valleys exist *because* erosion is directional.
+Suppressing this is as wrong as printing the lattice.
+
+**The rule that decides, and it is a sharp one: a directional control is legitimate exactly when
+its direction comes from a field, not from the grid.** A strike field, a wind field, a flow
+direction, an ice-flow vector — legitimate, and usually necessary. A single global angle
+parameter, or worse a "strength" knob with no direction at all, is the defect wearing the
+feature's clothes: it will align to the axes because the only direction available to it is the
+array's. When a tool exposes an "anisotropy" control, that is the question to ask of it — *where
+does the direction come from* — not whether directionality is allowed.
+
+**The test: rotate the domain.** Physical anisotropy rotates with the terrain; lattice anisotropy
+stays welded to the axes. Feed a radially symmetric input (the cone — it has no direction of its
+own, so any direction in the output was put there by the operator or the grid), then compare
+`rot(F(rot(h, −θ)), θ)` against `F(h)`. Any field the operator consumes must be rotated *with*
+the terrain. The rotation interpolates, so this needs a control — run the same comparison on a
+deliberately isotropic operator to measure the floor (`09`'s own rule: a metric with no control
+is not evidence). Measured, on a 4-neighbour max against a disc max of the same radius:
+
+| θ | Axis-locked operator | Isotropic control (the floor) |
+|---|---|---|
+| 23° | `0.093` | `0.016` |
+| 30° | `0.111` | `0.014` |
+| 45° | `0.128` | `0.020` |
+| **90°** | **`0.000`** | `0.000` |
+
+**The 90° row is the trap.** A quarter turn is a *symmetry of the square lattice*, so it maps the
+grid onto itself and a grossly axis-locked operator comes back exactly equivariant — a perfect
+score for a broken operator. **The test angle must not be a symmetry of the lattice under test**:
+avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the separation is about an
+order of magnitude, which is plenty. Pinned by
+`reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`.
+
+![anisotropy anatomy](../reference-impl/anisotropy_anatomy.png)
+
+*The test, and its trap, in one figure — regenerate with `reference-impl/anisotropy_anatomy.py`.*
+
+**A cure for one does nothing for the other, which is the proof they are different.** Swapping to
+a hex lattice (`26`) shrinks lattice anisotropy and leaves field anisotropy completely untouched —
+a strike-controlled valley network is just as directional on hex, because its direction never came
+from the grid. If a single change fixes one and not the other, they were never the same defect.
+
+**Deliberate stylised directionality is allowed, and it is an authoring choice, not a simulation
+parameter.** Same status as the stepped hex-prism terracing of `26`: fine, even desirable, as a
+declared style; a bug if you were hoping for geology. Record it as art direction, keep it out of
+the physics, and it still may not be sourced from the grid — a stylistic direction that happens to
+be the array's axes is indistinguishable from the defect, and will be read as one.
 
 ## Review checklist
 
@@ -391,6 +478,10 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Erosion backbone matched to world extent? (droplet <2 km, pipe 2–50, stream power >50)
 - [ ] Parameters in world units, not magic numbers tuned at one resolution?
 - [ ] Thermal downstream of hydraulic?
+- [ ] Sediment budget closed, or its leak measured and named? (erode-only or deposit-only is the tell; the usual sites are droplet expiry, flux caps/clamps, open boundaries, and an *effect* mask on an erosion node)
+- [ ] Every terrain-altering node co-updates the auxiliary maps its process touches (`27`)? (height written but `soilDepth`/`wetness` untouched is the tell — that state is unrecoverable afterwards)
+- [ ] State maps carried through the sim and derived maps recomputed from final R32F geometry — never the reverse (`27`)? (a curvature map whose parent hash mismatches `height` is the tell)
+- [ ] Snow only where moisture supplies it, or attributably displaced by wind-loading / avalanche / glacial flow (`27`)?
 - [ ] `A` reported in m², not cell counts?
 - [ ] MFD (not D8) feeding any hillslope quantity (wetness, dispersive masks)?
 - [ ] Quantisation to R16 after all derivatives?
@@ -401,6 +492,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Double-buffering in every grid simulation?
 - [ ] Masks partition to 1?
 - [ ] Every hard threshold noise-perturbed?
+- [ ] Any directional/"anisotropy" control sourced from a **field** (strike, wind, ice flow), not a global angle that will land on the axes? (rotate-the-domain test, at an angle that is *not* a lattice symmetry)
 - [ ] Vertex- vs pixel-centring documented and consistent?
 - [ ] If an extended family is in play (explosive volcanism, seafloor/turbidity, isostasy, terraces, avulsion, coral, planetary grid), has its check from *Checks for the extended families* been run?
 

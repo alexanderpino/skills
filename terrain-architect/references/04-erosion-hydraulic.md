@@ -134,6 +134,14 @@ step(Δt):
   onto x/y with a `1/√2` factor). On a hexagonal lattice this constraint does not arise - six
   pipes, one length (`26`). If you stay with 4 pipes for cost, know the artefact and
   review under a sun sweep (`09`) — the grid-anisotropy family table there lists its siblings.
+- **On a hexagonal grid the pipe model is 6 pipes, and the length fork disappears** (`26`). All
+  six neighbours sit at one `cellSize`, so there is a single `Δh/l`, no cardinal/diagonal
+  branch, and no projection factor — the velocity field sums the six fluxes along the six world
+  unit directions (60° apart) componentwise. Two constants must change with the lattice, and
+  both are silent if missed: the **cell area** in every volume↔depth conversion is
+  `(√3/2)·cellSize²` (`det B`), and the **flux-limiter** `K = min(1, d·A_cell / (Σf·Δt))` uses
+  that same area. The residual anisotropy is D6's 60° family — smaller than the 4-pipe plus
+  shape, not zero (`09`).
 
 ## Št'ava et al. (2008) extensions
 
@@ -216,6 +224,19 @@ droplet(map, x, y):
   spread out quickly.
 - **Droplet erosion has no standing water.** No lakes, no deltas, no ponding. If the brief
   mentions lakes, this is the wrong backbone.
+- **On a hexagonal grid, replace both bilinear calls — nothing else changes** (`26`). The
+  droplet's position is continuous and the lattice enters only through sampling, which is why
+  droplet erosion is the easiest backbone to port. `bilinearHeight` becomes the **barycentric
+  sample over the dual triangle** (`26`'s `sample`; there is no bilinear on this lattice), and
+  the gradient must **not** be the sampled triangle's own plane gradient — that is constant per
+  triangle, so droplets run straight and kink at every edge. Compute the one-ring world-space
+  gradient at each of the 3 triangle vertices (`26`'s `gradient6` — the `B⁻ᵀ` shear is already
+  inside it) and **interpolate those barycentrically**: the result is continuous across
+  triangle seams and affine-exact, so paths curve smoothly exactly as bilinear gradients do on
+  the square grid. `depositBilinear` spreads over the 3 dual-triangle vertices by the same
+  barycentric weights (weights sum to 1, so volume conservation is untouched); the erosion
+  brush is a world-radius disc of cells (`26`'s `ring`/`disc`), and `floor(pos)` for any
+  cell-keyed lookup is `cube_round`, never per-axis rounding.
 
 ## Stream power — the important one
 

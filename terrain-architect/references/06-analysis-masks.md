@@ -2,6 +2,7 @@
 
 Contents: [Ordering rule](#ordering-rule) · [Slope & aspect](#slope--aspect) ·
 [Curvature](#curvature-zevenbergen--thorne-1987) · [Horizon AO](#horizon-based-ambient-occlusion) ·
+[Insolation](#insolation-terrain-shadowed-solar-radiation) ·
 [Wetness](#wetness-index-beven--kirkby-1979) · [Normals](#normals) ·
 [Selectors](#selectors--masks-from-the-analysis-fields) · [Masks → materials](#masks--materials)
 
@@ -52,7 +53,7 @@ dzdy = ((h[i-1,j+1] + 2*h[i,j+1] + h[i+1,j+1]) - (h[i-1,j-1] + 2*h[i,j-1] + h[i+
 
 Use Horn if the height field is noisy or quantised, central differences if it's clean R32F. On a
 **hexagonal working grid** neither applies — use the one-ring 6-point gradient
-(`∇h ≈ Σhₖeₖ / (3·cellSize)`; `08`, *Hexagonal grids*), which has Horn's noise-averaging built in and
+(`∇h ≈ Σhₖeₖ / (3·cellSize)`; `26`), which has Horn's noise-averaging built in and
 an isotropic leading error. The slope/aspect conventions above hold unchanged.
 
 **Slope is resolution-dependent.** The same terrain sampled at 1 m/px and 8 m/px gives
@@ -113,6 +114,24 @@ quantised R16 field, curvature is essentially a picture of the quantisation stai
 it on R32F, before export. If the field is noisy, pre-smooth with a small Gaussian (σ ≈ 1 cell)
 — the alternative is a mask made of speckle.
 
+**On a hexagonal grid, the 3×3 quadratic fit is replaced by three second differences** (`26`).
+Zevenbergen–Thorne's `D, E, F` are the Hessian read off a 3×3 square window; the hex one-ring
+determines the same Hessian in closed form, from the **three antipodal pairs**:
+
+```
+D_k = h[+e_k] + h[−e_k] − 2·h[0]                 # second difference along lattice direction k
+[Hxx, Hxy, Hyy] = M⁻¹ · [D_0, D_1, D_2] / cellSize²   # M_k = (uₖ.x², 2·uₖ.x·uₖ.y, uₖ.y²),
+                                                       # uₖ = world unit dir of pair k — fixed 3×3
+```
+
+Exact on quadratics, like the fit it replaces, and `Hxx + Hyy` reproduces the renormalised
+6-neighbour Laplacian (`2/(3d²)`, `26`) — one consistency check for free. Profile, plan and
+mean curvature then follow from `(Hxx, Hxy, Hyy)` and the 6-point gradient by the *same*
+formulas above (they only need `D…H`, not the window they came from). The world directions
+`uₖ` come through the shear matrix `B`, so the orientation is baked in — do not build `M` from
+the index offsets. Runnable: `reference-impl/hex_grid.py` `hessian6`, pinned by
+`reference-impl/tests/test_hex_grid.py`.
+
 ## Horizon-based ambient occlusion
 
 For each of `N` azimuth directions, march outward and track the maximum horizon elevation
@@ -137,6 +156,10 @@ ao(h, p, N, maxDist):
         v += cos(θ)²                             # ← see derivation below
     return 1 - v / N                             # occlusion; visibility = v/N
 ```
+
+(On a hexagonal grid the march is unchanged — azimuths are world-space, and `N` should *not* be
+snapped to 6 — but `sample(h, q)` at a continuous position is the barycentric dual-triangle
+sample, since there is no bilinear on this lattice; `26`.)
 
 **Where `cos²θ` comes from.** Cosine-weighted visibility over the hemisphere with an up-facing
 normal, with the horizon at elevation `θ` blocking everything below it:
@@ -169,6 +192,71 @@ varies smoothly.
 Compute AO **before quantisation** (`08`). A second derivative it is not, but it samples height
 differences over long baselines, and R16 terracing shows up as concentric rings.
 
+## Insolation (terrain-shadowed solar radiation)
+
+**Not AO.** AO integrates visibility over the *whole sky*; insolation integrates received direct
+sunlight over the *sun's arc* — a narrow, latitude- and season-dependent band of directions. The
+two disagree exactly where it matters: a north-facing wall in the northern hemisphere can be
+wide-open to the sky (bright AO) and still never see the sun (near-zero insolation). Substituting
+one for the other is a real defect: AO-as-insolation puts "melt" in shaded ravines that are open
+overhead, and insolation-as-AO darkens sun-shadowed but sky-open faces. Compute both; ship both
+(`27`).
+
+Insolation is the map that decides where snow **melts** (equator-facing slopes clear first) and
+where it **persists** (pole-facing walls, deep ravines whose horizons block the whole winter arc)
+— the melt driver of `13`'s snow model and the `27` climate registry, and the physical field
+behind treeline and vegetation aspect asymmetry. `13`'s scalar `northness` correction is the
+cheap proxy for this map; replace it with the real field when the budget allows, because
+`northness` knows the slope's aspect but nothing about the ridge across the valley.
+
+Two ingredients, both already on hand: **standard solar geometry** (declination by day of year,
+elevation/azimuth from latitude and hour angle — textbook astronomy, no terrain content) and the
+**horizon-angle machinery** of the AO section above. A sun position is visible iff its elevation
+exceeds the terrain horizon toward its azimuth:
+
+```
+insolation(h, p, lat, days, stepsPerDay, maxDist):
+    n = surfaceNormal(h, p)                            # Normals, below
+    E = 0
+    Eflat = 0                                          # same integral for flat, unshadowed ground
+    for day in days:                                   # solstices + an equinox is usually enough;
+        δ = solarDeclination(day)                      #   monthly if driving seasonal snow (13)
+        for t in stepsPerDay:                          # 8–12 hour angles across the day
+            (az, elev) = sunPosition(lat, δ, t)        # standard solar-position formulas
+            if elev <= 0: continue                     # sun below the astronomical horizon
+            E     += max(0, dot(n, sunDir(az, elev)))  # cosine incidence — the aspect term
+                     * (elev > horizonAngle(h, p, dir(az), maxDist))   # terrain shadow test
+            Eflat += sin(elev)                         # flat ground, no horizon
+    return E / max(Eflat, ε)                           # received fraction vs flat unshadowed ground
+```
+
+**The normalisation is a decision — state it.** Dividing by the cell's *own* unshadowed potential
+would cancel the cosine-incidence term and leave a pure shadow map: a pole-facing slope with an
+open horizon would read 1.0, and the aspect signal — the entire reason the snow line sits higher
+on sunny slopes — would vanish. Normalise against **flat unshadowed ground at the same latitude**
+(`Eflat` above): flat open terrain reads 1.0, shaded ravines fall toward 0, and steep
+equator-facing slopes at mid/high latitude legitimately exceed 1 (they present more area to a low
+sun than flat ground does — typical ceiling ≈ 1.2–1.5, latitude-dependent). Declare the actual
+range in the export manifest (`08`, `27`) rather than silently clamping; the engine remaps it as
+a mask anyway.
+
+**Cost: the same as AO, not `N_sun ×` more.** The horizon angle depends only on azimuth, not on
+the sun — so precompute the per-azimuth horizon-angle maps once with the Timonen & Westerholm
+sweep (above; you need them for AO regardless), then every sun sample in the double loop is a
+table lookup against the precomputed horizon for the nearest azimuth. `N = 8–16` azimuths
+suffices for the same reason it does for AO: the horizon varies smoothly. The naive
+march-per-sun-sample version is for validation only.
+
+Both hemispheres fall out of the same formulas — the sun's arc leans the other way and the melt
+asymmetry flips with it, which is exactly the behaviour `13`'s hand-flipped `northness` sign
+approximates.
+
+**Provenance: F.** The composition — solar geometry × terrain horizon test — has no canonical
+terrain-graphics paper; it is standard practice in GIS solar-radiation tooling (GRASS `r.sun`,
+ArcGIS Solar Analyst). Treat the tool papers as `?` until verified against primary sources
+(`00`'s tier discipline); the horizon-sweep substrate is the verified Timonen & Westerholm 2010
+above, and the solar-position formulas are textbook astronomy needing no citation.
+
 ## Wetness index (Beven & Kirkby 1979)
 
 Topographic wetness index — where water lingers.
@@ -195,6 +283,13 @@ TWI needs **MFD**, not D8 (`03`). TWI is a hillslope quantity and D8's parallel-
 prints straight into it as stripes. This is the canonical reason to have MFD in the graph at
 all.
 
+On a hexagonal grid two constants shift together (`26`): `A` seeds from the hex cell area
+`(√3/2)·cellSize²` (`03`), and the contour width is the shared hex **edge**, `cellSize/√3` —
+uniform across all six directions, which is the simplification that lets D6-MFD drop Quinn's
+cardinal/diagonal contour-length split entirely. So `A_specific = A / (cellSize/√3)`. Use both
+hex constants or neither: mixing the hex area with the square width (or vice versa) shifts
+every TWI threshold silently.
+
 Typical range 3–20. Remap with a measured histogram, not an assumed range.
 
 ## Normals
@@ -210,8 +305,8 @@ as a terrain that's uniformly too flat or too steep under lighting and is madden
 diagnose.
 
 Sobel is the standard for normal maps (more robust than central differences), same kernels as
-Horn's slope above. On a hexagonal working grid, both are replaced by the 6-point gradient (`08`,
-*Hexagonal grids*) — same negation and same `z = 1` rule.
+Horn's slope above. On a hexagonal working grid, both are replaced by the 6-point gradient
+(`26`) — same negation and same `z = 1` rule.
 
 **Bake normals from R32F, always.** This is the single clearest case for the precision rule:
 a normal map derived from an R16 heightfield across a large vertical range shows visible
