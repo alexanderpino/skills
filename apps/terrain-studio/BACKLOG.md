@@ -21,9 +21,10 @@ nothing about whether the doctrine exists.
 **That merge has now happened** (`a7cc8f8`). The repo copy carries `26-hexagonal-grids.md` and
 `27-engine-data-handoff.md`, matching the installed one.
 
-**Correction — there are TWO chapter 26 files, and the second one is ours.** An earlier revision of
-this section said `26-hexagonal-lattice.md` was "gone — never cite it". That was wrong, and wrong in
-a way worth understanding rather than just patching:
+**Correction — there were TWO chapter 26 files, and the second one was ours.** Resolved in
+`f8ddd62`; the history is kept because the mistake is repeatable. An earlier revision of this
+section said `26-hexagonal-lattice.md` was "gone — never cite it". That was wrong, and wrong in a
+way worth understanding rather than just patching:
 
 - `26-hexagonal-lattice.md` was **never in main**. It was written on this branch. A merge cannot
   delete a file the other side never had — git simply carries ours through — which is exactly why it
@@ -36,10 +37,14 @@ a way worth understanding rather than just patching:
   file that exists. I threw them away on a false premise. (Restoring them verbatim is still wrong —
   see below — but the reason is different from the one I gave.)
 
-The real defect this exposed is worse than a missing citation: **two live files both answer to the
-`26` token**, and they decorate the same claims with different tiers (ours: "P for the papers";
-main's chapter: nothing on these citations at all). A corpus whose whole purpose is provenance
-cannot have one chapter number resolving to two files. Resolution in W7 below.
+The real defect this exposed was worse than a missing citation: **two live files both answered to the
+`26` token**, decorating the same claims with different tiers (ours: "P for the papers"; main's
+chapter: nothing on these citations at all). A corpus whose whole purpose is provenance cannot have
+one chapter number resolve to two files.
+
+**Resolved** (`f8ddd62`): consolidated into `26-hexagonal-grids.md`, duplicate deleted, `08`'s
+inbound link repointed, four citation families carried across with their attributions corrected
+under review, three index rows added. There is now exactly one chapter 26.
 
 Method note, because this is the second time in one session: **absence in one place is not evidence
 of an event elsewhere.** `git ls-tree origin/main` told me what main has, not what happened to our
@@ -57,7 +62,14 @@ cost deliberately — a truthful square world is the product requirement.
 
 Supersedes an earlier "squash or crop, no third option" framing that was written into the corpus.
 That dilemma was an artefact of reusing the square array shape; giving hex its own row count
-dissolves it. **`26` still carries the old framing and needs correcting** (see W7).
+dissolves it.
+
+**No longer outstanding, and not for the reason recorded.** This entry used to say "`26` still
+carries the old framing and needs correcting". It doesn't: the surviving `26-hexagonal-grids.md`
+has **zero** occurrences of squash/crop/"no third option" — that framing lived only in the branch's
+own `26-hexagonal-lattice.md`, which is now deleted, so it went with it. The surviving chapter
+independently agrees with the choice D1 made: *"at equal `cellSize` a hex grid has 15.5% more cells
+per unit area"* and *"treat the 13.4% as the direction of the advantage, not a budget line"*.
 
 ### D2 — The ragged hex rim is correct · DONE
 Odd rows sit half a cell right, so the map boundary is serrated by `s/2`. A hex heightfield does not
