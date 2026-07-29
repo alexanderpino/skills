@@ -246,7 +246,21 @@ Related dead code: `.effect` is declared on 7 node types (`:4567, :4579, :4599, 
 ### C8 — Oracle debt from the square-world flip · TODO
 - `_verify_hex_sampling.js` S4/S5 — closed form encodes the pre-flip warp world extent.
 - `_verify_wireframe.js` W0/W1/W3/W4 — edge-recovery walk validates against a **square adjacency
-  model** (hex `covered=785408/905571`). Structural rework, not a retune.
+  model** (hex `covered=785408/905571`). Structural rework, not a retune — but **narrower than it
+  looks, and the denominator is not the problem**. The two edge counts are algebraically identical:
+
+      square, one diagonal per quad :  (W-1)H + W(H-1) + (W-1)(H-1)
+      hex, odd-r offset             :  (W-1)H +        (2W-1)(H-1)
+
+  and these are the same expression, because `W(H-1) + (W-1)(H-1) = (H-1)(2W-1)`. Both evaluate to
+  **905 571** at 512×591 — so the oracle's denominator is already right for hex, and no recount is
+  needed. Three edges per interior cell either way; the lattices differ in *which* pairs are edges,
+  not *how many*. The fix is therefore a **re-pairing**, not a re-count: replace the fixed
+  neighbour offsets with the parity-dependent odd-r ones (SE/SW shift by row parity), and W4 should
+  close without touching the total.
+  Caution when reading the failure: the uncovered share is `120163/905571 = 13.27%`, which is
+  *not* the 13.4% hex-sampling figure and has nothing to do with it. Two unrelated quantities that
+  round to the same number is exactly the kind of coincidence this file exists to stop us acting on.
 - `_verify_hex_deferred.js` G1/G2 — harness built on `GPU.upload()`/`GPU.prog()`, which are
   square-by-construction (`upload` only makes `n×n`; `prog` caches by key and **ignores the
   source**). The shader itself is verified correct to six decimals by `_verify_glsl_probe.js`; this
