@@ -96,6 +96,57 @@ def wind_redistribute(h, snow, wind, *, cellsize=1.0, rate=0.4, iters=3, speed_r
     return np.maximum(snow, 0.0)
 
 
+def dry_snow_attribution(h, snow, moisture, wind=None, *, reach=None,
+                         snow_eps=1e-6, moisture_eps=1e-6):
+    """The `27` snow audit: **"no moisture = no new snow"**, so every cell with snow but ~no
+    moisture must be attributable to one of the displacement channels — wind-loading (it lies
+    downwind of a supplied cell), or gravity transport, i.e. avalanche/glacial flow (it lies
+    downhill of a supplied or already-attributed cell). Returns `(dry, attributed)` boolean masks;
+    `dry & ~attributed` is unattributed dry snow — a broken Snow Rule (a hand-painted mask, an
+    altitude-only snow line).
+
+    This is a *necessary-condition* audit, deliberately conservative: it asks whether a transport
+    path from a moisture-supplied source EXISTS within `reach` cells (default: unlimited), not
+    whether the sim actually used it. It therefore never false-positives on legitimate drifts,
+    runouts, and tongues, and still catches the isolated dry summit wearing painted snow — which
+    is the defect it exists for. `wind=(u, v)` as in `wind_redistribute` (constant or fields);
+    omit it to audit gravity channels only."""
+    h = np.asarray(h, dtype=np.float64)
+    snow = np.asarray(snow, dtype=np.float64)
+    n, m = h.shape
+    dry = (snow > snow_eps) & (np.asarray(moisture, dtype=np.float64) <= moisture_eps)
+    attributed = np.broadcast_to(np.asarray(moisture, dtype=np.float64) > moisture_eps,
+                                 (n, m)).copy()          # supplied cells: snowfall can land here
+    if wind is not None:
+        u = np.broadcast_to(np.asarray(wind[0], dtype=np.float64), (n, m))
+        v = np.broadcast_to(np.asarray(wind[1], dtype=np.float64), (n, m))
+        mag = np.hypot(u, v) + 1e-30
+        di = np.rint(v / mag).astype(np.int64)           # per-cell one-step downwind offset
+        dj = np.rint(u / mag).astype(np.int64)
+    if reach is None:
+        reach = n * m                                    # glacial tongues travel far: full closure
+    for _ in range(int(reach)):
+        prev = attributed
+        grown = attributed.copy()
+        if wind is not None:                             # wind-loading: attribution blows downwind
+            src = np.argwhere(attributed)
+            ti = np.clip(src[:, 0] + di[attributed], 0, n - 1)
+            tj = np.clip(src[:, 1] + dj[attributed], 0, m - 1)
+            grown[ti, tj] = True
+        for s_i, s_j in ((di_, dj_) for di_ in (-1, 0, 1) for dj_ in (-1, 0, 1)
+                         if (di_, dj_) != (0, 0)):       # gravity: attribution flows downhill
+            nb = np.zeros((n, m), dtype=bool)
+            i0, i1 = max(s_i, 0), n + min(s_i, 0)
+            j0, j1 = max(s_j, 0), m + min(s_j, 0)
+            nb[i0:i1, j0:j1] = attributed[i0 - s_i:i1 - s_i, j0 - s_j:j1 - s_j] \
+                & (h[i0:i1, j0:j1] < h[i0 - s_i:i1 - s_i, j0 - s_j:j1 - s_j])
+            grown |= nb
+        attributed = grown
+        if np.array_equal(attributed, prev):             # closure reached
+            break
+    return dry, attributed
+
+
 def snow_step(h, snow_depth, T, precip, *, dt=1.0, melt_factor=0.6, snow_repose_deg=37.0,
               shed_lo_deg=50.0, shed_hi_deg=60.0, cellsize=1.0, avalanche_iters=4,
               wind=None, wind_rate=0.4):

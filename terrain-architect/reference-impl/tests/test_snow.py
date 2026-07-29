@@ -118,3 +118,47 @@ def test_stronger_wind_scours_more():
     w = snow.wind_redistribute(h, s0, wind=(u, np.zeros((n, n))), rate=0.2, iters=3, speed_ref=1.0)
     moved = np.abs(w - s0)
     assert moved[:, 5:n // 2 - 5].mean() > 2.0 * moved[:, n // 2 + 5:-5].mean()
+
+
+# ---- the 27 handoff checks: layer-stack budget & the snow audit ----------------------------
+
+import asserts
+
+
+def test_layer_stack_budget_closes_across_avalanche_and_wind():
+    """`27`'s co-evolution budget: height + snow close as ONE budget through transport passes
+    that move snow between cells (the layers exchange nothing here, but the stack sum is the
+    invariant the multi-layer version relies on)."""
+    n = 40
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 200.0 - 6.0 * np.hypot(xx - 20, yy - 20)
+    s0 = np.full((n, n), 12.0)
+    s1 = snow.thermal_on_layer(h, s0, np.tan(np.radians(37.0)), iters=6)
+    s2 = snow.wind_redistribute(h, s1, wind=(1.0, 0.0), rate=0.4, iters=3)
+    asserts.assert_layer_budget([h, s0], [h, s2], tol=1e-9, msg="avalanche+wind")
+
+
+def test_dry_snow_attribution_accepts_wind_loaded_lee():
+    """Rain-shadow scenario: moisture only windward of a ridge; wind carries snow into the dry
+    lee. The audit must attribute the lee snow (downwind of supplied cells), not flag it."""
+    n = 30
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 100.0 - 4.0 * np.abs(xx - 15)                       # a ridge along column 15
+    moisture = np.where(xx < 15, 1.0, 0.0)                  # windward half supplied only
+    s0 = np.where(xx < 15, 5.0, 0.0)                        # snow fell windward
+    s = snow.wind_redistribute(h, s0, wind=(1.0, 0.0), rate=0.6, iters=8)
+    dry, attributed = snow.dry_snow_attribution(h, s, moisture, wind=(1.0, 0.0))
+    assert np.any(dry)                                      # snow really did reach the dry side
+    assert not np.any(dry & ~attributed)                    # ...and every flake is attributable
+
+
+def test_dry_snow_attribution_flags_painted_summit():
+    """A hand-painted snowcap on a dry, isolated summit — no moisture upwind, nothing supplied
+    uphill of it — is unattributable: the broken Snow Rule the audit exists to catch."""
+    n = 30
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = 20.0 + 100.0 * np.exp(-((xx - 22) ** 2 + (yy - 15) ** 2) / 8.0)   # isolated peak, dry side
+    moisture = np.where(xx < 5, 1.0, 0.0)                   # supply far away, low ground only
+    s = np.where(h > 80.0, 3.0, 0.0)                        # altitude-only painted snowcap
+    dry, attributed = snow.dry_snow_attribution(h, s, moisture, wind=(1.0, 0.0), reach=4)
+    assert np.any(dry & ~attributed)                        # the painted cap is flagged

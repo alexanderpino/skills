@@ -309,6 +309,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Horizon angle / occlusion | P | **Timonen & Westerholm 2010**, *Scalable Height Field Self-Shadowing*, CGF 29(2) — O(1)/cell sweep |
 | HBAO | P | Bavoil et al. 2008, SIGGRAPH talks. **Screen-space weighting; not the correct integral for a baked terrain AO map** (`06`) |
 | Sky-view factor | P | Zakšek, Oštir & Kokalj 2011, Remote Sensing 3(2) |
+| Insolation (terrain-shadowed solar radiation, sun-arc) | F | Standard solar geometry × the horizon-angle test (`06`) — **not AO**, which integrates the whole sky. GIS practice (GRASS `r.sun`, ArcGIS Solar Analyst); tool papers `?` until verified. Drives snow melt & aspect asymmetry (`13`, `27`) |
 | Terrain ruggedness index | P | Riley, DeGloria & Elliot 1999, Intermountain J. Sciences 5 |
 | Hypsometric (area–altitude) curve | P | Strahler 1952, *Hypsometric (Area-Altitude) Analysis of Erosional Topography*, GSA Bulletin 63 — the maturity diagnostic (`09`, `20`) |
 | Topographic position index | F | Weiss 2001 (ESRI poster) — widely used, not peer-reviewed |
@@ -560,6 +561,21 @@ rule; `26` owns everything else.
 | Tile triangulation: 6-triangle fan vs 4-triangle corner-only | F | `n−2` minimal triangulation vs an added interior vertex; the ×1/3 extremum attenuation is a two-line derivation (`09`) |
 | Index-space quadtrees / culling under a shear | F | Engineering — affine invariance of subdivision; 1.5× AABB slack, `√3` LOD-ring anisotropy |
 | Hex prism / "pillar" stepped-tile rendering | F | Rendering and art-direction convention; the quantisation is `11`'s terrace op at mesh-build time (`06`, `11`) |
+
+## 19. Auxiliary maps & engine data handoff → `27-engine-data-handoff.md`
+
+The **contract altitude** — like `08`/`14`, this chapter owns rules, not new simulations; every map
+in its registry routes to a producer chapter that already exists. Doctrine throughout, resting on
+P/F-tier producers.
+
+| Concern | Tier | Source |
+|---|---|---|
+| First-class auxiliary maps & the co-evolution rule | Doctrine | `27`, `SKILL.md` — every auxiliary layer a persistent R32F field on a typed port; a node that alters terrain co-updates the maps its process touches, in the same pass |
+| State vs derived map lifecycle | Doctrine | `27` — state maps (soil, wetness, snow) are path-dependent, carried through the sim, never reconstructed from final geometry; derived maps (curvature, AO, insolation) recomputed after the last height write (`06`, `SKILL.md` Legal Order) |
+| The Masking Doctrine (raw causes out; no baked diffuse / predefined materials in the runtime handoff) | Doctrine | `27` — the hydrology handoff (`SKILL.md`) generalised to the whole export surface; `08`'s satmap demoted to a preview/review product |
+| Standard map registry (climate / geology / hydrology / geometry) | — | Producers all routed: moisture & temperature & wind `13`, insolation `06`, soil depth `11`, strata hardness `11`, state wetness `13` / TWI `06`, flow velocity `03`, curvature & AO `06` |
+| The Snow Rule ("no moisture = no new snow") + its three displacement channels | Doctrine over P | Gating already in `13`'s snowStep (`precip · (T<0)`); displacement: wind-loading (Werner shadow-zone logic, `05`/`13`), avalanches (Cordonnier et al. 2018, `13`), glacial flow (SIA, `12`) — nothing else moves snow |
+| Handoff verification (layer-stack budget, dry-snow attribution, derived-map re-derivation) | Engineering check | `27`, registered in `09`'s checklist; runnable: `reference-impl/tests/asserts.py` (`assert_layer_budget`), `reference-impl/snow.py` (`dry_snow_attribution`) |
 
 ## Node types (N-tier) — not algorithms
 

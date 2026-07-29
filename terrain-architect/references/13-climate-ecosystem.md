@@ -311,6 +311,26 @@ soilMoisture = normalize(TWI) * precipFactor * (1 - drainageFactor(permeability)
 `permeability` comes from the material field (`11`) — sand drains, clay holds. Add distance to
 water bodies if you have them.
 
+**State wetness (puddling) — the residual the sim already knows.** TWI is a *prediction* — the
+topographic potential for wetness. If a hydraulic simulation ran (`04`), the graph also holds
+*evidence*: where water actually stood, flowed, and soaked in. That is a **state map** in `27`'s
+sense — path-dependent, co-evolved, unrecoverable from final geometry — and it costs two lines
+inside or immediately after the water loop:
+
+```
+wetnessStep(wetness, waterDepth, T, insolation, permeability, dt):
+    wetness = min(1, wetness + soakRate * (waterDepth > 0) * dt)     # soak wherever water stands or flows
+    drying  = dryRate * max(0, T) * insolation * permeability        # warm, sunny, well-drained ground dries
+    return max(0, wetness - drying * dt)
+```
+
+For droplet erosion, "water present" is the cells the droplet traversed this pass; for the pipe
+model it is `waterDepth > 0` directly. The drying term is deliberately the same trio that melts
+snow — temperature, insolation (`06`), drainage — so puddles linger exactly where snow would:
+shaded, cold, clay-floored hollows. F-tier, like the proxy above. **Ship state wetness and TWI as
+separate maps and never average them** (`27`): the state map drives puddle shaders and mud where
+water demonstrably went; TWI drives where the *engine's* rain should pool next.
+
 **Wetlands (swamps, marshes, bogs)** are where this machinery saturates, and they are a **mask,
 not a height**: flat ground + high TWI + an impermeable or frozen substrate (clay `18`, permafrost
 `17`) → the water table sits at or above the surface. Realise it as a wetland mask driving peat/mud

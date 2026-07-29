@@ -445,6 +445,8 @@ order before you check the maths.
   3b Volcanic (if volcanic)   edifices, lava, tephra/PDCs/caldera  → 11, 19
   4  Depression handling      fill or breach (MANDATORY)           → 03
   5  Flow routing             D8 / D∞ / MFD → drainage area A      → 03
+  5b Climate fields           temperature + orographic moisture
+                              (the rainfall term of 6)             → 13
   6  Fluvial erosion          stream power / pipe / droplet        → 04
   6b Glacial (if glaciated)   SIA ice flow, ALONGSIDE fluvial      → 12
   7  Hillslope erosion        thermal / talus / mass wasting       → 05

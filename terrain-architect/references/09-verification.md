@@ -199,6 +199,7 @@ quantitative, and loud on the one wrongness that a hero shot hides.
 | **Avulsion** (`03`) | Superelevation `SE` at the avulsion step | `SE ≈ 1` when it fires (one channel depth above the floodplain). Firing at `SE≪1`, or never, = the setup threshold is wrong |
 | **Coral cover** (`12`) | Growth-form / density vs depth & wave energy | Zonation **monotone** — branching/encrusting on the high-energy crest, massive on the flat, plate/foliose deep; cover **stops** above water and below the photic depth |
 | **Planetary grid** (`08`) | `A` and height across a cube-face seam; cell-area ratio | Continuous across the seam (metric-corrected `Δs`); resolution-consistent; no pole pinch. A drainage discontinuity at a face edge = seam routing missing |
+| **Auxiliary maps / engine handoff** (`27`) | Layer-stack mass budget; dry-snow attribution; derived-map re-derivation | Under pure transport `Σ(Δheight + Δsoil + Δsediment [+ Δsnow])` closes as **one** budget even while layers exchange mass, or the leak is named (`assert_layer_budget`); every cell with `snowDepth > 0` and `moisture ≈ 0` traces to a wind lee, an avalanche runout, or ice flow (`snow.dry_snow_attribution`); every derived map re-derives bit-equal from the final R32F fields. Unattributed dry snow = a broken Snow Rule; a re-derivation mismatch = a patched or pre-final-geometry map |
 
 The pattern is the file's thesis applied to each new family: **find the one measurement that makes the
 bug loud.** A tephra blanket that ignores distance, a caldera with a central peak, terraces that slope
@@ -451,6 +452,9 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Parameters in world units, not magic numbers tuned at one resolution?
 - [ ] Thermal downstream of hydraulic?
 - [ ] Sediment budget closed, or its leak measured and named? (erode-only or deposit-only is the tell; the usual sites are droplet expiry, flux caps/clamps, open boundaries, and an *effect* mask on an erosion node)
+- [ ] Every terrain-altering node co-updates the auxiliary maps its process touches (`27`)? (height written but `soilDepth`/`wetness` untouched is the tell — that state is unrecoverable afterwards)
+- [ ] State maps carried through the sim and derived maps recomputed from final R32F geometry — never the reverse (`27`)? (a curvature map whose parent hash mismatches `height` is the tell)
+- [ ] Snow only where moisture supplies it, or attributably displaced by wind-loading / avalanche / glacial flow (`27`)?
 - [ ] `A` reported in m², not cell counts?
 - [ ] MFD (not D8) feeding any hillslope quantity (wetness, dispersive masks)?
 - [ ] Quantisation to R16 after all derivatives?
