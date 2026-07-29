@@ -19,17 +19,31 @@ branch and catches up when `origin/main` is pulled in — so a chapter being abs
 nothing about whether the doctrine exists.
 
 **That merge has now happened** (`a7cc8f8`). The repo copy carries `26-hexagonal-grids.md` and
-`27-engine-data-handoff.md`, matching the installed one, and the older single
-`26-hexagonal-lattice.md` is **gone** — never cite it. Corpus corrections (W7) are writable now,
-against the merged filenames.
+`27-engine-data-handoff.md`, matching the installed one.
 
-Two things the merge settled, worth keeping because they will recur on the next one:
+**Correction — there are TWO chapter 26 files, and the second one is ours.** An earlier revision of
+this section said `26-hexagonal-lattice.md` was "gone — never cite it". That was wrong, and wrong in
+a way worth understanding rather than just patching:
 
-- Nothing in the auxiliary-map work was ever blocked on it; the doctrine was readable from the
-  installed copy throughout. An earlier revision of this file claimed otherwise and was wrong.
-- Edits authored against a superseded filename do not survive. Both of this branch's `SKILL.md`
-  edits pointed at `26-hexagonal-lattice.md` and had to be discarded wholesale — a routing-table
-  row naming a file that no longer exists is worse than no row at all.
+- `26-hexagonal-lattice.md` was **never in main**. It was written on this branch. A merge cannot
+  delete a file the other side never had — git simply carries ours through — which is exactly why it
+  never appeared among the 45 conflicts. I read its absence from `origin/main` as evidence it had
+  been *deleted*, when it was evidence it had never been *there*.
+- It still exists (20 398 bytes), it is live, and `08-output-contract.md:287` links it **by
+  filename**. It also already carries all three W7 citations in a `## Provenance spine` section —
+  so the work W7 was scoped to do was, in substance, already done.
+- Consequently the two `SKILL.md` edits I discarded during the merge were **valid**: they named a
+  file that exists. I threw them away on a false premise. (Restoring them verbatim is still wrong —
+  see below — but the reason is different from the one I gave.)
+
+The real defect this exposed is worse than a missing citation: **two live files both answer to the
+`26` token**, and they decorate the same claims with different tiers (ours: "P for the papers";
+main's chapter: nothing on these citations at all). A corpus whose whole purpose is provenance
+cannot have one chapter number resolving to two files. Resolution in W7 below.
+
+Method note, because this is the second time in one session: **absence in one place is not evidence
+of an event elsewhere.** `git ls-tree origin/main` told me what main has, not what happened to our
+file. The check that would have caught it — `ls` on the working tree — cost one command.
 
 ---
 
