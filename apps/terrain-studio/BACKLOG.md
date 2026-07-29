@@ -287,18 +287,31 @@ instance:
    it would have been waived — vacuity by the back door.
 6. A gate collecting side-channel records *only if present*, so a build that stopped producing them
    still passed. Vacuity by **absence**.
-7. **A gate whose result never arrived at all.** Two `_verify_digest.js` runs launched into the
-   background were still alive ~22 hours later (pids 5184/24096, ~1300 min wall, **120 CPU seconds
-   each, then 0.2% busy** — blocked, not spinning). The 120 s is the tell: it is exactly the tool's
-   default 120 000 ms timeout. The runner timed out, its shell was reaped, and the orphaned `node`
-   child blocked forever writing into a pipe with no reader. Their verdicts were lost — not red,
-   not green, *absent* — and an absent verdict is indistinguishable from one nobody looked at.
+7. **A gate that never ran, and then reported success.** Two `_verify_digest.js` runs launched into
+   the background were still alive ~22 hours later (pids 5184/24096, ~1300 min wall, **120 CPU
+   seconds each, then 0.2% busy** — blocked, not spinning). The 120 s is the tell: it is exactly the
+   runner's default 120 000 ms timeout. The runner timed out, its shell was reaped, and the orphaned
+   `node` child blocked forever writing into a pipe with no reader.
+
+   The instructive part came on cleanup. Killing the two orphans let their parent shells finally
+   exit — and both tasks were then reported **completed, exit code 0**, with **zero bytes of
+   output**. Their labels were "Square byte-identity gate" and "Verify square is still
+   byte-identical", so at a glance the record showed two green byte-identity gates. There were
+   none. The exit code belonged to the shell, not to the check.
+
+   This is the worst form of the pattern in this list, because the other six at least fail
+   *quietly*. This one **fabricates a pass**. No coverage was actually lost here — both were the
+   digest, and a foreground run of it returned 60/60 at the merge commit — but that was luck. The
+   green badge was available to be believed, and nothing except reading the empty output file
+   distinguished it from a real one.
 
 Entry 7 is the general form the first six are special cases of: **a gate only protects you if its
-verdict is observed.** Wrong tolerance, unreachable sub-gate, and never-returned all fail the same
-way at the point of use. So: give a gate a timeout longer than its honest runtime, redirect output
-to a file rather than a pipe that can fill, and treat "I never saw the result" as a failure to
-re-run — never as tacit approval.
+verdict is observed, and an exit code is not a verdict.** Wrong tolerance, unreachable sub-gate,
+and never-returned-but-reported-zero all fail identically at the point of use. So: give a gate a
+timeout longer than its honest runtime; redirect output to a file rather than a pipe that can fill;
+**assert on the gate's own output, never on its exit status alone**; and treat an empty result as a
+failure to re-run, never as tacit approval. A gate that cannot say *what* it checked did not
+check it.
 
 The countermeasures that worked:
 
