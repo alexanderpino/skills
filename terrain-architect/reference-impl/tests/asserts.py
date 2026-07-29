@@ -25,6 +25,19 @@ def assert_mass_conserved(before, after, tol=1e-6, msg=""):
     assert rel < tol, f"mass not conserved {msg}: {m0:.6g} -> {m1:.6g} (rel {rel:.2e})"
 
 
+def assert_layer_budget(before, after, tol=1e-6, msg=""):
+    """27's co-evolution budget: under pure transport the layer STACK closes as ONE budget --
+    height/bedrock plus every granular or transient layer (soil, sediment, sand, snow) summed
+    together -- even while individual layers legitimately exchange mass (erosion turns soil into
+    sediment, an avalanche moves snow between cells). Checking layers separately would flag those
+    exchanges as leaks; checking only height would miss a layer silently minting mass.
+    `before`/`after` are sequences of same-shape fields (the stack's thickness/height layers)."""
+    m0 = sum(float(np.sum(a)) for a in before)
+    m1 = sum(float(np.sum(a)) for a in after)
+    rel = abs(m1 - m0) / (abs(m0) + 1e-12)
+    assert rel < tol, f"layer-stack budget not closed {msg}: {m0:.6g} -> {m1:.6g} (rel {rel:.2e})"
+
+
 def assert_nonneg(a, name="field", tol=1e-9):
     assert np.all(a >= -tol), f"{name} has invalid negatives (min {float(a.min()):.3e})"
 

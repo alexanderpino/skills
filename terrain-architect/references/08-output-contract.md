@@ -23,6 +23,15 @@ of this boundary.
 | `albedo` (colour map) | linear RGB | RGB8 / BC7 | Composited from masks — see Satmap & colour map. **No directional light baked in.** |
 | `masks[i]` | [0,1] | R8 per channel | Must partition — see `06` |
 | `flowAccum` (`A`) | m² | R32F | Log-scaled for storage if needed |
+| `moisture` | mm/yr | R32F | Orographic precipitation (`13`) — the biome/snow gatekeeper (`27`) |
+| `temperature` | °C | R32F | Latitude base + lapse rate, aspect-corrected (`13`) |
+| `insolation` | received fraction vs flat ground | R32F | Sun-arc horizon test (`06`); can exceed 1 on equator-facing slopes — declare the range in the manifest |
+| `windVector` | m/s, world-space `(u, v)` | RG32F | Flowfield, not a constant (`13`); never normalised, never lattice-snapped (`26`) |
+| `soilDepth` | m | R32F | **State map** — co-evolved through erosion (`11`, `27`); a component of `solidTop` |
+| `strataHardness` | erodibility `K` | R32F | The exposed-surface slice of the strata stack, re-sampled as erosion exhumes (`11`) |
+| `wetness` | [0,1] state + TWI derived | R32F ×2 | Two maps, shipped separately — sim-residual puddling (`13`) and topographic potential (`06`); never averaged (`27`) |
+| `flowVelocity` | m/s, world-space `(u, v)` | RG32F | The engine's fluid driver (`03`; hydrology handoff, `SKILL.md`) |
+| `curvature` | 1/m, signed | R32F | Derived after final geometry, from R32F height (`06`) |
 | `scatter[i]` | positions + attrs | Point list | World-space |
 
 Plus a manifest, and the manifest is not optional:
@@ -41,7 +50,15 @@ Plus a manifest, and the manifest is not optional:
   "seaLevel":      float,
   "rootSeed":      uint64,
   "tileIndex":     [i, j],
-  "apron":         int            // cells of overlap included, if any
+  "apron":         int,           // cells of overlap included, if any
+  "layers": [                     // one entry per exported auxiliary map (27)
+    { "name":   "moisture",       // wire name from 27's registry
+      "unit":   "mm/yr",
+      "range":  [min, max],       // declared, not assumed (insolation can exceed 1)
+      "format": "R32F",           // RG32F for vector maps
+      "kind":   "state" | "derived",
+      "parentHash": "..." }       // derived maps only: content hash of the source field
+  ]
 }
 ```
 
@@ -52,6 +69,18 @@ conventionally *vertex-centred* (so `N` samples span `N−1` cells) but a textur
 *pixel-centred* (so `N` texels span `N` cells). Terrain heightmaps are vertex-centred; masks
 and splatmaps are pixel-centred. **They are not the same grid**, and the half-texel offset
 between them is a real and commonly-shipped bug.
+
+**The auxiliary maps are governed by `27`.** The climate / geology / hydrology / geometry rows
+above (`moisture` through `curvature`) are the **standard auxiliary-map registry** of
+`references/27-engine-data-handoff.md`, which owns their lifecycle rules — the co-evolution rule
+for state maps, the state-vs-derived distinction, the Masking Doctrine (raw physical fields out;
+no baked diffuse or predefined materials in the runtime handoff), and the Snow Rule. For each
+exported auxiliary map the manifest gains one entry in a `layers` table: **name, unit, declared
+range, format, kind (`state` | `derived`), and — for derived maps — the content hash of the field
+it was derived from**, so a stale `curvature` shipped against a newer `height` is detectable
+engine-side (`27`, the handoff contract; `14`'s content-addressed keys supply the hashes for
+free). The satmap/colour-map emitter below remains a preview and review product (`09`) — it is
+not part of the runtime handoff, and no engine-side system may depend on it.
 
 ## The layer stack
 

@@ -159,6 +159,7 @@ the compiler's FMA choices will disagree per shader and violate the shared-edge 
 | droplet delta | R32_SINT fixed-point | Determinism, above |
 | masks | R8_UNORM, packed ×4 | |
 | A (drainage) | R32F, log-encoded if stored | Spans 6+ decades |
+| auxiliary registry (moisture, temperature, insolation, soil, wetness…) | R32F; wind/flow vectors RG32F | The `27` export set — budget for it: it roughly doubles the R32F working set at bake time. Insolation reuses the AO horizon sweeps (`06`), so it lands in the same baked/amortised tier as AO, not per-frame |
 
 - **Pack the pipe model's per-cell state** (b, d, s + flux + v) into as few textures as
   possible; the sim is bandwidth-bound and every texture is a separate cache stream.

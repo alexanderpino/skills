@@ -294,13 +294,19 @@ def derive_substances(height, slope_tan, area, cellsize, *, climate, rng_seed=0)
                      AND the slope can HOLD it (steep faces shed) AND wind LOADS it: poleward/shaded
                      aspects and concave hollows collect, convex ridges are scoured. So the snowline
                      is not a clean contour — it dips on shaded aspects and fills sheltered hollows.
+                     **No moisture gate by default** — altitude/aspect-only snow is exactly what
+                     `27`'s Snow Rule ("no moisture = no new snow") forbids in a shipped export.
+                     This static placement is sandbox/preview only; pass ``climate["moisture"]``
+                     (a [0,1] supply field) to gate it, and use `snow.py` (`snow_step`,
+                     `dry_snow_attribution`) for the compliant dynamic model.
       * **sediment** — deposited where flow is high, the slope is gentle, and the profile is concave.
       * **vegetation** — soil/plants on gentle ground below the snowline (thinning with altitude),
                      only where the `climate` is not arid.
       * **ground** — the bare remainder (soil / regolith / dust).
 
     `climate` selects which substances exist and the thresholds:
-    ``{has_water, has_snow, snowline (0–1 of local relief), snow_soft, has_veg}``."""
+    ``{has_water, has_snow, snowline (0–1 of local relief), snow_soft, has_veg,
+    moisture (optional [0,1] supply field — gates snow per 27's Snow Rule)}``."""
     height = np.asarray(height, dtype=np.float64)
     slope_tan = np.asarray(slope_tan, dtype=np.float64)
     area = np.asarray(area, dtype=np.float64)
@@ -331,6 +337,9 @@ def derive_substances(height, slope_tan, area, cellsize, *, climate, rng_seed=0)
         drive = (hn - snowline) + 0.30 * (north - 0.5) + 0.08 * concave + 0.03 * jitter
         hold = 1.0 - smoothstep(tand(46), tand(58), slope_tan)              # steep faces shed snow
         snow = np.clip(smoothstep(0.0, soft, drive), 0.0, 1.0) * hold
+        mois = climate.get("moisture")
+        if mois is not None:                                                # 27's Snow Rule gate
+            snow = snow * np.clip(np.asarray(mois, dtype=np.float64), 0.0, 1.0)
     else:
         snow = np.zeros_like(height)
 

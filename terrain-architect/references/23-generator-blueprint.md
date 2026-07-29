@@ -36,15 +36,17 @@ An advanced generator is not complete until every row has at least one productio
 | **Hydrology** | epsilon fill or breach, D8 plus MFD/D∞, accumulation in m², lake/sea policy | `03` |
 | **Erosion** | one small-scale hydraulic model, Braun–Willett stream power, hillslope/thermal, diffusion | `04`, `05` |
 | **Regime processes** | aeolian/dunes, glacial/coastal, arid/periglacial, lava as product scope requires | `05`, `12`, `16`, `17`, `19` |
-| **Analysis** | slope, aspect, curvature, drainage/wetness, horizon/SVF AO, distance fields | `06` |
+| **Analysis** | slope, aspect, curvature, drainage/wetness, horizon/SVF AO, sun-arc insolation, distance fields | `06` |
 | **Materials & layers** | bedrock/soil/sand/water/snow stack, lithology and physical properties, splat/material masks | `08`, `11`, `13`, `18` |
 | **Climate & biomes** | lapse rate, orographic rain, wind, snow line, biome/ecosystem fields | `13` |
 | **Scatter** | deterministic Poisson/blue-noise placement, density masks, hierarchical scatter, cross-layer exclusion/affinity | `07` |
-| **Output** | quantisation last, normals/AO, mesh/heightfield, view-envelope/detail representation, tiling/aprons, LOD/clipmaps, engine encoding | `08` |
+| **Output** | quantisation last, normals/AO, mesh/heightfield, view-envelope/detail representation, tiling/aprons, LOD/clipmaps, engine encoding, auxiliary-map registry + manifest `layers` table | `08`, `27` |
 | **Runtime substrate** | typed ports, pure nodes, cache keys, dirty propagation, preview, jobs, serialisation | `14`, `15` |
 
 Product scope may omit a regime family; it may not omit the shared contracts that keep remaining
-nodes composable.
+nodes composable. The *exported form* of the analysis, climate, and layer families — which maps
+ship, their state-vs-derived lifecycle, and the no-baked-materials rule — is the auxiliary-map
+registry of `27`; the floor above produces those maps, `27` governs how they leave the tool.
 
 ## Shared substrate
 
@@ -160,7 +162,9 @@ The standard advanced architecture separates **process history** from **local ex
 
 - scale-free noise/warp below the baked band limit
 - bounded thermal/detail erosion that cannot move global drainage
-- local material breakup, decals and wetness/snow state
+- local material breakup, decals and wetness/snow state (seeded from the baked auxiliary
+  registry maps, `27` — the runtime evolves the state; the bake supplies its initial conditions
+  and drivers)
 - deterministic scatter and biome instances
 - mesh/normal generation and clipmap/chunk publication
 

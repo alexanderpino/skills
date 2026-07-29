@@ -2,6 +2,7 @@
 
 Contents: [Ordering rule](#ordering-rule) · [Slope & aspect](#slope--aspect) ·
 [Curvature](#curvature-zevenbergen--thorne-1987) · [Horizon AO](#horizon-based-ambient-occlusion) ·
+[Insolation](#insolation-terrain-shadowed-solar-radiation) ·
 [Wetness](#wetness-index-beven--kirkby-1979) · [Normals](#normals) ·
 [Selectors](#selectors--masks-from-the-analysis-fields) · [Masks → materials](#masks--materials)
 
@@ -190,6 +191,71 @@ varies smoothly.
 
 Compute AO **before quantisation** (`08`). A second derivative it is not, but it samples height
 differences over long baselines, and R16 terracing shows up as concentric rings.
+
+## Insolation (terrain-shadowed solar radiation)
+
+**Not AO.** AO integrates visibility over the *whole sky*; insolation integrates received direct
+sunlight over the *sun's arc* — a narrow, latitude- and season-dependent band of directions. The
+two disagree exactly where it matters: a north-facing wall in the northern hemisphere can be
+wide-open to the sky (bright AO) and still never see the sun (near-zero insolation). Substituting
+one for the other is a real defect: AO-as-insolation puts "melt" in shaded ravines that are open
+overhead, and insolation-as-AO darkens sun-shadowed but sky-open faces. Compute both; ship both
+(`27`).
+
+Insolation is the map that decides where snow **melts** (equator-facing slopes clear first) and
+where it **persists** (pole-facing walls, deep ravines whose horizons block the whole winter arc)
+— the melt driver of `13`'s snow model and the `27` climate registry, and the physical field
+behind treeline and vegetation aspect asymmetry. `13`'s scalar `northness` correction is the
+cheap proxy for this map; replace it with the real field when the budget allows, because
+`northness` knows the slope's aspect but nothing about the ridge across the valley.
+
+Two ingredients, both already on hand: **standard solar geometry** (declination by day of year,
+elevation/azimuth from latitude and hour angle — textbook astronomy, no terrain content) and the
+**horizon-angle machinery** of the AO section above. A sun position is visible iff its elevation
+exceeds the terrain horizon toward its azimuth:
+
+```
+insolation(h, p, lat, days, stepsPerDay, maxDist):
+    n = surfaceNormal(h, p)                            # Normals, below
+    E = 0
+    Eflat = 0                                          # same integral for flat, unshadowed ground
+    for day in days:                                   # solstices + an equinox is usually enough;
+        δ = solarDeclination(day)                      #   monthly if driving seasonal snow (13)
+        for t in stepsPerDay:                          # 8–12 hour angles across the day
+            (az, elev) = sunPosition(lat, δ, t)        # standard solar-position formulas
+            if elev <= 0: continue                     # sun below the astronomical horizon
+            E     += max(0, dot(n, sunDir(az, elev)))  # cosine incidence — the aspect term
+                     * (elev > horizonAngle(h, p, dir(az), maxDist))   # terrain shadow test
+            Eflat += sin(elev)                         # flat ground, no horizon
+    return E / max(Eflat, ε)                           # received fraction vs flat unshadowed ground
+```
+
+**The normalisation is a decision — state it.** Dividing by the cell's *own* unshadowed potential
+would cancel the cosine-incidence term and leave a pure shadow map: a pole-facing slope with an
+open horizon would read 1.0, and the aspect signal — the entire reason the snow line sits higher
+on sunny slopes — would vanish. Normalise against **flat unshadowed ground at the same latitude**
+(`Eflat` above): flat open terrain reads 1.0, shaded ravines fall toward 0, and steep
+equator-facing slopes at mid/high latitude legitimately exceed 1 (they present more area to a low
+sun than flat ground does — typical ceiling ≈ 1.2–1.5, latitude-dependent). Declare the actual
+range in the export manifest (`08`, `27`) rather than silently clamping; the engine remaps it as
+a mask anyway.
+
+**Cost: the same as AO, not `N_sun ×` more.** The horizon angle depends only on azimuth, not on
+the sun — so precompute the per-azimuth horizon-angle maps once with the Timonen & Westerholm
+sweep (above; you need them for AO regardless), then every sun sample in the double loop is a
+table lookup against the precomputed horizon for the nearest azimuth. `N = 8–16` azimuths
+suffices for the same reason it does for AO: the horizon varies smoothly. The naive
+march-per-sun-sample version is for validation only.
+
+Both hemispheres fall out of the same formulas — the sun's arc leans the other way and the melt
+asymmetry flips with it, which is exactly the behaviour `13`'s hand-flipped `northness` sign
+approximates.
+
+**Provenance: F.** The composition — solar geometry × terrain horizon test — has no canonical
+terrain-graphics paper; it is standard practice in GIS solar-radiation tooling (GRASS `r.sun`,
+ArcGIS Solar Analyst). Treat the tool papers as `?` until verified against primary sources
+(`00`'s tier discipline); the horizon-sweep substrate is the verified Timonen & Westerholm 2010
+above, and the solar-position formulas are textbook astronomy needing no citation.
 
 ## Wetness index (Beven & Kirkby 1979)
 
