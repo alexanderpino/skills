@@ -233,6 +233,42 @@ diffuse and rivers look like broad damp smears rather than lines. The standard f
 **hybrid**: MFD where `A` is small (hillslope), D8 or D∞ where `A` exceeds a channelisation
 threshold. This costs almost nothing and is what most good terrain tools do.
 
+## D6 (hexagonal grids)
+
+On a hexagonal working grid (`26`) the routing family above simplifies: every
+cell has **6 neighbours, all edge-adjacent at the same centre distance**, so the diagonal branch
+and the √2 disappear from the stencil.
+
+```
+d6(dem, c):
+    best = -INF; receiver = NONE
+    for n in 6 neighbours:
+        s = (dem[c] - dem[n]) / cellSize      // one distance — no diagonal test, no SQRT2
+        if s > best: best = s; receiver = n
+    return receiver                            // NONE if best <= 0 → c is a pit
+```
+
+MFD ports the same way: drop the distance fork *and* the contour-length split — all six shared
+edges have the same length (`cellSize/√3`), so only the slope exponent remains. Break equal-drop
+ties explicitly (epsilon or randomised choice, as in `09`'s cures) — equidistant neighbours make
+exact ties more common, not less.
+
+**What D6 fixes and what it doesn't.** The √2 weighting bug and the 4-versus-8 fork *cannot be
+written* — that branch of `09`'s anisotropy family is gone. But D6 is single-receiver over a
+**coarser** angular set than D8 — 6 directions at 60° (max aspect error 30°) against 8 at 45°
+(22.5°) — so the planar-hillslope artefact of D8 survives: parallel flow lines along the hex
+axes, smaller than D8's but present. The D8 advice transfers unchanged: single-flow for
+channels, dispersive flow for hillslopes, hybrid by an `A` threshold.
+
+**One constant does change: the cell area.** Accumulation seeds `A` with the cell's area, and on
+hex that is `A_cell = (√3/2)·cellSize²` (`det B`, `26`), not `cellSize²` — carry the square
+formula over and every drainage area, and every `A`-threshold downstream of it, is silently
+~13% low. **Everything else in this chapter is lattice-independent.** Depression handling still
+comes first and Priority-Flood runs on any graph; accumulation is the same recurrence over 6
+neighbours; stack ordering, lakes and channel morphology do not care. Published grounding:
+**Liao et al. 2020** (HexWatershed — flow routing on a hexagonal mesh) and **Liao et al. 2025**
+(routing datasets on the equal-area ISEA DGGS); see `99`.
+
 ## Flow accumulation
 
 Drainage area `A` at a cell = its own area plus everything routed into it.
@@ -371,8 +407,33 @@ mid-channel, flow splits around it, the split channels widen and deposit new bar
 multiplies. For terrain, a braided reach is a *wide, flat, gravel-floored corridor* (a `06` material
 band) stamped with a multi-thread channel pattern — anastomosing threads and lens-shaped bars —
 rather than a single incised line; glacial outwash plains (`12`) and alluvial-fan surfaces (`16`)
-are the type settings. Author the corridor from the routing (`03`) and the threads as a look; a
-braid's individual channels shift every flood and carry no long-term memory worth simulating.
+are the type settings. Author the corridor from the routing (`03`) and the threads either as a look
+or from the process model below; a braid's individual channels shift every flood and carry no
+long-term memory worth simulating, so the *pattern* is the deliverable, not any one channel.
+
+The implementable process model is **Murray & Paola 1994** (*A cellular model of braided rivers*,
+Nature 371:54–57): on a **gently** downstream-sloping, sediment-charged bed, (1) water in a cell
+splits among the downstream‑forward cells weighted by √slope, (2) transport capacity is super‑linear
+in discharge and is evaluated **per branch** — each downstream branch carries `K·(Q_branch)ᵐ`, m ≈ 2.5.
+This is the braiding engine: when a thread splits, its discharge divides, so `Σ K·(Q_branch)ᵐ ≪
+K·(Q_total)ᵐ` — capacity collapses super‑linearly, the sediment can no longer be carried, it drops as
+a mid‑channel **bar**, and the next flow routes around it. Where flow re‑concentrates, capacity rises
+and the bed is scoured (a channel). (3) Sediment also relaxes laterally down the cross‑stream slope —
+which shifts threads but, per Murray & Paola, is *not* what causes braiding. With `m = 1` the split
+capacities sum straight back to the single‑thread capacity, nothing deposits at splits, and the reach
+stays single‑thread — the super‑linearity IS the instability. Sediment is conserved to the export.
+
+*Runnable reference: `reference-impl/braided.py` (`braided_river` = this Murray–Paola model;
+`braiding_index` = mean active threads per cross‑section), verified by `tests/test_braided.py`:
+braids (index > 1 on a gravel braidplain); the super‑linearity is what banks bars (an m=2.5 reach
+retains sediment and exports far less than a near‑linear m=1 reach — the mass‑budget fingerprint of
+bar‑building); sediment conserved (Σbed_change = fed − exported); deterministic. **Reduced‑complexity
+tier:** this cellular model reproduces braiding *statistically* — multi‑thread topology, the
+super‑linear instability, a closed mass budget — but not a photoreal woven planform (it reads as
+downstream‑grained threads); a crisp braid needs a depth‑resolved CFD morphodynamic solver
+(Delft3D/BASEMENT class), out of scope for this pure‑NumPy sandbox. Gaea's "braided" (Anastomosis)
+sidesteps the physics entirely — it is a stylized downcutting carve on existing terrain, not a
+simulation; see `reference-impl/CANON-COMPARISON.md`.*
 
 **Bedrock vs alluvial.** High in the range the river cuts *rock* (detachment-limited — stream
 power, `04`); lower down it reworks its own *sediment* (transport-limited — deposition). The
@@ -383,6 +444,16 @@ graphics reference is **Génevaux et al. (2013)** — build the drainage tree fi
 terrain around it.
 
 ## Meandering & bank erosion
+
+*Runnable reference: `reference-impl/meander.py` (`migrate` = `meanderStep`, upstream-lagged near-bank
+velocity per Ikeda–Parker–Sawai 1981; `burn_channel` = `burnChannel`; `deposit_point_bars` =
+`depositPointBars`), verified by `tests/test_meander.py` — the decisive check: the migration peak lags
+the curvature peak downstream (drop the lag and it coincides, i.e. sine waves, not meanders). The
+`migrate` loop is centreline-only; the height-field realisation is applied after, never during — the
+migration physics never touches `h`. The `meander_belt` composite is the one-call node a scene drops in:
+it migrates, carves the active channel, deposits point/scroll bars on the convex banks (the
+cut-bank-erodes / point-bar-deposits pair — deposit AFTER the carve or it is eaten), and leaves oxbow
+lakes. The migration is P-tier; the realisation is the honest F-tier "look".*
 
 First, the correction that the question usually needs: a river does **not** erode its banks with
 waves. Coastal and marine erosion are *wave*-driven (`12`); a river migrates by **flow
@@ -405,7 +476,8 @@ meanderStep(centreline, Δt):
     # Howard & Knutson 1984): it depends on UPSTREAM curvature, exponentially lagged — not on
     # local curvature alone.
     for node i:
-        u_b[i] = Σ_{k≥0} C[i-k] * exp(-k * ds / L_adj)     # L_adj ≈ several channel widths
+        # weighted AVERAGE of upstream curvature (weights sum to 1, so E keeps its meaning as L_adj varies)
+        u_b[i] = ( Σ_{k≥0} C[i-k] * w_k ) / ( Σ_{k≥0} w_k ),   w_k = exp(-k * ds / L_adj)   # L_adj ≈ several channel widths
         move node i along its outward normal by E * u_b[i] * Δt    # E = bank erodibility
 
     # Neck cutoff → oxbow lake

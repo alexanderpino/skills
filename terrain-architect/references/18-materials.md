@@ -113,3 +113,32 @@ and visible layers atomically with the refined height.
 with rock repose → property bundle split; water folded into collision height → unswimmable sea;
 normal/AO baked after R16 quantisation → combs/rings; a texture-only material change alters erosion
 cache → physical and appearance versions coupled incorrectly.
+
+## Colour production: a SatMap is a CLUT, and CLUTs compose
+
+The colour stage is not "pick a palette". It is a lookup driven by a **channel**, and the choice of
+channel does more for the result than the choice of colours.
+
+**Any channel can drive it.** `render.satmap(driver, stops)` takes any normalised field, not just
+elevation. Elevation gives the classic hypsometric look; `analysis.slope` separates cliffs from
+benches; `flow.d8_accumulation` picks out drainage; `analysis.horizon_ao` finds crevices;
+`analysis.deposit_fill` finds where loose material rests; `analysis.wear` finds where it was
+stripped from; `analysis.peaks` isolates summits. `analysis.texture_base` mixes slope + soil + flow
+into the single composite driver that reads as *material* rather than tint — colouring straight off
+elevation is what makes procedural terrain look painted.
+
+**They combine.** `render.blend_rgb(base, over, mask, opacity, mode)` composites one colour layer
+over another, with `BLEND_MODES` = normal / max / min / multiply / screen / overlay. Two uses:
+*stacking* (a slope-driven rock ramp over a height-driven ground ramp, masked to the steeps) and
+*merging* two independent SatMap branches. `max` is the usual merge for two palettes — it keeps
+whichever layer is brighter and never darkens.
+
+**Two drivers at once.** `render.satmap_2d(driver_a, driver_b, stops_a, stops_b)` blends two ramps
+by a second driver — the altitude × slope biome LUT, where the same elevation reads as vegetation on
+gentle ground and bare rock on a cliff. Two 1-D ramps mixed by a second channel covers the usual
+altitude/slope and altitude/moisture cases far more cheaply than authoring a full 2-D image.
+
+**Authoring a palette from imagery.** `render.extract_satmap` orders an image's pixels by luminance
+into a ramp. It only works on **top-down** imagery: a ground-level photo puts sky at the bright end
+and the ramp comes out blue. Mask out space and open water first, and reject false-colour scenes —
+an infrared composite orders vegetation as red and produces a ramp no terrain should ever wear.

@@ -1,0 +1,112 @@
+# Atomic-base coverage & scope
+
+**What this is.** The reference implementation is a **curated core** of the atomic bases — the
+irreducible nodes everything else composes from (analytic noise, SDF/gradient primitives, combiners,
+and the iterative erosion/flow solvers). It is deliberately **not exhaustive**: it covers the
+must-have set that reproduces the large majority of real terrain work, not every node Gaea / World
+Machine / Houdini ship. The named *landform* generators (Mountain, Volcano, Canyon, …) are macros
+over these atoms and live in `landforms.py`; this file is only about the atoms.
+
+**Two artifacts, one guarantee.** The skill has two representations of each atom: the neutral
+**pseudocode** in `references/` (the algorithm + its grounding) and the executable **reference impl**
+here. They are meant to correspond. `tests/test_atom_coverage.py` is the anti-drift harness that keeps
+them honest: every atom listed as *implemented* below must exist as a callable in its module, the
+reference module's public surface must not contain an atom missing from this list, and every
+*deferred* atom must be genuinely absent from the code (documented, not silently half-built). The same
+harness also guards the **landform generators** (macros over the atoms — `mountain`, `ridge`, `volcano`,
+`canyon`, `fault_block_butte`): each must stay named in its chapter (`11`) pseudocode. What the harness
+does **not** prove is that the pseudocode is numerically correct, nor that its CONSTANTS match the code
+(e.g. a profile exponent) — pseudocode↔code *constant* drift is caught by the review/faithfulness passes,
+and numerical correctness by the per-atom oracle tests (`test_noise.py`, `test_ops_filters.py`, the solver tests).
+
+## Implemented atomic bases
+
+**Noise (`noise.py`, chapter `01`):** `perlin`, `value`, `simplex`, `worley` (f1 / f2f1 / inv_f1),
+`fbm`, `ridged_mf`, `hybrid_mf`, `gabor` (anisotropic/directional), `domain_warp`, `curl`.
+
+**Scale contract (chapter `08`).** Atom parameters must not be silently in CELL units — a cell is not
+a unit, `cellSize = extent / n` is. Every atom either takes `cellsize` or is listed with a reason in
+`tests/test_scale_contract.py` (caller-coordinate sampling, pure value maps, comparison-only
+algorithms, or an explicitly cell-space model). `erosion_droplet.resolution_matched()` carries
+droplet settings between grids (count ~ n², brush radius ~ n).
+
+**Placement & masking (`placement.py`, chapter `10`) — the art-direction layer:** `disc`, `rect`,
+`capsule`, `polygon`, `path_mask` build coverage masks from SDFs positioned in METRES; `place_coords` moves a GENERATOR by transforming the coordinates it samples (exact, unlike
+resampling its output); `affine`/`compose`/`transform_coords`/`sample_coords` are the 3x3 homogeneous
+form of the same thing, adding non-uniform scale, shear and chaining. `apply_masked`
+is the universal mask rule (an effect applies only where the mask is bright) and `stamp` composites a
+placed feature (max / add / replace).
+
+**Colour production (`render.py`, chapter `18`):** `satmap` (CLUT on any driver), `satmap_2d`
+(altitude × slope), `blend_rgb` + `BLEND_MODES`, `splat_blend`, `extract_satmap`.
+**Data-map channels (`analysis.py`, chapter `06`):** `wear`, `peaks`, `texture_base` alongside
+`curvature`, `horizon_ao`, `deposit_fill`, `twi`.
+**Spatial scale (`ops_filters.py`):** `resample`, `at_feature_scale` (run an effect on a coarser
+grid so its footprint widens; only the delta is carried back).
+
+**SDF / gradient / combiner / tonal primitives (`ops_filters.py`, chapter `10`):** `sd_circle`, `sd_box`,
+`sd_convex_polygon`, `sd_segment`, `radial_gradient`, `linear_gradient`, `cone`, `smin`, `smax`, `blend`,
+`remap`, `curve`, `levels`. (The module also carries the filter/morphology toolbox — `gaussian`,
+`unsharp`, `histogram_equalize`, `bilateral`, `guided_filter`, `perona_malik`,
+`dilate`/`erode`/`opening`/`closing`, `twist`, `bend` — treated as filters, not atoms.)
+
+**Solver atoms (iterative, stateful — cannot be composed from static fields):** flow routing
+(`flow.priority_flood_fill`, `d8_receivers`, `d8_accumulation`, `mfd_accumulation`), stream-power
+incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a field, or a callable
+`K(p,h)` for lithology-driven differential erosion, and `D=` couples the Cordonnier hillslope-diffusion
+companion term in the same loop — the pair sets valley spacing and divide roughness),
+droplet erosion (`erosion_droplet.droplet_erode`),
+thermal/talus (`erosion_thermal.thermal_erosion`), hillslope diffusion (`diffusion.hillslope_diffuse`),
+virtual-pipe flow + coupled erosion (`erosion_pipe.pipe_water`, `pipe_erode`), shallow-water
+(`shallow_water.simulate`), lateral fluvial migration (`meander.migrate`, with the F-tier
+height-field realisation `meander.burn_channel`), braided/anastomosing rivers
+(`braided.braided_river` — the Murray–Paola 1994 cellular braided-stream model: split flow +
+**per-branch** super-linear transport that banks bars where flow splits + lateral relaxation →
+multi-thread channels; reduced-complexity tier — statistically braided, not a photoreal planform),
+glacial erosion (`glacier.glacier_carve` —
+SIA ice flow + basal-sliding bed abrasion; illustrative-morphological tier), the dynamic
+snowpack (`snow.snow_step`, with the layer-avalanche `snow.thermal_on_layer`; F-tier), the
+terrain-aware **wind flow field** (`winds.wind_field` — the whole `13` recipe; its stages are
+`winds.terrain_speedup` over the fetch-secant `winds.upwind_slope` (Jackson & Hunt crest speed-up),
+`winds.lee_shelter` (Werner's 15° separation shadow at landscape scale), `winds.valley_channel` over
+the structure-tensor `winds.terrain_axis` (channelling along a confining valley), and
+`winds.terrain_adjust` composing the three; F-tier — plus `winds.mass_consistent`, the
+Helmholtz–Hodge projection, which is exact), **aeolian transport** under that field
+(`aeolian.shear_velocity` law-of-the-wall, `aeolian.threshold_shear` and `aeolian.saltation_flux` —
+Bagnold's threshold and cubic law, P-tier with arithmetic oracles — composed by
+`aeolian.transport_field`, lagged by `aeolian.saturate` over a Sauermann saturation length, and
+coupled to the bed by `aeolian.exner_step`, sediment continuity: flux divergence deflates, flux
+convergence deposits), aeolian
+abrasion (`aeolian.yardang` — wind-aligned bottom-weighted abrasion; F-tier), and structural
+tectonics (`tectonics.fault_scarp` displacement fractal + `tectonics.fault_weakness` — the fault-as-
+`K(x,y)` coupling that feeds stream power so valleys follow structure — and `tectonics.plate_uplift`,
+the Voronoi-plate boundary-classification uplift field; F-tier). The meander solver is the one atom that runs on a
+**centreline (polyline)**, not the height field — an agent model (`07`) — and its migration physics
+is the upstream-lagged near-bank velocity (Ikeda–Parker–Sawai 1981), documented in chapter `03`.
+
+**Hexagonal working grid (`hex_grid.py`, chapter `26`):** `basis` (the 2×2 shear matrix; the metric
+`G = BᵀB` and cell area `det B` route through it), `cell_at` (point→cell by cube rounding — per-axis
+rounding is wrong ~17% of the time), `sample` (barycentric over the dual triangle; there is no
+bilinear on this lattice), `ring` / `disc` (6k / 1+3k(k+1) neighbourhoods — the box loop has no hex
+analogue), `laplacian6` (renormalised `2/(3d²)` constant), `gradient6` (one-ring world-space
+gradient — the shear is inside the stencil, so the `B⁻ᵀ` normal rule cannot be forgotten) and
+`hessian6` (full world-space Hessian from the 3 antipodal second differences — the hex replacement
+for Zevenbergen–Thorne's 3×3 quadratic fit, exact on quadratics, trace-consistent with `laplacian6`). These are
+the hex-native forms of chapter `26`'s *What does not port* section; the chapter's measured claims
+(the 16.8% wrong-cell rate, the 30.5° naive-normal error, the √3 separable-blur anisotropy, the H/3
+corner-mean plateau, the 1.5× un-renormalised Laplacian) are pinned by
+`tests/test_hex_grid.py`.
+
+## Documented but NOT implemented (deferred)
+
+These are discussed in the chapter pseudocode / grounding but are **not** in the reference impl — the
+reference is narrower than the chapters here, by design:
+
+- **OpenSimplex2** — the CC0 lattice is a *port target* (`references/22-open-source-grounding.md`), not
+  reimplemented; `simplex` covers the same need for the reference.
+- **Wavelet noise** (Cook & DeRose) — band-limited, alias-free; discussed in `01`, not built.
+- **Generic sparse-convolution noise** — `gabor` is the one sparse-convolution instance we implement;
+  the general form is not.
+
+Other tool nodes (Cellular3D, Cracks, CutNoise, LineNoise/DotNoise, …) are catalogued as deferred in
+`GROUNDING.md`'s node table; they are landform/pattern nodes, not the generative atoms this file scopes.

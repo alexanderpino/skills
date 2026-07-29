@@ -70,6 +70,8 @@ lavaStep(bed, L, T, Δt):                      # double-buffer, like every grid 
         q  = k · (τ − τ_y(T)) · L² / η(T)               # Bingham flux PER UNIT WIDTH [m²/s]; k ~ O(1), dimensionless
         ΔL = q · Δt / cellSize                          # flux → thickness [m] (the pipe model's step, 04)
         move ΔL from cell to n  (cap so L stays ≥ 0)
+        advect heat with it: n inherits the source T (mass-mixed)   # ELSE the front lands in a cold cell and
+        #   freezes on arrival — no tongue ever forms; carry T·L and recover T = ΣT·L / ΣL after the moves
 
     # 3. Cooling — radiation dominates, crust insulates (FLOWGO's heat budget)
     crust = crustFraction(age, strainRate)              # 0 = incandescent, 1 = fully crusted
@@ -82,6 +84,11 @@ lavaStep(bed, L, T, Δt):                      # double-buffer, like every grid 
         material = pahoehoe | ʻaʻā | block              # from local flow rate (above) → 18
         L = 0
 ```
+
+*Runnable reference: `reference-impl/sims_illustrative.py` (`lava_flow`), verified by
+`tests/test_sims_illustrative.py` — the Bingham yield gate gives a finite-thickness flow that
+freezes; the mass budget balances (erupted == still-molten + frozen-into-bed). Heat is advected with
+the flux (step 2), so a real tongue travels instead of freezing at the vent.*
 
 The details that decide whether it works:
 
@@ -99,7 +106,11 @@ The details that decide whether it works:
 - **Anisotropy.** A deterministic 4/8-neighbour CA prints the lattice into the flow outline (the
   `05` thermal plus-artefact, again). Miyamoto & Sasaki's fix: distribute flux over neighbours
   stochastically (Monte Carlo) in proportion to the computed flux — the expected flow is right and
-  the lattice disappears.
+  the lattice disappears. On a **hexagonal grid** (`26`) the CA is 6 neighbours at one distance —
+  no √2 in the flux term — and the deterministic lobing drops to a weaker 60° family, but it does
+  **not** vanish: D6 still quantises, so keep the Monte Carlo selection. The lattice swap and the
+  stochastic fix treat different halves of the artefact (metric bias vs quantisation) and stack.
+  Volume↔thickness conversions use the hex cell area `(√3/2)·cellSize²` (`26`).
 - **Mass conservation is the sim's `09` check**: `Σ erupted = Σ still-molten + Σ frozen into bed`.
   Leaks come from the flux cap and the freeze step; measure them.
 

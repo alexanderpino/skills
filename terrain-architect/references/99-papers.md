@@ -37,7 +37,12 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   online versions omit. Also **Musgrave, F.K. (1993),** *Methods for Realistic Landscape
   Imaging*, PhD thesis, Yale.
 - **Quilez, I.** *Domain warping.* iquilezles.org/articles/warp — The `fbm(p + fbm(p + fbm(p)))`
-  construction.
+  construction. Warp a mask/strike coordinate before evaluating it so straight boundaries meander
+  organically (`11` ridge crest).
+- **Quilez, I.** *Smooth minimum.* iquilezles.org/articles/smin — The polynomial
+  `smin(a,b,k) = min(a,b) − h²·k/4`, `h = max(k−|a−b|,0)/k`, with `k` the blend thickness; `smax(a,b,k)
+  = −smin(−a,−b,k)`. Blending two flank profiles with `smin`/`smax` turns the C1 crease at a ridge
+  crest into a rounded C∞ transition (`10`/`11`).
 - **Bridson, R., Hourihan, J. & Nordenstam, M. (2007).** *Curl-Noise for Procedural Fluid Flow.*
   ACM TOG 26(3), SIGGRAPH '07. — Divergence-free noise.
 
@@ -145,12 +150,31 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   of Southern Denmark. — Fast approximations for thermal/talus, including the sweep-based
   variant.
 - **Bagnold, R.A. (1941).** *The Physics of Blown Sand and Desert Dunes.* Methuen, London. —
-  The physics. Threshold friction velocity, the `u*³` saltation law. Not directly
-  implementable; cite it for *why*, not *how*.
+  The physics. Threshold friction velocity, the `u*³` saltation law. The *saltation-cloud* physics
+  is not directly implementable over a heightfield — cite it for *why*, not *how* — but the two
+  headline results are one expression each per cell and, coupled to a wind field, are the whole
+  speed→transport chain (`05`). **Constants** (`reference-impl/aeolian.py`): `A ≈ 0.1` (turbulent
+  threshold coefficient), `ρ_s ≈ 2650 kg/m³` (quartz), `ρ_a ≈ 1.22 kg/m³` (sea-level air),
+  reference grain `D = 250 µm` → `u*_t ≈ 0.2 m/s`.
+- **Owen, P.R. (1964).** *Saltation of uniform grains in air.* J. Fluid Mech. 20(2), 225–242. —
+  The near-threshold refinement of Bagnold's cubic, `q ∝ u*²(u* − u*_t)`; reach for it when the
+  hard on/off gate reads as a hard edge (`05`).
+- **Sauermann, G., Kroy, K. & Herrmann, H.J. (2001).** *A continuum saltation model for sand
+  dunes.* Physical Review E 64, 031305. — **The continuum branch of aeolian transport**, and the
+  counterpart to Werner's CA: sand flux relaxes toward saturation over a **saturation length**
+  `L_sat`, and the bed follows the flux DIVERGENCE (Exner). `L_sat` is what gives dunes a minimum
+  size and shifts deposition downwind of the crest. This is the model that consumes a spatially
+  varying wind field (`13`) directly, where the CA consumes a direction (`05`).
 - **Werner, B.T. (1995).** *Eolian dunes: Computer simulations and attractor interpretation.*
   Geology 23(12), 1107–1110. — **The implementable dune model.** Slab CA with shadow zone and
   differential deposition probability. Produces barchan/transverse/linear/star dunes from wind
-  regime alone. Under-cited relative to its usefulness.
+  regime alone. Under-cited relative to its usefulness. **Constants** (`reference-impl/dunes.py`):
+  lee shadow line at **15°** (flow-separation/recirculation angle); avalanche at the dry-sand
+  angle of repose **33.7°** = tan⁻¹(2/3), i.e. a 2-slab drop under the standard 1:3 slab aspect.
+- **Momiji, H., Carretero-González, R., Bishop, S.R. & Warren, A. (2000).** *Simulation of the
+  effect of wind speedup in the formation of transverse dune fields.* Earth Surf. Process. Landforms
+  25, 905–918. — Refines Werner: **no erosion inside the lee shadow zone** (the separation bubble),
+  which sharpens slip faces and drives migration. The shadow-capture rule used in `05`.
 - **Tsoar, H. (1983).** *Wind tunnel modeling of echo and climbing dunes.* In M.E. Brookfield &
   T.S. Ahlbrandt (eds), *Eolian Sediments and Processes*, Developments in Sedimentology 38, Elsevier,
   Amsterdam, pp. 247–259. — **Anchored (obstacle) dunes.** The windward-slope angle sets whether sand
@@ -248,8 +272,21 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   *Efficient Maximal Poisson-Disk Sampling.* ACM TOG 30(4), SIGGRAPH '11.
 - **Wei, L.-Y. (2008).** *Parallel Poisson disk sampling.* ACM TOG 27(3), SIGGRAPH '08.
 
+## Practitioner tools & workflows
+
+- **Pandhi, D. (2011).** *Realism in Vue.* e-on software. — Practitioner documentation for Vue's
+  Terrain Fractal, Strata Filter, HyperTerrain/MetaBlob displacement, EcoSystem constraints and
+  viewing-scale practice. **N/F-tier only:** useful for mapping documented tool controls and artist
+  failure modes, not evidence of proprietary internals, physical algorithms or portable constants.
+
 ## Rendering & output
 
+- **Max, N. (1988).** *Horizon mapping: shadows for bump-mapped surfaces.* The Visual Computer 4(2),
+  109–117. — Geometry-native horizon-angle occlusion (per-azimuth max slope); the basis for the
+  terrain ambient-occlusion in `analysis`, distinct from screen-space AO.
+- **Andersson, J. (2007).** *Terrain Rendering in Frostbite Using Procedural Shader Splatting.*
+  SIGGRAPH 2007 Courses (Advanced Real-Time Rendering). — Procedural splatmap material blending by
+  slope/height/curvature masks; the compositor behind `render.splat_blend` / `material_rgb`.
 - **Losasso, F. & Hoppe, H. (2004).** *Geometry clipmaps: terrain rendering using nested
   regular grids.* ACM TOG 23(3), SIGGRAPH '04. — Nested grids, vertex morphing across the
   transition band.
@@ -364,6 +401,24 @@ is below.
 
 ## Geological formation
 
+- **Huggett, R.J. (2011).** *Fundamentals of Geomorphology*, 3rd ed. Routledge. — Structural
+  landforms: a **cuesta / homoclinal ridge / hogback** is the exhumed edge of a dipping resistant bed
+  (a homocline) under differential erosion — gentle **dip slope** (= the exhumed bedding plane, angle
+  ≈ bed dip) vs steep **scarp** (cuts across the beds); dip angle sets the class (cuesta ≲25°, hogback
+  ≳30–40°). Grounds `landforms.ridge`.
+- **Fairbridge, R.W. (1968).** *Hogback and Flatiron*, in *The Encyclopedia of Geomorphology*,
+  Reinhold. — Hogback definition and the triangular flatiron facets on a hogback dip slope.
+- **Collins, G.S., Melosh, H.J. & Marcus, R.A. (2005).** *Earth Impact Effects Program: A web-based
+  computer program for calculating the regional environmental consequences of a meteoroid impact on
+  Earth.* Meteoritics & Planetary Science 40(6), 817–840. — The transient-crater π-scaling used in
+  `crater.py`: D_tc = 1.161·(ρ_i/ρ_t)^⅓·L^0.78·v^0.44·g^(−0.22)·(sinθ)^⅓.
+- **Narr, W. & Suppe, J. (1991).** *Joint spacing in sedimentary rocks.* Journal of Structural
+  Geology 13(9), 1037–1048. — Systematic joint spacing scales with bed thickness; the near-orthogonal
+  joint sets that make flat-lying sandstone buttes blocky, not round (`landforms.fault_block_butte`).
+- **Karátson, D., Favalli, M., Tarquini, S., Fornaciai, A. & Wörner, G. (2010).** *The regular shape
+  of stratovolcanoes: A DEM-based morphometrical approach.* Journal of Volcanology and Geothermal
+  Research 193(3–4), 171–181. — Stratovolcano vs shield edifice morphometry (concave-up upper cone,
+  flaring apron, radial barrancos) grounding `landforms.volcano`.
 - **Beneš, B. & Forsbach, R. (2001).** *Layered Data Representation for Visual Simulation of
   Terrain Erosion.* SCCG 2001. — Layered material representation.
 - **Peytavie, A., Galin, E., Grosjean, J. & Mérillou, S. (2009).** *Arches: a Framework for
@@ -417,6 +472,11 @@ is below.
   10.1007/s00445-007-0168-8. — CA whose evolution function derives from a steady-state
   Navier–Stokes solution for a **Bingham** fluid + simplified heat transfer; run operationally at
   Etna; GPU-ported (*Porting and optimizing MAGFLOW on CUDA*, Annals of Geophysics) (`19`, `15`).
+- **Crisci, G.M., Rongo, R., Di Gregorio, S. & Spataro, W. (2004); D'Ambrosio, Spataro et al.** —
+  **SCIARA**: macroscopic-CA lava flow, Bingham outflow by the *minimisation of differences*, with
+  cooling from **radiative surface loss AND the change of temperature by the mixture of lavas
+  between cells**. That last term = advecting thermal content with the flux — the grounding for the
+  heat advection in `sims_illustrative.lava_flow` (without it a flow front freezes on arrival) (`19`).
 - **Culling, W.E.H. (1960).** *Analytical Theory of Erosion.* Journal of Geology 68(3). —
   Hillslope diffusion / soil creep as `D·∇²h`. The origin of the diffusion term in `04`.
 
@@ -650,6 +710,12 @@ is below.
 
 ## Hydrology (additional)
 
+- **Hack, J.T. (1957).** *Studies of longitudinal stream profiles in Virginia and Maryland.* USGS
+  Professional Paper 294-B. — Hack's law, L ∝ A^h with h ≈ 0.57; the emergent length–area exponent the
+  stream-power terrain is checked against (`test_empirical.py`, VALIDATION rung 5).
+- **Leopold, L.B., Wolman, M.G. & Miller, J.P. (1964).** *Fluvial Processes in Geomorphology.*
+  W.H. Freeman. — Meander geometry (wavelength ≈ 10–14× channel width) and downstream hydraulic
+  geometry; grounds the meandering trunk of `landforms.canyon`.
 - **Strahler, A.N. (1957).** *Quantitative analysis of watershed geomorphology.* Transactions,
   AGU 38(6). — Stream ordering. (Horton 1945 is the predecessor.)
 - **Ikeda, S., Parker, G. & Sawai, K. (1981).** *Bend theory of river meanders. Part 1. Linear
@@ -665,6 +731,14 @@ is below.
 - **Leopold, L.B. & Wolman, M.G. (1957).** *River channel patterns: Braided, meandering, and
   straight.* USGS Professional Paper 282-B. — The planform classification; braiding starts as a
   central bar of stalled coarse bedload (`03`).
+- **Murray, A.B. & Paola, C. (1994).** *A cellular model of braided rivers.* Nature 371, 54–57
+  (and JGR 102, 1997). — **The implementable braided-river model** (`braided.braided_river`, `03`):
+  water splits among downstream cells by √slope, sediment transport is **super-linear** in discharge
+  (`qs ∝ Qᵐ`, m≈2.5), and lateral transport builds bars. The super-linearity IS the braiding
+  instability — m=1 stays single-thread, m>1 braids.
+- **Nicholas, A.P. (2013).** *Modelling the continuum of river channel patterns.* Earth Surf.
+  Process. Landforms 38, 1187–1196. — Straight→meandering→braided as one continuum; context for
+  when the Murray–Paola regime applies.
 - **Beneš, B., Těšínský, V., Hornyš, J. & Bhatia, S.K. (2006).** *Hydraulic Erosion.* Computer
   Animation and Virtual Worlds 17(2), 99–108. — Shallow-water erosion.
 - **Montgomery, D.R. & Buffington, J.M. (1997).** *Channel-reach morphology in mountain drainage
@@ -807,7 +881,31 @@ boulders/cobbles/pebble beaches in a river like the Ardèche (`04`).
   Physics 124(1), 93–114. — The **equiangular** gnomonic cubed sphere; near-uniform cell area (`08`).
 - **Górski, K.M., Hivon, E., Banday, A.J. et al. (2005).** *HEALPix: a framework for high-resolution
   discretization and fast analysis of data distributed on the sphere.* The Astrophysical Journal
-  622(2), 759–771. — The equal-area, iso-latitude spherical pixelisation; a seam-free alternative (`08`).
+  622(2), 759–771. — The equal-area, iso-latitude *quadrilateral*-pixel spherical pixelisation; a
+  seam-free alternative, and **not** a hexagonal grid — don't conflate the two (`08`).
+- **Petersen, D.P. & Middleton, D. (1962).** *Sampling and reconstruction of wave-number-limited
+  functions in N-dimensional Euclidean spaces.* Information and Control 5(4), 279–323. — The
+  multidimensional sampling theorem; the **hexagonal lattice is the optimal 2D sampler** for an
+  isotropically band-limited signal (~13.4% fewer samples than square) — the theoretical basis of the
+  hexagonal heightfield (`08`).
+- **Mersereau, R.M. (1979).** *The processing of hexagonally sampled two-dimensional signals.*
+  Proceedings of the IEEE 67(6), 930–949. — The DSP-standard treatment of hexagonal sampling,
+  reconstruction, and filtering; the practical companion to Petersen & Middleton (`08`).
+- **Goldberg, M. (1937).** *A class of multi-symmetric polyhedra.* Tôhoku Mathematical Journal 43,
+  104–108. — The **Goldberg polyhedron**: hexagons + **exactly twelve pentagons** by Euler's formula —
+  why a hexagonal grid cannot close on a sphere without 12 pentagonal defects, the geometry every
+  icosahedral hex DGGS (and every "hex planet") inherits (`08`, `25`).
+- **Snyder, J.P. (1992).** *An equal-area map projection for polyhedral globes.* Cartographica 29(1),
+  10–21. — The **ISEA** (Icosahedral Snyder Equal-Area) projection; makes the icosahedral hex DGGS
+  equal-area (`08`, `25`).
+- **Sahr, K., White, D. & Kimerling, A.J. (2003).** *Geodesic Discrete Global Grid Systems.* Cartography
+  and Geographic Information Science 30(2), 121–134. — The reference survey of DGGS families (ISEA hex,
+  aperture-3/4/7 hierarchies); the taxonomy behind the hex-planet grid (`08`, `25`).
+- **Uber Technologies (2018).** *H3: Uber's Hexagonal Hierarchical Spatial Index.* Open-source library
+  (github.com/uber/h3). — The production icosahedral hex DGGS: aperture-7, 122 base cells (110 hexagons +
+  12 pentagons). **Gnomonic per-face projection, so *not* equal-area** — cell areas vary ~1.6× between
+  largest and smallest at a given resolution; the equal-area aperture-7 instance is ISEA7H (Snyder 1992;
+  Sahr et al. 2003). A documented open system, not a paper — **F/N**, cite as such (`08`, `25`).
 - **Snyder, J.P. (1987).** *Map Projections — A Working Manual.* USGS Professional Paper 1395,
   383 pp. — Projection scale factors and distortion; divide gradients by the scale factor `h` or
   erosion biases toward high-distortion regions (`08`).

@@ -37,6 +37,46 @@ base. Real hills have neither. If a primitive is going to be the base of a mount
 `smoothstep` on it or run thermal erosion (`05`) afterward — the latter is more honest and
 gives you a repose-angle profile for free.
 
+### Build the mass first, dissect it after
+
+The single most expensive mistake in this whole file, measured in rebuilds. Feature primitives are
+almost always written as **envelope × texture**:
+
+```
+h(p) = envelope(|p - centre|) * detail(p)          // <-- the trap
+```
+
+If the envelope is a function of **radius alone** — `(1-r)^k`, a bell, a cone, a Gaussian — the
+result is a **solid of revolution**, and multiplying it by texture does not change that. The
+silhouette stays revolved however good the texture is. It renders as a tipi tent. Starting with a
+cone and cutting radial grooves into it leaves a tent no matter how good the grooves are.
+
+This is hard to catch because it hides from the obvious checks. A smooth cone satisfies *all* of:
+relief within the requested range, exactly one dominant summit, summit well above the mean, margins
+below the mean, monotone radial descent, deep interior incision. Those are the assertions a
+mountain primitive naturally attracts, and every one of them passes.
+
+**The fix is an ordering, not a parameter.** Build an *asymmetric mass* first — a wandering
+crest-line polyline SDF, several unioned sub-masses, saddles, faces of unequal steepness — and only
+then dissect it with the Voronoi/drainage network. The mass carries the anisotropy; the dissection
+adds relief within it. Reversing the two cannot work, because dissection is a local operation and
+cannot introduce a large-scale asymmetry the envelope did not have.
+
+**Two metrics that separate the cases**, both cheap, both needing a cone as the control:
+
+| Metric | Cone | Pure noise | `landforms.mountain` |
+|---|---|---|---|
+| Rotational correlation about the summit (mean over 30–150°) | 1.000 | 0.092 | 0.073–0.337 |
+| Variance a best-fit radial profile leaves unexplained | 0.022 | 0.965 | 0.79–0.91 |
+
+Measure both against a cone every time; a bare threshold with no control is how the tent shipped
+twice. `landforms.mountain` uses the polyline envelope for exactly this reason, pinned by
+`tests/test_landforms.py::test_mountain_is_not_a_solid_of_revolution`.
+
+The same trap applies to any radially-enveloped primitive — volcanoes, craters, hills, islands. A
+volcano genuinely *is* close to a solid of revolution, so there it is fine; a mountain is not, and
+neither is an island.
+
 ## Distance fields (Frisken et al. 2000)
 
 *Adaptively Sampled Distance Fields*, SIGGRAPH 2000 — the canonical ADF reference. For
@@ -50,7 +90,11 @@ sdBox(p, b)        = d = abs(p) - b
 sdSegment(p, a, b) = pa = p - a;  ba = b - a
                      h = clamp(dot(pa, ba) / dot(ba, ba), 0, 1)
                      |pa - ba * h|
-```
+sdConvexPolygon(p, normals[], offsets[])         # a block as the intersection of half-planes;
+                   = max_k( dot(normals[k], p) - offsets[k] )   #   the generalisation of sdBox.
+```                                              # Exact on the faces; slight underestimate at exterior
+                                                 # corners (the max-of-half-planes). Behind fault-block
+                                                 # buttes (11): outline the polygonal joint-controlled footprint.
 
 Why this matters for terrain: an SDF gives you **distance**, and distance is what you want for
 falloffs, road corridors, river authoring, spline deformation, and uplift masks (`02`). A mask
@@ -86,6 +130,19 @@ larger domain. **That is a guaranteed seam.**
 
 Use `normalize` only inside the export node, or never. If you need a [0,1] field, use an
 explicit `remap(a, knownMin, knownMax)` with constants you wrote down.
+
+**Tonal family (the "Levels/Curve/Equalize/Sharpen" nodes).** `curve` (above) is the general
+value-remap; `levels(a, inLo, inHi, gamma)` = clip to a written range + a midtone gamma (the
+composable Levels); `sharpen`/`unsharp = a + amount·(a − blur(a))` boosts sub-`sigma` detail (the
+honest inverse of `gaussian`, which softens). `equalize` maps each value to its **CDF** so every
+band gets equal area — maximal contrast, but it is **data-dependent like `normalize`** (it reads the
+whole field's histogram), so it **seams**: a final-look / mask op, never mid-graph. `gradient` and
+`radialGradient` are the two ramps everything else masks against.
+
+*Runnable reference: `reference-impl/ops_filters.py` — `linear_gradient`, `curve`, `levels`,
+`histogram_equalize`, `unsharp` (verified in `tests/test_ops_filters.py`: gradient monotone & clamped,
+curve==remap at 2 points & order-preserving, levels clips/gammas, equalize flattens the histogram &
+never inverts, unsharp is identity at amount 0).*
 
 **2. `max` and `min` create creases.** `max(mountainA, mountainB)` produces a C1 discontinuity
 along the intersection curve — a hard crease that reads as obviously CG, and which produces a
@@ -308,3 +365,87 @@ Two rules:
   upstream of step 4 in the Legal Order. A `twist` node downstream of stream power is a bug,
   and it is the kind of bug that looks great in a hillshade and fails the flow accumulation
   check (`09`) instantly.
+
+## Placement & masking: making a procedural terrain art-directable
+
+A generator that only produces terrain *everywhere* cannot be directed. Two operations turn a
+procedural graph into something an artist can lay out, and every terrain tool converges on the same
+pair (`reference-impl/placement.py`):
+
+**Place** — build a coverage mask from an SDF positioned in **world coordinates**: `disc`, `rect`,
+`capsule` (a thick segment, for a river corridor or ridgeline), `polygon`, `path_mask` (a polyline
+corridor). The SDF primitives themselves are the `sd_*` functions above; placement adds the
+transform (centre, rotation) and the distance→coverage step.
+
+**Mask** — `apply_masked(base, modified, mask)` applies an effect *only where the mask is bright*:
+`base + (modified − base) · mask`. This is the universal "mask input" — erode this valley, leave
+that plateau; warp here, not there. Note it is a **post-process**: the effect runs, then the mask
+selects. Changing the mask therefore does not re-run the effect, which is what makes laying out a
+composition interactive. Gaea makes the same distinction explicitly, warning that masking a node
+*directly* forces a full rebuild while a separate mask node is "extremely fast".
+
+Two rules that are easy to get wrong:
+
+- **Author placements in metres, never cells** (08). A layout keyed to cell indices slides across
+  the terrain the moment the build resolution changes. `placement` takes `cellsize` and world-space
+  centres/radii for exactly this reason, and the invariance is pinned by a test.
+- **Never ship a binary mask.** A hard 0/1 edge prints its staircase through every downstream blend,
+  so `coverage()` clamps the soft edge to at least one cell even when `falloff=0`.
+
+A placement mask is also a **shape**: the same disc that confines an erosion can be treated as a
+heightfield and eroded into a landform. That dual use — mask *or* primitive — is why the shape
+belongs in the graph rather than in a brush tool.
+
+### Place before you sample, not after
+
+There are two ways to move a feature, and only one is free.
+
+**Coordinate transform (before sampling).** A procedural generator is a *function of position*, so
+evaluating it at shifted coordinates moves the feature **exactly** — it is the same function, sampled
+somewhere else. `placement.place_coords(xx, yy, shape, cellsize, center=, rotation=, scale=)`
+transforms a generator's own coordinate grid, and `landforms.mountain/ridge/canyon` take a `place=`
+argument that applies it. Placing at the native centre is the identity; placing elsewhere lands the
+crest at exactly the requested offset.
+
+**Raster transform (after sampling).** Moving the *output* resamples it, and bilinear resampling is a
+low-pass filter. Measured on 6-octave fBm with a non-integer offset, scored as **mean |laplacian|**:
+**one move loses ~24% of the fine detail, four chained moves ~53%** — the losses compound, because
+each hop filters the already-filtered result. Coordinate placement loses none of it at any depth. Use
+a raster transform only for fields you cannot re-evaluate — an imported DEM, or the output of an
+erosion simulation — which is exactly what a Transform node is for.
+
+**Always quote the metric with the number.** The same experiment scored on high-frequency band energy
+(field minus a σ=2 gaussian) reads ~9% and ~26% instead. Neither is wrong; a bare percentage is.
+`tests/test_placement.py::test_raster_transform_loses_detail_that_placement_keeps` pins these so the
+prose cannot drift from the code, and the Terrain Studio's independent JS implementation measures
+24.7% / 53.8% on the same metric — two implementations, one number.
+
+A second measurement trap sits inside this one: coordinate placement lands on a *different window* of
+the same fBm, and detail energy genuinely varies window to window (±6% at 192²). Read that variance as
+"placement lost detail too" and you have measured your own sampling noise. The invariant that survives
+is **no systematic decline with depth**, not equality.
+
+One honest caveat: a generator that normalises by its **own** extremes is not perfectly
+translation-invariant, because moving it changes what is in frame. Measured on `ridge`, that shows up
+as a global scale factor of 1.0006 and a mean difference of 0.013% of relief — negligible, but it is
+why the test asserts "the same terrain, moved" within a tolerance rather than bit-equality.
+
+#### It is an affine matrix — and sampling uses its inverse
+
+The placement above is a standard **affine transform**, and `placement.affine(center, rotation,
+scale, shear, pivot)` builds it explicitly as a 3x3 homogeneous matrix:
+
+    M = T(center) . R(rotation) . Sh(shear) . S(scale) . T(-pivot)
+
+The subtlety worth stating plainly: **you sample with the inverse.** You iterate over *destination*
+pixels and need the *source* coordinate feeding each one, so the sampler applies `M^-1`
+(`sample_coords`) while the feature moves by `M` (`transform_coords`). Getting that backwards moves
+everything the wrong way — the classic sign error in every texture transform. `place_coords` is
+exactly this inverse, hand-decomposed for the common translate/rotate/uniform-scale case; the tests
+assert the two agree.
+
+Two things the matrix form buys: **non-uniform scale and shear**, which the decomposed version
+cannot express, and **composition** — `compose(A, B, C)` collapses a chain into one transform. For a
+generator that is merely tidier (sampling is exact either way), but for a **raster** it is a real
+quality win: each extra resample is another low-pass filter, so collapsing four moves into one avoids
+the ~53% detail loss measured above.

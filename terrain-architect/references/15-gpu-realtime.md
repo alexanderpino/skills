@@ -216,3 +216,36 @@ to support:
   (`02` uplift-style masks + warped noise) and accept no true drainage. Rivers become authored
   splines (`10`) with `A` faked from a distance field. Playable-quality terrain does this all
   the time; it just shouldn't be called erosion.
+
+## Gather form: the rewrite that vectorises *and* ports to a shader
+
+Most CA-style terrain kernels are written as **scatter**: each cell computes what it sheds and adds
+it into its neighbours. That is the natural way to state the algorithm and the wrong way to run it —
+scatter needs either a serial loop or atomics, so it blocks both NumPy vectorisation and a fragment
+shader (which can only write its own pixel).
+
+The fix is to restate it as **gather**: each cell computes its own result by reading its
+neighbourhood. Thermal erosion becomes — per direction, a whole-array shifted difference gives the
+over-repose excess; a cell *loses* `factor · max(excess)` and *gains* each neighbour's share, which
+the neighbour's own excess and total determine. Identical arithmetic, no writes outside the cell.
+
+`erosion_thermal.thermal_erosion` is written this way and is **79× faster** than the literal
+cell-by-cell version (`_thermal_erosion_loop`, kept as the readable reference and asserted equal to
+1e-12 in `tests/test_thermal.py`), at 256² × 20 iterations.
+
+**Two-pass when the gather is quadratic.** A naive gather can recompute a neighbour's aggregate once
+per neighbour — for thermal that is 8 neighbours × 8 of their neighbours = 72 texture fetches per
+cell. Memoise the per-cell aggregate into its own target first, then a second pass reads it back:
+~27 fetches. Profiling a 1024² build put thermal at **84%** of total time before this split and cut
+the whole build from 10.6 s to 3.9 s. Profile before optimising — the expensive stage is routinely
+not the one you would guess.
+
+**Reproducibility across CPU and GPU.** Integer hashes must be exact in **32-bit**. A hash written
+with floating-point multiplies silently rounds once the product passes 2⁵³, so the CPU and a GLSL
+`uint` implementation diverge and the "same" seed gives different terrain. Use exact 32-bit integer
+multiplication on both sides (`Math.imul` in JS, `np.uint32` in NumPy, native `uint` in GLSL). With
+the hash exact, the remaining CPU/GPU difference is only float32-vs-float64 rounding — measured max
+|Δ| ≈ 2.6e-5 for fBm and 4.8e-7 for thermal, which is small *and* non-chaotic.
+
+Keep the CPU implementation as the reference and assert the GPU against it; a GPU path with no
+parity test drifts silently.

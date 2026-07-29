@@ -1,0 +1,4 @@
+# Optional: enables the dimensional-consistency audit (tests/test_dimensional.py), which
+# machine-checks that each load-bearing equation is dimensionally valid using a units library.
+# Absent -> those tests skip cleanly; the core numpy-only suite still runs green.
+pint

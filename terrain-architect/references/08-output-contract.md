@@ -1,7 +1,9 @@
 # Output Contract
 
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
-[Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) · [LOD](#lod) ·
+[Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) ·
+[Hexagonal grids](#hexagonal-grids) · [Planetary / spherical domains](#planetary--spherical-domains) ·
+[DEM & sensor realism](#dem--sensor-realism) · [View envelope](#view-envelope--detail-representation) · [LOD](#lod) ·
 [Splatmaps](#splatmaps) · [Satmap & colour map](#satmap--colour-map) ·
 [Normal & AO maps](#optimised-normal--ao-maps) · [Synthesising a material](#synthesising-a-material) ·
 [Compositing with the splatmap](#compositing-with-the-splatmap) · [Emitters](#emitters)
@@ -31,6 +33,10 @@ Plus a manifest, and the manifest is not optional:
   "extent":        [w, h],        // metres
   "resolution":    [px, py],
   "cellSize":      float,         // metres — extent / (resolution - 1) or extent / resolution?  STATE IT
+  "grid":          "square"|"hex",// working lattice — default square; the hex fields apply only when "hex"
+  "hexOrientation":"pointy"|"flat",   // hex only — neighbour offsets and row pitch depend on it
+  "hexCoords":     "axial"|"offset-odd-r"|"offset-even-r"|"offset-odd-q"|"offset-even-q", // hex only — how the 2D array indexes cells
+  "stepHeight":    float,         // metres — prism/pillar rendering only; RENDER-TIME quantisation, never applied to the simulated field
   "heightRange":   [min, max],    // metres, for R16 dequantisation
   "seaLevel":      float,
   "rootSeed":      uint64,
@@ -99,6 +105,10 @@ swim in. Bake only what is genuinely static; keep live whatever melts, migrates,
   2001, `11`): erosion eats the cover before the bedrock, which is what gives rock-above-scree.
 - **Fluid** (water) has a dynamic surface — tides (`12`), waves and flow (`03`, `04`), lake spill
   level (`03`) — and a depth you traverse. It is never part of the collision height.
+- **Sea ice** (`12`) is the one case that lands *on the fluid layer rather than the solid one*: a
+  transient crust carried by `waterSurface`, with its own thickness field. It never enters
+  `solidTop` — it has no bathymetry and it melts — and its terrain effect is to gate the coastal
+  loop, not to add relief.
 - **Transient** (snow `13`) accumulates and melts on top of everything, sliding off steep ground by
   its own thermal pass.
 
@@ -136,6 +146,16 @@ memory cost is real but the alternative is baking the artefact in permanently.
 **Dequantisation must be exact and shared.** `h = heightRange.min + (u16 / 65535.0) * (max - min)`.
 Note `65535`, not `65536`. If the engine uses `65536` and you used `65535`, you have a
 sub-millimetre error that nobody will find but which will haunt a seam somewhere.
+
+*Runnable reference: `reference-impl/heightfield_io.py` — the *File Input / Output* node (Gaea
+**File**, WM **File Input/Output**, Houdini **HeightField File**). `load_heightfield` /
+`save_heightfield` round-trip `.npy` (lossless R32-equivalent), 16-bit `.png`, raw `.r16`/`.raw` and
+`.r32` float, and SRTM/USGS `.hgt` tiles, using exactly this `/65535` dequantisation (verified to one
+quantum in `tests/test_heightfield_io.py`); `fetch_srtm` pulls a real AWS Terrain-Tiles SRTM1 tile and
+`window` crops it. This is what makes a **real-world DEM a first-class base** — load it, then run the
+same erosion / thermal / analysis atoms on it (`python heightfield_io.py` does exactly that on a real
+Colorado-Plateau tile). The rule above (quantise once, at export, after every derivative) is why the
+loaders return R32F floats and only `save_heightfield` quantises.*
 
 **Float precision at large world coordinates** — see `01`. At 100 km from the origin, fp32
 has ~8 mm of mantissa resolution. Terrain vertices computed in absolute world space that far
@@ -211,12 +231,37 @@ not "the same value computed twice". Two different evaluation paths that should 
 answer will differ in the last bit, and at a silhouette that's a visible pinhole. Compute the
 edge once and copy, or make the evaluation bit-identical by construction.
 
+## Hexagonal grids
+
+The working grid does not have to be a square raster. The **hexagonal grid** is a first-class
+alternative for ordinary flat heightfields — the optimal 2D sampling lattice, six equidistant
+edge-neighbours in place of the D4/D8 fork, and markedly less directional bias in erosion and CA. It is
+specified in full in `references/26-hexagonal-grids.md`, which owns the lattice and its metric, the
+stencils, meshing, storage as a sheared array, engine integration and the hex-prism look. Two things
+belong *here*, in the output contract.
+
+**The manifest records the choice.** `grid: "square"|"hex"`, plus `hexOrientation` and `hexCoords` when
+hex (schema at the top of this file). None of the three is cosmetic: neighbour offsets and row pitch
+depend on the orientation, and mixing conventions is the hex analogue of the vertex-vs-pixel-centring
+bug above. Note also that `cellSize` alone no longer determines the index→world map on a hex grid — it
+becomes a 2×2 matrix — so a consumer that reads `cellSize` as a scalar is already wrong (`26`).
+
+**Hex is a working grid; you still deliver a raster.** Engines, meshers and every DCC import expect a
+square raster (or, on a planet, an equirectangular one), so hex — exactly like equirectangular below —
+is a grid you **simulate on and resample out of**, not usually one you ship. The resampling rules, the
+apron and normal-baking order they imply, and the case where the renderer takes hex tiles directly, are
+all in `26`.
+
+The planetary version of the same lattice — the icosahedral hexagonal DGGS — is a spherical grid and
+stays in the next section.
+
 ## Planetary / spherical domains
 
 Everything above assumes a **flat, rectangular heightfield** — the right default, and wrong the moment
 the domain is a whole planet. You cannot wrap one rectangular grid around a sphere without a
 singularity (the lat–long "pole pinch": cells shrink to zero area and the timestep dies at the poles).
-Two grid families solve it, and the choice is the planetary version of the tiling decision above.
+Three grids solve it — the faceted **cube-sphere** and two seam-free geodesic grids, the **icosahedral
+hexagonal DGGS** and **HEALPix** — and the choice is the planetary version of the tiling decision above.
 
 **Cube-sphere — six faces, six flat grids.** Project the sphere onto a cube and grid each face; a
 point on face +X at face-local `(a,b)` maps to the sphere by normalising:
@@ -232,11 +277,32 @@ lookup. Origin of the quadrilateralized spherical cube: Chan & O'Neill 1975 (the
 finite-difference lineage is Sadourny 1972. The **six faces are six of the tiles above** and the
 **twelve cube edges are the seams** — the Seams problem again, now with a *rotation* between faces.
 
-**Geodesic / HEALPix — no faces, no seams.** Tile the sphere with hexagons and twelve pentagons
-(icosahedral geodesic), or with the equal-area pixels of **HEALPix** (`N_pix = 12·N_side²`, every
-pixel exactly equal-area; Górski et al. 2005). These have **no face seams** and near-uniform cells —
-why climate and cosmology grids use them — at the cost of a non-rectangular neighbour structure (a
-cell has 6 neighbours, sometimes 5).
+**Icosahedral hexagonal DGGS (the Goldberg polyhedron) — the hex grid, closed onto the sphere.** This
+is the planar hexagonal grid of the section above, wrapped around the globe — and the one **procedural
+planet** grid where the whole low-anisotropy story carries onto the sphere intact. You cannot tile a
+sphere with hexagons alone: Euler's formula forces **exactly twelve pentagons**, one at each icosahedron
+vertex (**Goldberg 1937**; the same reason a football has 12 pentagonal panels). The pentagons are the
+only **topological** irregularity: away from them every cell has 6 edge-neighbours, so D6 routing with
+no √2 carries over and the only stencil special case is the twelve 5-neighbour cells. The **metric**,
+though, is irregular *everywhere* — Goldberg hexagons are not congruent or regular; edge lengths and
+areas vary continuously across each icosahedral face — so "equidistant neighbours" holds only
+approximately on the sphere, and per-cell **areas and centres** must both come from the grid library —
+never from `(√3/2)·cellSize²` or the planar axial centre formula above. How much they vary is a **projection choice**: the **ISEA** (Icosahedral Snyder
+Equal-Area) projection (**Snyder 1992**) makes every cell **exactly equal-area**; the family and its
+aperture-3/4/7 hierarchies are surveyed in **Sahr, White & Kimerling 2003**, with **ISEA7H** the
+equal-area aperture-7 instance. **Uber's H3** is the production system — aperture-7, 122 base cells
+(110 hexagons + 12 pentagons) — but it is **not equal-area**: H3 projects through a **gnomonic**
+projection per icosahedron face, and cell areas vary by **~1.6×** between largest and smallest at a
+given resolution. On H3, drainage area and every per-area rate must use the per-cell true area (the
+library provides it), or the distortion correction below bites exactly as on any other projected grid.
+Reach for the hex DGGS when a planet wants near-uniform cells and seam-free hydrology: flow routing on
+it is published (Liao et al. 2020; Liao et al. 2025 — the 2025 datasets are on ISEA, the equal-area
+branch), and `25` stacks Euler-pole tectonics, latitude climate and erosion on top of it.
+
+**HEALPix — equal-area *pixels*, not hexagons.** A different seam-free grid, and not to be conflated with
+the hex DGGS: `N_pix = 12·N_side²` exactly-equal-area, iso-latitude **quadrilateral** pixels (every pixel
+equal-area; Górski et al. 2005) — the cosmology and climate standard. Like the hex DGGS it has **no face
+seams** and near-uniform cells, at the cost of a non-rectangular neighbour structure.
 
 **Distortion is the load-bearing correction.** A fixed-resolution grid sampled through any projection
 carries a per-cell **scale factor `h`** (Snyder 1987): true ground distance is `Δground = Δpixel / h`
@@ -271,9 +337,11 @@ no pole pinch; and slopes use the true ground run (a raster slope multiplied by 
 extended families*).
 
 **Tier.** The cube-sphere and equiangular mappings are P (Chan & O'Neill 1975; Sadourny 1972; Ronchi
-et al. 1996); HEALPix is P (Górski et al. 2005); map-distortion scale factors are P (Snyder 1987);
-DGGS flow routing is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells
-plus per-face rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
+et al. 1996); HEALPix is P (Górski et al. 2005); the icosahedral hex DGGS is P (Goldberg 1937 for the
+12-pentagon geometry; Snyder 1992 for ISEA equal-area; Sahr, White & Kimerling 2003 for the DGGS family;
+H3 is a documented open system, F/N); map-distortion scale factors are P (Snyder 1987); DGGS flow routing
+is P (Liao et al. 2020, 2025). Cube-face-**seam** flow routing is **F** — halo cells plus per-face
+rotation tables, solved ad hoc with no canonical paper; say so rather than inventing one.
 
 **Equirectangular (plate carrée) — the interchange format, not a working grid.** The lat–long raster
 (longitude→x, latitude→y, linearly; the *equidistant cylindrical* projection, Snyder 1987) is the
@@ -351,6 +419,52 @@ and quantisation/striping are F (textbook geometry / product-validation practice
 are `08` data-contract operations, not terrain *processes* — they change what the field *is measured as*,
 never what the land *did*.
 
+## View envelope & detail representation
+
+The terrain fields stay in world space, but a production asset still needs a declared **view
+envelope**: the nearest and farthest intended observation distance, the critical camera regime
+(plan, traversal, hero, close-up), and the display resolution/FOV used for acceptance. Without it,
+"more detail" has no measurable meaning and geometry, displacement, normal maps and scatter all
+compete to represent the same frequency.
+
+State the envelope beside the output manifest as an acceptance contract, not as graph input:
+
+```text
+viewEnvelope:
+  minDistanceM, maxDistanceM
+  criticalViews: [plan, traversal, hero, closeup]
+  referenceViewportPx: [width, height]
+  referenceFovDeg
+  scaleCues: [{kind, realSizeM}]        # optional: tree, boulder, road width, doorway
+```
+
+**Assign each relief band to one representation.**
+
+| Visible effect | Representation | Reason |
+|---|---|---|
+| Changes drainage, collision or the skyline | Height/mesh/volume geometry | Shading cannot move a silhouette or route water |
+| Visible parallax and self-shadow near the minimum distance | Tessellation/displacement or explicit geometry | Normal maps stay flat under motion and at the edge |
+| Sub-pixel to few-pixel surface relief | Tiling height/normal/AO/roughness | Cheaper and more stable than geometry |
+| Dense tiny debris beyond instance budget | Material plus representative instancing | Millions of pebbles are a surface, not transforms (`07`) |
+
+The cut is screen-space but the authored wavelengths remain in **metres**. At the reference view,
+drop detail whose projected wavelength is below about two screen pixels per cycle (the Nyquist
+limit) instead of preserving aliased noise; when a feature grows large enough to alter the
+silhouette, promote it out of bump/normal into displacement or geometry. A bump that implies a
+centimetre-deep crack while the object's edge remains perfectly smooth is a representation
+contradiction, not a tuning problem.
+
+**One microheight, many appearance channels.** Colour variation caused by exposed grains, cracks or
+weathering should correlate with the relief that produced it. Derive detail normal, cavity/AO and
+roughness from the same material microheight or explicitly documented related fields. Independent
+noise in every channel gives the "busy but flat" procedural look: colour says one structure, the
+normal another, and roughness a third.
+
+**Perceived scale never overrides world scale.** Atmosphere, focal length, depth of field and
+composition may make a scene read larger or smaller, but they are downstream renderer choices. Do
+not compensate by changing terrain units, material texel scale, scatter size or erosion parameters.
+Use correctly-sized scale cues and the declared view envelope to judge the result (`09`).
+
 ## LOD
 
 **Do not decimate a heightfield with a box filter.** Averaging heights removes peaks and fills
@@ -415,6 +529,25 @@ skill warns about (`00`):
 - **Colour map / albedo — the result.** The top-down **basecolour** texture (World Machine's
   *colour map*) that an engine actually samples. It is *composited* from the fields, and a gradient
   is one of the operators you build it with.
+
+**Authoring the gradient from imagery.** Sampling a satmap from a real satellite image is a small,
+mechanical extraction — order the pixels by a scalar that proxies elevation and average bins into
+stops. Luminance is the standard proxy (valley floors and shadow dark; crests, sand and snow
+bright), which holds in the imagery this is for (dunes, deserts, snow-capped ranges):
+
+```
+extractSatmap(rgbImage, nStops):
+    lum   = 0.2126 R + 0.7152 G + 0.0722 B          # Rec.709 luminance, the elevation proxy
+    order = argsort(lum)                             # darkest .. brightest pixel indices
+    stops = [mean(rgb[bin]) for bin in split(order, nStops)]
+    smooth stops along the ramp (box, width ~3)      # kill bin noise, keep the trend
+    return [(i/(nStops-1), stops[i])]                # -> the 1D LUT for satmap()
+```
+
+*Runnable reference: `reference-impl/render.py` — `extract_satmap` (this extraction; the shipped
+`SATMAPS["desert_terra"]` was extracted from a public-domain NASA Terra/ASTER image) and `satmap`
+(the CLUT application), verified in `tests/test_archetypes.py`: stops stay inside the source
+gamut, brighten monotonically, and plug into `satmap` unchanged.*
 
 The gradient is a `curve` / LUT (`10`), so it inherits that node's one real trap: **height is
 Gaussian-ish, not uniform** (`01`), so a gradient applied to raw altitude bunches most of its
@@ -662,3 +795,40 @@ real, not pedantry.
 **The emitter must not resample.** If the emitter is resampling to fit the engine's expected
 resolution, the graph produced the wrong resolution and should be fixed. Resampling in the
 emitter reintroduces every artefact the graph was careful to avoid.
+
+## Scale invariance: parameters must not be in cells
+
+A parameter expressed in **cells** silently changes meaning whenever the grid changes, because the
+cell is not a unit — `cellSize = extent / n` is. This is the most common way a graph that looked
+right at preview resolution comes out wrong at build resolution, and it is a *correctness* bug, not
+a tuning preference.
+
+The canonical case is talus. If a thermal node takes a per-cell height **drop**, the repose angle it
+actually encodes is `atan(drop · n)` — so the same value is 66° on a 192² grid and 85° on a 1024²
+one. At 1024² almost nothing exceeds the threshold, thermal stops running, and the build comes out
+spiky. `erosion_thermal.thermal_erosion` avoids this by taking `repose_slope` (a *slope*, tan of the
+angle) and multiplying by `cellsize`; `tests/test_thermal.py::test_repose_angle_is_resolution_independent`
+pins it.
+
+Two independent things have to scale, and fixing only the first is the usual half-fix:
+
+| Quantity | Wrong (cell units) | Right | Scales as |
+|---|---|---|---|
+| Threshold / magnitude | height drop per cell | slope × `cellsize`, or an angle | `1/n` |
+| Transport distance | fixed iteration count | iterations for a fixed physical distance | `n` |
+| Event density | fixed particle/droplet count | count per unit **area** | `n²` |
+| Kernel radius | radius in cells | radius in metres ÷ `cellsize` | `n` |
+
+Iteration count is the one people miss: a relaxation that moves material at most one cell per step
+needs iterations proportional to `n` to cover the same ground. Measured on a fixed 300 iterations, a
+cone relaxes to slope 0.51 / 0.55 / 0.60 at n = 32 / 64 / 128 — converged only at the coarsest grid.
+
+**Carry `cellsize` with the field.** Angles, densities and radii are only meaningful when the
+heightfield is accompanied by its horizontal extent and vertical range. An interactive tool should
+expose that as an explicit terrain definition (extent × height in metres); the vertical exaggeration
+of any preview is then `height / extent`, not an arbitrary constant.
+
+**Verify it, don't assume it.** The check is cheap: build the *same physical* landform at two or
+three resolutions and assert the derived angle agrees. Compare roughness in **slope** units
+(`per-cell drop × n`) — per-cell differences shrink as cells get closer, so raw per-cell roughness
+falsely suggests a finer grid is smoother when it is actually spikier.

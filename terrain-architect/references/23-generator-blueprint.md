@@ -39,8 +39,8 @@ An advanced generator is not complete until every row has at least one productio
 | **Analysis** | slope, aspect, curvature, drainage/wetness, horizon/SVF AO, distance fields | `06` |
 | **Materials & layers** | bedrock/soil/sand/water/snow stack, lithology and physical properties, splat/material masks | `08`, `11`, `13`, `18` |
 | **Climate & biomes** | lapse rate, orographic rain, wind, snow line, biome/ecosystem fields | `13` |
-| **Scatter** | deterministic Poisson/blue-noise placement, density masks, hierarchical scatter | `07` |
-| **Output** | quantisation last, normals/AO, mesh/heightfield, tiling/aprons, LOD/clipmaps, engine encoding | `08` |
+| **Scatter** | deterministic Poisson/blue-noise placement, density masks, hierarchical scatter, cross-layer exclusion/affinity | `07` |
+| **Output** | quantisation last, normals/AO, mesh/heightfield, view-envelope/detail representation, tiling/aprons, LOD/clipmaps, engine encoding | `08` |
 | **Runtime substrate** | typed ports, pure nodes, cache keys, dirty propagation, preview, jobs, serialisation | `14`, `15` |
 
 Product scope may omit a regime family; it may not omit the shared contracts that keep remaining
@@ -171,8 +171,8 @@ supports dynamic geomorphology.
 
 ## Implementation milestones
 
-1. **Contracts and tests:** field types, units, seed, boundaries, synthetic inputs, cache/version
-   scheme (`08`, `09`, `14`).
+1. **Contracts and tests:** field types, units, seed, boundaries, view envelope, synthetic inputs,
+   cache/version scheme (`08`, `09`, `14`).
 2. **Composable scalar core:** arrays/fields, operators, noise, curves, filters and CPU truth.
 3. **Hydrological backbone:** depression handling, routing, accumulation, lake/sea policy; prove
    connectivity before erosion.
@@ -202,6 +202,8 @@ Do not optimise milestone 2 into GPU-only code before milestone 4's scalar oracl
 - Same graph/seed produces bit-identical or tolerance-declared assets.
 - GLOBAL hydrology is connected; monolithic/tiled differences match declared theory.
 - Export quantises once, after analysis; LOD and chunk seams pass.
+- The near/far view-envelope review assigns silhouette/parallax relief to geometry and fine relief
+  to materials without a visible frequency gap or overlap.
 - Cook manifest can reproduce every shipped terrain asset.
 
 **Runtime gate**
@@ -210,6 +212,8 @@ Do not optimise milestone 2 into GPU-only code before milestone 4's scalar oracl
 - Worst-case time, memory and transient-resource budgets are measured per tier.
 - Cancellation leaks no resources and publishes no partial terrain.
 - Cross-chunk height, normal, water, material and drainage contracts pass.
+- Scatter exclusion/affinity dependencies include cross-chunk interaction aprons and remain
+  deterministic regardless of chunk publication order.
 - Save-state overlays survive regeneration and graph-version migration.
 
 **Hybrid gate**

@@ -133,6 +133,14 @@ step(Δt):
   require; the velocity field then sums all 8 fluxes componentwise (diagonal fluxes project
   onto x/y with a `1/√2` factor). If you stay with 4 pipes for cost, know the artefact and
   review under a sun sweep (`09`) — the grid-anisotropy family table there lists its siblings.
+- **On a hexagonal grid the pipe model is 6 pipes, and the length fork disappears** (`26`). All
+  six neighbours sit at one `cellSize`, so there is a single `Δh/l`, no cardinal/diagonal
+  branch, and no projection factor — the velocity field sums the six fluxes along the six world
+  unit directions (60° apart) componentwise. Two constants must change with the lattice, and
+  both are silent if missed: the **cell area** in every volume↔depth conversion is
+  `(√3/2)·cellSize²` (`det B`), and the **flux-limiter** `K = min(1, d·A_cell / (Σf·Δt))` uses
+  that same area. The residual anisotropy is D6's 60° family — smaller than the 4-pipe plus
+  shape, not zero (`09`).
 
 ## Št'ava et al. (2008) extensions
 
@@ -215,12 +223,30 @@ droplet(map, x, y):
   spread out quickly.
 - **Droplet erosion has no standing water.** No lakes, no deltas, no ponding. If the brief
   mentions lakes, this is the wrong backbone.
+- **On a hexagonal grid, replace both bilinear calls — nothing else changes** (`26`). The
+  droplet's position is continuous and the lattice enters only through sampling, which is why
+  droplet erosion is the easiest backbone to port. `bilinearHeight` becomes the **barycentric
+  sample over the dual triangle** (`26`'s `sample`; there is no bilinear on this lattice), and
+  the gradient must **not** be the sampled triangle's own plane gradient — that is constant per
+  triangle, so droplets run straight and kink at every edge. Compute the one-ring world-space
+  gradient at each of the 3 triangle vertices (`26`'s `gradient6` — the `B⁻ᵀ` shear is already
+  inside it) and **interpolate those barycentrically**: the result is continuous across
+  triangle seams and affine-exact, so paths curve smoothly exactly as bilinear gradients do on
+  the square grid. `depositBilinear` spreads over the 3 dual-triangle vertices by the same
+  barycentric weights (weights sum to 1, so volume conservation is untouched); the erosion
+  brush is a world-radius disc of cells (`26`'s `ring`/`disc`), and `floor(pos)` for any
+  cell-keyed lookup is `cube_round`, never per-axis rounding.
 
 ## Stream power — the important one
 
 *Runnable reference: `reference-impl/erosion_streampower.py` (Braun–Willett implicit), verified by
 `tests/test_streampower.py` — the decisive check: the steady-state slope–area exponent comes out at
-−m/n (`09`).*
+−m/n (`09`). `K` may be a scalar, an (n,m) **field**, or a callable **`K(p,h)`** re-evaluated on the
+surface each step — the lithology coupling (`11`): differential erosion of hard/soft beds, verified by
+`tests/test_lithology.py` (relief scales as `K^(−1/n)`; hard rock stands proud; tilted beds → cuestas).
+The Cordonnier **hillslope-diffusion companion term is coupled in the same solver** via `D=` (scalar
+or field), sub-cycled to stay under the explicit stability limit — see "Do not skip the diffusion
+term" below.*
 
 This is the ★★★★★ row, and the reason is not the equation. The equation is one line:
 
@@ -310,6 +336,36 @@ Dirichlet-only at raster borders.
 **Do not skip the diffusion term.** Stream power without it produces knife-edge interfluves
 and reads as obviously synthetic. In practice you can substitute a thermal erosion pass
 (`05`) for the diffusion, which is cheaper and gives you the repose-angle behaviour too.
+
+*Runnable reference: `erosion_streampower.stream_power_evolve(..., D=)`. It is coupled **inside**
+the solver rather than left as a separate pass the caller bolts on, because `D` and `K` are not
+independent — their competition is what selects a valley spacing, so two un-coupled passes give
+you no handle on the one landscape property the pair exists to set. Measured on 80×80, K=1,
+m=0.5, 200 steps:*
+
+| `D` | valley spacing (cells) | mean \|∇²h\| (divide roughness) |
+|---|---|---|
+| 0.0 | 3.32 | 1.4135 |
+| 0.1 | 3.38 | 0.6797 |
+| 0.5 | 3.81 | 0.2588 |
+| 1.5 | 6.33 | 0.1078 |
+| 4.0 | 9.76 | 0.0512 |
+| 10.0 | *network erased* | 0.0204 |
+
+*and at fixed `D`=0.5, raising `K` 1→2→4 tightens spacing 3.81→3.59→3.37. Two traps, both hit
+here: measure valley **spacing** (mean distance to the nearest channel), not channel **count** —
+the count reads flat (360/363/316/211/215 over that sweep) because at these grid sizes the network
+fills the domain regardless; and past some `D` diffusion **erases** the network rather than
+coarsening it, at which point a slope–area fit degrades for want of anything to fit. Verified by
+`tests/test_streampower.py`.*
+
+**The stability limit must be met strictly, not exactly.** The explicit Laplacian is stable for
+`D·dt/Δx² ≤ 0.25`, so sub-cycling seems like a matter of `ceil(D·dt / (0.25·Δx²))`. That expression
+lands *exactly* on `0.25` for every `D·dt` that divides evenly — and at exactly `0.25` the
+checkerboard mode's amplification is `1 − 8c = −1`, so it flips sign forever and never damps. The
+field stays finite and mass stays conserved while the pass **roughens** the terrain: mean `|∇²h|`
+*rose* 0.68 → 2.36 across `D` = 0.1 → 10 instead of falling. Keep the conventional 0.9 safety factor
+(`c` = 0.225), and assert the *direction* of the effect rather than merely that the output is finite.
 
 **Verification for stream power:** plot the long profile of the main channel (elevation vs
 distance downstream). It must be concave. Plot `log(S)` vs `log(A)` for channel cells — it

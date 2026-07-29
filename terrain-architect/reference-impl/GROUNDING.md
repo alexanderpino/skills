@@ -1,0 +1,285 @@
+# Sandbox grounding & provenance
+
+Where each node in the graph demo comes from, what tested library it is grounded in, under
+what licence, and which check compares it to that library. This is the sandbox-scoped view
+of the skill's full ledger in `references/22-open-source-grounding.md` (machine-readable:
+`references/open-source-grounding.json`) — read that for the exact adopted behaviour,
+deliberate deviations and engine-native translations. Revisions below are the pinned
+upstreams inspected 2026-07-20.
+
+**Grounding is not copying permission.** The licence column records what was *inspected and
+compared against*, not a grant to paste code into a product. MIT / CC0 upstreams are safe
+wells to lift from; the **GPL-3.0** ones (RichDEM, pysheds, fastscapelib) are fine to read
+and diff against in test-only optional dependencies, but copying their code into a
+permissively-licensed engine is a licence event. Reuse follows *your* project policy.
+
+## Grounding states
+
+Same scale as `references/22-open-source-grounding.md`:
+
+- **cross-validated** — the module is compared *by test* against an independent library's output.
+- **source-grounded** — an upstream revision was inspected and its behaviour adopted, but no
+  library is wired as a running comparison (often because the reference is a GPU/engine project
+  with no importable Python).
+- **skill-stricter** — public implementations exist, but the skill deliberately adopts a
+  stronger invariant than the inspected one.
+- **demo-only** — a stand-in for illustration, not a verified mirror of any reference chapter.
+
+## The graph-demo nodes
+
+| Sandbox node | Module | Reference library @ rev | Licence | Grounding | Compared by |
+|---|---|---|---|---|---|
+| `base` (noise) | `noise.py` | Perlin 2002 · Musgrave · Bridson 2007 · Worley 1996 (OpenSimplex2 `4cd120d3` · FastNoiseLite `785f37a9` for the API/variants) | papers; CC0 · MIT | **paper-grounded** (analytic oracles: lattice-zero, zero-divergence, single-octave identity) | `test_noise.py` |
+| `fluvial` (droplet) | `erosion_droplet.py` | SebLague/Hydraulic-Erosion `f245576d` | MIT | **source-grounded** | `09` oracles (`test_droplet.py`) |
+| `fluvial` (stream power) | `erosion_streampower.py` | **Landlab** FastscapeEroder `0b0ef086` · fastscapelib `b85cc6b1` | **MIT** · GPL-3.0 | **cross-validated** | `test_crossvalidate_landlab.py::test_streampower_slope_area_exponent_matches_landlab` |
+| `relaxed` (thermal) | `erosion_thermal.py` | bshishov/UnityTerrainErosionGPU `0e59f7c4` | MIT | **skill-stricter** (8-neighbour distance-correct; upstream 4-dir bug not ported) | `09` radial-anisotropy oracle (`test_thermal.py`) |
+| `filled` (fill) | `flow.py` | **RichDEM** FillDepressions `9a1c97bb` | GPL-3.0 | **cross-validated** | `test_crossvalidate.py::test_priority_flood_matches_richdem` |
+| `area` (D8 accumulation) | `flow.py` | **pysheds** `1949ce1d` · **Landlab** FlowAccumulator `0b0ef086` | GPL-3.0 · MIT | **cross-validated** | `test_crossvalidate.py::test_d8_accumulation_matches_pysheds` · `test_crossvalidate_landlab.py::test_d8_accumulation_matches_landlab` |
+| `slope`, `materials` (analysis/masks) | `analysis.py` | Zevenbergen & Thorne 1987 · Beven & Kirkby 1979 (GDAL/GRASS implement the same) | papers | **paper-grounded** (analytic oracles) | `test_analysis.py` |
+| `scatter` (boulders) | `scatter.py` | Bridson 2007 (tph_poisson `e436117b` for grid/active-list hardening) | paper; MIT | **paper-grounded** (min-distance oracle) | `test_scatter.py` |
+
+Adjacent module the sandbox can wire (a drop-in extra hillslope node), cross-validated too:
+
+| Module | Reference library @ rev | Licence | Grounding | Compared by |
+|---|---|---|---|---|
+| `diffusion.py` (Culling) | **Landlab** LinearDiffuser `0b0ef086` | **MIT** | **cross-validated** | `test_crossvalidate_landlab.py::test_hillslope_diffusion_matches_landlab` |
+
+The **render modes** (`render.py`) are standard cartographic transforms (hillshade, slope
+shade, `log(A)` overlay); the usual references are GDAL / RichDEM / matplotlib hillshade.
+They modify no terrain and carry no pinned upstream — sanity-check the hillshade against
+GDAL's if it matters. The **photoreal composite** (`sun_sky_shade` + `photoreal`: material
+colour × two-light (sun+sky) × ambient occlusion + rivers + aerial perspective) is
+**paper-grounded** in the standard real-time / cartographic pipeline: slope+altitude material
+splatting (Andersson/DICE, *Terrain Rendering in Frostbite Using Procedural Shader Splatting*,
+SIGGRAPH 2007); **horizon-based ambient occlusion computed on the height field itself** — Max
+1988, *Horizon mapping* (The Visual Computer 4(2)), the geometry-native method, not screen-space
+HBAO; and sky illumination + aerial perspective (Preetham et al. 1999; Bruneton & Neyret 2008).
+It is a *look*, not a verified field (a non-flat-render smoke test only).
+
+The **toolbox** (`ops_filters.py` — SDF primitives incl. `sd_convex_polygon`, smooth min/max,
+Gaussian/median/bilateral/guided/Perona–Malik filters, morphology, warps) is drawn on ad hoc
+rather than wired as a fixed graph node. **paper-grounded** (Frisken 2000, Quilez SDF & smooth-min,
+Tomasi & Manduchi 1998, He et al. 2010, Perona & Malik 1990, Serra 1982) with property oracles in
+`test_ops_filters.py`. `sd_convex_polygon` (a block as the intersection of half-planes) is the
+generalisation of `sd_box` and the primitive behind the fault-block landform below.
+
+The **geological landforms** (`landforms.py` — impact craters, strata/terracing, folding,
+karst sinkholes, **`fault_block_butte`**, and the **`mountain`/`ridge`/`volcano`/`canyon`** generators) are
+likewise a toolbox, not a fixed node. **paper-grounded** (Pike 1977, Melosh 1989; Beneš & Forsbach 2001
+strata; Ford & Williams 2007 karst; Karátson 2010 volcanoes; Leopold 1964 canyons) with oracles in
+`test_landforms.py`. These are **feature-primitive construction-tree** nodes in the
+Génévaux et al. 2015 (*Terrain Modelling from Feature Primitives*, CGF) / Guérin et al. 2016 (*Sparse
+representation of terrains*, CGF) sense — the placeable landform *generators* an artist drops in (Gaea's
+**Mountain / Ridge / Volcano / Canyon / Crater** nodes) that you combine by union and erode. The
+**`mountain`** node in particular is built the way Gaea's is — a **modulated-Voronoi ridge network**
+(`noise.worley` cell edges = ridgelines) broken by a domain distortion, with Gaea's five style presets
+(Basic/Eroded/Old/Alpine/Strata) baking the weathering in — so the raw primitive reads as a
+drainage-organised massif, not isotropic noise on a lump; see the catalog table below. `fault_block_butte` is a placeable SDF primitive (`ops_filters.sd_convex_polygon`)
+combined by union and eroded — with its **joint/fault-controlled outline grounded in geomorphology**
+(NPS Arches/Canyonlands *The Needles*; Li et al. 2021 orthogonal joints in quartz sandstone; Narr &
+Suppe 1991 joint spacing; Wadi Rum sandstone geomorphology). Verified by profile oracles (flat top,
+cliff, talus break, bounded footprint), not a physical simulation. Landforms without a standalone
+deterministic oracle — salt diapirs, tower karst, relief inversion — stay as reference pseudocode.
+
+The **parameterised impact** (`crater.py` — asteroid size/speed/density/gravity/angle → crater)
+is two tiers: the **size** physics is **paper-grounded** with *decisive* oracles (Collins/Melosh/
+Marcus 2005 π-scaling exponents — `L^0.78 v^0.44 g^(−0.22) (sinθ)^(1/3)` — and the 1/g transition,
+verified in `test_crater.py`); the **shape under obliquity** (elongation, downrange/butterfly
+ejecta) is **phenomenological**, matched to the oblique-impact experiments (Gault & Wedekind 1978;
+Pierazzo & Melosh 2000; Collins et al. 2011), not a ballistic-ejecta simulation — though the ejecta
+placement is held to a **mass-conservation invariant** (the excavated bowl volume is what the
+blanket redeposits, so mass is *pushed forward*, not conjured; `test_ejecta_conserves_excavated_mass`).
+The `crater_demo.py` `stamp_impact_natural` render (smooth circular cavity + raised rim ring,
+irregular rim/ejecta outline, terraced walls, defined central massif, hummocky downrange ejecta
+apron, grazing furrow deeper up-range) and the labelled `crater_anatomy.py` figure are **demo-only**
+presentation — they dress the verified
+`crater.py` skeleton with `noise.py` (01) detail for a hillshaded *look* and is deliberately outside
+the grounding scale (not mass-conserving, not oracle-verified; only a determinism/texture smoke test).
+
+The **coupled hydraulic erosion** (`erosion_pipe.py`) is the full Mei-2007 landscape-evolution loop:
+`pipe_water` routes the water (periodic, water-conserving — the `04` reference, verified in
+`test_pipe.py`), and **`pipe_erode`** couples that flow to sediment — the velocity sets a transport
+capacity, the bed **erodes** under capacity and **deposits** over it (alluvial fans, deltas, valley
+fill — the deposition the detachment-limited stream-power core cannot make), and suspended sediment is
+transported by the water fluxes so **mass is conserved**. **paper-grounded, invariant-checked**
+(`test_pipe.py`): a closed basin conserves bed volume exactly, a steep cone stays bounded (the
+stability guards hold), and a slope-into-basin **erodes the slope and deposits a fan in the basin**
+with material exported off the open edge. This closes `SIMULATION-AUDIT.md`'s #1 gap (deposition) on
+top of the real flow — the base the pro tools' hydro-erosion nodes descend from; not a calibrated LEM.
+
+The **shallow-water flow** (`shallow_water.py`) is a real, mass-conserving water simulation — the
+**virtual-pipe model** (Mei, Decaudin & Hu 2007, *Fast Hydraulic Erosion Simulation… on GPU*, Pacific
+Graphics, 10.1109/PG.2007.15): water depth is a state variable, a **rainfall source** (m/s) and/or
+point springs (m³/s) add water, flux moves through four pipes driven by the water-surface (head)
+gradient and **clamped so a cell never outputs more than it holds**, water leaves at open boundaries,
+and **discharge is a genuine volumetric flow in m³/s** that accumulates downstream. A `source_field`
+carries **snowmelt** (water sourced under the snowpack, so rivers run out from under the snow). **paper-grounded,
+invariant-checked** (`test_shallow_water.py`): depth ≥ 0, a **closed basin conserves every drop of
+rain** (stored = rain delivered), an open domain balances **rain in = out + stored**, and discharge
+grows downstream. This is the Eulerian pipe hydraulics the pro tools use, and the base for pipe-model
+erosion (the `SIMULATION-AUDIT.md` upgrade path). It is *not* a gauged/calibrated hydrology model.
+
+The **hydrology** (`hydrology.py` — a water SURFACE for rendering) turns a **discharge** field (m³/s,
+from the `shallow_water` sim, or the steady-state proxy `Q = rain · drainage-area`) into a water level:
+lakes fill enclosed depressions to their spill level (the RichDEM-validated priority-flood in
+`flow.py`), and rivers carry a depth set by that discharge via **bankfull hydraulic geometry** (depth
+grows with Q — Leopold & Maddock 1953, *The Hydraulic Geometry of Stream Channels and Some
+Physiographic Implications*, USGS Professional Paper 252). At landscape resolution the true channel is
+narrower than a cell, so the *discharge* is the physical truth and the channel is drawn from it.
+Water is rendered as its own **translucent** stage (`water_over_land`): Beer–Lambert transmittance
+`T = exp(-k·depth)` lets the bed (rock/soil) show through shallow water and hides it under deep water —
+not an opaque fill. **demo-only** rendering layer (invariants in `test_hydrology.py`). Together they
+make rivers in `hero.py` real flowing water *in the carved channel*, translucent, not a painted line.
+
+The **illustrative sims** (`sims_illustrative.py` — lava CA, SIA glacier, coastal retreat,
+tides) sit at a distinct, weaker tier: **invariant-checked only, NOT cross-validated or
+oracle-verified.** These are the regimes the coverage boundary excludes because they have no
+decisive oracle; they are included to run, held to invariants (finite, mass/energy budget,
+monotone trends) in `test_sims_illustrative.py`, and must not be read as verified numbers. This
+tier is deliberately outside the grounding scale above.
+
+## How this maps to Gaea / World Machine / Houdini (node-graph parity)
+
+The sandbox is the **same paradigm** these tools use: a DAG of pure field→field operators over a
+heightfield, evaluated on demand (`graph_demo.py`; run `--scene mesa` to see an archetype built as a
+DAG — noise → fault-block primitive → strata → thermal → flow/materials → photoreal). Gaea, World
+Machine and Houdini heightfields are all confirmed node graphs with the workflow *Create → Modify →
+Erode → Texture → Export*; the academic framing is the **construction tree** of Génévaux et al. 2013
+(*Terrain from Hydrology*, SIGGRAPH) and 2015 (*Feature Primitives*, CGF), Guérin et al. 2016 (*Sparse
+representation*, CGF), and the Galin et al. 2019 review (*A Review of Digital Terrain Modeling*, CGF).
+Every effect we add is one of their node categories, grounded in the same literature:
+
+| Node category | Our node(s) | Grounded in | How the pro tools do it |
+|---|---|---|---|
+| Generator | `noise` (Perlin/value/Worley/fBm/ridged/hybrid-mf) + **landform generators** (`mountain`, `ridge`, `volcano`, `canyon`, craters, `dunes`) | Perlin 2002, Musgrave, Worley 1996; Génévaux 2015 | noise + **Mountain/Ridge/Volcano/Canyon/Crater/Dunes primitive nodes** |
+| Warp | `noise.domain_warp`, `ops_filters` twist/bend | Quilez *domain warping*; Musgrave | Warp/Perturb/Distort |
+| Combiner | `ops_filters.smin/smax/blend`, `np.maximum` union | Quilez *smooth minimum*; Génévaux 2015 (Lipschitz operators) | Combine/Layer/math |
+| Primitive placement | `landforms.mountain` (+styles), `ridge`, `volcano`, `canyon`, `fault_block_butte`, crater/fold | Génévaux 2015 / Guérin 2016 feature-primitive tree; Quilez SDF | **Mountain/Crater/Range/Volcano/Canyon primitive nodes** |
+| Erosion (hydraulic) | `erosion_droplet`, `erosion_streampower` | Krištof 2009, Chiba 1998, Beyer 2015 (droplet); Braun & Willett 2013 (stream power) | Erode/Hydro |
+| Erosion (thermal) | `erosion_thermal` | **Musgrave, Kolb & Mace 1989** (angle-of-repose talus) | Thermal/Talus/Slump |
+| Selector / mask | `analysis` slope/curvature/**horizon AO**/TWI/area | Zevenbergen & Thorne 1987; Max 1988 (AO) | Slope/Height/Flow masks |
+| Colorizer / splat | `analysis.derive_substances` + `material_rgb` (default); `render.satmap`/`splat_blend` (toolbox); `render.extract_satmap` (authors a SatMap from real satellite imagery — Gaea's own SatMap-library path; `SATMAPS["desert_terra"]` is extracted from a PD NASA Terra image); `photoreal` | **Andersson/Frostbite 2007** splat; **substance placement** by slope/aspect/curvature/flow | splatmap masks (SatMap CLUT also available) |
+
+**Honest divergences (disclosed, not hidden):**
+
+- **Hydraulic erosion is Lagrangian here, Eulerian there.** Our droplet model (particle over the
+  heightfield) is literature-grounded — Krištof et al. 2009 (*Hydraulic Erosion Using SPH*, CGF, the
+  peer-reviewed bridge showing particle ≈ grid physics) and Chiba et al. 1998 (velocity-field erosion);
+  Beyer 2015 is the practical recipe but only a BSc thesis, so the *authority* is Krištof/Chiba. The
+  pro tools use **Eulerian grid / virtual-pipe** erosion (Houdini confirmed; Mei et al. 2007 is the
+  canonical model). We also ship a **grid fluvial path** (`erosion_streampower`, cross-validated vs
+  Landlab) for the broad-valley regime, so both discretisations are represented — but a droplet result
+  is a *known approximation* of the tools' grid erosion, best at fine dendritic channels.
+- **Gaea and World Machine erosion algorithms are proprietary/undisclosed** — we can claim *node-level*
+  parity (same category, same phenomenology, same repose-angle thermal) but **not algorithm-level
+  parity**. Only Houdini's grid approach is documented.
+- **SDF-primitive placement is the academic route.** `fault_block_butte` follows Génévaux/Guérin
+  (place a primitive, combine, erode); the tools' *default* idiom is generators + selection masks +
+  erosion. Both are valid; we do not claim primitive placement is how the tools default to it.
+- **Hard-`max` union creases.** We union plateau blocks with `np.maximum` (the acceptable cliff/plateau
+  case) and relax the seam with thermal downstream; `ops_filters.smax` is the crease-free (Lipschitz)
+  combiner for general merges.
+- **Colour is by SUBSTANCE, not by elevation.** The default tile colouriser is
+  `analysis.derive_substances`: each cell is coloured by the *material* on it, and each material is
+  placed where it physically accumulates — **snow** where it is cold enough (a lapse-rate temperature ∝
+  elevation) AND the slope holds it AND wind loads it (poleward/shaded aspects + concave hollows collect,
+  steep faces and convex ridges shed/scour); **rock** where the slope is too steep for anything to rest;
+  **scree** at the repose angle below cliffs; **sediment** where flow deposits on gentle, concave lows;
+  **vegetation** on gentle ground below the snowline (arid biomes have none). So snow is white because
+  snow is *a white substance*, not because "high == white" — the snowline is an irregular, aspect- and
+  shelter-dependent surface, not a contour. Substances also have **depth: they pile up and fill the
+  crevices** (`analysis.deposit_fill` — a morphological closing minus the surface, deep in gullies/
+  hollows, zero on ridges), so a loose deposit builds a surface *smoother* than the bedrock (snow drifts
+  into couloirs and covers them, sand banks into interdunes) and the render shades that piled surface.
+  The per-material blend is the Frostbite-2007 splat; the elevation-gradient **SatMap** (`render.satmap`)
+  stays as a toolbox node but is no longer the tile base. Still simpler than the pro tools' full
+  Flow/Wear/Deposits layer set, but now materially honest.
+- **Content-addressed caching** (Merkle key over params + upstream cone) is *our* mechanism — consistent
+  with how these tools cache cooked nodes, but an implementation choice, not a documented parity claim.
+
+### Generator / primitive node catalog (coverage vs Gaea, World Machine, Houdini)
+
+The generator/primitive nodes each tool ships, and what provides the same capability here. "Generator" =
+a node that *synthesises* a heightfield from parameters (a landform, a noise basis, a pattern); erosion,
+filters, masks and outputs live in the rows above. Sources: QuadSpinner Gaea 2.x node reference
+(`docs.gaea.app/reference/nodes/terrain` + `/primitive`), World Machine device reference
+(`world-machine.com/learn.php?page=devref`), SideFX Houdini HeightField docs
+(`sidefx.com/docs/houdini/model/heightfields.html`).
+
+**Noise / pattern bases** — the workhorses (Gaea *Perlin/Voronoi/MultiFractal/DriftNoise/Gabor…*;
+WM *Advanced Perlin/Perlin/Voronoi*; Houdini *HeightField Noise* unified basis):
+
+| Capability | Our node | Grounded in |
+|---|---|---|
+| Improved Perlin gradient noise | `noise.perlin` | Perlin 2002 |
+| Simplex gradient noise (no axis bias, cheaper in high-D) | `noise.simplex` | Perlin/Gustavson (patent expired 2022) |
+| Fractal fBm (natural terrain) | `noise.fbm` | Perlin 1985/2002 |
+| Ridged multifractal (mountainous) | `noise.ridged_mf` | Musgrave 1989 |
+| Billowy / hybrid multifractal (rough peaks, smooth basins) | `noise.hybrid_mf` | Musgrave 1993 (heterogeneous mf) |
+| Voronoi / Worley cellular (ridgelines = cell edges, basins = interiors) | `noise.worley` (`f1`/`f2f1`/`inv_f1`) | Worley 1996 |
+| Gabor / anisotropic directional noise (oriented bands, spectral control) | `noise.gabor` | Lagae et al. 2009 |
+| Domain warp / DriftNoise (flow-like advected noise) | `noise.domain_warp`, `noise.curl` | Quilez *domain warping* |
+| Constant | `np.full` / `inputs.flat` | — |
+| Radial gradient (island/dome falloff) | `ops_filters.radial_gradient`, `.cone` | Quilez SDF |
+| Linear gradient (directional ramp) | `inputs.constant_slope` | — |
+
+The full atomic-base coverage (implemented vs deliberately deferred) and the anti-drift harness that
+keeps the pseudocode, this reference impl, and the scope doc in sync are in `reference-impl/ATOM-COVERAGE.md`
+(enforced by `tests/test_atom_coverage.py`).
+
+**Landform generators** — the named "drop-in a mountain" nodes (Gaea *Mountain/MountainRange/Ridge/
+Canyon/Crater/CraterField/Volcano/DuneSea/Island/…*; WM and Houdini have **no** named landform nodes —
+they build shape from noise + the Layout/Project guide + a separate erosion pass, which we also support):
+
+| Gaea landform node | Our node | Grounded in |
+|---|---|---|
+| **Mountain** (+ Basic/Eroded/Old/Alpine/Strata styles) | `landforms.mountain(style=…)` — modulated-Voronoi ridge network + distortion + baked hydraulic/thermal | QuadSpinner Mountain docs; Génévaux 2015; Musgrave 1989 |
+| **Ridge** (hogback / cuesta / arête) | `landforms.ridge` — asymmetric-flank crest line | Twidale & Campbell 2005 (cuesta/hogback) |
+| **Volcano** (strato + shield, summit crater, barrancos) | `landforms.volcano(kind=…)` | Karátson et al. 2010 (volcano morphometry) |
+| **Canyon** (plateau incised by a meandering gorge) | `landforms.canyon` — trunk + tributaries + strata benches | Leopold 1964 (meanders); Grand-Canyon cliff-bench profile |
+| **Crater** (impact) / **CraterField** | `landforms.impact_crater` (+ `scatter` for fields) | Pike 1977; Melosh 1989 (pi-scaling) |
+| **DuneSea / Dunes** (wind-formed dune fields) | `dunes.werner_dunes` (slab cellular automaton) | Werner 1995 |
+| **MountainRange** (a chain of peaks) | `mountain(n_ridges=N)` or union several `mountain`/`ridge` with `np.maximum`/`smax` | Génévaux 2015 (combine primitives) |
+| **Island** | `radial_gradient × noise`, then a sea level (see `sims_illustrative` coastal) | — (compose from core set) |
+| **Uplift / Plates** (broad tectonic rise) | `isostasy` + `erosion_streampower` uplift term | Cordonnier 2016 (uplift+erosion) |
+| **Butte / Mesa** (not a stock Gaea node; our addition) | `landforms.fault_block_butte` | Narr & Suppe 1991; NPS Arches/Canyonlands |
+
+**Guide / import** — art direction and real data (Gaea *Shape/Draw/File/TileInput*; WM *Layout
+Generator/File Input*; Houdini *HeightField Project/File*):
+
+| Capability | Our node |
+|---|---|
+| Spline / shape guides (draw a feature *here*) | `ops_filters.sd_segment`, `.sd_convex_polygon`, `.sd_box` (SDF building blocks) |
+| DEM / heightmap import | `empirical_dem.fetch_dem` (Copernicus/FABDEM/3DEP GeoTIFF) |
+
+**Deferred (reproducible from the core set, not yet stock nodes):** Gaea *Cellular3D, WaveShine,
+LineNoise/DotNoise, Cracks, CutNoise, Pattern, Object, Hemisphere*; *Slump, Rugged, MountainSide*
+(erosion of a `mountain`/`ridge`); *OpenSimplex2* and *wavelet* noise (the `01` pseudocode covers them;
+`noise.simplex`/`noise.gabor` fill the base-noise and anisotropy needs). These are noted so the catalog
+is honest about what is and isn't implemented — the priority
+set above (fractal + Voronoi + gradient + the named landforms + an erosion pass) already reproduces the
+large majority of real terrain-authoring work across all three tools.
+
+## What the cross-checks assert
+
+Comparisons are on **physical signatures**, not raw fields — grid conventions and boundary
+handling differ between any two implementations, so equality is the wrong bar:
+
+- **Stream power** — both our Braun–Willett solver and Landlab's FastscapeEroder must recover
+  the steady-state slope–area exponent `-m/n` (the decisive `09` oracle), and agree to <0.1.
+- **D8 accumulation** — our drainage area correlates >0.9 with Landlab's (and with pysheds').
+- **Hillslope diffusion** — a single Fourier mode decays by the same factor under our explicit
+  Culling step and Landlab's LinearDiffuser (both match the analytic decay).
+
+Run them with `pip install -r requirements-crossvalidate.txt && pytest -q`; without those
+optional libraries the checks skip and the numpy-only core suite still runs green.
+
+## Nodes with no wired library comparison
+
+Droplet and thermal are **source-grounded** but not cross-validated here: their canonical
+references are GPU/engine projects (SebLague, the Unity pipe/thermal) with no importable
+Python to diff against, and the skill deliberately runs *stricter* than the inspected thermal
+(distance-correct 8-neighbour vs the upstream's 4-directional non-square-cell bug). They are
+held to their `09` oracles instead — determinism, mass conservation, and radial isotropy on a
+cone. If you port either to a new engine, re-ground against the pinned revision and keep the
+deviations in `references/22-open-source-grounding.md` beside the code.

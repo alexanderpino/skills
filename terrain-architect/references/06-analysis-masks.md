@@ -50,7 +50,10 @@ dzdx = ((h[i+1,j-1] + 2*h[i+1,j] + h[i+1,j+1]) - (h[i-1,j-1] + 2*h[i-1,j] + h[i-
 dzdy = ((h[i-1,j+1] + 2*h[i,j+1] + h[i+1,j+1]) - (h[i-1,j-1] + 2*h[i,j-1] + h[i+1,j-1])) / (8*cellSize)
 ```
 
-Use Horn if the height field is noisy or quantised, central differences if it's clean R32F.
+Use Horn if the height field is noisy or quantised, central differences if it's clean R32F. On a
+**hexagonal working grid** neither applies — use the one-ring 6-point gradient
+(`∇h ≈ Σhₖeₖ / (3·cellSize)`; `26`), which has Horn's noise-averaging built in and
+an isotropic leading error. The slope/aspect conventions above hold unchanged.
 
 **Slope is resolution-dependent.** The same terrain sampled at 1 m/px and 8 m/px gives
 different slopes — the coarse one averages away the steep bits. A slope mask tuned at one
@@ -78,7 +81,7 @@ H = (Z2 - Z8) / (2 * L)                      # ∂z/∂y
 p = G² + H²
 if p < eps:  profile = plan = 0              # flat — curvature undefined, guard it
 else:
-    profile = -2 * (D*G² + E*H² + F*G*H) / p     # curvature ALONG the slope
+    profile =  2 * (D*G² + E*H² + F*G*H) / p     # curvature ALONG the slope (concave valley +ve)
     plan    =  2 * (D*H² + E*G² - F*G*H) / p     # curvature ACROSS the slope
 ```
 
@@ -110,6 +113,24 @@ quantised R16 field, curvature is essentially a picture of the quantisation stai
 it on R32F, before export. If the field is noisy, pre-smooth with a small Gaussian (σ ≈ 1 cell)
 — the alternative is a mask made of speckle.
 
+**On a hexagonal grid, the 3×3 quadratic fit is replaced by three second differences** (`26`).
+Zevenbergen–Thorne's `D, E, F` are the Hessian read off a 3×3 square window; the hex one-ring
+determines the same Hessian in closed form, from the **three antipodal pairs**:
+
+```
+D_k = h[+e_k] + h[−e_k] − 2·h[0]                 # second difference along lattice direction k
+[Hxx, Hxy, Hyy] = M⁻¹ · [D_0, D_1, D_2] / cellSize²   # M_k = (uₖ.x², 2·uₖ.x·uₖ.y, uₖ.y²),
+                                                       # uₖ = world unit dir of pair k — fixed 3×3
+```
+
+Exact on quadratics, like the fit it replaces, and `Hxx + Hyy` reproduces the renormalised
+6-neighbour Laplacian (`2/(3d²)`, `26`) — one consistency check for free. Profile, plan and
+mean curvature then follow from `(Hxx, Hxy, Hyy)` and the 6-point gradient by the *same*
+formulas above (they only need `D…H`, not the window they came from). The world directions
+`uₖ` come through the shear matrix `B`, so the orientation is baked in — do not build `M` from
+the index offsets. Runnable: `reference-impl/hex_grid.py` `hessian6`, pinned by
+`reference-impl/tests/test_hex_grid.py`.
+
 ## Horizon-based ambient occlusion
 
 For each of `N` azimuth directions, march outward and track the maximum horizon elevation
@@ -134,6 +155,10 @@ ao(h, p, N, maxDist):
         v += cos(θ)²                             # ← see derivation below
     return 1 - v / N                             # occlusion; visibility = v/N
 ```
+
+(On a hexagonal grid the march is unchanged — azimuths are world-space, and `N` should *not* be
+snapped to 6 — but `sample(h, q)` at a continuous position is the barycentric dual-triangle
+sample, since there is no bilinear on this lattice; `26`.)
 
 **Where `cos²θ` comes from.** Cosine-weighted visibility over the hemisphere with an up-facing
 normal, with the horizon at elevation `θ` blocking everything below it:
@@ -192,6 +217,13 @@ TWI needs **MFD**, not D8 (`03`). TWI is a hillslope quantity and D8's parallel-
 prints straight into it as stripes. This is the canonical reason to have MFD in the graph at
 all.
 
+On a hexagonal grid two constants shift together (`26`): `A` seeds from the hex cell area
+`(√3/2)·cellSize²` (`03`), and the contour width is the shared hex **edge**, `cellSize/√3` —
+uniform across all six directions, which is the simplification that lets D6-MFD drop Quinn's
+cardinal/diagonal contour-length split entirely. So `A_specific = A / (cellSize/√3)`. Use both
+hex constants or neither: mixing the hex area with the square width (or vice versa) shifts
+every TWI threshold silently.
+
 Typical range 3–20. Remap with a measured histogram, not an assumed range.
 
 ## Normals
@@ -207,7 +239,8 @@ as a terrain that's uniformly too flat or too steep under lighting and is madden
 diagnose.
 
 Sobel is the standard for normal maps (more robust than central differences), same kernels as
-Horn's slope above.
+Horn's slope above. On a hexagonal working grid, both are replaced by the 6-point gradient
+(`26`) — same negation and same `z = 1` rule.
 
 **Bake normals from R32F, always.** This is the single clearest case for the precision rule:
 a normal map derived from an R16 heightfield across a large vertical range shows visible
@@ -279,6 +312,20 @@ grassMask  = (1 - rockMask) * (1 - snowMask) * (1 - sandMask)
 riverMask  = smoothstep(A_channel * 0.5, A_channel, A)           # A from 03, in m²
 ```
 
+**Substance-with-depth.** A material isn't just a mask — a loose granular deposit (snow, sand,
+scree, sediment) has DEPTH: it piles up and fills the crevices/hollows of the bedrock, so the surface
+you shade is *smoother* than the rock beneath (snow drifts into couloirs and covers them). The pile
+depth is a morphological **closing** minus the surface — deep in hollows, ~0 on ridges:
+
+```
+depositFill(h, r)  = max(closing(h, r) - h, 0)      # closing = erode∘dilate (10); extensive => >= 0
+```
+
+The reference's `derive_substances` builds the priority stack above but each substance placed where it
+physically ACCUMULATES (snow by lapse-rate temperature AND slope-holds AND wind-loading; scree at
+repose below cliffs; sediment in concave lows via `profile > 0`) and then piled with `depositFill`, so
+snow is white because it is a white *substance*, not because "high == white".
+
 **Principles:**
 
 - **Every hard threshold needs noise breakup.** A `slope > 0.7` mask has a mathematically
@@ -290,12 +337,14 @@ riverMask  = smoothstep(A_channel * 0.5, A_channel, A)           # A from 03, in
   you specified. Either build them as an explicit priority stack (snow beats rock beats
   grass — each subsequent mask multiplied by `(1 − Σ previous)`), or normalise explicitly and
   know that you did.
-- **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)` — with the
-  downslope aspect above and `y` = north, that is `sin(aspect)`: +1 facing north, −1 facing
-  south. Snow lingers on north faces (northern hemisphere), vegetation differs between north
-  and south slopes. One term, large payoff, and it's the kind of thing that makes people say
-  the terrain "feels real" without knowing why. (This is where the uphill-aspect sign bug
-  bites: it silently negates `northness` and moves the snow to the sunny side.)
+- **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)`. With the
+  downslope aspect above and the STANDARD raster convention — row index increases *southward*, so
+  row 0 = north and the `y` axis points SOUTH — that is `-sin(aspect)`: +1 facing north, −1 facing
+  south. (The naïve `+sin(aspect)` assumes `y` = north, i.e. a south-up array; on a normal north-up
+  DEM it is inverted and silently moves the snow to the sunny side — the sign bug to watch for.) Snow
+  lingers on north faces (northern hemisphere), vegetation differs between north and south slopes.
+  One term, large payoff, and it's the kind of thing that makes people say the terrain "feels real"
+  without knowing why.
 - **Use `deposition`, not just slope, for sediment materials.** If your erosion model tracks
   where it deposited (all three in `04` can), that field is far better than any slope-based
   proxy — it puts sand where sand actually went.

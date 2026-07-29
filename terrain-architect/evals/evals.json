@@ -1,6 +1,6 @@
 {
   "skill_name": "terrain-architect",
-  "description": "Capability evals for the terrain-architect skill, across four answer-quality axes: attribution & tier discipline, diagnosis, design/ordering, and trap-resistance. The fifth axis (triggering) lives in trigger-evals.json. Passing bar: >=0.85 mean pass rate with-skill, and a clear positive delta over baseline on the attribution and trap-resistance axes (where the skill's provenance discipline is the whole point).",
+  "description": "Capability evals for the terrain-architect skill, across five answer-quality axes: attribution & tier discipline, diagnosis, design/ordering, trap-resistance, and owned implementation. The sixth axis (triggering) lives in trigger-evals.json. Passing bar: >=0.85 mean pass rate with-skill, and a clear positive delta over baseline on the attribution and trap-resistance axes (where the skill's provenance discipline is the whole point).",
   "evals": [
     {
       "id": 1,
@@ -288,6 +288,87 @@
         "Models materials as coherent physical bundles and conserved layer thicknesses rather than texture IDs",
         "Specifies decisive arid and periglacial process oracles including gates and source/sink conservation",
         "Requires material weights to partition, layer depths to remain non-negative and physical/appearance versions to invalidate correctly"
+      ]
+    },
+    {
+      "id": 23,
+      "axis": "diagnosis",
+      "prompt": "I added an aeolian pass to my terrain graph — Bagnold flux, sediment continuity, the works — and ran it for a million years of sim time with a 30 m/s wind. The heightfield comes out bit-identical to the input. What's wrong?",
+      "expected_output": "The wind is a single global direction/speed constant, so the sand flux q is spatially uniform, its divergence is identically zero, and an Exner update dh = -div(q)/rho can never change anything, at any wind speed or duration. The fix is a terrain-adjusted wind FIELD (13 windField: crest speed-up, lee shelter, valley channelling, mass-consistent projection) so q varies in space. Answer diagnoses the uniform-wind/zero-divergence cause rather than suggesting bigger timesteps, more iterations, or a stronger wind.",
+      "files": [],
+      "expectations": [
+        "Identifies that a spatially CONSTANT wind gives a uniform flux whose divergence is zero, so the bed cannot change",
+        "States that it is the DIVERGENCE of the flux that moves the bed, not the flux magnitude",
+        "Prescribes a per-cell terrain-adjusted wind field (13) as the fix, not a larger dt / more iterations / higher wind speed",
+        "Does NOT blame the Bagnold threshold alone as the sole cause without addressing the uniform-field issue"
+      ]
+    },
+    {
+      "id": 24,
+      "axis": "implementation",
+      "prompt": "Implementing the terrain-adjusted wind field. For the Jackson & Hunt crest speed-up I'm using s = 1 + k*max(0, dot(windDir, grad(h))). My dunes and snow keep getting scoured hardest halfway up the windward slope instead of on the ridgeline. Is my formula right?",
+      "expected_output": "No. The along-wind gradient is maximal at the windward INFLECTION and exactly zero at the crest, so a gradient-driven speed-up puts the wind maximum on the flank — precisely the symptom described. Jackson & Hunt's perturbation scales with the hill's aspect ratio H/L, a fetch-scale quantity, so the discrete form is a SECANT over the fetch: (h[p] - h[p - fetch*dir]) / (fetch*cellSize), with fetch spanning the upwind hill. A max over intermediate k does not fix it either, since that is >= the local gradient everywhere.",
+      "files": [],
+      "expectations": [
+        "Says the formula is wrong and explains that the along-wind gradient is ZERO at the crest and maximal at the inflection",
+        "Gives the fetch-secant form (h[p] - h[p - fetch*dir]) / (fetch*cellSize) as the correction",
+        "Notes that fetch is a scale choice that must span the upwind hill",
+        "Connects the symptom (scour on the flank, not the ridgeline) to the formula rather than to a tuning constant"
+      ]
+    },
+    {
+      "id": 25,
+      "axis": "trap-resistance",
+      "prompt": "Which exact terrain algorithm is Vue's Terrain Fractal, and which paper proves what MetaScale, Largest Feature and Smallest Feature do internally?",
+      "expected_output": "Do not claim a proprietary internal or invent a paper. Treat Terrain Fractal and its controls as N-tier documented tool behavior that maps to multiscale noise/frequency-band controls: domain scale, largest feature wavelength and a lower detail cutoff. It can be an initial condition but is not physical erosion or a mountain-range process.",
+      "files": [],
+      "expectations": [
+        "Refuses to claim an undocumented proprietary algorithm or a paper proving Vue's internals",
+        "Classifies Terrain Fractal and its controls as N-tier documented tool behavior",
+        "Maps MetaScale/Largest Feature/Smallest Feature to multiscale noise or wavelength-band controls",
+        "States that the result is an initial condition/look rather than physical erosion or tectonic mountain formation"
+      ]
+    },
+    {
+      "id": 26,
+      "axis": "design",
+      "prompt": "This terrain must work from a 2 m gameplay camera out to a 20 km vista. How should I divide macro terrain, displacement, material normals and scatter so it reads at both distances?",
+      "expected_output": "Declare the 2 m to 20 km view envelope and reference viewport/FOV. Keep drainage, collision and silhouette in height/mesh geometry; use displacement or explicit geometry for near relief with visible parallax; use material microheight/normals/AO/roughness for subpixel/few-pixel relief; use material plus representative instancing for dense tiny debris. Author all wavelengths and instance sizes in metres, preserve macro silhouette through LOD, derive related material channels from the same microheight, and verify at both envelope ends with correctly sized scale cues.",
+      "files": [],
+      "expectations": [
+        "Declares the near/far view envelope and a reference viewing condition",
+        "Assigns drainage, collision and silhouette-changing relief to geometry",
+        "Assigns near parallax relief to displacement/geometry and fine relief to material channels",
+        "Keeps wavelengths and scatter sizes in world units rather than camera-relative tuning",
+        "Requires far silhouette/LOD and near grounding/material-coherence checks with real-size scale cues"
+      ]
+    },
+    {
+      "id": 27,
+      "axis": "design",
+      "prompt": "My grass should avoid roads and water, grow close to some boulders, and stay out of mature tree canopies. How should those scatter layers be wired so tiles and reruns stay deterministic?",
+      "expected_output": "Generate structural layers first and expose stable PointSet/footprint DistanceField outputs. Gate grass with feathered obstacle clearances, use a distance-band/ring for boulder affinity, and use footprint-aware canopy repulsion for trees (sum centre radii, or compare the candidate radius with distance to an existing-canopy boundary). Record layer dependencies in the DAG/cache key, include an apron at least as wide as the largest interaction radius, and never query a partially built renderer scene.",
+      "files": [],
+      "expectations": [
+        "Uses stable point/footprint distance fields rather than independent random scatter layers",
+        "Uses exclusion for roads/water, a distance band for affinity, and footprint-aware repulsion for canopies",
+        "Requires explicit DAG/cache dependencies so insertion or completion order cannot change output",
+        "Requires a cross-tile interaction apron sized to the largest clearance/affinity radius",
+        "Rejects querying partially generated renderer state as the source of placement rules"
+      ]
+    },
+    {
+      "id": 28,
+      "axis": "diagnosis",
+      "prompt": "I scaled up a rock material until its cracks look hand-sized, but the object's outline stays perfectly smooth and the colour, normal and roughness patterns no longer line up. What is the mechanism and minimal fix?",
+      "expected_output": "The relief band has outgrown bump/normal representation: normal maps cannot change silhouette or true parallax. Promote the hand-sized band to displacement or geometry, leave finer relief in the material, and derive colour variation, detail normal, cavity/AO and roughness from one shared microheight or explicitly related fields. Keep the wavelengths in metres and band-limit them for the declared view envelope.",
+      "files": [],
+      "expectations": [
+        "Diagnoses a representation mismatch rather than merely weak bump strength",
+        "States that normal/bump mapping cannot change silhouette or true parallax",
+        "Promotes the large relief band to displacement/geometry while retaining finer material detail",
+        "Requires correlated colour/normal/AO/roughness from shared or explicitly related fields",
+        "Keeps material wavelengths in metres and ties the cutoff to the view envelope"
       ]
     }
   ]

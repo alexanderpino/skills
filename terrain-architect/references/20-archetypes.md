@@ -54,6 +54,17 @@ archetypes (Group L) change the *regime itself*: no liquid water switches the fl
 (`03`/`04`) **off** and lets impact cratering dominate, and gravity rescales craters and dunes —
 the planetary doctrine in `SKILL.md`, built out.
 
+**Runnable examples.** `reference-impl/archetypes.py` implements **sixteen** of these as diffs from
+the baseline over the verified blocks — alpine & appalachian orogens, plateau canyon, mesa/tepui,
+erg, basin-and-range, badlands, tower karst, stratovolcano, caldera lake, fjord, sea cliffs, ag
+terraces, and the lunar-cratered / maria / Mars off-Earth trio — each printing its `09` signature
+(relief, slope percentile, hypsometric integral, depression storage) and rendered to
+`reference-impl/archetypes.png`. `reference-impl/ARCHETYPES.md` carries the full ledger, including an
+honest account of which blueprints here are *not* rendered and why (waterfalls read as a long-profile
+knickpoint not a plan-view relief; reefs and deltas need processes the sandbox does not implement;
+Himalaya/Ardèche/Zhangjiajie are regime variants of tiles already shown). Illustrative *kinds* of
+place at one small extent, not scale models — the prime directive below still holds: adapt, don't paste.
+
 ---
 
 ## Group A — Orogens (mountain ranges)
@@ -1209,6 +1220,13 @@ the story's world, and a terrain graph does the identical composition, changing 
 dressing** — materials, sky/light, and the scatter of props (`06`/`08`, `07`). So "make an ice
 planet / a desert planet" is not a new recipe; it is *decompose the fiction into the archetypes
 above, then re-dress.* There is no "Hoth algorithm" for the same reason there is no atoll one.
+
+**Runnable examples.** `reference-impl/screen_worlds.py` renders eight of these as re-dressed
+archetype compositions (`reference-impl/screen_worlds.png`): Arrakis (the erg), Monument Valley
+(the mesa end-member), Pandora (tower karst), Hoth (glacial, snow render), Skull Island (drowned
+tower karst), Beggar's Canyon (a relict canyon), Crait (evaporite playa, salt-crust material), and
+Interstellar's Miller's world (a flooded sandur). Each reuses an `archetypes.py` composition and
+changes only the dressing — render, sea level, or material — the section's thesis made executable.
 
 - **Hoth** *(filmed at Finse & the Hardangerjøkulen glacier, Norway)* — an **ice-sheet world**: the
   glacial machinery of entry 18 with **sea level off and the ice cap on**. Ice sheet + valley

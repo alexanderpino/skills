@@ -49,9 +49,20 @@ trade-offs, and this chapter assumes you have chosen one:
 - **Cube-sphere** — six flat face-grids; the twelve cube edges are seams with a *rotation* between
   faces; flow routing crosses them with halo cells + per-face rotation tables (**F**; no canonical
   paper — say so). Six faces = six of `08`'s tiles.
-- **Geodesic / HEALPix** — icosahedral hexagons + 12 pentagons, or HEALPix's exactly-equal-area pixels
-  (`N_pix = 12·N_side²`, Górski et al. 2005); no face seams, non-rectangular neighbours. Real published
-  flow routing exists (Liao et al. 2020, 2025).
+- **Icosahedral hexagonal DGGS (Goldberg polyhedron)** — the planar hex grid (`26`) closed onto the
+  sphere: hexagons everywhere except **exactly 12 pentagons** at the icosahedron vertices (Euler forces
+  them; Goldberg 1937). Equal-area **only with the right projection**: ISEA (Snyder 1992; family survey
+  Sahr, White & Kimerling 2003; ISEA7H is the equal-area aperture-7 instance) — **Uber H3, the
+  production system, is gnomonic and *not* equal-area** (cell areas vary ~1.6× at a given resolution;
+  take per-cell areas from the library, never from a constant). This is the grid to reach for a
+  **procedural planet** that wants near-uniform cells and low anisotropy — 6 edge-neighbours everywhere
+  means the tectonics, climate and flow-routing below run *without* the D8 √2 metric corrections a
+  square/cube grid needs; the pentagons are the only *topological* special case, though cell metrics
+  vary continuously across each face (Goldberg hexagons are not congruent). No face seams; real
+  published flow routing (Liao et al. 2020; Liao et al. 2025 — on ISEA).
+- **HEALPix** — a different seam-free grid: exactly-equal-area, iso-latitude **quadrilateral** pixels
+  (`N_pix = 12·N_side²`, Górski et al. 2005), *not* hexagons; the cosmology/climate standard.
+  Non-rectangular neighbours, no face seams.
 
 The **one correction that leaks into every process below**: a fixed-resolution grid sampled through any
 projection carries a per-cell scale factor `h` (Snyder 1987), and true ground distance is
@@ -268,8 +279,10 @@ The flat `09` oracles still apply *inside a face*; the planetary additions are:
 Mixed-tier, and honest about which is which:
 
 - **Spherical grids & distortion — P, and already in `08`:** cube-sphere/equiangular (Chan & O'Neill
-  1975; Sadourny 1972; Ronchi et al. 1996), HEALPix (Górski et al. 2005), scale factor (Snyder 1987),
-  DGGS flow routing (Liao et al. 2020, 2025). Cube-face-*seam* flow routing is **F**.
+  1975; Sadourny 1972; Ronchi et al. 1996), the icosahedral hexagonal DGGS / Goldberg polyhedron
+  (Goldberg 1937; ISEA equal-area, Snyder 1992; DGGS survey, Sahr, White & Kimerling 2003; H3 as the open
+  production system — gnomonic, not equal-area, F/N), HEALPix (Górski et al. 2005), scale factor (Snyder 1987), DGGS flow routing
+  (Liao et al. 2020, 2025). Cube-face-*seam* flow routing is **F**.
 - **Tectonics on a sphere — P:** Euler-pole rigid-plate rotation (**McKenzie & Parker 1967**, Nature 216;
   **Morgan 1968**); the graphics realization is **Cortial, Peytavie, Galin & Guérin 2019**, *Procedural
   Tectonic Planets*, CGF 38(2) (Eurographics 2019). Verify the related planet papers before citing them.

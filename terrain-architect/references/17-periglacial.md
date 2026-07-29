@@ -13,6 +13,12 @@ most of them: **freeze–thaw**, which heaves, sorts, and creeps the regolith. T
 *The Periglacial Environment* (4th ed., Wiley); **Washburn 1979**, *Geocryology*. Mostly **L/F-tier** —
 frost geomorphology has process models but few graphics papers, so the honest move is the recipe.
 
+Where this zone meets the sea, the coast becomes a periglacial landform in its own right: an
+ice-rich permafrost bluff retreats by **thermal abrasion** — a thaw niche melted at the waterline,
+undercutting until the block above fails along its ice wedges — which is governed by water
+temperature and the open-water season rather than by wave energy. That coupling, and sea ice's
+gating of it, is in `12`.
+
 ## Patterned ground (Kessler & Werner 2003)
 
 Stone circles, polygons, and stripes that **self-organize** on frost-heaved ground — and the

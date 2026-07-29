@@ -8,6 +8,8 @@ droplet's life is deposited, so total volume is conserved to floating point.
 
 Deterministic: pass a seed; the RNG is the only source of randomness.
 """
+import math
+
 import numpy as np
 
 
@@ -62,7 +64,14 @@ def droplet_erode(heightmap, n_droplets=20000, seed=0, *, inertia=0.05,
                   deposit_speed=0.3, evaporate=0.02, gravity=4.0,
                   max_lifetime=30, brush_radius=2):
     """Return the eroded heightfield. Total volume is conserved (leftover sediment is
-    deposited at end of life)."""
+    deposited at end of life).
+
+    SCALE (08): this solver works entirely in CELL space — droplets are seeded uniformly over the
+    grid, step one cell at a time, and `brush_radius` counts cells. Both `n_droplets` and
+    `brush_radius` are therefore resolution exposed: reused unchanged on a finer grid they give
+    proportionally fewer droplets per unit area and a proportionally smaller brush, so the same
+    graph erodes less and stays rougher. Use `resolution_matched()` to carry settings between
+    grids."""
     m = np.asarray(heightmap, dtype=np.float64).copy()
     n, w = m.shape
     rng = np.random.default_rng(seed)
@@ -99,3 +108,18 @@ def droplet_erode(heightmap, n_droplets=20000, seed=0, *, inertia=0.05,
         if sediment > 0.0:                                # conserve: drop the rest
             _deposit(m, x, y, sediment)
     return m
+
+
+def resolution_matched(*, n_droplets, brush_radius, base_shape, shape):
+    """Carry droplet settings from one grid to another so the SAME erosion lands (08).
+
+    Droplet count is a DENSITY — it must scale with cell COUNT (n^2) to hold droplets per unit
+    area. Brush radius is a LENGTH — it scales with n. Returns a kwargs dict for `droplet_erode`.
+
+    >>> resolution_matched(n_droplets=20000, brush_radius=2,
+    ...                    base_shape=(256, 256), shape=(512, 512))
+    {'n_droplets': 80000, 'brush_radius': 4}
+    """
+    ratio = math.sqrt((shape[0] * shape[1]) / float(base_shape[0] * base_shape[1]))
+    return {"n_droplets": int(round(n_droplets * ratio * ratio)),
+            "brush_radius": max(1, int(round(brush_radius * ratio)))}

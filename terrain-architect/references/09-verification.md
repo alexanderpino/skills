@@ -247,6 +247,22 @@ substitute one for the other.** A rotating sun over a plan-view hillshade plus o
 render catches more real defects in thirty seconds than any amount of turntable-ing the hero
 shot.
 
+**Review the whole declared view envelope (`08`).** The plan/hero pair is necessary but not enough
+for an asset that must work from a known camera range:
+
+- At the **far end**, inspect silhouette, macro material breakup, haze-free structure and correctly
+  sized scale cues. Peaks must survive LOD and the terrain must not depend on close-up noise to read.
+- At the **near end**, inspect whether relief that affects parallax or silhouette is real geometry,
+  whether material channels describe the same microstructure, and whether scatter instances are
+  grounded and clear of obstacles.
+- Use atmosphere and depth of field only after these passes. They can communicate depth, but they
+  must not hide tiling, missing geometry, broken scale or intersection defects.
+
+A useful scale-cue render includes one or more objects with known world dimensions (tree height,
+boulder diameter, road width, doorway) and no camera trick that miniaturises the scene. If the cue
+looks wrong, first check metres, material wavelengths and scatter sizes; do not "fix" it by scaling
+the atmosphere or terrain independently.
+
 ## Failure catalogue
 
 Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
@@ -260,6 +276,10 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Terracing on gentle slopes | R16 quantised too early | Work R32F, quantise at export (`08`) |
 | Faceted normals / ringed AO | Baked from quantised height | Bake from R32F (`06`, `08`) |
 | Speckled curvature mask | 2nd derivative of noisy/quantised field | Pre-smooth σ≈1 cell; compute from R32F (`06`) |
+| Terrain reads as a miniature | Detail/material/scatter frequencies disagree with world scale, or macro-style depth of field is used on a vista | Restore metre-based feature bands and correctly-sized scale cues; review at the declared view envelope (`08`) |
+| Close rock relief vanishes at the silhouette | Feature exists only in bump/normal although it is large enough to affect parallax/edge shape | Promote that band to displacement/geometry; keep finer relief in the material (`08`) |
+| Rocks float or disappear into the ground as size varies | Fixed embedding offset applied to every instance | Embed from the asset support radius with clamped bounds (`07`) |
+| Vegetation intersects water, roads, rocks or neighbouring canopies | Scatter layers generated independently with no footprint distance constraints | Stage layers and feed exclusion/affinity/repulsion distance fields with an interaction apron (`07`) |
 | Pipe erosion → NaN spikes | Missing outflow scaling factor `K` | Add step 3 of the pipe model (`04`) |
 | Pipe erosion → channels align to grid axes | 4-pipe von Neumann stencil | 8-pipe variant with per-pipe length (`04`) |
 | Droplet erosion → 1px scratches | Eroding point-wise instead of with a brush | Erode with disc radius 2–4 (`04`) |
@@ -330,10 +350,93 @@ member of this family strobes as the light azimuth rotates — and the universal
 clean baseline are the cone and constant-slope synthetic inputs, whose correct outputs have no
 preferred direction at all.
 
+There is a fourth, structural cure the table doesn't list: **change the lattice.** The **hexagonal
+grid** (`26`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
+edge-neighbours there is no diagonal to under-weight and no 4-versus-8 choice to get wrong — and
+*shrinks* the *D8-striping* row rather than deleting it: single-receiver striping is a
+**quantisation** artefact, not a metric one, and D6 still quantises (6 directions at 60°, max aspect
+error 30° against D8's 22.5°), so a planar slope still collects parallel flow lines along the hex
+axes. The sun sweep and the constant-slope control still apply on hex, with *less than the square
+grid* as the pass criterion, not *none*. The lattice swap also brings its **own failure rows**:
+axial-vs-offset coordinate mixing, row-parity neighbour tables applied with the wrong parity,
+pointy-top/flat-top orientation mismatch, and the un-renormalised 6-neighbour Laplacian (the hex
+constant is `2/(3d²)`, not `1/d²` — keep the square constant and diffusivity is silently 1.5× high;
+`26`). One of the new rows is invisible to the sun sweep: meshing visible hex tiles **corner-only**
+(4 triangles) instead of fanning through the centre (6) drops the cell's own sample from the mesh
+entirely and attenuates one-cell extrema by **exactly 1/3** — correct and free on flat prism tops or a
+far LOD tier, a silent amplitude bug anywhere else. Both meshes reproduce affine fields exactly, so
+the ramp and cone controls cannot see it; the detector is an **impulse** — raise one cell by `H` and
+measure the rendered peak (`26`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
+still not continuous), but when directional artefacts are endemic and the grid is yours to choose, the
+lattice itself is the highest-leverage fix — it trades the family for a smaller one, not for zero. On
+a sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the residual stencil
+irregularity is the 12 pentagons — a *topological* residue — plus the continuous metric distortion any
+projected spherical grid carries (`08`).
+
 The contrast case worth knowing: **droplet erosion is largely immune** — positions are
 continuous and gradients bilinear, so there is no stencil to print through. If a droplet result
 shows grid-aligned structure, the anisotropy came in with the height field (usually the noise,
 `01`), not the simulation.
+
+### "Anisotropy" names two different things — never conflate them
+
+Everything above is **lattice anisotropy**: the discretisation printing through. It is *always*
+a defect, and the reason is not aesthetic — the direction it prefers is a property of the
+**array**, not of the terrain. Nothing in the world put it there, so there is no parameter value
+that makes it correct.
+
+**Field anisotropy is the opposite, and terrain without it looks generic.** Real landscapes are
+full of direction, and every bit of it is sourced from a *cause*: bedding, strike and dip, joint
+sets and differential erodibility (`11`); fault fabric and tectonic grain (`02`); the wind, in
+yardangs, dune orientation and ventifacts (`05`, `16`); ice-flow direction, in striations,
+drumlins and U-valley alignment (`12`); slope aspect and insolation, in asymmetric valleys
+(`13`). Trellis drainage, hogbacks and strike valleys exist *because* erosion is directional.
+Suppressing this is as wrong as printing the lattice.
+
+**The rule that decides, and it is a sharp one: a directional control is legitimate exactly when
+its direction comes from a field, not from the grid.** A strike field, a wind field, a flow
+direction, an ice-flow vector — legitimate, and usually necessary. A single global angle
+parameter, or worse a "strength" knob with no direction at all, is the defect wearing the
+feature's clothes: it will align to the axes because the only direction available to it is the
+array's. When a tool exposes an "anisotropy" control, that is the question to ask of it — *where
+does the direction come from* — not whether directionality is allowed.
+
+**The test: rotate the domain.** Physical anisotropy rotates with the terrain; lattice anisotropy
+stays welded to the axes. Feed a radially symmetric input (the cone — it has no direction of its
+own, so any direction in the output was put there by the operator or the grid), then compare
+`rot(F(rot(h, −θ)), θ)` against `F(h)`. Any field the operator consumes must be rotated *with*
+the terrain. The rotation interpolates, so this needs a control — run the same comparison on a
+deliberately isotropic operator to measure the floor (`09`'s own rule: a metric with no control
+is not evidence). Measured, on a 4-neighbour max against a disc max of the same radius:
+
+| θ | Axis-locked operator | Isotropic control (the floor) |
+|---|---|---|
+| 23° | `0.093` | `0.016` |
+| 30° | `0.111` | `0.014` |
+| 45° | `0.128` | `0.020` |
+| **90°** | **`0.000`** | `0.000` |
+
+**The 90° row is the trap.** A quarter turn is a *symmetry of the square lattice*, so it maps the
+grid onto itself and a grossly axis-locked operator comes back exactly equivariant — a perfect
+score for a broken operator. **The test angle must not be a symmetry of the lattice under test**:
+avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the separation is about an
+order of magnitude, which is plenty. Pinned by
+`reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`.
+
+![anisotropy anatomy](../reference-impl/anisotropy_anatomy.png)
+
+*The test, and its trap, in one figure — regenerate with `reference-impl/anisotropy_anatomy.py`.*
+
+**A cure for one does nothing for the other, which is the proof they are different.** Swapping to
+a hex lattice (`26`) shrinks lattice anisotropy and leaves field anisotropy completely untouched —
+a strike-controlled valley network is just as directional on hex, because its direction never came
+from the grid. If a single change fixes one and not the other, they were never the same defect.
+
+**Deliberate stylised directionality is allowed, and it is an authoring choice, not a simulation
+parameter.** Same status as the stepped hex-prism terracing of `26`: fine, even desirable, as a
+declared style; a bug if you were hoping for geology. Record it as art direction, keep it out of
+the physics, and it still may not be sourced from the grid — a stylistic direction that happens to
+be the array's axes is indistinguishable from the defect, and will be read as one.
 
 ## Review checklist
 
@@ -347,6 +450,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Erosion backbone matched to world extent? (droplet <2 km, pipe 2–50, stream power >50)
 - [ ] Parameters in world units, not magic numbers tuned at one resolution?
 - [ ] Thermal downstream of hydraulic?
+- [ ] Sediment budget closed, or its leak measured and named? (erode-only or deposit-only is the tell; the usual sites are droplet expiry, flux caps/clamps, open boundaries, and an *effect* mask on an erosion node)
 - [ ] `A` reported in m², not cell counts?
 - [ ] MFD (not D8) feeding any hillslope quantity (wetness, dispersive masks)?
 - [ ] Quantisation to R16 after all derivatives?
@@ -357,8 +461,81 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Double-buffering in every grid simulation?
 - [ ] Masks partition to 1?
 - [ ] Every hard threshold noise-perturbed?
+- [ ] Any directional/"anisotropy" control sourced from a **field** (strike, wind, ice flow), not a global angle that will land on the axes? (rotate-the-domain test, at an angle that is *not* a lattice symmetry)
 - [ ] Vertex- vs pixel-centring documented and consistent?
 - [ ] If an extended family is in play (explosive volcanism, seafloor/turbidity, isostasy, terraces, avulsion, coral, planetary grid), has its check from *Checks for the extended families* been run?
 
 **Report findings as: symptom → mechanism → minimal fix.** A graph with one misordered node
 needs one node moved, not a rewrite. Minimal diffs are reviewable; rewrites are not.
+
+## Failure modes of the measurement itself
+
+**A saturating metric hides the thing you are testing.** Verifying that a 2× magnification really
+doubles feature size by counting zero-crossings gave 2.14× and 5× for true 2× and 4× — the metric
+was quantised (at 4× only ~3 crossings remain across a row), not the transform wrong. Replacing it
+with an **analytic oracle** — transform a sine, and assert the result equals `sin()` evaluated at
+the inverse-mapped coordinate — gave max error 0 / 0.0064 / 0.008, i.e. bilinear interpolation error
+only. Prefer an oracle you can derive in closed form over a statistic of the output; when a
+statistic is all you have, check its dynamic range covers the effect you are claiming.
+
+**A metric in the wrong units inverts the conclusion.** Comparing surface roughness across
+resolutions using mean per-cell height difference makes a *spikier* fine grid look *smoother*,
+because cells are closer together. Convert to **slope** (per-cell drop × n) and the same data says
+the fine grid is 3.15× spikier. Whenever a quantity is compared across two grids, state it in units
+that do not contain the grid.
+
+**Averaging over a region where the effect does not live.** A mountain primitive occupies perhaps
+30% of its tile; comparing whole-tile means diluted a real 10% difference between two seeds to
+0.0067 and read as "seeds do nothing". The same error in a different costume: sampling the first
+4000 cells of a field to compare two variants, when those rows are above the feature's footprint
+and identical either way. **Restrict the metric to the support of the thing you are measuring**,
+and if you cannot state where that support is, you are not ready to measure.
+
+**A harness that restates the defaults drifts away from them.** A verifier hard-coded
+`relief: 0.66` and kept passing after the default moved to `0.80`; worse, it never passed the
+`character` parameter at all, so the feature it existed to test was switched off in every run.
+Build test inputs **from the implementation's own defaults** (`TYPES.<node>.params`, the function
+signature, a shared fixture) and override only the one parameter under test. A literal copied into
+a test is a fact that will silently go stale.
+
+**Asserting an invariant the failure case also satisfies.** The clearest instance: a Mountain
+primitive was checked for relief in range, one dominant summit, a summit above the mean, margins
+below the mean, and deep interior incision. A smooth cone satisfies all five, and one shipped
+twice. The fix is not a stricter threshold, it is a **control that must fail** — measure a cone and
+pure noise with the same code, and assert the controls land where they should. If the control ever
+stops separating, the test fails loudly instead of passing vacuously. See
+`tests/test_landforms.py::test_mountain_is_not_a_solid_of_revolution`.
+
+**Thresholds invented before the measurement.** Writing `assert ratio > 3.0` first and then
+adjusting the code until it passes tests the threshold, not the code. Measure first with the
+numbers printed, look at the spread across seeds and parameters, and *then* set the bound — below
+the observed floor, with the observed values recorded in the docstring so the next person can see
+whether a later change moved them.
+
+**A number that is stable across the whole input range is not a measurement.** A "straightness"
+statistic read 0.183 / 0.189 / 0.188 across the entire parameter sweep it was supposed to
+characterise. That is not a weak effect, it is no instrument. Before trusting a green result, run
+the metric at both extremes of its input and confirm the output actually moves; if it does not,
+replace the metric rather than the threshold. When the replacement measures something weaker than
+the original claim, **state the weaker claim** — do not let the wording outrun the instrument.
+
+**When the obvious diagnosis appears, test it before acting on it.** A slope–area fit came out at
+−1.11 instead of −0.5 and the natural reading was "heavy diffusion is contaminating the fit", so
+the channel-area threshold was raised to exclude hillslopes — and the fit got *worse* (−0.35 →
+−0.61 → −1.11), because there were zero channel cells left above the new threshold. Diffusion had
+not contaminated the network, it had **erased** it (max drainage area 3969 → 707). Separately, a
+solver was suspected when the slope–area oracle failed at −0.591 / −1.003 / −1.213; the harness was
+wrong (a structured fBm initial condition with unbalanced uplift never reaches steady state), and
+reproducing the reference conditions gave −0.387 / −0.490 / −0.591, errors of 0.013 / 0.010 /
+0.009. **Suspect the harness at least as readily as the code**, and confirm which one is broken
+with a cheap direct probe before changing either.
+
+**A stability limit met exactly is not met.** The explicit 5-point Laplacian is stable for
+`D·dt/Δx² ≤ 0.25`, and sub-cycling sized with `ceil(D·dt / (0.25·Δx²))` lands *exactly* on 0.25
+whenever `D·dt` divides evenly. At exactly 0.25 the checkerboard mode's amplification factor is
+`1 − 8c = −1`: it flips sign forever and never decays. The field stays finite, mass stays
+conserved, and every blow-up assertion passes — while the diffusion pass **roughens** the terrain
+(mean `|∇²h|` rose 0.68 → 2.36 across `D` = 0.1 → 10 instead of falling). Use the safety factor
+(`diffusion.stable_dt`, 0.9), and test the *direction of the effect*, not merely that the output is
+finite. This is the general shape: an assertion that a result is finite/conserved/non-NaN says
+nothing about whether it is right.

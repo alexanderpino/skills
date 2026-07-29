@@ -1,5 +1,14 @@
-# Optional: enables the cross-validation tests (tests/test_crossvalidate.py), which
-# diff these reference implementations against mature, independently-tested libraries.
+# Optional: enables the cross-validation tests, which diff these reference
+# implementations against mature, independently-tested libraries.
 # Absent -> those tests skip cleanly; the core numpy-only suite still runs green.
+
+# flow operations (tests/test_crossvalidate.py): fill, D8 accumulation
 richdem
 pysheds
+
+# stream power, flow accumulation, hillslope diffusion
+# (tests/test_crossvalidate_landlab.py). Landlab is MIT.
+landlab
+# Recent Landlab pulls `requireit`, whose current release uses Python 3.12+ syntax;
+# pin it back on older interpreters so the import (and thus the tests) still work.
+requireit<0.3 ; python_version < "3.12"

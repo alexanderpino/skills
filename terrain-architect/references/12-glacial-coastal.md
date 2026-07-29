@@ -107,6 +107,18 @@ glacierStep(bed, H, Δt):
     # eroded volume → a moraine/sediment field at margins and terminus (the mass budget)
 ```
 
+*Runnable reference: `reference-impl/glacier.py` (`glacier_carve` = this `glacierStep`; SIA transport
+reused from `sims_illustrative.glacier_sia`, Halfar-validated), verified by `tests/test_glacier.py`.
+Invariant-checked (illustrative-morphological tier): it reduces to the ice-only sim when `K_g=0`,
+carves only (never raises), only under ice, conserves the eroded volume into a moraine field, and
+thick trunk ice erodes far more than thin ice — the arête / hanging-valley differential. The idealised
+parabolic **U** cross-section is the **L-tier** emergent form below: a vertically-integrated SIA
+concentrates abrasion at the thalweg and does not by itself reproduce the textbook parabola (that
+needs a higher-order ice model or the cross-valley sliding distribution of Harbor 1992); the optional
+`wall_abrasion` widens the trough as an honest F-tier "look". The explicit solver is also stiff — it
+stays stable for modest step counts / gentle terrain (as the chapter warns, use an implicit solve for
+large `Δt` on rough beds).*
+
 **The coupled fluvial–glacial loop.** "Glacial runs alongside fluvial" (the Legal Order's 6b) has
 a concrete shape: an outer loop where `glacierStep` erodes under the ice, the mass-balance melt
 feeds `03`'s discharge as a source term (proglacial rivers are melt-fed — it's why they surge in
@@ -329,12 +341,74 @@ exposure(p):
 
 This is structurally the same sweep as horizon AO (`06`) — and it can use the same
 Timonen & Westerholm O(1) machinery. Exposed headlands get high fetch, sheltered bays get low.
-That asymmetry drives everything.
+That asymmetry drives everything. (On a hexagonal grid the sweep is unchanged — the azimuths
+are world-space and must stay so — but every `isOcean(p − dir·d)` lookup at a continuous
+position goes through `cube_round`, never per-axis rounding; `26`.)
 
 One refinement the sweep misses: real waves **refract** — shoaling bends crests toward shallow
 water, *focusing* energy onto headlands and spreading it in bays, which sharpens the same
 asymmetry. Fold it in as an exposure multiplier from coastline convexity (shore-plan curvature,
 `06`) rather than simulating waves.
+
+## Sea ice — a gate on the coastal loop, not a landform
+
+**Sea ice is not terrain, and the first rule is not to make it terrain.** It is a transient solid
+crust on the *water surface* — the layer stack's `waterSurface` grows a lid (`08`). It never enters
+`solidTop`, it carries no bathymetry, and baking it in is the sea-going version of baking water into
+the height field. If it is rendered at all it is a surface with a thickness field, exactly like snow
+over land (`13`).
+
+**Its first-order geomorphic effect is switching the rest of this chapter off.** Shore-fast ice and
+an ice foot armour the shoreline for part of the year, and offshore pack ice removes the open water
+that waves need. So the coastal loop does not run year-round: it runs during an **open-water
+season**. Implementation is one multiplier and it is most of the story:
+
+```
+iceFree(azimuth, season)                       # fraction of the year that direction is open water
+fetch'(p, dir) = fetch(p, dir) * iceFree(dir, season)     # ice-limited fetch — 12's sweep, gated
+coastalStep(...) *= openWaterFraction           # the whole wave budget scales with the season
+```
+
+**And then the part that gets Arctic coasts backwards if you stop there.** Ice-bound coasts are not
+protected on net — they are among the fastest-retreating shorelines on Earth, several metres a year,
+because the dominant mechanism is not wave abrasion at all. Where the bluff is **ice-rich
+permafrost** (`17`), the sea does *thermal* work: a thaw niche is melted at the waterline, undercuts,
+and the block above collapses along its ice wedges. Retreat is therefore driven by **water
+temperature and open-water duration**, not by wave energy, and it is **not** proportional to fetch —
+a sheltered ice-rich bluff can retreat faster than an exposed rock headland. Model an ice-rich coast
+as thermal abrasion gated by the open-water season, and a rock coast with the wave machinery above;
+using the wave model for both is the defect.
+
+**Ice is also a sediment-transport path with no wave analogue**, and it matters to the budget
+invariant (`SKILL.md`). Sediment freezes into shore-fast and anchor ice during the freeze-up, rides
+out with the floes, and drops wherever they melt — **ice rafting**, offshore and often far from any
+current that could have carried it. The signature is a *dropstone*: a clast far too coarse for the
+mud it sits in, with the laminae beneath it deformed by the impact. The paleo record of the same
+process at scale is **Heinrich 1988** (*Quaternary Research* 29 — North Atlantic ice-rafted debris
+layers from iceberg armadas). For a graph, this is a **net offshore export term**: a sediment budget
+closed with waves alone will not close on an ice-affected coast.
+
+Three further forms, all cheap and all recognisable:
+
+- **Ice push / ice shove (ivu).** Wind- and current-driven pack ice rides up the shore and bulldozes
+  whatever it meets into ridges — **boulder barricades** and ice-push ramparts above the waterline.
+  Episodic and metre-scale; a displacement event, not a rate.
+- **Ice-keel gouging.** Pressure-ridge keels plough the shallow seabed, cutting linear scours with
+  levées either side, in water shallower than the keel draught. This is *seabed* morphology (`12`
+  submarine profile), not coastline, and it is a strong tell that a shelf is ice-affected.
+- **The ice surface itself**, if you render it, is composition rather than simulation (`10`): floes
+  are a fracture tessellation (Worley/Voronoi, `01`), leads are the linear openings between them, and
+  pressure ridges run along floe boundaries. Do not simulate ice dynamics to get a look you can
+  compose.
+
+**Tier — and the honesty is the point.** As with coastal erosion above, **there is no graphics paper
+for any of this**, and saying so beats inventing one. The process literature is periglacial and
+coastal geomorphology and sea-ice oceanography, not computer graphics: the mechanisms above are
+**P** as observed process, the ice-rafting paleo record is **P** (Heinrich 1988), and every
+*implementation* here — the fetch gate, the open-water multiplier, the thermal-abrasion coupling —
+is **F**, assembled from this chapter's existing machinery. Rates are strongly regional; treat any
+number as a knob to calibrate against a reference coast, not a constant. Permafrost substrate,
+ice-wedge geometry and thermokarst are `17`.
 
 ## Cliff retreat & beaches
 

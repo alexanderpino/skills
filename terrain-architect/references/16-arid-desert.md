@@ -13,8 +13,14 @@ not flushed away**, so they pile up. Three consequences drive every landform bel
 
 1. **Sparse, flashy runoff.** Rain is rare but arrives as flash floods; channels are dry most of
    the time (wadis) and braided/depositional when they run.
-2. **Wind is a first-class agent.** Abrasion (yardangs) and deflation (pavement, playas) shape
-   rock and strip fines — the `05` aeolian machinery, now *erosional*, not only depositional.
+2. **Wind is a first-class agent** — and being first-class means it is a **field**, built before
+   any of the landforms below (`13` `windField`: a per-cell speed *and* direction). Abrasion
+   (yardangs) and deflation (pavement, playas) shape rock and strip fines — the `05` aeolian
+   machinery, now *erosional*, not only depositional. The deflation half is the flux-divergence
+   coupling of `05` (*Wind speed → sand flux → bed change*), and it is worth knowing why it needs
+   the field: under a spatially constant wind the sand flux is uniform, `∇·q ≡ 0`, and **the wind
+   moves no terrain at all** — an arid graph driven by a single `windDir` constant can only fake its
+   aeolian relief with masks.
 3. **No base-level flush.** Endorheic basins (playas) terminate drainage internally — there is no
    ocean to carry sediment away, so everything accumulates *in the basin*.
 
@@ -44,6 +50,16 @@ yardang(h, windDir, softMask):
 The detail that sells it: **abrasion is bottom-weighted** — saltating sand only reaches ~1 m up,
 so yardangs are undercut at the base and the nose is steepest low down (Ward & Greeley). Which
 grains are in the abrading stream comes from the `05` Bagnold threshold.
+
+*Runnable reference: `reference-impl/aeolian.py` (`yardang`; wind-aligned lanes seeded by anisotropic
+fBm, abraded with a bottom-weighted saltation term inside a soft mask), verified by
+`tests/test_aeolian.py`. F-tier, invariant-checked: ridges elongate **‖ wind** (along-wind autocorr ≫
+cross-wind — the drumlin-like signature), abrasion is carve-only and confined to `softMask`, and the
+**low ground is cut fastest** (bottom-weighting → undercut, streamlined ridges). `wind` accepts the
+`13` field as well as a constant vector: the lane geometry then follows the field's **resultant**
+direction — a yardang field records the long-term prevailing wind, so its lanes stay straight where
+the instantaneous flow bends — while the abrasion **rate** follows the local speed cubed, so
+sheltered ground abrades slowly and exposed crests fast.*
 
 ## Inselbergs & bornhardts
 
@@ -88,6 +104,12 @@ Two details: **fan slope increases with debris-flow dominance and decreases with
 size** (Blair & McPherson), and **avulsion** — the feeder channel periodically jumps to build a new
 lobe — is what makes a fan a *fan* rather than a single incised gully. Coalesce several fans along a
 front and you have a bajada.
+
+*Runnable reference: `landforms.alluvial_fan(h, apex, downfan=…)` — a semiconical, deposition-only
+apex stamp with a concave downfan thinning profile, built from `seed`-jittered **avulsion lobes**;
+coalesce several along a range front for a bajada. Verified by `tests/test_alluvial_fan.py`: adds
+only, deposits only downfan (nothing behind the apex), thins with distance, and is confined to its
+angular sector. F-tier look.*
 
 ## Pediments
 

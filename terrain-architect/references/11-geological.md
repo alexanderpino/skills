@@ -56,6 +56,11 @@ talus(p, h) = layerAt(stratCoord(p, h), bedTable).reposeAngle
 Then feed `K` into stream power (`04`) or the pipe model's erodibility, and `talus` into
 thermal (`05`). Erosion produces the landform.
 
+*Runnable reference: `landforms.bed_erodibility(strat_coord(...), bedTable)` builds the `K(p,h)` field,
+fed to `erosion_streampower.stream_power_evolve` as a field or a callable `K(h)` (re-evaluated on the
+surface, so beds are fixed in the column and exposed as incision cuts down — caprock, cuestas, relief
+inversion). Verified by `tests/test_lithology.py`; the coupling is the geologically-correct one (`02`).*
+
 **Bed thickness must be non-uniform.** A `sin` or a uniform modulo gives evenly-spaced steps,
 which is exactly what a terrace node gives — you've done the expensive thing and got the cheap
 result. Use an authored table, or a noise-driven thickness sequence with a plausible
@@ -70,6 +75,11 @@ above — it's the obvious synthesis.
 ## Terracing
 
 The height op. Fine when you want the look.
+
+The **hex-prism / pillar** render style (`26`) is this op by another name, applied at mesh-build
+time — so it inherits the tell above (steps track absolute elevation and cut across valleys),
+deliberately. Keep it downstream of everything: quantise the field before simulating and slope
+becomes `0`-or-infinite, which breaks flow routing and erosion outright.
 
 ```
 terrace(h, levels, sharpness):
@@ -208,6 +218,109 @@ Cuesta / hogback  = tilted beds + differential erosion. Set `tilt` in stratCoord
 ```
 
 Nobody has published "the mesa algorithm" and nobody will. If asked for a paper, say so.
+
+## Placeable feature-primitive generators
+
+The recipes above build these landforms the **emergent** way: a material field (layered `K`) plus
+erosion, so the cliff/valley *falls out of the physics*. There is a second, equally-legitimate route —
+the one a Gaea "Mountain"/"Volcano"/"Canyon" node takes — the **feature-primitive construction tree**
+(Génévaux et al. 2015, *Terrain Modelling from Feature Primitives*, CGF; Guérin et al. 2016): you
+**place a parametric primitive**, combine several (`max` / smooth-max), then erode. The primitive stamps
+an approximate profile directly (a height op), which is faster and art-directable ("a mountain *here*")
+but less physically pure than letting it emerge — so run a real erosion pass afterwards, and prefer the
+emergent recipe when the material field is what you actually care about. Both are in the toolbox; these
+are the generators the reference implements, with the algorithm each uses.
+
+```
+# MOUNTAIN — a drainage-organised massif (how Gaea's Mountain node is built: modulated Voronoi
+# + distortion; Génévaux 2015). NOT thresholded isotropic noise (that reads as "noise on a lump").
+mountain(shape, style):
+    # 1. crest-skeleton ENVELOPE — a non-circular massif footprint (crest high, margins low)
+    env = 0
+    repeat n_ridges:
+        crest = wandering polyline across the tile (a few control points + perpendicular jitter)
+        d     = min distance to crest segments (ops_filters.sd_segment, 10)
+        env   = max(env, clip(1 - d/reach, 0, 1) ^ profile)
+    # 2. modulated-VORONOI ridge network: Worley f2-f1 cell EDGES are ridgelines, interiors valleys
+    (u,v) = tile coords scaled to ~cells drainage cells
+    (u,v) += warp * (fbm(u,v), fbm(u,v))          # two-scale domain distortion -> curved spurs (01)
+    ridges = 1 - worley(u, v, kind="f2f1") / percentile(.,98)     # ~1 on cell edges
+    ridges = mix(ridges, finer_octave, spur) ^ crestSharpness
+    # 3. incise: crest sits at the envelope, valleys drop `relief` below it
+    h = height * env * ((1 - relief) + relief * ridges)
+    # 4. bake the weathering the STYLE implies (basic|eroded|alpine|old|strata) — this is what
+    #    turns the Voronoi skeleton into a dendritic network, exactly what Gaea's Eroded/Old fold in:
+    if style.erode:  h = droplet_erode(h, ...)    # a modest real hydraulic pass (04)
+    if style.talus:  h = thermal_relax(h, repose, iters)          # faces to the angle of repose (05)
+    if style.strata: h = terrace(h, levels)       # sedimentary banding
+    return h            # NOTE: whole-tile percentile normalisation -> single-shot, not tile-composable
+
+# RIDGE — a single linear hogback/cuesta. Geology: the exhumed edge of a DIPPING RESISTANT BED
+# (a homocline) under differential erosion — the gentle DIP SLOPE is the exhumed top bedding plane
+# (angle ~ the bed dip), the steep SCARP cuts across the beds; dip angle sets the class (cuesta <~25°,
+# hogback >~30-40°). Huggett 2011 Fundamentals of Geomorphology; Fairbridge 1968. The PHYSICALLY-
+# CORRECT route is differential erosion of a tilted bed_erodibility field (04+11 above). This is the
+# fast PRIMITIVE, built the way graphics builds ridges — a BLENDED shape, not a hard-stamped wedge
+# (Génevaux 2013; Guérin 2016) — with three fixes so the crest is not a razor mathematical cut:
+ridge(shape, asymmetry):
+    s0 = signed across-crest coordinate (straight base line)
+    s  = s0 + warp * reach * fbm(p)               # 1. DOMAIN WARP: the strike-line meanders (01; Quilez)
+    scarp = reach*(1-asymmetry);  dip = reach*(1+asymmetry)       # asymmetry 0 = symmetric arete
+    p_scarp = height*(1 - s/scarp)                # roof plane descending on the scarp side
+    p_dip   = height*(1 + s/dip)                  # roof plane descending on the dip side
+    z = smin(p_scarp, p_dip, crest_round*height)  # 2. SMOOTH-MIN crest: rounded C-inf, not a C1 cut (10; Quilez)
+    z = clip(smax(z, 0, k_toe), 0, height)        #    ...and a smooth toe onto the plain
+    z *= (1 - detail*scarpMask) + detail*scarpMask*ridged_mf(...)  # dissect the SCARP; dip stays smooth (01)
+    if weather: z = thermal(z, repose)            # 3. talus-weather the over-steep crest (05; Musgrave 1989)
+    return z
+
+# VOLCANO — a radial edifice (Karátson et al. 2010 morphometry).
+volcano(shape, kind):
+    rn = clip(r / R, 0, 1)                          # r = radial distance from the centre
+    prof = (kind=="shield") ? 1 - rn^1.7            # broad convex dome, gentle slopes
+                            : (1 - rn)^2.2          # strato: CONCAVE-UP sweep (exponent > 1, ~2.2 -> summit
+                                                    #   ~3x steeper than the foot; a real sweep, not a cone)
+    grooves = ½(1 + cos(n_barrancos*theta + 2*pi*fbm))   # radial barrancos, deepen downslope
+    prof   *= (1 - barranco * grooves * rn)
+    h = height * prof
+    h -= crater_depth * bowl(r < crater_R) ^ 1.5    # summit crater / caldera
+    h += rim * gaussian_ring(r ~ crater_R)          # raised crater rim
+    return max(h, 0)          # barrancos are STAMPED here; run fluvial erosion (04) to cut real ones
+
+# CANYON — a plateau incised by a meandering trunk + tributaries (Leopold 1964 meanders).
+canyon(shape):
+    plateau = rim + roughness * fbm
+    trunk   = meandering centreline down the tile (sinusoid + random walk)
+    d       = distance to trunk; for each tributary: d = min(d, distance to tributary polyline)
+    ramp    = clip((d - floor_w) / wall_w, 0, 1)
+    smooth  = plateau - depth * ((d <= floor_w) ? 1 : 1 - ramp)     # a SMOOTH V-profile gorge, no benches
+    # benches are HORIZONTAL STRATA, not river contours: quantise ABSOLUTE ELEVATION to global bands (with a
+    # low-frequency warp for natural bed irregularity), ONLY on the incised walls — so the steps stay flat and
+    # geographically STATIONARY while the meander cuts down THROUGH them (true strath-terrace geometry).
+    step    = depth / n_benches
+    b       = (smooth - (rim - depth)) / step + 0.18 * fbm         # elevation-indexed band + irregularity
+    bench   = (rim - depth) + step * (floor(b) + riser(frac(b)))   # snap wall elevation to the strata band
+    wall    = (d > floor_w) and (smooth < rim - 0.02*depth)        # incised walls only (not floor/plateau)
+    return  wall ? bench : smooth                                  # plateau stays dominant; a thin deep floor
+
+# FAULT-BLOCK BUTTE — flat structural top, near-vertical cliff, talus at repose; a joint/fault-
+# controlled POLYGONAL footprint (Narr & Suppe 1991), not radial. The primitive form of "caprock
+# over soft beds"; the emergent recipe (layered K + erosion) is the physically-honest alternative.
+fault_block_butte(shape, bh):
+    d = sd_convex_polygon(footprint at two orthogonal joint azimuths, cross-joints ~1.7x wider)  # (10)
+    d = gaussian(d, corner_round)   # a short diffusion of the SDF rounds the ~90° joint corners — sharp
+                                    #   exposed corners weather fastest, so a perfectly square block reads fake
+    profile: d<=0 -> flat top bh; thin cliff band -> near-vertical; then talus at repose_tan down to 0
+    add a resistant caprock lip at the rim; roughen the scree
+    return max(profile, 0)     # place, combine with max/smax, then run thermal (05) for real talus
+```
+
+These stamp a profile directly, so honour the chapter's **central claim** where it matters: a butte's
+cliff is *most* honest as an emergent break-of-slope in a layered-`K` field; the primitive is the
+art-directed shortcut. Note `canyon` quantises benches by **absolute elevation** (horizontal strata),
+*not* by distance-to-river — so the terraces are geologically correct (flat, stationary, cut through by
+the meander), and this is a *primitive* step done before any flow routing; still never run `terrace`
+*after* erosion (it destroys the drainage — see Terracing above).
 
 ## When the heightfield fails
 
@@ -570,8 +683,9 @@ are the F-tier looks over those P-tier physics.
 Only a "crater" primitive exists today, but real craters have a well-constrained morphology that
 **changes with size** (**Melosh 1989**, *Impact Cratering: A Geologic Process*, Oxford Univ. Press;
 **Pike 1977**, *Size-dependence in the shape of fresh impact craters on the Moon*). Two regimes,
-with a transition around **~3 km on Earth and ~15 km on the Moon** — the transition diameter
-scales as **~1/g** (Melosh 1989), so it is *smaller* where gravity is stronger:
+with a transition around **~3 km on Earth and ~10–20 km on the Moon** (Pike's morphologic
+changes onset near ~11 km and span ~10–30 km) — the transition diameter scales as **~1/g**
+(Melosh 1989), so it is *smaller* where gravity is stronger:
 
 - **Simple crater** (small): a bowl. Raised, overturned **rim**; **ejecta blanket** draping outward
   ~1 crater radius and thinning roughly as `r⁻³`; depth ≈ 1/5 of diameter.
@@ -584,7 +698,7 @@ crater(D):
     profile(r):                                   # radial
         if r < R:  bowl (paraboloid) to depth d(D)          # d/D ~0.2 simple, less if complex
         else:      rim uplift + ejecta * (r/R)^-3           # ejecta thins outward
-    if D > D_complex:                             # ~3 km Earth / ~15 km Moon — scales ~1/g (Pike 1977; Melosh 1989)
+    if D > D_complex:                             # ~3 km Earth / ~10–20 km Moon — scales ~1/g (Pike 1977; Melosh 1989)
         add centralPeak (rebound) near r = 0
         terrace the inner walls (slump blocks)
         flatten the floor; the crater is shallower
@@ -596,3 +710,82 @@ Melosh's ejecta scaling and Pike's depth/diameter and rim-height ratios are the 
 crater that is a plain Gaussian dimple — no raised rim, no ejecta, no central peak at size — reads
 as a golf divot, not an impact. Crater size also scales with **gravity** (Melosh's π-group scaling),
 which matters off-Earth — see the planetary doctrine in `SKILL.md`.
+
+**From impactor to crater, and impact angle.** To drive a crater from the *asteroid* (diameter,
+speed, density) rather than a chosen `D`, use the **Collins, Melosh & Marcus 2005** π-scaling
+(*Earth Impact Effects Program*, MAPS) — the accessible, validated form. Gravity-regime transient
+diameter:
+
+```
+D_tc = 1.161 · (ρ_i/ρ_t)^(1/3) · L^0.78 · v^0.44 · g^(−0.22) · (sinθ)^(1/3)     # metres
+```
+
+then the final crater (`D = 1.25·D_tc` simple; a shallower complex law above the `~3.2 km·(g_⊕/g)`
+transition). **The angle enters as `(sinθ)^(1/3)`** — only the *vertical* velocity component
+excavates, so a 30° impact digs a crater ~`2^(1/3)` (≈20%) smaller than a vertical one of the same
+energy. θ is measured from horizontal; the most probable impact angle is 45°.
+
+Shape under obliquity (**Gault & Wedekind 1978**; **Pierazzo & Melosh 2000**; **Collins et al.
+2011**) — a *look*, not a ballistics sim:
+
+- **Circular until it grazes.** Craters stay round above a target-dependent threshold (~5° in sand,
+  ~30° in rock; ~12° a working default, and *higher* for large/low-efficiency craters — Elbeshausen
+  2013) and **elongate downrange** below it. Only a few percent of craters are elliptical, because
+  few impacts are that shallow (`P(<θ) = sin²θ`; the 12° default matches the observed ~5% — Bottke 2000).
+- **Ejecta walks through a sequence, not a single knob** (Gault & Wedekind 1978; Anderson 2003;
+  Luo 2022): near-symmetric when steep → increasingly **downrange**-loaded below ~45° (peak
+  down/up-range mass contrast ~8×, arXiv 2404.16677) → a sharp **up-range forbidden wedge** opens
+  below **~20°** → a cross-range **butterfly** (forbidden zones *both* up- and down-range, wings
+  thrown perpendicular to the path) only below **~5°**. Don't trigger the butterfly early — at 8–15°
+  the pattern is still a downrange lobe with an up-range gap. (Those are the *laboratory* thresholds;
+  on the Moon the up-range wedge is read from ~25° and butterflies from ~10° — Luo 2022 — slightly
+  higher than the lab values, and rims stay "nearly round" down to ~10°.)
+- **Asymmetric depth, rim & peak.** A grazing crater is **deeper up-range** — the deepest point and
+  steepest wall sit on the up-range side (first contact / peak energy transfer; Schultz — the
+  subsurface-pulse study *Anderson et al., arXiv 2308.01876* finds the up-range floor slope ~10°
+  steeper), shallowing **down-range** where material is plowed out. The **up-range rim is depressed**
+  into a forbidden arc, while structural rim uplift is greatest *transverse* to the path. Any
+  central-peak offset is **up-range**, toward the deepest-penetration side (Schultz 1996) — and it is
+  **contested** (Ekholm & Melosh 2001 found none on Venus), so a weak indicator, not a law. (An earlier
+  draft here had the deepening *and* the peak going **downrange** — both were backwards.)
+
+As pseudocode — the size + azimuthal-weight + peak-offset core is `reference-impl/crater.py`
+(`transient_crater_diameter`, `final_crater`, `_ellipticity`, `_ejecta_azimuth_weight`,
+`stamp_impact`); the relief styling below the dashed line (deeper up-range, `~0.04·D` rim ring,
+terraces, hummocky apron) is the `crater_demo.py` presentation layer:
+
+```
+finalCrater(D_tc, g):  Dc = 3200·(9.81/g)                    # transition ∝ 1/g
+    if 1.25·D_tc < Dc:  D = 1.25·D_tc;              depth = 0.20·D           # simple
+    else:               D = 1.17·D_tc^1.13 / Dc^0.13; depth < 0.20·D         # complex, shallower
+
+obliqueImpact(D_tc, angle, azimuth):        # angle from horizontal; ψ measured from DOWNRANGE
+    D, depth, complex = finalCrater(D_tc, g)
+    ecc = 1 + 1.2·clip((12−angle)/12, 0, 1)        # CIRCULAR ≥12°, elongates below (Bottke/Collins)
+    r   = dist(stretched by ecc along the track) / (D/2)      # the hole is round unless grazing
+    # azimuthal ejecta / rim weight — the observed sequence, not one knob:
+    d  = clip((90−angle)/85, 0, 1)                 # obliquity 0 (vertical) … 1 (grazing)
+    p  = 1 + 3·clip((20−angle)/20, 0, 1)           # sharpen up-range forbidden wedge <20°
+    bf = clip((5−angle)/5, 0, 1)                   # butterfly <5° (lab; ~10° on the Moon)
+    down = ½(1 + cos ψ)                            # 1 downrange, 0 up-range
+    w   = (1−d) + d·down^p                         # steep→uniform, oblique→downrange-loaded
+    w   = (1−bf)·w + bf·sin²ψ                      # <5°: cross-range wings, both forbidden zones
+    azw = 0.12 + 0.88·w                            # down/up-range mass contrast caps ~8× (arXiv 2404.16677)
+    # ---- crater.py stamps bowl + mass-conserving azw·ejecta + up-range peak above this line ----
+    # ---- crater_demo.py presentation adds the relief styling below, all keyed to azw / d: ------
+    bowl:   paraboloid to depth; at grazing DEEPER UP-RANGE (steeper up-range wall; Schultz)
+    rim:    raised ring ~0.04·D, lumpy; scaled by azw (downrange/transverse build-up, up-range starved)
+    ejecta: hummocky apron off the rim, ∝ azw, reaching farther downrange and thinning outward
+    peak(if complex): rough massif, offset slightly UP-RANGE (deepest-penetration side; contested)
+```
+
+`reference-impl/crater.py` implements this size+angle model with the π-scaling exponents verified
+against the source (`reference-impl/VALIDATION.md`); its ejecta is **mass-conserving** (the excavated
+bowl volume is what the downrange-biased blanket redeposits). For the *look*, the key principle is:
+a hypervelocity impact is a point-source explosion, so **keep the cavity a smooth near-circular bowl
+and put the chaos in the displaced mass**. `reference-impl/crater_demo.py` does that — a raised rim
+ring, an irregular rim/ejecta outline, terraced walls, a central massif, and a hummocky downrange
+ejecta apron — hillshaded across size × angle (`crater_matrix.png`); only below ~12° does the cavity
+elongate (deeper up-range). `reference-impl/crater_anatomy.py` labels the grazing case in
+`crater_anatomy.png` (map + trajectory cross-section). Those renders are presentation, not verified
+ledger — see `reference-impl/GROUNDING.md`.
