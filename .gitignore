@@ -8,3 +8,6 @@ apps/*/dist/
 apps/*/playwright-report/
 apps/*/test-results/
 apps/*/.playwright/
+
+# Mission Control state: SQLite db + evidence. Tooling, not product.
+.mission-control/
