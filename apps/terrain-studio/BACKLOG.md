@@ -349,8 +349,33 @@ at 3 per group and logged that it had):
 | File | Sites | What the audit claims |
 |---|---|---|
 | `_verify_hex_sampling.js` | 80, 212, 241 | `mkRamp` allocates `n*n`; **S5 unfalsifiable** because `bakeThumb` is already converted and reaches row 216 of a 192-row ramp; `warpField` runs over an input built under `square` |
-| `_verify_hex.js` | 139, 168, 278 | H4b's negative control, H2/H3's cone, and H6's paraboloid are all `n*n` while `terrainDef.lattice` is `'hex'` |
+| `_verify_hex.js` | 139, 168, 278 | H4b's negative control, H2/H3's cone, and H6's paraboloid are all `n*n` while `terrainDef.lattice` is `'hex'`. **Measured, and less severe than filed** — see below |
 | `_verify_hex_dem.js` | 77, 82 | D3's export probe is `n*n`; and the resample no longer matches the shipped `exportHeightmap`, which now applies `rowSpan = (fieldH()-1)/(RES-1) = 1.157` |
+
+**`_verify_hex.js` measured, not assumed** — it was one of the 8 the workflow never got to verify, and
+the file passes 8/8 with coherent discriminating numbers (H3 ring anisotropy 1.003, H6 hex/square
+curvature agreeing to five digits, H7 `lastTouchedRow=221/221`), which is not what corrupted input
+looks like. So I probed it directly at `RES=192`, hex, feeding `curvatureField` the same `n*n`
+paraboloid the file builds:
+
+```
+fieldH=222  fieldLen=42624   probe=36864  shortfall=5760
+nanCells=5952   firstNaNRow=191   lastAllFiniteRow=190
+H6 annulus spans rows 20..172    annulusTouchesNaN=FALSE
+```
+
+Both halves matter. **The NaN is real** — 5952 output cells, 14% of the field — and it starts at row
+**191**, one row before the allocation ends, because the curvature stencil at 191 reads its
+neighbour at 192. `gAt` does not save you: it clamps `y` to `fieldH()-1 = 221`, the *logical*
+height, then indexes an array that only has 192 rows. **And no gate looks there.** H6's annulus
+spans rows 20–172, so the measurement is untouched.
+
+These are therefore **domain-restricted, not corrupted** — the gates are honest about what they
+sample, they just sample 86% of the field. That is a real gap for a lattice whose whole point is the
+extra rows, and it needs fixing; but it is a different severity from `_verify_hex_flow.js`, where the
+NaN reached a min-heap and corrupted the flood globally. Fixing it means rebuilding the probes at
+full height, which moves `cy` from the pre-flip `(n·√3/2)/2` to `((rows-1)·√3/2)/2` and will shift
+the reported numbers — so re-baseline, don't assume the old values should reappear.
 
 **The lesson that generalises past this file.** `_verify_hex_flow.js` passed **6/6 before the fix**.
 Every asserted quantity — pits, borderReach, terminalMass — is a count or a ratio, and the phantom
