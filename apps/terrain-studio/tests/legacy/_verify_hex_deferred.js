@@ -71,7 +71,17 @@ const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
     const out = { liftedFromLiveShader: true }, HR = Math.sqrt(3) / 2;
     if (!gl) return { noGL: true };
     const N = 64;                      // probe grid: N*N world points rendered in one pass
-   const rectTex = (key, w, h, data) => {
+    // THREE parameters, not four. The vestigial leading `key` was never used in this body, but the
+    // single call site (`rectTex(n, nh, f)`) was written for the 3-arg form - so with the 4-arg
+    // signature the arguments shifted by one: w=nh, h=THE FLOAT32ARRAY, data=undefined. That does
+    // not throw, which is why it survived: `w * h` is number * Float32Array = NaN, so
+    // `new Float32Array(NaN * 4)` is a ZERO-LENGTH buffer and `i < NaN` is false, so the copy loop
+    // never runs and never dereferences the undefined `data`. An empty texture is uploaded in
+    // silence. This is the "remaining fault ... in the GPU.* plumbing" the STATUS note above
+    // describes: the shader was never the problem, the harness was handing it nothing.
+    const rectTex = (w, h, data) => {
+      if (!data || data.length < w * h)
+        throw new Error(`rectTex: need ${w * h} samples for ${w}x${h}, got ${data ? data.length : 'undefined'}`);
       const rgba = new Float32Array(w * h * 4);
       for (let i = 0; i < w * h; i++) rgba[i * 4] = data[i];
       const t = gl.createTexture();
