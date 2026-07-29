@@ -314,10 +314,51 @@ Related dead code: `.effect` is declared on 7 node types (`:4567, :4579, :4599, 
   the field contract over any `n * n` written from habit, and assert addressability before believing
   a count.
 - `_verify_hex_sampling.js` S4/S5 — still open; closed form encodes the pre-flip warp world extent.
-- `_verify_hex_deferred.js` G1/G2 — harness built on `GPU.upload()`/`GPU.prog()`, which are
-  square-by-construction (`upload` only makes `n×n`; `prog` caches by key and **ignores the
-  source**). The shader itself is verified correct to six decimals by `_verify_glsl_probe.js`; this
-  is test debt, not a product regression.
+  The audit below adds three more sites in this file, including one that makes **S5 unfalsifiable**.
+- `_verify_hex_deferred.js` G1/G2 — **FIXED** `3f63af3`, 4/4. I had this filed as harness debt
+  caused by `GPU.upload()`/`GPU.prog()` being square-by-construction. The conclusion was right (the
+  shader is correct — six decimals, `_verify_glsl_probe.js`) but the attribution was wrong, and a
+  wrong attribution keeps a one-line defect classified as someone else's problem indefinitely.
+  Actual cause: `rectTex` was declared `(key, w, h, data)` and called `rectTex(n, nh, f)`, so every
+  argument shifted — `w=nh`, `h=`**the Float32Array**, `data=undefined`. It does not throw, which is
+  why it survived: `w*h` is `number × Float32Array = NaN`, `new Float32Array(NaN*4)` is
+  **zero-length**, and `i < NaN` is false on the first test so the copy loop never runs and never
+  dereferences `data`. An empty texture uploaded in silence. `key` was never used in the body.
+
+### C11 — Square-shaped buffers across the oracle suite · WIP
+
+Generalised from the wireframe bug. 156 sites audited across 25 files: **16 BUG, 117 LATENT, 15
+NOT_A_FIELD, 8 STAGING_OK**. Every BUG is in one of the five hex oracles — the gates that exist to
+prove hex correctness were themselves square. The 117 LATENT are safe *today* only because those
+files never leave the square lattice.
+
+Two mechanisms, and they need different fixes:
+
+- **Discarded writes** — a buffer too short for the field; out-of-range `TypedArray` stores vanish
+  silently. This is the wireframe case.
+- **Out-of-range reads** — a *correctly sized* square field handed to a hex kernel that iterates
+  `fieldH()`. Reads past the end give `undefined → NaN`, and NaN then propagates somewhere that
+  cannot detect it: a min-heap sift (`<=` against NaN is always false, so NaN sorts to the **top**)
+  or a comparator (`(a,b) => g[b]-g[a]` with NaN keys is not a valid order). This is the hex_flow
+  case, and it is the more dangerous of the two because the buffer looks right.
+
+Fixed: `_verify_hex_flow.js` (`6179fdf`), `_verify_hex_deferred.js` (`3f63af3`).
+**Still open — 8 sites in 3 files**, all adversarially UNVERIFIED (the workflow capped verification
+at 3 per group and logged that it had):
+
+| File | Sites | What the audit claims |
+|---|---|---|
+| `_verify_hex_sampling.js` | 80, 212, 241 | `mkRamp` allocates `n*n`; **S5 unfalsifiable** because `bakeThumb` is already converted and reaches row 216 of a 192-row ramp; `warpField` runs over an input built under `square` |
+| `_verify_hex.js` | 139, 168, 278 | H4b's negative control, H2/H3's cone, and H6's paraboloid are all `n*n` while `terrainDef.lattice` is `'hex'` |
+| `_verify_hex_dem.js` | 77, 82 | D3's export probe is `n*n`; and the resample no longer matches the shipped `exportHeightmap`, which now applies `rowSpan = (fieldH()-1)/(RES-1) = 1.157` |
+
+**The lesson that generalises past this file.** `_verify_hex_flow.js` passed **6/6 before the fix**.
+Every asserted quantity — pits, borderReach, terminalMass — is a count or a ratio, and the phantom
+NaN border left all of them intact. The one number that moved was `overFill` (0.583 on a field of
+range ~0.8, where a strictly descending cone requires 0), and it was **printed in the message and
+omitted from the condition**. So: *a quantity worth printing is a quantity worth asserting.* If it
+is diagnostic enough to report, it is diagnostic enough to fail on — otherwise it is decoration
+that makes a broken gate look thorough.
 
 ---
 
