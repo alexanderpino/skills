@@ -168,6 +168,10 @@ defects:
 7. Is thermal downstream of hydraulic?
 8. Does the sediment budget close — and if it leaks, is the leak measured rather than assumed?
    (A graph that only erodes, or only deposits, is the tell.)
+9. Is water emitted as its own surface + depth layer rather than baked into the collision
+   height — and is the bake free of anything that should move at runtime (waves, foam,
+   spray, particles)? The tool exports causes and drivers; the engine renders motion
+   (Part 2, "Water is caused, not carved"; Part 3, "The hydrology handoff").
 
 State findings as **symptom → mechanism → minimal fix**. Do not rewrite a graph that has one
 misordered node.
@@ -219,6 +223,29 @@ truthful too, as their own layers on top. A graph that collapses them into one n
 tell the engine what to walk on, what to swim in, or what will be gone by summer. When the
 stack needs **voids** (overhangs, sea caves) rather than stacked thicknesses, the per-column
 material stack of `11` replaces the field stack.
+
+## Water is caused, not carved — the fluid boundary
+
+The single most common separation-of-concerns failure in terrain tooling is letting the
+offline tool do the engine's fluid work, or the engine do the tool's hydrology. The boundary
+is absolute:
+
+**Whitewater is caused, not carved.** The terrain tool's job is to build the *causes* of
+rapids and waterfalls — steep gradients, bedrock knickpoints (`04`), step-pool and
+constriction channel morphology (`03`), plunge pools — never the *effects*. No foam, no
+splashing, no spray, no particles, and no wave shapes are ever simulated into or baked into
+the heightfield or any water field. A baked wave is a frozen artefact: it cannot animate, it
+corrupts collision and derivatives, and it duplicates — badly — work the engine will do anyway.
+
+**The engine owns motion.** Real-time fluid simulation — SPH/FLIP particle waterfalls,
+Gerstner/FFT ocean waves, foam and spray shading — is strictly the game engine's domain
+(`15`). The terrain tool provides the static foundation and the *driving data* (surfaces,
+depths, flow vector fields — the hydrology handoff, Part 3); the engine provides the motion.
+
+The doctrinal test is simple: **if it moves at runtime, it is not the terrain tool's to
+generate; if it is the reason the water moves *there*, it is.** A waterfall in this skill is a
+knickpoint with a plunge pool and a flow field pointing over the lip — the falling water
+itself belongs to the engine.
 
 ## Every landform is a claim about a process
 
@@ -537,6 +564,31 @@ Contract (`references/08-output-contract.md`). This is where "the engine is just
   layout (`08`, `15`).
 - **DEM import is the contract read backwards.** The same chapter owns ingest: void-fill,
   hydro-enforcement, sensor error models — repair before simulate (Part 2).
+
+### The hydrology handoff
+
+Water crosses the tool/engine boundary under its own contract, enforcing the fluid boundary
+of Part 2 ("caused, not carved"):
+
+- **Water is a layer, not a solid.** The water surface (`waterSurface`) and its depth export
+  as separate fields — never folded into the solid collision height (`solidTop`). Baked-in
+  water is the **"solid ocean" defect**: a sea the player cannot swim in, a tide that cannot
+  move, a river frozen into a trench of glass. The engine needs the solid stack for
+  collision and the water layer for the swimmable, animatable volume — collapse them and
+  both are lost (Part 2, the layer stack).
+- **Export the drivers, not the effects.** So the engine can render rapids, waterfalls, and
+  particles, the tool emits the data that *drives* them: flow maps / velocity vector fields
+  (`FlowField`, from routing and discharge, `03`), water depth maps, and analysis-derived
+  masks (gradient, constriction, wetness — `06`). The engine consumes these to steer its own
+  particle systems and fluid shaders. Foam, spray, splash, and wave displacement are never
+  in the export.
+- **Lakes and oceans are flat planes at spill elevation.** After depression handling, a
+  standing water body is exactly two things: a perfectly flat `waterSurface` at its spill
+  level (`03` — sea level for oceans), and the **bathymetry** — the underwater solid
+  terrain, generated to the same standards as dry land (`12`). The tool puts no waves,
+  ripples, or chop on that plane; Gerstner/FFT wave synthesis is the engine's, and it needs
+  the flat datum plus depth to run correctly (wave shoaling, shoreline foam, and swim
+  volumes are all functions of the depth field the tool exported).
 
 ---
 
