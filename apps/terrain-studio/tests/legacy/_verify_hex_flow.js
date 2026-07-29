@@ -88,15 +88,35 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     // cone has one slope magnitude at every azimuth and one flow direction (radially out), which is
     // what makes both measurements below unambiguous. ----
     const mkCone = hex => {
-      const px = new Float64Array(N), py = new Float64Array(N), d = new Float64Array(N);
-      const cx = (n - 1) / 2 + (hex ? 0.25 : 0), cy = ((n - 1) / 2) * (hex ? HEXR : 1);
+      // SET THE LATTICE FIRST. newField() and fieldH() both read terrainDef.lattice at call time,
+      // and this function used to run while it was still 'square' - the switch happened later,
+      // inside slopeStats/routeStats. So the hex cone was a 192-row array handed to kernels that
+      // iterate fieldH() = 222 rows. They read past the end, got undefined, and wrote NaN into
+      // rows 192..221 of everything downstream. Nothing threw:
+      //   - priorityFloodFill seeds its border from row nh-1 = 221, i.e. from cells the input did
+      //     not contain, so those seeds are NaN;
+      //   - a min-heap sift compares `heap[p][0] <= heap[c][0]`, and EVERY comparison against NaN
+      //     is false, so NaN entries rise to the top and are popped FIRST - the flood started from
+      //     a phantom border and reached the real last row only afterwards;
+      //   - d8Accumulation then sorts 42624 keys of which 5760 are NaN with (a,b) => g[b] - g[a],
+      //     an inconsistent comparator, so the "topological" order was not one.
+      // The gate reported numbers the whole time. They described a different surface.
+      terrainDef.lattice = hex ? 'hex' : 'square';
+      const rows = fieldH(), NC = n * rows;
+      // cy is the centre of the FIELD, so it comes from the ROW COUNT, not the width. At (n-1)/2 it
+      // sat at world y 82.7 inside a hex world 191.4 tall - the cone was off-centre by 13%, which
+      // is precisely the ratio the square-world flip introduced.
+      const cx = (n - 1) / 2 + (hex ? 0.25 : 0), cy = ((rows - 1) / 2) * (hex ? HEXR : 1);
+      const px = new Float64Array(NC), py = new Float64Array(NC), d = new Float64Array(NC);
       let rmax = 0;
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const i = y * n + x;
+      for (let y = 0; y < rows; y++) for (let x = 0; x < n; x++) { const i = y * n + x;
         px[i] = wx(hex, x, y); py[i] = wy(hex, y);
         d[i] = Math.hypot(px[i] - cx, py[i] - cy); if (d[i] > rmax) rmax = d[i]; }
       const R = rmax * 1.25, f = newField();
-      for (let i = 0; i < N; i++) f[i] = 1 - d[i] / R;
-      return { f, px, py, d, cx, cy, R, hex };
+      if (f.length !== NC) throw new Error(`mkCone: newField() gave ${f.length}, expected ${n}x${rows}=${NC} `
+        + `- the lattice was not set before allocating, which is the whole bug this guard exists for`);
+      for (let i = 0; i < NC; i++) f[i] = 1 - d[i] / R;
+      return { f, px, py, d, cx, cy, R, hex, rows, N: NC };
     };
     // One annulus in WORLD units for both lattices, so hex and square are asked the same question.
     const rIn = 0.22 * n, rOut = 0.38 * n, B = 24;
@@ -107,7 +127,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       const sl = slopeOf(c.f);
       const sum = new Float64Array(B), cnt = new Float64Array(B);
       let tot = 0, cells = 0, axE = 0, axEn = 0, axN = 0, axNn = 0;
-      for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) {
+      for (let y = 2; y < c.rows - 2; y++) for (let x = 2; x < n - 2; x++) {
         const i = y * n + x, rr = c.d[i]; if (rr < rIn || rr > rOut) continue;
         const th = Math.atan2(c.py[i] - c.cy, c.px[i] - c.cx);
         let bb = Math.floor((th + Math.PI) / (2 * Math.PI) * B);
@@ -133,14 +153,16 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       const { rec, dist } = spReceivers(filled, 1); // same 8-offset family, and it RETURNS its
       // receivers + the distance it believes it used, so the legality check below reads the
       // product's own output rather than a re-implementation that a fix would invalidate.
-      let over = 0; for (let i = 0; i < N; i++) over = Math.max(over, filled[i] - c.f[i]);
+      let over = 0; for (let i = 0; i < c.N; i++) over = Math.max(over, filled[i] - c.f[i]);
 
       // Legal Order: after the fill nothing interior may be a pit under the lattice's OWN one-ring.
+      // Every bound here is c.rows, not n. On hex they differ by 30 rows, and using the WIDTH as a
+      // row bound silently excused the bottom 13.5% of the field from the pit check.
       let pits = 0;
-      for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
+      for (let y = 1; y < c.rows - 1; y++) for (let x = 1; x < n - 1; x++) {
         const i = y * n + x; let lower = false;
         for (const dd of nbOf(c.hex, y)) { const xx = x + dd[0], yy = y + dd[1];
-          if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue;
+          if (xx < 0 || yy < 0 || xx >= n || yy >= c.rows) continue;
           if (filled[yy * n + xx] < filled[i]) { lower = true; break; } }
         if (!lower) pits++;
       }
@@ -148,17 +170,17 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       // d8Accumulation stops on, so the basins A counts are exactly these cells' basins and
       // sum(A over terminals) must be N. That identity is the control on this accounting.
       let termA = 0, interiorTermA = 0, interiorTerms = 0, borderTerms = 0;
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const i = y * n + x;
+      for (let y = 0; y < c.rows; y++) for (let x = 0; x < n; x++) { const i = y * n + x;
         if (rec[i] >= 0) continue;
         termA += A[i];
-        if (x === 0 || y === 0 || x === n - 1 || y === n - 1) borderTerms++;
+        if (x === 0 || y === 0 || x === n - 1 || y === c.rows - 1) borderTerms++;
         else { interiorTerms++; interiorTermA += A[i]; } }
 
       // Receiver legality: a receiver must BE a lattice neighbour (world distance 1 on hex,
       // <= sqrt(2) on square) and the distance the router used must be the real one.
       const maxLegal = c.hex ? 1.0001 : Math.SQRT2 + 1e-4;
       let far = 0, wrongD = 0, seen = 0, maxStep = 0;
-      for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
+      for (let y = 1; y < c.rows - 1; y++) for (let x = 1; x < n - 1; x++) {
         const i = y * n + x, j = rec[i]; if (j < 0) continue;
         const L = Math.hypot(c.px[j] - c.px[i], c.py[j] - c.py[i]);
         seen++; if (L > maxStep) maxStep = L;
@@ -168,11 +190,14 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       // Reported, not gated (26 "Limits": single-receiver parallel-line artefacts survive on BOTH
       // lattices, so a channelisation statistic cannot discriminate lattice handling).
       let orphan = 0, ring = 0;
-      for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) { const i = y * n + x;
+      for (let y = 2; y < c.rows - 2; y++) for (let x = 2; x < n - 2; x++) { const i = y * n + x;
         if (c.d[i] < rIn || c.d[i] > rOut) continue; ring++; if (A[i] <= 1.000001) orphan++; }
+      // c.N, not N. d8Accumulation seeds A with fieldW()*fieldH() units of mass, so on hex the
+      // total is 42624 while n*n is 36864 - dividing by the latter inflated borderReach and broke
+      // the accounting identity (sum of A over terminals) / N == 1 that this gate rests on.
       return { overFill: +over.toExponential(2), interiorPits: pits,
-        borderReach: +(1 - interiorTermA / N).toFixed(6),
-        terminalMassOverN: +(termA / N).toFixed(6), interiorTerms, borderTerms,
+        borderReach: +(1 - interiorTermA / c.N).toFixed(6),
+        terminalMassOverN: +(termA / c.N).toFixed(6), interiorTerms, borderTerms,
         farRecFrac: +(far / seen).toFixed(4), wrongDistFrac: +(wrongD / seen).toFixed(4),
         maxStep: +maxStep.toFixed(4), orphanFrac: +(orphan / ring).toFixed(4) };
     };
@@ -206,10 +231,22 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     + `mean|slope|/analytic=${S.square.meanOverTruth} ewOverNs=${S.square.ewOverNs} — near-isotropic, so `
     + `F1 is reading lattice handling, not "cones are hard"`);
 
+  // overFill is ASSERTED, not merely printed. It used to be reported in the message and left out
+  // of the condition, and that is exactly how this gate passed 6/6 on a build where the hex cone
+  // was 192 rows being read by 222-row kernels: the flood-fill was seeded from NaN cells that did
+  // not exist in the input and raised the surface by 0.583 on a field of range ~0.8. Every other
+  // number in F3 survived that (pits 0, borderReach 1, terminalMass 1) because they are ratios and
+  // counts that the phantom border left intact. overFill was the one quantity that moved, and it
+  // was the one quantity nobody checked.
+  // Armed between measured endpoints, not from theory: broken 0.583, fixed 0.000, square 0.000.
+  // The bound sits at 1e-3 - 583x below the broken value, and far enough above zero to tolerate a
+  // legitimate flat-epsilon nudge from priorityFloodFill.
   gate('F3 routing-reaches-edge',
-    R.hex.interiorPits === 0 && R.hex.borderReach >= 0.999,
+    R.hex.interiorPits === 0 && R.hex.borderReach >= 0.999
+    && Math.abs(R.hex.overFill) < 1e-3 && Math.abs(R.square.overFill) < 1e-3,
     `hex cone: interiorPits(after priorityFloodFill, judged on the D6 one-ring)=${R.hex.interiorPits} `
-    + `borderReach=${R.hex.borderReach} overFill=${R.hex.overFill} interiorTerminals=${R.hex.interiorTerms} `
+    + `borderReach=${R.hex.borderReach} overFill=${R.hex.overFill} (ASSERTED <1e-3; broken build `
+    + `measured 0.583) squareOverFill=${R.square.overFill} interiorTerminals=${R.hex.interiorTerms} `
     + `borderTerminals=${R.hex.borderTerms} sum(A over terminals)/N=${R.hex.terminalMassOverN} `
     + `[square: pits=${R.square.interiorPits} borderReach=${R.square.borderReach} terminalMass=${R.square.terminalMassOverN}] `
     + `— MEASURED FINDING: the square-D8 offset set is a SUPERSET of the hex one-ring (all six true `
