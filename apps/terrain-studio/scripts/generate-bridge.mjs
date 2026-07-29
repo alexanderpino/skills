@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const surfacePath = resolve(here, '../../../terrain-architect/studio/bridge-surface.json')
+const surfacePath = resolve(here, '../tests/legacy/bridge-surface.json')
 // A SNIPPET for textual concatenation, NOT an importable module. This is not a style choice: an
 // accessor like `() => RES` only reaches the real binding if it is lexically inside the module that
 // declares it. Emitted as its own module and imported, every one of the 161 accessors would throw

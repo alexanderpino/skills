@@ -4,18 +4,15 @@ import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-// PHASE 1 — the app is served IN PLACE from the skill tree, not copied.
+// PHASE 3 — the app now LIVES here. Vite's root is this directory, index.html sits beside this
+// config as Vite expects, and the legacy _verify_*.js suite moved to tests/legacy/ alongside its
+// baselines and screenshots.
 //
-// `root` points straight at terrain-architect/studio, so `npm run dev` serves exactly the file the
-// skill ships and the file every legacy _verify_*.js script loads. A copy would be free to drift
-// from its original the moment either side is edited, and the whole point of this phase is that the
-// application is byte-for-byte unchanged while the toolchain is proven around it. The digest gate
-// (`_verify_digest.js`) is what asserts that; a copy would make it assert nothing.
-//
-// From Phase 3 this flips: `root` moves to this directory, `src/` becomes the real source, and
-// terrain-architect/studio/index.html becomes a GENERATED single-file build committed back into the
-// skill tree — which is what keeps the skill installable and keeps `file://` working.
-const STUDIO = resolve(here, '../../terrain-architect/studio')
+// Phases 1-2 served the app in place from terrain-architect/studio so it could not drift from what
+// the skill shipped while the toolchain was proven around it. That is over: main deleted that
+// directory, so serving in place now points at nothing. The app moved here instead of being copied,
+// which is what the no-drift rule actually wanted - one copy, in the right place.
+const STUDIO = here
 
 export default defineConfig({
   root: STUDIO,

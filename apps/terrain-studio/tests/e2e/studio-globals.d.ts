@@ -32,6 +32,8 @@ declare global {
   function outputNode(): StudioNode | null
   function evalGraph(): void
   function buildIndex(): void
+  var TYPES: Record<string, { params: Array<Record<string, any>> }>
+  function buildField(param: Record<string, any>): HTMLElement
 
   // --- build profile ----------------------------------------------------------
   var RES: number

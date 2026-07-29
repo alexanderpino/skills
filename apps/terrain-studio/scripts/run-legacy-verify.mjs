@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const app = resolve(here, '..')
-const studio = resolve(app, '../../terrain-architect/studio')
+const studio = resolve(app, 'tests/legacy')   // the legacy suite moved here with the app
 
 const argv = process.argv.slice(2)
 const useFile = argv.includes('--file')
