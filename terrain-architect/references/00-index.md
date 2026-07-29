@@ -582,7 +582,7 @@ to tell from the output which one it is (`09`).
 
 ## The tool-node crosswalk
 
-A fuller map from the **branded nodes** you meet in Gaea, World Machine and Houdini to the
+A fuller map from the **branded nodes** you meet in Gaea, World Machine, Houdini and Vue to the
 **algorithm family** underneath and the reference that covers it. This is the practical companion to
 "The terrain graph" in `SKILL.md`: it turns "which node do I reach for / what is this node really"
 into a routing decision. The node names are *examples*, not exhaustive, and mix tools deliberately —
@@ -590,12 +590,19 @@ the point is the family, not the brand. **Internals stay proprietary:** this map
 family it must belong to*, and `09` tells you how to read the output to confirm which member. Never
 upgrade a crosswalk row into a claim about a specific paper inside a closed-source node.
 
+The Vue names below are mapped from documented UI behavior and practitioner guidance (Pandhi 2011,
+`99`), not from source code. They are therefore **N/F-tier descriptions of controls**, never proof
+of the proprietary implementation or of a physical process.
+
 **Generators**
 
 | Branded node (examples) | Family | Ref |
 |---|---|---|
 | Perlin, Simplex, Voronoi / Cellular, Ridged, Billow, Worley | Noise / FBM / multifractal | `01` |
 | Mountain, Terrain, Ridge, Dunes, Canyon, Crater, Island | Primitive + noise, or a landform composition | `01`, `10`, `20` |
+| Vue Terrain Fractal; MetaScale / Largest Feature / Smallest Feature | Multiscale noise controls: domain scale, largest wavelength and lower band limit. Useful initial condition, **not** erosion or a mountain-range process | `01`, `02`, `04` |
+| Vue Strata Filter / Confined Strata | Usually a terrace/quantised-height look; for defensible geology use a tilted/folded stratigraphic coordinate feeding lithology and `K` instead | `10`, `11` |
+| Vue HyperTerrain / MetaBlob + displacement | Implicit/SDF or volumetric base shape plus procedural displacement. Use a non-heightfield representation when arches, caves or overhangs are required | `10`, `11`, `24` |
 | Constant, Gradient, Radial, Shape, Line, Draw / Spline | Primitives & SDF | `10` |
 | File / Import, DEM, Heightmap in | An input field — evaluate in world space, never tile-local | `08` |
 
@@ -638,9 +645,11 @@ upgrade a crosswalk row into a claim about a specific paper inside a closed-sour
 | Branded node (examples) | Family | Ref |
 |---|---|---|
 | Scatter, Distribute, Populate | Poisson-disk / blue-noise / density-driven | `07` |
+| Vue EcoSystem / Variable Density / Layer Affinity / Repulsion | Rule-based scatter or ecosystem simulation, with density fields and cross-layer distance constraints | `07`, `13` |
 | Accumulator, Mask registry, Global masks | A **side-channel mask registry** — editor sugar over the sim→splatmap fan-in. Must be desugared before evaluation: hash the *resolved* producer set into the cache key or adding a sim serves stale output, and carry an explicit precedence or the result depends on node insertion order | `14`, `08` |
 | SatMap, Colorizer, CLUTer, Tint | Colour LUT indexed by a field | `08`, `10` |
 | Texture, Splat, Mask export | Splatmap from `06` masks | `08` |
+| Vue Aerial Perspective / camera-scale controls | Downstream atmosphere/presentation, not terrain generation. They may change perceived scale but must not change world units or process parameters | `08`, `09` |
 | Build, Export, Mesh, Unreal / Unity out | Tiling / LOD / quantise — **last, and once** | `08` |
 
 **The two rules that keep this honest:** (1) a branded node maps to a *family*, never a claimed

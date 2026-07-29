@@ -247,6 +247,22 @@ substitute one for the other.** A rotating sun over a plan-view hillshade plus o
 render catches more real defects in thirty seconds than any amount of turntable-ing the hero
 shot.
 
+**Review the whole declared view envelope (`08`).** The plan/hero pair is necessary but not enough
+for an asset that must work from a known camera range:
+
+- At the **far end**, inspect silhouette, macro material breakup, haze-free structure and correctly
+  sized scale cues. Peaks must survive LOD and the terrain must not depend on close-up noise to read.
+- At the **near end**, inspect whether relief that affects parallax or silhouette is real geometry,
+  whether material channels describe the same microstructure, and whether scatter instances are
+  grounded and clear of obstacles.
+- Use atmosphere and depth of field only after these passes. They can communicate depth, but they
+  must not hide tiling, missing geometry, broken scale or intersection defects.
+
+A useful scale-cue render includes one or more objects with known world dimensions (tree height,
+boulder diameter, road width, doorway) and no camera trick that miniaturises the scene. If the cue
+looks wrong, first check metres, material wavelengths and scatter sizes; do not "fix" it by scaling
+the atmosphere or terrain independently.
+
 ## Failure catalogue
 
 Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
@@ -260,6 +276,10 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Terracing on gentle slopes | R16 quantised too early | Work R32F, quantise at export (`08`) |
 | Faceted normals / ringed AO | Baked from quantised height | Bake from R32F (`06`, `08`) |
 | Speckled curvature mask | 2nd derivative of noisy/quantised field | Pre-smooth σ≈1 cell; compute from R32F (`06`) |
+| Terrain reads as a miniature | Detail/material/scatter frequencies disagree with world scale, or macro-style depth of field is used on a vista | Restore metre-based feature bands and correctly-sized scale cues; review at the declared view envelope (`08`) |
+| Close rock relief vanishes at the silhouette | Feature exists only in bump/normal although it is large enough to affect parallax/edge shape | Promote that band to displacement/geometry; keep finer relief in the material (`08`) |
+| Rocks float or disappear into the ground as size varies | Fixed embedding offset applied to every instance | Embed from the asset support radius with clamped bounds (`07`) |
+| Vegetation intersects water, roads, rocks or neighbouring canopies | Scatter layers generated independently with no footprint distance constraints | Stage layers and feed exclusion/affinity/repulsion distance fields with an interaction apron (`07`) |
 | Pipe erosion → NaN spikes | Missing outflow scaling factor `K` | Add step 3 of the pipe model (`04`) |
 | Pipe erosion → channels align to grid axes | 4-pipe von Neumann stencil | 8-pipe variant with per-pipe length (`04`) |
 | Droplet erosion → 1px scratches | Eroding point-wise instead of with a brush | Erode with disc radius 2–4 (`04`) |

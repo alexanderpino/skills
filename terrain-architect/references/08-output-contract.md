@@ -3,7 +3,7 @@
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
 [Precision](#precision) · [Tiling & aprons](#tiling--aprons) · [Seams](#seams) ·
 [Hexagonal grids](#hexagonal-grids) · [Planetary / spherical domains](#planetary--spherical-domains) ·
-[DEM & sensor realism](#dem--sensor-realism) · [LOD](#lod) ·
+[DEM & sensor realism](#dem--sensor-realism) · [View envelope](#view-envelope--detail-representation) · [LOD](#lod) ·
 [Splatmaps](#splatmaps) · [Satmap & colour map](#satmap--colour-map) ·
 [Normal & AO maps](#optimised-normal--ao-maps) · [Synthesising a material](#synthesising-a-material) ·
 [Compositing with the splatmap](#compositing-with-the-splatmap) · [Emitters](#emitters)
@@ -418,6 +418,52 @@ review reference is Fisher & Tate 2006; the rest are per-artefact.
 and quantisation/striping are F (textbook geometry / product-validation practice, no canonical paper). All
 are `08` data-contract operations, not terrain *processes* — they change what the field *is measured as*,
 never what the land *did*.
+
+## View envelope & detail representation
+
+The terrain fields stay in world space, but a production asset still needs a declared **view
+envelope**: the nearest and farthest intended observation distance, the critical camera regime
+(plan, traversal, hero, close-up), and the display resolution/FOV used for acceptance. Without it,
+"more detail" has no measurable meaning and geometry, displacement, normal maps and scatter all
+compete to represent the same frequency.
+
+State the envelope beside the output manifest as an acceptance contract, not as graph input:
+
+```text
+viewEnvelope:
+  minDistanceM, maxDistanceM
+  criticalViews: [plan, traversal, hero, closeup]
+  referenceViewportPx: [width, height]
+  referenceFovDeg
+  scaleCues: [{kind, realSizeM}]        # optional: tree, boulder, road width, doorway
+```
+
+**Assign each relief band to one representation.**
+
+| Visible effect | Representation | Reason |
+|---|---|---|
+| Changes drainage, collision or the skyline | Height/mesh/volume geometry | Shading cannot move a silhouette or route water |
+| Visible parallax and self-shadow near the minimum distance | Tessellation/displacement or explicit geometry | Normal maps stay flat under motion and at the edge |
+| Sub-pixel to few-pixel surface relief | Tiling height/normal/AO/roughness | Cheaper and more stable than geometry |
+| Dense tiny debris beyond instance budget | Material plus representative instancing | Millions of pebbles are a surface, not transforms (`07`) |
+
+The cut is screen-space but the authored wavelengths remain in **metres**. At the reference view,
+drop detail whose projected wavelength is below about two screen pixels per cycle (the Nyquist
+limit) instead of preserving aliased noise; when a feature grows large enough to alter the
+silhouette, promote it out of bump/normal into displacement or geometry. A bump that implies a
+centimetre-deep crack while the object's edge remains perfectly smooth is a representation
+contradiction, not a tuning problem.
+
+**One microheight, many appearance channels.** Colour variation caused by exposed grains, cracks or
+weathering should correlate with the relief that produced it. Derive detail normal, cavity/AO and
+roughness from the same material microheight or explicitly documented related fields. Independent
+noise in every channel gives the "busy but flat" procedural look: colour says one structure, the
+normal another, and roughness a third.
+
+**Perceived scale never overrides world scale.** Atmosphere, focal length, depth of field and
+composition may make a scene read larger or smaller, but they are downstream renderer choices. Do
+not compensate by changing terrain units, material texel scale, scatter size or erosion parameters.
+Use correctly-sized scale cues and the declared view envelope to judge the result (`09`).
 
 ## LOD
 

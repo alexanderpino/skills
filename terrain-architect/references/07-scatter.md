@@ -2,7 +2,8 @@
 
 Contents: [Bridson](#poisson-disk-bridson-2007) · [Variable density](#variable-density--the-terrain-case) ·
 [Blue noise alternatives](#blue-noise-alternatives) · [Tiling scatter](#tiling-scatter) ·
-[Rule-based](#rule-based-scatter) · [Clasts (rocks & pebbles)](#clasts-rocks-cobbles-pebbles)
+[Rule-based](#rule-based-scatter) · [Layer interactions](#layer-interactions--obstacles-affinity-and-repulsion) ·
+[Clasts (rocks & pebbles)](#clasts-rocks-cobbles-pebbles)
 
 **Scope — placement, not plant geometry.** This chapter (with the ecosystem sim in `13`) decides
 *where* each instance goes and *what* it is — species, size, orientation, age, and how it responds to
@@ -230,8 +231,54 @@ for each sample p:
 - **Cluster.** Real vegetation clumps — seed dispersal is local. Multiply the density map by a
   mid-frequency noise before scattering (`density *= 0.5 + 0.5*fbm(p * clusterFreq)`). Pure
   blue noise reads as *too* even, which is its own kind of artificial.
-- **Sink into the ground.** Offset each instance down by a few cm so the base isn't floating
-  on any slope. Cheaper than the alternative of everyone noticing.
+- **Sink into the ground by asset scale.** A fixed few centimetres is wrong across pebbles,
+  boulders and trees. Store an anchor/support radius per asset and use
+  `embed = clamp(embedFraction * supportRadius, minEmbed, maxEmbed)`. Rocks usually need a larger
+  fraction than trunks; clamp it so small props are not swallowed. The transform, collision and
+  visual mesh must share the same anchor or the render looks grounded while physics floats.
+
+## Layer interactions — obstacles, affinity and repulsion
+
+Real distributions are not independent layers. Grass approaches a boulder and may thicken around
+its sheltered edge; a tree canopy excludes other mature trees; vegetation stops at water, roads and
+building footprints. Treat these as **distance-field constraints between declared scatter layers**,
+not as random rejection after all layers have already been emitted.
+
+Build coarse/structural layers first, derive world-space distance fields from their footprints, then
+feed those fields into dependent layers:
+
+```text
+boulders: PointSet ──rasterise support radius──▶ d_boulder:m
+waterMask / roads / structures ────────────────▶ d_obstacle:m
+
+grassDensity =
+    baseDensity
+  * smoothstep(clearance, clearance + feather, d_obstacle)       # hard exclusion, soft rim
+  * band(d_boulder, affinityNear, affinityFar, affinityFeather)   # optional shelter/edge affinity
+
+band(d, near, far, feather) =
+    smoothstep(near, near + feather, d)
+  * (1 - smoothstep(far - feather, far, d))
+
+treeCandidate survives only if:
+    d_obstacle > treeClearance
+    and d_existingCanopyBoundary > candidateCanopyR
+```
+
+- **Exclusion** is a hard physical or gameplay clearance with a feathered density edge. Include
+  each instance's support/canopy radius; centre-to-centre distance alone lets large assets overlap.
+- **Affinity** is a band, not "closer is always better": use a ring response between two distances.
+  This covers grass around rocks, riparian growth near but not inside water, and seedlings near a
+  canopy gap.
+- **Repulsion** must include both footprints. If working from centres, require
+  `distance > candidateRadius + neighbourRadius`; if the existing layer has already been rasterised
+  to a footprint distance field, require `distanceToBoundary > candidateRadius`. If layer B depends
+  on layer A, record that dependency in the DAG and cache key; insertion order must not change output.
+- **Do not query a partially-built renderer scene.** Consume stable `PointSet`, footprint,
+  `DistanceField` and mask inputs. That keeps preview, tiling, determinism and serialization honest.
+
+For streaming, distance fields need the same apron as the largest interaction radius. A tile that
+cannot see the neighbouring tile's boulder or tree will grow a visible density halo at the seam.
 
 ## Clasts (rocks, cobbles, pebbles)
 

@@ -405,7 +405,15 @@ When asked to design, review, or fix a terrain graph, work in this order:
 **1. Extract the landform claim.** What process history is implied? Ask if unclear —
 "eroded mountains" and "dune field" and "rolling farmland" have almost no nodes in common.
 Pin down: world extent (km), target resolution (m/px), vertical range (m), and whether the
-terrain is tiled or single-tile. If the request is a whole multi-biome world (a named map, or
+terrain is tiled or single-tile. If the deliverable is judged from a camera rather than only as
+data, also pin down the **view envelope**: nearest and farthest intended viewing distance, whether
+the critical read is plan / traversal / hero / close-up, and which correctly-sized natural or built
+features provide scale cues. This does not move the graph into camera space — terrain and material
+frequencies stay in metres — but it decides which bands must be geometry, which can be material
+relief, and which must survive LOD (`08`, `09`). Never fake a larger world by changing terrain units
+or atmospheric scale; those are downstream presentation choices.
+
+If the request is a whole multi-biome world (a named map, or
 "a continent with a desert, a swamp, and a volcano"), it is a *composition* problem — one global
 substrate and hydrology with masks varying parameters per region, not separate terrains blended
 together. See `references/13-climate-ecosystem.md`. If the request names a *recognisable
@@ -473,7 +481,9 @@ invisible at runtime and catastrophic in output.
 uniquely prone to plausible-looking wrongness. Demand at least: a flow accumulation
 visualisation (rivers must reach the sea, not stop), a slope histogram (should peak near the
 repose angle after thermal, not at 0° or 90°), and a hillshade at two zoom levels — plus the
-render-mode palette for review by eye (plan vs hero view, normals, slope shade, sun sweep). See
+render-mode palette for review by eye (plan vs hero view, normals, slope shade, sun sweep). For a
+camera-facing deliverable, review at both ends of the declared view envelope: macro silhouette and
+scale cues at the far end, geometry/material relief and instance grounding at the near end. See
 `references/09-verification.md`.
 
 **7. If the engine needs owned code, define the source boundary and runtime fit.** Read
