@@ -287,6 +287,18 @@ instance:
    it would have been waived — vacuity by the back door.
 6. A gate collecting side-channel records *only if present*, so a build that stopped producing them
    still passed. Vacuity by **absence**.
+7. **A gate whose result never arrived at all.** Two `_verify_digest.js` runs launched into the
+   background were still alive ~22 hours later (pids 5184/24096, ~1300 min wall, **120 CPU seconds
+   each, then 0.2% busy** — blocked, not spinning). The 120 s is the tell: it is exactly the tool's
+   default 120 000 ms timeout. The runner timed out, its shell was reaped, and the orphaned `node`
+   child blocked forever writing into a pipe with no reader. Their verdicts were lost — not red,
+   not green, *absent* — and an absent verdict is indistinguishable from one nobody looked at.
+
+Entry 7 is the general form the first six are special cases of: **a gate only protects you if its
+verdict is observed.** Wrong tolerance, unreachable sub-gate, and never-returned all fail the same
+way at the point of use. So: give a gate a timeout longer than its honest runtime, redirect output
+to a file rather than a pipe that can fill, and treat "I never saw the result" as a failure to
+re-run — never as tacit approval.
 
 The countermeasures that worked:
 
