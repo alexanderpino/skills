@@ -235,7 +235,7 @@ threshold. This costs almost nothing and is what most good terrain tools do.
 
 ## D6 (hexagonal grids)
 
-On a hexagonal working grid (`08`, *Hexagonal grids*) the routing family above simplifies: every
+On a hexagonal working grid (`26`) the routing family above simplifies: every
 cell has **6 neighbours, all edge-adjacent at the same centre distance**, so the diagonal branch
 and the √2 disappear from the stencil.
 
@@ -260,8 +260,11 @@ written* — that branch of `09`'s anisotropy family is gone. But D6 is single-r
 axes, smaller than D8's but present. The D8 advice transfers unchanged: single-flow for
 channels, dispersive flow for hillslopes, hybrid by an `A` threshold.
 
-**Everything else in this chapter is lattice-independent.** Depression handling still comes
-first and Priority-Flood runs on any graph; accumulation is the same recurrence over 6
+**One constant does change: the cell area.** Accumulation seeds `A` with the cell's area, and on
+hex that is `A_cell = (√3/2)·cellSize²` (`det B`, `26`), not `cellSize²` — carry the square
+formula over and every drainage area, and every `A`-threshold downstream of it, is silently
+~13% low. **Everything else in this chapter is lattice-independent.** Depression handling still
+comes first and Priority-Flood runs on any graph; accumulation is the same recurrence over 6
 neighbours; stack ordering, lakes and channel morphology do not care. Published grounding:
 **Liao et al. 2020** (HexWatershed — flow routing on a hexagonal mesh) and **Liao et al. 2025**
 (routing datasets on the equal-area ISEA DGGS); see `99`.

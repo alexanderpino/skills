@@ -106,7 +106,11 @@ The details that decide whether it works:
 - **Anisotropy.** A deterministic 4/8-neighbour CA prints the lattice into the flow outline (the
   `05` thermal plus-artefact, again). Miyamoto & Sasaki's fix: distribute flux over neighbours
   stochastically (Monte Carlo) in proportion to the computed flux — the expected flow is right and
-  the lattice disappears.
+  the lattice disappears. On a **hexagonal grid** (`26`) the CA is 6 neighbours at one distance —
+  no √2 in the flux term — and the deterministic lobing drops to a weaker 60° family, but it does
+  **not** vanish: D6 still quantises, so keep the Monte Carlo selection. The lattice swap and the
+  stochastic fix treat different halves of the artefact (metric bias vs quantisation) and stack.
+  Volume↔thickness conversions use the hex cell area `(√3/2)·cellSize²` (`26`).
 - **Mass conservation is the sim's `09` check**: `Σ erupted = Σ still-molten + Σ frozen into bed`.
   Leaks come from the flux cap and the freeze step; measure them.
 

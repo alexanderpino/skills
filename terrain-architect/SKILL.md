@@ -5,8 +5,8 @@ description: >-
   procedural landscapes, heightfields, terrain node graphs, and their GPU/runtime substrate.
   Use as the self-contained terrain-algorithm source for advanced offline/pre-cooked, runtime,
   or hybrid game-engine/world generators: design, implement, review, debug, or attribute
-  erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD, and
-  realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then
+  erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD,
+  square or hexagonal working grids (hex maps, hex tiles), and realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then
   redesigns allocation, CPU/GPU scheduling, streaming, determinism, and serialisation for
   engine-native runtime fit; source-independent and clean-room modes remain available when
   policy requires them. Do not use for generic geology teaching, GIS plotting, hiking,
@@ -437,8 +437,17 @@ erosion/CA are markedly less direction-biased (no 45°/90° striping; a smaller 
 The costs are interchange — engines and DEMs want a raster, so you resample out — and a renormalised
 stencil (the 6-neighbour Laplacian constant differs by 3/2; keep the square one and diffusivity is
 silently 1.5× high). Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
-every downstream parameter exactly as cellSize does. See `references/08-output-contract.md`, *Hexagonal
-grids*. This is entirely separate from — and applies with or without — the spherical-grid choice a
+every downstream parameter exactly as cellSize does. The practical shape of the choice is that **`cellSize` stops being a scalar and becomes a 2×2 shear
+matrix** `B` (a hex field is a square array under a shear — the index quad is a rhombus): distances go
+through `G = BᵀB`, whose off-diagonal `cos 60° = ½` is the term square-grid code assumes is zero, and
+**gradients and normals go through `B⁻ᵀ`, not `B`** — the classic shear bug, worth up to 30° of normal
+error and a `√3` slope-scale error if you skip it. Carry `B`, not trigonometry at each call site.
+Rendering hex is a separate, later fork — the
+dual mesh (centres only, ~2 triangles per cell) when the hexes are a working grid, and when the tiles
+are meant to be seen, a **6-triangle fan through the centre** or the minimal **4-triangle corner-only**
+triangulation, which is a third cheaper but drops the cell's own sample and attenuates one-cell extrema
+to `1/3` (free on flat prism tops and far LOD, a silent bug elsewhere). See
+`references/26-hexagonal-grids.md`. This is entirely separate from — and applies with or without — the spherical-grid choice a
 *planet* forces (`08`/`25`); a hex grid is for flat terrain first, the sphere only later.
 
 **3. Choose the erosion backbone by scale.** This is the highest-leverage decision:
@@ -492,7 +501,7 @@ truth, above).
 | `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport (Bagnold threshold + cubic flux law → Exner flux-divergence bed change, saturation length), Werner dune model, anchored/obstacle dunes (echo, climbing, falling, sand ramps, shadow dunes), dune hierarchy (draa), vegetation-anchored dunes (parabolics, blowouts) |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, **hexagonal grids (a grid system in their own right — optimal sampling lattice, D6 routing, no D4/D8 √2 ambiguity; meshing, per-vertex normals, and the hex-prism/"pillar" stepped-tile look)**, planetary/spherical domains (cube-sphere, icosahedral hexagonal DGGS / Goldberg polyhedron, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
+| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, the grid-topology choice and its manifest fields (**hexagonal grids route to `26`**), planetary/spherical domains (cube-sphere, icosahedral hexagonal DGGS / Goldberg polyhedron, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
 | `references/11-geological.md` | Strata, terracing, folding, salt & mud diapirism (salt domes/walls, namakiers, mud volcanoes), lithology, outcrops, karst (incl. tower/cone karst, dolines/uvalas/poljes/cenotes, karren), weathering & soil production, weathering microforms (tors, tafoni/honeycomb, exfoliation/sheeting domes), volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |
@@ -510,6 +519,7 @@ truth, above).
 | `references/23-generator-blueprint.md` | **End-to-end generator.** Complete node-library floor, offline/pre-cooked pipeline, runtime pipeline, hybrid architecture, implementation milestones, execution budgets and acceptance gates |
 | `references/24-voxel-streaming-generation.md` | **Voxel/streaming chunk worlds — the Minecraft-*family* paradigm.** Chunked, seeded, streamed, editable voxel worlds — Minecraft is the documented exemplar; Creativerse, Luanti (Minetest), Terasology, Vintage Story and smooth-voxel cousins are the family. Representation (2D-map or 3D density/SDF), multi-noise biomes, spline-into-density shape, the proto-chunk stage pipeline, aquifers, greedy-vs-smooth meshing — placed on the *axes* members vary along. The *doctrine ledger* of which `SKILL.md` invariants this regime deliberately suspends (heightfield-truth, process-history, mandatory flow routing) and what local noise substitutes. F/N-tier; sources are documented/open generators, dev talks and reverse-engineering, not papers — never a closed clone's guessed internals |
 | `references/25-planetary-spherical.md` | **Whole-planet / spherical worlds.** The consolidating "globe" altitude: tectonics as Euler-pole rotation (small circles about the pole; Cortial et al. 2019; McKenzie & Parker 1967), global circulation & the latitude climate bands that place deserts at ~30° and rainforest at 0°, sea level as a geoid/oblate-spheroid equipotential, 3D/4D noise on the sphere, planet-scale precision/LOD/streaming, and the alien-world regime knobs. **Routes to `08`** for the grid/seam/distortion substrate (does not duplicate it) and `20` Group L for specific worlds |
+| `references/26-hexagonal-grids.md` | **The hexagonal working grid, end to end** — a grid system in its own right, and a *flat-terrain* chapter first. Optimal 2D sampling lattice (~13.4% fewer samples, via ~15% coarser spacing); 6 equidistant edge-neighbours, so no D4/D8 √2 ambiguity and D6 routing (coarser quantisation, so striping shrinks rather than vanishes); renormalised stencils (the Laplacian constant is `2/(3d²)`, not `1/d²`). **Storage is a sheared 2D array**: `cellSize` becomes a 2×2 matrix `B`, metric via `G = BᵀB`, and **gradients/normals via `B⁻ᵀ`** — the classic shear bug, worth up to 30.5° of normal error. **Meshing is one structure, the rhombille tiling of diamonds**: dual mesh vs the 6-triangle centre fan vs the 4-triangle corner-only tile, and the ×1/3 amplitude loss the last one costs. But the shear licenses **storage and geometry, not algorithms** — a chapter section covers **what does not port**: neighbour tables (no `dx,dy` loop, no 4-vs-8 branch), cube distance, `cube_round` for point→cell (per-axis rounding is wrong 16.8% of the time), barycentric sampling (there is no bilinear), rings/discs instead of box loops, and the failure of separable filters (`√3` anisotropy; use three-axis passes). Plus engine integration (index-space quadtrees and culling; heightfield colliders take no shear), the hex-prism / "pillar" stepped-tile look, interchange and verification. **Routes to `08`** for the manifest fields and the deliver-a-raster rule |
 | `references/99-papers.md` | Bibliography with attribution notes |
 | `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (procedural noise, droplet/pipe/thermal/stream-power erosion, flow routing, lateral river meandering (upstream-lagged bank migration → oxbows + point bars), braided/anastomosing rivers (Murray–Paola cellular model, reduced-complexity tier), diffusion, dunes, isostatic flexure, the terrain-aware wind flow field (per-cell speed and direction: crest speed-up, lee shelter, valley channelling, mass-consistent projection) and the aeolian transport it drives (Bagnold threshold + cubic flux → Exner bed change), Voellmy runout, tephra/age-depth/PDC/avulsion, analysis/masks/materials, primitives/ops/filters, scatter, geological landforms, parameterised asteroid impacts by size & angle), each checked against its `09` oracle, plus a segregated, clearly-labelled **illustrative** tier (lava/glacier/coastal/tidal sims) held only to invariants where no decisive oracle exists. They are executable specifications for an owned implementation, not runtime dependencies; optional tests cross-validate flow operations against RichDEM and pysheds, and stream power, D8 accumulation and hillslope diffusion against Landlab (MIT). A dependency-free **graph+render sandbox** (`reference-impl/graph_demo.py`, `reference-impl/render.py`) wires these nodes into a Legal-Order DAG — a scale model of `14`'s substrate with content-addressed caching — and renders the `09` review modes to PNG, for testing algorithms by eye during development. A real/external **heightmap is a first-class base** via `reference-impl/heightfield_io.py` (the File Input/Output node — loads `.npy`/16-bit `.png`/raw `.r16`/`.r32`/SRTM `.hgt`, `fetch_srtm` pulls a real AWS Terrain-Tiles tile), so the same atoms run on real USGS/SRTM areas. An interactive **node-graph terrain generator** — `studio/index.html`, a single self-contained WebGL page (node graph + live 3D viewport + real-heightmap import/export, learning from Gaea / World Machine / Houdini) — is the by-eye authoring companion to these atoms. Committed visual references include a per-algorithm `gallery.png` and, for oblique-impact morphology, the size×angle `crater_matrix.png` and the labelled grazing-anatomy `crater_anatomy.png` — the latter two a *presentation* tier (circular cavity, chaos in the displaced mass; deeper up-range at grazing), distinct from the oracle-verified `crater.py` size physics. `reference-impl/archetypes.py` lifts the sandbox to the **province** altitude of this file's `20` — sixteen archetypes across Groups A–L (orogens, canyons, deserts, karst, volcanic, glacial/coastal, anthropogenic, off-Earth) as diffs from the baseline pipeline, each with its `09` signature (`archetypes.png`, labelled; `ARCHETYPES.md` also ledgers which blueprints are *not* renderable and why), and `reference-impl/screen_worlds.py` runs the "Screen worlds" section — eight fictional planets (Arrakis, Monument Valley, Pandora, Hoth, Skull Island, Beggar's Canyon, Crait, Miller's world) as those same archetypes re-dressed, each labelled with its real filming location (`screen_worlds.png`). Provenance and licences per node: `reference-impl/GROUNDING.md` |
 
@@ -543,6 +553,21 @@ level (water leaves, erosion cuts inward), a wall (water pools, terrain bulges),
 The default of "whatever the loop happens to do at index 0" produces a visible frame of
 artefacts. State it in the graph spec.
 
+**The sediment budget closes, or the leak is named.** Erosion and deposition are one budget, not
+two unrelated nodes: under pure transport — no uplift, no sources, closed boundaries —
+`Σ(bedrock + sediment)` is invariant. `SedimentField` is a **depth in metres**, like height, so the
+budget is that sum times the cell area, and on a hexagonal grid that area is `(√3/2)·cellSize²`
+(`26`) — carry the square `cellSize²` over and a closed budget reads as a drifting one. Every real
+model leaks somewhere, so the invariant is not *no leak*; it is that **the leak is measured and
+named** rather than discovered later. The usual sites: a droplet expiring with load still in it,
+the flux caps and clamps in the pipe model (`04`) and the lava CA (`19`), thermal's per-pair clamp
+(`05`), open boundaries, and — the quiet one — an erosion node given an *effect* mask instead of a
+*process* mask, which silently discards everything transported out of the masked region. `09` calls
+this the single most under-used terrain assertion, and `reference-impl` mechanises it: fourteen
+solver tests assert conservation of the transported material (bed, water, snow, ice, sand), four of
+them through the shared `reference-impl/tests/asserts.py` helper `assert_mass_conserved`. When a
+graph only erodes, ask where the sediment went; when it only deposits, ask where it came from.
+
 **Build the mass before you dissect it.** A feature primitive written as `envelope(r) × texture`
 with a *radial* envelope is a solid of revolution, and stays one however good the texture — it
 renders as a tipi tent while satisfying every obvious assertion, because a cone satisfies them too
@@ -570,6 +595,8 @@ Look for these in order — they account for most real defects:
 5. Is there an apron on tiled erosion, and is it wider than the maximum transport distance?
 6. Is the field quantised before its derivatives are taken?
 7. Is thermal downstream of hydraulic?
+8. Does the sediment budget close — and if it leaks, is the leak measured rather than assumed?
+   (A graph that only erodes, or only deposits, is the tell.)
 
 State findings as: **symptom → mechanism → minimal fix**. Do not rewrite a graph that has one
 misordered node.

@@ -331,7 +331,7 @@ clean baseline are the cone and constant-slope synthetic inputs, whose correct o
 preferred direction at all.
 
 There is a fourth, structural cure the table doesn't list: **change the lattice.** The **hexagonal
-grid** (`08`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
+grid** (`26`) *deletes* the *missing-√2* row of this family outright — with 6 equidistant
 edge-neighbours there is no diagonal to under-weight and no 4-versus-8 choice to get wrong — and
 *shrinks* the *D8-striping* row rather than deleting it: single-receiver striping is a
 **quantisation** artefact, not a metric one, and D6 still quantises (6 directions at 60°, max aspect
@@ -341,7 +341,12 @@ grid* as the pass criterion, not *none*. The lattice swap also brings its **own 
 axial-vs-offset coordinate mixing, row-parity neighbour tables applied with the wrong parity,
 pointy-top/flat-top orientation mismatch, and the un-renormalised 6-neighbour Laplacian (the hex
 constant is `2/(3d²)`, not `1/d²` — keep the square constant and diffusivity is silently 1.5× high;
-`08`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
+`26`). One of the new rows is invisible to the sun sweep: meshing visible hex tiles **corner-only**
+(4 triangles) instead of fanning through the centre (6) drops the cell's own sample from the mesh
+entirely and attenuates one-cell extrema by **exactly 1/3** — correct and free on flat prism tops or a
+far LOD tier, a silent amplitude bug anywhere else. Both meshes reproduce affine fields exactly, so
+the ramp and cone controls cannot see it; the detector is an **impulse** — raise one cell by `H` and
+measure the rendered peak (`26`). It is not free (engines want a square raster, so you resample out) and not total (6-fold is
 still not continuous), but when directional artefacts are endemic and the grid is yours to choose, the
 lattice itself is the highest-leverage fix — it trades the family for a smaller one, not for zero. On
 a sphere the same move is the **icosahedral hex DGGS** (`08`, `25`), where the residual stencil
@@ -352,6 +357,66 @@ The contrast case worth knowing: **droplet erosion is largely immune** — posit
 continuous and gradients bilinear, so there is no stencil to print through. If a droplet result
 shows grid-aligned structure, the anisotropy came in with the height field (usually the noise,
 `01`), not the simulation.
+
+### "Anisotropy" names two different things — never conflate them
+
+Everything above is **lattice anisotropy**: the discretisation printing through. It is *always*
+a defect, and the reason is not aesthetic — the direction it prefers is a property of the
+**array**, not of the terrain. Nothing in the world put it there, so there is no parameter value
+that makes it correct.
+
+**Field anisotropy is the opposite, and terrain without it looks generic.** Real landscapes are
+full of direction, and every bit of it is sourced from a *cause*: bedding, strike and dip, joint
+sets and differential erodibility (`11`); fault fabric and tectonic grain (`02`); the wind, in
+yardangs, dune orientation and ventifacts (`05`, `16`); ice-flow direction, in striations,
+drumlins and U-valley alignment (`12`); slope aspect and insolation, in asymmetric valleys
+(`13`). Trellis drainage, hogbacks and strike valleys exist *because* erosion is directional.
+Suppressing this is as wrong as printing the lattice.
+
+**The rule that decides, and it is a sharp one: a directional control is legitimate exactly when
+its direction comes from a field, not from the grid.** A strike field, a wind field, a flow
+direction, an ice-flow vector — legitimate, and usually necessary. A single global angle
+parameter, or worse a "strength" knob with no direction at all, is the defect wearing the
+feature's clothes: it will align to the axes because the only direction available to it is the
+array's. When a tool exposes an "anisotropy" control, that is the question to ask of it — *where
+does the direction come from* — not whether directionality is allowed.
+
+**The test: rotate the domain.** Physical anisotropy rotates with the terrain; lattice anisotropy
+stays welded to the axes. Feed a radially symmetric input (the cone — it has no direction of its
+own, so any direction in the output was put there by the operator or the grid), then compare
+`rot(F(rot(h, −θ)), θ)` against `F(h)`. Any field the operator consumes must be rotated *with*
+the terrain. The rotation interpolates, so this needs a control — run the same comparison on a
+deliberately isotropic operator to measure the floor (`09`'s own rule: a metric with no control
+is not evidence). Measured, on a 4-neighbour max against a disc max of the same radius:
+
+| θ | Axis-locked operator | Isotropic control (the floor) |
+|---|---|---|
+| 23° | `0.093` | `0.016` |
+| 30° | `0.111` | `0.014` |
+| 45° | `0.128` | `0.020` |
+| **90°** | **`0.000`** | `0.000` |
+
+**The 90° row is the trap.** A quarter turn is a *symmetry of the square lattice*, so it maps the
+grid onto itself and a grossly axis-locked operator comes back exactly equivariant — a perfect
+score for a broken operator. **The test angle must not be a symmetry of the lattice under test**:
+avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the separation is about an
+order of magnitude, which is plenty. Pinned by
+`reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`.
+
+![anisotropy anatomy](../reference-impl/anisotropy_anatomy.png)
+
+*The test, and its trap, in one figure — regenerate with `reference-impl/anisotropy_anatomy.py`.*
+
+**A cure for one does nothing for the other, which is the proof they are different.** Swapping to
+a hex lattice (`26`) shrinks lattice anisotropy and leaves field anisotropy completely untouched —
+a strike-controlled valley network is just as directional on hex, because its direction never came
+from the grid. If a single change fixes one and not the other, they were never the same defect.
+
+**Deliberate stylised directionality is allowed, and it is an authoring choice, not a simulation
+parameter.** Same status as the stepped hex-prism terracing of `26`: fine, even desirable, as a
+declared style; a bug if you were hoping for geology. Record it as art direction, keep it out of
+the physics, and it still may not be sourced from the grid — a stylistic direction that happens to
+be the array's axes is indistinguishable from the defect, and will be read as one.
 
 ## Review checklist
 
@@ -365,6 +430,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Erosion backbone matched to world extent? (droplet <2 km, pipe 2–50, stream power >50)
 - [ ] Parameters in world units, not magic numbers tuned at one resolution?
 - [ ] Thermal downstream of hydraulic?
+- [ ] Sediment budget closed, or its leak measured and named? (erode-only or deposit-only is the tell; the usual sites are droplet expiry, flux caps/clamps, open boundaries, and an *effect* mask on an erosion node)
 - [ ] `A` reported in m², not cell counts?
 - [ ] MFD (not D8) feeding any hillslope quantity (wetness, dispersive masks)?
 - [ ] Quantisation to R16 after all derivatives?
@@ -375,6 +441,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Double-buffering in every grid simulation?
 - [ ] Masks partition to 1?
 - [ ] Every hard threshold noise-perturbed?
+- [ ] Any directional/"anisotropy" control sourced from a **field** (strike, wind, ice flow), not a global angle that will land on the axes? (rotate-the-domain test, at an angle that is *not* a lattice symmetry)
 - [ ] Vertex- vs pixel-centring documented and consistent?
 - [ ] If an extended family is in play (explosive volcanism, seafloor/turbidity, isostasy, terraces, avulsion, coral, planetary grid), has its check from *Checks for the extended families* been run?
 

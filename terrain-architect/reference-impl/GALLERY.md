@@ -47,3 +47,41 @@ energy-cone runout *distance* `L = Hc/μ` (shown instead as the PDC inundation f
 drives, at 6,4), the river **superelevation** and **avulsion** criteria, and the GDH1 seafloor
 variant (visually identical to the HSC panel at 6,5) — plus the many `ops_filters` toolbox
 primitives (SDF/morphology/warp/blend) shown by representative rather than exhaustively.
+
+## Labelled anatomy figures
+
+Separate from the panel grid above: **diagrams**, not field renders. The gallery answers "what does
+this operator look like"; these answer "what is the geometry the chapter is describing", for the two
+places where the prose is carrying more than prose should. They regenerate deterministically
+(`python hex_anatomy.py`, `python anisotropy_anatomy.py`) and are guarded by
+`tests/test_anatomy_figures.py`, which checks that they still build *and* that the constants they
+draw still match the chapters — a diagram that drifts from its text is worse than no diagram.
+
+### `hex_anatomy.png` — hexagonal grids (`26`)
+
+![hex anatomy](hex_anatomy.png)
+
+Six panels: **a** the lattice and its two vertex classes (`N` centres, `2N` corners) with the two
+lengths that get confused — `cellSize` centre-to-centre against `s = cellSize/√3` centre-to-corner;
+**b** the rhombille tiling, `3N` diamonds, one per neighbour *pair*, in the three orientations that
+make the tumbling-blocks cube; **c** the two diamonds side by side, which exists because they are
+genuinely easy to conflate — the rhombille diamond (side `s`, centre·corner·centre·corner) against
+the **array** diamond of the sheared 2D storage (side `cellSize`, *four centres*, `√3` larger and
+turned 30°); **d** the three meshes and their counts; **e** the tile triangulations — the centre fan's six
+equilaterals against all three corner-only families (6 fan + 6 zigzag + 2 ear-and-core = 14), whose
+min angle is exactly 30° for every one of them; **f** the
+`×1/3` result in cross-section — a one-cell spike rendered at full `H` by the fan and as a flat
+plateau at `H/3` by corner-only, with the reminder that both reproduce an affine field exactly, so a
+ramp cannot tell them apart.
+
+### `anisotropy_anatomy.png` — lattice or field? (`09`)
+
+![anisotropy anatomy](anisotropy_anatomy.png)
+
+The rotate-the-domain test made visible. A cone (radially symmetric, so it carries no direction of
+its own) through an axis-locked operator and an isotropic control; then the rotation residual for
+each at 30°, on **one shared colour scale** — the axis-locked operator scores about an order of
+magnitude above the control, which measures the interpolation floor. The third residual is the
+trap: the *same* axis-locked operator at **90°**, scoring exactly `0.000`, because a quarter turn
+maps the square lattice onto itself. The test angle must not be a symmetry of the lattice under
+test — avoid multiples of 90° on square and 60° on hex (`26`).
