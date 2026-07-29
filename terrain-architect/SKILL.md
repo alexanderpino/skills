@@ -6,11 +6,13 @@ description: >-
   Use as the self-contained terrain-algorithm source for advanced offline/pre-cooked, runtime,
   or hybrid game-engine/world generators: design, implement, review, debug, or attribute
   erosion, hydrology, geology, climate, biomes, materials, masks, scatter, tiling, LOD,
-  square or hexagonal working grids (hex maps, hex tiles), and realtime terrain. It pre-grounds neutral pseudocode in pinned open-source behavior, then
-  redesigns allocation, CPU/GPU scheduling, streaming, determinism, and serialisation for
-  engine-native runtime fit; source-independent and clean-room modes remain available when
-  policy requires them. Do not use for generic geology teaching, GIS plotting, hiking,
-  real-world erosion control, non-terrain texturing, or generic fluid simulation.
+  square or hexagonal lattices (flat heightfields, hex maps, spherical planets), and realtime
+  terrain. Real-world GIS/DEM/lidar data is a first-class pipeline input (base layer,
+  hydro-enforcement, void-fill) — the tool is a generator, not a passive GIS viewer.
+  Pre-grounds neutral pseudocode in pinned open-source behavior for engine-native runtime
+  fit (CPU/GPU scheduling, streaming, determinism, serialisation). Do not use for generic
+  geology teaching, standalone GIS plotting, hiking, real-world erosion control, non-terrain
+  texturing, or generic fluid simulation.
 ---
 
 # Terrain Architect
@@ -19,33 +21,50 @@ You are the principal on terrain graphs. Your job is not to type the erosion loo
 make sure the graph is *legal*, the units are coherent, and the algorithm chosen actually
 produces the landform the user is describing.
 
-## Operating as the terrain authority
+This file carries the **doctrine, the triage, and the graph architecture**. The mathematics,
+pseudocode, constants, and runnable mirrors live in the **Implementation Reference** layer —
+the `references/` chapters and `reference-impl/` — and are routed to, never reconstructed from
+memory (Part 4). Bare chapter numbers in this file (`04`, `14`, …) are shorthand for the
+matching numbered chapter under `references/`, resolved by the routing table in Part 4.
 
-Every terrain question is one of five kinds; triage first, because the answer discipline differs:
+---
 
-1. **Attribute / explain** ("what's the paper for X", "how does Gaea's Erosion node work") → answer
-   from `00` with its **provenance tier**. Cite P directly; for F say "no canonical paper, standard
-   practice is…"; for L give the *composition*, not an algorithm; for a branded node give the
-   *family* via the crosswalk (`00`), never a claimed internal. **Never upgrade a tier to satisfy the
-   question** — a fabricated citation is the one defect this skill exists to prevent. On `?`, say so
-   and offer to search.
-2. **Design** ("build me eroded mountains / a delta / a planet") → run the **Design procedure** below:
-   extract the landform claim, derive cell size, choose the erosion backbone by extent, fix units and
-   the seed contract, write the DAG, and **specify verification before implementation**.
-3. **Review / fix** ("why do my rivers stop / seams / terracing") → **symptom → mechanism → minimal
-   fix** from `09`'s failure catalogue; check the Legal Order before the maths; move one node, don't
-   rewrite the graph.
-4. **Substrate** ("design the node engine / GPU placement") → `14`/`15`: the node model, typed ports,
-   caching, and the tiling and preview contracts.
+# Part 1 · Core Directive & Triage
+
+## The five kinds of terrain query
+
+Every terrain question is one of five kinds; triage first, because the answer discipline
+differs:
+
+1. **Attribute / explain** ("what's the paper for X", "how does Gaea's Erosion node work") →
+   answer from `00` with its **provenance tier** (Part 4). Cite P directly; for F say "no
+   canonical paper, standard practice is…"; for L give the *composition*, not an algorithm; for
+   a branded node give the *family* via the crosswalk (`00`), never a claimed internal. **Never
+   upgrade a tier to satisfy the question** — a fabricated citation is the one defect this
+   skill exists to prevent. On `?`, say so.
+2. **Design** ("build me eroded mountains / a delta / a planet") → run the **Design
+   procedure** below: extract the landform claim, derive cell size, choose the lattice and the
+   erosion backbone, fix units and the seed contract, write the DAG, and **specify
+   verification before implementation**.
+3. **Review / fix** ("why do my rivers stop / seams / terracing") → **symptom → mechanism →
+   minimal fix** from `09`'s failure catalogue; check the Legal Order (Part 3) before the
+   maths; move one node, don't rewrite the graph.
+4. **Substrate** ("design the node engine / GPU placement") → `14`/`15`: the node model, typed
+   ports, caching, scheduling, and the tiling and preview contracts (Part 3). The two hardest
+   substrate requirements come from the algorithms, not the engineering: GLOBAL nodes exist
+   and cannot tile (`03`, `04`, `08`), and resolution-bound nodes exist and must declare
+   preview scaling policies (`14`).
 5. **Implement engine-native** ("this library cannot be our runtime") → `21` plus the relevant
-   algorithm chapter: use the skill's already-grounded neutral pseudocode and recorded upstream
-   decisions, then write directly for the engine's CPU/GPU, memory, scheduling, streaming,
-   determinism and serialisation contracts.
+   algorithm chapter: use the skill's already-grounded neutral pseudocode and recorded
+   upstream decisions, then write directly for the engine's CPU/GPU, memory, scheduling,
+   streaming, determinism, and serialisation contracts. Answer with the implementation and its
+   decisions, not a reading assignment.
 
-Three things hold across all five: **the heightfield is the source of truth** (Doctrine); **name the
-field and its unit on every edge** (Field types); and **verification is where terrain graphs are won**
-— demand the check, don't trust the hillshade (`09`). State what you're confident of plainly, mark
-what is `?`, and route to the reference rather than reconstructing constants from memory.
+Three things hold across all five: **the heightfield stack is the source of truth** (Part 2);
+**name the field and its unit on every edge** (Part 3); and **verification is where terrain
+graphs are won** — demand the check, don't trust the hillshade (`09`). State what you're
+confident of plainly, mark what is `?`, and route to the reference rather than reconstructing
+constants from memory.
 
 ## Activation boundary
 
@@ -54,66 +73,124 @@ algorithm, terrain-tool architecture, owned terrain implementation, or terrain-s
 citation**. It includes game-engine and world-generator teams using primary literature and
 approved open-source libraries to specify behavior while building an engine-native runtime,
 because a research library rarely matches the engine's memory, GPU, scheduling, streaming,
-determinism, platform, serialisation, or dependency constraints. Named places and fictional worlds
-trigger it only when the task is to reconstruct their terrain or process history.
+determinism, platform, serialisation, or dependency constraints. Named places and fictional
+worlds trigger it only when the task is to reconstruct their terrain or process history.
 Terrain texturing triggers it when terrain fields drive materials, splatmaps, normals, AO, or
 layer composition.
 
-Do not use it for passive GIS loading or plotting, general geology instruction, travel or hiking,
-real-world civil/agricultural erosion control, descriptive prose, generic PBR texturing, or fluid
+**GIS data is inside the boundary as an input, not as a destination.** Real DEM/SRTM/lidar
+data is a first-class base layer for the generation pipeline — loading it, repairing it
+(void-fill, hydro-enforcement, artefact removal per `08`), and feeding it into erosion,
+analysis, and export is exactly what this skill is for. What stays *outside* is the passive
+end of GIS work: loading a DEM only to plot or inspect it, cartography, and geospatial
+analysis with no generation, simulation, or engine deliverable downstream. The test is the
+deliverable: "erode this SRTM tile and export it for Unreal" is in; "plot a hillshade of this
+GeoTIFF with matplotlib" is out.
+
+Also out of scope: general geology instruction, travel or hiking, real-world
+civil/agricultural erosion control, descriptive prose, generic PBR texturing, and fluid
 simulation unrelated to terrain. A request containing words such as *erosion*, *mountain*,
 *Perlin*, or *Houdini* is not enough by itself; the requested deliverable must fall inside the
 terrain-generation system.
 
-## Source of truth: the references first, the web second
+## Design procedure
 
-For anything this skill covers, the lookup order is fixed: **the routing table below → the
-relevant `references/` file → only then the internet.** This is not territorialism — it is why
-the skill exists. The references have been verified against primary sources: citations checked
-author-by-author, the load-bearing constants unit-checked, the sim pseudocode mirrored by
-pytest-verified implementations in `reference-impl/` (see `00`, "Verification status"). A web
-search for the same material returns, with high probability, exactly the defects this skill was
-built to correct — fabricated citations, landform-as-algorithm confusions, constants copied
-between blog posts until nobody knows the source. Searching first means re-deriving, unverified,
-what has already been verified.
+When asked to design a terrain graph, work in this order. Each step is doctrine here; its
+formulas and constants live in the routed chapter.
 
-The web is the *right* tool in four cases, and the index tells you when you're in one:
+**1. Extract the landform claim.** What process history is implied? Ask if unclear — "eroded
+mountains", "dune field", and "rolling farmland" have almost no nodes in common. Pin down:
+world extent (km), target resolution (m/px), vertical range (m), and whether the terrain is
+tiled or single-tile. If the deliverable is judged from a camera, also pin down the **view
+envelope** — nearest/farthest viewing distance, whether the critical read is plan / traversal
+/ hero / close-up, and which correctly-sized features provide scale cues. This does not move
+the graph into camera space — terrain frequencies stay in metres — but it decides which bands
+must be geometry, which can be material relief, and which must survive LOD (`08`, `09`).
 
-1. **The index lands on `?`** — claimed but unverified. Say so, then search.
-2. **The frontier** — ML terrain synthesis, learned materials, anything `00` flags as moving
-   faster than a static reference can track. Treat as `?` by default; search and confirm against
-   the primary source.
-3. **Publication-critical re-checks** — before a citation or constant ships somewhere that
-   matters, re-confirm it against the primary source, whatever tier it carries.
-4. **Genuinely out of scope** — the routing table has no row for it. Search freely; the skill
-   claims no authority there.
+Route paradigm shifts immediately: a multi-biome *world* is a composition problem — one global
+substrate with masks varying parameters per region, never separate terrains blended (`13`); a
+*recognisable landscape* starts from its archetype blueprint (`20`), adapted not pasted; an
+infinite streamed *block/voxel world* is a different paradigm whose doctrine ledger suspends
+several rules below (`24`); a *whole planet* starts from `25` and routes its grid substrate to
+`08`; a *real-world site* starts from imported DEM data (`08`, and the boundary rule above).
 
-For an implementation request inside scope, the corpus is **terrain-algorithm complete by
-contract**: it must supply the selection rule, equations or neutral pseudocode, field/unit
-contract, CPU/GPU placement, runtime locality, failure modes and verification oracle. Do not turn
-the answer into a literature search or leave terrain-algorithm choices to the implementer. Target
-engine APIs, rendering integration and product UX remain project-specific; the terrain behavior
-does not.
+**2. Derive the cell size and state it.** Nearly every downstream parameter — talus
+thresholds, erosion rates, scatter radii — is denominated in cell size, and a graph that does
+not know its cell size cannot have correct parameters. Express parameters in world units so
+the graph survives a resolution change. **Choose the lattice here too** — square or hexagonal
+(Part 3, "The lattice choice") — because the metric and neighbour stencil ripple through every
+downstream parameter exactly as cell size does.
 
-When a search result *conflicts* with a reference, do not silently prefer the newer or
-shinier-looking source — the references have been through primary-source verification and the
-average search result has not. Check the primary source; if the reference really is wrong, say
-so explicitly and flag it as a correction to the skill (errors have been found and fixed exactly
-this way — see `00`). A silent override discards the verification the whole skill is built on.
+**3. Choose the erosion backbone by scale.** The highest-leverage decision:
 
-## Doctrine
+| World extent | Backbone | Why |
+|---|---|---|
+| < 2 km | Droplet or pipe hydraulic | Detail-scale; explicit sim is affordable and looks right |
+| 2–50 km | Pipe hydraulic + thermal | Enough cells to matter, transport distances still local |
+| > 50 km | Stream power (Braun–Willett) + thermal | Only method unconditionally stable at geological timescale; produces correct drainage networks |
 
-**The heightfield is the source of truth; the engine is just an emitter.**
+Stream power is rated hardest not because the equation is hard but because a naive explicit
+solver is unstable and the O(N) implicit ordering is non-obvious. Do not hand-roll it from
+memory: take the ordering and its slope–area oracle from `04`.
 
-Everything in the graph operates on a small set of world-space fields (height in metres,
-water depth in metres, sediment in metres, drainage area in m², masks in [0,1]). Nebula,
-Unreal, Unity, and glTF are all downstream emitters of the same fields. Never let an engine's
-import format leak upstream into the graph — the moment a node reasons in "R16 units" or
-"Unreal's 0–512 landscape scale", the graph stops being portable and starts being wrong.
+**4. Fix the units and the seed contract** (Part 3, "Evaluation invariants").
 
-**The surface is a stack of layers, not one height.** That single "height" is a convenience — a
-realistic surface is an *ordered stack* over the bedrock, and the top number is just wherever the
-stack ends. From the bottom up:
+**5. Write the graph as a DAG with explicit fields on every edge.** Name the field and its
+unit: `height:m`, `A:m²`, `slope:tan`, `wetness:[0,1]`. Type errors between nodes are
+invisible at runtime and catastrophic in output.
+
+**6. Specify verification before implementation.** Terrain is judged by eye, which makes it
+uniquely prone to plausible-looking wrongness. Demand at least: a flow-accumulation
+visualisation (rivers must reach the sea), a slope histogram (peaking near the repose angle
+after thermal, not at 0° or 90°), and a hillshade at two zoom levels — plus `09`'s render-mode
+palette for review by eye. For a camera-facing deliverable, review at both ends of the
+declared view envelope.
+
+**7. If the engine needs owned code, define the source boundary and runtime fit.** Read
+`references/21-clean-room-implementation.md`. The normal path is **reference-informed,
+engine-native**: the skill has already distilled papers and approved open-source behavior into
+neutral pseudocode, edge-case decisions, and oracles — apply that packet directly to the
+target engine. Use source-independent or separated clean-room modes only when policy requires
+them. In every mode, the `09` oracles — not library resemblance — decide correctness.
+
+## Review posture
+
+When reviewing rather than designing, look for these in order — they account for most real
+defects:
+
+1. Is depression handling present, and is it before flow routing?
+2. Are analysis nodes downstream of the last node that modifies height?
+3. Is noise evaluated in world space?
+4. Are erosion parameters expressed in world units, or magic numbers that happen to work at
+   one resolution?
+5. Is there an apron on tiled erosion, and is it wider than the maximum transport distance?
+6. Is the field quantised before its derivatives are taken?
+7. Is thermal downstream of hydraulic?
+8. Does the sediment budget close — and if it leaks, is the leak measured rather than assumed?
+   (A graph that only erodes, or only deposits, is the tell.)
+
+State findings as **symptom → mechanism → minimal fix**. Do not rewrite a graph that has one
+misordered node.
+
+---
+
+# Part 2 · Doctrine
+
+Hard rules. Everything else in the skill is machinery for enforcing them.
+
+## The heightfield stack is the source of truth; the engine is an emitter
+
+Everything in the graph operates on a small set of world-space fields (height in metres, water
+depth in metres, sediment in metres, drainage area in m², masks in [0,1]). Unreal, Unity,
+Godot, and glTF are all downstream **emitters** of the same fields. Never let an engine's
+import format leak upstream into the graph — the moment a node reasons in "R16 units" or an
+engine's landscape scale, the graph stops being portable and starts being wrong. The emitter
+side of this rule — formats, precision, tiling — is the Output Contract (Part 3).
+
+## The surface is a stack of layers, not one height
+
+A single "height" is a convenience — a realistic surface is an *ordered stack* over the
+bedrock, and the top number is just wherever the stack ends:
 
 ```
   snow            ← transient: accumulates and MELTS (13); a seasonal overlay
@@ -124,119 +201,109 @@ stack ends. From the bottom up:
   bedrock         ← the base; the only layer always present
 ```
 
-Each layer is a **thickness field in metres** — the field contract in `08` already names
-`sandDepth` and `waterSurface`, and snow lives in `13` — never one baked number that has forgotten
-what it's made of. Three *kinds* of layer, and the distinction is exactly what the engine needs:
+Each layer is a **thickness field in metres** — never one baked number that has forgotten what
+it's made of. Three *kinds* of layer, and the distinction is exactly what the engine needs:
 
-- **Solid cover** (soil, sand) rests on rock, is part of the **collision surface**, and moves only
-  slowly, by erosion and deposition (`04`, `05`, `11`).
-- **Fluid** (water) is the one layer you move *through*, not on — it has a depth you can swim in and
-  a surface that is **dynamic**: tides raise and lower it (`12`), waves and flow ripple it, a lake
-  sits at its spill level (`03`). Emit it as a *separate* surface plus a depth field; fold it into
-  the solid collision height and the sea becomes a wall you can't swim in and a tide can't move.
-- **Transient** (snow) accumulates where it's cold and **melts** where it's warm (`13` degree-day),
-  laid *over* everything and slid off steep ground by its own thermal pass.
+- **Solid cover** (soil, sand) rests on rock, is part of the **collision surface**, and moves
+  only slowly, by erosion and deposition (`04`, `05`, `11`).
+- **Fluid** (water) is the one layer you move *through*, not on — it has a depth you can swim
+  in and a surface that is **dynamic**: tides raise and lower it (`12`), waves and flow ripple
+  it, a lake sits at its spill level (`03`). Emit it as a *separate* surface plus a depth
+  field; fold it into the solid collision height and the sea becomes a wall you can't swim in
+  and a tide can't move.
+- **Transient** (snow) accumulates where it's cold and **melts** where it's warm (`13`), laid
+  *over* everything and slid off steep ground by its own thermal pass.
 
-So "the heightfield is the source of truth" means the *solid* stack; water and snow are truthful
-too, as their own layers on top. A graph that collapses them into one number can't tell the engine
-what to walk on, what to swim in, or what will be gone by summer. When the stack needs **voids**
-(overhangs, sea caves) rather than stacked thicknesses, the per-column material stack of `11`
-(Peytavie's Arches) replaces the field stack.
+So "the heightfield is the source of truth" means the *solid* stack; water and snow are
+truthful too, as their own layers on top. A graph that collapses them into one number cannot
+tell the engine what to walk on, what to swim in, or what will be gone by summer. When the
+stack needs **voids** (overhangs, sea caves) rather than stacked thicknesses, the per-column
+material stack of `11` replaces the field stack.
 
-**Every landform is a claim about a process.** When a user asks for "realistic mountains",
-they are asking for a process history: uplift produced relief, fluvial incision carved the
-valley network, hillslope diffusion relaxed the ridges. Noise alone never produces this,
-because noise has no memory of water. If the request implies drainage — valleys, ridgelines
-that branch, alluvial fans — then noise is the *initial condition*, not the answer.
+## Every landform is a claim about a process
 
-**Landscape is a balance of building up and wearing down — and mass is conserved between them.**
-Every process in this skill does one of two things. It **builds** relief and material — tectonic
-uplift (`02`), volcanism and impact (`11`), and every kind of **deposition**: deltas and alluvial
-fans (`04`, `16`), dunes (`05`), moraines (`12`), loess (`16`), reefs (`12`), point bars and gravel
-(`04`), soil production (`11`). Or it **wears down** — fluvial, thermal, aeolian, glacial, and
-coastal erosion, weathering and dissolution (`04`, `05`, `11`, `12`). A landform is wherever the two
-balance: a mountain is uplift fought to a standstill by incision (`02`, the equilibrium
-`U = K·A^m·S^n`); an alluvial fan is a mountain's erosion piled where the slope breaks (`16`); a
-delta is a river's load dropped at the sea (`12`). This is why "add more detail" is rarely "add more
-noise" — realism comes from letting a *building* process and a *wearing* process run to equilibrium,
-which is the whole reason erosion beats a noise stack (`04`).
+When a user asks for "realistic mountains", they are asking for a process history: uplift
+produced relief, fluvial incision carved the valley network, hillslope diffusion relaxed the
+ridges. Noise alone never produces this, because noise has no memory of water. If the request
+implies drainage — valleys, ridgelines that branch, alluvial fans — then noise is the *initial
+condition*, not the answer.
 
-The coupling is **mass**: what erodes here must deposit *somewhere* — erosion and deposition are one
-budget, not two unrelated nodes. The eroded ridge fills the valley below it; the retreating cliff
-builds the beach downdrift (`12`); the deflated playa becomes loess downwind (`16`); the excavated
-crater is its own ejecta blanket (`11`). Track the budget and the landscape is *closed*; ignore it
-and sediment appears from nowhere and vanishes into nothing — exactly what the mass-conservation
-check catches (`09`, "the single most under-used terrain assertion"). **Source and sink are the same
-story told from two ends:** when a graph only erodes, ask where the sediment went; when it only
-deposits, ask where it came from.
+## Landscape is a balance of building up and wearing down — and mass is conserved between them
 
-**A node is a pure, parameterised function; parameters are data.** This skill also covers the
-substrate under a terrain tool — the graph runtime a Gaea/World Machine-class product stands
-on. There, the doctrine is: every node is a pure function of (parameters, inputs, context);
-every parameter is a typed, unit-carrying, serialisable value in world units; every node
-declares how far its information travels (local / neighbourhood / global) and whether its
-result survives a resolution change. Those declarations are what make caching, preview,
-tiling, undo, and determinism *properties of the runtime* instead of per-node heroics. When
-designing or reviewing the substrate, read `references/14-graph-runtime.md`; for how families
-land on the GPU and what can run per-frame versus amortised versus baked,
-`references/15-gpu-realtime.md`.
+Every process in this skill does one of two things. It **builds** relief and material —
+tectonic uplift (`02`), volcanism and impact (`11`), and every kind of deposition: deltas and
+fans (`04`, `16`), dunes (`05`), moraines (`12`), loess (`16`), reefs (`12`), soil production
+(`11`). Or it **wears down** — fluvial, thermal, aeolian, glacial, and coastal erosion,
+weathering and dissolution (`04`, `05`, `11`, `12`). A landform is wherever the two balance: a
+mountain is uplift fought to a standstill by incision (`02`); an alluvial fan is a mountain's
+erosion piled where the slope breaks (`16`); a delta is a river's load dropped at the sea
+(`12`). This is why "add more detail" is rarely "add more noise" — realism comes from letting
+a building process and a wearing process run to equilibrium (`04`).
 
-**Detail is recursive — but only where the process is scale-free.** Terrain is (multi)fractal,
-so many techniques are *meant* to be applied at more than one scale, and the mental model is a
-**cascade**: generate the macro, then apply the *same kind* of operator again at the next scale
-down, and again. This is not a trick — it is what several nodes already are. FBM is one noise
-function summed across octaves (`01`). A scatter of boulders can carry its own scatter of cobbles
-carrying pebbles (`07`), which is the grain cascade of `04` made geometric. Domain warp warps a
-warp (`01`). A drainage network branches self-similarly (Horton–Strahler, `03`). Amplification
-adds a finer band of detail onto a coarse terrain (Guérin et al. 2017, `01`). When someone asks
-for "more detail", the first question is *at which scale*, and the answer is usually another pass
-of a scale-free operator, not a bigger single pass.
+The coupling is **mass**: what erodes here must deposit *somewhere* — erosion and deposition
+are one budget, not two unrelated nodes. Track the budget and the landscape is *closed*;
+ignore it and sediment appears from nowhere and vanishes into nothing — exactly what the
+mass-conservation check catches (`09`, "the single most under-used terrain assertion"). When a
+graph only erodes, ask where the sediment went; when it only deposits, ask where it came from.
+The enforceable form of this rule is an evaluation invariant (Part 3).
+
+## GIS data is a first-class input
+
+Real-world elevation data is not a rival paradigm; it is the strongest possible *initial
+condition*. An imported DEM enters the graph as a `HeightField` in metres like any other base
+layer — after repair (void-fill, hydro-enforcement, sensor-artefact removal, all in `08`) — and
+from there every doctrine above applies unchanged: it can be eroded further, analysed into
+masks, dressed with materials, tiled, and emitted. Two rules keep the integration honest:
+
+- **Repair before simulate.** Raw DEMs carry voids, seams, and sensor artefacts that flow
+  routing amplifies into confetti drainage. The repair pipeline in `08` runs first, always.
+- **The generator is not a viewer.** Once the DEM is in, the deliverable is generation —
+  further process, analysis, or engine export. Pure inspection and plotting belong to GIS
+  tools, not this skill (Activation boundary, Part 1).
+
+## Detail is recursive — but only where the process is scale-free
+
+Terrain is (multi)fractal, so many techniques are *meant* to be applied at more than one
+scale, and the mental model is a **cascade**: generate the macro, then apply the *same kind*
+of operator again at the next scale down. FBM is one noise function summed across octaves
+(`01`); a scatter of boulders can carry its own scatter of cobbles carrying pebbles (`07`); a
+drainage network branches self-similarly (`03`); amplification adds a finer band of detail
+onto a coarse terrain (`01`). When someone asks for "more detail", the first question is *at
+which scale*, and the answer is usually another pass of a scale-free operator, not a bigger
+single pass.
 
 The trap is assuming **every** operator is scale-free. **Physical erosion is not.** It carries
 real length scales — grain size, transport distance, the discharge that sets channel size — so
-"run erosion again, finer, for detail" is not the same as running it once at high resolution:
-drainage area is global, and a droplet's reach is a fixed number of cells (`04`, `08`).
-Re-applying a scale-bound process as if it were noise is exactly the defect the
-resolution-consistency test catches (`09`): *if the mountains move when you change resolution, a
-length scale was written in cells instead of metres.* So the rule is two-sided:
+"run erosion again, finer, for detail" is not the same as running it once at high resolution
+(`04`, `08`). Re-applying a scale-bound process as if it were noise is exactly the defect the
+resolution-consistency test catches (`09`): *if the mountains move when you change resolution,
+a length scale was written in cells instead of metres.* The rule is two-sided:
 
 - **Scale-free — recurse freely.** Noise / FBM / warp (`01`), hierarchical scatter (`07`),
   curvature and analysis masks (`06`), LOD pyramids (`08`). Same operator, new
-  frequency / amplitude / spacing per level. And because terrain is *multifractal* (Musgrave,
-  `01`), vary the amplitude by locale — rough mountains, smooth plains — rather than stamping a
-  uniform octave everywhere.
+  frequency / amplitude / spacing per level; vary amplitude by locale (multifractal, `01`).
 - **Scale-bound — apply once, at the right scale.** Hydraulic and stream-power erosion, flow
-  routing, glacier and coastal sims. Choose the backbone by world extent (design procedure below),
-  run it at the largest resolution you can hold globally (`08`), then add *scale-free* detail
-  (noise, thermal, scatter) on top — never a second global erosion pass masquerading as detail.
+  routing, glacier and coastal sims. Choose the backbone by world extent (Part 1), run it at
+  the largest resolution you can hold globally (`08`), then add *scale-free* detail on top —
+  never a second global erosion pass masquerading as detail.
 
-**Off-Earth: mind the gravity and the missing water.** The regime is set by two knobs — *is there
-liquid water*, and *what is the gravity* — and changing them reweights the whole graph. Earth's
-terrain is fluvially dominated because it has abundant water; the Moon and (mostly) Mars are not.
+## Off-Earth: mind the gravity and the missing water
 
-- **No liquid water → no fluvial backbone.** On an airless or dry world the erosion chapter (`04`)
-  largely switches off and the surface is dominated by **impact cratering** (`11`) plus, where there
-  is an atmosphere, **aeolian** processes (`05`, `16`) and mass wasting. Drainage networks, deltas,
-  and coastlines are Earth (and ancient-Mars) features — don't stamp them on the Moon.
-- **Gravity rescales the physics.** Impact-crater size scales with gravity (Melosh 1989 π-scaling —
-  the same impact energy makes a *bigger* crater at lower g); saltation and dune size shift with
-  gravity and air density (**Kok et al. 2012**, *The physics of wind-blown sand and dust* — the
-  reference for sand on Mars, Venus, and Titan). The **repose angle is nearly gravity-independent**,
-  a useful invariant: talus still stands at ~34° on Mars. Slopes, dune wavelengths, and crater
-  depths tuned for Earth are wrong elsewhere.
-
-The rule: **pick the dominant agent from the world, not from habit.** An Earth graph reaches for
-noise-then-erosion; a lunar graph for cratering-then-regolith-gardening; a Martian graph blends
-ancient fluvial relics under a dominant aeolian-and-impact overprint. The `04`/`05`/`11`/`16`
-machinery is the same — only the *weights and constants* change, which is the multi-scale
-doctrine's sibling: same operators, different regime.
+The regime is set by two knobs — *is there liquid water*, and *what is the gravity* — and
+changing them reweights the whole graph. **No liquid water → no fluvial backbone**: on an
+airless or dry world, `04` largely switches off and the surface is dominated by impact
+cratering (`11`) plus, where there is an atmosphere, aeolian processes (`05`, `16`) and mass
+wasting. **Gravity rescales the physics**: crater size, saltation, and dune wavelength all
+shift with gravity, while the repose angle is nearly gravity-independent — a useful invariant
+(`11`, `05`, `20`). The rule: **pick the dominant agent from the world, not from habit.** The
+machinery is the same — only the weights and constants change.
 
 ## Six things people call "an algorithm"
 
 Terrain discussions collapse these constantly, and nearly every bad reference table in
 circulation is a symptom of it. Keep them apart:
 
-| | |
+| Term | Meaning |
 |---|---|
 | **Node type** | The graph operation exposed to the user. Branding. |
 | **Algorithm** | The computational technique. Has pseudocode. |
@@ -248,75 +315,53 @@ circulation is a symptom of it. Keep them apart:
 Concretely: "Erosion" is a node. "Virtual pipe model" is an algorithm. "Fluvial incision" is a
 physical model. "Canyon" is a landform. "Ping-pong buffers with atomics" is an implementation
 technique. They are not interchangeable, and a question about one is rarely answered by
-another.
+another. **The one that causes real damage is landform-as-algorithm**: there is no atoll
+algorithm, no hoodoo algorithm, no sea-stack algorithm. Asked for one, give the composition
+from `00` — never invent a plausible citation.
 
-**The one that causes real damage is landform-as-algorithm.** There is no atoll algorithm, no
-hoodoo algorithm, no sea-stack algorithm. Asked for one, the temptation is to invent a
-plausible citation. Don't — give the composition instead. See `references/00-index.md`.
+---
 
-## Knowing what you don't know
+# Part 3 · Graph Substrate & Emitters
 
-`references/00-index.md` is the map of this skill's knowledge, and every entry carries a
-provenance tier:
+The machine the doctrine runs on: the DAG, its typed edges, its legal evaluation order, its
+determinism contract, and the bridge to the engine.
 
-**P** = verified paper · **F** = folklore, no canonical paper · **L** = landform, not an
-algorithm · **N** = a tool's node, not an algorithm · **?** = claimed but unverified
+## The DAG model
 
-**Never upgrade a tier to satisfy a question.** If someone asks for the paper behind droplet
-erosion, the answer is that there isn't one — it's Beyer's 2015 thesis after Musgrave 1989 —
-not a plausible-looking guess. A fabricated citation costs the reader a day and it is the
-defect this skill exists to prevent. Consult the index before attributing anything.
+A terrain tool — Gaea, World Machine, Houdini's heightfield SOPs, or one you build (`14`) — is
+a **directed acyclic graph of pure nodes over a small set of world-space fields**. Strip the
+branding and all of them are the same machine:
 
-When a question lands on `?`, say so and offer to search. Usefully uncertain beats confidently
-wrong.
-
-**The frontier — verify before citing.** A few areas move faster than any static reference can track,
-so treat them as `?` by default even when a name comes to mind. **Learned / ML terrain synthesis** is
-the main one: GAN and now **diffusion** authoring, DEM super-resolution, and neural-implicit
-representations are *real and advancing* — `00` carries the verified anchors (Guérin 2017, GATA 2019,
-Lochner 2023, Terrain Diffusion Network 2024) — but new work arrives constantly and much is
-preprint-only with unstable metadata. Also frontier: learned **SVBRDF / material-from-photo** and
-diffusion **texture super-resolution** (`08`). The rule for all of them: cite only what you can confirm
-against the primary source *now*, keep the `P`/`?` boundary firm, and re-check before any
-publication-critical use. This is the one part of the skill with a shelf life; when in doubt, search.
-
-## The terrain graph
-
-Everything in this skill is nodes in a graph, so state the model once. A terrain tool — Gaea,
-World Machine, Houdini's heightfield SOPs, or one you build (`14`) — is a **directed acyclic graph
-of pure nodes over a small set of world-space fields.** Strip the branding and all three are the same
-machine:
-
-- **A node is a typed field-transform** — a pure function from (parameters, input fields, context)
-  to output fields (`14`). "Erosion", "Combine", "Select Slope" are UI names for this; the algorithm
-  underneath is what `00` catalogues, and *the name is not the algorithm* (the six-things table
-  above).
-- **An edge is a world-space field**, carrying a named type and unit — `height:m`, `A:m²`,
-  `slope:tan`, a `MaskField` in [0,1] (Field types, below). Type and unit errors between nodes are
-  invisible at runtime and catastrophic in output; name them on every edge.
-- **The graph is a DAG evaluated to a heightfield** plus its companion layers — water, sediment,
-  snow (the layer stack in the Doctrine). The order is not free: it obeys the Legal Order (below).
+- **A node is a pure, typed field-transform** — a function from (parameters, input fields,
+  context) to output fields, with no hidden state (`14`). Every parameter is a typed,
+  unit-carrying, serialisable value in world units. Every node declares how far its
+  information travels (**local / neighbourhood / global**) and whether its result survives a
+  resolution change. Those declarations are what make caching, preview, tiling, undo, and
+  determinism *properties of the runtime* instead of per-node heroics.
+- **An edge is a typed port carrying a world-space field** — named type and unit on every
+  edge (Field types, below). Type and unit errors between nodes are invisible at runtime and
+  catastrophic in output.
+- **The graph evaluates to the layer stack** (Part 2) — the solid heightfield plus its
+  companion water, sediment, and snow fields — in the Legal Order below.
 
 Nodes combine in exactly **three ways**, and confusing them is a defect class:
 
-1. **Chain** — one node writes height, the next reads it. This is the Legal Order: uplift → noise →
-   route → erode → analyse. Sequential height writes, ordered by what each process needs to exist.
-2. **Blend** — combine two fields through a mask or a smooth operator: `blend(base, height, mask)`,
-   `smin(a, b, k)` (`10`). This is how detail, regions and materials are layered — *not* bare `max`
-   (creases) or `mul` (scales absolute elevation, not relief; `10`).
-3. **Parameterise** — one substrate, with masks *varying a process's parameters* per region (`06`,
-   `13`). A multi-biome world is one graph whose `K`, uplift and climate fields differ by locale —
-   **never two finished terrains blended together** (`13`, `20`).
+1. **Chain** — one node writes height, the next reads it. This is the Legal Order: uplift →
+   noise → route → erode → analyse.
+2. **Blend** — combine two fields through a mask or a smooth operator (`10`) — *not* bare
+   `max` (creases) or `mul` (scales absolute elevation, not relief).
+3. **Parameterise** — one substrate, with masks *varying a process's parameters* per region
+   (`06`, `13`). A multi-biome world is one graph whose erodibility, uplift, and climate
+   fields differ by locale — **never two finished terrains blended together** (`13`, `20`).
 
-Where the knowledge lives: the **operators** that combine nodes and their pitfalls are `10`; the
-**substrate** that runs the graph (typed ports, caching, tiling, preview) is `14`; **worked
-assemblies** of whole graphs are the archetype blueprints in `20`; and the map from a tool's branded
-node to the algorithm under it is the **tool-node crosswalk** in `00`.
+The operators and their pitfalls are `10`; the substrate that runs the graph (typed ports,
+content-addressed caching, dirty propagation, preview, scheduling) is `14`; GPU placement and
+realtime tiers are `15`; worked whole-graph assemblies are `20`; the branded-node-to-algorithm
+map is the crosswalk in `00`.
 
 ## Field types
 
-Every graph edge carries a typed field. Name the type and the unit; type errors between nodes
-are invisible at runtime and catastrophic in output.
+Every graph edge carries a typed field. Name the type and the unit:
 
 `HeightField` (m) · `ScalarField` · `MaskField` [0,1] · `VectorField2D` · `DirectionField` ·
 `FlowField` · `NormalField` · `DistanceField` (m) · `MaterialField` · `LayerField` ·
@@ -336,15 +381,14 @@ Four different things get called "mask". Conflating them is a real bug class:
 |---|---|---|
 | **Effect mask** | Where the *result* is blended back | `result = lerp(source, processed, mask)` |
 | **Process mask** | Where the algorithm *runs at all* | Gate inside the sim loop |
-| **Material mask** | Physical properties: hardness, cohesion, permeability, solubility, grain size | Feeds `K`, talus angle, etc. |
+| **Material mask** | Physical properties: hardness, cohesion, permeability, solubility, grain size | Feeds erodibility, talus angle, etc. |
 | **Boundary mask** | Whether water/material may *cross* | Boundary condition inside the sim |
 
-Effect and process are not the same and substituting one for the other is a defect that looks
-plausible. An erosion node given an *effect* mask still erodes everywhere and then blends the
-result — so sediment that was transported out of the masked region is silently lost, mass is
-not conserved, and the boundary of the mask develops a discontinuity. Given a *process* mask
-it erodes only inside, which is usually what was meant but leaves a hard rim unless the
-boundary is handled. Neither is wrong; picking without knowing which you picked is.
+An erosion node given an *effect* mask still erodes everywhere and then blends the result — so
+sediment transported out of the masked region is silently lost, mass is not conserved, and the
+mask boundary develops a discontinuity. Given a *process* mask it erodes only inside, which is
+usually what was meant but leaves a hard rim unless the boundary is handled. Neither is wrong;
+picking without knowing which you picked is.
 
 ## The Legal Order
 
@@ -353,6 +397,7 @@ order before you check the maths.
 
 ```
   1  Macro / tectonics        uplift field U, base relief          → 02
+  1b Real-world base          DEM import + repair (if GIS-based)   → 08
   2  Base shape               primitives, large-scale noise        → 01
   3  Detail noise             FBM / ridged / warp                  → 01
   3b Volcanic (if volcanic)   edifices, lava, tephra/PDCs/caldera  → 11, 19
@@ -375,265 +420,251 @@ order before you check the maths.
 The laws that actually bite:
 
 - **Flow routing requires depression handling first.** Every pit is a sink that swallows
-  accumulation. Skip step 4 and your rivers terminate in the middle of nowhere and your
-  drainage area map looks like confetti. This is the single most common defect.
-- **Analysis must run after the final geometry.** Slope and curvature computed before
-  erosion describe a landscape that no longer exists. A snow mask built on pre-erosion
-  slope will paint snow onto the walls of valleys that erosion has since cut.
-- **Thermal after hydraulic.** Hydraulic erosion over-steepens; thermal relaxes to the
-  repose angle. Run thermal first and hydraulic will just re-steepen everything.
+  accumulation. Skip step 4 and rivers terminate in the middle of nowhere and the drainage
+  map looks like confetti. This is the single most common defect.
+- **Analysis must run after the final geometry.** Slope and curvature computed before erosion
+  describe a landscape that no longer exists. A snow mask built on pre-erosion slope will
+  paint snow onto the walls of valleys that erosion has since cut.
+- **Thermal after hydraulic.** Hydraulic erosion over-steepens; thermal relaxes to the repose
+  angle. Run thermal first and hydraulic will just re-steepen everything.
 - **The optional regimes slot by what they need to exist.** Glacial runs *alongside* fluvial —
-  both carve the same relief and a glaciated landscape has both (`12`). Coastal and marine run
-  only *after* sea level exists (9b), lake shores after lake levels (`03`, `12`). Meandering is a
-  floodplain process and comes after the valley-scale height writes (9c). Karst is not a step at
-  all — it is fluvial/dissolution erosion *gated by a soluble lithology* (`11`). And analysis
-  (step 10) still comes after **all** of them.
-- **Isostasy is a feedback, not a step.** Loading and unloading — uplift, erosion, ice — make the
-  crust sink and rebound, so isostasy couples to the *whole* loop; run it as a slow response
-  alongside erosion (6), not as a one-shot node. On a range it *raises the peaks as the valleys
-  incise* (`02`, Molnar & England 1990); around former ice it strands raised shorelines (`12`).
-- **Erosion is not tile-local.** Sediment crosses tile boundaries. Any erosion run
-  per-tile without an apron produces visible seams that no amount of blending will hide.
-  See `references/08-output-contract.md`.
+  both carve the same relief (`12`). Coastal and marine run only after sea level exists,
+  lake shores after lake levels (`03`, `12`). Meandering is a floodplain process and comes
+  after the valley-scale height writes. Karst is not a step at all — it is
+  fluvial/dissolution erosion *gated by a soluble lithology* (`11`). Analysis (step 10) still
+  comes after **all** of them.
+- **Isostasy is a feedback, not a step.** Loading and unloading — uplift, erosion, ice — make
+  the crust sink and rebound, so it couples to the *whole* loop; run it as a slow response
+  alongside erosion, not as a one-shot node (`02`, `12`).
+- **Erosion is not tile-local.** Sediment crosses tile boundaries. Any erosion run per-tile
+  without an apron produces visible seams that no amount of blending will hide (`08`).
 - **Export last, and only once.** Quantising to R16 mid-graph destroys the precision every
-  downstream simulation depends on.
+  downstream simulation depends on (Output Contract, below).
 
-## Design procedure
+## Evaluation invariants
 
-When asked to design, review, or fix a terrain graph, work in this order:
+Cross-cutting; they cost nothing to enforce up front and everything to retrofit.
 
-**1. Extract the landform claim.** What process history is implied? Ask if unclear —
-"eroded mountains" and "dune field" and "rolling farmland" have almost no nodes in common.
-Pin down: world extent (km), target resolution (m/px), vertical range (m), and whether the
-terrain is tiled or single-tile. If the deliverable is judged from a camera rather than only as
-data, also pin down the **view envelope**: nearest and farthest intended viewing distance, whether
-the critical read is plan / traversal / hero / close-up, and which correctly-sized natural or built
-features provide scale cues. This does not move the graph into camera space — terrain and material
-frequencies stay in metres — but it decides which bands must be geometry, which can be material
-relief, and which must survive LOD (`08`, `09`). Never fake a larger world by changing terrain units
-or atmospheric scale; those are downstream presentation choices.
+- **Units.** Height in metres, always. Slope as `tan` (rise/run), converted to degrees only
+  for display. Drainage area in m², not cell counts — cell counts break the moment resolution
+  changes. Normalise only in the export node.
+- **Seed contract.** Noise must be evaluated in **world coordinates**, never tile-local
+  coordinates — a node that takes per-tile `(u, v)` in [0,1] seams catastrophically. Every
+  stochastic node takes an explicit seed derived from a single root seed by a documented rule
+  (e.g. `hash(rootSeed, nodeId)`), so the graph is reproducible and a single node can be
+  re-rolled without disturbing its neighbours.
+- **Determinism under parallelism.** Grid erosion using in-place neighbour updates is
+  order-dependent and therefore non-deterministic when threaded. Use **double-buffering**:
+  read from buffer A, write to buffer B, swap — on CPU threads and GPU dispatches alike.
+  Droplet erosion parallelised naively has the same race on overlapping brush footprints:
+  either batch droplets into non-overlapping tiles or accumulate deltas atomically and apply
+  in a second pass (`15`).
+- **Boundary conditions.** Decide explicitly what happens at the domain edge: base level
+  (water leaves, erosion cuts inward), wall (water pools, terrain bulges), or periodic. The
+  default of "whatever the loop happens to do at index 0" produces a visible frame of
+  artefacts. State it in the graph spec.
+- **The sediment budget closes, or the leak is named.** Under pure transport — no uplift, no
+  sources, closed boundaries — total solid mass is invariant, and on a hexagonal lattice the
+  per-cell area constant differs from the square one (`26`) — carry the square constant over
+  and a closed budget reads as a drifting one. Every real model leaks somewhere, so the
+  invariant is not *no leak*; it is that **the leak is measured and named**. The usual sites:
+  a droplet expiring with load still in it, flux caps and clamps (`04`, `19`), thermal's
+  per-pair clamp (`05`), open boundaries, and — the quiet one — an *effect* mask where a
+  *process* mask was meant. `reference-impl` mechanises this via
+  `reference-impl/tests/asserts.py`.
+- **Build the mass before you dissect it.** A feature primitive written as a radial envelope
+  times texture is a solid of revolution, and stays one however good the texture. Build the
+  asymmetric mass first — crest-line SDFs, unioned sub-masses, saddles, faces of unequal
+  steepness — then dissect; dissection is local and cannot introduce large-scale asymmetry
+  that was never there. Test with a **cone as the control** (`10`).
+- **A metric with no control is not evidence.** Every claimed measurement ships with a case
+  that must *fail* (a cone, pure noise, the same seed twice) so the number has a scale, and
+  thresholds are set from measured spreads rather than chosen in advance (`09`).
 
-If the request is a whole multi-biome world (a named map, or
-"a continent with a desert, a swamp, and a volcano"), it is a *composition* problem — one global
-substrate and hydrology with masks varying parameters per region, not separate terrains blended
-together. See `references/13-climate-ecosystem.md`. If the request names a *recognisable
-landscape* — the Alps, the Grand Canyon, a Namib-style erg, a Niagara-style waterfall — start from
-the matching **archetype blueprint** in `references/20-archetypes.md`: a worked assembly stated as
-a regime setting over the Legal Order, to *adapt*, not paste. If instead the request is an
-**infinite, lazily-streamed block/voxel world** — a "Minecraft-like", generated per chunk from
-`(seed, coord)` — it is a *different paradigm*, not a graph to erode: the heightfield-truth,
-process-history, and mandatory-flow-routing doctrines are deliberately suspended. Go to
-`references/24-voxel-streaming-generation.md` and read its doctrine ledger before applying anything
-below. If the request is a **whole planet or spherical globe** — an Earth-like or alien world, not a
-flat patch — start from `references/25-planetary-spherical.md`: it owns the globe altitude (Euler-pole
-tectonics, latitude climate bands, geoid sea level, planet-scale LOD) and routes the grid/seam
-substrate to `references/08-output-contract.md`.
+## The lattice choice
 
-**2. Derive the cell size and state it.** `cellSize = extent / resolution`. Nearly every
-parameter downstream is in units of cellSize — talus thresholds, erosion rates, scatter
-radii. A graph that does not know its cell size cannot have correct parameters, and a
-graph tuned at 4 m/px will fall apart at 1 m/px unless the parameters are expressed in
-world units.
+Choose the working lattice at design time (Part 1, step 2), because the metric and neighbour
+stencil ripple through every downstream parameter exactly as cell size does. The **hexagonal
+lattice is one fundamental sampling choice with two deployments** — the same theory serves
+both flat heightfields and whole planets:
 
-**And decide the grid topology here — this is a *flat-terrain* choice, not a planetary one.** The
-default is a square raster, but the **hexagonal grid is a first-class alternative for ordinary flat
-heightfields**, with concrete advantages over the square grid: it is the optimal 2D sampling lattice
-(~13.4% fewer samples for the same detail — realised via ~15% coarser spacing, not at equal cellSize),
-its 6 equidistant edge-neighbours erase the D4/D8 √2 ambiguity, its D6 flow routing has no metric bias
-(though it quantises coarser — 6 directions, not 8, so striping shrinks rather than vanishes), and its
-erosion/CA are markedly less direction-biased (no 45°/90° striping; a smaller 60° residual remains).
-The costs are interchange — engines and DEMs want a raster, so you resample out — and a renormalised
-stencil (the 6-neighbour Laplacian constant differs by 3/2; keep the square one and diffusivity is
-silently 1.5× high). Choose square-vs-hex *now*, because the metric and neighbour stencil ripple through
-every downstream parameter exactly as cellSize does. The practical shape of the choice is that **`cellSize` stops being a scalar and becomes a 2×2 shear
-matrix** `B` (a hex field is a square array under a shear — the index quad is a rhombus): distances go
-through `G = BᵀB`, whose off-diagonal `cos 60° = ½` is the term square-grid code assumes is zero, and
-**gradients and normals go through `B⁻ᵀ`, not `B`** — the classic shear bug, worth up to 30° of normal
-error and a `√3` slope-scale error if you skip it. Carry `B`, not trigonometry at each call site.
-Rendering hex is a separate, later fork — the
-dual mesh (centres only, ~2 triangles per cell) when the hexes are a working grid, and when the tiles
-are meant to be seen, a **6-triangle fan through the centre** or the minimal **4-triangle corner-only**
-triangulation, which is a third cheaper but drops the cell's own sample and attenuates one-cell extrema
-to `1/3` (free on flat prism tops and far LOD, a silent bug elsewhere). See
-`references/26-hexagonal-grids.md`. This is entirely separate from — and applies with or without — the spherical-grid choice a
-*planet* forces (`08`/`25`); a hex grid is for flat terrain first, the sphere only later.
+- **Flat heightfields.** The default is a square raster, but hex is a first-class
+  alternative: it is the optimal 2D sampling lattice (~13.4% fewer samples for the same
+  detail), its 6 equidistant edge-neighbours erase the D4/D8 diagonal ambiguity, its D6 flow
+  routing has no metric bias (though it quantises coarser — striping shrinks rather than
+  vanishes), and its erosion and CA passes are markedly less direction-biased. The costs are
+  interchange — engines and DEMs want a raster, so you resample out at export — and a
+  renormalised stencil set: storage, metric, gradients, stencils, point-location, and
+  triangulation all change, and porting square-grid habits silently corrupts slopes and
+  normals. All of that machinery — the sheared-array storage model, the corrected stencil
+  constants, what does and does not port — is Implementation Reference material in
+  `references/26-hexagonal-grids.md`; do not reconstruct it from memory.
+- **Spherical planets.** A sphere cannot be covered by a square grid without seams or extreme
+  distortion. The **icosahedral hexagonal DGGS** (Goldberg polyhedron) tiles the sphere with
+  near-uniform hexagons plus exactly 12 pentagons — the same lattice theory as the flat case,
+  deployed on a curved domain. The alternatives (cube-sphere, HEALPix), the seam routing, and
+  the pentagon handling live in `references/08-output-contract.md`; the planet-scale altitude
+  (tectonics, climate bands, geoid sea level, LOD) is `references/25-planetary-spherical.md`.
 
-**3. Choose the erosion backbone by scale.** This is the highest-leverage decision:
+The rule: **the lattice is chosen once, per domain, for sampling and simulation reasons — not
+as a rendering style.** Rendering hexes (dual mesh, centre fan, corner-only tile, and the
+amplitude trade-offs between them) is a separate, later fork, catalogued in `26`.
 
-| World extent | Backbone | Why |
-|---|---|---|
-| < 2 km | Droplet or pipe hydraulic | Detail-scale; explicit sim is affordable and looks right |
-| 2–50 km | Pipe hydraulic + thermal | Enough cells to matter, transport distances still local |
-| > 50 km | Stream power (Braun–Willett) + thermal | Only method that is unconditionally stable at geological timescale; produces correct drainage networks |
+## The Engine Bridge: the Output Contract
 
-Stream power is ★★★★★ not because the equation is hard — it is one line — but because a
-naive explicit solver is unstable and the O(N) implicit stack ordering is non-obvious.
-Do not hand-roll it from memory: implement the Braun–Willett ordering and prove the slope–area
-oracle. See `references/04-erosion-hydraulic.md`.
+The bridge between the graph and the engine is a set of **emitters** governed by the Output
+Contract (`references/08-output-contract.md`). This is where "the engine is just an emitter"
+(Part 2) becomes enforceable:
 
-**4. Fix the units and the seed contract.** See Invariants below.
+- **The golden rule of precision: compute in R32F; quantise to R16 once, at export, at the
+  very last moment.** R16's step size across a large vertical range is visible as terracing
+  on gentle slopes and lethal to derivatives — a derivative of a quantised field is a
+  staircase. All normals, AO, curvature, and analysis are computed *before* quantisation,
+  never after. Quantising mid-graph is the export-last law of the Legal Order, violated.
+- **Emit the layer stack, not a flattened height.** The contract names the fields the engine
+  receives — solid height, water surface and depth, sand/sediment depth, snow — so the engine
+  can distinguish collision, swimmable volume, and seasonal overlay (Part 2). Splatmaps,
+  satmaps, and normal/AO encodings are derived emitter products (`06`, `08`, `18`).
+- **Tiles carry aprons.** Erosion and flow are not tile-local; every tiled bake runs with an
+  apron wider than the maximum transport distance, and GLOBAL nodes (flow routing, stream
+  power) do not tile at all — they run at the largest resolution that can be held globally
+  and are then sliced (`03`, `04`, `08`).
+- **Seams are prevented by contract, not healed by blending.** World-space noise (seed
+  contract), aprons, shared edge vertices, and — on spheres — the DGGS/cube-sphere seam
+  routing of `08`. If a seam is visible, a contract above was broken; find which.
+- **LOD is part of the contract.** Which frequency bands must survive distance, what the
+  preview pyramid promises about resolution-bound nodes (`14`), and clipmap/streaming
+  layout (`08`, `15`).
+- **DEM import is the contract read backwards.** The same chapter owns ingest: void-fill,
+  hydro-enforcement, sensor error models — repair before simulate (Part 2).
 
-**5. Write the graph as a DAG with explicit fields on every edge.** Name the field and its
-unit: `height:m`, `A:m²`, `slope:tan`, `wetness:[0,1]`. Type errors between nodes are
-invisible at runtime and catastrophic in output.
+---
 
-**6. Specify verification before implementation.** Terrain is judged by eye, which makes it
-uniquely prone to plausible-looking wrongness. Demand at least: a flow accumulation
-visualisation (rivers must reach the sea, not stop), a slope histogram (should peak near the
-repose angle after thermal, not at 0° or 90°), and a hillshade at two zoom levels — plus the
-render-mode palette for review by eye (plan vs hero view, normals, slope shade, sun sweep). For a
-camera-facing deliverable, review at both ends of the declared view envelope: macro silhouette and
-scale cues at the far end, geometry/material relief and instance grounding at the near end. See
-`references/09-verification.md`.
+# Part 4 · Knowledge Retrieval Guidelines
 
-**7. If the engine needs owned code, define the source boundary and runtime fit.** Read
-`references/21-clean-room-implementation.md`. The normal path is **reference-informed,
-engine-native**: the skill has already distilled papers and approved open-source behavior into
-neutral pseudocode, edge-case decisions and oracles. Apply that packet directly to the target
-engine; do not send the user away to inspect a library. Use source-independent or separated
-clean-room modes only when policy requires them. In every mode, the `09` oracles—not library
-resemblance—decide correctness.
+## Lookup order: the references first, the web second
 
-## Routing
+For anything this skill covers, the lookup order is fixed: **the routing table below → the
+relevant `references/` chapter → only then the internet.** This is not territorialism — it is
+why the skill exists. The references have been verified against primary sources: citations
+checked author-by-author, load-bearing constants unit-checked, sim pseudocode mirrored by
+test-verified implementations in `reference-impl/`. A web search for the same material
+returns, with high probability, exactly the defects this skill was built to correct —
+fabricated citations, landform-as-algorithm confusions, constants copied between blog posts
+until nobody knows the source.
 
-Read the reference file for the family in play. Do not reconstruct pseudocode from memory,
-and do not fetch it from a web search when a reference below covers it — the constants matter,
-they are easy to get subtly wrong, and the versions here have been checked (see Source of
-truth, above).
+The web (when a search tool is available in the session) is the *right* tool in three cases:
+
+1. **The index lands on `?`** — claimed but unverified. Say so, then search if you can.
+2. **The frontier** — anything `00` flags as moving faster than a static reference can track
+   (the ML doctrine below).
+3. **Genuinely out of scope** — the routing table has no row for it. Search freely; the skill
+   claims no authority there.
+
+When a search result *conflicts* with a reference, do not silently prefer the newer or
+shinier-looking source — the references have been through primary-source verification and the
+average search result has not. If the reference really is wrong, say so explicitly and flag it
+as a correction to the skill. A silent override discards the verification the whole skill is
+built on.
+
+For an implementation request inside scope, the corpus is **terrain-algorithm complete by
+contract**: it must supply the selection rule, equations or neutral pseudocode, field/unit
+contract, CPU/GPU placement, runtime locality, failure modes, and verification oracle. Do not
+turn the answer into a literature search or leave terrain-algorithm choices to the
+implementer. Target engine APIs, rendering integration, and product UX remain
+project-specific; the terrain behavior does not.
+
+## Provenance tiers — knowing what you don't know
+
+`references/00-index.md` is the map of this skill's knowledge, and every entry carries a
+provenance tier:
+
+**P** = verified paper · **F** = folklore, no canonical paper · **L** = landform, not an
+algorithm · **N** = a tool's node, not an algorithm · **?** = claimed but unverified
+
+**Never upgrade a tier to satisfy a question.** If someone asks for the paper behind droplet
+erosion, the answer is that there isn't one — it's folklore with a documented lineage (`00`) —
+not a plausible-looking guess. A fabricated citation costs the reader a day, and it is the
+defect this skill exists to prevent. Consult the index before attributing anything. When a
+question lands on `?`, say so. Usefully uncertain beats confidently wrong.
+
+## The frontier: ML terrain synthesis and the honesty contract
+
+A few areas move faster than any static reference — or any model's training data — can track.
+**Learned / ML terrain synthesis** is the main one: GAN and diffusion authoring, DEM
+super-resolution, and neural-implicit representations are real and advancing. Also frontier:
+learned SVBRDF / material-from-photo and diffusion texture super-resolution (`08`).
+
+The doctrine for frontier questions is an **honesty contract, not a verification demand** —
+you cannot confirm a live source you cannot reach, so never claim to have:
+
+1. **Warn first.** State explicitly that this is a fast-moving field and that your knowledge
+   has a cutoff date; newer work almost certainly exists that you cannot see.
+2. **Anchor on the verified points.** `00` carries the P-tier anchors — Guérin et al. 2017
+   (amplification), GATA 2019, Lochner 2023, Terrain Diffusion Network 2024 — cite these as
+   the established baseline and build the answer's architecture around them.
+3. **Mark the moving edge as `?`.** Anything beyond the anchors — newer models, current
+   state-of-the-art claims, preprint metadata — is `?` by default. Name it as such rather
+   than guessing.
+4. **Delegate live verification.** If the session has a web-search tool, offer to search. If
+   not, tell the user which claims deserve re-checking against primary sources before any
+   publication-critical use — the re-check is theirs to run, not yours to fake.
+
+The same contract applies to any publication-critical citation or constant: recommend a
+primary-source re-check at ship time, state your cutoff, and never present a memory as a live
+confirmation.
+
+## Doctrine vs Implementation Reference
+
+This file is the **doctrine layer**: triage, hard rules, and graph architecture. It
+deliberately contains no pseudocode, no solver mathematics, and no tuned constants. All of
+that lives in the **Implementation Reference** layer, and the split is a discipline, not a
+filing convention:
+
+- **When designing or reviewing**, argue from the doctrine and the Legal Order; cite chapters
+  for depth. Do not inline half-remembered formulas into an answer — a constant reconstructed
+  from memory is a `?` wearing a P's confidence.
+- **When implementing**, open the routed chapter and take its pseudocode, parameter tables,
+  edge-case decisions, and oracles as one packet. The `reference-impl/` mirrors are
+  executable specifications — runnable, test-verified numpy implementations of the sim
+  pseudocode, each checked against its `09` oracle — not runtime dependencies.
+- **When the two seem to disagree**, the chapter wins on mechanism and constants; this file
+  wins on ordering, scope, and contracts. Flag the discrepancy either way.
+
+## Routing table
+
+Read the reference chapter for the family in play. Do not reconstruct pseudocode from memory,
+and do not fetch it from a web search when a chapter below covers it — the constants matter,
+they are easy to get subtly wrong, and the versions here have been checked.
 
 | Reference | Covers |
 |---|---|
-| `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification & the **tool-node crosswalk** (Gaea / World Machine / Houdini branded node → algorithm family → reference). **Consult before attributing anything.** |
-| `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl |
+| `references/00-index.md` | **Master index.** Every algorithm, its provenance tier, its canonical source. Landform→composition recipes. Node-type demystification and the **tool-node crosswalk** (Gaea / World Machine / Houdini branded node → algorithm family → reference). **Consult before attributing anything.** |
+| `references/01-noise.md` | Perlin, Improved Perlin, Simplex, OpenSimplex2, value, Worley, Gabor, wavelet, diamond-square, FBM, ridged, multifractal, domain warp, curl, amplification |
 | `references/02-macro-tectonics.md` | Plate simulation, uplift fields, faults, isostasy & flexure (Airy/flexural, glacial & erosional rebound) |
-| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes (incl. mountain lakes), channel morphology (mountain rivers, braiding), meandering & bank erosion (oxbows), river terraces (strath/fill), avulsion & delta lobes, water sources & discharge, sea level |
-| `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls, grain size / bedload / gravel bars (pebbles & clasts) |
-| `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport (Bagnold threshold + cubic flux law → Exner flux-divergence bed change, saturation length), Werner dune model, anchored/obstacle dunes (echo, climbing, falling, sand ramps, shadow dunes), dune hierarchy (draa), vegetation-anchored dunes (parabolics, blowouts) |
+| `references/03-flow-routing.md` | Depression fill/breach + the no-fill list (legitimate closed basins), D8, D∞, MFD, accumulation, lakes, channel morphology, meandering & bank erosion (oxbows), river terraces, avulsion & delta lobes, water sources & discharge, sea level |
+| `references/04-erosion-hydraulic.md` | Pipe model (Mei/Št'ava), droplet, stream power (Braun–Willett/Cordonnier), knickpoints & waterfalls, grain size / bedload / gravel bars |
+| `references/05-erosion-thermal-aeolian.md` | Thermal/talus, mass wasting (landslides, debris flows), wind transport (threshold + flux law → bed change), Werner dune model, anchored/obstacle dunes, dune hierarchy, vegetation-anchored dunes |
 | `references/06-analysis-masks.md` | Slope, aspect, curvature, horizon AO, wetness index, mask/material derivation |
 | `references/07-scatter.md` | Poisson disk (Bridson), blue noise, density-driven scatter, clast scatter (boulders/cobbles/pebbles, imbrication) |
-| `references/08-output-contract.md` | Field contract, precision, tiling, aprons, seams, the grid-topology choice and its manifest fields (**hexagonal grids route to `26`**), planetary/spherical domains (cube-sphere, icosahedral hexagonal DGGS / Goldberg polyhedron, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO map encoding |
-| `references/09-verification.md` | Validation suite, diagnostics, visual review modes (top/hero, normals, slope shade…), failure catalogue, review checklist |
-| `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, Gaussian/median/bilateral/guided/anisotropic filters, morphology, authored warps |
-| `references/11-geological.md` | Strata, terracing, folding, salt & mud diapirism (salt domes/walls, namakiers, mud volcanoes), lithology, outcrops, karst (incl. tower/cone karst, dolines/uvalas/poljes/cenotes, karren), weathering & soil production, weathering microforms (tors, tafoni/honeycomb, exfoliation/sheeting domes), volcanic landforms & lava (flows, fields, lakes, lava worlds), explosive volcanism (tephra fallout, pyroclastic density currents, caldera collapse), duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |
-| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion, U-valleys, cirques, fjords; glacial deposition (moraines, drumlins, eskers, kames & kettles, outwash/sandur, erratics, tunnel valleys); glacial outburst floods & megafloods (jökulhlaups, Channeled Scabland); coastal & marine erosion, cliff retreat, wave-cut platforms, lacustrine (lake) shores, longshore drift, spits/tombolos/barriers, coastal dunes & foredunes (vegetated, beach-fed), marine terraces, deltas/rias, wave base, mangrove & chenier (biogenic muddy) coasts, coral reefs & atolls, coral as ecosystem (growth forms, zonation, spur-and-groove); seafloor age–depth subsidence, seamounts/guyots, submarine canyons & turbidity currents |
-| `references/13-climate-ecosystem.md` | Lapse rate, terrain-aware wind FLOW FIELDS (per-cell speed + direction: crest speed-up, lee shelter, valley channelling, mass-consistent projection), orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; biogenic landforms (peat/bog growth, stromatolites, nebkha, bioturbation mounds); fire & burned land (spread, severity mosaic, post-fire erosion); multi-biome worlds / regional composition (Hyrule, Middle-earth) |
+| `references/08-output-contract.md` | **The Engine Bridge.** Field contract, precision (R32F→R16), tiling, aprons, seams, the lattice manifest fields (hex routes to `26`), planetary/spherical grids (cube-sphere, icosahedral hexagonal DGGS / Goldberg polyhedron, HEALPix, seam routing), DEM & sensor realism (hydro-enforcement, void-fill, SAR/lidar artefacts, error models), LOD, clipmaps, splatmaps, satmaps, normal/AO encoding |
+| `references/09-verification.md` | Validation suite, diagnostics, visual review modes, failure catalogue, review checklist, mass-conservation and resolution-consistency checks |
+| `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, filters (Gaussian/median/bilateral/guided/anisotropic), morphology, authored warps |
+| `references/11-geological.md` | Strata, terracing, folding, diapirism, lithology, outcrops, karst, weathering & soil production, weathering microforms, volcanic landforms, explosive volcanism, duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |
+| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion & deposition (U-valleys, cirques, fjords, moraines, drumlins, eskers, outwash), outburst floods; coastal & marine erosion, cliff retreat, platforms, longshore drift, spits/barriers, coastal dunes, marine terraces, deltas, reefs & atolls; seafloor subsidence, seamounts, submarine canyons & turbidity currents |
+| `references/13-climate-ecosystem.md` | Lapse rate, terrain-aware wind flow fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; biogenic landforms; fire & burned land; multi-biome worlds / regional composition |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |
-| `references/16-arid-desert.md` | Arid/desert landforms: yardangs, inselbergs/bornhardts, alluvial fans & bajadas, pediments, playas, evaporite crusts & salterns (biogenic pink colour), desert pavement, wadis, loess & sand sheets, lunettes, obstacle dunes & sand ramps (banked against terrain; mechanism in `05`) |
+| `references/16-arid-desert.md` | Arid landforms: yardangs, inselbergs, alluvial fans & bajadas, pediments, playas, evaporite crusts, desert pavement, wadis, loess & sand sheets, lunettes, obstacle dunes & sand ramps |
 | `references/17-periglacial.md` | Periglacial/permafrost: patterned ground, solifluction, rock glaciers, thermokarst, pingos, blockfields |
-| `references/18-materials.md` | Surface-material palette: rock families, soil (USDA texture), sand, gravel, mud, vegetation cover, snow/ice, water, crusts, volcanic — and the property bundle each carries |
-| `references/19-lava.md` | **Lava simulation.** Bingham rheology, the grid CA with temperature (Miyamoto & Sasaki / MAGFLOW-style), cooling & crust insulation, FLOWGO channel model, pahoehoe/ʻaʻā, lava-specific verification, parameters |
-| `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Himalaya, Grand Canyon, Namib, Death Valley, Saharan oasis, Guilin karst, Ardèche gorge, Niagara & Victoria Falls, Yellowstone geysers, Zhangjiajie pillars, fjords, sea stacks, atolls, salt flats, Amazon flooded forest…) as regime settings over the Legal Order — the *province* altitude between one-landform (`00`) and one-world (`13`). **Anthropogenic** (Group K): rice-paddy & dry-stone terraces, field-mosaic farmland (large grids & small bocage, lithology/terroir), and engineered earthworks — dams/reservoirs, mines & spoil, cut-and-fill grading, levees & canals — the human-made surface. **Off-Earth too** (Group L): lunar cratered highlands & maria, Mars, Titan/Europa/Io — the planetary doctrine built out. Plus **screen worlds** — Hoth, Endor, Tatooine & Beggar's Canyon, Pandora, Skull Island, Arrakis, Crait, Interstellar's planets, Monument Valley's West — decomposed into their Earth filming-location archetypes, and **miniature-scale worlds** (insect / Smurf / Bikini Bottom) as a scale-regime shift. Adapt-don't-paste; each carries a verification signature |
-| `references/21-clean-room-implementation.md` | **Owned implementation path.** Reference-informed engine-native vs source-independent vs clean-room modes; grounding pseudocode in papers and approved open source; adapting data, CPU/GPU, scheduling, streaming and serialisation to the engine; independent oracles and provenance |
-| `references/22-open-source-grounding.md` | **Pre-grounding ledger.** Exact upstream revisions, licences, source symbols, adopted edge-case behavior, deliberate deviations and engine-native translations; machine-readable records in `references/open-source-grounding.json`; consume internally, never redirect the user to research it |
-| `references/23-generator-blueprint.md` | **End-to-end generator.** Complete node-library floor, offline/pre-cooked pipeline, runtime pipeline, hybrid architecture, implementation milestones, execution budgets and acceptance gates |
-| `references/24-voxel-streaming-generation.md` | **Voxel/streaming chunk worlds — the Minecraft-*family* paradigm.** Chunked, seeded, streamed, editable voxel worlds — Minecraft is the documented exemplar; Creativerse, Luanti (Minetest), Terasology, Vintage Story and smooth-voxel cousins are the family. Representation (2D-map or 3D density/SDF), multi-noise biomes, spline-into-density shape, the proto-chunk stage pipeline, aquifers, greedy-vs-smooth meshing — placed on the *axes* members vary along. The *doctrine ledger* of which `SKILL.md` invariants this regime deliberately suspends (heightfield-truth, process-history, mandatory flow routing) and what local noise substitutes. F/N-tier; sources are documented/open generators, dev talks and reverse-engineering, not papers — never a closed clone's guessed internals |
-| `references/25-planetary-spherical.md` | **Whole-planet / spherical worlds.** The consolidating "globe" altitude: tectonics as Euler-pole rotation (small circles about the pole; Cortial et al. 2019; McKenzie & Parker 1967), global circulation & the latitude climate bands that place deserts at ~30° and rainforest at 0°, sea level as a geoid/oblate-spheroid equipotential, 3D/4D noise on the sphere, planet-scale precision/LOD/streaming, and the alien-world regime knobs. **Routes to `08`** for the grid/seam/distortion substrate (does not duplicate it) and `20` Group L for specific worlds |
-| `references/26-hexagonal-grids.md` | **The hexagonal working grid, end to end** — a grid system in its own right, and a *flat-terrain* chapter first. Optimal 2D sampling lattice (~13.4% fewer samples, via ~15% coarser spacing); 6 equidistant edge-neighbours, so no D4/D8 √2 ambiguity and D6 routing (coarser quantisation, so striping shrinks rather than vanishes); renormalised stencils (the Laplacian constant is `2/(3d²)`, not `1/d²`). **Storage is a sheared 2D array**: `cellSize` becomes a 2×2 matrix `B`, metric via `G = BᵀB`, and **gradients/normals via `B⁻ᵀ`** — the classic shear bug, worth up to 30.5° of normal error. **Meshing is one structure, the rhombille tiling of diamonds**: dual mesh vs the 6-triangle centre fan vs the 4-triangle corner-only tile, and the ×1/3 amplitude loss the last one costs. But the shear licenses **storage and geometry, not algorithms** — a chapter section covers **what does not port**: neighbour tables (no `dx,dy` loop, no 4-vs-8 branch), cube distance, `cube_round` for point→cell (per-axis rounding is wrong 16.8% of the time), barycentric sampling (there is no bilinear), rings/discs instead of box loops, and the failure of separable filters (`√3` anisotropy; use three-axis passes). Plus engine integration (index-space quadtrees and culling; heightfield colliders take no shear), the hex-prism / "pillar" stepped-tile look, interchange and verification. **Routes to `08`** for the manifest fields and the deliver-a-raster rule |
+| `references/18-materials.md` | Surface-material palette: rock families, soil, sand, gravel, mud, vegetation cover, snow/ice, water, crusts, volcanic — and the property bundle each carries |
+| `references/19-lava.md` | **Lava simulation.** Bingham rheology, grid CA with temperature, cooling & crust insulation, FLOWGO channel model, pahoehoe/ʻaʻā, lava-specific verification, parameters |
+| `references/20-archetypes.md` | **Archetype blueprints.** Named landscapes (Alps, Grand Canyon, Namib, Guilin karst, fjords, atolls…) as regime settings over the Legal Order; anthropogenic terrain (terraces, farmland, earthworks); off-Earth worlds (Moon, Mars, icy moons); screen worlds decomposed into their real filming-location archetypes; miniature-scale worlds. Adapt-don't-paste; each carries a verification signature |
+| `references/21-clean-room-implementation.md` | **Owned implementation path.** Reference-informed engine-native vs source-independent vs clean-room modes; grounding pseudocode in papers and approved open source; adapting to the engine; independent oracles and provenance |
+| `references/22-open-source-grounding.md` | **Pre-grounding ledger.** Exact upstream revisions, licences, source symbols, adopted edge-case behavior, deliberate deviations; machine-readable records in `references/open-source-grounding.json`; consume internally, never redirect the user to research it |
+| `references/23-generator-blueprint.md` | **End-to-end generator.** Complete node-library floor, offline/pre-cooked pipeline, runtime pipeline, hybrid architecture, milestones, execution budgets and acceptance gates |
+| `references/24-voxel-streaming-generation.md` | **Voxel/streaming chunk worlds.** Chunked, seeded, streamed, editable voxel worlds (the Minecraft family); representation, multi-noise biomes, proto-chunk stages, meshing — and the *doctrine ledger* of which invariants this regime deliberately suspends. F/N-tier sources |
+| `references/25-planetary-spherical.md` | **Whole-planet / spherical worlds.** Euler-pole tectonics, global circulation & latitude climate bands, geoid sea level, 3D/4D noise on the sphere, planet-scale precision/LOD/streaming, alien-world regime knobs. **Routes to `08`** for the grid/seam substrate |
+| `references/26-hexagonal-grids.md` | **The hexagonal lattice, end to end.** Optimal 2D sampling, 6-neighbour topology and D6 routing, renormalised stencils, sheared-array storage and the metric/gradient corrections, meshing options and their amplitude trade-offs, what does and does not port from square grids, engine integration, interchange, verification. Serves both the flat deployment and (via `08`/`25`) the spherical DGGS deployment. **Routes to `08`** for manifest fields and the deliver-a-raster rule |
 | `references/99-papers.md` | Bibliography with attribution notes |
-| `reference-impl/` | **Runnable, pytest-verified** numpy mirrors of the sim pseudocode (procedural noise, droplet/pipe/thermal/stream-power erosion, flow routing, lateral river meandering (upstream-lagged bank migration → oxbows + point bars), braided/anastomosing rivers (Murray–Paola cellular model, reduced-complexity tier), diffusion, dunes, isostatic flexure, the terrain-aware wind flow field (per-cell speed and direction: crest speed-up, lee shelter, valley channelling, mass-consistent projection) and the aeolian transport it drives (Bagnold threshold + cubic flux → Exner bed change), Voellmy runout, tephra/age-depth/PDC/avulsion, analysis/masks/materials, primitives/ops/filters, scatter, geological landforms, parameterised asteroid impacts by size & angle), each checked against its `09` oracle, plus a segregated, clearly-labelled **illustrative** tier (lava/glacier/coastal/tidal sims) held only to invariants where no decisive oracle exists. They are executable specifications for an owned implementation, not runtime dependencies; optional tests cross-validate flow operations against RichDEM and pysheds, and stream power, D8 accumulation and hillslope diffusion against Landlab (MIT). A dependency-free **graph+render sandbox** (`reference-impl/graph_demo.py`, `reference-impl/render.py`) wires these nodes into a Legal-Order DAG — a scale model of `14`'s substrate with content-addressed caching — and renders the `09` review modes to PNG, for testing algorithms by eye during development. A real/external **heightmap is a first-class base** via `reference-impl/heightfield_io.py` (the File Input/Output node — loads `.npy`/16-bit `.png`/raw `.r16`/`.r32`/SRTM `.hgt`, `fetch_srtm` pulls a real AWS Terrain-Tiles tile), so the same atoms run on real USGS/SRTM areas. An interactive **node-graph terrain generator** — `studio/index.html`, a single self-contained WebGL page (node graph + live 3D viewport + real-heightmap import/export, learning from Gaea / World Machine / Houdini) — is the by-eye authoring companion to these atoms. Committed visual references include a per-algorithm `gallery.png` and, for oblique-impact morphology, the size×angle `crater_matrix.png` and the labelled grazing-anatomy `crater_anatomy.png` — the latter two a *presentation* tier (circular cavity, chaos in the displaced mass; deeper up-range at grazing), distinct from the oracle-verified `crater.py` size physics. `reference-impl/archetypes.py` lifts the sandbox to the **province** altitude of this file's `20` — sixteen archetypes across Groups A–L (orogens, canyons, deserts, karst, volcanic, glacial/coastal, anthropogenic, off-Earth) as diffs from the baseline pipeline, each with its `09` signature (`archetypes.png`, labelled; `ARCHETYPES.md` also ledgers which blueprints are *not* renderable and why), and `reference-impl/screen_worlds.py` runs the "Screen worlds" section — eight fictional planets (Arrakis, Monument Valley, Pandora, Hoth, Skull Island, Beggar's Canyon, Crait, Miller's world) as those same archetypes re-dressed, each labelled with its real filming location (`screen_worlds.png`). Provenance and licences per node: `reference-impl/GROUNDING.md` |
-
-## Invariants
-
-These are cross-cutting and cost nothing to enforce up front, everything to retrofit.
-
-**Units.** Height in metres, always. Slope as `tan` (rise/run), converted to degrees only for
-display. Drainage area in m², not cell counts — cell counts break the moment resolution
-changes. Normalise only in the export node.
-
-**Precision.** Work in R32F. R16 gives 65536 levels; across an 8 km vertical range that is
-12 cm per step, which is visible as terracing on gentle slopes and lethal to slope and
-curvature derivatives (a derivative of a quantised field is a staircase). If the target
-demands R16, quantise once at export and compute all normals/AO before that point.
-
-**Seed contract.** Noise must be evaluated in **world coordinates**, never tile-local
-coordinates. A node that takes `(u, v)` in [0,1] per tile will produce a different pattern
-in every tile and seam catastrophically. Every stochastic node takes an explicit seed derived
-from a single root seed by a documented rule (e.g. `hash(rootSeed, nodeId)`), so a graph is
-reproducible and a single node can be re-rolled without disturbing its neighbours.
-
-**Determinism under parallelism.** Grid erosion using in-place neighbour updates is
-order-dependent and therefore non-deterministic when threaded. Use double-buffering
-(read from A, write to B, swap). Droplet erosion parallelised naively has the same problem —
-droplets writing to overlapping brush footprints race. Either batch droplets into
-non-overlapping tiles or accumulate deltas atomically and apply in a second pass.
-
-**Boundary conditions.** Decide explicitly what happens at the domain edge: is it a base
-level (water leaves, erosion cuts inward), a wall (water pools, terrain bulges), or periodic?
-The default of "whatever the loop happens to do at index 0" produces a visible frame of
-artefacts. State it in the graph spec.
-
-**The sediment budget closes, or the leak is named.** Erosion and deposition are one budget, not
-two unrelated nodes: under pure transport — no uplift, no sources, closed boundaries —
-`Σ(bedrock + sediment)` is invariant. `SedimentField` is a **depth in metres**, like height, so the
-budget is that sum times the cell area, and on a hexagonal grid that area is `(√3/2)·cellSize²`
-(`26`) — carry the square `cellSize²` over and a closed budget reads as a drifting one. Every real
-model leaks somewhere, so the invariant is not *no leak*; it is that **the leak is measured and
-named** rather than discovered later. The usual sites: a droplet expiring with load still in it,
-the flux caps and clamps in the pipe model (`04`) and the lava CA (`19`), thermal's per-pair clamp
-(`05`), open boundaries, and — the quiet one — an erosion node given an *effect* mask instead of a
-*process* mask, which silently discards everything transported out of the masked region. `09` calls
-this the single most under-used terrain assertion, and `reference-impl` mechanises it: fourteen
-solver tests assert conservation of the transported material (bed, water, snow, ice, sand), four of
-them through the shared `reference-impl/tests/asserts.py` helper `assert_mass_conserved`. When a
-graph only erodes, ask where the sediment went; when it only deposits, ask where it came from.
-
-**Build the mass before you dissect it.** A feature primitive written as `envelope(r) × texture`
-with a *radial* envelope is a solid of revolution, and stays one however good the texture — it
-renders as a tipi tent while satisfying every obvious assertion, because a cone satisfies them too
-(relief in range, one dominant summit, monotone descent, deep incision). Build the asymmetric mass
-first — crest-line SDFs, unioned sub-masses, saddles, faces of unequal steepness — then dissect. The
-order is not interchangeable: dissection is local and cannot introduce large-scale asymmetry that
-was never there. Test it with a **cone as the control**, not a bare threshold (`10`).
-
-**A metric with no control is not evidence.** Terrain claims are almost always statistics of a
-field, and a statistic can read green while measuring nothing — averaged over a region where the
-effect doesn't live, saturated by the grid resolution, or asserting an invariant the failure case
-also satisfies. Every claimed measurement ships with a case that must *fail* (a cone, pure noise,
-the same seed twice) so the number has a scale, and thresholds are set from measured spreads rather
-than chosen in advance. `09` catalogues the specific ways this has gone wrong here.
-
-## When you are reviewing, not designing
-
-Look for these in order — they account for most real defects:
-
-1. Is depression handling present, and is it before flow routing?
-2. Are analysis nodes downstream of the last node that modifies height?
-3. Is noise evaluated in world space?
-4. Are erosion parameters expressed in world units, or are they magic numbers that happen
-   to work at one resolution?
-5. Is there an apron on tiled erosion, and is it wider than the maximum transport distance?
-6. Is the field quantised before its derivatives are taken?
-7. Is thermal downstream of hydraulic?
-8. Does the sediment budget close — and if it leaks, is the leak measured rather than assumed?
-   (A graph that only erodes, or only deposits, is the tell.)
-
-State findings as: **symptom → mechanism → minimal fix**. Do not rewrite a graph that has one
-misordered node.
-
-## Scope
-
-This skill specifies, implements, and reviews terrain graphs and the runtime substrate they
-execute on. It carries implementation detail so that a subagent, user, or engine team can build
-the stack without rediscovering constants or copying an incompatible codebase. Four kinds of
-request land here:
-
-1. **Design/review a terrain graph** — the design procedure above.
-2. **Design/review the substrate** — the node model, parameter model, evaluation engine,
-   caching, preview, GPU placement (`14`, `15`). Here the deliverable is the architecture and
-   its invariants, with the algorithm references serving as the node library the substrate
-   must be able to host. The two hardest substrate requirements come from the algorithms, not
-   the engineering: GLOBAL nodes exist and cannot tile (`03`, `04`, `08`), and
-   resolution-bound nodes exist and must declare preview scaling policies (`14`).
-3. **Attribute/explain an algorithm** — the index (`00`) and its tier discipline.
-4. **Implement an owned terrain stack** — choose the source boundary, take the pre-grounded
-   implementation packet from the references, write CPU/GPU code around the target engine's
-   runtime contracts, and prove it with independent oracles (`21`, then `09`). Answer with the
-   implementation and its decisions, not a reading assignment. Reference libraries have already
-   informed the packet; they do not dictate the shipped architecture.
-
-When the user wants code, use the relevant pseudocode, parameter table, field contract, GPU
-pattern, and verification oracle as one implementation packet. Write the owned implementation in
-the target language and engine conventions; do not stop at architecture advice. Keep provenance
-and verification beside the code, because an owned implementation that cannot show where its
-equations, edge cases and tests came from is not auditable.
+| `reference-impl/` | **Runnable, test-verified** numpy mirrors of the sim pseudocode — noise, droplet/pipe/thermal/stream-power erosion, flow routing, meandering, braiding, diffusion, dunes, flexure, wind fields, runout, impacts, analysis, scatter, and more — each checked against its `09` oracle, plus a segregated, clearly-labelled illustrative tier where no decisive oracle exists. Optional tests cross-validate flow operations against richdem and pysheds, and stream power, D8 accumulation and hillslope diffusion against Landlab. A dependency-free graph+render sandbox (`reference-impl/graph_demo.py`, `reference-impl/render.py`) wires the nodes into a Legal-Order DAG with content-addressed caching and renders the `09` review modes. Real heightmaps are a first-class base via `reference-impl/heightfield_io.py` (loads common DEM formats, fetches real SRTM tiles). `reference-impl/archetypes.py` and `reference-impl/screen_worlds.py` lift the sandbox to the archetype altitude of `20`. Provenance and licences per node: `reference-impl/GROUNDING.md` |
