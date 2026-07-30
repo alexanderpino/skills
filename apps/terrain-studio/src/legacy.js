@@ -8,7 +8,7 @@ import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
    mirrors the pure-numpy reference-impl atoms); the 3D viewport is WebGL2.
    ===================================================================== */
 const $=s=>document.querySelector(s);
-const clamp=(x,a,b)=>x<a?a:x>b?b:x;
+export const clamp=(x,a,b)=>x<a?a:x>b?b:x;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=t=>t*t*(3-2*t);
 const fade5=t=>t*t*t*(t*(t*6-15)+10);          // improved Perlin: C2 at lattice boundaries

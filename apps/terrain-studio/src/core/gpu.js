@@ -18,7 +18,7 @@
 // path with no error at all - a silent capability downgrade the digest cannot catch, because the
 // CPU path produces valid output.
 import { makeProg, u } from './gl-util.js';
-import { fieldW, fieldH, normalize, terrainDef, XF, USE_GPU } from '../legacy.js';
+import { fieldW, fieldH, normalize, terrainDef, XF, USE_GPU, clamp } from '../legacy.js';
 
 let gl = null;
 export const setGL = (ctx) => { gl = ctx; };
