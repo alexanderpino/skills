@@ -9,13 +9,27 @@ stands on. Vegetation is where terrain renderers most often lose the frame — n
 passes but in the overdraw and submission storm sitting on top of them. Leaf/canopy BRDF and
 translucency math route to physically-based-rendering; this chapter is systems and budgets.
 
-Contents: [The two pipelines](#the-two-pipelines) ·
+Contents: [Historical transition](#the-historical-transition-placement-moved-to-the-gpu-seating-became-stricter) ·
+[The two pipelines](#the-two-pipelines) ·
 [GPU instancing architecture](#gpu-instancing-architecture) · [Grass systems](#grass-systems) ·
 [Tree, rock, and prop LOD chain](#tree-rock-and-prop-lod-chain) ·
 [Culling & submission](#culling--submission) ·
 [Consistency with the terrain](#consistency-with-the-terrain) ·
 [Streaming & memory](#streaming--memory) · [The tri-fold ladder](#the-tri-fold-ladder) ·
 [Pitfalls](#pitfalls) · [Sources](#sources--provenance)
+
+## The historical transition: placement moved to the GPU, seating became stricter
+
+Early terrain engines placed trees and grass on the CPU, instantiated a bounded list, and baked
+each transform against the source heightmap. That matched fixed terrain meshes and short draw
+distances. Open worlds broke both assumptions: millions of anonymous instances made CPU
+placement/storage/submission dominant, while geomorphing and displacement made the source
+heightfield differ from the surface on screen.
+
+The modern pipeline therefore moves anonymous scatter generation, culling, compaction, and
+submission to the GPU — but **GPU placement is not permission to approximate the ground**.
+Instances must snap to the same evaluated LOD/morph/displacement surface the terrain draws.
+Otherwise the pipeline efficiently generates a million floating objects.
 
 ## The two pipelines
 
@@ -209,7 +223,9 @@ Frame-blend or increase view count when the swimming between views shows on hero
 existing: merge whole tiles' canopies into HLOD proxy meshes or coarse card clusters with baked
 lighting response — this is `06`'s HLOD machinery; the forest becomes terrain-with-height. The
 transition is the hardest seam in the chain: match aggregate color/normal statistics between the
-impostor field and the merged proxy or the forest changes tone at a visible ring.
+impostor field and the merged proxy or the forest changes tone at a visible ring. Apply `10`'s
+Rayleigh/Mie aerial perspective at runtime to impostors and HLOD with the same distance input as
+terrain; never bake a fixed fog/sky color into the atlas under a dynamic atmosphere.
 
 **Trees in the `02` cluster path.** Nanite-family renderers can carry bark/trunk/rock geometry
 beautifully, but foliage is **aggregate geometry** — thousands of disjoint leaf cards — and
@@ -230,6 +246,12 @@ remain a specialized problem. Evaluate with `11` captures at forest scale before
 - **Alpha-to-coverage** with MSAA: hardware-dithered coverage from alpha; Ben Golus' writeup is
   the practical reference (including sharpening alpha to restore edge contrast). Where MSAA
   exists (VR, forward renderers), it is the quality answer.
+
+**Hardware-RT note.** On OMM-capable DXR/Vulkan paths, opacity micromaps can classify much of an
+alpha-tested card as opaque or transparent during traversal and reduce expensive any-hit shader
+work for vegetation shadows/reflections (`18`). They do not reduce raster overdraw, repair bad
+coverage mips, or solve canopy LOD; OMM is an RT traversal optimization, not a replacement for
+this chapter's alpha and geometry discipline.
 
 **Alpha-test mip shrinkage.** Standard mip generation averages alpha downward, so coverage falls
 with each mip and distant trees *thin out and vanish* — the classic symptom Castaño documented on
@@ -289,6 +311,20 @@ function. For baked sets, bake a height *offset from the source field* and re-ad
 rendered height at runtime, so the instance rides LOD transitions with the ground under it.
 Geomorphing terrain implies instances subtly ride morphs; that is correct and invisible, whereas
 a static height against a morphing ground is a visible float/sink pulse.
+
+```hlsl
+// Shared-evaluator contract: identical inputs and function to the terrain vertex path.
+TileLOD lod     = SelectTerrainLOD(worldXZ, camera);
+float   morphT  = TerrainMorph(worldXZ, lod, camera);
+float   groundY = EvalTerrainHeight(worldXZ, lod, morphT, displacementState);
+instanceWS.y    = groundY + bakedRootOffset;
+```
+
+**Symptom → mechanism → fix:** trees pulse above/below the ground only inside morph bands →
+scatter sampled source/LOD0 height while terrain interpolated toward its parent → share the
+terrain evaluator and its runtime morph factor. For `02` cluster terrain, expose a stable surface
+query/proxy because there may be no analytic grid morph function; the contract is shared evaluated
+surface, not a particular API.
 
 **Slope alignment per type.** Grass and small scatter align to the terrain normal (inherit it
 outright — its shading normal already is the terrain's); rocks blend toward it; trees stay

@@ -20,6 +20,12 @@ Contents: [Roads and splines on terrain](#roads-and-splines-on-terrain) ·
 
 ## Roads and splines on terrain
 
+The historical failure is coplanar ribbon thinking. Early roads were meshes draped a few
+centimeters over the heightfield; depth bias hid the fight until distance, terrain LOD, and
+shadows made the separation visible. Modern roads either become the ground (grading/conforming)
+or become part of its material resolve (RVT/VT injection). Ribbon geometry remains only where
+silhouette, camber, curb, or bridge structure requires it.
+
 Three families render a road; every shipped scheme is one of them or a hybrid. Choose by what the
 road must *be*: a paint job, a silhouette, or part of the ground.
 
@@ -36,6 +42,12 @@ carries a cross-section profile — centerline material, edge blend, verge — a
 signed distance to the spline. Because it lives in the material domain it obeys `07`'s compositing
 order and costs nothing per frame after the page is cached. It cannot change the silhouette: a
 splat road over rough ground reads as painted-on rock the moment the sun grazes it.
+
+RVT injection has its own contract: road stamps have declared priority relative to base
+landscape, junction, decal, and weather writers; they are replayed whenever a page is generated;
+and they are evaluated at every requested mip, not stamped only at the finest page and blindly
+downsampled until lane markings disappear. Along-spline UV/tangent data must be reconstructed in
+world/page space so markings do not shear at page boundaries.
 
 **Draped ribbon.** Sweep a cross-section along the spline; project each vertex to the terrain and
 offset upward. The two structural failure modes are the subject of the next section (coplanarity)
@@ -156,6 +168,25 @@ pays the voxel tax: edit → light update → remesh on the `04` budget queue, d
 is almost never "voxels everywhere" — it is tier 2 for the open world plus tier 4 pockets where
 design promises digging, because tiers 0-2 preserve the heightfield's streaming, LOD, and
 collision economics that chapters `01`/`06` are built on.
+
+### The state-authority boundary
+
+The destruction tier is also the networking/physics boundary:
+
+| State class | Authority | Collision / gameplay | Persistence / replication |
+|---|---|---|---|
+| Tier 0-1 cosmetic surface response | GPU/client-local by default | Ignored by physics, nav, AI, and server rules | Ephemeral or cosmetic paged state; not replicated unless design explicitly requires visual parity |
+| Tier 2-4 gameplay geometry | CPU/server authoritative | Collider/nav/gameplay update is part of the commit | Ordered edit-op log or authoritative per-tile snapshot; replicated and saved |
+
+Footprints, shallow snow compression, and cosmetic tire tracks are allowed to disagree across
+clients because they do not change outcomes. A crater that changes cover, traversal, or collision
+is not. The client may predict it with a tier-0/1 visual immediately, but gameplay waits for the
+server-sequenced edit commit; rejection removes the prediction. Concurrent edits receive one
+authoritative order, or peers replay identical operations into different terrain.
+
+**Contract:** GPU state is never silently read back and promoted into gameplay truth. Promotion
+from cosmetic to authoritative deformation is a feature with explicit replication, persistence,
+collision latency, and anti-cheat ownership — not an implementation detail.
 
 **The invalidation checklist — where big destruction actually gets expensive.** A visible edit
 must propagate to every consumer that ever cached the old ground, and the tier-3/4 rungs pay this
@@ -321,6 +352,9 @@ particle, impact VFX` — one table, one query path, so what you hear always mat
   mirrors or the edit log.
 - **Edit persistence via buffer snapshots**: saves balloon, network desyncs across LOD, replays
   impossible. Persist and replicate the edit-op log; buffers are derived state.
+- **Cosmetic/authoritative state mixed**: one client sees a crater the server never committed, or
+  physics reacts to a footprint target. Split the channels; server-order every tier-2+ edit and
+  let tier-0/1 effects remain cosmetic.
 - **Re-normal without the apron**: every crater framed by a lighting rectangle. Derivatives need
   neighbors; recompute region = edit region + 1 texel, same as every mesher (`04`/`05`).
 - **Heightfield delta asked to make a tunnel**: overlays can only lower or raise one surface;

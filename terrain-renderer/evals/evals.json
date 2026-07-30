@@ -90,6 +90,62 @@
       "prompt": "What's the canonical paper for Nanite? And for greedy meshing? I need citations for a tech report.",
       "expected_output": "Answers honestly by provenance tier: Nanite is a SIGGRAPH 2021 Advances talk (Karis), not a peer-reviewed paper; greedy meshing has no canonical paper (folklore, canonical writeup is Lysenko's 0fps blog). Warns that attributions should be re-verified against primary sources for publication-critical use. Does not fabricate citations.",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Give my rendering team the historical architecture review for terrain LOD and culling. We still rebuild terrain indices on the CPU every frame, submit one draw per patch, and are considering ROAM because it minimizes triangle count.",
+      "expected_output": "Explains the lineage from ROAM/progressive meshes through regular chunked/fixed-function-era grids to a persistent GPU scene. States why CPU topology refinement died: fine-grained dependency walks, index churn, synchronization, and draw submission became more expensive than extra regular triangles. Recommends CPU policy plus GPU frustum/cone/two-phase HiZ culling, GPU LOD selection, compaction, and indirect/meshlet submission while preserving screen-space-error and seam contracts.",
+      "files": [],
+      "assertions": [
+        "Explains what hardware bottleneck ROAM or progressive meshes originally solved",
+        "Explains why per-frame CPU index rebuilding and fine-grained topology refinement stopped scaling",
+        "Describes a persistent GPU-resident scene rather than only moving the same loop to a compute shader",
+        "Includes two-phase HiZ or visibility-history handling",
+        "Includes indirect submission, meshlets, or cluster-level GPU submission",
+        "Preserves screen-space error and an explicit crack or transition contract"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "We want instant global seasons. Our plan is to bake summer/winter color, rain wetness, and snow accumulation into the Runtime Virtual Texture and invalidate it when the weather changes. Footprints and tire tracks should use the same data.",
+      "expected_output": "Rejects global dynamic state in RVT as a cache-coherency failure. Keeps stable spatial composition in RVT and applies seasons, global wetness, transient snow, footprints, and tire compression as post-RVT overlays. Uses camera-following or paged deformation targets for local transient state, distinguishes cosmetic GPU-only tracks from CPU/server-owned collision-changing edits, and allows only bounded replayable invalidation for persistent local stamps.",
+      "files": [],
+      "assertions": [
+        "Explicitly forbids baking global or continuously changing season/weather state into RVT",
+        "Explains that global state would cause broad or full-cache invalidation spikes",
+        "Keeps stable base material or road composition in RVT",
+        "Applies season, wetness, and snow after the RVT sample",
+        "Uses camera-following or paged state targets for footprints and tire tracks",
+        "Separates cosmetic GPU deformation from authoritative CPU/server collision state"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "How should hardware ray tracing see our geomorphed heightfield terrain? The raster quadtree changes LOD continuously and our prototype rebuilds a BLAS whenever the camera crosses an LOD band. We also have alpha-tested grass.",
+      "expected_output": "Rejects camera-driven terrain BLAS rebuilds. Chooses a stable triangulated proxy per tile/LOD or procedural AABBs with a heightfield intersection shader; permits fixed-topology refit only with a stated budget. Explains that opacity micromaps accelerate alpha-tested grass/foliage any-hit work but do not solve terrain displacement or topology changes, and treats displacement micromaps as capability-sensitive rather than universal.",
+      "files": [],
+      "assertions": [
+        "Rejects rebuilding terrain BLASes whenever raster LOD changes",
+        "Proposes a stable triangulated ray-tracing proxy or procedural AABB heightfield intersection",
+        "Distinguishes refit-compatible vertex motion from topology-changing LOD rebuilds",
+        "States that opacity micromaps address alpha-tested geometry rather than terrain displacement",
+        "Treats displacement micromap support as platform or vendor sensitive",
+        "Requires an explicit RT proxy error bound or usage contract"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Design the boundary between terrain, weather VFX, roads, vegetation, water, and atmosphere for a 20 km AAA world. We currently get floating trees, z-fighting road ribbons, hard shore intersections, flat-looking distance fog, and rain inside caves.",
+      "expected_output": "Defines one evaluated terrain surface consumed by all systems: vegetation snaps to the same morphed/displaced LOD surface; roads conform or integrate through RVT/material injection; water uses bathymetry/depth fade at shores; atmosphere uses Rayleigh/Mie scattering and volumetric aerial perspective. Keeps falling precipitation in VFX and screen droplets in PostFX while terrain publishes depth/top-down coverage plus wetness/curvature/flow for collision, cave rejection, darkening, and pooling.",
+      "files": [],
+      "assertions": [
+        "Seats vegetation on the rendered morphed or displaced terrain surface",
+        "Replaces coplanar z-biased road ribbons with conforming geometry or RVT/material integration",
+        "Uses water depth or bathymetry and a depth-faded shoreline intersection",
+        "Uses physically based atmosphere or Rayleigh/Mie plus aerial perspective instead of vertex Z-fog",
+        "Places falling rain or snow in VFX and screen droplets in PostFX",
+        "Makes terrain provide depth or occlusion for cave rejection and wetness/flow/curvature for surface reaction"
+      ]
     }
   ]
 }

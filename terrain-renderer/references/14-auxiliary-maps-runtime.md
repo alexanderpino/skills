@@ -222,6 +222,27 @@ all recover *together*, because there is nothing else to recover. That coherence
 with each other because they share a cause — is what players read as "the world is real", and it is
 unachievable when each system carries a private copy of the weather.
 
+### Effect ownership and pass boundary
+
+The registry connects systems; it does not erase ownership. Every effect has one owner and every
+consumer reads the same fields:
+
+| Effect | Owner | Terrain's responsibility |
+|---|---|---|
+| Base terrain color/normal | Terrain material / visibility resolve (`07`, `08`) | Resolve stable surface inputs |
+| Roads and persistent stamps | RVT/material injection with replay (`17`) | Provide page-space surface and ordering |
+| Snow, wetness, mud, deformation | Surface-state compute + terrain material (`13`) | Apply after stable RVT/base resolve |
+| Water surface, ripples, shore optics | Water renderer (`12`) | Provide terrain depth/bathymetry/shore fields |
+| Falling rain/snow, spray, airborne dust | VFX/particle system | Publish scene depth, top-down coverage, collision surface, flow/wind drivers |
+| Screen/lens droplets, heat distortion | PostFX | Publish wetness/intensity/depth where the effect needs masks |
+| Rayleigh/Mie atmosphere, aerial perspective, volumetric fog | Atmosphere/lighting (`10`) | Composite terrain with the one shared atmosphere state |
+
+**Depth ownership chain:** opaque terrain writes depth; water writes or prewrites its chosen depth
+policy (`12`); VFX soft-particles consume that depth for collision/soft clipping; PostFX reads the
+final scene depth. Falling precipitation inside caves is therefore a VFX coverage bug fed by a
+missing/ignored terrain depth contract, not a reason to move rain particles into the terrain
+module.
+
 ## Dynamic writeback: the overlay stack
 
 Some systems write surface state at runtime: deformation and weather (`13`), scorch/burn from

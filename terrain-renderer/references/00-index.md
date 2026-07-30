@@ -52,7 +52,7 @@ right fix.
 | Cluster DAG build (group→simplify→split), monotonic error | `02` | Karis, Stubbe & Wihlidal, "Nanite: A Deep Dive", SIGGRAPH 2021 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
 | Two-phase HiZ occlusion culling | `02` `08` | Nanite talk lineage + community practice | T/F | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
 | Software raster of micro-triangles, 64-bit visibility buffer | `02` | Karis, Stubbe & Wihlidal 2021 | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
-| Visibility buffer (deferred material shading) | `08` | Burns & Hunt, JCGT 2(2), 2013 | P | [jcgt.org](https://jcgt.org/published/0002/02/04/) |
+| Visibility buffer (deferred material shading) | `02` `07` `08` | Burns & Hunt, JCGT 2(2), 2013 | P | [jcgt.org](https://jcgt.org/published/0002/02/04/) |
 | Meshlets / mesh shaders | `02` | Vendor docs; meshoptimizer | D/F | [github.com/zeux/meshoptimizer](https://github.com/zeux/meshoptimizer) |
 | QEM simplification | `02` | Garland & Heckbert, SIGGRAPH 1997 | P | [ACM DL](https://dl.acm.org/doi/10.1145/258734.258849) |
 | Progressive meshes / view-dependent refinement (runtime edge collapse — historical; lineage of the DAG cut) | `02` | Hoppe, SIGGRAPH 1996 & 1997 | P | [hhoppe.com](https://hhoppe.com/proj/vdrpm/) |
@@ -79,12 +79,16 @@ right fix.
 | Tile pyramid + SSE refinement, residency state machine | `06` | Cozzi & Ring 2011 + industry practice | P/F | [virtualglobebook.com](https://virtualglobebook.com/) |
 | DirectStorage-era streaming IO | `06` | Vendor docs | D | [github.com/microsoft/DirectStorage](https://github.com/microsoft/DirectStorage) |
 | HLOD / far-world baking | `06` | Industry talks (various) | T/F | — |
+| Detail texturing (high-frequency tiled modulation over macro color) | `07` | Fixed-function multitexture lineage; no single terrain-specific canonical source | F/D | — |
+| Alpha/weight splatting | `07` | Crawfis & Max, "Texture Splats for 3D Scalar and Vector Field Visualization", IEEE Visualization 1993; terrain adaptation is industry practice | P/F | [IEEE Xplore](https://ieeexplore.ieee.org/document/398679/) |
 | Splat blending: height-lerp, weight packing, mip halos | `07` | Folklore | F | — |
 | Stochastic texturing (histogram-preserving blending) | `07` | Heitz & Neyret, HPG 2018 (PACM CGIT) | P | [eheitzresearch.wordpress.com](https://eheitzresearch.wordpress.com/722-2/) |
 | Hex-tiling | `07` | Mikkelsen, "Practical Real-Time Hex-Tiling", JCGT 11(3), 2022 | P | [jcgt.org](https://jcgt.org/published/0011/03/05/) |
 | Triplanar / biplanar projection | `07` | Folklore; Quilez writeups | F | — |
 | Reoriented Normal Mapping & normal-blend family (formulas inlined in `07`) | `07` | Barré-Brisebois & Hill, "Blending in Detail", 2012 | D/F | [selfshadow.com](https://blog.selfshadow.com/publications/blending-in-detail/) |
 | Virtual texturing (page tables, feedback, transcode) | `07` | id Tech MegaTexture lineage; Mittring "Advanced Virtual Texture Topics" (SIGGRAPH 2008) & van Waveren talks | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2008/SIGGRAPH%202008%20-%20Advanced%20virtual%20texture%20topics.pdf) |
+| id Tech MegaTexture (unique authored surface streamed as pages) | `07` | id Software / van Waveren and Mittring talk lineage | T/N | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2008/SIGGRAPH%202008%20-%20Advanced%20virtual%20texture%20topics.pdf) |
+| Runtime virtual texturing as cached material composition | `03` `07` `13` `17` | Epic docs; dynamic-state exclusion is this skill's cache doctrine | D/N/F | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/runtime-virtual-texturing-in-unreal-engine) |
 | Clipmap texturing | `07` | Tanner, Migdal & Jones, SIGGRAPH 1998 | P | [ACM DL](https://dl.acm.org/doi/10.1145/280814.280855) |
 | GPU-driven pipelines (persistent scene, indirect subm.) | `08` | Haar & Aaltonen, SIGGRAPH 2015 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2015/aaltonenhaar_siggraph2015_combined_final_footer_220dpi.pdf) |
 | Terrain max-mip pyramid as long-range occluder | `08` | Industry practice | F/T | — |
@@ -99,6 +103,7 @@ right fix.
 | Heightfield ray-marched shadows | `10` | Engine features + community practice | N/F | — |
 | Virtual shadow maps | `10` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/virtual-shadow-maps-in-unreal-engine) |
 | Aerial perspective / sky LUTs | `10` | Hillaire, EGSR 2020 (CGF 39(4)) | P | [Wiley](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.14050) |
+| Rayleigh/Mie atmosphere scattering for realtime skies | `10` | Bruneton & Neyret 2008 lineage; Hillaire 2020 production model | P | [Wiley](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.14050) |
 | Failure catalogue, debug views, budget assertions | `11` | This skill's consolidation | F | — |
 | FFT/spectral ocean synthesis | `12` | Tessendorf, "Simulating Ocean Water", SIGGRAPH course notes | T/P | [clemson.edu PDF](https://people.computing.clemson.edu/~jtessen/reports/papers_files/coursenotes2004.pdf) |
 | Gerstner/trochoidal wave sums | `12` | Classical; GPU form in GPU Gems ch. 1 (Finch) | F/D | [developer.nvidia.com](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models) |
@@ -111,6 +116,7 @@ right fix.
 | Ocean/water shading (Bruneton model family) | `12` | Bruneton, Neyret & Holzschuch, CGF 29(2), 2010 | P | [inria.hal.science](https://inria.hal.science/inria-00443630) |
 | Deferred snow/mud deformation | `13` | Michels & Sikachev, GPU Pro 7 (talk form SIGGRAPH 2015); Barré-Brisebois, GDC 2014 (Batman); Surricchio, GDC 2023 (God of War Ragnarök) | P/T | [gdcvault Batman](https://gdcvault.com/play/1020177/Deformable-Snow-Rendering-in-Batman) |
 | Wet-surface shading (porosity darkening, roughness drop) | `13` | Lagarde, "Water drop" blog series, 2012–2013 | F/D | [seblagarde.wordpress.com](https://seblagarde.wordpress.com/2013/03/19/water-drop-3a-physically-based-wet-surfaces/) |
+| Transient season/weather overlays after RVT | `07` `13` | Cache-coherency doctrine; bounded local invalidation in engine docs, global-state exclusion is practice | D/F | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/runtime-virtual-texturing-in-unreal-engine) |
 | Aux-map registry & consumption contract | `14` | terrain-architect `27` (generation-side contract), consumed render-side | D | — |
 | GPU-driven procedural placement | `15` | van Muijden, "GPU-Based Run-Time Procedural Placement in Horizon Zero Dawn", GDC 2017 (speaker web-verified 2026-07) | T | [gdcvault.com](https://gdcvault.com/play/1024120/GPU-Based-Run-Time-Procedural) |
 | Procedural GPU grass (Bezier blades) | `15` | Wohllaib, "Procedural Grass in Ghost of Tsushima", GDC 2021 Advanced Graphics Summit (speaker web-verified 2026-07); a companion wind talk exists (speaker unverified) | T | [gdcvault.com](https://gdcvault.com/play/1027033/Advanced-Graphics-Summit-Procedural-Grass) |
@@ -127,6 +133,10 @@ right fix.
 | Relief / parallax occlusion mapping family | `18` | Policarpo et al. I3D 2005 lineage; Tatarchuk POM (I3D 2006) | P | [ACM DL](https://dl.acm.org/doi/10.1145/1053427.1053453) |
 | Cone step mapping | `18` | Dummer, via GPU Gems 3 ch. 18's citation (original whitepaper not located) | F/? | [oreilly.com](https://www.oreilly.com/library/view/gpu-gems-3/9780321545428/ch18.html) |
 | Quadtree displacement mapping | `18` | Drobot, GDC 2010 / gamedevs.org PDF | T | [gamedevs.org](https://www.gamedevs.org/uploads/quadtree-displacement-mapping-with-height-blending.pdf) |
+| Static triangulated RT terrain proxy | `18` | DXR/Vulkan acceleration-structure update constraints + industry practice | D/F | [DirectX-Specs](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html) |
+| Procedural AABB + intersection shader for RT heightfields | `18` | DXR procedural-geometry sample; Vulkan RT procedural primitive model | D/F | [Microsoft sample](https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry) |
+| Opacity micromaps (alpha-tested RT geometry; not displacement) | `15` `18` | DXR opacity-micromap support and `VK_EXT_opacity_micromap` | D | [DirectX-Specs](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html) |
+| Displacement micromaps (terrain trajectory; capability-sensitive) | `18` | `VK_NV_displacement_micromap`; platform support remains non-universal | D/? | [Khronos registry](https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chapters/VK_NV_displacement_micromap.html) |
 
 ## Engine & shipped-system crosswalk
 

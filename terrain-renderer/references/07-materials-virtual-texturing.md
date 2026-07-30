@@ -6,11 +6,31 @@ The generation side of every mask lives in terrain-architect `27` (causes in, en
 effects); BRDF and material math route to the physically-based-rendering skill and are never
 duplicated here. Geometry LOD is `01`, engine-native systems `03`, streaming `06`, lighting `10`.
 
-Contents: [The splat pipeline](#the-splat-pipeline) · [Blend quality](#blend-quality) ·
+Contents: [Material-resolve evolution](#the-material-resolve-evolution-each-era-removed-one-bottleneck) ·
+[The splat pipeline](#the-splat-pipeline) · [Blend quality](#blend-quality) ·
 [Tiling breakup arsenal](#tiling-breakup-arsenal) · [Projection](#projection) ·
 [Virtual texturing](#virtual-texturing) · [Terrain-mesh integration](#terrain-mesh-integration) ·
 [Material AA at distance](#material-anti-aliasing-at-distance) · [Pitfalls](#pitfalls) ·
 [Sources](#sources--provenance)
+
+## The material-resolve evolution: each era removed one bottleneck
+
+Terrain texturing history is a sequence of bottleneck transfers. Do not prescribe a technique
+without naming the cost it was invented to remove:
+
+| Stage | What it did | Bottleneck it solved | What forced the next stage |
+|---|---|---|---|
+| **Detail texturing** | One macro/base color multiplied or blended with a high-frequency tiled detail texture | Early texture memory could not hold close-range surface detail over a whole terrain | Every square meter still repeated the same material identity; grass, rock, and mud could not vary spatially |
+| **Alpha/weight splatting** | Several tiling material layers blended by painted or generated weights | Gave each region material identity while reusing small tiling textures | Cost became `active layers × maps × projection samples` every visible pixel, every frame; texture-unit and sampler budgets capped variety |
+| **id Tech MegaTexture / SVT** | Authored unique surface texels stored in a huge virtual address space and streamed as pages | Removed visible tiling and decoupled world uniqueness from VRAM capacity | Unique texel storage and IO became the budget; authored pages could not cheaply express continuously changing material state |
+| **Runtime Virtual Texturing (RVT)** | GPU resolves expensive splats/decals into cached pages on demand | Amortized mostly static material composition instead of recomputing it per pixel per frame | Cache invalidation became the hard limit: dynamic weather or seasons inside pages turn global state changes into redraw storms |
+| **Visibility buffer / deferred material evaluation** | Raster stores the winning primitive/cluster ID; a later screen-space pass fetches attributes and evaluates only visible pixels, optionally bucketed by material | Decoupled material evaluation from triangle submission and microtriangle overshading; made cost follow visible shaded pixels | It does not eliminate the need for VT/RVT or material discipline; it changes *when and where* the resolve runs |
+
+The 2026 AAA path is usually a composition, not a winner-takes-all replacement: visibility
+resolves which surface pixels exist (`02`, `08`); SVT supplies unique authored data; RVT caches
+stable terrain/road/decal composition; this chapter's sample-time layers apply transient state.
+The architecture is wrong if a visibility buffer merely defers the same unbounded N-layer blend
+or if RVT is asked to cache global time.
 
 ## The splat pipeline
 
@@ -312,6 +332,30 @@ meshes and grass sample them back. RVT's defining constraint is **invalidation**
 dynamic baked into pages (time-varying wetness, moving decals) either forces page re-render or
 goes stale. Keep dynamic terms out of the cache (below).
 
+### The cache boundary: stable spatial composition only
+
+RVT is a cache, not the terrain's state database:
+
+| Legal inside RVT pages | Forbidden inside RVT pages |
+|---|---|
+| Static splat/ID resolve, macro color, stable geometry-derived masks | Season amount or season blend |
+| Static roads, persistent replayable decals, terrain/mesh contact blend | Global wetness, rain response, puddle level |
+| Authored substrate variation and static biome material selection | Snow accumulation, melt, footprints, tire compression |
+| Any input whose dirty region is bounded and replayable | Any input driven by global time, weather, camera, or per-frame interaction |
+
+The required two-layer composition is explicit:
+
+```hlsl
+Surface base      = SampleRVT(worldXZ);                    // stable, cached
+Surface seasonal  = ApplySeasonOverlay(base, seasonState); // global/sample-time
+Surface weathered = ApplyWetSnowDeform(seasonal, StateRT); // 13 camera/paged overlays
+```
+
+**Non-negotiable:** a slow season transition is still dynamic global state. Do not "solve" it by
+staggering a world-wide RVT invalidation; that only spreads the cache-coherency defect over more
+frames. Page invalidation is for bounded persistent edits and static content changes. Seasons,
+wetness, and transient snow always remain post-RVT overlays (`13`, `14`).
+
 **Clipmap texturing is the ancestor** (Tanner et al. 1998, P): a nested-resolution toroidally
 updated texture stack centered on the viewer — residency as a pure function of view distance.
 VT generalizes the residency set from concentric rings to arbitrary sparse pages; the clipmap
@@ -334,7 +378,8 @@ table.
   a page-border debug palette (`11`).
 - **Stale RVT pages**: a "cheap" global change (season tint, snow amount) that lives inside page
   composites invalidates *every* page — a full-cache re-render spike. Structure the material so
-  global dynamics apply at sample time, outside the cache.
+  global dynamics apply at sample time, outside the cache; `13` owns the season/weather state
+  targets and `14` owns their compositing order.
 
 ## Terrain-mesh integration
 

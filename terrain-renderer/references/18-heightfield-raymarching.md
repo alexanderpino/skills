@@ -214,17 +214,22 @@ conformance test: march known rays against `h = a·sin(kx)`, assert hit error bo
 When terrain must participate in hardware RT (shadow/GI/reflection rays from the whole scene),
 three architectures:
 
-1. **Pre-triangulated BLAS.** Bake terrain tiles to triangles at a chosen LOD, use the hardware
-   ray-triangle path. Fastest traversal, largest memory; deformation costs a vertex rewrite +
-   BLAS **refit** (cheap, quality degrades as geometry drifts from the built tree) or **rebuild**
-   (budgeted, amortized over frames — same discipline as `06`'s streaming budgets). This is the
-   2026 default because terrain is RT-*secondary* in almost every shipped title: rays start from
-   G-buffer surfaces, terrain only needs to be *hit correctly enough* for shadows and GI.
+1. **Stable pre-triangulated BLAS proxy.** Bake terrain tiles to triangles at a deliberately
+   chosen RT LOD and use the hardware ray-triangle path. Do **not** feed the camera-selected
+   raster cut into the BLAS: geomorphs and quadtree topology changes would turn camera motion
+   into acceleration-structure updates, and a dense near-coplanar heightfield floods memory with
+   triangles that secondary rays do not need. The proxy remains stable across raster LOD bands,
+   carries a conservative error bound `e_proxy`, and is coarse enough to fit the RT memory and
+   traversal budget. Fixed-topology height edits may use **refit**; topology/primitive-count
+   changes require **rebuild**. Rebuilds are streamed/amortized work (`06`), never a camera-driven
+   mid-frame event. This is the common 2026 shape because terrain is RT-*secondary* in almost
+   every shipped title: rays start from G-buffer surfaces, and terrain must be hit consistently
+   enough for shadows, GI, and reflections rather than reproduce the raster microcut.
 2. **Procedural AABB + intersection shader.** Declare per-tile AABBs; the intersection shader
    runs the max-mip traversal from this chapter. Memory ≈ the heightfield itself; edits are a
    texture update + pyramid rebuild, no BLAS geometry churn. Cost: intersection shaders forgo
-   the hardware triangle test, and vendor guidance consistently prices them above built-in
-   triangle intersection; incoherent secondary rays make the divergence worse.
+   the hardware triangle test and are generally costlier than built-in triangle intersection;
+   the gap is vendor/generation-dependent, and incoherent secondary rays make divergence worse.
 3. **Hybrid**: triangulated coarse BLAS for most rays + intersection-shader detail only where
    rays demand it. Rarely worth the complexity today — mark it a specialist move.
 
@@ -232,9 +237,24 @@ Contract to enforce regardless: the RT representation is a *proxy* at a differen
 raster terrain, so rays originating on raster surfaces self-intersect or float. Offset ray
 origins along the geometric normal by a bound derived from the LOD error `e` between the two
 representations (the same `e` the LOD controller already tracks, `01`) — not by a magic epsilon.
-Fast-moving parts, honestly marked `?`: hardware displacement/micromap paths for heightfield-like
-geometry and per-vendor intersection-shader performance shift by GPU generation — re-verify
-against current vendor docs before committing an architecture.
+Register `e_proxy`, intended ray uses, update policy, and resident-memory cost per tile in the
+same budget sheet as raster and streaming. A ray proxy with no declared error is an invisible
+second terrain.
+
+### Micromaps: opacity is established; displacement is not universal
+
+**Opacity Micromaps (OMM)** solve an adjacent terrain-ecosystem problem, not the heightfield BVH
+problem itself. Alpha-tested grass, shrubs, and leaf cards make RT shadow rays repeatedly invoke
+any-hit shaders to discover that a triangle is transparent. OMM-capable DXR/Vulkan paths encode
+opaque/transparent/unknown micro-regions so traversal can accept or reject many hits in hardware,
+substantially reducing any-hit work. They belong to `15`'s vegetation RT path and remain valid
+only while the asset's opacity mapping remains compatible with the built micromap.
+
+**Non-negotiable distinction:** OMM does not add terrain displacement, does not track a
+geomorphed heightfield, and does not make raster LOD topology legal for BLAS reuse. Displacement
+micromaps can encode geometric microdisplacement on supported paths, but API, hardware, tooling,
+and update support remain platform/vendor-sensitive in 2026. Treat DMM as a capability tier to
+verify, never as the portable terrain baseline.
 
 ## Hybrid architectures
 
@@ -265,6 +285,7 @@ frame is a screenshot technique, not a renderer.
 | Rays as infrastructure | n/a | pyramid rebuild per edit | low; one shared kernel | Always — shadows (`10`), occlusion (`08`), picking (`16`), LOS (`17`) |
 | RT: triangulated BLAS | RT-proxy LOD | refit/rebuild budget | medium; proxy-vs-raster offset contract | RT-secondary (shadows/GI) — the 2026 default |
 | RT: intersection shader | pixel-exact to rays | texture + pyramid only | medium-high; shader cost per hit | Memory-bound worlds, frequent deformation, heightfield-native engines |
+| RT: opacity micromaps | n/a — opacity coverage, not height | rebuild when coverage mapping changes | medium asset/build integration | Alpha-tested grass/foliage any-hit reduction on supported hardware |
 
 ## Pitfalls
 
@@ -288,6 +309,12 @@ frame is a screenshot technique, not a renderer.
   intersect (acne) or skip contact (peter-panning). Start shadow rays at the displaced hit
   point, bias along the light direction by a bound tied to the local step/texel size, and keep
   primary and shadow marchers on identical sampling conventions (see infrastructure rule).
+- **BLAS rebuild follows the camera**: raster LOD selection or geomorph topology was reused as the
+  RT input. The renderer hitches at LOD bands and RT shadows/reflections pop one frame later.
+  Keep a stable RT proxy or procedural AABBs; camera motion is never a terrain-AS invalidation.
+- **Opacity micromap category error**: OMM was proposed as the fix for changing terrain height.
+  OMM classifies alpha coverage only. Keep the terrain proxy/update contract above; apply OMM to
+  alpha-tested ecosystem geometry (`15`).
 - **Precision at planetary scale**: marching world-space rays in fp32 at 100 km jitters the hit
   by meters — march in camera-relative or patch-local coordinates with the ray origin rebased
   per `09`'s doctrine; the heightfield lookup, not the ray parameter, carries the large offset.
@@ -316,6 +343,8 @@ frame is a screenshot technique, not a renderer.
 | Cone step mapping (Dummer): per-texel empty-cone map for safe steps; relaxed cones trade one overshoot for fewer steps + binary refine — as documented in GPU Gems 3 ch. 18 (Policarpo & Oliveira) | **P** (Dummer's original attributed via GPU Gems 3; original whitepaper not fetched) | https://www.oreilly.com/library/view/gpu-gems-3/9780321545428/ch18.html |
 | Quadtree displacement mapping with height blending: top-down pyramid traversal for material displacement, ~66% step reduction claim — Drobot, GPU Pro (GDC 2010 talk) | **P/T** | https://www.gamedevs.org/uploads/quadtree-displacement-mapping-with-height-blending.pdf · https://www.gdcvault.com/play/1012014/Quadtree-Displacement-Mapping-with-Height |
 | DXR/Vulkan RT: intersection shaders only for procedural AABB geometry; costlier than built-in hardware triangle tests; BLAS structure differs for procedural vs triangle | **P/D** (Proceduray paper + Ray Tracing Gems II Vulkan chapter) | https://arxiv.org/pdf/2012.10357 · https://link.springer.com/content/pdf/10.1007/978-1-4842-7185-8_16.pdf |
+| Opacity micromaps: hardware-visible opacity classification for ray traversal; alpha-tested geometry use, not displacement | **D** | https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html · https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_opacity_micromap.html |
+| Displacement micromaps: displaced microtriangle geometry; Vulkan vendor extension and capability-sensitive adoption | **D/?** | https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chapters/VK_NV_displacement_micromap.html |
 | Max-mip machinery reused for terrain soft shadows (post-2008 continuation) | **P** (seen in results, not fetched) | https://arxiv.org/pdf/2005.06671 |
 | View-plane-parallel line marching avoids fisheye; pitch-as-horizon-shift, roll-as-column-shear approximations | **F** (folklore consistent with s-macke construction) | — |
 | Analytic normals/motion vectors over screen derivatives for marched hits; SV_Depth vs early-Z; conservative-depth workaround | **F/D** (standard practice; conservative depth is API-documented) | — |

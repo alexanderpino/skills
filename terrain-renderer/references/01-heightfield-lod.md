@@ -65,6 +65,17 @@ Its vertex-granularity sibling from the same era — progressive meshes and view
 refinement, i.e. *runtime edge collapse* — died the same death and was reborn offline as the
 cluster DAG; that lineage is told in `02`.
 
+**Why the old controller died.** ROAM and view-dependent progressive meshes were rational on
+1990s hardware: transform and raster capacity were scarce, CPU/GPU command streams were small,
+and saving one triangle could be worth the dependency walk required to remove it. Once GPUs
+became massively parallel, the cost inverted. Pointer-heavy split/merge queues, dependency
+propagation, index-buffer rewrites, uploads, and thousands of tiny submissions serialized the
+frame while the GPU waited. The fixed-function and early programmable GPU era therefore moved
+terrain to **regular immutable batches** — geomip chunks, clipmap rings, shared grids — and
+accepted some extra triangles to buy coherent memory access and stable draw calls. Modern CBT
+does not vindicate the old CPU loop; it preserves longest-edge bisection while relocating the
+controller into a GPU-resident parallel data structure.
+
 ### Geomipmapping (2000)
 
 de Boer 2000. Cut the heightfield into fixed chunks (e.g. 33×33 vertices); each chunk holds a
@@ -174,9 +185,13 @@ receive bit-identical factors from both patches**, which means computing each ed
 purely from data symmetric in the two patches (e.g. edge midpoint + edge length), never from
 patch-interior data. Use `fractional_even`/`fractional_odd` partitioning for continuous LOD
 (integer partitioning pops). In 2026 this path is legacy-leaning: fixed-function tessellators
-have unfriendly performance cliffs, factors cap at 64, and compute/mesh-shader subdivision
-(CBT, `02`) does the same job with more control — but it remains a low-effort win when the
-engine already has the pipeline and the terrain is a moderate-size single domain.
+have unfriendly amplification cliffs, factors cap at 64, and the tessellation decision lives in
+a dedicated fixed pipeline stage rather than beside the compute culling and compaction that own
+the persistent GPU scene (`08`). Compute/mesh-shader subdivision (CBT, `02`) can consume the same
+GPU-visible error, residency, and occlusion data without routing the decision back through a
+patch/draw abstraction. Hardware tessellation remains a low-effort win when the engine already
+has the pipeline and the terrain is a moderate-size single domain; it is no longer the
+architectural center of a GPU-driven world renderer.
 
 ### CBT / LEB adaptive GPU subdivision (2020s)
 
@@ -325,6 +340,11 @@ Dynamism is the sharpest discriminator: chunked LOD's baked meshes are the wrong
 moment gameplay edits heights at runtime; CBT and clipmaps are the strongest answers. World
 size is second: clipmaps' distance-only LOD wastes triangles on flat distant terrain that a
 quadtree would coarsen, which starts to matter past ~20 km view ranges.
+
+Whichever grid family wins, per-frame CPU iteration over every resident patch is not part of the
+2026 answer. `08` owns the transition from CPU visible-list construction and per-patch submission
+to a persistent GPU scene, compute LOD/culling, and indirect draws. Preserve this chapter's
+screen-space-error and seam contracts; replace its historical CPU control plane.
 
 ## Pitfalls
 

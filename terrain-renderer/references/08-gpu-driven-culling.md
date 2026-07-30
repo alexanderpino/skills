@@ -15,6 +15,14 @@ Contents: [Doctrine](#doctrine-cpu-sets-policy-the-gpu-decides) ·
 
 ## Doctrine: CPU sets policy, the GPU decides
 
+**The architecture this replaced:** the CPU walked every resident chunk/object each frame,
+frustum-tested it, selected its LOD, rebuilt or patched visible lists, changed draw state, and
+submitted one draw at a time. That was the natural continuation of geomipmapping and chunked LOD
+on fixed-function/early-shader APIs. Its cost is O(resident objects) on the render thread even
+when most objects are invisible, and per-frame index/argument uploads make the GPU wait on a
+serial producer. Explicit APIs reduced driver overhead but did not make an O(N) CPU controller
+free; they exposed enough control to remove it.
+
 The division of labor, fixed since Haar & Aaltonen's 2015 formulation and unchanged since:
 
 - **CPU owns policy.** Camera, budgets (`tau`, triangle/draw ceilings), streaming decisions (`06`),
@@ -296,7 +304,8 @@ Marked honestly — these change the shape of the pipeline but are not yet defau
 - **Two-phase history desync.** Visibility bits keyed by array slot instead of stable ID break
   when streaming compacts the scene — a recycled slot inherits a dead chunk's visibility and
   phase 1 draws the wrong thing (or skips a visible one) for a frame. Key history by persistent
-  chunk ID; clear on recycle (`06`).
+  chunk ID; clear on recycle, and forbid slot reuse between phase 1 and phase 2 of the same frame.
+  Residency changes become visible only at a frame boundary after the culling fence (`06`).
 - **Hysteresis missing** anywhere a threshold drives a binary state (LOD, occlusion-driven
   streaming, cascade membership) → per-frame flicker and request storms at the boundary.
 - **Assuming general-scene kill rates.** Flat terrain defeats cone culling; open plains defeat

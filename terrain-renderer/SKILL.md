@@ -81,14 +81,17 @@ cave systems, player-built block worlds.
 The dynamic surface is **in** scope, on the renderer's side of terrain-architect's "caused,
 not carved" boundary: the generator ships the causes (water datum/depth/flow, wetness, snow
 potential, wind); this skill owns the motion and the state — waves and foam (`12`), snow
-accumulation and deformation, rain and wetness (`13`), swaying vegetation (`15`), runtime
-craters and tracks (`17`).
+accumulation and deformation, ground wetness and puddling (`13`), swaying vegetation (`15`),
+runtime craters and tracks (`17`).
 
 Out of scope: generating the terrain data itself (route terrain-architect — including "why do
 my rivers stop", which is a generation-graph defect, not a rendering one); generic mesh
 rendering of props/characters; BRDF derivations (route physically-based-rendering); offline
-film-quality fluid sim; UI maps and minimaps. A request containing "voxel" or "LOD" is not
-enough by itself; the deliverable must be rendering a world surface.
+film-quality fluid sim; UI maps and minimaps. Falling rain and snow belong to VFX/particle
+systems; lens and screen droplets belong to PostFX. Terrain owns only their **surface reaction**
+and the data those systems consume: depth/coverage for cave rejection, wetness, pooling,
+accumulation, and collision. A request containing "voxel" or "LOD" is not enough by itself; the
+deliverable must be rendering a world surface.
 
 ## The three consumer profiles
 
@@ -106,6 +109,24 @@ The ladder is a doctrine, not a menu of taste: climb only when the world contrac
 cost. Prescriptions stay **engine-agnostic** — neutral math, HLSL/GLSL-style pseudocode, and
 explicit data structures that port to D3D12/Vulkan/Metal/WebGPU alike; `03` exists for teams
 inside a licensed engine, and everything else must not assume one.
+
+## Read the history as a bottleneck ledger
+
+Terrain rendering did not advance by discovering one final algorithm. Each generation removed
+the bottleneck exposed by the previous one, and the old technique died when its *control plane*
+stopped matching the hardware:
+
+| Era | Dominant terrain architecture | Bottleneck it solved | Why it stopped being the AAA default |
+|---|---|---|---|
+| **1990s CPU topology** | ROAM split/merge trees, view-dependent progressive meshes, per-frame index rebuilding | Triangle scarcity; CPUs could choose exactly which few thousand triangles the fixed-function GPU received | Fine-grained dependency walks, heap/list maintenance, index-buffer churn, and CPU→GPU synchronization became more expensive than drawing regular extra triangles |
+| **2000s batched fixed-function/early-shader GPU** | Geomipmapped chunks, chunked LOD, geometry clipmaps, detail textures and alpha splats | Feed the GPU coherent static grids and amortize draw setup; move terrain sampling and blending into texture hardware | Per-chunk CPU submission, fixed texture-unit/layer limits, and duplicated world textures failed as worlds and material counts grew |
+| **2010s programmable/streaming GPU** | CDLOD/clipmaps, compute culling, indirect draws, MegaTexture/virtual texturing, deferred shading | Remove CPU draw-call scaling and VRAM dependence on world size | Object-level granularity and eager material evaluation still wasted work on microgeometry and hidden pixels |
+| **2020s–2026 persistent GPU scene** | Meshlets/cluster DAGs, two-phase HiZ, GPU LOD selection, visibility buffers, virtualized geometry/material/shadow pages | Make cost proportional to *visible clusters and visible pixels*, not authored object or material count | This is the current baseline, not a universal representation: runtime topology mutation, global dynamic state, and RT acceleration updates still require separate contracts |
+
+**Contract:** never revive an old controller merely because its output looked good on old
+hardware. Preserve the invariant it discovered — screen-space error, monotonic simplification,
+stable transitions — and express it through the modern persistent-scene pipeline. `01`, `02`,
+`07`, and `08` carry the detailed lineage.
 
 ## The Paradigm procedure
 
@@ -185,6 +206,14 @@ defects:
 12. Do water, vegetation, and props all read the same weather/terrain state the ground reads
     (one world, one weather — `12`, `13`, `15`), and do instances sit on the *rendered* LOD
     surface rather than the source heightfield (`15`)?
+13. Has any global or time-varying state — season, wetness, snow accumulation — been baked into
+    an RVT page? If yes, the cache is architecturally invalid (`07`, `13`).
+14. Does each deformation channel declare its authority: GPU-only cosmetic, or CPU/server-owned
+    gameplay state with collision and replication? There is no implicit promotion (`13`, `17`).
+15. If hardware RT is enabled, is the RT representation stable across raster LOD morphs, or is
+    the engine rebuilding/refitting BLASes as the camera moves (`18`)?
+16. Are precipitation particles and screen droplets outside the terrain module, with terrain
+    exposing only depth/occlusion and surface-reaction state (`13`, `14`)?
 
 State findings as **symptom → mechanism → minimal fix**. Do not redesign a renderer that has
 one violated contract.
@@ -299,14 +328,26 @@ the auxiliary-map registry — which map drives which runtime system — is `14`
 ## The tool provides causes; the renderer renders motion — and state composes as overlays
 
 The other half of the handoff doctrine: everything that *moves or changes* at runtime is this
-skill's to render — waves, foam, spray, flowing rivers (`12`), accumulating and deforming
-snow, rain wetting the ground (`13`), swaying grass (`15`), craters and tire tracks (`17`) —
-always *driven by* the generator's cause-fields, never contradicting them (no snow where the
-Snow Rule forbids it, no puddles on ridges the wetness map excludes). And all runtime surface
-state obeys one compositing discipline: dynamic deltas live in **separate overlay targets**
-(camera-following or paged) composited over the immutable streamed base data in a declared
-order — never mutate the baked tiles in place, or streaming, caching, and save games all
-corrupt (`13`, `14`, `17`).
+skill's to render **where it changes the world surface** — waves, foam, flowing rivers (`12`),
+accumulating and deforming snow, ground wetness (`13`), swaying grass (`15`), craters and tire
+tracks (`17`) — always driven by the generator's cause-fields, never contradicting them (no
+snow where the Snow Rule forbids it, no puddles on ridges the wetness map excludes). Falling
+precipitation and screen-space droplets remain VFX/PostFX responsibilities.
+
+All runtime surface state obeys one compositing discipline: dynamic deltas live in **separate
+overlay targets** (camera-following or paged) composited over the immutable streamed base data
+in a declared order. Never mutate the baked tiles in place, or streaming, caching, and save
+games all corrupt (`13`, `14`, `17`).
+
+## Caches and consumers share one surface truth
+
+RVT caches stable spatial composition only; season, wetness, snow, footprints, and other global
+or transient state apply after the cache (`07`, `13`, `17`). Vegetation seats on the rendered
+morphed surface (`15`); roads conform or inject into its material (`17`); water uses bathymetry
+and depth-faded shores (`12`); atmosphere supplies Rayleigh/Mie aerial perspective (`10`);
+physics consumes CPU/server-authoritative state. Every consumer names the same surface version,
+coordinate frame, LOD/morph policy, and overlay stack. If those answers differ, the integration
+is already broken; Part 3 makes each boundary enforceable.
 
 ---
 
@@ -339,6 +380,47 @@ the no-holes guarantee (parent resident until all children renderable, and the r
 coarsen); eviction policy and pinned set (root tiles, collision ring); cancellation of
 in-flight work on eviction. Collision streams separately, coarser, and guaranteed — the
 render LOD never gates the physics world.
+
+## The cache-invalidation contract
+
+Every cached page declares which inputs are allowed to invalidate it and the maximum dirty
+region per event. RVT contains stable spatial composition only. Global or continuously varying
+state — seasons, global wetness, snow accumulation, wind response — is forbidden from RVT and
+composited afterward. A local persistent stamp may invalidate bounded pages and must be replayable
+after eviction; a global state change must update an overlay constant/target, never traverse the
+cache.
+
+## The deformation authority contract
+
+Every deformation channel is one of two things:
+
+- **Cosmetic GPU state:** camera-following or paged targets for footprints, shallow tire tracks,
+  snow compression, mud ruts, and similar surface response. It affects shading/displacement
+  only; physics, navigation, replication, and the multiplayer server ignore it.
+- **Gameplay geometry state:** CPU/server-owned terrain edits such as craters that change
+  collision or traversal. They are versioned, replicated, persisted, and committed to collision
+  before gameplay treats them as real; the GPU renders their authoritative delta.
+
+There is no middle category and no automatic GPU readback promotion. Changing authority is an
+explicit gameplay feature with a budget and synchronization design (`13`, `17`).
+
+## The hardware-RT terrain contract
+
+Raster LOD morphing must not force camera-driven BLAS rebuilds. Choose one RT representation:
+a stable triangulated proxy mesh/LOD per tile; procedural AABBs with a heightfield intersection
+shader; or a deliberately budgeted fixed-topology refit path. Opacity micromaps accelerate
+alpha-tested ecosystem geometry but do **not** solve heightfield displacement or topology
+changes; displacement micromaps remain capability- and vendor-sensitive. The RT proxy may be
+coarser than raster, but its error bound and use (shadow, AO, reflection, collision-like query)
+must be stated (`18`).
+
+## The VFX/PostFX boundary contract
+
+Terrain does not simulate or draw falling rainflakes/snowflakes and does not own screen droplets.
+It publishes scene depth, top-down coverage/occlusion where required, surface normals, wetness,
+curvature/flow, and pooling state. VFX uses those fields to reject precipitation under cover and
+collide particles; PostFX owns lens effects. Terrain owns only the persistent or slowly varying
+surface reaction (`13`, `14`).
 
 ## The budget sheet
 
@@ -384,17 +466,17 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/04-voxel-blocky.md` | Minecraft-family rendering: palettes and aprons, culled/greedy/binary meshing, packed vertex formats, voxel AO and flood-fill light, remesh pipeline, MDI submission, cave culling, distant-voxel LOD, transparency, ray-marched frontier |
 | `references/05-voxel-smooth-isosurface.md` | Marching cubes, surface nets, dual contouring (QEF), Transvoxel transition cells; octree LOD and stitching; gradient normals; material blending; edit pipeline; GPU extraction; isosurface failure catalogue |
 | `references/06-tiled-streaming.md` | Tile pyramids and SSE refinement; residency state machine, priorities, hysteresis, no-holes rule; DirectStorage-era IO; eviction; memory math worked example; HLOD/far representation; collision streaming |
-| `references/07-materials-virtual-texturing.md` | Splat pipeline and weight packing; height-based blending; normal blending with inlined RNM/whiteout/slope-space formulas; stochastic/hex tiling, triplanar/biplanar; virtual texturing (SVT vs RVT), page tables, feedback; terrain-mesh blending; material aliasing at distance |
+| `references/07-materials-virtual-texturing.md` | Material evolution (detail texture → alpha splat → MegaTexture → RVT → visibility buffer); splat pipeline and weight packing; height-based blending; normal blending; stochastic/hex tiling, triplanar/biplanar; SVT/RVT page tables and feedback; the stable-cache/transient-overlay contract; terrain-mesh blending; material aliasing |
 | `references/08-gpu-driven-culling.md` | GPU-driven doctrine; frustum/cone/two-phase HiZ occlusion; MDI + compaction; GPU LOD selection and readback discipline; terrain-as-occluder; visibility buffer; work-graphs frontier |
 | `references/09-planetary-precision.md` | Precision doctrine (camera-relative, rebasing, per-patch frames); reversed-Z/log depth; cube-sphere quadtrees; orbit-to-ground LOD; horizon culling; ECEF/ENU frames; procedural-on-demand planets |
 | `references/10-lighting-shadows.md` | CSM at km scale (splits, snapping, caster culling); heightfield ray-marched and horizon-map shadows; virtual shadow maps; terrain AO/GI; normal pipeline across LOD; aerial perspective, the fullscreen-triangle skybox seam, volumetric-fog boundary, god rays (post-process vs volumetric), volumetric-cloud seams, cloud shadows; time-of-day invalidation |
 | `references/11-verification-failures.md` | **The review chapter.** Failure catalogue (symptom → mechanism → fix → route); metrics and budget assertions; test controls (flat plane, analytic terrain, teleport, flythrough); mandatory debug views; profiling method; regression strategy |
 | `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, flow-mapped rivers, interactive GPU sim patches, optics (reflection/refraction/absorption, foam, underwater), shoreline integration, pass ordering |
-| `references/13-snow-weather-surface-state.md` | Dynamic surface state: camera-following state targets; deformable snow/mud/sand (deferred deformation); runtime accumulation & melt within the generator's envelope; snow shading; wetness/rain/puddles/drying; wind-driven surface effects; persistence |
-| `references/14-auxiliary-maps-runtime.md` | **The aux-map consumer's manual.** Registry table (map → consumers → format → lifecycle); packing/residency/mip rules; derived-vs-shipped; cross-system fan-out (material, VFX, audio, physics, AI); single-source-of-truth; dynamic writeback discipline |
-| `references/15-vegetation-scatter.md` | Vegetation & scatter: shipped vs runtime-procedural instances, GPU instancing/culling, grass systems and wind, tree LOD chains and octahedral impostors, alpha/overdraw doctrine, terrain-consistency (seating, color, weather), budgets |
+| `references/13-snow-weather-surface-state.md` | Seasons/snow evolution; camera-following state targets; deformable snow/mud/sand (deferred deformation); physical transient depth/compaction/melt lifecycle within the generator's envelope; post-RVT overlay doctrine; wetness/puddles/drying; VFX reaction boundary; persistence |
+| `references/14-auxiliary-maps-runtime.md` | **The aux-map consumer's manual.** Registry table (map → consumers → format → lifecycle); packing/residency/mip rules; derived-vs-shipped; cross-system fan-out and terrain/VFX/PostFX ownership; single-source-of-truth; dynamic writeback discipline |
+| `references/15-vegetation-scatter.md` | Vegetation & scatter evolution: CPU placement → GPU procedural instancing/culling; grass and wind; tree LOD/impostors/HLOD; alpha/overdraw doctrine; mandatory seating on the rendered morphed/displaced surface; weather/atmosphere consistency; budgets |
 | `references/16-tool-viewports.md` | Tool viewports for terrain authoring: WYSIWYG/export-parity contract, preview pyramid, dirty-region reupload, GPU derived-field passes (normals, hillshade, contours), shading-mode palette, brush echo loop, comparison harnesses |
-| `references/17-roads-decals-physics.md` | Roads/splines on terrain (splat injection vs draped ribbon vs conforming), z-fighting toolkit, decals and VT injection, **the destruction ladder** (cosmetic → state → height delta → voxel → hybrid zones) with the invalidation checklist, runtime modification (craters/tracks), physics-collider handoff, gameplay surface queries, buoyancy |
+| `references/17-roads-decals-physics.md` | Roads evolution from z-fighting ribbons to conforming/RVT integration; decals and replayable VT injection; **the destruction ladder** with the GPU-cosmetic vs CPU/server-authoritative boundary; invalidation checklist; runtime craters/tracks; physics-collider handoff; gameplay queries |
 | `references/18-heightfield-raymarching.md` | Ray-marched heightfield terrain: the Voxel Space column raycaster (Comanche lineage, pseudocode + y-buffer), per-pixel GPU marching (cone step, maximum-mipmap traversal), the POM/relief near-field tier, heightfield rays as shared infrastructure (shadows/occlusion/picking), RT-era heightfields, hybrid compositing |
 
 ## Cross-skill routing

@@ -6,12 +6,25 @@ atmosphere that makes distance readable. BRDF, scattering, and ambient-term math
 physically-based-rendering skill; material-side aliasing is `07`; geometry LOD contracts that
 shadows depend on are `01`/`02`; verification harnesses are `11`.
 
-Contents: [Cascaded shadow maps at terrain scale](#cascaded-shadow-maps-at-terrain-scale) ·
+Contents: [Historical shadow ladder](#the-historical-shadow-ladder) ·
+[Cascaded shadow maps at terrain scale](#cascaded-shadow-maps-at-terrain-scale) ·
 [Heightfield-native shadows](#heightfield-native-shadows) ·
 [Virtual shadow maps](#virtual-shadow-maps) · [Self-occlusion, AO, and GI](#self-occlusion-ao-and-gi) ·
 [The normal pipeline across LOD](#the-normal-pipeline-across-lod) ·
 [Atmospheric integration](#atmospheric-integration) · [Time-of-day dynamics](#time-of-day-dynamics) ·
 [Pitfalls](#pitfalls) · [Sources](#sources--provenance)
+
+## The historical shadow ladder
+
+Terrain exposed the limit of every shadow era first. Blob/projected shadows avoided terrain
+self-shadow entirely. Single directional shadow maps added real occlusion but spent one fixed
+texture over the whole camera range. CSM partitioned that texture by distance and made outdoor
+sun shadows practical, then failed again when the last cascade had to cover kilometers. The
+modern answer is not "more cascades": keep near/mid dynamic casters in CSM or VSM, virtualize
+receiver-driven shadow pages where the platform supports them, and move the static terrain far
+field to heightfield ray marching or horizon data. Each step changes the allocation unit —
+whole view, cascade, page, then terrain sample — because kilometer scale cannot be solved by
+bias tuning.
 
 ## Cascaded shadow maps at terrain scale
 
@@ -98,6 +111,14 @@ physical pages, and **only pages covering visible receiver pixels get allocated 
 Resolution is effectively receiver-driven — near-pixel-perfect shadow texel density without
 choosing cascade counts.
 
+That allocation rule is the structural improvement over CSM at world scale. A CSM commits one
+physical texture across the entire cascade footprint before it knows which receivers matter; as
+range grows, every texel's world footprint grows with it. A VSM commits physical pages only where
+visible receiver pixels request them, so detailed shadow memory follows the image rather than
+the square kilometers inside a cascade. Virtualization does not create infinite detail — distant
+clipmap levels still become coarse — but it postpones the failure and spends the budget where the
+camera can observe it.
+
 Why they pair with virtualized geometry (`02`): rendering a single 128² page requires drawing
 just the casters touching it at an appropriate detail level — cheap with cluster-culled,
 LOD-continuous Nanite-style geometry, brutal with monolithic draw calls that must be re-issued
@@ -108,6 +129,14 @@ disable WPO in shadow passes where acceptable, N/D), and a moving sun invalidate
 below). On terrain specifically, VSM's fine texel density restores near-field self-shadowing that
 CSM texel sizes blur away — but the far field still wants the heightfield techniques above; VSM
 clipmap levels at extreme distance recreate the same big-texel problem with different plumbing.
+
+**Far-field handoff contract.** Do not switch from VSM/CSM to heightfield shadowing on an
+arbitrary distance constant. Blend across a band where both paths are evaluated, normalize both
+to a common world-space penumbra width, and place the handoff where the page/cascade texel
+footprint exceeds the terrain-shadow quality threshold. The raster path uses a geometry proxy;
+the heightfield path uses the authoritative field, so an unblended switch reveals LOD and
+filter-kernel disagreement as a ring at dawn/dusk. Hardware RT shadows are an optional near-field
+tier against `18`'s stable terrain proxy; they do not remove the far-field requirement.
 
 ## Self-occlusion, AO, and GI
 
@@ -173,6 +202,13 @@ clipmap levels at extreme distance recreate the same big-texel problem with diff
 
 ## Atmospheric integration
 
+- **The history is vertex Z-fog → height fog → physical atmosphere.** Classic terrain engines
+  attenuated vertices or pixels by camera-space Z toward one fog color. It hid the far clip plane
+  and texture repetition, but every wavelength and altitude behaved identically, so a 40 km
+  mountain read as a small model behind gray glass. Exponential height fog added altitude
+  structure and sold valley mist, but remained an art-directed local medium. The 2026 baseline
+  evaluates Rayleigh/Mie scattering and aerial perspective from one atmosphere state; height fog
+  remains a bounded mood layer, never the world-scale distance model.
 - **Aerial perspective is THE distance cue.** Without atmosphere, a 40 km vista reads as a
   miniature: nothing else — not fog cards, not desaturation grading — communicates scale like
   wavelength-dependent in-scatter accumulating over kilometers. Budget it as a core terrain
@@ -264,8 +300,9 @@ data structure by what sun motion does to it:
   size) or round-robin at fixed Hz. Too slow shows discrete shadow "ticks" across the landscape —
   disguise by blending old/new cascade over a few frames (F).
 - **VSM under continuous sun motion** loses its central bargain (page caching); shipping patterns
-  quantize sun motion into steps sized to sit under perceptibility, or accept the invalidation
-  cost during time-lapse sequences only (N/?, verify current engine behavior — this area evolves).
+  quantize sun motion into steps sized to sit under perceptibility, preserving cache reuse
+  between steps, or accept the invalidation cost during time-lapse sequences only (N/?, verify
+  current engine behavior — this area evolves).
 - The table is the design tool: a dynamic-time-of-day title should push shadow/ambient data toward
   the rows that survive — horizon maps and sky-visibility bakes are the terrain far field's
   time-of-day-proof foundation, with rasterized shadows only where dynamic casters live.

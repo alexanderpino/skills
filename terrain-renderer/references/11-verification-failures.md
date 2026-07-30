@@ -59,8 +59,10 @@ missing boundary contract. Every such fix resurfaces under a different camera.
 |---|---|---|---|
 | Shadow acne (surface stripes) on terrain | Depth bias smaller than shadow-map texel's world footprint on slopes | Slope-scaled bias sized to texel world size per cascade | `10` |
 | Peter-panning (shadows detach from bases) | Bias overcorrected; or caster geometry (skirts) pulled from shadow pass | Reduce bias toward the texel-size bound; keep casters consistent | `10` |
+| Far-cascade terrain alternates between acne and detached shadows no matter how bias is tuned | The cascade covers kilometers, so one shadow texel spans too much world space; no bias can preserve both contact and self-shadowing | Stop tuning the impossible cascade: bound CSM to near/mid field and use VSM pages or heightfield ray-marched/horizon shadows for the far field | `10` |
 | Shadows shimmer/crawl as camera moves | Cascade frustum re-fit each frame without snapping projection to texel grid | Snap cascade origin to texel-size increments; stabilize cascade extents | `10` |
 | Self-shadow banding that tracks LOD morphing | Shadow pass renders different LOD/morph than main view — depth mismatch oscillates with morph factor | Same geometry (same selection + morph) in shadow and main passes | `01` `10` |
+| RT shadows/reflections pop when raster terrain changes LOD | RT BLAS follows raster topology or stale proxy bounds while the raster path geomorphs | Use a stable triangulated RT proxy or procedural AABB heightfield intersection; never camera-drive full BLAS rebuilds | `18` |
 | Distant slopes sparkle/glitter in motion | Normal/specular aliasing: full-frequency normals + tight specular under-sampled at distance | Roughness-encoding normal mips (vMF/Toksvig-style specular AA) | `10` |
 | Dark seams tracing chunk edges in AO/fog/screen-space passes | Skirt curtains visible to screen-space techniques; or normal/AO bake lacks cross-chunk apron | Exclude skirts from those passes or switch crack strategy; bake with apron | `01` `07` |
 | AO/normal discontinuity exactly at tile borders | Per-tile bakes computed without neighbor apron — derivative kernels read the tile edge clamp | Re-bake with apron ≥ kernel radius | `06` `07` |
@@ -73,6 +75,7 @@ missing boundary contract. Every such fix resurfaces under a different camera.
 | Obvious tiling repetition on large surfaces | Single detail tile at one frequency; eye locks onto the repeat | Stochastic/hex tiling or multi-frequency blend; verify in the distance view | `07` |
 | Dark/wrong-hue halos where splat layers meet, worse in mips | Weights and albedo mipped independently — non-premultiplied blend averages through zero-weight texels | Premultiply layer weights before mip generation (or blend in a premultiplied domain) | `07` |
 | Blurry patches that sharpen visibly after a beat (VT page pop-in) | Feedback→request→upload latency; fallback mip shown meanwhile | Prefetch by camera velocity; verify feedback loop latency budget, not just correctness | `07` |
+| Global season or rain transition causes a multi-frame RVT update spike | Time-varying season/wetness/snow was baked into cached pages, so one global parameter dirtied the world | Remove dynamic state from RVT; sample stable base composition, then apply season/weather as a post-RVT overlay | `07` `13` |
 | Texture detail wrong only on steep slopes | Planar UVs stretched; triplanar absent or blend too narrow | Triplanar (or slope-projected) sampling with adequate blend width | `07` |
 | Terrain color/normal detail pops with mesh LOD | Material inputs derived from current-LOD geometry (normals, slope masks) | Sample generator-baked maps at fixed resolution, independent of mesh LOD | `01` `07` |
 
@@ -97,13 +100,16 @@ missing boundary contract. Every such fix resurfaces under a different camera.
 | Ocean tiling visible from altitude | A single FFT cascade's wavelength repeats across the view | 2-4 cascades at different world sizes + macro variation and foam breakup | `12` |
 | A wall of grass pops in at a fixed radius | Generation-radius cutoff with constant density to the edge | Staggered per-instance fade + density pre-rolloff approaching the radius | `15` |
 | Props/grass float or sink at distance | Instances seated on the source heightfield while terrain renders a morphed/displaced LOD | Seat instances by sampling the same displaced/morphed height the terrain vertex path produces | `15` `01` |
+| Road edges z-fight or hover after terrain LOD changes | A coplanar ribbon mesh relies on depth bias and samples a different surface than the terrain material | Integrate the road through conforming geometry or RVT/material injection; reserve bias for bounded residual overlap | `17` `07` |
 | Snow/wetness on the ground but not on vegetation | State overlays sampled only by the terrain material — two weather systems | Sample the `13` state layers in vegetation (and prop) shaders too | `13` `15` |
 | Snow under overhangs and cave mouths | Accumulation mask lacks top-down occlusion capture | Gate accumulation by a top-down occlusion target (same machinery as deformation capture) | `13` |
 | Puddles on ridgelines and slopes | Wetness applied without curvature/flow gating | Drive puddles from the generator's curvature/flow/wetness maps, never raw rain intensity | `13` `14` |
 | Deformation trails seam or snap on camera motion | Camera-following state window re-centers by non-texel offsets, or discards retained texels | Texel-aligned toroidal window scroll with retained-region copy | `13` |
+| Footprints unexpectedly change collision, or a gameplay crater changes only the pixels | Cosmetic and authoritative deformation channels share storage without an ownership contract | Split GPU-only transient deformation from CPU/server-owned height deltas; replicate/version only the authoritative channel | `13` `17` |
 | Persistent decals/scorch vanish sporadically | VT-injected stamps evicted with their pages and never re-applied | Keep a stamp replay list; re-apply on page (re)load | `17` `07` |
 | Player falls through a fresh crater | Collision commit lags the visual height delta | Commit the collider before or with the visual delta; gate gameplay effects on collider version | `17` |
 | Ground darkens to mud-black in rain | Wetness darkening × baked AO × decal/shadow terms multiply unbounded | One declared compositing order; clamp combined darkening | `13` `14` `07` |
+| Rain or snow particles appear inside caves | Precipitation VFX ignores terrain/scene coverage and treats terrain as the particle owner | Keep particles in VFX; consume terrain-provided depth/top-down occlusion to reject covered regions | `13` `14` |
 
 ## Metrics & budgets
 

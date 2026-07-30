@@ -9,12 +9,29 @@ weather), and its readers (displacement, shading). Microfacet and BRDF math for 
 routes to physically-based-rendering; water surfaces themselves are `12`; the map registry these
 systems consume is `14`.
 
-Contents: [The state-layer model](#the-state-layer-model) ·
+Contents: [Historical seasons/snow ladder](#the-historical-ladder-winter-maps-to-transient-physical-state) ·
+[The state-layer model](#the-state-layer-model) ·
 [Deformable snow, mud, and sand](#deformable-snow-mud-and-sand) ·
 [Accumulation and melt](#accumulation-and-melt) · [Snow shading](#snow-shading) ·
 [Wetness and rain](#wetness-and-rain) · [Wind and storms](#wind-and-storms-as-surface-state) ·
 [Persistence and streaming](#persistence-and-streaming) · [Pitfalls](#pitfalls) ·
 [Sources](#sources--provenance)
+
+## The historical ladder: winter maps to transient physical state
+
+Snow and seasons expose the difference between **appearance** and **state**:
+
+| Era | Technique | What it solved | Why it failed |
+|---|---|---|---|
+| Separate summer/winter maps | Swap a second authored albedo set | Cheap global season art direction | Doubled content, hard-switched or cross-faded the whole world, carried no accumulation, melt, shelter, or deformation state |
+| Up-vector snow shader | Blend white albedo on `N·up`, sometimes altitude-gated | Removed the second texture set and made coverage react to slope | Painted every upward face equally, ignored moisture/shelter/temperature, and remained "white material" rather than material thickness |
+| Baked snow masks/material layers | Generator-derived snow potential, height/slope/temperature masks | Put snow in climatically plausible places and improved crevice blending | Still described only where snow *can* exist; global amounts and footprints remained ad hoc |
+| Transient layered snow | Baked potential envelope + runtime depth/compaction/melt/deformation targets | Represents snow as a physical, changing layer with history | Requires explicit cache, streaming, and gameplay-authority boundaries — the subject of this chapter |
+
+**Snow is a transient thickness field, not white albedo paint.** Albedo is one output of the
+layer. Depth drives displacement, crevice fill, compaction, trail rims, optical state, and melt
+into wetness. The camera-following deformation targets below are deliberately local and sparse:
+they preserve high-frequency history without mutating the global base heightfield.
 
 ## The state-layer model
 
@@ -35,6 +52,12 @@ has made this square meter. Two consequences fall out immediately:
   darken for wetness, displace for deformation). Never composite dynamic state *into* RVT/VT
   pages — a global snow amount baked into cached pages means a full cache invalidation every time
   it snows harder (`07` names this pitfall; this chapter is where the correct architecture lives).
+
+**RVT invalidation trap — no exceptions for "slow" seasons.** Season blend, snow amount,
+wetness, and accumulation are global/time-varying inputs and therefore never participate in RVT
+page generation. Sample the stable RVT base first, then apply these targets. A global state
+change must update constants/overlay textures, not dirty the page cache. Local persistent stamps
+may invalidate bounded pages through `17`'s replayable stamp list; weather may not.
 
 ### Camera-following toroidal targets
 
@@ -194,6 +217,13 @@ Within the envelope, per-pixel accumulation is cheap and mostly static-driven:
 - **Temperature bands**: the baked `temperature` field (lapse-rate-correct) thresholds the
   snowline; animate the threshold with weather/season, and the snowline moves up and down the
   mountain for free, correctly following aspect because `insolation` is in the melt term.
+- **Windward/leeward deposition**: use `14`'s `windVector` and the horizontal geometric normal
+  to suppress exposed windward faces and favor lee hollows, still clamped by `snowPotential`.
+  Up-vector-only accumulation is the historical shader returning under a new name.
+
+The 2D targets model terrain-surface deposition. Snow on roofs, canopy volumes, wall ledges, or
+overhang undersides needs a prop/volume accumulation system owned by VFX or the relevant object
+renderer; do not stretch the heightfield target into a fake 3D volume.
 
 ### Melt ordering
 
@@ -231,6 +261,21 @@ section is the terrain-scale approximation set that ships.
 - **Overbright pitfall**: fresh snow albedo pushed to 1.0 plus boosted ambient plus sparkle
   clips into bloom and reads emissive under TAA. Cap albedo ~0.9, keep energy in the wrap term,
   and validate against a gray-card exposure test, not against "looks bright enough at noon".
+
+### Snow lifecycle contract
+
+| State | Trigger / transition | Required writeback |
+|---|---|---|
+| Fresh | accumulation within potential envelope | increase depth; high roughness/sparkle |
+| Packed | deformer pressure / repeated traffic | compaction rises; normals flatten; depth redistributes into rims |
+| Icy | age + freeze/thaw or strong compaction | lower roughness, reduce porous response |
+| Slush | temperature crosses melt band | reduce sparkle; increase wetness and softness |
+| Melt/runoff | positive melt budget | remove snow depth and write the lost amount into wetness/flow response |
+| Dry baseline | wetness dries under temperature/insolation/curvature rules | preserve no hidden snow state outside the envelope |
+
+Missing a transition is a visible state bug, not a shading preference: snow that vanishes directly
+to dry ground violates mass/history; packed trails that retain fresh-snow sparkle ignore the
+deformation state.
 
 ## Wetness and rain
 
@@ -281,6 +326,10 @@ first) with zero authored puddle masks. Puddles on ridgelines and convex slopes 
   while discrete airborne snow/sand is VFX particles advected by the same wind field. Draw the
   handoff line explicitly (material owns attached, VFX owns airborne) or the two systems double
   up at the boundary and read as fog soup.
+- **Precipitation ownership**: this chapter writes the *reaction* — accumulation, wetness,
+  puddles, shelter masks. Falling rain/snow particles are VFX, and screen/lens droplets are
+  PostFX. Terrain publishes depth/top-down occlusion so VFX rejects caves and covered ground;
+  it does not spawn precipitation itself (`14` owns the pass boundary).
 - **Sand equivalents**: everything in this chapter transposes — deformation with near-zero refill
   and wide slump rims, accumulation as drift-loading in lee shelter, "wetness" as darker packed
   sand near water. Same targets, different constants; build the system once, parameterize per

@@ -70,7 +70,9 @@ with no other water bodies and a camera that never looks straight down. Whicheve
   waves live in the normal/material band only (the three-bands doctrine, applied to water).
 - **Far field**: an infinite-ocean skirt ring — a coarse annulus extended to the horizon at the
   sea datum, normal-mapped only. It must share the datum and the far fog/aerial-perspective path
-  with terrain (`10`) or the sea/sky junction band mismatches the land horizon.
+  with terrain (`10`) or the sea/sky junction band mismatches the land horizon. "Share" means
+  one atmosphere LUT/state and the same view-depth coordinate; a private water fog color creates
+  a blue/orange seam at sunset precisely where water, land, and sky should agree.
 - **Lakes and rivers** are finite meshes streamed with their tiles under the same residency
   contract as `06` — a lake tile's water mesh loads/evicts with the terrain tile, carries `e(tile)`
   and SSE-refines in the same currency, and matches terrain tile LOD at the shoreline (see
@@ -350,6 +352,21 @@ float3 refracted = SceneColor.Sample(s, uvR).rgb;
   for the vertical component; the shallow→deep color ramp is the single strongest realism cue
   water has, and it is entirely a function of the generator's bathymetry. Flat-colored water is
   almost always a missing/ignored depth field.
+
+```hlsl
+float rayDistance   = max(SceneLinearDepth(bottomUV) - waterLinearDepth, 0.0); // metres in water
+float verticalDepth = WaterDepth(worldXZ);                                     // bathymetry field
+float3 T             = exp(-sigmaPerBody * rayDistance);                        // Beer-Lambert
+float3 waterColor    = refracted * T + scatterColorPerBody * (1.0 - T);
+
+shoreMask   = saturate(verticalDepth / shoreFadeDepth);
+causticMask = 1.0 - saturate(verticalDepth / causticFadeDepth);
+```
+
+`rayDistance` controls optical extinction along the camera path; `verticalDepth` controls the
+shore regime, caustic survival, and shallow-wave response. They are related but not
+interchangeable. `sigma` and scatter color belong to the water-body descriptor — ocean, clear
+lake, and turbid river must not share one global absorption constant.
 - **Foam** is three masks with one compositor: shoreline foam (depth + shore distance, advected
   along shore tangent), whitecaps (Jacobian, above), flow foam (rivers, above). Composite as an
   opaque-ish albedo layer that *kills* the Fresnel reflection under it — foam is scattering
@@ -371,6 +388,12 @@ float3 refracted = SceneColor.Sample(s, uvR).rgb;
 
 The waterline is where water rendering is actually judged, because it is where the water surface
 meets `01`/`06` terrain at a shallow grazing angle — the worst case for every artifact class.
+
+Historically, the shoreline was two polygons crossing: the water plane cut through terrain and
+artists hid the z-fighting with a foam strip. The modern shoreline is data-driven. Bathymetry
+defines the submerged shape and optical path; scene-depth difference softens the visible
+intersection; shore distance/flow drive foam and run-up; the wetness overlay records the water's
+reaction on land. A hard intersection ribbon is not a shoreline architecture.
 
 - **Depth fade** ("soft intersection"): fade water opacity, distortion, and specular over the
   first few centimetres-to-metres of water depth, using scene-depth-vs-surface-depth (the "depth
@@ -438,6 +461,9 @@ Water is the classic hard transparency case, and the frame must be structured fo
   and screen borders. Mandatory fallback chain with brightness-matched cubemap; never ship SSR-only.
 - **Waterline crawl on LOD change**: water and terrain refine on different schedules; the
   intersection line steps visibly. Shared SSE currency + shoreline LOD bias (`11` symptom table).
+- **Water/land horizon color seam**: water applies a private fog constant while terrain samples
+  `10`'s Rayleigh/Mie aerial-perspective state. One atmosphere LUT, one view-depth convention,
+  sampled by both paths.
 - **Z-fighting of distant flat water vs flat terrain**: at km distance, a lake 20 cm above its
   bed fights the bed in depth. Reversed-Z + camera-relative transforms (`09`); if it persists,
   depth-bias the water or mask terrain under opaque-deep water via the watermask (`06` payload).

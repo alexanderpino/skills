@@ -100,6 +100,16 @@ error, over geometry that is immutable and streamable. What changed is the granu
 build/runtime split, not the principle — coarse enough to live in static buffers and parallel
 culling, fine enough that the cut still approximates per-vertex refinement to sub-pixel error.
 
+The long gap between the 1990s idea and the 2020s architecture was a hardware/runtime gap, not
+an algorithmic one. A cluster cut becomes practical only when the full hierarchy can remain
+resident or stream as pages, compute can traverse it and generate work without CPU readback,
+bindless-style resource access can shade the result, and atomics/programmable raster paths can
+resolve microtriangles efficiently. Haar & Aaltonen's persistent GPU scene (`08`) established
+the missing control plane; mesh/task shaders are one hardware submission route, while compute
+plus indirect draws remains the portable one. Without that stack, a fine cluster DAG collapses
+back into the per-frame CPU refinement and draw-list construction that killed progressive
+meshes.
+
 ## The runtime: cull, cut, rasterize, shade
 
 ### Per-cluster culling and hierarchy traversal
