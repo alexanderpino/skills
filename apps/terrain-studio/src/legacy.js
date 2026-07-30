@@ -5354,7 +5354,7 @@ function priorityFloodFill(h,flatEpsilon=2e-7){
 }
 // --- D8 flow accumulation on the (pit-free) filled DEM: drainage area per cell -> the river network. ---
 function d8Accumulation(g){
-  const n=fieldW(),nh=fieldH(),N=n*nh,rec=new Int32Array(N),A=new Float32Array(N).fill(1);
+  const n=fieldW(),nh=fieldH(),N=n*nh,A=new Float32Array(N).fill(1);
   // D6 on hex (the name is kept: this is the accumulation pass, whichever one-ring it walks).
   // Six equidistant candidates mean the receiver is unambiguous with no sqrt(2) weighting to
   // forget - 26's cleanest single win over D8.
@@ -5376,16 +5376,57 @@ function d8Accumulation(g){
   //
   // Hex is UNAFFECTED and that is the control: all six candidates are one cell away, so dividing by
   // a common distance cannot move the argmax. Measured hex 1.6734 before and after, unchanged.
+  // MULTIPLE FLOW DIRECTION (Freeman 1991, P-tier), which is the part that actually delivers
+  // "smoother and more natural" - D6 on its own does not, and `26` is explicit about it. A
+  // single-receiver router hands ALL of a cell's water to ONE neighbour, so the only flow directions
+  // it can express are the lattice's own: D8 offers eight at 45 degrees, D6 six at 60, and hex is
+  // the COARSER of the two on this one measure. Fixing which neighbour gets picked cannot help -
+  // the commit before this one corrected exactly that and facet concentration did not move (1.8132
+  // -> 1.8161). The spokes are the routing model, not the selection rule.
+  //
+  // Freeman distributes to EVERY downslope neighbour in proportion to slope^p, so the resolved
+  // direction is continuous rather than snapped, and p=1.1 is his recommended value. p -> infinity
+  // degenerates to single-receiver, which is the sense in which this generalises what it replaces.
+  // Quinn's contour-length weighting is deliberately NOT used: it collapses on hex (`26:174`), where
+  // all six neighbours share one contour length, so it would reduce to Freeman with extra steps on
+  // one lattice and not the other.
+  //
+  // Measured on a cone (_verify_flow_facets), where drainage is radial by symmetry:
+  //     single receiver   square 1.8161   hex 1.6734
+  //     Freeman p=1.1     square 1.0114   hex 1.0220
+  //
+  // Cost, measured against the same input rather than guessed: accumulation goes 78 -> 105 ms at
+  // 512 square and 270 -> 423 ms at 1024 square, so 1.3-1.6x. For scale, priorityFloodFill on the
+  // same field is 70 and 260 ms - this sits beside it in the same build-time budget, not in a new
+  // one. The sort is still the asymptotic term; the eight pow() calls per cell are not.
+  //
+  // Both call sites get this: the d_flow node AND refreshWater's curAccum. They must agree, or the
+  // rendered rivers sit somewhere other than the flow map says - which is the same class of defect
+  // as the three routers disagreeing, one commit ago.
   const nbSq=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
-  const hex=isHex();
-  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=0,bi=-1;
-    const nb=hex?hexNb(y):nbSq;
-    for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;
-      const ni=yy*n+xx,sl=(g[i]-g[ni])/(hex?1:dd[2]);
-      if(sl>best){best=sl;bi=ni;}}
-    rec[i]=bi;}
+  const hex=isHex(),P=1.1,w=new Float64Array(8);
   const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>g[b]-g[a]);   // upstream (high) before downstream (low)
-  for(const i of order){if(rec[i]>=0)A[rec[i]]+=A[i];}
+  // Descending height means a cell's own A is final before it gives any away, exactly as it was for
+  // the single-receiver walk. Weights are recomputed here rather than cached from a first pass: at
+  // 4096 square, eight fractions per cell would be 537 MB of Float32 that this loop reads once.
+  for(const i of order){
+    const y=(i/n)|0,x=i-y*n,nb=hex?hexNb(y):nbSq;
+    let tot=0,k=0;
+    for(const dd of nb){
+      const xx=x+dd[0],yy=y+dd[1];let ww=0;
+      if(xx>=0&&yy>=0&&xx<n&&yy<nh){
+        const sl=(g[i]-g[yy*n+xx])/(hex?1:dd[2]);
+        if(sl>0)ww=Math.pow(sl,P);
+      }
+      w[k++]=ww;tot+=ww;
+    }
+    if(tot<=0)continue;                     // filled flats and the outlet: flow stops, as before
+    const share=A[i]/tot;k=0;
+    for(const dd of nb){
+      if(w[k]>0)A[(y+dd[1])*n+(x+dd[0])]+=share*w[k];
+      k++;
+    }
+  }
   return A;
 }
 // Build the per-vertex WATER SURFACE (flat in lake basins, sloped along rivers) + its normals, from the

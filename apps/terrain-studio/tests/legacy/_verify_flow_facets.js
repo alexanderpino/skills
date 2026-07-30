@@ -134,15 +134,35 @@ const gate = (name, ok, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${nam
     + `— picking the lowest neighbour instead of the steepest reads 0.1382 here, because the sqrt(2) `
     + `diagonal is always lower on a smooth slope and no cell ever drains along an axis`);
 
-  // REPORTED, NOT GATED, and deliberately so. Single-receiver routing sends all of a cell's water to
-  // one neighbour, so the realisable directions ARE the lattice's own and concentration cannot reach
-  // 1.0 by fixing the selection rule - the distance correction above moved the spokes from the
-  // diagonals to the axes and left the number where it was (1.8132 -> 1.8161). Only distributing
-  // flow across several receivers moves it, which is precisely why `26` records MFD, and not D6, as
-  // what delivers "smoother and more natural". Gating this now would be gating a number no change in
-  // this commit can move; it becomes a gate when MFD lands.
-  console.log(`\nREPORT  flow-facet-concentration  square=${r.square.concentration}  hex=${r.hex.concentration}`
-    + `  (single-receiver floor; MFD is what lowers this)`);
+  // FACET CONCENTRATION, now a gate because MFD landed and there is finally something that moves it.
+  // Single-receiver routing hands all of a cell's water to one neighbour, so the only expressible
+  // directions are the lattice's own and the number has a floor no selection rule can go under -
+  // correcting the receiver choice moved the spokes from the diagonals to the axes and left the
+  // value where it was. Freeman p=1.1 distributes across every downslope neighbour, so the resolved
+  // direction is continuous:
+  //
+  //     single receiver, lowest-neighbour     square 1.8132   hex 1.6734
+  //     single receiver, steepest-descent     square 1.8161   hex 1.6734
+  //     Freeman MFD p=1.1                     square 1.0114   hex 1.0220
+  //
+  // Armed at 1.12. That is clear of both measured MFD values with room for resolution and annulus
+  // choice to wobble, and far below the 1.67 the best single-receiver router manages - so reverting
+  // to ANY single-receiver rule fails this, which is the property that makes it worth having. Note
+  // it is deliberately not armed near 1.00: exact flatness is not achievable on a discrete lattice
+  // and demanding it would make the gate fail on arithmetic rather than on routing.
+  console.log(`\nREPORT  flow-facet-concentration  square=${r.square.concentration}  hex=${r.hex.concentration}`);
+
+  for (const lat of ['square', 'hex'])
+    gate(`flow-facets-${lat}`, r[lat].concentration < 1.12,
+      `${lat} concentration = ${r[lat].concentration} — single-receiver routing reads 1.81 (square) `
+      + `and 1.67 (hex) here, because every cell snaps its whole discharge onto one lattice direction`);
+
+  // The floor of the profile matters as much as its peak: a router could flatten max/mean by
+  // spreading everything into a uniform haze while leaving some azimuths unserved.
+  for (const lat of ['square', 'hex'])
+    gate(`flow-facets-min-${lat}`, r[lat].minOverMean > 0.85,
+      `${lat} min/mean = ${r[lat].minOverMean} — single-receiver reads 0.27 (square) and 0.32 (hex), `
+      + `the starved azimuths between spokes`);
 
   gate('flow-no-page-errors', errors.length === 0, errors.length ? JSON.stringify(errors) : 'none');
 

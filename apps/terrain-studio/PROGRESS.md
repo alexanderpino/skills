@@ -38,7 +38,7 @@ npm run plugins:check                   60 modules: imports resolve, exports exi
 npm run verify -- _verify_blur_isotropy.js   square 1.0000, hex 1.0000 (was 1.185)
 npm run verify -- _verify_layers.js     L0 13/13 both lattices; roughness 0.0290/0.0286
 npm run verify -- _verify_hillslope_isotropy.js  9/9; hex sigma 3.873/3.873 = square exactly
-npm run verify -- _verify_flow_facets.js  8/8; square axis/diag 0.1382 -> 1.2547. Concentration 1.81/1.67 REPORTED, awaiting MFD
+npm run verify -- _verify_flow_facets.js  12/12; facets 1.0114/1.0220 (single-receiver floor was 1.81/1.67)
 node tests/legacy/_verify_shapescan.js  3 files, 8554 lines scanned
 npm run verify -- _verify_gpu.js        hasWebGL2Float=true init=true gpuReady=true
                                         fbm@512: 16ms GPU vs 231ms CPU
@@ -84,7 +84,7 @@ tests/e2e/          4 Playwright specs
 | Layer | State |
 |---|---|
 | L0 bedrock + blends + masks | **done** — hexBlur 1.185→1.0000; L0 is the opening document, 13/13 on both lattices |
-| L1 erosion (MC-3 D6 constants, MC-5 MFD6) | hillslope diffusion D6 **done** — hex was advecting, 1.1595 -> 1.0000, width 1.2246 -> 1.0000. MFD6 next |
+| L1 erosion (MC-3 D6 constants, MC-5 MFD6) | **done** — hillslope Laplacian was advecting on hex (1.1595->1.0000); flow drained diagonally always; MFD6 Freeman p=1.1 facets 1.81/1.67 -> 1.01/1.02 |
 | L2 cover · L3 water · L4 climate/snow · L5 dressing | |
 
 ## Next, in order
