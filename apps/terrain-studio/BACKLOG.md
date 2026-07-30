@@ -611,6 +611,35 @@ instance:
    green badge was available to be believed, and nothing except reading the empty output file
    distinguished it from a real one.
 
+8. **A suite that ran a sixth of itself and reported "all passed".** `npm run verify` points at
+   `_verify_all_canyon.js`, which carries a **hand-written list of 12** of the **70** oracles on
+   disk. The file is honest — its first line says "Runs the Canyon verification suite" — but
+   `package.json` binds the generic name `verify` to it, so the *command* claims a scope the
+   *content* never had. The 58 it never ran included `_verify_digest.js`, **the byte-identity gate
+   of record**, every hex oracle, and every gate added in the last three sessions.
+
+   Cost, measured: promoting the opening document to L0 (`31f5688`) broke **17 oracles**. The
+   canyon twelve caught two. Those two were fixed, the lesson was written up, and the other fifteen
+   stayed red and unobserved through four subsequent commits, each of which reported a green suite.
+   Established by bisect, not inference: 17 of 18 were green at `60435cd` and red at HEAD, the
+   exception being `_verify_hex_sampling` which was already carrying pre-flip geometry.
+
+   The tell was available and unread the whole time: **`ls tests/legacy/_verify_*.js | wc -l` is 70
+   and the suite printed 12 lines.** A suite that does not state its own coverage cannot be
+   audited by watching it pass. `scripts/sweep-oracles.mjs` now runs all of them and prints the
+   count.
+
+9. **The sweep's own first run scored one entry vacuously.** `_verify_bridge.js` is a generator and
+   a gate in one file: bare it **rewrites** `bridge-surface.json` and exits 0; only `--check`
+   compares. Sweeping it bare regenerated the frozen contract and then reported agreement with
+   what it had just written — it cannot fail in that mode, and the refreshed contract landed in
+   the working tree as a side effect of "verifying" it. Now invoked with `--check` via a per-oracle
+   flag table. **A tool that can write its own baseline must never be run in a gate without the
+   flag that stops it.**
+
+Entry 8 is the coverage form: the other entries are gates that could not fail, this is a gate that
+was never invoked — and the aggregate still said green. **A suite must report what it did not run.**
+
 Entry 7 is the general form the first six are special cases of: **a gate only protects you if its
 verdict is observed, and an exit code is not a verdict.** Wrong tolerance, unreachable sub-gate,
 and never-returned-but-reported-zero all fail identically at the point of use. So: give a gate a

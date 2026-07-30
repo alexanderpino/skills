@@ -7,6 +7,18 @@ Updated as work lands. If this disagrees with a commit message, the commit wins.
 
 ---
 
+## Suite coverage — corrected 2026-07-30
+
+`npm run verify` runs **12 of 70** oracles (it points at `_verify_all_canyon.js`, the Canyon
+suite). Use `node scripts/sweep-oracles.mjs` for all of them.
+
+    node scripts/sweep-oracles.mjs                  every oracle, one line each
+    node scripts/sweep-oracles.mjs _verify_x.js     a subset
+
+Baseline at a4c1247: **51/70 green**. The 19 red are 17 caused by the L0 promotion
+(31f5688) plus `_verify_hex_sampling` (carried, pre-flip geometry) and `_verify_pwa`
+(needs `--preview-prod`). Repair in flight.
+
 ## Now
 
 **Programme:** modularisation toward React + plugin nodes + PWA, per
