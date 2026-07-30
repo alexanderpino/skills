@@ -126,6 +126,49 @@ one field name carry two contracts — `snowDepth` is *final* under a static pro
 state at epoch T* under a dynamic one. The manifest must say which, and a driver-completeness check
 must fail an initial-state map whose drivers are absent.
 
+### D7 — Layered cake: the default document is the correctness frontier · TODO
+
+**The problem.** `defaultGraph()` (`:8050`) opens **18 nodes spanning the entire stack** — perlin,
+ridged, blend, warp, hydraulic, thermal, deposits, satmap, colorerosion, weathering, height,
+sunshadow, wind, water, temperature, heat, snow, output. It is a showcase, not a starting point, and
+it costs us three ways:
+
+1. **Unreadable as a default.** A new graph presents every subsystem at once; nothing is legible.
+2. **Useless as a regression surface.** The digest covers node *types* in isolation, but the thing
+   that actually renders is the default *document* — and it exercises everything simultaneously, so
+   any regression anywhere reads as "the default looks different" with 18 candidate causes.
+3. **Already load-bearing, already bitten.** Both "assign, never replace" comments at `:8056` and
+   `:8071` exist because a replaced params object silently rehydrated schema defaults and *changed
+   the shipped terrain* — 4.3 m rms on a click in one case, and in the other the default document
+   shipped without the new snow physics until someone clicked the node. A default this wide has too
+   many ways to drift without anyone noticing.
+
+**The decision.** Build in **layers, bottom-up**, matching the layer stack doctrine and the Legal
+Order — they are the same ordering:
+
+| Layer | Contents | Gate |
+|---|---|---|
+| **L0 bedrock** | base shape, detail noise, **blends and masks** — the combining machinery everything above uses | correct on both lattices; `hexBlur` (MC-4) lands here, since blur is what masks are built from |
+| **L1 eroded bedrock** | depression handling → flow routing → fluvial → thermal | MC-3's D6 constants and MFD6 (MC-5) land here — this is where "smoother and more natural" is delivered |
+| **L2 cover** | soil (weathering), sediment/sand deposits | needs the multi-output port contract — `soilDepth` and `sedimentDepth` are *outputs*, not side effects |
+| **L3 water** | sources, sinks, lakes, flow field | D5's authored sources; needs L1's routing to be correct first |
+| **L4 climate & snow** | temperature, insolation, wind, snow — brought *under* the aux-map contract | snow already exists; this is bringing it in, not building it |
+| **L5 dressing** | satmap, colour erosion, AO | preview products only — the Masking Doctrine keeps these out of the runtime handoff |
+
+**The rule that makes it self-enforcing: the opening default is the highest layer verified correct
+on both lattices.** Today that is L0. It gets promoted as layers complete. So the default document
+can never run ahead of what we have proven — and "the default changed" stops being ambiguous,
+because the default only contains work that is finished.
+
+Templates already exist (`:8032` dispatches on `template==="canyon"`), so the layered defaults slot
+into machinery that is already there rather than needing new architecture.
+
+**What this changes about the implementation order.** It subsumes the MC-3/4/5-first plan and orders
+it better: MC-4 (blur) belongs to **L0** because masks are built from it, while MC-3 and MC-5 belong
+to **L1**. And it moves the big refactor *later* — the multi-output port contract is not needed until
+**L2**, so two layers get finished and verified before the 60-node rewrite. That is a strictly better
+risk position than doing the refactor first.
+
 ---
 
 ## 2. Auxiliary maps — the three lenses
