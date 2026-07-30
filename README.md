@@ -16,6 +16,7 @@ no packaging or build step.
 | [`principal-architect`](principal-architect/) | Architecture & business analysis | Master enterprise/solution/software architecture skill: consult and maintain living architecture docs (PRD/HLD/SD/SAD/AD, ADRs, user stories) as a gate around planning and code changes. Conforms to ISO/IEC/IEEE 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42, with STRIDE/OWASP threat models, FinOps estimates, and Architecture-as-Code CI. |
 | [`mission-control`](mission-control/) | Agent orchestration | Command-and-control orchestrator for autonomous multi-agent development pipelines. Runs a continuous plan→build loop: an Architect decomposes goals into a prioritized backlog, Scouts research, then Implementers execute against a file-ownership ledger, gated by mechanical verifiers and code review. |
 | [`reasoning-matrix`](reasoning-matrix/) | Reasoning & ideation | Generate genuinely non-obvious insights on hard, open-ended questions by crossing a problem's building blocks against a curated set of reasoning lenses, then filtering the results for novelty *and* validity so what survives is both new and true. For lateral thinking, hypothesis generation, and getting past the obvious answer. |
+| [`terrain-renderer`](terrain-renderer/) | Terrain rendering | Principal terrain-rendering authority to 2026 AAA production standards — every major paradigm end to end: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (the Nanite family), UE Landscape/Nanite Landscape, blocky chunked voxel worlds (greedy/binary meshing, voxel AO), smooth voxel isosurfaces (marching cubes, Transvoxel, dual contouring), tiled streaming, terrain materials & virtual texturing, GPU-driven culling, planetary rendering & float-precision doctrine, terrain lighting/shadows, plus the full dynamic surface — water (Gerstner/FFT, flow-mapped rivers, fullscreen-triangle pass), snow/wetness/weather state & deformation, auxiliary-map consumption, vegetation/grass & scatter, roads/decals/runtime modification, physics handoff, tool-viewport previews — and the artifact catalogue (cracks, popping, swimming, shimmer). Consumes `terrain-architect`'s generated fields; routes BRDF math to `physically-based-rendering`. |
 | [`terrain-architect`](terrain-architect/) | Terrain generation | Principal-level terrain generation expertise — the algorithms with verified citations (noise/FBM, tectonic uplift, hydraulic/thermal/glacial/coastal/marine/aeolian erosion, mass wasting, rivers incl. meanders & waterfalls, lakes, karst, desert, periglacial, volcanoes, impact craters, climate & multi-biome worlds, ecosystems, scatter, surface materials, splatmap/albedo/normal/AO synthesis & compositing) and the substrate for building terrain tools (Gaea/World Machine-class, or realtime): typed fields, graph runtimes, caching, preview pyramids, GPU patterns. Also diagnoses wrong terrain (seams, terracing, stalled rivers). |
 
 More skills will be added over time — each one is independent, so you can
@@ -35,6 +36,7 @@ npx skills add github:alexanderpino/skills/principal-architect
 npx skills add github:alexanderpino/skills/mission-control
 npx skills add github:alexanderpino/skills/reasoning-matrix
 npx skills add github:alexanderpino/skills/terrain-architect
+npx skills add github:alexanderpino/skills/terrain-renderer
 ```
 
 You can also install from a local checkout:
@@ -83,9 +85,12 @@ skills/
 │   ├── SKILL.md                       # router + core mental model
 │   ├── references/                    # load-on-demand deep dives
 │   └── scripts/                       # pipeline state machine CLI
-└── terrain-architect/                # unpacked, reviewable skill
-    ├── SKILL.md                       # router + core mental model
-    └── references/                    # load-on-demand deep dives (noise, erosion, flow, graph runtime, GPU…)
+├── terrain-architect/                # unpacked, reviewable skill
+│   ├── SKILL.md                       # router + core mental model
+│   └── references/                    # load-on-demand deep dives (noise, erosion, flow, graph runtime, GPU…)
+└── terrain-renderer/                 # unpacked, reviewable skill
+    ├── SKILL.md                       # router + doctrine (paradigm choice, error budgets, contracts)
+    └── references/                    # load-on-demand deep dives (LOD, Nanite-family, voxels, VT, planetary…)
 ```
 
 ## Maintaining

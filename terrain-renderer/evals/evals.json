@@ -1,0 +1,151 @@
+{
+  "skill_name": "terrain-renderer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building an open-world game with a 32km x 32km heightfield terrain (1m/px source data). Design the terrain rendering system: LOD scheme, streaming, materials. Target is PC + current-gen consoles at 60fps. The terrain is static at runtime.",
+      "expected_output": "Chooses a quadtree/CDLOD-or-clipmap family renderer (not voxels/Nanite-by-default), states a screen-space error budget, specifies a crack contract (morph/stitching/skirts) explicitly, a tile streaming design with residency/hysteresis/no-holes rule, splat + virtual-texturing material plan, GPU-driven culling, and names debug views/verification before implementation. Routes generation-side data needs to the output contract rather than inventing them.",
+      "files": [],
+      "assertions": [
+        "Recommends a heightfield grid-LOD scheme (CDLOD / clipmap / quadtree chunks) rather than defaulting to voxels or Nanite",
+        "States a screen-space error budget in pixels (tau) or gives the SSE projection formula",
+        "Specifies an explicit crack-prevention strategy (vertex morph, index stitching, or sized skirts) rather than leaving seams to blending",
+        "Specifies tile streaming with a priority/residency rule (hysteresis, or never-show-holes / parent-resident guarantee)",
+        "Proposes amortized materials (virtual texturing, RVT, or ID maps) instead of only a per-pixel N-layer splat blend",
+        "Recommends GPU-driven submission or culling (indirect draws, compute culling, or HiZ occlusion)",
+        "Raises float precision (camera-relative rendering or origin rebasing) as required at 32 km scale",
+        "Names verification or debug views (LOD false-color, overdraw, residency) as part of the plan"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write me a fast chunk mesher for my Minecraft-like game in C++. Chunks are 32^3, blocks have per-face textures, and I want smooth lighting and ambient occlusion like Minecraft has.",
+      "expected_output": "Implements greedy or binary-greedy meshing with merge keys that include light/AO/tint (not just block type), uses a 1-voxel neighbor apron, the side1+side2+corner vertex AO rule with quad diagonal flip, packed vertex format, texture arrays over atlases, and mentions the remesh queue/budget doctrine. No fabricated citations.",
+      "files": [],
+      "assertions": [
+        "Implements greedy or binary/bitwise greedy meshing rather than only per-face culled meshing",
+        "Merge key includes per-vertex light and/or AO, not just block type (prevents merged-quad lighting errors)",
+        "Reads a 1-voxel neighbor apron/halo for face-visibility and AO at chunk borders",
+        "Implements the canonical voxel AO rule using two side neighbors plus the corner",
+        "Mentions the quad diagonal flip to fix AO interpolation anisotropy",
+        "Uses texture arrays (or explains the atlas UV-tiling constraint that greedy meshing imposes)",
+        "Uses a packed/compressed vertex format rather than full float32 per attribute",
+        "Mentions off-thread remeshing with a dirty-chunk queue or per-frame budget"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My terrain has visible cracks/holes between LOD levels and the shadows shimmer whenever the camera moves. Terrain is a chunked quadtree with skirts, world is about 40km across. What's wrong?",
+      "expected_output": "Diagnoses as symptom -> mechanism -> minimal fix: cracks indicate a violated seam contract (skirt depth vs neighbor error, or T-junctions from unmatched edge indices); shadow shimmer at 40km scale is float precision (needs camera-relative rendering/origin rebasing) and/or missing shadow texel snapping. Checks LOD consistency across passes. Does not propose rewriting the renderer.",
+      "files": [],
+      "assertions": [
+        "Diagnoses cracks as a violated LOD-boundary contract (skirt depth vs neighbor error, adjacency constraint, or missing edge-permutation indices)",
+        "Mentions T-junctions as a distinct crack/sparkle mechanism",
+        "Attributes shadow shimmer at 40 km at least partly to float precision (camera-relative rendering / origin rebasing)",
+        "Mentions shadow-cascade texel snapping and/or sphere-bounded cascade fitting as a shimmer fix",
+        "Checks LOD-selection consistency across passes (depth prepass / shadow cascades vs main view)",
+        "Presents findings as symptom to mechanism to minimal fix rather than prescribing a rewrite",
+        "Suggests a diagnostic or debug view to confirm the diagnosis before fixing"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Should I use Nanite for the terrain in my UE5 game? Players can dig and deform the ground in some areas.",
+      "expected_output": "Explains Nanite Landscape converts heightfield components to cluster meshes rebuilt offline/editor-time, so runtime deformation is unsupported on that path; recommends traditional Landscape or a voxel isosurface system for diggable regions (possibly hybrid), and flags version-sensitive claims as needing verification against current UE docs.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I want to render a whole planet you can fly from orbit down to the surface. Where do I even start?",
+      "expected_output": "Starts with precision doctrine (camera-relative/origin rebasing, per-patch local frames, reversed-Z), cube-sphere quadtree tiling with per-face LOD, horizon culling, streaming tile pyramid, and regime transitions orbit->ground; routes generation of planetary data to the terrain-architect skill and scattering math to physically-based-rendering.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Add an ocean and rivers to my custom engine's terrain. I don't want to build a whole water mesh LOD system if I can avoid it \u2014 I heard you can render water with just a fullscreen triangle?",
+      "expected_output": "Covers the fullscreen-triangle screen-space water pass (SV_VertexID triangle, per-pixel ray reconstruction, analytic ray-plane intersection with the water datum, depth-buffer rejection, depth-based absorption and shore fade), its trade-offs vs mesh/projected-grid water (TAA motion vectors, displaced silhouettes, multiple elevations), and flow-mapped rivers driven by the generator's flow field. Consumes water surface/depth from the generation-side contract; never carves water into the heightfield.",
+      "files": [],
+      "assertions": [
+        "Describes the fullscreen triangle emitted from SV_VertexID (3 oversized vertices, no vertex buffer)",
+        "Explains why one triangle beats a quad (no diagonal seam / fewer partial quads or helper lanes)",
+        "Reconstructs a per-pixel view ray and analytically intersects the water datum plane",
+        "Guards the degenerate intersection cases (ray near-parallel to the plane, t<0 / plane behind camera, camera below datum)",
+        "Rejects hits occluded by the scene using the depth buffer before shading water",
+        "Derives absorption/shore fade from water depth (scene depth minus hit distance, or the depth field)",
+        "Gives a layered wave recipe: two or more scrolling normal layers at different scales, decorrelated in direction/speed",
+        "Combines the wave layers with a real normal blend (RNM/whiteout) rather than lerping normals",
+        "Warns that the pass rasterizes nothing so TAA motion vectors must be derived analytically",
+        "Covers flow-mapped rivers driven by a flow vector field, not just the ocean",
+        "States honestly when a mesh/projected grid beats the fullscreen pass (displaced silhouettes, many water elevations)"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "My game has dynamic weather. I want rain to darken the ground and form puddles, snow to pile up and get trampled with footprints, and the grass to look wet too. How do I architect this?",
+      "expected_output": "Architecture: runtime surface-state overlay targets (wetness, snow depth delta, deformation) composited over immutable baked tiles; puddles driven by the generator's curvature/flow/wetness aux maps, snow constrained by the baked snow-potential envelope; deferred deformation (top-down deformer capture -> persistent heightmap -> displacement/normal); porosity-based wet darkening + roughness drop; the same state applied to vegetation so the world has one weather system.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "What's the canonical paper for Nanite? And for greedy meshing? I need citations for a tech report.",
+      "expected_output": "Answers honestly by provenance tier: Nanite is a SIGGRAPH 2021 Advances talk (Karis), not a peer-reviewed paper; greedy meshing has no canonical paper (folklore, canonical writeup is Lysenko's 0fps blog). Warns that attributions should be re-verified against primary sources for publication-critical use. Does not fabricate citations.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Give my rendering team the historical architecture review for terrain LOD and culling. We still rebuild terrain indices on the CPU every frame, submit one draw per patch, and are considering ROAM because it minimizes triangle count.",
+      "expected_output": "Explains the lineage from ROAM/progressive meshes through regular chunked/fixed-function-era grids to a persistent GPU scene. States why CPU topology refinement died: fine-grained dependency walks, index churn, synchronization, and draw submission became more expensive than extra regular triangles. Recommends CPU policy plus GPU frustum/cone/two-phase HiZ culling, GPU LOD selection, compaction, and indirect/meshlet submission while preserving screen-space-error and seam contracts.",
+      "files": [],
+      "assertions": [
+        "Explains what hardware bottleneck ROAM or progressive meshes originally solved",
+        "Explains why per-frame CPU index rebuilding and fine-grained topology refinement stopped scaling",
+        "Describes a persistent GPU-resident scene rather than only moving the same loop to a compute shader",
+        "Includes two-phase HiZ or visibility-history handling",
+        "Includes indirect submission, meshlets, or cluster-level GPU submission",
+        "Preserves screen-space error and an explicit crack or transition contract"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "We want instant global seasons. Our plan is to bake summer/winter color, rain wetness, and snow accumulation into the Runtime Virtual Texture and invalidate it when the weather changes. Footprints and tire tracks should use the same data.",
+      "expected_output": "Rejects global dynamic state in RVT as a cache-coherency failure. Keeps stable spatial composition in RVT and applies seasons, global wetness, transient snow, footprints, and tire compression as post-RVT overlays. Uses camera-following or paged deformation targets for local transient state, distinguishes cosmetic GPU-only tracks from CPU/server-owned collision-changing edits, and allows only bounded replayable invalidation for persistent local stamps.",
+      "files": [],
+      "assertions": [
+        "Explicitly forbids baking global or continuously changing season/weather state into RVT",
+        "Explains that global state would cause broad or full-cache invalidation spikes",
+        "Keeps stable base material or road composition in RVT",
+        "Applies season, wetness, and snow after the RVT sample",
+        "Uses camera-following or paged state targets for footprints and tire tracks",
+        "Separates cosmetic GPU deformation from authoritative CPU/server collision state"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "How should hardware ray tracing see our geomorphed heightfield terrain? The raster quadtree changes LOD continuously and our prototype rebuilds a BLAS whenever the camera crosses an LOD band. We also have alpha-tested grass.",
+      "expected_output": "Rejects camera-driven terrain BLAS rebuilds. Chooses a stable triangulated proxy per tile/LOD or procedural AABBs with a heightfield intersection shader; permits fixed-topology refit only with a stated budget. Explains that opacity micromaps accelerate alpha-tested grass/foliage any-hit work but do not solve terrain displacement or topology changes, and treats displacement micromaps as capability-sensitive rather than universal.",
+      "files": [],
+      "assertions": [
+        "Rejects rebuilding terrain BLASes whenever raster LOD changes",
+        "Proposes a stable triangulated ray-tracing proxy or procedural AABB heightfield intersection",
+        "Distinguishes refit-compatible vertex motion from topology-changing LOD rebuilds",
+        "States that opacity micromaps address alpha-tested geometry rather than terrain displacement",
+        "Treats displacement micromap support as platform or vendor sensitive",
+        "Requires an explicit RT proxy error bound or usage contract"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Design the boundary between terrain, weather VFX, roads, vegetation, water, and atmosphere for a 20 km AAA world. We currently get floating trees, z-fighting road ribbons, hard shore intersections, flat-looking distance fog, and rain inside caves.",
+      "expected_output": "Defines one evaluated terrain surface consumed by all systems: vegetation snaps to the same morphed/displaced LOD surface; roads conform or integrate through RVT/material injection; water uses bathymetry/depth fade at shores; atmosphere uses Rayleigh/Mie scattering and volumetric aerial perspective. Keeps falling precipitation in VFX and screen droplets in PostFX while terrain publishes depth/top-down coverage plus wetness/curvature/flow for collision, cave rejection, darkening, and pooling.",
+      "files": [],
+      "assertions": [
+        "Seats vegetation on the rendered morphed or displaced terrain surface",
+        "Replaces coplanar z-biased road ribbons with conforming geometry or RVT/material integration",
+        "Uses water depth or bathymetry and a depth-faded shoreline intersection",
+        "Uses physically based atmosphere or Rayleigh/Mie plus aerial perspective instead of vertex Z-fog",
+        "Places falling rain or snow in VFX and screen droplets in PostFX",
+        "Makes terrain provide depth or occlusion for cave rejection and wetness/flow/curvature for surface reaction"
+      ]
+    }
+  ]
+}
