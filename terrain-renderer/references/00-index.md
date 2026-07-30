@@ -96,6 +96,24 @@ right fix.
 | Virtual shadow maps | `10` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/virtual-shadow-maps-in-unreal-engine) |
 | Aerial perspective / sky LUTs | `10` | Hillaire, EGSR 2020 (CGF 39(4)) | P | [Wiley](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.14050) |
 | Failure catalogue, debug views, budget assertions | `11` | This skill's consolidation | F | — |
+| FFT/spectral ocean synthesis | `12` | Tessendorf, "Simulating Ocean Water", SIGGRAPH course notes | T/P | [clemson.edu PDF](https://people.computing.clemson.edu/~jtessen/reports/papers_files/coursenotes2004.pdf) |
+| Gerstner/trochoidal wave sums | `12` | Classical; GPU form in GPU Gems ch. 1 (Finch) | F/D | [developer.nvidia.com](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models) |
+| Flow mapping (rivers) | `12` | Vlachos, "Water Flow in Portal 2", SIGGRAPH 2010 | T | [steamstatic PDF](https://cdn.akamai.steamstatic.com/apps/valve/2010/siggraph2010_vlachos_waterflow.pdf) |
+| Projected-grid water surface | `12` | Johanson, Lund University master's thesis, 2004 | P | [lth.se PDF](https://fileadmin.cs.lth.se/graphics/theses/projects/projgrid/projgrid-lq.pdf) |
+| Fullscreen-triangle pass (and screen-space water) | `12` `16` | Community canon (Bilodeau GDC 2014 vertex-shader-tricks lineage; multiple writeups) | F/T | [slideshare Bilodeau](https://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau) |
+| Ocean/water shading (Bruneton model family) | `12` | Bruneton, Neyret & Holzschuch, CGF 29(2), 2010 | P | [inria.hal.science](https://inria.hal.science/inria-00443630) |
+| Deferred snow/mud deformation | `13` | Michels & Sikachev, GPU Pro 7 (talk form SIGGRAPH 2015); Barré-Brisebois, GDC 2014 (Batman); Surricchio, GDC 2023 (God of War Ragnarök) | P/T | [gdcvault Batman](https://gdcvault.com/play/1020177/Deformable-Snow-Rendering-in-Batman) |
+| Wet-surface shading (porosity darkening, roughness drop) | `13` | Lagarde, "Water drop" blog series, 2012–2013 | F/D | [seblagarde.wordpress.com](https://seblagarde.wordpress.com/2013/03/19/water-drop-3a-physically-based-wet-surfaces/) |
+| Aux-map registry & consumption contract | `14` | terrain-architect `27` (generation-side contract), consumed render-side | D | — |
+| GPU-driven procedural placement | `15` | van Muijden, "GPU-Based Run-Time Procedural Placement in Horizon Zero Dawn", GDC 2017 | T | [gdcvault.com](https://gdcvault.com/play/1024700/GPU-Based-Run-Time-Procedural) |
+| Procedural GPU grass (Bezier blades) | `15` | Wohllaib, Ghost of Tsushima procedural grass, GDC 2021; wind companion talk (Rockenbeck) | T | [gdcvault.com](https://gdcvault.com/play/1027033/Advanced-Graphics-Summit-Procedural-Grass) |
+| Octahedral impostors | `15` | Community canon (shaderbits writeup; engine implementations) | F/N | [shaderbits.com](https://shaderbits.com/blog/octahedral-impostors) |
+| Alpha-test mip shrinkage fix (coverage-preserving mips) | `15` | Castaño, The Witness blog, 2010 | F | [the-witness.net](https://the-witness.net/news/2010/09/computing-alpha-mipmaps/) |
+| Depth-bias semantics (coplanar geometry) | `17` | Microsoft D3D output-merger docs (formula verified) | D | [learn.microsoft.com](https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-output-merger-stage-depth-bias) |
+| Physics heightfield colliders | `17` | Jolt HeightFieldShape / PhysX PxHeightField docs | D | [jrouwe.github.io](https://jrouwe.github.io/JoltPhysics/class_height_field_shape_settings.html) |
+| Async GPU readback for surface queries | `17` | Engine docs (Unity AsyncGPUReadback as the D-tier example) | D/F | [docs.unity3d.com](https://docs.unity3d.com/ScriptReference/Rendering.AsyncGPUReadback.html) |
+| Hillshade / derived-field viewport passes | `16` | ESRI hillshade reference; GPU Gems 3 ch. 1 for GPU heightfield derivation | D | [esri.com](https://doc.esri.com/en/arcgis-pro/latest/tool-reference/3d-analyst/how-hillshade-works.html) |
+| Heightmap import/export parity (R16 scaling, Y-flip) | `16` | Epic heightmap import docs + tool docs (Gaea) | D | [dev.epicgames.com](https://dev.epicgames.com/documentation/unreal-engine/importing-and-exporting-landscape-heightmaps-in-unreal-engine) |
 
 ## Engine & shipped-system crosswalk
 
@@ -115,6 +133,10 @@ Branded system → what it actually is → where in this skill.
 | id Tech MegaTexture | Virtual texturing (streaming VT) | `07` |
 | No Man's Sky-class procedural planets | Procedural-on-demand patches + isosurface regions | `09`, `05` |
 | Dual Universe / Astroneer-class editable planets | Voxel isosurface (DC/MC family) | `05` |
+| Portal 2 water | Flow mapping over a static surface | `12` |
+| Rise of the Tomb Raider / Batman: Arkham Origins / GoW Ragnarök snow | Deferred deformation (top-down capture → displacement) | `13` |
+| Horizon Zero Dawn / Ghost of Tsushima vegetation | GPU-driven procedural placement + procedural grass | `15` |
+| Gaea / World Machine-class tool viewports | Preview pyramid + derived-field passes + shading modes | `16` |
 
 Public technical detail on shipped titles varies wildly; treat specific claims about any one
 title as T/F tier unless a named talk is in hand.
@@ -161,3 +183,25 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   specifics are version-sensitive.
 - `08`, `11`: work-graphs production readiness is `?` by construction; triangles-per-pixel
   target bands and budget numbers are practice bands, not standards.
+- `12`: shallow-water shoaling approximations attributed to no specific title (multiple talks
+  cover it); fullscreen-triangle rationale is community canon (F), not a paper; attribution
+  corrections applied 2026-07 (Johanson 2004 Lund; Kass & Miller SIGGRAPH 1990; Bruneton,
+  Neyret & Holzschuch CGF 2010).
+- `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
+  (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
+  Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-
+  diffuse snow approximation and band/budget numbers are F-tier practice.
+- `14`: per-map shipping formats and channel-pack groupings are standard-practice judgment;
+  Ghost Recon Wildlands / Far Cry 5 talk attributions came from search snippets, not the talks;
+  RVT aux-sampling behavior inferred from doc summaries.
+- `15`: Tsushima "~2.5 ms / ~10⁵ blades" figures are from a secondary summary of the talk;
+  Décoret billboard-clouds attribution unverified (no URL); all packing/distance/budget
+  numbers are F-tier order-of-magnitude practice.
+- `16`: viewport budget numbers (≤8 ms iGPU frame, ≤16 ms brush echo) are representative
+  practice; UE Z-scale formula cited from Epic's doc without the underlying range being stated
+  there; "sun sweep as highest-value check" inherits terrain-architect `09` without external
+  citation.
+- `17`: Far Cry 5 road-through-terrain-stack attribution not verified page-by-page; "2–3
+  frame" async-readback latency grounded only on Unity's "a few frames" wording; Jolt
+  height-update API name from release-note summaries; promotion-pipeline and stamp-replay
+  patterns are F-tier with no canonical citation.
