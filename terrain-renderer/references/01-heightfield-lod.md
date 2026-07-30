@@ -10,7 +10,9 @@ submission machinery that draws the result is `08`.
 Contents: [Problem statement](#the-problem-statement-error-control) ·
 [Technique survey](#technique-survey) · [Comparison table](#comparison-table) ·
 [Crack contract](#the-crack-contract) · [Geomorphing & popping](#geomorphing--popping-doctrine) ·
-[Vertex pipeline patterns](#vertex-pipeline-patterns) · [Selection guidance](#selection-guidance) ·
+[Vertex pipeline patterns](#vertex-pipeline-patterns) ·
+[Hex lattice, render-side](#the-hexagonal-lattice-render-side) ·
+[Selection guidance](#selection-guidance) ·
 [Pitfalls](#pitfalls) · [Sources](#sources--provenance)
 
 ## The problem statement: error control
@@ -250,6 +252,28 @@ to move it below perceptual threshold or spread it over time. Rules:
   in `10`. Same rule for any depth pre-pass: identical geometry or equal-depth guarantees,
   never "similar".
 
+## The hexagonal lattice, render-side
+
+Some pipelines sample terrain on a hex lattice (terrain-architect `26` owns that choice, its
+storage, and its stencils; hex-map *games* arrive here too). A hex grid rasterizes only after a
+triangulation choice, and the choice trades vertices against fidelity to the per-hex sample.
+With N hexes there are asymptotically 2N unique corners (each corner shared by 3 hexes):
+
+| Triangulation | Verts | Tris/hex | Height fidelity | Use when |
+|---|---|---|---|---|
+| **Corner-only** | ~2N | 4 | Corners only — each corner is a 3-hex average, so per-hex extrema (peaks, pits) are *attenuated*; high-frequency amplitude visibly shrinks | Cheapest smooth terrain; relief is low-frequency; memory-bound |
+| **Center-fan** | ~3N (2N corners + N centers) | 6 | Center vertex carries the hex's own sample exactly; corners still average — preserves amplitude and per-hex authorship | Default for simulation-faithful terrain; anything where a hex's value must survive to the silhouette |
+| **Flat per-hex (prism/extrusion)** | 6 per hex (unshared) | 4 top + sides | Exact and *discontinuous* — gameplay-readable steps, not terrain relief | Hex-map strategy rendering; the "board game" read |
+
+Two render-side rules: the corner average is a *resampling* — treat corner-only triangulation
+as a half-band low-pass and don't be surprised when verification (`11`) shows amplitude loss
+against the source field; and normals on hex meshes come from the lattice-correct gradient
+(terrain-architect `26`'s stencils), not from a square-grid Sobel run over a resampled raster —
+the square stencil on sheared storage silently skews every slope. LOD on hex terrain usually
+resamples to coarser hex rings or hands off to a raster pyramid at distance; crack handling at
+ring boundaries follows the same contract taxonomy as squares (skirts and morphs port; index
+stitching does not, because the neighbor topology differs).
+
 ## Selection guidance
 
 | Situation | Pick | Why |
@@ -325,3 +349,4 @@ quadtree would coarsen, which starts to matter past ~20 km view ranges.
 | "Chunked LOD is the ancestor of virtualized-geometry terrain" framing | **?** (interpretive) |
 | Tess factor cap of 64 in D3D11 | **D** |
 | Clipmap distance-only LOD wastes triangles vs quadtrees past ~20 km view range | **?** (directionally sound, threshold is judgment) |
+| Hex triangulation options (corner-only ~2N / center-fan ~3N / flat prism) and amplitude trade-offs | **D** (terrain-architect `26`'s catalog, restated render-side; vertex counts are lattice arithmetic) |

@@ -48,6 +48,7 @@ right fix.
 | Hardware tessellation terrain | `01` | DX11-era vendor samples | D/T | — |
 | CBT/LEB (GPU subdivision) | `01` | Dupuy, HPG 2020 (PACM CGIT) | P | [onrendering.com PDF](https://onrendering.com/data/papers/cbt/ConcurrentBinaryTrees.pdf) |
 | Skirts / stitching / morph / matched factors (crack taxonomy) | `01` | Folklore, consolidated | F | — |
+| Hex-lattice triangulation (corner-only 2N / center-fan 3N / flat prism) | `01` | terrain-architect `26` catalog, restated render-side | D | — |
 | Cluster DAG build (group→simplify→split), monotonic error | `02` | Karis, Stubbe & Wihlidal, "Nanite: A Deep Dive", SIGGRAPH 2021 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
 | Two-phase HiZ occlusion culling | `02` `08` | Nanite talk lineage + community practice | T/F | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
 | Software raster of micro-triangles, 64-bit visibility buffer | `02` | Karis, Stubbe & Wihlidal 2021 | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
@@ -80,6 +81,7 @@ right fix.
 | Stochastic texturing (histogram-preserving blending) | `07` | Heitz & Neyret, HPG 2018 (PACM CGIT) | P | [eheitzresearch.wordpress.com](https://eheitzresearch.wordpress.com/722-2/) |
 | Hex-tiling | `07` | Mikkelsen, "Practical Real-Time Hex-Tiling", JCGT 11(3), 2022 | P | [jcgt.org](https://jcgt.org/published/0011/03/05/) |
 | Triplanar / biplanar projection | `07` | Folklore; Quilez writeups | F | — |
+| Reoriented Normal Mapping & normal-blend family (formulas inlined in `07`) | `07` | Barré-Brisebois & Hill, "Blending in Detail", 2012 | D/F | [selfshadow.com](https://blog.selfshadow.com/publications/blending-in-detail/) |
 | Virtual texturing (page tables, feedback, transcode) | `07` | id Tech MegaTexture lineage; Mittring "Advanced Virtual Texture Topics" (SIGGRAPH 2008) & van Waveren talks | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2008/SIGGRAPH%202008%20-%20Advanced%20virtual%20texture%20topics.pdf) |
 | Clipmap texturing | `07` | Tanner, Migdal & Jones, SIGGRAPH 1998 | P | [ACM DL](https://dl.acm.org/doi/10.1145/280814.280855) |
 | GPU-driven pipelines (persistent scene, indirect subm.) | `08` | Haar & Aaltonen, SIGGRAPH 2015 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2015/aaltonenhaar_siggraph2015_combined_final_footer_220dpi.pdf) |
@@ -178,9 +180,10 @@ certain are consolidated here so a reviewer knows where to spend verification ef
 - `06`, `09`: see those chapters' provenance sections (industry-example attributions are
   deliberately vague; worked memory-math is illustrative arithmetic, not a measured budget).
 - `07`, `10`: hex-tiling venue — **resolved 2026-07**: Mikkelsen, "Practical Real-Time
-  Hex-Tiling", JCGT 11(3), 2022 (tier upgraded P/? → P). Still open: normal-blend variant
-  naming (RNM/UDN/whiteout) is blog-lineage F-tier; heightfield-shadow engine-feature
-  specifics are version-sensitive.
+  Hex-Tiling", JCGT 11(3), 2022 (tier upgraded P/? → P). Normal-blend family — **resolved
+  2026-07**: Barré-Brisebois & Hill, "Blending in Detail", 2012, URL verified; RNM and the
+  cheaper variants' formulas now inlined in `07`. Still open: heightfield-shadow
+  engine-feature specifics are version-sensitive.
 - `08`, `11`: work-graphs production readiness is `?` by construction; triangles-per-pixel
   target bands and budget numbers are practice bands, not standards.
 - `12`: shallow-water shoaling approximations attributed to no specific title (multiple talks

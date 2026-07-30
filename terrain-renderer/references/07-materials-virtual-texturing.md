@@ -125,13 +125,38 @@ when using top-K: it sharpens which K win.
 Lerping normal vectors and renormalizing is wrong twice: it flattens detail (the average of two
 unit vectors is shorter, renormalization redistributes but biases toward the mean) and it loses
 the base/detail semantic (detail should *perturb* base, not average with it). The accepted
-options — Reoriented Normal Mapping (RNM), whiteout, UDN, and partial-derivative (slope-space)
-blending, in descending order of correctness and cost — are cataloged with derivations in the
-physically-based-rendering skill; route there for the math (the "Blending in Detail" analysis is
-the standard reference, D/F). Terrain-specific doctrine: layer-vs-layer blends (two splat layers)
-may use weighted slope-space blending; base-vs-detail blends (macro normal + detail normal) should
-use RNM or whiteout; and the *geometric* terrain normal joins the stack per the `10` normal
-pipeline, not as another lerp participant.
+options, in descending order of correctness and cost — Reoriented Normal Mapping (RNM),
+whiteout, UDN, and partial-derivative (slope-space) blending — come from the "Blending in
+Detail" analysis (Barré-Brisebois & Hill 2012); *why* each works is theirs to explain, but the
+formulas are load-bearing terrain code and belong here.
+
+**RNM** rotates the detail normal so its +Z follows the base surface — a shortest-arc rotation
+folded into a few ALU ops. For raw `[0,1]` tangent-space texture samples `base`, `detail`:
+
+```hlsl
+float3 t = base.xyz   * float3( 2,  2, 2) + float3(-1, -1,  0);   // unpack, z biased +1
+float3 u = detail.xyz * float3(-2, -2, 2) + float3( 1,  1, -1);   // unpack, xy negated
+float3 n = normalize(t * dot(t, u) / t.z - u);                    // reorient detail onto base
+```
+
+(For already-unpacked unit vectors: `t = n1 + float3(0,0,1); u = n2 * float3(-1,-1,1);` then the
+same last line.) The cheaper approximations, when RNM's ~7 extra ALU matter or for mip-faded
+detail:
+
+```hlsl
+float3 whiteout = normalize(float3(n1.xy + n2.xy, n1.z * n2.z));  // decent grazing behavior
+float3 udn      = normalize(float3(n1.xy + n2.xy, n1.z));         // cheapest, flattens detail
+// slope-space (partial-derivative), the right frame for WEIGHTED N-way blends:
+float2 s = (w1 * (-n1.xy / n1.z) + w2 * (-n2.xy / n2.z)) / (w1 + w2);
+float3 pd = normalize(float3(-s, 1));
+```
+
+Terrain-specific doctrine: **layer-vs-layer** blends (two splat layers, arbitrary weights) live
+in slope space — slopes combine linearly, normals don't; **base-vs-detail** blends (macro
+terrain normal + tiling detail normal) use RNM (whiteout when budget-bound); and the *geometric*
+terrain normal joins the stack per the `10` normal pipeline, not as another lerp participant.
+Deeper theory (specular response of blended normals, filtering interactions) routes to
+physically-based-rendering.
 
 ### Procedural masks in-shader vs baked
 
@@ -399,7 +424,7 @@ at grazing sun angles, minified to sub-texel footprints (`10` owns the lighting-
 | UE Landscape weightmap channel packing in groups of 4 | **N/D** |
 | DLSS/FSR negative texture LOD bias ≈ log2(renderRes/outputRes) | **D** (vendor integration guides) |
 | Height-based blending with contrast — "the biggest upgrade per line of code" | **F** (universal practice, no canonical paper) |
-| RNM / whiteout / UDN / partial-derivative normal blending catalog ("Blending in Detail") | **D/F** (routed to physically-based-rendering) |
+| RNM / whiteout / UDN / partial-derivative normal blending — Barré-Brisebois & Hill, "Blending in Detail", 2012 (formulas inlined above; URL verified 2026-07: https://blog.selfshadow.com/publications/blending-in-detail/) | **D/F** |
 | Triplanar weight sharpening pow 4-8; per-plane normal handling (Golus writeup); biplanar variant (Quilez) | **F/D** |
 | 4-layer RGBA weight packing; sum-to-1 with inferred 4th channel; top-K blend, K=2-3 | **F** |
 | Premultiplied-weight mip generation to kill composite halos | **F** (alpha-premultiplication math applied to weights) |
