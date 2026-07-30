@@ -25,22 +25,21 @@ const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'));
 
-// Lift worldUV + latTap out of the SHIPPED file (the same one the page loads), by brace
+// Lift worldUV + latTap out of the SHIPPED source (the same code the page loads), by brace
 // matching. Reading the source rather than hand-copying it is the point: a hand-copied shader
 // keeps passing after someone edits the real one.
-const SRC = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
-function grabFn(sig) {
-  const i = SRC.indexOf(sig);
-  if (i < 0) return null;
-  let d = 0, j = SRC.indexOf('{', i);
-  if (j < 0) return null;
-  for (let k = j; k < SRC.length; k++) {
-    if (SRC[k] === '{') d++;
-    else if (SRC[k] === '}') { d--; if (!d) return SRC.slice(i, k + 1); }
-  }
-  return null;
-}
-const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
+//
+// This used to be a private fs.readFileSync('../../index.html') + a grabFn that returned null on a
+// miss. Both halves were wrong once the app became a module: the shader now lives in src/legacy.js,
+// so the read found nothing, and the null propagated into the probe as a SETUP FAILURE that named
+// no cause. lift-glsl-source.js searches index.html AND src/**/*.js, so the same lift works before
+// and after the split, and liftOrDie() exits 2 naming the signature it could not find and every
+// file it searched. Shared with _verify_glsl_probe.js rather than duplicated — the two had the
+// identical defect, and a second copy would have had to be fixed a second time.
+const { liftOrDie } = require('./lift-glsl-source');
+const SIG_WORLD = 'vec2 worldUV(', SIG_TAP = 'float latTap(';
+const LIFT = liftOrDie([SIG_WORLD, SIG_TAP], { label: 'the compositor helpers worldUV/latTap' });
+const FN_WORLD = LIFT.code[SIG_WORLD], FN_TAP = LIFT.code[SIG_TAP];
 // STATUS, recorded rather than left as a mystery red: G1/G2 currently FAIL and the SHADER IS NOT
 // THE REASON. After the square-world flip the compositor gained uROWS/uHpx/uZScale so that texture
 // addressing carries both dimensions; that change was verified INDEPENDENTLY by _diag_glsl.js,
