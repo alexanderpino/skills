@@ -32,6 +32,7 @@ Run from `apps/terrain-studio/`. Everything is HTTP now; `--file` died with A1.
 npm run verify -- _verify_digest.js     60 node types bit-identical at 256²
 npm run verify -- --preview _verify_digest.js   same, against the BUILT bundle
 npm run bridge:check                    202 symbols, unbridgeable 0
+npm run plugins:tdz                     33 modules, no module-eval-time legacy reference
 node tests/legacy/_verify_shapescan.js  3 files, 8554 lines scanned
 npm run verify -- _verify_gpu.js        hasWebGL2Float=true init=true gpuReady=true
                                         fbm@512: 16ms GPU vs 231ms CPU
@@ -63,9 +64,9 @@ tests/e2e/          4 Playwright specs
 | prerequisite · param DSL to `src/core/params.js` | — | **done** | `d85b84f` |
 | registry + `comb` | 6 | **done** | this commit |
 | `mask` | 4 | **done** | this commit |
-| `filt` | 11 | next | — |
-| `gen` | 12 | | — |
-| `ero` | 5 | | — |
+| `filt` | 11 | **done** | `2b6d1c8` |
+| `gen` | 12 | **done** | this commit |
+| `ero` | 5 | next | — |
 | `effect` | 7 | | — |
 | `data` | 14 | | — |
 | `out` | 1 | | — |

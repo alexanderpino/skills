@@ -1,9 +1,11 @@
 import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuReady, hydroMassDiag, setHydroMassDiag, setGL as setGpuGL } from './core/gpu.js';
 import { mergePlugins } from './core/registry.js';
+import './plugins/gen/index.js';
 import './plugins/filt/index.js';
 import './plugins/mask/index.js';
 import './plugins/comb/index.js';
 import { P, WHEN, GROUP, CAT } from './core/params.js';
+import { mountainSkirtDefault } from './core/defaults.js';
 import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
 
 "use strict";
@@ -144,7 +146,7 @@ const HEX_ROWS_FOR=w=>Math.round(w*2/Math.sqrt(3));   // rows that make the worl
 const latticeRows=w=>(HEX_SQUARE_WORLD&&terrainDef.lattice==="hex")?HEX_ROWS_FOR(w):w;
 export const fieldW=()=>RES;                                  // field WIDTH in cells - always RES
 export const fieldH=()=>latticeRows(RES);                     // field HEIGHT in ROWS
-const fieldLen=()=>fieldW()*fieldH();
+export const fieldLen=()=>fieldW()*fieldH();
 export function newField(v=0){const a=new Float32Array(fieldLen());if(v)a.fill(v);return a;}
 function sampleBilinear(f,x,y){            // x,y in grid coords (= world position in cell units)
   const n=fieldW(),nh=fieldH();
@@ -218,14 +220,14 @@ function vnoise(x,y,s){ // value noise, C1 smooth
   const a=hash2(x0,y0,s),b=hash2(x0+1,y0,s),c=hash2(x0,y0+1,s),d=hash2(x0+1,y0+1,s);
   return lerp(lerp(a,b,fx),lerp(c,d,fx),fy);
 }
-function gnoise(x,y,s){ // gradient (perlin-ish) noise in ~[-1,1] -> [0,1]
+export function gnoise(x,y,s){ // gradient (perlin-ish) noise in ~[-1,1] -> [0,1]
   const x0=Math.floor(x),y0=Math.floor(y),xf=x-x0,yf=y-y0;
   function grad(ix,iy,dx,dy){const a=hash2(ix,iy,s)*6.2831853;return Math.cos(a)*dx+Math.sin(a)*dy;}
   const u=fade5(xf),v=fade5(yf);
   const n00=grad(x0,y0,xf,yf),n10=grad(x0+1,y0,xf-1,yf),n01=grad(x0,y0+1,xf,yf-1),n11=grad(x0+1,y0+1,xf-1,yf-1);
   return 0.5+0.5*lerp(lerp(n00,n10,u),lerp(n01,n11,u),v)*1.35;
 }
-function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, normalised to [0,1]
+export function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, normalised to [0,1]
   const F2=0.3660254037844386,G2=0.21132486540518713;
   const skew=(x+y)*F2,i=Math.floor(x+skew),j=Math.floor(y+skew),unskew=(i+j)*G2;
   const x0=x-(i-unskew),y0=y-(j-unskew),i1=x0>y0?1:0,j1=x0>y0?0:1;
@@ -238,7 +240,7 @@ function snoise(x,y,s){ // 2D simplex gradient noise on a triangular lattice, no
   return clamp(0.5+35*(corner(i,j,x0,y0)+corner(i+i1,j+j1,x1,y1)+corner(i+1,j+1,x2,y2)),0,1);
 }
 // fractal sum over a base function
-function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
+export function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   const o=newField();const n=fieldW(),nh=fieldH();let amps=0,a=1;for(let k=0;k<octaves;k++){amps+=a;a*=gain;}
   // Authoring DOMAIN, not world metres (the AUTHORING DOMAIN note at isHex()). hxs=0 on square.
   const hxs=terrainDef.lattice==="hex"?0.5:0;
@@ -254,7 +256,7 @@ function fbmField(base,{seed=1,freq=3,octaves=5,lac=2.0,gain=0.5,ridge=false}){
   }
   return ridge?normalize(o):o;
 }
-function worleyField({seed=1,freq=5,mode="f2f1"}){
+export function worleyField({seed=1,freq=5,mode="f2f1"}){
   const o=newField();const n=fieldW(),nh=fieldH(),cells=Math.max(2,Math.round(freq));
   const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
@@ -271,13 +273,13 @@ function worleyField({seed=1,freq=5,mode="f2f1"}){
   }
   return normalize(o);
 }
-function gradientField(angleDeg){
+export function gradientField(angleDeg){
   const o=newField();const n=fieldW(),nh=fieldH(),a=angleDeg*Math.PI/180,cx=Math.cos(a),cy=Math.sin(a);
   const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){o[y*n+x]=(xfU((x+hxs*(y&1))/n,y/nh)*cx+xfV((x+hxs*(y&1))/n,y/nh)*cy);}
   return normalize(o);
 }
-function radialField(){
+export function radialField(){
   const o=newField();const n=fieldW(),nh=fieldH();
   const hxs=terrainDef.lattice==="hex"?0.5:0;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const dx=xfU((x+hxs*(y&1))/n,y/nh)-.5,dy=xfV((x+hxs*(y&1))/n,y/nh)-.5;o[y*n+x]=1-clamp(Math.hypot(dx,dy)*2,0,1);}
@@ -312,7 +314,7 @@ export let USE_GPU=true;
 /* ---- PLACEMENT (art direction): SDF shape masks positioned in METRES, mirroring
    reference-impl/placement.py. A Shape is both a mask (wire it into any node's Mask input to
    confine an effect) and a heightfield (erode it into a landform) — Gaea's Mask-as-Primitive. ---- */
-function shapeField(p){
+export function shapeField(p){
   const n=fieldW(),nh=fieldH(),o=newField(),cs=cellSizeM();
   const cx=p.x*terrainDef.scale,cy=p.y*terrainDef.scale;          // 0..1 of the terrain -> metres
   const rad=p.size*terrainDef.scale*0.5,fall=Math.max(p.falloff*terrainDef.scale*0.5,cs);
@@ -458,9 +460,11 @@ const SKIRT_PRESETS=[["Cone",1.0],["Apron",1.4],["Sweeping",2.2],["Plateau",0.65
 // The Mountain default is intentionally not a one-exponent radial ramp. Its upper crag, shoulder,
 // main face and pediment occupy separate slope bands, which prevents the profile reading as canvas
 // stretched between one pole and a circular rim.
-const mountainSkirtDefault=()=>[
-  [0,1],[.08,.975],[.18,.90],[.31,.72],[.44,.655],[.60,.40],[.78,.15],[.94,0],[1,0]
-];
+// mountainSkirtDefault moved to src/core/defaults.js. The Mountain plugin reads it while building
+// its params array — i.e. at module-evaluation time — and in the legacy<->plugin cycle the plugin
+// evaluates first, so a value declared here is still in its temporal dead zone and throws
+// "Cannot access mountainSkirtDefault before initialization", blanking the page. Anything a params
+// array reads directly has to live outside the cycle.
 
 /* ---- LAYOUT — the art-direction layer every terrain tool converges on. World Machine's Layout
    Generator, Houdini's HeightField Project from curves, Gaea's vector drawing, and academically
@@ -502,7 +506,7 @@ function pointInPoly(px,py,pts){
 /* Text format, one shape per header line, vertices `x,y,elevation` on the lines under it:
      path width=0.04 falloff=0.22 profile=scurve op=max breakup=0.4
        0.12,0.66,0.30   0.34,0.58,0.90   0.74,0.46,1.00 */
-function parseLayout(text){
+export function parseLayout(text){
   const shapes=[];let cur=null;
   for(const raw of String(text||"").split("\n")){
     const line=raw.trim();
@@ -521,7 +525,7 @@ function parseLayout(text){
   }
   return shapes.filter(sh=>sh.pts.length>0);
 }
-function layoutField(shapes,base){
+export function layoutField(shapes,base){
   const n=fieldW(),nh=fieldH(),o=base?base.slice():newField(0);
   for(const sh of shapes){
     const prof=FALLOFF[sh.profile]||FALLOFF.scurve;
@@ -777,7 +781,7 @@ function peakField(p){
   if(mx>0)for(let i=0;i<h.length;i++)h[i]=h[i]/mx*height;
   return h;
 }
-function mountainField(p){
+export function mountainField(p){
   if(p.form==="peak")return peakField(p);
   const n=fieldW(),nh=fieldH(),st=MOUNTAIN_STYLES[p.style]||MOUNTAIN_STYLES.eroded;
   const relief=p.relief,ncell=st.cells,warpamt=st.warp;
@@ -1381,7 +1385,7 @@ function canyonFieldCPU(p){
   }
   return o;
 }
-function canyonField(p){return canyonFieldCPU(p);}
+export function canyonField(p){return canyonFieldCPU(p);}
 function fbm2(x,y,seed,oct){                      // small fbm helper for the domain distortion
   let s=0,amp=1,f=1,tot=0;
   for(let k=0;k<oct;k++){s+=(gnoise(x*f,y*f,seed+k*7)-0.5)*2*amp;tot+=amp;amp*=0.5;f*=2;}
@@ -1752,7 +1756,7 @@ export function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
 
    Its purpose is to drive Stream power's Uplift input: this gives the structure, the rivers give the
    topography. F-tier -- a plausible planar plate sketch, not plate physics. */
-function plateUplift(p){
+export function plateUplift(p){
   const n=fieldW(),nh=fieldH(),N=n*nh,P=Math.max(3,Math.round(p.plates));
   let rs=((p.seed|0)*2654435761)>>>0;
   const rnd=()=>{rs=(Math.imul(rs^(rs>>>15),2246822519)+374761393)>>>0;return rs/4294967296;};
@@ -2847,106 +2851,6 @@ export function evalExact(id,guard){
 }
 
 const TYPES=mergePlugins({
-  perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
-    params:[P.seed("seed","Seed",7),P.log("freq","Frequency",0.5,12,3,v=>v<10?v.toFixed(2):v.toFixed(1),false),P.int("octaves","Octaves",1,9,6),
-      P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
-    eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
-  simplex:{cat:"gen",name:"Simplex fBm",ins:[],desc:"Fractal simplex gradient noise — isotropic, efficient terrain detail without Perlin's square-grid bias.",
-    params:[P.seed("seed","Seed",11),P.log("freq","Frequency",0.5,12,3,v=>v<10?v.toFixed(2):v.toFixed(1),false),P.int("octaves","Octaves",1,9,6),
-      P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
-    eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,simplex:true};return gpuReady()?gpuFbm(a):fbmField(snoise,a);}},
-  ridged:{cat:"gen",name:"Ridged MF",ins:[],desc:"Ridged multifractal — sharp mountain crests.",
-    params:[P.seed("seed","Seed",3),P.log("freq","Frequency",0.5,12,3.5,v=>v<10?v.toFixed(2):v.toFixed(1),false),P.int("octaves","Octaves",1,9,6),
-      P.slider("lac","Lacunarity",1.5,3,2.1,0.05),P.slider("gain","Gain",0.3,0.8,0.55,0.01)],
-    eval:(p)=>{const a={seed:p.seed,freq:p.freq,octaves:p.octaves,lac:p.lac,gain:p.gain,ridge:true};return gpuReady()?gpuFbm(a):fbmField(gnoise,a);}},
-  worley:{cat:"gen",name:"Voronoi",ins:[],desc:"Cellular / Worley noise — plates and cracks.",
-    params:[P.seed("seed","Seed",5),P.log("freq","Cell density",2,16,6,v=>v.toFixed(2),false),P.seg("mode","Mode",[["f2f1","F2−F1"],["f1","F1"],["invf1","1−F1"]],"f2f1")],
-    eval:(p)=>worleyField({seed:p.seed,freq:p.freq,mode:p.mode})},
-  gradient:{cat:"gen",name:"Gradient",ins:[],desc:"Linear or radial ramp — a base slope or falloff.",
-    params:[P.tabs("kind","Kind",[["lin","Linear"],["rad","Radial"]],"lin"),
-      WHEN(P.slider("angle","Angle",0,360,35,1,v=>v|0),"kind","lin")],
-    eval:(p)=>p.kind==="rad"?radialField():gradientField(p.angle)},
-  shape:{cat:"gen",name:"Shape",ins:[],desc:"An SDF placement mask — circle/box/line positioned in the terrain, with a soft edge. Wire it into any node's Mask input to confine that effect, or erode it directly into a landform (Gaea's Mask-as-Primitive).",
-    params:[P.seg("kind","Kind",[["circle","Circle"],["box","Box"],["line","Line"]],"circle"),
-      P.slider("x","Position X",0,1,0.5),P.slider("y","Position Y",0,1,0.5),
-      P.slider("size","Size",0.02,1.5,0.4),P.slider("aspect","Aspect",0.05,4,1,0.05),
-      P.slider("angle","Angle",0,360,0,1,v=>(v|0)+"\u00b0"),
-      P.slider("falloff","Falloff",0,1,0.25),
-      P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
-    eval:(p)=>shapeField(p)},
-  mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A cellular geological primitive: Mountain creates a hero landform from distorted, modulated Voronoi structure; Mountain range creates a broader multi-crest base. Five mountain types change the generating geometry as well as its weathering.",
-    params:[P.tabs("form","Landform",[["peak","Mountain"],["massif","Mountain range"]],"peak"),
-      WHEN(P.seg("shape","Shape family",[["dominant","Dominant peak"],["compound","Compound peaks"],["ridge","Ridgeline"],["broad","Broad dome"]],"compound"),"form","peak"),
-      P.seg("style","Mountain type",[["basic","Basic"],["eroded","Eroded"],["old","Old"],["alpine","Alpine"],["strata","Strata"]],"eroded"),
-      P.seed("seed","Seed",7),
-      P.slider("x","Position X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("y","Position Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("size","Reach",0.08,0.9,0.40,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("height","Peak height",0.1,2,0.72,0.01,v=>Math.round(v*terrainDef.height)+" m"),
-      P.seg("bulk","Bulk",[["low","Low"],["medium","Medium"],["high","High"]],"medium"),
-      P.slider("angle","Trend",0,180,25,1,v=>(v|0)+"\u00b0"),
-      WHEN(P.int("ridges","Massif crests",1,5,2),"form","massif"),
-      P.slider("detail","Drainage detail",0.4,3.5,2.6,0.1,v=>v.toFixed(1)+"\u00d7"),
-      P.slider("aspect","Footprint aspect",0.4,2.5,1,0.05,v=>v.toFixed(2)+"\u00d7"),
-      P.slider("relief","Valley depth",0.1,0.95,0.80,0.01),
-      P.slider("character","Character",0,0.9,0.72,0.01,v=>v.toFixed(2)),
-      P.slider("variation","Shape variation",0,1,0.55,0.01,v=>v.toFixed(2)),
-      P.slider("reduce","Reduce details",0,1,0.08,0.01,v=>Math.round(v*100)+"%"),
-      P.slider("weather","Weathering",0,2,1,0.05,v=>v.toFixed(2)+"\u00d7"),
-      P.curve("skirt","Skirt profile",mountainSkirtDefault())],
-    eval:(p)=>mountainField(p),
-    note:"<b>Mountain</b> is a clean-room geological primitive based on Gaea's public contract: distorted, modulated cellular fields create the large faces and rock divisions inside an asymmetric uplift mass. It is not a cone with radial ridge stamps. Broad basins interrupt different shoulders, while the hydraulic pass supplies smaller flow detail. The default <b>Skirt profile</b> has separate upper-crag, shoulder, face, talus and pediment bands rather than one constant tent slope.<br><br>For the <b>Mountain</b> landform, two controls deliberately stay separate. <b>Shape family</b> selects the primary uplift algorithm: <b>Dominant peak</b> favours one strong cell, <b>Compound peaks</b> joins several high cells and saddles, <b>Ridgeline</b> favours a long connected cellular divide, and <b>Broad dome</b> favours cell interiors and wide shoulders. These are clean-room behavioural families, not claims about Gaea's unpublished Type internals. <b>Mountain type</b> changes the geomorphic expression: <b>Basic</b> keeps broad simple masses; <b>Eroded</b> deepens cellular faces and basins before hydraulic weathering; <b>Old</b> rounds the elevation profile while retaining residual gullies; <b>Alpine</b> narrows the profile, strengthens large and medium rock divisions, and preserves the summit divide; <b>Strata</b> uses a broader profile with a layered elevation response. Both settings change geometry, not materials.<br><br><b>Bulk</b> changes flank mass, <b>Drainage detail</b> changes basin and fracture scale, <b>Character</b> expands the uplift and cellular breakup, <b>Reduce details</b> suppresses the cellular/micro bands, <b>Valley depth</b> changes incision, and <b>Weathering</b> scales the type's process overprint. <b>Peak height</b> is shown in metres against the Terrain Definition.<br><br><b>Mountain range</b> uses the broader multi-crest generator; <i>Massif crests</i> applies only to it. Gaea documents MountainSide as a separate primitive, so a one-sided slope is not silently folded into this hero-mountain mode. Placement is built in (Position / Reach / Trend), so the feature is constructed at the requested world-space location."},
-  canyon:{cat:"gen",name:"Canyon",ins:[],desc:"An evolved plateau-canyon landscape: an antecedent trunk and environment-selected tributaries emerge from uplift, drainage area, slope, lithology, incision, and hillslope retreat.",
-    params:[
-      GROUP(P.select("style","Style",[["classic","Classic"],["eroded","Eroded"],["eroded2","Eroded 2"],["strata","Strata"],["both","Both"]],"classic"),"Structure"),
-      GROUP(P.slider("scale","Scale",.05,1,.35,.01),"Structure"),
-      GROUP(P.slider("slot","Slot",0,1,.36,.01),"Structure"),
-      GROUP(P.slider("valley","Valley",0,1,.58,.01),"Structure"),
-      GROUP(P.slider("surrounding","Surrounding",0,1,.60,.01),"Structure"),
-      GROUP(P.slider("depth","Depth",0,1.25,1,.01,v=>Math.round((.10+.72*v)*terrainDef.height)+" m"),"Structure"),
-      GROUP(P.slider("structural","Structural warp",0,1,.50,.01),"Structure"),
-      GROUP(P.slider("tributaries","Tributary density",0,8,0,1,v=>Math.round(v)),"Structure"),
-      GROUP(P.seed("seed","Seed",3),"Structure"),
-      GROUP(P.slider("detailWarp","Detail warp",0,1,.50,.01),"Formation"),
-      GROUP(P.seg("alternate","Alternate style",[["off","Off"],["on","On"]],"off"),"Formation")],
-    eval:(p)=>canyonField(p),
-    note:"<b>Canyon</b> is a clean-room landscape-evolution primitive. A shallow regional sag, uplift, hard/soft beds, and tiny initial relief establish potential drainage; outlet-seeded Priority-Flood and distance-corrected D8 create a depression-safe catchment; an area–slope channel-head condition (<b>Montgomery & Dietrich, 1988</b>) decides which convergent hollows become streams; and the implicit n=1 stream-power solve (<b>Braun & Willett, 2013</b>) magnifies those paths through repeated incision. Base level <i>falls</i> through the run rather than starting as a pre-dug notch, so every metre of depth is transmitted upstream by the incision solve. Slope-limited thermal erosion (<b>Musgrave, Kolb & Mace, 1989</b>) replaces linear diffusion and relaxes each wall to the repose angle of the bed exposed there, following the ridge/valley competition described by <b>Perron, Kirchner & Dietrich, 2009</b>. One bed table sets both erodibility and repose angle, which is what makes cliff bands stand over talus aprons instead of a uniformly faceted wall.<br><br>The through-going river is an <i>antecedent boundary condition</i>: external contributing area enters at one edge and follows the current receiver graph to the outlet. No interior trunk or tributary curve is authored. <b>Tributary density</b> changes the environmental area–slope initiation threshold; it never requests a branch count. Above each channel head, a tapering colluvial hollow follows the strongest real donor, so side canyons fade into divides rather than ending as rounded capsules. <b>Structural warp</b> changes the weak regional substrate, and <b>Detail warp</b> changes sub-catchment erodibility.<br><br><b>Style</b> changes process balance rather than adding noise: Classic is balanced; Eroded increases hillslope retreat; Eroded 2 lowers the initiation threshold and strengthens incision; Strata maximises differential hard/soft-bed retreat; Both combines dense incision with strong lithology. The global topology is solved on a cached process grid and resampled for 2K/4K output; the rendered height is an affine view of that solve, so changing Depth is a vertical gain and never re-runs the process. At render resolution a weathering pass retreats exposed faces at a rate set by their own material and deposits the debris at the foot of the face it came from, which is where benches, facets and talus aprons come from — no noise is added to height anywhere. Continue with <b>Erosion 2 → HydroFix</b> when a transported-sediment budget is needed downstream."},
-  tectonic:{cat:"gen",name:"Tectonic uplift",ins:[],
-    desc:"Voronoi plates with noise-warped boundaries, each classified into collision / subduction / island arc / rift / transform, with the boundary uplift diffused inland over the orogen width. Wire it into Stream power's Uplift input: this gives the structure, the rivers give the topography.",
-    params:[P.seed("seed","Seed",3),
-      P.int("plates","Plates",3,24,10),
-      P.slider("warp","Boundary warp",0,1,0.5,0.01),
-      P.slider("orogen","Orogen width",0.05,1,0.35,0.01),
-      P.slider("ocean","Oceanic fraction",0,0.9,0.45,0.01),
-      P.slider("land","Continental uplift",0,1,0.45,0.01),
-      P.seg("output","Output",[["orogen","Orogen"],["elev","Elevation"]],"orogen")],
-    eval:(p)=>plateUplift(p),
-    note:"Raw Voronoi edges are dead straight, which is the giveaway in any plate map \u2014 so the coordinates are <b>domain-warped</b> before assignment and the sites are Lloyd-relaxed so plates come out evenly sized instead of slivered. <b>Orogen</b> spreads the boundary uplift inland, because a mountain belt is a broad welt rather than a line. <b>Orogen</b> output is the uplift field; <b>Elevation</b> adds the per-plate base (oceanic low, continental high) if you want to render it directly. F-tier: a plausible planar plate sketch, not plate physics."},
-  layout:{cat:"gen",name:"Layout",ins:["Base","Mask"],
-    desc:"Author the terrain's SKELETON as vector shapes carrying elevation \u2014 World Machine's Layout Generator, Houdini's project-from-curves, Gaea's vector drawing. Wire a Base to embed the shapes into existing terrain instead of generating from scratch.",
-    params:[P.text("spec","Shapes",
-`# path | point | poly, then vertices as x,y,elevation (0-1 of the tile)
-# width= falloff= profile=linear|squared|sqrt|scurve op=max|add|sub|replace breakup= seed=
-path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
-  0.10,0.70,0.35  0.28,0.62,0.85  0.44,0.66,0.55
-  0.62,0.52,1.00  0.80,0.46,0.62  0.93,0.52,0.30`, 10),
-      P.slider("height","Height",0,1,1,0.01)],
-    eval:(p,ins,node)=>{
-      let shapes;try{shapes=parseLayout(p.spec);}catch(err){console.error("layout",err);shapes=[];}
-      node._shapeCount=shapes.length;
-      const f=layoutField(shapes,ins[0]||null);
-      if(p.height!==1)for(let i=0;i<f.length;i++)f[i]*=p.height;
-      return maskApply(ins[0]||newField(0),f,ins[1]);},
-    note:"Elevation is <b>per vertex</b>, which is the whole point: a path is not a constant-height ribbon, it carries a height profile along its length. Summits fall out at the high vertices, saddles at the low ones, and faces fall away either side \u2014 so the node that art-directs a range is the same one that builds a single mountain. Overlapping shapes resolve by <b>greatest height wins</b>, as in World Machine. <b>Breakup</b> lets a fractal distort the outline so it is not geometric. With no <b>Base</b> wired it generates; wire one and it embeds instead."},
-  constant:{cat:"gen",name:"Constant",ins:[],desc:"A flat level.",
-    params:[P.slider("value","Value",0,1,0.5)],eval:(p)=>newField(p.value)},
-  import:{cat:"gen",name:"Import DEM",ins:[],desc:"A real / external heightmap loaded as a base.",
-    // Keep the stable `scale` key: old documents retain their exact real multiplier while the
-    // logarithmic track makes attenuation and amplification equally addressable around 1x.
-    params:[P.log("scale","Height multiplier",.01,100,1,
-      v=>(v<.1?v.toFixed(2):v<10?v.toFixed(1):v.toFixed(0))+"\u00d7",false)],
-    eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==fieldLen())&&(node._demImg||node._demRaw))buildDemFromSource(node);
-      if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
 
 
@@ -4495,7 +4399,7 @@ function loadImageAsDEM(nd,src,label){
 }
 // (re)build a node's imported heightfield at the CURRENT resolution from its retained source, so changing
 // the working resolution re-resamples cleanly instead of reading a stale, wrong-sized array.
-function buildDemFromSource(nd){const nh=fieldH();
+export function buildDemFromSource(nd){const nh=fieldH();
   if(nd._demImg){const c=document.createElement("canvas");c.width=c.height=RES;const cx=c.getContext("2d");
     cx.drawImage(nd._demImg,0,0,RES,RES);const d=cx.getImageData(0,0,RES,RES).data;const f=newField();
     const lum=i=>(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;

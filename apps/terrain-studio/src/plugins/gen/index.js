@@ -1,0 +1,13 @@
+// Every gen plugin. Imported for the side effect of registering with core/registry.js.
+import './perlin.js'
+import './simplex.js'
+import './ridged.js'
+import './worley.js'
+import './gradient.js'
+import './shape.js'
+import './mountain.js'
+import './canyon.js'
+import './tectonic.js'
+import './layout.js'
+import './constant.js'
+import './import.js'
