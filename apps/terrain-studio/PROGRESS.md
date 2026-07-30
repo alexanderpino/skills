@@ -15,9 +15,14 @@ suite). Use `node scripts/sweep-oracles.mjs` for all of them.
     node scripts/sweep-oracles.mjs                  every oracle, one line each
     node scripts/sweep-oracles.mjs _verify_x.js     a subset
 
-Baseline at a4c1247: **51/70 green**. The 19 red are 17 caused by the L0 promotion
-(31f5688) plus `_verify_hex_sampling` (carried, pre-flip geometry) and `_verify_pwa`
-(needs `--preview-prod`). Repair in flight.
+**69/70 green.** The 17 L0 casualties are repaired and now build their own document;
+`_verify_pwa` gets `--preview-prod` from the flag table; `_verify_hex_sampling` is 5/5
+(both failures were the ORACLE, not the app). Failing output is kept in `.sweep-logs/`.
+
+The one red is `_verify_build_progress`, which fails ONLY inside the full sweep and is
+green every way it is run alone. One race in it is fixed (the mid-build snapshot is now
+taken inside the waitForFunction predicate); a second cause is still unidentified, and
+the log capture just added exists to catch it on the next full run.
 
 ## Now
 

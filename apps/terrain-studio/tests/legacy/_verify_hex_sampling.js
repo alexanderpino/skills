@@ -77,9 +77,30 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
     // The seed contract, restated once: cell (x,y) of odd-r offset storage sits at this world
     // point, in CELL units. Every generator applies it; the sampler and its callers must too.
     const cw = (x, y, hex) => hex ? [x + 0.5 * (y & 1), y * H] : [x, y];
-    const mkRamp = (a, b2, hex) => { const f = new Float32Array(n * n);
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-        const w = cw(x, y, hex); f[y * n + x] = a * w[0] + b2 * w[1]; }
+    // THE RAMP MUST BE THE SHAPE OF THE LATTICE IT IS FOR. This allocated n*n and looped y<n on
+    // both lattices — a SQUARE BUFFER handed to hex code, which is C11's defect class appearing
+    // inside the oracle that exists to catch it.
+    //
+    // A hex field is n wide and latticeRows(n) = round(n*2/sqrt(3)) tall: 192 x 222, not 192 x 192.
+    // bakeThumb reads fieldW()/fieldH() and indexes to 221*192+191 = 42623 on a 36864-element
+    // array. Out-of-range reads on a Float32Array are `undefined`, so the sampler returned NaN for
+    // the bottom 13.5% and every one of those rows rendered identically.
+    //
+    // That is what S4 and S5 have been failing on. The S5 text blames bakeThumb for handing grid
+    // indices to the world-space sampler; bakeThumb was fixed and carries `rowScale=isHex()?
+    // HEX_ROW:1` today, and probed directly it returns dup=0 on BOTH lattices. The oracle was
+    // measuring its own short buffer and reporting it as the app's bug — and the giveaway was
+    // sitting in both REPORT lines as `rms=NaN`, printed and not asserted on.
+    //
+    // Sized off fieldH() rather than a recomputed formula, so it cannot drift from the app's
+    // own idea of the lattice shape.
+    const mkRamp = (a, b2, hex) => {
+      const lat = terrainDef.lattice; terrainDef.lattice = hex ? 'hex' : 'square';
+      const w2 = fieldW(), h2 = fieldH(); terrainDef.lattice = lat;
+      if (w2 !== n) throw new Error(`SETUP FAILURE: fieldW()=${w2} but RES=${n}`);
+      const f = new Float32Array(w2 * h2);
+      for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+        const w = cw(x, y, hex); f[y * w2 + x] = a * w[0] + b2 * w[1]; }
       return f; };
     const rng = f => { let mn = Infinity, mx = -Infinity;
       for (let i = 0; i < f.length; i++) { const v = f[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -178,11 +199,22 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
       const RS = hex ? H : 1;
       const f = mkRamp(1, 1, hex), range = rng(f), o = warpField(f, WS), s = WS.strength * n;
       const yMax = hex ? (n - 1) * H : n - 1;
+      // Walk the LATTICE's rows, not the square's. At RES=192 hex has 222, so `y < n` left the
+      // bottom 30 rows — 13.5% of the field, and precisely the band the short ramp buffer was
+      // corrupting — unprobed. Same C11 square-shape slip as mkRamp above, one loop bound instead
+      // of one allocation.
+      const rows = hex ? Math.round(n * 2 / Math.sqrt(3)) : n;
       let mx = 0, s2 = 0, m = 0, worst = null;
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      for (let y = 0; y < rows; y++) for (let x = 0; x < n; x++) {
         const du = x + (hex ? 0.5 * (y & 1) : 0), dv = y;           // authoring domain
-        const ox = (gnoise(du / n * WS.freq, dv / n * WS.freq, WS.seed) - .5) * 2 * s;
-        const oy = (gnoise(du / n * WS.freq, dv / n * WS.freq, WS.seed + 53) - .5) * 2 * s;
+        // dv is normalised by the ROW COUNT, not the width. This closed form has to reproduce
+        // warpField's displacement exactly or it predicts the wrong landing point, and warpField
+        // divides dv by nh (legacy.js: "du is a COLUMN (divide by the width) and dv a ROW (divide
+        // by the row count)"). This model still carried the pre-fix dv/n, so it was gating the app
+        // against a warp that no longer exists. Inert on square, where nh === n — which is why the
+        // square control read 3.994e-8 while hex read 0.05 and the file looked like an app defect.
+        const ox = (gnoise(du / n * WS.freq, dv / rows * WS.freq, WS.seed) - .5) * 2 * s;
+        const oy = (gnoise(du / n * WS.freq, dv / rows * WS.freq, WS.seed + 53) - .5) * 2 * s;
         // dropConversion models the specific slip this straddle invites: displacing in the domain
         // and then handing the domain row straight to a world-space sampler.
         const X = du + ox, Y = (dv + oy) * (dropConversion ? 1 : RS);
@@ -192,8 +224,17 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
           got: +o[y * n + x].toFixed(3), truth: +(X + Y).toFixed(3) }; }
         s2 += e * e; m++;
       }
-      return { maxAbs: +mx.toFixed(5), rmsAbs: +Math.sqrt(s2 / m).toFixed(5),
-        relMax: +(mx / range).toExponential(3), relRms: +(Math.sqrt(s2 / m) / range).toExponential(3),
+      // NaN IS A FAILURE, NOT A READING. Both REPORT lines in this file printed `rms=NaN` for
+      // months and nothing asserted on it, so the one symptom that named the real cause — a ramp
+      // buffer too short for the hex lattice, giving undefined reads — was on screen every run and
+      // never stopped anything. A quantity worth printing is worth asserting.
+      const rms = Math.sqrt(s2 / m);
+      if (!m) throw new Error('SETUP FAILURE: warp probe compared 0 cells — every one was clamped');
+      if (!Number.isFinite(mx) || !Number.isFinite(rms) || !Number.isFinite(range))
+        throw new Error(`SETUP FAILURE: non-finite warp probe (max=${mx} rms=${rms} range=${range})`
+          + ` — a NaN here means the probe read outside its own buffer, not that the app is wrong`);
+      return { maxAbs: +mx.toFixed(5), rmsAbs: +rms.toFixed(5),
+        relMax: +(mx / range).toExponential(3), relRms: +(rms / range).toExponential(3),
         cells: m, range: +range.toFixed(2), worst };
     };
     out.warpHex = warpRampErr(true, false);
@@ -287,13 +328,17 @@ const TOL = 1e-3;                       // max |error| as a fraction of the prob
     + `- that is the size of what S4 holds shut.`);
 
   gate('S5 callers-pass-world-units', r.thumbHex && r.thumbHex.dup === 0,
-    `bakeThumb walks sx,sy over grid indices 0..RES-1 and hands them to the world-space sampler. `
-    + `The hex field is only (RES-1)*sqrt(3)/2 = 165.4 cells tall in world units, so every sy above `
-    + `that clamps onto the LAST lattice row. Probed with a pure-Y ramp, where a correct thumbnail `
-    + `has every row different from the one above: `
-    + `${r.thumbHex && r.thumbHex.same}/${r.thumbHex && r.thumbHex.rows} bottom rows come back `
-    + `BYTE-IDENTICAL (${r.thumbHex && (r.thumbHex.frac * 100).toFixed(1)}% of the image; predicted `
-    + `${r.thumbHex && r.thumbHex.predicted} rows from the 1-sqrt(3)/2 = 13.4% overrun). `
+    `bakeThumb must hand the world-space sampler WORLD units. A hex field is only `
+    + `(RES-1)*sqrt(3)/2 = 165.4 cells tall in world units, so walking sy over raw grid indices `
+    + `runs 13.4% past the bottom and clamps onto the LAST lattice row. Probed with a pure-Y ramp, `
+    + `where a correct thumbnail has every row different from the one above: `
+    + `${r.thumbHex && r.thumbHex.same}/${r.thumbHex && r.thumbHex.rows} bottom rows byte-identical `
+    + `(${r.thumbHex && (r.thumbHex.frac * 100).toFixed(1)}% of the image; predicted `
+    + `${r.thumbHex && r.thumbHex.predicted} rows). bakeThumb now carries `
+    + `rowScale=isHex()?HEX_ROW:1 and reads dup=0 on both lattices. `
+    + `NOTE this gate spent a long time red while the app was CORRECT: the failure was this file's `
+    + `own mkRamp allocating n*n and looping y<n, a square buffer handed to hex code, so the `
+    + `sampler read past the end and got undefined for the bottom 13.5%. `
     + `NEGATIVE CONTROL, same probe on square: `
     + `${r.thumbSquare && r.thumbSquare.same}/${r.thumbSquare && r.thumbSquare.rows} - zero, so `
     + `this measures hex caller units, not thumbnail quantisation. Fix: sy must be `

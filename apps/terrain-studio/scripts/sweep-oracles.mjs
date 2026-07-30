@@ -4,13 +4,14 @@
 // the 70 oracles on disk - and the 58 it omits include _verify_digest.js, the byte-identity gate of
 // record. "The suite is green" therefore meant something much weaker than it read.
 import { spawnSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { readdirSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const app = resolve(here, '..')
 const legacy = resolve(app, 'tests/legacy')
+const LOGS = resolve(app, '.sweep-logs')
 
 const skip = new Set(['_verify_all_canyon.js'])
 
@@ -39,8 +40,21 @@ for (const f of files) {
     { cwd: app, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
   const code = r.status ?? -1
   const out = `${r.stdout || ''}${r.stderr || ''}`
+  // KEEP THE EVIDENCE. A sweep that reports THAT an oracle failed but not WHY sends you to
+  // reproduce it by hand - and the ones that only fail inside a full sweep are exactly the ones
+  // that will not reproduce. _verify_build_progress went red here and green every way it was run
+  // alone; the reason was in this buffer and thrown away.
+  if (code !== 0) {
+    mkdirSync(LOGS, { recursive: true })
+    writeFileSync(resolve(LOGS, `${f}.log`), out)
+  }
+  // Oracles do not share a failure vocabulary: some print `FAIL <gate>`, some `GATES FAILED:`,
+  // some FATAL, and some only a JSON blob ending in "ok": false. Match all of them, and fall back
+  // to the last non-empty line rather than reporting an empty reason.
   const why = code === 0 ? ''
-    : (out.match(/^FATAL.*$/m) || out.match(/^\s*FAIL\s+\S.*$/m) || out.match(/GATES FAILED:.*$/m) || [''])[0]
+    : (out.match(/^FATAL.*$/m) || out.match(/^\s*FAIL\s+\S.*$/m) || out.match(/GATES FAILED:.*$/m)
+      || out.match(/^.*"ok":\s*false.*$/m) || out.match(/SETUP FAILURE.*$/m)
+      || [out.trim().split('\n').filter(Boolean).pop() || '(no output)'])[0]
   rows.push({ f, code, s: ((Date.now() - t0) / 1000).toFixed(0), why: why.trim().slice(0, 110) })
   console.log(`${code === 0 ? 'ok  ' : 'FAIL'} ${f.padEnd(36)} ${rows.at(-1).s}s  ${rows.at(-1).why}`)
 }
