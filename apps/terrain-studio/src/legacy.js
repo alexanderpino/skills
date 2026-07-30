@@ -2002,6 +2002,28 @@ export function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,D
       if(h[i]<h[rec[i]])h[i]=h[rec[i]];                   // never incise below your own receiver
     }
     if(Ddt>0){
+      // THE LAPLACIAN CONSTANT IS NOT 1/s^2 ON HEX. Summing the six equidistant neighbours and
+      // Taylor-expanding gives sum(h_k - h_i) = (3s^2/2)*grad^2(h), because sum(cos^2) over six
+      // directions 60 degrees apart is 3, not 2 as it is over four at 90. So the isotropic operator
+      // is (2/(3s^2))*sum over SIX - carry the square 1/s^2 across and diffusivity comes out 1.5x
+      // too high, with nothing to see: relaxed hillslopes look like relaxed hillslopes.
+      //
+      // What was actually here was worse than the 1.5x, and the arithmetic that shows it is short.
+      // The four square offsets (x+-1,y) and (x,y+-1) ARE lattice neighbours under odd-r - but four
+      // of six, and the missing pair is chosen by row parity. Their world directions are
+      //     even rows  0, 180,  60, 300      offsets sum to (+1, 0)
+      //     odd rows   0, 180, 120, 240      offsets sum to (-1, 0)
+      // A Laplacian's offsets must sum to ZERO; a subset whose offsets do not is a first-derivative
+      // operator wearing a Laplacian's shape. This one ADVECTS - material pushed +x on even rows and
+      // -x on odd rows, a per-row zig-zag shear riding on top of the smoothing.
+      //
+      // Measured on an impulse (_verify_hillslope_isotropy, second-moment tensor, world units):
+      //     square stencil on both   square 1.0000   hex 1.1595
+      //     D6 stencil on hex        square 1.0000   hex 1.0000
+      // Note the leading-order tensor argument alone predicts 1.291 for the four-offset subset, and
+      // the measurement says 1.1595. The gap is the broken first-order term interacting with the
+      // parity flip, which that argument does not model. The MEASUREMENT is the endpoint the gate is
+      // armed against; the derivation explains the direction, not the magnitude.
       // Explicit 5-point Laplacian, SUBSTEPPED: dt <= ~0.25*cell^2/D or it blows up, so a dose
       // above the stability bound splits into stable substeps instead of being silently clamped
       // (the clamp under-diffused exactly when Res Lock scales the dose with the grid). The
@@ -2014,10 +2036,23 @@ export function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,D
       // buffer hoisted: a per-substep slice() was ~385 GB of allocation churn at 4096 square.
       const sub=Ddt<=0.24?1:Math.ceil(Ddt*6),c=Ddt/sub;
       const t=new Float32Array(h.length);
+      // THE STENCIL IS LATTICE-DEPENDENT, and the square one was running on hex. See hexLap below
+      // for what that cost. The substep bound is shared: on hex the amplification factor is
+      // 1+c*(2/3)*(S(k)-6) with S(k) >= -3 at the K point, so the worst mode damps by 1-6c - the
+      // same |1-8c|-style bound the square path uses, and strictly gentler, so reusing the square
+      // substep rule is conservative on hex rather than merely convenient.
+      const hex=isHex(),oE=[-1,1,-1-n,-n,-1+n,n],oO=[-1,1,-n,1-n,n,1+n];
       for(let s2=0;s2<sub;s2++){
         t.set(h);
-        for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
-          h[i]=t[i]+c*(-4*t[i]+t[i-1]+t[i+1]+t[i-n]+t[i+n]);}
+        if(hex){
+          for(let y=1;y<nh-1;y++){const o=(y&1)?oO:oE;
+            for(let x=1;x<n-1;x++){const i=y*n+x;
+              let a=0;for(let k=0;k<6;k++)a+=t[i+o[k]]-t[i];
+              h[i]=t[i]+c*(2/3)*a;}}
+        }else{
+          for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){const i=y*n+x;
+            h[i]=t[i]+c*(-4*t[i]+t[i-1]+t[i+1]+t[i-n]+t[i+n]);}
+        }
       }
     }
     for(let i=0;i<N;i++)if(isEdge[i])h[i]=0;
