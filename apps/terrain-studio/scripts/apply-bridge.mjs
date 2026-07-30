@@ -61,10 +61,13 @@ if (i === -1) {
 } else {
   const current = legacy.slice(i, j + END.length + 1)
   if (current === region) {
+    // NOT an early exit. The is-last assertion below has to run on this path too: the region can be
+    // byte-identical and still be in the wrong place, because someone appended after it. That is
+    // not hypothetical - it happened the first time this script was used, when the service-worker
+    // registration was appended to the end of legacy.js and this branch reported "already current"
+    // and returned 0 without looking.
     console.log(`bridge: region already current (${block.split('\n').length} lines)`)
-    process.exit(0)
-  }
-  if (check) {
+  } else if (check) {
     console.error('FAIL: the bridge region in src/legacy.js is stale. Run: npm run bridge:apply')
     process.exit(1)
   }

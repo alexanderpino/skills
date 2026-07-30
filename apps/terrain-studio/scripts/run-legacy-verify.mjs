@@ -9,7 +9,9 @@
 //   npm run verify                  whole suite over http
 //   npm run verify -- --file        whole suite over file:// (no server)
 //   npm run verify -- _verify_canyon_slopes.js
-//   npm run verify -- --preview     against the production build instead of the dev server
+//   npm run verify -- --preview     against the BUILT bundle (--mode test: keeps the test bridge)
+//   npm run verify -- --preview-prod  against a PRODUCTION build (service worker on, no bridge)
+//                                    _verify_pwa.js is the only oracle that needs this
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -21,7 +23,9 @@ const studio = resolve(app, 'tests/legacy')   // the legacy suite moved here wit
 
 const argv = process.argv.slice(2)
 const useFile = argv.includes('--file')
-const usePreview = argv.includes('--preview')
+const usePreviewProd = argv.includes('--preview-prod')
+// --preview-prod implies a preview server; it differs only in the build mode below.
+const usePreview = argv.includes('--preview') || usePreviewProd
 const targets = argv.filter((a) => !a.startsWith('--'))
 const script = targets[0] ?? '_verify_all_canyon.js'
 
@@ -55,8 +59,14 @@ if (usePreview) {
   //
   // `--mode test` keeps the bridge and still exercises the real bundle - minified, hashed asset
   // names, module preloads - which is the point of testing against the build at all.
-  console.log('Building bundle (--mode test, so the bridge survives)...')
-  const b = spawnSync('npx', ['vite', 'build', '--mode', 'test'], { cwd: app, stdio: 'inherit', shell: true })
+  // --preview-prod builds PRODUCTION: no test bridge, but the service worker IS registered.
+  // _verify_pwa.js needs exactly that and nothing else does, because the registration is gated
+  // on import.meta.env.MODE === 'production' precisely to keep the oracle suite worker-free.
+  const mode = usePreviewProd ? [] : ['--mode', 'test']
+  console.log(usePreviewProd
+    ? 'Building bundle (PRODUCTION - service worker active, NO test bridge)...'
+    : 'Building bundle (--mode test, so the bridge survives)...')
+  const b = spawnSync('npx', ['vite', 'build', ...mode], { cwd: app, stdio: 'inherit', shell: true })
   if (b.status !== 0) process.exit(b.status ?? 1)
 }
 
