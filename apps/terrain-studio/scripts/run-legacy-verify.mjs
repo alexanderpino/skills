@@ -29,13 +29,22 @@ const usePreview = argv.includes('--preview') || usePreviewProd
 const targets = argv.filter((a) => !a.startsWith('--'))
 const script = targets[0] ?? '_verify_all_canyon.js'
 
+// Flags this launcher consumes itself. EVERYTHING ELSE IS FORWARDED to the oracle, because several
+// of them take their own and until now had no way to receive one: _verify_digest documents
+// `--write` to re-bless the baseline and `--res=512`, and since A1 removed --file this launcher is
+// the only way to reach the app at all. So the digest's own re-bless path was unreachable - the
+// flag was silently swallowed here and the run compared instead of writing, reporting a FAIL that
+// looked exactly like a real regression. A dropped flag is worse than a rejected one.
+const OWN = new Set(['--file', '--preview', '--preview-prod'])
+const forward = argv.filter((a) => a.startsWith('--') && !OWN.has(a.split('=')[0]))
+
 if (!existsSync(resolve(studio, script))) {
   console.error(`No such verification script: ${script}`)
   process.exit(2)
 }
 
 const run = (env) => {
-  const r = spawnSync(process.execPath, [script], { cwd: studio, stdio: 'inherit', env })
+  const r = spawnSync(process.execPath, [script, ...forward], { cwd: studio, stdio: 'inherit', env })
   return r.status ?? 1
 }
 
