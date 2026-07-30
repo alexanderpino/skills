@@ -1,4 +1,4 @@
-| `out` | 1 | **done** | this commit || `data` | 14 | **done** | this commit || `effect` | 7 | **done** | this commit |# Terrain Studio — progress
+# Terrain Studio — progress
 
 Where the work stands. **`BACKLOG.md` holds findings, decisions and defects; this file holds
 position** — what shipped, what the gates measured, what is next.
@@ -15,17 +15,25 @@ suite). Use `node scripts/sweep-oracles.mjs` for all of them.
     node scripts/sweep-oracles.mjs                  every oracle, one line each
     node scripts/sweep-oracles.mjs _verify_x.js     a subset
 
-The last full-sweep record was **69/70 green** before later oracle additions; it is historical,
-not current 73-file coverage. The 17 L0 casualties are repaired and now build their own document;
-`_verify_pwa` gets `--preview-prod` from the flag table; `_verify_hex_sampling` is 5/5
-(both failures were the ORACLE, not the app). Failing output is kept in `.sweep-logs/`.
-
-The one red is `_verify_build_progress`, which fails ONLY inside the full sweep and is
-green every way it is run alone. One race in it is fixed (the mid-build snapshot is now
-taken inside the waitForFunction predicate); a second cause is still unidentified, and
-the log capture just added exists to catch it on the next full run.
+Current full-sweep record: **72/72 standalone oracles green** on 2026-07-30
+(`_verify_all_canyon.js` is the one aggregate file excluded by the sweep). This includes
+`_verify_build_progress`, production-mode `_verify_pwa`, the graph-authoring gates, and the new
+dual-GPU hydraulic gate. Failing output is retained in `.sweep-logs/`.
 
 ## Now
+
+**Composable GPU hydraulic erosion — done locally, 2026-07-30.**
+
+- Hydraulic now has independent Pipe / grid and Droplet / particle switches with collapsible,
+  model-specific controls. Switches are saved and undoable; expansion state is UI-local.
+- Square-lattice WebGL2 runs both mechanisms on the GPU. Pipe state feeds Droplet state in the
+  fixed order Pipe → Droplet and the combined node reads back once. The droplet stage uses particle
+  textures, MRT updates, additive float point-rasterisation, and a terrain gather/apply pass.
+- Old `engine` documents migrate to the two-switch schema. Hex and contexts without
+  `EXT_float_blend` retain an explicitly labelled CPU compatibility path.
+- `_verify_hydraulic_dual_gpu` gates same-seed repeatability, seed variation, finite output,
+  erosion and deposition, mass closure, combined stage order, one readback, inspector UI,
+  collapsible-state purity, switch history, and saved-graph migration.
 
 **Graph authoring UX — done locally, 2026-07-30.**
 
@@ -36,8 +44,8 @@ the log capture just added exists to catch it on the next full run.
   height persists across reloads and display growth. CSS and JavaScript independently preserve a
   220 px terrain viewport by shrinking the graph only when the window is constrained.
 - Focused gates green: `_verify_quick_create`, `_verify_workflow`, `_verify_toolbox`,
-  `_verify_edges`, `_verify_digest`; production `vite build` green. The full 73-file sweep was not
-  rerun for this local editor change.
+  `_verify_edges`, `_verify_digest`; production `vite build` green. The subsequent full standalone
+  sweep is 72/72 green.
 
 **Programme:** modularisation toward React + plugin nodes + PWA, per
 `~/.claude/plans/quiet-wishing-harbor.md` (adversarially reviewed before execution; seven blocking
@@ -72,6 +80,8 @@ npm run verify -- _verify_flow_facets.js  12/12; facets 1.0114/1.0220 (single-re
 node tests/legacy/_verify_shapescan.js  3 files, 8554 lines scanned
 npm run verify -- _verify_gpu.js        hasWebGL2Float=true init=true gpuReady=true
                                         fbm@512: 16ms GPU vs 231ms CPU
+npm run verify -- _verify_hydraulic_dual_gpu.js
+                                        GPU droplets + Pipe→Droplet, one readback, UI/migration green
 npm run verify -- _verify_wireframe.js  6/6   (gl.drawElements monkey-patch still takes)
 npm run verify -- _verify_hex_deferred.js  4/4
 npm run verify -- _verify_erosion_mass.js  9/9

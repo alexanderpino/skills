@@ -1,4 +1,6 @@
-import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuReady, hydroMassDiag, setHydroMassDiag, setGL as setGpuGL } from './core/gpu.js';
+import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuHydraulicDroplets,
+  gpuHydraulicCombined, gpuReady, gpuDropletsReady, hydroMassDiag, setHydroMassDiag,
+  setGL as setGpuGL } from './core/gpu.js';
 import { mergePlugins } from './core/registry.js';
 import './plugins/out/index.js';
 import './plugins/data/index.js';
@@ -2743,7 +2745,7 @@ export function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,s
 }
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
-export function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false,gridK=1}){
+export function hydraulicErode(inp,{droplets=15000,lifetime=null,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false,gridK=1}){
   const n=fieldW(),nh=fieldH();let h=inp.slice();
   // Res Lock (gridK = node-level RES/REF_RES; default 1 = legacy cell-unit behaviour, which the
   // mountain/peak callers rely on byte-for-byte). A step is one cell, so per-step rates are
@@ -2802,12 +2804,13 @@ export function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode
   const spawnIdx=hexL?(px,py)=>{const r=clamp(Math.round(py/HEX_ROW),0,nh-1);
       return r*n+clamp(Math.round(px-0.5*(r&1)),0,n-1);}
     :(px,py)=>clamp(py|0,0,nh-1)*n+clamp(px|0,0,n-1);
+  const maxLifetime=lifetime==null?n*0.7:Math.max(1,lifetime*gk);
   for(let d=0;d<droplets;d++){
     let px=rnd()*wW,py=rnd()*wH;
     if(spawn)for(let tries=0;tries<16&&spawn[spawnIdx(px,py)]<=0;tries++){
       px=rnd()*wW;py=rnd()*wH;}
     let dx=0,dy=0,speed=1,water=1,sed=0,leftGrid=false;
-    for(let life=0;life<n*0.7;life++){
+    for(let life=0;life<maxLifetime;life++){
       const g=at(px,py);const hOld=g.hh;
       dx=dx*inertia-g.gx*(1-inertia);dy=dy*inertia-g.gy*(1-inertia);
       const len=Math.hypot(dx,dy);if(len<1e-5){dx=rnd()-0.5;dy=rnd()-0.5;}else{dx/=len;dy/=len;}
@@ -3794,6 +3797,57 @@ function buildEdgeProps(body,title,sub,sw,edge){
   hint.innerHTML="Click near a curve—or right-click its connected input port—to select it. Press <kbd>Del</kbd>, use the × handle, or choose Disconnect.";
   body.appendChild(hint);
 }
+// Collapsed inspector state is presentation only: it is deliberately absent from graph snapshots,
+// saved documents, cache keys and undo. Enabling a stage is document state and uses the normal
+// command path; opening its panel is not.
+const paramSectionOpen=new Map();
+function appendParamFields(body,params){
+  let lastGroup=null;
+  params.filter(pr=>pr.type!=="hidden"&&pr.type!=="toggle"&&paramVisible(pr,selected.params)).forEach(pr=>{
+    if(pr.group&&pr.group!==lastGroup){const h=document.createElement("div");h.className="param-group-title";h.textContent=pr.group;body.appendChild(h);}
+    body.appendChild(buildField(pr));lastGroup=pr.group||null;
+  });
+}
+function buildParamSections(body,def,nd){
+  const consumed=new Set();
+  for(const section of def.paramSections||[]){
+    const toggle=def.params.find(pr=>pr.key===section.toggle);
+    if(!toggle)continue;
+    consumed.add(toggle.key);
+    const key=nd.id+":"+section.id,enabled=!!nd.params[toggle.key];
+    let open=paramSectionOpen.has(key)?paramSectionOpen.get(key):!!section.defaultOpen;
+    const card=document.createElement("section");card.className="param-section"+(enabled?" enabled":" disabled");
+    card.dataset.section=section.id;
+    const head=document.createElement("div");head.className="param-section-head";
+    const collapse=document.createElement("button");collapse.type="button";collapse.className="param-section-collapse";
+    collapse.setAttribute("aria-expanded",open?"true":"false");
+    const bodyId="param-section-"+nd.id+"-"+section.id;collapse.setAttribute("aria-controls",bodyId);
+    const chevron=document.createElement("span");chevron.className="param-section-chevron";chevron.textContent=open?"▾":"▸";
+    const label=document.createElement("span");label.className="param-section-label";label.textContent=section.label;
+    collapse.append(chevron,label);
+    let available=true;
+    if(section.device==="gpu")available=gpuReady();
+    else if(section.device==="gpu-droplets")available=gpuDropletsReady();
+    const badge=document.createElement("span");badge.className="param-section-badge"+(available?"":" fallback");
+    badge.textContent=available?"GPU":"CPU fallback";
+    const sw=document.createElement("button");sw.type="button";sw.className="param-switch";
+    sw.setAttribute("role","switch");sw.setAttribute("aria-checked",enabled?"true":"false");
+    sw.setAttribute("aria-label",(enabled?"Disable ":"Enable ")+section.label);
+    sw.innerHTML='<span class="param-switch-knob" aria-hidden="true"></span>';
+    const sectionBody=document.createElement("div");sectionBody.className="param-section-body";sectionBody.id=bodyId;
+    sectionBody.hidden=!open;
+    collapse.onclick=()=>{open=!open;paramSectionOpen.set(key,open);sectionBody.hidden=!open;
+      collapse.setAttribute("aria-expanded",open?"true":"false");chevron.textContent=open?"▾":"▸";};
+    sw.onclick=()=>{recordHistory();nd.params[toggle.key]=!nd.params[toggle.key];
+      if(nd.params[toggle.key])paramSectionOpen.set(key,true);
+      markParamDirty(nd);buildProps();requestEval();};
+    head.append(collapse,badge,sw);card.append(head,sectionBody);
+    const params=def.params.filter(pr=>pr.section===section.id);
+    params.forEach(pr=>consumed.add(pr.key));appendParamFields(sectionBody,params);
+    body.appendChild(card);
+  }
+  return consumed;
+}
 function buildProps(){
   const body=$("#pBody"),title=$("#pTitle"),sub=$("#pSub"),sw=$("#pSwatch");
   const edge=edgeByKey(selectedEdge);if(edge){buildEdgeProps(body,title,sub,sw,edge);return;}
@@ -3888,14 +3942,12 @@ function buildProps(){
   if(selected._inputError){const warning=document.createElement("div");warning.className="hint";
     warning.style.cssText="border-color:var(--bad);color:var(--bad);margin-bottom:10px";
     warning.textContent=selected._inputError;body.appendChild(warning);}
+  if(def.migrateParams)def.migrateParams(selected.params);
   // Graphs saved by older Studio versions (and concise hand-authored defaults) may not carry
   // parameters introduced later. Hydrate them from the schema before formatting or evaluating.
   def.params.forEach(pr=>{if(!(pr.key in selected.params))selected.params[pr.key]=cloneParams(pr.def);});
-  let lastGroup=null;
-  def.params.filter(pr=>paramVisible(pr,selected.params)).forEach(pr=>{
-    if(pr.group&&pr.group!==lastGroup){const h=document.createElement("div");h.className="param-group-title";h.textContent=pr.group;body.appendChild(h);}
-    body.appendChild(buildField(pr));lastGroup=pr.group||null;
-  });
+  const consumed=buildParamSections(body,def,selected);
+  appendParamFields(body,def.params.filter(pr=>!consumed.has(pr.key)&&!pr.section));
   if(selected.type==="colormixer")buildColorMixerProps(body);
   if(selected.type==="satmap"){
     const tools=document.createElement("div");tools.className="prop-actions";tools.style.margin="2px 0 8px";
@@ -6108,8 +6160,8 @@ $("#resSel").onchange=e=>{
 $("#qualitySel").onchange=e=>{BUILD_QUALITY=e.target.value;nodes.forEach(n=>n._dirty=true);
   toast(BUILD_QUALITY==="final"?"Final simulation budgets":"Interactive preview budgets");
   syncBuildProfile();evalGraph();};
-// GPU fast path toggle. Generators + thermal erosion run as WebGL2 fragment-shader kernels; the CPU
-// implementations stay the reference (see _verify_gpu.js for the GPU-vs-CPU parity check).
+// GPU fast path toggle. Generators, thermal erosion, and both square-lattice hydraulic stages run
+// as WebGL2 kernels; CPU implementations remain the reference/compatibility path.
 $("#gpuBtn").onclick=()=>{
   if(!GPU.init()){toast("GPU compute unavailable (needs WebGL2 + float render targets)");return;}
   USE_GPU=!USE_GPU;$("#gpuBtn").classList.toggle("on",USE_GPU);
@@ -6572,7 +6624,8 @@ function showcaseGraph(){
   const ridge=makeNode("ridged",40,220);ridge.params={seed:12,freq:4,octaves:6,lac:2.1,gain:0.55};
   const mix=makeNode("blend",200,120);mix.params={factor:0.5};
   const warp=makeNode("warp",200,300);warp.params={strength:0.08,freq:3,seed:5};
-  const hyd=makeNode("hydraulic",360,120);hyd.params={engine:"auto",pipeIters:48,droplets:16000,erode:0.35,deposit:0.28,capacity:6,inertia:0.05,seed:1,feat:1};
+  const hyd=makeNode("hydraulic",360,120);Object.assign(hyd.params,{pipeEnabled:true,dropletEnabled:false,
+    pipeIters:48,droplets:16000,pipeErode:0.35,pipeDeposit:0.28,pipeCapacity:6,pipeInertia:0.05,seed:1,feat:1});
   // assign, never replace (see the snow node below): a replaced params object loses schema keys
   // and the next property-panel hydration writes the schema defaults back in SILENTLY - here
   // that would flip the node to Real scale and change the shipped terrain by 4.3 m rms on a
@@ -6684,7 +6737,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 193 symbols (28 writable, 165 read-only).
+ * 196 symbols (28 writable, 168 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -6708,23 +6761,23 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("nodes", () => nodes, (v) => { nodes = v })
   __def("edges", () => edges, (v) => { edges = v })
   __def("selected", () => selected, (v) => { selected = v })
-  __def("cam", () => cam, (v) => { cam = v })
   __def("scene", () => scene, (v) => { scene = v })
-  __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
-  __def("TARGET_RES", () => TARGET_RES, (v) => { TARGET_RES = v })
-  __def("view", () => view, (v) => { view = v })
   __def("selectedEdge", () => selectedEdge, (v) => { selectedEdge = v })
+  __def("cam", () => cam, (v) => { cam = v })
+  __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
+  __def("uid", () => uid, (v) => { uid = v })
+  __def("view", () => view, (v) => { view = v })
+  __def("TARGET_RES", () => TARGET_RES, (v) => { TARGET_RES = v })
   __def("XF", () => XF, (v) => { XF = v })
   __def("SCALE_RES", () => SCALE_RES, (v) => { SCALE_RES = v })
   __def("BUILD_QUALITY", () => BUILD_QUALITY, (v) => { BUILD_QUALITY = v })
-  __def("uid", () => uid, (v) => { uid = v })
-  __def("historyReady", () => historyReady, (v) => { historyReady = v })
   __def("undoStack", () => undoStack, (v) => { undoStack = v })
+  __def("historyReady", () => historyReady, (v) => { historyReady = v })
   __def("H_SCALE", () => H_SCALE, (v) => { H_SCALE = v })
   __def("importTarget", () => importTarget, (v) => { importTarget = v })
+  __def("evalFrame", () => evalFrame, (v) => { evalFrame = v })
   __def("previewMode", () => previewMode, (v) => { previewMode = v })
   __def("buildRun", () => buildRun, (v) => { buildRun = v })
-  __def("evalFrame", () => evalFrame, (v) => { evalFrame = v })
   __def("shadeMode", () => shadeMode, (v) => { shadeMode = v })
   __def("uTime", () => uTime, (v) => { uTime = v })
   __def("redoStack", () => redoStack, (v) => { redoStack = v })
@@ -6733,7 +6786,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 165 read-only. Getters hand out the LIVE value: 6 of
+  // 168 read-only. Getters hand out the LIVE value: 6 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("gl", () => gl, __ro("gl"))
@@ -6748,44 +6801,46 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("outputNode", () => outputNode, __ro("outputNode"))
   __def("resolveColor", () => resolveColor, __ro("resolveColor"))
   __def("glc", () => glc, __ro("glc"))
+  __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
   __def("canyonFieldCPU", () => canyonFieldCPU, __ro("canyonFieldCPU"))
-  __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("GPU", () => GPU, __ro("GPU"))
+  __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("select", () => select, __ro("select"))
   __def("updateViewport", () => updateViewport, __ro("updateViewport"))
-  __def("u", () => u, __ro("u"))
-  __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
-  __def("cloneParams", () => cloneParams, __ro("cloneParams"))
   __def("curField", () => curField, __ro("curField"))
-  __def("waterLook", () => waterLook, __ro("waterLook"))
-  __def("buildProps", () => buildProps, __ro("buildProps"))
-  __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
-  __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
-  __def("newField", () => newField, __ro("newField"))
-  __def("sampleBilinear", () => sampleBilinear, __ro("sampleBilinear"))
-  __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
-  __def("activePreviewNode", () => activePreviewNode, __ro("activePreviewNode"))
   __def("fieldH", () => fieldH, __ro("fieldH"))
-  __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
+  __def("newField", () => newField, __ro("newField"))
+  __def("u", () => u, __ro("u"))
+  __def("buildProps", () => buildProps, __ro("buildProps"))
+  __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
+  __def("cloneParams", () => cloneParams, __ro("cloneParams"))
+  __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
+  __def("waterLook", () => waterLook, __ro("waterLook"))
+  __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
+  __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
+  __def("sampleBilinear", () => sampleBilinear, __ro("sampleBilinear"))
+  __def("activePreviewNode", () => activePreviewNode, __ro("activePreviewNode"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
+  __def("fieldW", () => fieldW, __ro("fieldW"))
+  __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
   __def("planView", () => planView, __ro("planView"))
+  __def("portPos", () => portPos, __ro("portPos"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
   __def("transformField", () => transformField, __ro("transformField"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
-  __def("portPos", () => portPos, __ro("portPos"))
   __def("simulateTerrainWind", () => simulateTerrainWind, __ro("simulateTerrainWind"))
   __def("sun", () => sun, __ro("sun"))
   __def("terrainProg", () => terrainProg, __ro("terrainProg"))
   __def("$", () => $, __ro("$"))
   __def("curWaterIce", () => curWaterIce, __ro("curWaterIce"))
   __def("fieldRange", () => fieldRange, __ro("fieldRange"))
-  __def("fieldW", () => fieldW, __ro("fieldW"))
+  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("inputEdge", () => inputEdge, __ro("inputEdge"))
   __def("nodeInputs", () => nodeInputs, __ro("nodeInputs"))
   __def("renderGL", () => renderGL, __ro("renderGL"))
@@ -6797,14 +6852,13 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("frameHero", () => frameHero, __ro("frameHero"))
   __def("gpuFbm", () => gpuFbm, __ro("gpuFbm"))
   __def("nearestUpstreamNode", () => nearestUpstreamNode, __ro("nearestUpstreamNode"))
+  __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
   __def("syncWindReadout", () => syncWindReadout, __ro("syncWindReadout"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("waterProg", () => waterProg, __ro("waterProg"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
-  __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
   __def("exactChain", () => exactChain, __ro("exactChain"))
-  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
-  __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
+  __def("gpuHydraulicDroplets", () => gpuHydraulicDroplets, __ro("gpuHydraulicDroplets"))
   __def("syncDisplayState", () => syncDisplayState, __ro("syncDisplayState"))
   __def("thermalErode", () => thermalErode, __ro("thermalErode"))
   __def("warpField", () => warpField, __ro("warpField"))
@@ -6815,6 +6869,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("curIceSnowSurfaceY", () => curIceSnowSurfaceY, __ro("curIceSnowSurfaceY"))
   __def("curSnowDepthM", () => curSnowDepthM, __ro("curSnowDepthM"))
   __def("curSurfaceY", () => curSurfaceY, __ro("curSurfaceY"))
+  __def("d8Accumulation", () => d8Accumulation, __ro("d8Accumulation"))
   __def("edgeByKey", () => edgeByKey, __ro("edgeByKey"))
   __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
   __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
@@ -6831,17 +6886,19 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("blurField", () => blurField, __ro("blurField"))
   __def("buildField", () => buildField, __ro("buildField"))
   __def("canyonBeds", () => canyonBeds, __ro("canyonBeds"))
+  __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
   __def("clamp", () => clamp, __ro("clamp"))
   __def("colorErodeField", () => colorErodeField, __ro("colorErodeField"))
   __def("combine", () => combine, __ro("combine"))
   __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
   __def("curveFromExponent", () => curveFromExponent, __ro("curveFromExponent"))
   __def("curWaterLiquid", () => curWaterLiquid, __ro("curWaterLiquid"))
-  __def("d8Accumulation", () => d8Accumulation, __ro("d8Accumulation"))
   __def("drawMaskField", () => drawMaskField, __ro("drawMaskField"))
   __def("drawTarget", () => drawTarget, __ro("drawTarget"))
   __def("edgeKey", () => edgeKey, __ro("edgeKey"))
   __def("encodeTemperatureC", () => encodeTemperatureC, __ro("encodeTemperatureC"))
+  __def("gpuDropletsReady", () => gpuDropletsReady, __ro("gpuDropletsReady"))
+  __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
   __def("gpuHydraulicPipes", () => gpuHydraulicPipes, __ro("gpuHydraulicPipes"))
   __def("gpuReady", () => gpuReady, __ro("gpuReady"))
   __def("HEX_SQUARE_WORLD", () => HEX_SQUARE_WORLD, __ro("HEX_SQUARE_WORLD"))
@@ -6852,7 +6909,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("renderLook", () => renderLook, __ro("renderLook"))
   __def("satLayerColor", () => satLayerColor, __ro("satLayerColor"))
   __def("sculptField", () => sculptField, __ro("sculptField"))
-  __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
   __def("smax", () => smax, __ro("smax"))
   __def("smin", () => smin, __ro("smin"))
   __def("syncClimateReadout", () => syncClimateReadout, __ro("syncClimateReadout"))

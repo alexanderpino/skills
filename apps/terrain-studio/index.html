@@ -384,6 +384,25 @@ select.inp{appearance:none}
 .param-group-title{display:flex;align-items:center;gap:7px;margin:15px 0 2px;color:var(--faint);
   font:600 9px var(--mono);letter-spacing:.7px;text-transform:uppercase}
 .param-group-title::after{content:"";height:1px;flex:1;background:var(--line)}
+.param-section{margin:10px 0;border:1px solid var(--line);border-radius:7px;background:var(--panel2);overflow:hidden}
+.param-section.enabled{border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.param-section-head{height:38px;display:flex;align-items:center;gap:7px;padding:0 8px;border-bottom:1px solid transparent}
+.param-section:has(.param-section-body:not([hidden])) .param-section-head{border-bottom-color:var(--line)}
+.param-section-collapse{min-width:0;align-self:stretch;display:flex;align-items:center;gap:7px;flex:1;
+  padding:0;background:none;border:0;color:var(--text);cursor:pointer;text-align:left}
+.param-section-chevron{width:9px;color:var(--faint);font-size:10px}
+.param-section-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600}
+.param-section-badge{padding:2px 5px;border-radius:8px;background:rgba(93,197,134,.12);color:var(--good);
+  font:600 8px var(--mono);letter-spacing:.35px;text-transform:uppercase;white-space:nowrap}
+.param-section-badge.fallback{background:rgba(230,169,83,.12);color:var(--warn)}
+.param-section-body{padding:1px 10px 7px}.param-section.disabled .param-section-body{opacity:.62}
+.param-switch{position:relative;width:34px;height:19px;flex:0 0 34px;padding:0;border:1px solid var(--line2);
+  border-radius:11px;background:var(--panel3);cursor:pointer;transition:background .14s,border-color .14s}
+.param-switch-knob{position:absolute;left:2px;top:2px;width:13px;height:13px;border-radius:50%;
+  background:var(--muted);box-shadow:0 1px 3px rgba(0,0,0,.45);transition:transform .14s,background .14s}
+.param-switch[aria-checked=true]{background:color-mix(in srgb,var(--accent) 38%,var(--panel3));border-color:var(--accent)}
+.param-switch[aria-checked=true] .param-switch-knob{transform:translateX(15px);background:var(--accent)}
+.param-section-collapse:focus-visible,.param-switch:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .hint{font-size:11px;color:var(--faint);line-height:1.5;margin-top:4px}
 .prop-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
 .edge-summary{margin:8px 0 13px;padding:10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}

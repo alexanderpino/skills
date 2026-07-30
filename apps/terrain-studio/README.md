@@ -134,7 +134,7 @@ separately-addressable, content-hashed assets to cache and update. That trade wa
 | **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Canyon** (cached landscape evolution: uplift, drainage competition, stream-power incision, lithology and hillslope retreat; five formation styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · **Normalize** (maskable) · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
-| **Erosion** | Thermal (talus) · Hydraulic (GPU pipes / CPU droplets) · **Erosion 2** (multi-scale hydraulic, sediment discharge, shape) · **HydroFix** (low-amplitude drainage repair) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
+| **Erosion** | Thermal (talus) · Hydraulic (independently switchable GPU pipes + GPU droplets) · **Erosion 2** (multi-scale hydraulic, sediment discharge, shape) · **HydroFix** (low-amplitude drainage repair) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select · **Temperature select** (physical °C biome band) |
 | **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (base climate field) · **Temperature Modify** (localized heat/cooling) · **Wind** (terrain-adjusted physical vectors) · **Wind Modify** (masked regional circulation) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** (metre-depth placement, melt, avalanches) · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
@@ -1193,7 +1193,7 @@ Res Lock on; depthRatio = rms modification depth at 384 over 192, target 1.0):
 | Stream power (m=0.5) | 0.719 | **1.004** | 0.992 |
 | Stream power (m=0.2 / m=0.8) | — | **0.991 / 1.004** | 0.999 / 0.971 |
 | Stream power at k=3, Final (576²) | — | **1.010** | 0.989 |
-| Hydraulic (CPU droplets) | 0.809 | **1.021** | 0.966 |
+| Hydraulic (droplet model; CPU measurement) | 0.809 | **1.021** | 0.966 |
 | Hydraulic (GPU pipes) | **0.383** | **1.020** | 0.940 |
 | Erosion 2 (GPU) | 0.499 | **1.077** | 0.984 |
 | HydroFix (corridor-dominated, pre-filled input) | ~0.70 | **0.934** | 0.908 |
@@ -1227,7 +1227,7 @@ Per-kernel mechanism, each an application of "express the length scale in world 
   line within ±0.12 — and it has already done its job once: tightening the substep bound moved
   the m=0.8 root by 0.17, the harness went red, and the line was re-fitted (residuals ≤ 0.02 at
   all three m). Calibration, not derivation — the code says so.
-- **CPU droplets** — a step is one cell, so per-step fractional rates (erode, deposit, evaporation)
+- **Droplets (GPU and CPU compatibility paths)** — a step is one cell, so per-step fractional rates (erode, deposit, evaporation)
   become `1−(1−r)^(1/k)` — identical total effect over the `k×` steps that now cover the same world
   distance — and the capacity's slope term is restored to reference-cell units. Speed and gravity need
   nothing: energy already sums the same total drop along the same world path.
@@ -1312,29 +1312,28 @@ spikier).
   composite *driver* is a relative mix by contract), so only its soil term carries the physical
   units.
 
-### Cross-engine honesty: what the hydraulic "auto" tab actually costs
+### Cross-model honesty: pipe and droplet erosion are different effects
 
-The Hydraulic node's two engines are two different simulations behind one tab, and at identical
-sliders the pipe engine modifies the terrain at **~0.37×** the droplet engine's depth
-(modification correlation ~0.59 — broad pipe valley systems vs dendritic particle tracks). A
-parity retune was attempted and **reverted, with the numbers kept**: raising pipe iterations to
-~160 reaches depth parity (0.89–1.0) but breaks the grid invariance above (1.42 at k=2), and
-scaling the per-iteration erosion cap leaves cross-engine depth *flat* while the grid ratio runs
-to ~2.0 — the pipe engine's resolution invariance partly *rests on* that k-scaled cap clamping
-the fine grid, so dose and invariance are coupled and no cheap knob buys both. What ships
-instead: the measured relationship is **gated** in `_verify_gpu.js` (depth band [0.25, 0.55],
-correlation floor 0.40 — a drift stop, explicitly not a parity claim), the Pipe iterations slider
-maximum is raised to 360 so the depth-parity trade is available *by choice*, and closing the gap
-properly — re-deriving the pipe dose family under clamp saturation — is queued kernel work, not
-something to force through a defaults change that trades one measured invariant for another.
+The Hydraulic node contains two different simulations, now exposed as independent switches and
+collapsible parameter panels. Pipe erosion produces broad connected drainage; droplet erosion
+produces finer stochastic tracks. At their historical shared settings, the pipe model modifies the
+terrain at **~0.37×** the droplet model's depth (modification correlation ~0.59), so matching their
+slider labels did not make them interchangeable. Their erosion, deposition, capacity and inertia
+controls are therefore separate.
+
+Either model can run alone or both can run in the fixed order **Pipe → Droplet**. A parity retune was
+attempted and rejected: raising pipe iterations to ~160 approaches depth parity but breaks grid
+invariance, while scaling the per-iteration erosion cap leaves cross-model depth flat and drives the
+grid ratio toward ~2.0. `_verify_gpu.js` retains the measured depth/correlation band as a drift stop,
+not a parity claim.
 
 ### GPU fast path (WebGL2 GPGPU)
 
 The **CPU kernels remain the reference implementation**. On top of them there is an optional GPU path
 (the **GPU** button in the toolbar) that runs the heavy, embarrassingly-parallel kernels as fragment
 shaders over a fullscreen triangle into `RGBA32F` ping-pong render targets — the same technique as the
-deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Simplex fBm**, **Ridged MF**, **Warp**, **thermal
-erosion**, and the default **Hydraulic erosion** engine.
+deferred composite. Currently GPU-accelerated: **Perlin fBm**, **Simplex fBm**, **Ridged MF**, **Warp**,
+**thermal erosion**, and both **Hydraulic erosion** models on square terrain.
 
 Canyon is intentionally not in that list. WebGL2 fragment shaders do not provide the global mutable
 queue/graph synchronization needed by Priority-Flood, flow accumulation, and receiver-first implicit
@@ -1374,12 +1373,20 @@ obvious single-pass version recomputes every neighbour's `moveSum` (72 texture f
 Profiling a 1024² build showed thermal at **84% of total time**; the split cut the whole build from
 **10.6 s → 3.9 s** with parity unchanged.
 
-Hydraulic now has two honest engines. **GPU pipes** is a Mei-style four-neighbour virtual-pipe solver:
-bed, water, suspended sediment and directional flux stay in `RGBA32F` textures for the whole simulation,
-with outflow clamped to available water and sediment transported by the same flux field. **CPU droplets**
-keeps the older scatter-write particle reference for comparisons. At 192² under SwiftShader, GPU pipes
-finish 48 iterations in **47 ms**, produce both erosion (20,350 cells) and deposition (16,514 cells), and
-remain finite; Warp matches its CPU reference to max |Δ| **4.4e-5**.
+Hydraulic now has two independently switchable GPU stages. **GPU pipes** is a Mei-style four-neighbour
+virtual-pipe solver: bed, water, suspended sediment and directional flux stay in `RGBA32F` textures for
+the whole simulation, with outflow clamped to available water and sediment transported by the same flux
+field. **GPU droplets** ping-pongs particle state through float textures, emits signed brush actions with
+multiple render targets, accumulates overlapping brushes through additive float point-rasterisation, and
+applies the gathered delta to the terrain. When both stages are enabled, the pipe height texture feeds the
+droplet stage directly and the node performs one final readback.
+
+The droplet path requires `EXT_float_blend`; unsupported WebGL2 contexts and the hexagonal lattice use an
+inspector-labelled CPU compatibility path. At 96² under SwiftShader, 1,800 droplets × 28 steps complete in
+about **0.6–0.9 s**, produce both erosion and deposition, repeat exactly for the same seed on the same
+device, and change when the seed changes. Additive float blending is not claimed bit-identical across GPU
+vendors; the gate checks seeded same-device repeatability, finite output, mass closure, both terrain-action
+signs, the combined stage order, and a single readback.
 
 **What erodes must deposit — or be counted as export.** Both engines used to leak their terminal
 suspended load, and the two leaks turned out to be different stories. The GPU readback kept only the
@@ -1507,6 +1514,7 @@ node _verify_tectonic.js             # Voronoi plates: warped boundaries, orogen
 node _verify_curve.js                # skirt curve: monotone bake, LUT contract, widget drag
 node _verify_layout.js               # Layout: per-vertex elevation, falloff profiles, ops, Source/Modifier
 node _verify_gpu.js                  # CPU/GPU parity, GPU hydraulic invariants + timings
+node _verify_hydraulic_dual_gpu.js   # GPU droplets, combined one-readback path, switches/panels, migration
 node _verify_erosion_mass.js         # erosion mass budget: terminal settle, export ledger, opt-in contract
 node _verify_simplex.js              # Simplex determinism, Perlin distinction, transform + GPU parity
 node _verify_all_canyon.js           # whole Canyon suite, one summary line per test (--quick to skip shared)

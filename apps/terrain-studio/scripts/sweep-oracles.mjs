@@ -1,7 +1,7 @@
 // Run EVERY _verify_*.js and report each one's exit status.
 //
 // This exists because `npm run verify` runs _verify_all_canyon.js, which carries a hand-listed 12 of
-// the 70 oracles on disk - and the 58 it omits include _verify_digest.js, the byte-identity gate of
+// the 72 standalone oracles on disk - and the 60 it omits include _verify_digest.js, the byte-identity gate of
 // record. "The suite is green" therefore meant something much weaker than it read.
 import { spawnSync } from 'node:child_process'
 import { readdirSync, mkdirSync, writeFileSync } from 'node:fs'

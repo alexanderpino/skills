@@ -30,6 +30,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
     showcaseGraph();
     const keys=()=>[...document.querySelectorAll('#pBody .field[data-param-key]')].map(e=>e.dataset.paramKey);
+    const sections=()=>[...document.querySelectorAll('#pBody .param-section')].map(s=>({
+      id:s.dataset.section,
+      enabled:s.querySelector('[role=switch]').getAttribute('aria-checked'),
+      keys:[...s.querySelectorAll('.field[data-param-key]')].map(e=>e.dataset.paramKey)
+    }));
     // gradient/mountain/transform/sculpt have never been in the opening document - makeNode is the
     // intended path for those. water/hydraulic/thermal DO come from the document, so their absence
     // is a named SETUP FAILURE rather than a freshly-defaulted stand-in that would quietly pass.
@@ -40,16 +45,19 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     const water=need('water'),savedLevel=water.params.level;
     if(!Number.isFinite(savedLevel))throw new Error('SETUP FAILURE: water node has no numeric level param to preserve');
     const hydro=show('water',{mode:'hydro'}),sea=show('water',{mode:'sea'});
-    const gpu=show('hydraulic',{engine:'auto'}),cpu=show('hydraulic',{engine:'droplets'});
+    const hydraulic=need('hydraulic');Object.assign(hydraulic.params,{engine:null,pipeEnabled:true,dropletEnabled:true});
+    selected=hydraulic;buildProps();const hydraulicSections=sections();
+    const hydraulicSwitches=[...document.querySelectorAll('#pBody [role=switch]')].length;
     const cell=show('thermal',{realScale:'off'}),real=show('thermal',{realScale:'on'});
     const linear=show('gradient',{kind:'lin'}),radial=show('gradient',{kind:'rad'});
     const peak=show('mountain',{form:'peak'}),massif=show('mountain',{form:'massif'});
     const exact=show('transform',{mode:'auto'}),raster=show('transform',{mode:'raster'});
     const smooth=show('sculpt',{mode:'smooth'}),raise=show('sculpt',{mode:'raise'}),flatten=show('sculpt',{mode:'flatten'});
     show('water',{mode:'hydro'});
-    return {hydro,sea,gpu,cpu,cell,real,linear,radial,peak,massif,exact,raster,smooth,raise,flatten,
+    return {hydro,sea,hydraulicSections,cell,real,linear,radial,peak,massif,exact,raster,smooth,raise,flatten,
       levelPreserved:water.params.level===savedLevel,
-      tabs:[...document.querySelectorAll('#pBody .seg.tabs')].length};
+      tabs:[...document.querySelectorAll('#pBody .seg.tabs')].length,
+      hydraulicSwitches};
   });
   await page.evaluate(()=>{const w=nodes.find(n=>n.type==='water');w.params.mode='hydro';selected=w;buildProps();});
   await page.locator('#props').screenshot({path:path.resolve(__dirname,'_shot_water_hydrology_props.png')});
@@ -57,8 +65,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const ok=has(report.hydro,'mode','lakes','lakeMin','flow','riverDepth','shoreSmooth','foam')
     && lacks(report.hydro,'level')
     && has(report.sea,'mode','level','shoreSmooth','foam')&&lacks(report.sea,'lakes','lakeMin','flow','riverDepth')
-    && has(report.gpu,'pipeIters')&&lacks(report.gpu,'droplets','seed')
-    && has(report.cpu,'droplets','seed')&&lacks(report.cpu,'pipeIters')
+    && report.hydraulicSections.length===2
+    && report.hydraulicSections[0].id==='pipe'&&report.hydraulicSections[0].enabled==='true'
+    && has(report.hydraulicSections[0].keys,'pipeIters','pipeCapacity','pipeErode','pipeDeposit')
+    && report.hydraulicSections[1].id==='droplet'&&report.hydraulicSections[1].enabled==='true'
+    && has(report.hydraulicSections[1].keys,'droplets','lifetime','dropletCapacity','radius','seed')
     && has(report.cell,'talus')&&lacks(report.cell,'repose')&&has(report.real,'repose')&&lacks(report.real,'talus')
     && has(report.linear,'angle')&&lacks(report.radial,'angle')
     && has(report.peak,'shape')&&lacks(report.peak,'ridges')&&has(report.massif,'ridges')&&lacks(report.massif,'shape')
@@ -66,7 +77,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     && has(report.smooth,'radius')&&lacks(report.smooth,'amount','target')
     && has(report.raise,'amount')&&lacks(report.raise,'radius','target')
     && has(report.flatten,'target')&&lacks(report.flatten,'radius','amount')
-    && report.levelPreserved&&report.tabs>0&&!errors.length;
+    && report.levelPreserved&&report.tabs>0&&report.hydraulicSwitches===2&&!errors.length;
   console.log(JSON.stringify({report,errors,ok},null,2));
   await browser.close();process.exit(ok?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(2);});

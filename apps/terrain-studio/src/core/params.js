@@ -23,6 +23,8 @@ export const P={
   select:(key,label,opts,def)=>({key,label,type:"select",opts,def}),
   seg:(key,label,opts,def)=>({key,label,type:"seg",opts,def}),
   tabs:(key,label,opts,def)=>({key,label,type:"tabs",opts,def}),
+  toggle:(key,label,def=false)=>({key,label,type:"toggle",def:!!def}),
+  hidden:(key,def=null)=>({key,label:key,type:"hidden",def}),
   text:(key,label,def,rows=9)=>({key,label,type:"text",def,rows}),
   curve:(key,label,def)=>({key,label,type:"curve",def}),
   seed:(key,label,def)=>({key,label,type:"seed",def}),
@@ -31,6 +33,7 @@ export const P={
 // their tab becomes active again. This keeps every node consistent instead of hard-coding UI cases.
 export const WHEN=(param,key,...values)=>({...param,when:{key,values:values.flat()}});
 export const GROUP=(param,name)=>({...param,group:name});
+export const SECTION=(param,name)=>({...param,section:name});
 export const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
   mask:{c:"--cat-mask",name:"Mask"},data:{c:"--cat-data",name:"Data map"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};

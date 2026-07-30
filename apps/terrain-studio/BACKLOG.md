@@ -346,17 +346,18 @@ input in `12:33` with no row in `14`'s registry at all.
 
 ## 3. Confirmed defects — measured
 
-### C1 — GPU and CPU run *different erosion models* · TODO
-[index.html:3877](index.html#L3877): `gpuReady() ? gpuHydraulicPipes(...) : hydraulicErode(...)`.
-Virtual-pipe vs droplet — different physics selected by **what hardware you have**.
+### C1 — GPU and CPU ran *different erosion models* · RESOLVED 2026-07-30
+The old path selected virtual-pipe vs droplet physics according to **what hardware you have**.
 
 Measured: fbm/thermal/warp are **exact** GPU-vs-CPU (corr 1.000, 0% diff); the hydraulic node
 correlates **0.854** (mean 9.1%, interior-dominated, so not a boundary bug). End-to-end the default
 graph diverges at corr **0.910**, while two same-engine rebuilds are bit-identical.
 
-Consequence: hex forces CPU (`gpuReady()` excludes it), so hex silently runs the droplet model while
-square runs pipes. Fixing this is *correctness*, not performance.
-Repro: `node tests/legacy/_verify_glsl_probe.js` and the diag in commit `d2f6769`.
+Resolved by making Pipe and Droplet independent authored switches with separate controls. On square
+terrain both have GPU implementations and compose Pipe → Droplet without an intermediate readback.
+Unsupported float-blend contexts and hex use an explicitly labelled compatibility fallback; hardware
+no longer silently chooses which erosion effect the document requested. Repro/gates:
+`_verify_glsl_probe.js`, `_verify_gpu.js`, and `_verify_hydraulic_dual_gpu.js`.
 
 ### C2 — Both sims compute velocity and discard it · TODO
 Pipe model computes per-cell speed at [index.html:1432](index.html#L1432); droplet model carries
@@ -566,7 +567,7 @@ that makes a broken gate look thorough.
 |---|---|---|
 | W1 | Hex-native blur | 3-axis lattice-line Gaussian across 17 call sites. F-tier construction — `26:232` sanctions only 7-point Laplacian iteration or O(k²), both rejected with measured reasons. `σ_axis = σ·√(2/3)`; boundary renormalisation gated constant-in-constant-out ≤1e-6; ring anisotropy red ~1.155 → fixed ≤1.03. |
 | W2 | **MFD6** | This is what actually delivers "smoother and more natural" — D6 alone does not. `26:143`: 6 directions at 60° is **coarser** than D8's 8 at 45° (max aspect error 30° vs 22.5°). Measured H3: hex facet concentration **1.413** vs corrected-D8 **1.17**. Freeman 1991 `p=1.1` (P); Quinn's contour-length term collapses on hex (`26:174`); `spReceivers` stays single-receiver. |
-| W3 | GPU hex kernels + 6-pipe | Fixes C1. 6-pipe hydraulics are **F-tier** (`26:53-56` — do not imply a paper); re-derive the six-outflow CFL bound (`08:361`). Relax `gpuReady()` **last**. |
+| W3 | GPU hex kernels + 6-pipe | Removes the remaining labelled hydraulic CPU fallback on hex. 6-pipe hydraulics are **F-tier** (`26:53-56` — do not imply a paper); re-derive the six-outflow CFL bound (`08:361`). Relax `gpuReady()` **last**. |
 | W4 | Auxiliary-map registry | The three lenses above. Lazily materialised — 12 R32F maps at 4K is ~930 MB, so allocate only what a graph reads; `wetness` could be R8. |
 | W5 | Water sources + flow field + ice chain | D5 + C2 + the ice node. |
 | W6 | Export profiles + manifest | D6. Includes the final-vs-initial-state contract and driver-completeness check. |
