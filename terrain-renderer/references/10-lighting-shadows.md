@@ -211,6 +211,27 @@ clipmap levels at extreme distance recreate the same big-texel problem with diff
   the double-attenuation rule extended to three media — aerial perspective, height fog, froxel
   fog — declare which owns the distance cue, which owns mood, which owns light shafts, and never
   let two attenuate the same cue.
+- **God rays / crepuscular rays** come in two mechanism families, and terrain vistas expose the
+  difference. The classic **screen-space post-process** (radial sampling toward the sun's screen
+  position — Mitchell, GPU Gems 3 ch. 13, P/D) is nearly free and scene-complexity-independent,
+  but it dies the moment the sun leaves the frame, and it bleeds through thin foreground
+  occluders. The **volumetric form** — shadowed in-scatter in the froxel volume or a raymarched
+  sun-visibility term — costs real budget but works with the sun off-screen and composes
+  correctly with the fog media above. Terrain doctrine either way: the occlusion source is the
+  terrain shadow path this chapter already built (cascades, heightfield rays, horizon maps), so
+  rays pour through ridge notches and valley gaps exactly where the shadows say they should —
+  rays through a notch at dawn are a scale cue of the same rank as aerial perspective. Pitfall:
+  post-process rays stacked on shadowed froxel fog double-counts the same phenomenon — the
+  three-media ownership rule above extends to light shafts; exactly one system renders them.
+- **Volumetric clouds** (raymarched noise-density decks — the Horizon Zero Dawn cloudscapes
+  lineage, Schneider, SIGGRAPH 2015 Advances, T) belong to the sky system, but terrain owns
+  three seams. First, the cloud pass must read terrain depth and march only to the nearer of
+  cloud exit or terrain hit — or summits get cloud drawn over them the day a mountain pierces
+  the deck. Second, one sky state: the coverage field that shapes the clouds is the *same* map
+  that drives the cloud-shadow term below and, where a weather system exists, `13`'s weather
+  intensity — clouds, their shadows, and the rain they imply must agree. Third, the
+  above-the-deck regime (flying through, seeing cloud tops from a summit or orbit) rides `09`'s
+  altitude machinery.
 - **Cloud shadows** are the cheapest large-scale life a vista can buy: a scrolling, tiling
   cloud-coverage texture projected top-down and sampled in the sun-visibility term (F-tier
   standard practice — a light modulator, *not* a shadow-map caster; keep it out of the caster
