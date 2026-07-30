@@ -3,23 +3,36 @@
 // points against their CPU reference, so the failure is located instead of guessed at.
 const { chromium } = require('playwright-core');
 const path = require('path');
-const fs = require('fs');
+const { liftOrDie, ENV_VAR } = require('./lift-glsl-source');
 const EXE = process.env.STUDIO_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-// STUDIO_URL first, file:// only as the fallback — see the note in _verify_colorknobs.js. This
-// probe lifts GLSL out of the live compositor source at runtime, so a blank page here does not
-// fail loudly; it finds no shader and has nothing to compare, which is the quiet variety.
+// STUDIO_URL first, file:// only as the fallback — see the note in _verify_colorknobs.js.
 const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'));
-const SRC = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
-function grabFn(sig) {
-  const i = SRC.indexOf(sig); if (i < 0) return null;
-  let d = 0, j = SRC.indexOf('{', i); if (j < 0) return null;
-  for (let k = j; k < SRC.length; k++) {
-    if (SRC[k] === '{') d++; else if (SRC[k] === '}') { d--; if (!d) return SRC.slice(i, k + 1); }
-  } return null;
-}
-const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
+
+// The lift used to be a private fs.readFileSync('../../index.html') + brace match that returned
+// null on a miss, and the null went straight into the shader template below. That is the quiet
+// failure this file's header used to admit to, and it is not hypothetical: run the old code
+// against an ES-module-split copy (script body in src/legacy.js) and you get
+//   fsOk:false  fsLog:"ERROR: 0:5: 'null' : syntax error"   "samples": []   exit 0
+// — a probe that compared nothing and reported success. lift-glsl-source.js searches index.html
+// AND src/**/*.js, so it keeps finding these before and after the split, and liftOrDie() exits 2
+// naming the signature it could not find and every file it looked in. FN_WORLD/FN_TAP below are
+// therefore guaranteed non-null by construction: there is no path from here into the template
+// that carries a missing function.
+const SIG_WORLD = 'vec2 worldUV(', SIG_TAP = 'float latTap(';
+const LIFT = liftOrDie([SIG_WORLD, SIG_TAP], { label: 'the compositor helpers worldUV/latTap' });
+const FN_WORLD = LIFT.code[SIG_WORLD], FN_TAP = LIFT.code[SIG_TAP];
 
 (async () => {
+  // Provenance, so a reader of the log can tell WHICH file the compiled GLSL came from instead of
+  // assuming index.html forever.
+  console.log('lifted ' + JSON.stringify({
+    from: LIFT.sources.mode === 'file' ? LIFT.sources.searched[0] : LIFT.sources.root,
+    override: LIFT.sources.override ? `${ENV_VAR}=${LIFT.sources.override}` : null,
+    searched: LIFT.sources.searched,
+    worldUV: `${LIFT.found[SIG_WORLD].file}:${LIFT.found[SIG_WORLD].line}`,
+    latTap: `${LIFT.found[SIG_TAP].file}:${LIFT.found[SIG_TAP].line}`,
+    chars: { worldUV: FN_WORLD.length, latTap: FN_TAP.length },
+  }));
   const b = await chromium.launch({ executablePath: EXE,
     args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
   const p = await b.newPage({ viewport: { width: 900, height: 700 } });
@@ -102,4 +115,48 @@ const FN_WORLD = grabFn('vec2 worldUV('), FN_TAP = grabFn('float latTap(');
   console.log(JSON.stringify(r, null, 1));
   console.log('errors', errors.length ? JSON.stringify(errors) : 'none');
   await b.close();
+
+  // ---- GATE. Everything above is a report; without this the report IS the result. --------------
+  // Lifting the right source only guarantees the probe found something to compile. It does not
+  // guarantee the compile SUCCEEDED, and a failed compile leaves `samples: []` and falls off the
+  // end of the script at exit 0 — which run-legacy-verify.mjs reports as a pass. That is not
+  // hypothetical: adding a single call to a nonexistent GLSL function inside latTap yields
+  //   fsOk:false  samples:[]  EXIT=0
+  // i.e. a probe that compared nothing and announced success. Four assertions close it, and each
+  // one is a distinct way of comparing nothing:
+  //   compile   — the shader never built
+  //   link      — it built but the program did not link
+  //   coverage  — it linked but produced no sample rows
+  //   agreement — rows exist but GPU and CPU disagree (the defect the probe is FOR)
+  const fail = [];
+  const c = r.compile || {};
+  if (!c.fsOk) fail.push(`fragment shader did not compile: ${c.fsLog || '(no log)'}`);
+  if (c.fsOk && !c.linkOk) fail.push(`program did not link: ${c.linkLog || '(no log)'}`);
+  if (!r.samples || r.samples.length !== 4)
+    fail.push(`expected 4 probe samples, got ${r.samples ? r.samples.length : 0} — nothing was compared`);
+  if (errors.length) fail.push(`page errors: ${JSON.stringify(errors)}`);
+
+  let maxDiff = 0;
+  for (const s of r.samples || []) maxDiff = Math.max(maxDiff, Math.abs(s.gpu - s.cpu));
+  // Bound armed between two MEASURED endpoints, not chosen from theory:
+  //   correct build                                        maxDiff = 0.000e+0   PASS
+  //   half-texel offset perturbed 0.5 -> 0.46 in latTap    maxDiff = 1.760e-4   FAIL
+  // so 1e-5 sits an order below a 4%-of-a-texel error and above exact agreement. Reproduce the
+  // negative control with GLSL_SRC pointed at a copy carrying that edit — the override exists
+  // precisely so this can be re-armed without touching the app.
+  //
+  // NOTE for whoever re-arms it: this probe runs `terrainDef.lattice='square'` with uRowScale=1
+  // (see below), so it exercises ONLY latTap's `if(uRowScale==1.0)` fast path. Perturbing the hex
+  // branch — anything guarded by uHpx/uRowScale != 1 — changes nothing here and the control will
+  // pass while proving nothing. Hex coverage of the same helper is _verify_hex_deferred.js G1.
+  const TOL = 1e-5;
+  if ((r.samples || []).length && maxDiff > TOL)
+    fail.push(`GPU/CPU disagree: maxDiff=${maxDiff.toExponential(3)} > ${TOL}`);
+
+  if (fail.length) {
+    console.log(`FAIL  glsl-probe  ${fail.join(' | ')}`);
+    process.exit(1);
+  }
+  console.log(`PASS  glsl-probe  lifted worldUV+latTap from ${LIFT.found[SIG_WORLD].file}, compiled, `
+    + `linked, 4/4 samples, maxDiff=${maxDiff.toExponential(3)} (tol ${TOL})`);
 })().catch(e => { console.error('FATAL ' + String(e).slice(0, 300)); process.exit(2); });
