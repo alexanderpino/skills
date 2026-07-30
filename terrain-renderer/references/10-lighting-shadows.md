@@ -192,6 +192,31 @@ clipmap levels at extreme distance recreate the same big-texel problem with diff
   landmark shot; a disk drawn over terrain (sky composited without depth test) is an instant
   fake. Bloom must bleed from the *visible* portion only, which it does for free when occlusion
   happens before the bloom chain.
+- **The skybox is the same fullscreen triangle.** Modern sky rendering is neither a dome mesh
+  nor a box: draw the sky **last** as one fullscreen triangle (the `12`/`16` idiom), depth-tested
+  at the far plane (`GREATER_EQUAL` at depth 0 under reversed-Z) so only pixels no geometry
+  touched get shaded — zero overdraw behind terrain, and the sun-disk occlusion above comes free.
+  Reconstruct the view ray per pixel and sample the sky: a cubemap for authored skies, the
+  sky-view LUT for the physical model. Ownership boundary: the sky *model* — scattering, cloud
+  rendering as a participating medium — belongs to the atmosphere system (route
+  physically-based-rendering); terrain owns the **seam**: sky pixels and terrain aerial
+  perspective must evaluate the *same* atmosphere parameterization or the horizon shows a color
+  discontinuity where mountains meet sky, and the horizon band's depth precision is `09`.
+- **Volumetric (froxel) fog is a boundary, not a terrain system.** Camera-frustum froxel
+  volumetrics is engine-wide (render-graph placement is game-engine-guru; phase functions and
+  scattering are physically-based-rendering). Terrain owns what *feeds* it: height/valley fog
+  density driven by terrain data — altitude, and the `14` aux maps, so morning mist pools where
+  the simulation put moisture, not uniformly at y < k; god rays sourced from the same terrain
+  shadow path rendered above (cascades or heightfield rays), never a separate shadow pass; and
+  the double-attenuation rule extended to three media — aerial perspective, height fog, froxel
+  fog — declare which owns the distance cue, which owns mood, which owns light shafts, and never
+  let two attenuate the same cue.
+- **Cloud shadows** are the cheapest large-scale life a vista can buy: a scrolling, tiling
+  cloud-coverage texture projected top-down and sampled in the sun-visibility term (F-tier
+  standard practice — a light modulator, *not* a shadow-map caster; keep it out of the caster
+  path). Two rules: every terrain consumer — ground, vegetation (`15`), water (`12`) — samples
+  the same shared lookup, or clouds pass over the grass but not the lake; and its scroll vector
+  is `13`/`15`'s wind vector, so clouds, grass, and blowing snow agree about the sky.
 - **Planet-scale**: at planetary distances the planet's own shadow darkens the atmosphere — the
   terminator seen from orbit, shadowed sky after sunset. That coupling, plus the precision
   machinery it rides on, is `09`; the flat-world approximation here quietly assumes the sun
