@@ -18,7 +18,8 @@
     "bridge:verify": "node scripts/apply-bridge.mjs --check",
     "plugins:extract": "node scripts/extract-plugins.cjs",
     "plugins:exports": "node scripts/export-plugin-helpers.cjs",
-    "plugins:tdz": "node scripts/check-plugin-tdz.cjs"
+    "plugins:tdz": "node scripts/check-plugin-tdz.cjs",
+    "plugins:check": "node scripts/check-plugin-imports.cjs && node scripts/check-plugin-exports.cjs && node scripts/check-plugin-tdz.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0",

@@ -4,6 +4,7 @@
 // until the graph is evaluated, so the legacy<->plugin cycle is safe. Anything needed at
 // module-evaluation time (the params array) comes from core/params.js, outside the cycle.
 import { definePlugin } from '../../core/registry.js'
+import { gpuReady, gpuWarp } from '../../core/gpu.js'
 import { P } from '../../core/params.js'
 import { maskApply, newField, warpField } from '../../legacy.js'
 

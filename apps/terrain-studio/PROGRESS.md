@@ -1,4 +1,4 @@
-# Terrain Studio — progress
+| `out` | 1 | **done** | this commit || `data` | 14 | **done** | this commit || `effect` | 7 | **done** | this commit |# Terrain Studio — progress
 
 Where the work stands. **`BACKLOG.md` holds findings, decisions and defects; this file holds
 position** — what shipped, what the gates measured, what is next.
@@ -12,6 +12,8 @@ Updated as work lands. If this disagrees with a commit message, the commit wins.
 **Programme:** modularisation toward React + plugin nodes + PWA, per
 `~/.claude/plans/quiet-wishing-harbor.md` (adversarially reviewed before execution; seven blocking
 issues found and folded in).
+
+**Phase B — 60 of 60 node types are plugins.** legacy.js 7,406 → 6,561 lines.
 
 **Phase A — become a module, extract GPU, ship the PWA shell.**
 
@@ -66,7 +68,7 @@ tests/e2e/          4 Playwright specs
 | `mask` | 4 | **done** | this commit |
 | `filt` | 11 | **done** | `2b6d1c8` |
 | `gen` | 12 | **done** | this commit |
-| `ero` | 5 | next | — |
+| `ero` | 5 | **done** | this commit |
 | `effect` | 7 | | — |
 | `data` | 14 | | — |
 | `out` | 1 | | — |

@@ -5,7 +5,7 @@
 // module-evaluation time (the params array) comes from core/params.js, outside the cycle.
 import { definePlugin } from '../../core/registry.js'
 import { P, WHEN } from '../../core/params.js'
-import { XF, setXF, evalExact, exactChain, inputEdge, maskApply, newField, terrainDef, transformField, xfFromParams, xfMul } from '../../legacy.js'
+import { XF, evalExact, exactChain, inputEdge, maskApply, newField, setXF, terrainDef, transformField, xfFromParams, xfMul } from '../../legacy.js'
 
 export default definePlugin({
   type: "transform",

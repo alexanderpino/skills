@@ -1,5 +1,9 @@
 import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuReady, hydroMassDiag, setHydroMassDiag, setGL as setGpuGL } from './core/gpu.js';
 import { mergePlugins } from './core/registry.js';
+import './plugins/out/index.js';
+import './plugins/data/index.js';
+import './plugins/effect/index.js';
+import './plugins/ero/index.js';
 import './plugins/gen/index.js';
 import './plugins/filt/index.js';
 import './plugins/mask/index.js';
@@ -51,7 +55,7 @@ document.addEventListener("wheel",e=>{
   inp.dispatchEvent(new Event("change",{bubbles:true}));
 },{passive:false,capture:true});
 
-let RES=512;                                   // active working grid resolution (square)
+export let RES=512;                                   // active working grid resolution (square)
 let TARGET_RES=RES;                            // profile target; 2K/4K wait for an explicit Build
 let AUTO=true;
 // SatMap colour LUTs — curated elevation gradients (Gaea's "SatMap" idea). "Dune" is EXTRACTED from a
@@ -307,7 +311,7 @@ export function radialField(){
 let SCALE_RES=true;
 const REF_RES=192;
 export const resScale=()=>SCALE_RES?RES/REF_RES:1;          // >1 when finer than the reference grid
-let BUILD_QUALITY="interactive";
+export let BUILD_QUALITY="interactive";
 export let USE_GPU=true;
 // GPU compute, makeProg and u now live in src/core/. See the import at the top of this file.
 
@@ -1420,7 +1424,7 @@ function resampleRect(f,fromW,fromH,toW,toH){
 // FEATURE SCALE — run `fn` on a grid k times coarser so its features come out k times WIDER, then add
 // the change back at full resolution (fine detail is preserved; only the erosion's footprint grows).
 // Coarse cell size is k * cellSizeM() metres, which is the lateral size the simulation actually sees.
-function atFeatureScale(inp,k,fn){
+export function atFeatureScale(inp,k,fn){
   if(!(k>1.02))return fn(inp);
   const full=RES,fullH=latticeRows(full),w=Math.max(16,Math.round(RES/k)),wH=latticeRows(w);
   const small=resampleRect(inp,full,fullH,w,wH);
@@ -1550,7 +1554,7 @@ function percentileOf(f,q){                       // q in [0,1]
 }
 
 /* ----------------------------------------------------- selectors ------ */
-function slopeOf(inp){
+export function slopeOf(inp){
   const n=fieldW(),nh=fieldH(),o=newField();
   if(isHex()){
     // D6 least-squares gradient. Square central differences on hex data span sqrt(3) world units
@@ -1581,7 +1585,7 @@ function slopeOf(inp){
    --------------------------------------------------------------------- */
 const gAt=(f,x,y)=>f[clamp(y,0,fieldH()-1)*RES+clamp(x,0,RES-1)];
 // Zevenbergen-Thorne curvature on the 3x3 window (analysis.curvature). profile: +ve concave valley floor.
-function curvatureField(inp,{kind="profile",strength=1}){
+export function curvatureField(inp,{kind="profile",strength=1}){
   const n=fieldW(),nh=fieldH(),o=newField(),L=1/n,eps=1e-12,hex=isHex();
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     let D,E,F,G,H;
@@ -1622,13 +1626,13 @@ function curvatureField(inp,{kind="profile",strength=1}){
   return o;
 }
 // Flow accumulation: priority-flood fill then D8 drainage area, log-compressed (analysis/flow).
-function flowField(inp,{gain=1}){
+export function flowField(inp,{gain=1}){
   const acc=d8Accumulation(priorityFloodFill(inp)),o=newField();
   for(let i=0;i<o.length;i++)o[i]=Math.log1p(acc[i]*gain);
   return normalize(o);
 }
 // Horizon-based ambient occlusion: occl = 1 - mean(cos^2 theta) over n dirs (analysis.horizon_ao).
-function occlusionField(inp,{radius=0.06,dirs=8}){
+export function occlusionField(inp,{radius=0.06,dirs=8}){
   const n=fieldW(),nh=fieldH(),o=newField(),maxD=Math.max(2,radius*n),hex=isHex();
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const h0=inp[y*n+x];let occ=0;
@@ -1678,7 +1682,7 @@ function morphDiag1D(inp,r,mx){
 // 1.000) - a HeightField laundered into a MaskField, 10's normalize defect verbatim. The mask is
 // now depth-in-metres against refDepth (the fill depth that saturates the mask), so "how much
 // soil" survives as information and two terrains stop reading identically.
-function depositsField(inp,{radius=3,refDepth=25}){
+export function depositsField(inp,{radius=3,refDepth=25}){
   const r=Math.max(1,Math.round(radius));
   // rd from the isotropy optimum r*(1-1/sqrt2), r1 as the RESIDUAL r-2rd - so the axis reach is
   // exactly r for every r and the slider stays monotone (a double round() of both radii made
@@ -1708,19 +1712,19 @@ function depositsField(inp,{radius=3,refDepth=25}){
   return o;
 }
 // Peaks: prominence above the local mean (h - blur(h), positive part).
-function peaksField(inp,{radius=4}){
+export function peaksField(inp,{radius=4}){
   const b=blurField(inp,{radius:Math.max(1,Math.round(radius))}),o=newField();
   for(let i=0;i<o.length;i++)o[i]=Math.max(inp[i]-b[i],0);
   return normalize(o);
 }
 // Wear: convex, steep ground — the exposed edges erosion strips first (convexity x slope).
-function wearField(inp,{strength=1}){
+export function wearField(inp,{strength=1}){
   const cur=curvatureField(inp,{kind:"mean",strength:1}),sl=normalize(slopeOf(inp)),o=newField();
   for(let i=0;i<o.length;i++)o[i]=Math.max(0.5-cur[i],0)*2*sl[i]*strength;
   return normalize(o);
 }
 // Texture: Gaea's composite colour driver — slope + soil(deposits) + flow mixed into one mask.
-function textureField(inp,{slopeW=0.5,soilW=0.3,flowW=0.2}){
+export function textureField(inp,{slopeW=0.5,soilW=0.3,flowW=0.2}){
   const sl=normalize(slopeOf(inp)),so=depositsField(inp,{radius:3}),fl=flowField(inp,{gain:1});
   const o=newField(),tot=(slopeW+soilW+flowW)||1;
   for(let i=0;i<o.length;i++)o[i]=(sl[i]*slopeW+so[i]*soilW+fl[i]*flowW)/tot;
@@ -1894,7 +1898,7 @@ function spReceivers(g,cellsize){
 // It has to run INSIDE the loop; a single relaxation pass afterwards cannot undo ridges that
 // sharpened for 200 iterations. reference-impl has hillslope_diffuse but never couples the two,
 // which is a gap there as well.
-function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
+export function streamPowerErode(inp,{Kdt=0.5,Udt=0,m=0.5,iters=25,uplift=null,Ddt=0}){
   const n=fieldW(),nh=fieldH(),N=n*nh;
   let h=inp.slice();
   const isEdge=new Uint8Array(N);
@@ -1966,7 +1970,7 @@ function thermalErodeHex(inp,{talus=0.012,iters=30,rate=0.5}){
 }
 // One dispatcher so no caller can silently keep the square kernel on a hex build. On square this
 // is exactly thermalErode, so the digest-pinned mountain/peak weathering is byte-identical.
-const thermalOn=(inp,opt)=>(isHex()?thermalErodeHex:thermalErode)(inp,opt);
+export const thermalOn=(inp,opt)=>(isHex()?thermalErodeHex:thermalErode)(inp,opt);
 function thermalErode(inp,{talus=0.012,iters=30,rate=0.5}){
   const n=fieldW(),nh=fieldH();let h=inp.slice();
   // 8-neighbour offsets with their DISTANCE (diagonals are sqrt(2) away). The repose threshold must
@@ -2016,21 +2020,21 @@ function blurScalarField(src,n,radius,passes=2){const nh=latticeRows(n);
 // Scalar buffers stay graph-friendly [0,1], while their physical meaning travels beside the
 // Float32Array. The wider interval includes magma/lava temperatures without sacrificing useful
 // precision around freezing (Float32 still resolves far below 0.01 °C here).
-const TEMP_MIN_C=-100,TEMP_MAX_C=1400,FIELD_META=new WeakMap();
-const encodeTemperatureC=c=>clamp((c-TEMP_MIN_C)/(TEMP_MAX_C-TEMP_MIN_C),0,1);
+export const TEMP_MIN_C=-100,TEMP_MAX_C=1400,FIELD_META=new WeakMap();
+export const encodeTemperatureC=c=>clamp((c-TEMP_MIN_C)/(TEMP_MAX_C-TEMP_MIN_C),0,1);
 const decodeTemperatureField=f=>{
   if(!f)return null;const out=new Float32Array(f.length),span=TEMP_MAX_C-TEMP_MIN_C;
   for(let i=0;i<f.length;i++)out[i]=TEMP_MIN_C+clamp(f[i],0,1)*span;
   return out;
 };
-function tagTemperatureField(field,temperatureC=null,extras={}){
+export function tagTemperatureField(field,temperatureC=null,extras={}){
   if(!field)return field;
   FIELD_META.set(field,{kind:"temperature",unit:"°C",minC:TEMP_MIN_C,maxC:TEMP_MAX_C,
     temperatureC,solarShadow:extras.solarShadow||null,solarExposure:extras.solarExposure||null,
     lapseRate:extras.lapseRate==null?null:extras.lapseRate,heightField:extras.heightField||null});
   return field;
 }
-const fieldMetadata=field=>field&&FIELD_META.get(field)||null;
+export const fieldMetadata=field=>field&&FIELD_META.get(field)||null;
 export function temperatureCFromField(field){
   const meta=fieldMetadata(field);if(!meta||meta.kind!=="temperature")return null;
   if(!meta.temperatureC)meta.temperatureC=decodeTemperatureField(field);
@@ -2111,7 +2115,7 @@ function climateSolarExposure(baseM,n,def,options={}){const nh=latticeRows(n);
   for(let i=0;i<N;i++)exposure[i]=clamp(.12+.88*direct[i]*(.08+.92*softShadow[i]),0,1);
   return{exposure,direct,shadow:softShadow,sunElevationDeg:elevation*180/Math.PI};
 }
-function evaluateSunShadowMap(inp,p={}){
+export function evaluateSunShadowMap(inp,p={}){
   const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
   const h=preview===full?inp:resampleField(inp,full,preview);
   const baseM=metricHeightField(h,preview,terrainDef);
@@ -2120,7 +2124,7 @@ function evaluateSunShadowMap(inp,p={}){
   return{heightM:resampleField(baseM,preview,full),solarExposure:resampleField(solar.exposure,preview,full),
     solarShadow:resampleField(solar.shadow,preview,full)};
 }
-function evaluateTemperatureMap(inp,p={},shadowInput=null){
+export function evaluateTemperatureMap(inp,p={},shadowInput=null){
   const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
   const h=preview===full?inp:resampleField(inp,full,preview);
   const supplied=shadowInput?(preview===full?shadowInput:resampleField(shadowInput,full,preview)):null;
@@ -2149,12 +2153,12 @@ function evaluateTemperatureMap(inp,p={},shadowInput=null){
 // only a graph thumbnail / generic-mask view of speed; the vector contract travels in FIELD_META,
 // exactly as physical Celsius travels beside Temperature's encoded scalar field. "Wind from"
 // bearings are map-relative: 0° arrives from map-top and therefore blows toward +row.
-const WIND_MAX_MPS=80;
-function windBearingVector(direction){
+export const WIND_MAX_MPS=80;
+export function windBearingVector(direction){
   const r=((direction||0)%360+360)%360*Math.PI/180;
   return[-Math.sin(r),Math.cos(r)];
 }
-function tagWindField(field,u,v,speed,extras={}){
+export function tagWindField(field,u,v,speed,extras={}){
   if(!field)return field;
   FIELD_META.set(field,{kind:"wind",unit:"m/s",u,v,speed,heightField:extras.heightField||null,
     baseDirection:extras.baseDirection==null?null:extras.baseDirection,
@@ -2163,11 +2167,11 @@ function tagWindField(field,u,v,speed,extras={}){
     divergenceRmsAfter:extras.divergenceRmsAfter==null?null:extras.divergenceRmsAfter});
   return field;
 }
-function windVectorFromField(field){
+export function windVectorFromField(field){
   const m=fieldMetadata(field);
   return m&&m.kind==="wind"&&m.u&&m.v&&m.speed?m:null;
 }
-function windDivergenceRms(u,v,n,cell){const nh=latticeRows(n);
+export function windDivergenceRms(u,v,n,cell){const nh=latticeRows(n);
   if(!u||!v||n<3)return 0;
   let sum=0,count=0;
   for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
@@ -2187,7 +2191,7 @@ function windDivergenceRms(u,v,n,cell){const nh=latticeRows(n);
 // reference-impl uses one spectral operator for div/Laplacian/grad for exactly this reason and
 // gates after < 0.05*before). A coarse-grid pre-solve (4x block-mean restriction, solved deep,
 // prolonged as the initial guess) carries the long-wavelength part a bounded fine sweep cannot.
-function projectWindMassConsistent(u0,v0,n,cell,iterations=56){const nh=latticeRows(n);
+export function projectWindMassConsistent(u0,v0,n,cell,iterations=56){const nh=latticeRows(n);
   const N=n*nh,rhs=new Float32Array(N);
   for(let y=0;y<nh-1;y++)for(let x=0;x<n-1;x++){
     const i=y*n+x;rhs[i]=(u0[i+1]-u0[i]+v0[i+n]-v0[i])/cell;
@@ -2350,7 +2354,7 @@ function simulateTerrainWind(inp,p={},context={}){
   return{u,v,speed,encoded,heightM:baseM,baseDirection:direction,baseSpeed,
     divergenceRmsBefore,divergenceRmsAfter,simulationResolution:n};
 }
-function evaluateTerrainWind(inp,p={}){
+export function evaluateTerrainWind(inp,p={}){
   const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
   if(preview===full)return simulateTerrainWind(inp,p,{res:full,terrainDef});
   const result=simulateTerrainWind(resampleField(inp,full,preview),p,{res:preview,terrainDef});
@@ -2602,7 +2606,7 @@ function simulateSnowLayer(inp,p={},context={}){
 // Keep live 1K–4K authoring bounded without changing the physical grid scale: avalanche stability is
 // solved on a 512² preview field (cell size follows that field), then only the transient depth is
 // reconstructed at working resolution. Final quality intentionally removes the cap.
-function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExposure=null,wind=null){
+export function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExposure=null,wind=null){
   const full=RES,preview=BUILD_QUALITY==="interactive"?Math.min(full,512):full;
   if(preview===full)return simulateSnowLayer(inp,p,{temperatureC:temperatureField,solarShadow,solarExposure,wind});
   const small=resampleField(inp,full,preview);
@@ -2624,7 +2628,7 @@ function evaluateSnowLayer(inp,p,temperatureField=null,solarShadow=null,solarExp
 }
 // Hydraulic (droplet) erosion — Beyer 2015 / Lague-style particle sim, mass-balanced with an
 // erosion brush so a droplet spreads its scour over a small radius (no single-cell pits).
-function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false,gridK=1}){
+export function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,deposit=0.3,evap=0.02,gravity=4,radius=2,minSlope=0.01,seed=1,spawn=null,settle=false,gridK=1}){
   const n=fieldW(),nh=fieldH();let h=inp.slice();
   // Res Lock (gridK = node-level RES/REF_RES; default 1 = legacy cell-unit behaviour, which the
   // mountain/peak callers rely on byte-for-byte). A step is one cell, so per-step rates are
@@ -2728,7 +2732,7 @@ function hydraulicErode(inp,{droplets=15000,inertia=0.05,capacity=4,erode=0.3,de
 // Gaea's implementation is proprietary; its public contract separates duration/downcutting, largest
 // erosion scale, three sediment mobilities, shape relaxation, and nested detail. We preserve that
 // separation rather than relabelling the older single-pass Hydraulic node.
-function erosion2Field(inp,p){
+export function erosion2Field(inp,p){
   const duration=clamp(p.duration,0,1),down=clamp(p.downcut,0,1),detail=clamp(p.shapeDetail,0,1);
   const sediment=clamp((p.suspended+p.bed+p.coarse)/3*(1+.75*p.depositBoost),.03,.95);
   const[mn,mx]=fieldRange(inp),relief=Math.max(mx-mn,1e-5),seeded=inp.slice(),n=RES,nh=latticeRows(n);
@@ -2785,7 +2789,7 @@ function erosion2Field(inp,p){
 // HYDROFIX — low-amplitude drainage conditioning. Route on a priority-filled copy, carve a soft
 // accumulation corridor into the original terrain, then enforce only the tiny descent needed for
 // connected receivers. This changes flow topology without replacing the landscape.
-function hydroFixField(inp,p){
+export function hydroFixField(inp,p){
   const n=fieldW(),nh=fieldH(),N=n*nh,filled=priorityFloodFill(inp),rec=new Int32Array(N).fill(-1),A=new Float32Array(N).fill(1);
   // Same one-ring contract as spReceivers: D6 on hex (one distance), D8 with sqrt(2) on square.
   const nbSq=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
@@ -2854,358 +2858,11 @@ const TYPES=mergePlugins({
 
 
 
-  thermal:{cat:"ero",name:"Thermal erosion",ins:["In","Mask"],desc:"Talus: material above repose slides down.",
-    // Real scale is the DEFAULT: with cell units shipping as default, the Repose slider did not
-    // exist on a fresh node and repose 25 vs 45 measured IDENTICAL slope percentiles - the
-    // node's only physical control was unreachable out of the box. Cell units stay as the
-    // escape hatch (existing saved graphs keep their stored value).
-    params:[P.tabs("realScale","Units",[["off","Cell units"],["on","Real scale"]],"on"),
-      WHEN(P.slider("repose","Repose angle",15,60,35,1,v=>(v|0)+"\u00b0"),"realScale","on"),
-      WHEN(P.slider("talus","Talus",0.002,0.05,0.012,0.001,v=>v.toFixed(3)),"realScale","off"),P.int("iters","Iterations",5,80,30),P.slider("rate","Rate",0.1,1,0.5),
-      P.log("feat","Feature scale",1,8,1,v=>v.toFixed(1)+"\u00d7",false)],
-    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
-    // Real Scale ON: `repose` is a true angle, so the per-cell drop is tan(angle) * cellSize / height
-    // — physically meaningful AND inherently resolution independent (it already carries the 1/RES).
-    // OFF: `talus` is a raw per-cell drop, divided by k to hold the same angle as the reference grid.
-    const talus=(p.realScale==="on")
-      ? Math.tan(p.repose*Math.PI/180)*cellSizeM()/terrainDef.height
-      : p.talus/k;
-    // Interactive is a preview-tier budget: enough relaxation to read the landform, bounded so a
-    // 1024² property edit does not launch 117+ simulation steps. Final retains full scaled travel.
-    const travel=BUILD_QUALITY==="final"?k:Math.min(1.5,Math.sqrt(k));
-    const q={...p,talus,iters:Math.max(1,Math.round(p.iters*travel))};
-    // Hex: the D6 kernel (one distance, one threshold); gpuReady() is already false on hex.
-    return maskApply(ins[0],atFeatureScale(ins[0],p.feat,f=>gpuReady()?gpuThermal(f,q):thermalOn(f,q)),ins[1]);}},
-  streampower:{cat:"ero",name:"Stream power",ins:["In","Uplift","Mask"],
-    desc:"Fluvial incision \u2014 dh/dt = U \u2212 K\u00b7A^m\u00b7S. Drainage area makes valleys join into a tree and deepen downstream, so ridges emerge as what is left between them. This is the process that organises a landscape, not a texture applied to one.",
-    // Incision default halved from 0.15: Kdt = strength*2, and 0.3 marches every cell 23% toward
-    // its receiver per iteration - at shipped iteration counts that removed 57-62% of a mountain's
-    // relief out of the box. 0.08 still carves a connected network (gated) while defaults keep most
-    // relief, which is the Gaea-baseline contract for an out-of-the-box erosion node.
-    params:[P.slider("strength","Incision",0,1,0.08,0.01),
-      P.slider("m","Area exponent",0.2,0.8,0.5,0.01),
-      P.int("iters","Iterations",1,60,14),
-      // Default RAISED from 0: with no uplift the implicit solve is pure decay toward base level
-      // and the shipped defaults removed 62% of a mountain in 14 iterations - a destructive
-      // out-of-the-box setting. 0.35 balances incision so defaults CARVE drainage while keeping
-      // most relief (the equilibrium-landscape regime the solver exists for). Uplift 0 remains
-      // available and documented as the erode-to-baselevel mode.
-      P.slider("uplift","Uplift",0,1,0.35,0.01),
-      P.slider("hillslope","Hillslope",0,1,0.9,0.01)],
-    // Res Lock mapping (k = RES/REF_RES): the solver's length scales live in cells, so the
-    // slider->physical mapping is where world units get restored. Iterations do NOT scale:
-    // this is the Braun-Willett implicit cascade - receivers are solved before donors in one
-    // ordered sweep, so a base-level signal crosses the whole network in a single iteration and
-    // the "one cell per iteration" travel intuition is false for this kernel (K's per-cell decay
-    // is real - which is exactly why K needs boosting beyond the steady-state exponent). The
-    // steady-state theory alone (K*k^(1-2m), U fixed) under-erodes the 14-iteration TRANSIENT
-    // the shipped defaults run, so K carries a CALIBRATED exponent, fitted by sweep over m in
-    // {.2,.5,.8} x k in {2,3} on the reference input (phi*(m) ~ 1.018m - 1.198, re-fitted after
-    // the diffusion substep bound moved the m=0.8 root - the calibration harness
-    // _verify_streampower_calibration.js re-derives the roots live and gates the line) and gated
-    // across m and k by _verify_erosion_gridscale.js. Calibration, not derivation - stated as
-    // such. Uplift is untouched (same iterations = same total). Incision cost is resolution-
-    // independent (iterations unchanged); the diffusion DOSE k^2 is the one k-growing cost term
-    // (k^4 total Laplacian work - measured 41.6 s of diffusion at 2048 square Final), so the
-    // DOSE takes the Interactive tier cap of 2 and Final pays it in full.
-    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
-      const kd=BUILD_QUALITY==="final"?k:Math.min(k,2);
-      return maskApply(ins[0],streamPowerErode(ins[0],
-      {Kdt:p.strength*2.0*Math.pow(k,1.198-1.018*p.m), Udt:p.uplift*0.004, m:p.m,
-       iters:p.iters,
-       uplift:ins[1]||null, Ddt:p.hillslope*0.24*kd*kd}),ins[2]);},
-    note:"Edges are held at <b>base level</b> \u2014 without a fixed outlet there is nothing to incise toward, so relief cannot organise at all.<br><br><b>Uplift 0 will erode your terrain away.</b> That is not a bug, it is what rivers do to a landmass that stops rising: measured on a Mountain, peak height goes 0.69 \u2192 0.53 \u2192 0.20 \u2192 0.000 as Incision rises with Uplift at 0. Keep Incision and Iterations low to carve, or raise <b>Uplift</b> so the interior keeps rising while the rivers cut \u2014 that balance is what holds a real range up, and it is the regime where slope and area settle to S \u221d A<sup>\u2212m</sup>.<br><br>Wire a field into the <b>Uplift</b> input and it scales the uplift rate per cell. That is the node's real use: feed a broad high region in (a Mountain, a Layout, a Shape) and let the rivers carve it, so summits and ridges emerge as <i>residue between the valleys</i> instead of being authored. A mountain is what erosion leaves behind.<br><br><b>Hillslope</b> is the diffusion term of the same equation, and it is what stops the ridges becoming razor blades: stream power sharpens interfluves without limit, diffusion relaxes them and gives hillslopes a length and valleys a width. At 0 you get blades.<br><br>The shipped defaults are set against <b>real SRTM data</b>, not by eye: driven by a Tectonic uplift they reproduce a real tile's slope distribution to within about one unit at every percentile (p90 9.9 vs 9.3, p99 16.0 vs 15.7, max 24.2 vs 22.8)."},
-  hydraulic:{cat:"ero",name:"Hydraulic erosion",ins:["In","Mask"],desc:"GPU virtual-pipe flow or CPU droplets — carves valleys and transports sediment.",
-    params:[P.tabs("engine","Engine",[["auto","GPU pipes"],["droplets","CPU droplets"]],"auto"),
-      // KNOWN CROSS-ENGINE GAP, measured and gated but not yet closed: at the same sliders the
-      // pipe engine modifies the terrain at ~0.37x the depth of the droplet engine (delta corr
-      // ~0.59 - they are different simulations: broad pipe valleys vs dendritic particle
-      // tracks). Raising this default toward ~160 buys depth parity but breaks the A2 grid
-      // invariance (measured 1.42 at k=2 - the invariance partly RESTS on the per-iteration
-      // erosion cap clamping the fine grid, so dose and invariance are coupled and no cheap
-      // knob buys both; cap-scaling was measured too: flat cross-depth, gridRatio ~2.0).
-      // Closing it needs a re-derivation of the pipe dose family under clamp saturation -
-      // queued. The slider max is raised to 360 so the trade is available BY CHOICE;
-      // _verify_gpu.js gates the measured relationship against silent drift.
-      WHEN(P.int("pipeIters","Pipe iterations",8,360,48),"engine","auto"),
-      WHEN(P.int("droplets","CPU droplets",2000,60000,18000),"engine","droplets"),
-      P.slider("erode","Erode",0.05,0.8,0.35),P.slider("deposit","Deposit",0.05,0.8,0.28),
-      P.slider("capacity","Capacity",1,12,6,0.5),P.slider("inertia","Inertia",0,0.5,0.05),
-      // This param was REFERENCED by the eval below since the node shipped, but never declared:
-      // p.radius was undefined, Math.round(undefined*k) is NaN, and hydraulicErode clamps NaN to a
-      // 1-cell brush - the corpus's #1 droplet defect (point scouring: +41% high-frequency scratch
-      // energy vs radius 2), unconditionally, at every setting of every other slider. Declared at
-      // the corpus default of 2; verified bit-identical to the old output only when forced to NaN.
-      WHEN(P.slider("radius","Brush radius",1,5,2,1,v=>(v|0)+" px"),"engine","droplets"),
-      WHEN(P.seed("seed","Seed",1),"engine","droplets"),
-      P.log("feat","Feature scale",1,8,1,v=>v.toFixed(1)+"\u00d7",false)],
-    eval:(p,ins)=>{if(!ins[0])return newField();const k=resScale();
-    const usePipes=p.engine!=="droplets"&&gpuReady();
-    // Interactive tier = a FULL-QUALITY simulation on a capped grid (<= 384), its delta
-    // upsampled - NOT a starved simulation on the full grid. A2's grid invariance is the
-    // contract that makes this a preview: a capped-grid sim lands within a few percent of the
-    // full-res landform, where the old dose caps (droplet count min(4,k^2) + gridK min(k,2) on
-    // the full grid) previewed at 0.64x of Final's depth at the default 512 (measured; rate
-    // compensation cannot close it - capacity-limited dynamics saturate). ke = k/tier keeps the
-    // node-level anchoring: at RES <= 384 it equals the old caps exactly (digest-identical),
-    // at 192 it is exactly 1, and Final (tier=1) is byte-identical to before.
-    const tier=BUILD_QUALITY==="final"?1:Math.max(1,RES/384),ke=k/tier;
-    return maskApply(ins[0],atFeatureScale(ins[0],p.feat*tier,f=>usePipes
-      ?gpuHydraulicPipes(f,{...p,iters:p.pipeIters,gridK:ke})
-      :hydraulicErode(f,{...p,droplets:Math.round(p.droplets*ke*ke),
-        radius:Math.max(1,Math.round((p.radius==null?2:p.radius)*ke)),settle:true,gridK:ke})),ins[1]);},
-    note:"<b>GPU pipes</b> is the interactive production path: a Mei-style virtual-pipe water and sediment simulation kept in float textures until one final readback. It scales with pixels × iterations and uses the GPU coherently. <b>CPU droplets</b> keeps the older particle reference for comparison; at high resolution its droplet count scales with pixel area, so it is deliberately much slower."},
-  erosion2:{cat:"ero",name:"Erosion 2",ins:["In","Mask"],
-    desc:"Advanced multi-scale hydraulic erosion: broad ravines first, nested gullies second, then sediment and shape relaxation.",
-    params:[
-      GROUP(P.slider("duration","Duration",0,1,.46,.01),"General"),
-      GROUP(P.slider("downcut","Downcutting",0,1,.58,.01),"General"),
-      GROUP(P.slider("erosionScale","Erosion scale",0,1,.38,.01,v=>lerp(1,7,v).toFixed(1)+"×"),"General"),
-      GROUP(P.seed("seed","Seed",17),"General"),
-      GROUP(P.slider("suspended","Suspended load",0,1,.36,.01),"Sediment discharge"),
-      GROUP(P.slider("bed","Bed load",0,1,.30,.01),"Sediment discharge"),
-      GROUP(P.slider("coarse","Coarse sediments",0,1,.22,.01),"Sediment discharge"),
-      GROUP(P.slider("depositBoost","Deposition boost",0,1,.18,.01),"Sediment discharge"),
-      GROUP(P.slider("shape","Shape",0,1,.28,.01),"Shape"),
-      GROUP(P.slider("shapeSharp","Shape sharpness",0,1,.42,.01),"Shape"),
-      GROUP(P.slider("shapeDetail","Shape detail scale",0,1,.72,.01),"Shape")],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],erosion2Field(ins[0],p),ins[1]):newField(),
-    note:"<b>Erosion 2</b> is a clean-room multi-scale composition over Terrain Studio's owned hydraulic and thermal kernels, following Gaea's public control contract rather than claiming its proprietary algorithm. <b>Duration</b> controls simulation travel; <b>Downcutting</b> controls incision; <b>Erosion scale</b> sets the largest ravines. A shorter near-native pass nests fine gullies inside those broad structures. Suspended, bed, and coarse loads jointly control deposition mobility; Shape adds hydraulic/thermal reshaping and Shape sharpness retains crisp interfluves.<br><br>For a Canyon, start with moderate Duration and Downcutting. Raise Erosion scale before Duration when you want wider ravines instead of noisy scratches. The bundled Canyon Landscape setup supplies a conservative starting point."},
-  hydrofix:{cat:"ero",name:"HydroFix",ins:["In","Mask"],
-    desc:"Low-amplitude drainage conditioning: promotes longer continuous flow paths without replacing the landscape.",
-    params:[GROUP(P.slider("fix","Hydro fix",0,1,.52,.01),"Drainage"),
-      GROUP(P.slider("downcut","Downcutting",0,1,.34,.01),"Drainage")],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],hydroFixField(ins[0],p),ins[1]):newField(),
-    note:"<b>HydroFix</b> routes on a priority-filled working copy, softly downcuts high-accumulation corridors in the original heightfield, and enforces only the tiny descent required for connected receivers. It is intentionally subtle: use it after Erosion 2 to repair broken flow paths, or before a flow-dependent node to prepare noisy terrain. It does not fill the rendered terrain or turn basins into flat plates."},
 
 
   // ---- DATA MAPS (Gaea's "Derive" channels): grayscale fields to bind a SatMap / mask to ----
-  d_slope:{cat:"data",name:"Slope",ins:["In"],desc:"Steepness as a grayscale field (0 flat → 1 vertical). The classic cliff/bench colour driver.",
-    params:[],eval:(p,ins)=>ins[0]?normalize(slopeOf(ins[0])):newField()},
-  d_height:{cat:"data",name:"Height",ins:["In"],desc:"Normalized relative elevation map (0 = tile minimum, 1 = tile maximum). Terrain Definition's Base elevation supplies its physical datum for climate.",
-    params:[],eval:(p,ins)=>ins[0]?normalize(ins[0]):newField()},
-  d_sunshadow:{cat:"data",name:"Sun Shadow",ins:["Height"],desc:"Deterministic terrain-space solar visibility. White is sunlit; black is occluded by the heightfield horizon. Unlike a viewport cascade shadow, this field is stable, blendable, and exportable.",
-    params:[P.slider("reach","Horizon reach",100,10000,2750,25,v=>Math.round(v)+" m"),
-      P.slider("softness","Softness",0,3,1,.05,v=>v.toFixed(2)+"×")],
-    eval:(p,ins,nd)=>{
-      if(!ins[0]){nd._solarShadow=newField();nd._solarExposure=newField();return nd._solarShadow;}
-      const maps=evaluateSunShadowMap(ins[0],p);
-      nd._solarShadow=maps.solarShadow;nd._solarExposure=maps.solarExposure;return maps.solarShadow;
-    },
-    note:"This node is a <b>terrain-space analysis map</b>: white means the climate sun reaches the surface and black means terrain blocks it. It uses a logarithmic heightfield-horizon march followed by a spatial penumbra filter. A cascaded shadow map is intentionally not used here because cascades are fitted to the current camera frustum and therefore change as the view moves."},
-  d_temperature:{cat:"data",name:"Temperature",ins:["Relative height","Sun visibility"],desc:"Generates the base surface-temperature field from datum-aware elevation lapse rate plus solar exposure. The physical Celsius map remains editable downstream.",
-    params:[P.slider("seaTemp","Sea-level temperature",-50,50,6,.5,v=>v.toFixed(1)+" °C"),
-      P.slider("lapseRate","Altitude lapse rate",-10,15,6.5,.1,v=>v.toFixed(1)+" °C/km"),
-      P.slider("warming","Solar warming",0,50,5,.5,v=>v.toFixed(1)+" °C")],
-    eval:(p,ins,nd)=>{
-      if(!ins[0]){
-        nd._temperatureC=new Float32Array(fieldLen());nd._solarShadow=newField();nd._solarExposure=newField();
-        const out=newField();out.fill(encodeTemperatureC(0));return tagTemperatureField(out,nd._temperatureC);
-      }
-      const maps=evaluateTemperatureMap(ins[0],p,ins[1]||null);
-      nd._temperatureC=maps.temperatureC;nd._solarShadow=maps.solarShadow;nd._solarExposure=maps.solarExposure;
-      return tagTemperatureField(maps.encoded,maps.temperatureC,{solarShadow:maps.solarShadow,solarExposure:maps.solarExposure,
-        lapseRate:p.lapseRate,heightField:ins[0]});
-    },
-    note:"This node creates the <b>base</b> temperature map; it is not a terminal display effect. Its climate sliders stay in useful Earth-scale ranges: sea-level temperature −50…+50 °C, lapse rate −10…+15 °C/km (including inversions), and solar warming 0…50 °C. Its Celsius contract survives unit-preserving spatial operations such as Blur, Warp, and Transform; generic tonal/arithmetic nodes deliberately drop it unless both inputs are compatible Temperature fields. Snow and Water read the final physical field wired into them. The scalar encoding still spans −100…1400 °C so volcanic heat remains representable through <b>Temperature Modify</b>. Without a Sun visibility edge, the model assumes open sky while retaining slope/aspect incidence; connect <b>Sun Shadow</b> to make terrain occlusion explicit. Terrain Definition supplies latitude, north, and solar elevation."},
-  d_heat:{cat:"data",name:"Temperature Modify",ins:["Temperature","Driver","Mask"],desc:"Modifies a Temperature field in physical °C. Driver supplies a biome, lava, geothermal, shade, or authored 0–1 footprint; Mask confines the exchange.",
-    params:[P.tabs("mode","Operation",[["offset","Offset"],["set","Set"],["minimum","Minimum"],["maximum","Maximum"]],"offset"),
-      WHEN(P.number("offsetC","Temperature offset",-500,1400,0,1,"°C"),"mode","offset"),
-      WHEN(P.number("targetC","Target temperature",-100,1400,900,1,"°C"),"mode","set","minimum","maximum"),
-      P.slider("amount","Amount",0,1,1,.01,v=>Math.round(v*100)+"%")],
-    eval:(p,ins,nd)=>{
-      const base=ins[0],baseC=temperatureCFromField(base);
-      if(!baseC){
-        nd._temperatureC=null;nd._inputError=base?"Temperature input requires a physical Temperature field":"Connect a Temperature field";
-        return newField();
-      }
-      nd._inputError=null;
-      const source=ins[1],mask=ins[2],outC=new Float32Array(baseC.length),out=new Float32Array(baseC.length);
-      for(let i=0;i<out.length;i++){
-        const w=clamp((source?source[i]:1)*(mask?mask[i]:1)*(p.amount==null?1:p.amount),0,1),c=baseC[i];
-        let q=c;
-        if(p.mode==="set")q=lerp(c,p.targetC,w);
-        else if(p.mode==="minimum")q=c+Math.max(0,p.targetC-c)*w;
-        else if(p.mode==="maximum")q=c-Math.max(0,c-p.targetC)*w;
-        else q=c+p.offsetC*w;
-        outC[i]=clamp(q,TEMP_MIN_C,TEMP_MAX_C);out[i]=encodeTemperatureC(outC[i]);
-      }
-      const meta=fieldMetadata(base)||{};nd._temperatureC=outC;nd._solarShadow=meta.solarShadow||null;nd._solarExposure=meta.solarExposure||null;
-      return tagTemperatureField(out,outC,{solarShadow:nd._solarShadow,solarExposure:nd._solarExposure,
-        lapseRate:meta.lapseRate,heightField:meta.heightField});
-    },
-    note:"Temperature Modify requires a physical Temperature field. <b>Offset</b> adds or removes degrees; <b>Set</b> approaches an absolute temperature; <b>Minimum</b> only heats colder cells; <b>Maximum</b> only cools warmer cells. Driver is a 0–1 spatial footprint, Mask confines the edit, and both multiply Amount. For authored climate regions, reuse the same Draw Mask that feeds the biome's SatMap layer: Set/Maximum can force an arctic cap, while Set/Minimum can force a hot desert. Chain regional edits over one global Temperature field so Snow and Water consume the final shared climate. A future Lava simulation can output a heat footprint into Driver—or emit a temperature field directly—without special cases in Snow, ice, biome selection, or the viewport."},
-  d_wind:{cat:"data",name:"Wind",ins:["Height"],desc:"Builds a physical horizontal wind-vector field from Terrain Definition's prevailing wind, then adjusts it for windward speed-up, lee shelter, and valley channeling.",
-    params:[P.slider("speedUp","Crest speed-up",0,1.5,.65,.05,v=>v.toFixed(2)+"×"),
-      P.slider("shelter","Lee shelter",0,1,.7,.05,v=>Math.round(v*100)+"%"),
-      P.slider("channeling","Valley channeling",0,1,.55,.05,v=>Math.round(v*100)+"%"),
-      P.slider("reach","Terrain reach",100,5000,1500,25,v=>Math.round(v)+" m"),
-      P.seg("consistency","Mass consistency",[["on","On"],["off","Off"]],"on")],
-    eval:(p,ins,nd)=>{
-      const h=ins[0]||newField(),wind=evaluateTerrainWind(h,p);nd._wind=wind;
-      return tagWindField(wind.encoded,wind.u,wind.v,wind.speed,{heightField:h,
-        baseDirection:wind.baseDirection,baseSpeed:wind.baseSpeed,
-        divergenceRmsBefore:wind.divergenceRmsBefore,divergenceRmsAfter:wind.divergenceRmsAfter});
-    },
-    note:"Prevailing direction and speed belong to <b>Terrain Definition</b>, because air crosses biome borders. Wind modifies that regional flow using the heightfield: slopes and crests accelerate wind, upwind relief shelters lee cells, and concave relief turns flow toward valley axes. <b>Mass consistency</b> removes artificial sources and sinks with a bounded Helmholtz–Hodge projection; it is a terrain-climate approximation, not CFD. The scalar thumbnail shows speed, while Display → Wind shows direction as hue and speed as brightness."},
-  d_windmodify:{cat:"data",name:"Wind Modify",ins:["Wind","Driver","Mask"],desc:"Sets a regional wind direction and speed inside a biome, weather, or authored mask while preserving the physical vector field outside it.",
-    params:[P.slider("direction","Target wind from",0,359,300,1,v=>(v|0)+"° map"),
-      P.slider("speed","Target speed",0,60,10,.5,v=>v.toFixed(1)+" m/s"),
-      P.slider("amount","Amount",0,1,1,.01,v=>Math.round(v*100)+"%"),
-      // Project (default): mass consistency survives the override, at the cost of flow bleeding
-      // across the mask seam (a hard half-map override measured -22% on the far side - that IS
-      // conservation talking). Preserve exactly: the authored values hold to 1e-3 everywhere,
-      // and the divergence the seam introduces (+39% measured) is knowingly kept.
-      P.tabs("consistency","Mass consistency",[["on","Project"],["off","Preserve exactly"]],"on")],
-    eval:(p,ins,nd)=>{
-      const base=ins[0],meta=windVectorFromField(base);
-      if(!meta){
-        nd._wind=null;nd._inputError=base?"Wind input requires a physical Wind field":"Connect a Wind field";
-        return newField();
-      }
-      nd._inputError=null;
-      const source=ins[1],mask=ins[2],N=base.length,u=new Float32Array(N),v=new Float32Array(N);
-      const speed=new Float32Array(N),encoded=new Float32Array(N),target=windBearingVector(p.direction);
-      for(let i=0;i<N;i++){
-        const w=clamp((source?source[i]:1)*(mask?mask[i]:1)*(p.amount==null?1:p.amount),0,1);
-        const s0=meta.speed[i],a0=s0>1e-6?Math.atan2(meta.v[i],meta.u[i]):Math.atan2(target[1],target[0]);
-        const a1=Math.atan2(target[1],target[0]),da=Math.atan2(Math.sin(a1-a0),Math.cos(a1-a0));
-        const a=a0+da*w,s=lerp(s0,p.speed,w);
-        u[i]=Math.cos(a)*s;v[i]=Math.sin(a)*s;speed[i]=s;encoded[i]=s/WIND_MAX_MPS;
-      }
-      // The override reintroduces divergence at every mask seam (+39% measured at a hard
-      // half-map mask - the exact biome workflow the note prescribes), so RE-PROJECT after the
-      // blend: mass consistency must survive regional editing. The diagnostics are stamped with
-      // THIS projection's before/after - the first version stamped before=inherited and
-      // after=post-override, an inverted signal under the shared key names.
-      const n2=Math.round(Math.sqrt(N)),cell=terrainDef.scale/n2;
-      const before=windDivergenceRms(u,v,n2,cell);
-      const doProject=p.consistency!=="off";
-      const proj=doProject?projectWindMassConsistent(u,v,n2,cell,Math.min(96,Math.max(36,Math.round(Math.sqrt(n2)*6)))):{u,v};
-      const uP=proj.u,vP=proj.v;
-      for(let i=0;i<N;i++){let sp=Math.hypot(uP[i],vP[i]);
-        if(sp>WIND_MAX_MPS){const f2=WIND_MAX_MPS/sp;uP[i]*=f2;vP[i]*=f2;sp=WIND_MAX_MPS;}
-        speed[i]=sp;encoded[i]=sp/WIND_MAX_MPS;}
-      const after=windDivergenceRms(uP,vP,n2,cell);
-      nd._wind={u:uP,v:vP,speed,encoded,baseDirection:meta.baseDirection,baseSpeed:meta.baseSpeed,
-        divergenceRmsBefore:before,divergenceRmsAfter:after,simulationResolution:n2};
-      return tagWindField(encoded,uP,vP,speed,{heightField:meta.heightField,
-        baseDirection:meta.baseDirection,baseSpeed:meta.baseSpeed,
-        divergenceRmsBefore:before,divergenceRmsAfter:after});
-    },
-    note:"Use this for a regional circulation override, not as a property baked into a SatMap. Reuse the biome's Draw Mask in <b>Mask</b>, set its local wind, and chain further Wind Modify nodes for other regions. Direction follows the shortest angular path through soft mask edges, so an ecotone rotates the flow rather than snapping it."},
-  d_curvature:{cat:"data",name:"Curvature",ins:["In"],desc:"Zevenbergen–Thorne curvature: convex ridges/lips vs concave valley floors (0.5 = flat).",
-    params:[P.seg("kind","Kind",[["profile","Profile"],["plan","Plan"],["mean","Mean"]],"profile"),
-      P.slider("strength","Strength",0.1,4,1,0.1)],
-    eval:(p,ins)=>ins[0]?curvatureField(ins[0],p):newField()},
-  d_flow:{cat:"data",name:"Flow",ins:["In"],desc:"Flow accumulation — the drainage network (priority-flood fill + D8), log-compressed. Where water runs.",
-    params:[P.slider("gain","Gain",0.1,8,1,0.1)],
-    eval:(p,ins)=>ins[0]?flowField(ins[0],p):newField()},
-  d_occlusion:{cat:"data",name:"Occlusion",ins:["In"],desc:"Horizon-based ambient occlusion — crevices and enclosed valleys dark, open peaks light.",
-    params:[P.slider("radius","Radius",0.01,0.2,0.06,0.01),P.int("dirs","Directions",4,16,8)],
-    eval:(p,ins)=>ins[0]?occlusionField(ins[0],p):newField()},
-  d_deposits:{cat:"data",name:"Deposits",ins:["In"],desc:"Soil / sediment: the depth loose material piles into hollows (morphological closing − surface).",
-    // refDepth is what keeps the mask PHYSICAL: the fill depth (metres) that saturates it.
-    // The old normalize() output was identical for a terrain at any amplitude.
-    params:[P.int("radius","Radius",1,10,3),
-      P.slider("refDepth","Full-mask depth",5,120,25,1,v=>(v|0)+" m")],
-    eval:(p,ins)=>ins[0]?depositsField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale())),
-      refDepth:p.refDepth==null?25:p.refDepth}):newField()},
-  d_wear:{cat:"data",name:"Wear",ins:["In"],desc:"Exposed, convex, steep ground — the edges erosion strips first.",
-    params:[P.slider("strength","Strength",0.2,3,1,0.1)],
-    eval:(p,ins)=>ins[0]?wearField(ins[0],p):newField()},
-  d_peaks:{cat:"data",name:"Peaks",ins:["In"],desc:"Prominence above the local mean — isolates summits and crests.",
-    params:[P.int("radius","Radius",1,12,4)],
-    eval:(p,ins)=>ins[0]?peaksField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}):newField()},
-  d_texture:{cat:"data",name:"Texture",ins:["In"],desc:"Gaea's composite colour driver: slope + soil + flow mixed into one mask — the usual SatMap input.",
-    params:[P.slider("slopeW","Slope",0,1,0.5),P.slider("soilW","Soil",0,1,0.3),P.slider("flowW","Flow",0,1,0.2)],
-    eval:(p,ins)=>ins[0]?textureField(ins[0],p):newField()},
 
-  water:{cat:"effect",name:"Water",ins:["In","Temperature"],desc:"Defines where fluid exists and uses an optional physical Temperature field for its liquid/ice phase. Hydrology fills selected basins; Sea adds one flat level. Waves and refraction are global renderer settings.",
-    passthrough:true,effect:"water",
-    params:[P.tabs("mode","Mode",[["hydro","Hydrology"],["sea","Sea level"]],"hydro"),
-      WHEN(GROUP(P.seg("lakes","Lakes",[["on","On"],["off","Off"]],"on"),"Hydrology"),"mode","hydro"),
-      WHEN(GROUP(P.slider("lakeMin","Minimum lake depth",0,.03,.001,.0005,v=>Math.round(v*terrainDef.height)+" m"),"Hydrology"),"mode","hydro"),
-      WHEN(GROUP(P.slider("flow","River network",0,1,.5,.01),"Hydrology"),"mode","hydro"),
-      WHEN(GROUP(P.slider("riverDepth","River depth",0,1,.7,.01),"Hydrology"),"mode","hydro"),
-      WHEN(GROUP(P.slider("level","Sea level",0,0.6,0.12,.01,v=>Math.round(v*terrainDef.height)+" m"),"Sea"),"mode","sea"),
-      GROUP(P.slider("shoreSmooth","Shore smoothing",0,2.5,1.35,.05),"Shoreline"),
-      GROUP(P.slider("foam","Shore foam",0,1,.18,.01),"Shoreline")],
-    eval:(p,ins)=>ins[0]||newField(),
-    note:"<b>Hydrology</b> runs a priority-flood over the terrain: lakes sit at basin spill elevations, while the D8 accumulation field supplies a branching river network. <b>Minimum lake depth</b> removes tiny numerical puddles; <b>River network</b> changes the contributing-area threshold, and <b>River depth</b> changes the visible water film.<br><br>The optional <b>Temperature</b> input controls phase locally: standing water freezes cell by cell, independent of whether a Snow node exists. Without it, the clearly labelled fallback climate in Terrain Definition is used. <b>Sea level</b> is a separate mode and therefore hides hydrology controls. Shoreline smoothing and foam apply to both modes. Wave pattern, motion, and <b>refraction</b> are global viewport settings in the Water Surface flyout, because they describe the renderer rather than this node's hydrological field."},
-  snow:{cat:"effect",name:"Snow",ins:["In","Temperature","Wind"],desc:"A transient snow-depth layer in metres: snowfall accumulates, sun and temperature melt it, avalanches settle it, and an optional physical Wind field scours windward faces into lee cornices.",
-    passthrough:true,effect:"snow",
-    params:[GROUP(P.log("snowfall","Snowfall",.02,20,3,v=>v<.995?(v*100).toFixed(0)+" cm":v.toFixed(2)+" m"),"Accumulation"),
-      GROUP(P.slider("meltDays","Melt period",0,120,45,1,v=>(v|0)+" days"),"Climate & melt"),
-      GROUP(P.log("meltRate","Degree-day melt",.05,20,10,v=>v.toFixed(2)+" mm/°C/day"),"Climate & melt"),
-      GROUP(P.slider("repose","Snow repose angle",20,60,38,1,v=>(v|0)+"°"),"Avalanche & settling"),
-      GROUP(P.slider("adhesion","Adhesion depth",0,2,.6,.05,v=>v.toFixed(2)+" m"),"Avalanche & settling"),
-      GROUP(P.int("iterations","Settling iterations",0,80,12),"Avalanche & settling"),
-      GROUP(P.slider("settle","Settling rate",.1,1,.55,.05,v=>v.toFixed(2)),"Avalanche & settling"),
-      GROUP(P.slider("windStrength","Fallback wind strength",0,1,.35,.05,v=>v.toFixed(2)),"Wind"),
-      GROUP(P.slider("windDirection","Fallback wind from",0,360,300,5,v=>(v|0)+"° map"),"Wind")],
-    eval:(p,ins,nd)=>{
-      const h=ins[0]||newField(),meta=fieldMetadata(ins[1])||{};
-      const temperature=temperatureCFromField(ins[1]),wind=windVectorFromField(ins[2]),errors=[];
-      if(ins[1]&&!temperature)errors.push("Temperature input requires a physical Temperature field");
-      if(ins[2]&&!wind)errors.push("Wind input requires a physical Wind field");
-      nd._inputError=errors.length?errors.join(" · "):null;
-      nd._snowLayer=evaluateSnowLayer(h,p,temperature,meta.solarShadow,meta.solarExposure,wind);return h;
-    },
-    note:"Snow is a separate transient <b>thickness field in metres</b>; it does not repaint or permanently alter bedrock. The renderer composes that thickness into a solid-surface heightfield, including above frozen water, so lighting, picking, and visible elevation follow the snow top. The underlying terrain output stays unchanged until an explicit bake/export-surface workflow is requested. <b>Snowfall</b> is settled vertical depth; precipitation transitions from rain to snow around freezing, and <b>degree-day melt</b> removes snow above 0 °C. Temperature consumes the final physical field wired into it. Wind consumes the final physical Wind field—including masked Wind Modify regions—and falls back to the local sliders only when no Wind edge exists.<br><br><b>Water is phase-aware.</b> Open liquid water masks terrain snow out. Frozen standing water is rendered as an ice surface and can receive its own snow thickness, so snow never floats on liquid but does accumulate on ice.<br><br><b>Solar warming is spatial.</b> Latitude and map north place an equator-side climate sun; its elevation is global. Surface incidence includes slope/aspect, a terrain-horizon march casts real ridge shadows, and a two-pass spatial blur supplies soft penumbra plus diffuse sky exposure. That map—not the cosmetic viewport shadow—raises surface temperature.<br><br>Settling conserves snow volume while relaxing the combined terrain + snow surface toward the snow repose angle, and transports only the surplus above a slope- and roughness-dependent <b>Adhesion depth</b> — the snow that clings to ledges and rough ground. Ridges and spurs therefore hold cover, cliffs thin to streaks rather than stripping bare, and snow COVERAGE no longer depends on iteration count. <b>Wind</b> then scours each cell along its local terrain-adjusted vector and loads the first lee cells—cornices—and deliberately is not re-relaxed afterwards. The implementation follows the placement/stability split of Fearing (2000), the five-step accumulate/melt/shed/avalanche/wind model of Cordonnier et al. (2018), and the shared terrain-wind field's Jackson–Hunt / Sherman-family approximation."},
-  satmap:{cat:"effect",name:"SatMap",ins:["In","Driver","Mask"],desc:"Authors one colour gradient, driven by height, slope, or any field wired into Driver. Chain a masked SatMap over another for a simple overlay, or blend separate SatMap branches in Color Blend for explicit biome composition. Height passes through unchanged.",
-    passthrough:true,effect:"satmap",
-    params:[P.select("gradient","Gradient",null,"Temperate"),
-      P.seg("source","Driven by",[["auto","Driver ▸ / Height"],["height","Height"],["slope","Slope"]],"auto"),
-      P.select("enhance","Enhance",[["none","None"],["autolevel","Autolevel"],["equalize","Equalize"]],"autolevel"),
-      P.seg("reverse","Reverse",[["off","Off"],["on","On"]],"off"),
-      P.slider("rangeLo","Range low",0,1,0),P.slider("rangeHi","Range high",0,1,1),
-      P.slider("shift","Bias",-0.5,0.5,0),
-      P.select("rough","Roughness",[["none","None"],["low","Low"],["med","Medium"],["high","High"],["ultra","Ultra"]],"med"),
-      P.slider("hue","Hue",-1,1,0,.01),P.slider("saturation","Saturation",-1,1,0,.01),
-      P.slider("lightness","Lightness",-1,1,0,.01)],
-    eval:(p,ins,nd)=>{const h=ins[0]||newField();
-      const raw=p.source==="slope"?slopeOf(h):p.source==="height"?h:(ins[1]||h);
-      if(p.enhance==="equalize")nd._driver=histEqualizeField(raw,{bins:256,amount:1});
-      else if(p.enhance==="none"){nd._driver=new Float32Array(raw.length);for(let i=0;i<raw.length;i++)nd._driver[i]=clamp(raw[i],0,1);}
-      else nd._driver=normalize(raw);
-      nd._mask=ins[2]||null;return h;}},
-  colorerosion:{cat:"effect",name:"Color Erosion",ins:["In","Sediment","Mask"],desc:"Transports the upstream SatMap stack downhill as mineral pigment, then deposits it along convergent flow paths. Optional Sediment accepts Deposits, Flow, Soil, or any mask; height passes through unchanged.",
-    passthrough:true,effect:"colorerosion",
-    params:[P.slider("transport","Transport distance",0,3,1.43,.01),
-      P.slider("density","Sediment density",0,1,.2,.01),P.slider("blend","Blend",0,1,.89,.01),
-      P.slider("hold","Color hold",0,1,.89,.01),P.slider("flow","Flow volume",0,1,0,.01),
-      P.seg("laminar","Laminar flow",[["off","Off"],["on","On"]],"off"),
-      P.slider("diffusion","Diffusion",0,1,0,.01),P.seed("seed","Seed",7),
-      P.select("blendMode","Blend mode",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
-    eval:(p,ins,nd)=>{const h=ins[0]||newField();nd._height=h;nd._sediment=ins[1]||null;nd._mask=ins[2]||null;return h;},
-    note:"The <b>Mask</b> gates the final colour effect: black preserves the upstream SatMap, white applies the transported pigment, and grey interpolates. It does not alter terrain height or rerun the transport route. Select the Mask connection to inspect its live range and coverage."},
-  weathering:{cat:"effect",name:"Weathering",ins:["In","Mask"],desc:"A terrain-aware colour ageing pass: exposed relief can bleach or brighten, while sheltered recesses collect dirt. Includes scale, creep, inversion, HSL post controls, opacity, and blend mode; height passes through unchanged.",
-    passthrough:true,effect:"weathering",
-    params:[P.slider("scale","Scale",.02,1,.72,.01),P.slider("creep","Creep",0,1,.27,.01),
-      P.slider("amount","Amount",0,1,.26,.01),
-      P.seg("washed","Washed out",[["off","Off"],["on","On"]],"on"),
-      P.seg("inverse","Inverse",[["off","Off"],["on","On"]],"off"),
-      P.slider("dirt","Dirt",0,1,.01,.01),P.seg("darker","Darker",[["off","Off"],["on","On"]],"on"),
-      P.slider("hue","Hue",-1,1,0,.01),P.slider("saturation","Saturation",-1,1,0,.01),
-      P.slider("lightness","Lightness",-1,1,0,.01),P.slider("opacity","Opacity",0,1,1,.01),
-      P.select("blendMode","Blend mode",[["normal","Normal"],["max","Max"],["min","Min"],["multiply","Multiply"],["screen","Screen"],["overlay","Overlay"]],"normal")],
-    eval:(p,ins,nd)=>{const h=ins[0]||newField();nd._height=h;nd._mask=ins[1]||null;return h;}},
-  satmapblend:{cat:"effect",name:"Color Blend",ins:["A","B","Mask"],desc:"Blend any two colour branches — SatMap, Color Erosion, Weathering, or a mixed chain. A is underneath; B composites over it by Mask × Opacity using the selected mode. Height passes through from A.",
-    passthrough:true,effect:"satmapblend",
-    params:[P.select("blend","Blend",[["normal","Blend"],["add","Add"],["screen","Screen"],["subtract","Subtract"],
-      ["difference","Difference"],["multiply","Multiply"],["divide","Divide"],["divide2","Divide 2"],
-      ["max","Max"],["min","Min"],["hypotenuse","Hypotenuse"],["overlay","Overlay"],["power","Power"]],"normal"),
-      P.slider("opacity","Opacity",0,1,1)],
-    eval:(p,ins,nd)=>{nd._mask=ins[2]||null;return ins[0]||newField();}},
-  colormixer:{cat:"effect",name:"Color Mixer",ins:["Layer 1","Layer 2","Layer 3"],
-    desc:"Ordered 2–15 layer biome/material stack. Layer 1 is the base; a standalone masked SatMap on a higher layer applies only inside its region, with a world-space edge blend. Height passes through from Layer 1.",
-    passthrough:true,effect:"colormixer",params:[],
-    eval:(p,ins)=>ins[0]||newField()},
 
-  output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
-    params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
-    eval:(p,ins)=>{const f=ins[0]||newField();return p.norm==="on"?normalize(f):f;}},
 });
 
 /* =====================================================================
@@ -4690,7 +4347,7 @@ function resolveColor(nodeId,n,memo,guard){
 // use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
 export let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,
   solarElevation:45,windDirection:300,windSpeed:10,lattice:"square"};
-const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the centre-to-centre spacing s)
+export const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the centre-to-centre spacing s)
 // Hexagonal lattice mode (references/26-hexagonal-lattice.md). Storage stays the same W x H
 // Float32Array in odd-r offset layout: odd rows are drawn (and sampled) half a cell to the
 // right, rows sit sqrt(3)/2 apart. Every check is strictly === "hex" so absent/old documents

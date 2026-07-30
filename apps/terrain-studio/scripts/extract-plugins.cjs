@@ -43,10 +43,30 @@ const entries = starts.map(({ key, line }) => {
 
 console.log(`  ${CAT}: ${entries.length} entries — ${entries.map((e) => e.key).join(' ')}`);
 
+// What legacy.js declares at top level — collected by PARSING, not by matching line starts.
+//
+// A regex over line starts reads only the first name in a multi-declarator statement, and legacy
+// has them: `export const TEMP_MIN_C=-100,TEMP_MAX_C=1400,FIELD_META=new WeakMap();` yields
+// TEMP_MIN_C and silently drops the other two. The consequence is not a bad import but a MISSING
+// one — the plugin never learns the name is legacy's, so no import is generated and the node dies
+// at eval with "TEMP_MAX_C is not defined". The digest caught exactly that on d_heat.
 const legacyDecls = new Set();
-for (const l of lines) {
-  const m = l.match(/^(?:export )?(?:function|const|let|var)\s+([a-zA-Z_$][\w$]*)/);
-  if (m) legacyDecls.add(m[1]);
+{
+  const ast = acorn.parse(lines.join('\n'), { ecmaVersion: 2022, sourceType: 'module' });
+  const bind = (pat) => {
+    if (!pat) return;
+    if (pat.type === 'Identifier') legacyDecls.add(pat.name);
+    else if (pat.type === 'ObjectPattern') pat.properties.forEach((q) => bind(q.value || q.argument));
+    else if (pat.type === 'ArrayPattern') pat.elements.forEach((x) => x && bind(x));
+    else if (pat.type === 'AssignmentPattern') bind(pat.left);
+    else if (pat.type === 'RestElement') bind(pat.argument);
+  };
+  for (const n of ast.body) {
+    const d = n.type === 'ExportNamedDeclaration' ? n.declaration : n;
+    if (!d) continue;
+    if ((d.type === 'FunctionDeclaration' || d.type === 'ClassDeclaration') && d.id) legacyDecls.add(d.id.name);
+    if (d.type === 'VariableDeclaration') d.declarations.forEach((v) => bind(v.id));
+  }
 }
 
 fs.mkdirSync(OUT, { recursive: true });
