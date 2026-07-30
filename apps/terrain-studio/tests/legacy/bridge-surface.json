@@ -9,9 +9,24 @@
       "file": "index.html",
       "inlineClassicScripts": 1,
       "moduleScripts": 0,
-      "scriptLines": "928-8111",
+      "externalScripts": 0,
+      "scriptLines": "928-8116",
       "topLevelDeclarations": 496,
-      "elementIds": 157
+      "elementIds": 157,
+      "sources": [
+        {
+          "id": "index.html#928",
+          "kind": "inline",
+          "declaredGoal": "script",
+          "parsedGoal": "script",
+          "imports": 0,
+          "newDeclarations": 496
+        }
+      ],
+      "entryModule": null,
+      "moduleGoalFailures": [],
+      "appParseErrors": [],
+      "notFollowed": []
     },
     "tests": {
       "files": 66,
@@ -120,7 +135,11 @@
       "Identifiers declared at index.html top level always win over the builtin deny-list, so app globals that shadow a DOM name (e.g. GPU) are never lost.",
       "Page-side callbacks passed by NAME (page.evaluate(installHarness, arg)) are resolved to their Node-side declaration and analysed like inline ones.",
       "meta.tests.unresolvedCallSites lists page-side calls with no analysable function argument (string bodies, handles). It must stay empty, or the surface is incomplete.",
-      "meta.tests.windowPropertyAccess lists every window.X touched from a page-side callback, flagged with whether X is an index.html global."
+      "meta.tests.windowPropertyAccess lists every window.X touched from a page-side callback, flagged with whether X is an index.html global.",
+      "The surface is the UNION of the top-level declarations of every source in the app graph: each <script> in the HTML, each src= followed to disk, and each static (or literal dynamic) import followed transitively. Exported and non-exported top-level bindings both count; bare specifiers (npm packages) are never followed, so their bindings are not app surface.",
+      "symbols[].declModule / declLine say WHERE a declaration lives. --check deliberately ignores both: a declaration moving from index.html to src/legacy.js to src/core/gpu.js is the migration working, not the surface drifting. Only name/kind/written/patched are contract.",
+      "unbridgeable lists symbols an oracle touches that the appended accessor block cannot serve: declared outside meta.app.entryModule AND either not exported (so the entry module cannot name it) or WRITTEN (an imported binding cannot be assigned -- TypeError: Assignment to constant variable). Exported and read-only is fine. It must stay empty or the bridge cannot be generated as designed.",
+      "meta.app.moduleGoalFailures lists sources the HTML declares as modules that do not PARSE as modules (e.g. a duplicate top-level function declaration, legal in a classic script and a SyntaxError in a module). The browser would refuse such a file outright, so it is a hard failure here."
     ]
   },
   "summary": {
@@ -140,6 +159,7 @@
     "builtinsFiltered": 34
   },
   "unknown": [],
+  "unbridgeable": [],
   "domIdCollisions": [
     "gl",
     "graphMenu"
@@ -245,6 +265,7 @@
       ],
       "declKind": "let",
       "declLine": 972,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -310,7 +331,8 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "patchFiles": [
         "_verify_realtime.js",
         "_verify_wireframe.js"
@@ -368,7 +390,8 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 4656,
+      "declLine": 4661,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -430,7 +453,8 @@
         "_verify_wireframe.js"
       ],
       "declKind": "let",
-      "declLine": 6133,
+      "declLine": 6138,
+      "declModule": "index.html#928",
       "patchFiles": [
         "_verify_canyon_identity.js",
         "_verify_colorknobs.js",
@@ -501,7 +525,8 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 4068,
+      "declLine": 4073,
+      "declModule": "index.html#928",
       "patchFiles": [
         "_verify_build_progress.js"
       ],
@@ -546,7 +571,8 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 4656,
+      "declLine": 4661,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -614,8 +640,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4717,
+      "declLine": 4722,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 54,
       "writes": 0
     },
@@ -637,7 +664,8 @@
         "_verify_wireframe.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 35,
       "writes": 0
     },
@@ -672,8 +700,9 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 4836,
+      "declLine": 4841,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 35,
       "writes": 0
     },
@@ -695,7 +724,8 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 5902,
+      "declLine": 5907,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_water.js"
       ],
@@ -742,6 +772,7 @@
       "declKind": "function",
       "declLine": 1135,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 33,
       "writes": 0
     },
@@ -769,6 +800,7 @@
       "declKind": "function",
       "declLine": 1155,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 32,
       "writes": 0
     },
@@ -789,7 +821,8 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 6184,
+      "declLine": 6189,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_wind.js"
       ],
@@ -842,7 +875,8 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 4656,
+      "declLine": 4661,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -894,8 +928,9 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 6744,
+      "declLine": 6749,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 28,
       "writes": 0
     },
@@ -930,6 +965,7 @@
       ],
       "declKind": "let",
       "declLine": 1223,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -977,8 +1013,9 @@
         "_verify_satnode.js"
       ],
       "declKind": "function",
-      "declLine": 6101,
+      "declLine": 6106,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 24,
       "writes": 0
     },
@@ -1005,8 +1042,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4735,
+      "declLine": 4740,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 23,
       "writes": 0
     },
@@ -1037,6 +1075,7 @@
       ],
       "declKind": "let",
       "declLine": 973,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1078,7 +1117,8 @@
         "_verify_toolbox.js"
       ],
       "declKind": "let",
-      "declLine": 4966,
+      "declLine": 4971,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_colorfx.js"
       ],
@@ -1108,7 +1148,8 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 20,
       "writes": 0
     },
@@ -1127,8 +1168,9 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "function",
-      "declLine": 2564,
+      "declLine": 2569,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 19,
       "writes": 0
     },
@@ -1150,8 +1192,9 @@
         "_verify_satnode.js"
       ],
       "declKind": "function",
-      "declLine": 4731,
+      "declLine": 4736,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 19,
       "writes": 0
     },
@@ -1175,6 +1218,7 @@
       ],
       "declKind": "const",
       "declLine": 1224,
+      "declModule": "index.html#928",
       "reads": 18,
       "writes": 0
     },
@@ -1197,8 +1241,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 5375,
+      "declLine": 5380,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 16,
       "writes": 0
     },
@@ -1218,8 +1263,9 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 6813,
+      "declLine": 6818,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 16,
       "writes": 0
     },
@@ -1245,6 +1291,7 @@
       ],
       "declKind": "let",
       "declLine": 1109,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_colorknobs.js",
         "_verify_digest.js",
@@ -1288,6 +1335,7 @@
       ],
       "declKind": "let",
       "declLine": 1219,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_colorknobs.js",
         "_verify_digest.js",
@@ -1324,7 +1372,8 @@
         "_verify_edges.js"
       ],
       "declKind": "let",
-      "declLine": 4656,
+      "declLine": 4661,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1350,8 +1399,9 @@
         "_verify_hex_deferred.js"
       ],
       "declKind": "function",
-      "declLine": 7411,
+      "declLine": 7416,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 13,
       "writes": 0
     },
@@ -1377,6 +1427,7 @@
       ],
       "declKind": "let",
       "declLine": 1222,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_colorknobs.js",
         "_verify_digest.js",
@@ -1415,7 +1466,8 @@
         "_verify_digest.js"
       ],
       "declKind": "const",
-      "declLine": 2088,
+      "declLine": 2093,
+      "declModule": "index.html#928",
       "reads": 12,
       "writes": 0
     },
@@ -1441,8 +1493,9 @@
         "_verify_snow_physics.js"
       ],
       "declKind": "const",
-      "declLine": 4659,
+      "declLine": 4664,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 12,
       "writes": 0
     },
@@ -1462,7 +1515,8 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 6782,
+      "declLine": 6787,
+      "declModule": "index.html#928",
       "reads": 12,
       "writes": 0
     },
@@ -1481,7 +1535,8 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "let",
-      "declLine": 4657,
+      "declLine": 4662,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1512,6 +1567,7 @@
       ],
       "declKind": "let",
       "declLine": 1021,
+      "declModule": "index.html#928",
       "patchFiles": [
         "_verify_render.js",
         "_verify_water.js",
@@ -1545,8 +1601,9 @@
         "_verify_water.js"
       ],
       "declKind": "function",
-      "declLine": 5418,
+      "declLine": 5423,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1566,8 +1623,9 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "function",
-      "declLine": 2260,
+      "declLine": 2265,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1586,7 +1644,8 @@
         "_verify_water_hydrology.js"
       ],
       "declKind": "let",
-      "declLine": 6782,
+      "declLine": 6787,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1603,7 +1662,8 @@
         "_verify_water_hydrology.js"
       ],
       "declKind": "let",
-      "declLine": 6784,
+      "declLine": 6789,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1619,8 +1679,9 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 3216,
+      "declLine": 3221,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1641,6 +1702,7 @@
       "declKind": "function",
       "declLine": 1069,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1657,8 +1719,9 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 3080,
+      "declLine": 3085,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 11,
       "writes": 0
     },
@@ -1677,7 +1740,8 @@
         "_verify_organize.js"
       ],
       "declKind": "let",
-      "declLine": 4657,
+      "declLine": 4662,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -1704,8 +1768,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 5356,
+      "declLine": 5361,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 10,
       "writes": 0
     },
@@ -1726,7 +1791,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6179,
+      "declLine": 6184,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_digest.js",
         "_verify_erosion_gridscale.js",
@@ -1751,7 +1817,8 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 5821,
+      "declLine": 5826,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_wind.js"
       ],
@@ -1781,6 +1848,7 @@
       "declKind": "function",
       "declLine": 1068,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 10,
       "writes": 0
     },
@@ -1801,7 +1869,8 @@
         "_verify_range.js"
       ],
       "declKind": "let",
-      "declLine": 4656,
+      "declLine": 4661,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js",
         "_verify_canyon.js",
@@ -1835,8 +1904,9 @@
         "_verify_trs.js"
       ],
       "declKind": "function",
-      "declLine": 4770,
+      "declLine": 4775,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 9,
       "writes": 0
     },
@@ -1855,7 +1925,8 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 5355,
+      "declLine": 5360,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_evolution.js",
@@ -1886,8 +1957,9 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 6996,
+      "declLine": 7001,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 9,
       "writes": 0
     },
@@ -1904,8 +1976,9 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 3562,
+      "declLine": 3567,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 9,
       "writes": 0
     },
@@ -1943,6 +2016,7 @@
       "declKind": "const",
       "declLine": 1066,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 8,
       "writes": 0
     },
@@ -1958,7 +2032,8 @@
         "_verify_organize.js"
       ],
       "declKind": "const",
-      "declLine": 5223,
+      "declLine": 5228,
+      "declModule": "index.html#928",
       "reads": 8,
       "writes": 0
     },
@@ -1979,7 +2054,8 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 7705,
+      "declLine": 7710,
+      "declModule": "index.html#928",
       "reads": 8,
       "writes": 0
     },
@@ -1998,8 +2074,9 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 7041,
+      "declLine": 7046,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 8,
       "writes": 0
     },
@@ -2016,8 +2093,9 @@
         "_verify_trs.js"
       ],
       "declKind": "function",
-      "declLine": 2618,
+      "declLine": 2623,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 8,
       "writes": 0
     },
@@ -2034,6 +2112,7 @@
       "declKind": "function",
       "declLine": 1113,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 8,
       "writes": 0
     },
@@ -2054,7 +2133,8 @@
         "_verify_streampower_calibration.js"
       ],
       "declKind": "let",
-      "declLine": 4784,
+      "declLine": 4789,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_digest.js",
         "_verify_erosion_gridscale.js",
@@ -2085,7 +2165,8 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 7,
       "writes": 0
     },
@@ -2100,7 +2181,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6784,
+      "declLine": 6789,
+      "declModule": "index.html#928",
       "reads": 7,
       "writes": 0
     },
@@ -2117,7 +2199,8 @@
         "_verify_realtime.js"
       ],
       "declKind": "let",
-      "declLine": 4784,
+      "declLine": 4789,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_digest.js",
         "_verify_erosion_gridscale.js"
@@ -2140,8 +2223,9 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 4973,
+      "declLine": 4978,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 7,
       "writes": 0
     },
@@ -2156,8 +2240,9 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 3444,
+      "declLine": 3449,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 7,
       "writes": 0
     },
@@ -2175,6 +2260,7 @@
       ],
       "declKind": "let",
       "declLine": 1019,
+      "declModule": "index.html#928",
       "patchFiles": [
         "_verify.js",
         "_verify_data.js",
@@ -2202,7 +2288,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 7,
       "writes": 0
     },
@@ -2219,6 +2306,7 @@
       "declKind": "const",
       "declLine": 935,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2234,7 +2322,8 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 6784,
+      "declLine": 6789,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2254,6 +2343,7 @@
       "declKind": "function",
       "declLine": 1091,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2271,8 +2361,9 @@
         "_verify_water.js"
       ],
       "declKind": "function",
-      "declLine": 4734,
+      "declLine": 4739,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2288,8 +2379,9 @@
         "_verify_digest.js"
       ],
       "declKind": "function",
-      "declLine": 4050,
+      "declLine": 4055,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2307,8 +2399,9 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 7327,
+      "declLine": 7332,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2326,6 +2419,7 @@
       ],
       "declKind": "let",
       "declLine": 1017,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2345,7 +2439,8 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 5902,
+      "declLine": 5907,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -2373,8 +2468,9 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 3036,
+      "declLine": 3041,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2389,8 +2485,9 @@
         "_verify_edge_spin.js"
       ],
       "declKind": "function",
-      "declLine": 6625,
+      "declLine": 6630,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 6,
       "writes": 0
     },
@@ -2407,7 +2504,8 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 6179,
+      "declLine": 6184,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_render.js",
         "_verify_water.js",
@@ -2433,7 +2531,8 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "const",
-      "declLine": 2098,
+      "declLine": 2103,
+      "declModule": "index.html#928",
       "patchFiles": [
         "_verify_canyon_slopes.js"
       ],
@@ -2456,8 +2555,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 3914,
+      "declLine": 3919,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2475,8 +2575,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 7711,
+      "declLine": 7716,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2495,6 +2596,7 @@
       "declKind": "function",
       "declLine": 1344,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2510,8 +2612,9 @@
         "_verify_satpicker.js"
       ],
       "declKind": "function",
-      "declLine": 4763,
+      "declLine": 4768,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2526,8 +2629,9 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 7217,
+      "declLine": 7222,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2545,8 +2649,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 7712,
+      "declLine": 7717,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2563,7 +2668,8 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 5,
       "writes": 0
     },
@@ -2579,8 +2685,9 @@
         "_verify_canyon_identity.js"
       ],
       "declKind": "function",
-      "declLine": 2130,
+      "declLine": 2135,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2596,8 +2703,9 @@
         "_verify_realscale.js"
       ],
       "declKind": "const",
-      "declLine": 6135,
+      "declLine": 6140,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2614,8 +2722,9 @@
         "_verify_simplex.js"
       ],
       "declKind": "function",
-      "declLine": 4051,
+      "declLine": 4056,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2635,6 +2744,7 @@
       "declKind": "const",
       "declLine": 1065,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2651,6 +2761,7 @@
       ],
       "declKind": "let",
       "declLine": 1443,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2668,7 +2779,8 @@
         "_verify_menubar.js"
       ],
       "declKind": "let",
-      "declLine": 4657,
+      "declLine": 4662,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_canyon.js",
         "_verify_canyon_classic.js",
@@ -2694,6 +2806,7 @@
       ],
       "declKind": "const",
       "declLine": 985,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2712,6 +2825,7 @@
       ],
       "declKind": "let",
       "declLine": 1015,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify.js",
         "_verify_highres.js"
@@ -2737,8 +2851,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 7751,
+      "declLine": 7756,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2756,8 +2871,9 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 3153,
+      "declLine": 3158,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2773,8 +2889,9 @@
         "_verify_hex_sampling.js"
       ],
       "declKind": "function",
-      "declLine": 2637,
+      "declLine": 2642,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2789,8 +2906,9 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 6027,
+      "declLine": 6032,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2805,8 +2923,9 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 3349,
+      "declLine": 3354,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 4,
       "writes": 0
     },
@@ -2822,7 +2941,8 @@
         "_verify_wireframe.js"
       ],
       "declKind": "let",
-      "declLine": 5902,
+      "declLine": 5907,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_wireframe.js"
       ],
@@ -2845,8 +2965,9 @@
         "_verify_peak.js"
       ],
       "declKind": "function",
-      "declLine": 1614,
+      "declLine": 1619,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2862,8 +2983,9 @@
         "_verify_highres.js"
       ],
       "declKind": "function",
-      "declLine": 5903,
+      "declLine": 5908,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2891,7 +3013,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6784,
+      "declLine": 6789,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2906,7 +3029,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6782,
+      "declLine": 6787,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2921,7 +3045,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6782,
+      "declLine": 6787,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2936,8 +3061,9 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 4733,
+      "declLine": 4738,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2954,7 +3080,8 @@
         "_verify_simplex.js"
       ],
       "declKind": "const",
-      "declLine": 4048,
+      "declLine": 4053,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2970,8 +3097,9 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 4660,
+      "declLine": 4665,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -2987,8 +3115,9 @@
         "_verify_hex.js"
       ],
       "declKind": "function",
-      "declLine": 3810,
+      "declLine": 3815,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3003,8 +3132,9 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 5207,
+      "declLine": 5212,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3021,8 +3151,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4705,
+      "declLine": 4710,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3038,8 +3169,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 5368,
+      "declLine": 5373,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3056,6 +3188,7 @@
       "declKind": "function",
       "declLine": 1142,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3070,8 +3203,9 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 7184,
+      "declLine": 7189,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3088,8 +3222,9 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4702,
+      "declLine": 4707,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3105,7 +3240,8 @@
         "_verify_render.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3121,7 +3257,8 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 3,
       "writes": 0
     },
@@ -3138,6 +3275,7 @@
       ],
       "declKind": "let",
       "declLine": 974,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_build_progress.js"
       ],
@@ -3158,8 +3296,9 @@
         "_verify_colormixer.js"
       ],
       "declKind": "function",
-      "declLine": 5948,
+      "declLine": 5953,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3174,8 +3313,9 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 5628,
+      "declLine": 5633,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3204,8 +3344,9 @@
         "_verify_canyon_relief.js"
       ],
       "declKind": "function",
-      "declLine": 2054,
+      "declLine": 2059,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3223,6 +3364,7 @@
       "declKind": "const",
       "declLine": 936,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3237,8 +3379,9 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 5971,
+      "declLine": 5976,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3253,8 +3396,9 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2705,
+      "declLine": 2710,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3282,7 +3426,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6782,
+      "declLine": 6787,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3297,8 +3442,9 @@
         "_verify_curve.js"
       ],
       "declKind": "function",
-      "declLine": 1640,
+      "declLine": 1645,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3313,7 +3459,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6784,
+      "declLine": 6789,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3329,8 +3476,9 @@
         "_verify_hex_flow.js"
       ],
       "declKind": "function",
-      "declLine": 7025,
+      "declLine": 7030,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3345,8 +3493,9 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 1535,
+      "declLine": 1540,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3361,7 +3510,8 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "let",
-      "declLine": 7427,
+      "declLine": 7432,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3376,8 +3526,9 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 4732,
+      "declLine": 4737,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3393,8 +3544,9 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 3203,
+      "declLine": 3208,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3425,6 +3577,7 @@
       "declKind": "function",
       "declLine": 1444,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3440,6 +3593,7 @@
       ],
       "declKind": "const",
       "declLine": 1059,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3467,8 +3621,9 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 1594,
+      "declLine": 1599,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3484,8 +3639,9 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 4972,
+      "declLine": 4977,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3503,6 +3659,7 @@
       "declKind": "function",
       "declLine": 1092,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3531,8 +3688,9 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 3225,
+      "declLine": 3230,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3548,6 +3706,7 @@
       ],
       "declKind": "let",
       "declLine": 1020,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3562,8 +3721,9 @@
         "_verify_render.js"
       ],
       "declKind": "function",
-      "declLine": 5920,
+      "declLine": 5925,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3578,8 +3738,9 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 1579,
+      "declLine": 1584,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3594,8 +3755,9 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2712,
+      "declLine": 2717,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3610,8 +3772,9 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 2709,
+      "declLine": 2714,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3626,8 +3789,9 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 7234,
+      "declLine": 7239,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3643,8 +3807,9 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 3209,
+      "declLine": 3214,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3659,8 +3824,9 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 3340,
+      "declLine": 3345,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3675,7 +3841,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6180,
+      "declLine": 6185,
+      "declModule": "index.html#928",
       "writeFiles": [
         "_verify_snow.js"
       ],
@@ -3696,8 +3863,9 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 3217,
+      "declLine": 3222,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3712,8 +3880,9 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 5004,
+      "declLine": 5009,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3730,6 +3899,7 @@
       "declKind": "function",
       "declLine": 1122,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 2,
       "writes": 0
     },
@@ -3744,8 +3914,9 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 2606,
+      "declLine": 2611,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3760,8 +3931,9 @@
         "_verify_hex_sampling.js"
       ],
       "declKind": "function",
-      "declLine": 4904,
+      "declLine": 4909,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3776,8 +3948,9 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 2687,
+      "declLine": 2692,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3792,8 +3965,9 @@
         "_verify_flip.js"
       ],
       "declKind": "function",
-      "declLine": 6657,
+      "declLine": 6662,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3808,8 +3982,9 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 7155,
+      "declLine": 7160,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3824,8 +3999,9 @@
         "_verify_zoom.js"
       ],
       "declKind": "const",
-      "declLine": 7256,
+      "declLine": 7261,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3840,7 +4016,8 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "const",
-      "declLine": 2043,
+      "declLine": 2048,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3855,8 +4032,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 2571,
+      "declLine": 2576,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3871,7 +4049,8 @@
         "_verify_toolbox.js"
       ],
       "declKind": "const",
-      "declLine": 4036,
+      "declLine": 4041,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3899,8 +4078,9 @@
         "_verify_hex.js"
       ],
       "declKind": "function",
-      "declLine": 2767,
+      "declLine": 2772,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3915,8 +4095,9 @@
         "_verify_peak.js"
       ],
       "declKind": "function",
-      "declLine": 1636,
+      "declLine": 1641,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3931,8 +4112,9 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 4980,
+      "declLine": 4985,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3947,8 +4129,9 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 5793,
+      "declLine": 5798,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3963,7 +4146,8 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5899,
+      "declLine": 5904,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3980,6 +4164,7 @@
       "declKind": "function",
       "declLine": 1355,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -3996,6 +4181,7 @@
       "declKind": "function",
       "declLine": 1383,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4010,8 +4196,9 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 5146,
+      "declLine": 5151,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4026,8 +4213,9 @@
         "_verify_hex.js"
       ],
       "declKind": "const",
-      "declLine": 6174,
+      "declLine": 6179,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4042,8 +4230,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 3971,
+      "declLine": 3976,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4058,7 +4247,8 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 6784,
+      "declLine": 6789,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4073,8 +4263,9 @@
         "_verify_streampower.js"
       ],
       "declKind": "function",
-      "declLine": 5838,
+      "declLine": 5843,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4089,8 +4280,9 @@
         "_verify_snow_physics.js"
       ],
       "declKind": "function",
-      "declLine": 3236,
+      "declLine": 3241,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4105,8 +4297,9 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 8024,
+      "declLine": 8029,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4121,8 +4314,9 @@
         "_verify_hex.js"
       ],
       "declKind": "function",
-      "declLine": 2814,
+      "declLine": 2819,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4137,8 +4331,9 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 7484,
+      "declLine": 7489,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4153,8 +4348,9 @@
         "_verify_layout.js"
       ],
       "declKind": "function",
-      "declLine": 1692,
+      "declLine": 1697,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4169,8 +4365,9 @@
         "_verify_colormixer.js"
       ],
       "declKind": "function",
-      "declLine": 5076,
+      "declLine": 5081,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4198,8 +4395,9 @@
         "_verify_toolbar.js"
       ],
       "declKind": "function",
-      "declLine": 4672,
+      "declLine": 4677,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4215,6 +4413,7 @@
       ],
       "declKind": "const",
       "declLine": 1026,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4229,8 +4428,9 @@
         "_verify_hex_dem.js"
       ],
       "declKind": "function",
-      "declLine": 5865,
+      "declLine": 5870,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4258,7 +4458,8 @@
         "_verify_range.js"
       ],
       "declKind": "const",
-      "declLine": 4715,
+      "declLine": 4720,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4273,7 +4474,8 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 6185,
+      "declLine": 6190,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4288,7 +4490,8 @@
         "_verify_curve.js"
       ],
       "declKind": "const",
-      "declLine": 1644,
+      "declLine": 1649,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4303,8 +4506,9 @@
         "_verify_hex_flow.js"
       ],
       "declKind": "function",
-      "declLine": 2736,
+      "declLine": 2741,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4321,6 +4525,7 @@
       "declKind": "const",
       "declLine": 938,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4335,8 +4540,9 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 4677,
+      "declLine": 4682,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4351,8 +4557,9 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 7166,
+      "declLine": 7171,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4367,8 +4574,9 @@
         "_verify_hex.js"
       ],
       "declKind": "function",
-      "declLine": 3130,
+      "declLine": 3135,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4383,8 +4591,9 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 6798,
+      "declLine": 6803,
       "valueIsFunction": true,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     },
@@ -4412,7 +4621,8 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 3335,
+      "declLine": 3340,
+      "declModule": "index.html#928",
       "reads": 1,
       "writes": 0
     }
