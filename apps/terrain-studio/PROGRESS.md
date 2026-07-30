@@ -21,8 +21,8 @@ issues found and folded in).
 | A1 · app becomes an ES module | **done** | `d67e9f8` (blocker `21953aa`) |
 | A1b · `--preview` builds with `--mode test` | **done** | `442564a` |
 | A2 · extract `src/core/gpu.js` + `gl-util.js` | **done** | `61ca297` |
-| A3 · PWA shell | **in progress** | — |
-| A4 · decide the single-file artifact | next | — |
+| A3 · PWA shell | **done** | `ab0a322` |
+| A4 · single-file artifact decided (multi-file accepted) | **done** | this commit |
 
 ## Gate readings, current
 
@@ -39,6 +39,7 @@ npm run verify -- _verify_wireframe.js  6/6   (gl.drawElements monkey-patch stil
 npm run verify -- _verify_hex_deferred.js  4/4
 npm run verify -- _verify_erosion_mass.js  9/9
 npm run verify -- _verify_glsl_probe.js  maxDiff 0.000e+0 (tol 1e-5)
+npm run verify -- --preview-prod _verify_pwa.js   6/6, incl. offline with the network cut
 ```
 
 Run the app: `.\run-studio.ps1` (dev, :5173) · `-Mode pwa` (build + preview, :4173) · `-Mode build`.

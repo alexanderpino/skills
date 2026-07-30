@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Terrain Studio — node-graph WebGL terrain generator. Source for the installable PWA; the skill ships a generated single-file build.",
+  "description": "Terrain Studio — node-graph WebGL terrain generator. Installable PWA; ES modules, no runtime dependencies.",
   "scripts": {
     "dev": "vite",
     "preview": "vite preview",

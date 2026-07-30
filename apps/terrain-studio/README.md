@@ -1,12 +1,24 @@
 # Terrain Studio — node-based WebGL terrain generator
 
-A self-contained, single-file terrain generator that runs in the browser: a **node graph** drives a
-live **WebGL 3D viewport**. It's the interactive companion to this skill's pure-NumPy `reference-impl/`
-atoms — the same algorithms (fractal noise, domain warp, thermal & hydraulic erosion, histogram
-equalisation, slope/height masks, real-DEM import) exposed as a graph you build and tune by eye.
+An installable terrain generator that runs in the browser: a **node graph** drives a live **WebGL 3D
+viewport**. It's the interactive companion to this skill's pure-NumPy `reference-impl/` atoms — the
+same algorithms (fractal noise, domain warp, thermal & hydraulic erosion, histogram equalisation,
+slope/height masks, real-DEM import) exposed as a graph you build and tune by eye.
 
-**Open `index.html`** in any modern browser — no build step, no server, no dependencies. Everything
-(UI, terrain kernels, WebGL renderer) is inline in that one file.
+**Run it:** `.\run-studio.ps1` (dev, `:5173`) · `-Mode pwa` (production build + preview, `:4173`) ·
+`-Mode build` (build only). There are no runtime dependencies — the toolchain is Vite and Playwright,
+and the app itself imports nothing.
+
+> **Opening `index.html` from disk no longer works, and that is deliberate.** The app is an ES
+> module, and module scripts are fetched with CORS semantics: a `file://` origin is opaque, so the
+> page comes up blank. It needs an origin. `localhost` counts as a secure one, which is also what
+> lets the service worker register — so the same change that ended `file://` is what made the app
+> installable and offline-capable.
+
+The build emits a small set of files rather than one: `index.html`, a hashed JS bundle, the
+manifest, icons, and `sw.js`. The single-file build this README used to describe was never
+engineered — it fell out of the script happening to be inline, and a service worker needs real,
+separately-addressable, content-hashed assets to cache and update. That trade was taken knowingly.
 
 ![Terrain Studio](../reference-impl/gallery.png)
 
