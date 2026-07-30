@@ -44,8 +44,19 @@ const port = usePreview ? 4173 : 5173
 const url = `http://127.0.0.1:${port}/index.html`
 
 if (usePreview) {
-  console.log('Building production bundle...')
-  const b = spawnSync('npx', ['vite', 'build'], { cwd: app, stdio: 'inherit', shell: true })
+  // --mode test, NOT a plain production build. The test bridge in src/legacy.js is wrapped in
+  // `if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))`, and Vite
+  // statically eliminates that whole block when MODE is "production". A production preview
+  // therefore serves an app with NO bridge, and the suite does not fail cleanly against it:
+  // every bare `RES = 192` writes a plain property nothing reads, and `gl` stops resolving to the
+  // WebGL context and starts resolving to the CANVAS ELEMENT, because the element's id is "gl" and
+  // the HTML parser publishes ids on window. The result is a wall of assertion failures that look
+  // like terrain regressions and are a stripped bridge.
+  //
+  // `--mode test` keeps the bridge and still exercises the real bundle - minified, hashed asset
+  // names, module preloads - which is the point of testing against the build at all.
+  console.log('Building bundle (--mode test, so the bridge survives)...')
+  const b = spawnSync('npx', ['vite', 'build', '--mode', 'test'], { cwd: app, stdio: 'inherit', shell: true })
   if (b.status !== 0) process.exit(b.status ?? 1)
 }
 
