@@ -333,11 +333,11 @@ its memory budget.)
 
 | Claim | Tier |
 |---|---|
-| Deferred deformation via top-down deformer capture + persistent heightmap, fill/settle over time — "Deferred Snow Deformation in Rise of the Tomb Raider" (GDC 2016 talk; companion GPU Pro 7 article, Michels & Sikachev as remembered) | **T** (attribution detail from memory) |
-| Displacement-based snow trails with rim bulge, tessellated near-field — Batman: Arkham Origins snow deformation (GDC talk) | **T** |
-| Snow/mud interaction and trail systems — God of War (GDC talks) | **T/?** (talks exist; speaker/year not pinned) |
+| Deferred deformation via top-down deformer capture + persistent heightmap, fill/settle over time — Michels & Sikachev, "Deferred Snow Deformation in Rise of the Tomb Raider" ([GPU Pro 7 chapter](https://www.taylorfrancis.com/chapters/edit/10.1201/b21261-5/deferred-snow-deformation-rise-tomb-raider-anton-kai-michels-peter-sikachev); talk form "Labs R&D: Rendering Techniques in Rise of the Tomb Raider", SIGGRAPH 2015 — no GDC 2016 talk found; earlier "GDC 2016" attribution was wrong) | **P/T** (verified) |
+| Displacement-based snow trails with rim bulge, tessellated near-field — Barré-Brisebois, "Deformable Snow Rendering in Batman: Arkham Origins" (GDC 2014) — [GDC Vault](https://gdcvault.com/play/1020177/Deformable-Snow-Rendering-in-Batman), [slides PDF](https://colinbarrebrisebois.com/wp-content/uploads/2022/06/gdc2014-deformable_snow_rendering.pdf) | **T** |
+| Snow/mud interaction and trail systems — Surricchio, "Advanced Graphics Summit: Reinventing the Wheel for Snow Rendering" (God of War Ragnarök, GDC 2023) — [GDC Vault](https://gdcvault.com/play/1028844/Advanced-Graphics-Summit-Reinventing-the), [slides PDF](https://media.gdcvault.com/gdc2023/Slides/Re-inventing+the+wheel+for+snow+rendering_Surricchio_Paolo.pdf) | **T** (was T/?; the pinned snow talk is Ragnarök 2023 — 2018-title GDC talks found cover wind/vegetation, not snow) |
 | Snow deformation over large worlds with follow-camera targets — Horizon Zero Dawn: The Frozen Wilds (GDC, as remembered) | **T/?** |
-| Porosity-based wetness darkening, roughness drop, damp/wet/puddle staging — Sébastien Lagarde, "Water drop" blog series | **F/D** |
+| Porosity-based wetness darkening, roughness drop, damp/wet/puddle staging — Sébastien Lagarde, "Water drop" blog series (2012-2013) — [1 "Observe rainy world"](https://seblagarde.wordpress.com/2012/12/10/observe-rainy-world/), [3a "Physically based wet surfaces"](https://seblagarde.wordpress.com/2013/03/19/water-drop-3a-physically-based-wet-surfaces/) | **F/D** |
 | Snow potential / moisture gating and the Snow Rule; wind, temperature, insolation fields | **D** (terrain-architect `13`/`27` contract) |
 | Toroidal / clipmap-style camera-following update discipline | **P**-family (Tanner et al. clipmap, `07`) applied as **F** |
 | Height-based blending for snow coverage in crevices | **F** (universal practice, `07`) |
