@@ -1524,11 +1524,16 @@ function shapeField(p){
   }
   return p.invert==="on"?invertField(o):o;
 }
-function pointSegmentDistance(px,py,ax,ay,bx,by){
-  const vx=bx-ax,vy=by-ay,den=vx*vx+vy*vy;
-  const t=den>1e-12?clamp(((px-ax)*vx+(py-ay)*vy)/den,0,1):0;
-  return Math.hypot(px-(ax+vx*t),py-(ay+vy*t));
-}
+// pointSegmentDistance lives at the stroke-rasteriser below (search: `function
+// pointSegmentDistance`). A SECOND, textually different definition used to sit here and was dead
+// code: in a classic script both declarations hoist and the LATER one wins, so this one had never
+// executed. Under `sourceType: "module"` the same pair is a hard SyntaxError -- "Identifier
+// 'pointSegmentDistance' has already been declared" -- which blocked the ES-module split outright.
+// Removing the unreachable one is behaviour-preserving by construction. (The two differed in their
+// degenerate-segment guard: this one tested `den > 1e-12`, the live one uses `d = dx*dx+dy*dy || 1`,
+// which only catches exact zero. Both clamp t to [0,1] so a sub-micron segment collapses to its
+// start point either way -- but if that guard is ever revisited, the epsilon form was the more
+// careful of the two.)
 // Vector brush strokes stay in normalised terrain coordinates, so an artist-authored road mask
 // survives every working/build resolution. Strokes alpha-composite in order; Erase is destructive
 // only inside this node and remains fully undoable/serialisable with the graph.
