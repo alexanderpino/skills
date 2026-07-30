@@ -32,6 +32,18 @@
       "files": []
     },
     {
+      "id": 7,
+      "prompt": "Add an ocean and rivers to my custom engine's terrain. I don't want to build a whole water mesh LOD system if I can avoid it — I heard you can render water with just a fullscreen triangle?",
+      "expected_output": "Covers the fullscreen-triangle screen-space water pass (SV_VertexID triangle, per-pixel ray reconstruction, analytic ray-plane intersection with the water datum, depth-buffer rejection, depth-based absorption and shore fade), its trade-offs vs mesh/projected-grid water (TAA motion vectors, displaced silhouettes, multiple elevations), and flow-mapped rivers driven by the generator's flow field. Consumes water surface/depth from the generation-side contract; never carves water into the heightfield.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "My game has dynamic weather. I want rain to darken the ground and form puddles, snow to pile up and get trampled with footprints, and the grass to look wet too. How do I architect this?",
+      "expected_output": "Architecture: runtime surface-state overlay targets (wetness, snow depth delta, deformation) composited over immutable baked tiles; puddles driven by the generator's curvature/flow/wetness aux maps, snow constrained by the baked snow-potential envelope; deferred deformation (top-down deformer capture -> persistent heightmap -> displacement/normal); porosity-based wet darkening + roughness drop; the same state applied to vegetation so the world has one weather system.",
+      "files": []
+    },
+    {
       "id": 6,
       "prompt": "What's the canonical paper for Nanite? And for greedy meshing? I need citations for a tech report.",
       "expected_output": "Answers honestly by provenance tier: Nanite is a SIGGRAPH 2021 Advances talk (Karis), not a peer-reviewed paper; greedy meshing has no canonical paper (folklore, canonical writeup is Lysenko's 0fps blog). Warns that attributions should be re-verified against primary sources for publication-critical use. Does not fabricate citations.",

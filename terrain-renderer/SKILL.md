@@ -12,13 +12,20 @@ description: >-
   GPU-driven culling and submission (HiZ two-phase occlusion, indirect draws), planetary
   rendering and float-precision doctrine, terrain lighting/shadows (CSM, virtual shadow
   maps, horizon maps), and the artifact catalogue (cracks, T-junctions, popping, swimming,
-  shimmer). Use for designing, implementing, reviewing, debugging, or optimizing any
+  shimmer). Also owns the dynamic surface: water rendering and interactive simulation
+  (Gerstner/FFT oceans, flow-mapped rivers, the fullscreen-triangle water pass, shoreline
+  and underwater), snow/wetness/weather surface state and deformation, runtime consumption
+  of every auxiliary map (wetness, flow, curvature, AO, wind, biome…), vegetation/grass and
+  scatter rendering, roads/decals/runtime terrain modification, the physics-collision and
+  gameplay handoff, and tool-viewport preview pipelines for terrain authoring tools. Serves
+  indie baselines, terrain-tool viewports, and AAA GPU-driven pipelines alike, engine-
+  agnostically. Use for designing, implementing, reviewing, debugging, or optimizing any
   terrain renderer or voxel engine — whenever the task involves drawing terrain, chunk
-  meshing, LOD selection or seams, terrain textures at scale, or streaming a large world
-  to the GPU — even if the word "terrain" is never said (heightmap rendering, "Minecraft
-  clone", planet renderer, open-world streaming). Do not use for terrain *generation*
-  (erosion, noise, biomes — that is terrain-architect) or generic BRDF/material math
-  (physically-based-rendering).
+  meshing, LOD selection or seams, terrain textures at scale, water/snow/grass on terrain,
+  or streaming a large world to the GPU — even if the word "terrain" is never said
+  (heightmap rendering, "Minecraft clone", planet renderer, open-world streaming). Do not
+  use for terrain *generation* (erosion, noise, biomes — that is terrain-architect) or
+  generic BRDF/material math (physically-based-rendering).
 ---
 
 # Terrain Renderer
@@ -84,13 +91,34 @@ any engine or from scratch, on any paradigm (heightfield, voxel, mesh, planet). 
 includes any large continuous ground surface: planets, asteroid fields of walkable bodies,
 cave systems, player-built block worlds.
 
+The dynamic surface is **in** scope, on the renderer's side of terrain-architect's "caused,
+not carved" boundary: the generator ships the causes (water datum/depth/flow, wetness, snow
+potential, wind); this skill owns the motion and the state — waves and foam (`12`), snow
+accumulation and deformation, rain and wetness (`13`), swaying vegetation (`15`), runtime
+craters and tracks (`17`).
+
 Out of scope: generating the terrain data itself (route terrain-architect — including "why do
 my rivers stop", which is a generation-graph defect, not a rendering one); generic mesh
-rendering of props/characters; BRDF derivations (route physically-based-rendering); water
-*simulation* (the engine's fluid/ocean system; this skill draws the terrain under it and
-consumes the generator's depth/flow fields for shoreline integration, `10`); UI maps and
-minimaps. A request containing "voxel" or "LOD" is not enough by itself; the deliverable must
-be rendering a world surface.
+rendering of props/characters; BRDF derivations (route physically-based-rendering); offline
+film-quality fluid sim; UI maps and minimaps. A request containing "voxel" or "LOD" is not
+enough by itself; the deliverable must be rendering a world surface.
+
+## The three consumer profiles
+
+Every module in this skill serves three developer profiles, and the right answer differs by
+rung. Name the rung before prescribing; when unstated, infer it from the project and say so.
+
+| Profile | What they need | Ladder default |
+|---|---|---|
+| **Indie / baseline** | The straightforward version that ships: chunked quadtree + skirts, CDLOD, Gerstner waves, 4-layer splat, CPU scatter, fullscreen-triangle water | The *Baseline* option in each chapter |
+| **Tool developer** | Interactive authoring viewports: preview pyramids, dirty-region reupload, false-color map overlays, sun sweeps, WYSIWYG export parity | `16`, plus each chapter's preview notes |
+| **AAA open-world** | GPU-driven everything: compute culling + MDI, mesh shaders/clusters, virtual texturing, two-phase HiZ, RTE precision, full aux-map registry | The *AAA* option in each chapter |
+
+The ladder is a doctrine, not a menu of taste: climb only when the world contract demands it
+(the Paradigm procedure), because every rung up buys scale with engineering and debugging
+cost. Prescriptions stay **engine-agnostic** — neutral math, HLSL/GLSL-style pseudocode, and
+explicit data structures that port to D3D12/Vulkan/Metal/WebGPU alike; `03` exists for teams
+inside a licensed engine, and everything else must not assume one.
 
 ## The Paradigm procedure
 
@@ -164,6 +192,12 @@ defects:
 8. Is popping managed (morph/dither/TAA) rather than denied?
 9. Do shadow casters get culled with *caster* logic, not camera logic (`08`, `10`)?
 10. Is there a debug view for the thing being debugged? If not, build it first (`11`).
+11. Does runtime surface state (snow, wetness, deformation, decals, craters) live in overlay
+    targets composited over immutable baked tiles, in a declared order — and does every
+    dynamic effect name the aux map that drives it (`13`, `14`, `17`)?
+12. Do water, vegetation, and props all read the same weather/terrain state the ground reads
+    (one world, one weather — `12`, `13`, `15`), and do instances sit on the *rendered* LOD
+    surface rather than the source heightfield (`15`)?
 
 State findings as **symptom → mechanism → minimal fix**. Do not redesign a renderer that has
 one violated contract.
@@ -272,7 +306,20 @@ side: never re-derive analysis the generator already shipped; never bake materia
 is supposed to compose (`07`); consume water as a separate surface + depth (shoreline
 blending, `10`), never as carved solid. When the renderer needs something the contract lacks
 (max displacement bounds for culling, per-tile error metrics, horizon maps), the fix is to
-*extend the contract*, not to invent the data renderer-side.
+*extend the contract*, not to invent the data renderer-side. The full consumer's manual for
+the auxiliary-map registry — which map drives which runtime system — is `14`.
+
+## The tool provides causes; the renderer renders motion — and state composes as overlays
+
+The other half of the handoff doctrine: everything that *moves or changes* at runtime is this
+skill's to render — waves, foam, spray, flowing rivers (`12`), accumulating and deforming
+snow, rain wetting the ground (`13`), swaying grass (`15`), craters and tire tracks (`17`) —
+always *driven by* the generator's cause-fields, never contradicting them (no snow where the
+Snow Rule forbids it, no puddles on ridges the wetness map excludes). And all runtime surface
+state obeys one compositing discipline: dynamic deltas live in **separate overlay targets**
+(camera-following or paged) composited over the immutable streamed base data in a declared
+order — never mutate the baked tiles in place, or streaming, caching, and save games all
+corrupt (`13`, `14`, `17`).
 
 ---
 
@@ -355,6 +402,12 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/09-planetary-precision.md` | Precision doctrine (camera-relative, rebasing, per-patch frames); reversed-Z/log depth; cube-sphere quadtrees; orbit-to-ground LOD; horizon culling; ECEF/ENU frames; procedural-on-demand planets |
 | `references/10-lighting-shadows.md` | CSM at km scale (splits, snapping, caster culling); heightfield ray-marched and horizon-map shadows; virtual shadow maps; terrain AO/GI; normal pipeline across LOD; aerial perspective integration; time-of-day invalidation |
 | `references/11-verification-failures.md` | **The review chapter.** Failure catalogue (symptom → mechanism → fix → route); metrics and budget assertions; test controls (flat plane, analytic terrain, teleport, flythrough); mandatory debug views; profiling method; regression strategy |
+| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, flow-mapped rivers, interactive GPU sim patches, optics (reflection/refraction/absorption, foam, underwater), shoreline integration, pass ordering |
+| `references/13-snow-weather-surface-state.md` | Dynamic surface state: camera-following state targets; deformable snow/mud/sand (deferred deformation); runtime accumulation & melt within the generator's envelope; snow shading; wetness/rain/puddles/drying; wind-driven surface effects; persistence |
+| `references/14-auxiliary-maps-runtime.md` | **The aux-map consumer's manual.** Registry table (map → consumers → format → lifecycle); packing/residency/mip rules; derived-vs-shipped; cross-system fan-out (material, VFX, audio, physics, AI); single-source-of-truth; dynamic writeback discipline |
+| `references/15-vegetation-scatter.md` | Vegetation & scatter: shipped vs runtime-procedural instances, GPU instancing/culling, grass systems and wind, tree LOD chains and octahedral impostors, alpha/overdraw doctrine, terrain-consistency (seating, color, weather), budgets |
+| `references/16-tool-viewports.md` | Tool viewports for terrain authoring: WYSIWYG/export-parity contract, preview pyramid, dirty-region reupload, GPU derived-field passes (normals, hillshade, contours), shading-mode palette, brush echo loop, comparison harnesses |
+| `references/17-roads-decals-physics.md` | Roads/splines on terrain (splat injection vs draped ribbon vs conforming), z-fighting toolkit, decals and VT injection, runtime modification (craters/tracks) with delta overlays, physics-collider handoff, gameplay surface queries, buoyancy |
 
 ## Cross-skill routing
 
