@@ -95,6 +95,25 @@ spaces, mip chains, and virtual-texture pages; so even hex-simulated planets get
 cube-face tiles (or locally-flat tiles) for drawing. Do not couple the render lattice to the
 simulation lattice; declare the resample as part of the bake.
 
+The tiling and its precision discipline in one sketch:
+
+```
+       +----+                           per-patch local frame — the precision fix:
+       | +Y |
+  +----+----+----+----+                       up   north
+  | -X | +Z | +X | -Z |                        \   /
+  +----+----+----+----+                ...______\_/______...  patch of the ellipsoid
+       | -Y |                                   O-----> east  (curved, drawn flat)
+       +----+
+  six faces, one quadtree each         O = patch origin (patch centre on the
+  +---------+----+-+-+                     ellipsoid), stored in double
+  |         |    +-+-+                 vertices = float32 offsets in the local
+  |         +----+---+                     east/north/up frame at O
+  |         |    |   |                 per draw: upload float32(O_f64 - cam_f64);
+  +---------+----+---+                 the GPU never sees a planet-radius-magnitude
+  quadtree deepens toward the viewer   coordinate
+```
+
 - **Mapping and distortion.** The naive (gnomonic) cube→sphere mapping varies texel solid angle by
   ~5.2× between face centre and corner — corners waste resolution and distort features.
   Tangent-adjusted mappings (`u' = tan(u·π/4)`, applied per axis) cut the variation to roughly

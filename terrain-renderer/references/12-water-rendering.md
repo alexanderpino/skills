@@ -123,6 +123,25 @@ The pixel shader is the whole system:
    depth field, normal detail from scrolling/FFT normal cascades sampled at the hit's world XZ,
    SSR/cubemap reflection, refraction from the scene-color copy.
 
+The geometry of the pass, in section view:
+
+```
+ C  camera — one fullscreen triangle, one view ray per pixel
+  \\
+   \ \_____ ray B                             ____
+    \      \_____                           _/    \_
+     \ ray A     \_____                   _/        \_    terrain surface
+      \                \_____           _/            \   from the depth
+       \                     \_____   _/               \  buffer
+        \                          \_X                  \
+ ~~~~~~~~*~~~~~~~~~~~~~~~~~~~~~~~~~~/~~~~~~~~~~~~~~~~~~~~\~~~ water datum y = h_water
+   ______________                  /
+  /   sea floor  \_________________/
+  * = ray A's plane hit, t = (h_water - camPos.y)/rayDir.y; the scene hit (sea
+      floor) lies beyond t -> ACCEPT: shade water there, absorb over sceneHit - t
+  X = ray B's scene hit is nearer than its t -> REJECT: terrain occludes the water
+```
+
 **Displaced surfaces: per-pixel raymarching.** The analytic plane carries waves in normals only —
 flat silhouette, no parallax between crests. To show real displacement, march the ray against the
 displaced height: start at the analytic hit of a crest-inflated plane, take fixed steps sampling
