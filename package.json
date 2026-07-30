@@ -18,5 +18,8 @@
     "test": "npm run test --workspace @skills/terrain-studio",
     "test:e2e": "npm run test:e2e --workspace @skills/terrain-studio",
     "verify": "npm run verify --workspace @skills/terrain-studio"
+  },
+  "devDependencies": {
+    "acorn": "^8.18.0"
   }
 }

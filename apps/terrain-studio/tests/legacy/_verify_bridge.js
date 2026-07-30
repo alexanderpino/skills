@@ -48,8 +48,20 @@ if (!acorn) {
 
 const DIR = __dirname;
 const SELF = path.basename(__filename);
-const APP = path.join(DIR, 'index.html');
+// ../../index.html, not ./index.html. This tool was written when it sat beside the app; the suite
+// then moved into tests/legacy/ and the path was never updated, so APP pointed at a file that does
+// not exist. Combined with acorn being uninstalled (the exit(2) above fires first), the tool has
+// been unrunnable — which is exactly why bridge-surface.json is a fossil: its meta still records
+// scriptLines "920-7623" and 56 test files against an app that is now 928-8110 with 66 oracles.
+// A frozen contract that cannot be regenerated stops being a contract and becomes a rumour.
+const APP = process.env.BRIDGE_APP
+  ? path.resolve(process.env.BRIDGE_APP)
+  : path.resolve(DIR, '../../index.html');
 const OUT = path.join(DIR, 'bridge-surface.json');
+if (!fs.existsSync(APP)) {
+  console.error(`FATAL: app not found at ${APP}\n  set BRIDGE_APP to override.`);
+  process.exit(2);
+}
 
 // Playwright methods whose function argument is serialized and run in the page.
 const PAGE_SIDE = new Set([
