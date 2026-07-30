@@ -2,7 +2,8 @@
 
 Water on terrain — oceans, rivers, lakes — arrives from the generation side as *still data*: flat
 surface datums, a depth field, a flow field. Everything that moves is made here. This chapter owns
-the engine side of that handoff: water surface geometry and its LOD, ambient wave synthesis
+the engine side of that handoff: water surface geometry and its LOD (meshed or the meshless
+screen-space pass), ambient wave synthesis
 (Gerstner and FFT), flow-driven river surfaces, local interactive simulation, water shading
 composition, shoreline integration, and the transparency/pass-ordering discipline water forces on
 the frame. Deep BRDF/scattering math routes to the physically-based-rendering skill; generation of
@@ -11,6 +12,7 @@ water bodies, routing, and flow fields routes to terrain-architect (its `03`/`04
 
 Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-render-side) ·
 [Surface geometry & LOD](#surface-geometry--lod) ·
+[Screen-space water: the fullscreen-triangle pass](#screen-space-water-the-fullscreen-triangle-pass) ·
 [Ambient waves: Gerstner and FFT](#ambient-waves-gerstner-and-fft) ·
 [Rivers: flow-driven surfaces](#rivers-flow-driven-surfaces) ·
 [Interactive simulation patches](#interactive-simulation-patches) ·
@@ -81,6 +83,80 @@ with no other water bodies and a camera that never looks straight down. Whicheve
 Culling note: wave displacement moves geometry outside its static bounds. Bounds submitted to
 `08`'s culling must be inflated by max amplitude + max horizontal chop, per cascade settings —
 un-inflated bounds cause tiles that pop at screen edges exactly when the sea is roughest.
+
+## Screen-space water: the fullscreen-triangle pass
+
+There is a third geometry answer for flat-datum water: draw no water geometry at all. A single
+fullscreen triangle covers the screen; the pixel shader builds a per-pixel view ray, intersects
+it analytically with the water plane, and shades water wherever the hit survives the depth
+buffer. The entire surface-geometry problem — LOD, cracks, morphing, culling, horizon skirts —
+evaporates because there is nothing to tessellate, and the horizon is pixel-exact by construction.
+
+One *triangle*, not a quad — community canon with a real reason: a quad is two triangles whose
+shared diagonal cuts 2×2 pixel quads in half, so the rasterizer runs partially-covered quads and
+redundant helper lanes twice along the seam, and sets up interpolants for two primitives instead
+of one. The triangle needs no vertex or index buffer; the vertex shader emits three oversized
+verts straight from `SV_VertexID`:
+
+```hlsl
+// Draw(3), nothing bound; the oversized tri clips to exactly the screen
+float4 FullscreenVS(uint id : SV_VertexID, out float2 uv : TEXCOORD0) : SV_Position {
+    uv = float2((id << 1) & 2, id & 2);               // (0,0) (2,0) (0,2)
+    return float4(uv.x * 2 - 1, 1 - uv.y * 2, 0, 1);  // spans NDC (-1,1)..(3,-3)
+}
+```
+
+The pixel shader is the whole system:
+
+1. **Ray**: unproject the pixel through the inverse view-projection (near/far points), or build
+   `rayDir` from the camera basis and pixel NDC. Origin is the camera; keep everything
+   camera-relative (`09`).
+2. **Analytic hit**: for a horizontal datum at `h_water`,
+   `t = (h_water - camPos.y) / rayDir.y`. Guard the degenerate cases explicitly: `|rayDir.y| < ε`
+   (ray parallel to the plane — no hit), `t < 0` (plane behind the camera), and the sign flip
+   when the camera is below the datum (underwater, below).
+3. **Depth reject**: reconstruct the opaque scene's world position from the depth buffer along
+   the same ray; if the scene hit is nearer than `t`, terrain or props occlude the water — output
+   nothing. The reconstruction must use the frame's actual depth convention (reversed-Z, jitter).
+4. **Shade**: everything in [Shading and optics](#shading-and-optics) applies unchanged at the
+   hit point — traversal distance from scene depth vs `t` for absorption, shore fade from the
+   depth field, normal detail from scrolling/FFT normal cascades sampled at the hit's world XZ,
+   SSR/cubemap reflection, refraction from the scene-color copy.
+
+**Displaced surfaces: per-pixel raymarching.** The analytic plane carries waves in normals only —
+flat silhouette, no parallax between crests. To show real displacement, march the ray against the
+displaced height: start at the analytic hit of a crest-inflated plane, take fixed steps sampling
+the summed cascades until the ray crosses the surface, then binary-refine 4–6 iterations. Cost
+doctrine: that is N cascade fetch+sums per water pixel, and N grows brutally at grazing angles
+where the ray travels far between height crossings — cap the step count and fall back to the
+analytic plane beyond a distance. Raymarching is worth it for hero close-ups with no mesh budget;
+the moment displacement must read everywhere on screen, a mesh is cheaper.
+
+**Underwater is the same triangle.** `camPos.y < h_water` flips the intersection's sign logic and
+the pass becomes a fullscreen underwater volume: every pixel starts in water, extinction fog runs
+over the distance to the scene hit or the surface exit point, the datum seen from below gets
+total internal reflection outside Snell's window, and the bright overhead circle comes from the
+same ray-plane math. Same triangle, different branch — the underwater state machine in
+[Shading and optics](#shading-and-optics) still owns the crossing frame.
+
+Honest trade-off against meshed water:
+
+| | Fullscreen-triangle pass | Mesh / projected grid |
+|---|---|---|
+| Horizon & LOD | pixel-exact plane; zero LOD/crack/skirt machinery | vertex-quantized; full crack/morph discipline |
+| Displacement | raymarch-only; silhouettes cost per-pixel marching | free in the vertex shader; cheap silhouettes |
+| Motion vectors | none rasterized — derive analytic velocity or TAA ghosts | rasterized like any other geometry |
+| Multiple bodies | per-body planes + screen bounds; cost per body drawn | meshes clip to body extents naturally |
+| Transparency | composites at one depth per pixel; other transparents need explicit ordering | sorts as ordinary transparent geometry |
+
+Where it wins: indie flat oceans, single-datum seas, and tool viewports (`16`) that need "sea
+level" visualized without buying the LOD apparatus. Where it strains: lakes and rivers at many
+elevations (each body needs its own plane and screen-space bounds, and the depth-reject must pick
+the nearest surface per pixel — the per-body sorting rule of
+[Transparency & pass ordering](#transparency--pass-ordering) applies unchanged), and any frame
+where wave silhouettes matter more than the saved machinery. The pass raises three traps of its
+own — grazing-angle ray-plane precision, reversed-Z reconstruction mismatch, and the missing
+motion vectors — catalogued in [Pitfalls](#pitfalls).
 
 ## Ambient waves: Gerstner and FFT
 
@@ -330,6 +406,17 @@ Water is the classic hard transparency case, and the frame must be structured fo
   water fizzes. De-jitter the sample and provide displaced-surface motion vectors.
 - **Waterfall without a feeding flow field**: the construct exists, the river above ignores it.
   Generation-graph defect — route to terrain-architect, do not patch with particles.
+- **Screen-space water: grazing-ray precision**: near the horizon `rayDir.y → 0` and `t`
+  explodes; float error shreds the last pixel rows into stripes. Camera-relative math (`09`),
+  clamp `t` against the far plane, and fade into the sky/fog band before the guards ever trip.
+- **Screen-space water: depth-reconstruction mismatch**: the ray hit is compared against a world
+  position rebuilt with the wrong depth convention (reversed-Z, ∞ far, jitter) — water pokes
+  through hills or vanishes hugging geometry. One shared reconstruction helper for every
+  screen-space pass; never a per-shader reimplementation.
+- **Screen-space water: no motion vectors**: nothing was rasterized, so TAA/upscalers see zero
+  velocity where waves move — crests ghost and smear. Write analytic velocity: reproject the hit
+  point through the previous frame's view-projection (plus wave advection) into the velocity
+  buffer.
 
 ## Sources & provenance
 
@@ -337,22 +424,45 @@ Water is the classic hard transparency case, and the frame must be structured fo
   crest-sharpening wave sum used across the industry.
 - **P** — Tessendorf, "Simulating Ocean Water" (SIGGRAPH course notes, early 2000s): the FFT
   ocean — spectrum sampling, inverse-FFT displacement, choppiness, Jacobian folding. The canon
-  for every spectral ocean shipped since.
+  for every spectral ocean shipped since. 2004 revision:
+  [coursenotes2004.pdf (Clemson)](https://people.computing.clemson.edu/~jtessen/reports/papers_files/coursenotes2004.pdf).
 - **P** — Phillips and JONSWAP spectra: oceanography literature, imported into graphics via
   Tessendorf's notes; parameter details in graphics use are simplified from the originals.
-- **T** — Vlachos, "Water Flow in Portal 2" (SIGGRAPH 2010 talk): flow mapping — dual
-  phase-offset samples with triangle-wave blend; the canonical river-surface technique.
-- **P** — Bruneton et al., ocean rendering (geometry-to-BRDF seamless transitions): the
-  principled treatment of wave detail crossing from geometry band to shading band.
-- **P** — Johanson, projected grid (master's thesis, ~2004): the screen-space grid concept and
-  its horizon-edge behavior, as compared in the geometry table.
-- **P** — Kass & Miller, heightfield shallow-water for graphics (SIGGRAPH, ~1990): the lineage
-  behind interactive heightfield ripple sims; pipe-model variants are later community practice.
-- **P** — Finch, "Effective Water Simulation from Physical Models" (GPU Gems, 2004): the
+- **T** — Vlachos, "Water Flow in Portal 2" (SIGGRAPH 2010, Advances in Real-Time Rendering
+  course): flow mapping — dual phase-offset samples with triangle-wave blend; the canonical
+  river-surface technique.
+  [Slides PDF (Valve)](https://cdn.akamai.steamstatic.com/apps/valve/2010/siggraph2010_vlachos_waterflow.pdf).
+- **P** — Bruneton, Neyret & Holzschuch, "Real-time Realistic Ocean Lighting using Seamless
+  Transitions from Geometry to BRDF" (Computer Graphics Forum 29(2), 2010): the principled
+  treatment of wave detail crossing from geometry band to shading band.
+  [HAL open access](https://inria.hal.science/inria-00443630).
+- **P** — Johanson, "Real-time water rendering — introducing the projected grid concept" (MSc
+  thesis, Lund University, 2004): the screen-space grid concept and its horizon-edge behavior,
+  as compared in the geometry table.
+  [Thesis PDF (Lund)](https://fileadmin.cs.lth.se/graphics/theses/projects/projgrid/projgrid-lq.pdf).
+- **P** — Kass & Miller, "Rapid, Stable Fluid Dynamics for Computer Graphics" (SIGGRAPH 1990):
+  the lineage behind interactive heightfield ripple sims; pipe-model variants are later
+  community practice. [ACM DL](https://dl.acm.org/doi/10.1145/97880.97884).
+- **P** — Finch, "Effective Water Simulation from Physical Models" (GPU Gems ch. 1, 2004): the
   standard practical Gerstner implementation reference.
+  [Chapter online (NVIDIA)](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models).
 - **F** — Cascade counts and sizes (2–4 cascades, ~400/60/10 m), Jacobian foam thresholds
   (0.5–0.9), sim patch sizes (256²–512² over 30–100 m), choppiness limits: standard-practice
   ranges from shipped-title talks and community writeups; tune per title, verify per `11`.
+- **T** — Bilodeau, "Vertex Shader Tricks" (GDC 2014, AMD): the `SV_VertexID` fullscreen
+  triangle among other bufferless draws.
+  [Slides (SlideShare)](https://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau).
+- **F** — One fullscreen triangle over a two-triangle quad (diagonal partial-quad/helper-lane
+  waste, double interpolant setup): community canon —
+  [Wallis, "Optimizing Triangles for a Full-screen Pass"](https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html);
+  [d7samurai, minimal D3D11 fullscreen triangle](https://gist.github.com/d7samurai/5915956fb8ce6a63503cf8c85ffd1e84);
+  [30fps.net, "Full screen triangle optimization"](https://30fps.net/pages/twotris/).
+- **F** — Water as a fullscreen ray-plane/ray-heightfield pass: long-running community
+  technique, no canonical paper —
+  [GameDev.net, "Rendering Water as a Post-process Effect"](https://www.gamedev.net/articles/programming/graphics/rendering-water-as-a-post-process-effect-r2642/).
+- **D** — Underwater as a fullscreen volume pass in shipped tooling:
+  [Crest Ocean System underwater docs](https://crest.readthedocs.io/en/latest/user/underwater.html)
+  (fullscreen effect between transparents and post, meniscus handling).
 - **F** — Depth-reject refraction fix, SSR fallback hierarchy, underwater state machine, planar
   one-body ceiling: ubiquitous production practice; no single canonical citation.
 - **?** — Attribution of specific shallow-water shoaling approximations to particular shipped
