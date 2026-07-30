@@ -100,6 +100,24 @@ the refill term is the entire "weather heals the world" system (refill fast whil
 from settling, not at all for mud if you want persistent ruts). **Clamp to available material**:
 carve depth can never exceed the local pack depth, or trails punch through into the base terrain.
 
+The pipeline end to end:
+
+```
+ deformer proxies (feet, wheels, capsules, impacts)
+        | drawn depth-only, orthographic, top-down (underside height)
+        v
+ +----------------------+  compute fold, per texel:   +---------------------------+
+ | deformer capture RT  |  carve = packTop - deformer | persistent deformation RT |
+ | (this frame, window  | --------------------------> | camera-following toroidal |
+ |  around the player)  |  deepen-only max() + refill | window; survives frames   |
+ +----------------------+                             +---------------------------+
+                                                         | sampled by the terrain
+                                                         v material, in world space
+                                    near: real displacement (tessellation / vertex)
+                                    mid:  parallax + normals from the SAME target
+                                    far:  albedo/roughness trail darkening only
+```
+
 ### Trail elevation profile
 
 A pure carve reads as CNC-milled. Real snow and mud displace: material compressed under the foot

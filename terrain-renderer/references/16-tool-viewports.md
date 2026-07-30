@@ -210,6 +210,24 @@ cook — the blend is a third terrain nobody authored). If the recook is cancell
 the echo back to the last cooked state; an echo that persists as if final is the worst lie in
 this chapter.
 
+The loop, both speeds at once:
+
+```
+                       brush stroke
+                      /            \
+    FAST — this frame, <16 ms       SLOW — async, authoritative
+    splat kernel into the           append stroke to the sculpt node;
+    preview tier; normals           dirty propagation recooks
+    over R ⊕ 1 texel                downstream (seconds)
+                      \                         |
+                       v                        | cook lands with
+             +-------------------+              | generation >= latest edit
+             |     viewport      | <------------+
+             | badge:APPROXIMATE |   atomic per-region swap of cooked
+             +-------------------+   rects, badge clears — never blend
+                                     echo and cook
+```
+
 **Normal apron on partial updates.** The `⊕ 1 texel` above is load-bearing: normals at the dirty
 rect's border read neighbors outside it. Re-normal exactly the dirty rect and you fossilize a
 one-texel lighting seam around every stroke — the tool-scale replay of the chunk-apron bug (`11`).
