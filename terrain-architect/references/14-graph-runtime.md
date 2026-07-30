@@ -7,6 +7,7 @@ deliberately does not.
 
 Contents: [The node model](#the-node-model) · [The parameter model](#the-parameter-model) ·
 [Parameter semantics](#parameter-semantics) · [Evaluation](#evaluation) ·
+[Numerical contracts](#numerical-contracts) ·
 [Content-addressed caching](#content-addressed-caching) · [Dirty propagation](#dirty-propagation) ·
 [Preview & the resolution pyramid](#preview--the-resolution-pyramid) ·
 [Region invalidation](#region-invalidation) · [Memory & scheduling](#memory--scheduling) ·
@@ -136,6 +137,90 @@ Topological order, memoised, no cycles — with one exception: the vegetation–
 (`13`) is a genuine cycle and is handled as a **fixed-iteration outer loop around a subgraph**,
 never as a graph cycle. The runtime supports "loop this subgraph N times" as a composite node;
 the DAG invariant survives.
+
+## Numerical contracts
+
+`validate(out)` above is the hook; this is what it enforces. A node that is individually correct
+can still emit garbage the moment it is wired to another one, and combined **erosion** nodes are
+where it shows up most: the reported symptom is almost always isolated spikes, or a field that
+has quietly gone NaN.
+
+### Ports carry a range, not just a type and a unit
+
+SKILL.md's field types name the type and the unit on every edge. That is not enough to validate
+against — add the **legal range and finiteness policy**, so a violation is caught on the edge
+that produced it instead of three nodes downstream where it finally manifests.
+
+| Field | Contract |
+|---|---|
+| `HeightField` (m) | Finite. No range — real terrain spans −11 km to +9 km, so a range check here is a bug, not a guard |
+| `MaskField` | Finite, closed `[0, 1]` |
+| `WaterField` (m) | Finite, `≥ 0` — it is a depth, not an elevation |
+| `SedimentField` (m) | Finite, `≥ 0` |
+| Drainage area (m²) | Finite, `≥ cellArea` — every cell drains at least itself (`03`) |
+| Slope (tan) | Finite, `≥ 0` |
+| `NormalField` | Finite, unit length within tolerance |
+| `MaterialField` / layer weights | Finite, each `[0, 1]`, and **partitioning to 1** (SKILL.md, mask semantics) |
+
+The sweep costs a fraction of any node's own evaluation, and it is the difference between "node 7
+emitted a negative depth" and "the export has holes in it".
+
+### Why the value goes bad at the seam
+
+Six mechanisms, none of which need a single node to be wrong:
+
+1. **An out-of-range input meets an operation with a restricted domain.** The classic is `S^n` in
+   stream power with `S < 0` from an unfilled pit or a sign slip — for non-integer `n` that is NaN
+   on the spot. `sqrt` of a marginally negative depth, `log(A)` where `A = 0`, and `acos` of a dot
+   product floating point nudged past 1 are the same bug wearing different hats.
+2. **Division by a quantity that is legitimately zero somewhere.** Slope on a flat, capacity in
+   still water, drainage area at a divide, a normalising sum whose weights are all 0. Each is
+   correct physics and an `Inf`.
+3. **Stability limits do not compose.** Each node is stable at its own `Δt`; chained, or
+   sub-cycled into a shared budget, they need not be. And **a limit met exactly is not met** — the
+   explicit Laplacian at `c = 0.25` has checkerboard amplification `−1`, which neither decays nor
+   blows up, so it passes every finite-and-conserved assertion while the pass *roughens* the
+   terrain (`09`; `reference-impl`'s 0.9 safety factor exists for this).
+4. **The grid-scale mode is what "weird spikes" usually are.** A ±alternating two-cell oscillation
+   hides in a histogram and is unmistakable under a sun sweep (`09`). It survives anything
+   marginally stable and is amplified by anything slope-driven.
+5. **Spikes self-amplify under erosion.** A one-cell spike is a huge local slope, hence a huge
+   local capacity, hence more erosion around it next step — the "tumour" in `09`'s catalogue. That
+   is why one bad cell does not stay one bad cell, and why finding the step that *created* it
+   beats smoothing the field that now contains it.
+6. **NaN spreads spatially, not merely downstream.** Any neighbourhood operation — blur,
+   Laplacian, the droplet's deposit brush, flow accumulation — mixes one NaN into all its
+   neighbours, so the poisoned region grows by the stencil radius every pass. A NaN found at
+   export tells you almost nothing about where it started. This is the entire reason `09` says to
+   assert after **every** step rather than at the end.
+
+### Guards are named, and clamps are counted
+
+The guards themselves are per-node and specified where they belong — the pipe model's outflow
+scaling `K` and its `α_min` floor (`04`), the multifractal's `min(weight, 1)` (`01`), the TWI
+slope floor (`06`). Two rules govern all of them:
+
+**A guard is a named constant with a unit and a reason**, not an epsilon sprinkled at the call
+site. `sinα ≥ 0.05` is a guard; `+ 1e-9` in a denominator is a wish. The named form survives a
+resolution change and can be argued about; the anonymous form quietly sets a different physical
+threshold at every cell size.
+
+**Count every clamp, and fail when the count grows.** This is the general form of the
+erosion-created-pit check (`09`) and of the sediment-budget rule (SKILL.md): a clamp firing a few
+times at start-up is a guard doing its job; the same clamp firing more often each iteration is a
+guard **masking a divergence**, and it is the only thing standing between you and a visible
+crash. A silent clamp converts a loud failure into a quiet wrong answer, which is strictly worse.
+Report clamp counts per node per step and treat a rising trend as a failure.
+
+### Do not despike the symptom
+
+A median or despike pass over a simulation's output removes the evidence and leaves the cause. It
+is the numerical twin of healing a seam by blending (SKILL.md): the artefact leaves the preview,
+the graph stays wrong, and the next parameter change brings it back somewhere else. Median
+filtering is legitimate on **imported** data, where salt-and-pepper genuinely is sensor noise with
+no upstream to repair (`08`, `10`); it is illegitimate as a way to survive your own simulation.
+When a spike appears, bisect — assert finiteness and range after each node, find the first node
+that violates its contract, and fix it there.
 
 ## Content-addressed caching
 

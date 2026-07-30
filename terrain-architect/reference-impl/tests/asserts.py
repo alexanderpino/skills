@@ -64,6 +64,47 @@ def radial_anisotropy(field, center=None):
     return float(np.sqrt(np.mean(resid ** 2)) / amp)
 
 
+def assert_in_range(a, lo=None, hi=None, name="field"):
+    """A port's RANGE contract, not just its type and unit (14). Checked at the node that
+    produced the field, because a value fractionally out of range is what becomes NaN two nodes
+    later inside a sqrt, a log, or S^n -- by then the origin is unrecoverable.
+
+    `lo`/`hi` are inclusive; pass None for an unbounded side (height is finite but unbounded --
+    real terrain spans -11 km to +9 km, so a range check on it would be the bug).
+    """
+    a = np.asarray(a)
+    assert_finite(a, name)
+    if lo is not None:
+        assert float(a.min()) >= lo, f"{name} below its port minimum {lo} (min {float(a.min()):.3e})"
+    if hi is not None:
+        assert float(a.max()) <= hi, f"{name} above its port maximum {hi} (max {float(a.max()):.3e})"
+
+
+def nonfinite_count(a):
+    """How many cells are NaN/Inf. Tracked ACROSS steps rather than as a single bool: a stencil
+    op mixes one NaN into all its neighbours, so a poisoned region grows by the stencil radius
+    every pass and the count is the thing that reveals it (14)."""
+    return int(np.count_nonzero(~np.isfinite(np.asarray(a))))
+
+
+def assert_clamps_not_growing(counts, tol=0.0, msg=""):
+    """`counts` is per-step clamp/correction events. A guard fires while the sim settles and then
+    subsides; a clamp firing MORE often each iteration is masking a divergence and is the only
+    thing between you and a visible crash (14, and 09's erosion-created-pit check).
+
+    Compares the late half's mean against the early half's, so a noisy but settling series passes
+    and a rising one does not.
+    """
+    counts = np.asarray(counts, dtype=np.float64)
+    if counts.size < 2:
+        return
+    half = counts.size // 2
+    early, late = float(np.mean(counts[:half])), float(np.mean(counts[half:]))
+    assert late <= early * (1.0 + tol) + 1e-12, (
+        f"clamp count is rising{msg}: {early:.3g} -> {late:.3g} per step -- the guard is masking "
+        "a divergence, not preventing one")
+
+
 def boundary_influence_profile(field):
     """`field` binned by INSET RING -- Chebyshev distance from the perimeter, so ring 0 is the
     outermost cells -- returned as the per-ring mean. The domain-edge check of 03 (*Domain

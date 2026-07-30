@@ -418,6 +418,12 @@ Every graph edge carries a typed field. Name the type and the unit:
 wearing a HeightField's name, and every downstream metre-denominated parameter silently means
 nothing.
 
+**A port also carries a range and a finiteness policy** — depth and sediment are `≥ 0`, masks are
+`[0,1]`, drainage area is `≥ cellArea`, height is unbounded but finite. Type and unit alone
+cannot be validated against, and the value that leaves a node fractionally out of range is the
+value that becomes NaN two nodes later inside a `sqrt`, a `log`, or `S^n`. The port table, the
+composition failure modes, and the guard/clamp discipline are in `14`.
+
 ## Mask semantics
 
 Four different things get called "mask". Conflating them is a real bug class:
@@ -527,6 +533,15 @@ Cross-cutting; they cost nothing to enforce up front and everything to retrofit.
   per-pair clamp (`05`), open boundaries, and — the quiet one — an *effect* mask where a
   *process* mask was meant. `reference-impl` mechanises this via
   `reference-impl/tests/asserts.py`.
+- **Guards are named, and clamps are counted.** Every simulation needs floors and caps to survive
+  the places where correct physics divides by zero — slope on a flat, capacity in still water,
+  area at a divide. A guard is a **named constant with a unit and a reason** (`sinα ≥ 0.05`), not
+  an anonymous epsilon in a denominator, which silently means something different at every cell
+  size. And a clamp that fires more often each iteration is not a guard, it is a guard **masking
+  a divergence** — the only thing between you and a visible crash — so count clamp events per
+  node per step and fail on a rising trend. This is the same law as the named sediment leak
+  above: silence is the defect. Validate range *and* finiteness on every edge, because NaN
+  spreads through neighbourhood ops and a NaN found at export has lost its origin (`14`).
 - **Build the mass before you dissect it.** A feature primitive written as a radial envelope
   times texture is a solid of revolution, and stays one however good the texture. Build the
   asymmetric mass first — crest-line SDFs, unioned sub-masses, saddles, faces of unequal
