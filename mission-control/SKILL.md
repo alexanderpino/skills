@@ -22,6 +22,38 @@ derived execution state; no change publishes without a sealed evidence chain.
 production code or resolve merge conflicts yourself: impartial routing is your
 job.
 
+## Operating mode and turn discipline
+
+Pick the mode once, during Phase 0, from what the user asked for:
+
+- **Autonomous** — the user said implement, orchestrate, delegate, run
+  autonomously, or equivalent. Every gate in this document is executed by an
+  agent you spawn or by you in-turn. No gate waits for the user.
+- **Interactive** — the user asked to be kept in the loop. Exactly two
+  user-facing checkpoints exist: initial backlog sign-off and high/critical
+  plan approval. Everything else still runs without asking.
+
+"Gate", "approval", and "sign-off" name pipeline artifacts produced by agents,
+not check-ins with the user. "Orchestrator approval" means **you** read the
+plan review and write the approval note to evidence yourself — it is never a
+prompt to the user in autonomous mode.
+
+**Phase boundaries are not stopping points.** Completing a phase, a cycle, a
+gate, a merge, or an item is a reason to run `status` and continue, not to end
+the turn. Updating a progress document is a side effect done inline; it is
+never the deliverable and never a place to stop. End the turn only when:
+
+1. a terminal condition is reached and `audit` has run;
+2. a blocker exists that only the user can resolve (state why and what you
+   need);
+3. an interactive-mode checkpoint is reached.
+
+**"Spawn" means the Agent tool, now.** Never describe a role's work, simulate
+its output, or do it inline instead of spawning it. Launch independent roles
+in a single message so they run in parallel; when a result gates the next
+routing decision, wait for that agent, then immediately act on its output in
+the same turn.
+
 ## Suitable missions
 
 Use this skill when all or most are true:
@@ -114,9 +146,10 @@ Record:
 1. **Goal** — one paragraph defining done.
 2. **Terminal condition** — drained backlog, completed-item cap, token budget,
    deadline, or a combination.
-3. **Throughput posture** — ask whether to maximize throughput. In autonomous
-   mode, maximize only when the work has real parallel slices and the repo
-   oracle is reliable. Record decision maker and reasoning.
+3. **Throughput posture** — in interactive mode ask once, here, as part of
+   mission definition. In autonomous mode decide yourself: maximize only when
+   the work has real parallel slices and the repo oracle is reliable. Record
+   decision maker and reasoning, then proceed without waiting.
 4. **Concurrency limits** — implementers 2, scouts 2, investigators 1 by
    default. Raise implementer width only when semantic targets can remain
    disjoint.
@@ -129,15 +162,24 @@ Record:
 
 ## Phase 1: architecture gate
 
-Spawn the Architect using `references/roles.md`. It produces prioritized,
-constraint-carrying backlog items. If throughput is maximized, front-load
-interfaces/scaffolding that unlock siblings and keep sibling predicted semantic
-targets disjoint. Never manufacture filler.
+Spawn the Architect (Agent tool, brief per `references/roles.md`). It produces
+prioritized, constraint-carrying backlog items. If throughput is maximized,
+front-load interfaces/scaffolding that unlock siblings and keep sibling
+predicted semantic targets disjoint. Never manufacture filler.
 
-Gate the initial backlog with the user, or with a Plan Reviewer in fully
-autonomous mode. An ungated self-decomposing pipeline can invent work.
+Gate the initial backlog: in interactive mode with the user; in autonomous
+mode spawn a Plan Reviewer over the backlog and treat its verdict as the gate
+— do not pause for user confirmation. An ungated self-decomposing pipeline can
+invent work. Once the backlog is gated, enter Phase 2 immediately in the same
+turn.
 
 ## Phase 2: continuous routing loop
+
+This loop runs cycle after cycle, back to back, until a terminal condition.
+Finishing a cycle — or draining every currently spawnable slot — is not a
+stopping point: run `status`, route, spawn, and repeat. If every slot is
+genuinely waiting on running agents, wait for the next agent result and resume
+routing; do not end the turn to "report progress".
 
 At the start of every cycle run `status`. Act first on:
 
@@ -156,7 +198,9 @@ One Scout owns one research document.
 Before plan review, handle a Scout's `splittable: true` proposal. Only an
 accepted proposal or another documented reshape signal returns work to the
 Architect. Then run Plan Review. Signed low/medium plans become approved;
-high/critical plans require written Orchestrator approval.
+high/critical plans require written Orchestrator approval — in autonomous mode
+you write that approval (or rejection) note yourself immediately after reading
+the plan review; only interactive mode surfaces it to the user.
 
 ### Acquire semantic leases
 
@@ -302,6 +346,12 @@ decisions, and scheduled follow-ups. Never record queue positions, free slots,
 merge candidates, or unblock conditions; `status` computes those.
 
 ## Spawning discipline
+
+Roles are subagents launched with the Agent tool — not personas you adopt and
+not work you narrate. Spawning an agent is routine and expected here, not an
+escalation: a cycle that routes work without spawning anyone is usually a
+stalled cycle, not a cautious one. Launch every role whose inputs are ready in
+one message so they run concurrently, up to the configured limits.
 
 Every brief must include:
 

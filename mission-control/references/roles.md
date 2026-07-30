@@ -280,6 +280,14 @@ gates. Acquire leases before worktrees; route builds to sandboxes; route
 verified items through the merge coordinator; spawn Merge Agent only for an
 allowed conflict.
 
+Cycles run back to back in one continuous turn. A completed phase, gate, or
+item means "run `status` and route again", never "stop and report". In
+autonomous mode no gate waits for the user: you write high-blast approvals
+yourself and a spawned Plan Reviewer gates the backlog. Spawn roles with the
+Agent tool the moment their inputs exist — launching agents is the job, not an
+exception — and end the turn only at a terminal condition (after `audit`), an
+interactive-mode checkpoint, or a blocker only the user can resolve.
+
 The Orchestrator never manually merges a branch or marks an item complete.
 `merge prepare/finalize` owns integration, post-merge verification, CAS
 publication, cleanup, lease release, and done state.
