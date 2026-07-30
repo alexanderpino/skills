@@ -1,5 +1,6 @@
 import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuReady, hydroMassDiag, setHydroMassDiag, setGL as setGpuGL } from './core/gpu.js';
 import { mergePlugins } from './core/registry.js';
+import './plugins/mask/index.js';
 import './plugins/comb/index.js';
 import { P, WHEN, GROUP, CAT } from './core/params.js';
 import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
@@ -337,7 +338,7 @@ function shapeField(p){
 // Vector brush strokes stay in normalised terrain coordinates, so an artist-authored road mask
 // survives every working/build resolution. Strokes alpha-composite in order; Erase is destructive
 // only inside this node and remains fully undoable/serialisable with the graph.
-function drawMaskField(p){
+export function drawMaskField(p){
   const n=fieldW(),nh=fieldH(),N=n*nh,out=new Float32Array(N),strokes=Array.isArray(p.strokes)?p.strokes:[];
   for(const stroke of strokes){
     const pts=stroke.points||[];if(!pts.length)continue;
@@ -1714,14 +1715,14 @@ function textureField(inp,{slopeW=0.5,soilW=0.3,flowW=0.2}){
   for(let i=0;i<o.length;i++)o[i]=(sl[i]*slopeW+so[i]*soilW+fl[i]*flowW)/tot;
   return normalize(o);
 }
-function slopeSelect(inp,{lo=0.1,hi=0.6,falloff=0.1}){
+export function slopeSelect(inp,{lo=0.1,hi=0.6,falloff=0.1}){
   const sl=normalize(slopeOf(inp));const o=newField();
   for(let i=0;i<o.length;i++){const v=sl[i];
     const a=smooth(clamp((v-(lo-falloff))/(falloff+1e-4),0,1));
     const b=smooth(clamp(((hi+falloff)-v)/(falloff+1e-4),0,1));o[i]=a*b;}
   return o;
 }
-function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
+export function heightSelect(inp,{lo=0.3,hi=0.7,falloff=0.12}){
   const o=newField();
   for(let i=0;i<o.length;i++){const v=inp[i];
     const a=smooth(clamp((v-(lo-falloff))/(falloff+1e-4),0,1));
@@ -2019,7 +2020,7 @@ function tagTemperatureField(field,temperatureC=null,extras={}){
   return field;
 }
 const fieldMetadata=field=>field&&FIELD_META.get(field)||null;
-function temperatureCFromField(field){
+export function temperatureCFromField(field){
   const meta=fieldMetadata(field);if(!meta||meta.kind!=="temperature")return null;
   if(!meta.temperatureC)meta.temperatureC=decodeTemperatureField(field);
   return meta.temperatureC;
@@ -2866,9 +2867,6 @@ const TYPES=mergePlugins({
       P.slider("falloff","Falloff",0,1,0.25),
       P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
     eval:(p)=>shapeField(p)},
-  drawmask:{cat:"mask",name:"Draw Mask",ins:["Reference"],referenceOnly:[0],desc:"Paint resolution-independent roads, corridors, and regions as editable vector brush strokes. The optional Reference input is shown beneath the drawing; the output is a reusable mask.",
-    params:[],eval:(p,ins,nd)=>{nd._reference=ins[0]||null;return drawMaskField(p);},
-    note:"Draw Mask outputs a reusable 0–1 region field and may fan out to any number of Mask inputs. For an authored biome, use one Draw Mask for that region and connect it to its masked <b>SatMap</b>, <b>Temperature Modify</b>, and—when regional circulation differs—<b>Wind Modify</b>; material and climate then share the same footprint. For a road, connect the pre-road terrain to <b>Reference</b>, draw the corridor, then wire the mask into Sculpt, Blur, Blend, or Stamp. Strokes are vectors in terrain space rather than pixels, so 512² authoring survives a 4K build."},
   mountain:{cat:"gen",name:"Mountain",ins:[],desc:"A cellular geological primitive: Mountain creates a hero landform from distorted, modulated Voronoi structure; Mountain range creates a broader multi-crest base. Five mountain types change the generating geometry as well as its weathering.",
     params:[P.tabs("form","Landform",[["peak","Mountain"],["massif","Mountain range"]],"peak"),
       WHEN(P.seg("shape","Shape family",[["dominant","Dominant peak"],["compound","Compound peaks"],["ridge","Ridgeline"],["broad","Broad dome"]],"compound"),"form","peak"),
@@ -3140,28 +3138,6 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     eval:(p,ins)=>ins[0]?maskApply(ins[0],hydroFixField(ins[0],p),ins[1]):newField(),
     note:"<b>HydroFix</b> routes on a priority-filled working copy, softly downcuts high-accumulation corridors in the original heightfield, and enforces only the tiny descent required for connected receivers. It is intentionally subtle: use it after Erosion 2 to repair broken flow paths, or before a flow-dependent node to prepare noisy terrain. It does not fill the rendered terrain or turn basins into flat plates."},
 
-  slopemask:{cat:"mask",name:"Slope select",ins:["In"],desc:"Mask by steepness — cliffs vs benches.",
-    params:[P.slider("lo","Low",0,1,0.12),P.slider("hi","High",0,1,0.55),P.slider("falloff","Falloff",0.01,0.4,0.12)],
-    eval:(p,ins)=>ins[0]?slopeSelect(ins[0],p):newField()},
-  heightmask:{cat:"mask",name:"Height select",ins:["In"],desc:"Mask by elevation band.",
-    params:[P.slider("lo","Low",0,1,0.3),P.slider("hi","High",0,1,0.7),P.slider("falloff","Falloff",0.01,0.4,0.12)],
-    eval:(p,ins)=>ins[0]?heightSelect(ins[0],p):newField()},
-  tempmask:{cat:"mask",name:"Temperature select",ins:["Temperature"],desc:"Selects a physical Celsius band from a Temperature field for snow, vegetation, biome, material, or scatter masks.",
-    params:[P.number("lo","Minimum temperature",-100,1400,-10,.5,"°C"),
-      P.number("hi","Maximum temperature",-100,1400,15,.5,"°C"),
-      P.number("falloff","Transition",0,100,3,.5,"°C"),
-      P.seg("invert","Invert",[["off","Off"],["on","On"]],"off")],
-    eval:(p,ins)=>{
-      const c=temperatureCFromField(ins[0]);if(!c)return newField();
-      const out=new Float32Array(c.length),lo=Math.min(p.lo,p.hi),hi=Math.max(p.lo,p.hi),f=Math.max(0,p.falloff);
-      const ss=(a,b,x)=>{if(b<=a)return x>=b?1:0;const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
-      for(let i=0;i<out.length;i++){
-        const v=ss(lo-f,lo,c[i])*(1-ss(hi,hi+f,c[i]));
-        out[i]=p.invert==="on"?1-v:v;
-      }
-      return out;
-    },
-    note:"Temperature Select converts a physical temperature interval into a regular 0–1 mask. Feed it into SatMap, Color Blend, Color Mixer branches, scatter, or any Mask port. Multiple selectors over one modified Temperature field are the basis for consistent tundra, alpine, temperate, arid, and volcanic biome bands."},
 
   // ---- DATA MAPS (Gaea's "Derive" channels): grayscale fields to bind a SatMap / mask to ----
   d_slope:{cat:"data",name:"Slope",ins:["In"],desc:"Steepness as a grayscale field (0 flat → 1 vertical). The classic cliff/bench colour driver.",

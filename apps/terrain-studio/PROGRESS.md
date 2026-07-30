@@ -62,8 +62,8 @@ tests/e2e/          4 Playwright specs
 |---|---|---|---|
 | prerequisite · param DSL to `src/core/params.js` | — | **done** | `d85b84f` |
 | registry + `comb` | 6 | **done** | this commit |
-| `mask` | 4 | next | — |
-| `filt` | 11 | | — |
+| `mask` | 4 | **done** | this commit |
+| `filt` | 11 | next | — |
 | `gen` | 12 | | — |
 | `ero` | 5 | | — |
 | `effect` | 7 | | — |

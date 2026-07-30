@@ -15,7 +15,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "bridge:apply": "node scripts/apply-bridge.mjs",
-    "bridge:verify": "node scripts/apply-bridge.mjs --check"
+    "bridge:verify": "node scripts/apply-bridge.mjs --check",
+    "plugins:extract": "node scripts/extract-plugins.cjs",
+    "plugins:exports": "node scripts/export-plugin-helpers.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0",
