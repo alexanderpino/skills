@@ -16,7 +16,28 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(1500);
 
-  console.log('default colour graph:', JSON.stringify(await page.evaluate(() => ({ satComposite }))));
+  // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the 18-node showcase to the page-global
+  // showcaseGraph() and made the opening document L0 - perlin, ridged, blend, d_height, heightmask,
+  // levels, output. This oracle needs a colour stack: its first assertion is that the DEFAULT graph
+  // already composites colour (satComposite===1), and its last stage removes every colour node and
+  // rewires the Output from the 'thermal' node - neither the satmap/colorerosion/weathering chain
+  // nor thermal exists in L0, so the fallback stage threw on nodes.find(...).id of undefined.
+  //
+  // evalGraph() is enough; the app's own #buildBtn is not needed. Every number this file asserts on
+  // comes from the graph evaluator - satComposite, resolveColor() buffers, TYPES schemas - and none
+  // of it reads curHgt/curFilled/curAccum or measures a viewport pixel. The subsequent stages each
+  // rewire and call evalGraph() again anyway, so a full build here would only be re-done and thrown
+  // away. (Measured: showcaseGraph()+evalGraph() 3.7 s vs 18.3 s through #buildBtn.)
+  await page.evaluate(() => {
+    nodes.length=0; edges.length=0; uid=1; selected=null; selectedEdge=null;
+    showcaseGraph(); evalGraph();
+    for (const t of ['satmap','colorerosion','weathering','thermal'])
+      if (!nodes.some(n => n.type === t))
+        throw new Error('SETUP FAILURE: no ' + t + ' node after showcaseGraph()');
+  });
+
+  const initial = await page.evaluate(() => ({ satComposite }));
+  console.log('default colour graph:', JSON.stringify(initial));
 
   // EXPLICIT BIOME BRANCH + BLEND: src -> SatMapA(height,Temperate) and src -> SatMapB(slope,Canyon);
   //   A -> Blend.A, B -> Blend.B, src -> Blend.Mask; Blend -> Output.
@@ -75,7 +96,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
 
   console.log('ERRORS', errors.length ? JSON.stringify(errors) : 'none');
   await browser.close();
-  const valid=branch.satComposite===1&&branch.differsFromA>0&&chain.satComposite===1&&removed.satComposite===0
+  // initial.satComposite was printed and never asserted - the exact vacuous-gate shape this project
+  // keeps finding. The showcase document ends satmap -> colorerosion -> weathering, so the opening
+  // state MUST already composite colour; measured 1 here, and 0 on L0 (no colour node at all).
+  const valid=initial.satComposite===1
+    &&branch.satComposite===1&&branch.differsFromA>0&&chain.satComposite===1&&removed.satComposite===0
     &&model.satmapParams.includes('gradient')&&!model.satmapParams.includes('gradientB')&&!model.satmapParams.includes('mode')
     &&model.satmapParams.includes('enhance')&&model.satmapParams.includes('hue')&&!model.satmapParams.includes('blend')
     &&model.blendModes.includes('normal')&&model.blendModes.includes('multiply')&&model.blendModes.includes('difference')

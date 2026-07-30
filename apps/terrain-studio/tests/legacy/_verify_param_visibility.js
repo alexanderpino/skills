@@ -14,9 +14,31 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1400);
   const report=await page.evaluate(()=>{
+    // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the 18-node showcase to L0 - the
+    // 7-node bedrock document (perlin, ridged, blend, d_height, heightmask, levels, output) - which
+    // carries no water, hydraulic or thermal node. Inherited, this file died on
+    // nodes.find(n=>n.type==='water').params.level: measured TypeError "Cannot read properties of
+    // undefined (reading 'params')", exit 2.
+    //
+    // showcaseGraph() ONLY - no evalGraph(), no #buildBtn. This oracle measures the PROPERTY PANEL:
+    // buildProps() renders #pBody rows straight out of nd.params (it touches _dem, and only for
+    // import nodes) and the screenshot is of #props, not #viewport. Nothing here reads a
+    // heightfield, a colour field, or curHgt/curFilled/curAccum, so there is no stale-cache hazard
+    // to close - and evaluating the showcase (hydraulic + thermal + snow) would cost seconds to
+    // prove nothing. Measured after the change: 0 console/page errors, so the unevaluated
+    // _field:null nodes do not upset the panel.
+    nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
+    showcaseGraph();
     const keys=()=>[...document.querySelectorAll('#pBody .field[data-param-key]')].map(e=>e.dataset.paramKey);
+    // gradient/mountain/transform/sculpt have never been in the opening document - makeNode is the
+    // intended path for those. water/hydraulic/thermal DO come from the document, so their absence
+    // is a named SETUP FAILURE rather than a freshly-defaulted stand-in that would quietly pass.
+    const need=t=>{const n=nodes.find(x=>x.type===t);
+      if(!n)throw new Error('SETUP FAILURE: no '+t+' node after showcaseGraph()');return n;};
     const show=(type,changes={})=>{const nd=nodes.find(n=>n.type===type)||makeNode(type,0,0);Object.assign(nd.params,changes);selected=nd;buildProps();return keys();};
-    const water=nodes.find(n=>n.type==='water'),savedLevel=water.params.level;
+    need('hydraulic');need('thermal');
+    const water=need('water'),savedLevel=water.params.level;
+    if(!Number.isFinite(savedLevel))throw new Error('SETUP FAILURE: water node has no numeric level param to preserve');
     const hydro=show('water',{mode:'hydro'}),sea=show('water',{mode:'sea'});
     const gpu=show('hydraulic',{engine:'auto'}),cpu=show('hydraulic',{engine:'droplets'});
     const cell=show('thermal',{realScale:'off'}),real=show('thermal',{realScale:'on'});

@@ -40,10 +40,57 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const page=await browser.newPage({viewport:{width:1280,height:800}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1600);
+
+  // BUILD THE DOCUMENT THIS FILE MEASURES. D7 (31f5688) demoted the 18-node showcase to the
+  // page-global showcaseGraph() and made the opening document L0 - perlin, ridged, blend, d_height,
+  // heightmask, levels, output. Inherited, this oracle read
+  //   "no snow node/_field in default graph"  -> exit 2
+  // because L0 has no snow node at all.
+  //
+  // FULL BUILD via #buildBtn, not evalGraph(). G0 is what forces the question: it compares
+  // metricHeightField(outputField) against datum + curHgt*height, and curHgt is the RENDERER's own
+  // normalised height buffer (legacy.js:5161), written ONLY by updateViewport.
+  //
+  // Measured, all three paths, same swapped showcase document, n=512:
+  //   swap with no viewport refresh at all  ->  frameErrM = 2213.537   (gate bound <= 0.001)
+  //   swap + evalGraph()                    ->  frameErrM = 0
+  //   swap + #buildBtn (this file)          ->  frameErrM = 0
+  // So evalGraph() IS sufficient today - it reaches updateViewport through
+  // finishGraphEvaluation (legacy.js:3155) - and the honest reading is that the build is not
+  // strictly required for G0 to be correct right now.
+  //
+  // It is used anyway, for a reason the first number shows: stale curHgt is 262144 floats of the
+  // PREVIOUS document, exactly the same length as the new one, so the oracle's `curHgt.length ===
+  // outF.length` guard does not catch it - only the value comparison does, at 2.2 km of error.
+  // G0's whole contract is "the sim runs on the terrain the SCREEN draws", so it is pinned to the
+  // path the screen actually takes: #buildBtn applies TARGET_RES, re-dirties every node and syncs
+  // the build profile (legacy.js:6050) before evaluating. If curHgt population ever moves off
+  // finishGraphEvaluation onto the render path, this oracle follows the app instead of routing
+  // around it.
+  //
+  // (The reset leaves previewMode at its default "output" - legacy.js:3685 - so activePreviewNode()
+  // is the output node and curHgt is normalised FROM the output field, the same field G0 feeds to
+  // metricHeightField. showcaseGraph() ends with select(sat), inert while previewMode is "output".)
+  await page.evaluate(()=>{
+    nodes.length=0; edges.length=0; uid=1; selected=null; selectedEdge=null;
+    showcaseGraph();
+  });
+  await page.locator('#buildBtn').click();
+  await page.waitForFunction(
+    () => !evalFrame && !document.querySelector('#buildBtn').hasAttribute('aria-busy'),
+    null, { timeout: 60000 });
+  await page.waitForTimeout(500);
+
   const out=await page.evaluate(()=>{
     USE_GPU=false;
+    // Assert the subjects EXIST. A missing node must be a named SETUP FAILURE (exit 2), never a
+    // silent undefined that reads as a physics verdict.
     const sn=nodes.find(n=>n.type==="snow");
-    const inp=sn&&sn._field;if(!inp)return{fatal:"no snow node/_field in default graph"};
+    if(!sn)return{fatal:"SETUP FAILURE: no snow node after showcaseGraph()"};
+    const inp=sn._field;
+    if(!inp)return{fatal:"SETUP FAILURE: snow node has no _field after the build"};
+    const outNd=outputNode();
+    if(!outNd||!outNd._field)return{fatal:"SETUP FAILURE: no output node/_field after the build"};
     const n=Math.sqrt(inp.length)|0,N=n*n;
     const defaults=Object.fromEntries(TYPES.snow.params.map(p=>[p.key,cloneParams(p.def)]));
     const REFK=n/192;
@@ -73,7 +120,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     // datum + curHgt*height, or the sim and the screen have diverged - whichever side moved.
     // (A transcription of metricHeightField's formula would stay green if the VIEWPORT changed,
     // which is precisely the failure this gate exists to catch.)
-    const outF=outputNode()._field;
+    const outF=outNd._field;
     const mh=metricHeightField(outF,Math.sqrt(outF.length)|0,terrainDef);
     let frameErr=0;
     if(curHgt&&curHgt.length===outF.length){

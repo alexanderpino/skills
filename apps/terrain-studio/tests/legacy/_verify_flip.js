@@ -42,6 +42,31 @@ const EXPECT_RECORDS = BASELINE ? 0 : +(process.env.FLIP_EXPECT_RECORDS || 29);
       SCALE_RES = true; XF = null; USE_GPU = false; BUILD_QUALITY = 'interactive';
       RES = 192; TARGET_RES = 192;
       terrainDef.lattice = 'hex';
+
+      // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the opening document to L0 - 7 nodes
+      // (perlin, ridged, blend, d_height, heightmask, levels, output), no hydraulic, no climate, no
+      // water, no snow. Measured on L0 this probe inspected 7 records, collected 0 side channels and
+      // forced feat on 0 nodes, yet still printed "every field and side channel finite, full height,
+      // live to the bottom row" - a green reading over a document containing none of the kernels the
+      // gate exists to cover. The 18-node showcase is what the 29-record red baseline in
+      // evidence/MC-1/red-baseline.md was recorded against, so rebuild it.
+      //
+      // evalGraph() is SUFFICIENT here; a #buildBtn build is not needed and would be wrong. Nothing
+      // in this probe reads the CONTENT of curHgt / curFilled / curAccum: every record comes straight
+      // off nd._field and the node side channels, and the buffer sub-gate asserts count, lineCount
+      // and builtLattice, which are pure functions of (n, nh, lattice) written by buildIndex() and
+      // buildWireIndex() below. Going through the app's own build would also discard the
+      // USE_GPU=false / RES=192 / lattice=hex configuration this probe is built on.
+      nodes.length = 0; edges.length = 0; uid = 1; selected = null; selectedEdge = null;
+      showcaseGraph();
+      // A missing node must be a NAMED setup failure, not a silently shorter record list: the
+      // record-count pin below would catch it, but not say what went absent.
+      if (!nodes.length) throw new Error('SETUP FAILURE: showcaseGraph() produced no nodes');
+      for (const t of ['hydraulic', 'thermal', 'satmap', 'water', 'snow', 'd_wind',
+                       'd_temperature', 'd_sunshadow'])
+        if (!nodes.some(nd => nd.type === t))
+          throw new Error('SETUP FAILURE: no ' + t + ' node after showcaseGraph()');
+
       buildIndex();
       const n = fieldW(), nh = fieldH(), want = n * nh;
       out.n = n; out.nh = nh; out.expectLen = want;
@@ -166,6 +191,11 @@ const EXPECT_RECORDS = BASELINE ? 0 : +(process.env.FLIP_EXPECT_RECORDS || 29);
   // Vacuity by ABSENCE: side-channel records are only collected when the channel EXISTS, so a build
   // that silently stops computing wind, snow or temperature loses those records and the remaining
   // ones still pass. Pin the count. This is the same class d2f6769 closed for lineCount.
+  // featForced was printed and never scored. On the L0 opening document it read null - no node had a
+  // feat param, so atFeatureScale's k<=1.02 short-circuit was never cleared and the item's own
+  // highest-severity NaN route sat outside the probe while the run reported PASS. If the subject
+  // graph ever loses its feature-scaled node again, that is a coverage hole, not a clean bill.
+  if (!(r.featForced >= 1)) unhealthy.push('featForced=' + r.featForced + ' - no node carried a feat param to lift past the 1.02 short-circuit, so the atFeatureScale routes were never entered');
   if (EXPECT_RECORDS && allRecs.length !== EXPECT_RECORDS)
     unhealthy.push('record count ' + allRecs.length + ' != expected ' + EXPECT_RECORDS + ' - a node or side channel stopped being produced');
   if (r.buffers && r.buffers.error) unhealthy.push('buffer probe threw');

@@ -17,9 +17,31 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(1400);
 
+  // BUILD THE DOCUMENT THIS FILE MEASURES. D7 (31f5688) demoted the 18-node showcase to the
+  // page-global showcaseGraph() and made the opening document L0 - perlin, ridged, blend,
+  // d_height, heightmask, levels, output. This oracle measures the SatMap -> Color Erosion ->
+  // Deposits corner of the graph, and none of those nodes exist in L0. Measured before this
+  // block: FATAL "Cannot read properties of undefined (reading 'id')" at ce.id, exit 2.
+  //
+  // evalGraph() is enough here; a full #buildBtn rebuild is NOT needed. Every quantity this
+  // oracle asserts on is either CPU graph state (resolveColor walks node _field / _mask, which
+  // evalGraph populates synchronously) or editor/DOM state (selection panel, mute, context
+  // menu, undo stack, edges.length). It never reads curHgt/curFilled/curAccum, never calls
+  // refreshWater() or renderGL(), and asserts nothing about viewport pixels - so a stale
+  // renderer cache cannot make any assertion here read the wrong document.
+  await page.evaluate(() => {
+    nodes.length = 0; edges.length = 0; uid = 1; selected = null; selectedEdge = null;
+    showcaseGraph(); evalGraph();
+  });
+  await page.waitForTimeout(200);
+
   const mask = await page.evaluate(() => {
     const ce = nodes.find(n => n.type === 'colorerosion');
-    const satEdge = inputEdge(ce.id, 0), sat = nodeById(satEdge.from);
+    if (!ce) throw new Error('SETUP FAILURE: no colorerosion node after showcaseGraph()');
+    const satEdge = inputEdge(ce.id, 0);
+    if (!satEdge) throw new Error('SETUP FAILURE: colorerosion slot 0 unconnected after showcaseGraph()');
+    const sat = nodeById(satEdge.from);
+    if (!sat || sat.type !== 'satmap') throw new Error('SETUP FAILURE: colorerosion slot 0 is not fed by satmap');
     const base = resolveColor(sat.id, RES), N = RES * RES;
     const old = { ...ce.params }, oldMask = ce._mask;
     ce.params.density = 1; ce.params.blend = 1; ce.params.transport = 2.2;
@@ -52,6 +74,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
 
   const target = await page.evaluate(() => {
     const e = edges.find(x => nodeById(x.from)?.type === 'd_deposits' && nodeById(x.to)?.type === 'colorerosion');
+    if (!e) throw new Error('SETUP FAILURE: no d_deposits -> colorerosion edge after showcaseGraph()');
     const a = nodeById(e.from), b = nodeById(e.to);
     const p = wirePoint(portPos(a, 'out'), portPos(b, 'in', e.slot), .5);
     return { key: edgeKey(e), x: p.x * view.z + view.x, y: p.y * view.z + view.y };

@@ -13,7 +13,29 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const errors=[];page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1200);
 
-  await page.evaluate(()=>select(nearestUpstreamNode('satmap')));
+  // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the 18-node showcase to the page-global
+  // showcaseGraph() and made the opening document L0 - perlin, ridged, blend, d_height, heightmask,
+  // levels, output. L0 has no satmap node, so nearestUpstreamNode('satmap') returned null,
+  // select(null) cleared the property panel and every locator below (.prop-sat-picker) timed out.
+  //
+  // evalGraph() is enough; the app's own #buildBtn is not needed. Everything asserted here is DOM
+  // and graph state - picker markup, .sat-option strips, node params, the TYPES.satmap schema - and
+  // the one global that has to be right, satName, is set by finishGraphEvaluation() from
+  // collectScene(), which evalGraph() runs. No cur* cache is read and the screenshot is diagnostic
+  // only. (Measured: showcaseGraph()+evalGraph() 3.7 s vs 18.3 s through #buildBtn.)
+  await page.evaluate(()=>{
+    nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
+    showcaseGraph();evalGraph();
+    const sat=nodes.find(n=>n.type==='satmap');
+    if(!sat)throw new Error('SETUP FAILURE: no satmap node after showcaseGraph()');
+    if(sat.params.gradient!=='Temperate')
+      throw new Error('SETUP FAILURE: satmap gradient is '+sat.params.gradient+', expected Temperate');
+  });
+
+  await page.evaluate(()=>{const sat=nearestUpstreamNode('satmap');
+    if(!sat)throw new Error('SETUP FAILURE: satmap node is not upstream of the preview root');
+    select(sat);});
+  await page.waitForTimeout(150);
   await page.locator('.prop-sat-picker').click();await page.waitForTimeout(120);
   const open=await page.evaluate(()=>{
     const items=[...document.querySelectorAll('#satPickerList .sat-option')],menu=document.querySelector('#satPickerMenu');

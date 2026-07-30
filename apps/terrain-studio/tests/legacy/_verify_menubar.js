@@ -34,14 +34,27 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     selected:selected&&selected.type,outputReady:!!(outputNode()&&outputNode()._field)
   }));
 
+  // "new-default" restores THE DEFAULT DOCUMENT, so this oracle deliberately does NOT construct
+  // showcaseGraph() the way the renderer/water oracles do - the default is precisely the subject
+  // under test, and seeding another graph first would measure nothing (newTerrainDocument() clears
+  // nodes/edges before building). D7 moved that default: newTerrainDocument(true) -> defaultGraph()
+  // -> layer0Graph() (legacy.js:6512), the L0 bedrock layer, where it used to be the 18-node
+  // showcase. The expectation below is re-pointed at L0 and tightened from the old
+  // count>=16 / edges>=18 / three membership tests to EXACT equality on the whole node list and
+  // edge count, so a silent change to the opening document is red in one line instead of
+  // surviving under a >= bound.
   await page.locator('#fileMenuBtn').click();
   page.once('dialog',d=>d.accept());
   await page.locator('#fileMenu [data-editor-command="new-default"]').click();
   await page.waitForTimeout(300);
-  const starter=await page.evaluate(()=>({
-    count:nodes.length,types:nodes.map(n=>n.type),edges:edges.length,
-    selected:selected&&selected.type,undo:undoStack.length
-  }));
+  const starter=await page.evaluate(()=>{
+    if(!nodes.length)throw new Error('SETUP FAILURE: new-default produced an empty graph');
+    return {count:nodes.length,types:nodes.map(n=>n.type),edges:edges.length,
+      selected:selected&&selected.type,undo:undoStack.length,
+      // newTerrainDocument() ends in evalGraph(), so a restored default must arrive EVALUATED.
+      // Without this the type list alone would pass on a default that renders nothing.
+      outputReady:!!(outputNode()&&outputNode()._field)};
+  });
 
   await page.setViewportSize({width:760,height:720});await page.waitForTimeout(150);
   const compact=await page.evaluate(()=>({
@@ -63,16 +76,23 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.keyboard.press('Escape');
   const escapeClosed=await page.evaluate(()=>mainMenu.hidden);
 
+  // Both File menus are driven off the same command table (legacy.js:5942/6029), so they are held
+  // to the same EXACT list rather than a membership test - a dropped or renamed command has to be
+  // red, and `.every(includes)` cannot see a removal. Measured: identical in desktop and compact.
+  const FILE_COMMANDS=JSON.stringify(['new','new-default','new-canyon','import','export']);
+  // The L0 opening document, read off layer0Graph() (legacy.js:6512) and confirmed by measurement:
+  // 7 nodes, 6 edges, selection parked on the base generator.
+  const STARTER_TYPES=JSON.stringify(['perlin','ridged','blend','d_height','heightmask','levels','output']);
   const ok=desktop.desktopDisplay==='flex'&&desktop.compactDisplay==='none'&&desktop.topbarOverflow<=1
     &&JSON.stringify(desktop.headings)===JSON.stringify(['File','Edit','View','Help'])
-    &&fileOpen.open&&['new','new-default','import','export'].every(x=>fileOpen.commands.includes(x))
+    &&fileOpen.open&&JSON.stringify(fileOpen.commands)===FILE_COMMANDS
     &&JSON.stringify(blank.types)===JSON.stringify(['output'])&&blank.edges===0&&!blank.undo&&!blank.redo
     &&blank.selected==='output'&&blank.outputReady
-    &&starter.count>=16&&starter.edges>=18&&starter.types.includes('water')&&starter.types.includes('snow')
-    &&starter.types.includes('d_temperature')&&starter.selected==='satmap'&&!starter.undo
+    &&starter.count===7&&starter.edges===6&&JSON.stringify(starter.types)===STARTER_TYPES
+    &&starter.selected==='perlin'&&!starter.undo&&starter.outputReady
     &&compact.desktopDisplay==='none'&&compact.compactDisplay==='block'&&compact.overflow<=1
     &&compactOpen.open&&JSON.stringify(compactOpen.sections)===JSON.stringify(['▱File','✎Edit','▣View','?Help'])
-    &&compactFile.open&&['new','new-default','import','export'].every(x=>compactFile.commands.includes(x))
+    &&compactFile.open&&JSON.stringify(compactFile.commands)===FILE_COMMANDS
     &&escapeClosed&&!errors.length;
   console.log(JSON.stringify({desktop,fileOpen,blank,starter,compact,compactOpen,compactFile,escapeClosed,errors,ok},null,2));
   await browser.close();process.exit(ok?0:1);

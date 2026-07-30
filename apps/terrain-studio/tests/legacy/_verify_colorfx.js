@@ -16,12 +16,40 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1200);
 
   const report=await page.evaluate(()=>{
-    const out=outputNode(),defaultChain=[];let walk=out.id;
+    // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the 18-node showcase to L0 - the
+    // 7-node bedrock document (perlin, ridged, blend, d_height, heightmask, levels, output) - which
+    // has no satmap, colorerosion, weathering, d_deposits or water node. The first block below reads
+    // the DEFAULT colour stack, so inherited it died on nodes.find(n=>n.type==='water').params:
+    // measured TypeError "Cannot read properties of undefined (reading 'params')", exit 2.
+    //
+    // evalGraph() is sufficient here; no #buildBtn round trip. Every number the gate asserts on is
+    // field math - resolveColor(), colorErodeField(), weatherColorField() - reading the node-local
+    // _field/_height/_mask/_sediment caches that evalGraph() itself writes. Nothing in this file
+    // reads curHgt/curFilled/curAccum, the water surface, or viewport pixels; the one screenshot is
+    // an unasserted diagnostic. (evalGraph() -> finishGraphEvaluation() -> updateViewport() does
+    // refresh the render caches anyway, so that screenshot still shows this document, not the old one.)
+    //
+    // The restored document leaves the gate real margin, measured over 3 runs (the colorerosion
+    // node below takes a random seed from makeNode, so this is checked, not assumed):
+    // erosionDelta 0.000978-0.001013 against the >0.0005 bound, sedimentChange high 0.00162-0.00166
+    // versus low 0.00064-0.00067 - a 2.5x separation, not a coin flip.
+    nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
+    showcaseGraph();evalGraph();
+    // Absence of a subject is a named SETUP FAILURE, never a silent undefined that the gate then
+    // "measures" as zero.
+    const need=t=>{const n=nodes.find(x=>x.type===t);
+      if(!n)throw new Error('SETUP FAILURE: no '+t+' node after showcaseGraph()');return n;};
+    const out=need('output'),defaultWater=need('water'),defaultCE=need('colorerosion');
+    need('satmap');need('weathering');need('d_deposits');
+    const defaultChain=[];let walk=out.id;
     for(let k=0;k<20;k++){const e=edges.find(x=>x.to===walk&&x.slot===0);if(!e)break;
       const n=nodeById(e.from);if(!n)break;defaultChain.push(n.type);walk=n.id;}
-    const defaultCE=nodes.find(n=>n.type==='colorerosion'),defaultSed=defaultCE&&inputEdge(defaultCE.id,1);
-    const defaultSetup={chain:defaultChain,sedimentType:defaultSed&&TYPES[nodeById(defaultSed.from).type].name,
-      water:({...nodes.find(n=>n.type==='water').params}),surface:({...waterLook})};
+    const defaultSed=inputEdge(defaultCE.id,1);
+    if(!defaultSed)throw new Error('SETUP FAILURE: colorerosion has no slot-1 sediment input after showcaseGraph()');
+    const defaultSedNode=nodeById(defaultSed.from);
+    if(!defaultSedNode)throw new Error('SETUP FAILURE: colorerosion slot-1 edge has no source node');
+    const defaultSetup={chain:defaultChain,sedimentType:TYPES[defaultSedNode.type].name,
+      water:({...defaultWater.params}),surface:({...waterLook})};
     const old=edges.find(e=>e.to===out.id&&e.slot===0),src=old.from;
     const sat=makeNode('satmap',430,520);sat.params.gradient='Terracotta';sat.params.source='height';sat.params.rough='med';
     const dep=makeNode('d_deposits',430,680);dep.params.radius=4;

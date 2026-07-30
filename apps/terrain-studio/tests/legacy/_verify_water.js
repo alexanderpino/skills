@@ -15,15 +15,37 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(URL, { waitUntil:'load' });
   await page.waitForTimeout(1200);
+
+  // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the opening document to L0 (perlin,
+  // ridged, blend, d_height, heightmask, levels, output) - no water node, so the lookup below
+  // returned undefined and the oracle died on `.params`. The 18-node graph it was written against
+  // is still shipped as showcaseGraph(); rebuild it.
+  //
+  // evalGraph() is enough here - the #buildBtn route is NOT needed - and that is measured, not
+  // assumed: evalGraph() runs finishGraphEvaluation -> updateViewport synchronously, which
+  // repopulates curHgt/curFilled/curAccum and calls refreshWater(). Probed both routes on this
+  // document: sum(curHgt[0..63]) = 46.13122934103012 and 86580 wet vertices of 262144, IDENTICAL
+  // from evalGraph() alone and from the progressive #buildBtn build (7.9 s vs 15.8 s wall).
+  // The evalGraph() call is the one already in the body below, after the water params are set.
+  await page.evaluate(() => {
+    nodes.length=0; edges.length=0; uid=1; selected=null; selectedEdge=null;
+    showcaseGraph();
+  });
   await page.locator('#layoutBtn').click();
 
   const report = await page.evaluate(() => {
     const water = nodes.find(n => n.type === 'water');
+    if (!water) throw new Error('SETUP FAILURE: no water node after showcaseGraph()');
     Object.assign(water.params, { mode:'sea', level:.46, shoreSmooth:1.35, foam:.18 });
     Object.assign(waterLook, {pattern:'wind',strength:.72,scale:.8,speed:.75,refraction:.55});
     selected = water;
     nodes.forEach(n => n._dirty = true);
     evalGraph();
+    // scene.water is what refreshWater()/renderGL() actually read. A water node that is not on the
+    // primary chain into Output would leave it null and every measurement below would silently be
+    // "no water" - a green run measuring nothing. Name that failure instead.
+    if (!scene.water) throw new Error('SETUP FAILURE: scene.water null after evalGraph() - water node not on the Output chain');
+    if (!curHgt || !curWater) throw new Error('SETUP FAILURE: curHgt/curWater not populated by evalGraph()');
     cam = { target:[0,.24,0], dist:1.48, az:.62, el:.38 };
     buildProps();
 

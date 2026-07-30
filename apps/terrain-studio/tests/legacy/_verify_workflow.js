@@ -26,6 +26,32 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.reload({waitUntil:'load'});await page.waitForTimeout(1200);
   const savedSide=await rects();
 
+  // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the 18-node showcase to L0 - a 7-node
+  // bedrock document (perlin, ridged, blend, d_height, heightmask, levels, output) - and this
+  // oracle needs the erosion stack: the intermediate-preview gate previews a `hydraulic` node, and
+  // the interactive perf smoke test times `hydraulic` and `thermal` specifically. Inherited, the
+  // run died at `curField===hyd._field` with "Cannot read properties of undefined (reading
+  // '_field')" - exit 2, measured.
+  //
+  // Placed AFTER the last reload deliberately: the layout gates above (stacked/side/savedSide) are
+  // pure geometry and must see the app's own persisted-layout boot path, unperturbed.
+  //
+  // evalGraph() is sufficient here; the app's own #buildBtn is NOT needed. The one renderer cache
+  // this file reads is curField, and it is written by the refreshPreview() call two statements
+  // before the assertion that reads it - so it cannot be inherited from L0. evalGraph() also ends
+  // in finishGraphEvaluation() -> updateViewport(), which rebuilds the viewport caches against the
+  // new document anyway. Nothing here samples pixels, water, or the wireframe: the two screenshots
+  // are layout artefacts, and every term of `ok` is geometry, node count, camera state, button
+  // state, or field finiteness. Going through evalGraphProgressive would only add wall clock.
+  await page.evaluate(()=>{
+    nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
+    showcaseGraph();evalGraph();
+    // Absence of evidence is failure: name the missing node instead of handing the gates an
+    // undefined that reads as a silent pass two indirections later.
+    for(const t of ['hydraulic','thermal','output'])
+      if(!nodes.find(n=>n.type===t))throw new Error('SETUP FAILURE: no '+t+' node after showcaseGraph()');
+  });
+
   const interaction=await page.evaluate(()=>{
     const before=nodes.length;
     const added=makeNode('perlin',120,120);select(added);evalGraph();

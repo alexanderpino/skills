@@ -5,6 +5,7 @@
 //   node _verify_all_canyon.js --quick    canyon only, skips render/realtime/build_progress
 const { execFileSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 const CANYON = [
   ['_verify_canyon_relief.js',   'relief budget: depth is cut by the solve, not stamped on'],
@@ -62,5 +63,16 @@ for(const [file,what] of tests){
   if(nums)console.log(`        ${nums}`);
   if(code!==0&&stdout.trim())console.log(`        ${stdout.trim().split('\n').slice(-4).join('\n        ')}`);
 }
-console.log(`\n${failed?`${failed} FAILED`:'all passed'}\n`);
+// STATE THE COVERAGE, ALWAYS. This file runs a hand-written list, and for a long time it printed
+// "all passed" while covering 12 of the 70 oracles on disk - including neither _verify_digest.js,
+// the byte-identity gate of record, nor any hex oracle. Promoting the opening document to L0 broke
+// 17 oracles; this list caught 2, and four subsequent commits each read as a green suite.
+//
+// A suite that does not say what it skipped cannot be audited by watching it pass, so the count is
+// printed next to the verdict and the number on disk is COUNTED rather than hardcoded - a hardcoded
+// total would drift back into a lie the moment someone adds an oracle.
+const onDisk = fs.readdirSync(__dirname).filter(f => /^_verify_.*\.js$/.test(f) && f !== path.basename(__filename));
+const skipped = onDisk.length - tests.length;
+console.log(`\n${failed?`${failed} FAILED`:'all passed'}  —  ran ${tests.length} of ${onDisk.length} oracles`
+  + `${skipped>0?`, ${skipped} NOT RUN (this is the Canyon suite; use \`npm run verify:all\` for every oracle)`:''}\n`);
 process.exit(failed?1:0);

@@ -12,6 +12,34 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const page=await browser.newPage({viewport:{width:1440,height:900}});
   const errors=[];page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1800);
+
+  // BUILD THE DOCUMENT THIS FILE MEASURES. D7 made the opening document L0 (perlin, ridged, blend,
+  // d_height, heightmask, levels, output) and this oracle's graph-locator gate drives the "Locate
+  // Water node" command. locateNode() (legacy.js:6015) exits with a toast when the type is absent,
+  // so inherited the click was a silent no-op: `located.selected` read 'perlin' - the L0 default
+  // selection, untouched - against an expected 'water'. showcaseGraph() is the 18-node graph that
+  // used to open, and it still carries water/satmap.
+  //
+  // evalGraph() is enough here; the app's own #buildBtn path is NOT needed. This oracle asserts
+  // only chip text, selection type and topbar geometry - it never reads pixels, water surface or
+  // curHgt/curFilled/curAccum. Its one renderer touch is updateViewport(curField) in the lattice
+  // probe below, and evalGraph() ends in finishGraphEvaluation() which itself calls updateViewport
+  // (legacy.js:3155), so curField is rebuilt from the new document rather than left holding L0's.
+  // This is byte-for-byte the app's own boot path: defaultGraph(); evalGraph(); (legacy.js:6538).
+  // It also has to happen HERE, before #resSel is moved to 2048: that queues a resolution without
+  // rebuilding (legacy.js:6051) and the "· Queued" it leaves in the chip is load-bearing for the
+  // lattice assertions, so no build may run after it.
+  const setup=await page.evaluate(()=>{
+    nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
+    showcaseGraph();evalGraph();
+    const w=nodes.find(n=>n.type==='water');
+    if(!w)throw new Error('SETUP FAILURE: no water node after showcaseGraph()');
+    // Absence of evidence is failure: if the render caches did not follow the swap, every later
+    // updateViewport(curField) would be replaying the previous document.
+    if(!curField)throw new Error('SETUP FAILURE: curField null after evalGraph() - render caches did not follow the new document');
+    return {count:nodes.length,edges:edges.length,selected:selected&&selected.type,curFieldLen:curField.length};
+  });
+
   const initial=await page.evaluate(()=>({res:RES,target:TARGET_RES,profile:profileRes.textContent,overflow:topbar.scrollWidth-topbar.clientWidth,
     resolutions:[...resSel.options].map(o=>+o.value)}));
   await page.locator('#buildProfileBtn').click();
@@ -47,7 +75,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     out.restored=chip();
     return out;
   });
-  const ok=initial.res===512&&initial.target===512&&initial.profile==='512²'&&initial.overflow<=1
+  // Guard the guard: the locator gate is only meaningful if the selection was something ELSE
+  // beforehand. showcaseGraph() ends on select(sat), so 'satmap' -> 'water' is a real transition;
+  // were the pre-state already 'water', `located.selected==='water'` would pass on a dead command.
+  const ok=setup.count===18&&setup.edges===22&&setup.selected==='satmap'&&setup.curFieldLen>0
+    &&initial.res===512&&initial.target===512&&initial.profile==='512²'&&initial.overflow<=1
     &&!lattice.square.includes('Hex')&&lattice.hex.includes('Hex')
     &&!lattice.undone.includes('Hex')&&lattice.redone.includes('Hex')&&!lattice.restored.includes('Hex')
     &&lattice.hex.includes('CPU')&&lattice.redone.includes('CPU')   /* hex forces the CPU path */
@@ -56,6 +88,6 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     &&filtered.profileClosed&&filtered.menu&&filtered.visible.length===1&&filtered.visible[0]==='find-water'
     &&located.selected==='water'&&located.menuClosed&&keyboardOpen
     &&compact.overflow<=1&&compact.commandRight&&compact.ioDisplay==='none'&&!errors.length;
-  console.log(JSON.stringify({initial,profileOpen,queued,filtered,located,keyboardOpen,compact,lattice,errors,ok},null,2));
+  console.log(JSON.stringify({setup,initial,profileOpen,queued,filtered,located,keyboardOpen,compact,lattice,errors,ok},null,2));
   await browser.close();process.exit(ok?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(2);});

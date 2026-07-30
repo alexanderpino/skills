@@ -12,9 +12,30 @@ const URL=process.env.STUDIO_URL||('file://'+path.resolve(__dirname, '../../inde
   const page=await browser.newPage({viewport:{width:1280,height:820}});
   const errors=[];page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1900);
+
+  // BUILD THE DOCUMENT THIS FILE MEASURES. 31f5688 demoted the opening document to L0 - seven
+  // bedrock nodes, no water node - so scene.water was null and the first statement in the page
+  // block threw "Cannot set properties of null (setting 'temperatureField')". Restore the 18-node
+  // graph this oracle was written against; it is still shipped as showcaseGraph().
+  //
+  // This oracle DOES touch the renderer (renderGL, gbuf.waterFbo readback, surfacePixels), so the
+  // question of evalGraph() vs the app's own #buildBtn build actually matters here. Measured, not
+  // assumed: evalGraph() calls finishGraphEvaluation -> updateViewport synchronously, which
+  // re-uploads the terrain buffers and refreshes the water caches. Probing both routes on this
+  // document gave sum(curHgt[0..63]) = 46.13122934103012 and 86580 wet vertices of 262144 -
+  // IDENTICAL - so evalGraph() leaves nothing stale for renderGL to read, at half the wall time
+  // (7.9 s vs 15.8 s). The surfacePixels>100 assertion is the standing check that the rasterized
+  // fluid layer really was rebuilt from this document.
+  await page.evaluate(()=>{
+    nodes.length=0;edges.length=0;uid=1;selected=null;selectedEdge=null;
+    showcaseGraph();evalGraph();
+  });
+
   await page.locator('#waterLookBtn').click();await page.waitForTimeout(80);
   await page.screenshot({path:path.resolve(__dirname,'_shot_water_surface_settings.png')});
   const result=await page.evaluate(()=>{
+    if(!nodes.find(n=>n.type==='water'))throw new Error('SETUP FAILURE: no water node after showcaseGraph()');
+    if(!scene.water)throw new Error('SETUP FAILURE: scene.water null after evalGraph() - water node not on the Output chain');
     const waterDef=TYPES.water,keys=waterDef.params.map(x=>x.key),linked=p=>!!p&&gl.getProgramParameter(p,gl.LINK_STATUS);
     // Rendering controls are tested on known liquid water so the independent climate/ice phase does
     // not reduce the refraction sample area.

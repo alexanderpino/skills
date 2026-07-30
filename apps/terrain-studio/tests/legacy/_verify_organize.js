@@ -17,7 +17,30 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(1400);
 
+  // BUILD THE DOCUMENT THIS FILE MEASURES. D7 (31f5688) demoted the 18-node showcase to the
+  // page-global showcaseGraph() and made the opening document L0 - 7 nodes, one branch point.
+  // Measured before this block: FATAL "Cannot read properties of undefined (reading 'id')" at
+  // anchor.id, because the branch-scope probe anchors on 'weathering', which L0 does not have.
+  // L0 is also too thin to be a layout regression surface at all: the whole point of the branch
+  // scope check is branch.scope < branch.all, i.e. a graph with a genuine off-branch remainder.
+  //
+  // evalGraph() is enough here; a full #buildBtn rebuild is NOT needed - and evalGraph() is
+  // REQUIRED, not optional. organizeGraph is an editor-only operation and the central contract
+  // is that it does not touch terrain: fieldStable/undoFieldStable/redoFieldStable compare
+  // outputNode()._field by IDENTITY. Without an evaluation those are undefined === undefined -
+  // three assertions that pass on any behaviour whatsoever. evalGraph() makes _field a real
+  // Float32Array so the identity comparison has something to be wrong about. Nothing here reads
+  // curHgt/curFilled/curAccum or renders, so the renderer caches are outside the measurement.
+  await page.evaluate(() => {
+    nodes.length = 0; edges.length = 0; uid = 1; selected = null; selectedEdge = null;
+    showcaseGraph(); evalGraph();
+  });
+  await page.waitForTimeout(200);
+
   const layout = await page.evaluate(() => {
+    const out0 = outputNode();
+    if (!out0) throw new Error('SETUP FAILURE: no output node after showcaseGraph()');
+    if (!out0._field) throw new Error('SETUP FAILURE: output node has no _field - evalGraph() did not run, the *FieldStable checks would be vacuous');
     const field = outputNode()._field;
     const dirty = nodes.map(n => [n.id, !!n._dirty]);
     const undoBefore = undoStack.length;
@@ -62,7 +85,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
 
   const branch = await page.evaluate(() => {
     const anchor = nodes.find(n => n.type === 'weathering');
+    if (!anchor) throw new Error('SETUP FAILURE: no weathering node after showcaseGraph()');
     const ids = graphIdsFrom(anchor.id, 'up');
+    if (!ids || !ids.size) throw new Error('SETUP FAILURE: empty upstream scope for weathering');
     const outside = nodes.filter(n => !ids.has(n.id));
     const outsideBefore = outside.map(n => [n.id, n.x, n.y]);
     nodes.filter(n => ids.has(n.id)).forEach((n, i) => { n.x += (i % 2 ? 91 : -74); n.y += i * 17; });
@@ -87,6 +112,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
 
   const nodePoint = await page.evaluate(() => {
     const n = nodes.find(x => x.type === 'weathering');
+    if (!n) throw new Error('SETUP FAILURE: no weathering node to right-click');
     return { x: n.x * view.z + view.x + 30, y: n.y * view.z + view.y + 24 };
   });
   await page.mouse.click(graphBox.x + nodePoint.x, graphBox.y + nodePoint.y, { button: 'right' });
