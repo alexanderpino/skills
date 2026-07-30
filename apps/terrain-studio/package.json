@@ -8,6 +8,9 @@
     "dev": "vite",
     "preview": "vite preview",
     "build": "vite build",
+    "bridge:surface": "node tests/legacy/_verify_bridge.js",
+    "bridge:check": "node tests/legacy/_verify_bridge.js --check",
+    "bridge:gen": "node scripts/generate-bridge.mjs",
     "verify": "node scripts/run-legacy-verify.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
