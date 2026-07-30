@@ -144,6 +144,8 @@ Branded system → what it actually is → where in this skill.
 | id Tech MegaTexture | Virtual texturing (streaming VT) | `07` |
 | No Man's Sky-class procedural planets | Procedural-on-demand patches + isosurface regions | `09`, `05` |
 | Dual Universe / Astroneer-class editable planets | Voxel isosurface (DC/MC family) | `05` |
+| Deep Rock Galactic-class fully-diggable worlds | Voxel isosurface everywhere (destruction tier 3) | `05`, ladder `17` |
+| Battlefield-class battlefield cratering | Heightfield delta overlays (destruction tier 2) | `17` |
 | Comanche / Outcast / Delta Force "voxel" terrain | 2.5D heightmap column raycasting (Voxel Space) — no true voxels | `18` |
 | UE 5.8 Mesh Terrain | Experimental 3D modifier-stack terrain rendered through Nanite | `03`, family `02` |
 | Portal 2 water | Flow mapping over a static surface | `12` |

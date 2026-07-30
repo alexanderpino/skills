@@ -137,6 +137,40 @@ list is also the save-game and network representation (below).
 
 ## Runtime terrain modification
 
+### The destruction ladder
+
+"Destructible terrain" spans five tiers, and the single most expensive mistake is building one
+tier above what gameplay actually needs — each rung up multiplies the invalidation surface. Name
+the tier first (it is the Paradigm procedure's *mutation* question, answered precisely):
+
+| Tier | Mechanism | Owner | Buys | Cannot do |
+|---|---|---|---|---|
+| 0 · Cosmetic | Decals / VT-injected scorch, splat swaps | this chapter, `07` | Bullet marks, burn scars, at near-zero cost | Any geometry change |
+| 1 · Surface state | Displacement in camera-following state targets | `13` | Trails, trampling, shallow ruts; refills over time | Persistence at scale, deep cuts |
+| 2 · Height delta | Persistent delta overlays over immutable tiles (below) | this chapter | Craters, trenches, terraforming on heightfield worlds | Overhangs, tunnels — no y-fold |
+| 3 · Voxel re-extraction | Field CSG + budgeted local remesh | `05` (smooth), `04` (blocky) | Arbitrary digging, caves, Minecraft-through-Deep-Rock digging | Heightfield's memory/streaming cheapness |
+| 4 · Hybrid zones | Heightfield world + voxel representation in declared destructible regions | `05` §hybrids + this chapter | AAA compromise: voxel cost only where gameplay pays for it | Free-form destruction *anywhere* |
+
+The Minecraft end (tier 3, blocky) is the *simple* case precisely because the whole world already
+pays the voxel tax: edit → light update → remesh on the `04` budget queue, done. The 2026 AAA end
+is almost never "voxels everywhere" — it is tier 2 for the open world plus tier 4 pockets where
+design promises digging, because tiers 0-2 preserve the heightfield's streaming, LOD, and
+collision economics that chapters `01`/`06` are built on.
+
+**The invalidation checklist — where big destruction actually gets expensive.** A visible edit
+must propagate to every consumer that ever cached the old ground, and the tier-3/4 rungs pay this
+per edit, not per feature. Route each: collision commit and its latency window (below, item 5);
+vegetation re-scatter of affected cells (`15`); VT page and decal re-composite over the area
+(`07`, and the stamp-replay rule above); **far-field representation** — the distant LOD/HLOD tile
+must show the crater too, so delta overlays must feed the coarse mip/HLOD path or a mountainside
+bite vanishes at 500 m (`06`; the `11` teleport control catches this); **baked lighting** — baked
+AO, horizon-shadow maps, and any lightmap over the region are now wrong: re-bake locally, fall
+back to dynamic terms, or constrain edit depth below noticeability (`10`); navmesh/AI rebuild
+(gameplay's problem, but *triggered* by this pipeline's commit event — publish it); and audio/
+physics material queries against the *composed* surface (`14` single-source rule). A destruction
+feature is shippable when every row of this list has an owner and a budget, not when the crater
+appears.
+
 Craters, trenches, tire ruts at world scale, player terraforming — on a heightfield paradigm,
 runtime edits are **delta overlays composited over immutable streamed tiles**. The baked tile is
 never mutated (`13`/`14` overlay doctrine: streaming a tile back in must not resurrect the
