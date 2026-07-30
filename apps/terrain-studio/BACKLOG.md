@@ -193,6 +193,112 @@ shoreline vegetation (`13`). Lens: continued state — authored at sources, adve
 `flowVelocity`, **concentrated by evaporation** (that concentration term is what makes a closed arid
 basin produce evaporite rather than merely drying out).
 
+### Both sides of the handoff, read against each other · researched
+
+Read `terrain-architect/27` + `03` (producer) against `terrain-renderer/14` + `12` + `13`
+(consumer). The two corpora agree on the water-source design and **both refuse the ice chain**.
+
+**Authored water sources are better grounded than we assumed — `P`-tier, not folklore.**
+`03:696-701` states the rule we arrived at independently: *"A spring is not a bump in the height
+field — it is a **source term in the flow field**. Place it as discharge and let routing and erosion
+carve the valley below it… Stamp a riverbed into the height instead and you get a channel that
+ignores the hydrology and stops where you stopped drawing."* Authored sources are the **Št'ava 2008**
+extension (`00:245`, **P**). Three consequences we should just adopt:
+
+- **`discharge` is m³/s, seeded into the same accumulation stack as `A`** (`03:673-676`) — no new
+  algorithm, only a different seed. Under uniform rain `Q ∝ A` and nothing changes; with sources
+  they diverge, and **`Q` is the physically correct driver** (stream power `K·Q^m·S^n`, and river
+  width/depth scale on `Q`). It is what lets a big river cross a desert without pretending the
+  desert fed it — the Nile and the Colorado are exactly this (`03:678-683`).
+- **The `kind` enum already exists**: distributed rain · boundary inflow · spring · karst
+  resurgence · oasis · glacial/snowmelt (`03:687-694`), each with its placement rule.
+- **Flat-at-spill is not a constraint we enforce — it is a consequence.** `lakeSurface = filledDem`,
+  "flat, by construction" (`03:326-328`), out of priority-flood (**P**, `00:232`). D5's claim that
+  designers *cannot* violate it is exactly right, and the reason is that they never touch it.
+
+**The ice chain has no grounding. All three criteria fail, and the corpora were searched.**
+
+| Our criterion | Status |
+|---|---|
+| salinity too high | **`salinity` does not exist** — no field, unit, port or source attribute in *either* skill. Verified by exhaustive grep. |
+| water temperature too warm | **No water-temperature field.** Registry `temperature` is **air** temperature, latitude + 6.5 °C/km lapse rate (`27:145`). Water temp appears twice as prose (`12:374-380`, `20:783`), never as a map. |
+| flow too fast | **No flow-speed criterion for ice anywhere.** The only speed-driven effect the corpus sanctions from `flowVelocity` is foam — and that is the *engine's*: *"The tool ships the vectors; it never ships the foam"* (`27:160`). |
+
+The corpus's only freeze gate is `snowfall(p) = moisture(p) · freezeFraction(temperature(p))`
+(`27:184`) — precipitation, on land, from air temperature. It is not a water-surface ice model.
+
+**What to build instead — the representation is grounded even though the criterion is not.**
+`12:353-359`: *"**Sea ice is not terrain, and the first rule is not to make it terrain.** It is a
+transient solid crust on the water surface — the layer stack's `waterSurface` grows a lid. It never
+enters `solidTop`, it carries no bathymetry, and baking it in is the sea-going version of baking
+water into the height field."* So: ship `iceThickness` (m, `R32F`) as a transient field riding on
+`waterSurface`, shaped like snow-over-land, with `iceFree(azimuth, season)` gating fetch
+(`12:361-370`). **Mark it `F`/`?` in our own docs — it is our design, not a citation.** Do not
+attach Cordonnier 2018 (that is avalanche) or the SIA (that is glacier flow) to it; neither covers
+surface water freezing. And ship *initial state + drivers*, never a baked binary ice mask — the
+Masking Doctrine again (`27:217-220`).
+
+**The one salinity path that IS grounded**, and it is a good one: an **endorheic sink**
+(`03:703-705`) with no outlet concentrates salt by evaporation, giving `P`-tier mineral zonation
+with real units — carbonate → gypsum (~130–150 g/L) → halite (~300–350 g/L) → bittern salts — plus
+the concentric saltern colour banding (`16:144-176`, `00:433`). So a `kind: sink` object plus an
+evaporation term buys the salinity gradient honestly. g/L is the only unit the corpus uses; use it.
+If we do add `salinity`, it classifies as **STATE** (`27:81-84`) — advected, mixed at confluences,
+concentrated by evaporation — so **the co-evolution rule binds it**: every node that moves water
+co-updates salinity in the same pass, or the information is destroyed unrecoverably.
+
+**Four constraints that change the design:**
+
+1. **Moving a source invalidates GLOBALLY, not regionally.** Flow accumulation and stream power are
+   declared GLOBAL — *"they cannot be tiled, full stop"* (`14:48-53`), and discharge routing is the
+   same machinery. Dragging a source in the viewport re-solves the whole watershed. Budget for it
+   or declare a hydrological domain; region invalidation is for LOCAL/NEIGHBOURHOOD nodes only.
+2. **We need a `sink` object and a no-fill flag, or endorheic designs are unrepresentable.**
+   Depression handling is mandatory *except* for the no-fill list — playas, craters, tarns, dolines,
+   thermokarst, oxbows, lagoons (`03:109-128`). Drop a source in one and filling erases the
+   landform; a crater lake silently vanishes.
+3. **Our propagation rule points the wrong way.** We said "if a node is simulated, everything
+   downstream must be too". The corpus's rule is **upstream inheritance**: *"Give it the tiling
+   contract of its worst upstream, not its own"* (`14:222-226`) — a node's *cone* sets its contract,
+   not its body. Same answer on water; the corpus form catches the bug ours misses, namely a
+   cheap-looking accumulator downstream of a sim that is not cheap. Note these are **two orthogonal
+   flags**, not one: *global/path-dependent* forces SHIP (no pixel shader can see beyond its
+   footprint), *runtime-simulated* forces SIMULATE. Ice sits downstream of flow accumulation, so it
+   inherits GLOBAL and **cannot be a pixel-shader effect on any engine**.
+4. **Profiles may vary resolution, format and mode — never names, units or semantics.**
+   `27:235-237`: the registry names are **wire names**; the emitter is the only place engine
+   conventions exist. And a profile must not bake water (`08:126-128`): *"solid covers (snow, soil,
+   sand) can bake; water should not — bake the sea in and you get the wall you can't swim in."*
+
+**The silent bug waiting for us in the ice chain.** `flowVelocity` is a *vector* map, and filtering
+averages opposing vectors toward zero (`14:134-137`) — a mip of a converging valley reads as calm.
+An ice rule that thresholds `length()` of a *filtered* flow vector will therefore **grow ice down
+the middle of the fastest channels** at coarse LOD, which is precisely backwards. Read a separately
+mipped **scalar speed** channel (`14:140-144`). This is the highest-probability defect in the whole
+feature and it fails in the direction that looks plausible.
+
+**Format floor, forced by our own thresholds.** Every input to the ice rule is thresholded, and
+thresholded quantities may not be 8-bit — 8-bit temperature under a freeze threshold produces a
+**terraced snowline**, the quantisation contours becoming isolines (`14:295-298`). That forces the
+climate pack to `RGBA16F` (`14:91` conditions it on exactly this). Stricter still on our side:
+simulation-consumed maps — `flowVelocity`, `waterDepth`, `windVector`, `snowDepth` — may **never**
+drop below `R32F` (`27:228`). *Provenance caution:* the 8-vs-16-bit doctrine is **F**-tier
+self-described sibling doctrine (`14:335`); only *"never quantise sim-consumed maps"* carries **D**
+backing from `27`.
+
+**Two audit rules to adopt verbatim**, because they make "a terrain is a set of maps" checkable:
+*"every auxiliary map is a driver, not a decoration"* — a map with zero declared consumers is
+deleted from the **shipping** manifest, not shipped "in case" (`14:22-28`); and *"every runtime
+effect names the map that drives it"* — if no field says where, extend the generator's contract
+rather than inventing renderer-side data (`14:30-37`). Both keep everything in the **tool** manifest
+regardless (`14:28`) — Studio producing more maps than any engine ships is sanctioned.
+
+**Registry gap to fix on our side:** `snowDepth`, `sedimentDepth`, `sandDepth` and `flowAccum` are
+named as state maps and appear in `27`'s co-evolution, consumption and precision rules, but have
+**no row in `27`'s four layer tables** — their units live in `08` (depths in m; `flowAccum` m²,
+R32F). A registry generated from `27` alone drops all four. Also `shore distance` is a required
+input in `12:33` with no row in `14`'s registry at all.
+
 ---
 
 ## 3. Confirmed defects — measured
