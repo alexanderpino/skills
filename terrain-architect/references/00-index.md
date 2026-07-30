@@ -248,6 +248,8 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Delta-lobe switching (the delta cycle) | L | Coleman 1988; Roberts 1997 — a composition over repeated avulsion (`03`) |
 | Glacial outburst flood (jökulhlaup) / megaflood | P | Nye 1976; Clarke 1982, 2003; Walder & Costa 1996; Björnsson 2003; Baker 1973; Bretz 1923, 1969 (`12`, `03`/`04`) |
 | Flood fill / sea level | F | — |
+| Domain boundary status (open / closed / fixed-gradient / looped / source) | F | No canonical paper; the standard formalisation is Landlab's `status_at_node` and fastscapelib's node-status enum (`03`, `22`) |
+| Boundary fringe from a uniform open perimeter (the "tablecloth") | L | **Not an algorithm** — the outcome of making every edge cell an outlet. Removed by a simulated margin that export crops, authored outlets, or base level inside the domain (`03`, `09`) |
 
 ## 5. Erosion → `04`, `05`, `12`
 

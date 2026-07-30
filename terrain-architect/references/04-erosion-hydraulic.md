@@ -153,7 +153,8 @@ What it adds over Mei, and why each matters:
 2. **Multiple layers.** Separate bedrock and regolith with different erodibility `K`.
    Erosion consumes regolith first. This is what produces the rock-outcrop-above-scree look
    for free.
-3. **Boundary conditions.** Explicit open/closed edges instead of Mei's implicit wall.
+3. **Boundary conditions.** Explicit open/closed edges instead of Mei's implicit wall — per cell,
+   not per domain, and *not* uniformly open on all four sides (`03`, *Domain boundaries*).
 4. **Water sources and sinks** as authored inputs — springs, rivers entering the domain.
 
 ## Droplet / particle erosion
@@ -332,7 +333,8 @@ count as a diagnostic and assert it does not grow without bound.
 Landlab uses a conservative production prefactor of `0.15` rather than relying on the textbook
 `0.25` limit. For geological bakes, fastscapelib's ADI path demonstrates the unconditionally
 stable production alternative. Declare the boundary policy—its ADI implementation is
-Dirichlet-only at raster borders.
+Dirichlet-only at raster borders, which is a *uniform open perimeter* and carries the fringe
+artefact of `03` with it.
 **Do not skip the diffusion term.** Stream power without it produces knife-edge interfluves
 and reads as obviously synthetic. In practice you can substitute a thermal erosion pass
 (`05`) for the diffusion, which is cheaper and gives you the repose-angle behaviour too.

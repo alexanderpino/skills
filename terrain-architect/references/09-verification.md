@@ -33,6 +33,7 @@ cheap — these are a dozen lines of setup each.
 | **Plateau** | Flat resolution — epsilon fill; catches the parallel-lines artefact |
 | **Coastline** | Sea-level flood fill vs threshold (`03`) |
 | **Cross-tile river** | Tiling. A river authored to cross a tile boundary must arrive with the same `A` on both sides. |
+| **Open-perimeter square** | Domain-edge policy. Uniform uplift, every edge open, run toward steady state: the boundary fringe and the dome **must** appear (`02`, `03`). This is the positive control — a metric that can't see it here isn't measuring anything. |
 | **Extreme height range** (0–20 km) | Precision. R16 terracing shows up here and nowhere else. |
 | **One-pixel spike** | Median/despike; erosion stability; capacity singularities |
 | **One-pixel pit** | Depression handling; the `?` case where breach and fill disagree |
@@ -53,6 +54,8 @@ eyeballs:
 | **Determinism** | Run twice, same seed → bit-identical. Then run threaded → still bit-identical. This is the double-buffering check (`04`, `05`) and it fails loudly. |
 | **No NaN / Inf** | Assert after every sim step, not at the end. The step that first produces NaN is the bug; by the end it's spread. |
 | **No invalid negatives** | `waterDepth ≥ 0`, `sediment ≥ 0`, `A ≥ cellArea`. Negative water is the missing pipe-model scaling factor (`04`). |
+| **Port range, not just port type** | Every edge validated against its declared range *and* finiteness, at the node that produced it. A value fractionally out of range is what becomes NaN two nodes later inside `sqrt`, `log`, or `S^n` (`14`). |
+| **Clamp counts do not grow** | Guards fire at start-up and settle. A clamp firing more often each iteration is masking a divergence — count them per node per step and fail on a rising trend. The generalisation of the erosion-created-pit check above (`14`). |
 | **Mass conservation** | Where applicable: `Σ(bedrock + sediment)` constant under pure transport (no uplift, no sources). Erosion models leak mass at boundaries and at every clamp; measure the leak and know it. **This is the single most under-used terrain assertion.** |
 | **Tile continuity** | Height, normals, and `A` match across a shared edge to within float epsilon |
 | **Monolithic vs tiled equivalence** | Run the graph whole; run it tiled; diff. Should be ~0 for local ops, provably non-zero for stream power (`08`) — **and knowing which is which is the point of the test.** |
@@ -195,6 +198,7 @@ quantitative, and loud on the one wrongness that a hero shot hides.
 | **Turbidity current** (`12`) | `C`, `U` along the run; Richardson number | Under autosuspension `C` and `U` **grow** downslope then wane; the deposit **fines upward** (Bouma). Instant death on a slope = no bed entrainment |
 | **Seafloor age–depth** (`12`) | Depth vs √age | `d ≈ d₀ + C·√age` within tolerance, flattening for old crust. A uniform-depth abyss = the law was never applied |
 | **Isostasy** (`02`) | Deflection vs the load convolution; peak vs mean elevation through erosion | Deflection = load ⊛ the flexural kernel; as valleys incise the **mean drops but peaks rise** (`ρc/ρm`). Peaks sinking with erosion = rebound missing |
+| **Domain boundary** (`03`) | Incision, local relief, or drainage density binned by **inset distance** from the perimeter | **Flat, within the interior spread.** A monotone ramp confined to an outer band = the boundary fringe, and the knee where it meets the interior value *is* the boundary-influence distance — read the margin width off it. Pair with a flow-azimuth histogram in that band: four spikes at the edge normals, present near the edge but **not** in the interior (interior too = grid anisotropy, below, not this) |
 | **River terraces** (`03`) | Elevation of a tread along the valley | **Horizontal**, parallel to the other treads — a level bevel, not a downstream-sloping surface. Sloping treads = cut without a base level |
 | **Avulsion** (`03`) | Superelevation `SE` at the avulsion step | `SE ≈ 1` when it fires (one channel depth above the floodplain). Firing at `SE≪1`, or never, = the setup threshold is wrong |
 | **Coral cover** (`12`) | Growth-form / density vs depth & wave energy | Zonation **monotone** — branching/encrusting on the high-energy crest, massive on the flat, plate/foliose deep; cover **stops** above water and below the photic depth |
@@ -274,6 +278,9 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Rivers stop mid-map; `A` is confetti | No depression handling | Insert epsilon priority-flood before routing (`03`) |
 | Hard seams between tiles | Noise in tile-local UV | Evaluate noise in world space (`01`) |
 | Soft seams / ridge at tile edges | Erosion run per-tile without apron | Apron ≥ max transport distance, or erode globally (`08`) |
+| Fringe of short parallel gullies hanging off all four map borders ("tablecloth") | Uniform open perimeter — every edge cell is an outlet, so the outer band drains straight out | Author the outlets and close the rest; simulate a margin and crop it (`03`) |
+| Radial fan at each map corner | Corner cell has two open boundary faces | Give corners an explicit status; same margin fix (`03`) |
+| Drainage divide runs parallel to the border at a constant inset; map domes | Headward retreat inward at equal rates from four open edges | Break the four-fold symmetry — one outlet edge, or base level inside the domain (`02`, `03`) |
 | Materials in the wrong places, subtly | Analysis upstream of erosion | Move all of `06` downstream of the last height write (`06`) |
 | Terracing on gentle slopes | R16 quantised too early | Work R32F, quantise at export (`08`) |
 | Faceted normals / ringed AO | Baked from quantised height | Bake from R32F (`06`, `08`) |
@@ -283,6 +290,11 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Rocks float or disappear into the ground as size varies | Fixed embedding offset applied to every instance | Embed from the asset support radius with clamped bounds (`07`) |
 | Vegetation intersects water, roads, rocks or neighbouring canopies | Scatter layers generated independently with no footprint distance constraints | Stage layers and feed exclusion/affinity/repulsion distance fields with an interaction apron (`07`) |
 | Pipe erosion → NaN spikes | Missing outflow scaling factor `K` | Add step 3 of the pipe model (`04`) |
+| Spikes only when two erosion nodes are chained; each is clean alone | Stability limits don't compose — the shared `Δt` breaks one node's CFL / diffusion ceiling | Sub-cycle each node under **its own** limit with a safety factor, not the shared budget (`14`, `04`) |
+| Alternating high/low cells that never blow up and conserve mass | A marginally stable pass — explicit Laplacian at exactly `c = 0.25`, amplification `−1` | Stay below the limit (0.9 safety factor); test the *direction* of the effect, not just finiteness (`14`, and below) |
+| A NaN region that grows a little every pass | One NaN mixed into its neighbours by a stencil op (blur, Laplacian, deposit brush) | Assert finiteness after **every** node and bisect to the producer — by export the origin is unrecoverable (`14`) |
+| `S^n`, `sqrt` or `log` goes NaN mid-graph | Out-of-range input met a restricted domain: negative slope from an unfilled pit, `A = 0`, depth marginally below zero | Range-check the port, not just its type and unit; depression-fill before stream power (`03`, `14`) |
+| One-cell spike grows into a tumour over iterations | Spike → huge local slope → huge capacity → more erosion: positive feedback | Fix the node that created the cell; despiking the field removes the evidence, not the cause (`04`, `14`) |
 | Pipe erosion → channels align to grid axes | 4-pipe von Neumann stencil | 8-pipe variant with per-pipe length (`04`) |
 | Droplet erosion → 1px scratches | Eroding point-wise instead of with a brush | Erode with disc radius 2–4 (`04`) |
 | Droplet erosion → mushy, silted | Depositing with a brush instead of point-wise | Deposit bilinear to 4 cells (`04`) |
@@ -461,9 +473,13 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Quantisation to R16 after all derivatives?
 - [ ] Normals and AO baked from R32F?
 - [ ] Apron on tiled erosion ≥ max transport distance? (Or: is stream power being tiled? It can't be.)
-- [ ] Boundary condition stated explicitly?
+- [ ] Boundary condition stated explicitly, per cell — and *not* a uniform open perimeter? (outlets authored, or base level inside the domain; the tell is a gully fringe and corner fans around the border, `03`)
+- [ ] Domain simulated on a margin that export crops, sized from the inset-profile knee? (the domain edge is a tile edge with no neighbour, `03`, `08`)
 - [ ] Seed derived from a documented root-seed rule?
 - [ ] Double-buffering in every grid simulation?
+- [ ] Every port range-checked and finiteness-swept at the node that produced it (`14`)?
+- [ ] Each chained sim sub-cycled under its **own** stability limit, with a safety factor — not a shared `Δt` (`14`)?
+- [ ] Guards named with a unit and a reason, clamp events counted, and a rising clamp count treated as a failure (`14`)?
 - [ ] Masks partition to 1?
 - [ ] Every hard threshold noise-perturbed?
 - [ ] Any directional/"anisotropy" control sourced from a **field** (strike, wind, ice flow), not a global angle that will land on the axes? (rotate-the-domain test, at an angle that is *not* a lattice symmetry)

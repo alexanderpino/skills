@@ -240,6 +240,15 @@ If you *must* erode per-tile:
 4. Crossfade the outermost few cells against the neighbour's result
 ```
 
+**The outermost tiles have no neighbour to load from.** The world's outer edge is a tile edge
+whose apron does not exist, and step 1 cannot fetch it — so the boundary condition takes over
+and prints its own artefact there instead of a seam: a fringe of short, edge-perpendicular
+gullies and a fan at each corner (`03`, *Domain boundaries*). The fix is the same rule with a
+*manufactured* apron — simulate a **margin** beyond the shipped extent and crop it at export —
+but it is sized differently: the apron above covers one run's transport distance, while the
+margin must cover **headward retreat accumulated over the whole run**, which is much longer
+(10–25 % per side for a stream-power bake; measure it with the inset profile in `09`).
+
 Step 4 is a lie that mostly works for droplet and thermal, and does not work for anything with
 long-range transport.
 

@@ -409,6 +409,63 @@
         "Maps the described evidence to the channels (lee drifts = wind-loading; valley tongue = glacial flow)",
         "Describes an attribution check (trace to wind lee / runout / accumulation zone) rather than declaring it fine or a bug outright"
       ]
+    },
+    {
+      "id": 32,
+      "axis": "diagnosis",
+      "prompt": "I ran hydraulic erosion on a square heightfield and the outer band of the map came out looking like a tablecloth -- a fringe of short parallel gullies hanging off all four borders, with a fan at each corner. The middle looks fine. What's wrong?",
+      "expected_output": "A uniform open (base-level) perimeter: every edge cell is an outlet, so the outer band drains straight out perpendicular to the nearest edge, and corner cells have two open faces. Fixes: simulate a margin and crop it at export (the domain edge is a tile edge with no neighbour), author the outlets and close the rest, or put base level inside the domain. Answer follows symptom -> mechanism -> fix and does NOT propose blending or smoothing the edge.",
+      "files": [],
+      "expectations": [
+        "Diagnoses a uniform open / fixed-base-level perimeter making every edge cell an outlet",
+        "Explains the corner fans as corner cells having two open boundary faces",
+        "Proposes simulating a margin that export crops, and/or authoring outlets with the rest closed, and/or base level inside the domain",
+        "Does NOT propose fixing it by blending, feathering, or smoothing the border",
+        "Structured as symptom -> mechanism -> fix"
+      ]
+    },
+    {
+      "id": 33,
+      "axis": "trap-resistance",
+      "prompt": "My eroded terrain has an ugly frame of artefacts around the domain border. I'm going to fix it by feathering the erosion strength to zero over the outer 64 cells so the edge blends smoothly into the unedited terrain. Sound good?",
+      "expected_output": "No -- that heals a symptom by blending and trades one artefact for another (a visibly un-eroded rim, and an effect mask where a process mask was meant, which also breaks the sediment budget). The border artefact is caused by the boundary condition, so fix the cause: simulate a margin wider than the boundary-influence distance and crop it at export, author the outlets and close the remaining perimeter, or move base level inside the domain. Size the margin by measuring the knee of the inset-distance profile rather than guessing 64 cells.",
+      "files": [],
+      "expectations": [
+        "Rejects feathering/blending as healing the symptom rather than the cause",
+        "Identifies the boundary condition (uniform open perimeter) as the actual cause",
+        "Notes that ramping erosion strength is an effect mask, leaving an un-eroded rim and/or leaking the sediment budget",
+        "Recommends margin-and-crop, authored outlets, or internal base level instead",
+        "Says the margin width should be measured (inset-distance profile knee), not guessed"
+      ]
+    },
+    {
+      "id": 34,
+      "axis": "diagnosis",
+      "prompt": "Each of my erosion nodes looks fine on its own, but when I chain hydraulic then thermal then hydraulic I start getting weird isolated spikes, and occasionally the whole field goes NaN. What's going on?",
+      "expected_output": "A composition problem, not a node bug. Likely causes: stability limits don't compose (a shared dt breaks one node's CFL or diffusion ceiling -- sub-cycle each under its OWN limit with a safety factor); a limit met exactly is not met (explicit Laplacian at c=0.25 has amplification -1, never damps, and passes finite/conserved assertions); the grid-scale checkerboard mode is what the spikes usually are; spikes self-amplify because a one-cell spike is a huge local slope hence more erosion; and an out-of-range value (negative slope from an unfilled pit) becomes NaN one operation later in S^n. Fix by asserting range AND finiteness after every node and bisecting to the producer, not by despiking.",
+      "files": [],
+      "expectations": [
+        "Frames it as a composition/coupling problem rather than a single broken node",
+        "Raises stability limits not composing under a shared dt, and sub-cycling each node under its own limit",
+        "Mentions the grid-scale/checkerboard mode and/or that a spike self-amplifies via local slope",
+        "Explains NaN arising from an out-of-range input meeting a restricted domain (S^n with negative S, sqrt, log, division by zero on flats)",
+        "Prescribes asserting finiteness and range after EVERY node and bisecting to the producing node",
+        "Does not recommend a median/despike pass as the fix"
+      ]
+    },
+    {
+      "id": 35,
+      "axis": "trap-resistance",
+      "prompt": "My erosion output has a few one-pixel spikes. I'll just run a median filter at the end of the graph to clean them up before export. Fine?",
+      "expected_output": "No -- that removes the evidence and leaves the cause, and the spikes will return elsewhere on the next parameter change. Spikes are self-amplifying under erosion (spike -> local slope -> capacity -> more erosion), so the producing node must be found: assert finiteness and range after each node and bisect. Median filtering IS legitimate on imported DEM data where salt-and-pepper is genuine sensor noise with no upstream to fix -- the distinction is whether there is an upstream node responsible.",
+      "files": [],
+      "expectations": [
+        "Rejects despiking your own simulation output as treating the symptom",
+        "Says to bisect -- assert finiteness/range per node and find the node that produced the spike",
+        "Notes the self-amplifying feedback (spike -> steep local slope -> more erosion) or that one bad cell does not stay one bad cell",
+        "Distinguishes the legitimate use of median filtering on IMPORTED/sensor data from hiding a sim's own defect",
+        "Does not simply approve the median filter"
+      ]
     }
   ]
 }

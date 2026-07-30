@@ -39,8 +39,24 @@ pytest -q                            # 144 pass; all optional checks now run
 
 The verification design is **layered**: use the strongest oracle available per algorithm —
 a closed-form value where one exists, otherwise `09`'s invariants (determinism, no NaN, mass
-conservation, radial symmetry) and quantitative signatures, plus an optional cross-check
-against an independent library.
+conservation, radial symmetry, boundary influence) and quantitative signatures, plus an optional
+cross-check against an independent library.
+
+`tests/test_numerics.py` covers the **node-composition** contracts of `14`, where individually
+correct nodes still produce spikes or NaN once wired together: that a stability limit met exactly
+is not met (the checkerboard mode's amplification is `−1` at `c = 0.25`, so the field stays finite
+and mass-conserving while the pass refuses to smooth — finiteness and conservation assertions
+both pass on a wrong result); that NaN spreads *spatially* through a stencil, so one bad cell
+becomes a growing blob and by export its origin is gone; that an out-of-range value is what
+becomes NaN one operation later in `S^n`; and that a rising clamp count is a guard masking a
+divergence. Helpers: `asserts.assert_in_range`, `nonfinite_count`, `assert_clamps_not_growing`.
+
+The boundary one is `tests/test_boundaries.py`, which measures what the **domain edge** did to a
+sim (`03`, *Domain boundaries*): `asserts.boundary_influence_distance` returns how far inward the
+edge policy reached, in cells — the margin width to simulate and crop. It has a closed-form
+oracle (Dirichlet diffusion reaches `√(4Dt)`), a must-read-zero control (a periodic domain has no
+edge), and a positive control (`erosion_streampower` holds its edges at base level, which is the
+uniform open perimeter that produces the fringe and the dome).
 
 **On what "verified" means here:** most oracles prove the code *solves the stated equation
 correctly* (internal consistency), not that the equation is *right* (validity). The evidence

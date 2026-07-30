@@ -102,8 +102,12 @@ to get valleys.
 
 Boundary condition matters more here than anywhere else: the domain edge is usually the base
 level (`h = 0`, fixed). Erosion cuts headward from the edges inward. If all four edges are
-fixed at zero, you get a dome. If one edge is the base level and the rest are no-flux, you get
-a range draining one way — usually what you want.
+fixed at zero, you get a dome — and, before the dome, a fringe of short edge-perpendicular
+gullies around the whole border and a fan at each corner. If one edge is the base level and the
+rest are no-flux, you get a range draining one way — usually what you want. The full boundary
+vocabulary, the margin-and-crop fix, and the inset-distance metric that measures how far the
+edge reached are in `03` (*Domain boundaries*); a constant-`U` run with an open perimeter is
+also the control case that must exhibit the artefact (`09`).
 
 ## Fault formation
 

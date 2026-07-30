@@ -418,6 +418,12 @@ Every graph edge carries a typed field. Name the type and the unit:
 wearing a HeightField's name, and every downstream metre-denominated parameter silently means
 nothing.
 
+**A port also carries a range and a finiteness policy** — depth and sediment are `≥ 0`, masks are
+`[0,1]`, drainage area is `≥ cellArea`, height is unbounded but finite. Type and unit alone
+cannot be validated against, and the value that leaves a node fractionally out of range is the
+value that becomes NaN two nodes later inside a `sqrt`, a `log`, or `S^n`. The port table, the
+composition failure modes, and the guard/clamp discipline are in `14`.
+
 ## Mask semantics
 
 Four different things get called "mask". Conflating them is a real bug class:
@@ -507,10 +513,17 @@ Cross-cutting; they cost nothing to enforce up front and everything to retrofit.
   Droplet erosion parallelised naively has the same race on overlapping brush footprints:
   either batch droplets into non-overlapping tiles or accumulate deltas atomically and apply
   in a second pass (`15`).
-- **Boundary conditions.** Decide explicitly what happens at the domain edge: base level
-  (water leaves, erosion cuts inward), wall (water pools, terrain bulges), or periodic. The
-  default of "whatever the loop happens to do at index 0" produces a visible frame of
-  artefacts. State it in the graph spec.
+- **Boundary conditions.** Decide explicitly what happens at the domain edge — and decide it per
+  *cell*, not per domain: open/base level (water leaves, erosion cuts inward), closed/no-flux
+  (water pools, terrain bulges), fixed-gradient, periodic, or source. The default of "whatever
+  the loop happens to do at index 0" produces a visible frame of artefacts, and **a uniform open
+  perimeter is the trap**: it makes every edge cell an outlet, so the outer band erodes into a
+  four-fold-symmetric fringe of short, edge-perpendicular gullies around a smoother interior —
+  the *tablecloth*, whose long-run limit is `02`'s dome. Author the outlets and close the rest,
+  put base level inside the domain where you can, and **simulate on a margin you then crop**:
+  the domain edge is a tile edge with no neighbour, so it needs the apron rule with the apron
+  manufactured rather than fetched. Mechanisms, sizing, and the inset-profile metric are in
+  `03`; state the policy in the graph spec either way.
 - **The sediment budget closes, or the leak is named.** Under pure transport — no uplift, no
   sources, closed boundaries — total solid mass is invariant, and on a hexagonal lattice the
   per-cell area constant differs from the square one (`26`) — carry the square constant over
@@ -520,6 +533,15 @@ Cross-cutting; they cost nothing to enforce up front and everything to retrofit.
   per-pair clamp (`05`), open boundaries, and — the quiet one — an *effect* mask where a
   *process* mask was meant. `reference-impl` mechanises this via
   `reference-impl/tests/asserts.py`.
+- **Guards are named, and clamps are counted.** Every simulation needs floors and caps to survive
+  the places where correct physics divides by zero — slope on a flat, capacity in still water,
+  area at a divide. A guard is a **named constant with a unit and a reason** (`sinα ≥ 0.05`), not
+  an anonymous epsilon in a denominator, which silently means something different at every cell
+  size. And a clamp that fires more often each iteration is not a guard, it is a guard **masking
+  a divergence** — the only thing between you and a visible crash — so count clamp events per
+  node per step and fail on a rising trend. This is the same law as the named sediment leak
+  above: silence is the defect. Validate range *and* finiteness on every edge, because NaN
+  spreads through neighbourhood ops and a NaN found at export has lost its origin (`14`).
 - **Build the mass before you dissect it.** A feature primitive written as a radial envelope
   times texture is a solid of revolution, and stays one however good the texture. Build the
   asymmetric mass first — crest-line SDFs, unioned sub-masses, saddles, faces of unequal
@@ -576,7 +598,9 @@ Contract (`references/08-output-contract.md`). This is where "the engine is just
 - **Tiles carry aprons.** Erosion and flow are not tile-local; every tiled bake runs with an
   apron wider than the maximum transport distance, and GLOBAL nodes (flow routing, stream
   power) do not tile at all — they run at the largest resolution that can be held globally
-  and are then sliced (`03`, `04`, `08`).
+  and are then sliced (`03`, `04`, `08`). **The outer edge of the whole domain is a tile edge
+  whose neighbour does not exist**: it takes the same rule with a *manufactured* apron — a
+  simulated margin, cropped at export — or it grows the boundary fringe of `03`.
 - **Seams are prevented by contract, not healed by blending.** World-space noise (seed
   contract), aprons, shared edge vertices, and — on spheres — the DGGS/cube-sphere seam
   routing of `08`. If a seam is visible, a contract above was broken; find which.
