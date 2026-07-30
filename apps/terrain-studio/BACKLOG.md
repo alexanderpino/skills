@@ -373,9 +373,33 @@ spans rows 20–172, so the measurement is untouched.
 These are therefore **domain-restricted, not corrupted** — the gates are honest about what they
 sample, they just sample 86% of the field. That is a real gap for a lattice whose whole point is the
 extra rows, and it needs fixing; but it is a different severity from `_verify_hex_flow.js`, where the
-NaN reached a min-heap and corrupted the flood globally. Fixing it means rebuilding the probes at
-full height, which moves `cy` from the pre-flip `(n·√3/2)/2` to `((rows-1)·√3/2)/2` and will shift
-the reported numbers — so re-baseline, don't assume the old values should reappear.
+NaN reached a min-heap and corrupted the flood globally.
+
+**The rework is simpler than it looks, because the flip already did the hard part.** Measured at
+`n=192`:
+
+```
+world extent, square :  191 × 191
+world extent, hex    :  191 × 191.4      ratio 1.0021
+centre cy, square    :  95.5
+centre cy, hex       :  95.7             they agree to 0.20 cells
+```
+
+The two lattices now have the **same world footprint** — that is what the square-world flip bought.
+So the probe constants should *converge*, not diverge: one radius `r0 = (n-1)/2` fits both, and one
+centre serves both. What the file has instead is `r0 = cy = (n/2)·√3/2 = 83.1`, the **pre-flip** hex
+half-extent from when the hex world genuinely was 13.4% shorter. Carried forward, it sizes the cone
+to a footprint that no longer exists and puts its centre **12.6 cells above** the field centre.
+
+So the fix is: allocate `n × fieldH()`, fill every row, and replace the `·√3/2` geometry constants
+with the shared ones. Re-baseline afterwards — H2/H3/H6 numbers will move, and the old values are
+not the target.
+
+**Do not rush this one.** `mkCone` takes a `hexGeom` flag that is deliberately independent of
+`terrainDef.lattice`: both cones go through the *same* hex kernel, and the square-geometry one is
+the control. Changing the row count changes what that control means, so read H2/H3's comparison
+before touching it. This is a case where the shape fix is trivial and the *semantics* of the
+negative control are the actual work.
 
 **The lesson that generalises past this file.** `_verify_hex_flow.js` passed **6/6 before the fix**.
 Every asserted quantity — pits, borderReach, terminalMass — is a count or a ratio, and the phantom
