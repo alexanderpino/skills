@@ -1,5 +1,6 @@
 import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuReady, hydroMassDiag, setHydroMassDiag, setGL as setGpuGL } from './core/gpu.js';
 import { mergePlugins } from './core/registry.js';
+import './plugins/filt/index.js';
 import './plugins/mask/index.js';
 import './plugins/comb/index.js';
 import { P, WHEN, GROUP, CAT } from './core/params.js';
@@ -186,10 +187,16 @@ export function normalize(f){const[mn,mx]=fieldRange(f);const d=mx-mn||1;const o
    transforms COMPOSE into one matrix (xfMul), so N moves still cost exactly one evaluation. This is
    reference-impl/placement.py's `affine`/`compose`/`sample_coords` in normalised tile units. ---- */
 export let XF=null;
+// XF is swapped by the transform node during evaluation, and the transform node is now a plugin
+// module - so it can no longer assign the binding directly. An imported binding is immutable in the
+// importing module ("TypeError: Assignment to constant variable"), which is the same rule that
+// governs the test bridge: a WRITTEN symbol cannot live outside the module that declares it unless
+// its owner exports a setter. This is that setter.
+export function setXF(v){ XF=v; }
 const xfU=(u,v)=>XF?XF[0]*u+XF[1]*v+XF[2]:u;
 const xfV=(u,v)=>XF?XF[3]*u+XF[4]*v+XF[5]:v;
 // The SAME inverse map transformField() uses, so exact and raster modes describe one placement.
-function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5}){
+export function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5}){
   const a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
   // M = T(offset) . T(pivot) . R(yaw) . S(scale) . T(-pivot), inverted for sampling. Rotation and
@@ -198,7 +205,7 @@ function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5}
   return [ca/sX,-sa/sX,(-ca*pivX+sa*pivY)/sX+pivX-offX,
           sa/sY, ca/sY,(-sa*pivX-ca*pivY)/sY+pivY-offY];
 }
-function xfMul(inner,outer){        // result(u,v) = inner(outer(u,v)) — outer applied first
+export function xfMul(inner,outer){        // result(u,v) = inner(outer(u,v)) — outer applied first
   if(!inner)return outer;if(!outer)return inner;
   const[a,b,c,d,e,f]=inner,[A,B,C,D,E,F]=outer;
   return [a*A+b*D,a*B+b*E,a*C+b*F+c,
@@ -297,7 +304,7 @@ function radialField(){
    -------------------------------------------------------------------- */
 let SCALE_RES=true;
 const REF_RES=192;
-const resScale=()=>SCALE_RES?RES/REF_RES:1;          // >1 when finer than the reference grid
+export const resScale=()=>SCALE_RES?RES/REF_RES:1;          // >1 when finer than the reference grid
 let BUILD_QUALITY="interactive";
 export let USE_GPU=true;
 // GPU compute, makeProg and u now live in src/core/. See the import at the top of this file.
@@ -382,7 +389,7 @@ export function drawMaskField(p){
   }
   return out;
 }
-function sculptField(inp,p){
+export function sculptField(inp,p){
   const o=new Float32Array(inp.length),strength=clamp(p.strength==null?1:p.strength,0,1);
   let smoothed=null;if(p.mode==="smooth")smoothed=blurField(inp,{radius:Math.max(1,Math.round(p.radius*resScale()))});
   for(let i=0;i<o.length;i++){
@@ -1421,7 +1428,7 @@ function atFeatureScale(inp,k,fn){
   return o;
 }
 // TRANSFORM — move / rotate / scale the terrain itself (Gaea's Transform node). scale>1 magnifies.
-function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5,edge="clamp"}){
+export function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5,edge="clamp"}){
   const n=fieldW(),nh=fieldH(),o=newField(),a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
   const sX=Math.max(0.05,scale),sY=Math.max(0.05,scale*aspect);
   // Edge handling is per AXIS: columns wrap/mirror/clamp over the WIDTH, rows over the ROW COUNT.
@@ -1440,7 +1447,7 @@ function transformField(inp,{scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,piv
 }
 
 /* ------------------------------------------------------- modifiers ---- */
-function warpField(inp,{strength=0.12,freq=3,seed=7}){
+export function warpField(inp,{strength=0.12,freq=3,seed=7}){
   const o=newField();const n=fieldW(),nh=fieldH(),s=strength*n;
   // Seed contract AND world-space displacement (26). Two separate hex defects lived here, and
   // together they were the largest single reason the DEFAULT graph's terrain changed on a
@@ -1465,7 +1472,7 @@ function warpField(inp,{strength=0.12,freq=3,seed=7}){
   }
   return o;
 }
-function terraceField(inp,{steps=8,sharp=0.6}){
+export function terraceField(inp,{steps=8,sharp=0.6}){
   const o=newField();
   for(let i=0;i<inp.length;i++){
     const v=inp[i]*steps;const f=Math.floor(v),frac=v-f;
@@ -1474,7 +1481,7 @@ function terraceField(inp,{steps=8,sharp=0.6}){
   }
   return o;
 }
-function curveField(inp,{bias=0.5,gain=0.5}){
+export function curveField(inp,{bias=0.5,gain=0.5}){
   // Schlick bias/gain tone curve; 0.5 = identity for each.
   const b=clamp(bias,.01,.99),g=clamp(gain,.01,.99);
   const biasF=(x,k)=>x/(((1/k-2)*(1-x))+1);
@@ -1483,14 +1490,14 @@ function curveField(inp,{bias=0.5,gain=0.5}){
   for(let i=0;i<inp.length;i++){let x=clamp(inp[i],0,1);x=biasF(x,b);x=gainF(x,g);o[i]=clamp(x,0,1);}
   return o;
 }
-function levelsField(inp,{inLo=0,inHi=1,gamma=1,outLo=0,outHi=1}){
+export function levelsField(inp,{inLo=0,inHi=1,gamma=1,outLo=0,outHi=1}){
   const o=newField();const d=(inHi-inLo)||1e-6;const ig=1/Math.max(1e-3,gamma);
   for(let i=0;i<inp.length;i++){let v=clamp((inp[i]-inLo)/d,0,1);v=Math.pow(v,ig);o[i]=outLo+v*(outHi-outLo);}
   return o;
 }
-function clampField(inp,{lo=0,hi=1}){const o=newField();for(let i=0;i<inp.length;i++)o[i]=clamp(inp[i],lo,hi);return o;}
-function invertField(inp){const o=newField();for(let i=0;i<inp.length;i++)o[i]=1-inp[i];return o;}
-function blurField(inp,{radius=2}){
+export function clampField(inp,{lo=0,hi=1}){const o=newField();for(let i=0;i<inp.length;i++)o[i]=clamp(inp[i],lo,hi);return o;}
+export function invertField(inp){const o=newField();for(let i=0;i<inp.length;i++)o[i]=1-inp[i];return o;}
+export function blurField(inp,{radius=2}){
   const n=fieldW(),nh=fieldH(),r=Math.max(1,Math.round(radius));const tmp=newField(),o=newField();
   const w=[];let ws=0;for(let k=-r;k<=r;k++){const g=Math.exp(-(k*k)/(2*(r*0.6)*(r*0.6)));w.push(g);ws+=g;}
   for(let i=0;i<w.length;i++)w[i]/=ws;
@@ -1498,7 +1505,7 @@ function blurField(inp,{radius=2}){
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,nh-1)*n+x]*w[k+r];o[y*n+x]=s;}
   return o;
 }
-function histEqualizeField(inp,{bins=256,amount=1}){
+export function histEqualizeField(inp,{bins=256,amount=1}){
   const[mn,mx]=fieldRange(inp);const d=mx-mn||1;const hist=new Float64Array(bins);
   for(let i=0;i<inp.length;i++){const b=clamp(((inp[i]-mn)/d*(bins-1))|0,0,bins-1);hist[b]++;}
   const cdf=new Float64Array(bins);let acc=0;for(let b=0;b<bins;b++){acc+=hist[b];cdf[b]=acc;}
@@ -2822,7 +2829,7 @@ function hydroFixField(inp,p){
 const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","drawmask","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
 function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
-function exactChain(id,guard){
+export function exactChain(id,guard){
   guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
   const nd=nodeById(id);if(!nd||!EXACT_TYPES.has(nd.type))return false;
   const refs=TYPES[nd.type].referenceOnly||[];
@@ -2830,7 +2837,7 @@ function exactChain(id,guard){
 }
 // Re-evaluate a chain under the ambient XF. Deliberately does NOT write nd._field: the cached fields
 // are the untransformed ones other branches and the thumbnails still depend on.
-function evalExact(id,guard){
+export function evalExact(id,guard){
   if(!id||guard.has(id))return null;guard.add(id);
   const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
   const def=TYPES[nd.type],refs=def.referenceOnly||[];
@@ -2942,77 +2949,6 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
       if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
 
-  warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",fieldSemantics:"preserve-primary",
-    params:[P.log("strength","Strength",.001,.4,.12,v=>v===0?"0":v<.01?v.toFixed(3):v.toFixed(2)),
-      P.log("freq","Frequency",.5,8,3,v=>v<1?v.toFixed(2):v.toFixed(1),false),P.seed("seed","Seed",7)],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],gpuReady()?gpuWarp(ins[0],p):warpField(ins[0],p),ins[1]):newField()},
-  terrace:{cat:"filt",name:"Terrace",ins:["In","Mask"],desc:"Snap to stratified benches.",
-    params:[P.int("steps","Steps",2,24,8),P.slider("sharp","Sharpness",0,1,0.6)],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],terraceField(ins[0],p),ins[1]):newField()},
-  normalizen:{cat:"filt",name:"Normalize",ins:["In","Mask"],desc:"Remap the field minimum to 0 and maximum to 1, optionally through a biome mask.",
-    params:[P.slider("amount","Amount",0,1,1,.01)],
-    eval:(p,ins)=>{
-      if(!ins[0])return newField();
-      const base=ins[0],normal=normalize(base);
-      if(p.amount<1)for(let i=0;i<normal.length;i++)normal[i]=lerp(base[i],normal[i],p.amount);
-      return maskApply(base,normal,ins[1]);
-    },
-    note:"The range is measured over the whole input field, then blended through <b>Mask</b>: black preserves the original height, white applies the normalized height, and grey makes a soft transition. Keeping range measurement independent of the mask prevents biome borders from changing the normalization whenever their falloff is edited."},
-  levels:{cat:"filt",name:"Levels",ins:["In"],desc:"Clip range + gamma + output range.",
-    params:[P.slider("inLo","In low",0,1,0),P.slider("inHi","In high",0,1,1),P.slider("gamma","Gamma",0.2,3,1),
-      P.slider("outLo","Out low",0,1,0),P.slider("outHi","Out high",0,1,1)],
-    eval:(p,ins)=>ins[0]?levelsField(ins[0],p):newField()},
-  curve:{cat:"filt",name:"Curve",ins:["In"],desc:"Bias / gain tone curve.",
-    params:[P.slider("bias","Bias",0.05,0.95,0.5),P.slider("gain","Gain",0.05,0.95,0.5)],
-    eval:(p,ins)=>ins[0]?curveField(ins[0],p):newField()},
-  histeq:{cat:"filt",name:"Histogram EQ",ins:["In"],desc:"CDF equalization — spread the tonal range.",
-    params:[P.slider("amount","Amount",0,1,1),P.int("bins","Bins",16,256,256)],
-    eval:(p,ins)=>ins[0]?histEqualizeField(ins[0],p):newField()},
-  blur:{cat:"filt",name:"Blur",ins:["In","Mask"],desc:"Separable Gaussian smoothing.",fieldSemantics:"preserve-primary",
-    params:[P.slider("radius","Radius",1,10,2,1,v=>v|0)],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],blurField(ins[0],{radius:Math.max(1,Math.round(p.radius*resScale()))}),ins[1]):newField()},
-  sculpt:{cat:"filt",name:"Sculpt",ins:["In","Mask"],desc:"Merge a masked Raise, Lower, Flatten, or Smooth operation into the incoming terrain. Pair it with Draw Mask for roads and authored regions.",
-    params:[P.tabs("mode","Tool",[["raise","Raise"],["lower","Lower"],["flatten","Flatten"],["smooth","Smooth"]],"smooth"),
-      WHEN(P.slider("amount","Height",0,.25,.03,.002,v=>Math.round(v*terrainDef.height)+" m"),"mode","raise","lower"),
-      WHEN(P.slider("target","Target height",0,1,.35,.01,v=>Math.round(v*terrainDef.height)+" m"),"mode","flatten"),
-      WHEN(P.slider("radius","Smooth radius",1,16,4,1,v=>v|0),"mode","smooth"),
-      P.slider("strength","Strength",0,1,1,.01)],
-    eval:(p,ins)=>ins[0]?maskApply(ins[0],sculptField(ins[0],p),ins[1]):newField(),
-    note:"This is a non-destructive merge modifier: <b>In</b> is the base terrain, <b>Mask</b> is the authored region, and the selected tool is blended back by Strength. Raise/Lower use a height delta, Flatten approaches one elevation, and Smooth merges a blurred copy only inside the mask."},
-  clampn:{cat:"filt",name:"Clamp",ins:["In"],desc:"Clip to a range.",
-    params:[P.slider("lo","Low",0,1,0),P.slider("hi","High",0,1,1)],
-    eval:(p,ins)=>ins[0]?clampField(ins[0],p):newField()},
-  transform:{cat:"filt",name:"Transform",ins:["In","Mask"],desc:"Translate, rotate and scale the terrain — Gaea's Transform. Scale >1 magnifies (same terrain over a smaller area); <1 shrinks it.",fieldSemantics:"preserve-primary",
-    params:[P.tabs("mode","Sampling",[["auto","Exact"],["raster","Raster"]],"auto"),
-      P.slider("scale","Scale",0.1,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
-      P.slider("aspect","Scale Y",0.25,4,1,0.05,v=>v.toFixed(2)+"\u00d7"),
-      P.slider("angle","Rotation",0,360,0,1,v=>(v|0)+"\u00b0"),
-      P.slider("offX","Move X",-1,1,0,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("offY","Move Y",-1,1,0,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("pivX","Pivot X",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      P.slider("pivY","Pivot Y",0,1,0.5,0.01,v=>Math.round(v*terrainDef.scale)+" m"),
-      WHEN(P.seg("edge","Edges",[["clamp","Clamp"],["wrap","Wrap"],["mirror","Mirror"]],"clamp"),"mode","raster")],
-    // PLACE BEFORE YOU SAMPLE. If everything upstream is procedural, push this placement down into
-    // the generators' coordinates and re-evaluate — exact, and the terrain simply continues past the
-    // old tile edge instead of clamping. Otherwise fall back to resampling the finished raster.
-    eval:(p,ins,node)=>{
-      const src=inputEdge(node.id,0);
-      // The Mask branch never has to be procedural: masking is a post-process lerp against the
-      // UNtransformed input, so only slot 0 decides whether the exact path is available.
-      if(p.mode!=="raster"&&src&&exactChain(src.from)){
-        const prev=XF;XF=xfMul(xfFromParams(p),prev);     // compose: N transforms, ONE evaluation
-        let f;try{f=evalExact(src.from,new Set());}finally{XF=prev;}
-        node._xfMode="exact";
-        return maskApply(ins[0]||newField(),f||newField(),ins[1]);
-      }
-      node._xfMode=ins[0]?"raster":"none";
-      return ins[0]?maskApply(ins[0],transformField(ins[0],p),ins[1]):newField();},
-    info:(nd)=>(nd._xfMode==="raster"
-      ? "<b>Raster resample.</b> The input cannot be re-evaluated — an erosion sim, a blur, an imported DEM — so the finished heightmap is filtered. Bilinear resampling is a low-pass: on fBm here it costs ~25% of the fine detail for one non-integer move and ~54% over four. Put the Transform <i>below</i> the erosion to place exactly instead."
-      : "<b>Exact placement.</b> Everything upstream is procedural, so it is re-evaluated at transformed coordinates rather than resampled: no filtering, no detail loss, and the terrain continues past the old tile edge instead of clamping (Edges is unused). Stacked Transforms compose into one matrix, so they still cost one evaluation.")
-      + "<br><br>Rotation is about the <b>up axis</b> — the only rotation a heightfield admits, since tipping the surface would make it multi-valued (two heights over one point). <b>Pivot</b> is the point rotation and scale turn about: centred spins a feature in place, moved swings it around that point. <b>Mask</b> confines the move to where it is bright."},
-  invert:{cat:"filt",name:"Invert",ins:["In"],desc:"1 − height.",params:[],
-    eval:(p,ins)=>ins[0]?invertField(ins[0]):newField()},
 
   thermal:{cat:"ero",name:"Thermal erosion",ins:["In","Mask"],desc:"Talus: material above repose slides down.",
     // Real scale is the DEFAULT: with cell units shipping as default, the Repose slider did not
@@ -3449,7 +3385,7 @@ function makeNode(type,x,y){
 function nodeById(id){return nodes.find(n=>n.id===id);}
 function edgeKey(e){return e?e.from+">"+e.to+":"+e.slot:null;}
 function edgeByKey(key){return edges.find(e=>edgeKey(e)===key);}
-function inputEdge(nodeId,slot){return edges.find(e=>!e.disabled&&e.to===nodeId&&e.slot===slot);}
+export function inputEdge(nodeId,slot){return edges.find(e=>!e.disabled&&e.to===nodeId&&e.slot===slot);}
 function outputNode(){return nodes.find(n=>n.type==="output");}
 function collectScene(root){                        // walk the PRIMARY height/effect chain only
   const s={water:null,snow:null,satmap:null};root=root||outputNode();if(!root)return s;

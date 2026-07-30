@@ -1,0 +1,12 @@
+// Every filt plugin. Imported for the side effect of registering with core/registry.js.
+import './warp.js'
+import './terrace.js'
+import './normalizen.js'
+import './levels.js'
+import './curve.js'
+import './histeq.js'
+import './blur.js'
+import './sculpt.js'
+import './clampn.js'
+import './transform.js'
+import './invert.js'
