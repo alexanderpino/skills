@@ -15,6 +15,24 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
 
   const r = await p.evaluate(() => {
     const res = { gpuAvailable: GPU.init() };
+    // Distinguish "this machine has no GPU" from "our refactor broke the GPU path". Without this
+    // they are the same observation, and the script exits 0 for both. `hasWebGL2Float` is the
+    // environment's own answer, taken independently of anything the app does: a WebGL2 context
+    // with EXT_color_buffer_float is exactly what GPU.init() requires, so if the capability is
+    // present and GPU.init() still says no, the app is at fault, not the machine.
+    res.hasWebGL2Float = (() => {
+      try {
+        const c = document.createElement('canvas');
+        const g2 = c.getContext('webgl2');
+        return !!(g2 && g2.getExtension('EXT_color_buffer_float'));
+      } catch (_) { return false; }
+    })();
+    // gpuReady() is the flag the NODES consult (TYPES.perlin.eval and friends), so it is the one
+    // that decides whether the fast path is actually taken. GPU.init() succeeding while gpuReady()
+    // is false would mean the capability exists and nothing uses it.
+    res.gpuReady = typeof gpuReady === 'function' ? gpuReady() : null;
+    res.usingGpuLattice = terrainDef.lattice;
+    res.useGpuFlag = USE_GPU;
     if (!res.gpuAvailable) return res;
     const diff = (a,bb) => { let mx=0,sum=0; for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-bb[i]); if(d>mx)mx=d; sum+=d;}
       return { maxAbs:+mx.toExponential(2), meanAbs:+(sum/a.length).toExponential(2) }; };
@@ -82,6 +100,32 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   });
 
   let crossFail = 0;
+
+  // THE SILENT-DOWNGRADE GATE. Everything below this point is skipped when the GPU is unavailable,
+  // and the script used to exit 0 in that case - so "no GPU on this box" and "the extraction broke
+  // the GPU path" were the same green. They are not the same thing and must not read the same.
+  //
+  // The failure this catches is specific and was expected during the src/core/gpu.js extraction: if
+  // setGL() is not called, or is called after boot() instead of inside initGL, then GPU.init() sees
+  // gl === undefined, returns false, and the app falls back to the CPU kernels. That fallback
+  // produces VALID output, so the digest stays 60/60 green while the GPU is dead. No other gate in
+  // the suite can see it.
+  if (r.hasWebGL2Float && !r.gpuAvailable) {
+    console.log(`FAIL gpu-capability: this environment HAS WebGL2 + EXT_color_buffer_float, but `
+      + `GPU.init() returned false. The capability is present and the app is not using it - that is `
+      + `the app's fault, not the machine's. Check that initGL() calls setGL() before anything `
+      + `reaches GPU.init().`);
+    crossFail = 1;
+  }
+  if (r.gpuAvailable && r.gpuReady !== true && r.usingGpuLattice !== 'hex' && r.useGpuFlag) {
+    console.log(`FAIL gpu-ready: GPU.init() succeeded but gpuReady() is ${JSON.stringify(r.gpuReady)} `
+      + `on lattice=${r.usingGpuLattice} with USE_GPU=${r.useGpuFlag}. gpuReady() is what the node `
+      + `evals consult, so the fast path exists and nothing takes it.`);
+    crossFail = 1;
+  }
+  console.log(`gpu-capability hasWebGL2Float=${r.hasWebGL2Float} init=${r.gpuAvailable} `
+    + `gpuReady=${r.gpuReady} lattice=${r.usingGpuLattice} USE_GPU=${r.useGpuFlag}`);
+
   if (!r.gpuAvailable) { console.log('GPU NOT AVAILABLE'); }
   else {
     for (const k of ['perlin','ridged','thermal','warp'])
