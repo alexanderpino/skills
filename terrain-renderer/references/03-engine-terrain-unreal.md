@@ -1,7 +1,8 @@
 # Engine-Native Terrain: Unreal Landscape & Friends
 
 This chapter owns the engine-native terrain systems — primarily Unreal's Landscape and its UE5
-satellites (Nanite Landscape, RVT, World Partition), with a comparative appendix for Unity, Godot,
+satellites (Nanite Landscape, RVT, World Partition), plus the experimental Mesh Terrain system
+introduced in UE 5.8, with a comparative appendix for Unity, Godot,
 O3DE, and CryEngine. It exists because engine terrain is a *contract you inherit*, not an
 architecture you choose: the win is knowing which knobs map onto the theory in `01`/`02`/`07`, and
 where the engine's fixed decisions will fight you. Almost everything here is D/N-tier — vendor
@@ -10,7 +11,9 @@ version-sensitive claims are tagged `?` rather than asserted as permanently true
 
 Contents: [Landscape anatomy](#landscape-anatomy) ·
 [Height & weight storage](#height--weight-storage) · [Runtime LOD](#runtime-lod) ·
-[Nanite Landscape](#nanite-landscape) · [Materials & RVT](#landscape-materials--rvt) ·
+[Nanite Landscape](#nanite-landscape) ·
+[Mesh Terrain (5.8+)](#ue-58-mesh-terrain-experimental) ·
+[Materials & RVT](#landscape-materials--rvt) ·
 [World scale](#world-scale-world-partition--lwc) ·
 [Import / roundtrip](#import--roundtrip-contract) ·
 [Performance doctrine](#performance-doctrine-checklists) ·
@@ -168,6 +171,65 @@ massive worlds breaks the authoring cadence; or when you need exotic per-vertex 
 baked path can't express. The traditional path remains fully supported — it is not legacy (**?**
 re-verify that statement each major version).
 
+## UE 5.8+: Mesh Terrain (experimental)
+
+UE 5.8 (June 2026) shipped **Mesh Terrain**: a fully-3D, mesh-based terrain system built on the
+**Mesh Partition** framework, positioned *alongside* heightmap Landscape, not replacing it. Epic's
+label is explicit — "Experimental … use caution when shipping with it" — so everything in this
+section carries an implicit **?**: APIs, plugin names, and limitations will move per release.
+
+**What it is.** Terrain as an actual mesh, not a heightfield function of (x, y). That makes it the
+engine-native answer to the Paradigm procedure's topology question (`SKILL.md`, question 1):
+**caves, overhangs, tunnels, arches, and floating islands as first-class terrain in UE, without
+voxels** — previously the domain of hidden-mesh workarounds or a custom `04`/`05` pipeline. It also
+drops the uniform-grid constraint: resolution is variable, so density concentrates at points of
+interest instead of being paid everywhere (contrast the component math above). Rendering goes
+through Nanite with Virtual Texture support, which places it in this skill's `02`
+cluster/virtualized-geometry family — a vendor-built member of the family, the way Nanite Landscape
+is, but with free topology instead of a baked heightfield.
+
+**The workflow contract.** Authoring is a **non-destructive modifier stack**: modifiers are actor
+components that deform the mesh-partition geometry and write **weight channels** (vertex attributes
+baked to texture arrays, feeding material blending and PCG). Documented modifiers as of 5.8:
+sculpt (brush sculpt/paint with local layers), remesh (retriangulate to a target edge length),
+tessellation, noise, texture displacement, spline and spline-remesh, mesh, boolean
+(add/subtract-and-merge), and patch (weight-channel writes). Build order is governed by **priority
+layers** plus per-modifier sub-priority — reordering changes the result, exactly like a generation
+DAG — with the Mesh Partition Outliner as the stack view. This is the same non-destructive-layers
+idea as Landscape edit layers, but over full 3D geometry and with the stack (not a flattened bake)
+as the authored artifact (**?** whether/when the stack flattens for cook — verify). Enablement is
+via plugins: MeshPartition, MeshPartitionWater, PCG MeshPartition Interop, Mesh Terrain Mode.
+Integration surface per Epic docs: Nanite + Virtual Textures for rendering, **World Partition +
+one-file-per-actor** for streaming and concurrent editing, **PCG** for scattering vegetation/rocks
+driven by the terrain's weight channels, and water-body tools (with a stated gap: not all Landscape
+water terrain-carving functionality is translated yet).
+
+**What remains true of heightmap Landscape.** Landscape is still the mature default for large
+streamed open worlds: proven at scale, with runtime edit paths (the traditional, non-Nanite path),
+collision/physics behavior that is fully documented, mobile support, and — decisive for this
+skill's pipeline — the established import contract from terrain-architect `08`/`27` (R16 height,
+weightmaps, tiled World Partition import). Mesh Terrain has **no documented equivalent import
+pipeline for externally generated terrain** as of 5.8 (**?** — a heightmap can seed it via the
+texture-displacement modifier, but the roundtrip/manifest contract of `08` does not yet exist for
+it). Collision, runtime deformation, cook/memory cost model, ray tracing, and platform coverage
+for Mesh Terrain are not yet characterized in Epic's docs — treat all as **?** and prototype
+before committing.
+
+**Decision table** (all Mesh Terrain rows **?**/experimental as of 5.8):
+
+| | Landscape (traditional) | Nanite Landscape | Mesh Terrain (5.8, exp.) | Custom `02` pipeline |
+|---|---|---|---|---|
+| Topology | Heightfield only | Heightfield only | Full 3D: caves, overhangs | Whatever you build |
+| Authoring | Sculpt/edit layers, mature import (`08`/`27`) | Same + rebuild step | Modifier stack; no external import contract yet (**?**) | Yours entirely |
+| Runtime deformation | Yes (traditional path) | No (baked) | Undocumented (**?**) | Yours to implement |
+| Streaming | World Partition proxies, HLOD | Same | World Partition + OFPA (**?** HLOD status) | Yours (`06`) |
+| Maturity | Production-proven | Production, per-version caveats | Experimental — Epic: caution shipping | Your team's to earn |
+| Reach for it when | Large streamed heightfield worlds, runtime edits, mobile | Silhouette quality, static ground | 3D terrain features inside UE tooling | Requirements exceed all engine paths (`02`/`04`/`05`) |
+
+Doctrine: for a shipping project today, Mesh Terrain is a prototyping and level-art tool, not yet a
+pipeline foundation; re-evaluate each release, because Epic's stated direction is to grow it (**?**
+whether it eventually supersedes Landscape is Epic's roadmap, not a current fact).
+
 ## Landscape materials & RVT
 
 The landscape material graph blends painted layers with dedicated nodes: **Landscape Layer Blend**
@@ -314,17 +376,19 @@ as lineage.
 
 | Engine | Geometry scheme | Texturing | LOD family (`01`/`02`) | Escape hatch needed when |
 |---|---|---|---|---|
-| Unreal Landscape | Component grid / Nanite clusters | Weightmap layers + RVT | Quadtree+geomorph, or `02` | Runtime deformation on Nanite; caves |
+| Unreal Landscape | Component grid / Nanite clusters | Weightmap layers + RVT | Quadtree+geomorph, or `02` | Runtime deformation on Nanite; caves (but see Mesh Terrain, 5.8+) |
 | Unity Terrain | Instanced patches | Terrain Layers (splat passes) | Patch pixel-error | Large streamed worlds; layer-heavy mats |
 | Godot + Terrain3D | Clipmap (plugin) | Plugin layer system | Clipmaps | Vendor-grade support requirements |
 | O3DE Terrain Gem | Component + clipmap detail | Macro + detail materials | Clipmaps (**?**) | Ecosystem maturity |
 | CryEngine (legacy) | Heightfield + voxel objects | Unified texture + detail | Engine-specific | New projects (it's lineage, not a target) |
 
-**When "just use a mesh" wins.** Every built-in above is a *uniform-grid heightfield* with a fixed
-material model. Prefer a custom mesh pipeline (`02` clusters, or `01` CDLOD/clipmaps over your own
-buffers) when the project needs: caves/overhangs as first-class terrain (`04`/`05`), planetary
-domains (`09`), non-uniform sampling density, aggressive runtime deformation, or a material model
-the engine's layer system can't express. The built-in buys tooling and editor integration; the
+**When "just use a mesh" wins.** Every *mature* built-in above is a *uniform-grid heightfield*
+with a fixed material model (UE's experimental Mesh Terrain, above, is the first vendor break from
+that — weigh it by its experimental status, not this paragraph). Prefer a custom mesh pipeline
+(`02` clusters, or `01` CDLOD/clipmaps over your own buffers) when the project needs:
+caves/overhangs as first-class terrain (`04`/`05` — or Mesh Terrain if UE-native and experimental
+is acceptable), planetary domains (`09`), non-uniform sampling density, aggressive runtime
+deformation, or a material model the engine's layer system can't express. The built-in buys tooling and editor integration; the
 moment you fight its representation rather than its defaults, the custom path is cheaper than it
 looks.
 
@@ -338,9 +402,26 @@ claim tagged **?** above must be verified against current engine docs before bei
   resolutions, 16-bit height encoding, weightmap packing, Layer Info, edit layers, holes, splines,
   collision mip); Landscape material nodes; Runtime Virtual Texturing; World Partition, HLOD, data
   layers; Large World Coordinates.
+- **D** — Epic UE 5.8 documentation, Mesh Terrain (fetched 2026-07): "Mesh Terrain in Unreal
+  Engine" (dev.epicgames.com/documentation/unreal-engine/mesh-terrain-in-unreal-engine — modifier
+  concept, weight channels, priority layers, experimental caveat), "Accessing Mesh Terrain in
+  Unreal Engine" (…/accessing-mesh-terrain-in-unreal-engine — the four plugins, mode toolbar,
+  Mesh Partition Outliner), "Crafting Mesh Terrain in Unreal Engine"
+  (…/crafting-mesh-terrain-in-unreal-engine — modifier catalogue, build priority, water-carving
+  gap); "Using Nanite with Landscapes in Unreal Engine"
+  (…/using-nanite-with-landscapes-in-unreal-engine — rebuild flow, no runtime deformation,
+  non-Nanite data retained for RVT/water, Nanite Skirts).
+- **T/F** — third-party Mesh Terrain writeups used for release framing (UE 5.8 shipped June 2026;
+  positioning vs Landscape): CGChannel, "5 key features for CG artists in Unreal Engine 5.8"
+  (cgchannel.com, 2026-06); 80.lv, "Details on UE5's next-generation terrain system revealed"
+  (80.lv, 2026-03, pre-release docs). Epic's own 5.8 announcement
+  (unrealengine.com/news/unreal-engine-5-8-is-now-available) was seen in search results but not
+  fetchable at write time — release-date and positioning claims lean on the docs + third-party
+  corroboration.
 - **N** — engine-branded features whose names, not internals, are the claim: Nanite Landscape,
-  Nanite tessellation/displacement, Virtual Heightfield Mesh, Landscape Streaming Proxy, Terrain3D
-  (Godot community), O3DE Terrain Gem, Unity Draw Instanced terrain.
+  Nanite tessellation/displacement, Virtual Heightfield Mesh, Landscape Streaming Proxy, Mesh
+  Terrain / Mesh Partition, Terrain3D (Godot community), O3DE Terrain Gem, Unity Draw Instanced
+  terrain.
 - **D** — Unity Manual: Terrain, Terrain Layers, detail/tree systems. Godot docs (absence of
   built-in terrain). O3DE Terrain Gem docs.
 - **T/F** — per-component draw-call intuition, the "≤ 4 layers per component" and mobile "~3
@@ -348,8 +429,9 @@ claim tagged **?** above must be verified against current engine docs before bei
   Fest talks and Epic staff guidance), stable in spirit, numeric specifics **?** per version.
 - **?** — explicitly version-sensitive in the text: exact recommended-size tables, LOD cvar names,
   Nanite Landscape runtime-deformation and ray-tracing status, Nanite displacement maturity, VHM
-  status, mobile landscape layer limits, O3DE clipmap internals. Verify against current engine
-  docs at time of use.
+  status, mobile landscape layer limits, O3DE clipmap internals; and the whole Mesh Terrain
+  section (experimental as of 5.8 — collision, runtime behavior, cost model, import pipeline,
+  HLOD status, and roadmap all unconfirmed). Verify against current engine docs at time of use.
 - Cross-references: geometry theory `01`/`02`; materials & VT `07`; GPU submission `08`; planetary
   precision `09`; lighting `10`; verification `11`; streaming `06`; generation-side contracts
   terrain-architect `08` and `27`; BRDF math: the physically-based-rendering skill.

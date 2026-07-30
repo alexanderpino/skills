@@ -88,6 +88,23 @@ missing boundary contract. Every such fix resurfaces under a different camera.
 | GPU idle bubbles correlated with streaming | CPU maps an in-flight readback/upload buffer synchronously | N-deep ring, consume N frames late, never wait | `08` `06` |
 | Overdraw spikes in valleys/water areas | Deep skirts, stacked transparency (water + decals), or dense cluster overlap | Overdraw heat view; shrink skirts to max-error depth; restrict transparent extents | `01` `08` |
 
+### Dynamic surface & population
+
+| Symptom | Mechanism | Minimal fix | Route |
+|---|---|---|---|
+| Waterline crawls/aliases as camera moves | Water surface LOD/tessellation cadence differs from the terrain tile LOD beneath; hard depth intersection | Depth-fade shore blend; align water and terrain LOD selection at the intersection band | `12` `06` |
+| Water ghosts/smears under TAA | Fullscreen-triangle/analytic water writes no motion vectors | Output analytic velocity (reproject the previous frame's plane/ray hit) | `12` |
+| Ocean tiling visible from altitude | A single FFT cascade's wavelength repeats across the view | 2-4 cascades at different world sizes + macro variation and foam breakup | `12` |
+| A wall of grass pops in at a fixed radius | Generation-radius cutoff with constant density to the edge | Staggered per-instance fade + density pre-rolloff approaching the radius | `15` |
+| Props/grass float or sink at distance | Instances seated on the source heightfield while terrain renders a morphed/displaced LOD | Seat instances by sampling the same displaced/morphed height the terrain vertex path produces | `15` `01` |
+| Snow/wetness on the ground but not on vegetation | State overlays sampled only by the terrain material — two weather systems | Sample the `13` state layers in vegetation (and prop) shaders too | `13` `15` |
+| Snow under overhangs and cave mouths | Accumulation mask lacks top-down occlusion capture | Gate accumulation by a top-down occlusion target (same machinery as deformation capture) | `13` |
+| Puddles on ridgelines and slopes | Wetness applied without curvature/flow gating | Drive puddles from the generator's curvature/flow/wetness maps, never raw rain intensity | `13` `14` |
+| Deformation trails seam or snap on camera motion | Camera-following state window re-centers by non-texel offsets, or discards retained texels | Texel-aligned toroidal window scroll with retained-region copy | `13` |
+| Persistent decals/scorch vanish sporadically | VT-injected stamps evicted with their pages and never re-applied | Keep a stamp replay list; re-apply on page (re)load | `17` `07` |
+| Player falls through a fresh crater | Collision commit lags the visual height delta | Commit the collider before or with the visual delta; gate gameplay effects on collider version | `17` |
+| Ground darkens to mud-black in rain | Wetness darkening × baked AO × decal/shadow terms multiply unbounded | One declared compositing order; clamp combined darkening | `13` `14` `07` |
+
 ## Metrics & budgets
 
 A renderer without numeric budgets cannot regress-test and cannot review. Set per platform tier,
@@ -177,6 +194,10 @@ mode toggled at runtime; each pairs with a catalogue family above.
 | LOD level false-color | Per-chunk/cluster LOD index | Selection errors, hysteresis flicker, per-pass mismatch (toggle per pass) |
 | Chunk/tile boundaries | Wireframe borders + IDs | Which seam artifact belongs to which tile; adjacency violations |
 | Overdraw heat | Additive per-pixel draw count | Skirt/transparency storms, cluster overlap |
+| Surface-state overlays | Wetness / snow depth / deformation targets as false color over terrain | State-window snapping, envelope violations (snow where forbidden), stale state |
+| Aux-map inspector | Any `14` registry map as false color, point-sampled | Filtered biome-ID bleed, stale tiles, aux/splat resolution mismatch halos |
+| Water depth & flow | Depth-band ramp + flow vectors as streaks | Bad shore fades, stagnant river flow, datum/bathymetry mismatches |
+| Instance density heat | Instances per cell vs the density map's target | Scatter starvation, popping-radius cliffs, nondeterministic reseeding |
 | Mip / texel density | Checker or gradient by sampled mip | Tiling frequency errors, mip bias mistakes, VT indirection bugs |
 | VT page residency | Requested vs resident pages, age-colored | Pop-in latency, feedback drops (`07`) |
 | HiZ occlusion result | Culled bounds re-projected in red over the frame | False occlusion at silhouettes, convention bugs (`08`) |

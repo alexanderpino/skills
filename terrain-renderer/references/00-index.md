@@ -107,8 +107,8 @@ right fix.
 | Deferred snow/mud deformation | `13` | Michels & Sikachev, GPU Pro 7 (talk form SIGGRAPH 2015); Barré-Brisebois, GDC 2014 (Batman); Surricchio, GDC 2023 (God of War Ragnarök) | P/T | [gdcvault Batman](https://gdcvault.com/play/1020177/Deformable-Snow-Rendering-in-Batman) |
 | Wet-surface shading (porosity darkening, roughness drop) | `13` | Lagarde, "Water drop" blog series, 2012–2013 | F/D | [seblagarde.wordpress.com](https://seblagarde.wordpress.com/2013/03/19/water-drop-3a-physically-based-wet-surfaces/) |
 | Aux-map registry & consumption contract | `14` | terrain-architect `27` (generation-side contract), consumed render-side | D | — |
-| GPU-driven procedural placement | `15` | van Muijden, "GPU-Based Run-Time Procedural Placement in Horizon Zero Dawn", GDC 2017 | T | [gdcvault.com](https://gdcvault.com/play/1024700/GPU-Based-Run-Time-Procedural) |
-| Procedural GPU grass (Bezier blades) | `15` | Wohllaib, Ghost of Tsushima procedural grass, GDC 2021; wind companion talk (Rockenbeck) | T | [gdcvault.com](https://gdcvault.com/play/1027033/Advanced-Graphics-Summit-Procedural-Grass) |
+| GPU-driven procedural placement | `15` | van Muijden, "GPU-Based Run-Time Procedural Placement in Horizon Zero Dawn", GDC 2017 (speaker web-verified 2026-07) | T | [gdcvault.com](https://gdcvault.com/play/1024120/GPU-Based-Run-Time-Procedural) |
+| Procedural GPU grass (Bezier blades) | `15` | Wohllaib, "Procedural Grass in Ghost of Tsushima", GDC 2021 Advanced Graphics Summit (speaker web-verified 2026-07); a companion wind talk exists (speaker unverified) | T | [gdcvault.com](https://gdcvault.com/play/1027033/Advanced-Graphics-Summit-Procedural-Grass) |
 | Octahedral impostors | `15` | Community canon (shaderbits writeup; engine implementations) | F/N | [shaderbits.com](https://shaderbits.com/blog/octahedral-impostors) |
 | Alpha-test mip shrinkage fix (coverage-preserving mips) | `15` | Castaño, The Witness blog, 2010 | F | [the-witness.net](https://the-witness.net/news/2010/09/computing-alpha-mipmaps/) |
 | Depth-bias semantics (coplanar geometry) | `17` | Microsoft D3D output-merger docs (formula verified) | D | [learn.microsoft.com](https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-output-merger-stage-depth-bias) |
@@ -116,6 +116,12 @@ right fix.
 | Async GPU readback for surface queries | `17` | Engine docs (Unity AsyncGPUReadback as the D-tier example) | D/F | [docs.unity3d.com](https://docs.unity3d.com/ScriptReference/Rendering.AsyncGPUReadback.html) |
 | Hillshade / derived-field viewport passes | `16` | ESRI hillshade reference; GPU Gems 3 ch. 1 for GPU heightfield derivation | D | [esri.com](https://doc.esri.com/en/arcgis-pro/latest/tool-reference/3d-analyst/how-hillshade-works.html) |
 | Heightmap import/export parity (R16 scaling, Y-flip) | `16` | Epic heightmap import docs + tool docs (Gaea) | D | [dev.epicgames.com](https://dev.epicgames.com/documentation/unreal-engine/importing-and-exporting-landscape-heightmaps-in-unreal-engine) |
+| UE Mesh Terrain (5.8+, experimental 3D modifier-stack terrain) | `03` | Epic docs (fetched 2026-07) | D/N/? | [dev.epicgames.com](https://dev.epicgames.com/documentation/unreal-engine/mesh-terrain-in-unreal-engine) |
+| Voxel Space column raycasting (Comanche family; 2.5D, no true voxels) | `18` | NovaLogic / Freeman, US patent 6,020,893 (fetched); canonical modern writeup s-macke | P/F | [patents.google.com](https://patents.google.com/patent/US6020893A/en) |
+| Maximum mipmaps heightfield ray traversal | `18` | Tevs, Ihrke & Seidel, I3D 2008 | P | [ACM DL](https://dl.acm.org/doi/10.1145/1342250.1342279) |
+| Relief / parallax occlusion mapping family | `18` | Policarpo et al. I3D 2005 lineage; Tatarchuk POM (I3D 2006) | P | [ACM DL](https://dl.acm.org/doi/10.1145/1053427.1053453) |
+| Cone step mapping | `18` | Dummer, via GPU Gems 3 ch. 18's citation (original whitepaper not located) | F/? | [oreilly.com](https://www.oreilly.com/library/view/gpu-gems-3/9780321545428/ch18.html) |
+| Quadtree displacement mapping | `18` | Drobot, GDC 2010 / gamedevs.org PDF | T | [gamedevs.org](https://www.gamedevs.org/uploads/quadtree-displacement-mapping-with-height-blending.pdf) |
 
 ## Engine & shipped-system crosswalk
 
@@ -135,6 +141,8 @@ Branded system → what it actually is → where in this skill.
 | id Tech MegaTexture | Virtual texturing (streaming VT) | `07` |
 | No Man's Sky-class procedural planets | Procedural-on-demand patches + isosurface regions | `09`, `05` |
 | Dual Universe / Astroneer-class editable planets | Voxel isosurface (DC/MC family) | `05` |
+| Comanche / Outcast / Delta Force "voxel" terrain | 2.5D heightmap column raycasting (Voxel Space) — no true voxels | `18` |
+| UE 5.8 Mesh Terrain | Experimental 3D modifier-stack terrain rendered through Nanite | `03`, family `02` |
 | Portal 2 water | Flow mapping over a static surface | `12` |
 | Rise of the Tomb Raider / Batman: Arkham Origins / GoW Ragnarök snow | Deferred deformation (top-down capture → displacement) | `13` |
 | Horizon Zero Dawn / Ghost of Tsushima vegetation | GPU-driven procedural placement + procedural grass | `15` |
@@ -197,8 +205,10 @@ certain are consolidated here so a reviewer knows where to spend verification ef
 - `14`: per-map shipping formats and channel-pack groupings are standard-practice judgment;
   Ghost Recon Wildlands / Far Cry 5 talk attributions came from search snippets, not the talks;
   RVT aux-sampling behavior inferred from doc summaries.
-- `15`: Tsushima "~2.5 ms / ~10⁵ blades" figures are from a secondary summary of the talk;
-  Décoret billboard-clouds attribution unverified (no URL); all packing/distance/budget
+- `15`: HZD and Tsushima talk speakers — **resolved 2026-07**: van Muijden (GDC 2017) and
+  Wohllaib (GDC 2021) web-verified; the Tsushima wind companion talk's speaker remains
+  unverified. Still open: Tsushima "~2.5 ms / ~10⁵ blades" figures are from a secondary
+  summary; Décoret billboard-clouds attribution unverified (no URL); packing/distance/budget
   numbers are F-tier order-of-magnitude practice.
 - `16`: viewport budget numbers (≤8 ms iGPU frame, ≤16 ms brush echo) are representative
   practice; UE Z-scale formula cited from Epic's doc without the underlying range being stated
@@ -208,3 +218,12 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   frame" async-readback latency grounded only on Unity's "a few frames" wording; Jolt
   height-update API name from release-note summaries; promotion-pipeline and stamp-replay
   patterns are F-tier with no canonical citation.
+- `18`: "raster-primary + RT-secondary with a triangulated terrain proxy is the 2026 default"
+  and the displacement-micromap trajectory are directional industry reads; cone-map bake cost
+  and POM sample counts are practice numbers; cone-step-mapping attribution to Dummer is via
+  GPU Gems 3's citation only; pitch/roll handling details in the Voxel Space section are part
+  folklore (consistent with the s-macke construction).
+- `03` (Mesh Terrain addendum): everything beyond Epic's fetched doc pages is flagged `?` —
+  collision, runtime deformation, cook flattening, cost model, HLOD, roadmap; the June 2026
+  release positioning is corroborated by third-party coverage because Epic's news page
+  resisted fetching.

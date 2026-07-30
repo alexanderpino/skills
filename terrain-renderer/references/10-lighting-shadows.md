@@ -162,7 +162,9 @@ clipmap levels at extreme distance recreate the same big-texel problem with diff
   clamped data. If runtime deformation forces re-derivation, exchange apron rows between tiles
   first (`06`).
 - **Shoreline lighting interplay**: the water/terrain boundary is a lighting problem before it is
-  a water problem. Drive it with the generation side's water **depth field** (terrain-architect
+  a water problem — the water surface itself (waves, foam, reflection/refraction, underwater)
+  is `12`; this bullet owns only the lighting of the terrain around and under it.
+  Drive it with the generation side's water **depth field** (terrain-architect
   hydrology handoff, its `27`): depth-driven shore blending — wet-sand darkening + roughness drop
   in a band above the waterline (the `07` wetness layer with a shoreline mask), depth-based
   absorption tint on submerged terrain, soft alpha/depth fade at the waterline instead of a hard

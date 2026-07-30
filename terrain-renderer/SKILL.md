@@ -1,31 +1,18 @@
 ---
 name: terrain-renderer
 description: >-
-  Principal terrain-rendering authority for AAA real-time worlds, to 2026 production
-  standards. Covers every major terrain rendering paradigm end to end: heightfield LOD
-  (geomipmapping, chunked LOD, geometry clipmaps, CDLOD, tessellation, CBT/LEB),
-  cluster/meshlet virtualized geometry (the Nanite family), Unreal Landscape / Nanite
-  Landscape and other engine-native terrain, blocky chunked voxel worlds (the Minecraft
-  family: greedy/binary meshing, voxel AO, chunk streaming), smooth voxel isosurfaces
-  (marching cubes, Transvoxel, surface nets, dual contouring), tiled streaming worlds,
-  terrain materials (splatmaps, triplanar, stochastic/hex tiling, virtual texturing, RVT),
-  GPU-driven culling and submission (HiZ two-phase occlusion, indirect draws), planetary
-  rendering and float-precision doctrine, terrain lighting/shadows (CSM, virtual shadow
-  maps, horizon maps), and the artifact catalogue (cracks, T-junctions, popping, swimming,
-  shimmer). Also owns the dynamic surface: water rendering and interactive simulation
-  (Gerstner/FFT oceans, flow-mapped rivers, the fullscreen-triangle water pass, shoreline
-  and underwater), snow/wetness/weather surface state and deformation, runtime consumption
-  of every auxiliary map (wetness, flow, curvature, AO, wind, biome…), vegetation/grass and
-  scatter rendering, roads/decals/runtime terrain modification, the physics-collision and
-  gameplay handoff, and tool-viewport preview pipelines for terrain authoring tools. Serves
-  indie baselines, terrain-tool viewports, and AAA GPU-driven pipelines alike, engine-
-  agnostically. Use for designing, implementing, reviewing, debugging, or optimizing any
-  terrain renderer or voxel engine — whenever the task involves drawing terrain, chunk
-  meshing, LOD selection or seams, terrain textures at scale, water/snow/grass on terrain,
-  or streaming a large world to the GPU — even if the word "terrain" is never said
-  (heightmap rendering, "Minecraft clone", planet renderer, open-world streaming). Do not
-  use for terrain *generation* (erosion, noise, biomes — that is terrain-architect) or
-  generic BRDF/material math (physically-based-rendering).
+  Principal terrain-rendering authority for real-time worlds to 2026 AAA standards, across every
+  paradigm: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (Nanite
+  family), engine-native terrain (UE Landscape, Nanite Landscape, 5.8 Mesh Terrain), blocky and
+  smooth voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
+  raymarching (Voxel Space lineage), tiled streaming, splatmaps and virtual texturing,
+  GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
+  rivers, fullscreen-triangle pass), snow and weather state, auxiliary maps, vegetation and
+  scatter, roads/decals/deformation, physics handoff, tool viewports, and the artifact
+  catalogue. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at scale, or
+  streaming large worlds - even if 'terrain' is never said (heightmap renderer, Minecraft clone,
+  planet renderer). Not for terrain generation (terrain-architect) or BRDF math
+  (physically-based-rendering).
 ---
 
 # Terrain Renderer
@@ -408,6 +395,7 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/15-vegetation-scatter.md` | Vegetation & scatter: shipped vs runtime-procedural instances, GPU instancing/culling, grass systems and wind, tree LOD chains and octahedral impostors, alpha/overdraw doctrine, terrain-consistency (seating, color, weather), budgets |
 | `references/16-tool-viewports.md` | Tool viewports for terrain authoring: WYSIWYG/export-parity contract, preview pyramid, dirty-region reupload, GPU derived-field passes (normals, hillshade, contours), shading-mode palette, brush echo loop, comparison harnesses |
 | `references/17-roads-decals-physics.md` | Roads/splines on terrain (splat injection vs draped ribbon vs conforming), z-fighting toolkit, decals and VT injection, runtime modification (craters/tracks) with delta overlays, physics-collider handoff, gameplay surface queries, buoyancy |
+| `references/18-heightfield-raymarching.md` | Ray-marched heightfield terrain: the Voxel Space column raycaster (Comanche lineage, pseudocode + y-buffer), per-pixel GPU marching (cone step, maximum-mipmap traversal), the POM/relief near-field tier, heightfield rays as shared infrastructure (shadows/occlusion/picking), RT-era heightfields, hybrid compositing |
 
 ## Cross-skill routing
 
