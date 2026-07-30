@@ -38,6 +38,7 @@ npm run plugins:check                   60 modules: imports resolve, exports exi
 npm run verify -- _verify_blur_isotropy.js   square 1.0000, hex 1.0000 (was 1.185)
 npm run verify -- _verify_layers.js     L0 13/13 both lattices; roughness 0.0290/0.0286
 npm run verify -- _verify_hillslope_isotropy.js  9/9; hex sigma 3.873/3.873 = square exactly
+npm run verify -- _verify_flow_facets.js  8/8; square axis/diag 0.1382 -> 1.2547. Concentration 1.81/1.67 REPORTED, awaiting MFD
 node tests/legacy/_verify_shapescan.js  3 files, 8554 lines scanned
 npm run verify -- _verify_gpu.js        hasWebGL2Float=true init=true gpuReady=true
                                         fbm@512: 16ms GPU vs 231ms CPU

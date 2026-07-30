@@ -5358,10 +5358,31 @@ function d8Accumulation(g){
   // D6 on hex (the name is kept: this is the accumulation pass, whichever one-ring it walks).
   // Six equidistant candidates mean the receiver is unambiguous with no sqrt(2) weighting to
   // forget - 26's cleanest single win over D8.
-  const nbSq=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1]],hex=isHex();
-  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=g[i],bi=-1;
+  //
+  // AND THE SQUARE BRANCH FORGOT IT, exactly as the line above warns. The receiver used to be the
+  // LOWEST neighbour rather than the STEEPEST, over a table that carried no distances - so on any
+  // smooth slope the diagonal, being sqrt(2) further, is always lower and always won. Measured on a
+  // cone, where true drainage is radial and every azimuth must carry equal area
+  // (_verify_flow_facets): FOUR spokes on the diagonals, and the four axial directions never chosen
+  // at all - axis-bin drainage ran at 0.14 of diagonal-bin drainage. spReceivers and hydroFixField
+  // both divide by d[2]*cellsize; this was the one router of three that did not, which is why the
+  // three disagreed about where water goes on identical terrain.
+  //
+  // WHAT THE FIX DOES NOT DO: it does not make routing isotropic. Facet concentration went 1.8132 ->
+  // 1.8161, i.e. nowhere. A single-receiver router snaps every cell onto SOME lattice direction
+  // whichever rule selects it; correcting the rule moved the spokes from the diagonals to the axes
+  // and restored the other four, but eight spokes are still spokes. Only MFD lowers that number -
+  // which is exactly why `26` credits MFD, not D6, with "smoother and more natural".
+  //
+  // Hex is UNAFFECTED and that is the control: all six candidates are one cell away, so dividing by
+  // a common distance cannot move the argmax. Measured hex 1.6734 before and after, unchanged.
+  const nbSq=[[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,Math.SQRT2],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2]];
+  const hex=isHex();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const i=y*n+x;let best=0,bi=-1;
     const nb=hex?hexNb(y):nbSq;
-    for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;const ni=yy*n+xx;if(g[ni]<best){best=g[ni];bi=ni;}}
+    for(const dd of nb){const xx=x+dd[0],yy=y+dd[1];if(xx<0||yy<0||xx>=n||yy>=nh)continue;
+      const ni=yy*n+xx,sl=(g[i]-g[ni])/(hex?1:dd[2]);
+      if(sl>best){best=sl;bi=ni;}}
     rec[i]=bi;}
   const order=Array.from({length:N},(_,i)=>i).sort((a,b)=>g[b]-g[a]);   // upstream (high) before downstream (low)
   for(const i of order){if(rec[i]>=0)A[rec[i]]+=A[i];}
