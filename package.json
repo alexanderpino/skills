@@ -20,6 +20,7 @@
     "verify": "npm run verify --workspace @skills/terrain-studio"
   },
   "devDependencies": {
-    "acorn": "^8.18.0"
+    "acorn": "^8.18.0",
+    "acorn-walk": "^8.3.5"
   }
 }
