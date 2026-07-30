@@ -28,21 +28,33 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       clock:document.querySelector('#buildElapsed').textContent
     };
   });
+  // SNAPSHOT INSIDE THE PREDICATE. This used to waitForFunction for 0 < value < 100 and then read
+  // the state back in a SEPARATE evaluate, which is a race: the build keeps running in the gap
+  // between the predicate returning true and the read arriving, so under load `now` came back 100
+  // and the `intermediate.now<100` gate failed on a perfectly healthy build. That is a flaky gate,
+  // and a flaky gate is one people learn to re-run rather than believe. Measured: green 3/3 run
+  // alone, red inside a 70-oracle sweep on the same commit.
+  //
+  // Capturing in the same tick as the test removes the window entirely rather than widening it -
+  // a longer timeout would only have made the race rarer, which is worse than leaving it visible.
   await page.waitForFunction(()=>{
     const value=+document.querySelector('#buildTicks').getAttribute('aria-valuenow');
-    return value>0&&value<100;
-  },{timeout:5000});
-  const intermediate=await page.evaluate(()=>({
-    hidden:document.querySelector('#buildHud').hidden,
-    busy:document.querySelector('#buildBtn').getAttribute('aria-busy'),
-    now:+document.querySelector('#buildTicks').getAttribute('aria-valuenow'),
-    active:document.querySelector('#buildNode').textContent,
-    done:document.querySelectorAll('#buildTicks i.done').length,
-    clock:document.querySelector('#buildElapsed').textContent,
-    status:document.querySelector('#statMsg').textContent
-  }));
+    if(!(value>0&&value<100))return false;
+    window.__buildIntermediate={
+      hidden:document.querySelector('#buildHud').hidden,
+      busy:document.querySelector('#buildBtn').getAttribute('aria-busy'),
+      now:value,
+      active:document.querySelector('#buildNode').textContent,
+      done:document.querySelectorAll('#buildTicks i.done').length,
+      clock:document.querySelector('#buildElapsed').textContent,
+      status:document.querySelector('#statMsg').textContent
+    };
+    return true;
+  },{timeout:20000});
+  const intermediate=await page.evaluate(()=>window.__buildIntermediate);
+  if(!intermediate)throw new Error('SETUP FAILURE: the mid-build snapshot was never taken');
   await page.screenshot({path:path.resolve(__dirname,'_shot_build_progress.png')});
-  await page.waitForFunction(()=>document.querySelector('#buildTicks').getAttribute('aria-valuenow')==='100',{timeout:5000});
+  await page.waitForFunction(()=>document.querySelector('#buildTicks').getAttribute('aria-valuenow')==='100',{timeout:20000});
   const complete=await page.evaluate(()=>({
     now:+document.querySelector('#buildTicks').getAttribute('aria-valuenow'),
     active:document.querySelector('#buildNode').textContent,
@@ -50,7 +62,10 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     eval:document.querySelector('#statTime').textContent,
     status:document.querySelector('#statMsg').textContent
   }));
-  await page.waitForTimeout(800);
+  // Wait for the HUD to dismiss rather than sleeping past it: a fixed 800 ms is the same race in
+  // slower clothes, and it fails in the direction that reads as a real defect.
+  await page.waitForFunction(()=>document.querySelector('#buildHud').hidden,{timeout:20000})
+    .catch(()=>{});   // swallowed so `dismissed` below reports the FACT rather than throwing here
   const dismissed=await page.$eval('#buildHud',el=>el.hidden);
   const ok=!initial.hidden&&initial.busy==='true'&&initial.now===0&&initial.tickCount===20&&/^\d\d:\d\d$/.test(initial.clock)
     &&!intermediate.hidden&&intermediate.busy==='true'&&intermediate.now>0&&intermediate.now<100

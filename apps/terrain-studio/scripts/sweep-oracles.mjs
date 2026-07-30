@@ -19,7 +19,13 @@ const skip = new Set(['_verify_all_canyon.js'])
 // the baseline and then reports agreement with the thing it just wrote. It cannot fail. The first
 // run of this sweep did exactly that, and the contract landed in the working tree as a side effect
 // of "verifying" it.
-const FLAGS = { '_verify_bridge.js': ['--check'] }
+// _verify_pwa.js is the other direction: it needs a flag to be RUNNABLE at all. The service worker
+// registers only when import.meta.env.MODE === 'production', deliberately, so the rest of the suite
+// never races a cached shell. Against the dev server the oracle is guaranteed to report
+// "registrations=0" - a red line that says nothing about the service worker and everything about
+// how it was launched. --preview-prod builds and serves production, which is the only mode in which
+// its subject exists.
+const FLAGS = { '_verify_bridge.js': ['--check'], '_verify_pwa.js': ['--preview-prod'] }
 const only = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 const files = readdirSync(legacy)
   .filter((f) => /^_verify_.*\.js$/.test(f) && !skip.has(f))

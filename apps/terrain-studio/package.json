@@ -12,6 +12,7 @@
     "bridge:check": "node tests/legacy/_verify_bridge.js --check",
     "bridge:gen": "node scripts/generate-bridge.mjs",
     "verify": "node scripts/run-legacy-verify.mjs",
+    "verify:all": "node scripts/sweep-oracles.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "bridge:apply": "node scripts/apply-bridge.mjs",
