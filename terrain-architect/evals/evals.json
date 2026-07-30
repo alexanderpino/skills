@@ -409,6 +409,34 @@
         "Maps the described evidence to the channels (lee drifts = wind-loading; valley tongue = glacial flow)",
         "Describes an attribution check (trace to wind lee / runout / accumulation zone) rather than declaring it fine or a bug outright"
       ]
+    },
+    {
+      "id": 32,
+      "axis": "diagnosis",
+      "prompt": "I ran hydraulic erosion on a square heightfield and the outer band of the map came out looking like a tablecloth -- a fringe of short parallel gullies hanging off all four borders, with a fan at each corner. The middle looks fine. What's wrong?",
+      "expected_output": "A uniform open (base-level) perimeter: every edge cell is an outlet, so the outer band drains straight out perpendicular to the nearest edge, and corner cells have two open faces. Fixes: simulate a margin and crop it at export (the domain edge is a tile edge with no neighbour), author the outlets and close the rest, or put base level inside the domain. Answer follows symptom -> mechanism -> fix and does NOT propose blending or smoothing the edge.",
+      "files": [],
+      "expectations": [
+        "Diagnoses a uniform open / fixed-base-level perimeter making every edge cell an outlet",
+        "Explains the corner fans as corner cells having two open boundary faces",
+        "Proposes simulating a margin that export crops, and/or authoring outlets with the rest closed, and/or base level inside the domain",
+        "Does NOT propose fixing it by blending, feathering, or smoothing the border",
+        "Structured as symptom -> mechanism -> fix"
+      ]
+    },
+    {
+      "id": 33,
+      "axis": "trap-resistance",
+      "prompt": "My eroded terrain has an ugly frame of artefacts around the domain border. I'm going to fix it by feathering the erosion strength to zero over the outer 64 cells so the edge blends smoothly into the unedited terrain. Sound good?",
+      "expected_output": "No -- that heals a symptom by blending and trades one artefact for another (a visibly un-eroded rim, and an effect mask where a process mask was meant, which also breaks the sediment budget). The border artefact is caused by the boundary condition, so fix the cause: simulate a margin wider than the boundary-influence distance and crop it at export, author the outlets and close the remaining perimeter, or move base level inside the domain. Size the margin by measuring the knee of the inset-distance profile rather than guessing 64 cells.",
+      "files": [],
+      "expectations": [
+        "Rejects feathering/blending as healing the symptom rather than the cause",
+        "Identifies the boundary condition (uniform open perimeter) as the actual cause",
+        "Notes that ramping erosion strength is an effect mask, leaving an un-eroded rim and/or leaking the sediment budget",
+        "Recommends margin-and-crop, authored outlets, or internal base level instead",
+        "Says the margin width should be measured (inset-distance profile knee), not guessed"
+      ]
     }
   ]
 }

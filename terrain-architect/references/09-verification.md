@@ -33,6 +33,7 @@ cheap — these are a dozen lines of setup each.
 | **Plateau** | Flat resolution — epsilon fill; catches the parallel-lines artefact |
 | **Coastline** | Sea-level flood fill vs threshold (`03`) |
 | **Cross-tile river** | Tiling. A river authored to cross a tile boundary must arrive with the same `A` on both sides. |
+| **Open-perimeter square** | Domain-edge policy. Uniform uplift, every edge open, run toward steady state: the boundary fringe and the dome **must** appear (`02`, `03`). This is the positive control — a metric that can't see it here isn't measuring anything. |
 | **Extreme height range** (0–20 km) | Precision. R16 terracing shows up here and nowhere else. |
 | **One-pixel spike** | Median/despike; erosion stability; capacity singularities |
 | **One-pixel pit** | Depression handling; the `?` case where breach and fill disagree |
@@ -195,6 +196,7 @@ quantitative, and loud on the one wrongness that a hero shot hides.
 | **Turbidity current** (`12`) | `C`, `U` along the run; Richardson number | Under autosuspension `C` and `U` **grow** downslope then wane; the deposit **fines upward** (Bouma). Instant death on a slope = no bed entrainment |
 | **Seafloor age–depth** (`12`) | Depth vs √age | `d ≈ d₀ + C·√age` within tolerance, flattening for old crust. A uniform-depth abyss = the law was never applied |
 | **Isostasy** (`02`) | Deflection vs the load convolution; peak vs mean elevation through erosion | Deflection = load ⊛ the flexural kernel; as valleys incise the **mean drops but peaks rise** (`ρc/ρm`). Peaks sinking with erosion = rebound missing |
+| **Domain boundary** (`03`) | Incision, local relief, or drainage density binned by **inset distance** from the perimeter | **Flat, within the interior spread.** A monotone ramp confined to an outer band = the boundary fringe, and the knee where it meets the interior value *is* the boundary-influence distance — read the margin width off it. Pair with a flow-azimuth histogram in that band: four spikes at the edge normals, present near the edge but **not** in the interior (interior too = grid anisotropy, below, not this) |
 | **River terraces** (`03`) | Elevation of a tread along the valley | **Horizontal**, parallel to the other treads — a level bevel, not a downstream-sloping surface. Sloping treads = cut without a base level |
 | **Avulsion** (`03`) | Superelevation `SE` at the avulsion step | `SE ≈ 1` when it fires (one channel depth above the floodplain). Firing at `SE≪1`, or never, = the setup threshold is wrong |
 | **Coral cover** (`12`) | Growth-form / density vs depth & wave energy | Zonation **monotone** — branching/encrusting on the high-energy crest, massive on the flat, plate/foliose deep; cover **stops** above water and below the photic depth |
@@ -274,6 +276,9 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Rivers stop mid-map; `A` is confetti | No depression handling | Insert epsilon priority-flood before routing (`03`) |
 | Hard seams between tiles | Noise in tile-local UV | Evaluate noise in world space (`01`) |
 | Soft seams / ridge at tile edges | Erosion run per-tile without apron | Apron ≥ max transport distance, or erode globally (`08`) |
+| Fringe of short parallel gullies hanging off all four map borders ("tablecloth") | Uniform open perimeter — every edge cell is an outlet, so the outer band drains straight out | Author the outlets and close the rest; simulate a margin and crop it (`03`) |
+| Radial fan at each map corner | Corner cell has two open boundary faces | Give corners an explicit status; same margin fix (`03`) |
+| Drainage divide runs parallel to the border at a constant inset; map domes | Headward retreat inward at equal rates from four open edges | Break the four-fold symmetry — one outlet edge, or base level inside the domain (`02`, `03`) |
 | Materials in the wrong places, subtly | Analysis upstream of erosion | Move all of `06` downstream of the last height write (`06`) |
 | Terracing on gentle slopes | R16 quantised too early | Work R32F, quantise at export (`08`) |
 | Faceted normals / ringed AO | Baked from quantised height | Bake from R32F (`06`, `08`) |
@@ -461,7 +466,8 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Quantisation to R16 after all derivatives?
 - [ ] Normals and AO baked from R32F?
 - [ ] Apron on tiled erosion ≥ max transport distance? (Or: is stream power being tiled? It can't be.)
-- [ ] Boundary condition stated explicitly?
+- [ ] Boundary condition stated explicitly, per cell — and *not* a uniform open perimeter? (outlets authored, or base level inside the domain; the tell is a gully fringe and corner fans around the border, `03`)
+- [ ] Domain simulated on a margin that export crops, sized from the inset-profile knee? (the domain edge is a tile edge with no neighbour, `03`, `08`)
 - [ ] Seed derived from a documented root-seed rule?
 - [ ] Double-buffering in every grid simulation?
 - [ ] Masks partition to 1?

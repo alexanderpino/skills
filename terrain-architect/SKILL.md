@@ -507,10 +507,17 @@ Cross-cutting; they cost nothing to enforce up front and everything to retrofit.
   Droplet erosion parallelised naively has the same race on overlapping brush footprints:
   either batch droplets into non-overlapping tiles or accumulate deltas atomically and apply
   in a second pass (`15`).
-- **Boundary conditions.** Decide explicitly what happens at the domain edge: base level
-  (water leaves, erosion cuts inward), wall (water pools, terrain bulges), or periodic. The
-  default of "whatever the loop happens to do at index 0" produces a visible frame of
-  artefacts. State it in the graph spec.
+- **Boundary conditions.** Decide explicitly what happens at the domain edge — and decide it per
+  *cell*, not per domain: open/base level (water leaves, erosion cuts inward), closed/no-flux
+  (water pools, terrain bulges), fixed-gradient, periodic, or source. The default of "whatever
+  the loop happens to do at index 0" produces a visible frame of artefacts, and **a uniform open
+  perimeter is the trap**: it makes every edge cell an outlet, so the outer band erodes into a
+  four-fold-symmetric fringe of short, edge-perpendicular gullies around a smoother interior —
+  the *tablecloth*, whose long-run limit is `02`'s dome. Author the outlets and close the rest,
+  put base level inside the domain where you can, and **simulate on a margin you then crop**:
+  the domain edge is a tile edge with no neighbour, so it needs the apron rule with the apron
+  manufactured rather than fetched. Mechanisms, sizing, and the inset-profile metric are in
+  `03`; state the policy in the graph spec either way.
 - **The sediment budget closes, or the leak is named.** Under pure transport — no uplift, no
   sources, closed boundaries — total solid mass is invariant, and on a hexagonal lattice the
   per-cell area constant differs from the square one (`26`) — carry the square constant over
@@ -576,7 +583,9 @@ Contract (`references/08-output-contract.md`). This is where "the engine is just
 - **Tiles carry aprons.** Erosion and flow are not tile-local; every tiled bake runs with an
   apron wider than the maximum transport distance, and GLOBAL nodes (flow routing, stream
   power) do not tile at all — they run at the largest resolution that can be held globally
-  and are then sliced (`03`, `04`, `08`).
+  and are then sliced (`03`, `04`, `08`). **The outer edge of the whole domain is a tile edge
+  whose neighbour does not exist**: it takes the same rule with a *manufactured* apron — a
+  simulated margin, cropped at export — or it grows the boundary fringe of `03`.
 - **Seams are prevented by contract, not healed by blending.** World-space noise (seed
   contract), aprons, shared edge vertices, and — on spheres — the DGGS/cube-sphere seam
   routing of `08`. If a seam is visible, a contract above was broken; find which.

@@ -64,6 +64,49 @@ def radial_anisotropy(field, center=None):
     return float(np.sqrt(np.mean(resid ** 2)) / amp)
 
 
+def boundary_influence_profile(field):
+    """`field` binned by INSET RING -- Chebyshev distance from the perimeter, so ring 0 is the
+    outermost cells -- returned as the per-ring mean. The domain-edge check of 03 (*Domain
+    boundaries*) and 09.
+
+    A boundary policy whose influence never reached inward gives a FLAT profile. A uniform open
+    perimeter gives a monotone ramp across an outer band: every edge cell is an outlet, so the
+    band drains straight out and erodes into the fringe ("tablecloth"), with the interior beyond
+    it untouched.
+    """
+    field = np.asarray(field, dtype=np.float64)
+    n, m = field.shape
+    ii, jj = np.mgrid[0:n, 0:m]
+    ring = np.minimum(np.minimum(ii, n - 1 - ii), np.minimum(jj, m - 1 - jj)).ravel()
+    counts = np.maximum(np.bincount(ring), 1)
+    return np.bincount(ring, weights=field.ravel()) / counts
+
+
+def boundary_influence_distance(field, tol=0.1):
+    """The inset (in cells) beyond which `boundary_influence_profile` stays settled at its
+    interior value -- the knee of the ramp, and therefore **the margin width to simulate and
+    crop**, measured rather than guessed. 0 => the edge policy left no measurable signature.
+
+    The interior value and the interior's own ring-to-ring spread are both taken from the inner
+    half of the profile, so the threshold comes from a measured noise floor rather than a chosen
+    constant (09: a metric with no control is not evidence). `tol` is the fraction of the total
+    edge-to-interior swing still permitted at the knee.
+    """
+    prof = boundary_influence_profile(field)
+    if prof.size < 4:
+        return 0
+    inner = prof[prof.size // 2:]
+    interior = float(np.median(inner))
+    noise = float(np.max(np.abs(inner - interior)))
+    swing = float(prof[0]) - interior
+    if abs(swing) <= max(noise, 1e-12):
+        return 0                                          # flat: no boundary signature
+    band = max(abs(tol * swing), noise)
+    settled = np.abs(prof - interior) <= band
+    stays = np.logical_and.accumulate(settled[::-1])[::-1]  # settled from here all the way in
+    return int(np.argmax(stays)) if stays.any() else int(prof.size - 1)
+
+
 def no_interior_pit(h, eps=1e-9):
     """After a correct (epsilon) depression fill, every interior cell has at least one
     strictly-lower 8-neighbour -> a downhill path to the edge exists everywhere."""

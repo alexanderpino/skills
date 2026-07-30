@@ -6,7 +6,8 @@ Contents: [Order of operations](#order-of-operations) · [Depression handling](#
 [Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) ·
 [Meandering & bank erosion](#meandering--bank-erosion) ·
 [River terraces](#river-terraces) · [Avulsion, crevasse splays & delta lobes](#avulsion-crevasse-splays--delta-lobes) ·
-[Water sources & discharge](#water-sources--discharge) · [Sea level](#sea-level) · [Choosing](#choosing)
+[Water sources & discharge](#water-sources--discharge) · [Domain boundaries](#domain-boundaries) ·
+[Sea level](#sea-level) · [Choosing](#choosing)
 
 ## Order of operations
 
@@ -703,6 +704,138 @@ springs and entering rivers as explicit inputs to the sim, not decoration.
 **Sinks** are the mirror image — a cell that *removes* water: a doline swallowing a stream (`11`),
 or an endorheic basin that only evaporates (the Dead Sea, the Aral). Mark them so depression
 handling leaves them unfilled and accumulation terminates there instead of forcing an outlet.
+
+## Domain boundaries
+
+Sources are how water enters; this is how it leaves. Every simulation needs an answer to *what
+is beyond the edge*, and the default answer — whatever the loop happens to do at index 0 —
+prints a frame of artefacts around the map. The decision is per **cell**, not per domain, and it
+belongs in the graph spec (`SKILL.md`, evaluation invariants).
+
+### Boundary status, per cell
+
+Landlab's `status_at_node` and fastscapelib's boundary enum formalise the same small set, and it
+is the right vocabulary to think in:
+
+| Status | Meaning | Flow behaviour |
+|---|---|---|
+| **Core** | Ordinary interior cell | Routes, erodes, receives |
+| **Open / fixed value** | Base level; `h` held fixed | Water and sediment leave the domain here; receiver is self |
+| **Closed / no-flux** | Wall | Nothing crosses; water pools against it |
+| **Fixed gradient** | Slope held, elevation floats | Continues a regional slope off-map without pinning height |
+| **Looped / periodic** | Wraps to the opposite edge | The domain is a torus |
+| **Source** | Inflow `Q_in` (above) | Real water arriving — conserve it; not a base level |
+
+Whole-domain modes are just the special case where every perimeter cell shares one status. **That
+special case is the one that looks wrong**, and it is the default in nearly every implementation.
+
+### The tablecloth: a uniform open perimeter
+
+Open every edge cell to base level, run erosion toward steady state, and the outer band grows a
+regular fringe of short, parallel, edge-perpendicular gullies — four-fold symmetric, sharply
+bounded on its inner side, hanging off a smoother interior. It reads as a cloth draped over a
+table: flat top, pleated skirt. `02` records the end state of the same mechanism — all four edges
+fixed at zero gives you a dome.
+
+Four mechanisms stack, and which ones you care about decides the fix:
+
+1. **Every edge cell is an outlet.** From anywhere in the outer band the shortest path to base
+   level is straight out, perpendicular to the nearest edge, so flow azimuths there collapse onto
+   four directions. A network needs *few* outlets to converge on; a perimeter of outlets can only
+   produce a comb.
+2. **Truncated catchment, maximal gradient.** A cell one row in has almost no upslope area
+   (`A ≈ cellArea`) but sits directly above fixed base level, so its slope is the steepest in the
+   domain. In `K·A^m·S^n` the `S` term runs away inside a thin band — deep, closely spaced, short
+   gullies. Further in, `A` grows and the real network takes over, which is why the fringe has a
+   hard inner limit instead of blending away.
+3. **Fixed rows never lower.** Dirichlet cells are unerodible by construction, so the comb is cut
+   *between* them: pinned to the border, about one drainage-spacing wide.
+4. **Corners drain twice.** A corner has two open faces and produces a radial fan — the most
+   visible tell in a hillshade, and the first place to look.
+
+Over a long run the divide then pins itself: headward retreat advances inward at a similar rate
+from all four sides, so the main divide settles into a rounded rectangle parallel to the border.
+Nothing in nature puts a drainage divide at a constant offset from a straight line.
+
+### The fixes
+
+They compose, and most maps want more than one — 1 is the most broadly applicable, but as the
+caveat under it says, it is not the one that fixes large-scale form.
+
+**1. Simulate on a margin, then crop.** The domain edge is a tile edge with no neighbour.
+Everything `08` says about aprons applies — except that no neighbour exists to supply one, so you
+manufacture it: generate and simulate a margin beyond the shipped extent, then cut it off. The
+fringe forms in the margin and is discarded, and the shipped extent only ever experiences
+interior behaviour.
+
+**Know what a margin does and does not fix.** The *texture* — the gully comb, the corner fans,
+the divide pinned parallel to the border — has a bounded influence distance, and a margin
+removes it outright. The *shape* does not: for stream power the boundary's reach is unbounded
+because `A` is global (`08`), so a margin relocates the dome's crest rather than abolishing it.
+Margin fixes the texture; fixes 2 and 3 fix the shape. Most maps need both.
+
+Size it by **boundary-influence distance**, not by the per-step transport distance the apron rule
+uses — the influence that matters here is headward retreat accumulated over the whole run, which
+is far longer:
+
+```
+margin ≥ boundaryInfluenceDistance        # measure it (below) — don't guess
+```
+
+Order of magnitude: tens of cells for droplet, where influence stays local; 10–25 % per side for
+a stream-power bake run near steady state. Read the real number off the inset profile below.
+
+**2. Author the outlets; close the rest.** Decide where water leaves — a river mouth, a coastal
+strip, one edge — and make every other perimeter cell no-flux. This is `02`'s observation stated
+as a rule: one edge at base level with the rest closed gives a range draining one way, which is
+usually what was wanted. Few outlets is what lets a network form at all.
+
+**3. Put base level inside the domain.** A sea, a lake, or a trunk valley crossing the map. The
+perimeter can then be closed entirely, and drainage organises around a feature that is actually
+*in* the shipped extent rather than around an edge of it. Strongest option for a hero map, and it
+makes the map's composition and its hydrology the same decision.
+
+**4. Never give all four sides the same status.** Even where each edge is individually
+defensible, uniformity produces the four-fold symmetry the eye reads as synthetic before it can
+say why. A regional tilt on the base level, so drainage has a preferred direction, breaks it for
+free.
+
+**5. Implement the choice as a halo, not an index special-case.** Pad the field with a ring of
+ghost cells carrying the boundary values and run the ordinary stencil over the interior — that is
+what removes the "whatever happens at index 0" frame, and it keeps one code path.
+`reference-impl` does exactly this: `shallow_water.py` and `erosion_pipe.py` pad with a very low
+ghost ring to drain (`drain_edges`) or with `mode="edge"` to wall.
+
+**Periodic** is the remaining option and is genuinely artefact-free — there is no edge — but it
+costs you a regional slope, a sea, and any single trunk river, and commits the map to tiling on
+both axes. Aeolian and dune sims take it by convention (`05`, `16`); most hero terrain cannot.
+
+### Measuring it
+
+Bin a statistic by **inset distance** from the perimeter — mean incision since the initial
+surface, local relief, or drainage density — and read the profile inward:
+
+- **Healthy:** flat within the interior spread; no trend.
+- **Tablecloth:** a monotone ramp confined to an outer band, with a knee where it meets the
+  interior value. **The knee is the boundary-influence distance** — take the margin width for fix
+  1 straight off it instead of guessing.
+
+The companion check is a flow-azimuth histogram restricted to the outer band: a uniform open
+perimeter puts four spikes at the edge normals. **Do not confuse this with the grid-anisotropy
+family** (`09`) — anisotropy spikes at the lattice directions and does so *everywhere*, while
+this spikes at the edge normals and only near the edge. Same instrument, different disease; the
+discriminator is whether the interior shows it too.
+
+The control that makes either number evidence (`09`): uniform uplift on a square with a fully
+open perimeter, run toward steady state, is the Braun–Willett test case (`02`) and it **must**
+show the ramp and the dome. A metric that cannot see it there is not measuring anything.
+
+`reference-impl` mechanises all of this — `tests/asserts.py` provides
+`boundary_influence_profile` and `boundary_influence_distance` (the knee, in cells), and
+`tests/test_boundaries.py` pins them against both controls: a periodic domain and a
+signature-free field, where the knee must read **0**, and Dirichlet diffusion, where the reach
+is analytically `√(4Dt)` so the measured knee has a closed-form answer to match. The same file
+records the unbounded-reach caveat above as a test, so fix 1 cannot quietly start overclaiming.
 
 ## Sea level
 
