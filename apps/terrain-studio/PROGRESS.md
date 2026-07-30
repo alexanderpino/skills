@@ -9,13 +9,14 @@ Updated as work lands. If this disagrees with a commit message, the commit wins.
 
 ## Suite coverage — corrected 2026-07-30
 
-`npm run verify` runs **12 of 70** oracles (it points at `_verify_all_canyon.js`, the Canyon
+`npm run verify` runs **12 of 73** oracle files (it points at `_verify_all_canyon.js`, the Canyon
 suite). Use `node scripts/sweep-oracles.mjs` for all of them.
 
     node scripts/sweep-oracles.mjs                  every oracle, one line each
     node scripts/sweep-oracles.mjs _verify_x.js     a subset
 
-**69/70 green.** The 17 L0 casualties are repaired and now build their own document;
+The last full-sweep record was **69/70 green** before later oracle additions; it is historical,
+not current 73-file coverage. The 17 L0 casualties are repaired and now build their own document;
 `_verify_pwa` gets `--preview-prod` from the flag table; `_verify_hex_sampling` is 5/5
 (both failures were the ORACLE, not the app). Failing output is kept in `.sweep-logs/`.
 
@@ -25,6 +26,18 @@ taken inside the waitForFunction predicate); a second cause is still unidentifie
 the log capture just added exists to catch it on the next full run.
 
 ## Now
+
+**Graph authoring UX — done locally, 2026-07-30.**
+
+- Releasing an output connection on empty graph space opens a focused, searchable node picker
+  containing only node types with an input. Selection creates the node at the release point and
+  connects slot 0; create + connect is one undo record, and Escape is a no-op.
+- The stacked/vertical workspace has an accessible horizontal splitter. The graph's preferred pixel
+  height persists across reloads and display growth. CSS and JavaScript independently preserve a
+  220 px terrain viewport by shrinking the graph only when the window is constrained.
+- Focused gates green: `_verify_quick_create`, `_verify_workflow`, `_verify_toolbox`,
+  `_verify_edges`, `_verify_digest`; production `vite build` green. The full 73-file sweep was not
+  rerun for this local editor change.
 
 **Programme:** modularisation toward React + plugin nodes + PWA, per
 `~/.claude/plans/quiet-wishing-harbor.md` (adversarially reviewed before execution; seven blocking
@@ -71,12 +84,12 @@ Run the app: `.\run-studio.ps1` (dev, :5173) · `-Mode pwa` (build + preview, :4
 ## Shape of the app today
 
 ```
-index.html          75 KB — markup, <style>, one <script type="module">
-src/legacy.js       7,126 lines — the app, + the test bridge spliced in at the end
+index.html          79 KB — markup, <style>, one <script type="module">
+src/legacy.js       6,905 lines — the app, + the test bridge spliced in at the end
 src/core/gpu.js     GPU, GLSL kernels, gpu* wrappers, gpuReady, hydroMassDiag
 src/core/gl-util.js makeProg, u, setGL
 src/testing/        bridge-block.js (generated, 191 symbols / 28 writable)
-tests/legacy/       66 oracles + bridge-surface.json (the frozen contract)
+tests/legacy/       73 oracle files + bridge-surface.json (the frozen contract)
 tests/e2e/          4 Playwright specs
 ```
 

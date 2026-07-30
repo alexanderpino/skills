@@ -3460,8 +3460,15 @@ window.addEventListener("mouseup",e=>{
         edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
         edges.push({from:linking.from,to:port.node,slot:port.slot});markDirtyFrom(port.node);requestEval();
       }
+    }else if(inside&&!nodeAt(w.x,w.y)&&!edgeAt(w.x,w.y)){
+      // Gaea-style drag-out quick create: keep the graph unchanged until the user actually
+      // chooses a compatible node. Releasing on empty space is therefore cancellable, and an
+      // input rewire keeps its original edge until the replacement node is committed.
+      const pending={from:linking.from,original:linking.original||null};
+      linking=null;gc.classList.remove("linking");drawGraph();
+      openMenu(e.clientX,e.clientY,w,pending);
     }
-    linking=null;gc.classList.remove("linking");drawGraph();
+    if(linking){linking=null;gc.classList.remove("linking");drawGraph();}
   }
   if(drag){if(drag.node&&drag.moved)pushUndo(drag.before);gc.classList.remove("panning");drag=null;}
 });
@@ -3611,34 +3618,76 @@ gc.addEventListener("dblclick",e=>{const r=gc.getBoundingClientRect(),w=toWorld(
 /* =====================================================================
    ADD-NODE MENU
    ===================================================================== */
-const menu=$("#menu");let menuWorld=null;
-function groupedNodeTypes(query){
+const menu=$("#menu");let menuWorld=null,menuConnect=null;
+function groupedNodeTypes(query,predicate){
   query=(query||"").trim().toLowerCase();const groups={};
   Object.keys(TYPES).forEach(t=>{const def=TYPES[t],cat=CAT[def.cat];
+    if(predicate&&!predicate(t,def))return;
     const hay=(def.name+" "+def.desc+" "+(cat?cat.name:"")).toLowerCase();
     if(query&&!hay.includes(query))return;(groups[def.cat]=groups[def.cat]||[]).push(t);});
   return groups;
 }
-function addNodeAt(type,world){
-  const nd=makeNode(type,world.x-nd0w(type)/2,world.y-30);select(nd);requestEval();return nd;
+function primaryInputSlot(type){return TYPES[type]&&TYPES[type].ins.length?0:-1;}
+function addNodeAt(type,world,connect){
+  const slot=connect?primaryInputSlot(type):-1;
+  if(connect&&slot<0)return null;
+  const nd=makeNode(type,world.x-nd0w(type)/2,world.y-30);
+  if(connect){
+    if(connect.original)edges=edges.filter(e=>e!==connect.original);
+    edges=edges.filter(e=>!(e.to===nd.id&&e.slot===slot));
+    edges.push({from:connect.from,to:nd.id,slot});markDirtyFrom(nd.id);
+  }
+  select(nd);requestEval();return nd;
 }
-function openMenu(clientX,clientY,world){
-  menuWorld=world;menu.innerHTML="";
-  const cats=groupedNodeTypes();
+function chooseMenuNode(type){
+  const world=menuWorld,connect=menuConnect;closeMenu();
+  if(world)addNodeAt(type,world,connect);
+}
+function renderAddMenu(query){
+  const list=menu.querySelector(".menu-list");if(!list)return;
+  list.innerHTML="";let shown=0;
+  const cats=groupedNodeTypes(query,menuConnect?(_t,def)=>def.ins.length>0:null);
   Object.keys(CAT).forEach(c=>{if(!cats[c])return;
-    const h=document.createElement("div");h.className="menu-cat";h.textContent=CAT[c].name;menu.appendChild(h);
-    cats[c].forEach(t=>{const def=TYPES[t];const it=document.createElement("div");it.className="menu-item";
+    const h=document.createElement("div");h.className="menu-cat";h.textContent=CAT[c].name;list.appendChild(h);
+    cats[c].forEach(t=>{const def=TYPES[t];const it=document.createElement("button");it.type="button";it.className="menu-item";
+      it.dataset.type=t;
       it.innerHTML=`<span class="dot" style="background:${css(CAT[c].c)}"></span>${def.name}<small>${def.ins.length?def.ins.length+"in":"gen"}</small>`;
-      it.onclick=()=>{addNodeAt(t,menuWorld);closeMenu();};
-      menu.appendChild(it);});
+      it.onclick=()=>chooseMenuNode(t);list.appendChild(it);shown++;});
   });
+  if(!shown){const empty=document.createElement("div");empty.className="menu-empty";
+    empty.textContent=menuConnect?"No connectable nodes match that search.":"No nodes match that search.";list.appendChild(empty);}
+  const first=list.querySelector(".menu-item");if(first)first.classList.add("active");
+}
+function openMenu(clientX,clientY,world,connect){
+  menuWorld=world;menuConnect=connect||null;menu.innerHTML="";
+  const context=document.createElement("div");context.className="menu-context";
+  const source=menuConnect&&nodeById(menuConnect.from);
+  context.innerHTML=source?`Connect from <b>${TYPES[source.type].name}</b>`:"Add node";
+  const search=document.createElement("input");search.type="search";search.className="menu-search";
+  search.autocomplete="off";search.spellcheck=false;search.placeholder=source?"Find a node to connect…":"Find a node…";
+  search.setAttribute("aria-label",search.placeholder);
+  const list=document.createElement("div");list.className="menu-list";
+  menu.append(context,search,list);renderAddMenu("");
+  search.oninput=()=>renderAddMenu(search.value);
+  search.onkeydown=e=>{
+    const items=[...list.querySelectorAll(".menu-item")],active=list.querySelector(".menu-item.active");
+    let index=items.indexOf(active);
+    if(e.key==="Escape"){e.preventDefault();closeMenu();gc.focus();return;}
+    if(e.key==="Enter"&&items.length){e.preventDefault();chooseMenuNode((active||items[0]).dataset.type);return;}
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      e.preventDefault();if(active)active.classList.remove("active");
+      index=e.key==="ArrowDown"?Math.min(items.length-1,index+1):Math.max(0,index<0?0:index-1);
+      if(items[index]){items[index].classList.add("active");items[index].scrollIntoView({block:"nearest"});}
+    }
+  };
   menu.classList.add("open");
-  const mw=210,mh=Math.min(menu.scrollHeight,window.innerHeight*0.7);
-  menu.style.left=Math.min(clientX,window.innerWidth-mw-8)+"px";
-  menu.style.top=Math.min(clientY,window.innerHeight-mh-8)+"px";
+  const mw=252,mh=Math.min(menu.scrollHeight,window.innerHeight*.7);
+  menu.style.left=Math.max(6,Math.min(clientX,window.innerWidth-mw-8))+"px";
+  menu.style.top=Math.max(6,Math.min(clientY,window.innerHeight-mh-8))+"px";
+  search.focus({preventScroll:true});
 }
 function nd0w(t){return 150;}
-function closeMenu(){menu.classList.remove("open");}
+function closeMenu(){menu.classList.remove("open");menuConnect=null;menuWorld=null;}
 window.addEventListener("mousedown",e=>{if(menu.classList.contains("open")&&!menu.contains(e.target))closeMenu();});
 
 /* =====================================================================
@@ -6116,13 +6165,87 @@ $("#previewBtn").onclick=()=>{
   refreshPreview();
 };
 $("#undoBtn").onclick=undoGraph;$("#redoBtn").onclick=redoGraph;
+
+/* ---- persistent vertical workspace splitter ----
+   The graph is the user-sized pane. Its preferred height is stored in pixels so moving the
+   Studio to a larger display gives the extra room to the terrain viewport instead of silently
+   stretching the graph. applyStackedPaneSize only clamps that preference when keeping it would
+   squeeze the terrain below its usable minimum; it never overwrites the preference while clamped. */
+const STACKED_TERRAIN_MIN=220,STACKED_GRAPH_MIN=120,STACKED_SPLITTER_SIZE=7;
+const workspaceSplitter=$("#workspaceSplitter");
+let stackedGraphPreferred=null,workspaceResize=null;
+function readStackedGraphPreference(){
+  if(stackedGraphPreferred!=null)return stackedGraphPreferred;
+  try{const value=Number(localStorage.getItem("terrainStudioStackedGraphSize"));
+    if(Number.isFinite(value)&&value>0)stackedGraphPreferred=value;}catch(_){}
+  if(stackedGraphPreferred==null){
+    const available=Math.max(0,$("#main").clientHeight-STACKED_SPLITTER_SIZE);
+    stackedGraphPreferred=Math.round(available*.48);
+  }
+  return stackedGraphPreferred;
+}
+function stackedGraphBounds(){
+  const available=Math.max(0,$("#main").clientHeight-STACKED_TERRAIN_MIN-STACKED_SPLITTER_SIZE);
+  return{min:Math.min(STACKED_GRAPH_MIN,available),max:available};
+}
+function applyStackedPaneSize(){
+  if(!$("#main").classList.contains("stacked"))return;
+  const bounds=stackedGraphBounds(),preferred=readStackedGraphPreference();
+  const actual=Math.round(clamp(preferred,bounds.min,bounds.max));
+  $("#main").style.setProperty("--stacked-graph-size",actual+"px");
+  workspaceSplitter.setAttribute("aria-valuemin",String(Math.round(bounds.min)));
+  workspaceSplitter.setAttribute("aria-valuemax",String(Math.round(bounds.max)));
+  workspaceSplitter.setAttribute("aria-valuenow",String(actual));
+  workspaceSplitter.setAttribute("aria-valuetext",
+    "Node graph "+actual+" pixels; terrain view "+Math.max(0,$("#main").clientHeight-actual-STACKED_SPLITTER_SIZE)+" pixels");
+}
+function setStackedGraphPreference(value,persist){
+  stackedGraphPreferred=Math.max(0,Math.round(value));
+  if(persist!==false)try{localStorage.setItem("terrainStudioStackedGraphSize",String(stackedGraphPreferred));}catch(_){}
+  applyStackedPaneSize();requestAnimationFrame(()=>{resizeGraph();resizeGL();});
+}
+function finishWorkspaceResize(e){
+  if(!workspaceResize)return;
+  if(e&&workspaceSplitter.hasPointerCapture&&workspaceSplitter.hasPointerCapture(e.pointerId))
+    workspaceSplitter.releasePointerCapture(e.pointerId);
+  workspaceResize=null;workspaceSplitter.classList.remove("resizing");document.body.classList.remove("resizing-workspace");
+  try{localStorage.setItem("terrainStudioStackedGraphSize",String(Math.round(stackedGraphPreferred)));}catch(_){}
+}
+workspaceSplitter.onpointerdown=e=>{
+  if(!$("#main").classList.contains("stacked")||e.button!==0)return;
+  e.preventDefault();workspaceSplitter.setPointerCapture(e.pointerId);
+  workspaceResize={pointerId:e.pointerId,startY:e.clientY,startSize:$("#graphwrap").getBoundingClientRect().height};
+  workspaceSplitter.classList.add("resizing");document.body.classList.add("resizing-workspace");
+};
+workspaceSplitter.onpointermove=e=>{
+  if(!workspaceResize||workspaceResize.pointerId!==e.pointerId)return;
+  // Moving the horizontal divider up grows the graph below it.
+  setStackedGraphPreference(workspaceResize.startSize+(workspaceResize.startY-e.clientY),false);
+};
+workspaceSplitter.onpointerup=finishWorkspaceResize;
+workspaceSplitter.onpointercancel=finishWorkspaceResize;
+workspaceSplitter.ondblclick=()=>{
+  const available=Math.max(0,$("#main").clientHeight-STACKED_SPLITTER_SIZE);
+  setStackedGraphPreference(available*.48,true);
+};
+workspaceSplitter.onkeydown=e=>{
+  const current=$("#graphwrap").getBoundingClientRect().height,bounds=stackedGraphBounds();
+  let next=null;
+  if(e.key==="ArrowUp")next=current+16;
+  else if(e.key==="ArrowDown")next=current-16;
+  else if(e.key==="PageUp")next=current+64;
+  else if(e.key==="PageDown")next=current-64;
+  else if(e.key==="Home")next=bounds.min;
+  else if(e.key==="End")next=bounds.max;
+  if(next!=null){e.preventDefault();setStackedGraphPreference(next,true);}
+};
 function setLayout(stacked){
   $("#main").classList.toggle("stacked",stacked);$("#layoutBtn").classList.toggle("on",stacked);
   $("#layoutBtn").textContent=stacked?"⬌":"⬍";
   $("#layoutBtn").title=stacked?"Use side-by-side graph and rendering":"Stack rendering above the graph";
   try{localStorage.setItem("terrainStudioLayout",stacked?"stacked":"side");}catch(_){}
   syncEditorCommandState();
-  requestAnimationFrame(()=>{resizeGraph();resizeGL();});
+  requestAnimationFrame(()=>{applyStackedPaneSize();resizeGraph();resizeGL();});
 }
 $("#layoutBtn").onclick=()=>setLayout(!$("#main").classList.contains("stacked"));
 async function toggleFullscreen(){
@@ -6536,7 +6659,8 @@ function boot(){
     setLayout(savedLayout?savedLayout==="stacked":true);
   }catch(_){setLayout(true);}
   resizeGraph();initGL();defaultGraph();evalGraph();historyReady=true;updateHistoryButtons();
-  window.addEventListener("resize",()=>{resizeGraph();});
+  window.addEventListener("resize",()=>{applyStackedPaneSize();resizeGraph();});
+  new ResizeObserver(()=>applyStackedPaneSize()).observe($("#main"));
   new ResizeObserver(()=>resizeGraph()).observe(gc.parentElement);
 }
 boot();

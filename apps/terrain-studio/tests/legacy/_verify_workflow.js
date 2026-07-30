@@ -20,8 +20,38 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   })));
   const stacked=await rects();
   await page.screenshot({path:path.resolve(__dirname,'_shot_workflow_stacked.png')});
+
+  // The graph pane in the vertical split is an authoring surface, not a percentage of the
+  // window. Grow it once, then prove that it keeps that pixel height when the display grows.
+  // Only a constrained terrain viewport may force it smaller.
+  const splitter=page.locator('#workspaceSplitter');
+  const splitterBox=await splitter.boundingBox();
+  if(!splitterBox)throw new Error('SETUP FAILURE: vertical workspace splitter is not visible');
+  const splitterSemantics=await splitter.evaluate(el=>({
+    role:el.getAttribute('role'),orientation:el.getAttribute('aria-orientation'),
+    min:el.getAttribute('aria-valuemin'),max:el.getAttribute('aria-valuemax')
+  }));
+  await page.mouse.move(splitterBox.x+splitterBox.width/2,splitterBox.y+splitterBox.height/2);
+  await page.mouse.down();
+  await page.mouse.move(splitterBox.x+splitterBox.width/2,splitterBox.y-110,{steps:6});
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  const resizedStacked=await rects();
+  const savedPane=await page.evaluate(()=>localStorage.getItem('terrainStudioStackedGraphSize'));
+  await page.locator('#workspaceSplitter').hover();
+  await page.screenshot({path:path.resolve(__dirname,'_shot_workflow_resized.png')});
+
+  await page.setViewportSize({width:1440,height:1080});await page.waitForTimeout(120);
+  const enlargedStacked=await rects();
+  await page.setViewportSize({width:1440,height:620});await page.waitForTimeout(120);
+  const constrainedStacked=await rects();
+  await page.setViewportSize({width:1440,height:900});await page.reload({waitUntil:'load'});
+  await page.waitForTimeout(1200);
+  const restoredStacked=await rects();
+
   await page.locator('#layoutBtn').click();await page.waitForTimeout(150);
   const side=await rects();
+  const sideSplitterDisplay=await splitter.evaluate(el=>getComputedStyle(el).display);
   await page.screenshot({path:path.resolve(__dirname,'_shot_workflow_side.png')});
   await page.reload({waitUntil:'load'});await page.waitForTimeout(1200);
   const savedSide=await rects();
@@ -79,6 +109,17 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   });
   const ok=stacked.viewport.y<stacked.graphwrap.y
     && stacked.viewport.x===stacked.graphwrap.x
+    && splitterSemantics.role==='separator'&&splitterSemantics.orientation==='horizontal'
+    && splitterSemantics.min!==null&&splitterSemantics.max!==null
+    && resizedStacked.graphwrap.h>=stacked.graphwrap.h+95
+    && resizedStacked.viewport.h<=stacked.viewport.h-95
+    && Number.isFinite(+savedPane)&&+savedPane>0
+    && Math.abs(enlargedStacked.graphwrap.h-resizedStacked.graphwrap.h)<=2
+    && enlargedStacked.viewport.h>=resizedStacked.viewport.h+175
+    && constrainedStacked.viewport.h>=218
+    && constrainedStacked.graphwrap.h<resizedStacked.graphwrap.h-100
+    && Math.abs(restoredStacked.graphwrap.h-resizedStacked.graphwrap.h)<=2
+    && sideSplitterDisplay==='none'
     && side.graphwrap.h>side.viewport.h
     && savedSide.graphwrap.h===side.graphwrap.h
     && savedSide.viewport.x===side.viewport.x
@@ -89,6 +130,8 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     && plan.planView&&plan.state==='plan'&&plan.label==='Return to hero camera'
     && fullscreen==='viewport'
     && !errors.length;
-  console.log(JSON.stringify({stackedDefault:stacked,side,savedSide,interaction,plan,fullscreen,perf,errors,ok},null,2));
+  console.log(JSON.stringify({stackedDefault:stacked,splitterSemantics,resizedStacked,savedPane,
+    enlargedStacked,constrainedStacked,restoredStacked,side,sideSplitterDisplay,savedSide,
+    interaction,plan,fullscreen,perf,errors,ok},null,2));
   await browser.close();process.exit(ok?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(2);});

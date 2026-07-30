@@ -185,7 +185,8 @@ select.btn{appearance:none;padding-right:22px;
 
 #main{display:grid;grid-template-columns:minmax(0,1fr) 372px;grid-template-rows:52% 48%;
   grid-template-areas:"graph viewport" "graph props";min-height:0;position:relative}
-#main.stacked{grid-template-areas:"viewport props" "graph props"}
+#main.stacked{grid-template-rows:minmax(0,1fr) 7px min(var(--stacked-graph-size,48%),max(0px,calc(100% - 227px)));
+  grid-template-areas:"viewport props" "splitter props" "graph props"}
 #graphwrap{grid-area:graph;position:relative;min-width:0;min-height:0;background:
   radial-gradient(1200px 800px at 30% 0%,#151b23 0%,var(--bg) 70%)}
 :root[data-theme="light"] #graphwrap{background:radial-gradient(1200px 800px at 30% 0%,#f4f7fb,var(--bg) 70%)}
@@ -228,7 +229,16 @@ select.btn{appearance:none;padding-right:22px;
 #viewport{grid-area:viewport;position:relative;min-width:0;min-height:0;border-left:1px solid var(--line);
   border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1b222c,#0e1319)}
 #main.stacked #viewport{border-left:0}
-#main.stacked #graphwrap{border-top:1px solid var(--line)}
+#workspaceSplitter{grid-area:splitter;display:none;position:relative;z-index:35;min-width:0;
+  cursor:row-resize;touch-action:none;background:var(--bg);outline:none}
+#main.stacked #workspaceSplitter{display:block}
+#workspaceSplitter::before{content:"";position:absolute;left:0;right:0;top:3px;height:1px;background:var(--line2)}
+#workspaceSplitter::after{content:"";position:absolute;left:50%;top:1px;width:42px;height:5px;
+  transform:translateX(-50%);border-radius:4px;background:var(--line2);opacity:0;transition:opacity .12s,background .12s}
+#workspaceSplitter:hover::after,#workspaceSplitter:focus-visible::after,#workspaceSplitter.resizing::after{
+  opacity:1;background:var(--accent)}
+#workspaceSplitter:focus-visible{box-shadow:inset 0 0 0 1px var(--accent)}
+body.resizing-workspace{cursor:row-resize;user-select:none}
 #viewport:fullscreen{width:100vw;height:100vh;border:0;background:#0e1319}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .vp-overlay{position:absolute;left:10px;top:10px;display:flex;pointer-events:none;max-width:calc(100% - 74px)}
@@ -390,13 +400,22 @@ select.inp{appearance:none}
 
 /* -- add-node menu -- */
 #menu{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line2);
-  border-radius:var(--radius);box-shadow:var(--shadow);width:210px;padding:6px;display:none;max-height:70vh;overflow:auto}
+  border-radius:var(--radius);box-shadow:var(--shadow);width:252px;padding:6px;display:none;overflow:hidden}
 #menu.open{display:block}
+.menu-context{padding:4px 7px 7px;color:var(--faint);font:9px var(--mono);letter-spacing:.25px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-context b{color:var(--text);font-weight:600}
+.menu-search{width:100%;height:30px;padding:0 8px;margin-bottom:4px;background:var(--panel2);color:var(--text);
+  border:1px solid var(--line);border-radius:var(--radius-sm);outline:none;font:11px var(--mono)}
+.menu-search:focus{border-color:var(--accent)}
+.menu-list{max-height:min(58vh,520px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
 .menu-cat{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);padding:8px 8px 3px}
-.menu-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px}
-.menu-item:hover{background:var(--panel2)}
+.menu-item{width:100%;display:flex;align-items:center;gap:8px;padding:6px 8px;border:0;
+  border-radius:var(--radius-sm);background:transparent;color:var(--text);cursor:pointer;font:12px var(--sans);text-align:left}
+.menu-item:hover,.menu-item:focus-visible,.menu-item.active{background:var(--panel2);outline:none}
 .menu-item .dot{width:8px;height:8px;border-radius:2px;flex:none}
 .menu-item small{color:var(--faint);margin-left:auto;font-family:var(--mono);font-size:10px}
+.menu-empty{padding:24px 10px;text-align:center;color:var(--faint);font-size:11px}
 #graphMenu{position:fixed;z-index:70;width:224px;padding:6px;display:none;background:var(--panel);
   border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow)}
 #graphMenu.open{display:block}
@@ -814,11 +833,15 @@ select.sg-btn{appearance:auto}
       </section>
       <button id="satGenBtn" type="button" hidden aria-hidden="true">Open SatMap Studio</button>
     </div>
+    <div id="workspaceSplitter" role="separator" tabindex="0" aria-label="Resize node graph"
+      aria-orientation="horizontal" aria-valuemin="120" aria-valuemax="120" aria-valuenow="120"
+      title="Drag to resize the node graph. Arrow keys resize in steps; double-click resets."></div>
     <div id="props">
       <div class="prop-head"><div class="prop-swatch" id="pSwatch"></div>
         <div class="prop-title" id="pTitle">No node selected<small id="pSub">Click a node to edit it</small></div></div>
       <div class="prop-body" id="pBody"><div class="prop-empty">Select a node in the graph to edit its parameters.<br><br>
-        Double-click empty canvas to add a node. Drag from a node's right port to wire it into another's left port.</div></div>
+        Double-click empty canvas to add a node. Drag from a node's right port to wire it into another's left port,
+        or release on empty canvas to create and connect the next node.</div></div>
     </div>
   </div>
 

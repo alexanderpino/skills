@@ -773,7 +773,10 @@ adding directional light or indiscriminate RGB noise to the exported albedo.
 ## Controls
 
 - The stacked vertical layout—rendering above the graph—is the first-run default. Use **⬌/⬍** in the
-  top bar to switch between stacked and side layouts; an explicit choice persists.
+  top bar to switch between stacked and side layouts; an explicit choice persists. In the stacked
+  layout, drag the horizontal divider to resize the graph. Its preferred graph height is remembered
+  in pixels, so a larger window gives the extra room to the terrain view; the graph yields only when
+  needed to preserve a usable terrain viewport.
 - Use **⛶** in the rendering or <kbd>Shift</kbd>+<kbd>F</kbd> for rendering fullscreen.
 - **Output / Selected** moves the viewport display flag between the final Output and the selected
   intermediate node. **Plan / Hero** switches between top-down inspection and the perspective camera.
@@ -810,7 +813,9 @@ adding directional light or indiscriminate RGB noise to the exported albedo.
   <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>.
 - Open **＋ Nodes** inside the graph view for the searchable, category-grouped node toolbox. Clicking
   a toolbox item places it in the visible graph area and keeps the toolbox open for building a chain.
-  **Double-click** empty canvas still opens the compact add-node menu at that exact position.
+  **Double-click** empty canvas still opens the compact add-node menu at that exact position. Dragging
+  a connection from an output and releasing it on empty canvas opens the same search with only
+  connectable node types; choosing one creates it at the release point and links it in one undoable edit.
 - **Right-click the graph** for **Organize all**, **Frame all**, Add-at-cursor, and the node toolbox.
   Right-click a node to organize its **connected branch**, only its **upstream** inputs, or only its
   **downstream** dependants; the same menu can frame the branch, preview, duplicate, or delete it.
@@ -1514,7 +1519,8 @@ node _verify_canyon_process.js       # Erosion 2/HydroFix invariants, starter gr
 node _verify_build_progress.js       # elapsed clock, dirty-node progress, active node, completion/dismissal
 node _verify_toolbar.js              # build profile, 512 default, queued 2K/4K, commands, responsive widths
 node _verify_menubar.js              # File/Edit/View/Help, New Terrain resets, responsive hamburger
-node _verify_workflow.js             # layouts, fullscreen, selected preview, undo/redo, 1024² smoke
+node _verify_workflow.js             # persistent/clamped splitter, layouts, fullscreen, preview, undo/redo
+node _verify_quick_create.js         # drag-out search, compatible creation, auto-link, one-step undo
 node _verify_viewport_ui.js          # quiet icon rail, exclusive flyouts, responsive viewport controls
 node _verify_toolbox.js              # graph-owned categorized node toolbox, search, placement, quick menu
 node _verify_organize.js             # deterministic graph layout, branch scopes, context actions, no rebuild
