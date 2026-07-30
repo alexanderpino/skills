@@ -1,4 +1,6 @@
 import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuReady, hydroMassDiag, setHydroMassDiag, setGL as setGpuGL } from './core/gpu.js';
+import { mergePlugins } from './core/registry.js';
+import './plugins/comb/index.js';
 import { P, WHEN, GROUP, CAT } from './core/params.js';
 import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
 
@@ -10,8 +12,8 @@ import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
    ===================================================================== */
 const $=s=>document.querySelector(s);
 export const clamp=(x,a,b)=>x<a?a:x>b?b:x;
-const lerp=(a,b,t)=>a+(b-a)*t;
-const smooth=t=>t*t*(3-2*t);
+export const lerp=(a,b,t)=>a+(b-a)*t;
+export const smooth=t=>t*t*(3-2*t);
 const fade5=t=>t*t*t*(t*(t*6-15)+10);          // improved Perlin: C2 at lattice boundaries
 const fract=x=>x-Math.floor(x);
 // Wheel-adjust every range control while hovered. Small precision-trackpad deltas accumulate into
@@ -141,7 +143,7 @@ const latticeRows=w=>(HEX_SQUARE_WORLD&&terrainDef.lattice==="hex")?HEX_ROWS_FOR
 export const fieldW=()=>RES;                                  // field WIDTH in cells - always RES
 export const fieldH=()=>latticeRows(RES);                     // field HEIGHT in ROWS
 const fieldLen=()=>fieldW()*fieldH();
-function newField(v=0){const a=new Float32Array(fieldLen());if(v)a.fill(v);return a;}
+export function newField(v=0){const a=new Float32Array(fieldLen());if(v)a.fill(v);return a;}
 function sampleBilinear(f,x,y){            // x,y in grid coords (= world position in cell units)
   const n=fieldW(),nh=fieldH();
   if(terrainDef.lattice==="hex"){
@@ -394,7 +396,7 @@ function sculptField(inp,p){
 }
 // Universal MASK rule (Gaea: "connect a mask to a node and it is applied only within the masked
 // area"). Applied as a POST-PROCESS lerp, so changing the mask never re-runs the effect.
-function maskApply(base,modified,mask){
+export function maskApply(base,modified,mask){
   if(!mask)return modified;
   const o=newField();for(let i=0;i<o.length;i++){const m=clamp(mask[i],0,1);o[i]=base[i]+(modified[i]-base[i])*m;}
   return o;
@@ -1505,14 +1507,14 @@ function histEqualizeField(inp,{bins=256,amount=1}){
 }
 
 /* ------------------------------------------------------- combiners ---- */
-function combine(a,b,fn){const o=newField();for(let i=0;i<o.length;i++)o[i]=fn(a?a[i]:0,b?b[i]:0);return o;}
-function blendField(a,b,mask,factor){
+export function combine(a,b,fn){const o=newField();for(let i=0;i<o.length;i++)o[i]=fn(a?a[i]:0,b?b[i]:0);return o;}
+export function blendField(a,b,mask,factor){
   const o=newField();for(let i=0;i<o.length;i++){const t=mask?mask[i]:factor;o[i]=lerp(a?a[i]:0,b?b[i]:0,t);}return o;
 }
-function smin(a,b,k){const h=clamp(0.5+0.5*(b-a)/k,0,1);return lerp(b,a,h)-k*h*(1-h);}
+export function smin(a,b,k){const h=clamp(0.5+0.5*(b-a)/k,0,1);return lerp(b,a,h)-k*h*(1-h);}
 // Quilez smooth MAX. For a heightfield this is the crease-free UNION: merging two peaks means taking
 // the higher surface, so it is max, not min. smin would take the lower one and delete both summits.
-function smax(a,b,k){return -smin(-a,-b,k);}
+export function smax(a,b,k){return -smin(-a,-b,k);}
 // --- pointwise primitives for feature generators (evaluate at ARBITRARY coordinates, not a grid) ---
 function sdSegment(px,py,ax,ay,bx,by){
   const vx=bx-ax,vy=by-ay,wx=px-ax,wy=py-ay;
@@ -2836,7 +2838,7 @@ function evalExact(id,guard){
   guard.delete(id);return f;
 }
 
-const TYPES={
+const TYPES=mergePlugins({
   perlin:{cat:"gen",name:"Perlin fBm",ins:[],desc:"Fractal gradient noise — the base terrain.",
     params:[P.seed("seed","Seed",7),P.log("freq","Frequency",0.5,12,3,v=>v<10?v.toFixed(2):v.toFixed(1),false),P.int("octaves","Octaves",1,9,6),
       P.slider("lac","Lacunarity",1.5,3,2,0.05),P.slider("gain","Gain",0.2,0.8,0.5,0.01)],
@@ -2941,37 +2943,6 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
     eval:(p,ins,node)=>{if((!node._dem||node._dem.length!==fieldLen())&&(node._demImg||node._demRaw))buildDemFromSource(node);
       if(!node._dem)return radialField();const o=newField();for(let i=0;i<o.length;i++)o[i]=node._dem[i]*p.scale;return o;}},
 
-  blend:{cat:"comb",name:"Blend",ins:["A","B","Mask"],desc:"Mix A→B by a factor or a mask input.",fieldSemantics:"temperature-pair",
-    params:[P.slider("factor","Factor",0,1,0.5)],
-    eval:(p,ins)=>blendField(ins[0],ins[1],ins[2],p.factor)},
-  add:{cat:"comb",name:"Combine",ins:["A","B"],desc:"Arithmetic combine of two fields.",
-    params:[P.seg("op","Op",[["add","Add"],["sub","Sub"],["mul","Mul"]],"add"),P.slider("amt","Amount",0,1,0.5)],
-    eval:(p,ins)=>combine(ins[0],ins[1],p.op==="add"?(a,b)=>a+b*p.amt:p.op==="sub"?(a,b)=>a-b*p.amt:(a,b)=>a*lerp(1,b,p.amt))},
-  maxmin:{cat:"comb",name:"Max / Min",ins:["A","B"],desc:"Union (max) or intersection (min).",fieldSemantics:"temperature-pair",
-    params:[P.seg("op","Op",[["max","Max"],["min","Min"]],"max")],
-    eval:(p,ins)=>combine(ins[0],ins[1],p.op==="max"?Math.max:Math.min)},
-  stampn:{cat:"comb",name:"Stamp",ins:["Base","Patch","Mask"],
-    desc:"Drop a placed feature onto a base terrain. This is the other half of placement: a Transform says WHERE the feature goes, a Shape mask says HOW FAR it reaches, and Stamp composites it in.",
-    params:[P.seg("op","Mode",[["max","Max"],["add","Add"],["replace","Replace"]],"max"),
-      P.slider("amount","Amount",0,1,1)],
-    // Mirrors reference-impl/placement.py `stamp`. Max is the default because it unions a landform in
-    // WITHOUT trenching what is already there; Add accumulates relief (two overlapping fans build up);
-    // Replace overwrites, which only reads well inside a soft-edged mask.
-    eval:(p,ins)=>{
-      const base=ins[0]||newField();if(!ins[1])return base;
-      const patch=ins[1],o=newField();
-      for(let i=0;i<o.length;i++){
-        const v=p.op==="max"?Math.max(base[i],patch[i]):p.op==="add"?base[i]+patch[i]:patch[i];
-        o[i]=base[i]+(v-base[i])*p.amount;}
-      return maskApply(base,o,ins[2]);},
-    note:"Without a <b>Mask</b> the patch applies everywhere it is defined, so a Shape (or any mask) is what turns this from a global combine into a <i>placement</i>. Because masking is a post-process lerp, dragging the mask never re-runs whatever generated the patch."},
-  smax:{cat:"comb",name:"Smooth Max",ins:["A","B"],desc:"Crease-free UNION of two heightfields (Quilez smax) \u2014 the node for merging placed peaks into one massif without a seam.",
-    params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
-    eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smax(a,b,p.k)),
-    note:"Union of two <i>surfaces</i> is a <b>max</b>: the merged terrain is whichever is higher. A hard Max/Min at Max does that but leaves a curvature crease where the two cross \u2014 measured across three placed Mountains, this smooths the seam by <b>75%</b>. Use Smooth <i>Min</i> only when you want the lower envelope (carving, intersections); on two peaks it deletes both summits."},
-  smin:{cat:"comb",name:"Smooth Min",ins:["A","B"],desc:"Crease-free smooth INTERSECTION \u2014 the lower envelope of two heightfields (Quilez smin). For merging peaks you want Smooth Max instead.",
-    params:[P.slider("k","Smoothness",0.02,0.5,0.15)],
-    eval:(p,ins)=>combine(ins[0],ins[1],(a,b)=>smin(a,b,p.k))},
 
   warp:{cat:"filt",name:"Warp",ins:["In","Mask"],desc:"Domain-warp the input by internal noise.",fieldSemantics:"preserve-primary",
     params:[P.log("strength","Strength",.001,.4,.12,v=>v===0?"0":v<.01?v.toFixed(3):v.toFixed(2)),
@@ -3419,7 +3390,7 @@ path width=0.03 falloff=0.26 profile=scurve op=max breakup=0.45 seed=3
   output:{cat:"out",name:"Output",ins:["Height"],desc:"The final terrain — drives the 3D viewport.",
     params:[P.seg("norm","Normalize",[["on","On"],["off","Off"]],"on")],
     eval:(p,ins)=>{const f=ins[0]||newField();return p.norm==="on"?normalize(f):f;}},
-};
+});
 
 /* =====================================================================
    GRAPH MODEL

@@ -56,6 +56,22 @@ tests/legacy/       66 oracles + bridge-surface.json (the frozen contract)
 tests/e2e/          4 Playwright specs
 ```
 
+## Phase B — plugin extraction
+
+| Batch | Nodes | State | Commit |
+|---|---|---|---|
+| prerequisite · param DSL to `src/core/params.js` | — | **done** | `d85b84f` |
+| registry + `comb` | 6 | **done** | this commit |
+| `mask` | 4 | next | — |
+| `filt` | 11 | | — |
+| `gen` | 12 | | — |
+| `ero` | 5 | | — |
+| `effect` | 7 | | — |
+| `data` | 14 | | — |
+| `out` | 1 | | — |
+
+60 total. Digest green per batch, so a bad extraction bisects to one node.
+
 ## Next, in order
 
 1. **A3 PWA shell** — `public/sw.js` (not `src/`: Vite emits nothing from there, so it 404s under
