@@ -71,10 +71,12 @@ decode — not as five small files that multiply seek/request overhead.
 Every tile in the *cut* (the set the traversal wants) is in exactly one state:
 
 ```
-unloaded -> requested -> loading -> resident -> renderable
-                 |           |          ^            |
-                 +-- cancel--+          |            v
-                                        +------- evictable -> unloaded
+unloaded --> requested --> loading --> resident --> renderable <---+
+   ^ ^           |            |                         |          |
+   | |    cancel |     cancel | (discard                v          | promotion: free —
+   | +-----------+<-----------+  the completion)    evictable -----+ the tile re-entered
+   |                                                    |            the cut
+   +----------------------- evict ----------------------+
 ```
 
 - **requested**: in the priority queue, no IO issued. Cheap to cancel — just drop it.

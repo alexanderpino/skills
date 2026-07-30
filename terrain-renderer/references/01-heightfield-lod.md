@@ -97,6 +97,24 @@ per-frame LOD decisions, ideal fit for GPU displacement and uniform streaming. W
 is distance-only (no adaptivity to rough vs flat terrain — flat ocean floor costs the same as a
 ridge), and view-centering means every level updates every frame the camera moves.
 
+The structure, seen from above:
+
+```
++----------------------------------+     one level's texture after the camera
+|  level 2 (2x coarser again)      |     moves +x,+z (toroidal addressing):
+|    +------------------------+    |     +--------------------+
+|    | level 1 (2x coarser)   |    |     |                |###|
+|    |    +--------------+    |    |     |    retained    |###|
+|    |    |   level 0    |    |    |     |     texels     |###|
+|    |    |   (finest)   |    |    |     +----------------+###|
+|    |    |      V       |    |    |     |####################|
+|    |    +--------------+    |    |     +--------------------+
+|    | transition region on   |    |     ### = newly exposed L-shaped strip,
+|    | each ring's fringe     |    |           the only texels written —
+|    +------------------------+    |           nothing ever scrolls
++---------- V = viewer ------------+
+```
+
 ### CDLOD (~2009)
 
 Strugar's whitepaper (~2009). Quadtree selection like chunked LOD, but all nodes render the
@@ -121,6 +139,20 @@ on the CPU to guarantee monotonicity. Height must be re-sampled at the *morphed*
 lerped between the two levels' samples), not just the XZ slid — otherwise the silhouette still
 pops. CDLOD remains the default recommendation for huge-view-range streamed heightfields in
 2026.
+
+The morph band, laid out along the distance axis:
+
+```
+distance from viewer --->
+
+ x-x-x-x-x-x-x-x-x-x | x-x-x--x--x---x---x----x | x----x----x----x
+ level N, un-morphed | morph band:              | level N+1 (parent),
+ full-detail grid    |   morphK: 0 ---------> 1 | selected past here
+                     |   odd verts slide onto   |
+                     |   even neighbors         |
+                rangeStart                  rangeEnd: mesh is vertex-identical
+                                            to the parent -> no crack, no pop
+```
 
 ### Quadtree chunks with index-buffer edge permutations
 

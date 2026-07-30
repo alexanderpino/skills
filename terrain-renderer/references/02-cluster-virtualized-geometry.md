@@ -37,6 +37,24 @@ the LOD scheme fails exactly where meshes are expensive. Group-boundary **altern
 an edge locked at level L falls in some group's *interior* at level L+1 and gets simplified there.
 No edge is locked forever; boundaries migrate; the DAG is the price and the point.
 
+Two build levels and the runtime cut, schematically:
+
+```
+level L+1:         [ P1   P2 ]   [ P3   P4 ]      P1,P2 <- group A; P3,P4 <- group B —
+                     \  \ / /      \  \ / /       each parent descends from EVERY child
+                      \  X  /       \  X  /       cluster of its group: multiple
+                       \/ \/         \/ \/        ancestry paths, a DAG, not a tree
+level L:           [C1 C2 C3 C4] S [C5 C6 C7 C8]
+                   '--group A--'   '--group B--'  S = boundary edges LOCKED while A and
+                                                      B are simplified into P1..P4
+new groups at L+1:   ..P1 ] [ P2      P3 ] [ P4..  grouping alternates: S now falls in
+                                                   the interior of group {P2,P3} and is
+                                                   simplified when level L+2 is built
+runtime cut:    ~ ~ [ P1   P2 ] ~ [C5 C6 C7 C8] ~  the cut passes one level per ancestry
+                                                   path; every LOD flip lands on a
+                                                   boundary locked at build time
+```
+
 **Monotonic error, group-shared.** Each simplification records an error (max surface deviation, in
 object units). Force monotonicity: `G.error = max(simplifyError, max(child cluster errors))`, and
 force the group's LOD bounding sphere to enclose all child LOD spheres. Store the group's

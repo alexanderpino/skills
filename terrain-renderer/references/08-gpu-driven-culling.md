@@ -96,6 +96,22 @@ reprojection, no one-frame-late popping, no artist-placed occluder proxies. Cost
 dispatch rounds, two submission rounds per pass, and a persistent visibility-bit buffer keyed by
 stable chunk/cluster IDs (streaming must not recycle an ID mid-frame — `06`).
 
+Laid out as the frame-N timeline, with the HiZ dependencies:
+
+```
+frame N -------------------------------------------------------------------------->
++------------------+   +------------+   +-----------------+   +------------------+
+| PHASE 1          |   | build HiZ  |   | PHASE 2         |   | draw the newly   |
+| draw everything  |-->| pyramid    |-->| test ALL        |-->| visible (pass,   |
+| visible LAST     |   | from that  |   | candidates      |   | not yet drawn);  |
+| frame (vis bits) |   | depth      |   | against the HiZ |   | write vis bits   |
++------------------+   +------------+   +-----------------+   +------------------+
+         |                ^      |              ^                       |
+         +----- depth ----+      +----- HiZ ----+                      +--> phase 1,
+      (the prev-visible set is a                                            frame N+1
+       near-complete occluder set)
+```
+
 **HiZ build correctness** — this is where the bugs live:
 
 - **Reduction convention.** With standard depth (near=0, far=1), an occluder test needs the

@@ -45,6 +45,20 @@ both classic bug sites:
    at enqueue time. Meshing directly against live neighbor storage races with edits and produces
    meshes that are internally inconsistent (half old, half new world) — visible as one-frame cracks.
 
+One 2D slice of a section plus its halo makes the ownership split concrete:
+
+```
+   b b b b b b b b b b      the job-local snapshot = section + 1-voxel halo
+   b o o o o o o o o b
+   b o o o o o o o o b      o  owned voxels — the mesher emits faces only for these
+   b o o o o o o o o #      b  borrowed apron — the border layer of every neighbor,
+   b o o o o o o o A #         edges and corners included (AO needs the diagonals)
+   b b b b b b b b # #
+                            A  owned voxel at the boundary: its face test and 3x3x3
+                               AO neighborhood read the '#' borrowed cells — so an
+                               edit to those voxels dirties THIS section's mesh
+```
+
 Pitfalls: apron copied from only the 6 face-neighbors (AO breaks at chunk edges/corners exactly);
 dirtying only the edited chunk; palette remap during meshing (snapshot the palette too).
 
