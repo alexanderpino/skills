@@ -85,6 +85,24 @@ asymptotic-decider / MC33-style corrected tables — resolve the ambiguous face 
 bilinear saddle point) or simply take Lengyel's published Transvoxel tables, which are
 hole-free and come with the LOD transition tables you will need anyway (see next section).
 Never hand-derive the tables; this is the single most re-fabricated data structure in graphics.
+Take them from an authoritative source: Bourke's "Polygonising a Scalar Field" page carries the
+classic edge/tri tables (by Cory Gene Bloyd) that most implementations trace back to
+(https://paulbourke.net/geometry/polygonise/ — URL verified 2026-07), and transvoxel.org
+carries Lengyel's corrected + transition tables. The cell convention those tables assume:
+
+```
+        4--------5          corners: bit i of the 8-bit case index     case index:
+       /|       /|          edges:   12 edges, numbered per the           mask = 0
+      7--------6 |                   table's convention — adopt it        for i in 0..7:
+      | |      | |                   verbatim, do not renumber              if d[i] < iso:
+      | 0------|-1          a corner inside the surface sets its              mask |= 1<<i
+      |/       |/           bit; mask selects the tri-table row;
+      3--------2            crossed edges get interpolated verts
+```
+
+The one non-negotiable: corner numbering, edge numbering, and winding are a *single convention
+package* from whichever table you adopt — mixing Bourke corner order with another table's edge
+order produces meshes that are subtly inside-out or hole-punched only on some cases (`11`).
 
 **Surface Nets (Gibson 1998) / "naive surface nets".** Dual method: **one vertex per cell**
 that has any sign change, placed at the average (or smoothed position) of that cell's edge
@@ -376,6 +394,9 @@ these are the smooth-voxel signatures.
 - **P** Nielson & Hamann — *The Asymptotic Decider*, IEEE Visualization 1991: resolving MC face
   ambiguity by the bilinear saddle sign. (Extended complete-case tables, "MC33", follow-on
   literature — attribution of the definitive corrected table `?`.)
+- **F/D** Bourke, P. — *Polygonising a Scalar Field* (1994; tables by Cory Gene Bloyd) — the
+  canonical public MC edge/tri tables most implementations trace back to. URL verified 2026-07:
+  https://paulbourke.net/geometry/polygonise/
 - **P** Gibson, S. — *Constrained Elastic Surface Nets*, MICCAI 1998. Origin of surface nets;
   the "naive surface nets" simplification used in games is folklore-named (**F**).
 - **P** Ju, T., Losasso, F., Schaefer, S. & Warren, J. — *Dual Contouring of Hermite Data*,

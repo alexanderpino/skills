@@ -70,6 +70,7 @@ right fix.
 | Sparse voxel octrees | `04` | Laine & Karras, I3D 2010 | P | [ACM DL](https://dl.acm.org/doi/10.1145/1730804.1730814) |
 | Weighted-blended OIT | `04` | McGuire & Bavoil, JCGT 2(2), 2013 | P | [jcgt.org](https://jcgt.org/published/0002/02/09/) |
 | Marching cubes (+ asymptotic decider) | `05` | Lorensen & Cline, SIGGRAPH 1987; Nielson & Hamann, IEEE Visualization '91 (1991) | P | [ACM DL](https://dl.acm.org/doi/10.1145/37402.37422) |
+| MC lookup tables (canonical public source) | `05` | Bourke, "Polygonising a Scalar Field" (1994; tables by Bloyd) | F/D | [paulbourke.net](https://paulbourke.net/geometry/polygonise/) |
 | Surface nets | `05` | Gibson 1998, "Constrained Elastic Surface Nets", MICCAI '98; naive form Lysenko (0fps) | P/F | [Springer](https://link.springer.com/chapter/10.1007/BFb0056277) |
 | Dual contouring (hermite + QEF) | `05` | Ju, Losasso, Schaefer & Warren, SIGGRAPH 2002 | P | [ACM DL](https://dl.acm.org/doi/10.1145/566570.566586) |
 | Transvoxel transition cells | `05` | Lengyel 2010, UC Davis dissertation ("Voxel-Based Terrain for Real-Time Virtual Simulations"); transvoxel.org | P/D | [transvoxel.org](https://transvoxel.org/) |
