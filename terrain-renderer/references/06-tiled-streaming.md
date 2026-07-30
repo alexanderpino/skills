@@ -62,7 +62,9 @@ labelling which payload is which is a classic source of double-drawn geometry.
 | Instance sets (scatter) | separate, keyed to tile ID | Spawn/despawn on residency events, not per frame |
 
 The load-bearing decision is which payloads share the geometry tile's lifecycle and which run their
-own (virtual texturing runs its own page residency in `07`; collision runs its own ring below).
+own (virtual texturing runs its own page residency in `07`; collision runs its own ring below;
+auxiliary cause-maps ride the geometry tile's lifecycle and are budgeted by their consumer registry
+in `14`; instance sets spawn on residency events and hand off to `15`'s population pipeline).
 Payloads that share a lifecycle must ship in **one contiguous blob per tile** — one IO request, one
 decode — not as five small files that multiply seek/request overhead.
 

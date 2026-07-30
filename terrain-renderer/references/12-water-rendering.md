@@ -142,6 +142,31 @@ The geometry of the pass, in section view:
   X = ray B's scene hit is nearer than its t -> REJECT: terrain occludes the water
 ```
 
+**Waves on the analytic plane: layered normal cascades.** The flat datum reads as glass until it
+carries wave detail, and on this pass the cheap tier is entirely in shading: perturb the plane
+normal at the hit's world XZ with **two to four scrolling layers** at decade-spaced scales. Two
+layers is the floor (swell + chop); three reads as open water; the fourth (fine ripple) exists
+mainly near the camera and must fade with distance or it aliases into shimmer:
+
+```hlsl
+// world-XZ uv at the ray hit; layers decorrelated by scale, direction, AND speed
+float3 n = float3(0, 1, 0);                                       // start at the datum normal
+n = blend(n, sampleNormal(uv * 0.045 + dir0 * t * 0.35));         // swell   ~20 m
+n = blend(n, sampleNormal(uv * 0.21  - dir1 * t * 0.60));         // chop    ~4 m
+n = blend(n, sampleNormal(uv * 1.15  + dir2 * t * 0.95) * fade);  // ripple  ~1 m, distance-faded
+```
+
+`blend` is a real normal combine — RNM or whiteout from `07`, never a lerp. The layers can be
+tiling noise-derived normal maps (indie tier), or the FFT cascades' normal outputs
+([Ambient waves](#ambient-waves-gerstner-and-fft)) sampled as textures — the fullscreen pass
+consumes either identically. Decorrelation rules: non-parallel directions, scale ratios off
+integer multiples, speed ratios irrational-ish — any two layers that line up periodically
+produce a visible beat pattern marching across the sea. An analytic Gerstner normal sum
+(evaluate ∂h/∂x, ∂h/∂z of 3-6 Gerstner terms at the hit) substitutes for the texture layers
+when fetch-bound; derive the foam/whitecap mask from the combined slope either way. None of
+this moves the silhouette — crests do not rise, the horizon stays a line — which is exactly the
+boundary where the next paragraph takes over.
+
 **Displaced surfaces: per-pixel raymarching.** The analytic plane carries waves in normals only —
 flat silhouette, no parallax between crests. To show real displacement, march the ray against the
 displaced height: start at the analytic hit of a crest-inflated plane, take fixed steps sampling

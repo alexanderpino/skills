@@ -138,7 +138,8 @@ line *= saturate(2.0 - 2.0*fwidth(g));        // fade out where contours pack be
 Fade is not optional: where spacing drops below pixel size, unfaded contours merge into flickering
 noise on every cliff. Draw every 5th/10th contour heavier (index contours) for readability.
 
-**Water overlay.** Preview water is not `12`'s ocean pipeline — it is a fullscreen composite: one
+**Water overlay.** Preview water is `12`'s fullscreen-triangle machinery stripped to a data
+overlay — not its ocean shading pipeline: one
 vertex-ID triangle (three vertices, no buffers — the standard fullscreen-pass idiom), reconstruct
 world position from the depth buffer, sample `waterSurface(x,z)` from the contract field, and
 where `waterSurface > groundY` tint by `waterDepth` with a cheap exponential absorption. This

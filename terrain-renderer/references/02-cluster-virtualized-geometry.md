@@ -83,6 +83,23 @@ handling moved from runtime stitching to build-time boundary locking.
 Default τ is ~1 pixel of error (UE: `r.Nanite.MaxPixelsPerEdge`), at which point LOD is visually
 lossless and pop is sub-pixel — TAA absorbs it. Raising τ is the knob for cheaper platforms.
 
+### Lineage: edge collapse, online → offline
+
+Edge collapse is the atom of this whole chapter, and its history explains the architecture.
+Hoppe's *Progressive Meshes* (SIGGRAPH 1996) encoded a mesh as a coarse base plus an ordered
+stream of vertex splits — the exact inverse of an edge-collapse sequence — and *View-Dependent
+Refinement of Progressive Meshes* (SIGGRAPH 1997) ran that stream **at runtime**: collapse and
+split individual vertices per frame against view criteria (frustum, orientation, screen-space
+error — the same three tests this chapter runs). It was `01`-ROAM's vertex-granularity sibling,
+and it died the same death: per-frame CPU refinement, per-frame index rebuilds, pointer-chasing
+data structures — everything post-2005 GPUs punish. The idea did not die; it moved **offline
+and coarsened**. Discrete LOD chains are snapshots along an edge-collapse run. The cluster DAG
+is view-dependent refinement resurrected at *cluster* granularity: the split/collapse decision
+survives, but it is made per ~128-triangle cluster on the GPU against precomputed monotonic
+error, over geometry that is immutable and streamable. What changed is the granularity and the
+build/runtime split, not the principle — coarse enough to live in static buffers and parallel
+culling, fine enough that the cut still approximates per-vertex refinement to sub-pixel error.
+
 ## The runtime: cull, cut, rasterize, shade
 
 ### Per-cluster culling and hierarchy traversal
@@ -329,7 +346,7 @@ blending is forgiving. At planetary scale, add `09`'s precision regime on top of
 | Visibility buffer (per-pixel triangle ID, deferred attribute fetch/shade) | **P** | Burns & Hunt, "The Visibility Buffer: A Cache-Friendly Approach to Deferred Shading", JCGT 2013 |
 | Cluster-hierarchy LOD with batched GPU-friendly units (pre-Nanite lineage) | **P** | Cignoni et al., "Adaptive TetraPuzzles" (SIGGRAPH 2004); Cignoni et al., "Batched Multi Triangulation" (IEEE Visualization 2005) |
 | QEM simplification; attribute-extended quadrics | **P** | Garland & Heckbert, "Surface Simplification Using Quadric Error Metrics", SIGGRAPH 1997 (attributes: Garland & Heckbert 1998) |
-| View-dependent continuous LOD lineage | **P** | Hoppe, "Progressive Meshes", SIGGRAPH 1996 |
+| View-dependent continuous LOD lineage (runtime edge collapse, historical) | **P** | Hoppe, "Progressive Meshes", SIGGRAPH 1996; "View-Dependent Refinement of Progressive Meshes", SIGGRAPH 1997 — project page hhoppe.com/proj/vdrpm/ (URL seen 2026-07) |
 | Two-phase (previous-frame HiZ, retest) occlusion culling | **T** | Haar & Aaltonen, "GPU-Driven Rendering Pipelines", SIGGRAPH 2015, Advances in Real-Time Rendering course |
 | Persistent-threads GPU work-queue pattern | **P** | Aila & Laine, "Understanding the Efficiency of Ray Traversal on GPUs", HPG 2009 |
 | Meshlet building, vertex-reuse limits, cone bounds, locked-border simplify | **D/F** | meshoptimizer (Kapoulkine), github.com/zeux/meshoptimizer — docs + established community practice |

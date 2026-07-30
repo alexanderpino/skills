@@ -61,6 +61,9 @@ priority queues, re-run on the CPU every frame. Dead as shipped: per-triangle CP
 per-frame index buffer rebuilds are exactly what GPUs punish hardest. Study it anyway, for two
 ideas that survived: (a) frame-coherent split/merge queues, and (b) the **longest-edge
 bisection** bintree, which is precisely the structure CBT/LEB (below) resurrected on the GPU.
+Its vertex-granularity sibling from the same era — progressive meshes and view-dependent
+refinement, i.e. *runtime edge collapse* — died the same death and was reborn offline as the
+cluster DAG; that lineage is told in `02`.
 
 ### Geomipmapping (2000)
 

@@ -55,6 +55,7 @@ right fix.
 | Visibility buffer (deferred material shading) | `08` | Burns & Hunt, JCGT 2(2), 2013 | P | [jcgt.org](https://jcgt.org/published/0002/02/04/) |
 | Meshlets / mesh shaders | `02` | Vendor docs; meshoptimizer | D/F | [github.com/zeux/meshoptimizer](https://github.com/zeux/meshoptimizer) |
 | QEM simplification | `02` | Garland & Heckbert, SIGGRAPH 1997 | P | [ACM DL](https://dl.acm.org/doi/10.1145/258734.258849) |
+| Progressive meshes / view-dependent refinement (runtime edge collapse — historical; lineage of the DAG cut) | `02` | Hoppe, SIGGRAPH 1996 & 1997 | P | [hhoppe.com](https://hhoppe.com/proj/vdrpm/) |
 | UE Landscape (components/sections, LOD, weightmaps) | `03` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/landscape-technical-guide-in-unreal-engine) |
 | Nanite Landscape, Nanite displacement | `03` | Epic docs — version-sensitive, re-verify | D/N/? | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/using-nanite-with-landscapes-in-unreal-engine) |
 | Runtime Virtual Texture (RVT) | `03` `07` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/runtime-virtual-texturing-in-unreal-engine) |

@@ -107,8 +107,8 @@ frame N ------------------------------------------------------------------------
 | frame (vis bits) |   | depth      |   | against the HiZ |   | write vis bits   |
 +------------------+   +------------+   +-----------------+   +------------------+
          |                ^      |              ^                       |
-         +----- depth ----+      +----- HiZ ----+                      +--> phase 1,
-      (the prev-visible set is a                                            frame N+1
+         +----- depth ----+      +----- HiZ ----+                       +--> phase 1,
+      (the prev-visible set is a                                              frame N+1
        near-complete occluder set)
 ```
 
@@ -155,7 +155,8 @@ Survivors become draws without CPU involvement:
   buffers means the args buffer is tiny and uniform — every draw differs only in its constants.
   This uniformity is what makes terrain MDI degenerate into "one draw, N instances" in the limit;
   use instancing when every chunk truly shares topology, MDI when edge-permutation IBs (`01`)
-  vary the index count.
+  vary the index count. The same generate→cull→compact→indirect spine, specialized to millions
+  of vegetation/scatter instances, is `15`.
 - **Bindless.** Per-tile heightmaps, splat/VT indirection (`07`), material tables: descriptor
   indexing from the chunk record. Without bindless you are back to CPU-side descriptor binding
   per draw, which reintroduces the per-object cost the architecture exists to kill. NonUniform
