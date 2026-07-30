@@ -19,6 +19,13 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.waitForTimeout(2200);
 
   const result=await page.evaluate(()=>{
+    // Build the showcase document explicitly. It used to be whatever boot() happened to load, but
+    // D7 demoted the 18-node graph and the opening document is now L0 bedrock - which has no wind,
+    // no snow and no water, so every lookup below would find nothing and the checks would pass
+    // vacuously on absent nodes. An oracle that asserts "wind wires to snow correctly" should
+    // CONSTRUCT that wiring rather than hope the default still contains it.
+    nodes.length=0; edges.length=0; uid=1; selected=null; selectedEdge=null;
+    showcaseGraph(); evalGraph();
     const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
     const snowNode=nodes.find(n=>n.type==='snow');
     const waterNode=nodes.find(n=>n.type==='water');

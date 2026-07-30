@@ -21,6 +21,13 @@ const HEIGHTMAP_SIZE = Number(process.env.STUDIO_HEIGHTMAP_SIZE || 0);
   await page.waitForTimeout(900);
 
   const report = await page.evaluate(() => {
+    // Build the showcase document explicitly. It used to be whatever boot() happened to load, but
+    // D7 demoted the 18-node graph and the opening document is now L0 bedrock — which has no wind,
+    // no snow and no water, so every lookup below would find nothing and the defaultGraph checks
+    // would pass vacuously on absent nodes. An oracle asserting "wind wires to snow correctly"
+    // should CONSTRUCT that wiring rather than hope the opening document still contains it.
+    nodes.length = 0; edges.length = 0; uid = 1; selected = null; selectedEdge = null;
+    showcaseGraph(); evalGraph();
     const n = 96, N = n * n;
     const def = { ...terrainDef, scale: 5000, height: 1200, baseElevation: 0,
       windDirection: 270, windSpeed: 12, lattice: 'square' };
