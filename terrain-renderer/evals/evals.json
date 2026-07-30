@@ -5,19 +5,48 @@
       "id": 1,
       "prompt": "I'm building an open-world game with a 32km x 32km heightfield terrain (1m/px source data). Design the terrain rendering system: LOD scheme, streaming, materials. Target is PC + current-gen consoles at 60fps. The terrain is static at runtime.",
       "expected_output": "Chooses a quadtree/CDLOD-or-clipmap family renderer (not voxels/Nanite-by-default), states a screen-space error budget, specifies a crack contract (morph/stitching/skirts) explicitly, a tile streaming design with residency/hysteresis/no-holes rule, splat + virtual-texturing material plan, GPU-driven culling, and names debug views/verification before implementation. Routes generation-side data needs to the output contract rather than inventing them.",
-      "files": []
+      "files": [],
+      "assertions": [
+        "Recommends a heightfield grid-LOD scheme (CDLOD / clipmap / quadtree chunks) rather than defaulting to voxels or Nanite",
+        "States a screen-space error budget in pixels (tau) or gives the SSE projection formula",
+        "Specifies an explicit crack-prevention strategy (vertex morph, index stitching, or sized skirts) rather than leaving seams to blending",
+        "Specifies tile streaming with a priority/residency rule (hysteresis, or never-show-holes / parent-resident guarantee)",
+        "Proposes amortized materials (virtual texturing, RVT, or ID maps) instead of only a per-pixel N-layer splat blend",
+        "Recommends GPU-driven submission or culling (indirect draws, compute culling, or HiZ occlusion)",
+        "Raises float precision (camera-relative rendering or origin rebasing) as required at 32 km scale",
+        "Names verification or debug views (LOD false-color, overdraw, residency) as part of the plan"
+      ]
     },
     {
       "id": 2,
       "prompt": "Write me a fast chunk mesher for my Minecraft-like game in C++. Chunks are 32^3, blocks have per-face textures, and I want smooth lighting and ambient occlusion like Minecraft has.",
       "expected_output": "Implements greedy or binary-greedy meshing with merge keys that include light/AO/tint (not just block type), uses a 1-voxel neighbor apron, the side1+side2+corner vertex AO rule with quad diagonal flip, packed vertex format, texture arrays over atlases, and mentions the remesh queue/budget doctrine. No fabricated citations.",
-      "files": []
+      "files": [],
+      "assertions": [
+        "Implements greedy or binary/bitwise greedy meshing rather than only per-face culled meshing",
+        "Merge key includes per-vertex light and/or AO, not just block type (prevents merged-quad lighting errors)",
+        "Reads a 1-voxel neighbor apron/halo for face-visibility and AO at chunk borders",
+        "Implements the canonical voxel AO rule using two side neighbors plus the corner",
+        "Mentions the quad diagonal flip to fix AO interpolation anisotropy",
+        "Uses texture arrays (or explains the atlas UV-tiling constraint that greedy meshing imposes)",
+        "Uses a packed/compressed vertex format rather than full float32 per attribute",
+        "Mentions off-thread remeshing with a dirty-chunk queue or per-frame budget"
+      ]
     },
     {
       "id": 3,
       "prompt": "My terrain has visible cracks/holes between LOD levels and the shadows shimmer whenever the camera moves. Terrain is a chunked quadtree with skirts, world is about 40km across. What's wrong?",
       "expected_output": "Diagnoses as symptom -> mechanism -> minimal fix: cracks indicate a violated seam contract (skirt depth vs neighbor error, or T-junctions from unmatched edge indices); shadow shimmer at 40km scale is float precision (needs camera-relative rendering/origin rebasing) and/or missing shadow texel snapping. Checks LOD consistency across passes. Does not propose rewriting the renderer.",
-      "files": []
+      "files": [],
+      "assertions": [
+        "Diagnoses cracks as a violated LOD-boundary contract (skirt depth vs neighbor error, adjacency constraint, or missing edge-permutation indices)",
+        "Mentions T-junctions as a distinct crack/sparkle mechanism",
+        "Attributes shadow shimmer at 40 km at least partly to float precision (camera-relative rendering / origin rebasing)",
+        "Mentions shadow-cascade texel snapping and/or sphere-bounded cascade fitting as a shimmer fix",
+        "Checks LOD-selection consistency across passes (depth prepass / shadow cascades vs main view)",
+        "Presents findings as symptom to mechanism to minimal fix rather than prescribing a rewrite",
+        "Suggests a diagnostic or debug view to confirm the diagnosis before fixing"
+      ]
     },
     {
       "id": 4,
@@ -35,7 +64,20 @@
       "id": 6,
       "prompt": "Add an ocean and rivers to my custom engine's terrain. I don't want to build a whole water mesh LOD system if I can avoid it \u2014 I heard you can render water with just a fullscreen triangle?",
       "expected_output": "Covers the fullscreen-triangle screen-space water pass (SV_VertexID triangle, per-pixel ray reconstruction, analytic ray-plane intersection with the water datum, depth-buffer rejection, depth-based absorption and shore fade), its trade-offs vs mesh/projected-grid water (TAA motion vectors, displaced silhouettes, multiple elevations), and flow-mapped rivers driven by the generator's flow field. Consumes water surface/depth from the generation-side contract; never carves water into the heightfield.",
-      "files": []
+      "files": [],
+      "assertions": [
+        "Describes the fullscreen triangle emitted from SV_VertexID (3 oversized vertices, no vertex buffer)",
+        "Explains why one triangle beats a quad (no diagonal seam / fewer partial quads or helper lanes)",
+        "Reconstructs a per-pixel view ray and analytically intersects the water datum plane",
+        "Guards the degenerate intersection cases (ray near-parallel to the plane, t<0 / plane behind camera, camera below datum)",
+        "Rejects hits occluded by the scene using the depth buffer before shading water",
+        "Derives absorption/shore fade from water depth (scene depth minus hit distance, or the depth field)",
+        "Gives a layered wave recipe: two or more scrolling normal layers at different scales, decorrelated in direction/speed",
+        "Combines the wave layers with a real normal blend (RNM/whiteout) rather than lerping normals",
+        "Warns that the pass rasterizes nothing so TAA motion vectors must be derived analytically",
+        "Covers flow-mapped rivers driven by a flow vector field, not just the ocean",
+        "States honestly when a mesh/projected grid beats the fullscreen pass (displaced silhouettes, many water elevations)"
+      ]
     },
     {
       "id": 7,
