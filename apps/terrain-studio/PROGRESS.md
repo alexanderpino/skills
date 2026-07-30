@@ -34,7 +34,8 @@ Run from `apps/terrain-studio/`. Everything is HTTP now; `--file` died with A1.
 npm run verify -- _verify_digest.js     60 node types bit-identical at 256²
 npm run verify -- --preview _verify_digest.js   same, against the BUILT bundle
 npm run bridge:check                    202 symbols, unbridgeable 0
-npm run plugins:tdz                     33 modules, no module-eval-time legacy reference
+npm run plugins:check                   60 modules: imports resolve, exports exist, no TDZ
+npm run verify -- _verify_blur_isotropy.js   square 1.0000, hex 1.0000 (was 1.185)
 node tests/legacy/_verify_shapescan.js  3 files, 8554 lines scanned
 npm run verify -- _verify_gpu.js        hasWebGL2Float=true init=true gpuReady=true
                                         fbm@512: 16ms GPU vs 231ms CPU
@@ -74,6 +75,14 @@ tests/e2e/          4 Playwright specs
 | `out` | 1 | | — |
 
 60 total. Digest green per batch, so a bad extraction bisects to one node.
+
+## D7 layered cake
+
+| Layer | State |
+|---|---|
+| L0 bedrock + blends + masks | hexBlur **done** — anisotropy 1.185 → 1.0000; default doc still to build |
+| L1 erosion (MC-3 D6 constants, MC-5 MFD6) | next |
+| L2 cover · L3 water · L4 climate/snow · L5 dressing | |
 
 ## Next, in order
 

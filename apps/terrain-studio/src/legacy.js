@@ -1505,13 +1505,93 @@ export function levelsField(inp,{inLo=0,inHi=1,gamma=1,outLo=0,outHi=1}){
 }
 export function clampField(inp,{lo=0,hi=1}){const o=newField();for(let i=0;i<inp.length;i++)o[i]=clamp(inp[i],lo,hi);return o;}
 export function invertField(inp){const o=newField();for(let i=0;i<inp.length;i++)o[i]=1-inp[i];return o;}
-export function blurField(inp,{radius=2}){
-  const n=fieldW(),nh=fieldH(),r=Math.max(1,Math.round(radius));const tmp=newField(),o=newField();
-  const w=[];let ws=0;for(let k=-r;k<=r;k++){const g=Math.exp(-(k*k)/(2*(r*0.6)*(r*0.6)));w.push(g);ws+=g;}
+// A 1-D Gaussian tap set of half-width r, normalised. sigma is expressed in LATTICE STEPS, and
+// on both lattices a step along a lattice line is one world unit, so the same weights serve every
+// axis. Separated out because the hex path needs the identical kernel three times.
+function gaussTaps(r,sigma){
+  const w=[];let ws=0;
+  for(let k=-r;k<=r;k++){const g=Math.exp(-(k*k)/(2*sigma*sigma));w.push(g);ws+=g;}
   for(let i=0;i<w.length;i++)w[i]/=ws;
+  return w;
+}
+
+// THE SQUARE PATH, unchanged. Two separable passes along the array axes, which on a square lattice
+// ARE the lattice lines. Kept byte-identical: the digest is a byte-identity gate and this is the
+// path it measures.
+function blurFieldSquare(inp,r){
+  const n=fieldW(),nh=fieldH();const tmp=newField(),o=newField();
+  const w=gaussTaps(r,r*0.6);
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=inp[y*n+clamp(x+k,0,n-1)]*w[k+r];tmp[y*n+x]=s;}
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){let s=0;for(let k=-r;k<=r;k++)s+=tmp[clamp(y+k,0,nh-1)*n+x]*w[k+r];o[y*n+x]=s;}
   return o;
+}
+
+// THE HEX PATH — three passes along the three lattice lines, not two along the array.
+//
+// Why the square code is wrong here, concretely: its second pass walks straight down the ARRAY,
+// (x, y+1). On an odd-r offset lattice that is not a neighbour at all — the two cells below are at
+// x and x±1 depending on row parity — and the row spacing is √3/2, not 1. So the vertical pass
+// blurs along a direction the lattice does not have, with the wrong metric. Measured on an impulse,
+// the result is an ellipse: anisotropy 1.185 at r=3 and 1.163 at r=6, against 1.0000 on square.
+//
+// A hex lattice has THREE axes at 60°, and three 1-D Gaussians at 60° compose to an isotropic 2-D
+// Gaussian — the same fact that makes a 6-fold lattice isotropic at 4th order where a 4-fold one is
+// not (FHP; `26`). The variance adds per axis: three passes of variance v give 3v/2 in every
+// direction, so to land on target variance σ² each pass uses
+//
+//     σ' = σ·√(2/3)
+//
+// which is where the factor in this function comes from. It is not a tuning constant and must not
+// be adjusted to taste — a different value produces a round blur of the wrong WIDTH, which is
+// harder to notice than an elliptical one of the right width.
+//
+// Axis walking uses the same odd-r neighbour tables as thermalErodeHex. Stepping along axes B and C
+// changes column by a row-parity-dependent amount, so the walk is done one row at a time rather
+// than by an index stride.
+function blurFieldHex(inp,r){
+  const n=fieldW(),nh=fieldH();
+  const w=gaussTaps(r,r*0.6*Math.sqrt(2/3));
+  const at=(f,x,y)=>f[clamp(y,0,nh-1)*n+clamp(x,0,n-1)];
+
+  // axis A: the row itself, (±1, 0) — a real lattice line on hex as on square
+  const a=newField();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
+    let s=0;for(let k=-r;k<=r;k++)s+=at(inp,x+k,y)*w[k+r];
+    a[y*n+x]=s;
+  }
+
+  // axes B and C: one row per step, column shifted by parity.
+  //   B (NW/SE): from an EVEN row, SE is (x, y+1) and NW is (x-1, y-1)
+  //              from an ODD  row, SE is (x+1, y+1) and NW is (x, y-1)
+  //   C (NE/SW): from an EVEN row, NE is (x, y-1) and SW is (x-1, y+1)
+  //              from an ODD  row, NE is (x+1, y-1) and SW is (x, y+1)
+  const walk=(src,dst,downDX)=>{
+    for(let y0=0;y0<nh;y0++)for(let x0=0;x0<n;x0++){
+      let s=src[y0*n+x0]*w[r];
+      // downhill in y
+      let x=x0,y=y0;
+      for(let k=1;k<=r;k++){
+        x+=downDX(y);y+=1;
+        s+=at(src,x,y)*w[k+r];
+      }
+      // uphill in y — the inverse step, so the parity consulted is that of the row being LEFT
+      x=x0;y=y0;
+      for(let k=1;k<=r;k++){
+        y-=1;x-=downDX(y);
+        s+=at(src,x,y)*w[r-k];
+      }
+      dst[y0*n+x0]=s;
+    }
+  };
+  const b=newField(),o=newField();
+  walk(a,b,(y)=>(y&1)?1:0);    // B: SE steps +1 in x from an odd row, +0 from an even one
+  walk(b,o,(y)=>(y&1)?0:-1);   // C: SW steps  0 in x from an odd row, -1 from an even one
+  return o;
+}
+
+export function blurField(inp,{radius=2}){
+  const r=Math.max(1,Math.round(radius));
+  return isHex()?blurFieldHex(inp,r):blurFieldSquare(inp,r);
 }
 export function histEqualizeField(inp,{bins=256,amount=1}){
   const[mn,mx]=fieldRange(inp);const d=mx-mn||1;const hist=new Float64Array(bins);
