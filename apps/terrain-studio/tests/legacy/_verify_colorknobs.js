@@ -15,7 +15,12 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
 const EXE = process.env.STUDIO_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const URL = 'file://' + path.resolve(__dirname, '../../index.html');
+// STUDIO_URL first, file:// only as the fallback. Once the app is an ES-module bundle, file://
+// cannot load it at all - module scripts are fetched with CORS semantics and a file:// origin is
+// opaque, so the page comes up blank and every gate below reports on an empty document. 62 of the
+// 66 oracles already honoured this; this file and _verify_glsl_probe.js were the two that would
+// have gone silently blank the moment the extraction started.
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'));
 
 (async () => {
   const b = await chromium.launch({ executablePath: EXE,

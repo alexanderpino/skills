@@ -5,7 +5,10 @@ const { chromium } = require('playwright-core');
 const path = require('path');
 const fs = require('fs');
 const EXE = process.env.STUDIO_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const URL = 'file://' + path.resolve(__dirname, '../../index.html');
+// STUDIO_URL first, file:// only as the fallback — see the note in _verify_colorknobs.js. This
+// probe lifts GLSL out of the live compositor source at runtime, so a blank page here does not
+// fail loudly; it finds no shader and has nothing to compare, which is the quiet variety.
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'));
 const SRC = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 function grabFn(sig) {
   const i = SRC.indexOf(sig); if (i < 0) return null;
