@@ -74,10 +74,18 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       await waitFrames(3);return{dispatchMs:performance.now()-t0,uploads:uploads.slice(),
         fieldStable:beforeField===activePreviewNode()._field,finalValue:waterLook.strength};
     };
+    // BUILD THE DOCUMENT THIS FILE NEEDS rather than inheriting whatever opens. D7 made the opening
+    // document the highest layer verified on both lattices (L0: bedrock, blend, mask), and the four
+    // lookups below want satmap, colorerosion and weathering - none of which L0 contains. Inherited,
+    // they returned undefined and edit() died on `nd.params`. An oracle about slider latency on a
+    // colour stack should construct that stack; the default is free to change under it.
+    showcaseGraph(); evalGraph();
     const sat = nodes.find(n => n.type === 'satmap');
     const erosion = nodes.find(n => n.type === 'colorerosion');
     const weather = nodes.find(n => n.type === 'weathering');
     const base = nodes.find(n => n.type === 'perlin');
+    for (const [nm, nd] of [['satmap', sat], ['colorerosion', erosion], ['weathering', weather], ['perlin', base]])
+      if (!nd) throw new Error(`SETUP FAILURE: no ${nm} node after showcaseGraph()`);
     return {
       sat: await edit(sat, 'hue', ['.1','.2','.3','.4','.5']),
       erosion: await edit(erosion, 'density', ['.3','.4','.5']),

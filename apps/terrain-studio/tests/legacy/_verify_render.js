@@ -61,6 +61,25 @@ function imageStats(png, r) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(URL, { waitUntil:'load' }); await page.waitForTimeout(1400);
+
+  // BUILD THE DOCUMENT THIS FILE MEASURES. D7 made the opening document L0 - bedrock, blend, mask -
+  // and this oracle needs water (ripple motion), a colour stack (SatMap breakup) and snow (the data
+  // views). Inherited, the water gate read rippleMotion.changed = 0 against a threshold of >20.
+  //
+  // It has to go through the APP'S OWN BUILD, not evalGraph() alone: refreshWater() reads curHgt,
+  // curFilled and curAccum, and those are populated by updateViewport on the render path. Calling
+  // evalGraph() in isolation leaves them holding the previous document's terrain, so the water
+  // surface would be computed against the wrong heightfield - green, and meaningless.
+  await page.evaluate(() => {
+    nodes.length=0; edges.length=0; uid=1; selected=null; selectedEdge=null;
+    showcaseGraph();
+  });
+  await page.locator('#buildBtn').click();
+  await page.waitForFunction(
+    () => !evalFrame && !document.querySelector('#buildBtn').hasAttribute('aria-busy'),
+    null, { timeout: 60000 });
+  await page.waitForTimeout(500);
+
   await page.locator('#layoutBtn').click(); await page.waitForTimeout(200);
   await page.evaluate(() => { cam.dist = 2.15; cam.el = .58; cam.az = .72; });
   const rect = await page.locator('#viewport').boundingBox();
@@ -100,6 +119,7 @@ function imageStats(png, r) {
       const a=satLayerColor(L,i);L.rough='high';const b=satLayerColor(L,i);L.rough='none';
       delta += Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])+Math.abs(a[2]-b[2]);
     }
+    if(!nodes.some(n=>n.type==='water'))throw new Error('SETUP FAILURE: no water node in the graph');
     const oldTime=uTime,oldRipple=waterLook.strength,oldSeaTemp=terrainDef.seaTemp;
     terrainDef.seaTemp=35;refreshWater(); // motion contract is liquid water; frozen standing water correctly has none
     const frame=(time,ripple)=>{
