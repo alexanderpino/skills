@@ -75,6 +75,40 @@ graph LR
    S2 --> S8
 ```
 
+### Mission Control traceability
+
+The sprint stories remain canonical. Mission Control items are implementation bundles only; an item
+may not add, omit, or redefine story scope. S1.0 is already implemented in the baseline, leaving 48
+stories assigned exactly once below.
+
+| Mission item | Canonical stories | Depends on |
+|---|---|---|
+| `MC-S01` | S2.1, S2.2 | — |
+| `MC-S02` | S2.3–S2.6 | `MC-S01` |
+| `MC-S03` | S1.1, S1.2 | — |
+| `MC-S04` | S1.3–S1.5 | — |
+| `MC-S05` | S3.1, S3.2, S3.4 | `MC-S02` |
+| `MC-S06` | S3.3, S3.5 | `MC-S05` |
+| `MC-S07` | S4.1, S4.2, S4.4, S4.5 | `MC-S06` |
+| `MC-S08` | S4.3, S4.6 | `MC-S07` |
+| `MC-S09` | S4.7 | `MC-S02` |
+| `MC-S10` | S4.8, S4.9 | `MC-S07`, `MC-S09` |
+| `MC-S11` | S4.10 | `MC-S08`, `MC-S10` |
+| `MC-S12` | S5.1–S5.4 | `MC-S06`, `MC-S08` |
+| `MC-S13` | S6.1–S6.3 | `MC-S12` |
+| `MC-S14` | S6.4–S6.6 | `MC-S13` |
+| `MC-S15` | S7.1, S7.2 | `MC-S03`, `MC-S04`, `MC-S06`, `MC-S12` |
+| `MC-S16` | S7.3 | `MC-S06`, `MC-S12` |
+| `MC-S17` | S7.4, S7.5 | `MC-S06`, `MC-S07` |
+| `MC-S18` | S8.1–S8.4 | `MC-S02` |
+| `MC-S19` | S8.5, S8.6 | `MC-S18` |
+| `MC-S20` | S5.5 + cross-sprint exit gates/default promotion | all producing bundles |
+
+`MC-S09` deliberately does not wait for S4 hydrology: S4.7 targets the existing Water mesh and may
+start once ADR 006 CPU vectors are armed. S4.9's final river regime remains in `MC-S10` and waits for
+`MC-S07` physical flow. Transitive dependencies are omitted from the table when the immediate edge
+already carries them.
+
 ---
 
 ## Capacity and cadence
