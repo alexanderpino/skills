@@ -1,5 +1,5 @@
-// The GPGPU fast path: WebGL2 render-to-texture kernels for noise, thermal, warp, and the
-// pipe + particle hydraulic solvers, plus their capability gates.
+// The GPGPU fast path: WebGL2 render-to-texture kernels for noise, thermal, warp, rock fracture,
+// and the pipe + particle hydraulic solvers, plus their capability gates.
 //
 // Extracted first of the four core concerns because it is the cheapest cut: 21 inbound references
 // of which 19 are its own wrappers, exactly two external callers (both toolbar handlers), no DOM,
@@ -208,6 +208,77 @@ export function gpuWarp(inp,{strength=0.12,freq=3,seed=7}){
   return GPU.read(dst,n);
 }
 
+// Multi-scale rock fractures are a T0 gather kernel: the input height is read once and a warped
+// Worley F2-F1 distance field is evaluated directly in world metres. No neighbour is sampled, so
+// the authored domain edge is not a simulation boundary and cannot grow a clamped frame.
+const GPU_ROCK_FRACTURE_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uH;
+  uniform int uN,uSeed,uOctaves;
+  uniform float uWorldScale,uScaleM,uLacunarity,uJitter,uWarp,uWarpScaleM;
+  uniform float uWidthM,uDepth,uDepthFalloff,uBreakdownM,uBreakdown,uRoughness,uWeather;
+  `+GLSL_NOISE+`
+  float smooth01(float t){t=clamp(t,0.0,1.0);return t*t*(3.0-2.0*t);}
+  float lineCoverage(float edge,float widthM,float cellM,float spacing){
+    float threshold=widthM/spacing,aa=max(1e-5,cellM/spacing);
+    return 1.0-smooth01((edge-(threshold-aa))/(2.0*aa));}
+  vec2 featurePoint(ivec2 c,int seed){
+    vec2 random=vec2(hashf(c.x,c.y,seed),hashf(c.x,c.y,seed+91));
+    return vec2(c)+mix(vec2(0.5),random,uJitter);}
+  vec2 fractureMasks(vec2 world,float cellM){
+    float core=0.0,weathered=0.0,spacing=uScaleM,amp=1.0;
+    for(int octave=0;octave<5;octave++){
+      if(octave>=uOctaves)break;
+      int octaveSeed=uSeed+octave*1013;
+      vec2 warpUV=world/uWarpScaleM;
+      vec2 warp=vec2(gnoise(warpUV.x,warpUV.y,octaveSeed+37),
+                     gnoise(warpUV.x,warpUV.y,octaveSeed+109));
+      vec2 p=(world+(warp-0.5)*2.0*uWarp*spacing)/spacing;
+      ivec2 c=ivec2(floor(p));float f1=1e9,f2=1e9;
+      for(int oy=-1;oy<=1;oy++)for(int ox=-1;ox<=1;ox++){
+        ivec2 q=c+ivec2(ox,oy);float d=length(p-featurePoint(q,octaveSeed));
+        if(d<f1){f2=f1;f1=d;}else if(d<f2)f2=d;}
+      float edge=max(0.0,f2-f1);
+      float crackWidth=uWidthM*amp;
+      float weatherWidth=crackWidth+2.0*uBreakdownM*amp;
+      float crack=lineCoverage(edge,crackWidth,cellM,spacing);
+      float broken=lineCoverage(edge,weatherWidth,cellM,spacing);
+      core=1.0-(1.0-core)*(1.0-crack*amp);
+      weathered=1.0-(1.0-weathered)*(1.0-broken*amp);
+      spacing/=uLacunarity;amp*=uDepthFalloff;
+    }
+    return vec2(core,max(0.0,weathered-core));}
+  void main(){
+    ivec2 pixel=ivec2(gl_FragCoord.xy);
+    float cellM=uWorldScale/float(uN);
+    vec2 world=(vec2(pixel)+0.5)*cellM;
+    vec2 masks=fractureMasks(world,cellM);
+    float shoulder=uWeather>0.5?masks.y*uBreakdown:0.0;
+    float rough=gnoise(world.x/max(1.0,uScaleM*0.37),
+      world.y/max(1.0,uScaleM*0.37),uSeed+2081);
+    float variation=1.0+uRoughness*(rough*1.4-0.7);
+    float height=texelFetch(uH,pixel,0).r;
+    frag=vec4(height-uDepth*(masks.x+shoulder)*variation,0.0,0.0,1.0);
+  }`;
+export function gpuRockFracture(inp,o={}){
+  const n=fieldW(),src=GPU.upload("fractureIn",n,inp),dst=GPU.rt("fractureOut",n);
+  const prog=GPU.prog("rockFracture",GPU_ROCK_FRACTURE_FS);
+  GPU.run(prog,n,dst,d=>{
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,src);gl.uniform1i(u(d,"uH"),0);
+    gl.uniform1i(u(d,"uN"),n);gl.uniform1i(u(d,"uSeed"),o.seed|0);
+    gl.uniform1i(u(d,"uOctaves"),o.octaves|0);
+    gl.uniform1f(u(d,"uWorldScale"),terrainDef.scale);
+    gl.uniform1f(u(d,"uScaleM"),o.scaleM);gl.uniform1f(u(d,"uLacunarity"),o.lacunarity);
+    gl.uniform1f(u(d,"uJitter"),o.jitter);gl.uniform1f(u(d,"uWarp"),o.warp);
+    gl.uniform1f(u(d,"uWarpScaleM"),o.warpScaleM);gl.uniform1f(u(d,"uWidthM"),o.widthM);
+    gl.uniform1f(u(d,"uDepth"),o.depthM/terrainDef.height);
+    gl.uniform1f(u(d,"uDepthFalloff"),o.depthFalloff);
+    gl.uniform1f(u(d,"uBreakdownM"),o.breakdownM);gl.uniform1f(u(d,"uBreakdown"),o.breakdown);
+    gl.uniform1f(u(d,"uRoughness"),o.roughness);gl.uniform1f(u(d,"uWeather"),o.weatherEnabled?1:0);
+  });
+  return GPU.read(dst,n);
+}
+
 // Mei-style virtual-pipe hydraulic erosion in gather form. Unlike the CPU droplet solver, every
 // pixel only reads its four neighbours, so the whole simulation remains in float textures until one
 // final readback. RGBA state = bed, water, sediment, 1; RGBA flux = left, right, top, bottom.
@@ -216,12 +287,15 @@ const GPU_PIPE_FLUX_FS=`#version 300 es
   uniform sampler2D uS,uPrevF;uniform int uN;uniform float uRain,uMomentum,uFlow;
   bool inside(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
   vec3 S(ivec2 p){return texelFetch(uS,clamp(p,ivec2(0),ivec2(uN-1)),0).rgb;}
-  float head(ivec2 p,float edge){return inside(p)?S(p).r+S(p).g:edge;}
+  float head(ivec2 p,float wallHead){return inside(p)?S(p).r+S(p).g:wallHead;}
   void main(){
     ivec2 p=ivec2(gl_FragCoord.xy);vec3 s=S(p);float water=s.g+uRain,h=s.r+water;
     vec4 prev=texelFetch(uPrevF,p,0);
-    vec4 dh=vec4(h-head(p+ivec2(-1,0),s.r-0.03),h-head(p+ivec2(1,0),s.r-0.03),
-                 h-head(p+ivec2(0,-1),s.r-0.03),h-head(p+ivec2(0,1),s.r-0.03));
+    // Explicit no-flux wall: an outside neighbour has the current cell's hydraulic head. This
+    // is the finite-heightfield boundary contract; it neither invents an exterior terrain step
+    // nor silently exports water through an unmodelled apron.
+    vec4 dh=vec4(h-head(p+ivec2(-1,0),h),h-head(p+ivec2(1,0),h),
+                 h-head(p+ivec2(0,-1),h),h-head(p+ivec2(0,1),h));
     vec4 f=max(vec4(0.0),prev*uMomentum+max(dh,vec4(0.0))*uFlow);
     float total=f.x+f.y+f.z+f.w;
     if(total>water&&total>0.0)f*=water/total;
@@ -246,10 +320,17 @@ const GPU_PIPE_STATE_FS=`#version 300 es
                +S(p+ivec2(0,1)).b/max(S(p+ivec2(0,1)).g+uRain,0.0001)*inB;
     float sediment=max(0.0,s.b+sedIn-c*outflow);
     float b=s.r;
-    float slope=uKS*max(max(abs(b-S(p+ivec2(-1,0)).r),abs(b-S(p+ivec2(1,0)).r)),
-                        max(abs(b-S(p+ivec2(0,-1)).r),abs(b-S(p+ivec2(0,1)).r)));
-    float speed=min(8.0,(inflow+outflow)/max(0.001,0.5*(water0+water)));
-    float cap=uCapacity*max(slope,0.0005)*speed*(water0>0.0002?1.0:0.0);
+    float lowest=min(min(S(p+ivec2(-1,0)).r,S(p+ivec2(1,0)).r),
+                     min(S(p+ivec2(0,-1)).r,S(p+ivec2(0,1)).r));
+    // Capacity needs a SIGNED downhill outlet. abs(b-neighbour) made a local minimum look
+    // maximally steep, so the minimum eroded itself deeper on every iteration.
+    float slope=uKS*max(0.0,b-lowest);
+    vec2 transport=0.5*vec2(own.y-own.x+inL-inR,own.w-own.z+inT-inB);
+    float depth=max(0.001,0.5*(water0+water));
+    float speed=min(8.0,length(transport)/depth);
+    // A soft depth ramp prevents a one-step rain film from carrying river-scale sediment.
+    float wet=smoothstep(0.0002,0.003,0.5*(water0+water));
+    float cap=uCapacity*slope*speed*wet;
     float er=cap>sediment?min(uErode*(cap-sediment),uErCap):0.0;
     float dep=cap<=sediment?min(uDeposit*(sediment-cap),sediment):0.0;
     frag=vec4(b+dep-er,water,sediment+er-dep,1.0);}`;
@@ -261,10 +342,14 @@ const GPU_PIPE_STATE_FS=`#version 300 es
 // direct kernel call. Erosion and deposition are one budget, not two nodes.
 export let hydroMassDiag=null;
 export const setHydroMassDiag=(v)=>{hydroMassDiag=v;};
+function continuationApron(inp,n,apron){
+  const simN=n+apron*2,out=new Float32Array(simN*simN);
+  for(let y=0;y<simN;y++)for(let x=0;x<simN;x++)
+    out[y*simN+x]=inp[clamp(y-apron,0,n-1)*n+clamp(x-apron,0,n-1)]; // shape-ok: GPU hydraulic input is square
+  return{field:out,n:simN};
+}
 function runHydraulicPipeState(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,inertia=0.05,gridK=1},key="pipe"){
-  const n=fieldW(),nh=fieldH(),pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
-  let state=GPU.uploadState(key+"StateA",n,inp),next=GPU.rt(key+"StateB",n);
-  let flux=GPU.rt(key+"FluxA",n),nextFlux=GPU.rt(key+"FluxB",n);GPU.clear(flux,n);
+  const n=fieldW(),nh=fieldH();
   // Res Lock (gridK = node-level RES/REF_RES; 1 = legacy behaviour, bit-exact). Water crosses one
   // cell per iteration, so the same world transport takes k x the iterations; everything the
   // solver does PER ITERATION is a per-cell rate and rescales accordingly: rain/erosion-cap by
@@ -277,46 +362,57 @@ function runHydraulicPipeState(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,
   // instability; cross-model review measured depth ratio 1.025 at k=3 Final), but a different
   // regime than k=1.
   const gk=gridK>0?gridK:1,itersEff=Math.max(1,Math.round(iters*gk));
+  // Simulate a border-replicated continuation and crop it, instead of crossfading the output. The bounded
+  // interactive apron moves the closed outer wall away from every authored sample; a tiled/export
+  // pipeline can request a wider source apron according to its own transport-distance contract.
+  const apron=Math.min(48,Math.max(8,Math.ceil(8*gk*Math.sqrt(Math.max(1,iters/48)))));
+  const padded=continuationApron(inp,n,apron),simN=padded.n;
+  const pF=GPU.prog("pipeFlux",GPU_PIPE_FLUX_FS),pS=GPU.prog("pipeState",GPU_PIPE_STATE_FS);
+  let state=GPU.uploadState(key+"StateA",simN,padded.field),next=GPU.rt(key+"StateB",simN);
+  let flux=GPU.rt(key+"FluxA",simN),nextFlux=GPU.rt(key+"FluxB",simN);GPU.clear(flux,simN);
   const rain=0.0012/gk,evap=gk===1?0.985:Math.pow(0.985,1/gk);
   const momentum0=clamp(0.35+inertia,0.2,0.82),momentum=gk===1?momentum0:Math.pow(momentum0,1/gk);
   const flow=0.42*gk;
   const er0=erode*0.16,erRate=gk===1?er0:1-Math.pow(1-er0,1/gk);
   const dp0=deposit*0.22,dpRate=gk===1?dp0:1-Math.pow(1-dp0,1/gk);
   for(let i=0;i<itersEff;i++){
-    GPU.run(pF,n,nextFlux,p=>{
+    GPU.run(pF,simN,nextFlux,p=>{
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uS"),0);
       gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,flux);gl.uniform1i(u(p,"uPrevF"),1);
-      gl.uniform1i(u(p,"uN"),n);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uMomentum"),momentum);
+      gl.uniform1i(u(p,"uN"),simN);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uMomentum"),momentum);
       gl.uniform1f(u(p,"uFlow"),flow);});
-    GPU.run(pS,n,next,p=>{
+    GPU.run(pS,simN,next,p=>{
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uS"),0);
       gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,nextFlux);gl.uniform1i(u(p,"uF"),1);
-      gl.uniform1i(u(p,"uN"),n);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uEvap"),evap);
-      gl.uniform1f(u(p,"uCapacity"),capacity*0.075);gl.uniform1f(u(p,"uErode"),erRate);
+      gl.uniform1i(u(p,"uN"),simN);gl.uniform1f(u(p,"uRain"),rain);gl.uniform1f(u(p,"uEvap"),evap);
+      // Calibrated after replacing abs-slope/total-flux speed: keeps the default pipe dose in the
+      // documented cross-engine band without restoring either self-deepening feedback.
+      gl.uniform1f(u(p,"uCapacity"),capacity*0.23);gl.uniform1f(u(p,"uErode"),erRate);
       gl.uniform1f(u(p,"uDeposit"),dpRate);
       gl.uniform1f(u(p,"uKS"),gk);gl.uniform1f(u(p,"uErCap"),0.0025/gk);});
     let t=state;state=next;next=t;t=flux;flux=nextFlux;nextFlux=t;
   }
-  return{state,n,nh};
+  return{state,n,nh,simN,apron,padded:padded.field};
 }
 export function gpuHydraulicPipes(inp,opts={}){
-  const{state,n,nh}=runHydraulicPipeState(inp,opts);
+  const{state,n,nh,simN,apron,padded}=runHydraulicPipeState(inp,opts);
   // Terminal settle. The state texture's blue channel is sediment still suspended when the
   // iterations end, in the SAME normalized-height units as bed (the state shader exchanges the
   // two strictly 1:1). GPU.read keeps only red, so this load used to vanish at readback - 92% of
   // net-eroded volume at reference settings - which is why the production hydraulic path could
-  // never finish a fan or a delta. Settle it where it stands, rim included: a rim exclusion was
-  // tried and REJECTED by measurement - the -0.03 edge head FLUSHES suspension off-grid, so the
-  // rim carries the LEAST of any ring (mean 0.0025 vs 0.0064 interior) and its max suspension is
-  // half its mean net erosion, making a deposit lip geometrically impossible; excluding it only
-  // deepened the existing one-cell border trench ~15%. Green (water) is never added - it is rain.
-  const rgba=GPU.readRGBA(state,n);
-  const o=new Float32Array(n*nh);let sumIn=0,sumOut=0,settled=0;
-  for(let i=0;i<n*nh;i++){o[i]=rgba[i*4]+rgba[i*4+2];settled+=rgba[i*4+2];sumIn+=inp[i];sumOut+=o[i];}
-  // With everything settled, the only bed-mass sink left is in-sim outflow through the edge
-  // pipes, so `exported` is exact by elimination - but DERIVED, not independently itemized.
-  // exportedDerived tells a closure gate not to accept it as evidence (the CPU ledger's is).
-  hydroMassDiag={engine:"pipes",settle:true,sumIn,sumOut,settled,exported:sumIn-sumOut,exportedDerived:true,lost:0};
+  // never finish a fan or a delta. Green (water) is never added - it is rain.
+  const rgba=GPU.readRGBA(state,simN);
+  const o=new Float32Array(n*nh);let sumIn=0,sumOut=0,settled=0,sumSimOut=0;
+  for(let i=0;i<simN*simN;i++)sumSimOut+=rgba[i*4]+rgba[i*4+2];
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
+    const i=y*n+x,si=((y+apron)*simN+x+apron)*4;
+    o[i]=rgba[si]+rgba[si+2];
+    settled+=rgba[si+2];sumIn+=inp[i];sumOut+=o[i];
+  }
+  const sumSimIn=fieldSum(padded);
+  hydroMassDiag={engine:"pipes",settle:true,boundaryPolicy:"continuation-apron-closed-wall",
+    boundaryApronCells:apron,sumIn,sumOut,settled,cropExchange:sumIn-sumOut,
+    sumSimIn,sumSimOut,exported:0,exportedDerived:false,lost:sumSimIn-sumSimOut};
   return o;
 }
 
@@ -327,8 +423,8 @@ export function gpuHydraulicPipes(inp,opts={}){
 // particles never write the terrain directly, and the terrain is read only after the complete
 // action batch has landed.
 const GPU_PIPE_SETTLE_FS=`#version 300 es
-  precision highp float;out vec4 frag;uniform sampler2D uS;
-  void main(){vec3 s=texelFetch(uS,ivec2(gl_FragCoord.xy),0).rgb;
+  precision highp float;out vec4 frag;uniform sampler2D uS;uniform int uOffset;
+  void main(){ivec2 p=ivec2(gl_FragCoord.xy)+ivec2(uOffset);vec3 s=texelFetch(uS,p,0).rgb;
     frag=vec4(s.r+s.b,0.0,0.0,1.0);}`;
 const GPU_DROPLET_UPDATE_FS=`#version 300 es
   precision highp float;precision highp int;
@@ -336,8 +432,8 @@ const GPU_DROPLET_UPDATE_FS=`#version 300 es
   layout(location=1) out vec4 outDyn;
   layout(location=2) out vec4 outAction;
   uniform sampler2D uPos,uDyn,uHeight;
-  uniform int uPS,uCount,uN,uStep;
-  uniform float uInertia,uCapacity,uErode,uDeposit,uEvap,uGravity,uMinSlope,uGridK;
+  uniform int uPS,uCount,uN,uStep,uSeed,uMargin;
+  uniform float uInertia,uCapacity,uErode,uDeposit,uEvap,uGravity,uMinSlope,uGridK,uMinWater;
   float H(ivec2 p){return texelFetch(uHeight,clamp(p,ivec2(0),ivec2(uN-1)),0).r;}
   vec3 HG(vec2 p){
     ivec2 a=ivec2(floor(p));vec2 f=p-vec2(a);
@@ -346,7 +442,7 @@ const GPU_DROPLET_UPDATE_FS=`#version 300 es
     float gx=mix(h10-h00,h11-h01,f.y),gy=mix(h01-h00,h11-h10,f.x);
     return vec3(gx,gy,h);}
   float rand01(int i){
-    uint h=uint(i)*374761393u+uint(uStep)*668265263u+2246822519u;
+    uint h=uint(i)*374761393u+uint(uStep)*668265263u+uint(uSeed)*1442695041u+2246822519u;
     h=(h^(h>>13u))*1274126177u;return float(h^(h>>16u))/4294967295.0;}
   void main(){
     ivec2 tc=ivec2(gl_FragCoord.xy);int idx=tc.y*uPS+tc.x;
@@ -359,7 +455,9 @@ const GPU_DROPLET_UPDATE_FS=`#version 300 es
     if(dl<0.00001){float a=rand01(idx)*6.28318530718;dir=vec2(cos(a),sin(a));}
     else dir/=dl;
     vec2 nextPos=pos+dir;
-    if(nextPos.x<0.0||nextPos.y<0.0||nextPos.x>=float(uN-1)||nextPos.y>=float(uN-1)){
+    float margin=float(uMargin);
+    if(nextPos.x<margin||nextPos.y<margin||
+       nextPos.x>=float(uN-1)-margin||nextPos.y>=float(uN-1)-margin){
       outPos=vec4(pos,dir);outDyn=vec4(speed,water,sed,0.0);outAction=vec4(0.0);return;}
     float dH=HG(nextPos).z-old.z;
     float cap=max(-dH*uGridK,uMinSlope)*speed*water*uCapacity;
@@ -371,17 +469,13 @@ const GPU_DROPLET_UPDATE_FS=`#version 300 es
       float er=min(max(0.0,(cap-sed)*uErode),max(0.0,-dH));
       sed+=er;amount=-er;
     }
-    speed=sqrt(max(0.0,speed*speed-dH*uGravity));water*=1.0-uEvap;
-    float alive=water<0.008?2.0:1.0; // 2 = stopped on-grid; terminal pass settles its load
+    // Bound the velocity/CFL feedback: a stale overlapping scatter may deepen a channel, but it
+    // cannot turn that local error into unbounded capacity on the following step.
+    speed=min(8.0,sqrt(max(0.0,speed*speed-dH*uGravity)));water*=1.0-uEvap;
+    float alive=water<uMinWater?2.0:1.0; // 2 = dry on-grid; remaining load stays suspended
     outPos=vec4(nextPos,dir);outDyn=vec4(speed,water,sed,alive);
     outAction=abs(amount)>1e-12?vec4(pos,amount,1.0):vec4(0.0);
   }`;
-const GPU_DROPLET_SETTLE_FS=`#version 300 es
-  precision highp float;precision highp int;out vec4 frag;
-  uniform sampler2D uPos,uDyn;uniform int uPS,uCount;
-  void main(){ivec2 tc=ivec2(gl_FragCoord.xy);int idx=tc.y*uPS+tc.x;
-    vec4 p=texelFetch(uPos,tc,0),d=texelFetch(uDyn,tc,0);
-    frag=(idx<uCount&&d.w>0.5&&d.z>0.0)?vec4(p.xy,d.z,1.0):vec4(0.0);}`;
 const GPU_DROPLET_SPLAT_VS=`#version 300 es
   precision highp float;precision highp int;
   uniform sampler2D uAction;uniform int uPS,uCount,uN,uRadius;
@@ -425,13 +519,17 @@ function bindTex(prog,name,unit,tex){
   gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(u(prog,name),unit);
 }
 function fieldSum(f){let s=0;for(let i=0;i<f.length;i++)s+=f[i];return s;}
-function initGpuDroplets(n,count,seed,key){
+function initGpuDroplets(n,count,seed,key,margin,particleWeight){
   const side=Math.max(1,Math.ceil(Math.sqrt(count))),pos=new Float32Array(side*side*4);
   const dyn=new Float32Array(side*side*4);let rng=Math.imul(seed|0,2654435761)>>>0;
   const rnd=()=>((rng=(Math.imul(rng,1664525)+1013904223)>>>0)/4294967295);
+  const span=Math.max(0.001,n-1-margin*2);
   for(let i=0;i<count;i++){
-    pos[i*4]=Math.min(n-1.001,rnd()*(n-1));pos[i*4+1]=Math.min(n-1.001,rnd()*(n-1));
-    dyn[i*4]=1;dyn[i*4+1]=1;dyn[i*4+3]=1;
+    // Spawn far enough inside the domain that the full erosion brush is in-bounds. A departing
+    // droplet is exported before it reaches this guard, so the rim never receives a renormalized
+    // partial brush (the previous source of concentrated edge cuts).
+    pos[i*4]=margin+rnd()*span;pos[i*4+1]=margin+rnd()*span;
+    dyn[i*4]=1;dyn[i*4+1]=particleWeight;dyn[i*4+3]=1;
   }
   return{side,pos:GPU.uploadRGBA(key+"PosA",side,pos),dyn:GPU.uploadRGBA(key+"DynA",side,dyn)};
 }
@@ -443,61 +541,99 @@ function splatDropletActions(action,side,count,delta,n,radius,key){
   gl.uniform1i(u(prog,"uN"),n);gl.uniform1i(u(prog,"uRadius"),radius);
   gl.drawArrays(gl.POINTS,0,side*side);gl.disable(gl.BLEND);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
 }
-function runHydraulicDropletTexture(heightTex,opts={},key="droplet"){
-  const n=fieldW(),count=Math.max(1,Math.round(opts.droplets==null?15000:opts.droplets));
+let lastDropletRunMeta=null;
+function runHydraulicDropletCohort(heightTex,opts,key,count,cohortSeed,particleWeight){
+  const n=fieldW();
   const lifetime=Math.max(1,Math.round(opts.lifetime==null?48:opts.lifetime));
   const inertia=opts.inertia==null ? .05 : opts.inertia,capacity=opts.capacity==null ? 4 : opts.capacity;
   const erode=opts.erode==null ? .3 : opts.erode,deposit=opts.deposit==null ? .3 : opts.deposit;
   const evap=opts.evap==null ? .02 : opts.evap,gravity=opts.gravity==null ? 4 : opts.gravity;
   const minSlope=opts.minSlope==null ? .01 : opts.minSlope,gk=opts.gridK>0?opts.gridK:1;
   const radius=Math.max(1,Math.min(5,Math.round(opts.radius==null?2:opts.radius)));
+  const margin=radius+1;
   const evapK=gk===1?evap:1-Math.pow(1-evap,1/gk);
   const erodeK=gk===1?erode:1-Math.pow(1-erode,1/gk);
   const depositK=gk===1?deposit:1-Math.pow(1-deposit,1/gk);
-  const steps=Math.max(1,Math.round(lifetime*gk)),initial=initGpuDroplets(n,count,opts.seed==null?1:opts.seed,key);
+  const steps=Math.max(1,Math.round(lifetime*gk));
+  const initial=initGpuDroplets(n,count,cohortSeed,key,margin,particleWeight);
   const side=initial.side,pUpdate=GPU.prog("dropletUpdate",GPU_DROPLET_UPDATE_FS);
-  const pSettle=GPU.prog("dropletSettle",GPU_DROPLET_SETTLE_FS),pApply=GPU.prog("dropletApply",GPU_DROPLET_APPLY_FS);
+  const pApply=GPU.prog("dropletApply",GPU_DROPLET_APPLY_FS);
   let pos=initial.pos,dyn=initial.dyn,nextPos=GPU.rt(key+"PosB",side),nextDyn=GPU.rt(key+"DynB",side);
-  let height=heightTex,nextHeight=GPU.rt(key+"HeightB",n);
+  const workA=GPU.rt(key+"HeightWorkA",n),workB=GPU.rt(key+"HeightWorkB",n);
+  let height=heightTex,nextHeight=heightTex===workA?workB:workA;
   const action=GPU.rt(key+"Action",side),delta=GPU.rt(key+"Delta",n);
   for(let step=0;step<steps;step++){
     GPU.runMRT(pUpdate,side,[nextPos,nextDyn,action],p=>{
       bindTex(p,"uPos",0,pos);bindTex(p,"uDyn",1,dyn);bindTex(p,"uHeight",2,height);
       gl.uniform1i(u(p,"uPS"),side);gl.uniform1i(u(p,"uCount"),count);gl.uniform1i(u(p,"uN"),n);
-      gl.uniform1i(u(p,"uStep"),step);gl.uniform1f(u(p,"uInertia"),inertia);
+      gl.uniform1i(u(p,"uStep"),step);gl.uniform1i(u(p,"uSeed"),cohortSeed);
+      gl.uniform1i(u(p,"uMargin"),margin);
+      gl.uniform1f(u(p,"uInertia"),inertia);
       gl.uniform1f(u(p,"uCapacity"),capacity);gl.uniform1f(u(p,"uErode"),erodeK);
       gl.uniform1f(u(p,"uDeposit"),depositK);gl.uniform1f(u(p,"uEvap"),evapK);
       gl.uniform1f(u(p,"uGravity"),gravity);gl.uniform1f(u(p,"uMinSlope"),minSlope);
-      gl.uniform1f(u(p,"uGridK"),gk);});
+      gl.uniform1f(u(p,"uGridK"),gk);gl.uniform1f(u(p,"uMinWater"),.008*particleWeight);});
     GPU.clear(delta,n);splatDropletActions(action,side,count,delta,n,radius,key);
     GPU.run(pApply,n,nextHeight,p=>{bindTex(p,"uHeight",0,height);bindTex(p,"uDelta",1,delta);});
     let t=pos;pos=nextPos;nextPos=t;t=dyn;dyn=nextDyn;nextDyn=t;t=height;height=nextHeight;nextHeight=t;
   }
-  // Dry/lifetime-capped droplets settle their remaining load. Off-grid droplets have dyn.w=0
-  // and are intentionally excluded: their load is named boundary export, matching the CPU model.
-  GPU.run(pSettle,side,action,p=>{bindTex(p,"uPos",0,pos);bindTex(p,"uDyn",1,dyn);
-    gl.uniform1i(u(p,"uPS"),side);gl.uniform1i(u(p,"uCount"),count);});
-  GPU.clear(delta,n);splatDropletActions(action,side,count,delta,n,radius,key);
-  GPU.run(pApply,n,nextHeight,p=>{bindTex(p,"uHeight",0,height);bindTex(p,"uDelta",1,delta);});
-  return nextHeight;
+  // ARCH-REF: ADR-001 (docs/adr-001-gpu-hydraulic-composition.md)
+  // Lifetime is a numerical work cap, not a physical deposition event. Depositing every
+  // particle's remaining load here synchronises thousands of point deposits and turns the
+  // terrain into a field of cones. Keep only capacity-driven deposition from the integration
+  // loop; boundary export and suspended load at truncation are named together in the ledger.
+  return height;
+}
+function runHydraulicDropletTexture(heightTex,opts={},key="droplet"){
+  const n=fieldW(),count=Math.max(1,Math.round(opts.droplets==null?15000:opts.droplets));
+  // A particle step is a scatter batch: every action in it sampled the same pre-step terrain.
+  // At high particles/cell, overlapping deposits/brushes can collectively overshoot the
+  // height difference each particle bounded independently, invert the slope, and feed an
+  // exponential speed/capacity spike on the next step. Cohorts cap that stale-read density;
+  // each cohort finishes against terrain containing every prior cohort's actions.
+  const cohortLimit=Math.max(1024,Math.floor(n*n*.10)); // shape-ok: GPU terrain texture is square
+  // Particle count is sampling density, not an unbounded erosion-strength multiplier. Up to
+  // half a particle per cell, each path has unit weight. Beyond that, each particle represents
+  // a smaller water parcel. Capacity, carried sediment, and the terrain write therefore use the
+  // same weight instead of scaling only the write and breaking the particle/terrain ledger.
+  const particleWeight=Math.min(1,n*n*.5/count); // shape-ok: GPU terrain texture is square
+  const cohorts=Math.ceil(count/cohortLimit),baseSeed=opts.seed==null?1:opts.seed|0;
+  let height=heightTex,offset=0;
+  for(let cohort=0;cohort<cohorts;cohort++){
+    const cohortCount=Math.min(cohortLimit,count-offset);
+    const cohortSeed=(baseSeed+Math.imul(cohort,0x9e3779b9))|0;
+    height=runHydraulicDropletCohort(height,opts,key,cohortCount,cohortSeed,particleWeight);
+    offset+=cohortCount;
+  }
+  lastDropletRunMeta={requestedDroplets:count,cohortLimit,cohorts,particleWeight};
+  return height;
 }
 export function gpuHydraulicDroplets(inp,opts={}){
   if(!gpuDropletsReady())throw new Error("GPU droplet erosion requires WebGL2 float render targets and EXT_float_blend");
   const n=fieldW(),sumIn=fieldSum(inp),height=GPU.upload("dropletHeightA",n,inp);
   const result=GPU.read(runHydraulicDropletTexture(height,opts,"droplet"),n),sumOut=fieldSum(result);
-  hydroMassDiag={engine:"gpu-droplets",settle:true,sumIn,sumOut,settled:0,
-    exported:sumIn-sumOut,exportedDerived:true,lost:0,stages:["droplets"],readbacks:1};
+  const exportedOrSuspended=sumIn-sumOut;
+  hydroMassDiag={engine:"gpu-droplets",settle:false,terminalDeposit:false,
+    terminalPolicy:"suspend-at-lifetime",sumIn,sumOut,settled:0,
+    exported:exportedOrSuspended,exportedOrSuspended,exportedDerived:true,
+    unresolvedIncluded:true,lost:0,...lastDropletRunMeta,stages:["droplets"],readbacks:1};
   return result;
 }
 export function gpuHydraulicCombined(inp,{pipes={},droplets={}}={}){
   if(!gpuDropletsReady())throw new Error("Combined hydraulic GPU path requires WebGL2 float blending");
   const sumIn=fieldSum(inp),pipe=runHydraulicPipeState(inp,pipes,"combinedPipe");
   const settleProg=GPU.prog("pipeSettle",GPU_PIPE_SETTLE_FS),pipeHeight=GPU.rt("combinedPipeHeight",pipe.n);
-  GPU.run(settleProg,pipe.n,pipeHeight,p=>bindTex(p,"uS",0,pipe.state));
+  GPU.run(settleProg,pipe.n,pipeHeight,p=>{bindTex(p,"uS",0,pipe.state);
+    gl.uniform1i(u(p,"uOffset"),pipe.apron);});
   const result=GPU.read(runHydraulicDropletTexture(pipeHeight,droplets,"combinedDroplet"),pipe.n);
   const sumOut=fieldSum(result);
-  hydroMassDiag={engine:"gpu-combined",settle:true,sumIn,sumOut,settled:0,
-    exported:sumIn-sumOut,exportedDerived:true,lost:0,stages:["pipes","droplets"],readbacks:1};
+  const exportedOrSuspended=sumIn-sumOut;
+  hydroMassDiag={engine:"gpu-combined",settle:false,pipeSettled:true,terminalDeposit:false,
+    terminalPolicy:"suspend-at-lifetime",
+    pipeBoundaryPolicy:"continuation-apron-closed-wall",pipeBoundaryApronCells:pipe.apron,
+    sumIn,sumOut,settled:0,exported:exportedOrSuspended,exportedOrSuspended,
+    exportedDerived:true,unresolvedIncluded:true,lost:0,
+    ...lastDropletRunMeta,stages:["pipes","droplets"],readbacks:1};
   return result;
 }
 // GPU compute is square-texture end to end: every kernel taps ivec2 +-(1,0) neighbours and the

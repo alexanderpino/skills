@@ -63,8 +63,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     res.hydraulic={gpuMs:hp.ms,finite,eroded,deposited,maxDrop:+maxDrop.toFixed(5),maxRise:+maxRise.toFixed(5)};
     // --- cross-ENGINE record of the hydraulic node: pipes vs droplets are two different
     // simulations behind one "auto" tab. The gap is MEASURED AND GATED, not closed: at the
-    // shipped defaults the pipe engine runs ~0.37x the droplet depth (band [0.25, 0.55]) with
-    // modification corr ~0.59 (floor 0.40). A parity retune was attempted and REVERTED: iters
+    // shipped defaults the signed-capacity pipe engine runs ~0.26x the droplet depth
+    // (band [0.20, 0.38]) with modification corr ~0.54 (floor 0.40). A parity retune was
+    // attempted and REVERTED: iters
     // ~160 reach depth parity but break grid invariance (1.42 at k=2), and cap-scaling moves
     // gridRatio to ~2.0 while cross-depth stays flat - the invariance partly rests on the
     // k-scaled erosion cap, so dose and invariance are coupled. These gates stop SILENT DRIFT
@@ -132,9 +133,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       console.log(`${k.padEnd(8)} maxAbs=${r[k].maxAbs} meanAbs=${r[k].meanAbs}   cpu=${r[k].cpuMs}ms gpu=${r[k].gpuMs}ms`);
     console.log('hydraulic',JSON.stringify(r.hydraulic));
     console.log('crossEngine',JSON.stringify(r.crossEngine));
-    if (!(r.crossEngine && r.crossEngine.depthRatio >= 0.25 && r.crossEngine.depthRatio <= 0.55
+    if (!(r.crossEngine && r.crossEngine.depthRatio >= 0.20 && r.crossEngine.depthRatio <= 0.38
         && r.crossEngine.deltaCorr >= 0.40)) {
-      console.log('FAIL cross-engine record: depthRatio in [0.25,0.55] (measured 0.37 — the gap '
+      console.log('FAIL cross-engine record: depthRatio in [0.20,0.38] (measured 0.26 — the gap '
         + 'is documented, not closed) and deltaCorr >= 0.40. This stops silent drift only.');
       crossFail = 1;
     }

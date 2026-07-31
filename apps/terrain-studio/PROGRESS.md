@@ -7,20 +7,65 @@ Updated as work lands. If this disagrees with a commit message, the commit wins.
 
 ---
 
-## Suite coverage — corrected 2026-07-30
+## Suite coverage — corrected 2026-07-31
 
-`npm run verify` runs **12 of 73** oracle files (it points at `_verify_all_canyon.js`, the Canyon
+`npm run verify` runs **12 of 75** oracle files (it points at `_verify_all_canyon.js`, the Canyon
 suite). Use `node scripts/sweep-oracles.mjs` for all of them.
 
     node scripts/sweep-oracles.mjs                  every oracle, one line each
     node scripts/sweep-oracles.mjs _verify_x.js     a subset
 
-Current full-sweep record: **72/72 standalone oracles green** on 2026-07-30
-(`_verify_all_canyon.js` is the one aggregate file excluded by the sweep). This includes
-`_verify_build_progress`, production-mode `_verify_pwa`, the graph-authoring gates, and the new
-dual-GPU hydraulic gate. Failing output is retained in `.sweep-logs/`.
+Current record: **74/74 standalone oracles green** on 2026-07-31
+(`_verify_all_canyon.js` is the one aggregate file excluded by the sweep). The all-oracle run first
+reported 71/74: the production PWA gate had reused a stale test-mode preview, shape scan found two
+misplaced annotations in the hydraulic apron, and deep zoom exposed an unconditional global-height
+camera guard. A fresh production preview plus targeted reruns closed all three; the hydraulic
+camera-guard load gate was rerun separately after the zoom correction. Failing output is retained
+in `.sweep-logs/`.
 
 ## Now
+
+**Separate GPU Rock Fracture node — done locally, 2026-07-31.**
+
+- Added an erosion-family **Rock Fracture** node instead of folding cracks into Thermal. It carves
+  deterministic warped Worley/Voronoi `F2−F1` joint boundaries at up to five scales. Fine sets become
+  shallower and narrower, avoiding the nearly uniform lowering produced by reusing the broadest
+  crack and shoulder at every octave.
+- **Fracture network** and **Edge weathering** are independently switchable, collapsible inspector
+  panels. Spacing, crack width, cut depth, warp scale, and shoulder width are authored in metres;
+  terrain scale/relief edits correctly dirty the node. The intended stack is
+  `Rock Fracture → Thermal`: joints first, talus transport second.
+- Square terrain runs a one-pass WebGL2 gather kernel with one readback. Hex and systems without
+  float render targets use the deterministic CPU compatibility path. Measured square CPU/GPU error:
+  max `5.25e-6`, RMS `4.71e-7`.
+- The procedural field continues beyond the rectangle rather than sampling a clamped border. The
+  focused gate measured edge/interior fracture dose `1.09`, 128²↔256² RMS drift `4.08e-4`, exact
+  disabled/masked identity, finite unbounded negative/>1 heights, seed determinism, strict `[0,1]`
+  masks, hex fallback, toolbox registration, GPU badges, and collapse-state purity.
+- Visual evidence on a deliberately smooth mountain shows connected multiscale rock joints rather
+  than thermal ribbing. A heightfield limitation is stated in the inspector: grooves and breakup
+  are representable; true separated blocks, undercuts, and open fissure voids are not.
+
+**GPU hydraulic spikes and edge tears — fixed locally, 2026-07-30.**
+
+- Removed the synchronized end-of-lifetime sediment dump that turned every surviving droplet into a
+  narrow cone. Lifetime is now a work cap; unresolved load is named `exportedOrSuspended`.
+- Fixed the separate high-density runaway. Particle cohorts cap stale-read scatter density at 0.1
+  particle/cell; speed is bounded; above 0.5 particle/cell, water/sediment parcel weight shrinks so
+  additional particles refine coverage without multiplying strength or breaking the terrain ledger.
+  The previous 30k UI / 120k actual case reached finite values around 10²¹.
+- Fixed the pipe solver’s self-deepening minima: transport capacity now uses a signed downhill outlet,
+  vector speed, and a shallow-water ramp. The post-output fade was removed. Pipe runs on a
+  border-continuation apron with an explicit closed outer wall and crops back to the authored field.
+  At 279 iterations / Deposit 0.48, edge p99/max are 0.00384/0.00454 versus input
+  0.00749/0.00849.
+- Droplets spawn inside a full-brush guard and export before reaching a partial edge brush. The
+  viewport also keeps the inspection eye above the open heightfield so back-facing mesh triangles
+  cannot masquerade as erosion spikes at grazing angles.
+- `_verify_hydraulic_dual_gpu` now has armed upward and downward controls and runs the real 512²
+  Interactive path: the reported 14,389 × 71 case, 30k, the 60k UI / 240k actual maximum, and exact
+  combined Pipe 279 → Droplet 57,670 × 48. All are finite with zero peaks or pits above 0.02. Focused
+  verification, the camera-guard rerun, and the current 74/74 standalone-oracle record are green.
 
 **Composable GPU hydraulic erosion — done locally, 2026-07-30.**
 
@@ -51,7 +96,8 @@ dual-GPU hydraulic gate. Failing output is retained in `.sweep-logs/`.
 `~/.claude/plans/quiet-wishing-harbor.md` (adversarially reviewed before execution; seven blocking
 issues found and folded in).
 
-**Phase B — 60 of 60 node types are plugins.** legacy.js 7,406 → 6,561 lines.
+**Phase B — the original 60 of 60 node types became plugins.** Rock Fracture was then added directly
+as plugin 61. legacy.js 7,406 → 6,561 lines during the extraction.
 
 **Phase A — become a module, extract GPU, ship the PWA shell.**
 
@@ -69,10 +115,10 @@ issues found and folded in).
 Run from `apps/terrain-studio/`. Everything is HTTP now; `--file` died with A1.
 
 ```
-npm run verify -- _verify_digest.js     60 node types bit-identical at 256²
+npm run verify -- _verify_digest.js     61 node types bit-identical at 256²; skipped 0
 npm run verify -- --preview _verify_digest.js   same, against the BUILT bundle
 npm run bridge:check                    202 symbols, unbridgeable 0
-npm run plugins:check                   60 modules: imports resolve, exports exist, no TDZ
+npm run plugins:check                   61 modules: imports resolve, exports exist, no TDZ
 npm run verify -- _verify_blur_isotropy.js   square 1.0000, hex 1.0000 (was 1.185)
 npm run verify -- _verify_layers.js     L0 13/13 both lattices; roughness 0.0290/0.0286
 npm run verify -- _verify_hillslope_isotropy.js  9/9; hex sigma 3.873/3.873 = square exactly
@@ -117,7 +163,8 @@ tests/e2e/          4 Playwright specs
 | `data` | 14 | | — |
 | `out` | 1 | | — |
 
-60 total. Digest green per batch, so a bad extraction bisects to one node.
+Original extraction total: 60. Rock Fracture later became plugin 61. Digest green per batch, so a
+bad extraction bisects to one node.
 
 ## D7 layered cake
 
@@ -134,8 +181,8 @@ tests/e2e/          4 Playwright specs
    `skipWaiting`, registration behind `import.meta.env.PROD`.
 2. **A4** — accept the multi-file `dist/` and drop the single-file claim from the docs. Today's
    single-file build is an accident of the script having been inline.
-3. **Phase B** — 60 node types → 60 plugin modules. The first genuinely parallel slice; this is
-   where mission-control earns its keep (see its agenda #11).
+3. **Phase B** — original 60 node types → plugin modules, then Rock Fracture as plugin 61. The first
+  genuinely parallel slice; this is where mission-control earns its keep (see its agenda #11).
 4. **D7 layers** — L0 bedrock + blends + masks, then L1 erosion (MC-3 D6 constants, MC-5 MFD6),
    L2 cover, L3 water, L4 climate/snow, L5 dressing.
 

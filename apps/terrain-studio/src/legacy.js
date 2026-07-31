@@ -3871,10 +3871,11 @@ function buildProps(){
         tdInfo();syncCompass();};
       i.onchange=()=>{if(changed)pushUndo(before);before=null;changed=false;
         // Every node whose output READS the terrain definition must re-evaluate when it moves:
-        // thermal (Real scale repose), and deposits/texture (fill depth is metres / refDepth).
+        // thermal (Real scale repose), Rock Fracture (all dimensions are metres), and
+        // deposits/texture (fill depth is metres / refDepth).
         if(key==="scale"||key==="height"){
           const affected=nodes.filter(n=>(n.type==="thermal"&&n.params.realScale==="on")
-            ||n.type==="d_deposits"||n.type==="d_texture");
+            ||n.type==="fracture"||n.type==="d_deposits"||n.type==="d_texture");
           if(affected.length){affected.forEach(n=>markDirtyFrom(n.id));requestEval();}}};
       f.appendChild(i);return f;};
     body.appendChild(mk("scale","Scale (across)",500,20000,1,v=>Math.round(v)+" m"));
@@ -5212,6 +5213,7 @@ function buildIndex(){const n=fieldW(),nh=fieldH(),cnt=(n-1)*(nh-1)*6,u32=(n*nh>
   if(typeof syncBuildProfile==="function"&&$("#profileDetail"))syncBuildProfile();
 }
 let curField=null,curHeightSource=null,curHgt=null,curSnowDepthM=null,curSurfaceY=null,curSolidSurfaceY=null,curSnowLayerRef=null;
+let curSurfaceMaxY=0;
 let curTemperatureRef=null,curSunVisibilityRef=null;
 let curFilled=null,curAccum=null,curWater=null,curWaterLiquid=null,curWaterIce=null,curIceSnow=null,curIceSnowSurfaceY=null,curGeomKey="",lastWaterSig="",lastWaterTemperatureRef=null,lastFallbackClimateSig="";
 function primaryImportedHeight(rootNode){
@@ -5403,6 +5405,8 @@ function updateViewport(f,rootNode,options){
     curSolidSurfaceY=surface.slice();
     if(curIceSnowSurfaceY&&curWaterIce)for(let i=0;i<curSolidSurfaceY.length;i++)
       if(curWaterIce[i]>.5)curSolidSurfaceY[i]=Math.max(curSolidSurfaceY[i],curIceSnowSurfaceY[i]);
+    curSurfaceMaxY=-Infinity;
+    for(let i=0;i<curSolidSurfaceY.length;i++)curSurfaceMaxY=Math.max(curSurfaceMaxY,curSolidSurfaceY[i]);
   }
   curField=f;curHeightSource=heightSource;curGeomKey=geomKey;
   if(baseChanged||!options||options.color!==false){
@@ -5668,6 +5672,21 @@ function surfaceHeight(wx,wz){
   const h=sampleBilinear(surface,x,isHex()?row*HEX_ROW:row);
   return curSolidSurfaceY||curSurfaceY?h:h*H_SCALE;
 }
+function keepCameraAboveSurface(){
+  if(!curHgt)return;
+  const eye=cameraEye();
+  // The terrain is an open heightfield surface, not a closed solid. Letting the orbit eye pass
+  // below it exposes back-facing triangles as long hanging wedges — visually identical to an
+  // erosion spike even when the raw field is finite and smooth. Preserve the authored orbit and
+  // lift eye + target together just enough to stay above the surface under the eye.
+  const outside=Math.abs(eye[0])>1||Math.abs(eye[2])>1;
+  const x=clamp(eye[0],-1,1),z=clamp(eye[2],-1,1);
+  // When the orbit eye is outside the square, a higher ridge anywhere in the open heightfield can
+  // silhouette the mesh from below. Its cached maximum is a conservative inspection-camera
+  // collision plane: low grazing views remain possible, but the eye never crosses under geometry.
+  const floor=(outside?curSurfaceMaxY:surfaceHeight(x,z))+Math.max(.006,cameraNear()*1.5);
+  if(eye[1]<floor)cam.target[1]+=floor-eye[1];
+}
 // Project authored terrain directions into the current camera plane. Unlike a screen-fixed north
 // badge, this needle remains useful after orbiting: it shows where map north and the equator actually
 // lie across the visible terrain.
@@ -5820,7 +5839,7 @@ function drawWaterDepth(MVP){
 }
 function renderGL(){
   if(!gl){return;}
-  resizeGL();syncCompass();syncWindReadout();syncClimateReadout();
+  resizeGL();keepCameraAboveSurface();syncCompass();syncWindReadout();syncClimateReadout();
   const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
   const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
   const waterRipple=scene.water?waterLook.strength:0;

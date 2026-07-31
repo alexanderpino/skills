@@ -359,6 +359,35 @@ Unsupported float-blend contexts and hex use an explicitly labelled compatibilit
 no longer silently chooses which erosion effect the document requested. Repro/gates:
 `_verify_glsl_probe.js`, `_verify_gpu.js`, and `_verify_hydraulic_dual_gpu.js`.
 
+### C1b — GPU droplets generated cones and high-density runaway · RESOLVED 2026-07-30
+Two mechanisms were present. The initial path dumped every surviving particle's full sediment load
+when `Lifetime` ended, synchronizing thousands of point deposits. Separately, all particles in a step
+sampled the same pre-step terrain; overlapping individually bounded actions could invert a slope and
+feed a much larger velocity/capacity into the next step. At the real 512² Interactive scale, 30k UI
+particles become 120k GPU particles and the latter feedback produced finite values around 10²¹.
+
+Resolved by making lifetime a work cap, retaining only capacity-driven deposition, running particle
+paths in cohorts no denser than 0.1 particle/cell, clamping particle speed, and representing excess
+sampling density as smaller water parcels so capacity, carried sediment, and terrain writes share one
+weight. Remaining load is named `exportedOrSuspended`. Droplets spawn inside a full-brush guard and
+export before a partial brush can concentrate at the rim. The armed regression measures symmetric
+upward/downward features at 96², 192²/18k, the reported 14,389-particle × 71-step case, the 60k UI /
+240k actual maximum, and the exact combined 279-pipe / 57,670-droplet case. CPU compatibility for the
+authored Droplet stage uses the same no-terminal-deposit policy.
+
+### C1c — Pipe boundary and signed-capacity failures tore terrain · RESOLVED 2026-07-30
+The flux shader modeled outside as `edgeBed - 0.03`, inventing a permanent head step around the
+terrain. More importantly, transport capacity used `abs(bed-neighbour)`: a local minimum therefore
+looked maximally steep and could erode itself deeper for every authored iteration. An output fade
+masked the boundary without fixing either mechanism and was rejected under the terrain boundary
+contract.
+
+Resolved with signed downhill capacity, vector transport speed, a shallow-water capacity ramp, and a
+border-replicated continuation apron cropped after the full solve. The apron’s outer edge has an
+explicit no-flux wall; authored samples are never crossfaded. At the reported 279 iterations /
+Deposit 0.48, edge p99/max slopes are 0.00384/0.00454 versus 0.00749/0.00849 on the input. A seeded
+one-cell pit control no longer deepens, and the full padded mass budget closes to numerical precision.
+
 ### C2 — Both sims compute velocity and discard it · TODO
 Pipe model computes per-cell speed at [index.html:1432](index.html#L1432); droplet model carries
 per-droplet speed at [index.html:3887](index.html#L3887). `flowVelocity` appears **0 times** in the

@@ -99,10 +99,10 @@ export default definePlugin({
           ...pp,droplets:dp.droplets,radius:dp.radius,seed:dp.seed,settle:true,gridK:ke})
       }
       if(stages.droplets)out=gpuDropletsReady()?gpuHydraulicDroplets(out,dp)
-        :hydraulicErode(out,{...dp,settle:true})
+        :hydraulicErode(out,{...dp,settle:false})
       return out
     }
     return maskApply(ins[0],atFeatureScale(ins[0],p.feat*tier,run),ins[1])
   },
-  note:"Enable either hydraulic model or both. <b>Pipe / grid</b> moves standing water and suspended sediment across the field, producing broad connected drainage. <b>Droplet / particle</b> follows many individual downhill paths, adding finer stochastic gullies. When both are enabled the order is fixed: <b>Pipe → Droplet</b>. On square terrain both stages stay in GPU textures and read back once; WebGL2 float-blend capability or a hexagonal lattice uses the labelled CPU compatibility fallback."
+  note:"Enable either hydraulic model or both. <b>Pipe / grid</b> moves standing water and suspended sediment across the field, producing broad connected drainage. <b>Droplet / particle</b> follows many individual downhill paths, adding finer stochastic gullies. When both are enabled the order is fixed: <b>Pipe → Droplet</b>. <b>Lifetime</b> is a work limit: remaining suspended load is reported at truncation, never force-deposited into a terminal cone. <b>Particles</b> increases path coverage; at high density the action budget saturates, so use Erode and Deposit for effect strength. On square terrain both stages stay in GPU textures and read back once; WebGL2 float-blend capability or a hexagonal lattice uses the labelled CPU compatibility fallback."
 })

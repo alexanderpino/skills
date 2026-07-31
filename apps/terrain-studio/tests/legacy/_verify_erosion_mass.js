@@ -8,11 +8,9 @@
 //   RED-RUN NUMBERS (pre-fix build, RES=192, fbm seed 7, reference params):
 //     - GPU pipes: deficit 0.9193 (E=316.1, D=25.5, D/E=0.081) — the readback kept only the red
 //       (bed) channel; ALL still-suspended sediment (blue) was discarded. Post-fix: deficit
-//       ~0.35 with ~231 units settled (rim included — a rim exclusion was tried and REJECTED by
-//       measurement: the -0.03 edge head flushes suspension, the rim carries the least of any
-//       ring, and excluding it deepened the border trench ~15%); the remainder is genuine
-//       in-sim export through the edge pipes, exact by elimination but DERIVED, so the GPU
-//       ledger flags exportedDerived:true and no closure gate may treat it as evidence.
+//       ~0.35 with ~231 units settled. The final boundary fix runs a replicated-continuation
+//       apron behind a closed wall, then crops; the full padded simulation closes to numerical
+//       precision while `cropExchange` honestly names transport across the authored crop.
 //     - CPU droplets: deficit 0.4291 — the ledger shows most of that is LEGITIMATE boundary
 //       export (droplets leaving with their load: 157.3 of E=382.0, 41.2%); the true interior
 //       loss (dry-out/life-cap exits) was 7.9 (~2% of E on open terrain; closed basins should
@@ -24,11 +22,11 @@
 //         sumIn - sumOut = exported + lost - brushClipGain.
 //
 // GATES:
-//   G1  gpu-mass-closes   GPU deficit (E-D)/E <= 0.45 — armed between broken 0.9193 and fixed
-//                         ~0.35 with margin both sides.
+//   G1  gpu-mass-closes   GPU crop deficit (E-D)/E <= 0.15 — armed between broken 0.9193 and
+//                         current ~0.04 with margin both sides.
 //   G2  cpu-mass-closes   CPU budget closes through the ITEMIZED ledger: E-D ~ exported.
-//   G3  diag gates        both engines write hydroMassDiag, internally consistent; the GPU's
-//                         exported is derived (flagged), the CPU's is itemized.
+//   G3  diag gates        both engines write hydroMassDiag. GPU closure is measured over the
+//                         padded closed simulation; CPU export is itemized.
 //   G4  settle-is-opt-in  ledger-based: with settle nothing is lost and something settles;
 //                         without it the same mass is lost and nothing settles. (The byte gate
 //                         for the opt-out callers is _verify_digest.js — NOTE: that digest pins
@@ -43,11 +41,8 @@
 //   G5c cpu-no-beading    DELTA gate: settle must not raise the CPU maxRise vs the no-settle
 //                         run (a change that dumps the residual into one cell instead of the
 //                         bilinear deposit1 fails here and nowhere else).
-//   G6  border-no-trench  rim inclusion is a MEASURED decision (excluding the rim deepened the
-//                         existing one-cell border trench ~15% and was rejected in review); the
-//                         ring0-vs-ring1 mean-delta gap is gated so a regressed exclusion goes
-//                         red instead of surviving on prose (armed: included 0.0035 / excluded
-//                         0.0060).
+//   G6  border-no-trench  the ring0-vs-ring1 mean-delta gap is gated so a boundary regression
+//                         goes red instead of surviving on prose.
 const { chromium } = require('playwright-core');
 const path = require('path');
 const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
@@ -124,14 +119,14 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     : null;
 
   if (r.gpuAvailable) {
-    gate('G1 gpu-mass-closes', r.gpu.finite && r.gpu.deficit <= 0.45,
-      `deficit=${r.gpu.deficit} (broken 0.9193; in-sim edge outflow is genuine export)`);
-    // Note: exportedDerived===true and lost===0 are literals in the pipes ledger — they are
-    // SHAPE checks (the contract fields exist as declared), not measured evidence. The measured
-    // conjuncts here are sumOut<=sumIn and settled>0.
+    gate('G1 gpu-mass-closes', r.gpu.finite && r.gpu.deficit <= 0.15,
+      `deficit=${r.gpu.deficit} (broken 0.9193; cropped continuation apron is ~0.04)`);
     gate('G3g gpu-diag', r.gpu.diag && r.gpu.diag.engine === 'pipes'
-      && r.gpu.diag.sumOut <= r.gpu.diag.sumIn + 1e-3
-      && r.gpu.diag.exportedDerived === true && r.gpu.diag.lost === 0 && r.gpu.diag.settled > 0,
+      && r.gpu.diag.boundaryPolicy === 'continuation-apron-closed-wall'
+      && r.gpu.diag.boundaryApronCells >= 8
+      && r.gpu.diag.exportedDerived === false && r.gpu.diag.exported === 0
+      && Math.abs(r.gpu.diag.lost) < 0.01
+      && Number.isFinite(r.gpu.diag.cropExchange) && r.gpu.diag.settled > 0,
       JSON.stringify(r.gpu.diag));
     gate('G5a fans-can-form', r.gpu.depositShare >= 0.30,
       `D/E=${r.gpu.depositShare} (broken 0.081 — deposition must exist as a phenomenon)`);
@@ -139,7 +134,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       `maxRise=${r.gpu.maxRise} (terminal settle must not print spikes; maxDrop ~0.0454 for scale)`);
     const trenchGap = +(r.gpu.ring1Mean - r.gpu.ring0Mean).toFixed(5);
     gate('G6 border-no-trench', trenchGap <= 0.0045,
-      `ring0=${r.gpu.ring0Mean} ring1=${r.gpu.ring1Mean} gap=${trenchGap} (rim-included 0.0035 / rim-excluded 0.0060)`);
+      `ring0=${r.gpu.ring0Mean} ring1=${r.gpu.ring1Mean} gap=${trenchGap}`);
   } else {
     gate('G1 gpu-mass-closes', false, 'GPU unavailable — cannot verify the production pipe path');
   }

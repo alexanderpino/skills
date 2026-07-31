@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 60,
+  "nodeCount": 61,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -28,6 +28,7 @@
     "d_windmodify": "6f088ad1:600daba6|wind_u=e2c08a7d:cee44275|wind_v=9298251e:81e0237|wind_speed=b2ab7603:8f0a661f|ex=f4da2304:1a304eee|ex_wind_u=bba34294:d1e7400a|ex_wind_v=2a2098e4:7a911bf6|ex_wind_speed=842b0eff:d88ba48c",
     "drawmask": "d9df5eac:d735aa08",
     "erosion2": "8fab94e8:df37d884",
+    "fracture": "f9e9b409:1a45735e",
     "gradient": "4b402641:c552b561",
     "heightmask": "175ca543:66caf8df",
     "histeq": "c2bdccf3:fd002f60",

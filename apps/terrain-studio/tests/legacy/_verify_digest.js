@@ -235,7 +235,8 @@ function installHarness(cfg) {
     warp: ['A', 'M'], terrace: ['A', 'M'], normalizen: ['A', 'M'], levels: ['A'], curve: ['A'], histeq: ['A'],
     blur: ['A', 'M'], sculpt: ['A', 'M'], clampn: ['A'], transform: ['A', 'M'], invert: ['A'],
     // --- erosion ---
-    thermal: ['A', 'M'], streampower: ['A', 'B', 'M'], hydraulic: ['A', 'M'],
+    thermal: ['A', 'M'], fracture: ['A', 'M'], streampower: ['A', 'B', 'M'],
+    hydraulic: ['A', 'M'],
     erosion2: ['A', 'M'], hydrofix: ['A', 'M'],
     // --- masks ---
     slopemask: ['A'], heightmask: ['A'], tempmask: ['T'],

@@ -134,7 +134,7 @@ separately-addressable, content-hashed assets to cache and update. That trade wa
 | **Generator** | Perlin fBm · **Simplex fBm** (triangular-lattice, isotropic noise) · Ridged MF · Voronoi (F1/F2−F1) · Gradient (linear/radial) · Constant · **Layout** (authored vector skeleton with per-vertex elevation) · **Mountain** (Mountain / Mountain range; 4 shape families × 5 geomorphic types) · **Canyon** (cached landscape evolution: uplift, drainage competition, stream-power incision, lithology and hillslope retreat; five formation styles) · **Shape** (SDF placement mask) · **Import DEM** (file *or* one-click real SRTM sample) |
 | **Combine** | Blend (factor or mask) · Combine (add/sub/mul) · Max/Min · **Smooth Max** (crease-free union) · Smooth Min (intersection) · **Stamp** (place a patch onto a base through a mask) |
 | **Filter** | Warp (domain warp) · **Transform** (translate/rotate/scale about a pivot, maskable, exact over procedural chains) · Terrace · **Normalize** (maskable) · Levels · Curve (bias/gain) · **Histogram EQ** · Blur · **Sculpt** (Raise/Lower/Flatten/Smooth through a mask) · Clamp · Invert |
-| **Erosion** | Thermal (talus) · Hydraulic (independently switchable GPU pipes + GPU droplets) · **Erosion 2** (multi-scale hydraulic, sediment discharge, shape) · **HydroFix** (low-amplitude drainage repair) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
+| **Erosion** | **Rock Fracture** (warped multi-scale Voronoi joints) · Thermal (talus) · Hydraulic (independently switchable GPU pipes + GPU droplets) · **Erosion 2** (multi-scale hydraulic, sediment discharge, shape) · **HydroFix** (low-amplitude drainage repair) · **Stream power** (fluvial incision, Braun–Willett implicit solver) |
 | **Mask** | **Draw Mask** (editable vector brush strokes) · Slope select · Height select · **Temperature select** (physical °C biome band) |
 | **Data map** | **Height** · **Sun Shadow** (terrain-horizon visibility) · **Temperature** (base climate field) · **Temperature Modify** (localized heat/cooling) · **Wind** (terrain-adjusted physical vectors) · **Wind Modify** (masked regional circulation) · **Slope** · **Curvature** (profile/plan/mean) · **Flow** (accumulation) · **Occlusion** (horizon AO) · **Deposits** (soil) · **Wear** · **Peaks** · **Texture** (slope+soil+flow composite) |
 | **Effect** | **Water** (Hydrology = lakes + rivers, or Sea = a flat level) · **Snow** (metre-depth placement, melt, avalanches) · **SatMap** (one colour LUT) · **Color Erosion** (pigment transport/deposition) · **Weathering** (exposure/recess ageing) · **Color Blend** (two branches + mask) · **Color Mixer** (ordered 2–15 layer stack) |
@@ -980,7 +980,33 @@ affects how your terrain is processed is when `Real Scale` is turned ON in the E
 nodes"* — the **Thermal erosion** node has a **Real Scale** switch. With it on, `Repose angle` is a true
 angle: the per-cell drop becomes `tan(angle) · cellSize ÷ height`, which is *inherently* resolution
 independent. Verified — a 35° repose stays exactly 35° at 128², 192², 256² and 512², with the per-cell
-drop halving as the cells do.
+drop halving as the cells do. Feature Scale recomputes that drop after entering its coarse simulation
+grid; reusing the full-grid threshold made a 4× feature scale relax a requested 35° slope toward
+about 9.9°. The thermal boundary is closed/no-flux (off-grid neighbours do not participate), and
+height values are finite but deliberately unbounded: negative bathymetry and elevations above 1 are
+preserved, while NaN/Infinity inputs and masks are rejected before they can spread through the solve.
+The Mask port remains the studio-wide post-process effect mask, not a sediment wall.
+
+### Rock fractures before talus
+
+**Rock Fracture** is a separate erosion-family node because a joint network and downslope mass
+wasting are different operations. It evaluates deterministic, warped Worley/Voronoi `F2−F1`
+boundaries at several scales, carves those boundaries into the incoming heightfield, and can recess
+a wider weathered shoulder beside them. **Largest spacing**, **crack width**, **cut depth**, **warp
+scale**, and **shoulder width** are world metres; finer sets become shallower and narrower instead of
+lowering the whole surface uniformly. The Seed changes the joint topology.
+
+Both **Fracture network** and **Edge weathering** have their own switches and collapsible panels.
+The square-lattice path is a single WebGL2 gather pass with one final readback; hex uses the
+deterministic CPU compatibility path. The procedural field continues through the authored rectangle,
+so no clamped neighbour, exterior drain, or copied border can create a frame at the terrain edge.
+Input heights remain finite but unbounded, masks must be finite `[0,1]` fields, and disabled processing
+is exact identity.
+
+For a broken-rock result, use `… → Rock Fracture → Thermal → …`: Fracture creates the joints and
+weakens their shoulders; Thermal then moves loose heightfield material toward the repose angle. A
+heightfield can depict grooves, slabs, and breakup, but it cannot create genuinely separated blocks,
+undercuts, or open three-dimensional fissure voids.
 
 ### Snow, ice, and a shared freezing climate
 
@@ -1341,10 +1367,13 @@ incision. Its bounded CPU topology solve is cached; the full-resolution resample
 rendering remain GPU work. This avoids pretending that a one-pass fragment shader is geological
 evolution while keeping 2K/4K output practical.
 
-It produces the *same* terrain as the CPU because the 32-bit integer hash is reproduced exactly in GLSL
-`uint` (the CPU hash now uses `Math.imul`; plain `*` silently rounded past 2⁵³). `_verify_gpu.js` is the
-parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 4.1e-5 (Simplex), 1.1e-4 (ridged), 4.8e-7 (thermal)**, i.e. float32
--vs-float64 rounding, not algorithmic drift.
+The per-cell kernels produce the *same* terrain as the CPU because the 32-bit integer hash is
+reproduced exactly in GLSL `uint` (the CPU hash now uses `Math.imul`; plain `*` silently rounded past
+2⁵³). `_verify_gpu.js` is the parity check — measured **max |Δ| ≈ 2.6e-5 (Perlin), 4.1e-5 (Simplex),
+1.1e-4 (ridged), 4.8e-7 (thermal), 5.3e-6 (Rock Fracture)**, i.e. float32-vs-float64 rounding,
+not algorithmic drift.
+Droplets use a parallel particle schedule and are instead gated by seeded repeatability, terrain
+shape, action signs, and an explicit sediment-budget policy.
 
 The studio opens at **512²**. The build profile also exposes **1024², 2048², and 4096²** targets; selecting
 1024² or above queues the new target and switches **Auto** off so the existing viewport remains usable until
@@ -1385,24 +1414,63 @@ The droplet path requires `EXT_float_blend`; unsupported WebGL2 contexts and the
 inspector-labelled CPU compatibility path. At 96² under SwiftShader, 1,800 droplets × 28 steps complete in
 about **0.6–0.9 s**, produce both erosion and deposition, repeat exactly for the same seed on the same
 device, and change when the seed changes. Additive float blending is not claimed bit-identical across GPU
-vendors; the gate checks seeded same-device repeatability, finite output, mass closure, both terrain-action
-signs, the combined stage order, and a single readback.
+vendors; the gate checks seeded same-device repeatability, finite output, a named truncation budget,
+both terrain-action signs, the combined stage order, one readback, and peak/slope bounds at both the
+small deterministic fixture and the node's default particle density.
 
-**What erodes must deposit — or be counted as export.** Both engines used to leak their terminal
-suspended load, and the two leaks turned out to be different stories. The GPU readback kept only the
-bed channel, discarding every unit of sediment still in transport when iterations end — **91.9% of
+**The droplet “forest” and high-density runaway artifacts (fixed).** There were two mechanisms. First,
+the initial GPU path treated `Lifetime` as a physical settling trigger. At default evaporation,
+thousands of droplets still carried sediment when that work limit expired, so one synchronized pass
+deposited every survivor's entire load into four cells and printed a forest of cones. Lifetime is now
+strictly a work cap: normal capacity-driven deposition still occurs along each path, while boundary
+export and load still suspended at truncation are named together as `exportedOrSuspended`; there is no
+terminal height write.
+
+Second, every particle in a GPU step sampled the same pre-step terrain. At high density, many
+individually bounded actions could overlap one cell, collectively invert its slope, and feed a much
+larger speed/capacity value into the next step. This produced finite values around 10²¹—an
+out-of-physical-range feedback, not a literal divide-by-zero. Particle paths now run in cohorts capped
+at 0.1 particle per terrain cell, with each cohort seeing all prior terrain changes, and particle speed
+is CFL-bounded. Above 0.5 particle per cell, each particle represents a proportionally smaller water
+parcel; capacity, carried sediment, and the terrain write share that weight. Additional particles then
+refine path coverage instead of multiplying erosion strength or breaking the sediment ledger.
+
+The armed regression contains a synthetic spike control and runs the real 512² Interactive scaling.
+At 96², terminal-dump peaks above 0.02 local prominence fell **53 → 0** (current maximum prominence
+**0.01823**); at 192²/18k they fell **154 → 0** (current maximum **0.00656**). The reported
+**14,389 particles × 71 lifetime** case is finite with maximum prominence **0.00241**, maximum pit
+depth **0.00307**, and maximum slope **0.03133**. The slider maximum—60k UI particles, 240k actual
+GPU particles—has zero peaks or pits above 0.02, maximum prominence **0.000699**, maximum pit depth
+**0.00133**, and maximum slope **0.01899**.
+
+**What erodes must deposit — or be counted as export.** Both original engines used to leak their
+terminal suspended load, and the two leaks turned out to be different stories. The GPU **pipe**
+readback kept only the bed channel, discarding every unit of sediment still in transport when
+iterations end — **91.9% of
 net-eroded volume vanished** at reference settings, which is why the node could never finish a fan or
 a delta: the sediment sliders modulated a sink. The fix settles the blue channel where it stands (bed
-and suspended sediment are exchanged strictly 1:1, same units), **rim included** — a rim exclusion was
-tried first, on the theory that the flux shader's permanent −0.03 edge head concentrates suspension
-there, and was **rejected by measurement** in cross-model review: the edge head *flushes* suspension
-off-grid, the rim carries the least suspended load of any ring (mean 0.0025 vs 0.0064 interior), a
-deposit lip is geometrically impossible (rim max suspension is half the rim's mean net erosion), and
-the exclusion only deepened the existing one-cell border trench by ~15%. Measured after the fix:
-deficit **0.919 → 0.345**, deposition-to-erosion ratio **0.08 → 0.65**, 231 units settled, max
-single-cell rise 0.033 (no beading); the remaining deficit is genuine in-sim export through the edge
-pipes — exact by elimination, so the GPU ledger flags it `exportedDerived` and no closure gate accepts
-it as evidence. The CPU droplet ledger read differently: most of its apparent **42.9%** loss was
+and suspended sediment are exchanged strictly 1:1, same units). Measured in the current mass gate:
+deficit **0.919 → 0.042**, deposition-to-erosion ratio **0.081 → 0.958**, 46.9 normalized-volume
+units settled, and maximum single-cell rise 0.02268 (no beading). The full padded simulation closes
+to numerical precision; `cropExchange` separately names material crossing the authored crop.
+
+**Pipe edges use a real simulation apron, not output blending.** The old flux shader lowered the
+outside head by a fixed 0.03, inventing a permanent terrain step along every edge. The replacement
+extends the heightfield through a bounded border-replicated continuation apron, applies an explicit
+closed-wall condition only at the apron’s outer boundary, runs the complete water/sediment solve, and
+crops back to the authored field. There is no frozen rim and no post-simulation crossfade. At the
+reported **279 iterations / Deposit 0.48** case, the 39-cell apron produces edge p99/max slopes
+**0.00384 / 0.00454**, both below the input’s **0.00749 / 0.00849**. The exact combined
+**Pipe 279 → Droplet 57,670 × 48** regression also has zero peaks or pits above 0.02, maximum pit
+depth **0.00154**, maximum slope **0.03255**, and edge p99 **0.00389**.
+
+The verifier also separates field data from the renderer. A low orbit target could previously put the
+camera eye below the open heightfield and display back-facing triangles as hanging spikes even when
+the raw field was smooth. The inspection camera now lifts eye and target together above the cached
+solid-surface maximum; the regression deliberately starts the eye below the surface and verifies the
+guard moves it above without modifying terrain data.
+
+The CPU droplet ledger read differently: most of its apparent **42.9%** loss was
 droplets *legitimately* exporting off-grid with their load (the boundary is base level); the true
 interior leak — dry-out and life-cap exits — was ~2% of eroded volume on open terrain (closed basins
 should raise the settled share *by mechanism* — a drying droplet is the pan filling — though the
@@ -1415,10 +1483,13 @@ border-clipped brush cells remove nothing from the terrain while the droplet cre
 settle flag is **opt-in**: Mountain/Peak macro-weathering callers stay byte-identical — the mountain
 node's massif form is now digest-pinned via an `ex=` exercise entry, closing the one opt-out call
 the baseline digest never reached — and the digest was re-baselined for exactly `hydraulic`,
-`erosion2`, and that coverage extension; 55 of 57 node types unchanged. Two honest
+`erosion2`, and that coverage extension. The current digest covers all 60 node types. Two honest
 caveats: the ledger is a *kernel* property, not a node property (Erosion 2 runs the kernel twice on a
 feature-scale-coarsened grid and post-shapes; a wired mask rescales the kernel's output — recovered
 mass included — per cell), and the ledger records only the most recent kernel run.
+The pipe ledger additionally reports `boundaryApronCells`, `cropExchange`, and `sumSimIn/sumSimOut`
+because closure belongs to the padded closed simulation while the cropped authored region can
+legitimately exchange material with that continuation.
 
 On the default graph, the combined GPU-pipe + GPU-warp + Interactive-tier change cut a 1024² evaluation
 under the software-GPU harness from **14.7 s to 3.6 s (4.1×)**. Real hardware should be faster; these
@@ -1535,6 +1606,8 @@ node _verify_organize.js             # deterministic graph layout, branch scopes
 node _verify_edges.js                # selectable/mutable links, hit target, removal paths, mask contract
 node _verify_placement.js            # SDF Shape masks + the universal Mask rule
 node _verify_featurescale.js         # Transform against an analytic sine oracle; Feature Scale widths
+node _verify_thermal_contract.js     # repose/Feature Scale, closed edges, finite-unbounded range, CPU/GPU
+node _verify_fracture.js             # Voronoi joints: range/mask/edges/world scale/hex/CPU-GPU
 node _verify_resparity.js            # Res Lock: same terrain at 192² / 384² / 768²
 node _verify_erosion_gridscale.js    # erosion-family grid invariance: modification depth + landform, 192 vs 384
 node _verify_streampower_calibration.js  # re-derives the stream-power K-exponent roots; gates the shipped line
