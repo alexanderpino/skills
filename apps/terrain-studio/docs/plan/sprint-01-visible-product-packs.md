@@ -18,7 +18,7 @@ not reintroduce the square-separable defect `C4`.
 
 | ID | Title | Cost | Pts | Notes |
 |---|---|---|---|---|
-| S1.0 | Add the Surface/Geology palette family; move Rock Fracture | `[C]` | 2 | **done locally**; taxonomy/UI only; Thermal remains Erosion |
+| S1.0 | Add the Surface/Geology palette family; move Rock Fracture | `[C]` | 2 | **DONE** · `da2e583`; focused/built gates green |
 | S1.1 | Surface-detail node (one plugin, `style` enum) | `[C]` | 5 | Roughen, Distress, GroundTexture, RockNoise, Bulbous, Pockmarks, Contours, Grid |
 | S1.2 | Landform pack: Crater, CraterField, Island, Volcano, MountainSide, Rugged | `[C]` | 8 | six plugin types; radial SDF + profile + noise/scatter |
 | S1.3 | Tone/morphology filters | `[C]` | 5 | Sharpen, Threshold, Dilate, Deflate, Match, SoftClip |

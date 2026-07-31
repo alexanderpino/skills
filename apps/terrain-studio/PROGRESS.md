@@ -25,7 +25,7 @@ in `.sweep-logs/`.
 
 ## Now
 
-**Sprint 1 started — S1.0 Surface / Geology palette family done locally, 2026-07-31.**
+**Sprint 1 started — S1.0 Surface / Geology palette family DONE (`da2e583`), 2026-07-31.**
 
 - Added the ninth palette family and reclassified Rock Fracture from Erosion; Thermal remains
   Erosion. Toolbox search and drag-out quick-create expose the new family without evaluator changes.

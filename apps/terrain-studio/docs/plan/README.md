@@ -81,6 +81,11 @@ The sprint stories remain canonical. Mission Control items are implementation bu
 may not add, omit, or redefine story scope. S1.0 is already implemented in the baseline, leaving 48
 stories assigned exactly once below.
 
+**Status rule:** a story is marked `DONE` in its sprint table only after its focused red/green gate,
+built-bundle validation, and integration commit are recorded in `PROGRESS.md`. Research,
+plan-review, building, and verification are not completion. Mission-item execution state remains in
+the installed Mission Control SQLite store; the sprint tables record only shipped story outcomes.
+
 | Mission item | Canonical stories | Depends on |
 |---|---|---|
 | `MC-S01` | S2.1, S2.2 | — |
