@@ -1,7 +1,7 @@
 # Terrain Studio sprint grounding ledger
 
-**Status:** candidate — independent review pending  
-**Audit:** Mission Control `INV-SPRINT-GROUNDING`  
+**Status:** implementation baseline; story gates remain authoritative
+**Audit:** Mission Control `INV-SPRINT-GROUNDING`
 **Rule:** a claim is grounded only by exact corpus/reference behavior, measured current source/test
 evidence, transparent derivation, or an accepted ADR with options and measurable consequences.
 Future implementation, R0 measurement, or a planned mutation is not current provenance.

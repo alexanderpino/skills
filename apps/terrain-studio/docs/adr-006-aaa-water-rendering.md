@@ -1,6 +1,6 @@
 # ADR 006 — Hybrid Gerstner water for the Terrain Studio viewport
 
-**Status:** accepted  
+**Status:** accepted
 **Date:** 2026-07-31
 
 ## Context

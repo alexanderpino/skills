@@ -1,6 +1,6 @@
 # ADR 004 — Variables, bounded expressions, and embedded subgraphs
 
-**Status:** accepted  
+**Status:** accepted
 **Date:** 2026-07-31
 
 ## Context

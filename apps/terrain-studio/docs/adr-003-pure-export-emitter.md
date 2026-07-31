@@ -1,6 +1,6 @@
 # ADR 003 — Pure export requests and explicit emitters
 
-**Status:** accepted  
+**Status:** accepted
 **Date:** 2026-07-31
 
 ## Context
