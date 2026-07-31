@@ -7,6 +7,7 @@ import './plugins/data/index.js';
 import './plugins/effect/index.js';
 import './plugins/ero/index.js';
 import './plugins/gen/index.js';
+import './plugins/surface/index.js';
 import './plugins/filt/index.js';
 import './plugins/mask/index.js';
 import './plugins/comb/index.js';
@@ -203,6 +204,11 @@ export let XF=null;
 export function setXF(v){ XF=v; }
 const xfU=(u,v)=>XF?XF[0]*u+XF[1]*v+XF[2]:u;
 const xfV=(u,v)=>XF?XF[3]*u+XF[4]*v+XF[5]:v;
+export function worldSampleAt(x,y){
+  const n=fieldW(),nh=fieldH(),hxs=terrainDef.lattice==="hex"?0.5:0;
+  const u=(x+0.5+hxs*(y&1))/n,v=(y+0.5)/nh;
+  return[xfU(u,v)*terrainDef.scale,xfV(u,v)*terrainDef.scale];
+}
 // The SAME inverse map transformField() uses, so exact and raster modes describe one placement.
 export function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5}){
   const a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
@@ -2952,7 +2958,7 @@ export function hydroFixField(inp,p){
    NODE TYPES
    ===================================================================== */
 // P / WHEN / GROUP / CAT now live in src/core/params.js.
-const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","drawmask","constant",
+const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","crater","island","volcano","drawmask","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
 function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
 export function exactChain(id,guard){

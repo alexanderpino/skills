@@ -70,9 +70,10 @@
 //   explicit test surface (e.g. `globalThis.__terrain = { TYPES, nodes, edges, ... }`), and the
 //   one commit that introduces it is the one commit where this file's page-side accessors change.
 // =====================================================================
-const { chromium } = require('playwright-core');
-const path = require('path');
-const fs = require('fs');
+const { chromium } = await import('playwright-core');
+const path = (await import('node:path')).default;
+const fs = (await import('node:fs')).default;
+const __dirname = path.dirname(path.resolve(process.argv[1]));
 
 const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
@@ -225,7 +226,8 @@ function installHarness(cfg) {
   const WIRING = {
     // --- generators: no inputs ---
     perlin: [], simplex: [], ridged: [], worley: [], gradient: [], shape: [],
-    mountain: [], canyon: [], tectonic: [], constant: [], import: [],
+    mountain: [], canyon: [], tectonic: [], crater: [], craterfield: [], island: [], volcano: [],
+    mountainside: [], rugged: [], constant: [], import: [],
     drawmask: ['A'],                       // Reference (referenceOnly slot 0)
     layout: ['A', 'M'],                    // Base, Mask
     // --- combine ---
@@ -238,6 +240,7 @@ function installHarness(cfg) {
     thermal: ['A', 'M'], fracture: ['A', 'M'], streampower: ['A', 'B', 'M'],
     hydraulic: ['A', 'M'],
     erosion2: ['A', 'M'], hydrofix: ['A', 'M'],
+    surface: ['A', 'M'],
     // --- masks ---
     slopemask: ['A'], heightmask: ['A'], tempmask: ['T'],
     // --- data maps ---
@@ -296,6 +299,16 @@ function installHarness(cfg) {
     // Not identity-shaped, but the default form:"peak" never reaches the massif branch — and
     // with it the second hydraulicErode call, which must stay settle-free (opt-out contract).
     mountain: { form: 'massif' },
+    surface: [
+      { name: 'roughen', overrides: { style: 'roughen', amountM: 120 } },
+      { name: 'distress', overrides: { style: 'distress', amountM: 120 } },
+      { name: 'groundtexture', overrides: { style: 'groundtexture', amountM: 120 } },
+      { name: 'rocknoise', overrides: { style: 'rocknoise', amountM: 120 } },
+      { name: 'bulbous', overrides: { style: 'bulbous', amountM: 120 } },
+      { name: 'pockmarks', overrides: { style: 'pockmarks', amountM: 120 } },
+      { name: 'contours', overrides: { style: 'contours', amountM: 120 } },
+      { name: 'grid', overrides: { style: 'grid', amountM: 120, angleDeg: 37 } },
+    ],
   };
 
   // A fixed stroke: drawmask ships with strokes:[] and would otherwise digest an all-zero field.
@@ -398,16 +411,20 @@ function installHarness(cfg) {
       } catch (err) { parts.push('hydrology=ERR:' + ((err && err.message) || String(err))); }
     }
     if (EXERCISE[type]) {
-      try {
-        const x = build(type, EXERCISE[type]);
-        const xd = digest(x.field);
-        parts.push('ex=' + (xd === null ? 'INVALID' : xd));
-        diag.exercise = stats(x.field);
+      const exercises = Array.isArray(EXERCISE[type]) ? EXERCISE[type]
+        : [{ name: '', overrides: EXERCISE[type] }];
+      diag.exercise = {};
+      for (const exercise of exercises) try {
+        const x = build(type, exercise.overrides), xd = digest(x.field);
+        const suffix = exercise.name ? '_' + exercise.name : '';
+        parts.push('ex' + suffix + '=' + (xd === null ? 'INVALID' : xd));
+        diag.exercise[exercise.name || 'default'] = stats(x.field);
         if (AUX[type]) for (const p of AUX[type]) {
           const d = digest(reach(x.nd, p));
-          parts.push('ex_' + p.replace(/^_/, '').replace(/\./g, '_') + '=' + (d === null ? 'INVALID' : d));
+          parts.push('ex' + suffix + '_' + p.replace(/^_/, '').replace(/\./g, '_') + '=' + (d === null ? 'INVALID' : d));
         }
-      } catch (err) { parts.push('ex=ERR:' + ((err && err.message) || String(err))); }
+      } catch (err) { parts.push('ex' + (exercise.name ? '_' + exercise.name : '')
+        + '=ERR:' + ((err && err.message) || String(err))); }
     }
     return { type, digest: parts.join('|'), diag, slotWarn };
   }
