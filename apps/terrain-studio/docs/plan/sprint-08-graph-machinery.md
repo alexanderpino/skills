@@ -27,6 +27,68 @@ or `new Function`.
 
 ---
 
+## Technical refinement
+
+### Locked runtime contract — [ADR 004](../adr-004-graph-machinery.md)
+
+- Variables and subgraph definitions are embedded
+  in the saved document for this sprint; there is no mutable external library dependency. Importing
+  a library item copies a canonical definition plus content hash into the document.
+- Route/Chokepoint are typed identity nodes. Edge emits `boundaryMask:[0,1]` and
+  `signedDistance:m`; threshold is authored in `[0,1]` with accepted initial value `0.5`, exact-threshold
+  samples are inside, and the boundary uses D8 on square / D6 on hex while distance uses the lattice
+  world metric.
+- Switch selection is a persisted stable branch ID. All branch descriptors must be compatible before
+  save/evaluation; only the selected branch is demanded. Gate's closed value is a typed constant
+  declared by its descriptor, never an untyped zero.
+- Variables live in a document table keyed by stable ID and carry scalar kind, unit-dimension vector,
+  range/default, and value. Display names are non-unique labels. Subgraph instances form child scope:
+  reads fall back to parent IDs, while instance overrides shadow only the referenced ID and never
+  mutate the definition or siblings.
+- Math uses an owned Pratt parser, not `eval`, `new Function`, or a general scripting dependency.
+  Grammar allows numeric literals, variable tokens `@{uuid}`, parentheses, unary `+/-`, binary `+ - * /`, and
+  `abs`, `min`, `max`, `clamp`, `sqrt`, `sinDeg`, `cosDeg`, `tanDeg`. ADR 004 defines each function's
+  dimensional contract. Accepted security budgets are 512 UTF-16 code units, AST depth 32, and 256
+  evaluated operator/function nodes; 513/33/257 are errors. No names other than resolved variable tokens
+  and the allowlist exist.
+- A subgraph definition has stable ID, positive integer version, content hash, typed MacroPorts,
+  exposed variable IDs, and internal DAG. Instances pin `(definitionId, version, hash)`. Any port-
+  breaking edit creates a new version; old instances do not float. Direct/indirect recursion is
+  rejected by definition-reference DFS before graph cycle validation.
+- Definitions use canonical full SHA-256 hashes. Same ID/version/hash deduplicates; same ID/version
+  with a different full hash is a visible import conflict and no data is rewritten. Cache identity is
+  the full definition hash/version, instance overrides, evaluation context/substrate version,
+  effective seed, demanded output/group, and upstream port keys; cached values are immutable.
+
+### Owning code surfaces and cut order
+
+1. **R0:** freeze S2 port/cache/document contracts and arm malicious-expression,
+   recursive-definition, missing-hash, and name-collision fixtures before implementation.
+2. **S8.1:** land generic identities and Edge outputs; no variable/subgraph schema is needed.
+3. **S8.2:** add lazy Switch/Gate using S2 demand propagation and source-port persistence.
+4. **S8.3:** add document variable table, parameter bindings, invalidation index, inspector, undo,
+   and serialization. Scope/override behavior is complete before Math consumes variables.
+5. **S8.4:** implement tokenizer, Pratt parser, unit checker, bounded interpreter, and precise errors
+   as separate modules under `src/core/`; the AST is serializable data, never executable source.
+6. **S8.5–S8.6:** add embedded definitions/MacroPorts, then instances, cross-boundary cycle checks,
+   cache keys, copy/import, and explicit version migration in that order.
+
+### Verification matrix and Ready condition
+
+| Contract risk | Passing endpoint | Mutation that must be red |
+|---|---|---|
+| Eager branch | unselected throwing branch is never demanded | evaluate all Switch inputs |
+| Name identity | rename preserves stable references | name-keyed variable binding |
+| Expression escape | bounded allowlist and unit-correct result | constructor/global/deep AST |
+| Instance leakage | overrides independent; immutable cache share only | mutable result alias |
+| Recursive graph | direct/indirect definitions rejected before run | self-containing definition |
+| Import drift | exact dedupe or visible full-hash conflict | silent rename/overwrite |
+
+Sprint 8 is Ready when Sprint 2 exits, ADR 004's schema fixtures load, and all four hostile
+fixtures in R0 have been observed red. Loops and external shared libraries remain out of scope.
+
+---
+
 ### S8.1 — Route / Chokepoint / Edge · `[C]` · 3 pts
 **User story:** As a graph author, I can organize wires and extract mask boundaries without changing
 values.
@@ -76,15 +138,17 @@ rename and must fail.
 **User story:** As a graph author, I can derive scalar controls from variables using deterministic,
 reviewable expressions without executing arbitrary code.
 
-Use a maintained parser or a small allowlisted grammar selected in the architecture decision. Parse
-to AST; allow only documented arithmetic/functions/constants; cap expression length, AST depth, and
-operation count; reject non-finite values and unit-incompatible operations. No property access,
+Use the locked owned Pratt grammar above. Parse to AST, enforce the stated source/depth/operation
+limits, and reject non-finite values and unit-incompatible operations. No property access,
 assignment, loops, I/O, globals, `eval`, or `new Function`.
 
 **Acceptance gate** — `tests/legacy/_verify_math.js`: analytic expressions match expected float
 results; same inputs are bit-identical; malformed syntax, division by zero/non-finite output,
 unknown variables, incompatible units, and adversarial property/function expressions fail with
 specific errors. A fixture attempting `constructor`/global access is the armed security failure.
+Valid expressions at 512/32/256 pass; 513/33/257 fail; parse plus one evaluation at the maximum valid
+budget completes without unbounded allocation or recursion. UUID-token fixtures cover adjacent minus,
+case canonicalization, malformed braces, and unknown IDs.
 
 ---
 
@@ -108,10 +172,11 @@ instance overrides produce independent results.
 **User story:** As a graph author, reusable definitions survive save/share/import and cache safely
 without instances leaking state into each other.
 
-Content/cache identity includes definition version, instance overrides, context, and upstream port
-keys. Saved documents include referenced definitions or stable library references with hashes.
-Copy/paste/import resolves ID collisions deterministically. Missing definitions and incompatible
-versions fail visibly; migrations are explicit, never best-effort rewiring.
+Content/cache identity includes full definition hash/version, instance overrides, context/substrate,
+effective seed, demanded output/group, and upstream port keys. Saved documents embed referenced
+definitions. Copy/paste/import deduplicates exact identity and rejects same-ID/version hash conflicts.
+Missing definitions and incompatible versions fail visibly; migrations are
+explicit, never best-effort rewiring.
 
 **Acceptance gate** — `tests/legacy/_verify_subgraph_persistence.js`: save/reload and copy/import retain
 exact output/topology; two identical instances may share immutable cached results while different

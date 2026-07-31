@@ -36,6 +36,7 @@ export const GROUP=(param,name)=>({...param,group:name});
 export const SECTION=(param,name)=>({...param,section:name});
 export const CAT={gen:{c:"--cat-gen",name:"Generator"},comb:{c:"--cat-comb",name:"Combine"},
   filt:{c:"--cat-filt",name:"Filter"},ero:{c:"--cat-ero",name:"Erosion"},
+  surface:{c:"--cat-surface",name:"Surface / Geology"},
   mask:{c:"--cat-mask",name:"Mask"},data:{c:"--cat-data",name:"Data map"},effect:{c:"--cat-effect",name:"Effect"},out:{c:"--cat-out",name:"Output"}};
 
 /* Node types that COMMUTE with a coordinate transform, so a Transform above them can be folded into

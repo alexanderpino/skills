@@ -18,12 +18,66 @@ not reintroduce the square-separable defect `C4`.
 
 | ID | Title | Cost | Pts | Notes |
 |---|---|---|---|---|
-| S1.0 | Add the Surface/Geology palette family; move Rock Fracture | `[C]` | 2 | taxonomy/UI only; Thermal remains Erosion |
+| S1.0 | Add the Surface/Geology palette family; move Rock Fracture | `[C]` | 2 | **done locally**; taxonomy/UI only; Thermal remains Erosion |
 | S1.1 | Surface-detail node (one plugin, `style` enum) | `[C]` | 5 | Roughen, Distress, GroundTexture, RockNoise, Bulbous, Pockmarks, Contours, Grid |
 | S1.2 | Landform pack: Crater, CraterField, Island, Volcano, MountainSide, Rugged | `[C]` | 8 | six plugin types; radial SDF + profile + noise/scatter |
 | S1.3 | Tone/morphology filters | `[C]` | 5 | Sharpen, Threshold, Dilate, Deflate, Match, SoftClip |
 | S1.4 | Coordinate filters | `[C]` | 5 | Flip, Transpose, Fold, DirectionalWarp; lattice-aware semantics |
 | S1.5 | Derive: Angle (aspect) | `[C]` | 2 | scalar field; Normals moves to Sprint 2 typed ports |
+
+---
+
+## Technical refinement
+
+### Locked decisions
+
+- Packaging is fixed at **18 new plugin types**: Surface Detail (1), landforms (6), filters (6),
+  coordinate filters (4), and Aspect (1). S1.0 is a reclassification, not a new type. The exit count
+  is still measured baseline + 18 rather than a hard-coded absolute total.
+- Surface Detail is one plugin with eight styles. Style changes select an implementation strategy;
+  they do not change the port contract. All wavelength/radius parameters are metres and all random
+  styles derive their seed from `(rootSeed, nodeId, style)`.
+- Coordinate operations are world transforms about the square world-extent centre. `Flip` reflects
+  x or y; `Transpose` applies `(x,y) -> (y,x)`; `Fold` reflects one half-space onto the other about an
+  authored world-space axis; `DirectionalWarp` offsets world coordinates along an authored bearing
+  by a scalar field measured in metres. Square and hex both resample through the lattice sampler.
+  Hex Transpose is therefore supported; a raw odd-row array transpose is never a valid path.
+- `EXACT_TYPES` eligibility is decided per generator before registration. Crater, Island, and
+  Volcano are eligible only if their evaluators are pure world-coordinate functions. CraterField,
+  MountainSide, and Rugged default to raster evaluation because placement/global normalization does
+  not commute with Transform. An implementation may promote one only by passing the existing
+  non-integer transform oracle.
+- Reference fixtures use the measured shipped convention: `terrainDef.scale = 5000 m` (the digest
+  and more than a dozen focused oracles), 128 and 256 columns, both lattices, and deterministic seed
+  `7` (the existing generator/oracle convention). Position-pure generators sample beyond the authored
+  rectangle in world space; neighbourhood filters declare their own support/boundary policy. Review
+  captures use the same world at traversal and close zoom.
+
+### Implementation surfaces and cut order
+
+1. **R0:** record plugin count, category membership, `EXACT_TYPES`, focused digest, and reference-
+   implementation availability. Missing reference symbols fail the baseline.
+2. **S1.0:** update category metadata/styling and Rock Fracture registration; run the category and
+   digest gates before adding behavior.
+3. **S1.1–S1.2:** add plugins under `src/plugins/surface/` and `src/plugins/gen/`; keep reusable
+   world-space profile/scatter routines in `src/core/` only when two plugins actually share them.
+4. **S1.3–S1.5:** add filter/derive plugins and update `EXACT_TYPES` in `src/legacy.js`; wire toolbox,
+   quick-create, source-shape checks, and plugin indexes in the same slice as each type.
+5. Add one focused oracle per story, then run the digest after each plugin pin so a drift bisects to
+   one type rather than the whole pack.
+
+### Verification matrix and Ready condition
+
+| Risk | Passing endpoint | Mutation that must be red |
+|---|---|---|
+| Cell-space scale | dominant wavelength/radius stable across 128/256 | parameters interpreted as cells |
+| Mask leakage | zero-mask samples are bit-identical; sampled style formula matches direct oracle | apply detail before the mask |
+| Fake landform mass | crater floor/rim/ejecta and saturated scatter status | cone-only or silent under-fill |
+| Hex coordinate shear | analytic centroid/gradient reaches world target | raw odd-row transpose |
+| Circular aspect | modal/circular azimuth within one lattice quantum | arithmetic mean across north |
+
+Sprint 1 is Ready when R0 has recorded the measured baseline and each reference symbol used by the
+fixtures executes. It has no architecture dependency.
 
 ---
 
@@ -57,9 +111,11 @@ build 18 nodes.
 
 **Acceptance gate** — new oracle `tests/legacy/_verify_surface.js`:
 - **Negative control (must be seen to fail):** with `amount = 0` the output must equal the input
-  bit-for-bit; with `amount > 0` on a deliberately smooth dome, assert `max(abs(delta)) <= 1e-6`
-  outside the driver mask and `p95(abs(delta)) >= 1e-3` inside it. Invert the mask and assert those
-  regions exchange roles.
+  bit-for-bit. With `amount > 0` on a deliberately smooth dome, every sample whose driver mask is
+  exactly zero remains bit-identical. At fixed interior sample points, each style matches its direct
+  scalar composition oracle within the Float32 forward-error bound for that formula and at least one
+  non-zero-mask sample differs from input. Invert the mask and assert the sampled regions exchange
+  roles.
 - Assert finite output and seed determinism (same seed → bit-identical). For each world-frequency
   style, the measured dominant wavelength at 128² and 256² must differ by no more than one 128² cell
   on the same 5 km domain; this detects cell-space parameters without guessing an RMS tolerance.
@@ -110,10 +166,13 @@ does not threshold); `Dilate`/`Deflate` (reuse the morphological closing already
 - `Threshold`: assert output is two-valued at the cut and that moving the cut moves the boundary by
   the predicted pixel count. Negative control: a cut below the field minimum yields all-high; above
   the maximum yields all-low — assert both, since a no-op threshold would pass a lazy test.
-- `Sharpen`: assert edge contrast rises and flat regions are unchanged within 1e-6 (so it sharpens
-  edges, not noise). `Dilate`/`Deflate`: assert a known disc grows/shrinks by the structuring radius.
-- `Match`: compare empirical CDFs at all 256 bins and assert maximum CDF error ≤ 1/255; matching a
-  field to itself is bit-identical. Four moments are not sufficient evidence of histogram matching.
+- `Sharpen`: assert edge contrast rises and a constant field matches the direct
+  `input + amount * (input - blur(input))` Float32 oracle (so it sharpens edges, not noise).
+  `Dilate`/`Deflate`: assert a known disc grows/shrinks by the structuring radius.
+- `Match`: independently stable-sort source samples, assign each rank the corresponding sorted target
+  quantile, and compare production output sample-for-sample to that rank oracle. A 256-level fixture
+  with equal multiplicities must reproduce target bin counts exactly; matching a field to itself is
+  bit-identical. Four moments or a bin-count-derived universal CDF tolerance are not sufficient.
 - Morphology radius is authored in metres. On an analytic disc, square and hex physical growth must
   each be within one cell of the requested radius. Hex branch present for every blur/morphology node
   (guardrail: inherit W1, do not reintroduce `C4`).
@@ -126,15 +185,15 @@ does not threshold); `Dilate`/`Deflate` (reuse the morphological closing already
 **User story:** As a terrain author, I can orient and deform fields predictably on either lattice.
 
 Add `Flip`, `Transpose`, `Fold`, and `DirectionalWarp`. A raw array transpose is not a valid hex
-transpose: define these in world space and resample through the lattice sampler. If that semantic is
-not accepted during Definition of Ready, disable Transpose on hex with a visible reason rather than
-shipping a parity/shear defect.
+transpose: define these in world space and resample through the lattice sampler using the locked
+semantics above.
 
 **Acceptance gate** — `tests/legacy/_verify_coordinate_filters.js`: evaluate analytic x/y ramps and
 a centred impulse. Assert each operation moves their world-space centroid and gradient to the
 analytic location on square and hex. Applying Flip twice must recover the source bit-for-bit where it
-is index-exact; resampled operations use the existing transform oracle's measured tolerance. A raw
-odd-r array transpose is the armed failing fixture.
+is index-exact. Bilinear affine-ramp samples use the direct interpolation formula and its Float32
+forward-error bound; impulse-centroid localization is at most one destination cell. A raw odd-r
+array transpose is the armed failing fixture.
 
 ---
 

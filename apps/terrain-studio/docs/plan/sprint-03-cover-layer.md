@@ -29,6 +29,63 @@ snow/water maps.
 
 ---
 
+## Technical refinement
+
+### Locked physical and data contract
+
+- The solid stack is `solidTopM = bedrockHeightM + soilDepthM + sedimentDepthM + sandDepthM`.
+  [ADR 005](../adr-005-physical-fields-and-climate-migration.md) keeps legacy terrain typed as
+  `heightNormalized` and requires the explicit measured-frame adapter before a physical node. Cover
+  fields are finite/non-negative; absolute bedrock elevation is finite and unbounded.
+- Regolith production uses the Heimsath et al. 1997 law from reference chapter 11:
+  `P(H) = P0 * exp(-H / hStar)`. Author `P0` in mm/yr, `hStar` in metres, and duration in years;
+  hard ranges are the cited `P0 = 0.05–0.3 mm/yr` and `hStar = 0.3–0.5 m`. Initial values are
+  transparently derived from those ranges: `P0 = sqrt(0.05 * 0.3) = 0.122474... mm/yr` (geometric
+  midpoint for a rate) and `hStar = 0.4 m` (arithmetic midpoint). Duration is required authored data
+  with no production default. The analytic update cannot produce negative depth. Climate modulation
+  is an optional dimensionless multiplier, not a hidden required model.
+- Hydraulic receives explicit cover plus precipitation. Until S5.2, old documents migrate their
+  existing rainfall parameter to an explicit uniform-raster compatibility source owned by S5; no
+  solver invents rainfall when the input is disconnected.
+- ADR 002 preserves one GPU synchronization point. Height-only demand keeps ADR 001's current RGBA
+  readback. State demand uses the accepted two-texel-per-cell `RGBA32F` atlas for `solidTop`,
+  `soilDepth`, `sedimentDepth`, and Pipe velocity x/y. Droplet action channels distinguish erosion
+  from capacity-driven deposition; unresolved terminal load remains `exportedOrSuspended`. No cell
+  velocity is claimed for droplets.
+- Transport accounting uses physical volume. Each process reports consumed cover, bedrock detached,
+  deposited cover, and named boundary/exported/suspended loss. Effect masks and process masks remain
+  distinct; the transport stories use process semantics inside the solve.
+
+### Owning code surfaces and cut order
+
+1. **R0:** freeze the S2 adapter/exemption ledger and enumerate every registered height writer as
+   generator, surface expression, or material transport. Resolve disputes before implementation.
+2. **S3.1:** extend `src/plugins/ero/hydraulic.js`, CPU hydraulic routines in `src/legacy.js`, and
+  GPU kernels/wrappers in `src/core/gpu.js`; land the ADR 002 atlas and state oracle before cover-aware
+   behavior changes primary height.
+3. **S3.2:** add the Regolith producer and reference-law fixture. Keep the preview-only
+   `src/plugins/effect/weathering.js` unchanged and label the distinction in search/inspector copy.
+4. **S3.3:** add typed cover/precipitation inputs and change transport order to loose cover first,
+   bedrock second. Re-bless Hydraulic only after mass/stack identities pass on GPU and compatibility
+   paths.
+5. **S3.4–S3.5:** add explicit readers, then migrate Thermal, Stream Power, Erosion 2, and HydroFix
+   one at a time, removing the corresponding exemption after each focused oracle passes.
+
+### Verification matrix and Ready condition
+
+| Invariant | Passing endpoint | Mutation that must be red |
+|---|---|---|
+| Physical mass | consumed = deposited + named loss using lattice area | square area reused on hex |
+| Cover precedence | bedrock unchanged while local loose cover remains | bedrock-first kernel |
+| Regolith law | analytic Heimsath depth at 0, 1, and 2 `hStar` | constant production rate |
+| State locality | selectors require explicit connected ports | graph-neighbour lookup/zero fallback |
+| Complete classification | every height writer has one reviewed class | pre-S3 exemption manifest |
+
+Sprint 3 is Ready when Sprint 2 exits, the R0 transport classification has no disputed entry, and
+the Heimsath analytic fixture plus hydraulic state omission mutation have both been observed red.
+
+---
+
 ### S3.1 — Hydraulic state outputs on CPU/GPU · `[E]` · 8 pts
 **Closes:** `C3` ("erosion's mass budget is computed and discarded"), `C2` (velocity discarded).
 
@@ -42,19 +99,22 @@ evaluation returns final solid height, deposited `sedimentDepth` (m), and Pipe `
 vector raster). If a Droplet velocity field is wanted, define a trajectory-weighted raster and its
 normalisation before implementation; never label raw per-particle terminal speed as a cell field.
 
-This is GPU work: preserve the combined Pipe→Droplet one-readback budget using MRT/packed readback,
-or record and approve a measured readback trade-off in the ADR. The digest's CPU path is not evidence
-for the shipping square GPU path.
+This is GPU work: implement ADR 002's height-only RGBA and state-demand two-texel atlas paths, each
+with exactly one `readPixels` call. The digest's CPU path is not evidence for the shipping square GPU
+path.
 
 **Acceptance gate** — `tests/legacy/_verify_sediment_state.js`, extending `_verify_erosion_mass.js`:
 - **Volume closure, armed:** convert every depth sum with lattice cell area (square `s²`, hex
-  `sqrt(3)/2·s²`) and assert `erodedVolume = depositedVolume + exportedOrSuspendedVolume` under the
-  existing `_verify_erosion_mass.js` measured tolerance. Assert integrated `sedimentDepth` equals
-  deposited volume under that same conversion. A fixture that omits the hex area factor must fail.
+  `sqrt(3)/2·s²`) and assert `erodedVolume = depositedVolume + exportedOrSuspendedVolume`. The
+  allowed reduction error is computed, not inherited: for `N` Float32 terms, use
+  `gamma_(N-1) * sum(abs(term))`, where `gamma_n = (n * 2^-24)/(1 - n * 2^-24)`. Assert integrated
+  `sedimentDepth` equals the deposited ledger under the same bound. A fixture that omits the hex area
+  factor must fail.
 - Assert `sedimentDepth` is zero where no deposition occurred (a prediction would smear it), and that
   the map is in metres (physical units, guardrail 6).
-- Same-seed repeatability bit-identical; run closure on the real square GPU path and CPU/hex
-  compatibility path, then parity under the existing hydraulic tolerance.
+- Same-seed repeatability is bit-identical on one device. Run the independent closure/range gates on
+  the real square GPU path and CPU/hex compatibility path; do not require those distinct numerical
+  implementations to produce an identical state raster.
 
 ---
 
@@ -65,14 +125,14 @@ later processes consume, independently of preview colour ageing.
 Add a physical Regolith/Soil Production node. Do **not** extend the existing `weathering` plugin: it
 is an `effect` node whose description and evaluator explicitly pass height through for colour ageing.
 The new process emits `soilDepth` in metres under the state lens and declares the bedrock/climate
-drivers it reads. Keep the first model bounded and cite its production law in Definition of Ready.
+drivers it reads. Use the locked Heimsath law, ranges, derived initial values, and required duration.
 
 **Acceptance gate** — `tests/legacy/_verify_soildepth.js`:
 - Assert the analytic zero-production controls (zero duration/rate or no eligible substrate) return
   zero soil bit-for-bit; eligible stable surfaces produce finite, non-negative depth in metres.
-- Resolution consistency uses one fixed world extent and cited physical parameters. The coarse field
-  resampled to the fine grid must meet a tolerance fixed from the reference implementation before the
-  production port is written.
+- Resolution consistency uses the 5 km measured fixture and evaluates the analytic Heimsath formula
+  independently at the same world-space samples. Production Float32 values must lie within
+  `gamma_8` of the double-precision oracle; no empirical post-result tolerance is selected.
 
 ---
 
@@ -90,7 +150,8 @@ ledger shrinks.
 **Acceptance gate** — `tests/legacy/_verify_cover_erosion.js`: on a two-layer analytic slope, the
 first eroded volume comes from cover and bedrock remains unchanged until local cover reaches zero;
 deposition increases `sedimentDepth` at transport sinks. Solid-top identity
-`bedrock + soilDepth + sedimentDepth` closes before/after with the transport ledger. Run on square
+`bedrockHeightM + soilDepthM + sedimentDepthM + sandDepthM` closes before/after with the transport
+ledger; this fixture also asserts `sandDepthM == 0`. Run on square
 GPU and CPU/hex compatibility paths. A kernel that erodes bedrock while cover remains is the armed
 failing fixture.
 

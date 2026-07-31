@@ -22,7 +22,69 @@ depth is metres. Surface detail may modify height but must not masquerade as con
 | S7.2 | Sandstone + Outcrops/Rockscape | `[K]` | 5 | surface expressions driven by exposed strata, slope, soil cover, fracture |
 | S7.3 | Aeolian: DuneSea + Sand transport/detail | `[K]` | 8 | reference-informed port; wind/moisture; co-update sandDepth |
 | S7.4 | Scree/talus transport | `[K]` | 5 | source-to-apron volume closure; distinguishable sediment state |
-| S7.5 | Debris runout | `[K]` | 5 | Voellmy reach + new deposition law; not merely a path renderer |
+| S7.5 | Debris runout path / reach | `[K]` | 5 | grounded Voellmy trajectory, speed and stop; deposition deferred |
+
+---
+
+## Technical refinement
+
+### Locked geology and transport contract
+
+- Strata use the chapter-11 stratigraphic coordinate
+  `s = height + dot(tilt, worldXY) + fold + world-space warp`. Beds come from a non-uniform authored
+  thickness table; a uniform sine/modulo stack is only the armed fake-terrace control.
+  Emit positive dimensionless `strataErodibilityFactor` from the authored bed table. ADR 005's
+  Stream Power/2 multiplies its physical `K0` by this factor; low factors resist and high factors
+  erode faster. Do not normalize or invert it into ambiguous “hardness.” The bed
+  table/coordinate are state; the exposed-surface slice co-updates when erosion reveals another bed.
+- Stratify zones are explicit masks with stable priority. Each contact is either `hard` (fault/contact,
+  zero blend) or `feathered` with an authored width in metres; there is no cell-sized production
+  default. Outcrop expressions read erodibility, cover depth, slope/curvature, and fracture; they do
+  not create conserved material.
+- `DuneSea` uses the Werner slab/shadow/avalanche model for transverse organization. `Sand` uses the
+  thresholded continuum Bagnold/Exner transport for finer response to the typed wind field. Boundary
+  policy is required authored data: `periodic` reproduces the reference Werner/Exner fixtures;
+  `open` reports source/outflow flux. There is no hidden production default. Wind direction is never
+  quantized to lattice directions in the continuum branch.
+- Aeolian transport is exactly zero below threshold or on fully immobilized wet/crusted cover.
+  Moisture is an availability gate, not a multiplier that lets wet sand creep. Sand moves only from
+  `sandDepth`; bedrock is not excavated by this first model.
+- Scree consumes an explicit `weatheredRockDepth:m` source field. Following chapter 05, it gates the
+  source by exposed cliff area (`slope > 55°`), dilates source to the cliff base in an authored metre
+  radius, then relaxes that material at an authored scree repose angle in the cited 35–40° range.
+  No source is exact identity; the node does not invent a weathering-rate law.
+- Debris runout uses only the grounded chapter-05 / `reference-impl/runout.py` Voellmy path. It emits
+  a feature set carrying the ordered world-space path, speed per sample, stop point, horizontal reach,
+  and boundary-exit status. It does not write height or claim a deposition field. Lobate/depth-averaged
+  deposition remains a named follow-up because the corpus marks the single-path terrain realization
+  F-tier and supplies no defensible spreading/deposition law.
+
+### Owning code surfaces and cut order
+
+1. **R0:** execute every named reference symbol/test, freeze both-lattice fixtures, and record the
+   S3 transport classification. Missing or square-only reference behavior is a planned adaptation,
+   not assumed production support.
+2. **S7.1:** implement bed table/coordinate and `strataErodibilityFactor`, then connect it to Stream
+   Power in a separate cut. Do not begin outcrop expressions until differential incision is proven.
+3. **S7.2:** add pure Surface/Geology expressions and close zero-exposure/covered identity first.
+4. **S7.3:** land Werner and continuum modes separately against their own controls; combine only
+   through explicit `sandDepth` state after each closes mass independently.
+5. **S7.4–S7.5:** implement explicit-source scree transport and Voellmy path/reach separately; port
+  each to D6 after the square analytic oracle is armed.
+
+### Verification matrix and Ready condition
+
+| Invariant | Passing endpoint | Mutation that must be red |
+|---|---|---|
+| Material convention | lower authored `K` incises less under equal forcing | normalized/inverted hardness |
+| Real strata | non-uniform tilted/folded beds move <= one coarse cell | global terrace/modulo fixture |
+| Aeolian threshold | below threshold/wet bed is exact identity | soft non-zero threshold ramp |
+| Sand/scree mass | source = deposit + named boundary flux | hidden wrap or square area on hex |
+| Runout physics | Coulomb reach, drag monotonicity, ordered legal path | stop-on-flat/terminal deposit claim |
+
+Sprint 7 is Ready when S1–S5 exit, every reference symbol named above executes, the Stream Power
+`K` integration is assigned to S7.1, and all boundary/source conventions are present in the
+armed fixtures. It may run parallel to S6 after those prerequisites.
 
 ---
 
@@ -31,14 +93,14 @@ depth is metres. Surface detail may modify height but must not masquerade as con
 changes erosion and whose exposed layers create non-global strata detail.
 
 Use `terrain-architect/reference-impl/landforms.py::strat_coord` and `bed_erodibility` as grounded
-atoms. Emit `strataHardness`/erodibility with explicit convention and unit; sample the exposed bed as
-height crosses strata. Stratify uses localized zones and nonlinear coordinates, not a global terrace.
-Feed hardness to a differential-erosion consumer in the same sprint so the field is not decorative.
+atoms. Emit `strataErodibilityFactor:ratio` without inversion; sample the exposed bed as height
+crosses strata. Stratify uses localized zones and nonlinear coordinates, not a global terrace. Feed
+the factor to Stream Power/2 in the same story so the field is not decorative.
 
 **Acceptance gate** — `tests/legacy/_verify_stratify.js`: two zones with different bed phase produce
 intentional discontinuity while each zone follows its analytic coordinate; a global terrace fixture
-fails. Hard/soft alternating beds under the same erosion forcing show lower incision in hard beds and
-the sign/convention matches the manifest. Changing resolution on one world does not move bed
+fails. Beds with lower `K` under the same erosion forcing show lower incision and the direct
+erodibility convention matches the manifest. Changing resolution on one world does not move bed
 boundaries beyond one coarse cell.
 
 ---
@@ -54,7 +116,7 @@ paired with a transport output.
 
 **Acceptance gate** — `tests/legacy/_verify_outcrops.js`: zero exposure or positive soil cover above
 the declared cutoff gives bit-identical input; exposed steep hard beds receive finite localized
-detail; inverting hardness/cover moves the detail to the analytic complementary region. World-space
+detail; exchanging high/low erodibility or cover moves detail to the analytic complementary region. World-space
 wavelength is resolution-consistent on square and hex. Capture close and traversal hillshades.
 
 ---
@@ -70,8 +132,9 @@ moisture gates it; both co-update `sandDepth` and solid top. The first shipped s
 so crest-orientation oracles are unambiguous.
 
 **Acceptance gate** — `tests/legacy/_verify_aeolian.js`: below threshold shear or fully wet bed is
-bit-identical; above threshold a transverse crest's dominant orientation is perpendicular to wind
-within one orientation-analysis bin, and rotating wind 90° rotates it by 90° ± one bin. Total sand
+bit-identical; above threshold a transverse crest's axial orientation, measured in 180 one-degree
+bins over `[0°,180°)`, is perpendicular to wind within one bin, and rotating wind 90° rotates it by
+90° ± one bin. Total sand
 volume closes using lattice cell area; source/sink boundary flux is explicit. Resolution consistency
 and square/hex legal-neighbour checks are armed before visual review.
 
@@ -81,30 +144,30 @@ and square/hex legal-neighbour checks are armed before visual review.
 **User story:** As a terrain author, loose fragments leave over-steep faces and accumulate as a
 separate talus apron at their base.
 
-Implement repose-driven source removal and downslope deposition, emitting/co-updating
-`sedimentDepth`. This is not just Thermal renamed: the output layer and apron are first-class and
-selectable. Use legal lattice neighbours and metres/degrees.
+Consume an explicit weathered-rock thickness, place it at the exposed cliff base, and relax it
+downslope into `sedimentDepth`. This is not Thermal renamed: the source field and apron state are
+first-class and selectable. Use legal lattice neighbours and metres/degrees.
 
-**Acceptance gate** — `tests/legacy/_verify_scree.js`: below-repose fixture is identity; above-repose
-cliff loses source volume and gains the same apron volume (plus declared boundary export), with apron
+**Acceptance gate** — `tests/legacy/_verify_scree.js`: disconnected/zero source is identity; an
+exposed-cliff source loses source volume and gains the same apron volume (plus declared boundary export), with apron
 centroid downslope and final active face at the authored repose angle within one lattice angular
 quantum. Run square/hex and reject illegal-neighbour transport.
 
 ---
 
-### S7.5 — Debris runout · `[K]` · 5 pts
-**User story:** As a terrain author, a failed mass follows a physically bounded runout path and leaves
-an explicit deposit rather than a decorative trace.
+### S7.5 — Debris runout path / reach · `[K]` · 5 pts
+**User story:** As a terrain author, I can route a failed mass along a physically bounded trajectory
+and export its path, speed, stop, and reach without pretending a one-path model predicts deposition.
 
-Use `reference-impl/runout.py::voellmy_runout` for path/reach behavior. Add and document a deposition
-law, source volume, width/spreading rule, and boundary export; the reference path alone is not a
-production node. Emit final height and sediment state together.
+Use `reference-impl/runout.py::voellmy_runout` for path/reach behavior. Emit a typed feature set and
+pass solid height through unchanged. Deposition is deliberately deferred to a future depth-averaged
+or independently grounded lobe model.
 
 **Acceptance gate** — `tests/legacy/_verify_debris_runout.js`: in the pure-Coulomb limit, horizontal
-reach satisfies `D = H / mu` under the existing reference tolerance; increasing turbulent drag
-shortens reach monotonically. Removed source volume equals deposited plus boundary-export volume, and
-deposits lie on/around the routed track rather than at a terminal pixel. Same seed is deterministic;
-square/hex use legal neighbours.
+reach satisfies `D = H / mu` with strict error `< 2 * cellSize`, matching
+`reference-impl/tests/test_runout.py`; increasing turbulent drag shortens reach monotonically. On a
+flat with initial speed, stop distance matches `v0²/(2*mu*g)` under the same strict bound. Height is
+bit-identical, path samples are adjacent legal neighbours, and a terminal-pixel deposit mutation fails.
 
 ---
 

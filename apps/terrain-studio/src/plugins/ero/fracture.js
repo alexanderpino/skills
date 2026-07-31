@@ -129,7 +129,7 @@ export function rockFractureField(input,params={}){
 }
 
 export default definePlugin({
-  type:"fracture",cat:"ero",name:"Rock Fracture",ins:["In","Mask"],
+  type:"fracture",cat:"surface",name:"Rock Fracture",ins:["In","Mask"],
   desc:"Warped multi-scale Voronoi joints with optional edge breakdown.",
   paramSections:[
     {id:"network",label:"Fracture network",toggle:"patternEnabled",defaultOpen:true,device:"gpu"},

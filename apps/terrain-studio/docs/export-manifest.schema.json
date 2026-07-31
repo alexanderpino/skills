@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://terrain-studio.local/schema/export-manifest-v1.json",
+  "title": "Terrain Studio Export Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "graphHash",
+    "substrateVersion",
+    "rootSeed",
+    "originM",
+    "extentM",
+    "verticalDatum",
+    "workingLattice",
+    "maxStagingBytes",
+    "products"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "graphHash": { "$ref": "#/$defs/hash" },
+    "substrateVersion": { "type": "string", "minLength": 1 },
+    "rootSeed": { "type": "string", "pattern": "^[0-9]+$" },
+    "originM": { "$ref": "#/$defs/vec2" },
+    "extentM": { "$ref": "#/$defs/positiveVec2" },
+    "verticalDatum": { "$ref": "#/$defs/verticalDatum" },
+    "workingLattice": { "enum": ["square", "hex-pointy-odd-r"] },
+    "maxStagingBytes": { "type": "integer", "minimum": 1 },
+    "products": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/scalarRaster" },
+          { "$ref": "#/$defs/vectorRaster" },
+          { "$ref": "#/$defs/labelRaster" },
+          { "$ref": "#/$defs/scalarValue" },
+          { "$ref": "#/$defs/featureSet" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "artifactPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "vec2": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "positiveVec2": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "exclusiveMinimum": 0 },
+        { "type": "number", "exclusiveMinimum": 0 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "resolution": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "integer", "minimum": 1 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "range": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "verticalDatum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "zeroElevationM"],
+      "properties": {
+        "kind": { "enum": ["local", "orthometric", "ellipsoidal"] },
+        "name": { "type": "string", "minLength": 1 },
+        "zeroElevationM": { "type": "number" }
+      }
+    },
+    "baseProductProperties": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "sourceNodeId": { "type": "string", "minLength": 1 },
+        "sourcePortId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+        "semanticType": { "type": "string", "minLength": 1 },
+        "unit": { "type": "string", "minLength": 1 },
+        "lens": { "enum": ["derived", "state", "continued"] },
+        "stateRole": { "enum": ["final", "initial"] },
+        "dependencies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" }
+        },
+        "epoch": { "type": "string", "format": "date-time" },
+        "drivers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" }
+        },
+        "parentHash": { "$ref": "#/$defs/hash" },
+        "exportPolicy": { "const": "raw" },
+        "file": { "$ref": "#/$defs/artifactPath" }
+      }
+    },
+    "rasterProperties": {
+      "type": "object",
+      "properties": {
+        "posting": { "enum": ["vertex", "pixel"] },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "cellSizeM": { "type": "number", "exclusiveMinimum": 0 },
+        "declaredRange": { "$ref": "#/$defs/range" },
+        "observedRange": { "$ref": "#/$defs/range" },
+        "constantValue": { "type": "number" },
+        "tiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tile" }
+        }
+      }
+    },
+    "tile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "originM", "coreResolution", "apronSamples", "cropResolution", "file"],
+      "properties": {
+        "index": { "$ref": "#/$defs/resolution" },
+        "originM": { "$ref": "#/$defs/vec2" },
+        "coreResolution": { "$ref": "#/$defs/resolution" },
+        "apronSamples": { "type": "integer", "minimum": 0 },
+        "cropResolution": { "$ref": "#/$defs/resolution" },
+        "file": { "$ref": "#/$defs/artifactPath" }
+      }
+    },
+    "scalarRaster": {
+      "type": "object",
+      "$comment": "Base and raster properties are repeated because additionalProperties is closed.",
+      "additionalProperties": false,
+      "required": [
+        "name", "sourceNodeId", "sourcePortId", "valueKind", "semanticType", "unit",
+        "format", "lens", "stateRole", "dependencies", "exportPolicy", "file", "posting",
+        "resolution", "cellSizeM", "declaredRange", "observedRange"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "sourceNodeId": { "type": "string", "minLength": 1 },
+        "sourcePortId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+        "valueKind": { "const": "scalarRaster" },
+        "semanticType": { "type": "string", "minLength": 1 },
+        "unit": { "type": "string", "minLength": 1 },
+        "format": { "enum": ["R32F_LE", "R16_LE", "PNG16_GRAY"] },
+        "lens": { "enum": ["derived", "state", "continued"] },
+        "stateRole": { "enum": ["final", "initial"] },
+        "dependencies": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "epoch": { "type": "string", "format": "date-time" },
+        "drivers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "parentHash": { "$ref": "#/$defs/hash" },
+        "exportPolicy": { "const": "raw" },
+        "file": { "$ref": "#/$defs/artifactPath" },
+        "posting": { "enum": ["vertex", "pixel"] },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "cellSizeM": { "type": "number", "exclusiveMinimum": 0 },
+        "declaredRange": { "$ref": "#/$defs/range" },
+        "observedRange": { "$ref": "#/$defs/range" },
+        "constantValue": { "type": "number" },
+        "tiles": { "type": "array", "items": { "$ref": "#/$defs/tile" } }
+      },
+      "allOf": [{ "$ref": "#/$defs/continuedRule" }]
+    },
+    "vectorRaster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name", "sourceNodeId", "sourcePortId", "valueKind", "semanticType", "unit",
+        "format", "components", "lens", "stateRole", "dependencies", "exportPolicy", "file",
+        "posting", "resolution", "cellSizeM", "declaredRange", "observedRange"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "sourceNodeId": { "type": "string", "minLength": 1 },
+        "sourcePortId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+        "valueKind": { "const": "vectorRaster" },
+        "semanticType": { "type": "string", "minLength": 1 },
+        "unit": { "type": "string", "minLength": 1 },
+        "format": { "enum": ["RG32F_LE", "RGB32F_LE", "RGBA32F_LE"] },
+        "components": { "type": "array", "minItems": 2, "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "lens": { "enum": ["derived", "state", "continued"] },
+        "stateRole": { "enum": ["final", "initial"] },
+        "dependencies": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "epoch": { "type": "string", "format": "date-time" },
+        "drivers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "parentHash": { "$ref": "#/$defs/hash" },
+        "exportPolicy": { "const": "raw" },
+        "file": { "$ref": "#/$defs/artifactPath" },
+        "posting": { "enum": ["vertex", "pixel"] },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "cellSizeM": { "type": "number", "exclusiveMinimum": 0 },
+        "declaredRange": { "$ref": "#/$defs/range" },
+        "observedRange": { "$ref": "#/$defs/range" },
+        "tiles": { "type": "array", "items": { "$ref": "#/$defs/tile" } }
+      },
+      "allOf": [{ "$ref": "#/$defs/continuedRule" }]
+    },
+    "labelRaster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name", "sourceNodeId", "sourcePortId", "valueKind", "semanticType", "unit",
+        "format", "noLabel", "lens", "stateRole", "dependencies", "exportPolicy", "file",
+        "posting", "resolution", "cellSizeM", "declaredRange", "observedRange"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "sourceNodeId": { "type": "string", "minLength": 1 },
+        "sourcePortId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+        "valueKind": { "const": "labelRaster" },
+        "semanticType": { "type": "string", "minLength": 1 },
+        "unit": { "const": "none" },
+        "format": { "const": "U32_LE" },
+        "noLabel": { "type": "integer", "minimum": 0 },
+        "lens": { "enum": ["derived", "state"] },
+        "stateRole": { "const": "final" },
+        "dependencies": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "parentHash": { "$ref": "#/$defs/hash" },
+        "exportPolicy": { "const": "raw" },
+        "file": { "$ref": "#/$defs/artifactPath" },
+        "posting": { "enum": ["vertex", "pixel"] },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "cellSizeM": { "type": "number", "exclusiveMinimum": 0 },
+        "declaredRange": { "$ref": "#/$defs/range" },
+        "observedRange": { "$ref": "#/$defs/range" },
+        "tiles": { "type": "array", "items": { "$ref": "#/$defs/tile" } }
+      }
+    },
+    "scalarValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name", "sourceNodeId", "sourcePortId", "valueKind", "semanticType", "unit",
+        "format", "value", "lens", "stateRole", "dependencies", "exportPolicy", "file"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "sourceNodeId": { "type": "string", "minLength": 1 },
+        "sourcePortId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+        "valueKind": { "const": "scalar" },
+        "semanticType": { "type": "string", "minLength": 1 },
+        "unit": { "type": "string", "minLength": 1 },
+        "format": { "const": "JSON_SCALAR_V1" },
+        "value": { "type": "number" },
+        "lens": { "enum": ["derived", "state", "continued"] },
+        "stateRole": { "enum": ["final", "initial"] },
+        "dependencies": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "epoch": { "type": "string", "format": "date-time" },
+        "drivers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "exportPolicy": { "const": "raw" },
+        "file": { "$ref": "#/$defs/artifactPath" }
+      },
+      "allOf": [{ "$ref": "#/$defs/continuedRule" }]
+    },
+    "featureSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name", "sourceNodeId", "sourcePortId", "valueKind", "semanticType", "unit",
+        "format", "coordinateFrame", "featureSchema", "lens", "stateRole", "dependencies",
+        "exportPolicy", "file"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "sourceNodeId": { "type": "string", "minLength": 1 },
+        "sourcePortId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+        "valueKind": { "const": "featureSet" },
+        "semanticType": { "type": "string", "minLength": 1 },
+        "unit": { "type": "string", "minLength": 1 },
+        "format": { "const": "JSON_FEATURES_V1" },
+        "coordinateFrame": { "const": "world-metres-x-east-y-north" },
+        "featureSchema": { "type": "string", "minLength": 1 },
+        "lens": { "enum": ["derived", "state", "continued"] },
+        "stateRole": { "enum": ["final", "initial"] },
+        "dependencies": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "epoch": { "type": "string", "format": "date-time" },
+        "drivers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "exportPolicy": { "const": "raw" },
+        "file": { "$ref": "#/$defs/artifactPath" }
+      },
+      "allOf": [{ "$ref": "#/$defs/continuedRule" }]
+    },
+    "continuedRule": {
+      "if": {
+        "properties": { "lens": { "const": "continued" } },
+        "required": ["lens"]
+      },
+      "then": {
+        "properties": { "stateRole": { "const": "initial" } },
+        "required": ["stateRole", "epoch", "drivers"]
+      }
+    }
+  }
+}

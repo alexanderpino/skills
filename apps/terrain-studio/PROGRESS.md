@@ -25,6 +25,33 @@ in `.sweep-logs/`.
 
 ## Now
 
+**Sprint 1 started — S1.0 Surface / Geology palette family done locally, 2026-07-31.**
+
+- Added the ninth palette family and reclassified Rock Fracture from Erosion; Thermal remains
+  Erosion. Toolbox search and drag-out quick-create expose the new family without evaluator changes.
+- Focused Surface-family oracle, toolbox, quick-create, 61/61 digest, plugin/bridge checks, and
+  production build are green. The broader sprint-grounding ledger remains open; only grounded,
+  independently gated stories may enter implementation.
+
+**Sprint 4 scope expanded — AAA hybrid Gerstner water accepted locally, 2026-07-31.**
+
+- ADR 006 keeps hydrology still and renderer motion separate, then adds shared displaced Gerstner
+  geometry, analytic normals, GGX/Fresnel/Beer-Lambert optics, flow-driven rivers, causal foam,
+  shore/ice regimes, supplied-reference captures, pass parity, temporal and frame-budget gates.
+- Sprint 4 now carries S4.7–S4.10 as separately routable renderer stories; no wave or foam data is
+  baked into terrain fields or export products.
+
+**All eight roadmap sprints — grounding audit reopened, NOT DONE, 2026-07-31.**
+
+- The first refinement pass added contracts, cut order, verification matrices, and Ready conditions,
+  but an audit found that some “locked” defaults and runtime choices had no corpus, measured-code, or
+  accepted-ADR evidence. That pass is not complete and must not be used to start a sprint.
+- Mission Control investigation `INV-SPRINT-GROUNDING` owns the correction. Completion requires a
+  claim-level grounding ledger, accepted ADRs for S2/S6/S8, removal or replacement of unsupported
+  mechanics, fixed pre-implementation thresholds, and an independent rubber-duck review with no
+  valid blocking finding.
+- Until that gate closes, every sprint remains **Not Ready** regardless of dependency position.
+
 **Separate GPU Rock Fracture node — done locally, 2026-07-31.**
 
 - Added an erosion-family **Rock Fracture** node instead of folding cracks into Thermal. It carves
@@ -159,9 +186,9 @@ tests/e2e/          4 Playwright specs
 | `filt` | 11 | **done** | `2b6d1c8` |
 | `gen` | 12 | **done** | this commit |
 | `ero` | 5 | **done** | this commit |
-| `effect` | 7 | | — |
-| `data` | 14 | | — |
-| `out` | 1 | | — |
+| `effect` | 7 | **done** | local history |
+| `data` | 14 | **done** | local history |
+| `out` | 1 | **done** | local history |
 
 Original extraction total: 60. Rock Fracture later became plugin 61. Digest green per batch, so a
 bad extraction bisects to one node.

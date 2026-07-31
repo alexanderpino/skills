@@ -29,6 +29,64 @@ export means initial condition + drivers + epoch, not a frozen seasonal answer.
 
 ---
 
+## Technical refinement
+
+### Locked climate and migration contract
+
+- Orographic Moisture uses the chapter-13 practical Smith–Barstad approximation: march entering
+    wind rays over a serialized `climateCellSizeM` in the cited 500–1,000 m range, initially 1,000 m
+    per ADR 005, condense from positive along-wind height
+    gradient, deplete the parcel, and apply downwind fallout lag `windSpeed * tau`. Default
+    `tau = sqrt(500 * 2000) = 1,000 s`, the geometric midpoint of chapter 13's cited characteristic-
+    time range; the user authors regional supply in mm/yr and the condensation coefficient.
+- Boundaries are open: supply enters only at the upwind edge, residual vapour exits downwind, and no
+    sample wraps. The budget is `input supply + declared recharge = precipitation + outflow`.
+    A uniform background component remains uniform on flat terrain; the orographic fraction is the
+    only redistributed component. Water-body recharge is optional and explicit.
+- Wind is sampled as an RG32F world-space vector field. Rays use its local direction/speed; zero wind
+    yields the uniform background and zero orographic redistribution. The production field is mm/yr;
+    normalization exists only in a thumbnail adapter.
+- Snow uses liquid-water-equivalent accounting for **new** precipitation. `accumulationDays = 365`
+    initially means one climatological year, matching the `mm/yr` input unit. `Snow/2` requires
+    `densityRatio = rhoSnow/rhoWater` (finite ratio `>0`),
+    `meltFactor:mm SWE/(°C·day)`, and epoch with no fabricated defaults. Existing documents migrate
+    to preview-only `Snow/1`, preserving exact settled-depth behavior; upgrade never reverse-engineers
+    annual moisture. Continued-state export requires Snow/2 and all authored physical data.
+- Avalanche transport runs on `solidTop + snowDepth` with legal lattice neighbours, a bounded
+    transportable surface layer, and the measured current `adhesion` parameter (`0.6 m` compatibility
+    initial value in `src/plugins/effect/snow.js`) so steep bedrock does not create an iteration-width
+    bare band. Chapter 13 identifies this as an authored holding-depth family, not a physical constant.
+    Wind redistribution deposits in the downwind shadow zone and never wraps the array edge.
+
+### Owning code surfaces and cut order
+
+1. **R0:** enumerate `_temperatureC`, `_wind`, `_snowLayer`, solar metadata, and every consumer;
+     freeze old-document climate/snow outputs and the S2 adapter rows.
+2. **S5.1:** migrate Temperature/Solar and Wind products/consumers one field at a time. Remove each
+     semantic side-channel read immediately after its port-aware oracle passes.
+3. **S5.2:** implement climate-grid march, conservative resampling, and budget diagnostics; then
+     replace the S3/S4 production uniform fixture in one integration graph.
+4. **S5.3:** land saved-document migration and SWE ledger before changing Snow evaluation. Add
+     accumulation, melt, avalanche, wind transport, and provenance as separately asserted terms.
+5. **S5.4–S5.5:** port the same terms to D6/hex metrics, remove the Snow Rule exemption, then promote
+     the default only after built-app visual and numerical evidence agrees.
+
+### Verification matrix and Ready condition
+
+| Invariant | Passing endpoint | Mutation that must be red |
+|---|---|---|
+| Moisture cause | flat/zero-wind baseline; ridge swaps with wind | slope magnitude instead of along-wind lift |
+| Water budget | supply + recharge = rain + outflow | omitted parcel depletion |
+| Snow Rule | zero moisture gives zero local accumulation | temperature-only snowfall |
+| SWE conversion | two authored intervals/densities match analytic supply | treat mm/yr as snow metres |
+| Hex transport | volume closes with D6/cell area | D8 or square area on hex |
+| No hidden state | migrated graph reads only typed products | `_snowLayer`/`_wind` semantic read |
+
+Sprint 5 is Ready when S2–S4 exit, all climate side channels have named adapter owners, and the
+flat/ridge moisture mutations plus no-moisture Snow mutation have been observed red.
+
+---
+
 ### S5.1 — Typed climate ports · `[E]` · 5 pts
 **User story:** As a graph author, I can connect Celsius temperature, insolation, and wind vectors as
 physical values rather than encoded scalar thumbnails carrying hidden JavaScript properties.
@@ -50,18 +108,20 @@ tonemaps drop/reject the type. Saved pre-Sprint-2 climate graphs migrate and eva
 terrain, and wind so Flow, Hydraulic erosion, and Snow share one climate cause; later vegetation and
 materials consume the same field rather than inventing their own precipitation.
 
-Add a Moisture/Orographic Precipitation node grounded in the cited chapter-13 model. Inputs are final
+Add a Moisture/Orographic Precipitation node using the locked chapter-13 march above. Inputs are final
 solid height, physical Wind, regional precipitation supply, and boundary conditions; output is
-`moisture` in mm/yr with an optional normalized preview adapter. Definition of Ready fixes domain,
-wind-boundary policy, precipitation conservation measure, and reference tolerance before the port.
+`moisture` in mm/yr with an optional normalized preview adapter. `climateCellSizeM` is serialized,
+validated to 500–1,000 m, and participates in cache identity.
 Wire this product into the precipitation inputs introduced in S3/S4 and into Snow; remove temporary
 uniform production fixtures from the default graph (fixtures remain in analytic tests).
 
 **Acceptance gate** — `tests/legacy/_verify_moisture.js`: zero regional supply returns exact zero;
 zero relief under uniform wind returns the declared baseline; an analytic ridge produces greater
 windward than leeward precipitation and closes the declared domain precipitation budget. Rotating
-wind 180 degrees swaps the wet/dry sides. Same world at two resolutions meets the predeclared
-reference tolerance on square and hex.
+wind 180 degrees swaps the wet/dry sides. Budget closure uses the `gamma_(N-1)` Float32 reduction
+bound. At 500 m and 1 km climate cells, integrated precipitation/outflow obeys the same budget and
+the lagged precipitation maximum differs by at most one coarse climate cell, the sampling limit
+declared by chapter 13. Run square and hex.
 - In one integration graph, the same Moisture bytes reach Physical Flow, Hydraulic, and Snow typed
     inputs; changing the field invalidates those consumers and produces no hidden fallback rainfall.
 
@@ -71,18 +131,20 @@ reference tolerance on square and hex.
 **User story:** As a terrain author, snow accumulation responds to available precipitation as well as
 temperature, and I can route the resulting depth and meltwater independently of terrain height.
 
-Add required typed inputs `moisture:mm/yr`, `temperature:°C`, `insolation:fraction`, and
+Add required typed inputs `moisture:mm SWE/yr`, `temperature:°C`, `insolation:fraction`, and
 `windVector:m/s`. Emit unchanged solid height as the compatibility primary, plus
 `snowDepth:m` (continued), meltwater/wetness state, and provenance channels sufficient for the dry-
 snow audit. The node no longer stores the only snow result in `nd._snowLayer`. Continued output
 carries an authored epoch/date and declares all drivers.
 
 Fix the unit bridge explicitly: moisture is annual **liquid-water equivalent**, while `snowDepth` is
-settled snow thickness. The node declares an accumulation interval in days and either a snow-density
-ratio or snow-water-equivalent state. Local accumulation is
+settled snow thickness. The node requires an accumulation interval and snow density when new snowfall
+is enabled, represented as required dimensionless `densityRatio = rhoSnow/rhoWater > 0`, and also
+emits `snowWaterEquivalent:m`. Local accumulation is
 `moisture(mm/yr) / 1000 · days / 365 · freezeFraction / densityRatio`; degree-day melt uses the same
-water-equivalent ledger before conversion back to depth. Definition of Ready fixes defaults and the
-saved-document migration from the existing authored `snowfall:m` parameter; no silent reinterpretation.
+water-equivalent ledger with authored `meltFactor:mm SWE/(°C·day)` before conversion back to depth.
+Legacy Snow/1 remains compatibility-only; no silent reinterpretation is permitted. Epoch is required
+before Snow/2 export.
 
 **Acceptance gate** — `tests/legacy/_verify_snow_rule.js`: cold + zero moisture produces exactly zero
 **new** local snowfall; cold + moisture produces the analytic water-equivalent and snow-depth supply

@@ -43,7 +43,7 @@ whenever Track B is blocked on review.
 | [1](sprint-01-visible-product-packs.md) | Surface family/detail, landforms, scalar filters, aspect | A | `[C]` | L5 dressing / L0 gen | — |
 | [2](sprint-02-multi-output-ports.md) | Typed multi-output DAG + auxiliary-map registry (**the keystone**) | B | `[E]` | enables L2 | — |
 | [3](sprint-03-cover-layer.md) | Cover layer: soil / sediment / sand as **state** | B | `[K]`+`[E]` | L2 | S2 |
-| [4](sprint-04-water-and-rivers.md) | Depression policy, physical flow, sources, lakes, rivers (**no carve**) | B | `[K]`+`[E]` | L3 | S2, S3, L1 (done) |
+| [4](sprint-04-water-and-rivers.md) | Physical water/rivers + AAA Gerstner viewport (**no carve**) | B | `[K]`+`[E]` | L3 + renderer | S2, S3, L1 (done) |
 | [5](sprint-05-climate-and-snow.md) | Moisture, typed climate, moisture-driven Snow, hex correctness | B | `[K]`+`[E]` | L4 | S2, S3, S4 |
 | [6](sprint-06-output-and-export.md) | Pure export sinks, formats, profiles, tiles, bake-boundary | B | `[K]`+`[E]` | — | S2–S5 |
 | [7](sprint-07-geology-and-regimes.md) | Strata/Sandstone/Outcrops, aeolian, mass-movement | A/B | `[K]` | L2/L5 | S1–S5 |
@@ -79,7 +79,7 @@ graph LR
 
 ## Capacity and cadence
 
-The eight thematic packets total **249 points** (S1 27 · S2 34 · S3 32 · S4 31 · S5 26 · S6 34 ·
+The eight thematic packets total **265 points** (S1 27 · S2 34 · S3 32 · S4 47 · S5 26 · S6 34 ·
 S7 31 · S8 34). The repo records no stable team velocity or sprint duration, so these numbers are
 relative scope, **not calendar estimates**. At each kickoff:
 
@@ -95,30 +95,90 @@ relative scope, **not calendar estimates**. At each kickoff:
 
 ---
 
+## Technical-refinement contract
+
+**Grounded, refined, and Ready are three different states.** A claim is *grounded* only when it cites
+an exact corpus/reference behavior, a measured current source/test fact, a transparent derivation, or
+an accepted ADR with option analysis and measurable consequences. A sprint is *technically refined*
+when every claim is grounded and its document fixes contracts, implementation cuts, owning surfaces,
+fixtures, and integration obligations. It becomes *Ready* only when prerequisites are closed and its
+first mutation control has run red. A future R0 measurement or future ADR cannot ground wording that
+is already labelled locked.
+
+Every sprint follows the same landable sequence:
+
+1. **R0 · Baseline:** record plugin/oracle counts, relevant digests, runtime path (CPU/GPU), and the
+   current exemption/debt entries. Empty inventories are failures.
+2. **R1 · Contract:** land accepted ADR/schema/port declarations and frozen old-document fixtures
+   without changing production numerical output.
+3. **R2 · Arm the gate:** add the analytic/reference fixture and its deliberately broken mutation;
+   record the failing measurement before production implementation.
+4. **R3 · Implement one vertical slice:** one node/path/lattice at a time. A CPU oracle does not
+   close a shipping GPU story, and a square path does not close a hex story.
+5. **R4 · Integrate:** wire UI, persistence, undo/redo, quick-create, demand/caching, preview, and
+   migration surfaces named by the sprint. Remove only the debt entries that this slice replaces.
+6. **R5 · Close:** run focused oracles, then plugin/bridge checks, production build, built-bundle
+   digest, and the full standalone sweep. Record red/green endpoints and update `PROGRESS.md`.
+
+Each sprint document therefore contains a **Technical refinement** section with five mandatory
+parts: locked decisions, implementation surfaces, cut order, verification matrix, and Ready/blocked
+conditions. A statement such as “choose during implementation” or “within a stated tolerance” makes
+the owning story not Ready. Research uncertainty is isolated as a time-boxed spike with pass/fail
+selection criteria and a declared fallback; it is never hidden inside a build story.
+
+[GROUNDING.md](GROUNDING.md) is the normative claim ledger. A sprint contract and that ledger must
+agree; disagreement is a blocking documentation defect, and the more conservative status wins.
+
+### Cross-sprint closure ledger
+
+| Temporary contract/debt | Introduced | Owner that must close it | Closure evidence |
+|---|---:|---:|---|
+| Primary-output and mutable side-channel adapters | S2 | S3/S5 by named field | adapter inventory reaches zero for migrated fields |
+| Material-transport co-evolution exemptions | S2 | S3 | no transport entry in exemption ledger |
+| Uniform precipitation production fixture | S3/S4 | S5.2 | one typed Moisture value reaches Hydraulic, Flow, and Snow |
+| Snow Rule exemption | S2 | S5.3 | real Snow declaration without Moisture fails registration |
+| Legacy 8-bit height download | baseline | S6.2 | removed when PNG16 becomes the production interchange path |
+| Salinity proposal | backlog | none in S1-S8 | explicitly out of scope; no port/profile may claim it |
+| EXR writer | outside S1-S8 | later codec ADR | no EXR claim in S6; R32F is the lossless master |
+| Read-only climate metadata adapter | S2.6 | S5.1 | no graph-semantic read of node-instance climate state |
+
+The owner sprint may not exit while its ledger row remains open. A later sprint may consume a
+temporary analytic fixture in tests, but production defaults and profiles may not.
+
+---
+
 ## Architecture gates
 
 Sprint 2 changes an internal interface, edge schema, persistence shape, evaluation model, and cache
-ownership. Sprint 6 adds an emitter boundary. Both are architecturally significant under the local
-documentation rules, so implementation starts only after two short ADRs are accepted:
+ownership. Sprint 6 adds an emitter boundary. Sprint 8 adds executable-expression semantics,
+lexical scopes, and versioned subgraph ownership. These are architecturally significant under the
+local documentation rules. The required decisions are accepted and normative:
 
-1. **Typed multi-output DAG ADR:** port descriptors, value kinds, source-port identity on edges,
+1. **[ADR 002 — Typed multi-output DAG](../adr-002-typed-multi-output-dag.md):** port descriptors, value kinds, source-port identity on edges,
     primary-output compatibility, demand-driven evaluation, cache ownership, and saved-graph
     migration.
-2. **Pure sink / emitter ADR:** graph nodes remain pure declarations; explicit Build/Export commands
+2. **[ADR 003 — Pure export requests and explicit emitters](../adr-003-pure-export-emitter.md):** graph nodes remain pure declarations; explicit Build/Export commands
     execute side effects once, outside `eval`; browser format writers and packaging live behind the
     emitter boundary.
+3. **[ADR 004 — Variables, bounded expressions, and embedded subgraphs](../adr-004-graph-machinery.md):** embedded definition ownership, lexical variable scope, bounded expression
+   grammar/unit algebra, definition version/hash identity, recursion rejection, cache identity, and
+   explicit import conflict handling.
+4. **[ADR 005 — Physical fields, climate resolution, and legacy migration](../adr-005-physical-fields-and-climate-migration.md):** normalized-height compatibility, rainfall/discharge units, deterministic climate sampling, Snow versioning, and physical lithology coupling.
+5. **[ADR 006 — Hybrid Gerstner water](../adr-006-aaa-water-rendering.md):** shared analytic displacement, PBR water optics, body-specific regimes, phase suppression, visual evidence, and frame budgets.
 
-The ADRs belong beside [adr-001-gpu-hydraulic-composition.md](../adr-001-gpu-hydraulic-composition.md).
 Sprint 2 also updates [phase-a-plugin-contract.md](../phase-a-plugin-contract.md) or adds its Phase B
 successor with the typed port/result/edge/evaluation contract. Sprint 6 adds the emitter contract and
-manifest schema to that design set. These are planned documentation deltas, not optional cleanup.
+uses the normative [export manifest schema](../export-manifest.schema.json). These are implementation
+obligations, not optional cleanup.
 
 ---
 
 ## Audit decisions (2026-07-31)
 
-The plan was reviewed against the working implementation and independently rubber-ducked by a
-read-only second model. The correction pass made these decisions explicit:
+The first pass was reopened by Mission Control investigation `INV-SPRINT-GROUNDING` after it mixed
+corpus facts, measured behavior, proposed decisions, and future validation. Three read-only Scouts
+and one Investigator produced the claim-level correction; independent rubber-duck convergence is
+still required before `PROGRESS.md` may say DONE. The corrected decisions are:
 
 - Working baseline is 61 plugins, not the pre-Fracture 60 in `GAEA-GAP.md`; all count gates are
    relative and require digest `skipped = 0`.
@@ -133,14 +193,19 @@ read-only second model. The correction pass made these decisions explicit:
    its own state/advection/export decision.
 - Reference implementations are evidence and oracle sources, not assumed production-ready ports.
 
-**Remaining product decisions before the owning story becomes Ready:**
+**Grounded technical decisions:**
 
-1. Salinity: omit (current plan) or approve a continued-state field with unit, source mixing,
-    evaporation concentration, advection, and export contract.
-2. EXR: select a browser/offline-capable maintained writer in S6.2; if none passes the documented
-    spike, ship R32F master and mark EXR blocked rather than implementing a partial codec.
-3. Regolith production law and River hydraulic-geometry relation: select the cited model and freeze
-    tolerances before S3.2/S4.5 implementation.
+1. Salinity is omitted from S1–S8. No schema, port, profile, or source may claim it without a later
+   continued-state ADR covering units, source mixing, concentration, advection, and export.
+2. EXR is outside S1-S8 because no browser codec decision is grounded. S6 ships R32F as the lossless
+   master plus RAW/R16 and PNG16 interchange; a later codec ADR may add EXR.
+3. S3.2 uses the Heimsath et al. exponential soil-production law. S4.5 uses Leopold–Maddock
+   downstream width/depth exponents. Their exact derivations and parameter policy are in the owning
+   sprint documents.
+
+What remains at kickoff is execution evidence: record each sprint's R0 baseline and run its mutation
+controls red. Architecture and product choices may not be reopened silently; a change requires a
+superseding ADR or an explicit plan revision.
 
 ---
 
@@ -196,6 +261,8 @@ A story may enter implementation only when:
   production code deliberately broken.
 - Any schema change names its saved-graph migration, undo/redo impact, quick-create compatibility,
   bridge impact, and old-document fixture.
+- Every claim in the owning sprint's grounding ledger is resolved; `TBD`, an uncited exact default,
+  or a future measurement presented as current evidence is a blocker.
 
 ---
 
