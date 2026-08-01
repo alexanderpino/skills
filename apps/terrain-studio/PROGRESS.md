@@ -86,7 +86,7 @@ refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026
 - The plan names a user-selected 100 km-class target and makes no unsourced claim about the actual
   dimensions of *Star Wars Outlaws*. GeoTIFF decoding remains a separate future codec/library story.
 
-**Sprint 1 implementation — S1.0 and S1.1 DONE (`da2e583`, `8a83bcf`), 2026-08-01.**
+**Sprint 1 implementation — S1.0, S1.1 and S1.2 DONE (`da2e583`, `8a83bcf`, `c096ed1`), 2026-08-01.**
 
 - Added the ninth palette family and reclassified Rock Fracture from Erosion; Thermal remains
   Erosion. Toolbox search and drag-out quick-create expose the new family without evaluator changes.
@@ -96,11 +96,10 @@ refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026
 - MC-S31 integrated Surface Detail plus the initial landform pack with seed lifecycle, direct/CJS
   68/68 digest, 32 armed mutations, full source/built 45° visual matrices, FOV state preservation,
   plugin/bridge/exact/hex/build gates, and clean independent review. This closes **S1.1 only**.
-- **S1.2 Volcano correction is mandatory before completion:** the current isolated implementation
-  now integrated exposes only a pointed `stratovolcano` profile and rejects `shield`. The plan requires distinct
-  shield (2–10° broad dome) and stratovolcano (20–35° summit-steepening, crater + barrancos) modes,
-  each with analytic and two-distance visual evidence. S1.2 remains **IN PROGRESS** and MUST NOT be
-  marked DONE until dependent MC-S32 passes and publishes.
+- MC-S32 completed the S1.2 Volcano correction: shield uses the grounded broad 2–10° dome family;
+  stratovolcano uses the 20–35° summit-steepening profile with crater and barrancos. Distinct direct
+  square/hex formulas, slope bands, style persistence, 17 armed mutations, 16 source/built 45°
+  captures, repeat 68/68 digests, plugin/bridge/build gates, and independent review are green.
 
 **Sprint 4 scope expanded — AAA hybrid Gerstner water accepted locally, 2026-07-31.**
 
