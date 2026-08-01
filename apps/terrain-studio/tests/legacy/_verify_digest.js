@@ -95,6 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
+const REQUIRED_NODE_COUNT = 79;
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -239,6 +240,9 @@ function installHarness(cfg) {
     // --- filters ---
     warp: ['A', 'M'], terrace: ['A', 'M'], normalizen: ['A', 'M'], levels: ['A'], curve: ['A'], histeq: ['A'],
     blur: ['A', 'M'], sculpt: ['A', 'M'], clampn: ['A'], transform: ['A', 'M'], invert: ['A'],
+    sharpen: ['A', 'M'], threshold: ['A'], dilate: ['A', 'M'], deflate: ['A', 'M'],
+    match: ['A', 'B'], softclip: ['A', 'M'], flip: ['A', 'M'], transpose: ['A', 'M'],
+    fold: ['A', 'M'], directionalwarp: ['A', 'D', 'M'],
     // --- erosion ---
     thermal: ['A', 'M'], fracture: ['A', 'M'], streampower: ['A', 'B', 'M'],
     hydraulic: ['A', 'M'],
@@ -251,7 +255,7 @@ function installHarness(cfg) {
     d_temperature: ['H', 'S'], d_heat: ['T', 'D', 'M'],
     d_wind: ['A'], d_windmodify: ['W', 'D', 'M'],
     d_curvature: ['A'], d_flow: ['A'], d_occlusion: ['A'], d_deposits: ['A'],
-    d_wear: ['A'], d_peaks: ['A'], d_texture: ['A'],
+    d_wear: ['A'], d_peaks: ['A'], d_texture: ['A'], aspect: ['A'],
     // --- effects (passthrough) ---
     water: ['A', 'T'], snow: ['A', 'T', 'W'], satmap: ['A', 'D', 'M'],
     colorerosion: ['SAT', 'D', 'M'], weathering: ['SAT', 'M'],
@@ -337,7 +341,11 @@ function installHarness(cfg) {
     const src = makeSources();
     const nd = mk(type, over);
     const recipe = WIRING[type];
-    recipe.forEach((key, slot) => { const s = src(key); if (s) wire(s, nd, slot); });
+    recipe.forEach((key, slot) => {
+      const source = src(key);
+      if (!source) throw new Error('wiring recipe slot ' + slot + ' uses unsupported source ' + key);
+      wire(source, nd, slot);
+    });
     if (type === 'drawmask') nd.params.strokes = DRAW_STROKES();
     if (type === 'import') nd._dem = SYNTH_DEM();
     const t0 = performance.now();
@@ -532,8 +540,8 @@ function document_(res, sweepResult) {
     errors.slice(0, 10).forEach(e => log('  ' + e));
   }
   log('');
-  log('covered ' + doc.nodeCount + ' node types, skipped ' + doc.skipped.length
-    + ' of ' + first.types.length + ' in TYPES');
+  log('covered ' + doc.nodeCount + '/' + first.types.length + ' registered node types, skipped '
+    + doc.skipped.length);
   doc.skipped.forEach(s => log('  SKIPPED ' + s.type + ': ' + s.reason));
 
   if (REPEAT > 1) {
@@ -552,10 +560,21 @@ function document_(res, sweepResult) {
   Object.keys(NONDETERMINISTIC).forEach(t =>
     log('UNGATED ' + t + ': ' + NONDETERMINISTIC[t]));
 
+  const complete = first.types.length === REQUIRED_NODE_COUNT
+    && doc.nodeCount === REQUIRED_NODE_COUNT && !doc.skipped.length && !first.warns.length;
+  if (!complete) {
+    log('INCOMPLETE digest sweep: required ' + REQUIRED_NODE_COUNT + '/' + REQUIRED_NODE_COUNT
+      + ' registered node types with zero skips and zero wiring warnings.');
+  }
+
   if (WRITE) {
+    if (nondet.length || !complete) {
+      log('baseline not written: the repeated digest sweep is not complete and deterministic.');
+      process.exit(1);
+    }
     fs.writeFileSync(BASELINE, JSON.stringify(doc, null, 2) + '\n');
     log('baseline written: ' + BASELINE);
-    process.exit(nondet.length ? 1 : 0);
+    process.exit(0);
   }
 
   // ---- GATE ---------------------------------------------------------------------------------
@@ -607,7 +626,7 @@ function document_(res, sweepResult) {
     log('  Re-baseline deliberately with --write once the new behaviour is reviewed.');
   }
 
-  const ok = !drifted.length && !missing.length && !added.length && !nondet.length;
+  const ok = !drifted.length && !missing.length && !added.length && !nondet.length && complete;
   log(ok
     ? 'PASS  ' + doc.nodeCount + ' node types bit-identical to the baseline at ' + doc.res + '\u00b2.'
     : 'FAIL  the computed terrain is not identical to the baseline.');
