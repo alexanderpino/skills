@@ -34,7 +34,8 @@ export function landformFbmAt(worldX,worldY,wavelengthM,seed,options,cellM=0){
   if(cellM>0){count=0;for(let k=0;k<options.octaves;k++){
     if(wavelengthM/Math.pow(options.lacunarity,k)<2*cellM)break
     count++
-  }count=Math.max(1,count)}
+  }}
+  if(count===0)return 0
   let sum=0,total=0,weight=1
   for(let k=0;k<count;k++){
     const f=Math.pow(options.lacunarity,k)/wavelengthM
@@ -91,5 +92,6 @@ const def=definePlugin({
 def.options=craterOptions
 def.profile=craterProfileM
 def.field=craterField
+def.worldSampleAt=(...args)=>worldSampleAt(...args)
 
 export default def

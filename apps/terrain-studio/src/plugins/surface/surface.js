@@ -52,7 +52,8 @@ export function surfaceOptions(params={}){
     edgeFeatherM:finite(params.edgeFeatherM,8,0,1000),intervalM:finite(params.intervalM,100,2,5000),
     spacingM:finite(params.spacingM,250,2,5000),lineWidthM:finite(params.lineWidthM,10,.25,1000),
     angleDeg:finite(params.angleDeg,0,0,360)}
-  o.slopeHighDeg=Math.max(o.slopeHighDeg,Math.min(89,o.slopeLowDeg+1))
+  o.slopeLowDeg=Math.min(o.slopeLowDeg,88)
+  o.slopeHighDeg=Math.max(o.slopeHighDeg,o.slopeLowDeg+1)
   const halfCell=o.cellSpacingM/2
   o.bulbRadiusM=Math.min(o.bulbRadiusM,halfCell)
   o.pitRadiusM=Math.min(o.pitRadiusM,halfCell)
@@ -75,8 +76,8 @@ export function surfaceFbmAt(worldX,worldY,wavelengthM,seed,options,cellM=0){
       if(wavelengthM/Math.pow(options.lacunarity,k)<2*cellM)break
       octaveCount++
     }
-    octaveCount=Math.max(1,octaveCount)
   }
+  if(octaveCount===0)return{value:0,octaves:0}
   let sum=0,weight=1,total=0
   for(let k=0;k<octaveCount;k++){
     const frequency=Math.pow(options.lacunarity,k)/wavelengthM

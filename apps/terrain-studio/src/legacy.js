@@ -205,8 +205,8 @@ export function setXF(v){ XF=v; }
 const xfU=(u,v)=>XF?XF[0]*u+XF[1]*v+XF[2]:u;
 const xfV=(u,v)=>XF?XF[3]*u+XF[4]*v+XF[5]:v;
 export function worldSampleAt(x,y){
-  const n=fieldW(),nh=fieldH(),hxs=terrainDef.lattice==="hex"?0.5:0;
-  const u=(x+0.5+hxs*(y&1))/n,v=(y+0.5)/nh;
+  const n=fieldW(),hex=terrainDef.lattice==="hex",hxs=hex?0.5:0;
+  const u=(x+0.5+hxs*(y&1))/n,v=(y+0.5)/n*(hex?Math.sqrt(3)/2:1);
   return[xfU(u,v)*terrainDef.scale,xfV(u,v)*terrainDef.scale];
 }
 // The SAME inverse map transformField() uses, so exact and raster modes describe one placement.
