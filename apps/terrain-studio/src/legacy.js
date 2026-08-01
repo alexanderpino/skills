@@ -4333,8 +4333,9 @@ $("#exportBtn").onclick=exportHeightmap;
    WEBGL 3D VIEWPORT
    ===================================================================== */
 const glc=$("#gl");let gl,terrainProg,waterProg,waterMaskProg,compProg,buffers,wTex,hTex,iTex,isTex,satTex,gbuf=null,USE_DEFERRED=false;
-const DEFAULT_HERO={az:0.7,el:0.62,dist:2.6,target:[0,.05,0]};
-const copyCam=c=>({az:c.az,el:c.el,dist:c.dist,target:[...c.target]});
+const DEFAULT_HERO={az:0.7,el:0.62,dist:2.6,target:[0,.05,0],fov:1.05};
+const copyCam=c=>{const copy={az:c.az,el:c.el,dist:c.dist,target:[...c.target]};
+  if(Number.isFinite(c.fov))copy.fov=c.fov;return copy;};
 let cam=copyCam(DEFAULT_HERO),shadeMode=0,wire=false;
 function buildSatLUT(name){buildSatLUTStops(SATMAPS[name]||SATMAPS.Temperate);}
 function buildSatLUTStops(stops){                            // bake a 256-wide RGBA LUT texture from stops [[pos,[r,g,b]],...]
@@ -6229,7 +6230,7 @@ function syncViewButton(){
 }
 function frameHero(){planView=false;cam=copyCam(DEFAULT_HERO);heroCam=copyCam(DEFAULT_HERO);syncViewButton();}
 function togglePlanView(){
-  if(!planView){heroCam=copyCam(cam);cam={az:0,el:1.535,dist:2.55,target:[...cam.target]};planView=true;}
+  if(!planView){heroCam=copyCam(cam);cam={az:0,el:1.535,dist:2.55,target:[...cam.target],fov:Number.isFinite(cam.fov)?cam.fov:DEFAULT_HERO.fov};planView=true;}
   else{cam=copyCam(heroCam);planView=false;}
   syncViewButton();
 }

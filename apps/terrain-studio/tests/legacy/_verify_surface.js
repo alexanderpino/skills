@@ -20,7 +20,7 @@ const MUTATIONS = ['roughen-drop-slope', 'distress-invert-convex', 'groundtextur
   'rocknoise-use-fbm', 'bulbous-invert-cell', 'pockmarks-positive', 'contours-cell-height',
   'grid-unrotated', 'pre-mask', 'cell-space', 'nyquist-force-one', 'hex-row-normalized',
   'root-seed-zero', 'spectral-cell-space', 'width-double', 'slope-endpoint',
-  'unfrozen-framebuffer', 'flat-render'];
+  'copycam-drop-fov', 'unfrozen-framebuffer', 'flat-render'];
 if (MUTATION && !MUTATIONS.includes(MUTATION)) { console.error(`Unknown mutation ${MUTATION}`); process.exit(2); }
 
 const EXPECTED = {
@@ -57,7 +57,7 @@ const EXPECTED = {
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(800);
 
-  const lifecycle = await page.evaluate(() => {
+  const lifecycle = await page.evaluate(mutation => {
     const readSeed = value => ({ has: Object.prototype.hasOwnProperty.call(value, 'seed'),
       value: value.seed === undefined ? null : value.seed });
     const defaults = () => Object.fromEntries(TYPES.surface.params.map(param => [param.key, cloneParams(param.def)]));
@@ -105,9 +105,21 @@ const EXPECTED = {
       && byName.boot.signature === byName['legacy-seedless'].signature;
     const distinctRoots = ['explicit-0', 'explicit-123', 'explicit-456']
       .every(name => byName[name].signature !== byName.boot.signature);
-    return { phases, stateOk, oracleOk, stableSeven, distinctRoots,
-      ok: phases.length === 6 && stateOk && oracleOk && stableSeven && distinctRoots };
-  });
+    const authoredFov = .73, rounds = [];
+    frameHero(); cam = { ...cam, target: [...cam.target], fov: authoredFov };
+    for (let round = 0; round < 2; round++) {
+      togglePlanView();
+      const planFov = cam.fov; togglePlanView();
+      if (mutation === 'copycam-drop-fov') delete cam.fov;
+      rounds.push({ round: round + 1, planFov, restoredFov: cam.fov });
+    }
+    frameHero(); const resetFov = cam.fov;
+    const camera = { authoredFov, defaultFov: 1.05, rounds, resetFov,
+      ok: rounds.length === 2 && rounds.every(round => round.planFov === authoredFov && round.restoredFov === authoredFov)
+        && resetFov === 1.05 };
+    return { phases, stateOk, oracleOk, stableSeven, distinctRoots, camera,
+      ok: phases.length === 6 && stateOk && oracleOk && stableSeven && distinctRoots && camera.ok };
+  }, MUTATION);
 
   const measured = await page.evaluate(({ styles, expected }) => {
     const def = TYPES.surface;
@@ -328,6 +340,7 @@ const EXPECTED = {
         'nyquist-force-one': 'zero-safe Nyquist octave truncation', 'hex-row-normalized': 'physical hex row pitch',
         'root-seed-zero': 'canonical root seed integration', 'spectral-cell-space': 'periodic-Hann DFT wavelength stability',
         'width-double': 'cellular/Grid/Contour 24-step width bisection', 'slope-endpoint': 'slope endpoint relation',
+        'copycam-drop-fov': 'plan-view camera FOV restoration',
         'unfrozen-framebuffer': 'frozen 960x540 framebuffer',
         'flat-render': 'visual treatment pixel threshold' })[mutation] : null };
   }, { styles: STYLES, mutation: MUTATION });
@@ -411,6 +424,7 @@ const EXPECTED = {
     }
   }
   if (MUTATION === 'flat-render' || MUTATION === 'unfrozen-framebuffer') analytic.mutationReached = VISUAL && !visual.ok;
+  if (MUTATION === 'copycam-drop-fov') analytic.mutationReached = !lifecycle.camera.ok;
 
   const manifestOk = measured.manifest && Object.values(measured.manifest).every(Boolean);
   const ok = measured.registered && measured.category === 'surface'
