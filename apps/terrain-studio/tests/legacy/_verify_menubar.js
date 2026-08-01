@@ -13,6 +13,11 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const errors=[];page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('pageerror',e=>errors.push(e.message));
   await page.goto(URL,{waitUntil:'load'});await page.waitForTimeout(1800);
 
+  const bootSeed=await page.evaluate(()=>{
+    const read=def=>({has:Object.prototype.hasOwnProperty.call(def,'seed'),value:def.seed===undefined?null:def.seed});
+    return {root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+  });
+
   const desktop=await page.evaluate(()=>({
     desktopDisplay:getComputedStyle(document.querySelector('.desktop-menu')).display,
     compactDisplay:getComputedStyle(document.querySelector('.compact-menu-wrap')).display,
@@ -31,7 +36,9 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   await page.waitForTimeout(120);
   const blank=await page.evaluate(()=>({
     types:nodes.map(n=>n.type),edges:edges.length,undo:undoStack.length,redo:redoStack.length,
-    selected:selected&&selected.type,outputReady:!!(outputNode()&&outputNode()._field)
+    selected:selected&&selected.type,outputReady:!!(outputNode()&&outputNode()._field),
+    seed:{root:{has:Object.prototype.hasOwnProperty.call(terrainDef,'seed'),value:terrainDef.seed===undefined?null:terrainDef.seed},
+      snapshot:{has:Object.prototype.hasOwnProperty.call(graphSnapshot().terrainDef,'seed'),value:graphSnapshot().terrainDef.seed===undefined?null:graphSnapshot().terrainDef.seed}}
   }));
 
   // "new-default" restores THE DEFAULT DOCUMENT, so this oracle deliberately does NOT construct
@@ -53,7 +60,52 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
       selected:selected&&selected.type,undo:undoStack.length,
       // newTerrainDocument() ends in evalGraph(), so a restored default must arrive EVALUATED.
       // Without this the type list alone would pass on a default that renders nothing.
-      outputReady:!!(outputNode()&&outputNode()._field)};
+      outputReady:!!(outputNode()&&outputNode()._field),
+      seed:{root:{has:Object.prototype.hasOwnProperty.call(terrainDef,'seed'),value:terrainDef.seed===undefined?null:terrainDef.seed},
+        snapshot:{has:Object.prototype.hasOwnProperty.call(graphSnapshot().terrainDef,'seed'),value:graphSnapshot().terrainDef.seed===undefined?null:graphSnapshot().terrainDef.seed}}};
+  });
+
+  await page.locator('#fileMenuBtn').click();
+  page.once('dialog',d=>d.accept());
+  await page.locator('#fileMenu [data-editor-command="new-canyon"]').click();
+  await page.waitForTimeout(300);
+  const canyonSeed=await page.evaluate(()=>{
+    const read=def=>({has:Object.prototype.hasOwnProperty.call(def,'seed'),value:def.seed===undefined?null:def.seed});
+    return {root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+  });
+
+  await page.locator('#fileMenuBtn').click();
+  page.once('dialog',d=>d.accept());
+  await page.locator('#fileMenu [data-editor-command="new"]').click();
+  await page.waitForTimeout(120);
+  const showcaseSeed=await page.evaluate(()=>{
+    showcaseGraph();
+    const read=def=>({has:Object.prototype.hasOwnProperty.call(def,'seed'),value:def.seed===undefined?null:def.seed});
+    return {root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+  });
+
+  const absentZero=await page.evaluate(()=>{
+    const read=def=>({has:Object.prototype.hasOwnProperty.call(def,'seed'),value:def.seed===undefined?null:def.seed});
+    undoStack=[];redoStack=[];
+    terrainDef.seed=0;
+    const legacy=graphSnapshot();delete legacy.terrainDef.seed;undoStack=[legacy];
+    undoGraph();
+    const undo={root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+    redoGraph();
+    const redo={root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+    return {undo,redo};
+  });
+
+  const explicitSeeds=await page.evaluate(()=>{
+    const read=def=>({has:Object.prototype.hasOwnProperty.call(def,'seed'),value:def.seed===undefined?null:def.seed});
+    undoStack=[];redoStack=[];
+    terrainDef.seed=456;
+    const prior=graphSnapshot();prior.terrainDef.seed=123;undoStack=[prior];
+    undoGraph();
+    const undo={root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+    redoGraph();
+    const redo={root:read(terrainDef),snapshot:read(graphSnapshot().terrainDef)};
+    return {undo,redo};
   });
 
   await page.setViewportSize({width:760,height:720});await page.waitForTimeout(150);
@@ -83,17 +135,23 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   // The L0 opening document, read off layer0Graph() (legacy.js:6512) and confirmed by measurement:
   // 7 nodes, 6 edges, selection parked on the base generator.
   const STARTER_TYPES=JSON.stringify(['perlin','ridged','blend','d_height','heightmask','levels','output']);
+  const seedIs=(reading,value)=>reading&&reading.root.has&&reading.root.value===value
+    &&reading.snapshot.has&&reading.snapshot.value===value;
   const ok=desktop.desktopDisplay==='flex'&&desktop.compactDisplay==='none'&&desktop.topbarOverflow<=1
     &&JSON.stringify(desktop.headings)===JSON.stringify(['File','Edit','View','Help'])
     &&fileOpen.open&&JSON.stringify(fileOpen.commands)===FILE_COMMANDS
     &&JSON.stringify(blank.types)===JSON.stringify(['output'])&&blank.edges===0&&!blank.undo&&!blank.redo
-    &&blank.selected==='output'&&blank.outputReady
+    &&blank.selected==='output'&&blank.outputReady&&seedIs(bootSeed,7)&&seedIs(blank.seed,7)
     &&starter.count===7&&starter.edges===6&&JSON.stringify(starter.types)===STARTER_TYPES
-    &&starter.selected==='perlin'&&!starter.undo&&starter.outputReady
+    &&starter.selected==='perlin'&&!starter.undo&&starter.outputReady&&seedIs(starter.seed,7)
+    &&seedIs(canyonSeed,7)&&seedIs(showcaseSeed,7)
+    &&seedIs(absentZero.undo,7)&&seedIs(absentZero.redo,0)
+    &&seedIs(explicitSeeds.undo,123)&&seedIs(explicitSeeds.redo,456)
     &&compact.desktopDisplay==='none'&&compact.compactDisplay==='block'&&compact.overflow<=1
     &&compactOpen.open&&JSON.stringify(compactOpen.sections)===JSON.stringify(['▱File','✎Edit','▣View','?Help'])
     &&compactFile.open&&JSON.stringify(compactFile.commands)===FILE_COMMANDS
     &&escapeClosed&&!errors.length;
-  console.log(JSON.stringify({desktop,fileOpen,blank,starter,compact,compactOpen,compactFile,escapeClosed,errors,ok},null,2));
+  console.log(JSON.stringify({bootSeed,desktop,fileOpen,blank,starter,canyonSeed,showcaseSeed,absentZero,explicitSeeds,
+    compact,compactOpen,compactFile,escapeClosed,errors,ok},null,2));
   await browser.close();process.exit(ok?0:1);
 })().catch(e=>{console.error('FATAL',e);process.exit(2);});
