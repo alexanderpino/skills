@@ -3024,9 +3024,7 @@ function restoreGraph(snap){
   }
   nodes=snap.nodes.map(n=>({...n,params:cloneParams(n.params),_inputs:n._inputs?[...n._inputs]:null,_field:null,_thumb:null,_dirty:true,
     _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null,_wind:null}));
-  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef={scale:5000,height:2600,baseElevation:0,
-    latitude:46,north:0,seaTemp:6,lapseRate:6.5,solarElevation:45,windDirection:300,windSpeed:10,
-    lattice:"square",...snap.terrainDef};
+  edges=snap.edges.map(e=>({...e}));uid=snap.uid;terrainDef=createTerrainDef(snap.terrainDef);
   H_SCALE=terrainDef.height/terrainDef.scale;
   selected=snap.selectedId==null?null:nodeById(snap.selectedId);
   selectedEdge=snap.selectedEdgeKey&&edgeByKey(snap.selectedEdgeKey)?snap.selectedEdgeKey:null;
@@ -4562,8 +4560,10 @@ function resolveColor(nodeId,n,memo,guard){
 // across and 2.6 km tall, giving a vertical ratio of height/scale = 0.52. This is what makes cell
 // size (scale/RES) and therefore slope ANGLES physically meaningful, which nodes with "Real Scale"
 // use. (In Gaea, scale only changes processing when Real Scale is on in Erosion/Snow/Thermal.)
-export let terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,
-  solarElevation:45,windDirection:300,windSpeed:10,lattice:"square"};
+const createTerrainDef=(overrides={})=>({scale:5000,height:2600,baseElevation:0,latitude:46,north:0,
+  seaTemp:6,lapseRate:6.5,solarElevation:45,windDirection:300,windSpeed:10,lattice:"square",seed:7,
+  ...overrides});
+export let terrainDef=createTerrainDef();
 export const cellSizeM=()=>terrainDef.scale/RES;       // metres per cell (hex: the centre-to-centre spacing s)
 // Hexagonal lattice mode (references/26-hexagonal-lattice.md). Storage stays the same W x H
 // Float32Array in odd-r offset layout: odd rows are drawn (and sampled) half a cell to the
@@ -6612,8 +6612,7 @@ function newTerrainDocument(withDefault,template=""){
   const ready=historyReady;historyReady=false;
   nodes=[];edges=[];uid=1;selected=null;selectedEdge=null;importTarget=null;
   undoStack.length=0;redoStack.length=0;previewMode="output";
-  terrainDef={scale:5000,height:2600,baseElevation:0,latitude:46,north:0,seaTemp:6,lapseRate:6.5,
-    solarElevation:45,windDirection:300,windSpeed:10,lattice:"square"};
+  terrainDef=createTerrainDef();
   H_SCALE=terrainDef.height/terrainDef.scale;scene={water:null,snow:null,satmap:null};
   if(template==="canyon")canyonGraph();else if(withDefault)defaultGraph();else blankGraph();
   nodes.forEach(n=>{n._dirty=true;n._thumb=null;});
