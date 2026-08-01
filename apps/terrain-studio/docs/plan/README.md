@@ -130,6 +130,11 @@ start once ADR 006 CPU vectors are armed. S4.9's final river regime remains in `
 `MC-S07` physical flow. Transitive dependencies are omitted from the table when the immediate edge
 already carries them.
 
+Repair/retry bundles do not duplicate canonical story ownership. `MC-S31` replays the blocked
+`MC-S03` implementation on the seed-correct lifecycle base; `MC-S32` is its dependent Volcano-mode
+correction. They jointly close S1.1/S1.2. S1.2 MUST remain not-DONE until `MC-S32` proves both shield
+and stratovolcano morphology and visual gates.
+
 `MC-S21` is deliberately independent of earlier implementation bundles: domain schema/dialog/import
 provenance can land against the current baseline. `MC-S22` waits on typed evaluation context from
 `MC-S02`; `MC-S23` waits on the completed Sprint 6 emitter/manifest bundle `MC-S14`; `MC-S24` waits

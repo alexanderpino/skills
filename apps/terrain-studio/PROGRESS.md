@@ -93,6 +93,11 @@ refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026
 - Focused Surface-family oracle, toolbox, quick-create, 61/61 digest, plugin/bridge checks, and
   production build are green. The broader sprint-grounding ledger remains open; only grounded,
   independently gated stories may enter implementation.
+- **S1.2 Volcano correction is mandatory before completion:** the current isolated implementation
+  exposes only a pointed `stratovolcano` profile and rejects `shield`. The plan now requires distinct
+  shield (2–10° broad dome) and stratovolcano (20–35° summit-steepening, crater + barrancos) modes,
+  each with analytic and two-distance visual evidence. S1.2/MC-S31 MUST NOT be marked DONE until this
+  gate passes.
 
 **Sprint 4 scope expanded — AAA hybrid Gerstner water accepted locally, 2026-07-31.**
 

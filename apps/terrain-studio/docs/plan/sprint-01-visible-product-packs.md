@@ -20,7 +20,7 @@ not reintroduce the square-separable defect `C4`.
 |---|---|---|---|---|
 | S1.0 | Add the Surface/Geology palette family; move Rock Fracture | `[C]` | 2 | **DONE** · `da2e583`; focused/built gates green |
 | S1.1 | Surface-detail node (one plugin, `style` enum) | `[C]` | 5 | Roughen, Distress, GroundTexture, RockNoise, Bulbous, Pockmarks, Contours, Grid |
-| S1.2 | Landform pack: Crater, CraterField, Island, Volcano, MountainSide, Rugged | `[C]` | 8 | six plugin types; radial SDF + profile + noise/scatter |
+| S1.2 | Landform pack: Crater, CraterField, Island, Volcano, MountainSide, Rugged | `[C]` | 8 | six plugin types; Volcano MUST include shield + stratovolcano modes |
 | S1.3 | Tone/morphology filters | `[C]` | 5 | Sharpen, Threshold, Dilate, Deflate, Match, SoftClip |
 | S1.4 | Coordinate filters | `[C]` | 5 | Flip, Transpose, Fold, DirectionalWarp; lattice-aware semantics |
 | S1.5 | Derive: Angle (aspect) | `[C]` | 2 | scalar field; Normals moves to Sprint 2 typed ports |
@@ -130,9 +130,24 @@ single-flank landforms instead of reconstructing each archetype from low-level n
 
 Six archetypes as compositions: `Crater` (radial profile through `shape` + `curve` + `stampn`),
 `CraterField` (Poisson-disc scatter of Crater), `Island` (radial falloff × existing noise), `Volcano`
-(cone + crater + flank noise — "central cone and crater structure"), `MountainSide` (`mountain` + a
-directional gradient mask), `Rugged` (broken non-hero base). Reference profiles exist in
-`terrain-architect/reference-impl/crater.py`.
+(the two mandatory edifice modes below), `MountainSide` (`mountain` + a directional gradient mask),
+`Rugged` (broken non-hero base). Reference crater profiles exist in
+`terrain-architect/reference-impl/crater.py`; volcano morphology is governed by installed Terrain
+Architect chapter 11 (Pike & Clow 1981 dimensions; Karátson et al. 2010 morphometry).
+
+**Volcano is not a generic pointed mound. Both modes are required:**
+
+- **Shield volcano:** a broad, low, convex dome built by fluid basaltic flows. Its normalized radial
+  edifice is `h/H = 1 - (r/R)^1.7` for `0 <= r/R <= 1`. Authored/default `H:R` must produce the
+  chapter-11 2–10° flank regime or the inspector reports the physical mismatch. It may have a shallow
+  summit depression, but it MUST NOT reuse the steep stratovolcano profile.
+- **Stratovolcano:** a concave-up edifice that steepens toward the summit, using
+  `h/H = (1 - r/R)^2.2`. Defaults must place representative upper flanks in the grounded 20–35°
+  regime. It carries a summit crater/caldera and radial barrancos; the radial incision count and
+  depth remain authored controls.
+- Style selects the morphology; a free `profileExponent` MUST NOT make both labels aliases for the
+  same shape. Shared controls (position, radius, amount, seed) may remain common, while style-specific
+  defaults/controls are visible and serialised.
 
 **Guardrail 7 is a hard sub-task:** classify each new type against `EXACT_TYPES` in `src/legacy.js`.
 Add only position-pure generators; deliberately exclude whole-field/self-normalising compositions
@@ -146,6 +161,15 @@ such as MountainSide if they inherit Mountain's non-commuting behavior.
   return the requested count and measured minimum spacing; in an overfull case it must return an
   explicit saturation result rather than silently placing fewer craters. Do not infer authored count
   from local minima, because overlap and flat floors make that observable unstable.
+- **Volcano modes, armed:** on one flat world, evaluate shield and stratovolcano with the same centre,
+  radius, amount, and seed. Assert both have a summit depression and positive edifice, then assert
+  distinct radial signatures: shield uses the direct `1-r^1.7` oracle and remains in the 2–10°
+  representative flank band; stratovolcano uses the direct `(1-r)^2.2` oracle, has upper-flank slope
+  greater than lower-flank slope, and its default representative upper flank is 20–35°. The
+  stratovolcano barranco ring has the authored number of radial minima. Required red mutations are:
+  map both enum values to one profile, use a straight/Gaussian cone, omit the summit depression, and
+  remove barrancos. Capture close and traversal hillshades for **both** modes at the frozen 45° FOV;
+  one screenshot of one mode is absence of evidence and fails.
 - **Transform eligibility:** assert every type declares an eligibility decision. For eligible types,
   a non-integer Transform matches direct coordinate evaluation under the existing transform oracle;
   excluded types must take the measured raster path and never claim exact evaluation.
