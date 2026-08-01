@@ -70,10 +70,13 @@
 //   explicit test surface (e.g. `globalThis.__terrain = { TYPES, nodes, edges, ... }`), and the
 //   one commit that introduces it is the one commit where this file's page-side accessors change.
 // =====================================================================
-const { chromium } = await import('playwright-core');
-const path = (await import('node:path')).default;
-const fs = (await import('node:fs')).default;
-const __dirname = path.dirname(path.resolve(process.argv[1]));
+const nodeRequire = typeof require === 'function'
+  ? require
+  : process.getBuiltinModule('node:module').createRequire(process.argv[1]);
+const { chromium } = nodeRequire('playwright-core');
+const path = nodeRequire('node:path');
+const fs = nodeRequire('node:fs');
+const scriptDir = path.dirname(path.resolve(process.argv[1]));
 
 const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
@@ -86,12 +89,12 @@ const flagVal = (name, dflt) => {
   return hit ? hit.slice(name.length + 3) : dflt;
 };
 const PAGE = argv.find(a => !a.startsWith('--')) || 'index.html';
-const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../', PAGE));
+const URL = process.env.STUDIO_URL || ('file://' + path.resolve(scriptDir, '../../', PAGE));
 const WRITE = flag('write');
 const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
-const BASELINE = path.resolve(__dirname, '_digest_baseline.json');
+const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.

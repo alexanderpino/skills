@@ -453,6 +453,8 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
   if (report.mutation) console.log(`MUTATION ${report.mutation} violated ${report.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ ...report, errors }, null, 2));
   else if (VISUAL) console.log(`visual runs=${report.visual.runs.length} minTerrain=${Math.min(...report.visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...report.visual.runs.map(run => run.changedFraction))} fov=${Math.min(...report.visual.runs.map(run => run.fovDeg))}`);
-  await browser.close();
+  const cleanupBudget = new Promise(resolve => setTimeout(resolve, 2000));
+  await Promise.race([page.close({ runBeforeUnload: false }).catch(() => {}), cleanupBudget]);
+  await Promise.race([browser.close().catch(() => {}), cleanupBudget]);
   process.exit(report.ok && !errors.length ? 0 : 1);
 })().catch(error => { console.error('FATAL', error); process.exit(2); });

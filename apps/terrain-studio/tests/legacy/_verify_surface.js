@@ -422,6 +422,8 @@ const EXPECTED = {
   if (analytic.mutation) console.log(`MUTATION ${analytic.mutation} violated ${analytic.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ lifecycle, measured, analytic, ui, visual, errors, ok }, null, 2));
   else if (VISUAL) console.log(`visual runs=${visual.runs.length} minTerrain=${Math.min(...visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...visual.runs.map(run => run.changedFraction))} fov=${Math.min(...visual.runs.map(run => run.fovDeg))}`);
-  await browser.close();
+  const cleanupBudget = new Promise(resolve => setTimeout(resolve, 2000));
+  await Promise.race([page.close({ runBeforeUnload: false }).catch(() => {}), cleanupBudget]);
+  await Promise.race([browser.close().catch(() => {}), cleanupBudget]);
   process.exit(ok ? 0 : 1);
 })().catch(error => { console.error('FATAL', error); process.exit(2); });
