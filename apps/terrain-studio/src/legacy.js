@@ -1654,6 +1654,127 @@ export function histEqualizeField(inp,{bins=256,amount=1}){
   return o;
 }
 
+export function sharpenField(inp,{amount=1,radiusM=100}){
+  const strength=Number.isFinite(amount)?Math.max(0,amount):1;
+  if(strength===0)return inp.slice();
+  const authoredRadius=Number.isFinite(radiusM)&&radiusM>0?radiusM:100;
+  const blurred=blurField(inp,{radius:Math.max(1,authoredRadius/cellSizeM())}),o=newField();
+  for(let i=0;i<inp.length;i++)o[i]=inp[i]+strength*(inp[i]-blurred[i]);
+  return o;
+}
+export function thresholdField(inp,{cut=.5}){
+  const threshold=Number.isFinite(cut)?cut:.5,o=newField();
+  for(let i=0;i<inp.length;i++)o[i]=inp[i]>=threshold?1:0;
+  return o;
+}
+function morphologyField(inp,radiusM,dilate){
+  const radius=Number.isFinite(radiusM)?Math.max(0,radiusM):100;
+  const k=Math.max(0,Math.round(radius/cellSizeM())),n=fieldW(),nh=fieldH();
+  if(k===0)return inp.slice();
+  const o=newField(),hex=isHex();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
+    let value=dilate?-Infinity:Infinity;
+    if(hex){
+      const q=x-((y-(y&1))>>1);
+      for(let dr=-k;dr<=k;dr++)for(let dq=Math.max(-k,-dr-k);dq<=Math.min(k,-dr+k);dq++){
+        const yy=y+dr,qq=q+dq,xx=qq+((yy-(yy&1))>>1);
+        if(xx<0||yy<0||xx>=n||yy>=nh)continue;
+        value=dilate?Math.max(value,inp[yy*n+xx]):Math.min(value,inp[yy*n+xx]);
+      }
+    }else for(let dy=-k;dy<=k;dy++)for(let dx=-k;dx<=k;dx++){
+      if(dx*dx+dy*dy>k*k)continue;
+      const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=n||yy>=nh)continue;
+      value=dilate?Math.max(value,inp[yy*n+xx]):Math.min(value,inp[yy*n+xx]);
+    }
+    o[y*n+x]=value;
+  }
+  return o;
+}
+export function dilateField(inp,{radiusM=100}){return morphologyField(inp,radiusM,true);}
+export function deflateField(inp,{radiusM=100}){return morphologyField(inp,radiusM,false);}
+export function matchField(source,target){
+  if(!source||!target||source.length===0||source.length!==target.length)throw new Error("Match requires equal-length non-empty fields");
+  const ranked=f=>Array.from(f,(value,index)=>{if(!Number.isFinite(value))throw new Error("Match requires finite fields");return{value,index};})
+    .sort((a,b)=>a.value-b.value||a.index-b.index);
+  const sourceRank=ranked(source),targetRank=ranked(target),o=new Float32Array(source.length);
+  for(let k=0;k<sourceRank.length;k++)o[sourceRank[k].index]=targetRank[k].value;
+  return o;
+}
+export function softClipField(inp,{lo=0,hi=1,softness=.5}){
+  const lower=Number.isFinite(lo)?lo:0,upper=Number.isFinite(hi)&&hi>lower?hi:lower+1;
+  const blend=Number.isFinite(softness)?clamp(softness,0,1):.5,o=newField(),range=upper-lower;
+  for(let i=0;i<inp.length;i++){
+    const t=clamp((inp[i]-lower)/range,0,1),hard=lower+range*t,soft=lower+range*t*t*(3-2*t);
+    o[i]=hard+blend*(soft-hard);
+  }
+  return o;
+}
+
+function sampleLatticeWorld(inp,worldX,worldY){
+  const n=fieldW(),nh=fieldH(),d=cellSizeM();
+  const atOffset=(x,y)=>inp[clamp(y,0,nh-1)*n+clamp(x,0,n-1)];
+  if(!isHex()){
+    const fx=worldX/d-.5,fy=worldY/d-.5,x0=Math.floor(fx),y0=Math.floor(fy),tx=fx-x0,ty=fy-y0;
+    return lerp(lerp(atOffset(x0,y0),atOffset(x0+1,y0),tx),lerp(atOffset(x0,y0+1),atOffset(x0+1,y0+1),tx),ty);
+  }
+  const r=worldY/(d*HEX_ROW)-.5,q=worldX/d-.5-r*.5;
+  const qi=Math.floor(q),ri=Math.floor(r),fq=q-qi,fr=r-ri;
+  const axial=(aq,ar)=>atOffset(aq+((ar-(ar&1))>>1),ar);
+  if(fq+fr<=1)return(1-fq-fr)*axial(qi,ri)+fq*axial(qi+1,ri)+fr*axial(qi,ri+1);
+  return(1-fr)*axial(qi+1,ri)+(1-fq)*axial(qi,ri+1)+(fq+fr-1)*axial(qi+1,ri+1);
+}
+function coordinateFilterField(inp,map){
+  const o=newField(),n=fieldW(),nh=fieldH();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
+    const p=worldSampleAt(x,y),q=map(p[0],p[1],y*n+x);
+    o[y*n+x]=sampleLatticeWorld(inp,q[0],q[1]);
+  }
+  return o;
+}
+export function flipField(inp,{axis="horizontal"}){
+  const extent=terrainDef.scale;
+  return coordinateFilterField(inp,(x,y)=>axis==="vertical"?[x,extent-y]:[extent-x,y]);
+}
+export function transposeWorldField(inp){return coordinateFilterField(inp,(x,y)=>[y,x]);}
+function bearingDirection(bearing){
+  const authored=Number.isFinite(bearing)?bearing:0;
+  const theta=authored*Math.PI/180+(terrainDef.north||0)*Math.PI/180-Math.PI/2;
+  return[Math.cos(theta),Math.sin(theta)];
+}
+export function foldField(inp,{bearing=0,offsetM=0}){
+  const dir=bearingDirection(bearing),normal=[-dir[1],dir[0]],offset=Number.isFinite(offsetM)?offsetM:0;
+  const ax=terrainDef.scale*.5+offset*normal[0],ay=terrainDef.scale*.5+offset*normal[1];
+  return coordinateFilterField(inp,(x,y)=>{const side=(x-ax)*normal[0]+(y-ay)*normal[1];
+    return side>=0?[x,y]:[x-2*side*normal[0],y-2*side*normal[1]];});
+}
+export function directionalWarpField(inp,driver,{bearing=0,amplitudeM=100}){
+  if(!driver||driver.length!==inp.length)throw new Error("DirectionalWarp requires an equal-length Driver field");
+  const amplitude=Number.isFinite(amplitudeM)?amplitudeM:100,dir=bearingDirection(bearing);
+  if(amplitude===0)return inp.slice();
+  return coordinateFilterField(inp,(x,y,index)=>{const value=driver[index];if(!Number.isFinite(value))throw new Error("DirectionalWarp Driver must be finite");
+    const displacement=amplitude*value;return[x+dir[0]*displacement,y+dir[1]*displacement];});
+}
+export function aspectField(inp){
+  const n=fieldW(),nh=fieldH(),d=cellSizeM(),o=newField();
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
+    let gx=0,gy=0;
+    if(isHex()){
+      const nb=hexNb(y);for(let k=0;k<6;k++){const h=inp[clamp(y+nb[k][1],0,nh-1)*n+clamp(x+nb[k][0],0,n-1)];gx+=h*HEX_EX[k];gy+=h*HEX_EY[k];}
+      gx/=3*d;gy/=3*d;
+    }else{
+      gx=(inp[y*n+clamp(x+1,0,n-1)]-inp[y*n+clamp(x-1,0,n-1)])/(2*d);
+      gy=(inp[clamp(y+1,0,nh-1)*n+x]-inp[clamp(y-1,0,nh-1)*n+x])/(2*d);
+    }
+    o[y*n+x]=gx===0&&gy===0?0:Math.atan2(-gy,-gx);
+  }
+  return o;
+}
+export function aspectPreviewField(inp,def=terrainDef){
+  const o=new Float32Array(inp.length),north=(def.north||0)*Math.PI/180,tau=2*Math.PI;
+  for(let i=0;i<inp.length;i++){const turn=(((inp[i]+Math.PI/2-north)/tau)%1+1)%1;o[i]=turn>1-2**-20?0:turn;}
+  return o;
+}
+
 /* ------------------------------------------------------- combiners ---- */
 export function combine(a,b,fn){const o=newField();for(let i=0;i<o.length;i++)o[i]=fn(a?a[i]:0,b?b[i]:0);return o;}
 export function blendField(a,b,mask,factor){
@@ -3283,10 +3404,11 @@ function requestEval(){
    ===================================================================== */
 const TH=48;
 function bakeThumb(nd){
-  const f=nd._field;if(!f)return null;
+  const raw=nd._field;if(!raw)return null;const adapter=TYPES[nd.type].previewAdapter;
+  const f=adapter?adapter(raw,terrainDef):raw;
   const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
   const img=ctx.createImageData(TH,TH);const n=fieldW(),nh=fieldH();
-  const[mn,mx]=fieldRange(f);const d=mx-mn||1;
+  const range=TYPES[nd.type].previewRange,[mn,mx]=range||fieldRange(f);const d=mx-mn||1;
   // sampleBilinear reads WORLD position in cell units. The hex world is only (n-1)*sqrt(3)/2
   // cells tall, so walking sy over raw grid indices runs 13.4% past the bottom and clamps onto
   // the last lattice row - measured: 6 of 48 thumbnail rows came back byte-identical on hex,
@@ -3797,7 +3919,8 @@ function updatePreviewInfo(root){
 }
 function refreshPreview(){
   const root=activePreviewNode(),meta=root&&fieldMetadata(root._field);scene=collectScene(root);
-  updateViewport(root?(meta&&meta.heightField||root._field):null,root);updatePreviewInfo(root);drawGraph();
+  const raw=root?(meta&&meta.heightField||root._field):null,adapter=root&&TYPES[root.type].previewAdapter;
+  updateViewport(adapter?adapter(raw,terrainDef):raw,root);updatePreviewInfo(root);drawGraph();
 }
 function selectEdge(edge){
   selectedEdge=edge?edgeKey(edge):null;buildProps();drawGraph();syncEditorCommandState();
