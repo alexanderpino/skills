@@ -240,9 +240,9 @@ const EXPECTED = {
         const treatment = flat ? baseline : TYPES.surface.eval(params, [input, null], node);
         const capture = field => { const root = { id: 24, type: 'output', params: { norm: 'off' }, _field: field };
           updateViewport(field, root); cam = { az: -35 * Math.PI / 180, el: 42 * Math.PI / 180,
-          dist: distance, target: [0, 0, 0] }; shadeMode = 1; syncDisplayState(); const canvas = document.querySelector('#gl'); canvas.width = 960; canvas.height = 540;
-          gl.viewport(0, 0, 960, 540); renderGL(); gl.finish(); const pixels = new Uint8Array(960 * 540 * 4);
-          gl.readPixels(0, 0, 960, 540, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return { pixels, png: canvas.toDataURL('image/png') }; };
+          dist: distance, target: [0, 0, 0], fov: 45 * Math.PI / 180 }; shadeMode = 1; syncDisplayState(); const canvas = document.querySelector('#gl'); canvas.width = 960; canvas.height = 540;
+          gl.viewport(0, 0, 960, 540); const renderedFov = renderGL(); gl.finish(); const pixels = new Uint8Array(960 * 540 * 4);
+          gl.readPixels(0, 0, 960, 540, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return { pixels, png: canvas.toDataURL('image/png'), fovDeg: renderedFov * 180 / Math.PI }; };
         const baselineCapture = capture(baseline), treatmentCapture = capture(treatment), before = baselineCapture.pixels, after = treatmentCapture.pixels;
         const clear = [before[0], before[1], before[2]], width = 960, height = 540;
         const terrain = new Uint8Array(width * height), stack = [Math.floor(height / 2) * width + Math.floor(width / 2)]; let count = 0, changed = 0;
@@ -254,9 +254,9 @@ const EXPECTED = {
           if (index >= width) stack.push(index - width); if (index < width * (height - 1)) stack.push(index + width);
         }
         return { lattice, style, distance, terrainPixels: count, changedPixels: changed, changedFraction: count ? changed / count : 0,
-          channelsValid: after.every(value => Number.isInteger(value) && value >= 0 && value <= 255), png: treatmentCapture.png };
+          channelsValid: after.every(value => Number.isInteger(value) && value >= 0 && value <= 255), fovDeg: treatmentCapture.fovDeg, png: treatmentCapture.png };
       }, { lattice, style, distance: view[1], flat: MUTATION === 'flat-render' });
-      result.view = view[0]; result.ok = result.terrainPixels >= 10000 && result.changedFraction >= .01 && result.channelsValid;
+      result.view = view[0]; result.ok = result.terrainPixels >= 10000 && result.changedFraction >= .01 && result.channelsValid && Math.abs(result.fovDeg - 45) < 1e-9;
       visual.runs.push(result); visual.ok &&= result.ok;
       if (MUTATION !== 'flat-render') {
         writeFileSync(path.join(evidenceDir, `surface-${style}-${lattice}-${view[0]}.png`), Buffer.from(result.png.split(',')[1], 'base64'));
@@ -274,7 +274,7 @@ const EXPECTED = {
   console.log(`surface registration registered=${measured.registered} styles=${measured.styles?.length || 0} manifest=${manifestOk ? 'pass' : 'fail'} latticeRuns=${analytic.runs.length} samples=${analytic.runs.reduce((sum, run) => sum + run.samples, 0)} mutationReached=${analytic.mutationReached}`);
   if (analytic.mutation) console.log(`MUTATION ${analytic.mutation} violated ${analytic.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ measured, analytic, ui, visual, errors, ok }, null, 2));
-  else if (VISUAL) console.log(`visual runs=${visual.runs.length} minTerrain=${Math.min(...visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...visual.runs.map(run => run.changedFraction))}`);
+  else if (VISUAL) console.log(`visual runs=${visual.runs.length} minTerrain=${Math.min(...visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...visual.runs.map(run => run.changedFraction))} fov=${Math.min(...visual.runs.map(run => run.fovDeg))}`);
   await browser.close();
   process.exit(ok ? 0 : 1);
 })().catch(error => { console.error('FATAL', error); process.exit(2); });

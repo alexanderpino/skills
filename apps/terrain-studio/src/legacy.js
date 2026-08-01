@@ -5846,7 +5846,7 @@ function drawWaterDepth(MVP){
 function renderGL(){
   if(!gl){return;}
   resizeGL();keepCameraAboveSurface();syncCompass();syncWindReadout();syncClimateReadout();
-  const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
+  const asp=glc.width/glc.height||1,near=cameraNear(),fov=Number.isFinite(cam.fov)?cam.fov:1.05,P=perspective(fov,asp,near,20);
   const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
   const waterRipple=scene.water?waterLook.strength:0;
   const waterRippleScale=waterLook.scale;
@@ -5925,6 +5925,7 @@ function renderGL(){
   }
   if(!REDUCED)uTime+=0.016;
   requestAnimationFrame(renderGL);
+  return fov;
 }
 function identity(){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);}
 function setM(p,name,m){gl.uniformMatrix4fv(u(p,name),false,m);}

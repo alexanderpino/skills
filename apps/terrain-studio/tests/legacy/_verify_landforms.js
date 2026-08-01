@@ -260,7 +260,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     && result.geometry && result.expected.every(key => result.keys.includes(key))));
   report.ok = report.ok && report.ui.ok;
 
-  report.visual = { runs: [], ok: true, fovDeg: 60, requestedFovDeg: 45 };
+  report.visual = { runs: [], ok: true };
   if (VISUAL) {
     const evidenceDir = path.resolve(__dirname, '../../.sweep-logs/MC-S03'); mkdirSync(evidenceDir, { recursive: true });
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -275,10 +275,10 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
           const baseline = newField(.12), generated = TYPES[type].eval(params, [], node), treatment = flat ? baseline : new Float32Array(generated.length);
           if (!flat) for (let i = 0; i < generated.length; i++) treatment[i] = Math.fround(baseline[i] + generated[i]);
           const capture = field => { const root = { id: 24, type: 'output', params: { norm: 'off' }, _field: field };
-            updateViewport(field, root); cam = { az: -35 * Math.PI / 180, el: 42 * Math.PI / 180, dist: distance, target: [0, 0, 0] };
+            updateViewport(field, root); cam = { az: -35 * Math.PI / 180, el: 42 * Math.PI / 180, dist: distance, target: [0, 0, 0], fov: 45 * Math.PI / 180 };
             shadeMode = 1; syncDisplayState(); const canvas = document.querySelector('#gl'); canvas.width = 960; canvas.height = 540;
-            gl.viewport(0, 0, 960, 540); renderGL(); gl.finish(); const pixels = new Uint8Array(960 * 540 * 4);
-            gl.readPixels(0, 0, 960, 540, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return { pixels, png: canvas.toDataURL('image/png') }; };
+            gl.viewport(0, 0, 960, 540); const renderedFov = renderGL(); gl.finish(); const pixels = new Uint8Array(960 * 540 * 4);
+            gl.readPixels(0, 0, 960, 540, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return { pixels, png: canvas.toDataURL('image/png'), fovDeg: renderedFov * 180 / Math.PI }; };
           const baselineCapture = capture(baseline), treatmentCapture = capture(treatment), before = baselineCapture.pixels, after = treatmentCapture.pixels;
           const clear = [before[0], before[1], before[2]], width = 960, height = 540;
           const terrain = new Uint8Array(width * height), stack = [Math.floor(height / 2) * width + Math.floor(width / 2)]; let count = 0, changed = 0;
@@ -290,9 +290,9 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
             if (index >= width) stack.push(index - width); if (index < width * (height - 1)) stack.push(index + width);
           }
           return { lattice, type, distance, terrainPixels: count, changedPixels: changed, changedFraction: count ? changed / count : 0,
-            channelsValid: after.every(value => Number.isInteger(value) && value >= 0 && value <= 255), png: treatmentCapture.png };
+            channelsValid: after.every(value => Number.isInteger(value) && value >= 0 && value <= 255), fovDeg: treatmentCapture.fovDeg, png: treatmentCapture.png };
         }, { lattice, type, distance: view[1], flat: MUTATION === 'flat-render' });
-        result.view = view[0]; result.ok = result.terrainPixels >= 10000 && result.changedFraction >= .01 && result.channelsValid;
+        result.view = view[0]; result.ok = result.terrainPixels >= 10000 && result.changedFraction >= .01 && result.channelsValid && Math.abs(result.fovDeg - 45) < 1e-9;
         report.visual.runs.push(result); report.visual.ok &&= result.ok;
         if (MUTATION !== 'flat-render') writeFileSync(path.join(evidenceDir, `landform-${type}-${lattice}-${view[0]}.png`), Buffer.from(result.png.split(',')[1], 'base64'));
         delete result.png;
@@ -305,7 +305,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
   console.log(`landforms latticeRuns=${report.lattices.length} samples=${report.lattices.reduce((sum, item) => sum + item.samples, 0)} seed=7 mutationReached=${report.mutationReached}`);
   if (report.mutation) console.log(`MUTATION ${report.mutation} violated ${report.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ ...report, errors }, null, 2));
-  else if (VISUAL) console.log(`visual runs=${report.visual.runs.length} minTerrain=${Math.min(...report.visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...report.visual.runs.map(run => run.changedFraction))} fov=${report.visual.fovDeg} requestedFov=${report.visual.requestedFovDeg}`);
+  else if (VISUAL) console.log(`visual runs=${report.visual.runs.length} minTerrain=${Math.min(...report.visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...report.visual.runs.map(run => run.changedFraction))} fov=${Math.min(...report.visual.runs.map(run => run.fovDeg))}`);
   await browser.close();
   process.exit(report.ok && !errors.length ? 0 : 1);
 })().catch(error => { console.error('FATAL', error); process.exit(2); });
