@@ -31,6 +31,63 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(900);
 
+  const lifecycle = await page.evaluate(() => {
+    const types = ['craterfield', 'island', 'volcano', 'mountainside', 'rugged'];
+    const readSeed = value => ({ has: Object.prototype.hasOwnProperty.call(value, 'seed'),
+      value: value.seed === undefined ? null : value.seed });
+    const defaults = type => Object.fromEntries(TYPES[type].params.map(param => [param.key, cloneParams(param.def)]));
+    const mix32 = value => { let hash = value >>> 0; hash = Math.imul(hash ^ (hash >>> 16), 0x7feb352d) >>> 0;
+      hash = Math.imul(hash ^ (hash >>> 15), 0x846ca68b) >>> 0; return (hash ^ (hash >>> 16)) >>> 0; };
+    const hashText = text => { let hash = 2166136261 >>> 0;
+      for (let index = 0; index < text.length; index++) { hash ^= text.charCodeAt(index); hash = Math.imul(hash, 16777619) >>> 0; }
+      return hash; };
+    const effectiveSeed = (type, seed, nodeId, rootSeed) => mix32((seed + hashText(type)
+      + Math.imul(nodeId, 0x9e3779b1) + rootSeed) >>> 0);
+    const compare = (actual, expected) => { let changed = 0;
+      for (let index = 0; index < actual.length; index++) if (actual[index] !== expected[index]) changed++;
+      return changed; };
+    const signature = field => { let hash = 2166136261 >>> 0; const view = new DataView(new ArrayBuffer(4));
+      for (const value of field) { view.setFloat32(0, value, true); hash ^= view.getUint32(0, true); hash = Math.imul(hash, 16777619) >>> 0; }
+      return hash.toString(16).padStart(8, '0'); };
+    RES = 64; TARGET_RES = 64; terrainDef.scale = 5000; terrainDef.height = 2600; terrainDef.lattice = 'square'; XF = null;
+    const fixtures = Object.fromEntries(types.map(type => [type, { params: defaults(type), node: { id: 23 } }]));
+    const phases = [];
+    const measure = (name, expectedRoot) => {
+      const root = readSeed(terrainDef), snapshot = readSeed(graphSnapshot().terrainDef), outputs = {};
+      for (const type of types) {
+        const { params, node } = fixtures[type], actual = TYPES[type].eval(params, [], node);
+        const expected = TYPES[type].field(params, node.id, expectedRoot);
+        outputs[type] = { effectiveSeed: effectiveSeed(type, TYPES[type].options(params).seed, node.id, expectedRoot),
+          signature: signature(actual), expectedSignature: signature(expected), oracleDiff: compare(actual, expected) };
+      }
+      phases.push({ name, expectedRoot, root, snapshot, outputs });
+    };
+    const restore = seed => {
+      const snapshot = graphSnapshot();
+      if (seed === undefined) delete snapshot.terrainDef.seed; else snapshot.terrainDef.seed = seed;
+      undoStack = [snapshot]; redoStack = []; undoGraph();
+    };
+    measure('boot', 7);
+    const originalConfirm = globalThis.confirm; globalThis.confirm = () => true;
+    newTerrainDocument(false); globalThis.confirm = originalConfirm;
+    measure('new', 7);
+    restore(undefined); measure('legacy-seedless', 7);
+    restore(0); measure('explicit-0', 0);
+    restore(123); measure('explicit-123', 123);
+    restore(456); measure('explicit-456', 456);
+    const byName = Object.fromEntries(phases.map(phase => [phase.name, phase]));
+    const stateOk = phases.every(phase => phase.root.has && phase.snapshot.has
+      && phase.root.value === phase.expectedRoot && phase.snapshot.value === phase.expectedRoot);
+    const oracleOk = phases.every(phase => types.every(type => phase.outputs[type].oracleDiff === 0
+      && phase.outputs[type].signature === phase.outputs[type].expectedSignature));
+    const stableSeven = types.every(type => byName.boot.outputs[type].signature === byName.new.outputs[type].signature
+      && byName.boot.outputs[type].signature === byName['legacy-seedless'].outputs[type].signature);
+    const distinctRoots = types.every(type => ['explicit-0', 'explicit-123', 'explicit-456']
+      .every(name => byName[name].outputs[type].signature !== byName.boot.outputs[type].signature));
+    return { types, phases, stateOk, oracleOk, stableSeven, distinctRoots,
+      ok: phases.length === 6 && stateOk && oracleOk && stableSeven && distinctRoots };
+  });
+
   const report = await page.evaluate(async mutation => {
     const TYPES_ = ['crater', 'craterfield', 'island', 'volcano', 'mountainside', 'rugged'];
     const defaults = type => Object.fromEntries(TYPES[type].params.map(param => [param.key, cloneParams(param.def)]));
@@ -340,7 +397,8 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
   report.ui = { desktop: await inspectUi({ width: 1440, height: 900 }), mobile: await inspectUi({ width: 390, height: 844 }) };
   report.ui.ok = Object.values(report.ui).filter(value => typeof value === 'object').every(view => Object.values(view).every(result => result.toolbox && result.quickCreate
     && result.geometry && result.expected.every(key => result.keys.includes(key))));
-  report.ok = report.ok && report.ui.ok;
+  report.lifecycle = lifecycle;
+  report.ok = report.ok && report.ui.ok && lifecycle.ok;
 
   report.visual = { runs: [], ok: true };
   if (VISUAL) {
@@ -390,6 +448,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     report.violatedFormula = MUTATION === 'flat-render' ? 'visual treatment pixel threshold' : 'frozen 960x540 framebuffer'; report.ok = false; }
   else report.ok = report.ok && report.visual.ok;
 
+  console.log(`landforms lifecycle ${JSON.stringify(lifecycle)}`);
   console.log(`landforms latticeRuns=${report.lattices.length} samples=${report.lattices.reduce((sum, item) => sum + item.samples, 0)} seed=7 mutationReached=${report.mutationReached}`);
   if (report.mutation) console.log(`MUTATION ${report.mutation} violated ${report.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ ...report, errors }, null, 2));

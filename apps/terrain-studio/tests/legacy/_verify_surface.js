@@ -57,6 +57,58 @@ const EXPECTED = {
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(800);
 
+  const lifecycle = await page.evaluate(() => {
+    const readSeed = value => ({ has: Object.prototype.hasOwnProperty.call(value, 'seed'),
+      value: value.seed === undefined ? null : value.seed });
+    const defaults = () => Object.fromEntries(TYPES.surface.params.map(param => [param.key, cloneParams(param.def)]));
+    const compare = (actual, expected) => { let changed = 0;
+      for (let index = 0; index < actual.length; index++) if (actual[index] !== expected[index]) changed++;
+      return changed;
+    };
+    const signature = field => { let hash = 2166136261 >>> 0; const view = new DataView(new ArrayBuffer(4));
+      for (const value of field) { view.setFloat32(0, value, true); hash ^= view.getUint32(0, true); hash = Math.imul(hash, 16777619) >>> 0; }
+      return hash.toString(16).padStart(8, '0'); };
+    RES = 64; TARGET_RES = 64; terrainDef.scale = 5000; terrainDef.height = 2600; terrainDef.lattice = 'square'; XF = null;
+    const input = newField(), size = fieldW();
+    for (let y = 0; y < fieldH(); y++) for (let x = 0; x < size; x++) {
+      const dx = (x + .5) / size - .5, dy = (y + .5) / fieldH() - .5;
+      input[y * size + x] = .18 + .55 * Math.max(0, 1 - 2.2 * Math.hypot(dx, dy) ** 2);
+    }
+    const params = { ...defaults(), style: 'roughen', amountM: 180, wavelengthM: 700, octaves: 4, seed: 19 };
+    const node = { id: 23 }, phases = [];
+    const measure = (name, expectedRoot) => {
+      const root = readSeed(terrainDef), snapshot = readSeed(graphSnapshot().terrainDef);
+      const actual = TYPES.surface.eval(params, [input, null], node);
+      const expected = TYPES.surface.field(input, params, null, node.id, expectedRoot);
+      phases.push({ name, expectedRoot, root, snapshot,
+        effectiveSeed: TYPES.surface.effectiveSeed(TYPES.surface.options(params), node.id, expectedRoot),
+        signature: signature(actual), expectedSignature: signature(expected), oracleDiff: compare(actual, expected) });
+    };
+    const restore = seed => {
+      const snapshot = graphSnapshot();
+      if (seed === undefined) delete snapshot.terrainDef.seed; else snapshot.terrainDef.seed = seed;
+      undoStack = [snapshot]; redoStack = []; undoGraph();
+    };
+    measure('boot', 7);
+    const originalConfirm = globalThis.confirm; globalThis.confirm = () => true;
+    newTerrainDocument(false); globalThis.confirm = originalConfirm;
+    measure('new', 7);
+    restore(undefined); measure('legacy-seedless', 7);
+    restore(0); measure('explicit-0', 0);
+    restore(123); measure('explicit-123', 123);
+    restore(456); measure('explicit-456', 456);
+    const byName = Object.fromEntries(phases.map(phase => [phase.name, phase]));
+    const stateOk = phases.every(phase => phase.root.has && phase.snapshot.has
+      && phase.root.value === phase.expectedRoot && phase.snapshot.value === phase.expectedRoot);
+    const oracleOk = phases.every(phase => phase.oracleDiff === 0 && phase.signature === phase.expectedSignature);
+    const stableSeven = byName.boot.signature === byName.new.signature
+      && byName.boot.signature === byName['legacy-seedless'].signature;
+    const distinctRoots = ['explicit-0', 'explicit-123', 'explicit-456']
+      .every(name => byName[name].signature !== byName.boot.signature);
+    return { phases, stateOk, oracleOk, stableSeven, distinctRoots,
+      ok: phases.length === 6 && stateOk && oracleOk && stableSeven && distinctRoots };
+  });
+
   const measured = await page.evaluate(({ styles, expected }) => {
     const def = TYPES.surface;
     if (!def) return { registered: false };
@@ -364,10 +416,11 @@ const EXPECTED = {
   const ok = measured.registered && measured.category === 'surface'
     && JSON.stringify(measured.inputs) === JSON.stringify(['In', 'Mask'])
     && JSON.stringify(measured.styles) === JSON.stringify(STYLES)
-    && measured.styleDefault === 'roughen' && manifestOk && measured.copyHonest && analytic.ok && ui.ok && visual.ok && !errors.length;
+    && measured.styleDefault === 'roughen' && manifestOk && measured.copyHonest && lifecycle.ok && analytic.ok && ui.ok && visual.ok && !errors.length;
+  console.log(`surface lifecycle ${JSON.stringify(lifecycle)}`);
   console.log(`surface registration registered=${measured.registered} styles=${measured.styles?.length || 0} manifest=${manifestOk ? 'pass' : 'fail'} latticeRuns=${analytic.runs.length} samples=${analytic.runs.reduce((sum, run) => sum + run.samples, 0)} mutationReached=${analytic.mutationReached}`);
   if (analytic.mutation) console.log(`MUTATION ${analytic.mutation} violated ${analytic.violatedFormula}`);
-  if (!SUMMARY) console.log(JSON.stringify({ measured, analytic, ui, visual, errors, ok }, null, 2));
+  if (!SUMMARY) console.log(JSON.stringify({ lifecycle, measured, analytic, ui, visual, errors, ok }, null, 2));
   else if (VISUAL) console.log(`visual runs=${visual.runs.length} minTerrain=${Math.min(...visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...visual.runs.map(run => run.changedFraction))} fov=${Math.min(...visual.runs.map(run => run.fovDeg))}`);
   await browser.close();
   process.exit(ok ? 0 : 1);
