@@ -86,18 +86,21 @@ refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026
 - The plan names a user-selected 100 km-class target and makes no unsourced claim about the actual
   dimensions of *Star Wars Outlaws*. GeoTIFF decoding remains a separate future codec/library story.
 
-**Sprint 1 started — S1.0 Surface / Geology palette family DONE (`da2e583`), 2026-07-31.**
+**Sprint 1 implementation — S1.0 and S1.1 DONE (`da2e583`, `8a83bcf`), 2026-08-01.**
 
 - Added the ninth palette family and reclassified Rock Fracture from Erosion; Thermal remains
   Erosion. Toolbox search and drag-out quick-create expose the new family without evaluator changes.
 - Focused Surface-family oracle, toolbox, quick-create, 61/61 digest, plugin/bridge checks, and
   production build are green. The broader sprint-grounding ledger remains open; only grounded,
   independently gated stories may enter implementation.
+- MC-S31 integrated Surface Detail plus the initial landform pack with seed lifecycle, direct/CJS
+  68/68 digest, 32 armed mutations, full source/built 45° visual matrices, FOV state preservation,
+  plugin/bridge/exact/hex/build gates, and clean independent review. This closes **S1.1 only**.
 - **S1.2 Volcano correction is mandatory before completion:** the current isolated implementation
-  exposes only a pointed `stratovolcano` profile and rejects `shield`. The plan now requires distinct
+  now integrated exposes only a pointed `stratovolcano` profile and rejects `shield`. The plan requires distinct
   shield (2–10° broad dome) and stratovolcano (20–35° summit-steepening, crater + barrancos) modes,
-  each with analytic and two-distance visual evidence. S1.2/MC-S31 MUST NOT be marked DONE until this
-  gate passes.
+  each with analytic and two-distance visual evidence. S1.2 remains **IN PROGRESS** and MUST NOT be
+  marked DONE until dependent MC-S32 passes and publishes.
 
 **Sprint 4 scope expanded — AAA hybrid Gerstner water accepted locally, 2026-07-31.**
 

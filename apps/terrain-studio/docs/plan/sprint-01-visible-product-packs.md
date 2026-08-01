@@ -19,8 +19,8 @@ not reintroduce the square-separable defect `C4`.
 | ID | Title | Cost | Pts | Notes |
 |---|---|---|---|---|
 | S1.0 | Add the Surface/Geology palette family; move Rock Fracture | `[C]` | 2 | **DONE** · `da2e583`; focused/built gates green |
-| S1.1 | Surface-detail node (one plugin, `style` enum) | `[C]` | 5 | Roughen, Distress, GroundTexture, RockNoise, Bulbous, Pockmarks, Contours, Grid |
-| S1.2 | Landform pack: Crater, CraterField, Island, Volcano, MountainSide, Rugged | `[C]` | 8 | six plugin types; Volcano MUST include shield + stratovolcano modes |
+| S1.1 | Surface-detail node (one plugin, `style` enum) | `[C]` | 5 | **DONE** · `8a83bcf`; 8 styles, lifecycle, 45° source/built visuals green |
+| S1.2 | Landform pack: Crater, CraterField, Island, Volcano, MountainSide, Rugged | `[C]` | 8 | **IN PROGRESS** · base pack integrated; MC-S32 MUST add shield + repair stratovolcano |
 | S1.3 | Tone/morphology filters | `[C]` | 5 | Sharpen, Threshold, Dilate, Deflate, Match, SoftClip |
 | S1.4 | Coordinate filters | `[C]` | 5 | Flip, Transpose, Fold, DirectionalWarp; lattice-aware semantics |
 | S1.5 | Derive: Angle (aspect) | `[C]` | 2 | scalar field; Normals moves to Sprint 2 typed ports |
