@@ -7,6 +7,7 @@ import './plugins/data/index.js';
 import './plugins/effect/index.js';
 import './plugins/ero/index.js';
 import './plugins/gen/index.js';
+import './plugins/surface/index.js';
 import './plugins/filt/index.js';
 import './plugins/mask/index.js';
 import './plugins/comb/index.js';
@@ -203,6 +204,11 @@ export let XF=null;
 export function setXF(v){ XF=v; }
 const xfU=(u,v)=>XF?XF[0]*u+XF[1]*v+XF[2]:u;
 const xfV=(u,v)=>XF?XF[3]*u+XF[4]*v+XF[5]:v;
+export function worldSampleAt(x,y){
+  const n=fieldW(),hex=terrainDef.lattice==="hex",hxs=hex?0.5:0;
+  const u=(x+0.5+hxs*(y&1))/n,v=(y+0.5)/n*(hex?Math.sqrt(3)/2:1);
+  return[xfU(u,v)*terrainDef.scale,xfV(u,v)*terrainDef.scale];
+}
 // The SAME inverse map transformField() uses, so exact and raster modes describe one placement.
 export function xfFromParams({scale=1,aspect=1,angle=0,offX=0,offY=0,pivX=0.5,pivY=0.5}){
   const a=-angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
@@ -2952,7 +2958,7 @@ export function hydroFixField(inp,p){
    NODE TYPES
    ===================================================================== */
 // P / WHEN / GROUP / CAT now live in src/core/params.js.
-const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","drawmask","constant",
+const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","crater","island","volcano","drawmask","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
 function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
 export function exactChain(id,guard){
@@ -4327,8 +4333,9 @@ $("#exportBtn").onclick=exportHeightmap;
    WEBGL 3D VIEWPORT
    ===================================================================== */
 const glc=$("#gl");let gl,terrainProg,waterProg,waterMaskProg,compProg,buffers,wTex,hTex,iTex,isTex,satTex,gbuf=null,USE_DEFERRED=false;
-const DEFAULT_HERO={az:0.7,el:0.62,dist:2.6,target:[0,.05,0]};
-const copyCam=c=>({az:c.az,el:c.el,dist:c.dist,target:[...c.target]});
+const DEFAULT_HERO={az:0.7,el:0.62,dist:2.6,target:[0,.05,0],fov:1.05};
+const copyCam=c=>{const copy={az:c.az,el:c.el,dist:c.dist,target:[...c.target]};
+  if(Number.isFinite(c.fov))copy.fov=c.fov;return copy;};
 let cam=copyCam(DEFAULT_HERO),shadeMode=0,wire=false;
 function buildSatLUT(name){buildSatLUTStops(SATMAPS[name]||SATMAPS.Temperate);}
 function buildSatLUTStops(stops){                            // bake a 256-wide RGBA LUT texture from stops [[pos,[r,g,b]],...]
@@ -5840,7 +5847,7 @@ function drawWaterDepth(MVP){
 function renderGL(){
   if(!gl){return;}
   resizeGL();keepCameraAboveSurface();syncCompass();syncWindReadout();syncClimateReadout();
-  const asp=glc.width/glc.height||1,near=cameraNear(),P=perspective(1.05,asp,near,20);
+  const asp=glc.width/glc.height||1,near=cameraNear(),fov=Number.isFinite(cam.fov)?cam.fov:1.05,P=perspective(fov,asp,near,20);
   const eye=cameraEye(),ex=eye[0],ey=eye[1],ez=eye[2];
   const waterRipple=scene.water?waterLook.strength:0;
   const waterRippleScale=waterLook.scale;
@@ -5919,6 +5926,7 @@ function renderGL(){
   }
   if(!REDUCED)uTime+=0.016;
   requestAnimationFrame(renderGL);
+  return fov;
 }
 function identity(){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);}
 function setM(p,name,m){gl.uniformMatrix4fv(u(p,name),false,m);}
@@ -6222,7 +6230,7 @@ function syncViewButton(){
 }
 function frameHero(){planView=false;cam=copyCam(DEFAULT_HERO);heroCam=copyCam(DEFAULT_HERO);syncViewButton();}
 function togglePlanView(){
-  if(!planView){heroCam=copyCam(cam);cam={az:0,el:1.535,dist:2.55,target:[...cam.target]};planView=true;}
+  if(!planView){heroCam=copyCam(cam);cam={az:0,el:1.535,dist:2.55,target:[...cam.target],fov:Number.isFinite(cam.fov)?cam.fov:DEFAULT_HERO.fov};planView=true;}
   else{cam=copyCam(heroCam);planView=false;}
   syncViewButton();
 }
