@@ -48,6 +48,8 @@ whenever Track B is blocked on review.
 | [6](sprint-06-output-and-export.md) | Pure export sinks, formats, profiles, tiles, bake-boundary | B | `[K]`+`[E]` | — | S2–S5 |
 | [7](sprint-07-geology-and-regimes.md) | Strata/Sandstone/Outcrops, aeolian, mass-movement | A/B | `[K]` | L2/L5 | S1–S5 |
 | [8](sprint-08-graph-machinery.md) | Subgraphs, Var, Math, Switch, Route, Edge | B | `[E]` | — | S2 |
+| [9](sprint-09-large-worlds.md) | Versioned world domain, global substrate, deterministic evaluation regions, bounded preview | B | `[K]`+`[E]` | all field layers | S2 for scheduling; S6 export; S8 presets |
+| [10](sprint-10-runtime-extreme-detail.md) | Cook-free runtime heightfield / Extreme Detail | B | `[K]`+`[E]` | renderer | S9 domain/evaluation; S6/S9 field manifests for export |
 
 ```mermaid
 graph LR
@@ -59,6 +61,8 @@ graph LR
    S6[S6 · Output + export W6]
    S7[S7 · Geology + regimes]
    S8[S8 · Graph machinery]
+   S9[S9 · Large-world domain + evaluation]
+   S10[S10 · Cook-free runtime heightfield]
   S2 --> S3
   S2 --> S4
    S3 --> S4
@@ -73,13 +77,17 @@ graph LR
    S1 --> S7
   S1 -.parallel, no dep.-> S2
    S2 --> S8
+   S2 --> S9
+   S6 --> S9
+   S8 --> S9
+   S9 --> S10
 ```
 
 ### Mission Control traceability
 
 The sprint stories remain canonical. Mission Control items are implementation bundles only; an item
-may not add, omit, or redefine story scope. S1.0 is already implemented in the baseline, leaving 48
-stories assigned exactly once below.
+may not add, omit, or redefine story scope. S1.0 is already implemented in the baseline, leaving
+**63 unfinished stories**, each assigned exactly once below.
 
 **Status rule:** a story is marked `DONE` in its sprint table only after its focused red/green gate,
 built-bundle validation, and integration commit are recorded in `PROGRESS.md`. Research,
@@ -107,20 +115,46 @@ the installed Mission Control SQLite store; the sprint tables record only shippe
 | `MC-S17` | S7.4, S7.5 | `MC-S06`, `MC-S07` |
 | `MC-S18` | S8.1–S8.4 | `MC-S02` |
 | `MC-S19` | S8.5, S8.6 | `MC-S18` |
-| `MC-S20` | S5.5 + cross-sprint exit gates/default promotion | all producing bundles |
+| `MC-S20` | S5.5 + cross-sprint exit gates/default promotion | all producing bundles, including future `MC-S24` and `MC-S28` |
+| `MC-S21` | S9.1–S9.3 | — |
+| `MC-S22` | S9.4, S9.5 | `MC-S21`, `MC-S02` |
+| `MC-S23` | S9.6 | `MC-S22`, `MC-S14` |
+| `MC-S24` | S9.7, S9.8 | `MC-S19`, `MC-S23` |
+| `MC-S25` | S10.1 | — |
+| `MC-S26` | S10.2, S10.3 | `MC-S22` |
+| `MC-S27` | S10.4, S10.5 | `MC-S25`, `MC-S26` |
+| `MC-S28` | S10.6, S10.7 | `MC-S27`, `MC-S23` |
 
 `MC-S09` deliberately does not wait for S4 hydrology: S4.7 targets the existing Water mesh and may
 start once ADR 006 CPU vectors are armed. S4.9's final river regime remains in `MC-S10` and waits for
 `MC-S07` physical flow. Transitive dependencies are omitted from the table when the immediate edge
 already carries them.
 
+`MC-S21` is deliberately independent of earlier implementation bundles: domain schema/dialog/import
+provenance can land against the current baseline. `MC-S22` waits on typed evaluation context from
+`MC-S02`; `MC-S23` waits on the completed Sprint 6 emitter/manifest bundle `MC-S14`; `MC-S24` waits
+on Sprint 8 reusable definitions through `MC-S19`. No Mission Control runtime item is created by
+this planning change; these rows are the canonical future traceability extension.
+
+`MC-S25` is independently routable because capability probing precedes terrain allocation. `MC-S26`
+waits for the Sprint 9 domain and evaluator contracts before building versioned field pages,
+S10.2-owned root/fallback/cancellation/atomic promotion, and the fixed-topology runtime clipmap base.
+`MC-S27` joins that base with a passing WebGPU probe for fixed-ring visibility, bucketed instanced
+submission, scaled async feedback, eviction/byte plateau, and precision. `MC-S28` retains its
+dependency on `MC-S23`, but may land as two cuts inside the one item: sourced visual detail and its
+calibrated/pass-authority gates may land first; field-manifest export integration and final evidence
+land after `MC-S23`. The `MC-S20` dependency above remains a
+roadmap requirement only: this documentation change does **not** assert that existing Mission
+Control SQLite state already contains `MC-S25`-`MC-S28` or the new `MC-S20` edge.
+
 ---
 
 ## Capacity and cadence
 
-The eight thematic packets total **265 points** (S1 27 · S2 34 · S3 32 · S4 47 · S5 26 · S6 34 ·
-S7 31 · S8 34). The repo records no stable team velocity or sprint duration, so these numbers are
-relative scope, **not calendar estimates**. At each kickoff:
+The ten thematic packets total **386 points** (S1 27 · S2 34 · S3 32 · S4 47 · S5 26 · S6 34 ·
+S7 31 · S8 34 · S9 61 · S10 60). This is the current 326-point programme plus the grounded
+60-point cook-free runtime Extreme Detail packet. The repo records no stable team velocity or sprint
+duration, so these numbers are relative scope, **not calendar estimates**. At each kickoff:
 
 - commit no more than demonstrated recent velocity;
 - preserve the dependency/order and story IDs while carrying excess stories into a named continuation
@@ -167,6 +201,8 @@ selection criteria and a declared fallback; it is never hidden inside a build st
 
 [GROUNDING.md](GROUNDING.md) is the normative claim ledger. A sprint contract and that ledger must
 agree; disagreement is a blocking documentation defect, and the more conservative status wins.
+Sprint 10 is currently grounded but not technically refined or Ready because its required S10.R0
+GPU-parity and anti-tiling calibration bounds have no recorded measured controls.
 
 ### Cross-sprint closure ledger
 
@@ -204,6 +240,8 @@ local documentation rules. The required decisions are accepted and normative:
    explicit import conflict handling.
 4. **[ADR 005 — Physical fields, climate resolution, and legacy migration](../adr-005-physical-fields-and-climate-migration.md):** normalized-height compatibility, rainfall/discharge units, deterministic climate sampling, Snow versioning, and physical lithology coupling.
 5. **[ADR 006 — Hybrid Gerstner water](../adr-006-aaa-water-rendering.md):** shared analytic displacement, PBR water optics, body-specific regimes, phase suppression, visual evidence, and frame budgets.
+6. **[ADR 007 — Versioned world domain and bounded global-substrate evaluation](../adr-007-large-world-domain-and-tiling.md):** independent metre-space extents, vertex/legacy posting, pre-allocation feasibility, import provenance, full-domain GLOBAL substrate, deterministic apron regions, bounded residency, camera-relative precision, and versioned manifest integration.
+7. **[ADR 008 — Cook-free WebGPU heightfield](../adr-008-cook-free-webgpu-heightfield.md):** exact secure-context/WebGPU capability profile, allocation-free blocking startup, versioned streamed height/auxiliary pages, derived runtime caches, fixed-topology geometry clipmaps, portable WebGPU visibility/HiZ/bucketed instanced indirect rendering, bounded residency, precision, and field-manifest export.
 
 Sprint 2 also updates [phase-a-plugin-contract.md](../phase-a-plugin-contract.md) or adds its Phase B
 successor with the typed port/result/edge/evaluation contract. Sprint 6 adds the emitter contract and

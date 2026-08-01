@@ -25,6 +25,67 @@ in `.sweep-logs/`.
 
 ## Now
 
+**Sprint 10 cook-free runtime heightfield / Extreme Detail — canonical plan grounded, technical
+refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026-08-01.**
+
+- Added the exactly 60-point Sprint 10 packet and accepted ADR 008. The ten-sprint programme is now
+  **386 points** (`326 + 60`). `ExtremeCapability/1` requires secure context, `navigator.gpu`, a
+  non-null adapter/device, no optional features, WebGPU guaranteed-default minimum limits, and
+  validated core format usages. Standard requires WebGL2 plus `EXT_color_buffer_float`.
+- Capability wording is **“No supported graphics capability,”** not “no GPU.” Browser APIs do not
+  reliably prove physical GPU versus SwiftShader/software or report VRAM. Headless SwiftShader is a
+  valid endpoint when requirements pass. Persisted preference cannot bypass a fresh probe;
+  insecure-context/API-absent/adapter-null/device-reject/device-lost diagnostics remain distinct,
+  while timestamp queries are diagnostics only.
+- Extreme pages have profile-authored power-of-two core cells, `coreCells+1` posts, `coreCells`
+  shared-edge stride, declared aprons, explicit parent/downsample registration, and persisted
+  conservative min/max/error headers. Local edits create a `surfaceVersion` and invalidate leaves,
+  apron dependants, ancestors, and caches; domain/GLOBAL edits invalidate broadly. S10.2 owns pinned
+  roots, ancestor fallback, cancellation, old-front retention, and atomic promotion.
+- Geometry is pure fixed-topology clipmap rings. Error metadata prioritizes residency/quality labels
+  only. Overlapping toroidal motion uploads exposed strips; a teleport beyond the logical span uses
+  budgeted multi-frame full logical refill while an ancestor renders. CPU texture scrolling and
+  unbudgeted same-frame refill are forbidden.
+- WebGPU compacts visible records into one instance buffer and issues exactly one `drawIndexedIndirect` per
+  fixed pass/material/index-pattern bucket with `instanceCount=visible patches` and
+  `firstInstance=0`. Shader `instance_index` addresses compacted records; CPU encoding is O(fixed
+  buckets), and `indirect-first-instance` is not required.
+- S10.5 owns scaled asynchronous feedback, real eviction, the complete byte plateau, and analytic
+  camera-relative precision `<=1 mm` at 100 km. Platform frame/memory budgets are authored inputs.
+  Software depth/patch-ID controls are byte-identical; GPU parity uses a one-ULP mismatch formula.
+  Visual displacement is identical in main/depth/shadow/velocity, and dependent surface consumers
+  declare authoritative-height or visual-displacement use.
+- Anti-tiling still lacks measured periodic/decorrelated autocorrelation controls. The zero-point
+  S10.R0 readiness-only story must freeze that bound and the GPU parity bound between measured red/green
+  controls; until then Sprint 10 is not technically refined or Ready.
+- Mission traceability adds future roadmap bundles `MC-S25`–`MC-S28`; `MC-S20` must eventually wait
+  for `MC-S28`. No Mission Control SQLite/runtime item or dependency was created by this documentation
+  change. Export waits for the Sprint 6 and Sprint 9 manifest owners and remains height, auxiliary,
+  and domain/region pages only; runtime caches regenerate after import.
+
+**Sprint 9 large worlds — canonical plan grounded/refined, implementation NOT STARTED, 2026-08-01.**
+
+- Added the 61-point large-world packet and accepted ADR 007: versioned independent-width/height
+  world domains, m/km/mi/ft input with internal metres, vertex/legacy posting, vertical datum/range,
+  allocation-free New Terrain preflight, and import metadata with explicit embedded/inferred/override
+  provenance. Sprint 9 brought the then-current programme to **326 points** (`265 + 61`); Sprint 10
+  is followed by the Sprint 10 total recorded above.
+- The selected architecture is one authored/derived full-domain substrate for GLOBAL nodes plus
+  deterministic LOCAL/NEIGHBOURHOOD evaluation regions with transitive support-radius aprons. Global
+  results are sampled into regions; cosmetic seam crossfade is not correctness. Preview keeps a
+  byte-bounded active hierarchy with cancellation, eviction, and camera-relative rendering rather
+  than materializing a 40-billion-sample graph.
+- Canonical arithmetic is fixed: 100 km at 0.5 m `cellSizeM` is `200001` square vertex samples per axis,
+  approximately 40.0 B samples / 160.0 GB for one R32F field; equal-cell hex is approximately
+  46.2 B / 184.8 GB. An illustrative 5 km evaluation partition is `100/5=20` per axis and **400
+  regions** total; actual evaluation regions and streaming chunks are much smaller and budget-derived.
+- Mission Control traceability extends to `MC-S21`–`MC-S24`. These are future implementation
+  bundles in the roadmap only; no Mission Control runtime item/state was created or changed.
+  Domain/dialog/import may start early; tiled evaluation waits on `MC-S02`, manifest integration on
+  `MC-S14`, and reusable-definition constraints on `MC-S19`.
+- The plan names a user-selected 100 km-class target and makes no unsourced claim about the actual
+  dimensions of *Star Wars Outlaws*. GeoTIFF decoding remains a separate future codec/library story.
+
 **Sprint 1 started — S1.0 Surface / Geology palette family DONE (`da2e583`), 2026-07-31.**
 
 - Added the ninth palette family and reclassified Rock Fracture from Erosion; Thermal remains
@@ -41,7 +102,7 @@ in `.sweep-logs/`.
 - Sprint 4 now carries S4.7–S4.10 as separately routable renderer stories; no wave or foam data is
   baked into terrain fields or export products.
 
-**All eight roadmap sprints — grounding audit reopened, NOT DONE, 2026-07-31.**
+**Sprints 1–8 — grounding audit reopened, NOT DONE, 2026-07-31.**
 
 - The first refinement pass added contracts, cut order, verification matrices, and Ready conditions,
   but an audit found that some “locked” defaults and runtime choices had no corpus, measured-code, or
@@ -203,15 +264,14 @@ bad extraction bisects to one node.
 
 ## Next, in order
 
-1. **A3 PWA shell** — `public/sw.js` (not `src/`: Vite emits nothing from there, so it 404s under
-   preview), `manifest.webmanifest`, icons, per-build precache list, versioned cache +
-   `skipWaiting`, registration behind `import.meta.env.PROD`.
-2. **A4** — accept the multi-file `dist/` and drop the single-file claim from the docs. Today's
-   single-file build is an accident of the script having been inline.
-3. **Phase B** — original 60 node types → plugin modules, then Rock Fracture as plugin 61. The first
-  genuinely parallel slice; this is where mission-control earns its keep (see its agenda #11).
-4. **D7 layers** — L0 bedrock + blends + masks, then L1 erosion (MC-3 D6 constants, MC-5 MFD6),
-   L2 cover, L3 water, L4 climate/snow, L5 dressing.
+1. **Finish `MC-S03`** — S1.1 Surface and S1.2 landforms are building in the isolated worktree;
+  complete focused red/green, built-PWA, review, and merge gates.
+2. **Route approved `MC-S01` and `MC-S04`** — typed-DAG foundation and the remaining Sprint 1
+  filters/coordinate/aspect bundle are approved and independently leasable.
+3. **Advance dependency queue** — canonical Mission Control status has 17 open items beginning with
+  `MC-S02`, `MC-S05`, `MC-S06`, `MC-S07`, and `MC-S12`; route them only as their immediate
+  producing dependencies exit. Sprint 9/10 bundles remain roadmap traceability, not current mission
+  runtime items.
 
 ## Open, carried
 

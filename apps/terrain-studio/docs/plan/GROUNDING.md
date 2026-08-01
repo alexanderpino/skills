@@ -1,6 +1,7 @@
 # Terrain Studio sprint grounding ledger
 
-**Status:** implementation baseline; story gates remain authoritative
+**Status:** implementation baseline plus grounded/refined Sprint 9 and grounded Sprint 10 planning;
+S10 technical refinement/Ready blocked on S10.R0 calibration; S9/S10 implementation NOT STARTED
 **Audit:** Mission Control `INV-SPRINT-GROUNDING`
 **Rule:** a claim is grounded only by exact corpus/reference behavior, measured current source/test
 evidence, transparent derivation, or an accepted ADR with options and measurable consequences.
@@ -30,6 +31,8 @@ constants or runtime schemas by themselves.
 | Variables, expressions, and subgraphs are bounded and pinned | C/A | chapter 14; `adr-004-graph-machinery.md` | Exact scope/parser/hash/import policy is ADR 004. |
 | Physical fields and legacy climate/Snow migration | C/M/A | chapters 03/04/13/27; current source; `adr-005-physical-fields-and-climate-migration.md` | Exact unit bridges and version boundaries are ADR 005. |
 | Dynamic water rendering remains renderer-owned | C/M/A | Terrain Architect water boundary; installed Terrain Renderer chapter 12; current water shaders; ADR 006 | Graph exports causes; viewport owns waves, optics, foam and reflection. |
+| Large-world domain and evaluation use one global substrate plus bounded regions/chunks | C/M/A | chapters 08/14; installed Terrain Renderer chapters 06/09/16; current source; `adr-007-large-world-domain-and-tiling.md` | Exact domain, migration, preflight, region, precision, residency, and integration contracts are ADR 007. |
+| Extreme Detail uses a cook-free streamed runtime heightfield under exact browser capability gates | C/M/A | installed Terrain Renderer chapters 01/06/07/08/09/11/16; current `src/core/gpu.js`; WebGPU API facts; `adr-008-cook-free-webgpu-heightfield.md` | Exact tier, field-page, derived-cache, fixed-topology clipmap, GPU visibility/instanced submission, residency, precision, evidence, and export contracts are ADR 008. |
 | Continued state requires authored epoch and drivers | C | chapter 27; `BACKLOG.md` auxiliary-map lenses | Missing epoch/drivers blocks export; no epoch is fabricated. |
 | Every numerical gate is analytic, cited, or measured red/green | M | `CLAUDE.md`; `BACKLOG.md` verification lessons | Generic “existing tolerance” and post-result thresholds are forbidden. |
 
@@ -142,12 +145,68 @@ constants or runtime schemas by themselves.
 | Hash and import conflict | A | ADR 004 | RFC 8785 semantic bytes, full SHA-256, exact dedupe, visible conflict, fixed hash vectors. |
 | Cache identity and immutability | C/A | chapter 14 Merkle cache; ADRs 002/004 | Full definition identity, overrides, effective seed, context, demand and upstream ports. |
 
+## Sprint 9 — large worlds
+
+**Planning status:** grounded and technically refined. **Implementation status:** NOT STARTED.
+Ready remains blocked on the required Sprint 2/6/8 dependencies and each owning story's first red
+mutation control.
+
+| Claim | Class | Evidence | Resolution |
+|---|---|---|---|
+| Programme scope is 61 points | D | S9 story table: `8+8+5+13+8+8+3+8` | Programme total is `265+61=326`; points are relative scope, not duration. |
+| 100 km at 0.5 m is `200001` square vertex samples per axis | D | Vertex posting: `samples=extent/spacing+1` | `200001^2=40,000,400,001` samples and `160,001,600,004 B` per R32F field. |
+| Equal-cell hex deployment is larger | C/D | chapters 08/26; factor approximately `2/sqrt(3)` for the same rectangular footprint/centre spacing | Approximately 46.2 B samples and 184.8 GB per R32F field; exact dimensions come from the persisted global hex basis. |
+| An illustrative 100 km partition at 5 km per evaluation region has 400 regions | D | `100/5=20` per axis; `20*20=400` | Arithmetic only; actual evaluation regions and streaming chunks are much smaller and budget-derived. |
+| Current runtime is not a large-world substrate | M | `src/legacy.js`, `src/core/gpu.js`, `src/plugins/gen/import.js` | One global `RES`, square `terrainDef.scale`, monolithic fields, immediate new-document evaluation, retained GPU targets, and missing import provenance are measured constraints. |
+| `WorldDomain/1` and legacy migration | M/A | current `terrainDef.scale/RES`; ADR 007 | New worlds are vertex-posted; old worlds migrate as explicit `legacy-cell` with `scale/RES` preserved until an authored resample. |
+| Display/input units do not change evaluator identity | D/A | exact m/km/mi/ft conversion; physical-unit doctrine; ADR 007 | Internal persistence/evaluation is metres with independent width/height and explicit requested/actual resolution. |
+| New Terrain preflight is allocation-free | M/D/A | current immediate creation path; integer/byte derivation; ADR 007 | Clean/default/template share one dialog; unsafe browser/GPU/CPU/build terms reject before graph/field/texture/worker allocation. Authored `cellSizeM` is sample spacing, not a chunk size. |
+| Imported metadata preserves provenance | M/A | current PNG/image and RAW/R16 import; ADR 007 | Embedded, inferred-default, user-override, and unknown remain separate. PNG/RAW normally lack physical extent; unsupported GeoTIFF is not presented as decoded. |
+| GLOBAL work uses the full-domain substrate | C/A | chapters 08/14; ADR 007 | Completed global fields are sampled into evaluation regions; per-region GLOBAL dispatch is rejected before evaluation. |
+| LOCAL/NEIGHBOURHOOD detail uses support-radius aprons | C/A | chapters 08/14; ADR 007 | Transitive declared radius sizes the region apron; crop only after the final dependant; cosmetic crossfade is not correctness. |
+| Square/hex region identity is global | C/M/A | chapters 08/26; current odd-r storage/sampling; ADR 007 | Shared square posts are copied exactly; hex row parity/basis never restart at region-local row zero. |
+| Determinism is world-coordinate based | C/A | chapter 14 seed/context contract; ADR 007 | Shared samples hash global coordinates; region-index streams are limited to core-owned work and cannot author shared boundaries/aprons. |
+| Preview memory is bounded and precision is camera-relative | C/A | Terrain Renderer chapters 06/09/16; ADR 007 | Byte-budgeted chunk residency/eviction/cancellation and Float64 CPU authority prevent all-world allocation and 100 km Float32 jitter. |
+| Manifest and reusable-definition integration respect earlier owners | A | ADRs 003/004/007; Sprint 6 and Sprint 8 plans | Region manifest integration waits for S6; only real lattice/scope/radius/spacing preset constraints wait for S8. |
+| The target is user-selected, not attributed to a shipped game | A | Sprint 9 scope and ADR 007 | Documentation says “user-selected 100 km-class target”; no unsourced title dimensions are claimed. |
+
+## Sprint 10 — Cook-free runtime heightfield / Extreme Detail
+
+**Planning status:** grounded. **Implementation status:** NOT STARTED. Technical refinement and
+Ready remain blocked on the explicit S10.R0 calibration gate.
+
+| Claim | Class | Evidence | Resolution |
+|---|---|---|---|
+| Programme scope is 60 points | D | S10 story table: `5+8+13+13+8+5+8` | Programme total is `326+60=386`; points are relative scope, not duration. |
+| Extreme and Standard are capability tiers, not GPU-brand tiers | M/A | current `GPU.init()`; WebGPU adapter/device APIs; ADR 008 | `ExtremeCapability/1` requires secure context, API, non-null adapter/device, no optional features, guaranteed-default minimum limits, and validated core usages; Standard requires WebGL2 + `EXT_color_buffer_float`; neither blocks before document/resource allocation. |
+| Browser capability facts do not prove physical GPU or VRAM | D/A | WebGPU privacy-tiered limits; non-portable fallback-adapter history; ADR 008 | Wording is “no supported graphics capability”; SwiftShader is valid when requirements pass; authored/measured byte budgets replace guessed VRAM. |
+| Persisted preference cannot bypass current capability | A | ADR 008 | Every startup reprobes; Retry reprobes; preference only selects among passing tiers. |
+| Source terrain uses authored 0.5 m vertex spacing | D/A | ADR 007 `cellSizeM`; ADR 008 | Adjacent vertex posts are 0.5 m apart and the finest resident ring samples them at texel centres; no explicit dense mesh is stored. |
+| Streamed height/auxiliary pages are the persistent representation | C/A | installed Terrain Renderer chapters 01/06/16; ADR 008 | Profile-authored power-of-two core cells use `coreCells+1` posts and `coreCells` stride, explicit parent/downsample registration, declared aprons, persisted conservative headers, and pinned roots. |
+| Runtime-generated products are derived caches, not a cook | C/A | installed Terrain Renderer chapters 01/06/16; ADR 008 | Height mips, min/max/error, normals, page tables, clipmap textures, shared indices, patch records, and GPU buffers are bounded, reproducible, disposable, and excluded from export. |
+| Height edits create an atomic surface version | C/A | installed Terrain Renderer chapters 06/07/16; ADR 008 | Local edits invalidate leaves, apron dependants, ancestors, and caches; domain/GLOBAL edits invalidate broadly; S10.2 keeps the old complete front until atomic promotion and rejects stale work. |
+| Geometry clipmaps are the initial reliable base | C/A | installed Terrain Renderer chapter 01; ADR 008 | Nested camera-centred rings use shared grids, vertex pulling, fixed memory/vertex count, and expose finest resident source spacing near the camera. |
+| Ring updates and transitions are structural contracts | C/A | installed Terrain Renderer chapters 01/11 | Camera motion uploads only toroidal exposed strips/dirty rects; transition morph reaches 1.0 and degenerate/stitch topology removes T-junctions. |
+| Geometry topology is pure fixed geometry clipmaps | C/A | installed Terrain Renderer chapters 01/06/08; ADR 008 | Conservative page error controls residency priority/quality labels only; it never walks a quadtree or changes the profile-authored ring/patch topology. |
+| Portable WebGPU runtime avoids native-only assumptions | C/D/A | installed Terrain Renderer chapter 08; WebGPU `drawIndexedIndirect()` API; ADR 008 | GPU page requests, fixed-ring visibility, frustum/two-phase HiZ, and bucketed compaction issue exactly one instanced indirect draw per fixed pass/material/index-pattern bucket with `firstInstance=0`; CPU encoding is O(fixed buckets), with no mesh/tessellation shader, work graph, bindless, indirect count, or `indirect-first-instance`. |
+| Extreme is field-native rather than a static-mesh parity claim | C/A | installed Terrain Renderer chapter 01; ADR 008 | Quality means fidelity to the finest resident source level exposed by fixed clipmaps plus sourced material detail; the representation remains an editable runtime heightfield. |
+| Page misses never create holes | C/A | installed Terrain Renderer chapters 06/08 | S10.2 pins roots, chooses the finest resident ancestor, cancels stale generations, and promotes versions atomically. |
+| Feedback and residency are bounded and asynchronous | C/A | installed Terrain Renderer chapters 06/07/08 | S10.5 scales an N-deep readback ring beyond pool capacity, demonstrates eviction, and asserts a complete byte plateau within authored budgets. |
+| Large-world rendering is camera-relative | C/A | installed Terrain Renderer chapter 09; ADRs 007/008 | Float64 CPU origins/camera; camera-relative Float32 GPU data; no 100 km absolute near-field shader positions. |
+| Sub-cell detail is sourced and non-authoritative | C/A | installed Terrain Renderer chapter 07; ADR 008 | VT, macro/detail normals, calibrated anti-tiling, parallax, and bounded displacement need sources/bounds and identical main/depth/shadow/velocity evaluation; seating/picking/water/vegetation/decals declare authoritative or visual surface use. |
+| CPU/workers and GPU have explicit ownership | C/A | installed Terrain Renderer chapters 01/06/08/09; ADR 008 | CPU/workers own field-page IO/generation, Float64 authority, deterministic cache oracle, residency, manifests, and GLOBAL science; GPU owns proven cache kernels, selection, culling, compaction, indirect arguments, and rendering. |
+| Evidence is temporal, analytic, and budgeted | C/A | installed Terrain Renderer chapters 11/16; ADR 008 | Software depth/patch-ID is byte-identical; GPU parity uses a frozen one-ULP mismatch formula; RTE error is `<=1 mm` at 100 km; frame/memory gate authored budgets; anti-tiling needs calibrated periodic/decorrelated controls. |
+| Export respects prior field-manifest owners | A | ADRs 003/007/008; Sprint 6/Sprint 9 plans | Export contains height/auxiliary/domain pages only; runtime caches regenerate after import and no geometry product crosses the package boundary. |
+| No geometry build path exists | A | ADR 008; Sprint 10 acceptance gates | Artifact scans and invocation spies assert no geometry file/page output and no runtime/export geometry-cooker call. |
+| Platform budgets are authored inputs | C/A | installed Terrain Renderer chapter 11; ADR 008 | Non-empty frame/memory measurements must be `<=` pre-authored profile budgets; no discovered or hard-coded device-class threshold. |
+| S10.R0 calibration is unresolved | M/A | no recorded periodic/decorrelated or GPU parity control measurements; Sprint 10/ADR 008 | Zero-point readiness-only story must freeze GPU mismatch and anti-tiling autocorrelation bounds between measured red/green controls; S10 remains not technically refined/Ready until then. |
+
 ## Closure gate
 
 This ledger is sealed only when:
 
 1. every linked ADR/schema exists and diagnostics are clean;
-2. an unresolved-claim scan finds no future-decision or placeholder-tolerance language in S1–S8;
+2. an unresolved-claim scan finds no future-decision or placeholder-tolerance language in S1–S10;
 3. an independent read-only rubber-duck review reports no valid blocking finding;
 4. every valid advisory finding is fixed or rejected with evidence; and
 5. `PROGRESS.md` is updated only after 1–4 pass.
