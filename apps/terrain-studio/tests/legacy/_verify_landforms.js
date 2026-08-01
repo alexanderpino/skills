@@ -10,12 +10,14 @@ const VISUAL = process.argv.includes('--visual');
 const SUMMARY = process.argv.includes('--summary');
 const flagValue = name => process.argv.find(argument => argument.startsWith(`--${name}=`))?.split('=')[1];
 const VISUAL_TYPE = flagValue('visual-type');
+const VISUAL_STYLE = flagValue('visual-style');
 const VISUAL_LATTICE = flagValue('visual-lattice');
 const VISUAL_VIEW = flagValue('visual-view');
 const mutationArg = process.argv.find(argument => argument.startsWith('--mutate='));
 const MUTATION = mutationArg ? mutationArg.slice(9) : null;
 const MUTATIONS = ['crater-ejecta-r2', 'craterfield-grid-jitter', 'island-circular-envelope',
-  'volcano-drop-summit', 'mountainside-invert-halfplane', 'rugged-sum-blocks', 'silent-underfill',
+  'volcano-alias-styles', 'volcano-straight-cone', 'volcano-gaussian-cone', 'volcano-drop-summit',
+  'volcano-swap-style-defaults', 'mountainside-invert-halfplane', 'rugged-sum-blocks', 'silent-underfill',
   'nyquist-force-one', 'hex-row-normalized', 'root-seed-zero', 'volcano-no-barrancos',
   'unfrozen-framebuffer', 'flat-render'];
 if (MUTATION && !MUTATIONS.includes(MUTATION)) {
@@ -84,8 +86,32 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
       && byName.boot.outputs[type].signature === byName['legacy-seedless'].outputs[type].signature);
     const distinctRoots = types.every(type => ['explicit-0', 'explicit-123', 'explicit-456']
       .every(name => byName[name].outputs[type].signature !== byName.boot.outputs[type].signature));
-    return { types, phases, stateOk, oracleOk, stableSeven, distinctRoots,
-      ok: phases.length === 6 && stateOk && oracleOk && stableSeven && distinctRoots };
+    const volcano = makeNode('volcano', 0, 0); nodes = [volcano]; edges = []; selected = volcano; historyReady = true;
+    undoStack = []; redoStack = []; buildProps();
+    const setStyle = style => { const input = document.querySelector('.field[data-param-key="style"] select');
+      input.value = style; input.onchange(); };
+    setStyle('shield');
+    const shieldSnapshot = graphSnapshot(), shieldJson = JSON.stringify(shieldSnapshot);
+    const bundleKeys = Object.keys(volcano.params).filter(key => key.startsWith('shield') || key.startsWith('strato')).sort();
+    setStyle('stratovolcano'); const stratoSnapshot = graphSnapshot();
+    undoGraph(); const undoStyle = nodes[0].params.style; redoGraph(); const redoStyle = nodes[0].params.style;
+    undoStack = [JSON.parse(shieldJson)]; redoStack = []; undoGraph(); const loaded = graphSnapshot(), loadedKeys = Object.keys(nodes[0].params)
+      .filter(key => key.startsWith('shield') || key.startsWith('strato')).sort();
+    const legacy = TYPES.volcano.options({ style: 'stratovolcano', radiusM: 1777, heightM: 888, craterRadiusM: 99,
+      craterDepthM: 77, rimHeightM: 22, rimWidthM: 33, barrancoCount: 9, barrancoDepth: .27,
+      barrancoWavelengthM: 444, octaves: 3, lacunarity: 1.8, gain: .4 });
+    const stylePersistence = { shieldSerialized: shieldJson.includes('"style":"shield"'), bundles: bundleKeys.length === 18,
+      stratoSerialized: stratoSnapshot.nodes[0].params.style === 'stratovolcano', undoStyle, redoStyle,
+      loadStyle: nodes[0].params.style, loadEquivalent: JSON.stringify(loaded.nodes[0].params) === JSON.stringify(shieldSnapshot.nodes[0].params),
+      bundlesEquivalent: JSON.stringify(loadedKeys) === JSON.stringify(bundleKeys),
+      legacy: legacy.radiusM === 1777 && legacy.heightM === 888 && legacy.craterRadiusM === 99 && legacy.craterDepthM === 77
+        && legacy.rimHeightM === 22 && legacy.rimWidthM === 33 && legacy.barrancoCount === 9 && legacy.barrancoDepth === .27
+        && legacy.barrancoWavelengthM === 444 && legacy.octaves === 3 && legacy.lacunarity === 1.8 && legacy.gain === .4 };
+    stylePersistence.ok = stylePersistence.shieldSerialized && stylePersistence.bundles && stylePersistence.stratoSerialized
+      && undoStyle === 'shield' && redoStyle === 'stratovolcano' && stylePersistence.loadStyle === 'shield'
+      && stylePersistence.loadEquivalent && stylePersistence.bundlesEquivalent && stylePersistence.legacy;
+    return { types, phases, stateOk, oracleOk, stableSeven, distinctRoots, stylePersistence,
+      ok: phases.length === 6 && stateOk && oracleOk && stableSeven && distinctRoots && stylePersistence.ok };
   });
 
   const report = await page.evaluate(async mutation => {
@@ -146,10 +172,19 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
       invalid[type] = checks.length > 0 && checks.every(Boolean);
     }
     let unknownEnum = false, badCurve = false;
-    try { TYPES.volcano.options({ ...defaults('volcano'), style: 'shield' }); } catch (error) { unknownEnum = /unknown/i.test(error.message); }
+    try { TYPES.volcano.options({ ...defaults('volcano'), style: 'caldera' }); } catch (error) { unknownEnum = /unknown/i.test(error.message); }
     try { TYPES.mountainside.options({ ...defaults('mountainside'), skirt: [[0, 1], [.5, NaN], [1, 0]] }); }
     catch (error) { badCurve = /finite, monotone/i.test(error.message); }
-    invalid.enums = unknownEnum; invalid.curve = badCurve; invalid.ok = Object.values(invalid).every(Boolean);
+    const shieldDefaults = TYPES.volcano.options({ ...defaults('volcano'), style: 'shield' });
+    const stratoDefaults = TYPES.volcano.options({ ...defaults('volcano'), style: 'stratovolcano' });
+    invalid.enums = unknownEnum && ['shield', 'stratovolcano'].every(style => TYPES.volcano.options({ ...defaults('volcano'), style }).style === style);
+    invalid.volcanoSchema = !TYPES.volcano.params.some(param => param.key === 'profileExponent')
+      && shieldDefaults.radiusM === 3500 && shieldDefaults.heightM === 300 && shieldDefaults.craterRadiusM === 180
+      && shieldDefaults.craterDepthM === 20 && shieldDefaults.rimHeightM === 8 && shieldDefaults.rimWidthM === 45 && shieldDefaults.barrancoDepth === 0
+      && stratoDefaults.radiusM === 2500 && stratoDefaults.heightM === 1000 && stratoDefaults.craterRadiusM === 100
+      && stratoDefaults.craterDepthM === 120 && stratoDefaults.rimHeightM === 30 && stratoDefaults.rimWidthM === 35
+      && stratoDefaults.barrancoCount === 12 && stratoDefaults.barrancoDepth === .18 && stratoDefaults.barrancoWavelengthM === 700;
+    invalid.curve = badCurve; invalid.ok = Object.values(invalid).every(Boolean);
 
     const craterParams = defaults('crater'), craterOracle = radius => {
       const D = craterParams.diameterM, R = D / 2, u = radius / R, Dc = 3200 * (9.81 / craterParams.gravity);
@@ -246,19 +281,27 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
         islandExpected.push(Math.fround(Math.max(0, envelope * relief) / terrainDef.height));
         islandActual.push(islandField[index[1] * resolution + index[0]]); }
 
-      const volcanoParams = { ...defaults('volcano'), barrancoDepth: .35, barrancoWavelengthM: 5000, octaves: 1 }, volcanoOptions = TYPES.volcano.options(volcanoParams);
-      const volcanoSeed = seedFor('volcano', volcanoOptions.seed);
-      const volcanoField = TYPES.volcano.eval(volcanoParams, [], { id: 0 }), volcanoExpected = [], volcanoActual = [];
-      for (const index of indices) { const point = world(index[0], index[1], resolution, nh, lattice), dx = point[0] - 2500, dy = point[1] - 2500;
-        const radius = Math.hypot(dx, dy), rn = radius / volcanoOptions.radiusM;
-        const base = rn <= 1 ? Math.max(0, (1 - rn) ** volcanoOptions.profileExponent) : 0;
-        const noise = fbm(point[0], point[1], volcanoOptions.barrancoWavelengthM, volcanoSeed, volcanoOptions, cellM);
-        const grooves = .5 * (1 + Math.cos(volcanoOptions.barrancoCount * Math.atan2(dy, dx) + 2 * Math.PI * noise));
-        const edifice = volcanoOptions.heightM * base * (1 - volcanoOptions.barrancoDepth * grooves * rn), craterRho = radius / volcanoOptions.craterRadiusM;
-        const summit = mutation === 'volcano-drop-summit' ? 0 : (craterRho < 1 ? -volcanoOptions.craterDepthM * (1 - craterRho ** 2) ** 1.5 : 0);
-        const rim = volcanoOptions.rimHeightM * Math.exp(-.5 * ((radius - volcanoOptions.craterRadiusM) / volcanoOptions.rimWidthM) ** 2);
-        volcanoExpected.push(Math.fround(Math.max(0, edifice + summit + rim) / terrainDef.height));
-        volcanoActual.push(volcanoField[index[1] * resolution + index[0]]); }
+      const volcanoComparisons = {}, volcanoFields = {};
+      for (const style of ['shield', 'stratovolcano']) {
+        const volcanoParams = { ...defaults('volcano'), style, stratoBarrancoDepth: .35, stratoBarrancoWavelengthM: 5000, stratoOctaves: 1 };
+        const volcanoOptions = TYPES.volcano.options(volcanoParams), volcanoSeed = seedFor('volcano', volcanoOptions.seed);
+        const volcanoField = TYPES.volcano.eval(volcanoParams, [], { id: 0 }), volcanoExpected = [], volcanoActual = [];
+        for (const index of indices) { const point = world(index[0], index[1], resolution, nh, lattice), dx = point[0] - 2500, dy = point[1] - 2500;
+          const radius = Math.hypot(dx, dy), rn = radius / volcanoOptions.radiusM;
+          let base = rn <= 1 ? Math.max(0, style === 'shield' ? 1 - rn ** 1.7 : (1 - rn) ** 2.2) : 0;
+          if (mutation === 'volcano-alias-styles' && style === 'shield') base = rn <= 1 ? (1 - rn) ** 2.2 : 0;
+          if (mutation === 'volcano-straight-cone') base = rn <= 1 ? 1 - rn : 0;
+          if (mutation === 'volcano-gaussian-cone') base = rn <= 1 ? Math.exp(-4 * rn * rn) : 0;
+          const noise = style === 'shield' ? 0 : fbm(point[0], point[1], volcanoOptions.barrancoWavelengthM, volcanoSeed, volcanoOptions, cellM);
+          const grooves = style === 'shield' ? 0 : .5 * (1 + Math.cos(volcanoOptions.barrancoCount * Math.atan2(dy, dx) + 2 * Math.PI * noise));
+          const depth = mutation === 'volcano-no-barrancos' ? 0 : volcanoOptions.barrancoDepth;
+          const edifice = volcanoOptions.heightM * base * (1 - depth * grooves * rn), craterRho = radius / volcanoOptions.craterRadiusM;
+          const summit = mutation === 'volcano-drop-summit' ? 0 : (craterRho < 1 ? -volcanoOptions.craterDepthM * (1 - craterRho ** 2) ** 1.5 : 0);
+          const rim = volcanoOptions.rimHeightM * Math.exp(-.5 * ((radius - volcanoOptions.craterRadiusM) / volcanoOptions.rimWidthM) ** 2);
+          volcanoExpected.push(Math.fround(Math.max(0, edifice + summit + rim) / terrainDef.height));
+          volcanoActual.push(volcanoField[index[1] * resolution + index[0]]); }
+        volcanoComparisons[style] = maxError(volcanoActual, volcanoExpected); volcanoFields[style] = volcanoField;
+      }
 
       const sideParams = { ...defaults('mountainside'), weather: 0 }, sideOptions = TYPES.mountainside.options(sideParams);
       sideOptions.seed = seedFor('mountainside', sideOptions.seed, 0, 7);
@@ -279,13 +322,13 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
         const blocks = mutation === 'rugged-sum-blocks' ? contributions.reduce((sum, value) => sum + value, 0) : Math.max(0, ...contributions);
         ruggedExpected.push(Math.fround((ruggedOptions.baseElevationM + blocks) / terrainDef.height)); ruggedActual.push(ruggedField[index[1] * resolution + index[0]]); }
 
-      const comparisons = { island: maxError(islandActual, islandExpected), volcano: maxError(volcanoActual, volcanoExpected),
+      const comparisons = { island: maxError(islandActual, islandExpected), volcanoShield: volcanoComparisons.shield, volcanoStrato: volcanoComparisons.stratovolcano,
         mountainside: maxError(sideActual, sideExpected), rugged: maxError(ruggedActual, ruggedExpected) };
       const tolerance = gamma(64) * 2;
       lattices.push({ lattice, resolution, seed: 7, samples: indices.length, comparisons,
-        positive: { island: islandField.some(value => value > 0), volcano: volcanoField.some(value => value > 0),
+        positive: { island: islandField.some(value => value > 0), volcanoShield: volcanoFields.shield.some(value => value > 0), volcanoStrato: volcanoFields.stratovolcano.some(value => value > 0),
           mountainside: sideField.some(value => value > 0), rugged: ruggedField.some(value => value > 0) },
-        zero: { island: islandField.some(value => value === 0), volcano: volcanoField.some(value => value === 0),
+        zero: { island: islandField.some(value => value === 0), volcanoShield: volcanoFields.shield.some(value => value === 0), volcanoStrato: volcanoFields.stratovolcano.some(value => value === 0),
           mountainside: sideField.some(value => value === 0), rugged: ruggedField.every(value => value >= 0) },
         ok: Object.values(comparisons).every(value => value.error <= tolerance) });
     }
@@ -316,8 +359,8 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
         Math.abs(point[0] - expected[index][0]), Math.abs(point[1] - expected[index][1])), 0);
       worldMapping.push({ lattice, samples: baseActual.length, baseError: coordinateError(baseActual, baseExpected),
         transformError: coordinateError(transformedActual, transformedExpected) });
-      for (const type of ['crater', 'island', 'volcano']) {
-        const params = defaults(type), options = TYPES[type].options(params), node = { id: 0 }, previous = XF; XF = transformMatrix;
+      for (const entry of ['crater', 'island', 'volcano:shield', 'volcano:stratovolcano']) {
+        const [type, style] = entry.split(':'), params = { ...defaults(type), ...(style ? { style } : {}) }, options = TYPES[type].options(params), node = { id: 0 }, previous = XF; XF = transformMatrix;
         const field = TYPES[type].eval(params, [], node); XF = previous; const actual = [], expected = [], seed = seedFor(type, params.seed || 0);
         for (let iy = 1; iy <= 8; iy++) for (let ix = 1; ix <= 8; ix++) { const x = Math.floor(ix * RES / 10), y = Math.floor(iy * nh / 10);
           const point = world(x, y, RES, nh, lattice), u = point[0] / terrainDef.scale, v = point[1] / terrainDef.scale;
@@ -326,7 +369,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
           const metres = type === 'crater' ? TYPES.crater.profile(Math.hypot(worldX - options.x * terrainDef.scale, worldY - options.y * terrainDef.scale), options)
             : TYPES[type].profile(worldX, worldY, options, seed, terrainDef.scale / RES);
           actual.push(field[y * RES + x]); expected.push(Math.fround(metres / terrainDef.height)); }
-        const comparison = maxError(actual, expected); transformed[`${lattice}:${type}`] = { samples: actual.length, maxError: comparison.error, ok: comparison.error === 0 };
+        const comparison = maxError(actual, expected); transformed[`${lattice}:${entry}`] = { samples: actual.length, maxError: comparison.error, ok: comparison.error === 0 };
       }
     }
     worldMapping.ok = worldMapping.every(item => item.samples === 64 && item.baseError <= 1e-10 && item.transformError <= 1e-10);
@@ -334,8 +377,50 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     transformed.ok = Object.entries(transformed).filter(([key]) => key.includes(':')).every(([, value]) => value.ok) && transformed.rasterExcluded;
 
     terrainDef.lattice = 'square'; RES = 256; TARGET_RES = 256; XF = null;
-    const barrancoParams = { ...defaults('volcano'), craterDepthM: 0, rimHeightM: 0, barrancoDepth: mutation === 'volcano-no-barrancos' ? 0 : .65,
-      barrancoWavelengthM: 5000, octaves: 1 }, barrancoOptions = TYPES.volcano.options(barrancoParams);
+    const radialExpected = {
+      shield: [.9052677146, .6922138967, .3867971739],
+      stratovolcano: [.5310492251, .2176376408, .0473661427] };
+    const radial = {}, radialValues = [], radialRhos = [.25, .5, .75];
+    for (const style of ['shield', 'stratovolcano']) {
+      const prefix = style === 'shield' ? 'shield' : 'strato';
+      const params = { ...defaults('volcano'), style, [`${prefix}RadiusM`]: 1000, [`${prefix}HeightM`]: 500,
+        [`${prefix}CraterDepthM`]: 0, [`${prefix}RimHeightM`]: 0, stratoBarrancoDepth: 0 };
+      const options = TYPES.volcano.options(params), values = radialRhos.map(rho =>
+        TYPES.volcano.profile(2500 + rho * options.radiusM, 2500, options, seedFor('volcano', options.seed), terrainDef.scale / RES) / options.heightM);
+      radial[style] = { values, expected: radialExpected[style], maxError: Math.max(...values.map((value, index) => Math.abs(value - radialExpected[style][index]))) };
+      radialValues.push(...values);
+    }
+    const secant = (style, height, radius, a, b) => { const B = rho => style === 'shield' ? 1 - rho ** 1.7 : (1 - rho) ** 2.2;
+      return Math.atan(Math.abs(height / radius * (B(b) - B(a)) / (b - a))) * 180 / Math.PI; };
+    let slopeShield = shieldDefaults, slopeStrato = stratoDefaults;
+    if (mutation === 'volcano-swap-style-defaults') [slopeShield, slopeStrato] = [slopeStrato, slopeShield];
+    const slopes = { shield: secant('shield', slopeShield.heightM, slopeShield.radiusM, .25, .75),
+      stratoUpper: secant('stratovolcano', slopeStrato.heightM, slopeStrato.radiusM, .2, .4),
+      stratoLower: secant('stratovolcano', slopeStrato.heightM, slopeStrato.radiusM, .6, .8) };
+    const summit = {};
+    for (const style of ['shield', 'stratovolcano']) {
+      const prefix = style === 'shield' ? 'shield' : 'strato', base = defaults('volcano');
+      if (mutation === 'volcano-drop-summit') base[`${prefix}CraterDepthM`] = 0;
+      const options = TYPES.volcano.options({ ...base, style }), seed = seedFor('volcano', options.seed), centre = TYPES.volcano.profile(2500, 2500, options, seed, terrainDef.scale / RES);
+      const annulus = Array.from({ length: 65 }, (_, index) => { const radius = options.craterRadiusM * (.8 + .4 * index / 64);
+        return TYPES.volcano.profile(2500 + radius, 2500, options, seed, terrainDef.scale / RES); });
+      const noDepression = TYPES.volcano.options({ ...base, style, [`${prefix}CraterDepthM`]: 0 });
+      summit[style] = { centre, annulusMax: Math.max(...annulus), depression: TYPES.volcano.profile(2500, 2500, noDepression, seed, terrainDef.scale / RES) - centre };
+    }
+    const shieldSymmetryOptions = TYPES.volcano.options({ ...defaults('volcano'), style: 'shield', shieldCraterDepthM: 0, shieldRimHeightM: 0 });
+    const shieldCircle = Array.from({ length: 64 }, (_, index) => { const angle = 2 * Math.PI * index / 64, radius = .55 * shieldSymmetryOptions.radiusM;
+      return TYPES.volcano.profile(2500 + radius * Math.cos(angle), 2500 + radius * Math.sin(angle), shieldSymmetryOptions, seedFor('volcano', shieldSymmetryOptions.seed), terrainDef.scale / RES); });
+    const volcanoMorphology = { radial, slopes, summit, shieldSpread: Math.max(...shieldCircle) - Math.min(...shieldCircle) };
+    volcanoMorphology.ok = Object.values(radial).every(item => item.values.length === 3 && item.maxError <= 1e-9)
+      && radialExpected.shield.every((value, index) => value !== radialExpected.stratovolcano[index])
+      && Math.abs(slopes.shield - 5.079140) < 1e-6 && slopes.shield >= 2 && slopes.shield <= 10
+      && Math.abs(slopes.stratoUpper - 29.858292) < 1e-6 && slopes.stratoUpper >= 20 && slopes.stratoUpper <= 35
+      && Math.abs(slopes.stratoLower - 11.773853) < 1e-6 && slopes.stratoUpper > slopes.stratoLower
+      && Object.values(summit).every(item => item.centre > 0 && item.centre < item.annulusMax && item.depression > 0)
+      && shieldCircle.length === 64 && volcanoMorphology.shieldSpread <= gamma(16) * Math.max(...shieldCircle);
+    const barrancoParams = { ...defaults('volcano'), style: 'stratovolcano', stratoCraterDepthM: 0, stratoRimHeightM: 0,
+      stratoBarrancoDepth: mutation === 'volcano-no-barrancos' ? 0 : .65, stratoBarrancoWavelengthM: 5000, stratoOctaves: 1 };
+    const barrancoOptions = TYPES.volcano.options(barrancoParams);
     const barrancoSeed = seedFor('volcano', barrancoOptions.seed), barrancoSamples = 16 * barrancoOptions.barrancoCount, circular = [];
     for (let index = 0; index < barrancoSamples; index++) { const angle = 2 * Math.PI * index / barrancoSamples, radius = barrancoOptions.radiusM * .55;
       circular.push(TYPES.volcano.profile(2500 + radius * Math.cos(angle), 2500 + radius * Math.sin(angle), barrancoOptions, barrancoSeed, terrainDef.scale / RES)); }
@@ -348,17 +433,22 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     terrainDef.lattice = 'square'; RES = 512; TARGET_RES = 512;
     const mutationReached = mutation ? ({
       'crater-ejecta-r2': !crater.ok, 'craterfield-grid-jitter': !placement.craterfield.spacing,
-      'island-circular-envelope': lattices.some(item => !item.ok), 'volcano-drop-summit': lattices.some(item => !item.ok),
+      'island-circular-envelope': lattices.some(item => !item.ok), 'volcano-alias-styles': lattices.some(item => !item.ok),
+      'volcano-straight-cone': lattices.some(item => !item.ok), 'volcano-gaussian-cone': lattices.some(item => !item.ok),
+      'volcano-drop-summit': !volcanoMorphology.ok, 'volcano-swap-style-defaults': !volcanoMorphology.ok,
       'mountainside-invert-halfplane': lattices.some(item => !item.ok), 'rugged-sum-blocks': lattices.some(item => !item.ok),
       'silent-underfill': !placement.craterfield.saturation, 'nyquist-force-one': lattices.some(item => !item.ok),
       'hex-row-normalized': !worldMapping.ok || lattices.some(item => !item.ok), 'root-seed-zero': lattices.some(item => !item.ok),
       'volcano-no-barrancos': !barrancos.ok }[mutation]) : false;
-    const normalOk = registration.ok && invalid.ok && crater.ok && craterMass.ok && placement.ok && worldMapping.ok && transformed.ok && barrancos.ok
+    const normalOk = registration.ok && invalid.ok && crater.ok && craterMass.ok && placement.ok && worldMapping.ok && transformed.ok && volcanoMorphology.ok && barrancos.ok
       && Object.values(rootSeedIntegration).every(item => item.changed) && lattices.every(item => item.ok)
       && lattices.every(item => Object.values(item.positive).every(Boolean) && Object.values(item.zero).every(Boolean));
-    return { registration, invalid, crater, craterMass, placement, worldMapping, transformed, rootSeedIntegration, barrancos, lattices, mutation, mutationReached,
+    return { registration, invalid, crater, craterMass, placement, worldMapping, transformed, rootSeedIntegration, volcanoMorphology, barrancos, lattices, mutation, mutationReached,
       violatedFormula: mutation ? ({ 'crater-ejecta-r2': 'Crater ejecta u^-3', 'craterfield-grid-jitter': 'Bridson pairwise spacing',
-        'island-circular-envelope': 'Island elliptical envelope', 'volcano-drop-summit': 'Volcano summit depression',
+        'island-circular-envelope': 'Island elliptical envelope', 'volcano-alias-styles': 'Volcano distinct fixed radial signatures',
+        'volcano-straight-cone': 'Volcano shield 1-r^1.7 and strato (1-r)^2.2 profiles',
+        'volcano-gaussian-cone': 'Volcano non-Gaussian fixed radial signatures', 'volcano-drop-summit': 'Volcano style summit depressions',
+        'volcano-swap-style-defaults': 'Volcano style default slope bands',
         'mountainside-invert-halfplane': 'MountainSide M*G half-plane', 'rugged-sum-blocks': 'Rugged base+max(block)',
         'silent-underfill': 'Poisson saturation status', 'nyquist-force-one': 'zero-safe Nyquist octave truncation',
         'hex-row-normalized': 'physical hex world/transform row pitch', 'root-seed-zero': 'canonical root seed integration',
@@ -371,15 +461,17 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     const result = await page.evaluate(types => {
       buildIndex(); nodes.length = 0; edges.length = 0; uid = 1; selected = null; selectedEdge = null;
       const measured = {};
-      for (const type of types) { const node = makeNode(type, 0, 0), keys = new Set(); let geometry = true;
-        const variants = type === 'mountainside' ? [{ form: 'peak' }, { form: 'massif' }] : [{}];
+      for (const type of types) { const node = makeNode(type, 0, 0), keys = new Set(), styles = {}; let geometry = true;
+        const variants = type === 'mountainside' ? [{ form: 'peak' }, { form: 'massif' }]
+          : type === 'volcano' ? [{ style: 'shield' }, { style: 'stratovolcano' }] : [{}];
         for (const variant of variants) { Object.assign(node.params, variant); selected = node; buildProps();
           const panel = document.querySelector('#props').getBoundingClientRect(), fields = [...document.querySelectorAll('#pBody .field[data-param-key]')];
           for (const field of fields) { keys.add(field.dataset.paramKey); const rect = field.getBoundingClientRect();
             geometry &&= rect.width > 0 && rect.left >= panel.left - 1 && rect.right <= panel.right + 1 && field.scrollWidth <= field.clientWidth + 2; }
+          if (type === 'volcano') styles[variant.style] = { keys: fields.map(field => field.dataset.paramKey), info: TYPES.volcano.info(node) };
         }
         measured[type] = { name: TYPES[type].name, toolbox: !!document.querySelector(`.node-tool-item[data-type="${type}"]`), keys: [...keys],
-          expected: TYPES[type].params.map(param => param.key), geometry };
+          expected: TYPES[type].params.map(param => param.key), geometry, styles };
       }
       return measured;
     }, ['crater', 'craterfield', 'island', 'volcano', 'mountainside', 'rugged']);
@@ -395,22 +487,33 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     return result;
   };
   report.ui = { desktop: await inspectUi({ width: 1440, height: 900 }), mobile: await inspectUi({ width: 390, height: 844 }) };
-  report.ui.ok = Object.values(report.ui).filter(value => typeof value === 'object').every(view => Object.values(view).every(result => result.toolbox && result.quickCreate
-    && result.geometry && result.expected.every(key => result.keys.includes(key))));
+  report.ui.ok = Object.values(report.ui).filter(value => typeof value === 'object').every(view => Object.values(view).every(result => {
+    const stylesOk = !result.styles.shield || (result.styles.shield.keys.some(key => key.startsWith('shield'))
+      && !result.styles.shield.keys.some(key => key.startsWith('strato')) && /5\.079.*2-10.*depression.*disabled/i.test(result.styles.shield.info)
+      && result.styles.stratovolcano.keys.some(key => key.startsWith('strato'))
+      && !result.styles.stratovolcano.keys.some(key => key.startsWith('shield')) && /29\.858.*20-35.*11\.774.*crater.*12.*barranco/i.test(result.styles.stratovolcano.info));
+    return result.toolbox && result.quickCreate && result.geometry && result.expected.every(key => result.keys.includes(key)) && stylesOk;
+  }));
   report.lifecycle = lifecycle;
   report.ok = report.ok && report.ui.ok && lifecycle.ok;
 
   report.visual = { runs: [], ok: true };
   if (VISUAL) {
-    const evidenceDir = path.resolve(__dirname, '../../.sweep-logs/MC-S03'); mkdirSync(evidenceDir, { recursive: true });
+    if (VISUAL_STYLE && !['shield', 'stratovolcano'].includes(VISUAL_STYLE)) throw new Error(`Unknown visual style ${VISUAL_STYLE}`);
+    if (VISUAL_STYLE && VISUAL_TYPE !== 'volcano') throw new Error('--visual-style requires --visual-type=volcano');
+    const endpoint = (() => { try { const parsed = new globalThis.URL(URL); return parsed.port || parsed.protocol.replace(':', ''); } catch (_) { return 'source'; } })();
+    const evidenceDir = path.resolve(__dirname, `../../.sweep-logs/MC-S32/${endpoint}`); mkdirSync(evidenceDir, { recursive: true });
     await page.setViewportSize({ width: 1440, height: 900 });
     const visualLattices = VISUAL_LATTICE ? [VISUAL_LATTICE] : ['square', 'hex'];
     const visualTypes = VISUAL_TYPE ? [VISUAL_TYPE] : ['crater', 'craterfield', 'island', 'volcano', 'mountainside', 'rugged'];
     const visualViews = VISUAL_VIEW ? [[VISUAL_VIEW, VISUAL_VIEW === 'traversal' ? 2.88 : 1.04]] : [['traversal', 2.88], ['close', 1.04]];
-    for (const lattice of visualLattices) for (const type of visualTypes) for (const view of visualViews) {
-        const result = await page.evaluate(({ lattice, type, distance, flat }) => {
+    for (const lattice of visualLattices) for (const type of visualTypes) {
+      const visualStyles = type === 'volcano' ? (VISUAL_STYLE ? [VISUAL_STYLE] : ['shield', 'stratovolcano']) : [null];
+      for (const style of visualStyles) for (const view of visualViews) {
+        const result = await page.evaluate(({ lattice, type, style, distance, flat }) => {
           RES = 256; TARGET_RES = 256; terrainDef.lattice = lattice; terrainDef.scale = 5000; terrainDef.height = 2600; buildIndex();
           const params = Object.fromEntries(TYPES[type].params.map(param => [param.key, cloneParams(param.def)])), node = { id: 23, type, params };
+          if (style) params.style = style;
           if ('amount' in params) params.amount = 1.7;
           const baseline = newField(.12), generated = TYPES[type].eval(params, [], node), treatment = flat ? baseline : new Float32Array(generated.length);
           if (!flat) for (let i = 0; i < generated.length; i++) treatment[i] = Math.fround(baseline[i] + generated[i]);
@@ -432,17 +535,22 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
             const x = index % width; if (x) stack.push(index - 1); if (x < width - 1) stack.push(index + 1);
             if (index >= width) stack.push(index - width); if (index < width * (height - 1)) stack.push(index + width);
           }
-          return { lattice, type, distance, terrainPixels: count, changedPixels: changed, changedFraction: count ? changed / count : 0,
+          return { lattice, type, style, distance, terrainPixels: count, changedPixels: changed, changedFraction: count ? changed / count : 0,
             channelsValid: after.every(value => Number.isInteger(value) && value >= 0 && value <= 255), fovDeg: treatmentCapture.fovDeg,
             framebuffer: [treatmentCapture.canvasWidth, treatmentCapture.canvasHeight, treatmentCapture.drawingWidth, treatmentCapture.drawingHeight],
             deviceScale: treatmentCapture.deviceScale, png: treatmentCapture.png };
-          }, { lattice, type, distance: view[1], flat: MUTATION === 'flat-render' ? true : MUTATION === 'unfrozen-framebuffer' ? 'unfrozen-framebuffer' : false });
-        result.view = view[0]; result.ok = result.terrainPixels >= 10000 && result.changedFraction >= .01 && result.channelsValid && Math.abs(result.fovDeg - 45) < 1e-9;
+          }, { lattice, type, style, distance: view[1], flat: MUTATION === 'flat-render' ? true : MUTATION === 'unfrozen-framebuffer' ? 'unfrozen-framebuffer' : false });
+        result.endpoint = endpoint; result.view = view[0]; result.ok = result.terrainPixels >= 10000 && result.changedFraction >= .01 && result.channelsValid && Math.abs(result.fovDeg - 45) < 1e-9;
           result.ok &&= result.deviceScale === 1 && result.framebuffer.every((value, index) => value === (index % 2 ? 540 : 960));
         report.visual.runs.push(result); report.visual.ok &&= result.ok;
-        if (MUTATION !== 'flat-render') writeFileSync(path.join(evidenceDir, `landform-${type}-${lattice}-${view[0]}.png`), Buffer.from(result.png.split(',')[1], 'base64'));
+        const styleName = style ? `-${style}` : '';
+        if (MUTATION !== 'flat-render') writeFileSync(path.join(evidenceDir, `landform-${type}${styleName}-${lattice}-${view[0]}.png`), Buffer.from(result.png.split(',')[1], 'base64'));
         delete result.png;
       }
+    }
+    if (VISUAL_TYPE === 'volcano' && VISUAL_STYLE) report.visual.ok &&= report.visual.runs.length === 4
+      && report.visual.runs.every(run => run.type === 'volcano' && run.style === VISUAL_STYLE)
+      && new Set(report.visual.runs.map(run => `${run.style}:${run.lattice}:${run.view}`)).size === 4;
   }
   if (MUTATION === 'flat-render' || MUTATION === 'unfrozen-framebuffer') { report.mutationReached = VISUAL && !report.visual.ok;
     report.violatedFormula = MUTATION === 'flat-render' ? 'visual treatment pixel threshold' : 'frozen 960x540 framebuffer'; report.ok = false; }
@@ -450,6 +558,11 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
 
   console.log(`landforms lifecycle ${JSON.stringify(lifecycle)}`);
   console.log(`landforms latticeRuns=${report.lattices.length} samples=${report.lattices.reduce((sum, item) => sum + item.samples, 0)} seed=7 mutationReached=${report.mutationReached}`);
+  console.log(`landforms gates=${JSON.stringify({ registration: report.registration.ok, invalid: report.invalid.ok, crater: report.crater.ok,
+    craterMass: report.craterMass.ok, placement: report.placement.ok, worldMapping: report.worldMapping.ok, transformed: report.transformed.ok,
+    barrancos: report.barrancos.ok, roots: Object.values(report.rootSeedIntegration).every(item => item.changed),
+    lattices: report.lattices.every(item => item.ok), ui: report.ui.ok, lifecycle: report.lifecycle.ok })}`);
+  console.log(`landforms volcanoUi=${JSON.stringify({ ok: report.ui.ok, desktop: report.ui.desktop.volcano.styles, mobile: report.ui.mobile.volcano.styles })}`);
   if (report.mutation) console.log(`MUTATION ${report.mutation} violated ${report.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ ...report, errors }, null, 2));
   else if (VISUAL) console.log(`visual runs=${report.visual.runs.length} minTerrain=${Math.min(...report.visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...report.visual.runs.map(run => run.changedFraction))} fov=${Math.min(...report.visual.runs.map(run => run.fovDeg))}`);
