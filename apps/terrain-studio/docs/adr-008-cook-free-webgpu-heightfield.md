@@ -2,6 +2,9 @@
 
 **Status:** accepted
 **Date:** 2026-08-01
+**Amended by:** [ADR 009](adr-009-arbitrary-raster-gpu-authoring.md) for complete GPU-required paged
+terrain evaluation at arbitrary dimensions; [ADR 010](adr-010-walkaround-traversal-inspection.md)
+for collision-first Walkaround and reachability.
 
 ## Context
 

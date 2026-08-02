@@ -16,7 +16,8 @@ and are limited to the compatibility metadata that large-world reuse actually ne
 **Architecture gate:** [ADR 007](../adr-007-large-world-domain-and-tiling.md) is accepted and
 normative. It extends, rather than replaces, [ADR 003](../adr-003-pure-export-emitter.md): Sprint 6
 still owns pure emitters and package validation; Sprint 9 adds a globally evaluated substrate and a
-bounded region schedule before those results are emitted.
+bounded region schedule before those results are emitted. [ADR 009](../adr-009-arbitrary-raster-gpu-authoring.md)
+strengthens this contract with exact arbitrary sample dimensions and partial terminal pages.
 
 **Target naming.** This plan specifies a **user-selected 100 km-class target**. It makes no claim
 about the actual dimensions of *Star Wars Outlaws* or any other shipped game.
@@ -98,7 +99,8 @@ whose limits are unknown is not labelled safe.
 | S9.6 | World manifest export/import integration | `[E]` | 8 | after S6; region/substrate identity and package reconstruction |
 | S9.7 | Large-world constraints on reusable presets | `[C]` | 3 | after S8; compatibility metadata only, no duplicate world ownership |
 | S9.8 | Armed large-world acceptance matrix | `[E]` | 8 | arithmetic, seams, memory, UI, import, built PWA |
-| | **Sprint 9 total** | | **61** | |
+| S9.9 | Arbitrary raster dimensions + paged import | `[E]` | 5 | 16K square, awkward rectangles, partial terminal pages, no rounding |
+| | **Sprint 9 total** | | **66** | `8+8+5+13+8+8+3+8+5` |
 
 ---
 
@@ -216,6 +218,12 @@ Rectangular domains use independent column/row counts and partial terminal regio
 vertex rows/columns are copied bit-identically. Hex regions use the global basis and odd-r row number;
 neighbour lookup and apron dilation are D6 in the global lattice metric.
 
+No axis has a power-of-two requirement. Page cores may be power-of-two internally, but each page
+records a valid core/apron rectangle and terminal pages are partial. Allocation padding is not
+terrain data and cannot enter a filter, derivative, min/max, shared-edge, or export result. Under the
+ADR 009 256-cell control profile, `16384 x 16384` samples produce `64 x 64` pages with 255 valid
+terminal cells, while `1573 x 13789` samples produce `7 x 54` pages with a `36 x 220` terminal core.
+
 ### Locked preview and residency contract
 
 - The full world is represented by a hierarchy whose root/global substrate remains renderable. The
@@ -273,6 +281,8 @@ neighbour lookup and apron dilation are D6 in the global lattice metric.
 7. **S9.6:** after S6, version the world manifest integration and round-trip monolithic/partitioned worlds.
 8. **S9.7:** after S8, add only the reusable-definition compatibility declarations above.
 9. **S9.8:** run the complete red/green matrix, production build, built-PWA tests, and memory probes.
+10. **S9.9:** make exact arbitrary dimensions flow through domain creation, import, page identity,
+  partial-edge aprons/downsampling, save/load, and export metadata without monolithic allocation.
 
 ---
 
@@ -375,6 +385,21 @@ an assertion. Empty inventories are red. Record at least these deliberate failur
 dispatch, zero apron, region-local hex parity, stale cancelled upload, unbounded residency, and inferred import metadata
 mislabelled embedded.
 
+### S9.9 - Arbitrary raster dimensions and paged import - 5 pts
+
+**User story:** As a terrain author, I can create, import, save, process, and export a heightmap with
+any independent integer sample width and height, including 16K square and awkward portrait rasters,
+without resampling or padding becoming visible terrain.
+
+**Acceptance gate:** `tests/legacy/_verify_arbitrary_dimensions.js` round-trips exact dimensions for
+`16384 x 16384`, `1573 x 13789`, `2 x 8191`, `8191 x 2`, prime dimensions, and swapped portrait/
+landscape forms. Under 256-cell cores it asserts ADR 009's `64 x 64` / terminal 255 and `7 x 54` /
+terminal `36 x 220` arithmetic, non-zero validity rectangles, exact shared posts, partial-child
+downsampling, apron/boundary behavior, square/hex global identity, and schedule-order hashes. Spies
+prove no 16K monolithic texture/buffer or whole-field CPU array. Mutations that round to power of
+two, force square, treat allocation padding as samples, drop the last post, or restart odd-r parity
+are red.
+
 ---
 
 ## Verification matrix and Ready condition
@@ -391,20 +416,24 @@ mislabelled embedded.
 | browser OOM | measured peak within non-empty active-set budget | cache with eviction disabled |
 | stale viewport | cancelled generation never uploads | late completion enters cache |
 | package drift | validated manifest reconstructs domain/region hashes | mixed substrate/region versions |
+| arbitrary dimensions | exact sample counts and partial terminal validity | power-of-two rounding or padding leakage |
 
 Sprint 9 planning is **grounded and technically refined**. Implementation is **NOT STARTED**. The
 whole sprint is not Ready until Sprint 2, Sprint 6, and Sprint 8 dependency gates required by the
 owning stories have exited and each first mutation has been observed red. The S9.1-S9.3 early slice
 may enter its own R0/R1 work independently once its old-document and allocation-spy controls are red.
+S9.9 may start with S9.1-S9.3 and completes after the bounded page identity from S9.4 exists.
 
 ## Exit gate
 
-- All eight story gates have measured red and green endpoints; no report-only or zero-fixture gate.
+- All nine story gates have measured red and green endpoints; no report-only or zero-fixture gate.
 - The four feasibility examples and illustrative 20 x 20 = 400 region derivation match the canonical table.
 - No path allocates terrain resources before New Terrain confirmation.
 - GLOBAL nodes never dispatch per evaluation region; one-region bounded output equals monolithic output.
 - Square shared posts, hex parity, transitive aprons, deterministic seeds, and rectangular terminal
   regions pass in the production bundle.
+- `16384 x 16384` and `1573 x 13789` retain exact dimensions through partial pages with no
+  power-of-two rounding, padding leakage, monolithic 16K allocation, or whole-field CPU array.
 - Import provenance stays explicit and GeoTIFF support is not implied.
 - Peak CPU, GPU, in-flight, cache, and build-staging bytes are measured and asserted below authored
   budgets with a non-empty active set.

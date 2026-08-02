@@ -25,11 +25,83 @@ in `.sweep-logs/`.
 
 ## Now
 
+**DELIVERY RECOVERY — risk-based fast path adopted, 2026-08-02.**
+
+Canonical execution policy: [docs/plan/DELIVERY.md](docs/plan/DELIVERY.md). Quality is unchanged,
+but focused evidence now runs per changed slice and exhaustive evidence once per integrated wave.
+Routine one-owner work no longer pays the full Mission Control lifecycle; high-risk contracts,
+migrations, runtime work, and real lease contention still do.
+
+### Visible delivery checklist
+
+- [ ] Diagnose and green the MC-S33 runner contract
+- [ ] Review, integrate, and publish MC-S33
+- [ ] Replay S1.3–S1.5 on the published runner and close Sprint 1
+- [ ] Publish the S2 typed-port keystone
+- [ ] Start the first four disjoint Wave 2 lanes
+- [ ] Integrate the S3–S5 physical stack
+- [ ] Complete S6/S8/S9 integration
+- [ ] Calibrate S10.R0 and deliver S10
+- [ ] Pass exact `16384 x 16384` and `1573 x 13789` GPU-only terrain gates
+- [ ] Deliver Boundary Landforms and doll-based Walkaround/reachability with no flight
+- [ ] Pass final built digest, standalone sweep, applicable e2e/PWA, and audit
+
+- Canonical runtime: `C:\repos\GitHub\skills\.mission-control-plan`, driven only by the installed
+  skill at `C:\Users\AlexanderPino\.agents\skills\mission-control`. The repository's
+  `mission-control/` skill is not part of this programme and must remain untouched.
+- Integration product baseline is `97d163f`. Sprint 1 stories S1.0, S1.1, and S1.2 are **DONE**;
+  shield and stratovolcano modes shipped through MC-S32. MC-S30/31/32 are canonical `done` items.
+- `MC-S04` (S1.3–S1.5 filters, coordinate transforms, Aspect) is committed at `3ebcb8d` and all
+  product/focused/source/built/digest gates are green at 79/79 with zero skips. Canonical verdict is
+  `oracle-broken`, not product-red: Node 25 CommonJS handling and the fixed/reused 5173 launcher make
+  the exact bridge/blur/sweep commands unable to grade the item honestly. Its 19 leases remain held.
+- `MC-S33` is the quality-preserving throughput fix for that infrastructure: isolated OS-selected
+  ports, private browser profiles/TEMP, owned-process cleanup, byte-preserving CommonJS execution,
+  one server per mode, and verified `dist/`-only build cache. It is `building` with seven leases.
+  Its worktree currently has modified `package.json`, `run-legacy-verify.mjs`, and
+  `sweep-oracles.mjs`; new runner/cache/bootstrap/test files; and an untracked `runner-focused.log`.
+  There is no `handoff.md` and no commit yet. The last `npm run verify:all` exited 1 and must be
+  diagnosed from output before any claim of completion; do not widen/skip oracle evidence.
+- After MC-S33 publishes, create the reviewed retry item proposed as `MC-S45` with
+  `origin: split:MC-S04`, dependency `MC-S33`, and the same canonical S1.3–S1.5 scope. Replay the
+  MC-S04 commits onto the published runner base and verify through the new exact commands. Do not
+  mutate or relabel MC-S04 history.
+- Approved and waiting behind shared central-file leases: `MC-S01` (typed document/ports),
+  `MC-S21` (large-world domain/dialog/import metadata), and `MC-S25` (graphics capability modal).
+  Open dependency queue begins with MC-S02/S05/S06/S07/S12. Sprint 9 and cook-free Sprint 10 are in
+  the canonical roadmap; Sprint 10 remains refinement/Ready-blocked until its S10.R0 calibration.
+- Measured bottleneck: repeated verification infrastructure failures and `legacy.js` lease
+  serialization, not feature coding. Publish MC-S33 first. Add a digest-preserving extraction only
+  when two ready bundles demonstrably contend on the same file; scaffolding is no longer a separate
+  programme. Acceptance semantics, armed controls, built checks, and the integration-wave sweep
+  remain mandatory.
+
+Continuation prompt: [CONTINUATION.md](CONTINUATION.md).
+
+**Arbitrary dimensions, GPU-only high-resolution authoring, Boundary Landforms, and Walkaround —
+accepted into the roadmap, implementation NOT STARTED, 2026-08-02.**
+
+- ADR 009 requires exact independent sample dimensions with no power-of-two rounding. Named gates
+  include `16384 x 16384` and `1573 x 13789`; 256-cell page controls produce `64 x 64` pages with
+  255 valid terminal cells and `7 x 54` pages with a `36 x 220` terminal core respectively.
+- High-resolution `gpu-required-paged` mode forbids CPU terrain-field computation, whole-raster CPU
+  arrays, full-field readback, and silent fallback. CPU remains a bounded metadata/IO/control plane;
+  every demanded terrain node must have a validated paged WebGPU implementation or preflight rejects.
+- Sprint 7 adds S7.6 Boundary Landforms: selected north/east/south/west hills, asymmetric mountain
+  chains, and heightfield cliffs with metre-authored profiles, arbitrary dimensions, and a GPU path.
+- ADR 010 and S10.9 add a Street-View-style doll placement tool, fixed-step Rapier WASM capsule
+  controller, walk/run/jump, collision-first streaming, WebGPU reachability overlays, and route
+  replay. There is explicitly no flight, noclip, ascend, or descend action.
+- Sprint totals are now S7 36, S9 66, and S10 81. The ten-sprint programme is **417 points**. Future
+  traceability bundles are MC-S37 Boundary Landforms, MC-S38 arbitrary dimensions, MC-S39 GPU-only
+  graph evaluation, and MC-S40 Walkaround/reachability; no canonical runtime item was created by
+  this planning change.
+
 **Sprint 10 cook-free runtime heightfield / Extreme Detail — canonical plan grounded, technical
 refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026-08-01.**
 
-- Added the exactly 60-point Sprint 10 packet and accepted ADR 008. The ten-sprint programme is now
-  **386 points** (`326 + 60`). `ExtremeCapability/1` requires secure context, `navigator.gpu`, a
+- Added the original 60-point Sprint 10 packet and accepted ADR 008; ADRs 009/010 later expand
+  Sprint 10 to 81 points and the programme to **417 points**. `ExtremeCapability/1` requires secure context, `navigator.gpu`, a
   non-null adapter/device, no optional features, WebGPU guaranteed-default minimum limits, and
   validated core format usages. Standard requires WebGL2 plus `EXT_color_buffer_float`.
 - Capability wording is **“No supported graphics capability,”** not “no GPU.” Browser APIs do not
@@ -65,7 +137,8 @@ refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026
 
 **Sprint 9 large worlds — canonical plan grounded/refined, implementation NOT STARTED, 2026-08-01.**
 
-- Added the 61-point large-world packet and accepted ADR 007: versioned independent-width/height
+- Added the original 61-point large-world packet and accepted ADR 007; ADR 009 later expands it to
+  66 points with exact arbitrary sample dimensions. The base contract includes versioned independent-width/height
   world domains, m/km/mi/ft input with internal metres, vertex/legacy posting, vertical datum/range,
   allocation-free New Terrain preflight, and import metadata with explicit embedded/inferred/override
   provenance. Sprint 9 brought the then-current programme to **326 points** (`265 + 61`); Sprint 10
@@ -109,16 +182,17 @@ refinement/Ready BLOCKED on S10.R0 calibration, implementation NOT STARTED, 2026
 - Sprint 4 now carries S4.7–S4.10 as separately routable renderer stories; no wave or foam data is
   baked into terrain fields or export products.
 
-**Sprints 1–8 — grounding audit reopened, NOT DONE, 2026-07-31.**
+**Sprints 1–8 — grounding ledger applies per story, 2026-08-02.**
 
 - The first refinement pass added contracts, cut order, verification matrices, and Ready conditions,
   but an audit found that some “locked” defaults and runtime choices had no corpus, measured-code, or
-  accepted-ADR evidence. That pass is not complete and must not be used to start a sprint.
+  accepted-ADR evidence. Those claims still require correction before their owning stories start.
 - Mission Control investigation `INV-SPRINT-GROUNDING` owns the correction. Completion requires a
   claim-level grounding ledger, accepted ADRs for S2/S6/S8, removal or replacement of unsupported
   mechanics, fixed pre-implementation thresholds, and an independent rubber-duck review with no
   valid blocking finding.
-- Until that gate closes, every sprint remains **Not Ready** regardless of dependency position.
+- Readiness is now local: an unresolved claim blocks its owning story and consumers, while unrelated
+  grounded stories proceed. Ledger-wide closure remains a final programme gate.
 
 **Separate GPU Rock Fracture node — done locally, 2026-07-31.**
 
@@ -271,14 +345,13 @@ bad extraction bisects to one node.
 
 ## Next, in order
 
-1. **Finish `MC-S03`** — S1.1 Surface and S1.2 landforms are building in the isolated worktree;
-  complete focused red/green, built-PWA, review, and merge gates.
-2. **Route approved `MC-S01` and `MC-S04`** — typed-DAG foundation and the remaining Sprint 1
-  filters/coordinate/aspect bundle are approved and independently leasable.
-3. **Advance dependency queue** — canonical Mission Control status has 17 open items beginning with
-  `MC-S02`, `MC-S05`, `MC-S06`, `MC-S07`, and `MC-S12`; route them only as their immediate
-  producing dependencies exit. Sprint 9/10 bundles remain roadmap traceability, not current mission
-  runtime items.
+1. **Finish `MC-S33`** to its reviewed runner contract and publish it without widening scope.
+2. **Replay `MC-S04` once** on that published runner, run focused/built/digest plus the integrated
+   wave gate, and close S1.3–S1.5.
+3. **Publish S2's keystone** through `MC-S01` → `MC-S02`; concurrently route the already-independent
+   S9 domain and S10 capability foundations when their ownership is disjoint.
+4. **Fan out the first real parallel wave**: cover/state (`MC-S05`), Gerstner foundation (`MC-S09`),
+   graph machinery (`MC-S18`), and large-world evaluation (`MC-S22`).
 
 ## Open, carried
 
@@ -290,5 +363,4 @@ bad extraction bisects to one node.
 - C11 square-shape audit: 8 sites still open in `_verify_hex.js` (measured domain-restricted, not
   corrupted), `_verify_hex_sampling.js`, `_verify_hex_dem.js`; plus 117 latent sites in square-only
   oracles.
-- **69 commits are not on the remote.** `origin/<branch>` sits at `346c6c6`, a full session behind.
-  Push has never been authorised.
+- **19 commits are not on the remote** as measured on 2026-08-02. Push has never been authorised.

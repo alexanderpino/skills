@@ -14,6 +14,11 @@ is called out explicitly instead of being hidden inside a node story.
 tree now contains **61** plugin types. Gates must measure the baseline at sprint start; no story may
 hard-code 60 or infer a target count from its story count.
 
+**Execution policy.** [DELIVERY.md](DELIVERY.md) is normative for scheduling, gate placement,
+review depth, evidence reuse, and concurrency. Sprint files and ADRs define behavior; the delivery
+policy prevents that behavior from being rebuilt and certified repeatedly at administrative phase
+boundaries.
+
 ---
 
 ## The decision: a hybrid two-track schedule
@@ -46,10 +51,10 @@ whenever Track B is blocked on review.
 | [4](sprint-04-water-and-rivers.md) | Physical water/rivers + AAA Gerstner viewport (**no carve**) | B | `[K]`+`[E]` | L3 + renderer | S2, S3, L1 (done) |
 | [5](sprint-05-climate-and-snow.md) | Moisture, typed climate, moisture-driven Snow, hex correctness | B | `[K]`+`[E]` | L4 | S2, S3, S4 |
 | [6](sprint-06-output-and-export.md) | Pure export sinks, formats, profiles, tiles, bake-boundary | B | `[K]`+`[E]` | — | S2–S5 |
-| [7](sprint-07-geology-and-regimes.md) | Strata/Sandstone/Outcrops, aeolian, mass-movement | A/B | `[K]` | L2/L5 | S1–S5 |
+| [7](sprint-07-geology-and-regimes.md) | Strata/Sandstone/Outcrops, boundary landforms, aeolian, mass-movement | A/B | `[K]` | L2/L5 | S1–S5; boundary node after S2 |
 | [8](sprint-08-graph-machinery.md) | Subgraphs, Var, Math, Switch, Route, Edge | B | `[E]` | — | S2 |
-| [9](sprint-09-large-worlds.md) | Versioned world domain, global substrate, deterministic evaluation regions, bounded preview | B | `[K]`+`[E]` | all field layers | S2 for scheduling; S6 export; S8 presets |
-| [10](sprint-10-runtime-extreme-detail.md) | Cook-free runtime heightfield / Extreme Detail | B | `[K]`+`[E]` | renderer | S9 domain/evaluation; S6/S9 field manifests for export |
+| [9](sprint-09-large-worlds.md) | Versioned arbitrary-dimension domain, global substrate, deterministic regions, bounded preview | B | `[K]`+`[E]` | all field layers | S2 for scheduling; S6 export; S8 presets |
+| [10](sprint-10-runtime-extreme-detail.md) | Cook-free GPU-only heightfield, Extreme Detail, Walkaround/reachability | B | `[K]`+`[E]` | renderer / traversal | S9 domain/evaluation; S6/S9 manifests; S2 execution descriptors |
 
 ```mermaid
 graph LR
@@ -87,12 +92,18 @@ graph LR
 
 The sprint stories remain canonical. Mission Control items are implementation bundles only; an item
 may not add, omit, or redefine story scope. S1.0 is already implemented in the baseline, leaving
-**63 unfinished stories**, each assigned exactly once below.
+**65 unfinished stories** after S1.1 and S1.2 shipped, each assigned exactly once below.
 
 **Status rule:** a story is marked `DONE` in its sprint table only after its focused red/green gate,
-built-bundle validation, and integration commit are recorded in `PROGRESS.md`. Research,
-plan-review, building, and verification are not completion. Mission-item execution state remains in
-the installed Mission Control SQLite store; the sprint tables record only shipped story outcomes.
+built validation required by its change class, integration-wave gate, and integration commit are
+recorded in `PROGRESS.md`. Research, plan-review, building, and verification are not completion.
+Mission-item execution state remains in the installed Mission Control SQLite store; the sprint
+tables record only shipped story outcomes.
+
+Mission Control is used only where [DELIVERY.md](DELIVERY.md) requires it: real concurrent lease
+contention, shared/high-risk contracts, migrations, or merge coordination. These IDs remain stable
+traceability for story ownership even when a routine one-owner slice uses the lighter execution
+path.
 
 | Mission item | Canonical stories | Depends on |
 |---|---|---|
@@ -115,7 +126,7 @@ the installed Mission Control SQLite store; the sprint tables record only shippe
 | `MC-S17` | S7.4, S7.5 | `MC-S06`, `MC-S07` |
 | `MC-S18` | S8.1–S8.4 | `MC-S02` |
 | `MC-S19` | S8.5, S8.6 | `MC-S18` |
-| `MC-S20` | S5.5 + cross-sprint exit gates/default promotion | all producing bundles, including future `MC-S24` and `MC-S28` |
+| `MC-S20` | S5.5 + cross-sprint exit gates/default promotion | all producing bundles, including future `MC-S24`, `MC-S28`, and `MC-S37`–`MC-S40` |
 | `MC-S21` | S9.1–S9.3 | — |
 | `MC-S22` | S9.4, S9.5 | `MC-S21`, `MC-S02` |
 | `MC-S23` | S9.6 | `MC-S22`, `MC-S14` |
@@ -124,6 +135,10 @@ the installed Mission Control SQLite store; the sprint tables record only shippe
 | `MC-S26` | S10.2, S10.3 | `MC-S22` |
 | `MC-S27` | S10.4, S10.5 | `MC-S25`, `MC-S26` |
 | `MC-S28` | S10.6, S10.7 | `MC-S27`, `MC-S23` |
+| `MC-S37` | S7.6 Boundary Landforms | `MC-S02` |
+| `MC-S38` | S9.9 arbitrary raster dimensions | `MC-S21`, `MC-S22` |
+| `MC-S39` | S10.8 GPU-only arbitrary-dimension graph | `MC-S02`, `MC-S25`, `MC-S26`, `MC-S38` |
+| `MC-S40` | S10.9 Walkaround + reachability | `MC-S27`, `MC-S39` |
 
 `MC-S09` deliberately does not wait for S4 hydrology: S4.7 targets the existing Water mesh and may
 start once ADR 006 CPU vectors are armed. S4.9's final river regime remains in `MC-S10` and waits for
@@ -152,13 +167,21 @@ land after `MC-S23`. The `MC-S20` dependency above remains a
 roadmap requirement only: this documentation change does **not** assert that existing Mission
 Control SQLite state already contains `MC-S25`-`MC-S28` or the new `MC-S20` edge.
 
+`MC-S37` is independently routable after typed descriptors and does not wait for the physical-stack
+stories in the rest of Sprint 7. `MC-S38` owns exact arbitrary dimensions and terminal-page identity.
+`MC-S39` migrates every production terrain-field node to GPU-required paged execution; it cannot
+claim completion while any demanded node silently falls back to CPU. `MC-S40` adds the Rapier-backed
+Walkaround controller and WebGPU traversal reachability after streamed rendering/collision and the
+GPU-only graph exist. These rows are future traceability only; this documentation change does not
+assert that canonical Mission Control SQLite already contains `MC-S37`-`MC-S40`.
+
 ---
 
 ## Capacity and cadence
 
-The ten thematic packets total **386 points** (S1 27 · S2 34 · S3 32 · S4 47 · S5 26 · S6 34 ·
-S7 31 · S8 34 · S9 61 · S10 60). This is the current 326-point programme plus the grounded
-60-point cook-free runtime Extreme Detail packet. The repo records no stable team velocity or sprint
+The ten thematic packets total **417 points** (S1 27 · S2 34 · S3 32 · S4 47 · S5 26 · S6 34 ·
+S7 36 · S8 34 · S9 66 · S10 81). This is the prior 386-point programme plus Boundary Landforms,
+arbitrary raster dimensions, GPU-only high-resolution evaluation, and Walkaround/reachability. The repo records no stable team velocity or sprint
 duration, so these numbers are relative scope, **not calendar estimates**. At each kickoff:
 
 - commit no more than demonstrated recent velocity;
@@ -177,26 +200,17 @@ duration, so these numbers are relative scope, **not calendar estimates**. At ea
 
 **Grounded, refined, and Ready are three different states.** A claim is *grounded* only when it cites
 an exact corpus/reference behavior, a measured current source/test fact, a transparent derivation, or
-an accepted ADR with option analysis and measurable consequences. A sprint is *technically refined*
-when every claim is grounded and its document fixes contracts, implementation cuts, owning surfaces,
-fixtures, and integration obligations. It becomes *Ready* only when prerequisites are closed and its
-first mutation control has run red. A future R0 measurement or future ADR cannot ground wording that
-is already labelled locked.
+an accepted ADR with option analysis and measurable consequences. A story is *technically refined*
+when its controlling claims are grounded and its document fixes contracts, owning surfaces,
+fixtures, and integration obligations. It becomes *Ready* when its own prerequisites are closed and
+its focused gate has an armed negative control. A future measurement or ADR cannot ground wording
+already labelled locked.
 
-Every sprint follows the same landable sequence:
-
-1. **R0 · Baseline:** record plugin/oracle counts, relevant digests, runtime path (CPU/GPU), and the
-   current exemption/debt entries. Empty inventories are failures.
-2. **R1 · Contract:** land accepted ADR/schema/port declarations and frozen old-document fixtures
-   without changing production numerical output.
-3. **R2 · Arm the gate:** add the analytic/reference fixture and its deliberately broken mutation;
-   record the failing measurement before production implementation.
-4. **R3 · Implement one vertical slice:** one node/path/lattice at a time. A CPU oracle does not
-   close a shipping GPU story, and a square path does not close a hex story.
-5. **R4 · Integrate:** wire UI, persistence, undo/redo, quick-create, demand/caching, preview, and
-   migration surfaces named by the sprint. Remove only the debt entries that this slice replaces.
-6. **R5 · Close:** run focused oracles, then plugin/bridge checks, production build, built-bundle
-   digest, and the full standalone sweep. Record red/green endpoints and update `PROGRESS.md`.
+R0–R5 remain useful concerns, but they are not mandatory phases, handoffs, or commits. A landable
+vertical slice measures the affected baseline, uses an already-armed gate or records a new red
+endpoint, implements the behavior, integrates its named UI/persistence/migration surfaces, and runs
+the change-class gates from [DELIVERY.md](DELIVERY.md). A CPU oracle does not close a shipping GPU
+story, and a square path does not close a hex story.
 
 Each sprint document therefore contains a **Technical refinement** section with five mandatory
 parts: locked decisions, implementation surfaces, cut order, verification matrix, and Ready/blocked
@@ -205,7 +219,7 @@ the owning story not Ready. Research uncertainty is isolated as a time-boxed spi
 selection criteria and a declared fallback; it is never hidden inside a build story.
 
 [GROUNDING.md](GROUNDING.md) is the normative claim ledger. A sprint contract and that ledger must
-agree; disagreement is a blocking documentation defect, and the more conservative status wins.
+agree. A disagreement blocks the owning story and dependent consumers, not unrelated ready work.
 Sprint 10 is currently grounded but not technically refined or Ready because its required S10.R0
 GPU-parity and anti-tiling calibration bounds have no recorded measured controls.
 
@@ -247,6 +261,8 @@ local documentation rules. The required decisions are accepted and normative:
 5. **[ADR 006 — Hybrid Gerstner water](../adr-006-aaa-water-rendering.md):** shared analytic displacement, PBR water optics, body-specific regimes, phase suppression, visual evidence, and frame budgets.
 6. **[ADR 007 — Versioned world domain and bounded global-substrate evaluation](../adr-007-large-world-domain-and-tiling.md):** independent metre-space extents, vertex/legacy posting, pre-allocation feasibility, import provenance, full-domain GLOBAL substrate, deterministic apron regions, bounded residency, camera-relative precision, and versioned manifest integration.
 7. **[ADR 008 — Cook-free WebGPU heightfield](../adr-008-cook-free-webgpu-heightfield.md):** exact secure-context/WebGPU capability profile, allocation-free blocking startup, versioned streamed height/auxiliary pages, derived runtime caches, fixed-topology geometry clipmaps, portable WebGPU visibility/HiZ/bucketed instanced indirect rendering, bounded residency, precision, and field-manifest export.
+8. **[ADR 009 — Arbitrary raster GPU authoring](../adr-009-arbitrary-raster-gpu-authoring.md):** exact independent sample dimensions, partial terminal pages, GPU-required paged terrain evaluation, zero whole-field CPU materialization, and Boundary Landforms.
+9. **[ADR 010 — Walkaround traversal inspection](../adr-010-walkaround-traversal-inspection.md):** doll placement, fixed-step Rapier walk/run/jump, collision-first streaming, no flight, and profile-specific WebGPU reachability with deterministic route replay.
 
 Sprint 2 also updates [phase-a-plugin-contract.md](../phase-a-plugin-contract.md) or adds its Phase B
 successor with the typed port/result/edge/evaluation contract. Sprint 6 adds the emitter contract and
@@ -343,8 +359,9 @@ A story may enter implementation only when:
   production code deliberately broken.
 - Any schema change names its saved-graph migration, undo/redo impact, quick-create compatibility,
   bridge impact, and old-document fixture.
-- Every claim in the owning sprint's grounding ledger is resolved; `TBD`, an uncited exact default,
-  or a future measurement presented as current evidence is a blocker.
+- Every claim controlling the story is resolved in the grounding ledger. `TBD`, an uncited exact
+   default, or a future measurement presented as current evidence blocks that story and its
+   consumers, not unrelated work.
 
 ---
 
@@ -353,21 +370,23 @@ A story may enter implementation only when:
 The project's standing failure mode is **the vacuous gate: a check that passes on a broken build**
 (six recurrences in one session, `BACKLOG §5`). A story is not done until its gate satisfies all of:
 
-- **Armed between two measured endpoints.** The oracle must have been *seen to fail* on the broken
-  path and *seen to pass* on the fixed one. A gate that has never failed is not a gate. State both
-  numbers in the story's closing note.
+- **Armed between two measured endpoints.** A new or changed oracle must be *seen to fail* on the
+   broken path and *seen to pass* on the fixed one. Later slices using an unchanged oracle reference
+   its recorded red endpoint rather than recreating it. A gate that has never failed is not a gate.
 - **Assert on output, never exit status.** A process can exit 0 having done nothing.
 - **A quantity worth printing is worth asserting.** No report-only probes (`_verify_realtime.js` is
   the anti-pattern — 0 PASS / 0 FAIL).
 - **Absence of evidence is a failure.** An empty result set, a scan that matched no files, a probe
   that compared nothing — all red.
-- **The digest stays honest.** `npm run verify -- _verify_digest.js` covers every registered type and
-   reports **skipped = 0**; the oracle and the app never move in the same commit for an existing node.
-- **Visible terrain has visual evidence.** Generator/surface/process stories capture hillshade,
-   slope, and relevant field overlays at two zoom levels on square and hex; numeric oracles remain the
-   gate, screenshots are the review evidence.
-- **Runtime changes validate the built app.** In addition to focused oracles, run the plugin/bridge
-   checks, production build, built-bundle digest, and full standalone sweep.
+- **The digest stays honest.** Numerical and contract slices run
+   `npm run verify -- _verify_digest.js` over every registered type with **skipped = 0**. The oracle
+   and app never move together for an existing-node rebaseline.
+- **Visible changes have visual evidence once.** A changed generator/surface/process contract
+   captures its required hillshade, slope, and field overlays on square and hex. Unchanged matrices
+   are reused only by validated content identity.
+- **Runtime changes validate the built app.** Production build and focused built-bundle evidence run
+   before merge. The exhaustive standalone sweep and built digest run once on the integrated wave,
+   as specified by [DELIVERY.md](DELIVERY.md).
 
 Run gates from `apps/terrain-studio/`:
 

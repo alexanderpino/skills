@@ -13,12 +13,17 @@ submission. Standard remains the WebGL2 renderer over the same height pyramid.
 Sprint 9 domain and bounded-evaluation contracts in `MC-S21`/`MC-S22`. Runtime clipmaps require
 renderable height ancestors and runtime-derived cache generation. WebGPU selection requires a
 passing capability probe plus the height-page/clipmap contracts. Export integration waits for the
-Sprint 6 and Sprint 9 manifest owners in `MC-S23`.
+Sprint 6 and Sprint 9 manifest owners in `MC-S23`. GPU-only graph evaluation waits for Sprint 2
+execution descriptors and Sprint 9 arbitrary page identity. Walkaround waits for renderable pages,
+bounded residency, and the GPU reachability substrate, but its Rapier collision/controller work may
+begin once versioned collision pages exist.
 
 **Architecture gate:** [ADR 008](../adr-008-cook-free-webgpu-heightfield.md) is accepted and
 normative. It selects a cook-free streamed heightfield with fixed-topology runtime geometry clipmaps
 for Extreme, keeps WebGL2 CPU-selected clipmap rings as Standard, and rejects both a monolithic dense grid
-and cooked cluster/Nanite-family terrain.
+and cooked cluster/Nanite-family terrain. [ADR 009](../adr-009-arbitrary-raster-gpu-authoring.md)
+adds GPU-required paged authoring for arbitrary raster dimensions. [ADR 010](../adr-010-walkaround-traversal-inspection.md)
+adds grounded walk/run/jump inspection and traversal reachability without flight.
 
 **Scope boundary.** The source is Sprint 9's authoritative vertex-posted heightfield. At
 `cellSizeM = 0.5`, adjacent authored vertex posts are 0.5 m apart. Height, auxiliary maps, and their
@@ -67,7 +72,9 @@ test/runtime adapter when the same required capabilities pass.
 | S10.5 | Scaled async feedback, eviction, byte plateau, RTE precision | `[E]` | 8 | feedback scale, eviction, byte budget, Float64 authority |
 | S10.6 | Sub-cell visual detail | `[K]` | 5 | VT, normal/parallax, bounded optional displacement |
 | S10.7 | Evidence/export integration | `[E]` | 8 | controls, built PWA, capability matrix, field-page manifests |
-| | **Sprint 10 total** | | **60** | `5+8+13+13+8+5+8` |
+| S10.8 | GPU-only arbitrary-dimension graph evaluation | `[K]`+`[E]` | 13 | all nodes paged on WebGPU; 16K/awkward fixtures; no CPU fallback |
+| S10.9 | Walkaround + traversal reachability | `[E]` | 8 | doll drop; fixed-step walk/run/jump; streamed collision; no flight |
+| | **Sprint 10 total** | | **81** | `5+8+13+13+8+5+8+13+8` |
 
 ---
 
@@ -145,6 +152,11 @@ canonical shared edges. Missing or mixed-version children cannot promote a paren
 field page persists conservative `minHeightM`, `maxHeightM`, and `geometricErrorM` headers as
 field-page metadata covered by its content hash. The error pyramid may prioritize residency and
 label current quality; it never changes clipmap topology or selects extra geometry.
+
+Domain dimensions are independent of page-core dimensions. Every page records valid core/apron
+rectangles; partial terminal pages contribute only valid samples and the authored boundary policy
+to parent generation. Padding is never terrain. ADR 009's `16384 x 16384` and `1573 x 13789`
+fixtures are mandatory.
 
 Minimum renderability belongs here: each surface version pins a complete root, every miss resolves
 to the finest resident ancestor, and the old complete renderable front remains active until the new
@@ -283,6 +295,18 @@ promotes and versions it as authoritative height data.
 No owner creates exportable geometry artifacts. GLOBAL drainage/climate/science scheduling remains
 under the Sprint 9 evaluator contract and is not converted into per-page renderer work.
 
+ADR 009 adds `gpu-required-paged` mode. There CPU/workers retain bounded IO, metadata, command
+encoding, cancellation, and residency control only; WebGPU owns every per-sample terrain operation.
+No whole-raster CPU field, CPU sample loop, full-field readback, or CPU fallback is legal. A demanded
+node without a validated GPU implementation is rejected before allocation. GLOBAL nodes keep GLOBAL
+semantics and require a complete-substrate paged/multi-pass GPU implementation.
+
+ADR 010 adds a separately budgeted Rapier WASM collision ring around the doll. It consumes completed
+authoritative local height pages for fixed-step physics but performs no terrain generation or
+whole-field processing. Traversal reachability is WebGPU-computed and reads back bounded route/
+summary records only. Collision streaming has priority over visual refinement and missing/stale
+collision blocks movement rather than allowing flight or fall-through.
+
 ### Evidence and export integration
 
 Profile frame/pass, memory, request, page, upload, readback, and cache-regeneration budgets are
@@ -351,6 +375,10 @@ creation and rejects partial or mixed packages atomically.
 7. **S10.6:** add VT material pages and sourced bounded near-field detail.
 8. **S10.7:** add debug/control evidence, platform profiles, built-PWA gates, no-cooker assertion,
    and field-manifest integration.
+9. **S10.8:** migrate the complete production node registry to ADR 009's GPU-required page
+  evaluator, prove partial terminal dimensions, and remove every runtime CPU terrain fallback.
+10. **S10.9:** integrate the ADR 010 doll tool, Rapier fixed-step controller, collision ring,
+  GPU reachability, route overlay, and deterministic replay.
 
 ---
 
@@ -464,12 +492,50 @@ exist, height/aux/domain pages round-trip; missing root/dependency, mixed hash/v
 and partial cancellation packages are red. Any cluster mesh, meshlet, geometry page, simplification
 DAG, or derived runtime cache in the package is red.
 
+### S10.8 - GPU-only arbitrary-dimension graph evaluation - 13 pts
+
+**User story:** As a terrain author, I can evaluate the complete production graph on a
+`16384 x 16384` or arbitrary rectangular heightmap without CPU terrain computation, silent
+fallback, monolithic allocation, or dimension rounding.
+
+**Acceptance gate:** the built PWA runs constant, generated, filtered, analysed, simulated, and
+multi-node production fixtures at `16384 x 16384` and `1573 x 13789` through bounded WebGPU pages.
+Registry inventory is non-empty and every demanded production terrain-field node records a
+validated GPU dispatch; per-node dispatch/coverage counters are asserted. CPU terrain sample-loop,
+whole-field typed-array, fallback evaluator, full-field readback, 16K texture, and over-profile
+buffer spies remain exactly zero. Processing more pages than fit forces eviction and a stable byte
+plateau. Partial terminal pages preserve shared posts, aprons, filters, min/max/error, square/hex
+identity, and schedule-order determinism. Boundary Landforms is included. Device loss and a
+CPU-only-node mutation stop with an explicit compatibility error before evaluation; they never run
+on CPU.
+
+### S10.9 - Walkaround and traversal reachability - 8 pts
+
+**User story:** As a terrain author, I can drop a person marker onto the terrain, walk, run, and jump
+at human scale, and test whether selected areas are reachable without ever entering flight mode.
+
+Implement ADR 010 with a draggable and keyboard-accessible doll tool, Inspect/Walkaround mode switch,
+pinned `@dimforge/rapier3d-compat`, fixed 60 Hz capsule controller, versioned streamed collision ring,
+first/close-third-person camera, target marker, WebGPU traversal analysis, blocker overlay, and route
+replay. `LocomotionProfile/1` is the single source for controller and analysis limits.
+
+**Acceptance gate:** Playwright and deterministic headless fixtures prove doll placement, invalid
+drop reasons, exit/reset, walk/run speed, jump apex/time, gravity, slope/step limits, ground snap,
+capsule collision, and identical replay under 30/60/144 Hz render schedules. There is no ascend,
+descend, noclip, vertical camera translation, or flight input/action in code or UI. Missing/stale
+collision and page boundaries clamp movement with visible loading; edits, teleports, eviction, and
+device loss never cause fall-through or stale collider promotion. Reachability covers connected
+ramps, excessive slopes, steps, jumpable/un-jumpable gaps, water policy, clearance, domain edge, and
+partial pages with non-zero visited/rejection counts. Every reachable route replays through Rapier;
+slope/step/jump mutations are red. `16384 x 16384` and `1573 x 13789` runs keep collision and
+analysis residency bounded. The built PWA caches Rapier WASM offline.
+
 ---
 
 ## S10.R0 readiness calibration story (required, 0 pts)
 
-S10.R0 is a readiness-only calibration story, not an eighth product story, and does not change the
-60-point total. It
+S10.R0 is a readiness-only calibration story, not a tenth product story, and does not change the
+81-point total. It
 must generate the deterministic software depth/patch-ID control, GPU wrong-depth and stale-ID
 mutations, `PeriodicTileControl/1`, and `DecorrelatedControl/1`; record non-empty measurements; and
 freeze `gpuParityMaxMismatchFraction` plus `antiTilingMinReduction` exactly as defined above. Until
@@ -494,17 +560,20 @@ refined or Ready. Implementers may not choose either bound after seeing the fixe
 | precision | analytic RTE error `<= 0.001 m` at 100 km | absolute Float32 near-field positions |
 | sourced visual detail | calibrated autocorrelation reduction; source removal removes effect | periodic/unsourced detail or pass mismatch |
 | package boundary | S6/S9 height/aux/domain pages only | geometry or runtime-cache artifact exported |
+| arbitrary GPU graph | all demanded nodes dispatch paged WebGPU at both named sizes | CPU fallback, 16K texture, or rounded axis |
+| grounded traversal | fixed-step replay and reachable-route agreement | flight input, stale collider, or false reachable path |
 
 Sprint 10 planning is **grounded but not technically refined or Ready** until S10.R0 records and
 freezes both calibration bounds. Implementation is **NOT STARTED**.
 S10.1 may enter R0 independently after allocation-spy controls are observed red. S10.2-S10.3 wait
 for Sprint 9 domain/evaluation ownership. S10.4-S10.5 wait for capability and runtime-heightfield
 base gates. S10.7 export integration remains blocked until the Sprint 6/Sprint 9 manifest branches
-exist.
+exist. S10.8 waits for S2 execution descriptors and S9.9 page identity. S10.9 waits for S10.2,
+S10.3, S10.5, and S10.8, while its collision/controller slice may begin after S10.2.
 
 ## Exit gate
 
-- All seven story gates have measured red and green endpoints; no report-only or zero-inventory gate.
+- All nine story gates have measured red and green endpoints; no report-only or zero-inventory gate.
 - Programme capability language says "No supported graphics capability," never "no GPU."
 - Standard works with WebGL2 plus `EXT_color_buffer_float`; Extreme requires every exact
   `ExtremeCapability/1` secure-context/API/adapter/limit/device/format step; preference never bypasses it.
@@ -521,6 +590,12 @@ exist.
 - Sub-cell detail has a source, calibrated anti-repetition gate, conservative bound, and pass parity;
   collision/gameplay remains authoritative heightfield data and dependent consumers declare which
   surface contract they use.
+- `16384 x 16384` and `1573 x 13789` complete representative production graphs through bounded
+  WebGPU pages with exact dimensions, partial terminal validity, zero CPU terrain sample loops,
+  zero whole-field CPU arrays/readbacks, zero monolithic 16K textures, and no fallback.
+- Doll placement, fixed-step walk/run/jump, collision-first streaming, and profile-specific
+  reachability/replay are green on ordinary, arbitrary, and 16K domains. No flight, noclip, ascend,
+  descend, or vertical camera-translation action exists.
 - Export contains only S6/S9-owned height, auxiliary, and domain/region pages plus their persisted
   field-page headers. Derived runtime cache representations regenerate after import and never cross
   the package boundary.
@@ -548,6 +623,12 @@ exist.
 - Installed Terrain Renderer `references/16-tool-viewports.md`: honest asynchronous preview,
   field-contract WYSIWYG, dirty-region uploads, shared-grid clipmap preview, and built/export
   parity.
+- Installed Terrain Architect `references/08-output-contract.md`, `10-primitives-ops-filters.md`,
+  `14-graph-runtime.md`, and `15-gpu-realtime.md`: partial terminal domains, valid aprons,
+  boundary-distance placement, asymmetric mountain mass, execution flags, and GPU page placement.
+- Installed Game Engine Physics & Jobs skill: fixed-step physics, broad/narrow query discipline,
+  immutable input snapshots, and deterministic replay. Rapier WASM is the selected browser physics
+  implementation under ADR 010.
 - Current `src/core/gpu.js`: WebGL2 + `EXT_color_buffer_float` gate, optional `EXT_float_blend`,
   square `RGBA32F` target cache, and no WebGPU/VRAM/software-adapter probe.
 - WebGPU/MDN API documentation: adapter features/limits and required device limits,

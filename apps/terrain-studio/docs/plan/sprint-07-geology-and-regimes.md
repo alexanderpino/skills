@@ -1,6 +1,7 @@
 # Sprint 7 — Geology & regimes: strata, rock, aeolian, mass movement `[K]`
 
-**Goal.** Add the geological finish and two missing transport regimes after state layers exist.
+**Goal.** Add the geological finish, an art-directable world-boundary landform generator, and two
+missing transport regimes after state layers exist.
 Reference implementations reduce research risk but are not drop-in production nodes: they use NumPy,
 have square assumptions in places, and `runout.py` returns a path rather than a depositional field.
 Each story owns its world-unit/lattice/runtime adaptation and validation.
@@ -23,6 +24,8 @@ depth is metres. Surface detail may modify height but must not masquerade as con
 | S7.3 | Aeolian: DuneSea + Sand transport/detail | `[K]` | 8 | reference-informed port; wind/moisture; co-update sandDepth |
 | S7.4 | Scree/talus transport | `[K]` | 5 | source-to-apron volume closure; distinguishable sediment state |
 | S7.5 | Debris runout path / reach | `[K]` | 5 | grounded Voellmy trajectory, speed and stop; deposition deferred |
+| S7.6 | Boundary Landforms: hills / mountains / cliffs | `[C]` | 5 | selected world edges, metre profiles, arbitrary dimensions, GPU-native |
+| | **Sprint 7 total** | | **36** | `8+5+8+5+5+5` |
 
 ---
 
@@ -58,6 +61,12 @@ depth is metres. Surface detail may modify height but must not masquerade as con
   and boundary-exit status. It does not write height or claim a deposition field. Lobate/depth-averaged
   deposition remains a named follow-up because the corpus marks the single-path terrain realization
   F-tier and supplies no defensible spreading/deposition law.
+- Boundary Landforms follows ADR 009. It derives exact distance to selected valid domain edges and
+  builds profiles in world metres. Hills use a smooth C1 profile; mountains build a wandering,
+  asymmetric crest mass before adding dissection; cliffs use an authored lip and face width. The
+  heightfield mode cannot represent overhangs, caves, or detached blocks and does not claim them.
+  Inactive edges and samples farther than the authored band are exact identity. Corner joins are
+  explicit and cannot double relief where two selected edges meet.
 
 ### Owning code surfaces and cut order
 
@@ -71,6 +80,8 @@ depth is metres. Surface detail may modify height but must not masquerade as con
    through explicit `sandDepth` state after each closes mass independently.
 5. **S7.4–S7.5:** implement explicit-source scree transport and Voellmy path/reach separately; port
   each to D6 after the square analytic oracle is armed.
+6. **S7.6:** may run independently after Sprint 2 descriptors. Land exact boundary distance and
+  selected-side masks first, then the three profiles and GPU path. Its 16K gate closes under S10.8.
 
 ### Verification matrix and Ready condition
 
@@ -81,10 +92,13 @@ depth is metres. Surface detail may modify height but must not masquerade as con
 | Aeolian threshold | below threshold/wet bed is exact identity | soft non-zero threshold ramp |
 | Sand/scree mass | source = deposit + named boundary flux | hidden wrap or square area on hex |
 | Runout physics | Coulomb reach, drag monotonicity, ordered legal path | stop-on-flat/terminal deposit claim |
+| Boundary localization | exact identity outside selected metre band | UV/pixel-width band or corner doubling |
+| Boundary morphology | hills/mountains/cliffs have distinct controlled profiles | radial cone reused for mountains |
 
-Sprint 7 is Ready when S1–S5 exit, every reference symbol named above executes, the Stream Power
+S7.1–S7.5 are Ready when S1–S5 exit, every reference symbol named above executes, the Stream Power
 `K` integration is assigned to S7.1, and all boundary/source conventions are present in the
-armed fixtures. It may run parallel to S6 after those prerequisites.
+armed fixtures. S7.6 is independently Ready after Sprint 2 typed descriptors and ADR 009; it may run
+as a Track A slice without waiting for cover, hydrology, or climate. Sprint 7 may run parallel to S6.
 
 ---
 
@@ -171,9 +185,29 @@ bit-identical, path samples are adjacent legal neighbours, and a terminal-pixel 
 
 ---
 
+### S7.6 — Boundary Landforms: hills / mountains / cliffs · `[C]` · 5 pts
+**User story:** As a terrain author, I can deliberately frame selected world borders with hills,
+mountain chains, or cliff walls without hand-building masks or affecting the interior.
+
+Implement ADR 009's pure GPU-native generator with selected north/east/south/west sides, style,
+inset, band width, relief, falloff, crest wandering/detail wavelengths, corner join, strength, and
+seed. Emit `height:m`, `coverage:[0,1]`, and `boundaryDistance:m`. Build mountain mass from a
+world-space wandering crest parallel to the boundary before dissection; do not texture a radial
+cone. Cliff mode is a heightfield face and must state its no-overhang limitation.
+
+**Acceptance gate** — `tests/legacy/_verify_boundary_landforms.js`: inactive sides and samples beyond
+the authored band are exact zero; selected borders reach the authored relief/profile without corner
+doubling; translating/resizing a rectangular world preserves metre wavelengths; square and hex
+world-coincident samples agree within the declared GPU tolerance. Hill, mountain, and cliff slope/
+rotational metrics are distinguishable against flat, cone, and hard-step controls. Fixtures include
+landscape, portrait, `1573 x 13789`, and partial terminal pages. Source and built GPU paths pass with
+CPU terrain evaluation disabled. S10.8 later proves the complete `16384 x 16384` paged path.
+
+---
+
 ## Sprint 7 exit gate
 
-- Strata, outcrop, aeolian, scree, and debris oracles are green with armed failing fixtures and fixed
+- Strata, outcrop, aeolian, scree, debris, and Boundary Landforms oracles are green with armed failing fixtures and fixed
   pre-implementation thresholds.
 - Sand/sediment volume closure holds with lattice cell area; no co-evolution exemption is added.
 - Visual evidence covers two zoom levels and both lattices; numeric oracles remain the gate.

@@ -2,6 +2,9 @@
 
 **Status:** accepted
 **Date:** 2026-08-01
+**Amended by:** [ADR 009](adr-009-arbitrary-raster-gpu-authoring.md) for exact arbitrary sample
+dimensions, partial terminal pages, and GPU-required high-resolution processing; [ADR 010](adr-010-walkaround-traversal-inspection.md)
+for bounded collision and traversal inspection over streamed worlds.
 
 ## Context
 

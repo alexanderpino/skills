@@ -7,6 +7,10 @@ S10 technical refinement/Ready blocked on S10.R0 calibration; S9/S10 implementat
 evidence, transparent derivation, or an accepted ADR with options and measurable consequences.
 Future implementation, R0 measurement, or a planned mutation is not current provenance.
 
+**Delivery rule:** readiness is evaluated per story. An unresolved claim blocks the story it
+controls and dependent consumers; it does not globally stop unrelated stories whose own claims and
+dependencies are closed. Ledger-wide audit remains required for final programme closure.
+
 This ledger covers the technical claims that control implementation. Story outcomes and dependency
 order come from `GAEA-GAP.md`, `BACKLOG.md`, and the sprint map; they do not establish physical
 constants or runtime schemas by themselves.
@@ -132,6 +136,8 @@ constants or runtime schemas by themselves.
 | Scree source and repose | C | chapter 05 scree source and 35–40 degree table | Consume explicit weathered depth, gate cliff >55°, place at base, relax at authored repose. |
 | Voellmy path/reach | C | chapter 05; `reference-impl/runout.py` and test | Reach error is strictly `<2*cellSize`; speed/stop/path emitted as features. |
 | Runout deposition | C | Corpus says one-path terrain realization is F-tier and supplies no lobe law | Removed from S7; no height/state write or invented exponential spreading. |
+| Boundary Landforms composition | C/A | chapter 10 SDF/placement and asymmetric-mass rule; ADR 009 | Exact boundary distance plus selected-side masks; hills, asymmetric crest mountains, and heightfield cliffs remain distinct. |
+| Boundary Landforms execution | C/A | chapters 14/15 LOCAL/GPU-native contract; ADR 009 | World-space metre parameters, arbitrary dimensions, square/hex path, and no CPU terrain fallback at 16K. |
 
 ## Sprint 8 — graph machinery
 
@@ -154,7 +160,7 @@ mutation control.
 
 | Claim | Class | Evidence | Resolution |
 |---|---|---|---|
-| Programme scope is 61 points | D | S9 story table: `8+8+5+13+8+8+3+8` | Programme total is `265+61=326`; points are relative scope, not duration. |
+| Programme scope is 66 points | D | S9 story table: `8+8+5+13+8+8+3+8+5` | Ten-sprint programme total is 417 after the accepted ADR 009/010 additions; points are relative scope, not duration. |
 | 100 km at 0.5 m is `200001` square vertex samples per axis | D | Vertex posting: `samples=extent/spacing+1` | `200001^2=40,000,400,001` samples and `160,001,600,004 B` per R32F field. |
 | Equal-cell hex deployment is larger | C/D | chapters 08/26; factor approximately `2/sqrt(3)` for the same rectangular footprint/centre spacing | Approximately 46.2 B samples and 184.8 GB per R32F field; exact dimensions come from the persisted global hex basis. |
 | An illustrative 100 km partition at 5 km per evaluation region has 400 regions | D | `100/5=20` per axis; `20*20=400` | Arithmetic only; actual evaluation regions and streaming chunks are much smaller and budget-derived. |
@@ -170,6 +176,8 @@ mutation control.
 | Preview memory is bounded and precision is camera-relative | C/A | Terrain Renderer chapters 06/09/16; ADR 007 | Byte-budgeted chunk residency/eviction/cancellation and Float64 CPU authority prevent all-world allocation and 100 km Float32 jitter. |
 | Manifest and reusable-definition integration respect earlier owners | A | ADRs 003/004/007; Sprint 6 and Sprint 8 plans | Region manifest integration waits for S6; only real lattice/scope/radius/spacing preset constraints wait for S8. |
 | The target is user-selected, not attributed to a shipped game | A | Sprint 9 scope and ADR 007 | Documentation says “user-selected 100 km-class target”; no unsourced title dimensions are claimed. |
+| Arbitrary dimensions are exact domain data | C/D/A | chapter 08 vertex posting; ADRs 007/009 | Independent integer axes are never rounded to powers of two; page validity rectangles isolate terminal padding. |
+| Named page arithmetic | D/A | `ceil((samples-1)/256)` under vertex posting; ADR 009 | `16384²` gives `64²` pages with 255 terminal cells; `1573 x 13789` gives `7 x 54` with terminal `36 x 220`. |
 
 ## Sprint 10 — Cook-free runtime heightfield / Extreme Detail
 
@@ -178,7 +186,7 @@ Ready remain blocked on the explicit S10.R0 calibration gate.
 
 | Claim | Class | Evidence | Resolution |
 |---|---|---|---|
-| Programme scope is 60 points | D | S10 story table: `5+8+13+13+8+5+8` | Programme total is `326+60=386`; points are relative scope, not duration. |
+| Programme scope is 81 points | D | S10 story table: `5+8+13+13+8+5+8+13+8` | Ten-sprint programme total is 417; points are relative scope, not duration. |
 | Extreme and Standard are capability tiers, not GPU-brand tiers | M/A | current `GPU.init()`; WebGPU adapter/device APIs; ADR 008 | `ExtremeCapability/1` requires secure context, API, non-null adapter/device, no optional features, guaranteed-default minimum limits, and validated core usages; Standard requires WebGL2 + `EXT_color_buffer_float`; neither blocks before document/resource allocation. |
 | Browser capability facts do not prove physical GPU or VRAM | D/A | WebGPU privacy-tiered limits; non-portable fallback-adapter history; ADR 008 | Wording is “no supported graphics capability”; SwiftShader is valid when requirements pass; authored/measured byte budgets replace guessed VRAM. |
 | Persisted preference cannot bypass current capability | A | ADR 008 | Every startup reprobes; Retry reprobes; preference only selects among passing tiers. |
@@ -201,13 +209,21 @@ Ready remain blocked on the explicit S10.R0 calibration gate.
 | No geometry build path exists | A | ADR 008; Sprint 10 acceptance gates | Artifact scans and invocation spies assert no geometry file/page output and no runtime/export geometry-cooker call. |
 | Platform budgets are authored inputs | C/A | installed Terrain Renderer chapter 11; ADR 008 | Non-empty frame/memory measurements must be `<=` pre-authored profile budgets; no discovered or hard-coded device-class threshold. |
 | S10.R0 calibration is unresolved | M/A | no recorded periodic/decorrelated or GPU parity control measurements; Sprint 10/ADR 008 | Zero-point readiness-only story must freeze GPU mismatch and anti-tiling autocorrelation bounds between measured red/green controls; S10 remains not technically refined/Ready until then. |
+| GPU-required high-resolution semantics | C/M/A | chapters 14/15; WebGPU guaranteed limits; current CPU fallback paths; ADR 009 | No CPU terrain-field computation, whole-raster CPU materialization, full-field readback, or silent fallback; bounded CPU metadata/IO control remains legal. |
+| Complete-node GPU compatibility | C/A | chapter 14 execution flags; ADR 009 | Graph preflight rejects any demanded node without a validated paged GPU implementation; GLOBAL semantics cannot become per-page approximations. |
+| Walkaround uses fixed-step proven collision | A | Game Engine Physics fixed-update/query doctrine; ADR 010 | Pinned Rapier WASM capsule controller runs at fixed 60 Hz over a bounded versioned collision ring. |
+| Walkaround cannot fly | A | ADR 010 product requirement | No ascend/descend/noclip/vertical translation action exists; vertical motion comes only from jump and gravity. |
+| Reachability matches locomotion | C/A | bounded graph scheduling; fixed-step ballistic/controller semantics; ADR 010 | WebGPU traversal uses the same persisted profile and every reachable route must replay through the actual controller. |
 
 ## Closure gate
 
-This ledger is sealed only when:
+This ledger is sealed for final programme closure only when:
 
 1. every linked ADR/schema exists and diagnostics are clean;
 2. an unresolved-claim scan finds no future-decision or placeholder-tolerance language in S1–S10;
 3. an independent read-only rubber-duck review reports no valid blocking finding;
 4. every valid advisory finding is fixed or rejected with evidence; and
-5. `PROGRESS.md` is updated only after 1–4 pass.
+5. final programme completion is recorded in `PROGRESS.md` only after 1–4 pass.
+
+This ledger-wide seal is not a prerequisite for implementing or shipping an independently grounded
+story under the delivery policy.
