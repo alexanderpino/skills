@@ -16,9 +16,24 @@ const bootstrap = resolve(here, 'legacy-oracle-bootstrap.cjs')
 const MODES = new Set(['source', 'preview', 'preview-prod', 'file'])
 const WINDOWS_MAX_PATH = 259
 const WORKER_ROOT_PREFIX = 'terrain-studio-verify-'
+const WINDOWS_PROCESS_PROBE_ATTEMPTS = 3
+const WINDOWS_PROCESS_PROBE_BACKOFF_MS = 50
 export const PLAYWRIGHT_PATH_RESERVE = 48
 const sha256 = value => createHash('sha256').update(value).digest('hex')
-const delay = milliseconds => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds))
+const delay = (milliseconds, signal) => new Promise((resolvePromise, reject) => {
+  let timer
+  const abort = () => {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
+    reject(new VerifyError('RUN_CANCELLED', 'Verification was cancelled'))
+  }
+  timer = setTimeout(() => {
+    signal?.removeEventListener('abort', abort)
+    resolvePromise()
+  }, milliseconds)
+  signal?.addEventListener('abort', abort, { once: true })
+  if (signal?.aborted) abort()
+})
 
 function throwIfAborted(signal) {
   if (signal?.aborted) throw new VerifyError('RUN_CANCELLED', 'Verification was cancelled')
@@ -208,11 +223,12 @@ async function listen(appDir, mode, worker, identity, fixedPort, distDir, signal
     detached: process.platform !== 'win32',
     stdio: ['ignore', hostLog.fd, hostLog.fd, 'ipc'],
   })
-  const rootIdentity = await establishSpawnOwnership(child, worker, ownershipGate)
+  const rootIdentity = await establishSpawnOwnership(child, worker, ownershipGate, signal)
   let ready
   let readyTimer
+  let abortCleanup
   const abort = () => {
-    if (child.exitCode === null) killOwnedRoot(worker, rootIdentity)
+    if (child.exitCode === null) abortCleanup ||= killOwnedRoot(worker, rootIdentity)
   }
   signal?.addEventListener('abort', abort, { once: true })
   if (signal?.aborted) abort()
@@ -228,6 +244,7 @@ async function listen(appDir, mode, worker, identity, fixedPort, distDir, signal
       }),
     ])
   } catch (error) {
+    await abortCleanup?.catch(() => {})
     await hostLog.close()
     throw signal?.aborted ? new VerifyError('RUN_CANCELLED', 'Verification was cancelled during host startup') : error
   } finally {
@@ -307,6 +324,32 @@ export function queryWindowsProcesses() {
   }))
 }
 
+export async function queryWindowsProcessesWithRetry({
+  signal,
+  attempts = WINDOWS_PROCESS_PROBE_ATTEMPTS,
+  backoffMs = WINDOWS_PROCESS_PROBE_BACKOFF_MS,
+  query = queryWindowsProcesses,
+  sleep = delay,
+} = {}) {
+  const failedAttempts = []
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    throwIfAborted(signal)
+    try {
+      return query()
+    } catch (error) {
+      if (error?.code !== 'PROCESS_PROBE') throw error
+      failedAttempts.push({ attempt, code: error.code, message: error.message, details: error.details || {} })
+      if (attempt === attempts) {
+        throw new VerifyError('PROCESS_PROBE', `CIM process probe failed after ${attempts} attempts: ${error.message}`, {
+          maxAttempts: attempts,
+          attempts: failedAttempts,
+        })
+      }
+      await sleep(backoffMs, signal)
+    }
+  }
+}
+
 function processCreationTime(value) {
   const cimEpoch = /^\/Date\((-?\d+)\)\/$/.exec(value)
   return cimEpoch ? Number(cimEpoch[1]) : Date.parse(value)
@@ -382,11 +425,11 @@ export function windowsTerminationTargets(processes, roots, marker, ownershipTok
   return [...new Map([...rootTargets, ...markedTargets].map(row => [row.pid, row])).values()]
 }
 
-async function establishSpawnOwnership(child, worker, ownershipGate) {
+async function establishSpawnOwnership(child, worker, ownershipGate, signal) {
   try {
     let rootIdentity = { pid: child.pid }
     if (process.platform === 'win32') {
-      rootIdentity = queryWindowsProcesses().find(row => row.pid === child.pid)
+      rootIdentity = (await queryWindowsProcessesWithRetry({ signal })).find(row => row.pid === child.pid)
       if (!rootIdentity || !rootIdentity.commandLine.includes(worker.markerArgument)
         || !Number.isFinite(processCreationTime(rootIdentity.creationDate))) {
         throw new VerifyError('OWNERSHIP_UNPROVEN', `Spawned root ${child.pid} has no marked CIM creation identity`)
@@ -400,9 +443,9 @@ async function establishSpawnOwnership(child, worker, ownershipGate) {
   }
 }
 
-function killOwnedRoot(worker, rootIdentity) {
+async function killOwnedRoot(worker, rootIdentity) {
   if (process.platform === 'win32') {
-    const current = queryWindowsProcesses().find(row => row.pid === rootIdentity.pid)
+    const current = (await queryWindowsProcessesWithRetry()).find(row => row.pid === rootIdentity.pid)
     if (sameProcessIdentity(current, rootIdentity) && current.commandLine.includes(worker.markerArgument)) {
       spawnSync('taskkill.exe', ['/PID', String(rootIdentity.pid), '/T', '/F'], { stdio: 'ignore' })
     }
@@ -411,12 +454,12 @@ function killOwnedRoot(worker, rootIdentity) {
   }
 }
 
-async function processEvidence(worker, roots, phase, { allowMarkedStrays = false } = {}) {
+async function processEvidence(worker, roots, phase, { allowMarkedStrays = false, signal } = {}) {
   if (process.platform !== 'win32') return []
-  let all = queryWindowsProcesses()
+  let all = await queryWindowsProcessesWithRetry({ signal })
   let tree = ownedProcessTree(all, roots, worker.markerArgument)
   if (tree.some(processInfo => !processInfo.commandLine)) {
-    const confirmed = queryWindowsProcesses()
+    const confirmed = await queryWindowsProcessesWithRetry({ signal })
     const confirmedByPid = new Map(confirmed.map(processInfo => [processInfo.pid, processInfo]))
     all = all.flatMap(processInfo => {
       if (processInfo.commandLine) return [processInfo]
@@ -445,16 +488,16 @@ async function processEvidence(worker, roots, phase, { allowMarkedStrays = false
 
 async function terminateRoots(worker, roots) {
   if (process.platform === 'win32') {
-    const before = queryWindowsProcesses()
+    const before = await queryWindowsProcessesWithRetry()
     const targets = windowsTerminationTargets(before, roots, worker)
     for (const target of targets) {
-      const current = queryWindowsProcesses().find(row => row.pid === target.pid)
+      const current = (await queryWindowsProcessesWithRetry()).find(row => row.pid === target.pid)
       if (sameProcessIdentity(current, target) && ownershipProof(current, worker)) {
         spawnSync('taskkill.exe', ['/PID', String(target.pid), '/T', '/F'], { stdio: 'ignore' })
       }
     }
     await delay(150)
-    const after = queryWindowsProcesses()
+    const after = await queryWindowsProcessesWithRetry()
     const remainingMarked = workerOwnedProcesses(after, worker)
     if (remainingMarked.length) {
       throw new VerifyError('OWNED_PROCESS_LEAK', `Owned marker remains: ${remainingMarked.map(row => row.pid).join(',')}`, { remainingMarked })
@@ -466,18 +509,18 @@ async function terminateRoots(worker, roots) {
   }
 }
 
-async function waitForCaseProcesses(worker, roots, timeoutMs = 5000) {
+async function waitForCaseProcesses(worker, roots, timeoutMs = 5000, signal) {
   if (process.platform !== 'win32') return
   const deadline = Date.now() + timeoutMs
   while (true) {
-    const processes = queryWindowsProcesses()
+    const processes = await queryWindowsProcessesWithRetry({ signal })
     const persistentPids = new Set(ownedProcessTree(processes, roots, worker.markerArgument).map(processInfo => processInfo.pid))
     const remaining = workerOwnedProcesses(processes, worker).filter(processInfo => !persistentPids.has(processInfo.pid))
     if (remaining.length === 0) return
     if (Date.now() >= deadline) {
       throw new VerifyError('OWNED_PROCESS_LEAK', `Marked case processes remain: ${remaining.map(row => row.pid).join(',')}`, { remaining })
     }
-    await delay(100)
+    await delay(100, signal)
   }
 }
 
@@ -495,13 +538,15 @@ async function runChild({ worker, oracle, classification, args, cwd, env, timeou
     cwd, env: { ...env, STUDIO_VERIFY_OWNERSHIP_GATE: ownershipGate, STUDIO_VERIFY_SPAWN_AUDIT: spawnAuditPath }, windowsHide: true,
     detached: process.platform !== 'win32', stdio: ['ignore', log.fd, log.fd],
   })
-  const rootIdentity = await establishSpawnOwnership(child, worker, ownershipGate)
+  const rootIdentity = await establishSpawnOwnership(child, worker, ownershipGate, signal)
   let timedOut = false
   let cancelled = false
   let ownershipError
+  let stopPromise
   const stopChild = () => {
-    if (child.exitCode !== null) return
-    killOwnedRoot(worker, rootIdentity)
+    if (child.exitCode !== null) return Promise.resolve()
+    stopPromise ||= killOwnedRoot(worker, rootIdentity).catch(error => { ownershipError ||= error })
+    return stopPromise
   }
   const timeout = setTimeout(() => {
     timedOut = true
@@ -514,9 +559,9 @@ async function runChild({ worker, oracle, classification, args, cwd, env, timeou
     if (process.platform !== 'win32') return
     let sequence = 0
     while (child.exitCode === null && !ownershipError) {
-      try { await processEvidence(worker, [...roots, rootIdentity], `live-${child.pid}-${sequence++}`, { allowMarkedStrays: true }) } catch (error) {
+      try { await processEvidence(worker, [...roots, rootIdentity], `live-${child.pid}-${sequence++}`, { allowMarkedStrays: true, signal }) } catch (error) {
         ownershipError = error
-        stopChild()
+        await stopChild()
       }
       if (child.exitCode === null && !ownershipError) await delay(25)
     }
@@ -528,6 +573,7 @@ async function runChild({ worker, oracle, classification, args, cwd, env, timeou
   clearTimeout(timeout)
   signal?.removeEventListener('abort', abort)
   await liveEvidence
+  await stopPromise
   await log.close()
   const spawnAudit = await readFile(spawnAuditPath, 'utf8').catch(error => error.code === 'ENOENT' ? '' : Promise.reject(error))
   const unmarkedSpawns = spawnAudit.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line)).filter(row => !row.proven)
@@ -556,12 +602,18 @@ async function runBuildChild({ worker, roots, appDir, mode, outDir, environment,
     detached: process.platform !== 'win32',
     stdio: ['ignore', log.fd, log.fd],
   })
-  const rootIdentity = await establishSpawnOwnership(child, worker, ownershipGate)
+  const rootIdentity = await establishSpawnOwnership(child, worker, ownershipGate, signal)
   let ownershipError
   let cancelled = false
+  let stopPromise
+  const stopChild = () => {
+    if (child.exitCode !== null) return Promise.resolve()
+    stopPromise ||= killOwnedRoot(worker, rootIdentity).catch(error => { ownershipError ||= error })
+    return stopPromise
+  }
   const abort = () => {
     cancelled = true
-    if (child.exitCode === null) killOwnedRoot(worker, rootIdentity)
+    stopChild()
   }
   signal?.addEventListener('abort', abort, { once: true })
   if (signal?.aborted) abort()
@@ -569,7 +621,7 @@ async function runBuildChild({ worker, roots, appDir, mode, outDir, environment,
     if (process.platform !== 'win32') return
     let sequence = 0
     while (child.exitCode === null && !ownershipError) {
-      try { await processEvidence(worker, [...roots, rootIdentity], `live-build-${child.pid}-${sequence++}`) } catch (error) { ownershipError = error }
+      try { await processEvidence(worker, [...roots, rootIdentity], `live-build-${child.pid}-${sequence++}`, { signal }) } catch (error) { ownershipError = error }
       if (child.exitCode === null && !ownershipError) await delay(25)
     }
   })()
@@ -578,6 +630,7 @@ async function runBuildChild({ worker, roots, appDir, mode, outDir, environment,
     child.once('exit', code => resolvePromise(code ?? 1))
   })
   await liveEvidence
+  await stopPromise
   signal?.removeEventListener('abort', abort)
   await log.close()
   if (cancelled) throw new VerifyError('RUN_CANCELLED', 'Verification was cancelled during build', { logPath })
@@ -668,7 +721,7 @@ export async function runWorker({
         })
       }
       if (!result.ownershipError) {
-        try { await waitForCaseProcesses(worker, roots) } catch (error) { result.ownershipError = error }
+        try { await waitForCaseProcesses(worker, roots, 5000, signal) } catch (error) { result.ownershipError = error }
       }
       rows.push({ name: declaration.name, path: oracle, format: classification.format, sourceSha256: classification.sha256, ...result })
       if (result.outputBytes <= 0 || result.outputLines <= 0) failure ||= new VerifyError('EMPTY_EVIDENCE', `${declaration.name} produced no evidence`, { result })
@@ -679,7 +732,7 @@ export async function runWorker({
       else if (result.code !== 0) failure ||= new VerifyError('CASE_FAILED', `${declaration.name} exited ${result.code}`, { result })
     }
     if (rows.length !== cases.length) throw new VerifyError('INCOMPLETE_INVENTORY', `Executed ${rows.length}/${cases.length} declarations`)
-    await processEvidence(worker, roots, 'before-cleanup')
+    await processEvidence(worker, roots, 'before-cleanup', { signal })
     if (failure) throw failure
   } catch (error) {
     failure = error instanceof VerifyError ? error : new VerifyError(error.code || 'RUNNER_FAILURE', error.message)
@@ -691,7 +744,7 @@ export async function runWorker({
     try { await terminateRoots(worker, roots) } catch (error) { failure = error }
     try {
       if (process.platform === 'win32') {
-        const remaining = workerOwnedProcesses(queryWindowsProcesses(), worker)
+        const remaining = workerOwnedProcesses(await queryWindowsProcessesWithRetry(), worker)
         if (remaining.length) throw new VerifyError('OWNED_PROCESS_LEAK', `Marker remains after cleanup: ${worker.marker}`)
       }
     } catch (error) { failure = error }

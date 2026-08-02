@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { CACHE_SCHEMA, CacheError, createBuildKey, ensureBuild } from '../../scripts/build-cache.mjs'
 import {
-  PLAYWRIGHT_PATH_RESERVE, classifyOracle, ownedProcessTree, queryWindowsProcesses, runBatch, runModePartitions, runWorker,
+  PLAYWRIGHT_PATH_RESERVE, VerifyError, classifyOracle, ownedProcessTree, queryWindowsProcesses, queryWindowsProcessesWithRetry,
+  runBatch, runModePartitions, runWorker,
   windowsTerminationTargets,
 } from '../../scripts/isolated-verify-runner.mjs'
 
@@ -132,6 +133,60 @@ test('reused Windows root PID is excluded from ownership and termination', () =>
   ]
   assert.deepEqual(ownedProcessTree(processes, [expectedRoot], marker), [])
   assert.deepEqual(windowsTerminationTargets(processes, [expectedRoot], marker).map(row => row.pid), [30])
+})
+
+test('Windows process probe retries transient PROCESS_PROBE failures then returns rows', async () => {
+  const rows = [{ pid: 10, parentPid: 1, commandLine: 'node marked', creationDate: '/Date(1785664800000)/' }]
+  const waits = []
+  let attempts = 0
+  const result = await queryWindowsProcessesWithRetry({
+    attempts: 3,
+    backoffMs: 7,
+    query: () => {
+      attempts++
+      if (attempts < 3) throw new VerifyError('PROCESS_PROBE', `transient ${attempts}`)
+      return rows
+    },
+    sleep: async milliseconds => { waits.push(milliseconds) },
+  })
+  assert.equal(attempts, 3)
+  assert.deepEqual(waits, [7, 7])
+  assert.deepEqual(result, rows)
+})
+
+test('Windows process probe reports PROCESS_PROBE evidence after bounded attempts', async () => {
+  let attempts = 0
+  await assert.rejects(queryWindowsProcessesWithRetry({
+    attempts: 3,
+    backoffMs: 1,
+    query: () => {
+      attempts++
+      throw new VerifyError('PROCESS_PROBE', `persistent ${attempts}`, { source: 'test' })
+    },
+    sleep: async () => {},
+  }), error => {
+    assert.equal(error.code, 'PROCESS_PROBE')
+    assert.equal(error.details.maxAttempts, 3)
+    assert.deepEqual(error.details.attempts.map(attempt => attempt.message), ['persistent 1', 'persistent 2', 'persistent 3'])
+    return true
+  })
+  assert.equal(attempts, 3)
+})
+
+test('Windows process probe cancellation prevents further retry attempts', async () => {
+  const controller = new AbortController()
+  let attempts = 0
+  await assert.rejects(queryWindowsProcessesWithRetry({
+    attempts: 3,
+    backoffMs: 1,
+    signal: controller.signal,
+    query: () => {
+      attempts++
+      throw new VerifyError('PROCESS_PROBE', 'transient before cancellation')
+    },
+    sleep: async () => { controller.abort() },
+  }), error => error.code === 'RUN_CANCELLED')
+  assert.equal(attempts, 1)
 })
 
 test('fast Windows root records a marked CIM creation identity before execution', { skip: process.platform !== 'win32' }, async () => {
