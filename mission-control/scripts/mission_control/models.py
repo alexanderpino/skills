@@ -115,14 +115,15 @@ def recommend_track(
             reason += "; speed request declined — correctness dominates here"
         return "full", risk, reason
     if risk == "low":
-        if speed == "fast":
+        if speed == "thorough":
             return (
-                "express", risk,
-                "low-risk mechanical change; fast track granted "
-                "(mechanical gates still apply)")
+                "standard", risk,
+                "low risk, but thorough posture keeps the plan-review gate")
+        detail = ("fast" if speed == "fast" else "balanced default")
         return (
-            "standard", risk,
-            "low risk; standard track — set speed=fast to run express")
+            "express", risk,
+            f"low-risk mechanical change ({detail}); express track — plan and "
+            "code review skipped, mechanical gates still apply")
     if speed == "fast":
         return (
             "standard", risk,

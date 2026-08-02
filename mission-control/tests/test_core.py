@@ -521,8 +521,12 @@ class TrackPolicyTest(unittest.TestCase):
         track, risk, _ = recommend_track("low", "low", False, "fast")
         self.assertEqual((track, risk), ("express", "low"))
 
-    def test_low_risk_without_fast_request_stays_standard(self):
+    def test_low_risk_balanced_defaults_to_express(self):
         track, risk, _ = recommend_track("low", "low", False, "balanced")
+        self.assertEqual((track, risk), ("express", "low"))
+
+    def test_low_risk_thorough_keeps_plan_review(self):
+        track, risk, _ = recommend_track("low", "low", False, "thorough")
         self.assertEqual((track, risk), ("standard", "low"))
 
     def test_high_signal_overrides_fast_request(self):

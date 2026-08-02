@@ -233,6 +233,18 @@ def validate_mission(mission: dict[str, Any]) -> None:
         raise ValueError("mission.merge must be an object")
     if merge.get("max_cas_retries", 3) < 1:
         raise ValueError("mission.merge.max_cas_retries must be positive")
+    verification = mission.get("verification", {})
+    if not isinstance(verification, dict):
+        raise ValueError("mission.verification must be an object")
+    if verification.get("post_merge", "auto") not in ("auto", "full"):
+        raise ValueError("mission.verification.post_merge must be auto or full")
+    smoke = verification.get("smoke_commands")
+    if smoke is not None and (
+            not isinstance(smoke, list) or not smoke or not all(
+                isinstance(command, str) and command.strip()
+                for command in smoke)):
+        raise ValueError(
+            "mission.verification.smoke_commands must be non-empty strings")
     speed = mission.get("speed")
     if speed is not None:
         if not isinstance(speed, dict):

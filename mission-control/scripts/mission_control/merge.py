@@ -662,9 +662,54 @@ class MergeCoordinator:
         )
         return value, result_commit, scope
 
+    def _post_merge_commands(
+        self, record: dict[str, Any], result_commit: str, was_conflict: bool,
+    ) -> tuple[list[str] | None, str, str]:
+        """Choose the post-merge command set and record why.
+
+        The full suite is the safe default.  A smoke set runs only when the
+        integrated tree is byte-identical to the implementation tree the
+        Verifier already ran the full suite against, so nothing new can regress.
+        ``None`` selects the full configured command set.
+        """
+        mission = self.store.document("mission").data
+        verification = mission.get("verification") or {}
+        if verification.get("post_merge", "auto") == "full":
+            return None, "full", "mission requires full post-merge verification"
+        if was_conflict:
+            return None, "full", "conflict resolution integrated new content"
+        integration = Path(record["integration_path"])
+        impl_tree = git(
+            integration,
+            ["rev-parse", record["implementation_commit"] + "^{tree}"],
+        ).stdout.strip()
+        result_tree = git(
+            integration, ["rev-parse", result_commit + "^{tree}"],
+        ).stdout.strip()
+        if impl_tree != result_tree:
+            return (
+                None, "full",
+                "target advanced; integrated tree differs from verified tree")
+        smoke = verification.get("smoke_commands")
+        if smoke is not None:
+            if not isinstance(smoke, list) or not smoke or not all(
+                    isinstance(command, str) and command.strip()
+                    for command in smoke):
+                raise ValueError(
+                    "mission.verification.smoke_commands must be non-empty "
+                    "strings")
+            return list(smoke), "smoke", (
+                "integrated tree equals the verified tree; smoke set only")
+        build = (mission.get("repo_oracle") or {}).get("build")
+        if build:
+            return [build], "smoke", (
+                "integrated tree equals the verified tree; build liveness only")
+        return None, "full", "no smoke set configured for an identical tree"
+
     def finalize(self, item_id: str) -> dict[str, Any]:
         versioned = self.store.queue_item(item_id)
         item = versioned.data
+        was_conflict = item["state"] == "merge-conflict"
         runtime = self.store.runtime_record("merge_jobs", item_id)
         if runtime is None:
             raise ValueError(
@@ -711,8 +756,10 @@ class MergeCoordinator:
         integration = Path(record["integration_path"])
         manager = SandboxManager(self.store, integration)
         manager.prepare(item_id, result_commit)
+        commands, scope_mode, scope_reason = self._post_merge_commands(
+            record, result_commit, was_conflict)
         sandbox = manager.run(
-            item_id, evidence_name="post-merge-sandbox.json")
+            item_id, commands, evidence_name="post-merge-sandbox.json")
         passed = all(
             command["exit_code"] == 0 for command in sandbox["commands"])
         verification = {
@@ -720,6 +767,8 @@ class MergeCoordinator:
             "verdict": "green" if passed else "red",
             "result_commit": result_commit,
             "target_head": record["target_head"],
+            "verification_scope": scope_mode,
+            "scope_reason": scope_reason,
             "sandbox_evidence_sha256": file_hash(
                 self.store.evidence_dir(item_id) /
                 "post-merge-sandbox.json"),

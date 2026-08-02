@@ -160,6 +160,10 @@ def _default_mission(goal: str | None) -> dict[str, Any]:
             "max_cas_retries": 3,
             "require_resolution_review": True,
         },
+        "verification": {
+            "post_merge": "auto",
+            "smoke_commands": None,
+        },
         "repo_oracle": {"build": build, "test": test, "lint": None},
         "gates": {
             "orchestrator_approval_min_blast": "high",

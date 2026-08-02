@@ -1045,7 +1045,10 @@ Create a fix item.
         self.run_cli(
             "configure",
             "--json",
-            json.dumps({"execution": {"commands": [failing]}}),
+            json.dumps({
+                "execution": {"commands": [failing]},
+                "verification": {"post_merge": "full"},
+            }),
         )
         result = self.run_cli("merge", "finalize", "MC-1", ok=False)
         self.assertIn("post-merge verification failed", result.stderr)
@@ -1061,6 +1064,53 @@ Create a fix item.
                 encoding="utf-8"))
         self.assertTrue(resolution["resolution_allowed"])
         self.assertFalse(resolution["semantic_invariant_violation"])
+
+    def test_auto_post_merge_smokes_identical_tree(self):
+        self.add_and_claim(fast=True)
+        self.enter_build()
+        self.write_verify()
+        self.run_cli("transition", "MC-1", "ready-to-merge")
+        self.run_cli("merge", "prepare", "MC-1")
+        # A fast-forward integration reproduces the already-verified tree, so
+        # the redundant full suite is skipped; a failing command must not run.
+        failing = f'"{sys.executable}" -c "import sys;sys.exit(7)"'
+        self.run_cli(
+            "configure",
+            "--json",
+            json.dumps({"execution": {"commands": [failing]}}),
+        )
+        self.run_cli("merge", "finalize", "MC-1")
+        post = json.loads(
+            self.evidence("MC-1", "post-merge-verify.json").read_text(
+                encoding="utf-8"))
+        self.assertEqual(post["verification_scope"], "smoke")
+        self.assertEqual(post["verdict"], "green")
+        self.assertEqual(self.load("queue")["items"][0]["state"], "done")
+
+    def test_auto_post_merge_runs_full_when_target_advanced(self):
+        self.add_and_claim(fast=True)
+        self.enter_build()
+        self.write_verify()
+        self.run_cli("transition", "MC-1", "ready-to-merge")
+        # The target advances before integration, so the merged tree differs
+        # from the verified implementation tree and the full suite must run.
+        (self.repo / "unrelated.txt").write_text("x\n", encoding="utf-8")
+        self.git("add", "unrelated.txt")
+        self.git("commit", "-qm", "advance target before merge")
+        self.run_cli("merge", "prepare", "MC-1")
+        failing = f'"{sys.executable}" -c "import sys;sys.exit(7)"'
+        self.run_cli(
+            "configure",
+            "--json",
+            json.dumps({"execution": {"commands": [failing]}}),
+        )
+        result = self.run_cli("merge", "finalize", "MC-1", ok=False)
+        self.assertIn("post-merge verification failed", result.stderr)
+        post = json.loads(
+            self.evidence("MC-1", "post-merge-verify.json").read_text(
+                encoding="utf-8"))
+        self.assertEqual(post["verification_scope"], "full")
+        self.assertEqual(post["verdict"], "red")
 
     def test_target_ref_cas_loss_requeues_then_retries(self):
         self.add_and_claim(fast=True)

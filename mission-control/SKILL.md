@@ -45,7 +45,7 @@ work one capable agent can safely complete.
 GOAL
   └─ ARCHITECT ─ backlog
        └─ TRIAGE ─ track = express | standard | full
-            ├─ express (low risk + speed request) ─ triage.json
+            ├─ express (low risk, balanced/fast) ─ triage.json
             │    └─ APPROVED ─ IMPLEMENTER ─ VERIFIER ─ merge
             └─ standard | full
                  └─ SCOUT ─ research.md + semantic touch targets
@@ -163,16 +163,18 @@ Risk collapses the routing signals: any single strong signal
 (`blast_radius` high/critical, `complexity` high, or `concurrency`) is **high
 risk**; every signal benign is **low risk**; otherwise **medium**.
 
-- **express** — low risk *and* a `fast` speed request. Skips the Scout and
-  Plan-Reviewer spawns; the claimant records `evidence/<id>/triage.json`
-  in their place. Triage is bound to the backlog version, repository commit,
-  mission speed, source citations, and semantic scope. All mechanical gates
-  still run: lease coverage, semantic scope, private sandbox, post-merge
-  verification, CAS, and audit. Mark the item `--fast-track` and record triage
-  before claiming; `claim` recomputes risk and refuses the shortcut if it is
-  not genuinely low.
-- **standard** — the default full plan→build→merge chain without mandatory
-  orchestrator approval.
+- **express** — the default for low-risk items on `balanced` or `fast` speed.
+  Skips the Scout and Plan-Reviewer spawns; the claimant records
+  `evidence/<id>/triage.json` in their place. Triage is bound to the backlog
+  version, repository commit, mission speed, source citations, and semantic
+  scope. All mechanical gates still run: lease coverage, semantic scope,
+  private sandbox, post-merge verification, CAS, and audit. A `thorough`
+  posture keeps a low-risk item on standard so the plan-review gate still runs.
+  Mark the item `--fast-track` and record triage before claiming; `claim`
+  recomputes risk and refuses the shortcut if it is not genuinely low.
+- **standard** — the full plan→build→merge chain without mandatory
+  orchestrator approval. It is the medium-risk default and the low-risk route
+  under a `thorough` posture.
 - **full** — high risk. Research, plan review, orchestrator approval when the
   gate threshold is met, and mandatory code review.
 
@@ -320,11 +322,17 @@ result against semantic leases, and writes merge evidence.
   `resolution_commit` and the embedded code-review record may complete the
   sealed conflict analysis.
 
-`merge finalize` recomputes scope, runs the full sandbox against the integrated
-commit, and publishes with `git update-ref <ref> <new> <expected-old>`. A CAS
-loss returns the item to `merge-pending`; retry integration against the new
-head. A failed post-merge sandbox does not publish and creates a reviewed
-resolution task.
+`merge finalize` recomputes scope, runs the post-merge sandbox against the
+integrated commit, and publishes with `git update-ref <ref> <new>
+<expected-old>`. Post-merge verification scales to what integration actually
+changed: when the integrated tree is byte-identical to the implementation tree
+the Verifier already ran the full suite against (a fast-forward), it runs a
+smoke/liveness command instead of the whole suite. Any conflict resolution, an
+advanced target whose merged tree differs, or `verification.post_merge: full`
+forces the complete command set. The chosen scope and reason are sealed in
+`post-merge-verify.json`. A CAS loss returns the item to `merge-pending`; retry
+integration against the new head. A failed post-merge sandbox does not publish
+and creates a reviewed resolution task.
 
 `complete` is deprecated. It can finalize only an already prepared
 `post-merge-verifying` item; it never performs or bypasses merge preparation.

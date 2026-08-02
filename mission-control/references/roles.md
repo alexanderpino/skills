@@ -152,8 +152,11 @@ Verify the committed implementation:
    `degraded_isolation: true`; never relabel it as equivalent to a container.
 
 Incremental builds are acceptable for iteration when the private build
-directory is retained. The final item verification and post-merge verification
-must execute the configured full command set.
+directory is retained. The final item verification must execute the configured
+full command set. Post-merge verification also runs the full set, except that a
+fast-forward integration whose tree is byte-identical to this verified tree may
+run only a smoke/liveness command, since there is nothing new to regress; the
+coordinator records that scope in `post-merge-verify.json`.
 
 Verdict `green | red | oracle-broken`. Red includes reproducible evidence.
 Oracle-broken halts build routing; never grade against a known broken baseline.
