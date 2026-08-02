@@ -22,7 +22,13 @@ sys.path.insert(0, str(SCRIPTS))
 
 from mission_control.evidence import validate_sandbox
 from mission_control.merge import MergeCoordinator
-from mission_control.models import LeaseConflict, StateConflict, now
+from mission_control.models import (
+    LeaseConflict,
+    StateConflict,
+    classify_risk,
+    now,
+    recommend_track,
+)
 from mission_control.sandbox import CommandResult, SandboxManager
 from mission_control.semantic import (
     SemanticRegistry,
@@ -508,6 +514,37 @@ class SandboxTest(TempCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("DEPRECATED", result.stderr)
         self.assertIn("ok", result.stdout)
+
+
+class TrackPolicyTest(unittest.TestCase):
+    def test_low_risk_fast_request_grants_express(self):
+        track, risk, _ = recommend_track("low", "low", False, "fast")
+        self.assertEqual((track, risk), ("express", "low"))
+
+    def test_low_risk_without_fast_request_stays_standard(self):
+        track, risk, _ = recommend_track("low", "low", False, "balanced")
+        self.assertEqual((track, risk), ("standard", "low"))
+
+    def test_high_signal_overrides_fast_request(self):
+        for blast, complexity, concurrency in [
+                ("high", "low", False),
+                ("low", "high", False),
+                ("low", "low", True)]:
+            track, risk, reason = recommend_track(
+                blast, complexity, concurrency, "fast")
+            self.assertEqual(track, "full")
+            self.assertEqual(risk, "high")
+            self.assertIn("declined", reason)
+
+    def test_medium_risk_declines_express(self):
+        track, risk, _ = recommend_track("medium", "low", False, "fast")
+        self.assertEqual((track, risk), ("standard", "medium"))
+
+    def test_classify_risk_boundaries(self):
+        self.assertEqual(classify_risk("low", "low", False), "low")
+        self.assertEqual(classify_risk("medium", "low", False), "medium")
+        self.assertEqual(classify_risk("critical", "low", False), "high")
+        self.assertEqual(classify_risk("low", "low", True), "high")
 
 
 if __name__ == "__main__":

@@ -4,11 +4,14 @@ description: >-
   Durable command-and-control orchestration for middle-large and large
   repository changes executed by several agents. Uses canonical SQLite/WAL
   state, semantic leases, private build sandboxes, evidence-gated transitions,
-  automated merge coordination, and crash recovery. Use when the user asks for
-  a sustained multi-agent implementation mission, maximum-throughput
-  decomposition, or resumption/audit of an existing .mission-control state.
-  Do not use for small fixes, ordinary one-agent coding, or lightweight
-  delegation where this lifecycle would add more ceremony than safety.
+  automated merge coordination, and crash recovery. Scales ceremony per item
+  across express/standard/full tracks so low-risk slices move fast without
+  losing the mechanical evidence chain. Use when the user asks for a sustained
+  multi-agent implementation mission, maximum-throughput decomposition, faster
+  results on a mixed backlog, or resumption/audit of an existing
+  .mission-control state. Do not use for small fixes, ordinary one-agent
+  coding, or lightweight delegation where this lifecycle would add more
+  ceremony than safety.
 ---
 
 # Mission Control
@@ -41,23 +44,28 @@ work one capable agent can safely complete.
 ```text
 GOAL
   └─ ARCHITECT ─ backlog
-       └─ SCOUT ─ research.md + semantic touch targets
-            └─ PLAN REVIEWER ─ plan-review.json
-                 └─ ORCHESTRATOR APPROVAL (high/critical only)
-                      └─ APPROVED
-                           └─ IMPLEMENTER ─ committed branch + handoff.md
-                                └─ VERIFIER ─ sandbox.json + verify.json
-                                     └─ CODE REVIEWER (medium+ only)
-                                          └─ MERGE PENDING
-                                               ├─ clean mechanical merge
-                                               └─ MERGE AGENT (conflicts only)
-                                                    └─ post-merge sandbox
-                                                         └─ CAS publish ─ DONE
+       └─ TRIAGE ─ track = express | standard | full
+            ├─ express (low risk + speed request) ─ triage.json
+            │    └─ APPROVED ─ IMPLEMENTER ─ VERIFIER ─ merge
+            └─ standard | full
+                 └─ SCOUT ─ research.md + semantic touch targets
+                      └─ PLAN REVIEWER ─ plan-review.json
+                           └─ ORCHESTRATOR APPROVAL (high/critical only)
+                                └─ APPROVED
+                                     └─ IMPLEMENTER ─ committed branch + handoff.md
+                                          └─ VERIFIER ─ sandbox.json + verify.json
+                                               └─ CODE REVIEWER (medium+ or concurrency)
+                                                    └─ MERGE PENDING
+                                                         ├─ clean mechanical merge
+                                                         └─ MERGE AGENT (conflicts only)
+                                                              └─ post-merge sandbox
+                                                                   └─ CAS publish ─ DONE
 ```
 
 Plan gates bless intent. Build gates bless the implementation. Merge gates
 bless the integrated result. Never substitute evidence from one chain for
-another.
+another. The express track drops the *plan-side agent gates* but never the
+mechanical ones (semantic scope, sandbox, CAS, audit).
 
 ## Durable state
 
@@ -117,14 +125,18 @@ Record:
 3. **Throughput posture** — ask whether to maximize throughput. In autonomous
    mode, maximize only when the work has real parallel slices and the repo
    oracle is reliable. Record decision maker and reasoning.
-4. **Concurrency limits** — implementers 2, scouts 2, investigators 1 by
+4. **Speed posture** — record the user's speed preference: `thorough`,
+   `balanced` (default), or `fast`. Speed only *lowers ceremony inside the safe
+   envelope*; it never overrides a risk-driven floor. Push back in writing when
+   a fast request meets real risk (`init --speed`, or `speed` in `configure`).
+5. **Concurrency limits** — implementers 2, scouts 2, investigators 1 by
    default. Raise implementer width only when semantic targets can remain
    disjoint.
-5. **Repo oracle** — build and test commands are mandatory before building;
+6. **Repo oracle** — build and test commands are mandatory before building;
    lint is optional.
-6. **Execution policy** — prefer Docker or Podman with a pinned image. Native
+7. **Execution policy** — prefer Docker or Podman with a pinned image. Native
    execution is an explicit degraded fallback and is always labeled as such.
-7. **Merge target** — default is the symbolic current branch; configure
+8. **Merge target** — default is the symbolic current branch; configure
    `merge.target_ref` when detached or when another integration ref is desired.
 
 ## Phase 1: architecture gate
@@ -137,6 +149,59 @@ targets disjoint. Never manufacture filler.
 Gate the initial backlog with the user, or with a Plan Reviewer in fully
 autonomous mode. An ungated self-decomposing pipeline can invent work.
 
+## Track selection
+
+Every item is routed onto one of three tracks. The orchestrator scales ceremony
+to **risk first, speed second**, and asks the CLI rather than guessing:
+
+```bash
+python scripts/pipeline.py --root .mission-control track MC-7 \
+  --blast low --complexity low --speed fast
+```
+
+Risk collapses the routing signals: any single strong signal
+(`blast_radius` high/critical, `complexity` high, or `concurrency`) is **high
+risk**; every signal benign is **low risk**; otherwise **medium**.
+
+- **express** — low risk *and* a `fast` speed request. Skips the Scout and
+  Plan-Reviewer spawns; the claimant records `evidence/<id>/triage.json`
+  in their place. Triage is bound to the backlog version, repository commit,
+  mission speed, source citations, and semantic scope. All mechanical gates
+  still run: lease coverage, semantic scope, private sandbox, post-merge
+  verification, CAS, and audit. Mark the item `--fast-track` and record triage
+  before claiming; `claim` recomputes risk and refuses the shortcut if it is
+  not genuinely low.
+- **standard** — the default full plan→build→merge chain without mandatory
+  orchestrator approval.
+- **full** — high risk. Research, plan review, orchestrator approval when the
+  gate threshold is met, and mandatory code review.
+
+**Pushing back.** A `fast` request never buys the express track for a medium or
+high-risk item; the recommender downgrades it to the safe floor and records why.
+`concurrency: true` forces code review regardless of blast radius or track.
+Never weaken a gate to satisfy a speed request; state the residual risk instead.
+Use `claim MC-7 --standard` to atomically accept the item into grounded planning
+when an express request is unwise. The selected route is durable queue state;
+transition and audit replay policy from sealed evidence and reject a weaker
+route.
+
+### Reuse grounded plans
+
+Do not repeat Scout and Plan Review merely because the target branch advanced.
+Revalidate the existing plan against the new commit:
+
+```bash
+python scripts/pipeline.py --root .mission-control revalidate MC-7
+```
+
+The command computes the semantic delta since the last validated commit. If no
+changed target overlaps the plan's sealed lease targets, it seals
+`plan-revalidation.json` and advances the validated commit. If any target
+overlaps — including conservative file fallback — the plan is stale and returns
+to research. `worktree-add` refuses a plan that has not been validated for the
+current configured merge target (the symbolic current branch by default). This
+is incremental invalidation, not a quality waiver.
+
 ## Phase 2: continuous routing loop
 
 At the start of every cycle run `status`. Act first on:
@@ -146,6 +211,19 @@ At the start of every cycle run `status`. Act first on:
 - repeated semantic contention;
 - `DIAGNOSIS READY`;
 - unresolved agenda notes.
+
+`status` is the orchestrator's derived worklist. For a human-facing view of what
+is being worked on and what comes next, use the board:
+
+```bash
+python scripts/pipeline.py --root .mission-control board
+```
+
+The board lists every in-flight item with its track, risk, current gate, and the
+concrete next step, then the ready and dependency-waiting backlog. It is derived
+state — never hand-maintain it. Missing or malformed routing evidence is
+reported as `unknown`, never assumed low risk; expired leases are not shown as
+held.
 
 ### Feed the plan side
 
@@ -315,6 +393,25 @@ Every brief must include:
 Each role owns one artifact. Gates matter even when roles must run
 sequentially.
 
+## Pause and checkpoint
+
+When the user asks to pause, stop, or hand off the mission, write a durable
+checkpoint before ending the turn:
+
+```bash
+python scripts/pipeline.py --root .mission-control checkpoint \
+  --note "reason for pausing"
+```
+
+This snapshots the board and writes a timestamped
+`checkpoints/checkpoint-<ts>.md` plus a stable `CHECKPOINT.md` pointer. Each
+checkpoint contains the latest status list (in-flight items with their next
+steps, ready/waiting backlog, and anything needing attention) and a short
+continuation prompt that a resuming orchestrator can act on directly. Canonical
+SQLite/WAL state already survives interruption; the checkpoint is the
+human-readable resume brief that rides on top of it. Report the continuation
+prompt to the user when you pause.
+
 ## Audit and recovery
 
 Run before declaring the mission complete:
@@ -339,4 +436,7 @@ and retry. Never delete unmerged work implicitly.
 - `references/roles.md` — Architect, Scout, Plan Reviewer, Implementer,
   Verifier, Code Reviewer, Merge Agent, Investigator, and Designer briefs.
 - `scripts/pipeline.py` — composition entrypoint; `--help` lists commands.
+  `track` recommends a track, `revalidate` reuses non-overlapping grounding,
+  `board` shows in-flight work and next steps, and `checkpoint` writes a pause
+  snapshot with a continuation prompt.
 - `scripts/wait-in-line.py` — deprecated legacy mutex wrapper.

@@ -16,6 +16,8 @@ from typing import Any
 SCHEMA_VERSION = 2
 BLAST_ORDER = ("low", "medium", "high", "critical")
 COMPLEXITIES = ("low", "medium", "high")
+TRACKS = ("express", "standard", "full")
+SPEED_PREFERENCES = ("thorough", "balanced", "fast")
 MERGE_STATES = (
     "merge-pending",
     "merging",
@@ -71,6 +73,92 @@ class LeaseConflict(ValueError):
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+
+
+def classify_risk(blast: str, complexity: str, concurrency: bool) -> str:
+    """Collapse routing signals into low/medium/high risk.
+
+    High risk is any single strong signal; low risk requires every signal to be
+    benign.  Concurrency is always high because shared mutable state cannot be
+    graded mechanically.
+    """
+    if blast in ("high", "critical") or complexity == "high" or concurrency:
+        return "high"
+    if blast == "low" and complexity == "low" and not concurrency:
+        return "low"
+    return "medium"
+
+
+def recommend_track(
+    blast: str, complexity: str, concurrency: bool, speed: str,
+) -> tuple[str, str, str]:
+    """Return (track, risk, rationale) for an item.
+
+    The track scales ceremony to risk first and speed second.  A speed request
+    can only *lower* ceremony inside the safe envelope; it never overrides a
+    risk-driven floor, which is how the orchestrator pushes back on unwise
+    fast-tracking.
+    """
+    risk = classify_risk(blast, complexity, concurrency)
+    if risk == "high":
+        drivers = []
+        if blast in ("high", "critical"):
+            drivers.append(f"blast_radius={blast}")
+        if complexity == "high":
+            drivers.append("complexity=high")
+        if concurrency:
+            drivers.append("concurrency")
+        reason = (
+            "high risk (" + ", ".join(drivers) + ") requires full ceremony: "
+            "research, plan review, and code review")
+        if speed == "fast":
+            reason += "; speed request declined — correctness dominates here"
+        return "full", risk, reason
+    if risk == "low":
+        if speed == "fast":
+            return (
+                "express", risk,
+                "low-risk mechanical change; fast track granted "
+                "(mechanical gates still apply)")
+        return (
+            "standard", risk,
+            "low risk; standard track — set speed=fast to run express")
+    if speed == "fast":
+        return (
+            "standard", risk,
+            "medium risk; express declined, standard track is the safe floor")
+    if speed == "thorough":
+        return (
+            "full", risk,
+            "medium risk with thorough posture; full ceremony")
+    return "standard", risk, "medium risk; standard track"
+
+
+def route_snapshot(
+    blast: str, complexity: str, concurrency: bool, speed: str, *,
+    source: str,
+) -> dict[str, Any]:
+    if blast not in BLAST_ORDER:
+        raise ValueError(f"invalid blast radius: {blast}")
+    if complexity not in COMPLEXITIES:
+        raise ValueError(f"invalid complexity: {complexity}")
+    if not isinstance(concurrency, bool):
+        raise ValueError("concurrency must be boolean")
+    if speed not in SPEED_PREFERENCES:
+        raise ValueError(f"invalid speed preference: {speed}")
+    track, risk, rationale = recommend_track(
+        blast, complexity, concurrency, speed)
+    return {
+        "track": track,
+        "risk": risk,
+        "blast_radius": blast,
+        "complexity": complexity,
+        "concurrency": concurrency,
+        "speed_preference": speed,
+        "source": source,
+        "rationale": rationale,
+        "decided_at": now(),
+    }
 
 
 def validate_id(value: str, field: str = "id") -> str:

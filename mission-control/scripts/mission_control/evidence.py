@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -12,12 +12,14 @@ from .models import (
     BLAST_ORDER,
     COMPLEXITIES,
     GATE_EVIDENCE,
+    SPEED_PREFERENCES,
     file_hash,
     normalize_path,
     parse_bool,
     parse_time,
+    recommend_track,
 )
-from .semantic import parse_target_json
+from .semantic import canonical_target, parse_target_json
 
 
 FRESHNESS_TOLERANCE_SECONDS = 1.0
@@ -231,6 +233,124 @@ def validate_mission(mission: dict[str, Any]) -> None:
         raise ValueError("mission.merge must be an object")
     if merge.get("max_cas_retries", 3) < 1:
         raise ValueError("mission.merge.max_cas_retries must be positive")
+    speed = mission.get("speed")
+    if speed is not None:
+        if not isinstance(speed, dict):
+            raise ValueError("mission.speed must be an object")
+        if speed.get("preference", "balanced") not in SPEED_PREFERENCES:
+            raise ValueError(
+                "mission.speed.preference must be thorough, balanced, or fast")
+
+
+def validate_triage(
+    evidence_dir: Path, item_id: str, *,
+    expected_speed: str | None = None,
+    expected_backlog_version: int | None = None,
+    expected_base_commit: str | None = None,
+    require_fresh: bool = False,
+) -> dict[str, Any]:
+    """Validate the express fast-track justification artifact.
+
+    Fast-track skips the Scout/Plan-Reviewer chain, so ``triage.json`` is the
+    minimal grounded evidence that replaces it.  Validation re-derives the
+    recommended track and refuses the express shortcut whenever the recorded
+    risk is not genuinely low — the mechanical form of orchestrator push-back.
+    """
+    path = evidence_dir / "triage.json"
+    if not path.is_file():
+        raise ValueError(
+            f"express fast-track requires {path}: record a triage "
+            "justification before claiming the item")
+    value = load_llm_json(path)
+    if value.get("item") != item_id:
+        raise ValueError(f"triage.json.item must be {item_id}")
+    if value.get("track") != "express":
+        raise ValueError("triage.json.track must be 'express'")
+    complexity = value.get("complexity")
+    if complexity not in COMPLEXITIES:
+        raise ValueError("triage.json.complexity must be low, medium, or high")
+    blast = value.get("blast_radius")
+    if blast not in BLAST_ORDER:
+        raise ValueError(
+            "triage.json.blast_radius must be low, medium, high, or critical")
+    concurrency = parse_bool(
+        value.get("concurrency"), "triage.json.concurrency")
+    speed = value.get("speed_preference")
+    if speed not in SPEED_PREFERENCES:
+        raise ValueError(
+            "triage.json.speed_preference must be thorough, balanced, or fast")
+    if speed != "fast":
+        raise ValueError("triage.json.speed_preference must be fast for express")
+    if expected_speed is not None and speed != expected_speed:
+        raise ValueError(
+            "triage.json.speed_preference does not match mission speed: "
+            f"{speed} != {expected_speed}")
+    track, risk, reason = recommend_track(
+        blast, complexity, concurrency, speed)
+    if track != "express":
+        raise ValueError(
+            f"triage.json claims express but computed risk={risk}: {reason}; "
+            "drop --fast-track and route this item through research")
+    required_string(value, "rationale", "triage.json")
+    grounding = value.get("grounding")
+    if not isinstance(grounding, list) or not grounding or not all(
+            isinstance(entry, str) and re.fullmatch(r".+:\d+", entry.strip())
+            for entry in grounding):
+        raise ValueError(
+            "triage.json.grounding must contain file:line source references")
+    paths = value.get("touch_list")
+    if not isinstance(paths, list) or not paths:
+        raise ValueError("triage.json.touch_list must be a non-empty list")
+    normalized = [normalize_path(entry) for entry in paths]
+    if len(normalized) != len(set(normalized)):
+        raise ValueError("triage.json.touch_list contains duplicate paths")
+    lease_targets = value.get("lease_targets", [])
+    parsed_targets: list[dict[str, Any]] = []
+    if lease_targets:
+        if not isinstance(lease_targets, list):
+            raise ValueError("triage.json.lease_targets must be a list")
+        for raw in lease_targets:
+            parsed_targets.append(
+                parse_target_json(raw) if isinstance(raw, str)
+                else canonical_target(raw))
+    backlog_version = value.get("backlog_version")
+    if not isinstance(backlog_version, int) or isinstance(
+            backlog_version, bool) or backlog_version < 1:
+        raise ValueError("triage.json.backlog_version must be positive integer")
+    if expected_backlog_version is not None and \
+            backlog_version != expected_backlog_version:
+        raise ValueError(
+            "triage.json is stale for the backlog revision: "
+            f"{backlog_version} != {expected_backlog_version}")
+    base_commit = required_string(value, "base_commit", "triage.json")
+    if not re.fullmatch(r"[0-9a-fA-F]{40,64}", base_commit):
+        raise ValueError("triage.json.base_commit must be a full commit hash")
+    if expected_base_commit is not None and base_commit != expected_base_commit:
+        raise ValueError(
+            "triage.json is stale for the repository base: "
+            f"{base_commit} != {expected_base_commit}")
+    acceptance = value.get("acceptance")
+    if not isinstance(acceptance, list) or not acceptance or not all(
+            isinstance(entry, str) and entry.strip() for entry in acceptance):
+        raise ValueError(
+            "triage.json.acceptance must be a non-empty list of check commands")
+    stamp = parse_time(value.get("timestamp"), "triage.json.timestamp")
+    if require_fresh:
+        current = datetime.now(timezone.utc)
+        if stamp > current + timedelta(seconds=FRESHNESS_TOLERANCE_SECONDS):
+            raise ValueError("triage.json.timestamp is in the future")
+        if current - stamp > timedelta(hours=24):
+            raise ValueError("triage.json is older than 24 hours; re-triage")
+    return {
+        "blast_radius": blast,
+        "complexity": complexity,
+        "concurrency": concurrency,
+        "speed_preference": speed,
+        "touch_list": normalized,
+        "lease_targets": parsed_targets,
+        "base_commit": base_commit,
+        "backlog_version": backlog_version,
+    }
 
 
 def validate_research(

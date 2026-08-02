@@ -101,6 +101,11 @@ leases, and update both queue and backlog in one SQLite transaction.
     "decided_by": "user",
     "reason": null
   },
+  "speed": {
+    "preference": "balanced",
+    "decided_by": "user",
+    "reason": null
+  },
   "lease_ttl_minutes": 90,
   "bounce_limit": 3,
   "semantic": {
@@ -137,6 +142,11 @@ leases, and update both queue and backlog in one SQLite transaction.
 At least one terminal condition is enabled. Build and test commands are
 mandatory before `building`. `throughput.reason` is mandatory when the
 Orchestrator decides autonomously.
+
+`speed.preference` is `thorough | balanced | fast` and biases track selection
+only. It can lower ceremony inside the safe envelope but never overrides a
+risk-driven floor; a `fast` request on a medium/high-risk item is downgraded to
+the safe track, not honored.
 
 `execution.backend` is `auto | docker | podman | native`. Container execution
 requires an image. `auto` chooses an available container only when an image is
@@ -225,6 +235,95 @@ Ledger export:
   }]
 }
 ```
+
+## Track selection
+
+Risk collapses the three routing signals: any strong signal (`blast_radius`
+high/critical, `complexity` high, or `concurrency`) is **high** risk; all benign
+is **low**; otherwise **medium**. The track is a pure function of risk and the
+mission speed preference:
+
+```text
+low  + speed fast              -> express
+low  + speed balanced/thorough -> standard
+medium                         -> standard   (full if speed thorough)
+high (any strong signal)       -> full
+```
+
+`concurrency: true` always forces code review, on every track. A `fast` request
+never upgrades a medium/high item to express; it is recorded and declined.
+The selected route is stored on the queue item with track, risk, all input
+signals, speed, source artifact, rationale, and decision timestamp. Gates and
+audit replay the policy from sealed evidence. A route may be more conservative
+than the recommendation, never less. The snapshot is immutable for that item:
+later mission-speed changes affect new routing decisions only. The captured
+`backlog_version` identifies the exact pre-claim subject revision against which
+express triage was accepted.
+
+## Triage — `evidence/<id>/triage.json`
+
+Express fast-track skips the Scout/Plan-Reviewer chain, so this artifact is the
+minimal grounded evidence that replaces it. `claim` validates it, seals it into
+the new `approved` history entry in the same claim workflow, and then records
+the accepted hash in `evidence_seals`; `audit` re-checks both. Validation occurs
+before the queue row exists, while sealing occurs immediately after the atomic
+claim, so no unvalidated artifact is accepted as approved state.
+
+```json
+{
+  "item": "MC-007",
+  "track": "express",
+  "complexity": "low",
+  "blast_radius": "low",
+  "concurrency": false,
+  "speed_preference": "fast",
+  "backlog_version": 1,
+  "base_commit": "<full commit hash>",
+  "grounding": ["src/query.py:42"],
+  "touch_list": ["src/query.py"],
+  "lease_targets": [{"path":"src/query.py","type":"symbol","qualified_symbol":"Query.execute","node_kind":"FunctionDef","base_blob":"...","base_commit":"...","structural_anchor_hash":"...","adapter":"python-ast"}],
+  "rationale": "why this is genuinely mechanical",
+  "acceptance": ["exact check command"],
+  "timestamp": "ISO-8601"
+}
+```
+
+Validation recomputes the recommended track from the recorded signals and
+rejects the file whenever the result is not `express` — a low-risk item claimed
+with `--fast-track` whose signals imply real risk cannot take the shortcut.
+It also requires mission speed `fast`, current backlog/base revisions, structured
+file:line grounding, scope, and evidence no older than 24 hours at claim.
+`acceptance` is a non-empty list of mechanically checkable commands. Triage
+targets are enforced before building exactly like research targets.
+
+## Plan revalidation — `evidence/<id>/plan-revalidation.json`
+
+```json
+{
+  "item": "MC-007",
+  "from_commit": "...",
+  "to_commit": "...",
+  "derived_from": {"file": "research.md", "sha256": "..."},
+  "planned_targets": [],
+  "changed_targets": [],
+  "overlapping_targets": [],
+  "diagnostics": [],
+  "verdict": "reusable",
+  "timestamp": "ISO-8601"
+}
+```
+
+Revalidation is allowed only after grounding is sealed and before implementation
+starts. `reusable` requires an empty semantic intersection between intervening
+changes and planned targets. File fallback overlaps any change under that path.
+The artifact is sealed in queue history and advances `plan_validated_commit`;
+overlap writes `stale` evidence but does not alter canonical route state. The
+default destination is `merge.target_ref`, falling back to the symbolic current
+branch; `--commit` may select an explicit revision for diagnostics.
+
+Merge preparation resolves and records its publication target in the merge job.
+That prepare-time target remains authoritative through finalization and CAS even
+if mission configuration changes afterward; a later item uses the new setting.
 
 ## Research document — `evidence/<id>/research.md`
 

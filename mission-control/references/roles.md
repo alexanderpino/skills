@@ -280,6 +280,25 @@ gates. Acquire leases before worktrees; route builds to sandboxes; route
 verified items through the merge coordinator; spawn Merge Agent only for an
 allowed conflict.
 
+Choose each item's track with `track`, not by intuition. Scale ceremony to risk
+first and the user's speed preference second: grant express only to genuinely
+low-risk items with a `fast` request, and record `triage.json` before claiming
+them. Push back in writing when a speed request meets real risk — downgrade to
+the safe track with `claim --standard` and name the residual risk rather than
+weakening a gate. `concurrency: true` and every `full` route always keep code
+review. Treat the persisted route as authoritative and let transition/audit
+replay it from sealed evidence.
+
+When an approved grounded plan no longer matches current HEAD, run `revalidate`.
+Reuse it only when the semantic delta is disjoint from every planned target;
+overlap returns the item to research. Do not ask Scout and Plan Reviewer to
+repeat unchanged work. Use `board` to show the user what is in flight and what
+is next; unknown evidence remains unknown rather than defaulting to low risk.
+
+When the user asks to pause or hand off, run `checkpoint` before ending the
+turn and report the continuation prompt. Canonical state already survives
+interruption; the checkpoint is the human-readable resume brief.
+
 The Orchestrator never manually merges a branch or marks an item complete.
 `merge prepare/finalize` owns integration, post-merge verification, CAS
 publication, cleanup, lease release, and done state.

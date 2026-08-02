@@ -30,7 +30,7 @@ class PipelineTest(unittest.TestCase):
         (self.repo / "seed.txt").write_text("seed\n", encoding="utf-8")
         self.git("add", "seed.txt")
         self.git("commit", "-qm", "seed")
-        self.run_cli("init", "--goal", "test mission")
+        self.run_cli("init", "--goal", "test mission", "--speed", "fast")
         self.run_cli(
             "configure", "--json",
             json.dumps({
@@ -139,9 +139,35 @@ class PipelineTest(unittest.TestCase):
         if fast:
             args.append("--fast-track")
         self.run_cli(*args)
+        if fast:
+            self.write_triage(item, blast, concurrency)
         self.run_cli("claim", item)
         if not fast:
             self.write_research(item, blast, concurrency)
+
+    def write_triage(self, item="MC-1", blast="low", concurrency=False,
+                     touch="change.txt", lease_targets=None):
+        path = self.evidence(item, "triage.json")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({
+                "item": item,
+                "track": "express",
+                "complexity": "low",
+                "blast_radius": blast,
+                "concurrency": concurrency,
+                "speed_preference": "fast",
+                "rationale": "Mechanical low-risk change, grounded in seed.txt:1.",
+                "grounding": ["seed.txt:1"],
+                "touch_list": [touch],
+                "lease_targets": lease_targets or [],
+                "backlog_version": 1,
+                "base_commit": self.git("rev-parse", "HEAD").stdout.strip(),
+                "acceptance": ["test -f change.txt"],
+                "timestamp": self.stamp(),
+            }),
+            encoding="utf-8",
+        )
 
     def write_research(self, item="MC-1", blast="low", concurrency=False):
         self.evidence(item, "research.md").write_text(
@@ -329,7 +355,15 @@ None.
         module.write_text(base_source, encoding="utf-8")
         self.git("add", "module.py")
         self.git("commit", "-qm", "python base")
-        self.add_and_claim(item, fast=True)
+        self.run_cli("add-item", item, "Test item", "--fast-track")
+        index = json.loads(
+            self.run_cli("semantic-index", "module.py").stdout)
+        target = next(
+            value for value in index["targets"]
+            if value.get("qualified_symbol") == symbol)
+        self.write_triage(
+            item, touch="module.py", lease_targets=[target])
+        self.run_cli("claim", item)
         self.run_cli("lease", item, "--symbol", f"module.py::{symbol}")
         self.run_cli("worktree-add", item)
         self.run_cli("transition", item, "building")
@@ -382,6 +416,169 @@ None.
                 self.finish(item, blast, concurrency)
         audit = self.run_cli("audit")
         self.assertIn("0 hole(s)", audit.stdout)
+
+    def test_track_recommends_and_pushes_back_on_unsafe_fast_track(self):
+        self.run_cli("add-item", "MC-1", "Risky item", "--fast-track")
+        recommend = self.run_cli(
+            "track", "MC-1", "--blast", "high", "--complexity", "low",
+            "--speed", "fast")
+        self.assertIn("recommended track: full", recommend.stdout)
+        self.assertIn("PUSH BACK", recommend.stdout)
+
+    def test_track_grants_express_for_low_risk_fast_request(self):
+        self.run_cli("add-item", "MC-1", "Trivial item")
+        recommend = self.run_cli(
+            "track", "MC-1", "--blast", "low", "--complexity", "low",
+            "--speed", "fast")
+        self.assertIn("recommended track: express", recommend.stdout)
+
+    def test_fast_track_rejected_when_triage_claims_unsafe_risk(self):
+        self.run_cli("add-item", "MC-1", "Sneaky item", "--fast-track")
+        self.write_triage("MC-1", blast="high")
+        rejected = self.run_cli("claim", "MC-1", ok=False)
+        self.assertIn("computed risk=high", rejected.stderr)
+        self.assertNotIn("Traceback", rejected.stderr)
+
+    def test_full_track_from_complexity_forces_code_review(self):
+        self.add_and_claim()
+        research = self.evidence("MC-1", "research.md")
+        research.write_text(
+            research.read_text(encoding="utf-8").replace(
+                "complexity: low", "complexity: high"),
+            encoding="utf-8",
+        )
+        self.approve()
+        self.enter_build()
+        self.write_verify()
+        blocked = self.run_cli(
+            "transition", "MC-1", "merge-pending", ok=False)
+        self.assertIn("code-review before merge-pending", blocked.stderr)
+
+    def test_express_requires_mission_speed_and_current_revision(self):
+        self.run_cli("add-item", "MC-1", "Express item", "--fast-track")
+        self.write_triage("MC-1")
+        triage = json.loads(
+            self.evidence("MC-1", "triage.json").read_text(encoding="utf-8"))
+        triage["speed_preference"] = "balanced"
+        self.evidence("MC-1", "triage.json").write_text(
+            json.dumps(triage), encoding="utf-8")
+        mismatch = self.run_cli("claim", "MC-1", ok=False)
+        self.assertIn("must be fast", mismatch.stderr)
+
+        triage["speed_preference"] = "fast"
+        self.evidence("MC-1", "triage.json").write_text(
+            json.dumps(triage), encoding="utf-8")
+        (self.repo / "advance.txt").write_text("advance\n", encoding="utf-8")
+        self.git("add", "advance.txt")
+        self.git("commit", "-qm", "advance after triage")
+        stale = self.run_cli("claim", "MC-1", ok=False)
+        self.assertIn("stale for the repository base", stale.stderr)
+
+    def test_express_rejects_stale_timestamp(self):
+        self.run_cli("add-item", "MC-1", "Express item", "--fast-track")
+        self.write_triage("MC-1")
+        path = self.evidence("MC-1", "triage.json")
+        triage = json.loads(path.read_text(encoding="utf-8"))
+        triage["timestamp"] = (
+            datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        path.write_text(json.dumps(triage), encoding="utf-8")
+        stale = self.run_cli("claim", "MC-1", ok=False)
+        self.assertIn("older than 24 hours", stale.stderr)
+
+    def test_express_lease_must_cover_triage_scope(self):
+        self.add_and_claim(fast=True)
+        self.run_cli("lease", "MC-1", "--path", "unrelated.txt")
+        self.run_cli("worktree-add", "MC-1")
+        rejected = self.run_cli(
+            "transition", "MC-1", "building", ok=False)
+        self.assertIn("does not hold leases covering", rejected.stderr)
+
+    def test_fast_request_can_be_atomically_downgraded(self):
+        self.run_cli("add-item", "MC-1", "Risky item", "--fast-track")
+        claimed = self.run_cli("claim", "MC-1", "--standard")
+        self.assertIn("PUSH BACK", claimed.stdout)
+        queue = self.load("queue")["items"][0]
+        backlog = self.load("backlog")["items"][0]
+        self.assertEqual(queue["state"], "researching")
+        self.assertFalse(backlog["fast_track"])
+
+    def test_route_speed_is_immutable_after_claim(self):
+        self.add_and_claim(fast=True)
+        self.run_cli(
+            "configure", "--json",
+            json.dumps({"speed": {"preference": "thorough"}}),
+        )
+        queue = self.load("queue")["items"][0]
+        self.assertEqual(queue["route"]["track"], "express")
+        self.assertEqual(queue["route"]["speed_preference"], "fast")
+        self.run_cli("lease", "MC-1", "--path", "change.txt")
+        self.run_cli("worktree-add", "MC-1")
+        self.run_cli("transition", "MC-1", "building")
+
+    def test_sealed_triage_scope_cannot_change_after_claim(self):
+        self.add_and_claim(fast=True)
+        path = self.evidence("MC-1", "triage.json")
+        triage = json.loads(path.read_text(encoding="utf-8"))
+        triage["touch_list"] = ["unrelated.txt"]
+        path.write_text(json.dumps(triage), encoding="utf-8")
+        self.run_cli("lease", "MC-1", "--path", "unrelated.txt")
+        self.run_cli("worktree-add", "MC-1")
+        rejected = self.run_cli(
+            "transition", "MC-1", "building", ok=False)
+        self.assertIn("changed after its gate accepted it", rejected.stderr)
+
+    def test_revalidate_reuses_disjoint_grounding_and_rejects_overlap(self):
+        self.add_and_claim()
+        self.approve()
+        (self.repo / "unrelated.txt").write_text("safe\n", encoding="utf-8")
+        self.git("add", "unrelated.txt")
+        self.git("commit", "-qm", "unrelated change")
+        self.run_cli("lease", "MC-1", "--path", "change.txt")
+        stale = self.run_cli("worktree-add", "MC-1", ok=False)
+        self.assertIn("run revalidate", stale.stderr)
+        reused = self.run_cli("revalidate", "MC-1")
+        self.assertIn("grounded plan reusable", reused.stdout)
+        self.run_cli("worktree-add", "MC-1")
+
+        self.add_and_claim("MC-2")
+        self.approve("MC-2")
+        (self.repo / "change.txt").write_text("overlap\n", encoding="utf-8")
+        self.git("add", "change.txt")
+        self.git("commit", "-qm", "overlap plan")
+        rejected = self.run_cli("revalidate", "MC-2", ok=False)
+        self.assertIn("overlaps repository changes", rejected.stderr)
+
+    def test_concurrency_forces_code_review_even_at_low_blast(self):
+        self.add_and_claim(blast="low", concurrency=True)
+        self.approve(blast="low")
+        self.enter_build()
+        self.write_verify()
+        blocked = self.run_cli(
+            "transition", "MC-1", "merge-pending", ok=False)
+        self.assertIn("code-review before merge-pending", blocked.stderr)
+        self.assertIn("concurrency", blocked.stderr)
+
+    def test_board_lists_in_flight_and_next_steps(self):
+        self.add_and_claim("MC-1", fast=True)
+        self.run_cli("add-item", "MC-2", "Queued item", "--priority", "5")
+        board = self.run_cli("board")
+        self.assertIn("IN FLIGHT", board.stdout)
+        self.assertIn("MC-1", board.stdout)
+        self.assertIn("next:", board.stdout)
+        self.assertIn("NEXT UP", board.stdout)
+        self.assertIn("MC-2", board.stdout)
+
+    def test_checkpoint_writes_status_and_continuation_prompt(self):
+        self.add_and_claim("MC-1", fast=True)
+        result = self.run_cli("checkpoint", "--note", "pausing for the day")
+        self.assertIn("checkpoint written", result.stdout)
+        self.assertIn("Resume as the Mission Control Orchestrator", result.stdout)
+        latest = self.repo / ".mc" / "CHECKPOINT.md"
+        self.assertTrue(latest.exists())
+        text = latest.read_text(encoding="utf-8")
+        self.assertIn("pausing for the day", text)
+        self.assertIn("## Continuation", text)
+        self.assertIn("MC-1", text)
 
     def test_plan_bounce_cannot_advance(self):
         self.add_and_claim()

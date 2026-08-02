@@ -32,6 +32,7 @@ from mission_control.evidence import (
     validate_review_json,
     validate_sandbox,
     validate_sealed_evidence,
+    validate_triage,
     validate_verify,
 )
 from mission_control.merge import (
@@ -43,8 +44,11 @@ from mission_control.merge import (
 from mission_control.models import (
     BLAST_ORDER,
     BOUNCES,
+    COMPLEXITIES,
     GATE_EVIDENCE,
     MERGE_STATES,
+    SPEED_PREFERENCES,
+    TRACKS,
     TRANSITIONS,
     LeaseConflict,
     StateConflict,
@@ -52,16 +56,21 @@ from mission_control.models import (
     file_hash,
     normalize_path,
     now,
+    parse_bool,
     parse_time,
+    recommend_track,
+    route_snapshot,
     validate_id,
 )
 from mission_control.sandbox import SandboxManager
 from mission_control.semantic import (
     SemanticRegistry,
     canonical_target,
+    map_committed_diff,
     parse_target_json,
     target_covers,
     targets_conflict,
+    targets_overlap,
     validate_committed_scope,
 )
 from mission_control.store import MissionStore
@@ -84,6 +93,19 @@ def repo_root() -> Path:
 
 def store_for(args: argparse.Namespace) -> MissionStore:
     return MissionStore(args.root)
+
+
+def _mission_target_ref(mission: dict[str, Any], repository: Path) -> str:
+    return (mission.get("merge") or {}).get("target_ref") or \
+        current_target_ref(repository)
+
+
+def _mission_target_commit(
+    mission: dict[str, Any], repository: Path,
+) -> tuple[str, str]:
+    target_ref = _mission_target_ref(mission, repository)
+    commit = git(repository, ["rev-parse", target_ref]).stdout.strip()
+    return target_ref, commit
 
 
 def _default_mission(goal: str | None) -> dict[str, Any]:
@@ -117,6 +139,9 @@ def _default_mission(goal: str | None) -> dict[str, Any]:
         "throughput": {
             "maximize": False, "decided_by": "user", "reason": None,
         },
+        "speed": {
+            "preference": "balanced", "decided_by": "user", "reason": None,
+        },
         "lease_ttl_minutes": 90,
         "bounce_limit": 3,
         "semantic": {"python_adapter": "stdlib-ast", "fallback": "file"},
@@ -145,6 +170,8 @@ def _default_mission(goal: str | None) -> dict[str, Any]:
 
 def cmd_init(args: argparse.Namespace) -> None:
     mission = _default_mission(args.goal)
+    if getattr(args, "speed", None):
+        mission["speed"]["preference"] = args.speed
     MissionStore.initialize(args.root, mission)
     print(
         f"initialized {args.root} with canonical SQLite/WAL state; "
@@ -259,21 +286,67 @@ def cmd_add_item(args: argparse.Namespace) -> None:
 def cmd_claim(args: argparse.Namespace) -> None:
     store = store_for(args)
     _require_spawning(store, f"claim {args.id}")
+    mission = store.document("mission").data
+    validate_mission(mission)
     backlog = store.backlog_item(args.id)
     if backlog.data["status"] != "open":
         raise ValueError(
             f"{args.id} is {backlog.data['status']}, not open")
-    state = "approved" if backlog.data.get("fast_track") else "researching"
+    requested_fast = bool(backlog.data.get("fast_track"))
+    fast_track = requested_fast and not args.standard
+    state = "approved" if fast_track else "researching"
     evidence = store.evidence_dir(args.id)
     evidence.mkdir(parents=True, exist_ok=True)
+    if fast_track:
+        speed = (mission.get("speed") or {}).get("preference", "balanced")
+        _, base = _mission_target_commit(mission, repo_root())
+        header = validate_triage(
+            evidence, args.id,
+            expected_speed=speed,
+            expected_backlog_version=backlog.version,
+            expected_base_commit=base,
+            require_fresh=True,
+        )
+        route = route_snapshot(
+            header["blast_radius"], header["complexity"],
+            parse_bool(header["concurrency"], "concurrency"), speed,
+            source="triage.json",
+        )
+        route["backlog_version"] = backlog.version
+        if route["track"] != "express":
+            raise ValueError(
+                f"{args.id} cannot use express: {route['rationale']}; "
+                f"run claim {args.id} --standard")
     item = {
         "id": args.id,
         "state": state,
         "ui": backlog.data.get("ui", False),
         "history": [{"state": state, "at": now()}],
     }
+    if fast_track:
+        item["route"] = route
+        item["plan_base_commit"] = header["base_commit"]
+        item["plan_validated_commit"] = header["base_commit"]
+    elif requested_fast:
+        item["speed_pushback"] = (
+            "express request downgraded by orchestrator to grounded planning")
     record_gate_baseline(item, state, evidence)
-    store.claim_item(args.id, backlog.version, item)
+    if fast_track:
+        seal = {
+            "file": "triage.json",
+            "sha256": file_hash(evidence / "triage.json"),
+        }
+        item["history"][-1].setdefault("additional_evidence", []).append(seal)
+    store.claim_item(
+        args.id, backlog.version, item,
+        backlog_patch={"fast_track": False} if args.standard else None,
+    )
+    if fast_track:
+        store.seal_evidence(args.id, "approved", evidence / "triage.json")
+    if requested_fast and args.standard:
+        print(
+            f"PUSH BACK: {args.id} express request declined; "
+            "routing through grounded planning")
     print(f"{args.id}: backlog -> {state} (evidence: {evidence})")
 
 
@@ -296,16 +369,50 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(text if text.endswith("\n") else text + "\n",
+                         encoding="utf-8")
+    temporary.replace(path)
+
+
 def _research(
     store: MissionStore, item_id: str, item: dict[str, Any],
     fast_track: bool, *, current: str,
 ) -> dict[str, Any]:
+    evidence = store.evidence_dir(item_id)
     if fast_track:
-        return {}
+        validate_sealed_evidence(item, "triage.json", evidence)
+        return validate_triage(evidence, item_id)
+    if current != "researching":
+        validate_sealed_evidence(item, "research.md", evidence)
     return validate_research(
-        store.evidence_dir(item_id), item_id, item,
-        require_fresh=current == "researching",
+        evidence, item_id, item, require_fresh=current == "researching")
+
+
+def _validate_route_snapshot(
+    route: dict[str, Any], header: dict[str, Any], source: str,
+) -> None:
+    if not isinstance(route, dict):
+        raise ValueError("missing authoritative route snapshot")
+    speed = route.get("speed_preference")
+    expected = route_snapshot(
+        header["blast_radius"], header["complexity"],
+        parse_bool(header.get("concurrency", False), "concurrency"),
+        speed, source=source,
     )
+    for field in (
+            "risk", "blast_radius", "complexity", "concurrency",
+            "speed_preference", "source"):
+        if route.get(field) != expected[field]:
+            raise ValueError(
+                f"route snapshot {field} does not match sealed {source}")
+    track = route.get("track")
+    if track not in TRACKS or TRACKS.index(track) < TRACKS.index(
+            expected["track"]):
+        raise ValueError(
+            f"route snapshot weakens required {expected['track']} track")
 
 
 def _worktree_tip(item: dict[str, Any]) -> tuple[Path, str, str]:
@@ -348,11 +455,13 @@ def _expected_targets(
     store: MissionStore, item_id: str, header: dict[str, Any],
     fast_track: bool,
 ) -> list[dict[str, Any]]:
-    if fast_track:
-        return []
     values = header.get("lease_targets") or []
     if values:
-        return [parse_target_json(raw) for raw in values]
+        return [
+            parse_target_json(raw) if isinstance(raw, str)
+            else canonical_target(raw)
+            for raw in values
+        ]
     return [{
         "path": normalize_path(path),
         "type": "file",
@@ -396,13 +505,35 @@ def cmd_transition(args: argparse.Namespace) -> None:
             raise ValueError(
                 "only merge-side blocks may return to merge-pending")
     backlog = store.backlog_item(args.id)
-    fast_track = bool(backlog.data.get("fast_track"))
+    fast_track = item.get("route", {}).get("track") == "express"
     header = _research(
         store, args.id, item, fast_track, current=current)
     blast = header.get("blast_radius", "low")
     is_bounce = (current, target) in BOUNCES
     forward = target != "blocked"
     additional_seals: list[dict[str, str]] = []
+
+    if current != "researching":
+        _validate_route_snapshot(
+            item.get("route"), header,
+            "triage.json" if fast_track else "research.md",
+        )
+
+    if current == "researching" and target == "plan-review":
+        speed = (mission.get("speed") or {}).get("preference", "balanced")
+        route = route_snapshot(
+            blast, header["complexity"],
+            parse_bool(header.get("concurrency", False), "concurrency"),
+            speed, source="research.md",
+        )
+        if route["track"] == "express":
+            route["track"] = "standard"
+            route["rationale"] = (
+                "grounding already completed; continue the standard plan gate")
+        item["route"] = route
+        _, plan_base = _mission_target_commit(mission, repo_root())
+        item["plan_base_commit"] = plan_base
+        item["plan_validated_commit"] = plan_base
 
     if forward:
         evidence_dir = store.evidence_dir(args.id)
@@ -462,11 +593,22 @@ def cmd_transition(args: argparse.Namespace) -> None:
             raise ValueError(
                 f"{args.id} blast_radius={blast} requires "
                 "orchestrator-approval")
-        if current == "verifying" and target == "merge-pending" and \
+        if current == "verifying" and target == "merge-pending":
+            concurrency = parse_bool(
+                header.get("concurrency", False), "concurrency")
+            needs_review = (
+                item.get("route", {}).get("track") == "full"
+                or
                 BLAST_ORDER.index(blast) >= BLAST_ORDER.index(
-                    gates["code_review_min_blast"]):
-            raise ValueError(
-                f"{args.id} blast_radius={blast} requires code-review")
+                    gates["code_review_min_blast"])
+                or concurrency)
+            if needs_review:
+                driver = f"blast_radius={blast}"
+                if concurrency:
+                    driver += ", concurrency"
+                raise ValueError(
+                    f"{args.id} requires code-review before merge-pending "
+                    f"({driver})")
         if target == "building":
             _require_spawning(store, f"start building {args.id}")
             if not (
@@ -718,6 +860,13 @@ def cmd_worktree_add(args: argparse.Namespace) -> None:
     if not store.leases(args.id):
         raise ValueError(
             f"worktree-add requires {args.id} to hold a lease")
+    repository = repo_root()
+    mission = store.document("mission").data
+    target_ref, current_head = _mission_target_commit(mission, repository)
+    if item.get("plan_validated_commit") != current_head:
+        raise ValueError(
+            f"{args.id} grounded plan is not validated for current HEAD; "
+            f"run revalidate {args.id}")
     if item.get("worktree"):
         path = Path(item["worktree"])
         if not path.exists():
@@ -728,14 +877,13 @@ def cmd_worktree_add(args: argparse.Namespace) -> None:
     store.paths["worktrees"].mkdir(parents=True, exist_ok=True)
     path = (store.paths["worktrees"] / args.id).resolve()
     branch = f"mc/{args.id}"
-    repository = repo_root()
     exists = git(
         repository, ["rev-parse", "--verify", "--quiet", branch],
         check=False).returncode == 0
     git(
         repository,
         ["worktree", "add", str(path), branch] if exists else
-        ["worktree", "add", "-b", branch, str(path)],
+        ["worktree", "add", "-b", branch, str(path), target_ref],
     )
     item["worktree"] = str(path)
     item.setdefault(
@@ -755,6 +903,87 @@ def cmd_worktree_add(args: argparse.Namespace) -> None:
     print(
         f"{args.id}: worktree {path}; edits happen here, builds run through "
         "sandbox prepare/run")
+
+
+def cmd_revalidate(args: argparse.Namespace) -> None:
+    store = store_for(args)
+    versioned = store.queue_item(args.id)
+    item = dict(versioned.data)
+    if item["state"] not in (
+            "plan-review", "orchestrator-approval", "approved"):
+        raise ValueError(
+            f"revalidate requires a grounded plan, not {item['state']}")
+    route = item.get("route")
+    if not isinstance(route, dict):
+        raise ValueError(f"{args.id} has no route snapshot")
+    previous = item.get("plan_validated_commit")
+    if not previous:
+        raise ValueError(f"{args.id} has no validated plan commit")
+    repository = repo_root()
+    mission = store.document("mission").data
+    target_ref = args.commit or _mission_target_ref(mission, repository)
+    current = git(
+        repository, ["rev-parse", target_ref]).stdout.strip()
+    evidence = store.evidence_dir(args.id)
+    express = route.get("track") == "express"
+    header = _research(store, args.id, item, express, current=item["state"])
+    planned = _expected_targets(store, args.id, header, express)
+    changed: list[dict[str, Any]] = []
+    diagnostics: list[str] = []
+    if previous != current and git(
+            repository, ["diff", "--quiet", previous, current],
+            check=False).returncode:
+        report = map_committed_diff(repository, previous, current)
+        changed = report["changed_targets"]
+        diagnostics = report["diagnostics"]
+    overlap = targets_overlap(changed, planned)
+    source_name = "triage.json" if express else "research.md"
+    source_seal = sealed_record(item, source_name)
+    if source_seal is None:
+        raise ValueError(
+            f"{source_name} is not sealed; its grounding cannot be reused")
+    artifact = {
+        "item": args.id,
+        "from_commit": previous,
+        "to_commit": current,
+        "derived_from": source_seal,
+        "planned_targets": planned,
+        "changed_targets": changed,
+        "overlapping_targets": [
+            {"changed": left, "planned": right} for left, right in overlap
+        ],
+        "diagnostics": diagnostics,
+        "verdict": "stale" if overlap else "reusable",
+        "timestamp": now(),
+    }
+    path = evidence / "plan-revalidation.json"
+    _write_json(path, artifact)
+    if overlap:
+        labels = sorted({
+            f"{planned_target['path']}::"
+            f"{planned_target.get('qualified_symbol') or '*'}"
+            for _, planned_target in overlap
+        })
+        raise ValueError(
+            "grounded plan overlaps repository changes; return to research: "
+            + ", ".join(labels))
+    item["plan_validated_commit"] = current
+    seal = {"file": path.name, "sha256": file_hash(path)}
+    item.setdefault("history", []).append({
+        "state": item["state"],
+        "at": now(),
+        "reason": "plan-revalidated",
+        "additional_evidence": [seal],
+    })
+    store.update_queue_item(
+        args.id, item, versioned.version, versioned.data["state"],
+        action="plan-revalidate",
+        detail={"from": previous, "to": current},
+    )
+    store.seal_evidence(args.id, "plan-revalidate", path)
+    print(
+        f"{args.id}: grounded plan reusable at {current} "
+        f"({len(changed)} changed target(s), no overlap)")
 
 
 def cmd_worktree_remove(args: argparse.Namespace) -> None:
@@ -990,6 +1219,317 @@ def cmd_investigate(args: argparse.Namespace) -> None:
     print(f"{args.id}: closed ({args.disposition})")
 
 
+def cmd_track(args: argparse.Namespace) -> None:
+    store = store_for(args)
+    mission = store.document("mission").data
+    validate_mission(mission)
+    backlog = store.backlog_item(args.id).data
+    evidence = store.evidence_dir(args.id)
+    complexity = args.complexity
+    blast = args.blast
+    concurrency = bool(args.concurrency)
+    source = "cli overrides/defaults"
+    triage_path = evidence / "triage.json"
+    research_path = evidence / "research.md"
+    if triage_path.exists():
+        header = validate_triage(evidence, args.id)
+        complexity = complexity or header["complexity"]
+        blast = blast or header["blast_radius"]
+        concurrency = concurrency or bool(header["concurrency"])
+        source = "triage.json"
+    elif research_path.exists():
+        header = research_header(evidence)
+        complexity = complexity or header.get("complexity")
+        blast = blast or header.get("blast_radius")
+        if not concurrency:
+            concurrency = str(header.get("concurrency")).lower() == "true"
+        source = "research.md"
+    if complexity is None or blast is None:
+        raise ValueError(
+            "routing signals are unknown; provide --blast and --complexity "
+            "or create valid triage/research evidence")
+    speed = args.speed or (mission.get("speed") or {}).get(
+        "preference", "balanced")
+    track, risk, reason = recommend_track(blast, complexity, concurrency, speed)
+    fast_flag = bool(backlog.get("fast_track"))
+    print(f"{args.id} recommended track: {track}")
+    print(
+        f"  signals: blast={blast}, complexity={complexity}, "
+        f"concurrency={str(concurrency).lower()} (from {source})")
+    print(f"  risk: {risk}")
+    print(f"  speed preference: {speed}")
+    print(f"  rationale: {reason}")
+    if fast_flag and track != "express":
+        print(
+            "PUSH BACK: item carries --fast-track but express is unsafe here; "
+            "remove the flag and route through research, or reduce risk")
+    elif not fast_flag and track == "express":
+        print(
+            "note: eligible for express — add --fast-track and record "
+            "triage.json to take the fast path")
+
+
+_NEXT_STEP = {
+    "researching": "Scout writes research.md, then transition to plan-review",
+    "plan-review": "Plan Reviewer signs plan-review.json",
+    "orchestrator-approval": "Orchestrator records approval.json (high blast)",
+    "approved": "acquire leases, add worktree, transition to building",
+    "building": "Implementer commits the diff + handoff.md, then verifying",
+    "verifying": "Verifier runs the private sandbox and writes verify.json",
+    "code-review": "Code Reviewer approves code-review.json",
+    "merge-pending": "run merge prepare, then merge finalize",
+    "merging": "integration underway — check merge status",
+    "merge-conflict": "Merge Agent resolves, or serialize/reshape the backlog",
+    "post-merge-verifying": "post-merge sandbox then CAS publish",
+    "blocked": "clear the blocker, then re-enter the pipeline",
+}
+
+
+def _route_signals(
+    store: MissionStore, item_id: str,
+) -> tuple[str | None, str | None, bool | None, str]:
+    """Read routing signals from sealed triage/research, tolerating gaps.
+
+    The board and checkpoint must never crash on a half-written artifact, so a
+    malformed or missing source degrades to conservative defaults rather than
+    raising.
+    """
+    evidence = store.evidence_dir(item_id)
+    blast: str | None = None
+    complexity: str | None = None
+    concurrency: bool | None = None
+    source = "unknown"
+    try:
+        if (evidence / "triage.json").exists():
+            header = validate_triage(evidence, item_id)
+            blast, complexity = header["blast_radius"], header["complexity"]
+            concurrency = parse_bool(header["concurrency"], "concurrency")
+            source = "triage.json"
+        elif (evidence / "research.md").exists():
+            header = research_header(evidence)
+            blast = header.get("blast_radius")
+            complexity = header.get("complexity")
+            concurrency = parse_bool(
+                header.get("concurrency", False), "concurrency")
+            source = "research.md"
+    except ValueError:
+        source = "unavailable"
+    return blast, complexity, concurrency, source
+
+
+def _active_lease(lease: dict[str, Any]) -> bool:
+    return datetime.now(timezone.utc) - parse_time(
+        lease["acquired"], "lease acquired") <= timedelta(
+            minutes=lease["ttl_minutes"])
+
+
+def _next_step(item: dict[str, Any], lease_count: int) -> str:
+    state = item["state"]
+    if state == "approved":
+        if lease_count == 0:
+            return "acquire approved semantic leases"
+        if not item.get("worktree"):
+            return "create worktree (revalidate first if HEAD moved)"
+        return "transition to building"
+    if state == "blocked" and item.get("blocked_on"):
+        return f"resolve blocker {item['blocked_on']}"
+    return _NEXT_STEP.get(state, "route via status")
+
+
+def _board_view(store: MissionStore, mission: dict[str, Any]) -> dict[str, Any]:
+    queue = store.rows("queue_items")
+    backlog = store.rows("backlog_items")
+    all_leases = store.leases()
+    leases = [lease for lease in all_leases if _active_lease(lease)]
+    lease_counts: dict[str, int] = {}
+    for lease in leases:
+        lease_counts[lease["item"]] = lease_counts.get(lease["item"], 0) + 1
+    order = list(TRANSITIONS)
+    speed = (mission.get("speed") or {}).get("preference", "balanced")
+    done = {item["id"] for item in queue if item["state"] == "done"}
+    done |= {item["id"] for item in backlog if item["status"] == "done"}
+
+    in_flight = []
+    evidence_attention: list[str] = []
+    for item in queue:
+        if item["state"] == "done":
+            continue
+        route = item.get("route")
+        if isinstance(route, dict) and route.get("track") in (
+                "express", "standard", "full"):
+            track, risk = route["track"], route.get("risk", "unknown")
+        else:
+            blast, complexity, concurrency, source = _route_signals(
+                store, item["id"])
+            if None in (blast, complexity, concurrency):
+                track = risk = "unknown"
+                evidence_attention.append(
+                    f"ROUTING EVIDENCE {source.upper()}: {item['id']}")
+            else:
+                track, risk, _ = recommend_track(
+                    blast, complexity, concurrency, speed)
+        card = store.backlog_item(item["id"]).data
+        in_flight.append({
+            "id": item["id"],
+            "title": card.get("title", ""),
+            "state": item["state"],
+            "track": track,
+            "risk": risk,
+            "next_step": _next_step(item, lease_counts.get(item["id"], 0)),
+            "blocked_on": item.get("blocked_on"),
+            "leases": lease_counts.get(item["id"], 0),
+            "worktree": bool(item.get("worktree")),
+        })
+    in_flight.sort(key=lambda card: (order.index(card["state"]), card["id"]))
+
+    next_up = []
+    for card in sorted(
+            (item for item in backlog if item["status"] == "open"),
+            key=lambda item: (item["priority"], item["id"])):
+        waiting = [dep for dep in card.get("depends_on", []) if dep not in done]
+        blast, complexity, concurrency, source = _route_signals(
+            store, card["id"])
+        if None in (blast, complexity, concurrency):
+            track = "unknown"
+        else:
+            track, _, _ = recommend_track(
+                blast, complexity, concurrency, speed)
+        next_up.append({
+            "id": card["id"],
+            "title": card.get("title", ""),
+            "priority": card["priority"],
+            "ready": not waiting,
+            "waiting_on": waiting,
+            "track": track,
+        })
+
+    attention: list[str] = evidence_attention
+    for item in queue:
+        if item["state"] == "merge-pending":
+            attention.append(f"MERGE CANDIDATE: {item['id']}")
+        elif item["state"] == "merge-conflict":
+            attention.append(f"MERGE RESOLUTION: {item['id']}")
+        elif item["state"] == "blocked" and item.get("blocked_on") in done:
+            attention.append(
+                f"UNBLOCK CANDIDATE: {item['id']} "
+                f"({item['blocked_on']} done)")
+    return {
+        "generated": now(),
+        "goal": mission["goal"],
+        "speed": speed,
+        "in_flight": in_flight,
+        "next_up": next_up,
+        "done": sorted(done),
+        "attention": attention,
+        "terminal_stops": _terminal_stop_reasons(store),
+    }
+
+
+def _render_board(view: dict[str, Any]) -> list[str]:
+    lines = [
+        f"goal: {view['goal']}",
+        f"speed posture: {view['speed']}",
+        "",
+        f"IN FLIGHT ({len(view['in_flight'])}):",
+    ]
+    if not view["in_flight"]:
+        lines.append("  (nothing in flight)")
+    for card in view["in_flight"]:
+        title = f" — {card['title']}" if card["title"] else ""
+        flags = []
+        if card["leases"]:
+            flags.append(f"{card['leases']} lease(s)")
+        if card["worktree"]:
+            flags.append("worktree")
+        if card["blocked_on"]:
+            flags.append(f"blocked on {card['blocked_on']}")
+        suffix = f" [{', '.join(flags)}]" if flags else ""
+        lines.append(
+            f"  {card['id']} [{card['track']}/{card['risk']}] "
+            f"{card['state']}{title}{suffix}")
+        lines.append(f"      next: {card['next_step']}")
+    lines.append("")
+    ready = [card for card in view["next_up"] if card["ready"]]
+    waiting = [card for card in view["next_up"] if not card["ready"]]
+    lines.append(f"NEXT UP — ready ({len(ready)}):")
+    if not ready:
+        lines.append("  (none ready)")
+    for card in ready:
+        title = f" — {card['title']}" if card["title"] else ""
+        lines.append(
+            f"  {card['id']} p{card['priority']} [{card['track']}]{title}")
+    if waiting:
+        lines.append(f"NEXT UP — waiting on dependencies ({len(waiting)}):")
+        for card in waiting:
+            lines.append(
+                f"  {card['id']} p{card['priority']} "
+                f"waiting on {', '.join(card['waiting_on'])}")
+    if view["attention"]:
+        lines.append("")
+        lines.append("NEEDS ATTENTION:")
+        lines.extend(f"  {note}" for note in view["attention"])
+    if view["terminal_stops"]:
+        lines.append("")
+        lines.append(
+            f"TERMINAL: {', '.join(view['terminal_stops'])} — stop spawning")
+    return lines
+
+
+def _continuation_prompt(view: dict[str, Any], root: str) -> str:
+    flight = ", ".join(
+        f"{card['id']}:{card['state']}" for card in view["in_flight"]
+    ) or "none"
+    ready = ", ".join(
+        card["id"] for card in view["next_up"] if card["ready"]) or "none"
+    first = view["attention"][0] if view["attention"] else next((
+        f"{card['id']}: {card['next_step']}" for card in view["in_flight"]
+    ), f"claim {ready}" if ready != "none" else "no runnable work")
+    return (
+        f"Resume as the Mission Control Orchestrator for \"{view['goal']}\". "
+        f"State is at {root} (SQLite/WAL, resumable). Run `status` then "
+        f"`board`. Act first on: {first}. In flight: {flight}. Next ready: "
+        f"{ready}. Keep routing without weakening gates; never implement or "
+        "merge by hand.")
+
+
+def cmd_board(args: argparse.Namespace) -> None:
+    store = store_for(args)
+    mission = store.document("mission").data
+    validate_mission(mission)
+    view = _board_view(store, mission)
+    if getattr(args, "json", False):
+        print(json.dumps(view, indent=2))
+        return
+    print("\n".join(_render_board(view)))
+
+
+def cmd_checkpoint(args: argparse.Namespace) -> None:
+    store = store_for(args)
+    mission = store.document("mission").data
+    validate_mission(mission)
+    view = _board_view(store, mission)
+    prompt = _continuation_prompt(view, str(args.root))
+    checkpoints = store.root / "checkpoints"
+    checkpoints.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^0-9A-Za-z]", "", view["generated"])
+    body = [
+        f"# Mission Control checkpoint — {view['generated']}",
+        "",
+    ]
+    if args.note:
+        body += [f"> pause note: {args.note}", ""]
+    body += _render_board(view)
+    body += ["", "## Continuation", "", prompt, ""]
+    text = "\n".join(body)
+    path = checkpoints / f"checkpoint-{safe}.md"
+    _write_text(path, text)
+    _write_text(store.root / "CHECKPOINT.md", text)
+    print(f"checkpoint written: {path}")
+    print(f"latest pointer: {store.root / 'CHECKPOINT.md'}")
+    print("")
+    print(prompt)
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     store = store_for(args)
     mission = store.document("mission").data
@@ -1128,9 +1668,24 @@ def _audit_done(
         raise ValueError(
             f"backlog status is {backlog.get('status')}, expected done")
     evidence = store.evidence_dir(item["id"])
-    fast_track = bool(backlog.get("fast_track"))
-    header = {} if fast_track else validate_research(
-        evidence, item["id"], item, require_fresh=False)
+    route = item.get("route")
+    if not isinstance(route, dict) or route.get("track") not in (
+            "express", "standard", "full"):
+        raise ValueError("missing authoritative route snapshot")
+    fast_track = route["track"] == "express"
+    if fast_track:
+        header = validate_triage(
+            evidence, item["id"],
+            expected_speed=route.get("speed_preference"),
+            expected_backlog_version=route.get("backlog_version"),
+            expected_base_commit=item.get("plan_base_commit"),
+        )
+        validate_sealed_evidence(item, "triage.json", evidence)
+    else:
+        header = validate_research(
+            evidence, item["id"], item, require_fresh=False)
+    _validate_route_snapshot(
+        route, header, "triage.json" if fast_track else "research.md")
     blast = header.get("blast_radius", "low")
     mission = store.document("mission").data
     if not fast_track:
@@ -1158,8 +1713,9 @@ def _audit_done(
     if semantic.get("verdict") != "green" or \
             semantic.get("uncovered_targets"):
         raise ValueError("semantic-scope.json does not prove leased scope")
-    if BLAST_ORDER.index(blast) >= BLAST_ORDER.index(
-            mission["gates"]["code_review_min_blast"]):
+    if route["track"] == "full" or BLAST_ORDER.index(blast) >= BLAST_ORDER.index(
+            mission["gates"]["code_review_min_blast"]) or \
+            parse_bool(header.get("concurrency", False), "concurrency"):
         validate_code_review(
             evidence, item["id"], item, header, forward=True)
         validate_sealed_evidence(item, "code-review.json", evidence)
@@ -1277,6 +1833,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     command = commands.add_parser("init", help="create canonical SQLite state")
     command.add_argument("--goal")
+    command.add_argument("--speed", choices=SPEED_PREFERENCES)
     command.set_defaults(fn=cmd_init)
 
     command = commands.add_parser(
@@ -1306,6 +1863,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     command = commands.add_parser("claim")
     command.add_argument("id")
+    command.add_argument(
+        "--standard", action="store_true",
+        help="decline a requested express route and run grounded planning")
     command.set_defaults(fn=cmd_claim)
 
     command = commands.add_parser("transition")
@@ -1343,6 +1903,13 @@ def build_parser() -> argparse.ArgumentParser:
     command.set_defaults(fn=cmd_worktree_remove)
 
     command = commands.add_parser(
+        "revalidate",
+        help="reuse grounded plan when intervening semantic changes are disjoint")
+    command.add_argument("id")
+    command.add_argument("--commit")
+    command.set_defaults(fn=cmd_revalidate)
+
+    command = commands.add_parser(
         "semantic-index", help="inspect stable semantic targets")
     command.add_argument("path")
     command.add_argument("--commit", default="HEAD")
@@ -1372,6 +1939,15 @@ def build_parser() -> argparse.ArgumentParser:
     command.add_argument("id")
     command.set_defaults(fn=cmd_complete)
 
+    command = commands.add_parser(
+        "track",
+        help="recommend express/standard/full track from risk and speed")
+    command.add_argument("id")
+    command.add_argument("--blast", choices=BLAST_ORDER)
+    command.add_argument("--complexity", choices=COMPLEXITIES)
+    command.add_argument("--concurrency", action="store_true")
+    command.add_argument("--speed", choices=SPEED_PREFERENCES)
+    command.set_defaults(fn=cmd_track)
     command = commands.add_parser("agenda")
     command.add_argument("action", choices=("add", "resolve", "list"))
     command.add_argument("text", nargs="?")
@@ -1394,6 +1970,18 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("status").set_defaults(fn=cmd_status)
     commands.add_parser("metrics").set_defaults(fn=cmd_metrics)
     commands.add_parser("audit").set_defaults(fn=cmd_audit)
+
+    command = commands.add_parser(
+        "board",
+        help="user-facing in-flight list with per-item next steps")
+    command.add_argument("--json", action="store_true")
+    command.set_defaults(fn=cmd_board)
+
+    command = commands.add_parser(
+        "checkpoint",
+        help="pause: write status list + continuation prompt to disk")
+    command.add_argument("--note", help="optional reason for the pause")
+    command.set_defaults(fn=cmd_checkpoint)
     return parser
 
 

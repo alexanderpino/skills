@@ -430,7 +430,8 @@ class MissionStore:
 
     def claim_item(
         self, item_id: str, expected_backlog_version: int,
-        queue_item: dict[str, Any],
+        queue_item: dict[str, Any], *,
+        backlog_patch: dict[str, Any] | None = None,
     ) -> None:
         clean = dict(queue_item)
         clean.pop("version", None)
@@ -459,6 +460,8 @@ class MissionStore:
             if unmet:
                 raise ValueError(
                     f"{item_id} has unmet dependencies: {', '.join(unmet)}")
+            if backlog_patch:
+                backlog.update(backlog_patch)
             backlog["status"] = "claimed"
             db.execute(
                 "UPDATE backlog_items SET status='claimed',data_json=?,"
@@ -473,7 +476,11 @@ class MissionStore:
                 )
             except sqlite3.IntegrityError as exc:
                 raise StateConflict(f"{item_id} was already claimed") from exc
-            self._audit(db, item_id, "claim", {"state": clean["state"]})
+            self._audit(db, item_id, "claim", {
+                "state": clean["state"],
+                "route": clean.get("route"),
+                "backlog_patch": backlog_patch or {},
+            })
 
     def update_queue_item(
         self, item_id: str, replacement: dict[str, Any],
