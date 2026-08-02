@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { runWorker, VerifyError } from './isolated-verify-runner.mjs'
+import { runModePartitions, runWorker, VerifyError } from './isolated-verify-runner.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(here, '..')
@@ -54,9 +54,9 @@ process.once('SIGTERM', onSigterm)
 
 const results = new Map()
 let failed = false
-for (const mode of ['source', 'preview', 'preview-prod']) {
+await runModePartitions(['source', 'preview', 'preview-prod'], cancellation.signal, async mode => {
   const cases = declarations.filter(declaration => declaration.mode === mode)
-  if (!cases.length) continue
+  if (!cases.length) return
   try {
     const summary = await runWorker({
       appDir,
@@ -73,7 +73,7 @@ for (const mode of ['source', 'preview', 'preview-prod']) {
     for (const row of error.summary?.rows || []) results.set(row.name, row)
     if (!(error instanceof VerifyError)) console.error(error.stack || error)
   }
-}
+})
 
 for (const declaration of declarations) {
   const row = results.get(declaration.name)

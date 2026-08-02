@@ -7,7 +7,42 @@ const markerPrefix = '--studio-verify-owner='
 const marker = process.argv.find(argument => argument.startsWith(markerPrefix))
 if (marker) process.argv = process.argv.filter(argument => argument !== marker)
 
+const ownershipGate = process.env.STUDIO_VERIFY_OWNERSHIP_GATE
+if (ownershipGate) {
+  const gateDeadline = Date.now() + 30000
+  while (!fs.existsSync(ownershipGate)) {
+    if (Date.now() >= gateDeadline) throw new Error('OWNERSHIP_GATE timed out')
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10)
+  }
+  fs.rmSync(ownershipGate, { force: true })
+  delete process.env.STUDIO_VERIFY_OWNERSHIP_GATE
+}
+
 const browserMarker = process.env.STUDIO_VERIFY_BROWSER_MARKER
+const processTokens = (() => {
+  try { return JSON.parse(process.env.STUDIO_VERIFY_PROCESS_TOKENS || '[]') }
+  catch { return [] }
+})()
+const spawnAudit = process.env.STUDIO_VERIFY_SPAWN_AUDIT
+if (spawnAudit) {
+  const childProcess = require('node:child_process')
+  const originalSpawn = childProcess.spawn
+  childProcess.spawn = function auditedSpawn(command, args) {
+    const child = Reflect.apply(originalSpawn, this, arguments)
+    const commandLine = [command, ...(Array.isArray(args) ? args : [])].map(String).join(' ')
+    const proof = processTokens.find(token => token.value && commandLine.includes(token.value))
+    fs.appendFileSync(spawnAudit, `${JSON.stringify({
+      pid: child.pid,
+      commandLine,
+      marked: Boolean(browserMarker && commandLine.includes(browserMarker)),
+      proven: Boolean(proof),
+      ownershipProof: proof?.name || null,
+    })}\n`)
+    return child
+  }
+  Module.syncBuiltinESMExports()
+}
+
 if (browserMarker) {
   try {
     const { chromium } = require('playwright-core')

@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer as createHttpServer } from 'node:http'
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { CACHE_SCHEMA, CacheError, createBuildKey, ensureBuild } from '../../scripts/build-cache.mjs'
-import { classifyOracle, ownedProcessTree, queryWindowsProcesses, runBatch, runWorker } from '../../scripts/isolated-verify-runner.mjs'
+import {
+  classifyOracle, ownedProcessTree, queryWindowsProcesses, runBatch, runModePartitions, runWorker, windowsTerminationTargets,
+} from '../../scripts/isolated-verify-runner.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(here, '../..')
@@ -92,6 +94,25 @@ test('recursive PID/PPID ownership includes descendants and exposes markerless r
   assert.deepEqual(processes.filter(row => row.commandLine.includes(marker) && !tree.some(owned => owned.pid === row.pid)).map(row => row.pid), [30])
 })
 
+test('reused Windows root PID is excluded from ownership and termination', () => {
+  const marker = 'owner-uuid'
+  const expectedRoot = { pid: 10, parentPid: 1, commandLine: `node --studio-verify-owner=${marker}`, creationDate: '/Date(1785664800000)/' }
+  const processes = [
+    { ...expectedRoot, creationDate: '/Date(1785664900000)/' },
+    { pid: 11, parentPid: 10, commandLine: `node child --studio-verify-owner=${marker}`, creationDate: '/Date(1785664901000)/' },
+    { pid: 30, parentPid: 1, commandLine: `node orphan --studio-verify-owner=${marker}`, creationDate: '/Date(1785664802000)/' },
+  ]
+  assert.deepEqual(ownedProcessTree(processes, [expectedRoot], marker), [])
+  assert.deepEqual(windowsTerminationTargets(processes, [expectedRoot], marker).map(row => row.pid), [30])
+})
+
+test('fast Windows root records a marked CIM creation identity before execution', { skip: process.platform !== 'win32' }, async () => {
+  const path = await oracle(await makeRoot('studio-fast-root-'), 'fast.cjs', 'console.log("fast evidence")\n')
+  const result = await runWorker({ appDir, mode: 'file', cases: [{ name: 'fast', path }] })
+  assert.match(result.rows[0].rootCreationDate, /Date|\d{4}-\d{2}-\d{2}/)
+  assert.equal(result.rows[0].outputBytes > 0, true)
+})
+
 test('environment-only descendant is OWNERSHIP_UNPROVEN and fully cleaned', { skip: process.platform !== 'win32' }, async () => {
   const root = await makeRoot('studio-owner-env-')
   const path = await oracle(root, 'environment-only.cjs', `
@@ -106,6 +127,34 @@ setTimeout(() => {}, 5000)
     return error.code === 'OWNERSHIP_UNPROVEN'
   })
   assert.equal(queryWindowsProcesses().some(row => row.commandLine.includes(marker)), false)
+})
+
+test('short-lived markerless helper is red even when it exits between CIM snapshots', { skip: process.platform !== 'win32' }, async () => {
+  const root = await makeRoot('studio-owner-short-helper-')
+  const path = await oracle(root, 'short-helper.cjs', `
+const { spawn } = require('node:child_process')
+spawn(process.execPath, ['-e', 'process.exit(0)'], { stdio: 'ignore' })
+console.log('short markerless helper launched')
+`)
+  await assert.rejects(runWorker({ appDir, mode: 'file', cases: [{ name: 'short-helper', path }] }), error => {
+    assert.equal(error.code, 'OWNERSHIP_UNPROVEN')
+    assert.equal(error.summary.rows[0].ownershipError.details.unmarkedSpawns.length, 1)
+    return true
+  })
+})
+
+test('preview descendant is proven by the exact private worker token', { skip: process.platform !== 'win32' }, async () => {
+  const root = await makeRoot('studio-owner-private-token-')
+  const cacheRoot = await makeRoot('studio-owner-private-cache-')
+  const path = await oracle(root, 'private-token.cjs', `
+const { spawn } = require('node:child_process')
+const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 300)', '--', process.env.STUDIO_VERIFY_PRIVATE_TOKEN], { stdio: 'ignore' })
+child.once('exit', () => console.log('private-token descendant completed'))
+`)
+  const result = await runWorker({ appDir, mode: 'preview', cacheRoot, cases: [{ name: 'private-token', path }] })
+  assert.equal(result.completed, 1)
+  assert.match(result.worker.processToken, /^studio-process-token-[0-9a-f-]{36}$/)
+  assert.equal(queryWindowsProcesses().some(row => row.commandLine.includes(result.worker.processToken)), false)
 })
 
 test('marked orphan is red, cleanup reaches zero, and foreign node survives', { skip: process.platform !== 'win32' }, async () => {
@@ -153,9 +202,35 @@ test('failure, timeout, and simulated SIGINT cancellation all clean owned roots'
   const waiting = await oracle(root, 'waiting.cjs', 'console.log("waiting evidence"); setInterval(() => {}, 1000)\n')
   await assert.rejects(runWorker({ appDir, mode: 'file', timeoutMs: 150, cases: [{ name: 'timeout', path: waiting }] }), error => error.code === 'CASE_TIMEOUT')
   const controller = new AbortController()
-  const cancelled = runWorker({ appDir, mode: 'file', signal: controller.signal, cases: [{ name: 'cancelled', path: waiting }] })
+  const never = await oracle(root, 'never.cjs', 'console.log("must not start")\n')
+  const cancelled = runWorker({ appDir, mode: 'file', signal: controller.signal, cases: [
+    { name: 'cancelled', path: waiting }, { name: 'never', path: never },
+  ] })
   setTimeout(() => controller.abort(), 700)
-  await assert.rejects(cancelled, error => error.code === 'RUN_CANCELLED')
+  await assert.rejects(cancelled, error => {
+    assert.equal(error.code, 'RUN_CANCELLED')
+    assert.equal(error.summary.started, 1)
+    assert.equal(error.summary.rows.some(row => row.name === 'never'), false)
+    return true
+  })
+  const alreadyCancelled = new AbortController()
+  alreadyCancelled.abort()
+  await assert.rejects(runWorker({ appDir, mode: 'preview', signal: alreadyCancelled.signal, cases: [{ name: 'never', path: never }] }), error => {
+    assert.equal(error.code, 'RUN_CANCELLED')
+    return true
+  })
+})
+
+test('cancelled sweep partition does not launch a later mode', async () => {
+  const controller = new AbortController()
+  const started = []
+  const completed = await runModePartitions(['source', 'preview', 'preview-prod'], controller.signal, async mode => {
+    started.push(mode)
+    controller.abort()
+    return mode
+  })
+  assert.deepEqual(started, ['source'])
+  assert.deepEqual(completed, ['source'])
 })
 
 test('positive output is required even when a case exits zero', async () => {
@@ -198,6 +273,20 @@ test('CommonJS helper and native ESM execute once with unchanged bytes and argv'
   assert.deepEqual(result.rows.map(row => row.format), ['commonjs', 'module'])
   assert.equal(result.rows.every(row => row.outputBytes > 0 && row.outputLines > 0), true)
   assert.deepEqual([await readFile(commonjs), await readFile(module), await readFile(join(root, 'helper.js'))], before)
+})
+
+test('parent rejects CommonJS source changed by a later exit listener', async () => {
+  const root = await makeRoot('studio-post-exit-identity-')
+  const path = await oracle(root, 'late-mutation.cjs', `
+const fs = require('node:fs')
+process.once('exit', () => fs.appendFileSync(__filename, '// changed after bootstrap exit check\\n'))
+console.log('late mutation registered')
+`)
+  await assert.rejects(runWorker({ appDir, mode: 'file', cases: [{ name: 'late-mutation', path }] }), error => {
+    assert.equal(error.code, 'ORACLE_BYTES_CHANGED')
+    assert.notEqual(error.details.beforeSha256, error.details.afterSha256)
+    return true
+  })
 })
 
 test('cache miss, hit, complete entry, and key controls', async () => {
@@ -254,6 +343,106 @@ test('concurrent same-key cache requests build once and restore identical bytes'
   assert.deepEqual(results.map(result => result.hit).sort(), [false, true])
   assert.equal(results[0].key, results[1].key)
   assert.equal(results[0].outputHash, results[1].outputHash)
+})
+
+test('different cache keys publish and restore into independent private directories', async () => {
+  const { app } = await fixtureApp()
+  const cacheRoot = await makeRoot('studio-cache-different-keys-')
+  const privateRoot = await makeRoot('studio-cache-private-dist-')
+  const invoke = mode => ensureBuild({
+    appDir: app,
+    cacheRoot,
+    mode,
+    command: ['fixture', mode],
+    tools: { vite: 'v', esbuild: 'e' },
+    destinationDir: join(privateRoot, mode),
+    build: async outDir => {
+      await new Promise(resolvePromise => setTimeout(resolvePromise, mode === 'test' ? 80 : 20))
+      await mkdir(outDir, { recursive: true })
+      await writeFile(join(outDir, 'index.html'), `${mode} bytes`)
+    },
+  })
+  const [testBuild, productionBuild] = await Promise.all([invoke('test'), invoke('production')])
+  assert.notEqual(testBuild.key, productionBuild.key)
+  assert.notEqual(testBuild.distDir, productionBuild.distDir)
+  assert.equal(await readFile(join(testBuild.distDir, 'index.html'), 'utf8'), 'test bytes')
+  assert.equal(await readFile(join(productionBuild.distDir, 'index.html'), 'utf8'), 'production bytes')
+  await assert.rejects(readFile(join(app, 'dist', 'index.html')), error => error.code === 'ENOENT')
+})
+
+test('concurrent built modes serve matching identities from Vite private outputs', async () => {
+  const root = await makeRoot('studio-served-identity-')
+  const cacheRoot = await makeRoot('studio-served-cache-')
+  const path = await oracle(root, 'served-identity.cjs', `
+fetch(process.env.STUDIO_URL).then(async response => {
+  const body = await response.text()
+  const owner = response.headers.get('x-studio-verify-owner')
+  const identity = response.headers.get('x-studio-verify-identity')
+  process.stdout.write('served ' + owner + ' ' + identity + ' ' + body.length + '\\n')
+  if (owner !== process.env.STUDIO_VERIFY_OWNER || !/^[a-f0-9]{64}$/.test(identity) || body.length === 0) process.exitCode = 1
+}).catch(error => { console.error(error); process.exitCode = 1 })
+`)
+  const [testMode, productionMode] = await Promise.all(['preview', 'preview-prod'].map(mode => runWorker({
+    appDir,
+    mode,
+    cacheRoot,
+    cases: [{ name: mode, path }],
+  })))
+  assert.notEqual(testMode.cache.key, productionMode.cache.key)
+  assert.notEqual(testMode.cache.distDir, productionMode.cache.distDir)
+  for (const result of [testMode, productionMode]) {
+    assert.equal(result.hostImplementation, 'vite-preview')
+    assert.equal(result.cache.distDir.startsWith(result.worker.root), true)
+    const output = await readFile(result.rows[0].logPath, 'utf8')
+    assert.match(output, new RegExp(`served ${result.worker.marker} ${result.cache.outputHash} [1-9]\\d*`))
+  }
+})
+
+test('dead cache lock owner is recovered without waiting for lock timeout', async () => {
+  const { app } = await fixtureApp()
+  const cacheRoot = await makeRoot('studio-cache-stale-lock-')
+  const key = (await createBuildKey({
+    appDir: app,
+    mode: 'test',
+    command: ['fixture'],
+    tools: { vite: 'v', esbuild: 'e' },
+  })).key
+  const lockDir = join(cacheRoot, `${key}.lock`)
+  await mkdir(lockDir)
+  await writeFile(join(lockDir, 'owner.json'), JSON.stringify({ pid: 2147483647, token: 'dead-owner', createdAt: '2000-01-01T00:00:00.000Z' }))
+  const result = await ensureBuild({
+    appDir: app,
+    cacheRoot,
+    mode: 'test',
+    command: ['fixture'],
+    tools: { vite: 'v', esbuild: 'e' },
+    build: async outDir => { await mkdir(outDir, { recursive: true }); await writeFile(join(outDir, 'index.html'), 'recovered') },
+  })
+  assert.equal(result.hit, false)
+  assert.equal(await readFile(join(result.distDir, 'index.html'), 'utf8'), 'recovered')
+  await assert.rejects(stat(lockDir), error => error.code === 'ENOENT')
+})
+
+test('reused live Windows PID does not retain a stale cache lock', { skip: process.platform !== 'win32' }, async () => {
+  const { app } = await fixtureApp()
+  const cacheRoot = await makeRoot('studio-cache-reused-lock-')
+  const options = { appDir: app, mode: 'test', command: ['fixture'], tools: { vite: 'v', esbuild: 'e' } }
+  const key = (await createBuildKey(options)).key
+  const lockDir = join(cacheRoot, `${key}.lock`)
+  await mkdir(lockDir)
+  await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+    pid: process.pid,
+    token: 'reused-owner',
+    processCreationDate: '2000-01-01T00:00:00.0000000Z',
+  }))
+  const result = await ensureBuild({
+    ...options,
+    cacheRoot,
+    build: async outDir => { await mkdir(outDir, { recursive: true }); await writeFile(join(outDir, 'index.html'), 'reused recovered') },
+  })
+  assert.equal(result.hit, false)
+  assert.equal(await readFile(join(result.distDir, 'index.html'), 'utf8'), 'reused recovered')
+  await assert.rejects(stat(lockDir), error => error.code === 'ENOENT')
 })
 
 test('cache tamper is red and deliberate repair is a visible miss', async () => {

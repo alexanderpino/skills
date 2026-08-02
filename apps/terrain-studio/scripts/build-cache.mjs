@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
@@ -21,6 +22,10 @@ export class CacheError extends Error {
 const sha256 = value => createHash('sha256').update(value).digest('hex')
 const normalize = value => value.split(sep).join('/')
 const sleep = milliseconds => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds))
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw new CacheError('RUN_CANCELLED', 'Build cache operation was cancelled')
+}
 
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
@@ -171,38 +176,102 @@ async function validateEntry(entryDir, expectedKey) {
   return manifest
 }
 
-async function withLock(lockDir, callback) {
+function processIsAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+function windowsProcessCreationDate(pid) {
+  if (process.platform !== 'win32' || !Number.isInteger(pid) || pid <= 0) return null
+  const command = `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CreationDate.ToUniversalTime().ToString('o')`
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
+    encoding: 'utf8', windowsHide: true,
+  })
+  return result.status === 0 && result.stdout.trim() ? result.stdout.trim() : null
+}
+
+function lockOwnerIsAlive(owner) {
+  if (!processIsAlive(owner?.pid)) return false
+  if (process.platform !== 'win32') return true
+  const currentCreationDate = windowsProcessCreationDate(owner.pid)
+  return Boolean(owner.processCreationDate && currentCreationDate === owner.processCreationDate)
+}
+
+async function recoverStaleLock(lockDir) {
+  let owner
+  try {
+    owner = JSON.parse(await readFile(join(lockDir, 'owner.json'), 'utf8'))
+  } catch {
+    const info = await stat(lockDir).catch(() => null)
+    if (!info || Date.now() - info.mtimeMs < 1000) return false
+  }
+  if (owner && lockOwnerIsAlive(owner)) return false
+  const staleDir = `${lockDir}.stale-${randomUUID()}`
+  try {
+    await rename(lockDir, staleDir)
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'EACCES' || error.code === 'EPERM') return false
+    throw error
+  }
+  await rm(staleDir, { recursive: true, force: true })
+  return true
+}
+
+async function withLock(lockDir, signal, callback) {
   const deadline = Date.now() + 120000
+  const token = randomUUID()
   while (true) {
+    throwIfAborted(signal)
     try {
       await mkdir(lockDir)
+      await writeFile(join(lockDir, 'owner.json'), `${canonicalJson({
+        pid: process.pid,
+        token,
+        createdAt: new Date().toISOString(),
+        processStartedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+        processCreationDate: windowsProcessCreationDate(process.pid),
+      })}\n`, { flag: 'wx' })
       break
     } catch (error) {
       if (error.code !== 'EEXIST') throw error
+      if (await recoverStaleLock(lockDir)) continue
       if (Date.now() >= deadline) throw new CacheError('CACHE_LOCK', `Timed out waiting for ${lockDir}`)
       await sleep(50)
     }
   }
   try {
+    throwIfAborted(signal)
     return await callback()
   } finally {
-    await rm(lockDir, { recursive: true, force: true })
+    const owner = await readFile(join(lockDir, 'owner.json'), 'utf8').then(JSON.parse, () => null)
+    if (owner?.token === token) await rm(lockDir, { recursive: true, force: true })
   }
 }
 
-async function restore(entryDir, appDir, manifest) {
-  const parent = dirname(join(appDir, 'dist'))
+async function restore(entryDir, destinationDir, manifest, signal) {
+  destinationDir = resolve(destinationDir)
+  const parent = dirname(destinationDir)
+  await mkdir(parent, { recursive: true })
   const staging = await mkdtemp(join(parent, '.dist-restore-'))
   try {
+    throwIfAborted(signal)
     await copyDirectory(join(entryDir, 'dist'), staging)
+    throwIfAborted(signal)
     const restored = await hashDirectory(staging, { requireIndex: true })
     if (canonicalJson(restored) !== canonicalJson(manifest.output)) {
       throw new CacheError('CACHE_TAMPER', 'Restored dist does not match manifest')
     }
-    await rm(join(appDir, 'dist'), { recursive: true, force: true })
-    await rename(staging, join(appDir, 'dist'))
+    await rename(staging, destinationDir)
   } catch (error) {
     await rm(staging, { recursive: true, force: true })
+    if (error.code === 'EEXIST' || error.code === 'ENOTEMPTY') {
+      throw new CacheError('CACHE_DESTINATION', `Private build destination already exists: ${destinationDir}`)
+    }
     throw error
   }
 }
@@ -217,15 +286,19 @@ export async function ensureBuild({
   runtime,
   schema = CACHE_SCHEMA,
   repairTamper = false,
+  destinationDir,
+  signal,
   build,
 }) {
+  throwIfAborted(signal)
   const { key, descriptor } = await createBuildKey({ appDir, mode, command, environment, tools, runtime, schema })
   const entryDir = join(resolve(cacheRoot), key)
   const lockDir = `${entryDir}.lock`
   await mkdir(resolve(cacheRoot), { recursive: true })
-  return withLock(lockDir, async () => {
+  return withLock(lockDir, signal, async () => {
     let hit = false
     let manifest
+    throwIfAborted(signal)
     try {
       manifest = await validateEntry(entryDir, key)
       hit = true
@@ -236,8 +309,10 @@ export async function ensureBuild({
       const staging = await mkdtemp(join(resolve(cacheRoot), `.${key}-`))
       try {
         const stagedDist = join(staging, 'dist')
-        if (build) await build(stagedDist)
+        throwIfAborted(signal)
+        if (build) await build(stagedDist, signal)
         else await viteBuild({ root: appDir, mode, logLevel: 'info', build: { outDir: stagedDist, emptyOutDir: true } })
+        throwIfAborted(signal)
         const output = await hashDirectory(stagedDist, { requireIndex: true })
         manifest = { schema: CACHE_SCHEMA, key, descriptor, output, createdAt: new Date().toISOString() }
         await writeFile(join(staging, 'manifest.json'), `${canonicalJson(manifest)}\n`, { flag: 'wx' })
@@ -247,8 +322,16 @@ export async function ensureBuild({
         throw buildError
       }
     }
+    throwIfAborted(signal)
     manifest = await validateEntry(entryDir, key)
-    await restore(entryDir, appDir, manifest)
-    return { key, hit, outputHash: manifest.output.hash, manifest, entryDir }
+    if (destinationDir) await restore(entryDir, destinationDir, manifest, signal)
+    return {
+      key,
+      hit,
+      outputHash: manifest.output.hash,
+      manifest,
+      entryDir,
+      distDir: destinationDir ? resolve(destinationDir) : join(entryDir, 'dist'),
+    }
   })
 }
