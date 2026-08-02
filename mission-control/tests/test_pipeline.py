@@ -567,6 +567,19 @@ None.
         self.assertEqual(
             self.load("queue")["items"][0]["state"], "merge-pending")
 
+    def test_retro_reports_safe_envelope_tuning_signals(self):
+        self.valid_flow(fast=True)
+        view = json.loads(self.run_cli("retro", "--json").stdout)
+        self.assertIn("safe envelope", view["guardrail"])
+        self.assertEqual(view["totals"]["items"], 1)
+        signals = {obs["signal"] for obs in view["observations"]}
+        self.assertIn("verification-cost", signals)
+        self.assertTrue(
+            all(obs["scope"] in ("safe-envelope", "proposal")
+                for obs in view["observations"]))
+        self.run_cli("retro", "--write")
+        self.assertTrue((self.repo / ".mc" / "RETROSPECTIVE.md").exists())
+
     def test_board_lists_in_flight_and_next_steps(self):
         self.add_and_claim("MC-1", fast=True)
         self.run_cli("add-item", "MC-2", "Queued item", "--priority", "5")

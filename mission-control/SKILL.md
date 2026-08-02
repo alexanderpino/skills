@@ -389,6 +389,33 @@ Agenda notes hold only non-derivable intent: user directives, deferred
 decisions, and scheduled follow-ups. Never record queue positions, free slots,
 merge candidates, or unblock conditions; `status` computes those.
 
+## Micro-retrospectives
+
+The framework is fixed, but every plan is different — the same routing that is
+efficient for one backlog wastes time on the next. Between cycles the
+orchestrator runs a cheap, derived retrospective and adapts:
+
+```bash
+python scripts/pipeline.py --root .mission-control retro
+python scripts/pipeline.py --root .mission-control retro --write
+```
+
+`retro` reads only sealed state — track mix, per-item active versus idle time,
+bounce classification, lease-contention hotspots, and smoke-versus-full
+verification share — and emits evidence-cited tuning signals: heavier-than-
+express low-risk items, queue residence dominating active work, localized
+repair bounces burning the shared architectural cap, repeatedly serialized
+targets, and diverging pre-merge trees. `--write` persists a durable
+`retrospectives/retro-<ts>.md` and a `RETROSPECTIVE.md` pointer for audit.
+
+Run it at natural checkpoints — after a bounce, a merge, an SLA breach, or
+repeated contention — not on a timer; the retrospective must never become the
+ceremony it exists to remove. Every recommendation tunes throughput and
+ceremony **inside the safe envelope only**: concurrency width, speed posture,
+lease granularity, and merge batching. It routes structural findings through
+the existing reshape signals and never weakens a lease, sandbox, evidence, CAS,
+or audit gate; anything gate-affecting is surfaced as a proposal, not applied.
+
 ## Spawning discipline
 
 Every brief must include:
@@ -447,6 +474,7 @@ and retry. Never delete unmerged work implicitly.
   Verifier, Code Reviewer, Merge Agent, Investigator, and Designer briefs.
 - `scripts/pipeline.py` — composition entrypoint; `--help` lists commands.
   `track` recommends a track, `revalidate` reuses non-overlapping grounding,
-  `board` shows in-flight work and next steps, and `checkpoint` writes a pause
-  snapshot with a continuation prompt.
+  `board` shows in-flight work and next steps, `retro` emits safe-envelope
+  tuning signals, and `checkpoint` writes a pause snapshot with a continuation
+  prompt.
 - `scripts/wait-in-line.py` — deprecated legacy mutex wrapper.

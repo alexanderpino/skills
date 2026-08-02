@@ -1639,6 +1639,247 @@ def cmd_metrics(args: argparse.Namespace) -> None:
     print(json.dumps({"items": output, "generated": now()}, indent=2))
 
 
+# States where an agent or command is actively working, versus states that
+# only accrue queue-residence / handoff latency. Kept separate so telemetry
+# never reports idle wait as active work.
+_RETRO_ACTIVE_STATES = frozenset({
+    "researching", "plan-review", "orchestrator-approval", "building",
+    "verifying", "code-review", "merging", "post-merge-verifying",
+    "merge-conflict",
+})
+_RETRO_IDLE_STATES = frozenset({
+    "backlog", "approved", "merge-pending", "blocked",
+})
+_RETRO_GUARDRAIL = (
+    "Retrospective tuning adjusts throughput and ceremony only inside the safe "
+    "envelope. It never weakens semantic leases, private sandbox verification, "
+    "non-vacuous evidence, risk-based review, CAS publication, or audit "
+    "integrity; gate-affecting changes are proposals, not auto-applied."
+)
+
+
+def _state_durations(history: list[dict[str, Any]]) -> dict[str, float]:
+    durations: dict[str, float] = {}
+    for left, right in zip(history, history[1:]):
+        seconds = (
+            parse_time(right["at"], "history timestamp")
+            - parse_time(left["at"], "history timestamp")
+        ).total_seconds()
+        durations[left["state"]] = durations.get(left["state"], 0.0) + seconds
+    return durations
+
+
+def _retro_observations(
+    store: MissionStore, mission: dict[str, Any],
+    items: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    observations: list[dict[str, str]] = []
+
+    low_missed = [
+        item["id"] for item in items
+        if (item.get("route") or {}).get("risk") == "low"
+        and (item.get("route") or {}).get("track") != "express"
+    ]
+    if low_missed:
+        observations.append({
+            "signal": "ceremony-overhead",
+            "evidence": (
+                f"{len(low_missed)} low-risk item(s) ran heavier than express: "
+                f"{', '.join(sorted(low_missed))}"),
+            "recommendation": (
+                "set the speed posture to balanced (or use an express-auto "
+                "claim) so low-risk items skip plan and code review"),
+            "scope": "safe-envelope",
+        })
+
+    idle_offenders: list[tuple[str, int, int]] = []
+    for item in items:
+        durations = _state_durations(item.get("history", []))
+        active = sum(
+            value for key, value in durations.items()
+            if key in _RETRO_ACTIVE_STATES)
+        idle = sum(
+            value for key, value in durations.items()
+            if key in _RETRO_IDLE_STATES)
+        if idle > 900 and idle > max(active, 1.0) * 2:
+            idle_offenders.append((item["id"], round(idle), round(active)))
+    if idle_offenders:
+        worst = sorted(idle_offenders, key=lambda row: row[1], reverse=True)[:5]
+        observations.append({
+            "signal": "idle-queue-residence",
+            "evidence": "; ".join(
+                f"{iid} idle {idle}s vs active {active}s"
+                for iid, idle, active in worst),
+            "recommendation": (
+                "queue wait dominates active work — raise implementer/scout "
+                "concurrency where semantic targets stay disjoint, or shorten "
+                "handoff latency; this is not a gate change"),
+            "scope": "safe-envelope",
+        })
+
+    localized = upstream = 0
+    limit = mission.get("bounce_limit", 3)
+    near_cap: list[str] = []
+    for item in items:
+        bounces = [row for row in item.get("history", []) if row.get("bounce")]
+        localized += sum(1 for row in bounces if row.get("state") == "building")
+        upstream += sum(
+            1 for row in bounces if row.get("state") == "researching")
+        if bounces and len(bounces) >= limit - 1:
+            near_cap.append(item["id"])
+    if localized or upstream:
+        advice = []
+        if localized:
+            advice.append(
+                "localized verify/code-review repairs are burning the shared "
+                "bounce cap; treat them as in-place repair, not architecture")
+        if upstream:
+            advice.append(
+                "recurring plan/approval bounces are a decomposition signal — "
+                "consider an Architect reshape of the open backlog")
+        evidence = f"{localized} localized, {upstream} upstream bounce(s)"
+        if near_cap:
+            evidence += f"; near cap: {', '.join(sorted(near_cap))}"
+        observations.append({
+            "signal": "bounce-pressure",
+            "evidence": evidence,
+            "recommendation": "; ".join(advice),
+            "scope": "safe-envelope",
+        })
+
+    hotspots: dict[str, int] = {}
+    for event in store.contention():
+        for target in event.get("targets", []):
+            key = (
+                target.get("qualified_symbol") or target.get("path")
+                if isinstance(target, dict) else str(target))
+            if key:
+                hotspots[key] = hotspots.get(key, 0) + 1
+    repeated = sorted(
+        ((path, count) for path, count in hotspots.items() if count >= 2),
+        key=lambda row: row[1], reverse=True)[:5]
+    if repeated:
+        observations.append({
+            "signal": "lease-contention-hotspot",
+            "evidence": "; ".join(
+                f"{path} x{count}" for path, count in repeated),
+            "recommendation": (
+                "these targets serialize repeatedly — narrow lease granularity "
+                "(symbol/synthetic over file) or reshape so siblings are "
+                "disjoint; never widen a fallback for throughput"),
+            "scope": "safe-envelope",
+        })
+
+    smoke = full = 0
+    for item in items:
+        if item["state"] != "done":
+            continue
+        path = store.evidence_dir(item["id"]) / "post-merge-verify.json"
+        if not path.is_file():
+            continue
+        try:
+            scope = json.loads(
+                path.read_text(encoding="utf-8")).get("verification_scope")
+        except (ValueError, OSError):
+            continue
+        if scope == "smoke":
+            smoke += 1
+        elif scope == "full":
+            full += 1
+    if smoke or full:
+        observations.append({
+            "signal": "verification-cost",
+            "evidence": f"post-merge verification: {smoke} smoke, {full} full",
+            "recommendation": (
+                "fast-forward smokes already skip the redundant suite; a high "
+                "full share means targets keep diverging before merge — land "
+                "greens sooner or in disjoint waves to preserve fast-forwards"),
+            "scope": "safe-envelope",
+        })
+
+    return observations
+
+
+def _retro_view(
+    store: MissionStore, mission: dict[str, Any],
+) -> dict[str, Any]:
+    items = store.rows("queue_items")
+    track_mix = {"express": 0, "standard": 0, "full": 0, "unknown": 0}
+    active_total = idle_total = 0.0
+    for item in items:
+        track = (item.get("route") or {}).get("track", "unknown")
+        track_mix[track if track in track_mix else "unknown"] += 1
+        durations = _state_durations(item.get("history", []))
+        active_total += sum(
+            value for key, value in durations.items()
+            if key in _RETRO_ACTIVE_STATES)
+        idle_total += sum(
+            value for key, value in durations.items()
+            if key in _RETRO_IDLE_STATES)
+    return {
+        "generated": now(),
+        "goal": mission["goal"],
+        "speed": (mission.get("speed") or {}).get("preference", "balanced"),
+        "totals": {
+            "items": len(items),
+            "track_mix": track_mix,
+            "active_seconds": round(active_total),
+            "idle_seconds": round(idle_total),
+        },
+        "observations": _retro_observations(store, mission, items),
+        "guardrail": _RETRO_GUARDRAIL,
+    }
+
+
+def _render_retro(view: dict[str, Any]) -> list[str]:
+    totals = view["totals"]
+    mix = totals["track_mix"]
+    lines = [
+        f"goal: {view['goal']}",
+        f"speed posture: {view['speed']}",
+        (f"items: {totals['items']} | tracks express={mix['express']} "
+         f"standard={mix['standard']} full={mix['full']} | "
+         f"active={totals['active_seconds']}s idle={totals['idle_seconds']}s"),
+        "",
+        f"OBSERVATIONS ({len(view['observations'])}):",
+    ]
+    if not view["observations"]:
+        lines.append(
+            "  none — routing looks efficient for this plan; re-run after the "
+            "next bounce, merge, or contention event")
+    for obs in view["observations"]:
+        lines.append(f"  [{obs['signal']}] ({obs['scope']})")
+        lines.append(f"      evidence: {obs['evidence']}")
+        lines.append(f"      tune:     {obs['recommendation']}")
+    lines += ["", view["guardrail"]]
+    return lines
+
+
+def cmd_retro(args: argparse.Namespace) -> None:
+    store = store_for(args)
+    mission = store.document("mission").data
+    validate_mission(mission)
+    view = _retro_view(store, mission)
+    if getattr(args, "json", False):
+        print(json.dumps(view, indent=2))
+        return
+    text = "\n".join(_render_retro(view))
+    if getattr(args, "write", False):
+        retros = store.root / "retrospectives"
+        retros.mkdir(parents=True, exist_ok=True)
+        safe = re.sub(r"[^0-9A-Za-z]", "", view["generated"])
+        body = (
+            f"# Mission Control retrospective — {view['generated']}\n\n"
+            + text + "\n")
+        path = retros / f"retro-{safe}.md"
+        _write_text(path, body)
+        _write_text(store.root / "RETROSPECTIVE.md", body)
+        print(f"retrospective written: {path}")
+        print(f"latest pointer: {store.root / 'RETROSPECTIVE.md'}")
+        print("")
+    print(text)
+
+
 def _history_evidence(
     item: dict[str, Any], filename: str,
 ) -> dict[str, str] | None:
@@ -1986,6 +2227,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="pause: write status list + continuation prompt to disk")
     command.add_argument("--note", help="optional reason for the pause")
     command.set_defaults(fn=cmd_checkpoint)
+
+    command = commands.add_parser(
+        "retro",
+        help="derived micro-retrospective: safe-envelope tuning signals")
+    command.add_argument("--json", action="store_true")
+    command.add_argument(
+        "--write", action="store_true",
+        help="persist a durable retrospectives/retro-<ts>.md")
+    command.set_defaults(fn=cmd_retro)
     return parser
 
 
