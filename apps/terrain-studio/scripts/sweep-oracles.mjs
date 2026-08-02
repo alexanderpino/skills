@@ -1,68 +1,103 @@
-// Run EVERY _verify_*.js and report each one's exit status.
-//
-// This exists because `npm run verify` runs _verify_all_canyon.js, which carries a hand-listed 12 of
-// the 72 standalone oracles on disk - and the 60 it omits include _verify_digest.js, the byte-identity gate of
-// record. "The suite is green" therefore meant something much weaker than it read.
-import { spawnSync } from 'node:child_process'
-import { readdirSync, mkdirSync, writeFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { runWorker, VerifyError } from './isolated-verify-runner.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const app = resolve(here, '..')
-const legacy = resolve(app, 'tests/legacy')
-const LOGS = resolve(app, '.sweep-logs')
-
+const appDir = resolve(here, '..')
+const legacyDir = resolve(appDir, process.env.STUDIO_LEGACY_DIR || 'tests/legacy')
+const failureLogs = resolve(appDir, '.sweep-logs')
+const requested = process.argv.slice(2).filter(argument => !argument.startsWith('--'))
 const skip = new Set(['_verify_all_canyon.js'])
+const discovered = existsSync(legacyDir) ? readdirSync(legacyDir)
+  .filter(name => /^_verify_.*\.js$/.test(name) && !skip.has(name)).sort() : []
 
-// Oracles that need a flag to BE a gate. _verify_bridge.js is a generator and a gate in one file:
-// run bare it REWRITES the frozen contract and exits 0, so sweeping it without --check regenerates
-// the baseline and then reports agreement with the thing it just wrote. It cannot fail. The first
-// run of this sweep did exactly that, and the contract landed in the working tree as a side effect
-// of "verifying" it.
-// _verify_pwa.js is the other direction: it needs a flag to be RUNNABLE at all. The service worker
-// registers only when import.meta.env.MODE === 'production', deliberately, so the rest of the suite
-// never races a cached shell. Against the dev server the oracle is guaranteed to report
-// "registrations=0" - a red line that says nothing about the service worker and everything about
-// how it was launched. --preview-prod builds and serves production, which is the only mode in which
-// its subject exists.
-const FLAGS = { '_verify_bridge.js': ['--check'], '_verify_pwa.js': ['--preview-prod'] }
-const only = process.argv.slice(2).filter((a) => !a.startsWith('--'))
-const files = readdirSync(legacy)
-  .filter((f) => /^_verify_.*\.js$/.test(f) && !skip.has(f))
-  .filter((f) => !only.length || only.includes(f))
-  .sort()
+if (discovered.length === 0) {
+  console.error('EMPTY_INVENTORY: no legacy oracles discovered')
+  process.exit(1)
+}
+const unknown = requested.filter(name => !discovered.includes(name))
+if (unknown.length) {
+  console.error(`UNKNOWN_ORACLE: ${unknown.join(', ')}`)
+  process.exit(1)
+}
+if (new Set(requested).size !== requested.length) {
+  console.error('DUPLICATE_DECLARATION: requested oracle names must be unique')
+  process.exit(1)
+}
+const selected = requested.length ? discovered.filter(name => requested.includes(name)) : discovered
+const declarations = selected.map(name => ({
+  name,
+  path: resolve(legacyDir, name),
+  args: name === '_verify_bridge.js' ? ['--check'] : [],
+  mode: name === '_verify_pwa.js' ? 'preview-prod' : 'source',
+  parallelSafe: false,
+}))
+if (declarations.length === 0) {
+  console.error('EMPTY_INVENTORY: no selected legacy oracles')
+  process.exit(1)
+}
 
-const rows = []
-for (const f of files) {
-  const t0 = Date.now()
-  const r = spawnSync(process.execPath, [resolve(here, 'run-legacy-verify.mjs'), f, ...(FLAGS[f] || [])],
-    { cwd: app, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-  const code = r.status ?? -1
-  const out = `${r.stdout || ''}${r.stderr || ''}`
-  // KEEP THE EVIDENCE. A sweep that reports THAT an oracle failed but not WHY sends you to
-  // reproduce it by hand - and the ones that only fail inside a full sweep are exactly the ones
-  // that will not reproduce. _verify_build_progress went red here and green every way it was run
-  // alone; the reason was in this buffer and thrown away.
-  if (code !== 0) {
-    mkdirSync(LOGS, { recursive: true })
-    writeFileSync(resolve(LOGS, `${f}.log`), out)
+const workersArgument = process.argv.find(argument => argument.startsWith('--workers='))
+const workers = workersArgument ? Number(workersArgument.slice('--workers='.length)) : 1
+if (!Number.isInteger(workers) || workers < 1 || workers > 1) {
+  console.error('UNSAFE_PARALLELISM: legacy sweep declarations are not parallel-safe')
+  process.exit(1)
+}
+const cancellation = new AbortController()
+let signalExitCode = 0
+const cancel = exitCode => { signalExitCode ||= exitCode; cancellation.abort() }
+const onSigint = () => cancel(130)
+const onSigterm = () => cancel(143)
+process.once('SIGINT', onSigint)
+process.once('SIGTERM', onSigterm)
+
+const results = new Map()
+let failed = false
+for (const mode of ['source', 'preview', 'preview-prod']) {
+  const cases = declarations.filter(declaration => declaration.mode === mode)
+  if (!cases.length) continue
+  try {
+    const summary = await runWorker({
+      appDir,
+      mode,
+      cases,
+      cacheRoot: process.env.STUDIO_BUILD_CACHE,
+      temporaryRoot: process.env.STUDIO_VERIFY_TMP,
+      keepWorkerRoot: true,
+      signal: cancellation.signal,
+    })
+    for (const row of summary.rows) results.set(row.name, row)
+  } catch (error) {
+    failed = true
+    for (const row of error.summary?.rows || []) results.set(row.name, row)
+    if (!(error instanceof VerifyError)) console.error(error.stack || error)
   }
-  // Oracles do not share a failure vocabulary: some print `FAIL <gate>`, some `GATES FAILED:`,
-  // some FATAL, and some only a JSON blob ending in "ok": false. Match all of them, and fall back
-  // to the last non-empty line rather than reporting an empty reason.
-  const why = code === 0 ? ''
-    : (out.match(/^FATAL.*$/m) || out.match(/^\s*FAIL\s+\S.*$/m) || out.match(/GATES FAILED:.*$/m)
-      || out.match(/^.*"ok":\s*false.*$/m) || out.match(/SETUP FAILURE.*$/m)
-      || [out.trim().split('\n').filter(Boolean).pop() || '(no output)'])[0]
-  rows.push({ f, code, s: ((Date.now() - t0) / 1000).toFixed(0), why: why.trim().slice(0, 110) })
-  console.log(`${code === 0 ? 'ok  ' : 'FAIL'} ${f.padEnd(36)} ${rows.at(-1).s}s  ${rows.at(-1).why}`)
 }
 
-const bad = rows.filter((r) => r.code !== 0)
-console.log(`\n${rows.length - bad.length}/${rows.length} green`)
-if (bad.length) {
-  console.log('\nFAILING:')
-  for (const r of bad) console.log(`  ${r.f}  exit=${r.code}  ${r.why}`)
+for (const declaration of declarations) {
+  const row = results.get(declaration.name)
+  if (!row) {
+    failed = true
+    console.log(`FAIL ${declaration.name.padEnd(36)} not executed`)
+    continue
+  }
+  const output = readFileSync(row.logPath, 'utf8')
+  if (row.code !== 0) {
+    failed = true
+    mkdirSync(failureLogs, { recursive: true })
+    copyFileSync(row.logPath, resolve(failureLogs, `${row.name}.log`))
+  }
+  const reason = row.code === 0 ? '' : (output.match(/^FATAL.*$/m) || output.match(/^\s*FAIL\s+\S.*$/m)
+    || output.match(/GATES FAILED:.*$/m) || output.match(/^.*"ok":\s*false.*$/m)
+    || output.match(/SETUP FAILURE.*$/m) || [output.trim().split('\n').filter(Boolean).pop() || '(no output)'])[0]
+  console.log(`${row.code === 0 ? 'ok  ' : 'FAIL'} ${row.name.padEnd(36)} bytes=${row.outputBytes} lines=${row.outputLines} ${String(reason).trim().slice(0, 110)}`)
 }
-process.exit(bad.length ? 1 : 0)
+const completed = [...results.values()].filter(row => row.completedAt).length
+const green = [...results.values()].filter(row => row.code === 0).length
+console.log(`\nSWEEP discovered=${discovered.length} declared=${declarations.length} started=${results.size} completed=${completed} skipped=${declarations.length - results.size}`)
+console.log(`${green}/${declarations.length} green`)
+if (results.size !== declarations.length || completed !== declarations.length) failed = true
+process.removeListener('SIGINT', onSigint)
+process.removeListener('SIGTERM', onSigterm)
+process.exit(signalExitCode || (failed ? 1 : 0))
