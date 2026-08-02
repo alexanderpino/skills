@@ -251,7 +251,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
 
   const failures = []
   const s = result.schema
-  if (!s.present || s.category !== 'ero' || s.inputs.join(',') !== 'In,Mask'
+  if (!s.present || s.category !== 'surface' || s.inputs.join(',') !== 'In,Mask'
     || s.sections.length !== 2 || s.sections.some(section => section.device !== 'gpu')) {
     failures.push(`registration/schema failed: ${JSON.stringify(s)}`)
   }
