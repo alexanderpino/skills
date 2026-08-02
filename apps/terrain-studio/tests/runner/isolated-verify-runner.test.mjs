@@ -2,17 +2,20 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer as createHttpServer } from 'node:http'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { CACHE_SCHEMA, CacheError, createBuildKey, ensureBuild } from '../../scripts/build-cache.mjs'
 import {
-  classifyOracle, ownedProcessTree, queryWindowsProcesses, runBatch, runModePartitions, runWorker, windowsTerminationTargets,
+  PLAYWRIGHT_PATH_RESERVE, classifyOracle, ownedProcessTree, queryWindowsProcesses, runBatch, runModePartitions, runWorker,
+  windowsTerminationTargets,
 } from '../../scripts/isolated-verify-runner.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(here, '../..')
+const require = createRequire(import.meta.url)
 const roots = []
 const makeRoot = async prefix => { const root = await mkdtemp(join(tmpdir(), prefix)); roots.push(root); return root }
 test.after(async () => Promise.all(roots.map(root => rm(root, { recursive: true, force: true }))))
@@ -51,6 +54,31 @@ test('stale selected root fails before server or case launch', async () => {
   await assert.rejects(runWorker({ appDir, mode: 'source', cases: [{ name: 'x', path }], selectedRoot }),
     error => error.code === 'STALE_PROFILE')
   assert.equal(await readFile(join(selectedRoot, 'sentinel'), 'utf8'), 'keep')
+})
+
+test('deep Windows temporary root shortens privately before Playwright launch', { skip: process.platform !== 'win32' }, async () => {
+  const deepRoot = join(await makeRoot('studio-deep-root-'), ...Array.from({ length: 12 }, (_, index) => `integration-segment-${index.toString().padStart(2, '0')}`))
+  const playwrightPath = require.resolve('playwright')
+  const path = await oracle(await makeRoot('studio-playwright-path-'), 'playwright-path.cjs', `
+const { statSync } = require('node:fs')
+const { chromium } = require(${JSON.stringify(playwrightPath)})
+;(async () => {
+  if (!statSync(process.env.TEMP).isDirectory()) throw new Error('private TEMP missing')
+  if (!statSync(process.env.STUDIO_VERIFY_PROFILE).isDirectory()) throw new Error('private profile missing')
+  const browser = await chromium.launch({ headless: true })
+  console.log('playwright path evidence', process.env.TEMP, process.env.STUDIO_VERIFY_PROFILE)
+  await browser.close()
+})().catch(error => { console.error(error); process.exitCode = 1 })
+`)
+  const result = await runWorker({ appDir, mode: 'file', temporaryRoot: deepRoot, cases: [{ name: 'playwright-path', path }] })
+  assert.equal(result.completed, 1)
+  assert.equal(result.worker.root.startsWith(resolve(deepRoot)), false)
+  assert.equal(result.worker.temp.startsWith(result.worker.tokenRoot), true)
+  assert.equal(result.worker.profile.startsWith(result.worker.tokenRoot), true)
+  assert.notEqual(result.worker.temp, result.worker.profile)
+  assert.equal(result.worker.temp.length + PLAYWRIGHT_PATH_RESERVE <= 259, true)
+  assert.equal(result.worker.profile.length + PLAYWRIGHT_PATH_RESERVE <= 259, true)
+  assert.equal(result.rows[0].outputBytes > 0, true)
 })
 
 test('occupied strict port is PORT_COLLISION and foreign server survives', async () => {

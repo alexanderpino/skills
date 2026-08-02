@@ -4,7 +4,7 @@ import { copyFile, mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile 
 import { createServer as createHttpServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, parse as parsePath, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'acorn'
 import { build as viteBuild, createServer as createViteServer, preview as vitePreview } from 'vite'
@@ -14,6 +14,9 @@ const here = dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
 const bootstrap = resolve(here, 'legacy-oracle-bootstrap.cjs')
 const MODES = new Set(['source', 'preview', 'preview-prod', 'file'])
+const WINDOWS_MAX_PATH = 259
+const WORKER_ROOT_PREFIX = 'terrain-studio-verify-'
+export const PLAYWRIGHT_PATH_RESERVE = 48
 const sha256 = value => createHash('sha256').update(value).digest('hex')
 const delay = milliseconds => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds))
 
@@ -49,9 +52,70 @@ async function isEmpty(directory) {
   return (await readdir(directory)).length === 0
 }
 
-export async function createWorkerRoot({ temporaryRoot = process.env.STUDIO_VERIFY_TMP || tmpdir(), selectedRoot } = {}) {
-  if (!selectedRoot) await mkdir(resolve(temporaryRoot), { recursive: true })
-  const root = selectedRoot ? resolve(selectedRoot) : await mkdtemp(join(resolve(temporaryRoot), 'terrain-studio-verify-'))
+function workerPaths(root, marker, processToken) {
+  const markerRoot = join(root, marker)
+  const tokenRoot = join(markerRoot, processToken)
+  return { markerRoot, tokenRoot, profile: join(tokenRoot, 'profile'), temp: join(tokenRoot, 'temp') }
+}
+
+function assertPlaywrightPathBudget(paths, base) {
+  const measured = { temp: paths.temp.length, profile: paths.profile.length }
+  const overBudget = Object.entries(measured).filter(([, length]) => length + PLAYWRIGHT_PATH_RESERVE > WINDOWS_MAX_PATH)
+  if (overBudget.length) {
+    throw new VerifyError('PROFILE_PATH_BUDGET', `Worker paths exceed the Windows Playwright path budget under ${base}`, {
+      base,
+      maxPath: WINDOWS_MAX_PATH,
+      reservedSuffix: PLAYWRIGHT_PATH_RESERVE,
+      measured,
+      overBudget: overBudget.map(([name]) => name),
+    })
+  }
+}
+
+function baseFitsPlaywrightPathBudget(base) {
+  const prospectiveRoot = join(base, `${WORKER_ROOT_PREFIX}${'x'.repeat(6)}`)
+  const paths = workerPaths(prospectiveRoot, 'x'.repeat(36), `studio-process-token-${'x'.repeat(36)}`)
+  return paths.temp.length + PLAYWRIGHT_PATH_RESERVE <= WINDOWS_MAX_PATH
+    && paths.profile.length + PLAYWRIGHT_PATH_RESERVE <= WINDOWS_MAX_PATH
+}
+
+async function selectAutomaticTemporaryBase(temporaryRoot) {
+  const requested = resolve(temporaryRoot || process.env.STUDIO_VERIFY_TMP || tmpdir())
+  if (process.platform !== 'win32') {
+    await mkdir(requested, { recursive: true })
+    return requested
+  }
+  const driveRoot = parsePath(requested).root
+  const candidates = [
+    requested,
+    process.env.STUDIO_VERIFY_TMP && resolve(process.env.STUDIO_VERIFY_TMP),
+    driveRoot && join(driveRoot, '.studio-verify'),
+    process.env.LOCALAPPDATA && join(resolve(process.env.LOCALAPPDATA), 'Temp', 'studio-verify'),
+    join(resolve(tmpdir()), 'studio-verify'),
+  ].filter((candidate, index, values) => candidate && values.indexOf(candidate) === index)
+  const attempts = []
+  for (const candidate of candidates) {
+    if (!baseFitsPlaywrightPathBudget(candidate)) {
+      attempts.push({ base: candidate, reason: 'path-budget' })
+      continue
+    }
+    try {
+      await mkdir(candidate, { recursive: true })
+      return candidate
+    } catch (error) {
+      attempts.push({ base: candidate, reason: error.code || error.message })
+    }
+  }
+  throw new VerifyError('PROFILE_PATH_BUDGET', 'No writable Windows temporary base can fit private Playwright paths', {
+    maxPath: WINDOWS_MAX_PATH,
+    reservedSuffix: PLAYWRIGHT_PATH_RESERVE,
+    attempts,
+  })
+}
+
+export async function createWorkerRoot({ temporaryRoot, selectedRoot } = {}) {
+  const base = selectedRoot ? null : await selectAutomaticTemporaryBase(temporaryRoot)
+  const root = selectedRoot ? resolve(selectedRoot) : await mkdtemp(join(base, WORKER_ROOT_PREFIX))
   if (selectedRoot) {
     try {
       const info = await stat(root)
@@ -62,11 +126,9 @@ export async function createWorkerRoot({ temporaryRoot = process.env.STUDIO_VERI
     }
   }
   const marker = randomUUID()
-  const markerRoot = join(root, marker)
   const processToken = `studio-process-token-${randomUUID()}`
-  const tokenRoot = join(markerRoot, processToken)
-  const profile = join(tokenRoot, 'profile')
-  const temp = join(tokenRoot, 'temp')
+  const { markerRoot, tokenRoot, profile, temp } = workerPaths(root, marker, processToken)
+  if (process.platform === 'win32') assertPlaywrightPathBudget({ temp, profile }, root)
   const logs = join(root, 'logs')
   await mkdir(markerRoot)
   await mkdir(tokenRoot)
@@ -217,6 +279,7 @@ function childEnvironment(worker, url, environment = process.env, ownershipGate)
     STUDIO_VERIFY_BROWSER_MARKER: worker.markerArgument,
     STUDIO_VERIFY_PRIVATE_TOKEN: worker.processToken,
     STUDIO_VERIFY_PROCESS_TOKENS: JSON.stringify(worker.ownershipTokens),
+    STUDIO_VERIFY_PROFILE: worker.profile,
     TEMP: worker.temp,
     TMP: worker.temp,
     TMPDIR: worker.temp,
@@ -641,7 +704,7 @@ export async function runWorker({
     mode,
     worker: {
       root: worker.root, marker: worker.marker, profile: worker.profile, temp: worker.temp,
-      processToken: worker.processToken,
+      processToken: worker.processToken, tokenRoot: worker.tokenRoot,
     },
     port: serverInfo?.port || null,
     hostImplementation: serverInfo?.implementation || null,
