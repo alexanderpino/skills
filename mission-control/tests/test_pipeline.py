@@ -558,6 +558,15 @@ None.
         self.assertIn("code-review before merge-pending", blocked.stderr)
         self.assertIn("concurrency", blocked.stderr)
 
+    def test_medium_blast_skips_code_review_by_default(self):
+        self.add_and_claim(blast="medium")
+        self.approve(blast="medium")
+        self.enter_build()
+        self.write_verify()
+        self.run_cli("transition", "MC-1", "merge-pending")
+        self.assertEqual(
+            self.load("queue")["items"][0]["state"], "merge-pending")
+
     def test_board_lists_in_flight_and_next_steps(self):
         self.add_and_claim("MC-1", fast=True)
         self.run_cli("add-item", "MC-2", "Queued item", "--priority", "5")

@@ -54,7 +54,7 @@ GOAL
                                 └─ APPROVED
                                      └─ IMPLEMENTER ─ committed branch + handoff.md
                                           └─ VERIFIER ─ sandbox.json + verify.json
-                                               └─ CODE REVIEWER (medium+ or concurrency)
+                                               └─ CODE REVIEWER (full track or concurrency)
                                                     └─ MERGE PENDING
                                                          ├─ clean mechanical merge
                                                          └─ MERGE AGENT (conflicts only)
@@ -294,8 +294,10 @@ legacy host-side commands and warns on every invocation.
 
 Before verification the CLI computes a semantic diff between the worktree base
 and implementation commit. Every changed target must be covered by the lease
-snapshot. Verifier evidence must seal passing sandbox evidence. Medium+ changes
-then receive Code Review.
+snapshot. Verifier evidence must seal passing sandbox evidence. High-risk
+(full-track) changes and any change touching concurrency then receive Code
+Review; lower `gates.code_review_min_blast` to bring medium-blast items back
+under the reviewer when a mission wants that floor.
 
 ### Merge; never complete manually
 

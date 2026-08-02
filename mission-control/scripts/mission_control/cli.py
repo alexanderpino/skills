@@ -167,7 +167,7 @@ def _default_mission(goal: str | None) -> dict[str, Any]:
         "repo_oracle": {"build": build, "test": test, "lint": None},
         "gates": {
             "orchestrator_approval_min_blast": "high",
-            "code_review_min_blast": "medium",
+            "code_review_min_blast": "high",
         },
     }
 
