@@ -25,6 +25,7 @@ const MUTATIONS = [
   'unit-dimensional',      // accept dimensionally-equal units -> degC into K silently allowed
   'label-into-continuous', // categorical source into a continuous input silently allowed
   'single-output-geometry',// two outputs drawn on top of each other -> the second is unclickable
+  'sink-without-primary',  // the graph sink loses its value -> the whole terrain goes undefined
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -142,6 +143,26 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     }
     out.illegalAccepted = Object.entries(illegal).filter(([, accepted]) => accepted).map(([k]) => k)
 
+    // --- the graph sink still carries a value ----------------------------------------------
+    // `output` (cat:"out") publishes NO port — it has no outgoing wire, which is why drawNode and
+    // portAt have always refused to draw one. But its eval returns the final terrain that the
+    // renderer, the exporter and collectScene all read through nd._field. Typing the runtime made
+    // it briefly possible to have zero declared outputs AND therefore no value, and the digest
+    // could not see it: the digest calls def.eval directly and never evaluates through a sink.
+    // Every reading in _verify_water, _verify_snow and _verify_workflow went to zero instead.
+    defaultGraph()
+    nodes.forEach(n => { n._dirty = true })
+    evalGraph()
+    const sink = nodes.find(n => TYPES[n.type].cat === 'out')
+    let sinkField = sink && sink._field
+    if (mutation === 'sink-without-primary') sinkField = null
+    out.sink = {
+      exists: !!sink,
+      declaresNoPort: !!sink && nodeOutputs(sink).length === 0,
+      hasField: !!sinkField && sinkField.length === RES * (terrainDef.lattice === 'hex' ? Math.round(RES * 2 / Math.sqrt(3)) : RES),
+      finite: !!sinkField && Number.isFinite(sinkField[0]) && Number.isFinite(sinkField[sinkField.length - 1]),
+    }
+
     // --- the multi-output machinery must actually work ------------------------------------
     // Every shipped type declares exactly one output, so the N>1 paths in portPos / portAt /
     // nodeH / drawNode have nothing exercising them. Shipping them unexercised would be dead code
@@ -181,11 +202,11 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
       out.multi.hitsSecond = false
     }
     // An edge leaving the SECOND output must report slot 1, so the wire is drawn from the right port.
-    const sink = makeNode('output', 1100, 500)
-    edges.push({ from: probe.id, fromPort: 'flow', to: sink.id, toPort: 'height', slot: 0 })
+    const probeSink = makeNode('output', 1100, 500)
+    edges.push({ from: probe.id, fromPort: 'flow', to: probeSink.id, toPort: 'height', slot: 0 })
     out.multi.outSlotResolved = outSlotForEdge(edges[edges.length - 1]) === 1
     // An edge with no port identity resolves to 0 rather than guessing.
-    out.multi.legacyEdgeResolvesToZero = outSlotForEdge({ from: probe.id, to: sink.id, slot: 0 }) === 0
+    out.multi.legacyEdgeResolvesToZero = outSlotForEdge({ from: probe.id, to: probeSink.id, slot: 0 }) === 0
     edges.pop()
     delete TYPES[probeType]
 
@@ -205,6 +226,8 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     shippedEdgesAllLegal: report.refusedShipped.length === 0,
     everyMaskSlotAcceptsAGenerator: report.maskRefusals.length === 0 && report.maskSlots === 30,
     illegalPairsRefused: report.illegalAccepted.length === 0,
+    sinkPublishesNoPortButKeepsItsValue: report.sink.exists === true && report.sink.declaresNoPort === true
+      && report.sink.hasField === true && report.sink.finite === true,
     multiOutputGeometry: report.multi.distinctPositions === true && report.multi.hitsFirst === true
       && report.multi.hitsSecond === true && report.multi.outputCount === 2 && report.multi.heightGrew === true
       && report.multi.outSlotResolved === true && report.multi.legacyEdgeResolvesToZero === true,

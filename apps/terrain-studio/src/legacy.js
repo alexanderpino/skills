@@ -3139,6 +3139,39 @@ function nodeOutputs(nd){
   if(def.outputs)return def.outputs;
   return def.cat==="out"?[]:[{id:"out",name:"Out"}];
 }
+// S2.3 — the typed result contract, shared by ALL THREE evaluation paths (evalGraph's ev,
+// evalGraphProgressive, and evalExact) so recursive, progressive and exact execution cannot
+// disagree about which port carries what.
+//
+// ADR-002: "A typed evaluation returns { values: Map<portId, value> }. The primary output is
+// compatibility metadata, not an untyped bypass." A legacy evaluator returning a bare
+// Float32Array is adapted to its ONE declared primary scalar raster; that adaptation is the only
+// thing standing between 79 untyped plugins and a typed runtime, and it is why the digest does not
+// move: the same eval is called with the same arguments and its result is simply given a name.
+// The graph SINK produces a value but publishes no port. `output` (cat:"out") has no outgoing wire
+// — that is why drawNode and portAt have always refused to draw one — yet its eval returns the
+// final terrain the renderer, the exporter and collectScene all read through nd._field. Keying that
+// value under a reserved id keeps the alias alive without inventing a connectable port.
+//
+// Measured the hard way: returning an empty Map for the sink left outputNode()._field undefined,
+// and _verify_water, _verify_snow and _verify_workflow all went red with every reading at zero.
+// The digest never noticed, because it calls def.eval directly and never goes through a sink.
+const SINK_PRIMARY="__sink";
+function evaluateNodeValues(nd,ins){
+  const def=TYPES[nd.type];
+  const raw=def.eval(nd.params,ins,nd);
+  if(raw&&raw.values instanceof Map)return raw.values;           // already typed
+  return new Map([[primaryPortId(nd),raw]]);
+}
+function primaryPortId(nd){const o=nodeOutputs(nd),p=o.find(x=>x.primary)||o[0];return p?p.id:SINK_PRIMARY;}
+// Read one input for `nd` at `slot`, honouring the edge's SOURCE port. For a single-output node
+// this is the primary and therefore exactly the previous behaviour.
+function readInputValue(e,fallback){
+  if(!e||!e.fromPort)return fallback;
+  const src=nodeById(e.from);
+  if(src&&src._outputs&&src._outputs.has(e.fromPort))return src._outputs.get(e.fromPort);
+  return fallback;
+}
 // Which output an existing edge leaves from. Edges written before port identity carry no fromPort,
 // and every type declares exactly one output today, so 0 is the correct answer rather than a guess.
 function outSlotForEdge(e){
@@ -3160,8 +3193,12 @@ export function evalExact(id,guard){
   if(!id||guard.has(id))return null;guard.add(id);
   const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
   const def=TYPES[nd.type],refs=def.referenceOnly||[];
-  const ins=nodeInputs(nd).map((_,s)=>{if(refs.includes(s))return nd._reference||null;const e=inputEdge(id,s);return e?evalExact(e.from,guard):null;});
-  let f;try{f=def.eval(nd.params,ins,nd);f=propagateFieldMetadata(f,ins,def);}catch(err){console.error("exact",nd.type,err);f=newField();}
+  const ins=nodeInputs(nd).map((_,s)=>{if(refs.includes(s))return nd._reference||null;const e=inputEdge(id,s);
+    if(!e)return null;const up=evalExact(e.from,guard);return readInputValue(e,up);});
+  // The exact path is a fold used by Transform chains: it does not populate the per-output cache,
+  // because it deliberately does not own node state. It reads ports the same way, so the three
+  // paths cannot disagree about which output an edge carries.
+  let f;try{f=evaluateNodeValues(nd,ins).get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);}catch(err){console.error("exact",nd.type,err);f=newField();}
   guard.delete(id);return f;
 }
 
@@ -3365,10 +3402,15 @@ function evalGraph(){
     if(!id)return null;if(guard.has(id))return null;guard.add(id);
     const nd=nodeById(id);if(!nd){guard.delete(id);return null;}
     if(!nd._dirty&&nd._field){guard.delete(id);return nd._field;}
-    const def=TYPES[nd.type];const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);return e?ev(e.from,guard):null;});
-    const nt0=performance.now();let f;try{f=def.eval(nd.params,ins,nd);f=propagateFieldMetadata(f,ins,def);}catch(err){console.error("node",nd.type,err);f=newField();}
+    const def=TYPES[nd.type];const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);
+      if(!e)return null;const up=ev(e.from,guard);return readInputValue(e,up);});
+    const nt0=performance.now();let f,values;
+    try{values=evaluateNodeValues(nd,ins);f=values.get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);}
+    catch(err){console.error("node",nd.type,err);f=newField();values=new Map([[primaryPortId(nd),f]]);}
     nd._lastMs=performance.now()-nt0;
-    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
+    // _field stays a read-only ALIAS of the primary scalar raster, per ADR-002. Semantic data lives
+    // in the per-output cache; nothing may write through the alias to reach it.
+    nd._outputs=values;nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
     if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
     guard.delete(id);return f;
   }
@@ -3399,11 +3441,14 @@ async function evalGraphProgressive(label="Building terrain"){
     if(i===0||nd._lastMs>8||i%4===0||performance.now()-lastYield>24){
       await nextPaint();lastYield=performance.now();if(run!==buildRun)return false;
     }
-    const ins=nodeInputs(nd).map((_,slot)=>{const edge=inputEdge(nd.id,slot);return edge?(nodeById(edge.from)||{})._field||null:null;});
+    const ins=nodeInputs(nd).map((_,slot)=>{const edge=inputEdge(nd.id,slot);
+      if(!edge)return null;return readInputValue(edge,(nodeById(edge.from)||{})._field||null);});
     const nt0=performance.now();let f;
-    try{f=def.eval(nd.params,ins,nd);f=propagateFieldMetadata(f,ins,def);}
+    let values;
+    try{values=evaluateNodeValues(nd,ins);f=values.get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);}
     catch(err){console.error("node",nd.type,err);f=newField();}
-    nd._lastMs=performance.now()-nt0;nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
+    nd._lastMs=performance.now()-nt0;nd._outputs=values||new Map([[primaryPortId(nd),f]]);
+    nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
     if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
     updateBuildHud(i+1,work.length,def.name,started);
     setStat("warn",label+" · "+(i+1)+" / "+work.length);
