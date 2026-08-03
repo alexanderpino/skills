@@ -76,10 +76,44 @@ Three findings changed the plan:
     _verify_webgpu_capability.js                PASS, adapter+device, 12 assertions, 0 failed
     mutation controls                           RED 11/11 (S1.3–S1.5) + 1/1 (S1.0) + 2/2 (WebGPU)
 
+### Wave gate — the real number
+
+    node scripts/sweep-oracles.mjs
+    SWEEP discovered=81 declared=81 started=81 completed=81 skipped=0
+    81/81 green
+
+**This replaces the stale "74/74 green" record above**, which was not merely out of date but
+unreachable: five oracles could not load, so the suite had been reporting on 76 of 81 files.
+
+The first run of this gate was 80/81, and the failure was a regression the focused gates could not
+see. Recovering MC-S04 brought a preview-adapter hook, and `bakeThumb` read
+`TYPES[nd.type].previewAdapter`, which throws on an unregistered type. `_verify_hex_sampling` S5
+died before measuring anything and reported `undefined/undefined`. Fixed at all three call sites
+(`1b2696c`); S5 now reads `0/48` duplicate bottom rows where it predicted 6, square control also
+`0/48`.
+
 Sprint 1 is complete on evidence: S1.0–S1.5 all have armed red and green endpoints.
 
-**Next:** S0.1 document persistence, then the S2 typed multi-output keystone (S2.1 descriptors and
-the legacy adapter, bit-identical; S2.2 source-port edges and the v1→v2 migration).
+### In flight — S0.1 and S2.1 foundations
+
+Three pure, DOM-free modules are committed and **not yet imported**, so the app and the digest are
+untouched:
+
+- `src/core/project.js` (`0b55efe`) — the versioned project document. Normal form makes
+  save→load→save byte-identical; values are written verbatim and the cases JSON would silently
+  corrupt are refused (non-finite numbers, TypedArrays, undefined/function/symbol).
+  `migrateProject` is a version dispatch with an injectable table, so S2.2 adds one line.
+- `src/core/ports.js` (`298261d`) — ADR-002 vocabulary and `canConnect`. Three rules corrected
+  against measured behaviour: mask inputs are generic (declaring `semantic:'mask'` would make ~30
+  shipped wirings illegal), unit compatibility is identity not dimensional equality (the ADR
+  contradicts itself; identity is the only reading under which `rad→deg` is refused), and a
+  `semanticFrom` source is deferred at connect time rather than resolved.
+- `src/core/legacy-ports.js` (`13508b9`) — the frozen 79-row table. Port ids seeded once from
+  measured `def.ins` labels and never recomputed. 0 validation problems; a generator output
+  reaches all 30 mask slots with 0 refusals.
+
+**Next:** wire persistence into `legacy.js` (Save/Open, `_demSrc` capture, frozen v1 fixture,
+`_verify_project_io.js` with its 18 mutations), then the S2.1 adapter and S2.2 source-port edges.
 
 ---
 
