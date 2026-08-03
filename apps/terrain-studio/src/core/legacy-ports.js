@@ -1,0 +1,559 @@
+// Frozen legacy port table — one row per node type measured at the S2.1 sprint start.
+//
+// This is DATA, not derivation. Port ids are stable identifiers that a saved v2 document stores on
+// every edge, so they are seeded ONCE from the measured `def.ins` labels and then never
+// recomputed: a rule that regenerates them would silently rewrite every saved graph the day a
+// display name changes. That is exactly what ADR-002 forbids — "Display names and array positions
+// are never identifiers."
+//
+// Generated from src/plugins/**/*.js by scanning `type:`, `cat:`, `ins:`, `fieldSemantics:`,
+// `passthrough:` and `referenceOnly:`, then committed as literals. Regenerating is a deliberate,
+// reviewed act, not a build step.
+//
+// MEASURED at seeding time:
+//   79 types; 17 pure generators with no inputs; exactly one type with no output port (`output`,
+//   cat 'out' — matching the `def.cat!=="out"` gate in drawNode and portAt); 30 mask slots, every
+//   one labelled exactly "Mask"; 13 types carrying fieldSemantics (11 preserve-primary, 2
+//   temperature-pair) and 7 carrying passthrough — 20 deferred outputs in total; and
+//   referenceOnly on drawmask slot 0 alone.
+//
+// WHY EVERY ADAPTED OUTPUT IS UNTYPED HERE (semantic defaults to relativeHeight, unit none):
+// ADR-005 keeps legacy terrain typed as heightNormalized until an explicit measured-frame adapter
+// exists, and S3/S5 own that migration field by field. Typing these outputs physically now would
+// also refuse wiring the app ships today: 30 mask slots are `anyMask`, which requires a
+// dimensionless source, so declaring a generator's output as height:m would make every
+// generator-into-mask edge illegal. The physical semantics arrive with the stories that own the
+// fields, not here.
+//
+// A deferred output (semanticFrom) resolves its semantic from its inputs at evaluation time, which
+// is what fieldSemantics/passthrough already mean today. It declares no semantic or unit of its
+// own; validatePortList rejects a port that declares both.
+
+import { RANGE } from './ports.js'
+
+/** Defaults applied to every row below, so the table stays readable and the rules stay in one place. */
+export const LEGACY_INPUT_DEFAULTS = Object.freeze({
+  kind: 'scalarRaster', storage: 'R32F', components: 1, unit: 'none',
+  strictRange: false, required: false, role: 'data', default: null,
+})
+
+export const LEGACY_OUTPUT_DEFAULTS = Object.freeze({
+  kind: 'scalarRaster', storage: 'R32F', components: 1, unit: 'none',
+  semantic: 'relativeHeight', primary: true, group: null, lens: null,
+})
+
+const LEGACY_PORTS_RAW = {
+  "add": {
+    in: [
+      { id: "a", name: "A", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "b", name: "B", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "aspect": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "blend": {
+    in: [
+      { id: "a", name: "A", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "b", name: "B", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'agree', ports: ['a', 'b'] } },
+  },
+  "blur": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "canyon": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "clampn": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "colorerosion": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "sediment", name: "Sediment", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "colormixer": {
+    in: [
+      { id: "layer1", name: "Layer 1", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "layer2", name: "Layer 2", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "layer3", name: "Layer 3", semantic: "anyScalarRaster", legacySlot: 2 },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'layer1' } },
+  },
+  "constant": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "crater": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "craterfield": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "curve": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_curvature": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_deposits": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_flow": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_heat": {
+    in: [
+      { id: "temperature", name: "Temperature", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "driver", name: "Driver", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_height": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_occlusion": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_peaks": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_slope": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_sunshadow": {
+    in: [
+      { id: "height", name: "Height", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_temperature": {
+    in: [
+      { id: "relativeHeight", name: "Relative height", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "sunVisibility", name: "Sun visibility", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_texture": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_wear": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_wind": {
+    in: [
+      { id: "height", name: "Height", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "d_windmodify": {
+    in: [
+      { id: "wind", name: "Wind", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "driver", name: "Driver", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "deflate": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "dilate": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "directionalwarp": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "driver", name: "Driver", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "drawmask": {
+    in: [
+      { id: "reference", name: "Reference", semantic: "anyScalarRaster", legacySlot: 0, role: 'reference' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "erosion2": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "flip": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "fold": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "fracture": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "gradient": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "heightmask": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "histeq": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "hydraulic": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "hydrofix": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "import": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "invert": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "island": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "layout": {
+    in: [
+      { id: "base", name: "Base", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "levels": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "match": {
+    in: [
+      { id: "source", name: "Source", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "target", name: "Target", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "maxmin": {
+    in: [
+      { id: "a", name: "A", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "b", name: "B", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'agree', ports: ['a', 'b'] } },
+  },
+  "mountain": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "mountainside": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "normalizen": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "output": {
+    in: [
+      { id: "height", name: "Height", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: null,
+  },
+  "perlin": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "ridged": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "rugged": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "satmap": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "driver", name: "Driver", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "satmapblend": {
+    in: [
+      { id: "a", name: "A", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "b", name: "B", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'a' } },
+  },
+  "sculpt": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "shape": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "sharpen": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "simplex": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "slopemask": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "smax": {
+    in: [
+      { id: "a", name: "A", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "b", name: "B", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "smin": {
+    in: [
+      { id: "a", name: "A", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "b", name: "B", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "snow": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "temperature", name: "Temperature", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "wind", name: "Wind", semantic: "anyScalarRaster", legacySlot: 2 },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "softclip": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "stampn": {
+    in: [
+      { id: "base", name: "Base", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "patch", name: "Patch", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "streampower": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "uplift", name: "Uplift", semantic: "anyScalarRaster", legacySlot: 1 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "surface": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "tectonic": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "tempmask": {
+    in: [
+      { id: "temperature", name: "Temperature", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "terrace": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "thermal": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "threshold": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+    ],
+    out: { id: 'out', name: 'Out' },
+  },
+  "transform": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "transpose": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "volcano": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+  "warp": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "water": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "temperature", name: "Temperature", semantic: "anyScalarRaster", legacySlot: 1 },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "weathering": {
+    in: [
+      { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+    ],
+    out: { id: 'out', name: 'Out', semanticFrom: { mode: 'inherit', port: 'in' } },
+  },
+  "worley": {
+    in: [],
+    out: { id: 'out', name: 'Out' },
+  },
+}
+
+/** Materialise a row into full descriptors, applying the defaults above. */
+const hydrate = row => ({
+  in: row.in.map(port => Object.freeze({ ...LEGACY_INPUT_DEFAULTS, range: RANGE.unbounded(), ...port })),
+  out: row.out === null ? null : Object.freeze(
+    // A deferred output must not carry a semantic or unit of its own.
+    row.out.semanticFrom
+      ? { ...LEGACY_OUTPUT_DEFAULTS, semantic: undefined, unit: undefined, range: RANGE.unbounded(), ...row.out }
+      : { ...LEGACY_OUTPUT_DEFAULTS, range: RANGE.unbounded(), ...row.out }
+  ),
+})
+
+export const LEGACY_PORTS = Object.freeze(Object.fromEntries(
+  Object.entries(LEGACY_PORTS_RAW).map(([type, row]) => [type, Object.freeze(hydrate(row))])
+))
+
+/** The exact type roster measured at seeding time. Membership decides adapter eligibility. */
+export const LEGACY_ROSTER = Object.freeze(Object.keys(LEGACY_PORTS_RAW))
+
+/** The exact measured def.ins arrays — the bit-identity anchor for the rebuild-ins mutation. */
+export const LEGACY_INS_LABELS = Object.freeze(Object.fromEntries(
+  Object.entries(LEGACY_PORTS_RAW).map(([type, row]) => [type, Object.freeze(row.in.map(p => p.name))])
+))
