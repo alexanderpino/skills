@@ -112,8 +112,47 @@ untouched:
   measured `def.ins` labels and never recomputed. 0 validation problems; a generator output
   reaches all 30 mask slots with 0 refusals.
 
-**Next:** wire persistence into `legacy.js` (Save/Open, `_demSrc` capture, frozen v1 fixture,
-`_verify_project_io.js` with its 18 mutations), then the S2.1 adapter and S2.2 source-port edges.
+### S0.1 and the S2 keystone — shipped
+
+| Story | What landed | Gate |
+|---|---|---|
+| **S0.1** | Save/Open project, `Ctrl+S`/`Ctrl+O`, versioned document, `migrate()` dispatch, `_demSrc` source capture | `_verify_project_io.js` armed **13/13** |
+| **S2.1** | Typed port descriptors, frozen 79-row legacy table, adapter at registration | `_verify_port_contract.js` armed **8/8** |
+| **S2.2** | Schema v2 `{from,fromPort,to,toPort}`, v1→v2 migration, multi-output graph UI | same, plus v1 migration gates |
+| **S2.3** | Typed result contract across all three evaluators, per-output cache, demand-driven allocation | `undemandedOutputNotComputed` |
+| **S2.6** | **Normals** — vectorRaster, two outputs, the first real multi-output node | digest `port_normal` |
+
+Digest: **80/80 bit-identical, skipped 0**. The re-baseline for `normals` was scoped and proven so —
+`nodeCount 79→80`, one entry added, **zero existing entries changed**.
+
+### Defects these gates caught that inspection did not
+
+1. **The graph sink lost its value.** `output` (`cat:"out"`) publishes no port — no outgoing wire —
+   but its `eval` returns the terrain the renderer, exporter and `collectScene` read through
+   `_field`. Typing the runtime made zero-declared-outputs mean zero value, and `outputNode()._field`
+   went `undefined`. **The digest stayed green at 79/79 throughout**, and could not have done
+   otherwise: it calls `def.eval` directly and never evaluates through a sink. Three product oracles
+   going red together caught it; stashing the change and watching them recover proved it was mine.
+2. **The reader accepted a v2 edge with `fromPort` missing.** The writer refuses to emit one, but
+   validation skipped the source check when the field was absent — so a truncated file would
+   validate and then resolve positionally, the exact fragility v2 removes.
+3. **`validateProject` still checked `edge.slot`**, which a v2 edge does not carry, so every v2 load
+   failed `EDGE_SLOT_RANGE`.
+4. **Three mutations were vacuous on first write** and were repaired rather than counted:
+   `round-curve` rounded "4+ decimals" when the default skirt has 1–2; `uid-from-count` set a uid
+   that still exceeded every id; `mask-strict-semantic` checked template graphs, which wire **no
+   mask slots at all** (24 shipped edges, not one a mask).
+
+### Corrections to ADR-002, forced by measurement
+
+- **Mask inputs are generic (`anyMask`), not `semantic:'mask'`.** Declaring them strictly would make
+  all 30 mask wirings illegal — `_verify_digest` drives a plain perlin into every one.
+- **Unit compatibility is identity, not dimensional equality.** The ADR says both; identity is the
+  only reading under which `rad→deg` and `degC→K` are refused.
+- **A `semanticFrom` source is deferred at connect time**, not resolved — 20 of 80 types have one.
+
+**Next:** S2.4 aux-map registry (three lenses + debt ledger), S2.5 doctrine validators, then the
+full wave sweep before Phase 2 fans out.
 
 ---
 
