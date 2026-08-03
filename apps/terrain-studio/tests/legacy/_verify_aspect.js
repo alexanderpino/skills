@@ -1,6 +1,5 @@
-const { chromium } = await import('playwright-core');
-const path = (await import('node:path')).default;
-const __dirname = path.dirname(path.resolve(process.argv[1]));
+const { chromium } = require('playwright-core');
+const path = require('node:path');
 const EXE=process.env.STUDIO_CHROME||(process.platform==='win32'?'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe':'/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 const URL=process.env.STUDIO_URL||('file://'+path.resolve(__dirname,'../../index.html'));
 const mutation=(process.argv.find(value=>value.startsWith('--mutate='))||'').slice(9)||process.env.MC_MUTATION||null;

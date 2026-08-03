@@ -1,7 +1,6 @@
-const { chromium } = await import('playwright-core');
-const path = (await import('node:path')).default;
-const { mkdirSync, writeFileSync } = await import('node:fs');
-const __dirname = path.dirname(path.resolve(process.argv[1]));
+const { chromium } = require('playwright-core');
+const path = require('node:path');
+const { mkdirSync, writeFileSync } = require('node:fs');
 const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
