@@ -515,6 +515,31 @@ function pointInPoly(px,py,pts){
     if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/((yj-yi)||1e-9)+xi)inside=!inside;}
   return inside;
 }
+// Author the canyon trunk's centerline directly instead of only accepting the procedural sinusoid.
+// Lines of "x,y" (normalized 0-1), sorted by y so callers can list them in any order; interpolated
+// piecewise-linearly and held constant past the first/last row so v outside the authored span is
+// still defined. Two points is a valid path (a straight cut); fewer is not enough to define one.
+function parseCanyonWaypoints(text){
+  const pts=[];
+  for(const raw of String(text||"").split("\n")){
+    const line=raw.trim();
+    if(!line||line[0]==="#")continue;
+    const a=line.split(",").map(Number);
+    if(a.length>=2&&a.every(isFinite))pts.push([clamp(a[0],0,1),clamp(a[1],0,1)]);
+  }
+  if(pts.length<2)return null;
+  pts.sort((p,q)=>p[1]-q[1]);
+  return pts;
+}
+function canyonWaypointX(pts,v){
+  if(v<=pts[0][1])return pts[0][0];
+  if(v>=pts[pts.length-1][1])return pts[pts.length-1][0];
+  for(let i=0;i<pts.length-1;i++){
+    const [ax,ay]=pts[i],[bx,by]=pts[i+1];
+    if(v>=ay&&v<=by){const t=by>ay?(v-ay)/(by-ay):0;return ax+(bx-ax)*t;}
+  }
+  return pts[pts.length-1][0];
+}
 /* Text format, one shape per header line, vertices `x,y,elevation` on the lines under it:
      path width=0.04 falloff=0.22 profile=scurve op=max breakup=0.4
        0.12,0.66,0.30   0.34,0.58,0.90   0.74,0.46,1.00 */
@@ -960,7 +985,7 @@ function canyonCacheKey(p,n){
   // World extent and height are solver inputs, not just display units, so a terrainDef change has to
   // invalidate the cached process. Without this a resized world silently reuses a stale solve.
   return[n,p.style,p.scale,p.slot,p.valley,p.surrounding,p.structural,
-    p.tributaries??0,p.seed,p.detailWarp,p.alternate,
+    p.tributaries??0,p.seed,p.detailWarp,p.alternate,p.waypoints??'',
     terrainDef.scale,terrainDef.height].join("|");
 }
 function canyonPriorityFlood(h,n,outlet){const nh=latticeRows(n);
@@ -1096,7 +1121,13 @@ function canyonEvolutionState(p,requestedN){
   const alternate=p.alternate==="on",initial=new Float32Array(N);let h=new Float32Array(N);
   const uplift=new Float32Array(N),weakness=new Float32Array(N),fluvialCut=new Float32Array(N);
   const phase=(hash2(seed,17,seed+199)-.5)*Math.PI*2;
-  const centerAt=y=>clamp(.5+(.018+.105*structural)*Math.sin(y*Math.PI*(1.18+.72*structural)+phase)
+  // A waypoint path (if the user drew one) supplies the macro trunk shape; the same fine fbm wiggle
+  // still rides on top either way, so an authored two-point line still incises as an organic river
+  // and not a ruler-straight cut. No waypoints -> byte-identical to the procedural sinusoid.
+  const waypoints=parseCanyonWaypoints(p.waypoints);
+  const centerAt=waypoints
+    ?v=>clamp(canyonWaypointX(waypoints,v)+fbm2(.37,v*1.65+3.4,seed+201,4)*.035,.16,.84)
+    :y=>clamp(.5+(.018+.105*structural)*Math.sin(y*Math.PI*(1.18+.72*structural)+phase)
     +fbm2(.37,y*1.65+3.4,seed+201,4)*.052*structural,.16,.84);
   const inletX=clamp(Math.round(centerAt(0)*(n-1)),2,n-3),inlet=inletX;
   const outletX=clamp(Math.round(centerAt(1)*(n-1)),2,n-3),outlet=(nh-1)*n+outletX;
@@ -1353,9 +1384,16 @@ function canyonSurfaceExpression(state,p,o,n){const nh=latticeRows(n);
   const src=new Float32Array(N),dep=new Float32Array(N);
   const tan28=Math.tan(28*Math.PI/180),tan62=Math.tan(62*Math.PI/180);
   let sourced=0,exported=0;
-  for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
+  // Full field, border included: one-sided differences at the edge (replicate boundary) rather than
+  // skipping the outermost ring outright. The prior y=1..nh-2/x=1..n-2 loop left every border pixel
+  // permanently unweathered - a visible, untouched seam exactly at the domain edge, worst at higher
+  // output resolutions where that seam is a full render pixel wide. `(xp-xm)`/`(yp-ym)` is 2 in the
+  // interior (central difference, unchanged) and 1 at the edge (one-sided), so no fictitious neighbour
+  // across the boundary is invented.
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x;
-    const gx=(o[i+1]-o[i-1])*H/(2*cellM),gy=(o[i+n]-o[i-n])*H/(2*cellM),S=Math.hypot(gx,gy);
+    const xm=x>0?x-1:x,xp=x<n-1?x+1:x,ym=y>0?y-1:y,yp=y<nh-1?y+1:y;
+    const gx=(o[y*n+xp]-o[y*n+xm])*H/(cellM*Math.max(xp-xm,1)),gy=(o[yp*n+x]-o[ym*n+x])*H/(cellM*Math.max(yp-ym,1)),S=Math.hypot(gx,gy);
     // Hard-gated to zero below 28 degrees: this is FACE retreat, so it does not touch gentle ground.
     if(S<=tan28)continue;
     const exposure=smooth(clamp((S-tan28)/(tan62-tan28),0,1));
@@ -1370,11 +1408,17 @@ function canyonSurfaceExpression(state,p,o,n){const nh=latticeRows(n);
     src[i]=lower;sourced+=lower;
   }
   // Deposit at the foot of the face: one steepest-descent hop. Mass is moved, never conjured.
-  for(let y=1;y<nh-1;y++)for(let x=1;x<n-1;x++){
+  // Full field again; clamped neighbour coordinates that fall back onto the source cell itself are
+  // skipped (`j===i`), so a border/corner cell with no true off-domain neighbour on some side simply
+  // has fewer candidates rather than inventing one - it can still deposit toward any real interior
+  // neighbour it has.
+  for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x,q=src[i];if(q<=0)continue;
     let bj=-1,best=0;
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-      if(!dx&&!dy)continue;const j=(y+dy)*n+x+dx,d=o[i]-o[j];
+      if(!dx&&!dy)continue;
+      const nx=clamp(x+dx,0,n-1),ny=clamp(y+dy,0,nh-1),j=ny*n+nx;if(j===i)continue;
+      const d=o[i]-o[j];
       if(d>best){best=d;bj=j;}
     }
     if(bj<0){exported+=q;continue;}
@@ -3970,6 +4014,15 @@ function buildProps(){
     const count=document.createElement("span");count.className="hint";count.style.margin="0";count.textContent=(selected.params.strokes||[]).length+" strokes";
     tools.append(edit,count);body.appendChild(tools);
   }
+  if(selected.type==="canyon"){
+    const tools=document.createElement("div");tools.className="prop-actions";tools.style.margin="2px 0 8px";
+    const edit=document.createElement("button");edit.type="button";edit.className="btn primary";edit.style.flex="1";
+    edit.textContent="Edit waypoints on terrain…";edit.title="Click top-down to draw the trunk route";edit.onclick=()=>openPathEditor(selected);
+    const pts=parsePathPoints(selected.params.waypoints);
+    const count=document.createElement("span");count.className="hint";count.style.margin="0";
+    count.textContent=pts.length?pts.length+" waypoints":"procedural (no waypoints)";
+    tools.append(edit,count);body.appendChild(tools);
+  }
   const note=def.info?def.info(selected):def.note;
   if(note){const nt=document.createElement("div");nt.className="hint";
     nt.style.margin="14px 0 10px";nt.innerHTML=note;body.appendChild(nt);}
@@ -6043,6 +6096,110 @@ $("#drawClear").onclick=()=>{
 };
 $("#drawDone").onclick=closeDrawEditor;$("#drawCancel").onclick=closeDrawEditor;
 $("#drawEditor").onpointerdown=e=>{if(e.target===$("#drawEditor"))closeDrawEditor();};
+
+/* =====================================================================
+   PATH WAYPOINT EDITOR
+   Click to append an ordered top-down point, drag an existing one to move it.
+   Points are the same "x,y per line" text the node's Waypoints field parses,
+   so typing and drawing are two views of one source of truth.
+   ===================================================================== */
+let pathTarget=null,pathDragIndex=-1,pathBefore=null;
+const pathCanvas=$("#pathCanvas"),pathCtx=pathCanvas.getContext("2d"),pathBaseCanvas=document.createElement("canvas");
+pathBaseCanvas.width=pathCanvas.width;pathBaseCanvas.height=pathCanvas.height;
+let pathBaseField=null,pathBaseResolution=0;
+function parsePathPoints(text){
+  const pts=[];
+  for(const raw of String(text||"").split("\n")){
+    const line=raw.trim();if(!line||line[0]==="#")continue;
+    const a=line.split(",").map(Number);
+    if(a.length>=2&&a.every(isFinite))pts.push([clamp(a[0],0,1),clamp(a[1],0,1)]);
+  }
+  return pts;
+}
+const pathPointsToText=pts=>pts.map(p=>p[0].toFixed(4)+","+p[1].toFixed(4)).join("\n");
+function renderPathEditor(){
+  if(!pathTarget||$("#pathEditor").hidden)return;
+  const W=pathCanvas.width,H=pathCanvas.height,base=curField;
+  if(pathBaseField!==base||pathBaseResolution!==RES){
+    const bx=pathBaseCanvas.getContext("2d"),img=bx.createImageData(W,H),n=RES;
+    let mn=0,mx=1;if(base&&base.length){const r=fieldRange(base);mn=r[0];mx=r[1];}
+    const d=mx-mn||1;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const sx=Math.min(n-1,Math.floor(x/W*n)),sy=Math.min(n-1,Math.floor(y/H*n)),i=(y*W+x)*4;
+      const h=base&&base.length?(base[sy*n+sx]-mn)/d:0;
+      const hx=base&&base.length?(base[sy*n+Math.min(n-1,sx+1)]-base[sy*n+Math.max(0,sx-1)])/d:0;
+      const hy=base&&base.length?(base[Math.min(latticeRows(n)-1,sy+1)*n+sx]-base[Math.max(0,sy-1)*n+sx])/d:0;
+      const shade=clamp(.22+h*.66+(hx+hy)*2.8,0,1),v=Math.round(shade*255);
+      img.data[i]=Math.round(v*.88);img.data[i+1]=Math.round(v*.94);img.data[i+2]=v;img.data[i+3]=255;
+    }
+    bx.putImageData(img,0,0);pathBaseField=base;pathBaseResolution=RES;
+  }
+  pathCtx.clearRect(0,0,W,H);pathCtx.drawImage(pathBaseCanvas,0,0);
+  const pts=parsePathPoints(pathTarget.params.waypoints);
+  if(pts.length){
+    pathCtx.save();pathCtx.strokeStyle="#3cd2e6";pathCtx.lineWidth=2.5;pathCtx.lineJoin="round";
+    pathCtx.beginPath();pathCtx.moveTo(pts[0][0]*W,pts[0][1]*H);
+    for(let i=1;i<pts.length;i++)pathCtx.lineTo(pts[i][0]*W,pts[i][1]*H);
+    pathCtx.stroke();pathCtx.restore();
+    pts.forEach((p,i)=>{
+      const x=p[0]*W,y=p[1]*H;
+      pathCtx.beginPath();pathCtx.arc(x,y,7,0,Math.PI*2);
+      pathCtx.fillStyle=i===0?"#5be86b":i===pts.length-1?"#e65b5b":"#1c2733";pathCtx.fill();
+      pathCtx.lineWidth=1.5;pathCtx.strokeStyle="#eaf2fa";pathCtx.stroke();
+      pathCtx.fillStyle="#eaf2fa";pathCtx.font="10px var(--mono, monospace)";pathCtx.textAlign="center";pathCtx.textBaseline="middle";
+      pathCtx.fillText(String(i+1),x,y);
+    });
+  }
+  $("#pathPointCount").textContent=pts.length+" point"+(pts.length===1?"":"s");
+  $("#pathUndoPoint").disabled=!pts.length;$("#pathClear").disabled=!pts.length;
+}
+function setPathPoints(pts){pathTarget.params.waypoints=pathPointsToText(pts);}
+function openPathEditor(nd){
+  if(!nd||nd.type!=="canyon")return;pathTarget=nd;pathBaseField=null;
+  $("#pathEditor").hidden=false;renderPathEditor();$("#pathDone").focus();
+}
+function closePathEditor(){
+  if($("#pathEditor").hidden)return;$("#pathEditor").hidden=true;pathDragIndex=-1;pathBefore=null;
+  const nd=pathTarget;pathTarget=null;if(nd&&selected===nd)buildProps();
+}
+function pathPointFromEvent(e){
+  const r=pathCanvas.getBoundingClientRect();
+  return[clamp((e.clientX-r.left)/r.width,0,1),clamp((e.clientY-r.top)/r.height,0,1)];
+}
+function pathHitTest(pts,p){
+  let best=-1,bd=9/pathCanvas.getBoundingClientRect().width;
+  pts.forEach((q,i)=>{const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<bd){bd=d;best=i;}});
+  return best;
+}
+pathCanvas.onpointerdown=e=>{
+  if(!pathTarget||e.button!==0)return;e.preventDefault();pathCanvas.setPointerCapture(e.pointerId);
+  const pts=parsePathPoints(pathTarget.params.waypoints),p=pathPointFromEvent(e);
+  pathBefore=graphSnapshot();
+  const hit=pathHitTest(pts,p);
+  if(hit>=0)pathDragIndex=hit;else{pts.push(p);setPathPoints(pts);pathDragIndex=pts.length-1;}
+  renderPathEditor();
+};
+pathCanvas.onpointermove=e=>{
+  if(pathDragIndex<0||!pathTarget)return;
+  const pts=parsePathPoints(pathTarget.params.waypoints);pts[pathDragIndex]=pathPointFromEvent(e);
+  setPathPoints(pts);renderPathEditor();
+};
+function finishPathEdit(e){
+  if(pathDragIndex<0)return;
+  if(pathCanvas.hasPointerCapture(e.pointerId))pathCanvas.releasePointerCapture(e.pointerId);
+  pushUndo(pathBefore);pathBefore=null;pathDragIndex=-1;markDirtyFrom(pathTarget.id);requestEval();drawGraph();renderPathEditor();
+}
+pathCanvas.onpointerup=finishPathEdit;pathCanvas.onpointercancel=finishPathEdit;
+$("#pathUndoPoint").onclick=()=>{
+  if(!pathTarget)return;const pts=parsePathPoints(pathTarget.params.waypoints);if(!pts.length)return;
+  recordHistory();pts.pop();setPathPoints(pts);markDirtyFrom(pathTarget.id);requestEval();drawGraph();renderPathEditor();
+};
+$("#pathClear").onclick=()=>{
+  if(!pathTarget)return;const pts=parsePathPoints(pathTarget.params.waypoints);if(!pts.length)return;
+  recordHistory();setPathPoints([]);markDirtyFrom(pathTarget.id);requestEval();drawGraph();renderPathEditor();
+};
+$("#pathDone").onclick=closePathEditor;$("#pathCancel").onclick=closePathEditor;
+$("#pathEditor").onpointerdown=e=>{if(e.target===$("#pathEditor"))closePathEditor();};
 const editorMenuPanels=["fileMenu","editMenu","viewMenu","helpMenu","mainMenu"];
 const editorMenuButtons={fileMenu:"fileMenuBtn",editMenu:"editMenuBtn",viewMenu:"viewMenuBtn",helpMenu:"helpMenuBtn",mainMenu:"mainMenuBtn"};
 let lastEditorMenuButton=null;

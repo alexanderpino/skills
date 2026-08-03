@@ -288,7 +288,10 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
         const volcanoField = TYPES.volcano.eval(volcanoParams, [], { id: 0 }), volcanoExpected = [], volcanoActual = [];
         for (const index of indices) { const point = world(index[0], index[1], resolution, nh, lattice), dx = point[0] - 2500, dy = point[1] - 2500;
           const radius = Math.hypot(dx, dy), rn = radius / volcanoOptions.radiusM;
-          let base = rn <= 1 ? Math.max(0, style === 'shield' ? 1 - rn ** 1.7 : (1 - rn) ** 2.2) : 0;
+          const stratoApexRn = 0.12, stratoBase = (value) => { if (value >= stratoApexRn) return (1 - value) ** 2.2;
+            const t = value / stratoApexRn, h0 = 1, h1 = (1 - stratoApexRn) ** 2.2, m1 = stratoApexRn * (-2.2 * (1 - stratoApexRn) ** 1.2);
+            return h0 * (2 * t ** 3 - 3 * t ** 2 + 1) + h1 * (-2 * t ** 3 + 3 * t ** 2) + m1 * (t ** 3 - t ** 2); };
+          let base = rn <= 1 ? Math.max(0, style === 'shield' ? 1 - rn ** 1.7 : stratoBase(rn)) : 0;
           if (mutation === 'volcano-alias-styles' && style === 'shield') base = rn <= 1 ? (1 - rn) ** 2.2 : 0;
           if (mutation === 'volcano-straight-cone') base = rn <= 1 ? 1 - rn : 0;
           if (mutation === 'volcano-gaussian-cone') base = rn <= 1 ? Math.exp(-4 * rn * rn) : 0;

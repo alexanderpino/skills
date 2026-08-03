@@ -535,6 +535,8 @@ select.sg-btn{appearance:auto}
   linear-gradient(90deg,rgba(93,120,150,.08) 1px,transparent 1px);background-size:32px 32px}
 #drawCanvas{display:block;max-width:100%;max-height:100%;aspect-ratio:1;border:1px solid var(--line2);border-radius:5px;
   box-shadow:0 14px 40px rgba(0,0,0,.45);cursor:crosshair;touch-action:none;background:#111}
+#pathCanvas{display:block;max-width:100%;max-height:100%;aspect-ratio:1;border:1px solid var(--line2);border-radius:5px;
+  box-shadow:0 14px 40px rgba(0,0,0,.45);cursor:crosshair;touch-action:none;background:#111}
 .draw-stage-label{position:absolute;left:28px;bottom:25px;padding:4px 7px;border-radius:4px;background:rgba(8,12,17,.76);
   color:#a9bdd1;font:9px var(--mono);pointer-events:none}
 .draw-empty{position:absolute;top:27px;right:28px;padding:4px 7px;border-radius:4px;background:rgba(8,12,17,.76);
@@ -967,6 +969,31 @@ select.sg-btn{appearance:auto}
         <canvas id="drawCanvas" width="768" height="768" aria-label="Terrain mask drawing canvas"></canvas>
         <div class="draw-stage-label">terrain space · vector strokes · resolution independent</div>
         <div class="draw-empty" id="drawStrokeCount">0 strokes</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="draw-editor" id="pathEditor" role="dialog" aria-modal="true" aria-labelledby="pathTitle" hidden>
+  <div class="draw-shell">
+    <header class="draw-head">
+      <div class="draw-head-copy"><b id="pathTitle">Trunk Waypoints</b><small>Click top-down to place points, drag to reposition</small></div>
+      <span class="draw-spacer"></span>
+      <button class="btn" id="pathCancel" type="button">Close</button>
+      <button class="btn primary" id="pathDone" type="button">Done</button>
+    </header>
+    <div class="draw-work">
+      <aside class="draw-tools">
+        <div class="draw-tool-actions">
+          <button class="btn" id="pathUndoPoint" type="button" title="Remove the most recent point">↶ Point</button>
+          <button class="btn" id="pathClear" type="button">Clear</button>
+        </div>
+        <div class="draw-help"><b>Waypoint workflow</b><br>Click from the top edge (inlet) toward the bottom edge (outlet) to draw the trunk river's route. Drag any point to fine-tune it. The stream-power solve still erodes, retreats walls, and drains tributaries around this path — only the macro route is drawn; leave it empty for the procedural route.</div>
+      </aside>
+      <div class="draw-stage">
+        <canvas id="pathCanvas" width="768" height="768" aria-label="Canyon trunk waypoint editor"></canvas>
+        <div class="draw-stage-label">terrain space · top-down · ordered points</div>
+        <div class="draw-empty" id="pathPointCount">0 points</div>
       </div>
     </div>
   </div>
