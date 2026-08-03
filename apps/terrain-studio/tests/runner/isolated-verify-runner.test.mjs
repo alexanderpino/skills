@@ -333,13 +333,22 @@ test('positive output is required even when a case exits zero', async () => {
 })
 
 test('mixed legacy formats classify without changing oracle bytes', async () => {
+  // Every production oracle under tests/legacy/ is CommonJS, and must stay that way: the directory
+  // ships its own package.json declaring "type": "commonjs", so a .js file there written with
+  // top-level `await import(...)` does not load at all under Node 25. Five oracles were in exactly
+  // that state and were converted. This test therefore pins the production side to commonjs and
+  // supplies its own ESM fixture, so the mixed-format claim does not silently evaporate the next
+  // time a real oracle changes shape.
   const names = ['_verify_bridge.js', '_verify_blur_isotropy.js', '_verify_digest.js', '_verify_surface.js']
   const before = new Map(await Promise.all(names.map(async name => [name, await readFile(join(appDir, 'tests/legacy', name))])))
   const formats = new Map()
   for (const name of names) formats.set(name, (await classifyOracle(join(appDir, 'tests/legacy', name))).format)
-  assert.equal(formats.get('_verify_bridge.js'), 'commonjs')
-  assert.equal(formats.get('_verify_blur_isotropy.js'), 'commonjs')
-  assert.equal(formats.get('_verify_surface.js'), 'module')
+  for (const name of names) assert.equal(formats.get(name), 'commonjs', `${name} must be CommonJS to load under tests/legacy/package.json`)
+
+  const root = await makeRoot('studio-mixed-formats-')
+  const esm = await oracle(root, 'native-module.mjs', 'await Promise.resolve(); console.log("esm")\n')
+  assert.equal((await classifyOracle(esm)).format, 'module')
+
   for (const name of names) assert.deepEqual(await readFile(join(appDir, 'tests/legacy', name)), before.get(name))
 })
 
