@@ -26,7 +26,9 @@ export const PROJECT_KIND = 'terrain-studio-project'
 // v2 (S2.2, ADR-002): edges are {from, fromPort, to, toPort}. Port ids are stable plugin-local
 // ASCII identifiers, never array positions — so renaming a display name or inserting an input can
 // never silently rewire a saved graph, which is what the v1 `slot` index did.
-export const PROJECT_SCHEMA_VERSION = 2
+// v3 (S9.1, ADR-007): the document carries a WorldDomain, so width and height are independent and
+// the vertical frame is a datum plus a range rather than one `height` number.
+export const PROJECT_SCHEMA_VERSION = 3
 export const PROJECT_FILE_EXTENSION = '.tsproj.json'
 
 // Embedded import sources are base64 and inflate ~4/3. A 4096² raw16 is 32 MiB before encoding,
@@ -214,6 +216,9 @@ export function canonicalProject(state) {
   // Workspace is restored best-effort — a stale selectedId or edge key is a warning, never a
   // fatal load. It deliberately excludes the three localStorage UI preferences: opening someone
   // else's project must not move your panes around.
+  // WorldDomain/1 — the authoritative frame. Emitted before graph, because everything in the graph
+  // is interpreted against it.
+  if (isPlainObject(state.domain)) doc.domain = canonicalValue(state.domain, 'domain')
   // Variables are document state, sorted by id so the file is a normal form like everything else.
   if (Array.isArray(state.variables) && state.variables.length) {
     doc.variables = state.variables
@@ -371,6 +376,25 @@ export function migrateV1toV2(doc, { resolve } = {}) {
     return out
   })
   return { ...doc, schemaVersion: 2, graph: { ...doc.graph, edges } }
+}
+
+/**
+ * v2 -> v3: give the document a WorldDomain.
+ *
+ * `buildDomain` is injected for the same reason migrateV1toV2's resolver is: this module must stay
+ * DOM-free and must not import the app's terrainDef or RES. The caller supplies a function that
+ * turns the legacy terrain block plus build resolution into WorldDomain/1.
+ *
+ * The migration PRESERVES NUMERICAL OUTPUT — posting 'legacy-cell', spacing scale/RES — because a
+ * schema upgrade that moved every sample by half a cell would look to the author like the terrain
+ * had silently changed on open. Converting to vertex posting is a separate explicit resample.
+ */
+export function migrateV2toV3(doc, { buildDomain } = {}) {
+  if (typeof buildDomain !== 'function') fail('NO_MIGRATION', 'migrateV2toV3 needs a buildDomain(terrain, build) function')
+  if (doc.domain) return { ...doc, schemaVersion: 3 }        // idempotent
+  const domain = buildDomain(doc.terrain || {}, doc.build || {})
+  if (!isPlainObject(domain)) fail('BAD_SHAPE', 'buildDomain did not return a WorldDomain')
+  return { ...doc, schemaVersion: 3, domain }
 }
 
 export function migrateProject(doc, { targetVersion = PROJECT_SCHEMA_VERSION, migrations = {} } = {}) {

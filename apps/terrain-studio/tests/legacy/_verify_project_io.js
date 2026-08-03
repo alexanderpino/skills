@@ -189,7 +189,12 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
       v1Upgraded = JSON.parse(saveProjectText())
     } catch (e) { v1Error = (e && e.code) || String(e) }
     out.v1Error = v1Error
-    out.v1MigratedToV2 = !!v1Upgraded && v1Upgraded.schemaVersion === 2
+    // A v1 document now migrates through BOTH steps — v1->v2 gives edges port identity, v2->v3
+    // gives the document a WorldDomain — so the assertion is 'reached the current schema', not
+    // 'reached 2'. Chaining is the property that matters: the dispatch must not stop halfway.
+    out.v1MigratedToV2 = !!v1Upgraded && v1Upgraded.schemaVersion === PROJECT.PROJECT_SCHEMA_VERSION
+    out.v1ChainedThroughV2 = !!v1Upgraded && !!v1Upgraded.domain
+      && v1Upgraded.graph.edges.every(e => typeof e.fromPort === 'string')
     out.v1EdgesCarryPorts = !!v1Upgraded && v1Upgraded.graph.edges.every(e => typeof e.fromPort === 'string' && typeof e.toPort === 'string')
     out.v1TopologyPreserved = !!v1Upgraded
       && v1Upgraded.graph.edges.length === v2doc.graph.edges.length
@@ -258,7 +263,8 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     refusalIsNonDestructive: report.documentSurvivedRefusal === true,
     // Absence of evidence is failure: a run that saved nothing proves nothing.
     loadAccepted: report.loadAccepted === true,
-    v1MigratesToV2: report.v1MigratedToV2 === true,
+    v1MigratesToCurrentSchema: report.v1MigratedToV2 === true,
+    v1ChainedThroughEveryStep: report.v1ChainedThroughV2 === true,
     v1EdgesCarryPorts: report.v1EdgesCarryPorts === true,
     v1TopologyPreserved: report.v1TopologyPreserved === true,
     v1FieldsIdentical: report.v1FieldsIdentical === true,
