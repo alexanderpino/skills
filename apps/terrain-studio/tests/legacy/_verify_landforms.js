@@ -5,7 +5,14 @@ const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'));
-const VISUAL = process.argv.includes('--visual');
+// A visual mutation FORCES the capture on. flat-render and unfrozen-framebuffer are checked only
+// inside the --visual block, so without it they went through a branch that renders nothing, set
+// mutationReached = VISUAL && !visual.ok = false, and still exited 1 — reporting a violation that
+// was never observed. The sweep never passes --visual, so both controls were dead in every
+// automated run. A control that cannot operate in the invocation it ships under is not a control.
+const VISUAL_MUTATIONS = ['flat-render', 'unfrozen-framebuffer'];
+const VISUAL = process.argv.includes('--visual')
+  || VISUAL_MUTATIONS.includes((process.argv.find(a => a.startsWith('--mutate=')) || '').slice(9));
 const SUMMARY = process.argv.includes('--summary');
 const flagValue = name => process.argv.find(argument => argument.startsWith(`--${name}=`))?.split('=')[1];
 const VISUAL_TYPE = flagValue('visual-type');
@@ -346,7 +353,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     terrainDef.seed = 7;
 
     const transformMatrix = xfFromParams({ scale: 1.17, aspect: .83, angle: 23, offX: .071, offY: -.043, pivX: .41, pivY: .63 });
-    const worldMapping = [], transformed = {};
+    const worldMappingRuns = [], transformed = {};
     for (const lattice of ['square', 'hex']) {
       terrainDef.lattice = lattice; const nh = fieldH(), baseActual = [], baseExpected = [], transformedActual = [], transformedExpected = [];
       for (let iy = 1; iy <= 8; iy++) for (let ix = 1; ix <= 8; ix++) { const x = Math.floor(ix * RES / 10), y = Math.floor(iy * nh / 10);
@@ -359,7 +366,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
       XF = null;
       const coordinateError = (actual, expected) => actual.reduce((error, point, index) => Math.max(error,
         Math.abs(point[0] - expected[index][0]), Math.abs(point[1] - expected[index][1])), 0);
-      worldMapping.push({ lattice, samples: baseActual.length, baseError: coordinateError(baseActual, baseExpected),
+      worldMappingRuns.push({ lattice, samples: baseActual.length, baseError: coordinateError(baseActual, baseExpected),
         transformError: coordinateError(transformedActual, transformedExpected) });
       for (const entry of ['crater', 'island', 'volcano:shield', 'volcano:stratovolcano']) {
         const [type, style] = entry.split(':'), params = { ...defaults(type), ...(style ? { style } : {}) }, options = TYPES[type].options(params), node = { id: 0 }, previous = XF; XF = transformMatrix;
@@ -374,7 +381,14 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
         const comparison = maxError(actual, expected); transformed[`${lattice}:${entry}`] = { samples: actual.length, maxError: comparison.error, ok: comparison.error === 0 };
       }
     }
-    worldMapping.ok = worldMapping.every(item => item.samples === 64 && item.baseError <= 1e-10 && item.transformError <= 1e-10);
+    // A PLAIN OBJECT, not an array carrying an .ok property. page.evaluate serialises its result as
+    // structured/JSON data, and non-index properties of an Array do not survive that trip — so
+    // worldMapping.ok was `true` inside the page and `undefined` in Node, silently dropping a real
+    // gate from every Node-side reading. normalOk is computed IN the page, which is why the oracle
+    // still exited correctly and nothing noticed. The evidence line did not.
+    const worldMapping = { runs: worldMappingRuns,
+      ok: worldMappingRuns.length > 0
+        && worldMappingRuns.every(item => item.samples === 64 && item.baseError <= 1e-10 && item.transformError <= 1e-10) };
     transformed.rasterExcluded = ['craterfield', 'mountainside', 'rugged'].every(type => !EXACT_TYPES.has(type));
     transformed.ok = Object.entries(transformed).filter(([key]) => key.includes(':')).every(([, value]) => value.ok) && transformed.rasterExcluded;
 
@@ -499,7 +513,10 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
   report.lifecycle = lifecycle;
   report.ok = report.ok && report.ui.ok && lifecycle.ok;
 
-  report.visual = { runs: [], ok: true };
+  // Absence of evidence is failure: when a capture was requested, an EMPTY run set is red. This
+  // initialised to ok:true and stayed that way whenever the capture block did not execute, which is
+  // how S1.2's "both modes, or it fails" hillshade requirement was satisfied by capturing nothing.
+  report.visual = { runs: [], ok: !VISUAL };
   if (VISUAL) {
     if (VISUAL_STYLE && !['shield', 'stratovolcano'].includes(VISUAL_STYLE)) throw new Error(`Unknown visual style ${VISUAL_STYLE}`);
     if (VISUAL_STYLE && VISUAL_TYPE !== 'volcano') throw new Error('--visual-style requires --visual-type=volcano');
@@ -565,6 +582,25 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
     barrancos: report.barrancos.ok, roots: Object.values(report.rootSeedIntegration).every(item => item.changed),
     lattices: report.lattices.every(item => item.ok), ui: report.ui.ok, lifecycle: report.lifecycle.ok })}`);
   console.log(`landforms volcanoUi=${JSON.stringify({ ok: report.ui.ok, desktop: report.ui.desktop.volcano.styles, mobile: report.ui.mobile.volcano.styles })}`);
+  // THE GATES, NAMED, in the shape scripts/gate.py scores. Without a failed=[...] line the runner
+  // cannot tell "red because a named gate broke" from "red for any other reason", and it scored
+  // every control here as unarmed.
+  const namedGates = { registration: report.registration.ok, invalid: report.invalid.ok, crater: report.crater.ok,
+    craterMass: report.craterMass.ok, placement: report.placement.ok, worldMapping: report.worldMapping.ok,
+    transformed: report.transformed.ok, volcanoMorphology: report.volcanoMorphology.ok, barrancos: report.barrancos.ok,
+    roots: Object.values(report.rootSeedIntegration).every(item => item.changed),
+    lattices: report.lattices.every(item => item.ok), ui: report.ui.ok, lifecycle: report.lifecycle.ok,
+    visual: report.visual.ok };
+  const failedGates = Object.entries(namedGates).filter(([, v]) => !v).map(([k]) => k);
+  console.log(`landforms failed=[${failedGates.join(',')}] mutation=${report.mutation || 'none'}`);
+
+  // ASSERT mutationReached. It was computed and printed but never entered `ok`, and `ok` was forced
+  // false under ANY mutation — so every mutated run exited 1 whether or not the mutation broke
+  // anything, and none of these controls had ever been shown to detect what it claims. That is a
+  // safety net wearing a gate's clothes: exit status carried no information.
+  if (report.mutation && !report.mutationReached) {
+    console.error(`FAIL mutation ${report.mutation} was not detected — that control is vacuous`);
+  }
   if (report.mutation) console.log(`MUTATION ${report.mutation} violated ${report.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ ...report, errors }, null, 2));
   else if (VISUAL) console.log(`visual runs=${report.visual.runs.length} minTerrain=${Math.min(...report.visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...report.visual.runs.map(run => run.changedFraction))} fov=${Math.min(...report.visual.runs.map(run => run.fovDeg))}`);
