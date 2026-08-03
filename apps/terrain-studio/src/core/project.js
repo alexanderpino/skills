@@ -23,7 +23,10 @@
 // loader hydrates missing ones from the schema before anything evaluates.
 
 export const PROJECT_KIND = 'terrain-studio-project'
-export const PROJECT_SCHEMA_VERSION = 1
+// v2 (S2.2, ADR-002): edges are {from, fromPort, to, toPort}. Port ids are stable plugin-local
+// ASCII identifiers, never array positions — so renaming a display name or inserting an input can
+// never silently rewire a saved graph, which is what the v1 `slot` index did.
+export const PROJECT_SCHEMA_VERSION = 2
 export const PROJECT_FILE_EXTENSION = '.tsproj.json'
 
 // Embedded import sources are base64 and inflate ~4/3. A 4096² raw16 is 32 MiB before encoding,
@@ -155,10 +158,15 @@ function canonicalNode(node) {
 
 function canonicalEdge(edge) {
   if (!isPlainObject(edge)) fail('BAD_SHAPE', 'graph.edges must contain objects', { got: typeof edge })
-  const out = { from: edge.from, to: edge.to, slot: edge.slot }
-  if (!Number.isInteger(out.from) || !Number.isInteger(out.to) || !Number.isInteger(out.slot)) {
-    fail('BAD_SHAPE', 'edge from/to/slot must be integers', { edge: `${edge.from}>${edge.to}:${edge.slot}` })
+  if (!Number.isInteger(edge.from) || !Number.isInteger(edge.to)) {
+    fail('BAD_SHAPE', 'edge from/to must be integers', { edge: `${edge.from}>${edge.to}` })
   }
+  if (typeof edge.fromPort !== 'string' || !edge.fromPort || typeof edge.toPort !== 'string' || !edge.toPort) {
+    // A v2 edge without port identity is the exact defect the schema exists to prevent: it would
+    // fall back to positional wiring and rewire itself the next time an input is inserted.
+    fail('BAD_SHAPE', `edge ${edge.from}>${edge.to} is missing fromPort/toPort`, { edge: `${edge.from}>${edge.to}` })
+  }
+  const out = { from: edge.from, fromPort: edge.fromPort, to: edge.to, toPort: edge.toPort }
   // Emitted only when truthy, so an enabled edge has exactly one representation.
   if (edge.disabled) out.disabled = true
   return out
@@ -181,7 +189,7 @@ export function canonicalProject(state) {
     seen.add(node.id)
   }
 
-  const canonEdges = edges.map(canonicalEdge).sort((a, b) => (a.to - b.to) || (a.slot - b.slot) || (a.from - b.from))
+  const canonEdges = edges.map(canonicalEdge).sort((a, b) => (a.to - b.to) || (a.toPort < b.toPort ? -1 : a.toPort > b.toPort ? 1 : 0) || (a.from - b.from))
 
   const maxId = canonNodes.reduce((m, n) => Math.max(m, n.id), 0)
   const uid = state.uid
@@ -254,7 +262,7 @@ export function parseProject(text) {
  * `types` is the TYPES table; `arityOf(type, node)` reports how many input slots a node has,
  * which is dynamic for ColorMixer and therefore cannot be read from the descriptor alone.
  */
-export function validateProject(doc, { types, arityOf } = {}) {
+export function validateProject(doc, { types, arityOf, portsOf } = {}) {
   const problems = []
   const byId = new Map()
   for (const node of doc.graph.nodes) {
@@ -269,8 +277,39 @@ export function validateProject(doc, { types, arityOf } = {}) {
   for (const edge of doc.graph.edges) {
     if (!byId.has(edge.from)) problems.push({ code: 'EDGE_ENDPOINT', end: 'from', id: edge.from })
     if (!byId.has(edge.to)) { problems.push({ code: 'EDGE_ENDPOINT', end: 'to', id: edge.to }); continue }
-    if (arityOf) {
-      const to = byId.get(edge.to)
+    const to = byId.get(edge.to)
+    // A v2 document MUST carry both port ids on every edge. The writer already refuses to emit one
+    // without them, but the reader has to refuse too: a hand-edited or truncated file that reaches
+    // the loader with fromPort missing would otherwise validate, and then resolve positionally —
+    // which is precisely the fragility v2 exists to remove.
+    if (doc.schemaVersion >= 2) {
+      if (typeof edge.fromPort !== 'string' || !edge.fromPort) {
+        problems.push({ code: 'BAD_SHAPE', reason: 'v2 edge missing fromPort', from: edge.from, to: edge.to })
+      }
+      if (typeof edge.toPort !== 'string' || !edge.toPort) {
+        problems.push({ code: 'BAD_SHAPE', reason: 'v2 edge missing toPort', from: edge.from, to: edge.to })
+      }
+    }
+    if (edge.toPort != null) {
+      // v2: the destination is a stable port id, so validate it as one. ADR-002 is explicit that an
+      // unknown port id is a load error and never a best-effort rewire — resolving it positionally
+      // here would reintroduce exactly the fragility the schema exists to remove.
+      if (portsOf) {
+        const ports = portsOf(to.type, to)
+        const inputs = (ports && ports.inputs) || []
+        if (!inputs.some(p => p.id === edge.toPort)) {
+          problems.push({ code: 'EDGE_SLOT_RANGE', to: edge.to, type: to.type, toPort: edge.toPort, known: inputs.map(p => p.id) })
+        }
+        const from = byId.get(edge.from)
+        if (from && edge.fromPort != null) {
+          const srcPorts = portsOf(from.type, from)
+          const outputs = (srcPorts && srcPorts.outputs) || []
+          if (outputs.length && !outputs.some(p => p.id === edge.fromPort)) {
+            problems.push({ code: 'EDGE_ENDPOINT', end: 'fromPort', id: edge.from, type: from.type, fromPort: edge.fromPort })
+          }
+        }
+      }
+    } else if (arityOf) {
       const arity = arityOf(to.type, to)
       if (!(edge.slot >= 0 && edge.slot < arity)) {
         problems.push({ code: 'EDGE_SLOT_RANGE', to: edge.to, slot: edge.slot, arity })
@@ -293,6 +332,41 @@ export function validateProject(doc, { types, arityOf } = {}) {
  *   NO_MIGRATION        — a version on the path has no registered step
  *   MIGRATION_VERSION   — a step ran but did not stamp schemaVersion forward
  */
+/**
+ * v1 -> v2: give every edge port identity.
+ *
+ * A v1 edge is {from, to, slot}: the destination is an ARRAY POSITION into the plugin's `ins`
+ * list, and the source is the whole node. Both are exactly what ADR-002 forbids as identifiers.
+ * The upgrade resolves each edge's slot to the destination port carrying that legacySlot, and
+ * each source node to its plugin's primary output.
+ *
+ * `resolve` is injected rather than imported so this stays DOM-free and testable: the caller
+ * supplies (nodeType, node) -> {inputs, outputs}. An edge whose port cannot be resolved is a
+ * LOAD ERROR, never a best-effort rewire — ADR-002: "Unknown port IDs are load errors, never
+ * best-effort rewiring." Silently dropping or guessing one produces a graph that opens and
+ * computes something else, which is strictly worse than refusing.
+ */
+export function migrateV1toV2(doc, { resolve } = {}) {
+  if (typeof resolve !== 'function') fail('NO_MIGRATION', 'migrateV1toV2 needs a resolve(nodeType, node) function')
+  const byId = new Map(doc.graph.nodes.map(n => [n.id, n]))
+  const edges = doc.graph.edges.map(edge => {
+    if (edge.fromPort && edge.toPort) return { ...edge }        // idempotent: already upgraded
+    const src = byId.get(edge.from), dst = byId.get(edge.to)
+    if (!src) fail('EDGE_ENDPOINT', `edge from unknown node ${edge.from}`, { id: edge.from })
+    if (!dst) fail('EDGE_ENDPOINT', `edge to unknown node ${edge.to}`, { id: edge.to })
+    const srcPorts = resolve(src.type, src), dstPorts = resolve(dst.type, dst)
+    const primary = (srcPorts.outputs || []).find(p => p.primary) || (srcPorts.outputs || [])[0]
+    if (!primary) fail('EDGE_ENDPOINT', `node ${edge.from} (${src.type}) declares no output to migrate from`, { id: edge.from, type: src.type })
+    const inPort = (dstPorts.inputs || []).find(p => p.legacySlot === edge.slot)
+                || (dstPorts.inputs || [])[edge.slot]
+    if (!inPort) fail('EDGE_SLOT_RANGE', `node ${edge.to} (${dst.type}) has no input at legacy slot ${edge.slot}`, { id: edge.to, type: dst.type, slot: edge.slot })
+    const out = { from: edge.from, fromPort: primary.id, to: edge.to, toPort: inPort.id }
+    if (edge.disabled) out.disabled = true
+    return out
+  })
+  return { ...doc, schemaVersion: 2, graph: { ...doc.graph, edges } }
+}
+
 export function migrateProject(doc, { targetVersion = PROJECT_SCHEMA_VERSION, migrations = {} } = {}) {
   let current = doc
   let guard = 0

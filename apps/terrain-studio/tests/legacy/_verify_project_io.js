@@ -28,6 +28,9 @@ const MUTATIONS = [
   'keep-runtime-fields',  // writer emits _field/_thumb -> not a fixed point, and huge
   'skip-normalize',       // a schema key missing at load -> re-save differs
   'migrate-skip-dispatch',// migrateProject must throw on a missing/no-op step
+  'discard-fromport',     // S2.2: a v2 edge without source-port identity must be refused
+  'unknown-toport',       // S2.2: an unknown port id is a load error, never a best-effort rewire
+  'v1-slot-out-of-range', // S2.2: a v1 edge whose slot no longer exists must refuse, not guess
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -161,6 +164,60 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
       out.historyCleared = false; out.paramsIndependent = false; out.uidPreserved = false
     }
 
+    // --- S2.2: a real v1 document migrates -------------------------------------------------
+    // Build the v1 shape by hand: {from,to,slot}, no ports, schemaVersion 1. This is what every
+    // graph saved before S2.2 looks like, and what S8.5/S8.6/S9.1/S9.6 are specified to migrate
+    // from. The upgrade must resolve each slot to the destination port carrying that legacySlot
+    // and each source to its plugin's primary output — and reproduce identical terrain.
+    const v2doc = JSON.parse(saveProjectText())
+    const v1doc = JSON.parse(JSON.stringify(v2doc))
+    v1doc.schemaVersion = 1
+    v1doc.graph.edges = v2doc.graph.edges.map(e => {
+      const to = v2doc.graph.nodes.find(n => n.id === e.to)
+      const def = TYPES[to.type]
+      const slot = (def.inputs || []).findIndex(p => p.id === e.toPort)
+      const out = { from: e.from, to: e.to, slot: slot < 0 ? 0 : slot }
+      if (e.disabled) out.disabled = true
+      return out
+    })
+    if (mutation === 'v1-slot-out-of-range') v1doc.graph.edges[0].slot = 97
+
+    let v1Error = null, v1Upgraded = null
+    try {
+      loadProjectText(JSON.stringify(v1doc, null, 2) + '\n')
+      nodes.forEach(n => { n._dirty = true }); evalGraph()
+      v1Upgraded = JSON.parse(saveProjectText())
+    } catch (e) { v1Error = (e && e.code) || String(e) }
+    out.v1Error = v1Error
+    out.v1MigratedToV2 = !!v1Upgraded && v1Upgraded.schemaVersion === 2
+    out.v1EdgesCarryPorts = !!v1Upgraded && v1Upgraded.graph.edges.every(e => typeof e.fromPort === 'string' && typeof e.toPort === 'string')
+    out.v1TopologyPreserved = !!v1Upgraded
+      && v1Upgraded.graph.edges.length === v2doc.graph.edges.length
+      && v1Upgraded.graph.edges.every((e, i) => e.from === v2doc.graph.edges[i].from
+        && e.to === v2doc.graph.edges[i].to && e.toPort === v2doc.graph.edges[i].toPort
+        && !!e.disabled === !!v2doc.graph.edges[i].disabled)
+    out.v1FieldsIdentical = !!v1Upgraded && graphDigest() === beforeDigest
+
+    // A v2 edge stripped of its source-port identity, and one naming a port that does not exist,
+    // must BOTH be refused. Best-effort rewiring is the failure this schema exists to prevent.
+    const refusals = {}
+    for (const [name, mutate] of [
+      ['missingFromPort', d => { delete d.graph.edges[0].fromPort }],
+      ['unknownToPort', d => { d.graph.edges[0].toPort = 'notAPortId' }],
+    ]) {
+      const bad = JSON.parse(JSON.stringify(v2doc)); mutate(bad)
+      try { loadProjectText(JSON.stringify(bad, null, 2) + '\n'); refusals[name] = null }
+      catch (e) { refusals[name] = e.code }
+    }
+    if (mutation === 'discard-fromport') refusals.missingFromPort = null
+    if (mutation === 'unknown-toport') refusals.unknownToPort = null
+    out.refusals = refusals
+    out.portIdentityEnforced = refusals.missingFromPort === 'BAD_SHAPE' && refusals.unknownToPort === 'EDGE_SLOT_RANGE'
+
+    // Put the good document back so the checks after this run against a sane graph.
+    loadProjectText(JSON.stringify(v2doc, null, 2) + '\n')
+    nodes.forEach(n => { n._dirty = true }); evalGraph()
+
     // --- migrate dispatch, armed here rather than promised for S2.2 ------------------------
     const dispatch = { noMigration: null, migrationVersion: null, passthrough: null }
     try { PROJECT.migrateProject({ kind: 'k', schemaVersion: 1, graph: {}, terrain: {} }, { targetVersion: 3, migrations: { 1: d => ({ ...d, schemaVersion: 2 }) } }) }
@@ -201,6 +258,11 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     refusalIsNonDestructive: report.documentSurvivedRefusal === true,
     // Absence of evidence is failure: a run that saved nothing proves nothing.
     loadAccepted: report.loadAccepted === true,
+    v1MigratesToV2: report.v1MigratedToV2 === true,
+    v1EdgesCarryPorts: report.v1EdgesCarryPorts === true,
+    v1TopologyPreserved: report.v1TopologyPreserved === true,
+    v1FieldsIdentical: report.v1FieldsIdentical === true,
+    portIdentityEnforced: report.portIdentityEnforced === true,
     evidenceNonEmpty: typeof report.bytes === 'number' && report.bytes > 200 && report.nodeCount > 0,
   }
 

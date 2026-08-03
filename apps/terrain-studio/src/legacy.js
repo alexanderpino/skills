@@ -17,7 +17,7 @@ import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
 // Acyclic core import, safe at module-evaluation time: project.js imports nothing from here.
 import { canConnect, validatePortList, GENERICS, SEMANTICS, UNITS, RANGE } from './core/ports.js';
 import { LEGACY_PORTS, LEGACY_ROSTER, LEGACY_INS_LABELS } from './core/legacy-ports.js';
-import { serializeProject, parseProject, migrateProject, validateProject,
+import { serializeProject, parseProject, migrateProject, migrateV1toV2, validateProject,
   PROJECT_SCHEMA_VERSION, PROJECT_FILE_EXTENSION, ProjectError } from './core/project.js';
 
 "use strict";
@@ -4549,6 +4549,43 @@ $("#exportBtn").onclick=exportHeightmap;
    user action.
    ===================================================================== */
 
+// --- edge port identity (S2.2) --------------------------------------------------------------
+// A v1 edge addressed its destination by ARRAY POSITION into the plugin's `ins` list and its source
+// by the whole node. Both are exactly what ADR-002 forbids as identifiers: insert an input and
+// every saved graph silently rewires itself. v2 edges carry {fromPort, toPort}.
+//
+// In memory the edge keeps `slot` as well, and `slot` remains what the three evaluators index. That
+// is deliberate for this cut: port identity is a schema and authoring change, not a numerical one,
+// so the evaluator is untouched and the digest cannot move. S2.3 takes evaluation itself.
+function nodeOutPortId(type){
+  const def=TYPES[type],outs=def&&def.outputs;
+  if(!outs||!outs.length)return null;
+  return (outs.find(p=>p.primary)||outs[0]).id;
+}
+function nodeInPorts(nd){
+  const def=TYPES[nd.type],declared=(def&&def.inputs)||[],arity=nodeInputs(nd).length;
+  if(arity<=declared.length)return declared.slice(0,arity);
+  // ColorMixer authors its arity at runtime, so beyond the declared template the ports are
+  // synthesised by the same rule that named them: "Layer 4" -> layer4.
+  const out=declared.slice();
+  for(let i=declared.length;i<arity;i++)out.push({id:"layer"+(i+1),name:"Layer "+(i+1),legacySlot:i,semantic:"anyScalarRaster",unit:"none"});
+  return out;
+}
+function inPortIdForSlot(nd,slot){const p=nodeInPorts(nd);return (p[slot]&&p[slot].id)||null;}
+function slotForInPortId(nd,portId){const p=nodeInPorts(nd);const i=p.findIndex(x=>x.id===portId);return i<0?null:i;}
+// Back-fill port identity onto any edge that predates it. Called before a save and after template
+// construction; an edge whose endpoints have gone is left for deleteEdge to clean up.
+function ensureEdgePorts(){
+  for(const e of edges){
+    if(e.fromPort&&e.toPort)continue;
+    const from=nodeById(e.from),to=nodeById(e.to);
+    if(!from||!to)continue;
+    if(!e.fromPort){const id=nodeOutPortId(from.type);if(id)e.fromPort=id;}
+    if(!e.toPort){const id=inPortIdForSlot(to,e.slot);if(id)e.toPort=id;}
+  }
+  return edges;
+}
+
 // Frozen at module load, before SatMap Studio can add anything, so "custom" means "not shipped".
 const BUILTIN_SATMAP_NAMES=Object.freeze(Object.keys(SATMAPS));
 
@@ -4588,7 +4625,7 @@ function collectProjectState(){
       if(nd._demSrc)out.source=nd._demSrc;
       return out;
     }),
-    edges:edges.map(e=>{const o={from:e.from,to:e.to,slot:e.slot};if(e.disabled)o.disabled=true;return o;}),
+    edges:ensureEdgePorts().map(e=>{const o={from:e.from,fromPort:e.fromPort,to:e.to,toPort:e.toPort};if(e.disabled)o.disabled=true;return o;}),
     uid,
     ...(palettes?{palettes}:{}),
     workspace:{
@@ -4625,7 +4662,13 @@ function applyProjectDocument(doc){
   if(doc.palettes&&doc.palettes.satmaps)for(const [name,stops] of Object.entries(doc.palettes.satmaps))SATMAPS[name]=stops;
 
   nodes=nextNodes;
-  edges=doc.graph.edges.map(e=>({...e}));
+  // Derive the legacy slot from the stable port id. That is the whole point of v2: the wire
+  // remembers which INPUT it feeds, not which position that input happened to occupy.
+  edges=doc.graph.edges.map(e=>{
+    const to=nextNodes.find(n=>n.id===e.to);
+    const slot=to?slotForInPortId(to,e.toPort):null;
+    return{...e,slot:slot==null?0:slot};
+  });
   uid=doc.graph.uid;
   terrainDef=createTerrainDef(doc.terrain);
   H_SCALE=terrainDef.height/terrainDef.scale;
@@ -4671,13 +4714,23 @@ function rebuildDemFromProjectSource(nd){
 export function loadProjectText(text){
   const{doc,warnings}=parseProject(text);
   const upgraded=migrateProject(doc,{targetVersion:PROJECT_SCHEMA_VERSION,migrations:PROJECT_MIGRATIONS});
-  validateProject(upgraded,{types:TYPES,arityOf:(type,node)=>(node&&node.inputs?node.inputs.length:(TYPES[type]&&TYPES[type].ins?TYPES[type].ins.length:0))});
+  validateProject(upgraded,{types:TYPES,arityOf:(type,node)=>(node&&node.inputs?node.inputs.length:(TYPES[type]&&TYPES[type].ins?TYPES[type].ins.length:0)),portsOf:(type,node)=>({inputs:nodeInPorts({type,_inputs:node&&node.inputs}),outputs:(TYPES[type]&&TYPES[type].outputs)||[]})});
   applyProjectDocument(upgraded);
   return{warnings};
 }
 
 // S2.2 adds `1: migrateV1toV2` here and changes nothing else.
-const PROJECT_MIGRATIONS={};
+// S2.2: the dispatch gains its first real step. Ports resolve from the LIVE registry, so a v1
+// document written before a plugin gained an input still migrates against that plugin's current
+// declaration rather than a snapshot of it.
+const PROJECT_MIGRATIONS={
+  1:doc=>migrateV1toV2(doc,{resolve:(type,node)=>({
+    inputs:node&&Array.isArray(node.inputs)
+      ?node.inputs.map((name,i)=>({id:(TYPES[type]&&TYPES[type].inputs&&TYPES[type].inputs[i]&&TYPES[type].inputs[i].id)||("layer"+(i+1)),legacySlot:i}))
+      :((TYPES[type]&&TYPES[type].inputs)||[]),
+    outputs:(TYPES[type]&&TYPES[type].outputs)||[],
+  })}),
+};
 
 function saveProjectFile(){
   let text;
