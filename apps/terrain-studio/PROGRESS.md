@@ -25,6 +25,64 @@ in `.sweep-logs/`.
 
 ## Now
 
+**PHASE 0 — DELIVERY RECOVERY, 2026-08-03.** The programme was audited against the source rather
+than against its own status documents, and the two abandoned branches were recovered. Plan of
+record: `~/.claude/plans/distributed-squishing-feigenbaum.md`.
+
+### Measured ground truth at the start of this pass
+
+Every story in all ten sprint documents was audited against the tree, then adversarially re-checked.
+**3 of 55 stories had shipped** (S1.0, S1.1, S1.2), four were thin partials where an existing node
+overlaps a contract without satisfying it (S4.8, S4.9, S4.10, S5.1), and the rest were absent —
+including all of S2, S3, and S6 through S10. About **405 of 417 points remained**.
+
+Three findings changed the plan:
+
+1. **There is no project save/open.** File menu is New / Import heightmap / Export heightmap;
+   `localStorage` holds three UI preferences. But S2.2, S8.5, S8.6, S9.1 and S9.6 all specify
+   "load v1, save v2, reload, prove idempotence" against a document format that never existed.
+   Those migration gates were unarmable. A persistence story (**S0.1**) is now a prerequisite of
+   S2.2 — user decision, taken.
+2. **WebGPU works here, but the house test profile hides it.** Measured over `http://localhost`:
+   real Intel Xe-LPG adapter, device acquired, `maxTextureDimension2D = 16384`,
+   `maxStorageBufferBindingSize = 2 GiB`. Under the suite's SwiftShader flags `requestAdapter()`
+   returns **null**, and `navigator.gpu` is undefined on `file://` outright. 77 of 78 oracles use
+   those flags. Every Sprint 10 GPU gate written to the house pattern would have been vacuous.
+3. **Five oracles could not load at all under Node 25** — ESM-shaped `.js` files under a
+   `"type": "commonjs"` directory. Two of them, `_verify_landforms.js` and `_verify_surface.js`,
+   are the gates for S1.1 and S1.2, the stories recorded as DONE. The **74/74 green record below
+   is stale** and is being replaced by a fresh measured sweep.
+
+### What landed
+
+| Commit | What |
+|---|---|
+| `35200f6`, `25974a2` | MC-S04 recovered by cherry-pick — S1.3 tone/morphology filters, S1.4 coordinate filters, S1.5 Aspect. 11 node types, 3 oracles. One mechanical `_digest_baseline.json` conflict (HEAD had re-baselined `volcano`; the branch inserted `transpose` adjacent) resolved keeping HEAD's numbers. |
+| `7a0fbb7` | The five unloadable oracles converted to CommonJS. |
+| `28a4f5f` | S1.0's armed control was `({...TYPES.fracture, cat:'ero'}).cat !== 'surface'` — a literal compared to a literal, constant true on every possible build, ANDed into `ok` as if it were a gate. Replaced with `--mutate=fracture-under-erosion`, which reclassifies the live registry: green `toolbox=Surface / Geology`, red `toolbox=Erosion`. |
+| `7a79340`…`9fd22ea` | MC-S33 isolated verification runner adopted **on measured evidence** — OS-selected ports, private profile/TEMP, owned-process cleanup, dist-only build cache, fail-closed sweep preconditions. 33/33 self-tests. |
+| `716a978` | WebGPU launch profile (`tests/legacy/_gpu_launch.cjs`) and `_verify_webgpu_capability.js`. Also corrected the export button's false "16-bit PNG" claim — `exportHeightmap` writes `*255` through canvas `toDataURL` and cannot do otherwise. |
+
+### Gate readings
+
+    npm run plugins:check                       79 modules, clean
+    npm run verify -- _verify_digest.js         PASS 79/79 bit-identical, skipped 0
+    npm run bridge:check                        PASS 207 symbols, unknown 0, no drift
+    node --test tests/runner/…runner.test.mjs   33/33 pass
+    _verify_filters_pack.js                     exit 0, 41 assertions / 19243 samples
+    _verify_coordinate_filters.js               exit 0, 30 assertions / 262176 samples
+    _verify_aspect.js                           exit 0, 9465 compared, maxError 1.18e-7 < 1.87e-3
+    _verify_landforms.js / _verify_surface.js   exit 0 (had been unable to load at all)
+    _verify_webgpu_capability.js                PASS, adapter+device, 12 assertions, 0 failed
+    mutation controls                           RED 11/11 (S1.3–S1.5) + 1/1 (S1.0) + 2/2 (WebGPU)
+
+Sprint 1 is complete on evidence: S1.0–S1.5 all have armed red and green endpoints.
+
+**Next:** S0.1 document persistence, then the S2 typed multi-output keystone (S2.1 descriptors and
+the legacy adapter, bit-identical; S2.2 source-port edges and the v1→v2 migration).
+
+---
+
 **DIRECT FIX PASS — 2026-08-03, commit `36d37b2`.** User-reported visual bugs and two follow-on
 feature requests landed and were verified directly against the running dev server (no Mission
 Control lifecycle — routine, single-owner, low-risk work per `DELIVERY.md`):
