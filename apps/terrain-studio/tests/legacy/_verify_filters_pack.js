@@ -61,7 +61,30 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     const target=Float32Array.from([40,10,30,20,20,30,10,40]);
     const rank=(field)=>Array.from(field,(value,index)=>({value,index})).sort((a,b)=>a.value-b.value||a.index-b.index);
     const s=rank(source),t=rank(target),rankExpected=new Float32Array(source.length);for(let k=0;k<s.length;k++)rankExpected[s[k].index]=t[k].value;
-    const matched=mutation==='match-cdf'?Float32Array.from(source,value=>value/4):TYPES.match.eval({},[source,target]);
+    // THE STORY'S NAMED REJECTION, spelled the way the story names it: "Four moments or a
+    // bin-count-derived universal CDF tolerance are not sufficient." The fixture substituted
+    // `source/4` — a scaled copy of the source, which is not a histogram match of anything. It
+    // turned the gate red, so it looked armed, but it could not distinguish a rank match from the
+    // CDF match the oracle is required to reject. That is the same defect as S1.4's reversal.
+    //
+    // A real binned CDF match: bucket the source, map each bucket through the cumulative
+    // distribution, and read back the target quantile at that cumulative position. With coarse bins
+    // this loses the WITHIN-BUCKET ordering that exact rank matching preserves, which is precisely
+    // why the story rejects it — and why the rank oracle below must catch it.
+    const cdfMatch=(src,tgt,binCount)=>{
+      const lo=Math.min(...src),hi=Math.max(...src),span=(hi-lo)||1;
+      const hist=new Float64Array(binCount);
+      for(const v of src)hist[Math.min(binCount-1,Math.floor((v-lo)/span*binCount))]++;
+      const cum=new Float64Array(binCount);let running=0;
+      for(let b=0;b<binCount;b++){running+=hist[b];cum[b]=running/src.length;}
+      const sortedTarget=Float32Array.from(tgt).sort();
+      return Float32Array.from(src,v=>{
+        const b=Math.min(binCount-1,Math.floor((v-lo)/span*binCount));
+        const q=Math.min(sortedTarget.length-1,Math.max(0,Math.round(cum[b]*sortedTarget.length)-1));
+        return sortedTarget[q];
+      });
+    };
+    const matched=mutation==='match-cdf'?cdfMatch(source,target,3):TYPES.match.eval({},[source,target]);
     equal(matched,rankExpected,'Match stable rank violated'); equal(TYPES.match.eval({},[source,source]),source,'Match self identity'); assertions+=2;samples+=source.length;
     const bins=new Float32Array(1024);for(let i=0;i<bins.length;i++)bins[i]=i%256;
     const binsOut=TYPES.match.eval({},[Float32Array.from(bins,(v,i)=>((i*313)%1024)),bins]);
