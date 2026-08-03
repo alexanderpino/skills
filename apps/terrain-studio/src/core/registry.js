@@ -1,3 +1,6 @@
+import { PORTS_VERSION } from './ports.js'
+import { LEGACY_PORTS } from './legacy-ports.js'
+
 // The plugin registry.
 //
 // A node type is a manifest plus a pure function - `{cat, name, ins, params, eval}` - which is what
@@ -68,5 +71,52 @@ export function mergePlugins(inlineTypes) {
     throw new Error(`mergePlugins: ${clash.length} type(s) exist BOTH as a plugin and inline in TYPES `
       + `— the inline copy was not removed: ${clash.join(', ')}`)
   }
-  return { ...inlineTypes, ...PLUGINS }
+  return attachLegacyPorts({ ...inlineTypes, ...PLUGINS })
+}
+
+/**
+ * S2.1 — give every registered type a typed port block.
+ *
+ * Placement matters. This runs ONCE over the assembled TYPES table, after every plugin has
+ * registered, and it is PURELY ADDITIVE: it writes `def.inputs`, `def.outputs` and `def.ports` and
+ * touches nothing else. It never reads or replaces `eval`, never reorders or rewrites `ins`, never
+ * touches `params` or a default. That is what makes it impossible for this step to move a digest —
+ * the evaluator still calls the same `def.eval(nd.params, ins, nd)` with the same arguments in the
+ * same order, and the descriptors are metadata hanging off the side.
+ *
+ * A type already carrying `inputs`/`outputs` declared its own ports and is left alone: ADR-002 is
+ * explicit that new plugins may not use the legacy adapter.
+ *
+ * A type absent from the frozen roster gets `source:'unregistered'` rather than a guessed block.
+ * Inventing descriptors for a type nobody measured would be the adapter reporting on itself, and a
+ * later gate counting those rows would be measuring its own invention.
+ */
+export function attachLegacyPorts(types) {
+  for (const [type, def] of Object.entries(types)) {
+    if (!def || typeof def !== 'object') continue
+    if (def.ports) continue                       // already attached (a second mergePlugins call)
+    if (def.inputs || def.outputs) {              // self-declaring plugin — not the adapter's business
+      def.ports = { version: PORTS_VERSION, source: 'declared', roster: false, dynamic: null, groups: def.portGroups || {} }
+      continue
+    }
+    const row = LEGACY_PORTS[type]
+    if (!row) {
+      def.ports = { version: PORTS_VERSION, source: 'unregistered', roster: false, dynamic: null, groups: {} }
+      continue
+    }
+    def.inputs = row.in
+    def.outputs = row.out ? [row.out] : []
+    def.ports = {
+      version: PORTS_VERSION,
+      source: 'legacy-adapter',
+      roster: true,
+      // ColorMixer is the one type whose input arity is authored at runtime (nd._inputs), so its
+      // descriptor list is a template rather than the whole story. S2.2 owns the dynamic case.
+      dynamic: type === 'colormixer'
+        ? { template: 'layer', min: 1, max: 32, reason: 'nd._inputs is edited by buildColorMixerProps' }
+        : null,
+      groups: {},
+    }
+  }
+  return types
 }
