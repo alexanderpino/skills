@@ -5142,7 +5142,7 @@ export const HEX_ROW=Math.sqrt(3)/2;
 // convention is defined once (thermalErodeHex established it).
 const HEX_NB_EVEN=[[-1,0],[1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
 const HEX_NB_ODD =[[-1,0],[1,0],[0,-1],[1,-1],[0,1],[1,1]];
-const hexNb=y=>(y&1)?HEX_NB_ODD:HEX_NB_EVEN;
+export const hexNb=y=>(y&1)?HEX_NB_ODD:HEX_NB_EVEN;
 // Unit vectors to those six neighbours, in the SAME order the tables list them, for the
 // least-squares gradient: sum(e_k)=0 and sum(e_k e_k^T)=3I, so g = sum(h_k*e_k)/3 is exact for
 // a plane and isotropic to leading order. The centre height drops out entirely.
@@ -7426,8 +7426,8 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("nodes", () => nodes, (v) => { nodes = v })
   __def("edges", () => edges, (v) => { edges = v })
   __def("selected", () => selected, (v) => { selected = v })
-  __def("cam", () => cam, (v) => { cam = v })
   __def("TARGET_RES", () => TARGET_RES, (v) => { TARGET_RES = v })
+  __def("cam", () => cam, (v) => { cam = v })
   __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
   __def("selectedEdge", () => selectedEdge, (v) => { selectedEdge = v })
   __def("scene", () => scene, (v) => { scene = v })

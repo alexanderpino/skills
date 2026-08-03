@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 80,
+  "nodeCount": 82,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -33,6 +33,7 @@
     "dilate": "a2ade0df:c8827752",
     "directionalwarp": "1f18b57a:caa00c3a",
     "drawmask": "d9df5eac:d735aa08",
+    "edge": "4441cf00:36149580",
     "erosion2": "8fab94e8:df37d884",
     "flip": "194ea963:99c754a3",
     "fold": "3e5aa341:199d6e1c",
@@ -56,6 +57,7 @@
     "output": "7b0de484:d4ae72f5",
     "perlin": "5601956f:473ffde7",
     "ridged": "9cb9f837:843dbcb0",
+    "route": "263bdef7:bcf4a390",
     "rugged": "58cd1479:cf0cafdb",
     "satmap": "263bdef7:bcf4a390|driver=71ece1e6:9f23adf9|color=a9b42879:f657c9c6",
     "satmapblend": "263bdef7:bcf4a390|color=421f78ff:447670f9",

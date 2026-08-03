@@ -11,7 +11,7 @@
       "moduleScripts": 1,
       "externalScripts": 1,
       "scriptLines": "",
-      "topLevelDeclarations": 735,
+      "topLevelDeclarations": 736,
       "elementIds": 167,
       "sources": [
         {
@@ -99,7 +99,7 @@
           "kind": "file",
           "declaredGoal": "module",
           "parsedGoal": "module",
-          "imports": 4,
+          "imports": 5,
           "newDeclarations": 0
         },
         {
@@ -107,7 +107,7 @@
           "kind": "file",
           "declaredGoal": "module",
           "parsedGoal": "module",
-          "imports": 6,
+          "imports": 7,
           "newDeclarations": 0
         },
         {
@@ -735,6 +735,14 @@
           "newDeclarations": 0
         },
         {
+          "id": "src/plugins/mask/edge.js",
+          "kind": "file",
+          "declaredGoal": "module",
+          "parsedGoal": "module",
+          "imports": 3,
+          "newDeclarations": 1
+        },
+        {
           "id": "src/plugins/mask/drawmask.js",
           "kind": "file",
           "declaredGoal": "module",
@@ -772,6 +780,14 @@
           "declaredGoal": "module",
           "parsedGoal": "module",
           "imports": 3,
+          "newDeclarations": 0
+        },
+        {
+          "id": "src/plugins/comb/route.js",
+          "kind": "file",
+          "declaredGoal": "module",
+          "parsedGoal": "module",
+          "imports": 2,
           "newDeclarations": 0
         },
         {
@@ -821,7 +837,7 @@
       "notFollowed": []
     },
     "tests": {
-      "files": 86,
+      "files": 87,
       "fileList": [
         "_verify.js",
         "_verify_all_canyon.js",
@@ -853,6 +869,7 @@
         "_verify_featurescale.js",
         "_verify_filters_pack.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_glsl_probe.js",
@@ -910,7 +927,7 @@
         "_verify_workflow.js",
         "_verify_zoom.js"
       ],
-      "pageSideCallbacks": 249,
+      "pageSideCallbacks": 250,
       "indirectCallbacks": 1,
       "methodsScanned": [
         "$$eval",
@@ -1036,8 +1053,8 @@
       "kind": "mutable-global",
       "written": true,
       "patched": false,
-      "refCount": 414,
-      "fileCount": 67,
+      "refCount": 418,
+      "fileCount": 68,
       "files": [
         "_verify.js",
         "_verify_aspect.js",
@@ -1065,6 +1082,7 @@
         "_verify_featurescale.js",
         "_verify_filters_pack.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_glsl_probe.js",
@@ -1131,6 +1149,7 @@
         "_verify_erosion_mass.js",
         "_verify_filters_pack.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_glsl_probe.js",
@@ -1165,16 +1184,16 @@
         "RES = 160",
         "RES = 192"
       ],
-      "reads": 325,
-      "writes": 89
+      "reads": 328,
+      "writes": 90
     },
     {
       "name": "terrainDef",
       "kind": "mutable-global",
       "written": false,
       "patched": true,
-      "refCount": 287,
-      "fileCount": 38,
+      "refCount": 291,
+      "fileCount": 39,
       "files": [
         "_verify_aspect.js",
         "_verify_blur_isotropy.js",
@@ -1188,6 +1207,7 @@
         "_verify_erosion_gridscale.js",
         "_verify_filters_pack.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_glsl_probe.js",
@@ -1228,6 +1248,7 @@
         "_verify_coordinate_filters.js",
         "_verify_filters_pack.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_glsl_probe.js",
@@ -1257,7 +1278,7 @@
         "terrainDef.baseElevation=3000",
         "terrainDef.baseElevation=savedDatum"
       ],
-      "reads": 287,
+      "reads": 291,
       "writes": 0
     },
     {
@@ -1265,8 +1286,8 @@
       "kind": "const-global",
       "written": false,
       "patched": true,
-      "refCount": 270,
-      "fileCount": 47,
+      "refCount": 275,
+      "fileCount": 48,
       "files": [
         "_verify_aspect.js",
         "_verify_build_progress.js",
@@ -1287,6 +1308,7 @@
         "_verify_erosion_gridscale.js",
         "_verify_featurescale.js",
         "_verify_filters_pack.js",
+        "_verify_flow_control.js",
         "_verify_fracture.js",
         "_verify_gpu.js",
         "_verify_hydraulic_dual_gpu.js",
@@ -1331,7 +1353,7 @@
         "TYPES[probeType]",
         "TYPES[probeType] = { cat: 'gen', name: 'Port Probe', ins: [], params:..."
       ],
-      "reads": 270,
+      "reads": 275,
       "writes": 0
     },
     {
@@ -1820,6 +1842,77 @@
       "writes": 0
     },
     {
+      "name": "TARGET_RES",
+      "kind": "mutable-global",
+      "written": true,
+      "patched": false,
+      "refCount": 44,
+      "fileCount": 24,
+      "files": [
+        "_verify_aspect.js",
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_colorknobs.js",
+        "_verify_coordinate_filters.js",
+        "_verify_digest.js",
+        "_verify_filters_pack.js",
+        "_verify_flip.js",
+        "_verify_flow_control.js",
+        "_verify_fracture.js",
+        "_verify_hex_parity.js",
+        "_verify_landforms.js",
+        "_verify_mask_draw.js",
+        "_verify_project_io.js",
+        "_verify_simplex.js",
+        "_verify_surface.js",
+        "_verify_toolbar.js"
+      ],
+      "declKind": "let",
+      "declLine": 69,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "writeFiles": [
+        "_verify_aspect.js",
+        "_verify_build_progress.js",
+        "_verify_canyon.js",
+        "_verify_canyon_classic.js",
+        "_verify_canyon_evolution.js",
+        "_verify_canyon_gridscale.js",
+        "_verify_canyon_identity.js",
+        "_verify_canyon_process.js",
+        "_verify_canyon_relief.js",
+        "_verify_canyon_slopes.js",
+        "_verify_colorknobs.js",
+        "_verify_coordinate_filters.js",
+        "_verify_digest.js",
+        "_verify_filters_pack.js",
+        "_verify_flip.js",
+        "_verify_flow_control.js",
+        "_verify_fracture.js",
+        "_verify_hex_parity.js",
+        "_verify_landforms.js",
+        "_verify_mask_draw.js",
+        "_verify_project_io.js",
+        "_verify_simplex.js",
+        "_verify_surface.js"
+      ],
+      "writeExamples": [
+        "TARGET_RES = 128",
+        "TARGET_RES = 16",
+        "TARGET_RES = 160",
+        "TARGET_RES = 192"
+      ],
+      "reads": 4,
+      "writes": 40
+    },
+    {
       "name": "cam",
       "kind": "mutable-global",
       "written": true,
@@ -1873,81 +1966,12 @@
       "writes": 5
     },
     {
-      "name": "TARGET_RES",
-      "kind": "mutable-global",
-      "written": true,
-      "patched": false,
-      "refCount": 43,
-      "fileCount": 23,
-      "files": [
-        "_verify_aspect.js",
-        "_verify_build_progress.js",
-        "_verify_canyon.js",
-        "_verify_canyon_classic.js",
-        "_verify_canyon_evolution.js",
-        "_verify_canyon_gridscale.js",
-        "_verify_canyon_identity.js",
-        "_verify_canyon_process.js",
-        "_verify_canyon_relief.js",
-        "_verify_canyon_slopes.js",
-        "_verify_colorknobs.js",
-        "_verify_coordinate_filters.js",
-        "_verify_digest.js",
-        "_verify_filters_pack.js",
-        "_verify_flip.js",
-        "_verify_fracture.js",
-        "_verify_hex_parity.js",
-        "_verify_landforms.js",
-        "_verify_mask_draw.js",
-        "_verify_project_io.js",
-        "_verify_simplex.js",
-        "_verify_surface.js",
-        "_verify_toolbar.js"
-      ],
-      "declKind": "let",
-      "declLine": 69,
-      "declModule": "src/legacy.js",
-      "declScope": "module",
-      "writeFiles": [
-        "_verify_aspect.js",
-        "_verify_build_progress.js",
-        "_verify_canyon.js",
-        "_verify_canyon_classic.js",
-        "_verify_canyon_evolution.js",
-        "_verify_canyon_gridscale.js",
-        "_verify_canyon_identity.js",
-        "_verify_canyon_process.js",
-        "_verify_canyon_relief.js",
-        "_verify_canyon_slopes.js",
-        "_verify_colorknobs.js",
-        "_verify_coordinate_filters.js",
-        "_verify_digest.js",
-        "_verify_filters_pack.js",
-        "_verify_flip.js",
-        "_verify_fracture.js",
-        "_verify_hex_parity.js",
-        "_verify_landforms.js",
-        "_verify_mask_draw.js",
-        "_verify_project_io.js",
-        "_verify_simplex.js",
-        "_verify_surface.js"
-      ],
-      "writeExamples": [
-        "TARGET_RES = 128",
-        "TARGET_RES = 16",
-        "TARGET_RES = 160",
-        "TARGET_RES = 192"
-      ],
-      "reads": 4,
-      "writes": 39
-    },
-    {
       "name": "USE_GPU",
       "kind": "mutable-global",
       "written": true,
       "patched": false,
-      "refCount": 42,
-      "fileCount": 27,
+      "refCount": 43,
+      "fileCount": 28,
       "files": [
         "_verify_blur_isotropy.js",
         "_verify_canyon.js",
@@ -1962,6 +1986,7 @@
         "_verify_digest.js",
         "_verify_erosion_gridscale.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_gpu.js",
@@ -1996,6 +2021,7 @@
         "_verify_digest.js",
         "_verify_erosion_gridscale.js",
         "_verify_flip.js",
+        "_verify_flow_control.js",
         "_verify_flow_facets.js",
         "_verify_fracture.js",
         "_verify_gpu.js",
@@ -2018,7 +2044,7 @@
         "USE_GPU = saved.USE_GPU"
       ],
       "reads": 5,
-      "writes": 37
+      "writes": 38
     },
     {
       "name": "newField",
@@ -6187,6 +6213,7 @@
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
+      "exported": true,
       "reads": 1,
       "writes": 0
     },
