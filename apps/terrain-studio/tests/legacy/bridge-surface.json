@@ -11,16 +11,16 @@
       "moduleScripts": 1,
       "externalScripts": 1,
       "scriptLines": "",
-      "topLevelDeclarations": 780,
-      "elementIds": 167,
+      "topLevelDeclarations": 794,
+      "elementIds": 179,
       "sources": [
         {
           "id": "src/legacy.js",
           "kind": "file",
           "declaredGoal": "module",
           "parsedGoal": "module",
-          "imports": 22,
-          "newDeclarations": 577
+          "imports": 23,
+          "newDeclarations": 583
         },
         {
           "id": "src/core/gpu.js",
@@ -181,6 +181,14 @@
           "parsedGoal": "module",
           "imports": 0,
           "newDeclarations": 14
+        },
+        {
+          "id": "src/core/feasibility.js",
+          "kind": "file",
+          "declaredGoal": "module",
+          "parsedGoal": "module",
+          "imports": 0,
+          "newDeclarations": 7
         },
         {
           "id": "src/core/legacy-ports.js",
@@ -893,7 +901,7 @@
       "notFollowed": []
     },
     "tests": {
-      "files": 91,
+      "files": 92,
       "fileList": [
         "_verify.js",
         "_verify_all_canyon.js",
@@ -945,6 +953,7 @@
         "_verify_mask_draw.js",
         "_verify_math.js",
         "_verify_menubar.js",
+        "_verify_new_terrain.js",
         "_verify_organize.js",
         "_verify_param_visibility.js",
         "_verify_peak.js",
@@ -987,7 +996,7 @@
         "_verify_world_domain.js",
         "_verify_zoom.js"
       ],
-      "pageSideCallbacks": 254,
+      "pageSideCallbacks": 255,
       "indirectCallbacks": 1,
       "methodsScanned": [
         "$$eval",
@@ -1039,12 +1048,12 @@
     ]
   },
   "summary": {
-    "totalSymbols": 221,
-    "needsBridge": 210,
+    "totalSymbols": 225,
+    "needsBridge": 214,
     "byKind": {
       "mutable-global": 55,
-      "const-global": 36,
-      "function": 119,
+      "const-global": 37,
+      "function": 122,
       "dom-id": 11
     },
     "written": 28,
@@ -1114,8 +1123,8 @@
       "kind": "mutable-global",
       "written": true,
       "patched": false,
-      "refCount": 430,
-      "fileCount": 72,
+      "refCount": 431,
+      "fileCount": 73,
       "files": [
         "_verify.js",
         "_verify_aspect.js",
@@ -1162,6 +1171,7 @@
         "_verify_layout.js",
         "_verify_mask_draw.js",
         "_verify_math.js",
+        "_verify_new_terrain.js",
         "_verify_peak.js",
         "_verify_placement.js",
         "_verify_port_contract.js",
@@ -1191,7 +1201,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 71,
+      "declLine": 72,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -1232,6 +1242,7 @@
         "_verify_layers.js",
         "_verify_mask_draw.js",
         "_verify_math.js",
+        "_verify_new_terrain.js",
         "_verify_peak.js",
         "_verify_project_io.js",
         "_verify_realscale.js",
@@ -1254,15 +1265,15 @@
         "RES = 192"
       ],
       "reads": 336,
-      "writes": 94
+      "writes": 95
     },
     {
       "name": "terrainDef",
       "kind": "mutable-global",
       "written": false,
       "patched": true,
-      "refCount": 295,
-      "fileCount": 43,
+      "refCount": 296,
+      "fileCount": 44,
       "files": [
         "_verify_aspect.js",
         "_verify_blur_isotropy.js",
@@ -1293,6 +1304,7 @@
         "_verify_layers.js",
         "_verify_math.js",
         "_verify_menubar.js",
+        "_verify_new_terrain.js",
         "_verify_port_contract.js",
         "_verify_project_io.js",
         "_verify_realscale.js",
@@ -1309,7 +1321,7 @@
         "_verify_world_domain.js"
       ],
       "declKind": "let",
-      "declLine": 5181,
+      "declLine": 5241,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -1337,6 +1349,7 @@
         "_verify_layers.js",
         "_verify_math.js",
         "_verify_menubar.js",
+        "_verify_new_terrain.js",
         "_verify_project_io.js",
         "_verify_render.js",
         "_verify_snow.js",
@@ -1355,7 +1368,7 @@
         "terrainDef.baseElevation=3000",
         "terrainDef.baseElevation=savedDatum"
       ],
-      "reads": 295,
+      "reads": 296,
       "writes": 0
     },
     {
@@ -1419,7 +1432,7 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 3240,
+      "declLine": 3241,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "patchFiles": [
@@ -1462,7 +1475,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "patchFiles": [
@@ -1540,7 +1553,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 3254,
+      "declLine": 3255,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -1654,7 +1667,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 3254,
+      "declLine": 3255,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -1762,7 +1775,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3313,
+      "declLine": 3314,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -1821,7 +1834,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 3254,
+      "declLine": 3255,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -1918,7 +1931,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 3432,
+      "declLine": 3433,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -1930,8 +1943,8 @@
       "kind": "mutable-global",
       "written": true,
       "patched": false,
-      "refCount": 48,
-      "fileCount": 28,
+      "refCount": 49,
+      "fileCount": 29,
       "files": [
         "_verify_aspect.js",
         "_verify_build_progress.js",
@@ -1954,6 +1967,7 @@
         "_verify_landforms.js",
         "_verify_mask_draw.js",
         "_verify_math.js",
+        "_verify_new_terrain.js",
         "_verify_project_io.js",
         "_verify_simplex.js",
         "_verify_surface.js",
@@ -1963,7 +1977,7 @@
         "_verify_world_domain.js"
       ],
       "declKind": "let",
-      "declLine": 72,
+      "declLine": 73,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -1988,6 +2002,7 @@
         "_verify_landforms.js",
         "_verify_mask_draw.js",
         "_verify_math.js",
+        "_verify_new_terrain.js",
         "_verify_project_io.js",
         "_verify_simplex.js",
         "_verify_surface.js",
@@ -2002,15 +2017,15 @@
         "TARGET_RES = 192"
       ],
       "reads": 4,
-      "writes": 44
+      "writes": 45
     },
     {
       "name": "USE_GPU",
       "kind": "mutable-global",
       "written": true,
       "patched": false,
-      "refCount": 47,
-      "fileCount": 32,
+      "refCount": 48,
+      "fileCount": 33,
       "files": [
         "_verify_blur_isotropy.js",
         "_verify_canyon.js",
@@ -2036,6 +2051,7 @@
         "_verify_hillslope_isotropy.js",
         "_verify_layers.js",
         "_verify_math.js",
+        "_verify_new_terrain.js",
         "_verify_project_io.js",
         "_verify_simplex.js",
         "_verify_snow_physics.js",
@@ -2046,7 +2062,7 @@
         "_verify_world_domain.js"
       ],
       "declKind": "let",
-      "declLine": 333,
+      "declLine": 334,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -2075,6 +2091,7 @@
         "_verify_hillslope_isotropy.js",
         "_verify_layers.js",
         "_verify_math.js",
+        "_verify_new_terrain.js",
         "_verify_project_io.js",
         "_verify_simplex.js",
         "_verify_snow_physics.js",
@@ -2091,7 +2108,7 @@
         "USE_GPU = saved.USE_GPU"
       ],
       "reads": 5,
-      "writes": 42
+      "writes": 43
     },
     {
       "name": "cam",
@@ -2114,7 +2131,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 4947,
+      "declLine": 5007,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2175,7 +2192,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 167,
+      "declLine": 168,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2222,7 +2239,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 3254,
+      "declLine": 3255,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2288,7 +2305,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 245,
+      "declLine": 246,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2326,7 +2343,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 5792,
+      "declLine": 5852,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2350,7 +2367,7 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 5231,
+      "declLine": 5291,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2418,7 +2435,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 3254,
+      "declLine": 3255,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2480,7 +2497,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 35,
@@ -2509,7 +2526,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 265,
+      "declLine": 266,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2545,7 +2562,7 @@
         "_verify_surface.js"
       ],
       "declKind": "let",
-      "declLine": 208,
+      "declLine": 209,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -2594,7 +2611,7 @@
         "_verify_toolbox.js"
       ],
       "declKind": "let",
-      "declLine": 3577,
+      "declLine": 3578,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2641,7 +2658,7 @@
         "_verify_thermal_contract.js"
       ],
       "declKind": "let",
-      "declLine": 329,
+      "declLine": 330,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2693,7 +2710,7 @@
         "_verify_surface.js"
       ],
       "declKind": "let",
-      "declLine": 3255,
+      "declLine": 3256,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -2743,7 +2760,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "const",
-      "declLine": 165,
+      "declLine": 166,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2774,7 +2791,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3331,
+      "declLine": 3332,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2796,7 +2813,7 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 3258,
+      "declLine": 3259,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2819,7 +2836,7 @@
         "_verify_satnode.js"
       ],
       "declKind": "function",
-      "declLine": 5146,
+      "declLine": 5206,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2854,7 +2871,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 332,
+      "declLine": 333,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -2914,7 +2931,7 @@
         "_verify_surface.js"
       ],
       "declKind": "const",
-      "declLine": 3257,
+      "declLine": 3258,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2940,7 +2957,7 @@
         "_verify_satnode.js"
       ],
       "declKind": "function",
-      "declLine": 3327,
+      "declLine": 3328,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -2978,7 +2995,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 7363,
+      "declLine": 7425,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3010,7 +3027,7 @@
         "_verify_water.js"
       ],
       "declKind": "function",
-      "declLine": 4150,
+      "declLine": 4151,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3042,7 +3059,7 @@
         "_verify_surface.js"
       ],
       "declKind": "const",
-      "declLine": 164,
+      "declLine": 165,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3063,7 +3080,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 20,
@@ -3084,7 +3101,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "function",
-      "declLine": 1447,
+      "declLine": 1448,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3137,7 +3154,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 5862,
+      "declLine": 5922,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3165,7 +3182,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4056,
+      "declLine": 4057,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3189,7 +3206,7 @@
         "_verify_landforms.js"
       ],
       "declKind": "let",
-      "declLine": 3255,
+      "declLine": 3256,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3226,7 +3243,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 5830,
+      "declLine": 5890,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 14,
@@ -3247,7 +3264,7 @@
         "_verify_water_hydrology.js"
       ],
       "declKind": "let",
-      "declLine": 5830,
+      "declLine": 5890,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 13,
@@ -3266,7 +3283,7 @@
         "_verify_water_hydrology.js"
       ],
       "declKind": "let",
-      "declLine": 5833,
+      "declLine": 5893,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 13,
@@ -3308,7 +3325,7 @@
         "_verify_digest.js"
       ],
       "declKind": "const",
-      "declLine": 952,
+      "declLine": 953,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 12,
@@ -3332,7 +3349,7 @@
         "_verify_surface.js"
       ],
       "declKind": "let",
-      "declLine": 3255,
+      "declLine": 3256,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3365,7 +3382,7 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 2164,
+      "declLine": 2165,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3384,7 +3401,7 @@
         "_verify_variables.js"
       ],
       "declKind": "const",
-      "declLine": 4817,
+      "declLine": 4875,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -3406,7 +3423,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 120,
+      "declLine": 121,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "patchFiles": [
@@ -3439,7 +3456,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "function",
-      "declLine": 1124,
+      "declLine": 1125,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3458,7 +3475,7 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 2335,
+      "declLine": 2336,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3483,7 +3500,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5226,
+      "declLine": 5286,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3513,7 +3530,7 @@
         "_verify_quick_create.js"
       ],
       "declKind": "function",
-      "declLine": 3588,
+      "declLine": 3589,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3537,7 +3554,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "let",
-      "declLine": 4035,
+      "declLine": 4036,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3574,7 +3591,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "function",
-      "declLine": 6455,
+      "declLine": 6515,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3596,7 +3613,7 @@
         "_verify_hex_sampling.js"
       ],
       "declKind": "function",
-      "declLine": 168,
+      "declLine": 169,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3618,7 +3635,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4036,
+      "declLine": 4037,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3642,7 +3659,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 6944,
+      "declLine": 7004,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3680,7 +3697,7 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 4565,
+      "declLine": 4566,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3708,7 +3725,7 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 6047,
+      "declLine": 6107,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3730,7 +3747,7 @@
         "_verify_snow_physics.js"
       ],
       "declKind": "let",
-      "declLine": 3380,
+      "declLine": 3381,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3759,7 +3776,7 @@
         "_verify_trs.js"
       ],
       "declKind": "function",
-      "declLine": 3366,
+      "declLine": 3367,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3785,7 +3802,7 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 4947,
+      "declLine": 5007,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -3819,7 +3836,7 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 2681,
+      "declLine": 2682,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3842,7 +3859,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 6945,
+      "declLine": 7005,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3879,7 +3896,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3298,
+      "declLine": 3299,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3898,7 +3915,7 @@
         "_verify_landforms.js"
       ],
       "declKind": "function",
-      "declLine": 223,
+      "declLine": 224,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3918,7 +3935,7 @@
         "_verify_organize.js"
       ],
       "declKind": "const",
-      "declLine": 3861,
+      "declLine": 3862,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 8,
@@ -3937,7 +3954,7 @@
         "_verify_world_domain.js"
       ],
       "declKind": "function",
-      "declLine": 4886,
+      "declLine": 4946,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -3962,7 +3979,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "let",
-      "declLine": 6938,
+      "declLine": 6998,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 8,
@@ -3983,7 +4000,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 6154,
+      "declLine": 6214,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4003,7 +4020,7 @@
         "_verify_trs.js"
       ],
       "declKind": "function",
-      "declLine": 1501,
+      "declLine": 1502,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4026,7 +4043,7 @@
         "_verify_world_domain.js"
       ],
       "declKind": "function",
-      "declLine": 7325,
+      "declLine": 7385,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4050,7 +4067,7 @@
         "_verify_streampower_calibration.js"
       ],
       "declKind": "let",
-      "declLine": 3380,
+      "declLine": 3381,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -4083,7 +4100,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 7,
@@ -4100,7 +4117,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5833,
+      "declLine": 5893,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 7,
@@ -4122,7 +4139,7 @@
         "_verify_simplex.js"
       ],
       "declKind": "const",
-      "declLine": 3136,
+      "declLine": 3137,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 7,
@@ -4141,7 +4158,7 @@
         "_verify_world_domain.js"
       ],
       "declKind": "function",
-      "declLine": 4799,
+      "declLine": 4857,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4160,7 +4177,7 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 2563,
+      "declLine": 2564,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4180,7 +4197,7 @@
         "_verify_highres.js"
       ],
       "declKind": "let",
-      "declLine": 118,
+      "declLine": 119,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "patchFiles": [
@@ -4214,7 +4231,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 7058,
+      "declLine": 7118,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4234,7 +4251,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 7,
@@ -4255,7 +4272,7 @@
         "_verify_thermal_contract.js"
       ],
       "declKind": "function",
-      "declLine": 2272,
+      "declLine": 2273,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4273,7 +4290,7 @@
         "_verify_snow.js"
       ],
       "declKind": "const",
-      "declLine": 34,
+      "declLine": 35,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4292,7 +4309,7 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 5833,
+      "declLine": 5893,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 6,
@@ -4312,7 +4329,7 @@
         "_verify_simplex.js"
       ],
       "declKind": "function",
-      "declLine": 190,
+      "declLine": 191,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4333,7 +4350,7 @@
         "_verify_water.js"
       ],
       "declKind": "function",
-      "declLine": 3330,
+      "declLine": 3331,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4357,7 +4374,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 7333,
+      "declLine": 7393,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4376,7 +4393,7 @@
         "_verify_digest.js"
       ],
       "declKind": "function",
-      "declLine": 3217,
+      "declLine": 3218,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4398,7 +4415,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 3301,
+      "declLine": 3302,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4418,7 +4435,7 @@
         "_verify_wind.js"
       ],
       "declKind": "let",
-      "declLine": 116,
+      "declLine": 117,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 6,
@@ -4437,7 +4454,7 @@
         "_verify_tectonic.js"
       ],
       "declKind": "function",
-      "declLine": 2120,
+      "declLine": 2121,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4455,7 +4472,7 @@
         "_verify_edge_spin.js"
       ],
       "declKind": "function",
-      "declLine": 5673,
+      "declLine": 5733,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4475,7 +4492,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 5226,
+      "declLine": 5286,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -4503,7 +4520,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "const",
-      "declLine": 962,
+      "declLine": 963,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "patchFiles": [
@@ -4531,7 +4548,7 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 35,
+      "declLine": 36,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4550,7 +4567,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 3034,
+      "declLine": 3035,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4610,7 +4627,7 @@
         "_verify_satpicker.js"
       ],
       "declKind": "function",
-      "declLine": 3359,
+      "declLine": 3360,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4630,7 +4647,7 @@
         "_verify_satpicker.js"
       ],
       "declKind": "const",
-      "declLine": 84,
+      "declLine": 85,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 5,
@@ -4647,7 +4664,7 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 6345,
+      "declLine": 6405,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4667,7 +4684,7 @@
         "_verify_water.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 5,
@@ -4687,7 +4704,7 @@
         "_verify_hex_sampling.js"
       ],
       "declKind": "function",
-      "declLine": 3510,
+      "declLine": 3511,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4706,7 +4723,7 @@
         "_verify_canyon_identity.js"
       ],
       "declKind": "function",
-      "declLine": 994,
+      "declLine": 995,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4725,7 +4742,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5830,
+      "declLine": 5890,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 4,
@@ -4744,7 +4761,7 @@
         "_verify_simplex.js"
       ],
       "declKind": "function",
-      "declLine": 3218,
+      "declLine": 3219,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4765,7 +4782,7 @@
         "_verify_port_contract.js"
       ],
       "declKind": "function",
-      "declLine": 3585,
+      "declLine": 3586,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4783,7 +4800,7 @@
         "_verify_port_contract.js"
       ],
       "declKind": "function",
-      "declLine": 3141,
+      "declLine": 3142,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4801,7 +4818,25 @@
         "_verify_math.js"
       ],
       "declKind": "const",
-      "declLine": 4815,
+      "declLine": 4873,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "exported": true,
+      "reads": 4,
+      "writes": 0
+    },
+    {
+      "name": "PROJECT",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 4,
+      "fileCount": 1,
+      "files": [
+        "_verify_project_io.js"
+      ],
+      "declKind": "const",
+      "declLine": 4861,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -4821,7 +4856,7 @@
         "_verify_workflow.js"
       ],
       "declKind": "function",
-      "declLine": 4048,
+      "declLine": 4049,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4842,7 +4877,7 @@
         "_verify_satpicker.js"
       ],
       "declKind": "let",
-      "declLine": 114,
+      "declLine": 115,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -4868,7 +4903,7 @@
         "_verify_hex_sampling.js"
       ],
       "declKind": "function",
-      "declLine": 1520,
+      "declLine": 1521,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4887,7 +4922,7 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 5072,
+      "declLine": 5132,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4905,7 +4940,7 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 2468,
+      "declLine": 2469,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4925,7 +4960,7 @@
         "_verify_wireframe.js"
       ],
       "declKind": "let",
-      "declLine": 4947,
+      "declLine": 5007,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -4950,7 +4985,7 @@
         "_verify_doctrine.js"
       ],
       "declKind": "const",
-      "declLine": 4811,
+      "declLine": 4869,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -4969,7 +5004,7 @@
         "_verify_peak.js"
       ],
       "declKind": "function",
-      "declLine": 451,
+      "declLine": 452,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -4988,7 +5023,7 @@
         "_verify_highres.js"
       ],
       "declKind": "function",
-      "declLine": 4948,
+      "declLine": 5008,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5007,7 +5042,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 6268,
+      "declLine": 6328,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5038,7 +5073,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5833,
+      "declLine": 5893,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 3,
@@ -5055,7 +5090,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5830,
+      "declLine": 5890,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 3,
@@ -5072,7 +5107,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5830,
+      "declLine": 5890,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 3,
@@ -5090,7 +5125,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 1851,
+      "declLine": 1852,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5111,7 +5146,7 @@
         "_verify_hex_flow.js"
       ],
       "declKind": "function",
-      "declLine": 6076,
+      "declLine": 6136,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5130,7 +5165,7 @@
         "_verify_port_contract.js"
       ],
       "declKind": "function",
-      "declLine": 7447,
+      "declLine": 7509,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5150,7 +5185,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 3601,
+      "declLine": 3602,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5168,7 +5203,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 3329,
+      "declLine": 3330,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5186,7 +5221,7 @@
         "_verify_switch.js"
       ],
       "declKind": "function",
-      "declLine": 3226,
+      "declLine": 3227,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5226,7 +5261,7 @@
         "_verify_hex.js"
       ],
       "declKind": "function",
-      "declLine": 2929,
+      "declLine": 2930,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5245,7 +5280,7 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 3845,
+      "declLine": 3846,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5264,28 +5299,10 @@
         "_verify_port_contract.js"
       ],
       "declKind": "function",
-      "declLine": 3702,
+      "declLine": 3703,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
-      "reads": 3,
-      "writes": 0
-    },
-    {
-      "name": "PROJECT",
-      "kind": "const-global",
-      "written": false,
-      "patched": false,
-      "refCount": 3,
-      "fileCount": 1,
-      "files": [
-        "_verify_project_io.js"
-      ],
-      "declKind": "const",
-      "declLine": 4803,
-      "declModule": "src/legacy.js",
-      "declScope": "module",
-      "exported": true,
       "reads": 3,
       "writes": 0
     },
@@ -5300,7 +5317,7 @@
         "_verify_simplex.js"
       ],
       "declKind": "function",
-      "declLine": 252,
+      "declLine": 253,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5319,7 +5336,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 6312,
+      "declLine": 6372,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5338,7 +5355,7 @@
         "_verify_render.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 3,
@@ -5356,7 +5373,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 3,
@@ -5374,7 +5391,7 @@
         "_verify_toolbar.js"
       ],
       "declKind": "let",
-      "declLine": 73,
+      "declLine": 74,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -5397,7 +5414,7 @@
         "_verify_colormixer.js"
       ],
       "declKind": "function",
-      "declLine": 4993,
+      "declLine": 5053,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5416,7 +5433,7 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 1654,
+      "declLine": 1655,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5435,7 +5452,7 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 4368,
+      "declLine": 4369,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5467,7 +5484,7 @@
         "_verify_canyon_relief.js"
       ],
       "declKind": "function",
-      "declLine": 918,
+      "declLine": 919,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5505,7 +5522,7 @@
         "_verify_realscale.js"
       ],
       "declKind": "const",
-      "declLine": 5182,
+      "declLine": 5242,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5524,7 +5541,7 @@
         "_verify_colorfx.js"
       ],
       "declKind": "function",
-      "declLine": 5016,
+      "declLine": 5076,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5542,7 +5559,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 1789,
+      "declLine": 1790,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5574,7 +5591,7 @@
         "_verify_curve.js"
       ],
       "declKind": "function",
-      "declLine": 477,
+      "declLine": 478,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5592,9 +5609,28 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5833,
+      "declLine": 5893,
       "declModule": "src/legacy.js",
       "declScope": "module",
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "DOMAIN",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 2,
+      "files": [
+        "_verify_new_terrain.js",
+        "_verify_world_domain.js"
+      ],
+      "declKind": "const",
+      "declLine": 4877,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "exported": true,
       "reads": 2,
       "writes": 0
     },
@@ -5609,7 +5645,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 372,
+      "declLine": 373,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5628,7 +5664,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "let",
-      "declLine": 6555,
+      "declLine": 6615,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 2,
@@ -5645,7 +5681,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 3328,
+      "declLine": 3329,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5664,7 +5700,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "const",
-      "declLine": 2322,
+      "declLine": 2323,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5755,7 +5791,7 @@
         "_verify_flip.js"
       ],
       "declKind": "const",
-      "declLine": 158,
+      "declLine": 159,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 2,
@@ -5773,7 +5809,7 @@
         "_verify_hex.js"
       ],
       "declKind": "const",
-      "declLine": 5221,
+      "declLine": 5281,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5805,7 +5841,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 431,
+      "declLine": 432,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5825,7 +5861,7 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 191,
+      "declLine": 192,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5845,7 +5881,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 1898,
+      "declLine": 1899,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5864,10 +5900,29 @@
         "_verify_port_contract.js"
       ],
       "declKind": "function",
-      "declLine": 3211,
+      "declLine": 3212,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
+      "reads": 2,
+      "writes": 0
+    },
+    {
+      "name": "previewCreation",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 2,
+      "fileCount": 1,
+      "files": [
+        "_verify_new_terrain.js"
+      ],
+      "declKind": "function",
+      "declLine": 4679,
+      "valueIsFunction": true,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "exported": true,
       "reads": 2,
       "writes": 0
     },
@@ -5896,7 +5951,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 2344,
+      "declLine": 2345,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5914,7 +5969,7 @@
         "_verify_render.js"
       ],
       "declKind": "let",
-      "declLine": 119,
+      "declLine": 120,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 2,
@@ -5931,7 +5986,7 @@
         "_verify_render.js"
       ],
       "declKind": "function",
-      "declLine": 4965,
+      "declLine": 5025,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5949,7 +6004,7 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 416,
+      "declLine": 417,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5969,7 +6024,7 @@
         "_verify_surface.js"
       ],
       "declKind": "function",
-      "declLine": 1820,
+      "declLine": 1821,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -5988,7 +6043,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 1796,
+      "declLine": 1797,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6007,7 +6062,7 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 1793,
+      "declLine": 1794,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6026,7 +6081,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 6362,
+      "declLine": 6422,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6045,7 +6100,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "function",
-      "declLine": 2328,
+      "declLine": 2329,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6064,7 +6119,7 @@
         "_verify_wind.js"
       ],
       "declKind": "function",
-      "declLine": 2459,
+      "declLine": 2460,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6083,7 +6138,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5227,
+      "declLine": 5287,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "writeFiles": [
@@ -6106,7 +6161,7 @@
         "_verify_snow.js"
       ],
       "declKind": "function",
-      "declLine": 2336,
+      "declLine": 2337,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6125,7 +6180,7 @@
         "_verify_edges.js"
       ],
       "declKind": "function",
-      "declLine": 3625,
+      "declLine": 3626,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6143,7 +6198,7 @@
         "_verify_exact_transform.js"
       ],
       "declKind": "function",
-      "declLine": 232,
+      "declLine": 233,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6162,7 +6217,7 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 1489,
+      "declLine": 1490,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6181,7 +6236,7 @@
         "_verify_flip.js"
       ],
       "declKind": "function",
-      "declLine": 5705,
+      "declLine": 5765,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6199,7 +6254,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "const",
-      "declLine": 6384,
+      "declLine": 6444,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6217,7 +6272,7 @@
         "_verify_canyon_slopes.js"
       ],
       "declKind": "const",
-      "declLine": 907,
+      "declLine": 908,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6234,7 +6289,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 1454,
+      "declLine": 1455,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6256,6 +6311,25 @@
       "writes": 0
     },
     {
+      "name": "confirmNewTerrain",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_new_terrain.js"
+      ],
+      "declKind": "function",
+      "declLine": 4708,
+      "valueIsFunction": true,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "exported": true,
+      "reads": 1,
+      "writes": 0
+    },
+    {
       "name": "curveAt",
       "kind": "function",
       "written": false,
@@ -6266,7 +6340,7 @@
         "_verify_peak.js"
       ],
       "declKind": "function",
-      "declLine": 473,
+      "declLine": 474,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6284,25 +6358,7 @@
         "_verify_doctrine.js"
       ],
       "declKind": "const",
-      "declLine": 4813,
-      "declModule": "src/legacy.js",
-      "declScope": "module",
-      "exported": true,
-      "reads": 1,
-      "writes": 0
-    },
-    {
-      "name": "DOMAIN",
-      "kind": "const-global",
-      "written": false,
-      "patched": false,
-      "refCount": 1,
-      "fileCount": 1,
-      "files": [
-        "_verify_world_domain.js"
-      ],
-      "declKind": "const",
-      "declLine": 4819,
+      "declLine": 4871,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -6320,10 +6376,28 @@
         "_verify_range.js"
       ],
       "declKind": "function",
-      "declLine": 4533,
+      "declLine": 4534,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "FEASIBILITY_API",
+      "kind": "const-global",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_new_terrain.js"
+      ],
+      "declKind": "const",
+      "declLine": 4879,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "exported": true,
       "reads": 1,
       "writes": 0
     },
@@ -6338,7 +6412,7 @@
         "_verify_water_surface.js"
       ],
       "declKind": "let",
-      "declLine": 4943,
+      "declLine": 5003,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6393,7 +6467,7 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 3784,
+      "declLine": 3785,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6411,7 +6485,7 @@
         "_verify_canyon_process.js"
       ],
       "declKind": "function",
-      "declLine": 3091,
+      "declLine": 3092,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6430,7 +6504,7 @@
         "_verify_snow.js"
       ],
       "declKind": "let",
-      "declLine": 5833,
+      "declLine": 5893,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6447,7 +6521,7 @@
         "_verify_layers.js"
       ],
       "declKind": "function",
-      "declLine": 7429,
+      "declLine": 7491,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6465,7 +6539,7 @@
         "_verify_streampower.js"
       ],
       "declKind": "function",
-      "declLine": 4593,
+      "declLine": 4594,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6483,7 +6557,7 @@
         "_verify_snow_physics.js"
       ],
       "declKind": "function",
-      "declLine": 2355,
+      "declLine": 2356,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6501,10 +6575,29 @@
         "_verify_mask_draw.js"
       ],
       "declKind": "function",
-      "declLine": 6612,
+      "declLine": 6672,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
+      "reads": 1,
+      "writes": 0
+    },
+    {
+      "name": "openNewTerrainDialog",
+      "kind": "function",
+      "written": false,
+      "patched": false,
+      "refCount": 1,
+      "fileCount": 1,
+      "files": [
+        "_verify_new_terrain.js"
+      ],
+      "declKind": "function",
+      "declLine": 4697,
+      "valueIsFunction": true,
+      "declModule": "src/legacy.js",
+      "declScope": "module",
+      "exported": true,
       "reads": 1,
       "writes": 0
     },
@@ -6519,7 +6612,7 @@
         "_verify_layout.js"
       ],
       "declKind": "function",
-      "declLine": 556,
+      "declLine": 557,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6538,7 +6631,7 @@
         "_verify_port_contract.js"
       ],
       "declKind": "const",
-      "declLine": 4807,
+      "declLine": 4865,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,
@@ -6569,7 +6662,7 @@
         "_verify_toolbar.js"
       ],
       "declKind": "function",
-      "declLine": 3270,
+      "declLine": 3271,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6587,7 +6680,7 @@
         "_verify_streampower.js"
       ],
       "declKind": "const",
-      "declLine": 125,
+      "declLine": 126,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6604,7 +6697,7 @@
         "_verify_hex_dem.js"
       ],
       "declKind": "function",
-      "declLine": 4620,
+      "declLine": 4621,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6635,7 +6728,7 @@
         "_verify_range.js"
       ],
       "declKind": "const",
-      "declLine": 3311,
+      "declLine": 3312,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6652,7 +6745,7 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 5232,
+      "declLine": 5292,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6669,7 +6762,7 @@
         "_verify_curve.js"
       ],
       "declKind": "const",
-      "declLine": 481,
+      "declLine": 482,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "reads": 1,
@@ -6686,7 +6779,7 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 37,
+      "declLine": 38,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6705,7 +6798,7 @@
         "_verify_organize.js"
       ],
       "declKind": "function",
-      "declLine": 3275,
+      "declLine": 3276,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6723,7 +6816,7 @@
         "_verify_zoom.js"
       ],
       "declKind": "function",
-      "declLine": 6279,
+      "declLine": 6339,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6741,7 +6834,7 @@
         "_verify_hex.js"
       ],
       "declKind": "function",
-      "declLine": 2249,
+      "declLine": 2250,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6759,7 +6852,7 @@
         "_verify_featurescale.js"
       ],
       "declKind": "function",
-      "declLine": 5847,
+      "declLine": 5907,
       "valueIsFunction": true,
       "declModule": "src/legacy.js",
       "declScope": "module",
@@ -6790,7 +6883,7 @@
         "_verify_wind.js"
       ],
       "declKind": "const",
-      "declLine": 2454,
+      "declLine": 2455,
       "declModule": "src/legacy.js",
       "declScope": "module",
       "exported": true,

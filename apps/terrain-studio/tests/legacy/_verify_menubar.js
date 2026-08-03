@@ -31,8 +31,16 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   }));
   await page.screenshot({path:path.resolve(__dirname,'_shot_menubar_desktop.png')});
 
-  page.once('dialog',d=>d.accept());
+  // `new` opens the New Terrain dialog now, not a native confirm(), so no dialog handler here:
+  // an unconsumed page.once('dialog') collides with the next one that IS needed.
   await page.locator('#fileMenu [data-editor-command="new"]').click();
+  // S9.2: `new` now opens the New Terrain dialog rather than creating immediately — creation
+  // runs a feasibility preflight before anything is allocated. The dialog is modal and
+  // intercepts pointer events, so confirm it opened, then dismiss it with Escape.
+  const newDialogOpened = await page.evaluate(() => document.querySelector("#newTerrainDialog").hidden === false);
+  if (!newDialogOpened) throw new Error("File > New did not open the New Terrain dialog");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(80);
   await page.waitForTimeout(120);
   const blank=await page.evaluate(()=>({
     types:nodes.map(n=>n.type),edges:edges.length,undo:undoStack.length,redo:redoStack.length,
@@ -75,8 +83,16 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   });
 
   await page.locator('#fileMenuBtn').click();
-  page.once('dialog',d=>d.accept());
+  // `new` opens the New Terrain dialog now, not a native confirm(), so no dialog handler here:
+  // an unconsumed page.once('dialog') collides with the next one that IS needed.
   await page.locator('#fileMenu [data-editor-command="new"]').click();
+  // S9.2: `new` now opens the New Terrain dialog rather than creating immediately — creation
+  // runs a feasibility preflight before anything is allocated. The dialog is modal and
+  // intercepts pointer events, so confirm it opened, then dismiss it with Escape.
+  const newDialogOpened2 = await page.evaluate(() => document.querySelector("#newTerrainDialog").hidden === false);
+  if (!newDialogOpened2) throw new Error("File > New did not open the New Terrain dialog");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(80);
   await page.waitForTimeout(120);
   const showcaseSeed=await page.evaluate(()=>{
     showcaseGraph();
@@ -143,8 +159,13 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   const ok=desktop.desktopDisplay==='flex'&&desktop.compactDisplay==='none'&&desktop.topbarOverflow<=1
     &&JSON.stringify(desktop.headings)===JSON.stringify(['File','Edit','View','Help'])
     &&fileOpen.open&&JSON.stringify(fileOpen.commands)===FILE_COMMANDS
-    &&JSON.stringify(blank.types)===JSON.stringify(['output'])&&blank.edges===0&&!blank.undo&&!blank.redo
-    &&blank.selected==='output'&&blank.outputReady&&seedIs(bootSeed,7)&&seedIs(blank.seed,7)
+    // S9.2: `new` opens the New Terrain dialog instead of wiping immediately, and this oracle
+    // presses Escape. Cancelling must leave the open document UNTOUCHED — a stronger property than
+    // the old expectation, which described the immediate wipe ('output' alone, zero edges) and
+    // would now pass only if cancelling still destroyed the user's graph.
+    &&JSON.stringify(blank.types)===JSON.stringify(['perlin','ridged','blend','d_height','heightmask','levels','output'])
+    &&blank.edges===6&&!blank.undo&&!blank.redo
+    &&blank.outputReady&&seedIs(bootSeed,7)&&seedIs(blank.seed,7)
     &&starter.count===7&&starter.edges===6&&JSON.stringify(starter.types)===STARTER_TYPES
     &&starter.selected==='perlin'&&!starter.undo&&starter.outputReady&&seedIs(starter.seed,7)
     &&seedIs(canyonSeed,7)&&seedIs(showcaseSeed,7)

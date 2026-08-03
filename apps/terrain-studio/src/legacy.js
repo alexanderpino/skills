@@ -21,6 +21,7 @@ import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, H
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION } from './core/world-domain.js';
+import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { LEGACY_PORTS, LEGACY_ROSTER, LEGACY_INS_LABELS } from './core/legacy-ports.js';
 import { serializeProject, parseProject, migrateProject, migrateV1toV2, migrateV2toV3, validateProject,
   PROJECT_SCHEMA_VERSION, PROJECT_FILE_EXTENSION, ProjectError } from './core/project.js';
@@ -4668,6 +4669,63 @@ $("#exportBtn").onclick=exportHeightmap;
    user action.
    ===================================================================== */
 
+// --- New Terrain dialog and creation preflight (S9.2) -----------------------------------------
+// THE RULE IS: NOTHING IS ALLOCATED UNTIL THE USER CONFIRMS. Today `newTerrainDocument` gates on a
+// confirm() and then synchronously builds and evaluates, and there is no preflight anywhere — so
+// asking for a raster too large simply allocates until the tab dies and the author learns the
+// answer by losing their work. The preflight is pure arithmetic on counts and byte sizes; it never
+// touches a Float32Array, which is what _verify_new_terrain.js spies on.
+let pendingNewTerrain=null;
+export function previewCreation(){
+  const cols=parseInt($("#ntCols").value,10),rows=parseInt($("#ntRows").value,10);
+  const width=parseFloat($("#ntWidth").value),height=parseFloat($("#ntHeight").value);
+  // liveFields is MEASURED from the graph that will exist, not guessed: a blank document holds one
+  // field, the templates hold as many as their node count.
+  const liveFields=Math.max(1,nodes.length||1);
+  const verdict=assessCreation({sampleCount:{columns:cols,rows:rows},liveFields});
+  const out=$("#ntReadout");
+  if(verdict.mode==="rejected"){out.textContent="Cannot create: "+verdict.reason;out.dataset.mode="rejected";}
+  else{
+    const pages=verdict.mode==="gpu-required-paged"?decomposePages({sampleCount:{columns:cols,rows:rows}}):null;
+    out.textContent=verdict.reason+(pages?` · ${pages.pagesX}x${pages.pagesY} pages, terminal core ${pages.terminalCoreCells.x}x${pages.terminalCoreCells.y}`:"");
+    out.dataset.mode=verdict.mode;
+  }
+  $("#ntCreate").disabled=verdict.mode==="rejected"||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0;
+  pendingNewTerrain={cols,rows,width,height,lattice:$("#ntLattice").value,template:$("#ntTemplate").value,verdict};
+  return pendingNewTerrain;
+}
+export function openNewTerrainDialog(){
+  $("#newTerrainDialog").hidden=false;previewCreation();
+}
+export function closeNewTerrainDialog(){$("#newTerrainDialog").hidden=true;pendingNewTerrain=null;}
+// Live preflight on every edit, so the readout is never stale relative to the inputs.
+for(const id of ["ntCols","ntRows","ntWidth","ntHeight","ntLattice","ntTemplate"]){
+  const el=$("#"+id);if(el)el.addEventListener("input",()=>previewCreation());
+}
+if($("#ntCancel"))$("#ntCancel").onclick=closeNewTerrainDialog;
+if($("#ntCreate"))$("#ntCreate").onclick=confirmNewTerrain;
+
+export function confirmNewTerrain(){
+  const p=pendingNewTerrain||previewCreation();
+  if(!p||p.verdict.mode==="rejected")return false;
+  const domain={
+    version:WORLD_DOMAIN_VERSION,originM:{x:0,y:0},extentM:{width:p.width,height:p.height},
+    authoringUnits:{horizontal:"m",vertical:"m"},lattice:p.lattice,posting:"vertex",
+    resolution:{mode:"explicit-samples",sampleCount:{columns:p.cols,rows:p.rows},actualSpacingM:{x:1,y:1}},
+    vertical:{datum:{kind:"unknown",offsetM:0},rangeM:{min:0,max:terrainDef.height||2600}},
+  };
+  const derived=deriveResolution(domain);
+  domain.resolution.actualSpacingM=derived.actualSpacingM;
+  const problems=setWorldDomain(domain);
+  if(problems.length){toast("Cannot create: "+problems[0].code);return false;}
+  terrainDef=createTerrainDef({...terrainDef,scale:p.width,lattice:p.lattice==="hex-pointy-odd-r"?"hex":"square"});
+  H_SCALE=terrainDef.height/terrainDef.scale;
+  closeNewTerrainDialog();
+  // Only NOW does anything allocate.
+  newTerrainDocument(p.template==="default",p.template==="canyon"?"canyon":null,true);
+  return true;
+}
+
 // --- world domain (S9.1) ---------------------------------------------------------------------
 // The authoritative frame. Derived from the legacy terrainDef/RES on boot so nothing changes
 // numerically today; S9.2 lets the author set it directly and S9.9 makes arbitrary dimensions
@@ -4817,6 +4875,8 @@ export const PORTS_EXPR={parseExpr,evalExpr,EXPR_FUNCTIONS,EXPR_MAX_NODES,EXPR_M
 export const VARS={documentScope,setDocumentVariables,getDocumentVariables,validateVariables,requireVariable,makeScope,VARIABLE_UNITS};
 
 export const DOMAIN={getWorldDomain,setWorldDomain,domainFromLegacy,deriveResolution,validateDomain,spacingWasRounded,WORLD_DOMAIN_VERSION};
+
+export const FEASIBILITY_API={assessCreation,decomposePages,formatBytes};
 
 // Restoring is deliberately close to restoreGraph: same runtime-field reset, same H_SCALE recompute.
 // Undo history is CLEARED, not carried — an undo across an Open would splice two unrelated
@@ -6778,7 +6838,7 @@ function syncEditorCommandState(){
   document.querySelectorAll('[data-editor-command="layout-side"]').forEach(b=>b.setAttribute("aria-checked",stacked?"false":"true"));
 }
 const editorCommands={
-  new:()=>newTerrainDocument(false),
+  new:openNewTerrainDialog,
   "new-default":()=>newTerrainDocument(true),
   "new-canyon":()=>newTerrainDocument(false,"canyon"),
   save:saveProjectFile,open:openProjectFile,
@@ -7296,6 +7356,7 @@ $("#waterRefraction").oninput=e=>{waterLook.refraction=parseFloat(e.target.value
 syncLookValues();syncWaterLookValues();
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&!$("#newTerrainDialog").hidden){e.preventDefault();closeNewTerrainDialog();return;}
   if(e.key==="Escape"&&!$("#drawEditor").hidden){e.preventDefault();closeDrawEditor();return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu",true);return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="n"){e.preventDefault();runEditorCommand("new");return;}
@@ -7330,8 +7391,10 @@ function blankGraph(){
   // newTerrainDocument() disables history around construction, so this cannot create a phantom undo.
   organizeGraph(null,null,"Organized new terrain");
 }
-function newTerrainDocument(withDefault,template=""){
-  if(historyReady&&nodes.length&&!confirm("Start a new terrain? The current graph and its undo history will be discarded."))return false;
+function newTerrainDocument(withDefault,template="",alreadyConfirmed){
+  // alreadyConfirmed: the New Terrain dialog has taken the decision and run the preflight, so a
+  // second confirm() would ask the same question twice.
+  if(!alreadyConfirmed&&historyReady&&nodes.length&&!confirm("Start a new terrain? The current graph and its undo history will be discarded."))return false;
   const ready=historyReady;historyReady=false;
   nodes=[];edges=[];uid=1;selected=null;selectedEdge=null;importTarget=null;
   undoStack.length=0;redoStack.length=0;previewMode="output";
@@ -7478,7 +7541,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 210 symbols (28 writable, 182 read-only).
+ * 214 symbols (28 writable, 186 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7527,7 +7590,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 182 read-only. Getters hand out the LIVE value: 6 of
+  // 186 read-only. Getters hand out the LIVE value: 6 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("terrainDef", () => terrainDef, __ro("terrainDef"))
@@ -7617,6 +7680,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("nodeH", () => nodeH, __ro("nodeH"))
   __def("nodeOutputs", () => nodeOutputs, __ro("nodeOutputs"))
   __def("PORTS_EXPR", () => PORTS_EXPR, __ro("PORTS_EXPR"))
+  __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
   __def("warpField", () => warpField, __ro("warpField"))
   __def("weatherColorField", () => weatherColorField, __ro("weatherColorField"))
@@ -7638,7 +7702,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("hydraulicErode", () => hydraulicErode, __ro("hydraulicErode"))
   __def("organizeGraph", () => organizeGraph, __ro("organizeGraph"))
   __def("portAt", () => portAt, __ro("portAt"))
-  __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
   __def("USE_DEFERRED", () => USE_DEFERRED, __ro("USE_DEFERRED"))
@@ -7653,6 +7716,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("combine", () => combine, __ro("combine"))
   __def("curveFromExponent", () => curveFromExponent, __ro("curveFromExponent"))
   __def("curWaterLiquid", () => curWaterLiquid, __ro("curWaterLiquid"))
+  __def("DOMAIN", () => DOMAIN, __ro("DOMAIN"))
   __def("drawMaskField", () => drawMaskField, __ro("drawMaskField"))
   __def("drawTarget", () => drawTarget, __ro("drawTarget"))
   __def("edgeKey", () => edgeKey, __ro("edgeKey"))
@@ -7666,6 +7730,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("normalize", () => normalize, __ro("normalize"))
   __def("occlusionField", () => occlusionField, __ro("occlusionField"))
   __def("outSlotForEdge", () => outSlotForEdge, __ro("outSlotForEdge"))
+  __def("previewCreation", () => previewCreation, __ro("previewCreation"))
   __def("propagateFieldMetadata", () => propagateFieldMetadata, __ro("propagateFieldMetadata"))
   __def("renderLook", () => renderLook, __ro("renderLook"))
   __def("satLayerColor", () => satLayerColor, __ro("satLayerColor"))
@@ -7684,10 +7749,11 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("cameraNear", () => cameraNear, __ro("cameraNear"))
   __def("CANYON_STYLE_ID", () => CANYON_STYLE_ID, __ro("CANYON_STYLE_ID"))
   __def("canyonField", () => canyonField, __ro("canyonField"))
+  __def("confirmNewTerrain", () => confirmNewTerrain, __ro("confirmNewTerrain"))
   __def("curveAt", () => curveAt, __ro("curveAt"))
   __def("DOCTRINE", () => DOCTRINE, __ro("DOCTRINE"))
-  __def("DOMAIN", () => DOMAIN, __ro("DOMAIN"))
   __def("duplicateSel", () => duplicateSel, __ro("duplicateSel"))
+  __def("FEASIBILITY_API", () => FEASIBILITY_API, __ro("FEASIBILITY_API"))
   __def("gbuf", () => gbuf, __ro("gbuf"))
   __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
   __def("gpuWarp", () => gpuWarp, __ro("gpuWarp"))
@@ -7698,6 +7764,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("loadImageAsDEM", () => loadImageAsDEM, __ro("loadImageAsDEM"))
   __def("metricHeightField", () => metricHeightField, __ro("metricHeightField"))
   __def("openDrawEditor", () => openDrawEditor, __ro("openDrawEditor"))
+  __def("openNewTerrainDialog", () => openNewTerrainDialog, __ro("openNewTerrainDialog"))
   __def("parseLayout", () => parseLayout, __ro("parseLayout"))
   __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("pushUndo", () => pushUndo, __ro("pushUndo"))

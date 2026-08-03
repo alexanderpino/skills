@@ -1009,6 +1009,29 @@ select.sg-btn{appearance:auto}
   </div>
 </div>
 
+<!-- New Terrain (S9.2). A fourth detached overlay, following the #drawEditor / #pathEditor
+     convention exactly: role=dialog, aria-modal, hidden, same .draw-editor styling. -->
+<div class="draw-editor" id="newTerrainDialog" role="dialog" aria-modal="true" aria-labelledby="newTerrainTitle" hidden>
+  <div class="draw-editor-head">
+    <b id="newTerrainTitle">New terrain</b>
+    <span class="muted" id="newTerrainSub">Set the world before anything is allocated</span>
+  </div>
+  <div class="draw-editor-body" style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;padding:12px">
+    <label for="ntWidth">Width (m)</label><input id="ntWidth" type="number" min="1" step="1" value="5000">
+    <label for="ntHeight">Height (m)</label><input id="ntHeight" type="number" min="1" step="1" value="5000">
+    <label for="ntCols">Columns</label><input id="ntCols" type="number" min="2" step="1" value="512">
+    <label for="ntRows">Rows</label><input id="ntRows" type="number" min="2" step="1" value="512">
+    <label for="ntLattice">Lattice</label>
+    <select id="ntLattice"><option value="square">Square</option><option value="hex-pointy-odd-r">Hex (pointy, odd-r)</option></select>
+    <label for="ntTemplate">Start from</label>
+    <select id="ntTemplate"><option value="blank">Blank</option><option value="default">Default setup</option><option value="canyon">Canyon landscape</option></select>
+    <span></span><div id="ntReadout" class="hint" style="grid-column:2">&nbsp;</div>
+  </div>
+  <div class="draw-editor-foot">
+    <button class="btn" id="ntCancel" type="button">Cancel</button>
+    <button class="btn primary" id="ntCreate" type="button">Create</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script type="module" src="./src/legacy.js"></script>
