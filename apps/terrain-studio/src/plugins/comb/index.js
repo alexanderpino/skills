@@ -1,5 +1,6 @@
 // Every comb plugin. Imported for the side effect of registering with core/registry.js.
 import './blend.js'
+import './mathnode.js'
 import './switch.js'
 import './gate.js'
 import './route.js'

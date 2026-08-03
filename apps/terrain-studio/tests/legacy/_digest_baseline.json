@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 84,
+  "nodeCount": 85,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -50,6 +50,7 @@
     "layout": "d8454784:2cf20779",
     "levels": "263bdef7:bcf4a390|ex=69ad9c27:988ef7cb",
     "match": "6c2e3a11:36c65a07",
+    "mathnode": "263bdef7:bcf4a390",
     "maxmin": "5bb3a537:98a99a56",
     "mountain": "b9035986:bee88586|ex=eafbd5e3:2389cee8",
     "mountainside": "bd484464:377497e9",
