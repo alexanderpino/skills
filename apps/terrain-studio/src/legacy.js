@@ -3404,11 +3404,15 @@ function requestEval(){
    ===================================================================== */
 const TH=48;
 function bakeThumb(nd){
-  const raw=nd._field;if(!raw)return null;const adapter=TYPES[nd.type].previewAdapter;
+  // TYPES[nd.type] may be absent: a node whose plugin failed to register, and the probe fixtures
+  // that drive bakeThumb directly with a synthetic node. Before the preview-adapter hook existed
+  // this function never consulted TYPES at all, so an unregistered type baked a plain thumbnail
+  // rather than throwing. Keep that: a missing descriptor means "no adapter", not a crash.
+  const raw=nd._field;if(!raw)return null;const adapter=TYPES[nd.type]?.previewAdapter;
   const f=adapter?adapter(raw,terrainDef):raw;
   const c=document.createElement("canvas");c.width=TH;c.height=TH;const ctx=c.getContext("2d");
   const img=ctx.createImageData(TH,TH);const n=fieldW(),nh=fieldH();
-  const range=TYPES[nd.type].previewRange,[mn,mx]=range||fieldRange(f);const d=mx-mn||1;
+  const range=TYPES[nd.type]?.previewRange,[mn,mx]=range||fieldRange(f);const d=mx-mn||1;
   // sampleBilinear reads WORLD position in cell units. The hex world is only (n-1)*sqrt(3)/2
   // cells tall, so walking sy over raw grid indices runs 13.4% past the bottom and clamps onto
   // the last lattice row - measured: 6 of 48 thumbnail rows came back byte-identical on hex,
@@ -3919,7 +3923,7 @@ function updatePreviewInfo(root){
 }
 function refreshPreview(){
   const root=activePreviewNode(),meta=root&&fieldMetadata(root._field);scene=collectScene(root);
-  const raw=root?(meta&&meta.heightField||root._field):null,adapter=root&&TYPES[root.type].previewAdapter;
+  const raw=root?(meta&&meta.heightField||root._field):null,adapter=root&&TYPES[root.type]?.previewAdapter;
   updateViewport(adapter?adapter(raw,terrainDef):raw,root);updatePreviewInfo(root);drawGraph();
 }
 function selectEdge(edge){
