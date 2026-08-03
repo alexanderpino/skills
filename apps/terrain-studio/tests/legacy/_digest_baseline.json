@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 85,
+  "nodeCount": 86,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -83,6 +83,7 @@
     "threshold": "d87f5680:6262d480",
     "transform": "263bdef7:bcf4a390|ex=dcc43730:472011da",
     "transpose": "ac563da2:f78fe024",
+    "variable": "d4000000:30200000",
     "volcano": "a4f31322:d197ffb3",
     "warp": "3ad3d1a6:ef19167f",
     "water": "263bdef7:bcf4a390|filled=123042f:c1bd235a|accum=8d06cd91:933f145a",

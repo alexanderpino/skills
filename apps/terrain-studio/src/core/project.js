@@ -214,6 +214,12 @@ export function canonicalProject(state) {
   // Workspace is restored best-effort — a stale selectedId or edge key is a warning, never a
   // fatal load. It deliberately excludes the three localStorage UI preferences: opening someone
   // else's project must not move your panes around.
+  // Variables are document state, sorted by id so the file is a normal form like everything else.
+  if (Array.isArray(state.variables) && state.variables.length) {
+    doc.variables = state.variables
+      .map(v => canonicalValue({ id: v.id, name: v.name, value: v.value, unit: v.unit }, `variable ${v.id}`))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  }
   if (isPlainObject(state.workspace) && Object.keys(state.workspace).length) {
     doc.workspace = canonicalValue(state.workspace, 'workspace')
   }
