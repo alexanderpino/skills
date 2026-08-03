@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 82;   // 80 + `route` and `edge`, the S8.1 graph-machinery pair
+const REQUIRED_NODE_COUNT = 84;   // 82 + `switch` and `gate`, the S8.2 conditional-flow pair
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -271,6 +271,7 @@ function installHarness(cfg) {
     d_slope: ['A'], d_height: ['A'], d_sunshadow: ['A'],
     normals: ['A'],
     route: ['A'], edge: ['M'],
+    switch: ['A','B','C'], gate: ['A'],
     d_temperature: ['H', 'S'], d_heat: ['T', 'D', 'M'],
     d_wind: ['A'], d_windmodify: ['W', 'D', 'M'],
     d_curvature: ['A'], d_flow: ['A'], d_occlusion: ['A'], d_deposits: ['A'],

@@ -54,7 +54,7 @@ def declared_mutations(oracle):
     # first version of this parser did exactly that and tried to run three phantom mutations.
     names = []
     for line in m.group(1).splitlines():
-        code = re.split(r"//", line, 1)[0].strip()
+        code = re.split(r"//", line, maxsplit=1)[0].strip()
         found = re.findall(r"['\"]([^'\"]+)['\"]", code)
         names.extend(found)
     return names
