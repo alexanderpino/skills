@@ -565,6 +565,11 @@ select.sg-btn{appearance:auto}
             <button class="editor-menu-item" role="menuitem" data-editor-command="new-canyon">
               <span class="editor-menu-icon">⌁</span><span>New Canyon landscape</span></button>
             <div class="editor-menu-separator" role="separator"></div>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="open">
+              <span class="editor-menu-icon">⇧</span><span>Open project…</span><kbd>Ctrl O</kbd></button>
+            <button class="editor-menu-item" role="menuitem" data-editor-command="save">
+              <span class="editor-menu-icon">⇩</span><span>Save project…</span><kbd>Ctrl S</kbd></button>
+            <div class="editor-menu-separator" role="separator"></div>
             <button class="editor-menu-item" role="menuitem" data-editor-command="import">
               <span class="editor-menu-icon">↓</span><span>Import heightmap…</span><kbd>Ctrl I</kbd></button>
             <button class="editor-menu-item" role="menuitem" data-editor-command="export">
@@ -634,6 +639,8 @@ select.sg-btn{appearance:auto}
             <button class="editor-menu-item" data-editor-command="new"><span class="editor-menu-icon">◇</span><span>New terrain</span><kbd>Ctrl N</kbd></button>
             <button class="editor-menu-item" data-editor-command="new-default"><span class="editor-menu-icon">◆</span><span>New from default setup</span></button>
             <button class="editor-menu-item" data-editor-command="new-canyon"><span class="editor-menu-icon">⌁</span><span>New Canyon landscape</span></button>
+            <button class="editor-menu-item" data-editor-command="open"><span class="editor-menu-icon">⇧</span><span>Open project…</span></button>
+            <button class="editor-menu-item" data-editor-command="save"><span class="editor-menu-icon">⇩</span><span>Save project…</span></button>
             <button class="editor-menu-item" data-editor-command="import"><span class="editor-menu-icon">↓</span><span>Import heightmap…</span></button>
             <button class="editor-menu-item" data-editor-command="export"><span class="editor-menu-icon">↑</span><span>Export heightmap…</span></button>
           </div>
@@ -884,6 +891,9 @@ select.sg-btn{appearance:auto}
   </div>
 </div>
 <input type="file" id="fileInput" accept=".png,.r16,.raw,.bin" style="display:none">
+<!-- A SECOND input, not a reuse: #fileInput's onchange is bound to importTarget and would try
+     to read a project document as a heightmap. -->
+<input type="file" id="projectFileInput" accept=".tsproj.json,.tsproj,.json,application/json" style="display:none">
 <div id="menu"></div>
 <div id="graphMenu" role="menu" aria-label="Graph actions"></div>
 <div class="sat-menu" id="satPickerMenu" role="dialog" aria-label="SatMap Library" hidden>

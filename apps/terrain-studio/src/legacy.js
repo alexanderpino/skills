@@ -14,6 +14,9 @@ import './plugins/comb/index.js';
 import { P, WHEN, GROUP, CAT } from './core/params.js';
 import { mountainSkirtDefault } from './core/defaults.js';
 import { makeProg, u, setGL as setGlUtilGL } from './core/gl-util.js';
+// Acyclic core import, safe at module-evaluation time: project.js imports nothing from here.
+import { serializeProject, parseProject, migrateProject, validateProject,
+  PROJECT_SCHEMA_VERSION, PROJECT_FILE_EXTENSION, ProjectError } from './core/project.js';
 
 "use strict";
 /* =====================================================================
@@ -4434,6 +4437,10 @@ function deleteSel(){if(!selected)return;const id=selected.id;
 /* =====================================================================
    IMPORT / EXPORT
    ===================================================================== */
+// Chunked so a large raw16 cannot blow the argument limit of String.fromCharCode.
+function bytesToBase64(bytes){let out="";const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(out);}
 let importTarget=null;
 function importHeightmap(){
   importTarget=(selected&&selected.type==="import")?selected:nodes.find(n=>n.type==="import")||null;
@@ -4447,12 +4454,23 @@ $("#fileInput").onchange=e=>{const file=e.target.files[0];if(!file||!importTarge
     file.arrayBuffer().then(buf=>{const u16=new Uint16Array(buf);const side=Math.round(Math.sqrt(u16.length));
       if(side*side!==u16.length){toast("Raw must be square (got "+u16.length+" samples)");return;}
       recordHistory();
-      nd._demRaw={u16,side};nd._demImg=null;buildDemFromSource(nd);finishDem(nd);toast("Loaded "+side+"² raw heightmap");});
-  }else{loadImageAsDEM(nd,URL.createObjectURL(file),"Loaded heightmap file");}
+      nd._demRaw={u16,side};nd._demImg=null;
+      // Capture the SOURCE bytes, not the derived field. Without them a saved project cannot
+      // reproduce identical terrain on reload, and that is the whole point of the format.
+      nd._demSrc={kind:"raw16",name:file.name,side,base64:bytesToBase64(new Uint8Array(buf))};
+      buildDemFromSource(nd);finishDem(nd);toast("Loaded "+side+"² raw heightmap");});
+  }else{
+    // readAsDataURL rather than createObjectURL: the data URL is what gets persisted, and an
+    // object URL would also be revoked out from under a later reload.
+    const reader=new FileReader();
+    reader.onload=()=>loadImageAsDEM(nd,reader.result,"Loaded heightmap file",{kind:"image",name:file.name,mime:file.type||"image/png",dataUrl:reader.result});
+    reader.onerror=()=>toast("Could not read that file");
+    reader.readAsDataURL(file);
+  }
   e.target.value="";
 };
-function loadImageAsDEM(nd,src,label){
-  const img=new Image();img.onload=()=>{recordHistory();nd._demImg=img;nd._demRaw=null;buildDemFromSource(nd);finishDem(nd);toast(label);};
+function loadImageAsDEM(nd,src,label,source){
+  const img=new Image();img.onload=()=>{recordHistory();nd._demImg=img;nd._demRaw=null;if(source)nd._demSrc=source;buildDemFromSource(nd);finishDem(nd);toast(label);};
   img.onerror=()=>toast("Could not read that image");img.src=src;
 }
 // (re)build a node's imported heightfield at the CURRENT resolution from its retained source, so changing
@@ -4515,6 +4533,172 @@ function exportHeightmap(){const out=outputNode();if(!out||!out._field){toast("N
   // a preview export and is now labelled as one.
   cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG (8-bit preview)");}
 $("#exportBtn").onclick=exportHeightmap;
+
+/* =====================================================================
+   PROJECT DOCUMENT — SAVE / OPEN   (S0.1)
+
+   The format lives in src/core/project.js, which is pure and DOM-free. This section owns the
+   BINDINGS: nodes, edges, uid, terrainDef, RES, view, cam, previewMode, satName and selection are
+   module-local `let`s that no other module can read or write, so the collect/apply adapters have
+   to live here.
+
+   Nothing below runs at module-evaluation time except the two DOM handler assignments at the end
+   — `cam` is declared with `let` further down this file, and every function here only runs on a
+   user action.
+   ===================================================================== */
+
+// Frozen at module load, before SatMap Studio can add anything, so "custom" means "not shipped".
+const BUILTIN_SATMAP_NAMES=Object.freeze(Object.keys(SATMAPS));
+
+// Template graphs replace params wholesale (`out.params={norm:"on"}`), so the live app routinely
+// holds nodes missing schema keys; buildProps hydrates them lazily and only for the SELECTED node.
+// A document must not inherit that unevenness, so both endpoints map into a normal form. This runs
+// on LOAD only, never on save: hydrating a live graph mid-session would move terrain under the
+// user, and Ctrl+S must never change what is on screen.
+function normalizeNodeParams(nd){
+  const def=TYPES[nd.type];if(!def||!def.params)return 0;
+  let added=0;
+  for(const pr of def.params){if(!(pr.key in nd.params)){nd.params[pr.key]=cloneParams({v:pr.def}).v;added++;}}
+  if(def.migrateParams)def.migrateParams(nd.params);
+  return added;
+}
+function normalizeAllNodeParams(){let n=0,keys=0;for(const nd of nodes){const a=normalizeNodeParams(nd);if(a){n++;keys+=a;}}return{nodesChanged:n,keysAdded:keys};}
+
+// Only palettes some node actually references, or the active global one, and only when they are
+// not built in. An empty set is omitted entirely rather than written as {}.
+function collectCustomSatmaps(){
+  const used=new Set();
+  if(satName&&!BUILTIN_SATMAP_NAMES.includes(satName))used.add(satName);
+  for(const nd of nodes){const g=nd.params&&nd.params.gradient;if(typeof g==="string"&&!BUILTIN_SATMAP_NAMES.includes(g))used.add(g);}
+  const out={};for(const name of [...used].sort())if(SATMAPS[name])out[name]=SATMAPS[name];
+  return Object.keys(out).length?{satmaps:out}:null;
+}
+
+// The writer is VERBATIM and side-effect-free.
+function collectProjectState(){
+  const palettes=collectCustomSatmaps();
+  return{
+    terrain:{...terrainDef},
+    build:{res:RES,quality:BUILD_QUALITY,resLock:SCALE_RES},
+    nodes:nodes.map(nd=>{
+      const out={id:nd.id,type:nd.type,x:nd.x,y:nd.y,w:nd.w,params:cloneParams(nd.params)};
+      if(nd._inputs)out.inputs=[...nd._inputs];
+      if(nd._demSrc)out.source=nd._demSrc;
+      return out;
+    }),
+    edges:edges.map(e=>{const o={from:e.from,to:e.to,slot:e.slot};if(e.disabled)o.disabled=true;return o;}),
+    uid,
+    ...(palettes?{palettes}:{}),
+    workspace:{
+      selectedId:selected?selected.id:null,
+      selectedEdgeKey:selectedEdge||null,
+      previewMode,satName,
+      graphView:{x:view.x,y:view.y,z:view.z},
+      camera:{az:cam.az,el:cam.el,dist:cam.dist,target:[...cam.target],fov:cam.fov},
+    },
+  };
+}
+
+export function saveProjectText(){return serializeProject(collectProjectState());}
+
+// Declared here rather than re-exported so the generated test bridge can publish it: an imported
+// binding cannot be bridged, and the oracle needs to drive the migration dispatch directly.
+export const PROJECT={serializeProject,parseProject,migrateProject,validateProject,PROJECT_SCHEMA_VERSION};
+
+// Restoring is deliberately close to restoreGraph: same runtime-field reset, same H_SCALE recompute.
+// Undo history is CLEARED, not carried — an undo across an Open would splice two unrelated
+// documents together and the result would be neither.
+function applyProjectDocument(doc){
+  const nextNodes=doc.graph.nodes.map(n=>({
+    id:n.id,type:n.type,x:n.x,y:n.y,w:n.w,params:cloneParams(n.params),
+    _inputs:Array.isArray(n.inputs)?[...n.inputs]:null,
+    _demSrc:n.source||null,
+    _field:null,_thumb:null,_dirty:true,_dem:null,_demImg:null,_demRaw:null,
+    _snowLayer:null,_temperatureC:null,_solarShadow:null,_solarExposure:null,_wind:null,
+  }));
+  if(doc.palettes&&doc.palettes.satmaps)for(const [name,stops] of Object.entries(doc.palettes.satmaps))SATMAPS[name]=stops;
+
+  nodes=nextNodes;
+  edges=doc.graph.edges.map(e=>({...e}));
+  uid=doc.graph.uid;
+  terrainDef=createTerrainDef(doc.terrain);
+  H_SCALE=terrainDef.height/terrainDef.scale;
+
+  const ws=doc.workspace||{};
+  if(ws.graphView&&Number.isFinite(ws.graphView.x))view={x:ws.graphView.x,y:ws.graphView.y,z:ws.graphView.z};
+  if(ws.camera&&Number.isFinite(ws.camera.az))cam={az:ws.camera.az,el:ws.camera.el,dist:ws.camera.dist,target:[...ws.camera.target],fov:ws.camera.fov};
+  if(ws.previewMode==="output"||ws.previewMode==="selected")previewMode=ws.previewMode;
+  if(typeof ws.satName==="string"&&SATMAPS[ws.satName]){satName=ws.satName;buildSatLUT(satName);}
+
+  // Normal form BEFORE anything evaluates, so a sparse document cannot produce different terrain
+  // from the same document saved dense.
+  normalizeAllNodeParams();
+  // Rebuild every imported heightfield from its retained source at the CURRENT resolution. _dem is
+  // derived, never persisted: it is a pure function of the source plus RES plus the lattice, and
+  // freezing one resolution into the file would go stale the moment either changed.
+  for(const nd of nodes)if(nd._demSrc)rebuildDemFromProjectSource(nd);
+
+  undoStack.length=0;redoStack.length=0;
+  selected=ws.selectedId==null?null:nodeById(ws.selectedId);
+  selectedEdge=ws.selectedEdgeKey&&edgeByKey(ws.selectedEdgeKey)?ws.selectedEdgeKey:null;
+  const build=doc.build||{};
+  if(Number.isInteger(build.res)&&build.res>=64)applyWorkingResolution(build.res);
+  buildProps();drawGraph();evalGraph();updateHistoryButtons();syncEditorCommandState();
+  return true;
+}
+
+// Rebuild an import node's heightfield from the embedded source bytes.
+function rebuildDemFromProjectSource(nd){
+  const src=nd._demSrc;if(!src)return;
+  if(src.kind==="raw16"&&typeof src.base64==="string"){
+    const bin=atob(src.base64),bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    nd._demRaw={u16:new Uint16Array(bytes.buffer),side:src.side};nd._demImg=null;buildDemFromSource(nd);
+  }else if(src.kind==="image"&&typeof src.dataUrl==="string"){
+    // Asynchronous by nature; the node evaluates flat until the decode lands, then re-evaluates.
+    const img=new Image();
+    img.onload=()=>{nd._demImg=img;nd._demRaw=null;buildDemFromSource(nd);markDirtyFrom(nd.id);requestEval();};
+    img.src=src.dataUrl;
+  }
+}
+
+export function loadProjectText(text){
+  const{doc,warnings}=parseProject(text);
+  const upgraded=migrateProject(doc,{targetVersion:PROJECT_SCHEMA_VERSION,migrations:PROJECT_MIGRATIONS});
+  validateProject(upgraded,{types:TYPES,arityOf:(type,node)=>(node&&node.inputs?node.inputs.length:(TYPES[type]&&TYPES[type].ins?TYPES[type].ins.length:0))});
+  applyProjectDocument(upgraded);
+  return{warnings};
+}
+
+// S2.2 adds `1: migrateV1toV2` here and changes nothing else.
+const PROJECT_MIGRATIONS={};
+
+function saveProjectFile(){
+  let text;
+  try{text=saveProjectText();}
+  catch(err){toast(err instanceof ProjectError?("Could not save: "+err.message):"Could not save this project");console.error(err);return false;}
+  const blob=new Blob([text],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.download="terrain"+PROJECT_FILE_EXTENSION;a.href=url;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),0);
+  toast("Saved project ("+nodes.length+" nodes)");
+  return true;
+}
+function openProjectFile(){$("#projectFileInput").click();}
+$("#projectFileInput").onchange=e=>{
+  const file=e.target.files[0];e.target.value="";
+  if(!file)return;
+  file.text().then(text=>{
+    try{const{warnings}=loadProjectText(text);
+      toast("Opened project ("+nodes.length+" nodes)"+(warnings.length?" · "+warnings[0].message:""));}
+    catch(err){
+      // A refused load leaves the current document untouched, which is the point: this format
+      // never best-effort repairs a graph, because silently rewiring one is worse than refusing.
+      toast(err instanceof ProjectError?("Could not open: "+err.message):"Could not open that project");
+      console.error(err);
+    }
+  });
+};
 
 /* =====================================================================
    WEBGL 3D VIEWPORT
@@ -6360,6 +6544,7 @@ const editorCommands={
   new:()=>newTerrainDocument(false),
   "new-default":()=>newTerrainDocument(true),
   "new-canyon":()=>newTerrainDocument(false,"canyon"),
+  save:saveProjectFile,open:openProjectFile,
   import:importHeightmap,export:exportHeightmap,undo:undoGraph,redo:redoGraph,
   duplicate:()=>{if(selected&&!selectedEdge)duplicateSel();},
   delete:()=>{if(selectedEdge)deleteEdge(selectedEdge);else if(selected)deleteSel();},
@@ -6878,6 +7063,8 @@ window.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();filterCommands("");$("#commandSearch").value="";setTopPopover("commandMenu",true);return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="n"){e.preventDefault();runEditorCommand("new");return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="i"){e.preventDefault();runEditorCommand("import");return;}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"){e.preventDefault();runEditorCommand("save");return;}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="o"){e.preventDefault();runEditorCommand("open");return;}
   if(e.key==="Escape"&&editorMenuPanels.some(id=>!$("#"+id).hidden)){e.preventDefault();closeEditorMenus();if(lastEditorMenuButton)lastEditorMenuButton.focus();return;}
   if(e.key==="Escape"&&topPopovers.some(id=>!$("#"+id).hidden)){e.preventDefault();closeTopPopovers();$("#commandBtn").focus();return;}
   if(e.key==="Escape"&&viewportPanels.some(id=>!$("#"+id).hidden)){e.preventDefault();closeViewportPanels();return;}
@@ -7054,7 +7241,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 196 symbols (28 writable, 168 read-only).
+ * 199 symbols (28 writable, 171 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7078,136 +7265,145 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("nodes", () => nodes, (v) => { nodes = v })
   __def("edges", () => edges, (v) => { edges = v })
   __def("selected", () => selected, (v) => { selected = v })
-  __def("scene", () => scene, (v) => { scene = v })
-  __def("selectedEdge", () => selectedEdge, (v) => { selectedEdge = v })
   __def("cam", () => cam, (v) => { cam = v })
-  __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
-  __def("uid", () => uid, (v) => { uid = v })
-  __def("view", () => view, (v) => { view = v })
   __def("TARGET_RES", () => TARGET_RES, (v) => { TARGET_RES = v })
+  __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
+  __def("selectedEdge", () => selectedEdge, (v) => { selectedEdge = v })
+  __def("scene", () => scene, (v) => { scene = v })
+  __def("uid", () => uid, (v) => { uid = v })
   __def("XF", () => XF, (v) => { XF = v })
+  __def("view", () => view, (v) => { view = v })
   __def("SCALE_RES", () => SCALE_RES, (v) => { SCALE_RES = v })
-  __def("BUILD_QUALITY", () => BUILD_QUALITY, (v) => { BUILD_QUALITY = v })
   __def("undoStack", () => undoStack, (v) => { undoStack = v })
+  __def("BUILD_QUALITY", () => BUILD_QUALITY, (v) => { BUILD_QUALITY = v })
   __def("historyReady", () => historyReady, (v) => { historyReady = v })
+  __def("redoStack", () => redoStack, (v) => { redoStack = v })
   __def("H_SCALE", () => H_SCALE, (v) => { H_SCALE = v })
+  __def("previewMode", () => previewMode, (v) => { previewMode = v })
   __def("importTarget", () => importTarget, (v) => { importTarget = v })
   __def("evalFrame", () => evalFrame, (v) => { evalFrame = v })
-  __def("previewMode", () => previewMode, (v) => { previewMode = v })
-  __def("buildRun", () => buildRun, (v) => { buildRun = v })
   __def("shadeMode", () => shadeMode, (v) => { shadeMode = v })
+  __def("buildRun", () => buildRun, (v) => { buildRun = v })
   __def("uTime", () => uTime, (v) => { uTime = v })
-  __def("redoStack", () => redoStack, (v) => { redoStack = v })
   __def("satName", () => satName, (v) => { satName = v })
   __def("wire", () => wire, (v) => { wire = v })
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 168 read-only. Getters hand out the LIVE value: 6 of
+  // 171 read-only. Getters hand out the LIVE value: 6 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
-  __def("gl", () => gl, __ro("gl"))
   __def("terrainDef", () => terrainDef, __ro("terrainDef"))
   __def("TYPES", () => TYPES, __ro("TYPES"))
+  __def("gl", () => gl, __ro("gl"))
   __def("makeNode", () => makeNode, __ro("makeNode"))
   __def("evalGraph", () => evalGraph, __ro("evalGraph"))
-  __def("buffers", () => buffers, __ro("buffers"))
+  __def("newField", () => newField, __ro("newField"))
   __def("gnoise", () => gnoise, __ro("gnoise"))
-  __def("fbmField", () => fbmField, __ro("fbmField"))
   __def("buildIndex", () => buildIndex, __ro("buildIndex"))
+  __def("buffers", () => buffers, __ro("buffers"))
+  __def("fbmField", () => fbmField, __ro("fbmField"))
+  __def("fieldH", () => fieldH, __ro("fieldH"))
   __def("outputNode", () => outputNode, __ro("outputNode"))
+  __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
   __def("resolveColor", () => resolveColor, __ro("resolveColor"))
-  __def("glc", () => glc, __ro("glc"))
+  __def("cloneParams", () => cloneParams, __ro("cloneParams"))
   __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
+  __def("buildProps", () => buildProps, __ro("buildProps"))
+  __def("fieldW", () => fieldW, __ro("fieldW"))
+  __def("glc", () => glc, __ro("glc"))
   __def("canyonFieldCPU", () => canyonFieldCPU, __ro("canyonFieldCPU"))
   __def("GPU", () => GPU, __ro("GPU"))
   __def("nodeById", () => nodeById, __ro("nodeById"))
-  __def("select", () => select, __ro("select"))
   __def("updateViewport", () => updateViewport, __ro("updateViewport"))
+  __def("select", () => select, __ro("select"))
   __def("curField", () => curField, __ro("curField"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
-  __def("fieldH", () => fieldH, __ro("fieldH"))
-  __def("newField", () => newField, __ro("newField"))
   __def("u", () => u, __ro("u"))
-  __def("buildProps", () => buildProps, __ro("buildProps"))
   __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
-  __def("cloneParams", () => cloneParams, __ro("cloneParams"))
   __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
   __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
   __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
+  __def("renderGL", () => renderGL, __ro("renderGL"))
   __def("sampleBilinear", () => sampleBilinear, __ro("sampleBilinear"))
   __def("activePreviewNode", () => activePreviewNode, __ro("activePreviewNode"))
+  __def("frameHero", () => frameHero, __ro("frameHero"))
+  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
-  __def("fieldW", () => fieldW, __ro("fieldW"))
   __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
+  __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
+  __def("undoGraph", () => undoGraph, __ro("undoGraph"))
+  __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
   __def("planView", () => planView, __ro("planView"))
   __def("portPos", () => portPos, __ro("portPos"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
   __def("transformField", () => transformField, __ro("transformField"))
-  __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
+  __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
   __def("simulateTerrainWind", () => simulateTerrainWind, __ro("simulateTerrainWind"))
   __def("sun", () => sun, __ro("sun"))
+  __def("syncDisplayState", () => syncDisplayState, __ro("syncDisplayState"))
   __def("terrainProg", () => terrainProg, __ro("terrainProg"))
+  __def("thermalErode", () => thermalErode, __ro("thermalErode"))
   __def("$", () => $, __ro("$"))
   __def("curWaterIce", () => curWaterIce, __ro("curWaterIce"))
   __def("fieldRange", () => fieldRange, __ro("fieldRange"))
-  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("inputEdge", () => inputEdge, __ro("inputEdge"))
   __def("nodeInputs", () => nodeInputs, __ro("nodeInputs"))
-  __def("renderGL", () => renderGL, __ro("renderGL"))
+  __def("redoGraph", () => redoGraph, __ro("redoGraph"))
   __def("satComposite", () => satComposite, __ro("satComposite"))
   __def("spReceivers", () => spReceivers, __ro("spReceivers"))
   __def("terrainQuadFitDelta", () => terrainQuadFitDelta, __ro("terrainQuadFitDelta"))
   __def("CANYON_PROCESS", () => CANYON_PROCESS, __ro("CANYON_PROCESS"))
+  __def("clamp", () => clamp, __ro("clamp"))
   __def("erosion2Field", () => erosion2Field, __ro("erosion2Field"))
-  __def("frameHero", () => frameHero, __ro("frameHero"))
   __def("gpuFbm", () => gpuFbm, __ro("gpuFbm"))
+  __def("gpuHydraulicDroplets", () => gpuHydraulicDroplets, __ro("gpuHydraulicDroplets"))
   __def("nearestUpstreamNode", () => nearestUpstreamNode, __ro("nearestUpstreamNode"))
   __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
   __def("syncWindReadout", () => syncWindReadout, __ro("syncWindReadout"))
-  __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("waterProg", () => waterProg, __ro("waterProg"))
+  __def("bakeThumb", () => bakeThumb, __ro("bakeThumb"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
+  __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
   __def("exactChain", () => exactChain, __ro("exactChain"))
-  __def("gpuHydraulicDroplets", () => gpuHydraulicDroplets, __ro("gpuHydraulicDroplets"))
-  __def("syncDisplayState", () => syncDisplayState, __ro("syncDisplayState"))
-  __def("thermalErode", () => thermalErode, __ro("thermalErode"))
+  __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
+  __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
   __def("warpField", () => warpField, __ro("warpField"))
   __def("weatherColorField", () => weatherColorField, __ro("weatherColorField"))
   __def("windVectorFromField", () => windVectorFromField, __ro("windVectorFromField"))
   __def("bakeCurve", () => bakeCurve, __ro("bakeCurve"))
   __def("buildSatLUT", () => buildSatLUT, __ro("buildSatLUT"))
+  __def("cameraEye", () => cameraEye, __ro("cameraEye"))
   __def("curIceSnowSurfaceY", () => curIceSnowSurfaceY, __ro("curIceSnowSurfaceY"))
   __def("curSnowDepthM", () => curSnowDepthM, __ro("curSnowDepthM"))
   __def("curSurfaceY", () => curSurfaceY, __ro("curSurfaceY"))
+  __def("curvatureField", () => curvatureField, __ro("curvatureField"))
   __def("d8Accumulation", () => d8Accumulation, __ro("d8Accumulation"))
+  __def("drawGraph", () => drawGraph, __ro("drawGraph"))
   __def("edgeByKey", () => edgeByKey, __ro("edgeByKey"))
-  __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
-  __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
+  __def("gpuReady", () => gpuReady, __ro("gpuReady"))
   __def("hydraulicErode", () => hydraulicErode, __ro("hydraulicErode"))
+  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("organizeGraph", () => organizeGraph, __ro("organizeGraph"))
-  __def("redoGraph", () => redoGraph, __ro("redoGraph"))
-  __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
+  __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
-  __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("USE_DEFERRED", () => USE_DEFERRED, __ro("USE_DEFERRED"))
   __def("waterMaskProg", () => waterMaskProg, __ro("waterMaskProg"))
   __def("blendFields", () => blendFields, __ro("blendFields"))
   __def("blurField", () => blurField, __ro("blurField"))
   __def("buildField", () => buildField, __ro("buildField"))
   __def("canyonBeds", () => canyonBeds, __ro("canyonBeds"))
+  __def("CAT", () => CAT, __ro("CAT"))
   __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
-  __def("clamp", () => clamp, __ro("clamp"))
   __def("colorErodeField", () => colorErodeField, __ro("colorErodeField"))
   __def("combine", () => combine, __ro("combine"))
-  __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
   __def("curveFromExponent", () => curveFromExponent, __ro("curveFromExponent"))
   __def("curWaterLiquid", () => curWaterLiquid, __ro("curWaterLiquid"))
   __def("drawMaskField", () => drawMaskField, __ro("drawMaskField"))
@@ -7215,17 +7411,19 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("edgeKey", () => edgeKey, __ro("edgeKey"))
   __def("encodeTemperatureC", () => encodeTemperatureC, __ro("encodeTemperatureC"))
   __def("gpuDropletsReady", () => gpuDropletsReady, __ro("gpuDropletsReady"))
-  __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
   __def("gpuHydraulicPipes", () => gpuHydraulicPipes, __ro("gpuHydraulicPipes"))
-  __def("gpuReady", () => gpuReady, __ro("gpuReady"))
+  __def("gpuThermal", () => gpuThermal, __ro("gpuThermal"))
   __def("HEX_SQUARE_WORLD", () => HEX_SQUARE_WORLD, __ro("HEX_SQUARE_WORLD"))
   __def("maskApply", () => maskApply, __ro("maskApply"))
   __def("nodeH", () => nodeH, __ro("nodeH"))
   __def("normalize", () => normalize, __ro("normalize"))
+  __def("occlusionField", () => occlusionField, __ro("occlusionField"))
   __def("propagateFieldMetadata", () => propagateFieldMetadata, __ro("propagateFieldMetadata"))
   __def("renderLook", () => renderLook, __ro("renderLook"))
   __def("satLayerColor", () => satLayerColor, __ro("satLayerColor"))
+  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("sculptField", () => sculptField, __ro("sculptField"))
+  __def("slopeOf", () => slopeOf, __ro("slopeOf"))
   __def("smax", () => smax, __ro("smax"))
   __def("smin", () => smin, __ro("smin"))
   __def("syncClimateReadout", () => syncClimateReadout, __ro("syncClimateReadout"))
@@ -7235,19 +7433,14 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("wirePoint", () => wirePoint, __ro("wirePoint"))
   __def("xfMul", () => xfMul, __ro("xfMul"))
   __def("atFeatureScale", () => atFeatureScale, __ro("atFeatureScale"))
-  __def("bakeThumb", () => bakeThumb, __ro("bakeThumb"))
   __def("buildWireIndex", () => buildWireIndex, __ro("buildWireIndex"))
-  __def("cameraEye", () => cameraEye, __ro("cameraEye"))
   __def("cameraNear", () => cameraNear, __ro("cameraNear"))
   __def("CANYON_STYLE_ID", () => CANYON_STYLE_ID, __ro("CANYON_STYLE_ID"))
   __def("canyonField", () => canyonField, __ro("canyonField"))
-  __def("CAT", () => CAT, __ro("CAT"))
-  __def("curvatureField", () => curvatureField, __ro("curvatureField"))
   __def("curveAt", () => curveAt, __ro("curveAt"))
-  __def("drawGraph", () => drawGraph, __ro("drawGraph"))
   __def("duplicateSel", () => duplicateSel, __ro("duplicateSel"))
   __def("gbuf", () => gbuf, __ro("gbuf"))
-  __def("gpuThermal", () => gpuThermal, __ro("gpuThermal"))
+  __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
   __def("gpuWarp", () => gpuWarp, __ro("gpuWarp"))
   __def("graphIdsFrom", () => graphIdsFrom, __ro("graphIdsFrom"))
   __def("hexNb", () => hexNb, __ro("hexNb"))
@@ -7256,8 +7449,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("layer0Graph", () => layer0Graph, __ro("layer0Graph"))
   __def("loadImageAsDEM", () => loadImageAsDEM, __ro("loadImageAsDEM"))
   __def("metricHeightField", () => metricHeightField, __ro("metricHeightField"))
-  __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
-  __def("occlusionField", () => occlusionField, __ro("occlusionField"))
   __def("openDrawEditor", () => openDrawEditor, __ro("openDrawEditor"))
   __def("parseLayout", () => parseLayout, __ro("parseLayout"))
   __def("portAt", () => portAt, __ro("portAt"))
@@ -7267,7 +7458,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("SEED_MAX", () => SEED_MAX, __ro("SEED_MAX"))
   __def("SHADE", () => SHADE, __ro("SHADE"))
   __def("SKIRT_PRESETS", () => SKIRT_PRESETS, __ro("SKIRT_PRESETS"))
-  __def("slopeOf", () => slopeOf, __ro("slopeOf"))
   __def("smooth", () => smooth, __ro("smooth"))
   __def("snapshotIsEditorOnly", () => snapshotIsEditorOnly, __ro("snapshotIsEditorOnly"))
   __def("surfaceHeight", () => surfaceHeight, __ro("surfaceHeight"))
@@ -7276,3 +7466,4 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("WIND_MAX_MPS", () => WIND_MAX_MPS, __ro("WIND_MAX_MPS"))
 }
 // ==== TEST BRIDGE END ====
+
