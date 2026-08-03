@@ -4502,7 +4502,14 @@ function exportHeightmap(){const out=outputNode();if(!out||!out._field){toast("N
   }
   const img=cx.createImageData(RES,RES);   // NOTE (converted, not an exemption): exported PNG is a square RESxRES interchange raster, not the working lattice
   /* shape-ok: the export PNG is a square RES x RES interchange raster by design; hex rows are resampled into it above */ for(let i=0;i<RES*RES;i++){const v=Math.round(f[i]*255);img.data[i*4]=img.data[i*4+1]=img.data[i*4+2]=v;img.data[i*4+3]=255;}
-  cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG");}
+  // PRECISION DEBT (S6.2 owns the fix): this writer is 8-bit and cannot be otherwise. Canvas 2D
+  // ImageData is Uint8ClampedArray and toDataURL re-encodes to 8-bit RGBA, so the *255 above is the
+  // real ceiling, not a rounding choice. The UI advertised "16-bit PNG" for this path, which was
+  // simply false. 256 levels across a 2600 m vertical range is ~10 m per step - visible terracing
+  // on gentle slopes and lethal to any derivative taken downstream. The lossless R32F master plus
+  // PNG16/RAW interchange arrive with the S6.2 physical format writers; until then this button is
+  // a preview export and is now labelled as one.
+  cx.putImageData(img,0,0);const a=document.createElement("a");a.download="terrain_height_"+RES+".png";a.href=c.toDataURL("image/png");a.click();toast("Exported "+RES+"² heightmap PNG (8-bit preview)");}
 $("#exportBtn").onclick=exportHeightmap;
 
 /* =====================================================================

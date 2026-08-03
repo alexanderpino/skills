@@ -168,6 +168,20 @@ const BUILTINS = new Set([
   'DOMMatrixReadOnly', 'DOMQuad', 'DOMException', 'DOMStringMap', 'DOMTokenList',
   'CanvasRenderingContext2D', 'OffscreenCanvas', 'OffscreenCanvasRenderingContext2D',
   'ImageData', 'ImageBitmap', 'Path2D', 'CanvasGradient', 'CanvasPattern',
+  // --- WebGL / WebGPU interface objects ---
+  // These are platform globals, exactly like Blob or Response above. They are NOT app surface, so
+  // they must be recognised here rather than frozen into bridge-surface.json: a re-freeze would
+  // record a browser API as "a symbol the suite depends the app to publish", and the bridge would
+  // then defend a contract the app does not own. Sprint 10 is the cook-free WebGPU heightfield, so
+  // the flag namespaces below are referenced from page code by every GPU oracle.
+  'WebGLRenderingContext', 'WebGL2RenderingContext',
+  'GPUTextureUsage', 'GPUBufferUsage', 'GPUShaderStage', 'GPUMapMode', 'GPUColorWrite',
+  'GPUAdapter', 'GPUDevice', 'GPUBuffer', 'GPUTexture', 'GPUTextureView', 'GPUSampler',
+  'GPUQueue', 'GPUCommandEncoder', 'GPUCommandBuffer', 'GPURenderPassEncoder',
+  'GPUComputePassEncoder', 'GPUBindGroup', 'GPUBindGroupLayout', 'GPUPipelineLayout',
+  'GPURenderPipeline', 'GPUComputePipeline', 'GPUShaderModule', 'GPUQuerySet',
+  'GPUCanvasContext', 'GPUValidationError', 'GPUOutOfMemoryError', 'GPUInternalError',
+  'GPUDeviceLostInfo', 'GPUUncapturedErrorEvent',
   'CSS', 'CSSStyleDeclaration', 'CSSStyleSheet', 'StyleSheet', 'StyleSheetList',
   'CSSRule', 'CSSRuleList', 'MediaQueryList', 'MediaQueryListEvent',
   'Storage', 'Notification', 'Navigator', 'Location', 'History', 'Screen',
