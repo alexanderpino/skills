@@ -61,6 +61,11 @@ export const SEMANTICS = Object.freeze({
   solarExposure: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   windSpeed: { kind: 'scalarRaster', defaultUnit: 'mPerS', continuous: true },
   wind: { kind: 'vectorRaster', defaultUnit: 'mPerS', continuous: true },
+  // A surface normal is a unit 3-vector per sample, interleaved xyz. It is NOT a scalar raster
+  // that happens to have three of them: interpolating or tonemapping it is meaningless, which is
+  // why it needs a vectorRaster port and could not ship in Sprint 1.
+  normal: { kind: 'vectorRaster', defaultUnit: 'none', continuous: true },
+  velocity: { kind: 'vectorRaster', defaultUnit: 'mPerS', continuous: true },
   aspect: { kind: 'scalarRaster', defaultUnit: 'rad', continuous: true },
   slope: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   curvature: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },

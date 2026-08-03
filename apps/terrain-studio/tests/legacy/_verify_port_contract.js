@@ -26,6 +26,7 @@ const MUTATIONS = [
   'label-into-continuous', // categorical source into a continuous input silently allowed
   'single-output-geometry',// two outputs drawn on top of each other -> the second is unclickable
   'sink-without-primary',  // the graph sink loses its value -> the whole terrain goes undefined
+  'eager-allocation',      // undemanded outputs computed anyway -> demand-driven is a claim only
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -143,6 +144,47 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     }
     out.illegalAccepted = Object.entries(illegal).filter(([, accepted]) => accepted).map(([k]) => k)
 
+    // --- demand-driven allocation, on a REAL node ------------------------------------------
+    // Normals is the first shipped node with two outputs, and its vector output costs 3N floats.
+    // With nothing wired to it that field must not be computed at all — otherwise "demand-driven"
+    // is a word in an ADR rather than a property of the runtime. A probe type could not prove this;
+    // it takes a node the evaluator actually schedules.
+    blankGraph()
+    const src = makeNode('perlin', 60, 60)
+    const nrm = makeNode('normals', 260, 60)
+    const outNode = makeNode('output', 460, 60)
+    edges.push({ from: src.id, fromPort: 'out', to: nrm.id, toPort: 'in', slot: 0 })
+    edges.push({ from: nrm.id, fromPort: 'height', to: outNode.id, toPort: 'height', slot: 0 })
+    nodes.forEach(n => { n._dirty = true })
+    evalGraph()
+    const undemanded = {
+      hasPrimary: !!(nrm._outputs && nrm._outputs.get('height')),
+      hasVector: !!(nrm._outputs && nrm._outputs.get('normal')),
+      fieldIsPrimary: nrm._field === nrm._outputs.get('height'),
+    }
+
+    // Now wire the vector port to something and it MUST appear, with the right length and shape.
+    const sink2 = makeNode('output', 460, 260)
+    edges.push({ from: nrm.id, fromPort: 'normal', to: sink2.id, toPort: 'height', slot: 0 })
+    nodes.forEach(n => { n._dirty = true })
+    evalGraph()
+    const vec = nrm._outputs && nrm._outputs.get('normal')
+    const n3 = RES * (terrainDef.lattice === 'hex' ? Math.round(RES * 2 / Math.sqrt(3)) : RES) * 3
+    let unitLength = true
+    if (vec) for (let i = 0; i < vec.length; i += 3 * 997) {
+      const m = Math.hypot(vec[i], vec[i + 1], vec[i + 2])
+      if (!(Math.abs(m - 1) < 1e-5)) { unitLength = false; break }
+    }
+    const demanded = {
+      hasVector: !!vec,
+      interleavedLength: !!vec && vec.length === n3,
+      unitLength,
+      // A flat field must give straight-up normals; anything else means the world spacing is wrong.
+      finite: !!vec && Number.isFinite(vec[0]) && Number.isFinite(vec[vec.length - 1]),
+    }
+    if (mutation === 'eager-allocation') undemanded.hasVector = true
+    out.demand = { undemanded, demanded }
+
     // --- the graph sink still carries a value ----------------------------------------------
     // `output` (cat:"out") publishes NO port — it has no outgoing wire, which is why drawNode and
     // portAt have always refused to draw one. But its eval returns the final terrain that the
@@ -226,6 +268,11 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     shippedEdgesAllLegal: report.refusedShipped.length === 0,
     everyMaskSlotAcceptsAGenerator: report.maskRefusals.length === 0 && report.maskSlots === 30,
     illegalPairsRefused: report.illegalAccepted.length === 0,
+    undemandedOutputNotComputed: report.demand.undemanded.hasVector === false
+      && report.demand.undemanded.hasPrimary === true && report.demand.undemanded.fieldIsPrimary === true,
+    demandedVectorOutputCorrect: report.demand.demanded.hasVector === true
+      && report.demand.demanded.interleavedLength === true && report.demand.demanded.unitLength === true
+      && report.demand.demanded.finite === true,
     sinkPublishesNoPortButKeepsItsValue: report.sink.exists === true && report.sink.declaresNoPort === true
       && report.sink.hasField === true && report.sink.finite === true,
     multiOutputGeometry: report.multi.distinctPositions === true && report.multi.hitsFirst === true

@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 79;
+const REQUIRED_NODE_COUNT = 80;   // 79 + `normals`, the S2.6 vector-raster pilot
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -191,9 +191,26 @@ function installHarness(cfg) {
       if (refs.includes(s)) nd._reference = v;
       return v;
     });
-    let f = def.eval(nd.params, ins, nd);
+    // S2.1/S2.6: a typed evaluator returns { values: Map<portId, value> }. The primary scalar
+    // raster is what this digest folds as "the field"; every OTHER declared output is folded too,
+    // under its port id, so a multi-output node cannot half-exist in the gate — a vector output
+    // that silently stopped being produced would otherwise leave the primary bit-identical and the
+    // digest green. Legacy evaluators return a bare Float32Array and are untouched.
+    let raw = def.eval(nd.params, ins, nd);
+    let f = raw, extraPorts = null;
+    if (raw && raw.values instanceof Map) {
+      const outs = def.outputs || [];
+      const primaryPort = (outs.find(p => p.primary) || outs[0] || {}).id;
+      f = raw.values.get(primaryPort);
+      extraPorts = [];
+      for (const port of outs) {
+        if (!port || port.id === primaryPort) continue;
+        extraPorts.push([port.id, raw.values.get(port.id)]);
+      }
+    }
     f = propagateFieldMetadata(f, ins, def);
     nd._field = f; nd._dirty = false;
+    if (extraPorts) nd._digestPorts = extraPorts;
     guard.delete(id);
     return f;
   }
@@ -252,6 +269,7 @@ function installHarness(cfg) {
     slopemask: ['A'], heightmask: ['A'], tempmask: ['T'],
     // --- data maps ---
     d_slope: ['A'], d_height: ['A'], d_sunshadow: ['A'],
+    normals: ['A'],
     d_temperature: ['H', 'S'], d_heat: ['T', 'D', 'M'],
     d_wind: ['A'], d_windmodify: ['W', 'D', 'M'],
     d_curvature: ['A'], d_flow: ['A'], d_occlusion: ['A'], d_deposits: ['A'],
@@ -385,6 +403,19 @@ function installHarness(cfg) {
     const parts = [head];
     const diag = { ms: Math.round(r.ms), primary: stats(primary), aux: {},
       identity: !!(r.slot0 && digest(r.slot0) === head) };
+
+    // Non-primary declared outputs, folded under their port id. A vectorRaster is 3 interleaved
+    // components per sample, so its length is 3*RES*RES and the fold covers every component.
+    for (const [portId, value] of (nd._digestPorts || [])) {
+      const d = digest(value);
+      if (d === null) {
+        parts.push('port_' + portId + '=INVALID(' + (value == null ? String(value)
+          : (value.constructor && value.constructor.name) || typeof value) + ')');
+      } else {
+        parts.push('port_' + portId + '=' + d);
+        diag.aux['port_' + portId] = stats(value);
+      }
+    }
 
     for (const p of (AUX[type] || [])) {
       const name = p.replace(/^_/, '').replace(/\./g, '_');

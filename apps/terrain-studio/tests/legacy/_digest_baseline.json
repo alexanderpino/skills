@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 79,
+  "nodeCount": 80,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -52,6 +52,7 @@
     "mountain": "b9035986:bee88586|ex=eafbd5e3:2389cee8",
     "mountainside": "bd484464:377497e9",
     "normalizen": "6f1c4830:37577d0b|ex=3fbd9de1:a88b28e4",
+    "normals": "263bdef7:bcf4a390|port_normal=1f285761:9468881b",
     "output": "7b0de484:d4ae72f5",
     "perlin": "5601956f:473ffde7",
     "ridged": "9cb9f837:843dbcb0",
