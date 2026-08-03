@@ -1,12 +1,134 @@
 # Terrain Studio continuation prompt
 
-Resume the Terrain Studio implementation mission from delivery recovery on 2026-08-02.
+Resume Terrain Studio work as of **2026-08-03**, commit `36d37b2` on
+`claude/terrain-architect-heightmap-sample-ls4sjv`.
 
-Read [docs/plan/DELIVERY.md](docs/plan/DELIVERY.md) first. It is the canonical execution policy:
-focused evidence per changed slice, exhaustive evidence once per integrated wave, risk-based review,
-and Mission Control only where shared/high-risk work or real contention justifies it.
+## Governing directive — read this first
 
-## Visible checklist
+The user has explicitly and repeatedly overridden the earlier Mission-Control-heavy plan that used
+to occupy this file:
+
+> **Timebox reviews. 80% of the time should go to implementation of new functionality and fixing
+> issues when found.**
+
+In practice this means, for routine single-owner terrain-generation work:
+
+- **Do not** open a Mission Control item, worktree, lease, or handoff for an ordinary bug fix or
+  small feature. Just make the change, in the actual product source
+  (`apps/terrain-studio/src/**`, `apps/terrain-studio/index.html`), and validate it directly.
+- **Direct validation pattern that worked well this session** (fast, no ceremony):
+  1. Start a throwaway dev server: `Start-Process -FilePath "cmd.exe" -ArgumentList "/c npx vite
+     --port <free-port> --strictPort > vite.out.log 2>&1" -WindowStyle Hidden`, then poll
+     `Invoke-WebRequest -Method Head` until it answers.
+  2. Run the relevant oracle(s) directly with `node`, pointing `$env:STUDIO_URL` at that server.
+     Legacy oracles under `tests/legacy/` mix ESM (top-level `await import`) and genuine CommonJS
+     (`require`) despite sharing one directory `package.json`. If `node file.js` fails with
+     `ReferenceError: require is not defined in ES module scope`, the file is really CommonJS —
+     run it as-is. If it fails the other way, copy it to a `.temp.mjs` extension, run that, then
+     delete the copy.
+  3. For anything touching a generator's output field, write a short throwaway Playwright script
+     (`playwright-core`, launch with `--use-gl=angle --use-angle=swiftshader
+     --enable-unsafe-swiftshader --no-sandbox`, executablePath
+     `C:\Program Files\Google\Chrome\Application\chrome.exe`) that calls `TYPES.<type>.eval(...)`
+     in-page and asserts on real numbers (min/max/NaN count/diff fraction) — never trust exit code
+     alone. Delete the script after.
+  4. If the change alters a node's numeric output, run `node tests/legacy/_verify_digest.js` (no
+     flags) first to see exactly which node types drifted. It should be **only** the type(s) you
+     intentionally changed. Then re-baseline with `node tests/legacy/_verify_digest.js --write` and
+     diff `_digest_baseline.json` to confirm the diff is scoped to those exact entries.
+  5. `npm run build` once at the end as a cheap whole-bundle sanity check.
+  6. Kill the throwaway server, delete `.log`/temp files, leave the tree clean before committing.
+- **Commit as work lands** (authorised). **Do not push** (not authorised).
+- Only reach for Mission Control (`C:\Users\AlexanderPino\.agents\skills\mission-control`,
+  canonical root `C:\repos\GitHub\skills\.mission-control-plan`) for genuinely shared/high-risk
+  work, real multi-agent lease contention, or the large runtime/migration items called out in
+  `DELIVERY.md` — not for the kind of fix described above.
+- Keep chat replies short. Record what landed in `PROGRESS.md`, not in a long conversational
+  narration.
+
+## What just landed (commit `36d37b2`)
+
+- **Volcano centre spike**: fixed (Hermite-capped stratovolcano profile below `rn=0.12`).
+- **Canyon edge/border weathering seam**: fixed (`canyonSurfaceExpression` now covers the full
+  field instead of skipping the outermost 1px ring).
+- **Volcano `age` param**: new, default `0` (bit-identical). Aging warps the footprint, degrades/
+  breaches the rim, adds a hummocky crater floor.
+- **Canyon `waypoints` param**: new, default empty (bit-identical). Text field (`x,y` per line) plus
+  a graphical top-down click/drag plan-view editor ("Edit waypoints on terrain…" button on the
+  Canyon node, mirroring the existing Draw Mask editor at `#drawEditor`/`openDrawEditor`). New
+  editor lives at `#pathEditor`/`openPathEditor` in `src/legacy.js`.
+- All four verified: relevant oracle suites green, digest 68/68 bit-identical (touching only the
+  two intentionally-changed node types along the way), clean production build, and targeted
+  Playwright smoke tests for the new numeric/UI behavior specifically (oracles don't exercise `age`
+  or `waypoints` yet — that is deliberate, see below).
+- Full detail: `PROGRESS.md` "DIRECT FIX PASS — 2026-08-03" entry.
+
+### Deliberately not done as part of that pass
+
+- The legacy oracles (`_verify_landforms.js`, `_verify_all_canyon.js`) do not yet exercise
+  `age`/`waypoints` themselves (only smoke-tested ad hoc). If you touch volcano or canyon again,
+  consider whether it's worth adding a permanent oracle case for these — optional, not required,
+  weigh against the 80% directive.
+- **Mountain ranges via waypoints**: no new code needed. The existing **Layout** node
+  (`src/plugins/gen/layout.js`, `parseLayout`/`layoutField` in `legacy.js`) already supports
+  drawing a `path` shape with per-vertex elevation, width, falloff, and profile — that is the
+  waypoint-authored ridgeline tool. Point users at it rather than rebuilding it.
+
+## Next candidates, roughly in order of value for the time spent
+
+1. If the user reports more visual/behavioral bugs: fix them directly using the pattern above.
+   This is almost always higher value than any of the below.
+2. Consider whether the Layout node's path editor and the new Canyon waypoint editor should be
+   unified (they are two separate, nearly-identical top-down click/drag canvases). Not urgent —
+   only worth it if a third node needs the same kind of editor, or if maintaining both starts
+   causing bugs.
+3. The larger, already-designed-but-unstarted backlog (ADRs exist, zero code written):
+   - **Boundary Landforms** node — hills/mountains/cliffs along selected world edges. Described in
+     `docs/plan/sprint-07-geology-and-regimes.md` story S7.6.
+   - **Arbitrary raster dimensions** (including exact `16384x16384`, `1573x13789`, no power-of-two
+     rounding) — `docs/adr-009-arbitrary-raster-gpu-authoring.md`,
+     `docs/plan/sprint-09-large-worlds.md` S9.9.
+   - **GPU-only "gpu-required-paged" execution mode** (forbids CPU terrain-field computation at
+     those sizes) — same ADR-009, `docs/plan/sprint-10-runtime-extreme-detail.md` S10.8.
+   - **Walkaround / traversal / reachability** — doll placement, Rapier WASM capsule controller,
+     walk/run/jump only (no flight), WebGPU reachability —
+     `docs/adr-010-walkaround-traversal-inspection.md`, S10.9.
+   These are genuinely large (each is many-day scope even solo); if picked up, still favor direct
+   implementation over ceremony, but do check `DELIVERY.md`'s risk-based gate table since these are
+   exactly the "runtime/migration" class of work it flags as warranting more evidence.
+
+## Where things physically are
+
+- Product source: `apps/terrain-studio/src/**`, `apps/terrain-studio/index.html`.
+- Legacy oracles: `apps/terrain-studio/tests/legacy/_verify_*.js` (aggregate:
+  `_verify_all_canyon.js` for canyon; there is no single aggregate for landforms — run
+  `_verify_landforms.js` directly). Digest oracle + baseline:
+  `tests/legacy/_verify_digest.js` / `tests/legacy/_digest_baseline.json`.
+- Run locally: `.\run-studio.ps1` from repo root (dev mode, HMR, no PWA cache in the way).
+- Position/history: `PROGRESS.md` (position), `BACKLOG.md` (findings/decisions),
+  `docs/plan/DELIVERY.md` (execution policy, still valid for anything that actually needs it).
+
+## Standing permissions (from `CLAUDE.md`, unchanged)
+
+- Commits: authorised. Push: **not** authorised — ask first.
+- Sub-agents/workflows: authorised, no need to ask.
+- Stop only for a real user decision, an unsafe/irreversible action, a finding that invalidates the
+  plan, or a genuinely empty queue. A completed fix, passing gate, or landed commit is not a stopping
+  point — keep going to the next item.
+
+## Superseded material (Mission Control delivery-recovery plan)
+
+Everything below this line is the **prior** plan, from before the 80%-implementation directive. It
+is kept only for archaeology on the still-open `MC-S33`/`MC-S04` infrastructure items in case someone
+resumes that specific thread. Do not default to it — the governing directive above takes priority for
+any ordinary product work.
+
+Read [docs/plan/DELIVERY.md](docs/plan/DELIVERY.md) first if you do pick this thread back up. It is
+the canonical execution policy: focused evidence per changed slice, exhaustive evidence once per
+integrated wave, risk-based review, and Mission Control only where shared/high-risk work or real
+contention justifies it.
+
+### Visible checklist (stale — MC-S33/MC-S04 status unverified since 2026-08-02)
 
 - [ ] Diagnose and green the MC-S33 runner contract
 - [ ] Review, integrate, and publish MC-S33
@@ -18,7 +140,7 @@ and Mission Control only where shared/high-risk work or real contention justifie
 - [ ] Deliver exact arbitrary dimensions, 16K GPU-only evaluation, Boundary Landforms, and Walkaround
 - [ ] Pass the final integrated quality gate and audit
 
-## Non-negotiable operating rules
+### Non-negotiable operating rules (for the MC-S33/MC-S04 thread specifically)
 
 - When Mission Control is warranted by `DELIVERY.md`, use only the **installed** skill:
   `C:\Users\AlexanderPino\.agents\skills\mission-control`.
@@ -40,11 +162,10 @@ and Mission Control only where shared/high-risk work or real contention justifie
   integration commit are recorded in `PROGRESS.md`.
 - Do not repeat an unchanged artifact's build, visual matrix, negative-control arming, or review
   without a source/toolchain/input identity change.
-- Commits are authorized. Push is not authorized.
 - Keep routing through phase and wave boundaries; stop only for a real user decision, unsafe action,
   invalidated plan, or drained queue.
 
-## Start here
+### Start here (if resuming the MC-S33/MC-S04 thread)
 
 From `C:\repos\GitHub\skills`:
 
@@ -57,7 +178,7 @@ git status --short
 git log -8 --oneline
 ```
 
-Expected recovery state:
+State as of 2026-08-02 (unverified since):
 
 - Integration product baseline at `97d163f`, with delivery-document edits in progress.
 - Canonical done: `MC-S30`, `MC-S31`, `MC-S32`.
@@ -70,7 +191,7 @@ Expected recovery state:
 If state differs, trust canonical SQLite and current Git over this prompt; explain the delta in
 `PROGRESS.md` before proceeding.
 
-## Priority 1 — finish MC-S33 without weakening evidence
+### Priority 1 — finish MC-S33 without weakening evidence
 
 Worktree:
 `C:\repos\GitHub\skills\.mission-control-plan\worktrees\MC-S33`
@@ -116,7 +237,7 @@ Required MC-S33 gates from its research/approval:
 When green for its actual contract: commit MC-S33, write schema-valid canonical `handoff.md`, transition
 through verifying, independent code review, merge prepare/finalize, and CAS publish.
 
-## Priority 2 — retry MC-S04 on the published runner base
+### Priority 2 — retry MC-S04 on the published runner base
 
 After MC-S33 is canonical `done` and target HEAD equals its merge result:
 
@@ -138,7 +259,7 @@ After MC-S33 is canonical `done` and target HEAD equals its merge result:
   byte-identical product at each transition.
 - Only after publication mark S1.3, S1.4, and S1.5 `DONE` in the plan and `PROGRESS.md`.
 
-## Priority 3 — publish the keystone and fan out
+### Priority 3 — publish the keystone and fan out
 
 After Sprint 1 closes, make S2 the primary lane: `MC-S01` then `MC-S02`. In parallel, route the
 already-independent S9 domain/dialog/import work (`MC-S21`) and S10 capability probe (`MC-S25`) when
@@ -158,7 +279,7 @@ extraction owns parity only, lands before its dependants, and may not duplicate 
 Use at most four implementation lanes. Prefer the item that unlocks the most ready dependants, and
 continue unrelated lanes whenever one is blocked.
 
-## Product roadmap snapshot
+### Product roadmap snapshot
 
 - Sprint 1: S1.0–S1.2 DONE; S1.3–S1.5 implemented in MC-S04 but not published.
 - Sprint 2–8: queued per canonical dependency graph.
@@ -177,7 +298,7 @@ continue unrelated lanes whenever one is blocked.
   border hills, mountain chains, and heightfield cliffs.
 - Current programme total: 417 points.
 
-## Status discipline
+### Status discipline
 
 Update `apps/terrain-studio/PROGRESS.md` and its visible checklist as work lands. Keep chat short.
 Record:

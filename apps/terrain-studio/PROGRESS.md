@@ -25,6 +25,35 @@ in `.sweep-logs/`.
 
 ## Now
 
+**DIRECT FIX PASS — 2026-08-03, commit `36d37b2`.** User-reported visual bugs and two follow-on
+feature requests landed and were verified directly against the running dev server (no Mission
+Control lifecycle — routine, single-owner, low-risk work per `DELIVERY.md`):
+
+- Volcano centre spike fixed: `(1-rn)^2.2` had nonzero slope at the vent, a literal cone apex.
+  Hermite-capped below `rn=0.12` to zero slope at centre. Verified against
+  `_verify_landforms.js` (full pass) and the digest oracle (only `volcano` changed, re-baselined).
+- Canyon edge/border weathering fixed: `canyonSurfaceExpression` skipped the outermost 1px ring,
+  leaving an unweathered seam at every domain edge. Extended to the full field with boundary-safe
+  one-sided differences. Verified against the full 11-test `_verify_all_canyon.js` suite and the
+  digest oracle (only `canyon` changed, re-baselined).
+- Volcano **Age / weathering** param added (default `0`, bit-identical to prior output — zero
+  digest drift at default). Nonzero age warps the footprint, degrades/breaches the rim, and adds a
+  hummocky crater floor. Smoke-tested via Playwright: age 0 vs 0.7 differs on ~79% of pixels, no
+  NaNs, sane bounds.
+- Canyon **trunk waypoints** added: optional `x,y`-per-line text param (default empty, bit-identical)
+  plus a graphical top-down click/drag plan-view editor (mirrors the existing Draw Mask editor;
+  button reads "Edit waypoints on terrain…" in the Canyon node's params panel). Verified the compute
+  path (waypoints correctly relocate the trunk, confirmed via column-mean argmin) and the UI path
+  end-to-end with real Playwright clicks/drags (add/drag/undo/clear all confirmed via DOM state).
+- All four changes: full oracle suites green, 68/68 digest bit-identical, clean production build.
+
+Still open from the same conversation, not started: **mountain ranges via waypoints** are already
+covered by the existing Layout node (`path` shapes with per-vertex elevation) — no new code needed,
+just point users at it. The larger backlog items below (Boundary Landforms, arbitrary dimensions,
+GPU-only mode, Walkaround) remain untouched.
+
+---
+
 **DELIVERY RECOVERY — risk-based fast path adopted, 2026-08-02.**
 
 Canonical execution policy: [docs/plan/DELIVERY.md](docs/plan/DELIVERY.md). Quality is unchanged,
