@@ -34,14 +34,12 @@ const MUTATIONS = [
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
-const HARNESS_NOISE = ['WebSocket closed without opened.']
-
 ;(async () => {
   const browser = await chromium.launch({ executablePath: EXE,
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const errors = []
-  page.on('pageerror', e => { if (!HARNESS_NOISE.includes(e.message)) errors.push(e.message) })
+  page.on('pageerror', e => errors.push(e.message))
   await page.goto(URL, { waitUntil: 'load' })
   await page.waitForTimeout(1600)
 

@@ -172,7 +172,32 @@ async function startHost({ appDir, mode, token, identity, fixedPort, distDir }) 
         optimizeDeps: { noDiscovery: true, include: [] },
         server: { host, middlewareMode: true, strictPort: true, headers, hmr: false },
       })
-      sourceServer = createHttpServer(vite.middlewares)
+      // Serve a NO-OP @vite/client. In middleware mode Vite's dev client is still injected into
+      // index.html even with hmr:false, and it opens a websocket that has nothing to attach to —
+      // this http server wraps vite.middlewares rather than being handed to Vite, so there is no
+      // upgrade handler. The client's failure surfaces in the PAGE as
+      //   "WebSocket closed without opened."
+      // and every oracle that ends in `process.exit(ok && !errors.length ? 0 : 1)` — which is most
+      // of them — then exits 1 with all of its own assertions passing.
+      //
+      // It is TIMING-DEPENDENT, which is what makes it dangerous rather than merely noisy: a sweep
+      // can be green one run and red the next with no code change, and the failure looks like a
+      // terrain regression. Measured: _verify_landforms and _verify_surface were green in an 83/83
+      // sweep and red afterwards with nothing between them but unrelated stories.
+      //
+      // Stubbing the module is better than teaching seventeen oracles to filter one string: the
+      // websocket is never attempted, so there is no error to filter, and no oracle has to carry a
+      // suppression that could hide a real page error later.
+      const VITE_CLIENT_STUB = 'export const createHotContext = () => ({ on(){}, off(){}, send(){}, accept(){}, acceptExports(){}, dispose(){}, prune(){}, invalidate(){}, decline(){} });'
+        + 'export const updateStyle = () => {}; export const removeStyle = () => {}; export const injectQuery = (u) => u; export default {};'
+      sourceServer = createHttpServer((req, res) => {
+        if (req.url && req.url.split('?')[0] === '/@vite/client') {
+          res.writeHead(200, { ...headers, 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' })
+          res.end(VITE_CLIENT_STUB)
+          return
+        }
+        vite.middlewares(req, res)
+      })
       await new Promise((resolvePromise, reject) => {
         sourceServer.once('error', reject)
         sourceServer.listen(fixedPort ?? 0, host, resolvePromise)

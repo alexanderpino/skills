@@ -29,18 +29,15 @@ const check = (name, condition, detail) => { assertions.push({ name, ok: !!condi
     variant: mutation === 'swiftshader-launch-flags' ? 'swiftshader' : 'gpu',
   })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-  // The isolated runner serves source by wrapping vite.middlewares in a plain http server, so the
-  // dev client's websocket has nothing to attach to and reports "WebSocket closed without opened."
-  // That is dev-server transport, cannot occur in a production build (no @vite/client is emitted),
-  // and is timing-dependent — which makes it a latent flake for every oracle that asserts on page
-  // errors, not just this one. Excluded by exact text only, and the excluded set is reported, so a
-  // real error can never hide behind the filter.
-  const HARNESS_TRANSPORT_NOISE = ['WebSocket closed without opened.']
+  // No page-error suppression here, and that is deliberate. This oracle used to filter
+  // "WebSocket closed without opened." — dev-server transport noise from Vite's client having
+  // no websocket to attach to in middleware mode. That was the wrong layer: the noise was
+  // timing-dependent and failed OTHER oracles that assert on page errors, and a suppression
+  // list can only hide a real error later. The runner now serves a no-op @vite/client, so the
+  // websocket is never attempted and there is nothing to filter.
   const errors = []
   const filtered = []
-  page.on('pageerror', error => {
-    (HARNESS_TRANSPORT_NOISE.includes(error.message) ? filtered : errors).push(error.message)
-  })
+  page.on('pageerror', error => errors.push(error.message))
 
   // The insecure-origin control never reaches the served page: about:blank is not a secure
   // context, so navigator.gpu is undefined there regardless of the adapter.

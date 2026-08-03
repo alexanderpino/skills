@@ -80,7 +80,7 @@ function scanDigestGated() {
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const errors = []
-  page.on('pageerror', e => { if (e.message !== 'WebSocket closed without opened.') errors.push(e.message) })
+  page.on('pageerror', e => errors.push(e.message))
   await page.goto(URL, { waitUntil: 'load' })
   await page.waitForTimeout(1400)
 

@@ -30,14 +30,12 @@ const MUTATIONS = [
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
-const HARNESS_NOISE = ['WebSocket closed without opened.']
-
 ;(async () => {
   const browser = await chromium.launch({ executablePath: EXE,
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const errors = []
-  page.on('pageerror', e => { if (!HARNESS_NOISE.includes(e.message)) errors.push(e.message) })
+  page.on('pageerror', e => errors.push(e.message))
   await page.goto(URL, { waitUntil: 'load' })
   await page.waitForTimeout(1600)
 
@@ -112,9 +110,10 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     // This gate holds that open.
     const genOut = (TYPES.perlin.outputs || [])[0]
     const maskRefusals = []
-    let maskSlots = 0
+    let maskSlots = 0, maskRoleSlots = 0
     for (const t of types) {
       for (const port of (TYPES[t].inputs || [])) {
+        if (port.role === 'mask') maskRoleSlots++
         if (port.semantic !== 'anyMask') continue
         maskSlots++
         const dst = maskSemantic ? { ...port, semantic: maskSemantic, unit: 'none' } : port
@@ -123,6 +122,7 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
       }
     }
     out.maskSlots = maskSlots
+    out.maskRoleSlots = maskRoleSlots
     out.maskRefusals = maskRefusals
 
     // --- the illegal pairs ADR-002 names must be refused --------------------------------------
@@ -266,7 +266,15 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     insUnchanged: report.insDrift.length === 0,
     registrationClean: report.registrationProblems.length === 0,
     shippedEdgesAllLegal: report.refusedShipped.length === 0,
-    everyMaskSlotAcceptsAGenerator: report.maskRefusals.length === 0 && report.maskSlots === 30,
+    // SELF-CONSISTENT rather than pinned. This was `maskSlots === 30`, and adding the Edge node in
+    // S8.1 — which has a Mask input — made it 31 and turned the gate red. That is the gate working,
+    // but a frozen literal goes stale on every new node with a mask, which trains whoever hits it
+    // to bump the number rather than think. The invariant that actually matters is that every port
+    // declaring role 'mask' also declares semantic 'anyMask' and accepts a dimensionless generator:
+    // a mask port that quietly acquired a strict semantic is caught, and a NEW mask port is not a
+    // false alarm. The non-zero check keeps it from passing on an empty scan.
+    everyMaskSlotAcceptsAGenerator: report.maskRefusals.length === 0
+      && report.maskSlots > 0 && report.maskSlots === report.maskRoleSlots,
     illegalPairsRefused: report.illegalAccepted.length === 0,
     undemandedOutputNotComputed: report.demand.undemanded.hasVector === false
       && report.demand.undemanded.hasPrimary === true && report.demand.undemanded.fieldIsPrimary === true,
@@ -292,7 +300,7 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
   }
   const failed = Object.entries(gates).filter(([, v]) => !v).map(([k]) => k)
   console.log(`${ok ? 'PASS' : 'FAIL'}  port contract types=${report.typeCount} adapted=${report.adapted}/${report.rosterCount} `
-    + `shippedEdges=${report.shippedEdgesChecked} refused=${report.refusedShipped.length} maskSlots=${report.maskSlots} maskRefused=${report.maskRefusals.length} `
+    + `shippedEdges=${report.shippedEdgesChecked} refused=${report.refusedShipped.length} maskSlots=${report.maskSlots}/${report.maskRoleSlots} maskRefused=${report.maskRefusals.length} `
     + `failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
   console.log(JSON.stringify({ ...report, gates, errors, ok }, null, 2))
   await browser.close()

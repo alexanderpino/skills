@@ -45,7 +45,13 @@ def run(cmd, timeout=1800):
 def declared_mutations(oracle):
     """Read the MUTATIONS allowlist out of the oracle itself, so the runner cannot drift from it."""
     src = (APP / "tests" / "legacy" / oracle).read_text(encoding="utf-8", errors="replace")
-    m = re.search(r"const MUTATIONS\s*=\s*\[(.*?)\n\]", src, re.S)
+    # Non-greedy to the FIRST closing bracket, wherever it sits. The previous pattern required the
+    # bracket at line start, and silently returned [] for any oracle that closes on the same line
+    # as its last entry. Measured: 7 of 17 oracles, including one this runner was written to
+    # check. The runner did report "no MUTATIONS allowlist declared" rather than passing them, so
+    # nothing went green that should not have — but 37 declared controls were never executed by
+    # the tool whose whole job is to execute them.
+    m = re.search(r"const MUTATIONS\s*=\s*\[(.*?)\]", src, re.S)
     if not m:
         return []
     # Strip the trailing // comment on each entry BEFORE extracting the quoted name. Every mutation
