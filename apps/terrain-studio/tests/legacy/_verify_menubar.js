@@ -131,7 +131,10 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   // Both File menus are driven off the same command table (legacy.js:5942/6029), so they are held
   // to the same EXACT list rather than a membership test - a dropped or renamed command has to be
   // red, and `.every(includes)` cannot see a removal. Measured: identical in desktop and compact.
-  const FILE_COMMANDS=JSON.stringify(['new','new-default','new-canyon','import','export']);
+  // S0.1 added `open` and `save` between the New group and the heightmap group, in both menus.
+  // Updating this list is a deliberate contract change, not a repair: the EXACT match is what makes
+  // an accidental addition or a silent removal red, and it caught this one.
+  const FILE_COMMANDS=JSON.stringify(['new','new-default','new-canyon','open','save','import','export']);
   // The L0 opening document, read off layer0Graph() (legacy.js:6512) and confirmed by measurement:
   // 7 nodes, 6 edges, selection parked on the base generator.
   const STARTER_TYPES=JSON.stringify(['perlin','ridged','blend','d_height','heightmask','levels','output']);

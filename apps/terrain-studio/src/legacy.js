@@ -3130,6 +3130,23 @@ export function hydroFixField(inp,p){
 // P / WHEN / GROUP / CAT now live in src/core/params.js.
 const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shape","crater","island","volcano","drawmask","constant",
   "levels","curve","clampn","invert","terrace","blend","add","maxmin","smin","smax","stampn"]);
+// The declared output ports of a node instance. `cat:"out"` types (the Output sink) declare none,
+// which is the same rule drawNode and portAt used to spell inline as `def.cat!=="out"` — it now
+// lives in one place and answers with the actual descriptors rather than a boolean.
+function nodeOutputs(nd){
+  const def=TYPES[nd.type||nd];
+  if(!def)return [];
+  if(def.outputs)return def.outputs;
+  return def.cat==="out"?[]:[{id:"out",name:"Out"}];
+}
+// Which output an existing edge leaves from. Edges written before port identity carry no fromPort,
+// and every type declares exactly one output today, so 0 is the correct answer rather than a guess.
+function outSlotForEdge(e){
+  const from=e&&nodeById(e.from);
+  if(!from||!e.fromPort)return 0;
+  const i=nodeOutputs(from).findIndex(p=>p.id===e.fromPort);
+  return i<0?0:i;
+}
 function nodeInputs(nd){return nd&&nd._inputs?nd._inputs:TYPES[nd.type].ins;}
 export function exactChain(id,guard){
   guard=guard||new Set();if(!id||guard.has(id))return false;guard.add(id);
@@ -3481,10 +3498,20 @@ function css(v){return getComputedStyle(document.documentElement).getPropertyVal
 function resizeGraph(){const r=gc.parentElement.getBoundingClientRect();const dpr=Math.min(2,devicePixelRatio||1);
   gc.width=r.width*dpr;gc.height=r.height*dpr;gc.style.width=r.width+"px";gc.style.height=r.height+"px";gx.setTransform(dpr,0,0,dpr,0,0);drawGraph();}
 function toWorld(mx,my){return{x:(mx-view.x)/view.z,y:(my-view.y)/view.z};}
-function nodeH(nd){const n=nodeInputs(nd).length;return nd.type==="colormixer"?Math.max(30+TH+8,38+n*15):30+TH+8;}
+// Height must clear BOTH port columns. With one output — every type today — the outputs term is
+// inert, so this is byte-identical to the previous single-output layout.
+function nodeH(nd){const n=nodeInputs(nd).length,m=nodeOutputs(nd).length;
+  const base=nd.type==="colormixer"?Math.max(30+TH+8,38+n*15):30+TH+8;
+  return m>1?Math.max(base,38+m*15):base;}
 function portPos(nd,which,slot){
   const h=nodeH(nd);
-  if(which==="out")return{x:nd.x+nd.w,y:nd.y+h/2};
+  if(which==="out"){
+    const m=nodeOutputs(nd).length;
+    // One output keeps the exact previous geometry — centred on the node's right edge — so the
+    // single-output layout every existing oracle measures is unchanged to the pixel.
+    if(m<=1)return{x:nd.x+nd.w,y:nd.y+h/2};
+    const gapY=h/(m+1);return{x:nd.x+nd.w,y:nd.y+gapY*((slot||0)+1)};
+  }
   const ins=nodeInputs(nd),n=ins.length;
   if(nd.type==="colormixer")return{x:nd.x,y:nd.y+31+(slot+.5)*(h-36)/Math.max(n,1)};
   const gapY=h/(n+1);return{x:nd.x,y:nd.y+gapY*(slot+1)};
@@ -3501,10 +3528,10 @@ function drawGraph(){
   gx.save();gx.translate(view.x,view.y);gx.scale(view.z,view.z);
   // edges
   edges.forEach(e=>{const a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)return;
-    const p0=portPos(a,"out"),p1=portPos(b,"in",e.slot),key=edgeKey(e);
+    const p0=portPos(a,"out",outSlotForEdge(e)),p1=portPos(b,"in",e.slot),key=edgeKey(e);
     const state=selectedEdge===key?"selected":hoverEdge===key?"hover":(!selectedEdge&&selected&&(selected.id===a.id||selected.id===b.id))?"related":"normal";
     drawWire(p0,p1,state,!!e.disabled);if(selectedEdge===key)drawEdgeDeleteHandle(p0,p1);});
-  if(linking){const p0=portPos(nodeById(linking.from),"out");drawWire(p0,linking.cur,"selected",true);}
+  if(linking){const p0=portPos(nodeById(linking.from),"out",linking.fromSlot||0);drawWire(p0,linking.cur,"selected",true);}
   // nodes
   nodes.forEach(nd=>drawNode(nd));
   gx.restore();
@@ -3542,14 +3569,14 @@ function pointSegmentDistance(px,py,ax,ay,bx,by){
 function edgeAt(wx,wy){
   const tolerance=11/view.z;
   for(let ei=edges.length-1;ei>=0;ei--){const e=edges[ei],a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)continue;
-    const p0=portPos(a,"out"),p1=portPos(b,"in",e.slot);let prev=p0;
+    const p0=portPos(a,"out",outSlotForEdge(e)),p1=portPos(b,"in",e.slot);let prev=p0;
     for(let i=1;i<=28;i++){const p=wirePoint(p0,p1,i/28);
       if(pointSegmentDistance(wx,wy,prev.x,prev.y,p.x,p.y)<=tolerance)return e;prev=p;}}
   return null;
 }
 function edgeDeleteAt(wx,wy){
   const e=edgeByKey(selectedEdge);if(!e)return null;const a=nodeById(e.from),b=nodeById(e.to);if(!a||!b)return null;
-  const p=wirePoint(portPos(a,"out"),portPos(b,"in",e.slot),.5);
+  const p=wirePoint(portPos(a,"out",outSlotForEdge(e)),portPos(b,"in",e.slot),.5);
   return Math.hypot(wx-p.x,wy-p.y)<=11/view.z?e:null;
 }
 function roundRect(x,y,w,h,r){gx.beginPath();gx.moveTo(x+r,y);gx.arcTo(x+w,y,x+w,y+h,r);gx.arcTo(x+w,y+h,x,y+h,r);gx.arcTo(x,y+h,x,y,r);gx.arcTo(x,y,x+w,y,r);gx.closePath();}
@@ -3578,7 +3605,12 @@ function drawNode(nd){
   // ports
   nodeInputs(nd).forEach((nm,s)=>{const p=portPos(nd,"in",s);drawPort(p,cc,hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="in"&&hoverPort.slot===s);
     gx.fillStyle=css("--muted");gx.font="9px "+css("--mono");gx.textAlign="left";gx.fillText(nm,p.x+8,p.y);gx.textAlign="left";});
-  if(def.cat!=="out"){const p=portPos(nd,"out");drawPort(p,css("--accent"),hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="out");}
+  // One output port per declared output. `cat!=="out"` remains the rule for having outputs at all
+  // — the Output node is the one sink — and nodeOutputs returns [] for it.
+  nodeOutputs(nd).forEach((op,s)=>{const p=portPos(nd,"out",s);
+    drawPort(p,css("--accent"),hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="out"&&(hoverPort.slot||0)===s);
+    if(nodeOutputs(nd).length>1){gx.fillStyle=css("--muted");gx.font="9px "+css("--mono");gx.textAlign="right";
+      gx.fillText(op.name||op.id,p.x-8,p.y);gx.textAlign="left";}});
   gx.restore();
 }
 function drawPort(p,color,hot){gx.beginPath();gx.arc(p.x,p.y,hot?6:4.5,0,7);gx.fillStyle=hot?css("--accent"):css("--panel");gx.fill();
@@ -3589,8 +3621,9 @@ function portAt(wx,wy){
   const hit=12/view.z;                                        // fixed ~12 px target at every graph zoom
   let best=null,bestDistance=hit;
   for(let i=nodes.length-1;i>=0;i--){const nd=nodes[i],def=TYPES[nd.type];
-    if(def.cat!=="out"){const p=portPos(nd,"out"),d=Math.hypot(wx-p.x,wy-p.y);
-      if(d<bestDistance){bestDistance=d;best={node:nd.id,which:"out"};}}
+    const outs=nodeOutputs(nd);
+    for(let s=0;s<outs.length;s++){const p=portPos(nd,"out",s),d=Math.hypot(wx-p.x,wy-p.y);
+      if(d<bestDistance){bestDistance=d;best={node:nd.id,which:"out",slot:s};}}
     for(let s=0;s<nodeInputs(nd).length;s++){const p=portPos(nd,"in",s),d=Math.hypot(wx-p.x,wy-p.y);
       if(d<bestDistance){bestDistance=d;best={node:nd.id,which:"in",slot:s};}}}
   return best;
@@ -3604,8 +3637,8 @@ gc.addEventListener("mousedown",e=>{
   if(e.button===1||spaceDown||(e.button===0&&e.altKey)){e.preventDefault();drag={pan:true,sx:mx,sy:my,vx:view.x,vy:view.y};gc.classList.add("panning");return;}
   const port=portAt(w.x,w.y);
   if(port){
-    if(port.which==="out"){linking={from:port.node,cur:w};gc.classList.add("linking");}
-    else{const ex=inputEdge(port.node,port.slot);if(ex){linking={from:ex.from,cur:w,original:ex};gc.classList.add("linking");}}
+    if(port.which==="out"){linking={from:port.node,fromSlot:port.slot||0,cur:w};gc.classList.add("linking");}
+    else{const ex=inputEdge(port.node,port.slot);if(ex){linking={from:ex.from,fromSlot:outSlotForEdge(ex),cur:w,original:ex};gc.classList.add("linking");}}
     return;
   }
   const edgeDelete=edgeDeleteAt(w.x,w.y);
@@ -3640,7 +3673,11 @@ window.addEventListener("mouseup",e=>{
         recordHistory();
         if(linking.original)edges=edges.filter(x=>x!==linking.original);
         edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
-        edges.push({from:linking.from,to:port.node,slot:port.slot});markDirtyFrom(port.node);requestEval();
+        const src=nodeById(linking.from),dstNode=nodeById(port.node);
+        const fromPort=src?(nodeOutputs(src)[linking.fromSlot||0]||{}).id:null;
+        edges.push({from:linking.from,fromPort:fromPort||undefined,to:port.node,
+          toPort:dstNode?inPortIdForSlot(dstNode,port.slot):undefined,slot:port.slot});
+        markDirtyFrom(port.node);requestEval();
       }
     }else if(inside&&!nodeAt(w.x,w.y)&&!edgeAt(w.x,w.y)){
       // Gaea-style drag-out quick create: keep the graph unchanged until the user actually
@@ -7300,7 +7337,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 201 symbols (28 writable, 173 read-only).
+ * 203 symbols (28 writable, 175 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7349,7 +7386,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 173 read-only. Getters hand out the LIVE value: 6 of
+  // 175 read-only. Getters hand out the LIVE value: 6 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("terrainDef", () => terrainDef, __ro("terrainDef"))
@@ -7385,6 +7422,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
   __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
   __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
+  __def("portPos", () => portPos, __ro("portPos"))
   __def("renderGL", () => renderGL, __ro("renderGL"))
   __def("sampleBilinear", () => sampleBilinear, __ro("sampleBilinear"))
   __def("activePreviewNode", () => activePreviewNode, __ro("activePreviewNode"))
@@ -7398,7 +7436,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
   __def("planView", () => planView, __ro("planView"))
-  __def("portPos", () => portPos, __ro("portPos"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
   __def("transformField", () => transformField, __ro("transformField"))
   __def("compProg", () => compProg, __ro("compProg"))
@@ -7413,6 +7450,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("curWaterIce", () => curWaterIce, __ro("curWaterIce"))
   __def("fieldRange", () => fieldRange, __ro("fieldRange"))
   __def("inputEdge", () => inputEdge, __ro("inputEdge"))
+  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("nodeInputs", () => nodeInputs, __ro("nodeInputs"))
   __def("redoGraph", () => redoGraph, __ro("redoGraph"))
   __def("satComposite", () => satComposite, __ro("satComposite"))
@@ -7432,7 +7470,9 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
   __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
   __def("exactChain", () => exactChain, __ro("exactChain"))
+  __def("nodeH", () => nodeH, __ro("nodeH"))
   __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
+  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("warpField", () => warpField, __ro("warpField"))
   __def("weatherColorField", () => weatherColorField, __ro("weatherColorField"))
   __def("windVectorFromField", () => windVectorFromField, __ro("windVectorFromField"))
@@ -7448,8 +7488,9 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("edgeByKey", () => edgeByKey, __ro("edgeByKey"))
   __def("gpuReady", () => gpuReady, __ro("gpuReady"))
   __def("hydraulicErode", () => hydraulicErode, __ro("hydraulicErode"))
-  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
+  __def("nodeOutputs", () => nodeOutputs, __ro("nodeOutputs"))
   __def("organizeGraph", () => organizeGraph, __ro("organizeGraph"))
+  __def("portAt", () => portAt, __ro("portAt"))
   __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
@@ -7474,13 +7515,12 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("gpuThermal", () => gpuThermal, __ro("gpuThermal"))
   __def("HEX_SQUARE_WORLD", () => HEX_SQUARE_WORLD, __ro("HEX_SQUARE_WORLD"))
   __def("maskApply", () => maskApply, __ro("maskApply"))
-  __def("nodeH", () => nodeH, __ro("nodeH"))
   __def("normalize", () => normalize, __ro("normalize"))
   __def("occlusionField", () => occlusionField, __ro("occlusionField"))
+  __def("outSlotForEdge", () => outSlotForEdge, __ro("outSlotForEdge"))
   __def("propagateFieldMetadata", () => propagateFieldMetadata, __ro("propagateFieldMetadata"))
   __def("renderLook", () => renderLook, __ro("renderLook"))
   __def("satLayerColor", () => satLayerColor, __ro("satLayerColor"))
-  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("sculptField", () => sculptField, __ro("sculptField"))
   __def("slopeOf", () => slopeOf, __ro("slopeOf"))
   __def("smax", () => smax, __ro("smax"))
@@ -7511,7 +7551,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("metricHeightField", () => metricHeightField, __ro("metricHeightField"))
   __def("openDrawEditor", () => openDrawEditor, __ro("openDrawEditor"))
   __def("parseLayout", () => parseLayout, __ro("parseLayout"))
-  __def("portAt", () => portAt, __ro("portAt"))
   __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("pushUndo", () => pushUndo, __ro("pushUndo"))
   __def("REAL_DEM_SAMPLE", () => REAL_DEM_SAMPLE, __ro("REAL_DEM_SAMPLE"))

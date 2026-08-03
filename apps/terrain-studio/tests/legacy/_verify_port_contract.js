@@ -24,6 +24,7 @@ const MUTATIONS = [
   'mask-strict-semantic',  // mask inputs declared semantic 'mask' -> shipped wiring becomes illegal
   'unit-dimensional',      // accept dimensionally-equal units -> degC into K silently allowed
   'label-into-continuous', // categorical source into a continuous input silently allowed
+  'single-output-geometry',// two outputs drawn on top of each other -> the second is unclickable
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -141,6 +142,53 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     }
     out.illegalAccepted = Object.entries(illegal).filter(([, accepted]) => accepted).map(([k]) => k)
 
+    // --- the multi-output machinery must actually work ------------------------------------
+    // Every shipped type declares exactly one output, so the N>1 paths in portPos / portAt /
+    // nodeH / drawNode have nothing exercising them. Shipping them unexercised would be dead code
+    // presented as a feature. Register a temporary two-output type and drive the real functions.
+    const probeType = '__portProbe'
+    TYPES[probeType] = {
+      cat: 'gen', name: 'Port Probe', ins: [], params: [],
+      eval: () => newField(),
+      outputs: [
+        { id: 'height', name: 'Height', kind: 'scalarRaster', storage: 'R32F', components: 1, semantic: 'relativeHeight', unit: 'none', primary: true },
+        { id: 'flow', name: 'Flow', kind: 'scalarRaster', storage: 'R32F', components: 1, semantic: 'flow', unit: 'none' },
+      ],
+      ports: { version: 1, source: 'declared', roster: false, dynamic: null, groups: {} },
+    }
+    const probe = makeNode(probeType, 900, 500)
+    const single = nodes.find(n => n.type === 'perlin') || makeNode('perlin', 900, 700)
+
+    const p0 = portPos(probe, 'out', 0), p1 = portPos(probe, 'out', 1)
+    const sole = portPos(single, 'out', 0)
+    const soleH = nodeH(single)
+    out.multi = {
+      distinctPositions: p0.y !== p1.y && p0.x === p1.x,
+      // A single-output node must keep the EXACT previous geometry: centred on the right edge.
+      singleOutputUnmoved: Math.abs(sole.y - (single.y + soleH / 2)) < 1e-9 && sole.x === single.x + single.w,
+      heightGrew: nodeH(probe) >= 38 + 2 * 15,
+      outputCount: nodeOutputs(probe).length,
+      soleOutputCount: nodeOutputs(single).length,
+      sinkHasNoOutput: nodeOutputs({ type: 'output' }).length === 0,
+    }
+    // portAt must be able to hit BOTH ports, not just whichever is nearer the centre.
+    const hit0 = portAt(p0.x, p0.y), hit1 = portAt(p1.x, p1.y)
+    out.multi.hitsFirst = !!hit0 && hit0.node === probe.id && hit0.which === 'out' && (hit0.slot || 0) === 0
+    out.multi.hitsSecond = !!hit1 && hit1.node === probe.id && hit1.which === 'out' && hit1.slot === 1
+    if (mutation === 'single-output-geometry') {
+      // Model the defect: both outputs land on the same point, so the second is unreachable.
+      out.multi.distinctPositions = false
+      out.multi.hitsSecond = false
+    }
+    // An edge leaving the SECOND output must report slot 1, so the wire is drawn from the right port.
+    const sink = makeNode('output', 1100, 500)
+    edges.push({ from: probe.id, fromPort: 'flow', to: sink.id, toPort: 'height', slot: 0 })
+    out.multi.outSlotResolved = outSlotForEdge(edges[edges.length - 1]) === 1
+    // An edge with no port identity resolves to 0 rather than guessing.
+    out.multi.legacyEdgeResolvesToZero = outSlotForEdge({ from: probe.id, to: sink.id, slot: 0 }) === 0
+    edges.pop()
+    delete TYPES[probeType]
+
     // A deferred source is permitted and reported as deferred, not silently resolved.
     const def1 = canConnect(P({ id: 'o', semanticFrom: { mode: 'inherit', port: 'in' } }), P({ id: 'i', semantic: 'temperature', unit: 'degC' }))
     out.deferredAllowed = def1.ok === true && def1.deferred === true
@@ -157,6 +205,11 @@ const HARNESS_NOISE = ['WebSocket closed without opened.']
     shippedEdgesAllLegal: report.refusedShipped.length === 0,
     everyMaskSlotAcceptsAGenerator: report.maskRefusals.length === 0 && report.maskSlots === 30,
     illegalPairsRefused: report.illegalAccepted.length === 0,
+    multiOutputGeometry: report.multi.distinctPositions === true && report.multi.hitsFirst === true
+      && report.multi.hitsSecond === true && report.multi.outputCount === 2 && report.multi.heightGrew === true
+      && report.multi.outSlotResolved === true && report.multi.legacyEdgeResolvesToZero === true,
+    singleOutputGeometryUnchanged: report.multi.singleOutputUnmoved === true && report.multi.soleOutputCount === 1
+      && report.multi.sinkHasNoOutput === true,
     deferredSourceAllowed: report.deferredAllowed === true,
     // Absence of evidence is failure: a run that compared no edges proves nothing.
     evidenceNonEmpty: report.shippedEdgesChecked > 0,
