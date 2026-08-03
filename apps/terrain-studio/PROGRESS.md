@@ -151,8 +151,43 @@ Digest: **80/80 bit-identical, skipped 0**. The re-baseline for `normals` was sc
   only reading under which `rad→deg` and `degC→K` are refused.
 - **A `semanticFrom` source is deferred at connect time**, not resolved — 20 of 80 types have one.
 
-**Next:** S2.4 aux-map registry (three lenses + debt ledger), S2.5 doctrine validators, then the
-full wave sweep before Phase 2 fans out.
+### Sprint 8 (first half) and Sprint 9 (opening)
+
+| Story | What landed | Gate |
+|---|---|---|
+| **S8.1** | Route (typed identity) + Edge (mask boundary, 4-neighbour square / 6-neighbour hex) | armed 4/4 |
+| **S8.2** | Switch / Gate — unselected branches never evaluated, via `demandInputs` | armed 4/4 |
+| **S8.3** | Typed variables + lexical scope chain; rename-safe by stable id | armed 5/5 |
+| **S8.4** | Safe Math — parsed AST, allowlist, bounded size/depth, no `eval` | armed 5/5 |
+| **S9.1** | `WorldDomain/1` — independent axes, honest spacing, datum+range vertical frame | armed 5/5 |
+| **S9.2** | New Terrain dialog + allocation-free feasibility preflight | armed 5/5 |
+
+Node types **79 → 86**. Document schema at **v3** with a working two-step migration chain
+(v1→v2 port identity, v2→v3 world domain). Wave sweep after the keystone: **83/83 green**.
+
+`scripts/gate.py` now runs a story's whole evidence set in one command — the oracle green plus
+every declared mutation — and fails on both `NOT ARMED` (mutated run exited 0) and `VACUOUS`
+(only the safety net tripped).
+
+### More defects the gates caught
+
+5. **`constructor` escaped the Safe Math allowlist.** `'constructor' in EXPR_CONSTANTS` is `true` —
+   `in` walks the prototype chain — so it parsed as a literal whose value was the `Object`
+   constructor. Same for `toString`, `__proto__`, and the function table. Lookup tables are now
+   null-prototype with `Object.hasOwn`. Found only because the oracle attempts the escapes
+   explicitly and demands a *named* refusal; testing arithmetic would never have surfaced it.
+6. **The Switch fixtures evaluated through the Output sink**, which normalises its input and
+   rewrote the very constants used to identify a branch — three gates red for one cause.
+7. **`_verify_menubar` broke twice on S9.2** and was right both times: a stale `page.once('dialog')`
+   for a `confirm()` that no longer fires, and a blank-state expectation describing the old
+   immediate-wipe. The replacement is stronger — cancelling the dialog must leave the document
+   untouched.
+
+Page arithmetic for arbitrary dimensions was derived independently and matches ADR-009 exactly:
+`16384²` → 64×64 pages, terminal core 255×255; `1573×13789` → 7×54 pages, terminal core 36×220.
+
+**Next:** post-sprint audit of Sprints 1 and 2 (in progress), then S9.3 import provenance and
+S8.5/S8.6 subgraphs.
 
 ---
 
