@@ -18,7 +18,22 @@ if(mutation&&!MUTATIONS.includes(mutation)){console.error(`Unknown mutation ${mu
       for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const wx=(x+.5+(lattice==='hex'?.5*(y&1):0))*d,wy=(y+.5)*d*(lattice==='hex'?Math.sqrt(3)/2:1),i=y*n+x;
         xRamp[i]=wx/5000;yRamp[i]=wy/5000;input[i]=.2+wx/10000+wy/20000;varying[i]=(x/(n-1))*2-1;}
       const flip=TYPES.flip.eval({axis:'horizontal'},[input,null]);if(lattice==='square'){const twice=TYPES.flip.eval({axis:'horizontal'},[flip,null]);assert(maxError(twice,input)===0,'Square Flip twice identity violated');assertions++;}
-      const trans=TYPES.transpose.eval({},[mutation==='raw-odd-r-transpose'&&lattice==='hex'?Float32Array.from(input).reverse():input,null]);
+      // THE STORY'S NAMED FAILING FIXTURE, spelled the way the story names it: "A raw odd-r array
+      // transpose is the armed failing fixture." This previously fed production a REVERSED array
+      // (Float32Array.from(input).reverse()), which is not a transpose of anything — it turned the
+      // gate red, but for garbage input rather than for the defect the story describes, so the
+      // named failure mode had never actually been executed.
+      //
+      // A raw odd-r transpose swaps array indices directly, out[x*nh+y] = in[y*n+x]. On square that
+      // IS the world transpose. On hex it is wrong, because odd rows sit half a cell right and rows
+      // are sqrt(3)/2 apart — so index space is not world space, and the affine assertion below is
+      // exactly what catches it. Substituting it for production's output is the fixture.
+      let trans=TYPES.transpose.eval({},[input,null]);
+      if(mutation==='raw-odd-r-transpose'){
+        const raw=newField();
+        for(let y=0;y<nh;y++)for(let x=0;x<n;x++){const ty=x,tx=y;if(ty<nh&&tx<n)raw[ty*n+tx]=input[y*n+x];}
+        trans=raw;
+      }
       const margin=Math.ceil(300/d)+2;for(let y=margin;y<nh-margin;y++)for(let x=margin;x<n-margin;x++){const i=y*n+x,wx=(x+.5+(lattice==='hex'?.5*(y&1):0))*d,wy=(y+.5)*d*(lattice==='hex'?Math.sqrt(3)/2:1);
         assert(Math.abs(trans[i]-(.2+wy/10000+wx/20000))<3e-6,`${lattice} Transpose affine violated`);samples++;}
       assertions++;
