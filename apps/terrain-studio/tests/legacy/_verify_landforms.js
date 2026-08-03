@@ -23,6 +23,7 @@ const mutationArg = process.argv.find(argument => argument.startsWith('--mutate=
 const MUTATION = mutationArg ? mutationArg.slice(9) : null;
 const MUTATIONS = ['crater-ejecta-r2', 'craterfield-grid-jitter', 'island-circular-envelope',
   'volcano-alias-styles', 'volcano-straight-cone', 'volcano-gaussian-cone', 'volcano-drop-summit',
+  'volcano-radial-alias',
   'volcano-swap-style-defaults', 'mountainside-invert-halfplane', 'rugged-sum-blocks', 'silent-underfill',
   'nyquist-force-one', 'hex-row-normalized', 'root-seed-zero', 'volcano-no-barrancos',
   'unfrozen-framebuffer', 'flat-render'];
@@ -404,6 +405,13 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
       const options = TYPES.volcano.options(params), values = radialRhos.map(rho =>
         TYPES.volcano.profile(2500 + rho * options.radiusM, 2500, options, seedFor('volcano', options.seed), terrainDef.scale / RES) / options.heightM);
       radial[style] = { values, expected: radialExpected[style], maxError: Math.max(...values.map((value, index) => Math.abs(value - radialExpected[style][index]))) };
+      // SENSITIVITY SELF-TEST, and labelled as one. The styles-are-distinguishable assertion below
+      // now compares production values; this forces those two arrays equal so the assertion can be
+      // SEEN to fire. It is not a production control — volcano-alias-styles already covers the
+      // reference path — it exists so the replacement for a constant-true check is not itself
+      // unfalsifiable. Without it, "shield differs from stratovolcano" would be an untested claim
+      // about two arrays that happen to differ today.
+      if (mutation === 'volcano-radial-alias' && style === 'stratovolcano') radial[style].values = radial.shield.values.slice();
       radialValues.push(...values);
     }
     const secant = (style, height, radius, a, b) => { const B = rho => style === 'shield' ? 1 - rho ** 1.7 : (1 - rho) ** 2.2;
@@ -428,7 +436,12 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
       return TYPES.volcano.profile(2500 + radius * Math.cos(angle), 2500 + radius * Math.sin(angle), shieldSymmetryOptions, seedFor('volcano', shieldSymmetryOptions.seed), terrainDef.scale / RES); });
     const volcanoMorphology = { radial, slopes, summit, shieldSpread: Math.max(...shieldCircle) - Math.min(...shieldCircle) };
     volcanoMorphology.ok = Object.values(radial).every(item => item.values.length === 3 && item.maxError <= 1e-9)
-      && radialExpected.shield.every((value, index) => value !== radialExpected.stratovolcano[index])
+      // PRODUCTION values, not the expectations. This compared radialExpected.shield against
+      // radialExpected.stratovolcano — two hard-coded literals declared a few lines above — which
+      // is constant true on every possible build, broken ones included, and it sat inside
+      // volcanoMorphology.ok as though it gated something. Comparing what the two styles ACTUALLY
+      // produce is the claim the story makes: the morphologies must be distinguishable.
+      && radial.shield.values.every((value, index) => value !== radial.stratovolcano.values[index])
       && Math.abs(slopes.shield - 5.079140) < 1e-6 && slopes.shield >= 2 && slopes.shield <= 10
       && Math.abs(slopes.stratoUpper - 29.858292) < 1e-6 && slopes.stratoUpper >= 20 && slopes.stratoUpper <= 35
       && Math.abs(slopes.stratoLower - 11.773853) < 1e-6 && slopes.stratoUpper > slopes.stratoLower
@@ -452,6 +465,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
       'island-circular-envelope': lattices.some(item => !item.ok), 'volcano-alias-styles': lattices.some(item => !item.ok),
       'volcano-straight-cone': lattices.some(item => !item.ok), 'volcano-gaussian-cone': lattices.some(item => !item.ok),
       'volcano-drop-summit': !volcanoMorphology.ok, 'volcano-swap-style-defaults': !volcanoMorphology.ok,
+      'volcano-radial-alias': !volcanoMorphology.ok,
       'mountainside-invert-halfplane': lattices.some(item => !item.ok), 'rugged-sum-blocks': lattices.some(item => !item.ok),
       'silent-underfill': !placement.craterfield.saturation, 'nyquist-force-one': lattices.some(item => !item.ok),
       'hex-row-normalized': !worldMapping.ok || lattices.some(item => !item.ok), 'root-seed-zero': lattices.some(item => !item.ok),
@@ -465,6 +479,7 @@ if (MUTATION && !MUTATIONS.includes(MUTATION)) {
         'volcano-straight-cone': 'Volcano shield 1-r^1.7 and strato (1-r)^2.2 profiles',
         'volcano-gaussian-cone': 'Volcano non-Gaussian fixed radial signatures', 'volcano-drop-summit': 'Volcano style summit depressions',
         'volcano-swap-style-defaults': 'Volcano style default slope bands',
+        'volcano-radial-alias': 'Volcano styles produce distinguishable radial signatures',
         'mountainside-invert-halfplane': 'MountainSide M*G half-plane', 'rugged-sum-blocks': 'Rugged base+max(block)',
         'silent-underfill': 'Poisson saturation status', 'nyquist-force-one': 'zero-safe Nyquist octave truncation',
         'hex-row-normalized': 'physical hex world/transform row pitch', 'root-seed-zero': 'canonical root seed integration',
