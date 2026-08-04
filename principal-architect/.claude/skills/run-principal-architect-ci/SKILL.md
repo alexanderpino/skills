@@ -47,7 +47,7 @@ bash .claude/skills/run-principal-architect-ci/driver.sh
 ```
 
 Prints a per-assertion `PASS`/`FAIL` log and ends with `DRIVER OK` (exit 0) or
-`DRIVER FAILED` (exit 1). Last verified run: **8 passed, 0 failed**. What it
+`DRIVER FAILED` (exit 1). Last verified run: **11 passed, 0 failed**. What it
 asserts, in order:
 
 1. `arch_lint all` exits **0** on a conformant 42010 fixture tree.
@@ -60,6 +60,9 @@ asserts, in order:
    authored from a *given* epic + functional requirements + story acceptance criteria for an
    existing service) still lints clean — guarding the skill's authoring workflow against
    regressions.
+6. The **staleness check** fires: a `current` doc last updated in 2020 draws a
+   `stale: last reviewed/updated …` warning by default, and `--max-age-days 0`
+   silences it (the fixture date is fixed in the past, so this stays time-proof).
 
 No screenshots — these are CLIs; the PASS/FAIL log is the observable output.
 

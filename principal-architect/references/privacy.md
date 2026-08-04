@@ -49,15 +49,39 @@ Name the frameworks in scope and map obligations to design decisions:
 | **CCPA/CPRA** | California consumers | opt-out of sale, access/delete, data inventory |
 | **HIPAA** | US health (PHI) | encryption, access audit, BAAs with processors |
 | **PCI-DSS** | cardholder data | network segmentation, tokenisation, no PAN at rest in the clear |
-| **SOC 2 / ISO 27001** | security controls (org-wide) | control mapping; complements, not replaces, the above |
+| **EU AI Act** (Reg. (EU) 2024/1689) | AI systems placed on / used in the EU market | risk-tier classification; for high-risk: risk management, data governance, technical documentation, logging, human oversight, accuracy/robustness (see below) |
+| **SOC 2 / ISO 27001 / ISO/IEC 42001** | security / AI management controls (org-wide) | control mapping; complements, not replaces, the above (42001 = the AI-management counterpart of 27001) |
 
 > Supply-chain note: third-party/SaaS processors that touch personal data are part of the
 > privacy surface (and OWASP **A03 Software Supply Chain Failures**). Record the processor, the
 > data it sees, and the data-processing agreement (DPA) in the §8 table.
 
+## AI-bearing systems — the same artifacts carry the obligations
+
+When the system contains an ML/LLM component, no new documentation formalism is needed —
+the existing artifacts carry the AI obligations, and the skill's job is to make sure they do:
+
+1. **Classify the risk tier first** (EU AI Act: prohibited / high-risk per Annex III /
+   transparency-only / minimal). The tier is a constraint (`C.xx`) and decides how much of
+   the rest applies. Outside the EU, **NIST AI RMF 1.0** (govern·map·measure·manage) is the
+   voluntary counterpart; **ISO/IEC 42001:2023** the certifiable management system.
+2. **Model quality targets are ordinary `Q.xx` scenarios** — accuracy, groundedness,
+   refusal behaviour, latency; response measure = the eval threshold, means of verification
+   = the eval suite (run in CI as a fitness function, `automation.md`).
+3. **The high-risk obligations map onto artifacts that already exist**: technical
+   documentation → the AD/HLD/SD set itself; record-keeping/logging → the observability
+   design (`operability.md`); human oversight → a design constraint on the flow (`C.xx`);
+   data governance for training/eval data → `data-architecture.md` ownership + the DPIA
+   table (training data containing personal data is *processing* — the DPIA above applies).
+4. **A model card** (Mitchell et al. 2019) or the vendor's system card is the model's
+   interface contract — link it from the SD like an `api-spec:`. Model/prompt/eval-set
+   versions are part of the SD's design, and a significant model or provider choice is an
+   ADR (it's a build-vs-buy decision with quality, cost, and lock-in consequences).
+
 ## Linkage
 - **PRD**: data-protection limits are quality/constraint drivers (`Q.xx` security→confidentiality,
   or `C.xx` constraints).
 - **HLD/SAD §8**: the DPIA table + `privacy-reviewed` flag (enforced by `arch_lint.py`).
-- **ADR**: each significant privacy trade-off (e.g. residency vs. latency, retention vs. analytics).
+- **ADR**: each significant privacy trade-off (e.g. residency vs. latency, retention vs. analytics),
+  and each significant model/provider choice in an AI-bearing system.
 - **Conformance**: privacy obligations are concerns in `AD.md` §3, framed by the quality viewpoint.

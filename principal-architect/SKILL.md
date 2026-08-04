@@ -5,12 +5,12 @@ description: >-
   maintain architecture docs as a gate around planning and code changes: use BEFORE a plan or
   any change affecting structure, boundaries, interfaces, dependencies, data, security, or a
   quality attribute — read first, then update. Also use when the user mentions architecture, a
-  PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate diagrams, capabilities, landscape, roadmap, migration,
-  threat modeling, cloud cost, user stories, or acceptance criteria. The agent acts as a master
-  architect and business analyst: it picks the altitude, derives content from evidence, writes
-  user stories/acceptance criteria in the company's house format, and triages so only needed
-  artifacts are produced. Captures software with C4, records decisions via RFC→ADR (Nygård/MADR),
-  and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD. Conforms to
+  PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate/BPMN diagrams, capabilities, landscape, roadmap, migration,
+  threat modeling, SLOs, data models/ERDs, cloud cost, user stories, or acceptance criteria. The
+  agent acts as a master architect and business analyst: it picks the altitude, derives content
+  from evidence, writes user stories/acceptance criteria in the company's house format, and
+  triages so only needed artifacts are produced. Captures software with C4, records decisions via
+  RFC→ADR, and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD. Conforms to
   ISO/IEC/IEEE 42010, ISO/IEC 25010, ISO/IEC/IEEE 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42.
 ---
 
@@ -128,6 +128,7 @@ code changes don't.
 |---|---|
 | New/changed **business capability**, portfolio standard, principle, or landscape/roadmap | `enterprise-architecture.md` (relevant section) + enterprise-level ADR |
 | New **solution** to a business problem, cross-system integration, technology selection, or build-vs-buy | `SAD.md` + solution-level ADR; then software changes per affected system |
+| New/changed **business process** — who does what, in what order, across roles/systems | process view (BPMN-style, `references/mermaid-guide.md`) in `enterprise-architecture.md` or `SAD.md` + ADR if a real choice was made; conform to the org's `.bpmn` where one is executed |
 | **Migration / modernization** of an existing system (local-to-global, on-prem→cloud, monolith→distributed/SaaS) | `transition-architecture.md` (As-Is → interim states → To-Be, rollback per state) + ADRs; recover As-Is SDs from runtime (`references/migration.md`) |
 | **Evaluate / review an existing architecture** (pre-migration health-check, due-diligence, "keep investing?") | `architecture-evaluation.md` (ATAM-lite: risks · non-risks · sensitivity · trade-offs → ADRs + fitness functions; `methods.md` §11) |
 | Within a single system | the software table below |
@@ -140,8 +141,8 @@ code changes don't.
 | **Local** — behaviour change or small feature *inside* an existing component; no new contract | only if a real choice was made | update the affected section | — | — | — | only if the picture changed |
 | **New component / internal interface** within existing structure | if a choice was made | new or updated SD | add a components-table row | — | — | component view |
 | **New / breaking published interface** (API, event, RPC, file format) | **required** (breaking change) | update SD + link/refresh the contract (`api-spec:`, `references/interfaces.md`) | context view if external | — | — | context view |
-| **Architecturally significant** — new boundary/dependency/integration, data-model change, cross-cutting mechanism, or pattern/style adoption (see `references/significance.md`) | **required** | update/add affected SD | update context/container/deployment as relevant | if a driver changed | only if it adds a concern/view | refresh affected views |
-| **New or changed quality target** | usually (how it's met) | maybe | note in trade-offs | **quality scenario (Q.xx)** | add concern + VP-QUAL view | — |
+| **Architecturally significant** — new boundary/dependency/integration, data-model/schema change (`references/data-architecture.md`), cross-cutting mechanism, or pattern/style adoption (see `references/significance.md`) | **required** | update/add affected SD | update context/container/deployment as relevant | if a driver changed | only if it adds a concern/view | refresh affected views |
+| **New or changed quality target** | usually (how it's met) | maybe | note in trade-offs | **quality scenario (Q.xx)**; operational targets become SLOs (`references/operability.md`) | add concern + VP-QUAL view | — |
 | **New stakeholder / external consumer** | — | — | context view | maybe a driver | **stakeholders + concerns + viewpoint coverage** | context view |
 | **New feature / functional behaviour to specify** | — | maybe | — | new/updated `F.xx` **+ user story `US-NNN` (under an epic `EP-NNN`) with acceptance criteria, in the house format** (`business-analysis.md`) | — | — |
 | **Greenfield / docs don't exist yet & task is significant** | first ADR(s) | one SD for the area you touch | context + container | driver stub for what you build | minimal AD + checklist | context + container |
@@ -263,7 +264,9 @@ One PRD per project (or per bounded product area in a monorepo).
 ### HLD — High-Level Design (`HLD.md`)
 The system shape (arc42 §3–8). C4 **Context** + **Container** + **Deployment**
 views (mermaid), the major components and their responsibilities, the main runtime
-flows, cross-cutting concerns, and the key trade-offs. The container-level
+flows, cross-cutting concerns — including **operability** (SLOs over SLIs, RTO/RPO,
+observability; `references/operability.md`) for anything run in production — and
+the key trade-offs. The container-level
 "building block view" is the one part arc42 marks **mandatory** — never ship an HLD
 without it. Links to the ADRs that produced this shape. One HLD per system/service.
 
@@ -301,7 +304,8 @@ Container** are always required (HLD), **L3 Component** for any significant cont
 doc, or keep a single **Structurizr DSL** model (`diagrams/workspace.dsl`) and render all
 levels from it. A diagram earns its place only when prose can't say it cleanly — **skip it
 if a sentence is clearer**. Ready-to-copy L1–L4 snippets, the mandate table, ArchiMate views
-for higher altitudes, and the Structurizr DSL pattern are in `references/mermaid-guide.md`.
+for higher altitudes, ER/entity-lifecycle views for data, BPMN-style process views, and the
+Structurizr DSL pattern are in `references/mermaid-guide.md`.
 
 ## Step 3 — Link code back to the docs
 
@@ -328,6 +332,9 @@ After any create/update:
 - Update `<root>/decisions/README.md` (the decision log) for any new/changed ADR:
   its ID, title, status, date, and one-line summary.
 - If an ADR moved to `superseded`, update both the old and new records' links.
+- When you verify a long-lived doc is still true *without* editing it, stamp
+  `last-reviewed:` — `arch_lint.py` warns when a `current`/`accepted` doc goes
+  unreviewed past the threshold (default 180 days).
 - Honour the correspondence rules (AD.md §7): update every corresponding view, SD,
   and diagram in the *same* change so the views stay consistent.
 
@@ -368,6 +375,16 @@ manifest in the index README). Condensed:
   component-dependency principles, and a forward **tactic→ISO 25010 quality** catalogue
   (cloud/distributed patterns, EIP) — each with its trade-offs. Companion to `methods.md`;
   the architectural home for DDD/SOLID/patterns (code-altitude ones stay pointers).
+- `references/data-architecture.md` — **data as a structural concern**: ownership &
+  boundaries (one owning context per dataset; shared writable stores are ADR-worthy),
+  storage selection keyed to `Q.xx` (CAP/PACELC), schema evolution (expand–contract,
+  registry compatibility), slice-scoped ER/lifecycle views, and the enterprise data
+  landscape (BDAT-D, data mesh). Read for any data-model, store, or schema change.
+- `references/operability.md` — **SLOs, error budgets, RTO/RPO** (Google SRE): the
+  mechanical translation from an operational `Q.xx` scenario to an SLI/SLO, why
+  reliability targets dictate topology (and are therefore ADRs), and the HLD §7
+  operability table. Read when a quality driver concerns reliability/performance in
+  operation, or the system runs as a service.
 - `references/reverse-engineering.md` — **legacy code-to-architecture at scale**: the SAR
   discipline (reflexion models, Ducasse & Pollet, SEI), AST tooling (Tree-sitter,
   Structurizr, CodeQL, jQAssistant), LLM-assisted/GraphRAG, polyglot pipeline. Read for any
@@ -396,8 +413,10 @@ manifest in the index README). Condensed:
   versioning/compat, and contract testing. Read for any service interface (esp. recovering one
   from existing code).
 - `references/privacy.md` — **privacy & compliance (DPIA)**: when a DPIA is required, the
-  lightweight assessment, privacy-by-design moves, and the regime map (GDPR/CCPA/HIPAA/PCI).
-  The companion to the threat model — both live in HLD/SAD §8.
+  lightweight assessment, privacy-by-design moves, and the regime map (GDPR/CCPA/HIPAA/PCI/
+  EU AI Act). The companion to the threat model — both live in HLD/SAD §8. Includes how
+  **AI-bearing systems** map their obligations onto the existing artifacts (risk tier as
+  `C.xx`, evals as `Q.xx`, model cards linked from the SD).
 - `references/significance.md` — is this change architecturally significant / ADR-worthy?
 - `references/conventions.md` — IDs, the machine-readable front-matter schema, naming,
   status lifecycle, the `ARCH-REF:` marker, grep patterns. Read before editing any doc.

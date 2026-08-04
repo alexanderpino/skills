@@ -7,6 +7,7 @@ level: software
 domain: <business/technical domain, e.g. payments>
 owner: <accountable person/team>
 updated: <YYYY-MM-DD>
+last-reviewed: <YYYY-MM-DD>    # stamp when re-verified without editing; linter warns when stale
 conforms-to: [ISO/IEC/IEEE 42010:2022, ISO/IEC 25010:2023]
 source: designed           # designed (To-Be) | recovered (As-Is, reverse-engineered from existing code — methods.md §3)
 security-reviewed: false   # set true once the threat model (§8) is signed off
@@ -91,6 +92,20 @@ C4Deployment
 How the system handles, across components: communication style (e.g. files vs
 shared memory vs network), concurrency, error handling, configuration, security.
 Link the ADR for each non-obvious choice.
+
+### Operability — SLOs & recovery
+**Required for anything that runs in production; one sentence ("not operated as a
+service") otherwise.** Restate each operational quality driver as an SLO over a
+measured SLI, and give the recovery targets — full method in
+`references/operability.md`. A reliability target that dictates topology (multi-AZ,
+multi-region) is an ADR, and its price shows up in §9.
+
+| SLI (what is measured) | SLO (target + window) | Error budget | Satisfies | Guarded by |
+|---|---|---|---|---|
+| <successful requests / all> | <99.9% / 30 d> | <43.8 min/mo> | Q.NN | <burn-rate alert / fitness function> |
+
+- **RTO / RPO:** <time to restore> / <tolerable data loss> — verified by <restore drill>.
+- **Observability:** <metrics/logs/traces approach — prefer OpenTelemetry instrumentation>.
 
 ## 8. Security & privacy — threat model + DPIA (mandatory)
 Threat-model every system. Use **STRIDE** per element of the L1/L2 diagrams and map

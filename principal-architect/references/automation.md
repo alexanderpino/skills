@@ -33,6 +33,10 @@ Enforce the machine-readable contract from `conventions.md`:
   `updated`/`date`, `owner`, …); `status` is one of the allowed values; `level` ∈ {enterprise, solution,
   software}; ADR IDs are unique and zero-padded.
 - Status transitions are legal (no `accepted → draft`); `superseded` ADRs link both ways.
+- **Freshness**: a `current`/`accepted` doc whose newest `last-reviewed`/`updated`/`date`
+  is older than a threshold gets a staleness warning (`arch_lint.py --max-age-days`,
+  default 180, `0` disables) — a "living" doc that nobody has re-verified in half a year
+  is drifting by default. Re-verify and stamp `last-reviewed:` (`conventions.md` §2).
 - Tools: a YAML/JSON linter such as **Spectral** (https://github.com/stoplightio/spectral)
   with custom rules over front-matter, **markdownlint** for structure, or purpose-built ADR
   tooling — **adr-tools** (https://github.com/npryce/adr-tools) and **Log4brains**

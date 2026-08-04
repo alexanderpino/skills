@@ -203,6 +203,35 @@ else
   bad "worked example missing at $EX"
 fi
 
+# ---------- staleness: current docs must be re-verified periodically ----------
+echo "== 6. staleness check (expect WARN on an old 'current' doc; --max-age-days 0 silences) =="
+SROOT="$WORK/stale/docs/architecture"
+mkdir -p "$SROOT"
+# 2020 date: always > 180 days in the past, so this assertion is time-proof.
+cat > "$SROOT/HLD.md" <<'EOF'
+---
+id: HLD
+title: Stale HLD
+status: current
+level: software
+updated: 2020-01-01
+security-reviewed: true
+cost-reviewed: true
+privacy-reviewed: n/a
+---
+# HLD — Stale
+## 8. Security — threat model
+STRIDE mapped to OWASP Top 10:2025.
+## 9. FinOps — cost estimate
+Cost estimate matrix.
+EOF
+SOUT="$("$PY" "$LINT" frontmatter --root "$SROOT" 2>&1)"
+echo "$SOUT" | grep -q "stale: last reviewed/updated" \
+  && ok "stale current doc warned" || bad "missed staleness warning"
+SOUT0="$("$PY" "$LINT" frontmatter --root "$SROOT" --max-age-days 0 2>&1)"
+echo "$SOUT0" | grep -q "stale: " \
+  && bad "--max-age-days 0 should disable staleness" || ok "--max-age-days 0 disables staleness"
+
 echo
 echo "Summary: $pass passed, $fail failed."
 [ "$fail" -eq 0 ] && { echo "DRIVER OK"; exit 0; } || { echo "DRIVER FAILED"; exit 1; }
