@@ -114,7 +114,7 @@ right fix.
 | Wave–current interaction (Doppler-shifted dispersion, blocking at group speed) | `12` | Peregrine, "Interaction of Water Waves and Currents", *Advances in Applied Mechanics* 16, 1976 | P | [Semantic Scholar](https://www.semanticscholar.org/paper/Interaction-of-Water-Waves-and-Currents-Peregrine/ead4947119505f48eaa8adaa4a3d78da7c722fad) |
 | Wave particles (Lagrangian wave carriers → height field) | `12` | Yuksel, House & Keyser, SIGGRAPH 2007 (ACM TOG 26(3)) | P | [cemyuksel.com](https://www.cemyuksel.com/research/waveparticles/) |
 | Wave packets / water surface wavelets (dispersive Lagrangian wave groups) | `12` | Jeschke & Wojtan, SIGGRAPH 2017; Jeschke, Skřivan, Müller-Fischer, Chentanez, Macklin & Wojtan, SIGGRAPH 2018 | P | [ACM DL](https://dl.acm.org/doi/10.1145/3197517.3201336) |
-| Shipped shore/ocean water systems (wave particles in production; stylized FFT + shore treatment) | `12` | Gonzalez-Ochoa, "Water Technology of Uncharted", GDC 2012; Ang, Catling, Ciardi & Kozin, "The Technical Art of Sea of Thieves", SIGGRAPH 2018 Talks | T | [gdcvault.com](https://gdcvault.com/play/1015309/Water-Technology-of) |
+| Shipped shore/ocean water systems (ocean mesh LOD + flow shader; stylized FFT + shore treatment) | `12` | Gonzalez-Ochoa, "Water Technology of Uncharted", GDC 2012; Ang, Catling, Ciardi & Kozin, "The Technical Art of Sea of Thieves", SIGGRAPH 2018 Talks | T | [gdcvault.com](https://gdcvault.com/play/1015309/Water-Technology-of) |
 | Travel-time (eikonal) shore phase fields, breaker-profile authoring, group-envelope sets | `12` | Production practice, no canonical source | F | — |
 | Fullscreen-triangle pass (screen-space water, skybox, aux composites) | `12` `16` `10` | Community canon (Bilodeau GDC 2014 vertex-shader-tricks lineage; multiple writeups) | F/T | [slideshare Bilodeau](https://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau) |
 | Cloud shadows (projected scrolling coverage) | `10` | Standard practice, no canonical source | F | — |
@@ -168,7 +168,7 @@ Branded system → what it actually is → where in this skill.
 | Comanche / Outcast / Delta Force "voxel" terrain | 2.5D heightmap column raycasting (Voxel Space) — no true voxels | `18` |
 | UE 5.8 Mesh Terrain | Experimental 3D modifier-stack terrain rendered through Nanite | `03`, family `02` |
 | Portal 2 water | Flow mapping over a static surface | `12` |
-| Uncharted (3) water | Wave-particle interactive waves + ocean mesh LOD | `12` |
+| Uncharted (3) water | Ocean mesh LOD + wave generation + flow shader; wave-particle lineage claimed but not confirmed against the talk (`?`) | `12` |
 | Sea of Thieves water | Stylized FFT cascades + shore/foam treatments | `12` |
 | Rise of the Tomb Raider / Batman: Arkham Origins / GoW Ragnarök snow | Deferred deformation (top-down capture → displacement) | `13` |
 | Horizon Zero Dawn / Ghost of Tsushima vegetation | GPU-driven procedural placement + procedural grass | `15` |
@@ -224,14 +224,20 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   corrections applied 2026-07 (Johanson 2004 Lund; Kass & Miller SIGGRAPH 1990; Bruneton,
   Neyret & Holzschuch CGF 2010). Shoal/shore-wave rows added 2026-08: Yuksel 2007,
   Jeschke & Wojtan 2017/2018, Gonzalez-Ochoa GDC 2012, and the Sea of Thieves SIGGRAPH 2018
-  talk were web-verified (attribution only, not content); the Airy/McCowan/Battjes physics
-  rows are textbook coastal engineering cited from model knowledge — constants (H ≈ 0.78·h,
-  h^(-1/4) shoaling) are standard values, not re-derived, and the Dean & Dalrymple citation
-  was not web-checked; the eikonal travel-time phase field, breaker-profile constructs, and
-  break-mask tuning windows are F-tier practice with no canonical source. Wave–current row
-  added 2026-08: Peregrine 1976 attribution web-verified; the opposition-scalar modulation
-  and blocking-range constants in the chapter are F-tier renderer practice, not from the
-  paper.
+  talk were web-verified (attribution only, not content). **Audit pass 2026-08** re-checked
+  every row added in this batch and corrected: Battjes 1974 completed to Copenhagen, 466–480
+  (databases propagate a wrong "Honolulu, 446–480"); Dean & Dalrymple 1991 now web-verified
+  (World Scientific, *Advanced Series on Ocean Engineering* vol. 2), so it is no longer
+  model-knowledge-only; and the claim that *Uncharted* shipped wave particles was demoted to
+  **`?`** — the GDC 2012 talk documents mesh LOD, wave generation and a flow shader, and the
+  wave-particle attribution is unconfirmed. Remaining model-knowledge-only: the Airy/McCowan
+  physics rows (constants H ≈ 0.78·h and h^(-1/4) shoaling are standard textbook values, not
+  re-derived). The eikonal travel-time phase field, breaker-profile constructs, and break-mask
+  tuning windows are F-tier practice with no canonical source. Wave–current row added 2026-08:
+  Peregrine 1976 attribution web-verified; the opposition-scalar modulation and blocking-range
+  constants in the chapter are F-tier renderer practice, not from the paper. The shallow-water
+  group speed in that chapter's snippet was corrected 2026-08 (`c_g = √(g·d)`; the earlier
+  `½√(g·d)` was the deep-water relation).
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-

@@ -8,8 +8,8 @@ description: >-
   raymarching (Voxel Space lineage), tiled streaming, splatmaps and virtual texturing,
   GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
   shoal/shore-aware waves and breakers, rivers, fullscreen-triangle pass), snow and weather
-  state, auxiliary maps, vegetation and
-  scatter, roads/decals/deformation, physics handoff, tool viewports, and the artifact
+  state, auxiliary maps, vegetation and scatter, roads/decals/deformation, physics handoff,
+  tool viewports, and the artifact
   catalogue. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at scale, or
   streaming large worlds - even if 'terrain' is never said (heightmap renderer, Minecraft clone,
   planet renderer). Not for terrain generation (terrain-architect) or BRDF math

@@ -5,6 +5,7 @@ Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#
 [Glacial erosion](#glacial-erosion) · [Landforms](#glacial-landforms) · [Glacial deposition](#glacial-deposition) ·
 [Outburst floods & megafloods](#glacial-outburst-floods--megafloods) ·
 [Coastal: be honest](#coastal-be-honest) · [Wave exposure](#wave-exposure) ·
+[Sea ice](#sea-ice--a-gate-on-the-coastal-loop-not-a-landform) ·
 [Cliff retreat & beaches](#cliff-retreat--beaches) ·
 [Lacustrine (lake) shores](#lacustrine-lake-shores) ·
 [Marine: the honest frame](#marine-the-honest-frame) ·
@@ -475,7 +476,7 @@ at an inland basin instead of the sea.
 "Oceanic erosion" sounds like the sea grinding down the seabed. It mostly doesn't. Wave energy
 does work in a narrow band **at and just below sea level**; below **wave base** (~½ the
 wavelength — tens of metres for ordinary swell) the water barely stirs the bottom and the seabed
-is **depositional**, not erosional. So marine processes in a terrain graph are three things, none
+is **depositional**, not erosional. So marine processes in a terrain graph are four things, none
 of them "carve the abyss":
 
 1. **The shoreline band** — cliff retreat and wave-cut platform, the `notch → collapse → deposit`
@@ -486,8 +487,11 @@ of them "carve the abyss":
 4. **Surf-zone morphodynamics** — the one strip of seabed the sea *does* continuously rework:
    breaker bars, rip channels, and the nearshore circulation (its own section below).
 
-Same honesty as coastal: **no canonical graphics paper** (`00`, F-tier). What follows is a look
-built from the same fetch/exposure sweep, not physics — say so.
+Same honesty as coastal for items 1–3: **no canonical graphics paper** (`00`, F-tier), and what
+follows in those sections is a look built from the same fetch/exposure sweep, not physics — say
+so. Item 4 is the exception and is tiered separately: the surf-zone loop rests on real
+coastal-engineering physics (**P**), and only its graph realisation is authored (**L/F**). Do not
+extend the F-tier caveat over it.
 
 ## Longshore drift & depositional landforms
 
@@ -510,15 +514,19 @@ from the flow or shelters (low `exposure`). What falls out:
 | **Spit** | Sediment carried past a change in coast direction, building into open water |
 | **Recurved spit / hook** | A spit whose tip curls landward where refracted waves wrap in |
 | **Tombolo** | A spit that reaches an offshore island and ties it to the mainland |
-| **Bay-mouth bar** | A spit grown across a bay, sealing a lagoon behind it |
+| **Bay-mouth bar** | A spit grown across a bay, enclosing a lagoon behind it (breached by a tidal inlet where the prism is large enough — below) |
 | **Barrier island** | An offshore sediment ridge parallel to a low, sediment-rich coast |
 | **Cuspate foreland** | Deposition where two opposing drift directions meet |
 
-All **L-tier** — compositions of drift + deposition + sheltering, not algorithms. `00` carries the
-caveat: CERC is coastal engineering, the graphics version is authored. The one quantity worth
-actually computing is the drift *direction* from the wave-approach angle relative to the local
-shoreline normal — that asymmetry is what makes spits point the right way instead of being
-symmetric blobs.
+All **L-tier** *as landforms* — compositions of drift + deposition + sheltering, not algorithms.
+`00` carries the caveat: the CERC transport *closure* is empirical coastal engineering and its
+graphics version is authored. Note the split, because it is easy to misread: the transport
+formula is F-tier, but the **current that does the transporting** is P-tier dynamics
+(Longuet-Higgins 1970) and is derived in
+[Surf-zone morphodynamics](#surf-zone-morphodynamics--bars-rips--the-nearshore-circulation)
+below. The one quantity worth actually computing here is the drift *direction* from the
+wave-approach angle relative to the local shoreline normal — that asymmetry is what makes spits
+point the right way instead of being symmetric blobs.
 
 ## Coastal dunes & foredunes
 
@@ -611,65 +619,100 @@ practical consequences:
   then let deposition (deltas, longshore) modify it. This reads correctly and costs nothing;
   trying to *erode* a seabed into shape does not.
 
+**One bounded exception, below.** The rule above governs the seabed *below wave base*. Inside the
+surf zone the bed genuinely is reworked every day, and that band gets a real morphodynamic step —
+see [Surf-zone morphodynamics](#surf-zone-morphodynamics--bars-rips--the-nearshore-circulation).
+The exception is bounded on both sides: it never runs below wave base, and its far field relaxes
+back onto this Dean ramp.
+
 ## Surf-zone morphodynamics — bars, rips & the nearshore circulation
 
 The equilibrium-ramp doctrine has one deliberate exception. Between the shoreline band and wave
-base lies the **surf zone**, and there the sea reworks the bottom continuously — it is the most
-morphodynamically active seabed on Earth, and its products (breaker bars, rip channels, the
-nearshore current field) are exactly what the render side's shore-wave and wave–current systems
-consume (`08`; terrain-renderer `12`). The full coupled model is a 2DH morphodynamic code
-(Delft3D/XBeach class) and stays honestly out of scope; but the loop's *structure* is P-tier
-physics, and a 1D-profile step plus compositions captures the landforms.
+base lies the **surf zone**, and there the sea reworks the bottom continuously — its products
+(breaker bars, rip channels, the nearshore current field) are exactly what the render side's
+shore-wave and wave–current systems consume (`08`; terrain-renderer `12`). The full coupled
+model is a 2DH morphodynamic code (Delft3D/XBeach class) and stays honestly out of scope; but
+the loop's *structure* is P-tier physics, and a 1D-profile step plus compositions captures the
+landforms.
+
+**Symbols.** This chapter's glacial half already owns `A`, `D`, `H`, `n` and `C` (Glen's-law rate
+factor and exponent, SIA diffusivity, ice thickness, turbidity concentration). The marine set is
+therefore subscripted throughout — `H_w`/`H_b`, `D_w`, `A_inlet`, `C_OB`, `n_OB` — and `h` keeps
+the chapter-wide meaning of **bed elevation**, with local water depth written `d`. Do not let the
+two sets touch.
 
 **The loop.** Waves shape currents; currents move sand; sand reshapes the bed; the bed reshapes
 the waves:
 
 ```
-waves (shoal, refract, break)                   # H(x), θ(x), dissipation D(x)
+waves (shoal, refract, break)                   # H_w(x), θ(x), dissipation D_w(x)
   → currents (radiation stress)                 # setup, longshore V(x), undertow, rips
     → sediment flux q (energetics)              # stirred by waves, carried by currents
-      → bed change (Exner)                      # ∂h/∂t = −∇·q / (1−porosity)
+      → bed change (Exner)                      # ∂h/∂t = −∇·q / (1 − poros)
         → waves feel the new bed → repeat
 ```
 
-**Radiation stress — the engine (Longuet-Higgins & Stewart 1962).** Waves carry momentum; where
-they break, that momentum flux converges and pushes water. Cross-shore it piles water against
-the beach (**setup**); alongshore, for obliquely incident waves, the thrust per unit coast is
-`(E_b/4)·sin 2θ_b` (Longuet-Higgins 1970), driving a **longshore current** confined to the surf
-zone:
+**Radiation stress — the engine (Longuet-Higgins & Stewart 1962, 1964).** Waves carry momentum;
+where they break, that momentum flux converges and pushes water. Cross-shore it piles water
+against the beach (**setup**); alongshore, for obliquely incident waves, the thrust delivered per
+unit length of coast is `(E₀/4)·sin 2θ₀` in **deep-water** quantities (Longuet-Higgins 1970).
+
+> **Factor-of-two trap.** That coefficient carries `c_g/c`, which is ½ in deep water but **1** at
+> breaking. The same conserved flux therefore reads `(E_b/2)·sin 2θ_b` in breaking-zone
+> quantities. Write `E₀/4` with deep-water subscripts or `E_b/2` with breaking ones — pairing
+> the ¼ with breaking-zone values is wrong by exactly two, and it is the easy mistake here.
+
+That thrust drives a **longshore current** confined to the surf zone:
 
 ```
-V_long(x) ∝ sqrt(g·H_b) · sinθ_b · cosθ_b · f(x/X_surf)   # peaks mid-surf-zone
-# the sin2θ structure is P-tier; the magnitude coefficient (bed friction, mixing) is tuned
+V_long(x) ∝ (γ / C_f) · tanβ · sqrt(g·d_b) · sinθ_b · cosθ_b · f(x/X_surf)   # peaks mid-surf-zone
+# d_b = depth at breaking (= H_b/γ);  tanβ = beach slope;  C_f = bed friction
+# the sin2θ, slope and depth structure is P-tier; C_f and the mixing profile f are tuned
 ```
+
+The beach slope is **structural, not a fudge factor** — a steep coast runs a materially faster
+longshore current than a flat one, and the slope field is already in hand (it is the same one
+that picks breaker class below). Dropping `tanβ` gives every coast the same drift, which is the
+tell that someone copied the proportionality without the derivation.
 
 This is the current that physically executes the CERC transport above — `Q_long` is the sand
 flux it carries.
 
 **Undertow and the breakpoint bar (Svendsen 1984; Bailard 1981).** Breaking waves fling water
 shoreward above trough level (Stokes drift plus the surface roller); continuity returns it
-seaward *below* the trough — the **undertow**, scaling like `u_u ~ E/(ρ·c·h)`, strongest where
-dissipation is strongest. Seaward of the breakpoint, wave-orbital **skewness** (sharp shoreward
-crest-strokes) nudges sand shoreward; landward of it, the undertow drags stirred sand seaward.
-The two fluxes converge at the break point, and the Exner balance turns convergence into a
-ridge — the **breaker bar**, crest near depth `h_bar ≈ H_b/γ` with `γ ≈ 0.78`, the same
-breaking index the renderer's break mask uses. Storms (large `H_b`) push the bar seaward; calm
-swell walks it back — the profile breathes on a storm/calm cycle.
+seaward *below* the trough — the **undertow**, scaling like `u_u ~ E_w/(ρ·c·d)`, strongest where
+dissipation is strongest. (Check the dimensions of that group: it must come out in m/s. Building
+it from the *dissipation rate* `D_w` instead of the *energy density* `E_w` yields an
+acceleration, and is a standing trap in reimplementations.) Seaward of the breakpoint, wave-orbital
+**skewness** (sharp shoreward crest-strokes) nudges sand shoreward; landward of it, the undertow
+drags stirred sand seaward. The two fluxes converge at the break point, and the Exner balance
+turns convergence into a ridge — the **breaker bar**, crest near depth `d_bar ≈ H_b/γ` with
+`γ ≈ 0.78`, the same breaking index the renderer's break mask uses. Storms (large `H_b`) push the
+bar seaward; calm swell walks it back — the profile breathes on a storm/calm cycle.
 
 ```
 # 1D cross-shore profile step — the runnable core (energetics-style)
-profileStep(h[], H_b, T, dt):
-    H(x)  = min(shoal(H_b, h), γ·h)                   # transform: shoaling + breaker cap
-    D(x)  = −d(E·c_g)/dx                              # dissipation where the cap bites
-    u_u   = k_u · D / (ρ·c·max(h, h_min))             # undertow ~ dissipation (Svendsen)
-    q(x)  = k_on·u_orb(H,T,h)³ − k_off·u_u·stir(D)    # onshore skewness − offshore undertow
-    h    -= dt/(1−p) · dq/dx                          # Exner: flux convergence builds the bar
-# equilibrium: bar crest settles near h ≈ H_b/γ; far field relaxes to the Dean ramp
+#   h = BED ELEVATION (chapter convention);  d = waterSurface − h = local water depth
+#   H_0 = deep-water wave height IN; H_b (the breaker height) is an OUTPUT of the transform
+profileStep(h[], H_0, T, dt):
+    d      = waterSurface − h
+    H_w    = min(shoal(H_0, d), γ·d)                  # transform: shoaling + breaker cap
+    E_w    = ρ·g·H_w² / 8                             # wave energy density
+    D_w    = −∂(E_w·c_g)/∂x                           # dissipation rate, where the cap bites
+    u_u    = k_u · E_w / (ρ·c·max(d, d_min))          # undertow return flow — E_w, not D_w
+    q      = k_on·Sk(H_w,T,d)·u_orb³ − k_off·u_u·stir(D_w)
+    #        └ onshore: orbital SKEWNESS Sk (→0 for a symmetric wave, so q→0 — the skewness
+    #          factor is what makes this term exist; u_orb³ alone would move sand onshore
+    #          under a perfectly symmetric swell, which is wrong)
+    h     -= dt/(1 − poros) · ∂q/∂x                   # Exner: flux convergence builds the bar
+# equilibrium: bar crest settles near depth d ≈ H_b/γ; far field relaxes to the Dean ramp
 ```
 
 **Which surf zone to author — beach states (Wright & Short 1984).** One number picks the
-template: the dimensionless fall velocity `Ω = H_b/(w_s·T)` (`w_s` = sand settling velocity,
-from grain size — `04`):
+template: the dimensionless fall velocity `Ω = H_b/(w_s·T)`, where `w_s` is the sand **settling
+velocity** — derived from grain size (`04` ships `D50`) through a settling law (Stokes in the
+fine limit, a drag-corrected form for sand); `04` carries the grain sizes but not `w_s` itself,
+so the settling law is yours to state:
 
 | Ω | State | The look |
 |---|---|---|
@@ -686,13 +729,15 @@ bar and weakly over a gap, so setup shoreward of the bar exceeds setup behind th
 alongshore pressure gradient drives **feeder currents** that converge on the gap and jet
 seaward — a **rip**. The circulation scours the channel it flows through, which further
 suppresses breaking there, which maintains the gradient: a positive feedback that organises a
-uniform bar into a **rhythmic bar–rip system** (observed spacings are O(100–1000 m) and
-irregular). Composition version:
+uniform bar into a **rhythmic bar–rip system**. Characteristic spacing is **O(100 m)** (field
+values typically 50–500 m), and the correct description is **quasi-rhythmic** — a preferred
+wavelength with real scatter about it, neither a fixed period nor true disorder. Composition
+version:
 
 ```
-ripSystem(bar, λ_rip):
-    for y along shore, channels at spacing ~λ_rip (jittered — never metronomic):
-        carve gap through bar:  h += channelDepth · gaussAlong(y)
+ripSystem(bar, λ_rip):                                 # λ_rip ~ 100 m (typically 50–500 m)
+    for y along shore, channels near spacing λ_rip (jittered — quasi-rhythmic, not exact):
+        carve gap through bar:  h -= channelDepth · gaussAlong(y)   # LOWER the bed to cut it
         flowVelocity += feeder(alongshore in the trough, converging on the gap)
                       + jet(seaward through the gap, u_rip ~ 0.5–1 m/s,
                             decaying over ~2–3 surf-zone widths offshore)
@@ -707,18 +752,22 @@ interaction and flow foam consume (terrain-renderer `12`): a rip exists for the 
 it exists in the export. The undertow stays internal — it is depth-structured (seaward at the
 bed, shoreward at the surface), and a single 2D field carries the *surface* circulation.
 
-**Verify.** The bar crest sits near `H_b/γ` and migrates seaward when `H_b` is raised; coast
-segments with `1 < Ω < 6` grow rips and segments outside the band don't; rip spacing is
-banded-irregular, not periodic; `flowVelocity` is nonzero in the surf band, and its jets point
-seaward through the gaps they carved (`09`).
+**Verify.** The bar crest sits near **depth** `d ≈ H_b/γ` and migrates seaward when `H_b` is
+raised; coast segments with `1 < Ω < 6` grow rips and segments outside the band don't; rip
+spacing clusters around λ_rip with scatter (quasi-rhythmic, neither exactly periodic nor
+uniformly random); `flowVelocity` is nonzero in the surf band, and its jets point seaward
+through the gaps they carved (`09`).
 
-**Tier.** The loop's physics is **P**: radiation stress (Longuet-Higgins & Stewart 1962),
-longshore current (Longuet-Higgins 1970), undertow (Svendsen 1984), energetics transport
-(Bailard 1981), sediment continuity (the Exner balance; generalized form Paola & Voller 2005),
-beach states (Wright & Short 1984), rip circulation (Bowen 1969; review MacMahan, Thornton &
-Reniers 2006). The graph realisation — profile step, bar/rip stamps, flow-field composition —
-is **L/F**: the `k` coefficients, rip speeds, and spacings are tuned looks, and the full 2DH
-coupled model is out of scope by declaration.
+**Tier.** The loop's physics is **P**: radiation stress (Longuet-Higgins & Stewart 1962, and the
+1964 nearshore exposition), longshore current (Longuet-Higgins 1970), undertow (Svendsen 1984),
+energetics transport (Bailard 1981), beach states (Wright & Short 1984), rip circulation
+(Bowen 1969; review MacMahan, Thornton & Reniers 2006). Sediment continuity is the **classical
+Exner equation** — attribute the plain `∂h/∂t = −∇·q/(1−poros)` form to Exner himself, *not* to
+Paola & Voller 2005, whose contribution is the generalisation (uplift/subsidence, compaction,
+soil creep, independently evolving bedrock–sediment and sediment–flow interfaces); cite them when
+you need those terms, which a surf-zone step does not. The graph realisation — profile step,
+bar/rip stamps, flow-field composition — is **L/F**: the `k` coefficients, rip speeds, and
+spacings are tuned looks, and the full 2DH coupled model is out of scope by declaration.
 
 ## Tides & the intertidal zone
 
@@ -759,15 +808,17 @@ lagoon behind it, and it does so through **inlets** whose geometry the tide itse
 cross-section tracks the **tidal prism** `P` — the water volume exchanged per half tidal cycle:
 
 ```
-P       = tidalRange · bayArea            # per half cycle; range from the tides section
-A_inlet = C · P^n                         # O'Brien 1969: n ≈ 0.85 in the classic fit
-u_jet   ~ P / (A_inlet · T_tide/2)        # peak throat speed, O(1 m/s)
-# C is empirical and unit-system-bound — treat it as a calibration, not a constant
+P_tide  = tidalRange · bayArea            # tidal prism per half cycle; range from the tides section
+A_inlet = C_OB · P_tide^n_OB              # O'Brien 1969: n_OB ≈ 0.85 in the classic fit
+u_jet   ~ P_tide / (A_inlet · T_tide/2)   # MEAN throat speed over the half cycle, O(1 m/s);
+                                          #   peak ≈ (π/2)× this for a sinusoidal tide
+# C_OB is empirical and unit-system-bound (O'Brien's ft-units fit: 4.69e-4 over all 28 US
+# entrances, 1.08e-4 over the 8 unjettied ones, same exponent) — a calibration, not a constant
 ```
 
 The equilibrium is a scour feedback: a throat too small runs a faster jet and erodes; too
 large, and the jet slows below transport capacity and the throat shoals — which is why inlets
-persist and why `A` is predictable from `P` at all. The jet drops its load where it decelerates
+persist and why `A_inlet` is predictable from `P_tide` at all. The jet drops its load where it decelerates
 on *both* sides of the throat, building the two signature sediment bodies on the sea bottom and
 lagoon floor:
 
@@ -783,25 +834,35 @@ inconsistent.
 
 ```
 inletStamp(barrier, bay, tide):
-    P = tide.range · bay.area;   A = C · P^0.85
-    carve throat through the barrier to area A     # width ≫ depth
+    P_tide = tide.range · bay.area;   A_inlet = C_OB · P_tide^0.85
+    carve throat through the barrier to area A_inlet    # width ≫ depth
     stamp ebbDelta   (seaward lobe + radial channels; crest shallow enough to break)
     stamp floodDelta (lagoonward fan, shallower, sheltered)
-    flowVelocity += tidalJet(throat, u_jet)        # reverses with tidalCurve(t) sign
-    downdriftBudget −= k_trap · Q_long             # the deltas are fed by the drift
+    flowVelocity += tidalJet(throat, u_jet)             # reverses with tidalCurve(t) sign
+    downdriftBudget −= k_trap · Q_long                  # the deltas are fed by the drift
 ```
 
 Export the **ebb-phase** (seaward) jet as the representative `flowVelocity` unless the engine
 carries the tidal oscillation — ebb is when the jet-versus-incoming-surf interaction
 (terrain-renderer `12` wave–current) is visible, and it is the river-mouth bar's tidal twin.
 
-**Verify.** `A` tracks `P^0.85` across the map's inlets (near-straight in log-log); every lagoon
-has an inlet or a spilling outlet (a sealed lagoon violates the `03` flood-fill); the ebb delta
-breaks waves in the exposure sweep; downdrift beaches measurably thin (`09`).
+**The lagoon is still a closed basin — do not "fix" it with flow routing.** Cutting an inlet does
+*not* turn the lagoon into a pit to drain. A barrier lagoon remains one of the **legitimate closed
+basins** `03` lists as never-fill (alongside crater lakes, playas and kettle holes), exactly like
+the atoll lagoon further down this chapter: it is a flat at sea level, not a bowl. The inlet is a
+channel *at* sea level connecting two bodies of water, not a drainage path out of a depression —
+carve it geometrically and leave the depression-handling pass alone. And the inlet is conditional,
+not universal: a lagoon on a microtidal or fetch-sheltered coast may have **no** inlet at all and
+is perfectly correct sealed. Tidal prism is what decides.
 
-**Tier.** The prism–area relation is **P** (O'Brien 1969, coastal engineering; refined by later
-work). The deltas and the stamp are **L** compositions; `C`, delta shapes, and `k_trap` are
-authored.
+**Verify.** `A_inlet` tracks `P_tide^0.85` across the map's inlets (near-straight in log-log);
+lagoons whose prism is large enough to sustain one *have* an inlet, and the flood-fill pass has
+not silently drained any lagoon whether or not it does; the ebb delta breaks waves in the
+exposure sweep; downdrift beaches measurably thin (`09`).
+
+**Tier.** The prism–area relation is **P** (O'Brien 1969, ASCE — first form 1931; refined by
+later work). The deltas and the stamp are **L** compositions; `C_OB`, delta shapes, and `k_trap`
+are authored.
 
 ## Biogenic muddy coasts — mangroves & cheniers
 

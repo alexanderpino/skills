@@ -466,6 +466,24 @@
         "Distinguishes the legitimate use of median filtering on IMPORTED/sensor data from hiding a sim's own defect",
         "Does not simply approve the median filter"
       ]
+    },
+    {
+      "id": 36,
+      "prompt": "I'm generating a barrier-island coast for a game world. The engine team wants offshore sandbars and rip channels they can actually render surf against, and they say their water shader needs current data at the beach. What should the generator produce, and what's the physics?",
+      "expected_output": "Prescribes the surf-zone morphodynamic loop as the one bounded exception to 'author the shoreface, do not erode the seabed': waves -> currents (radiation stress) -> energetics sediment flux -> Exner bed update. Breakpoint bar from convergence of onshore skewness-driven transport and offshore undertow, crest near depth H_b/gamma. Beach state from Omega = H_b/(w_s*T) picks reflective / intermediate bar-rip / dissipative. Rips from setup gradients scouring gaps, quasi-rhythmic at O(100 m). Tidal inlets sized by O'Brien prism-area with ebb/flood deltas. Critically: the nearshore circulation (longshore current, rip and inlet jets) must be exported in flowVelocity across the surf band, not stopped at the waterline.",
+      "files": [],
+      "assertions": [
+        "Frames the surf zone as a bounded exception to the Dean equilibrium-profile / do-not-erode-the-seabed doctrine, relaxing to that ramp in the far field",
+        "Gives the loop: radiation stress -> nearshore currents -> sediment flux -> Exner bed update",
+        "Places the breaker bar crest near depth H_b/gamma with gamma about 0.78",
+        "Attributes net onshore transport to wave-orbital SKEWNESS (a symmetric wave moves no net sand), not to orbital amplitude alone",
+        "Uses Omega = H_b/(w_s*T) to select reflective (<1) / intermediate bar-rip (1-6) / dissipative (>6)",
+        "Describes rip spacing as quasi-rhythmic at O(100 m), not exactly periodic and not fully irregular",
+        "Requires the nearshore circulation to be exported in flowVelocity across the surf band for the engine's wave-current interaction",
+        "Sizes tidal inlets from the tidal prism (A_inlet proportional to P^0.85) with ebb and flood tidal deltas fed by intercepted longshore drift",
+        "Keeps the lagoon a legitimate closed basin that flow routing must not fill, even once an inlet is cut",
+        "Distinguishes P-tier physics from the L/F-tier graph realisation rather than tiering the whole thing as a look"
+      ]
     }
   ]
 }

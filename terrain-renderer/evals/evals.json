@@ -62,7 +62,7 @@
     },
     {
       "id": 6,
-      "prompt": "Add an ocean and rivers to my custom engine's terrain. I don't want to build a whole water mesh LOD system if I can avoid it \u2014 I heard you can render water with just a fullscreen triangle?",
+      "prompt": "Add an ocean and rivers to my custom engine's terrain. I don't want to build a whole water mesh LOD system if I can avoid it — I heard you can render water with just a fullscreen triangle?",
       "expected_output": "Covers the fullscreen-triangle screen-space water pass (SV_VertexID triangle, per-pixel ray reconstruction, analytic ray-plane intersection with the water datum, depth-buffer rejection, depth-based absorption and shore fade), its trade-offs vs mesh/projected-grid water (TAA motion vectors, displaced silhouettes, multiple elevations), and flow-mapped rivers driven by the generator's flow field. Consumes water surface/depth from the generation-side contract; never carves water into the heightfield.",
       "files": [],
       "assertions": [
@@ -145,6 +145,38 @@
         "Uses physically based atmosphere or Rayleigh/Mie plus aerial perspective instead of vertex Z-fog",
         "Places falling rain or snow in VFX and screen droplets in PostFX",
         "Makes terrain provide depth or occlusion for cave rejection and wetness/flow/curvature for surface reaction"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Our ocean looks fine offshore but the beach is wrong — the swell just marches diagonally onto the sand at whatever angle the wind is set to, and the waves keep going right through the shoreline. Sandbars offshore do nothing at all. How do we make the surf actually read as surf?",
+      "expected_output": "Diagnoses deep-water-only synthesis running unmodified to depth 0, and prescribes a shoal/shore-aware treatment driven by the exported bathymetry: depth-attenuated amplitude with a shoaling gain before the cut, a shore-wave band whose phase comes from a precomputed travel-time (eikonal) field so crests refract shore-parallel and wrap headlands, a break mask at H ~ 0.78*depth, breaker type selected by beach slope (Iribarren), and foam born at the break decaying into run-up. Insists the system is keyed off DEPTH rather than shore distance so offshore bars and reefs break their own surf. States honestly that this is data-driven plausibility approximation, not fluid simulation.",
+      "files": [],
+      "assertions": [
+        "Identifies that ambient FFT/Gerstner cascades are a deep-water model and must be depth-modulated near shore",
+        "Prescribes refraction so crests arrive shore-parallel regardless of wind direction (travel-time/eikonal phase field, or at minimum shore-distance phase with its limits stated)",
+        "Uses a breaking criterion tied to local depth (H is approximately 0.78 * depth) for the break mask",
+        "Keys shoaling and breaking off the (filtered) depth field, NOT shore distance, so offshore sandbars and reefs break their own surf line",
+        "Mentions depth attenuation so waves do not poke through the beach, with a shoaling amplitude gain before the fade",
+        "Selects breaker character (spilling / plunging / surging) from beach slope rather than one global setting",
+        "Warns against summing the shore-wave band on top of un-attenuated ambient cascades (cross-fade energy instead)",
+        "States the tier honestly: plausibility approximation driven by exported data, not a shallow-water simulation",
+        "Does not carve waves into the terrain heightfield or bake waves into exported maps"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "We have a river mouth emptying into the sea and a rip current marked in our flow data, but the surf renders identically everywhere — it sails straight across the outflow like the current isn't there. What's missing?",
+      "expected_output": "Identifies missing wave-current interaction: the shore-wave band reads only depth and ignores the exported flow field. Prescribes Doppler-style modulation via an opposition scalar (wave direction dotted with the negated flow, normalised by the shallow-water group speed sqrt(g*d)), steepening amplitude against opposing flow and forcing a break/chop where opposition approaches blocking, flattening slightly with following flow. Notes rip lanes and seaward-streaked foam fall out because surf-zone foam advects by bore motion plus the flow field. States limits: no momentum exchange, and rips must exist in the exported flow field, which routes to terrain-architect.",
+      "files": [],
+      "assertions": [
+        "Names wave-current interaction / Doppler-shifted dispersion as the missing mechanism",
+        "Modulates wave amplitude, steepness and break threshold by opposition to the flow field",
+        "Uses the SHALLOW-water group speed sqrt(g*depth) as the blocking scale (NOT the deep-water c/2 form)",
+        "Describes river-mouth / inlet outflow producing steep breaking chop over the bar",
+        "Explains rip currents as smooth lanes through the breaker line with foam streaked seaward",
+        "States the honest limit: amplitude/steepness shaping only, no momentum exchange or true blocking dynamics",
+        "Routes missing rip/outflow data upstream to terrain-architect rather than inventing currents renderer-side"
       ]
     }
   ]

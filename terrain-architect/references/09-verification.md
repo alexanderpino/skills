@@ -332,10 +332,10 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | River terraces slope downstream / aren't parallel | Treads not cut at a base level | Bevel each strath at the current base level — horizontal (`03`) |
 | Avulsion fires every step, or never | Superelevation threshold missing / wrong | Require `SE≳1` (one channel depth) + a flood trigger (`03`) |
 | Coral covers deep / aphotic seabed | No photic gate on placement | `density × inPhotic(depth)`; stop below compensation (`12`) |
-| Surf zone has no bar, or the bar sits at an arbitrary depth | Cross-shore fluxes never converge at the breakpoint | Energetics profile step; bar crest near `h ≈ H_b/γ` (`12`) |
+| Surf zone has no bar, or the bar sits at an arbitrary depth | Cross-shore fluxes never converge at the breakpoint | Energetics profile step; bar crest near **depth** `d ≈ H_b/γ` (`12`) |
 | Rips on a dissipative beach / none on an intermediate one | Bar–rip template chosen by hand, beach state ignored | Pick the surf-zone template from `Ω = H_b/(w_s·T)` (`12`) |
 | `flowVelocity` is zero seaward of the waterline | Nearshore circulation never exported | Stamp longshore/rip/inlet currents into `flowVelocity` (`12`, `08`) |
-| Lagoon sealed behind an unbroken barrier | Barrier stamped without an inlet; tidal prism ignored | Carve an inlet at `A = C·P^0.85` with ebb/flood deltas (`12`) |
+| Barrier coast with a big tidal prism but no inlet anywhere | Barrier stamped as an unbroken wall; prism–area relation never applied | Carve an inlet at `A_inlet = C_OB·P_tide^0.85` with ebb/flood deltas — and leave the lagoon itself a legitimate closed basin, never flood-filled (`12`, `03`) |
 | Range erodes straight down; peaks never rise | Isostatic rebound not coupled to erosion | Add flexural / erosional rebound alongside erosion (`02`) |
 | Seams or a pole pinch on a planet | Lat-long grid, or tile-local coords on a sphere | Cube-sphere / HEALPix + metric-corrected `Δs`; seam routing (`08`) |
 | Crease along the equator on a planet | Two hemispheres generated separately, or N mirrored to S | Generate one field on the whole `S²` (sample the 3D surface point); the equator is not a boundary (`25`) |

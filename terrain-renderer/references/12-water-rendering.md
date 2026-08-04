@@ -352,9 +352,11 @@ float  disp  = A * CrestProfile(phase, /*steepen by*/ A / max(h, 1e-3));
 
 The simulation-grade tier: Lagrangian carriers of wave energy advected over the bathymetry and
 rasterized into a displacement field each frame. **Wave particles** (Yuksel et al.) made it
-real-time — each particle a small wavefront segment that subdivides as fronts spread — and
-the lineage shipped at production scale in *Uncharted*'s water (per the GDC 2012 talk).
-**Wave packets / water surface wavelets** (Jeschke & Wojtan and successors) carry a
+real-time — each particle a small wavefront segment that subdivides as fronts spread. Production
+water systems of that era are documented in Gonzalez-Ochoa's GDC 2012 *Uncharted* talk (ocean
+mesh LOD, wave generation, flow shader); that the shipped technique was specifically wave
+particles is commonly repeated but **not confirmed** against the talk — treat it as `?` and do
+not cite it as the shipped implementation. **Wave packets / water surface wavelets** (Jeschke & Wojtan and successors) carry a
 full dispersive wave *group* per carrier, so refraction, dispersion, and shoaling over
 arbitrary bathymetry emerge rather than being painted. Cost honesty: this tier buys emergent
 shore behavior and object interaction with research-grade machinery — tens of thousands of
@@ -394,7 +396,9 @@ is its dot with the negated flow, and everything keys off that scalar:
 
 ```hlsl
 float2 U    = DecodeFlow(FlowField.Sample(s, uv));        // handoff flow field, m/s
-float  cg   = 0.5 * sqrt(9.81 * max(h, hMin));            // ~shallow group speed
+float  cg   = sqrt(9.81 * max(h, hMin));                  // shallow-water group speed: c_g = c
+                                                          // (NO 1/2 — that is the deep-water
+                                                          //  c_g = c/2 relation, wrong here)
 float  opp  = dot(normalize(gradTau), -U) / cg;           // 1 ~ blocking
 A          *= 1.0 + kSteepen * saturate(opp);             // shorten/steepen against flow
 brk         = max(brk, smoothstep(0.8, 1.2, opp));        // blocked -> forced break/chop
@@ -750,8 +754,10 @@ Water is the classic hard transparency case, and the frame must be structured fo
   textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
   (1991). Constants quoted from model knowledge of the textbooks, not re-derived.
 - **P** — Breaker criterion `H ≈ 0.78·h` (McCowan lineage) and surf-similarity/breaker
-  classification via the Iribarren number: Battjes, "Surf Similarity" (Coastal Engineering
-  Conference, 1974) and standard coastal-engineering references.
+  classification via the Iribarren number: Battjes, "Surf Similarity", *Proceedings of the 14th
+  International Conference on Coastal Engineering*, Copenhagen, ASCE, 1974, 466–480 (verified
+  2026-08 — note several citation databases propagate a wrong "Honolulu, 446–480"; Honolulu was
+  the 15th ICCE, 1976).
 - **P** — Wave–current interaction (Doppler-shifted dispersion `ω = σ + k·U`, steepening
   against opposing flow, blocking near group speed): Peregrine, "Interaction of Water Waves
   and Currents", *Advances in Applied Mechanics* 16, 1976.
@@ -760,9 +766,11 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **P** — Yuksel, House & Keyser, "Wave Particles" (SIGGRAPH 2007, ACM TOG 26(3)): Lagrangian
   wave carriers rasterized to a height field; object interaction.
   [Author page (verified 2026-08)](https://www.cemyuksel.com/research/waveparticles/).
-- **T** — Gonzalez-Ochoa, "Water Technology of Uncharted" (GDC 2012, Naughty Dog): the
-  wave-particle lineage and beach/ocean water in production.
+- **T** — Gonzalez-Ochoa, "Water Technology of Uncharted" (GDC 2012, Naughty Dog): shipped
+  ocean/beach water — mesh LOD, wave generation, flow shader.
   [GDC Vault (verified 2026-08)](https://gdcvault.com/play/1015309/Water-Technology-of).
+  Whether the shipped waves were specifically *wave particles* is **`?`** — widely repeated,
+  not verified against the talk.
 - **P** — Jeschke & Wojtan, "Water Wave Packets" (SIGGRAPH 2017); Jeschke, Skřivan,
   Müller-Fischer, Chentanez, Macklin & Wojtan, "Water Surface Wavelets" (SIGGRAPH 2018):
   dispersive Lagrangian wave groups; emergent refraction/shoaling over bathymetry.

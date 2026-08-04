@@ -623,7 +623,9 @@ of Part 2 ("caused, not carved"):
   both are lost (Part 2, the layer stack).
 - **Export the drivers, not the effects.** So the engine can render rapids, waterfalls, and
   particles, the tool emits the data that *drives* them: flow maps / velocity vector fields
-  (`FlowField`, from routing and discharge, `03`), water depth maps, and analysis-derived
+  (`FlowField`, from routing and discharge, `03`, **plus the nearshore surface circulation —
+  longshore current, rip and tidal-inlet jets, `12`** — the field must not stop at the
+  waterline), water depth maps, and analysis-derived
   masks (gradient, constriction, wetness — `06`). The engine consumes these to steer its own
   particle systems and fluid shaders. Foam, spray, splash, and wave displacement are never
   in the export.
@@ -633,7 +635,9 @@ of Part 2 ("caused, not carved"):
   terrain, generated to the same standards as dry land (`12`). The tool puts no waves,
   ripples, or chop on that plane; Gerstner/FFT wave synthesis is the engine's, and it needs
   the flat datum plus depth to run correctly (wave shoaling, shoreline foam, and swim
-  volumes are all functions of the depth field the tool exported).
+  volumes are all functions of the depth field the tool exported) — plus, for shore-aware
+  surf, the **flow field** (waves steepen and break against an opposing current) and a
+  wavelength-scale **filtered** depth copy (raw bathymetry noise dithers the break line).
 
 ---
 
