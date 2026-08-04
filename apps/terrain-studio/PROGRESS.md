@@ -782,3 +782,46 @@ than ticked, and it is the strongest evidence so far that the audit is not a for
   corrupted), `_verify_hex_sampling.js`, `_verify_hex_dem.js`; plus 117 latent sites in square-only
   oracles.
 - **19 commits are not on the remote** as measured on 2026-08-02. Push has never been authorised.
+
+---
+
+## Water: S4.7 closed, plus four defects the user's screenshots found
+
+S4.7 is complete and gated. Getting there turned up four separate defects, three of them in code
+that had already passed its own gates — worth recording because the pattern is the same each time:
+**a gate that measures the wrong quantity passes on a broken build.**
+
+| # | Defect | How it was caught | Gate now |
+|---|---|---|---|
+| 1 | Gerstner controls (wave height, sea state, body kind) were never built, so the preset expanded at 1.2 m on a 5 km world — correct and invisible | user screenshot: "this is liquid water" | `_verify_water_displacement.js` — the signal must SCALE with the authored height |
+| 2 | The analytic wave normal was computed by both vertex shaders and **read by neither**. Water was displaced by 12 broadband waves and lit by 2 plane sinusoids | user screenshot of the banding | `_verify_water_banding.js` — median local-peak autocorrelation, 0.369 → 0.000 |
+| 3 | Detail slope spectrum ASCENDED (0.390/0.462/0.546, +18.5%/octave) so the finest octave drove the normal; all three octaves shared one lattice orientation; the sparkle field had a 7.854 s global period | arithmetic on my own new code, prompted by research | not directly gated — see Open |
+| 4 | Shoaling was INVERTED: amplitude faded to zero as depth fell, so the sea was glassiest where real water is roughest | user: "real water has waves on the shore … take shoal into account" | `_verify_shoaling.js`, 4/4 armed, one mutation replays the original defect |
+
+Defect 4 recurred *while being fixed*: the first implementation referenced the onset of shoaling to
+wave **height** instead of half the **wavelength**, so the breaking limit bound before Green's law
+could lift anything and the wave never actually grew. The gate caught it because it asserts the peak
+*exceeds* the authored height — "amplitude varies with depth" would have passed the broken version.
+
+Four measurement errors were made building the banding oracle alone, all recorded in the file: a
+plain autocorrelation maximum (measures smoothness, not periodicity); a 41 px high-pass narrower than
+the 63 px band it had to preserve; a pixel population selected by "the ripple changed this pixel",
+which fragments the run at every zero crossing of the signal being measured; and scanning rows only,
+which is blind to bands running along the scanline. It also first ran at −4.5 °C, where the sea is
+ice and there are no ripples at all — now an explicit liquid-water assertion.
+
+**Now shared, generated, injected into both passes** (the rule that already governed the geometry):
+the Gerstner terms, the detail layer, and the shoaling law. Before this, `waveData` was hand-copied
+into two shaders and was the one piece of water GLSL outside that rule — and the piece that rotted.
+
+### Open
+
+- **W18c** — the detail layer's octaves are below 1.5 m, so at overview zoom (~10 m/px) they fade to
+  nothing by design and the `strength` dial is close to a no-op there. Correct physically; means the
+  visible band at that distance is entirely the swell. Whether the dial should retarget to a
+  view-relevant band is a product question, not a bug.
+- **W19/W20** — stylized (BotW-style) and realistic upgrades. Research landed with sources; the
+  highest-value items are a world-space (not screen-space) depth ramp for banded colour, Roystan's
+  normal-compensated shoreline foam, and slope-variance specular AA to replace the fixed exponents.
+- Defect 3's fixes (descending spectrum, per-octave rotation, aperiodic sparkle) are verified by
+  arithmetic and by the banding oracle staying at 0.000, but none has a mutation of its own.
