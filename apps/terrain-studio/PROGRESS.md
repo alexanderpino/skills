@@ -276,6 +276,36 @@ GPU-only mode, Walkaround) remain untouched.
 
 ---
 
+### Sprint 8 — the post-sprint audit, and what it cost
+
+The audit rated **6 of 6 stories UNSUPPORTED** with 91 gaps, against six oracles that were all green.
+It was right on every count, and the work it forced is the seventh instance of this project's
+standing failure mode. The pattern is written up in `BACKLOG.md` §5; the position is here.
+
+**Eleven controls across four files assigned the answer instead of breaking production.** They went
+red when mutated, so `gate.py` called them armed, and they proved only that a test can edit a local
+variable. All eleven are rewritten to perturb an input production consumes.
+
+What the repair uncovered, none of it visible to the gates that existed:
+
+| | Defect | Evidence |
+|---|---|---|
+| S8.2/S8.5 | **The editor never type-checked a wire.** `canConnect` had existed since S2.1; `grep -nE "canConnect" src/legacy.js` returned two lines — the import and the bridge re-export. | `7036e12` |
+| S8.6 | **Two instances served each other's terrain.** Cache identity keyed upstream on `String(ins[0].length)`; every field is RES², so the term never discriminated. Instance A fed by perlin and instance D fed by ridged returned the *identical Float32Array*. | `ec87490` |
+| S8.6 | A nested definition's hash was not part of its parent's identity, so a dropped inner definition still served a cached result computed from it. | `ec87490` |
+| S8.5 | **Nothing pinned anything.** ADR-004 requires `(definitionId, version, fullHash)` and "old instances never float"; registering v2 replaced v1 in place and moved every existing instance's output. | `1e073ea` |
+| S8.6 | An embedded definition's stated hash was never verified on load — a document claiming `deadbeefdeadbeef` loaded silently. | `1e073ea` |
+| S8.4 | **Unit validation was entirely absent**: `grep -nE "unit" src/core/expr.js` returned zero matches. | `c87c333` |
+| S8.3 | Variable output hard-coded `unit:'none'`; `graphSnapshot()` omitted variables, so a variable edit wrote **zero** undo records; subgraph overrides were merged into node params while the header comment claimed a scope frame that had one caller and one frame. | `cbbce15` |
+| S8.1 | **Chokepoint had never been built** — one comment matched it in the whole tree. And Route declared `kind:'scalarRaster'`, so the registry's only vectorRaster could not enter the identity node the story requires to carry it. | `e0dac3a` |
+
+Two mechanical traps, both of which report as success, are recorded in `BACKLOG.md`: a mutation of a
+frozen object is a silent no-op under sloppy-mode `page.evaluate`, and a positional signature called
+with an options object made three "templates" measure the same graph three times.
+
+Controls now armed on these six stories: **flow control 5, connect-time 3, variables 8, math 11,
+subgraph 7, subgraph persistence 18** — every one seen red, zero vacuous.
+
 **DELIVERY RECOVERY — risk-based fast path adopted, 2026-08-02.**
 
 Canonical execution policy: [docs/plan/DELIVERY.md](docs/plan/DELIVERY.md). Quality is unchanged,
@@ -535,10 +565,12 @@ as plugin 61. legacy.js 7,406 → 6,561 lines during the extraction.
 Run from `apps/terrain-studio/`. Everything is HTTP now; `--file` died with A1.
 
 ```
-npm run verify -- _verify_digest.js     61 node types bit-identical at 256²; skipped 0
+npm run verify -- _verify_digest.js     88 node types bit-identical at 256²; skipped 0
 npm run verify -- --preview _verify_digest.js   same, against the BUILT bundle
-npm run bridge:check                    202 symbols, unbridgeable 0
-npm run plugins:check                   61 modules: imports resolve, exports exist, no TDZ
+npm run bridge:check                    228 symbols, unbridgeable 0
+npm run plugins:check                   88 modules: imports resolve, exports exist, no TDZ
+python scripts/gate.py --oracle X       runs green + every declared mutation; flags NOT ARMED
+                                        and VACUOUS. An oracle is not done until this is green.
 npm run verify -- _verify_blur_isotropy.js   square 1.0000, hex 1.0000 (was 1.185)
 npm run verify -- _verify_layers.js     L0 13/13 both lattices; roughness 0.0290/0.0286
 npm run verify -- _verify_hillslope_isotropy.js  9/9; hex sigma 3.873/3.873 = square exactly
@@ -596,13 +628,26 @@ bad extraction bisects to one node.
 
 ## Next, in order
 
-1. **Finish `MC-S33`** to its reviewed runner contract and publish it without widening scope.
-2. **Replay `MC-S04` once** on that published runner, run focused/built/digest plus the integrated
-   wave gate, and close S1.3–S1.5.
-3. **Publish S2's keystone** through `MC-S01` → `MC-S02`; concurrently route the already-independent
-   S9 domain and S10 capability foundations when their ownership is disjoint.
-4. **Fan out the first real parallel wave**: cover/state (`MC-S05`), Gerstner foundation (`MC-S09`),
-   graph machinery (`MC-S18`), and large-world evaluation (`MC-S22`).
+Sprints 1, 2, 8 and the opening of 9 have shipped and been audited. The list below is what remains,
+in dependency order.
+
+1. **S9.3** — import metadata and provenance sidebar, closing Sprint 9's opening trio.
+2. **S3 — cover layer**: hydraulic state outputs, regolith, cover-aware transport. This is the first
+   story of the physical stack and everything in S4–S5 sits on it.
+3. **S4 — water and rivers**, including S4.7's Gerstner renderer.
+4. **S5 — climate and snow**, which closes 9 of the 11 genuine aux-map debt rows.
+5. **S6 — export and format writers**, replacing the 8-bit PNG path the File menu still mislabels.
+6. **S7 — geology and regimes**, including S7.6 Boundary Landforms.
+7. **S9.4–S9.9** — global substrate, bounded evaluator, arbitrary dimensions. Three measured
+   substrate defects block anything paged and must be fixed first: `GPU.rt()` never frees and
+   `applyWorkingResolution` does not invalidate it; `GPU.prog()` caches by key ignoring source;
+   `atFeatureScale` mutates the global `RES` in place, so it is not re-entrant.
+8. **S10** — capability tiers, streamed pages, clipmaps, GPU-only paged evaluation, Walkaround.
+   **S10.R0 calibration runs first and in parallel**: Sprint 10 is not Ready until both
+   `gpuParityMaxMismatchFraction` and `antiTilingMinReduction` are frozen from measured controls.
+
+An audit runs after each sprint. The Sprint 8 audit is the reason six stories were rebuilt rather
+than ticked, and it is the strongest evidence so far that the audit is not a formality.
 
 ## Open, carried
 

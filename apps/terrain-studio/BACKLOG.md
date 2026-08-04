@@ -603,6 +603,9 @@ that makes a broken gate look thorough.
 | W7 | Corpus: one chapter 26 · **DONE** `f8ddd62` | Scoped as "re-author three lost citations"; the premise was wrong twice. Nothing was lost — `26-hexagonal-lattice.md` was **ours**, main never had it, and a merge cannot delete what the other side never had. The real defect was a **duplicate chapter 26**: two live files on the `26` token with divergent tiers. Consolidated into main-s `26-hexagonal-grids.md`, duplicate deleted, `08`-s inbound link repointed. Four citation families carried (verified absent from the **installed** corpus: Wang & Ai 0, Hasslacher 0, Sivaswamy 0, absence-record 0), plus three index rows. Attribution corrected under review: Wang & Ai 2018 does **not** introduce D6 (de Sousa 2006 predates); both papers are single-receiver drainage-*structure* results that ground routing and **nothing downstream** — they do not license hex erosion; six-fold is *smallest sufficient*, not necessary; HPP/FHP are P as physics, **F** as a transfer onto terrain. |
 | W8 | Merge `origin/main` · **DONE** `a7cc8f8` | 45 conflicts, two classes. 43 studio paths were rename/delete (we moved, main deleted) — resolved to our version at the new path, staged bytes identical to pre-merge HEAD. `SKILL.md` + `00-index.md` taken from main. Digest 60/60 after. Note the merge commit message contains an error corrected in `33f17fe`: it says main *deleted* `26-hexagonal-lattice.md`. Main never had it. |
 | W9 | Weathering defaults | C7's real finding: `dirt` ships at 0.01, effectively off. Defaults change → digest re-bless. |
+| W10 | Definition hash is FNV-1a, not SHA-256 | ADR-004 specifies "canonical full SHA-256 hashes" and RFC 8785 JCS canonicalisation. The implementation is a 64-bit FNV-1a pair over `JSON.stringify` of a hand-built canonical object (`subgraph.js:57-58`, documented there as such). Adequate for divergence detection, **not** for the ADR's stated identity contract, and JCS is not implemented at all. |
+| W11 | One version per id in the palette | Instances now pin `(id, version, hash)` and a version archive keeps old ones working (`1e073ea`). But the palette still offers only the latest of each id, so authoring a **new** instance of an older version is not possible from the UI. |
+| W12 | `check-plugin-imports.cjs` false negative | It binds only `Identifier` declarators in a `BlockStatement`, so `const { a, b } = f()` inside a plugin function reads as two undefined names and fails the check falsely. Its `Function` handler already destructures correctly — a two-line fix in `BlockStatement`/`ForOf`/`ForIn`. Worked around in `mathnode.js` with a comment. |
 
 ---
 
@@ -704,6 +707,34 @@ including a transposed noise domain (`ox` sampling `gnoise(du/nh, dv/n)` where `
 Tooling note: `codex` is unusable locally (CLI pinned to a model version it cannot serve); `copilot`
 is the working fallback. And `GPU.prog` caches by key while **ignoring the source** — it silently
 returns a stale program when two call sites share a key.
+
+### The Sprint 8 audit: a seventh shape, and the commonest one
+
+The audit rated all six Sprint 8 stories UNSUPPORTED. Every story had a green oracle. The defect was
+the same in **eleven controls across four files** and it is now the pattern to look for first:
+
+> **A control that assigns the answer proves the test can edit a local variable.**
+> `routed = Float32Array.from(src)` · `inheritsSemantic = mutation === 'x' ? false : …` ·
+> `afterUndo = 0.75` · `hi = 0.2; lo = 0.2` · `r.ok = false` · `dynamicCode = true`.
+> Each produced a red on the mutated run, so `gate.py` reported ARMED. None of them touched
+> production. The fix is to perturb **an input production consumes** — a live registry entry, a
+> document, an override string, a snapshot with a field removed — and then read production's answer.
+
+Two mechanical traps found while fixing it, both of which report as success:
+
+- **A mutation of a frozen object is a silent no-op.** `page.evaluate` bodies run sloppy, so
+  `port.semantic = 'x'` on a frozen descriptor throws nothing and changes nothing. Two controls
+  reported `VACUOUS` when the truth was "not attempted". Mutations must **replace** the object and
+  then **assert the registry moved** — an unapplied control is an error, not a pass.
+- **A positional signature called with an options object.** `newTerrainDocument({template, …})`
+  against `newTerrainDocument(withDefault, template, alreadyConfirmed)` made `withDefault` truthy
+  every time, so three "templates" silently measured the boot graph: 18 edges that were 6 counted
+  three times. Corpora must assert **distinctness**, not just non-emptiness.
+
+And the finding that motivates all of it: `canConnect` had existed since S2.1 and `grep -nE
+"canConnect" src/legacy.js` returned exactly two lines — the import and the bridge re-export. The
+library refused wires the editor happily made, and two stories' "rejected at connection time" gates
+had been testing the library the whole time.
 
 ---
 
