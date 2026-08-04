@@ -255,6 +255,29 @@ const LEGACY_PORTS_RAW = {
     in: [
       { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
       { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+      // S3.5 — the explicit cover inputs, added for exactly the three reasons the `hydraulic` and
+      // `thermal` rows record: a ROSTERED type has to gain a port in the adapter's own data
+      // (registry.js:98 drops a type out of the adapter the moment it declares `inputs:`, and
+      // LEGACY_INS_LABELS — the `insDrift` anchor — is DERIVED from these rows); a physical semantic
+      // is legal because these are NEW slots no shipped document uses and cover thickness in metres
+      // is not ADR-005's disputed elevation frame; and stable new ids are not a regeneration of the
+      // frozen ones.
+      //
+      // OPTIONAL, for the same measured reason: every erosion2 node in every saved graph has these
+      // slots unwired, and unwired means "this graph carries no cover", which is bare bedrock. The
+      // multi-scale composition has a defined answer with no cover, so a REQUIRED input here would
+      // refuse every document that ships — including the bundled Canyon Landscape setup, whose
+      // canyon -> erosion2 -> hydrofix chain _verify_canyon_process.js pins.
+      //
+      // Erosion 2 takes no `precipitation`, for the same reason Thermal and Stream Power do not.
+      // Hydraulic declares one (slot 4) and states in its own ledger that it is NOT consumed; the
+      // composition here reaches the identical pipe/droplet kernels through `erosion2Field`
+      // (src/legacy.js:3082-3090), which passes no rain term at all, so a port here would be
+      // declared-and-never-filled twice over.
+      { id: "soilDepth", name: "Soil depth", semantic: "soilDepth", unit: "m",
+        lens: "state", legacySlot: 2 },
+      { id: "sedimentDepth", name: "Sediment depth", semantic: "sedimentDepth", unit: "m",
+        lens: "state", legacySlot: 3 },
     ],
     out: { id: 'out', name: 'Out' },
   },

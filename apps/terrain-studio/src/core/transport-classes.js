@@ -24,13 +24,22 @@
 // to co-update yet"). S3.5 flips these to `true` one node at a time, and each flip is a measured
 // before/after with the exemption ledger one entry shorter.
 //
-// POSITION, measured 2026-08-04: 2 of 4 compliant (`thermal`, `streampower`). The remaining two are
-// separate commits by explicit decision (D21: one node per commit, each with a digest delta naming
-// that node and nothing else — and both nodes so far have needed no re-bless at all, because the
-// cover work is demand-gated and the published field never moved). `hydraulic`'s cover-first
-// consumption landed in S3.3 and is gated by _verify_cover_erosion.js; only its LEDGER FLIP is
-// outstanding, and it is deliberately not taken here because a commit that moved two rows could not
-// say which change moved which gate.
+// POSITION, measured 2026-08-04: 3 of 4 compliant (`thermal`, `streampower`, `erosion2`). The last
+// one is a separate commit by explicit decision (D21: one node per commit, each with a digest delta
+// naming that node and nothing else — and all three nodes so far have needed no re-bless at all,
+// because the cover work is demand-gated and the published field never moved). `hydraulic`'s
+// cover-first consumption landed in S3.3 and is gated by _verify_cover_erosion.js; only its LEDGER
+// FLIP is outstanding, and it is deliberately not taken here because a commit that moved two rows
+// could not say which change moved which gate.
+//
+// `coUpdates` IS NOW A DELIVERED CLAIM, NOT A STATEMENT OF INTENT. Until S3.5c nothing anywhere
+// checked that a row's co-update targets were things the node can actually publish, so a
+// `compliant: true` row naming a map the node never produces would have read as coverage — the
+// declared-but-never-filled half-gate, in manifest form. `_verify_transport_coevolution.js`'s
+// `compliantRowsDeliverTheirCoUpdates` closes that: every target of a COMPLIANT row must be a
+// declared output port semantic on that node's registered type. That is what removed `wetness` from
+// the `erosion2` row (see the row's own note); `hydraulic` still carries it and is still exempt, so
+// the gate does not yet reach it — when its flip lands, its row has to answer the same question.
 //
 // CLASSES
 // -------
@@ -136,11 +145,40 @@ export const TRANSPORT_CLASSES = Object.freeze([
   Object.freeze({
     node: 'erosion2',
     class: 'materialTransport',
-    coUpdates: Object.freeze(['soilDepth', 'sedimentDepth', 'wetness']),
-    compliant: false,
+    // `wetness` LEAVES this list in S3.5, and that is a correction rather than a retreat. The row
+    // inherited it from `hydraulic`, whose pipe solver carries a water column the node could in
+    // principle publish. `erosion2Field` reaches the same kernels through `atFeatureScale`
+    // (src/legacy.js:3086-3089) and hands back one height Float32Array (:3113); no water field
+    // survives the call on either engine, and the thermal and sharpening stages that follow have no
+    // water at all. Keeping a co-update target this node cannot produce would be the
+    // declared-but-never-filled half-gate in manifest form — the thing the R0 table exists to catch.
+    // The remaining two are what the node genuinely reads and writes.
+    coUpdates: Object.freeze(['soilDepth', 'sedimentDepth']),
+    // S3.5, THIRD NODE. The multi-scale composition now consumes loose cover before bedrock and
+    // books what it aggrades into `sedimentDepth`, co-updated with the height it publishes. The
+    // stack identity solidTop = bedrock + soil + sediment + sand is asserted per sample.
+    //
+    // IT DEPOSITS, and that is measured, not inherited: the pipe/droplet stage carries
+    // `deposit = lerp(.08,.62,sediment)` (src/legacy.js:3084) and the shape stage is a thermal
+    // relaxation (:3100-3105), so unlike Stream Power this node genuinely puts transported material
+    // down and `maxCoverRiseM` is required to be strictly positive.
+    //
+    // THE SPRINT'S OTHER HALF IS OPEN AND SAID SO. sprint-03:188 asks for stage-resolved state
+    // instead of deposits re-derived from final height; `erosion2Field` accumulates nothing per
+    // stage, so the ledger publishes `depositionStageResolved:false` and names the two stages that
+    // raise the surface WITHOUT transporting anything — the unconditional fbm injection at :3068-3070
+    // and the asymmetric sharpening at :3106-3112 — rather than pretending the figure is clean.
+    // Closing it needs accumulators inside `erosion2Field`, which lives in src/legacy.js.
+    // Evidence: tests/legacy/_verify_erosion2_coevolution.js.
+    compliant: true,
     ownerSprint: 'S3.5',
     why: 'Composes hydraulic and thermal stages and re-derives deposits from final height instead of carrying them.',
-    note: 'Must expose/co-update the state of the stages it composes (sprint-03:188).',
+    note: 'Consumes loose cover before bedrock and deposits into the explicit sediment layer. '
+      + 'Publishes NO node-level boundary budget: the fbm seed injection is unconditional and '
+      + 'unaccumulated, so even with every transform off the solvers budget a field the node did not '
+      + 'receive. Where the composition reduces to one hydraulic pass on the native grid it reports '
+      + 'that STAGE\'s own solver counters, scoped as such. The stage-resolved deposit sprint-03:188 '
+      + 'asks for stays open and is declared open.',
   }),
   Object.freeze({
     node: 'hydrofix',
