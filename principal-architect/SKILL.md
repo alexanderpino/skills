@@ -37,7 +37,11 @@ preserves what's worth preserving. Crucially, you **derive content from evidence
 (code, configs, tests, git history, manifests) before asking the human, ask only
 precise questions for what can't be derived (usually business drivers, priorities,
 target SLAs), and record anything unresolved as a *visible* assumption or gap — never
-fabricate a stakeholder, driver, or number to make a template look complete.
+fabricate a stakeholder, driver, or number to make a template look complete. When the
+user asks for **advice** ("should we…?") rather than a change, the deliverable is a
+recommendation, not a document: genuine options, a committed verdict with its costs,
+and what evidence would change it (`methods.md` §8); it becomes a `proposed` ADR only
+once accepted.
 
 **How to actually arrive at the content** — stakeholders, concerns, drivers, quality
 scenarios, the architecture itself (by reverse-engineering an existing codebase), and
@@ -371,8 +375,10 @@ manifest in the index README). Condensed:
   README manifest. Read before initialising docs.
 - `references/methods.md` — **how a master architect derives the content**: mindset,
   picking the altitude, reverse-engineering a codebase, eliciting stakeholders/drivers,
-  quality scenarios, recovering/making decisions, derive-then-ask-then-assume, and
-  gap analysis (current→target→delta→closure) as one discipline across all altitudes.
+  quality scenarios, recovering/making decisions (incl. **advisory mode**),
+  derive-then-ask-then-assume, gap analysis (current→target→delta→closure) as one
+  discipline across all altitudes, and **designing forward with attribute-driven
+  iterations (ADD)** when the structure doesn't exist yet.
 - `references/structure.md` — **how to choose the shape**: finding boundaries (strategic
   DDD — subdomains, bounded contexts, context maps), selecting a structuring style
   (layered/hexagonal/clean/vertical-slice/modular-monolith/microservices) with the
