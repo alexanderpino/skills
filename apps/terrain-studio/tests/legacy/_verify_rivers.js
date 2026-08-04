@@ -37,6 +37,8 @@ const MUTATIONS = [
   'no-channel-head',       // channel initiation threshold removed: hillslopes become rivers
   'straight-guide',        // the mask is a drawn straight line, not derived from where water goes
   'ports-offer-carve',     // the node declares AND computes a carved-terrain output
+  'mask-unclamped',        // coverage fraction left unclamped: a "fraction" of 8.5 on a real river
+  'ignore-bankfull',       // the bankfull slider wired to nothing
 ]
 const PATCHES = {
   'carve-in-place': [[
@@ -90,6 +92,23 @@ const PATCHES = {
      + '  for (let i = 0; i < N; i++) carvedHeight[i] = solidTopM[i] - waterDepth[i]\n'
      + '  return { carvedHeight, solidTop: solidTopM, channelMask,'],
   ],
+  // The Y-valley's largest river is 0.28 m wide in a 10 m cell, so NO cell of it ever reaches the
+  // clamp — measured, zero cells wide enough. Deleting the Math.min therefore changed nothing any
+  // assertion could see: measured, the whole oracle stayed green with the clamp gone. That is the
+  // regime a real river actually lives in (2.7*sqrt(1000) = 85 m on 10 m cells), and an unclamped
+  // mask ships a "fraction of the cell covered" of 8.5.
+  'mask-unclamped': [[
+    '    channelMask[i] = Math.min(1, wM / cellSizeM)',
+    '    channelMask[i] = wM / cellSizeM',
+  ]],
+  // The node exposes a 1-8 bankfull slider. Measured, raising it to 8 takes this fixture from 107
+  // channel cells to 2223, so it changes what ships — and measured, deleting the factor from the code
+  // left the whole oracle green. A parameter that can be wired to nothing without a gate noticing is
+  // the vacuous gate wearing a slider.
+  'ignore-bankfull': [[
+    '    const qb = bankfullFactor * dischargeM3PerS[i]',
+    '    const qb = dischargeM3PerS[i]',
+  ]],
 }
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -226,6 +245,32 @@ function yValley() {
     above.channelCells === N, { channelCells: above.channelCells, N })
   const zeroQ = M.riverFields(flatBed(), new Float32Array(N), W, H, { widthCoefficient: KW, depthCoefficient: KD, cellSizeM: CELL })
   check('zero discharge gives exactly zero channel', zeroQ.channelCells === 0, { channelCells: zeroQ.channelCells })
+
+  // --- the mask is a COVERAGE FRACTION, so one is its ceiling ------------------------------------
+  // A SEPARATE FIXTURE, because the Y-valley cannot reach this regime: its largest river is 0.28 m in
+  // a 10 m cell and zero of its cells are wider than their cell, so the clamp in the mask is dead
+  // code under that fixture. Measured: with `Math.min(1, ...)` deleted the entire oracle stayed green.
+  // Q = 1000 m3/s gives 2.7*sqrt(1000) = 85.4 m, 8.5 cells wide — an ordinary large river on a 10 m
+  // lattice — and the unclamped mask there reads 8.538, which is not a fraction of anything.
+  const bigField = new Float32Array(N).fill(1000)
+  const big = M.riverFields(flatBed(), bigField, W, H, { widthCoefficient: KW, depthCoefficient: KD, cellSizeM: CELL })
+  let wideCells = 0, maskOverOne = 0, notFullyCovered = 0, bigMaxMask = 0
+  for (let i = 0; i < N; i++) {
+    if (big.channelWidth[i] > CELL) wideCells++
+    if (big.channelMask[i] > 1) maskOverOne++
+    if (big.channelMask[i] !== 1) notFullyCovered++
+    if (big.channelMask[i] > bigMaxMask) bigMaxMask = big.channelMask[i]
+  }
+  // Absence of evidence is a failure: prove the fixture REACHED the clamp regime before reading it.
+  // Without this the two checks below would pass on a fixture whose channels are all sub-cell, which
+  // is exactly the hole they exist to close.
+  check('the wide-channel fixture actually exceeds one cell of width',
+    wideCells === N && big.channelWidth[0] > CELL,
+    { wideCells, N, widthM: +big.channelWidth[0].toFixed(4), cellSizeM: CELL })
+  check('the channel mask never exceeds one', maskOverOne === 0,
+    { maskOverOne, maxMask: bigMaxMask })
+  check('a channel wider than its cell covers the cell exactly', notFullyCovered === 0,
+    { notFullyCovered, maxMask: bigMaxMask })
 
   // --- the analytic Y-valley --------------------------------------------------------------------
   const bed = yValley()
@@ -364,6 +409,37 @@ function yValley() {
   check('trunk width grows from confluence to base level', trunkLast > trunkFirst * 1.2,
     { trunkFirst: +trunkFirst.toFixed(4), trunkLast: +trunkLast.toFixed(4),
       ratio: +(trunkLast / trunkFirst).toFixed(4) })
+
+  // --- the bankfull factor is a discharge scaling, and it is load-bearing -----------------------
+  // The relations take the channel-forming flood, not the mean annual flow, and the node ships a 1-8
+  // slider for that conversion. Measured, the slider matters: at 8 this fixture goes from 107 channel
+  // cells to 2223. Measured, nothing gated it — with the factor deleted from the code the whole
+  // oracle stayed green, so the slider could have been wired to nothing and every gate would have
+  // agreed. Stated as an IDENTITY rather than a tolerance: scaling the factor by B is the same
+  // computation as scaling the discharge by B. B = 8 is a power of two, so the Float32 rescale shifts
+  // the exponent and touches no mantissa bit — which is what makes the comparison bitwise.
+  const B = 8
+  const scaledQ = new Float32Array(N)
+  for (let i = 0; i < N; i++) scaledQ[i] = B * discharge[i]
+  const opts = { widthCoefficient: KW, depthCoefficient: KD, cellSizeM: CELL }
+  const viaFactor = M.riverFields(yValley(), discharge, W, H, { ...opts, bankfullFactor: B })
+  const viaField = M.riverFields(yValley(), scaledQ, W, H, { ...opts, bankfullFactor: 1 })
+  let bankfullMismatch = 0
+  for (let i = 0; i < N; i++) {
+    if (viaFactor.channelWidth[i] !== viaField.channelWidth[i]) bankfullMismatch++
+    if (viaFactor.waterDepth[i] !== viaField.waterDepth[i]) bankfullMismatch++
+    if (viaFactor.channelMask[i] !== viaField.channelMask[i]) bankfullMismatch++
+  }
+  check('the bankfull factor scales discharge exactly',
+    bankfullMismatch === 0 && viaFactor.channelCells === viaField.channelCells,
+    { bankfullMismatch, viaFactorCells: viaFactor.channelCells, viaFieldCells: viaField.channelCells })
+  // ...and it must MOVE something. Two empty fields satisfy the identity above perfectly. Measured
+  // endpoints: 107 cells at factor 1, 2223 at factor 8 — a ratio of 20.8 — against 1.0 with the
+  // factor ignored, so the bound sits between two measured builds and is nowhere near either.
+  check('the bankfull factor changes the channel it produces',
+    viaFactor.channelCells > r.channelCells * 1.5,
+    { atFactor1: r.channelCells, atFactor8: viaFactor.channelCells,
+      ratio: +(viaFactor.channelCells / r.channelCells).toFixed(4) })
 
   // --- the declared port block ------------------------------------------------------------------
   // The plugin cannot be imported here (it pulls in legacy.js, which needs a DOM), so the port block

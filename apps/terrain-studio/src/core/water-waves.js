@@ -274,7 +274,22 @@ export function glslGerstner(preset, fnName = 'gerstnerDisp') {
     // vanish over the horizon while the swell, still hundreds of metres long, stays. Full
     // strength at four pixels, gone at two. `mpp` is metres per pixel AT THIS VERTEX, so the
     // fade is per-vertex distance-dependent rather than one global LOD switch.
+    // TWO LIMITS, NOT ONE, because geometry and shading are sampled by different things.
+    //
+    // `fd` is the pixel limit and it applies to everything: a wave below two pixels cannot be drawn
+    // at all. `fm` is the MESH limit and it applies only to the DISPLACEMENT: the water is displaced
+    // per-vertex on the terrain's own grid, so a wave shorter than a few cells is being sampled two
+    // or three times per period. That does not render as a wave, it renders as a zigzag of spikes
+    // pulled between adjacent vertices — the grid showing through the water, which is exactly what
+    // it looks like.
+    //
+    // The fix is not to drop those waves. It is to stop DISPLACING them while keeping them in the
+    // NORMAL, where they cost nothing and are sampled per-pixel rather than per-vertex. That is the
+    // whole point of separating geometry from shading: a 6 m wave on a 10 m grid is real, it simply
+    // cannot be a vertex position, so it becomes shading instead. Full displacement at eight cells
+    // per wavelength, none at four — four samples per period is already generous for a sinusoid.
     return `  { float fd=clamp(${f(t.lambda)}/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`
+      + ` float fm=clamp(${f(t.lambda)}/max(4.0*cellM,1e-6)-1.0,0.0,1.0);`
       + ` float th=${f(k)}*(${f(dx)}*p.x+${f(dz)}*p.y)-${f(om)}*t+${f(t.phase)};`
       + ` float c=cos(th), s=sin(th);`
       // EVERY COEFFICIENT IS PARENTHESISED and carries its own sign. Emitting `nx+=-${value}` put a
@@ -282,7 +297,8 @@ export function glslGerstner(preset, fnName = 'gerstnerDisp') {
       // which GLSL parses as a decrement and rejects with "l-value required". The sign belongs in
       // the number, not in the operator.
       + ` float c2=c*fd, s2=s*fd;`
-      + ` d.x+=(${f(t.Q * t.A * dx)})*c2; d.y+=(${f(t.A)})*s2; d.z+=(${f(t.Q * t.A * dz)})*c2;`
+      + ` float cg=c2*fm, sg=s2*fm;`
+      + ` d.x+=(${f(t.Q * t.A * dx)})*cg; d.y+=(${f(t.A)})*sg; d.z+=(${f(t.Q * t.A * dz)})*cg;`
       + ` nx+=(${f(-t.Q * t.A * dx * dx * k)})*s2; ny+=(${f(t.A * dx * k)})*c2; nz+=(${f(-t.Q * t.A * dz * dx * k)})*s2;`
       + ` mx+=(${f(-t.Q * t.A * dx * dz * k)})*s2; my+=(${f(t.A * dz * k)})*c2; mz+=(${f(-t.Q * t.A * dz * dz * k)})*s2; }`
   })
@@ -291,7 +307,7 @@ export function glslGerstner(preset, fnName = 'gerstnerDisp') {
   // function rather than two approximations of one.
   return [
     `// generated from WaterWavePreset v${WATER_WAVE_VERSION} — ${terms.length} terms, steepness ${(preset && preset.steepness || 0).toFixed(4)}`,
-    `vec3 ${fnName}(vec2 p, float t, float mpp, out vec3 N){`,
+    `vec3 ${fnName}(vec2 p, float t, float mpp, float cellM, out vec3 N){`,
     `  vec3 d=vec3(0.0);`,
     `  float nx=1.0, ny=0.0, nz=0.0;`,   // dP/dx
     `  float mx=0.0, my=0.0, mz=1.0;`,   // dP/dz

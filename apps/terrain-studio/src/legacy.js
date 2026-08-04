@@ -5840,7 +5840,7 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // pixel, converted out of grid space. uMppK carries uScale*2*tan(fov/2)/height so the
       // shader does one multiply rather than re-deriving the projection it cannot see.
       float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
-      vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, WN);
+      vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, uCellM, WN);
       // SHOALING, which this had exactly backwards. The old fade took the waves to ZERO as water got
       // shallower, so the sea went glassy precisely where real water is at its roughest. Waves
       // entering shallow water slow down, shorten, and GROW: Green's law gives amplitude rising as
@@ -5870,11 +5870,11 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
     precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;in float vBreak;in float vCrest;out vec4 frag;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;uniform float uCellM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform float uToon;uniform float uBandSteps;`+SKY_GLSL+``
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;uniform float uCellM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform float uToon;uniform float uBandSteps;`)+`
     ${(waterShaderSources.forwardDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
@@ -6029,13 +6029,13 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     // the same normalised axis, so one conversion serves all three components.
     const wmVs=`#version 300 es
       in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;out float vBreak;out float vCrest;
-      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
+      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;uniform float uCellM;
 ${(waterShaderSources.maskShoal=shoalGlsl()).split(/\r?\n/).map(l => '' + l).join(String.fromCharCode(10))}
 ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       void main(){
         vDepth=(aw-ah)*uH;
         float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
-        vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, N);
+        vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, uCellM, N);
         // TWO SEPARATE FACTORS, and conflating them was a real bug. wet is a 0..1 shoreline fade
         // so a dry cell is untouched and the shore grows no fringe of waves standing on land.
         // uWaveAmp is the authored height IN METRES and can be 30+. Using one value for both made
@@ -7150,6 +7150,7 @@ function drawWaterDepth(MVP,ex,ey,ez){
   setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);gl.uniform1f(u(waterMaskProg,"uScale"),terrainDef.scale);
   gl.uniform1f(u(waterMaskProg,"uTime"),uTime);   // the SAME clock the forward pass uses — ADR-006 requires one time
   gl.uniform3f(u(waterMaskProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterMaskProg,"uMppK"),mppPerUnitDistance());
+  gl.uniform1f(u(waterMaskProg,"uCellM"),cellSizeM());
   gl.uniform1f(u(waterMaskProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterMaskProg,"uShoalRefM"),shoalReferenceM());
   gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
   bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
@@ -7249,7 +7250,7 @@ function renderGL(){
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uToon"),waterLook.style==="toon"?1:0);gl.uniform1f(u(waterProg,"uBandSteps"),Math.max(2,waterLook.bandSteps||5));
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
-      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterProg,"uMppK"),mppPerUnitDistance());gl.uniform1f(u(waterProg,"uShoalRefM"),shoalReferenceM());
+      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterProg,"uMppK"),mppPerUnitDistance());gl.uniform1f(u(waterProg,"uShoalRefM"),shoalReferenceM());gl.uniform1f(u(waterProg,"uCellM"),cellSizeM());
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
       bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"ais",1,buffers.iceSnow);bindAttr(waterProg,"aice",1,buffers.ice);
       bindAttr(waterProg,"awn",3,buffers.wnrm);bindAttr(waterProg,"asnowN",3,buffers.iceSnowNrm);

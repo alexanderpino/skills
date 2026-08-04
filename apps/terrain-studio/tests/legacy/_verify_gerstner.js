@@ -314,7 +314,7 @@ const TERMS = 12
         const fs = `#version 300 es
 precision highp float; out vec4 o; uniform float uMpp;
 ${mut === 'fade-disabled' ? src.replace(/float fd=clamp\([^;]*;/g, 'float fd=1.0;') : src}
-void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, N);
+void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, 0.0, N);
   o=vec4(d.y*0.5+0.5, N.y, 0.0, 1.0); }`
         const pr = g.createProgram()
         g.attachShader(pr, sh(g.VERTEX_SHADER, ['#version 300 es','in vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'].join(String.fromCharCode(10))))
