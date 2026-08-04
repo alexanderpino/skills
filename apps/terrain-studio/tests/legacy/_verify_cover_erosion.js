@@ -631,6 +631,48 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
             const rise = sedA[i] - sedB[i]
             if (rise > maxSedRise) maxSedRise = rise
           }
+          // AN INDEPENDENT SECOND OPINION, from a raster the cover book never touches.
+          //
+          // The Sprint 3 audit rated coverBookCloses algebraic and it was right: production
+          // accumulates consumedM/depositedM from exactly the per-cell differences it publishes
+          // (hydraulic.js:98), and dCover above re-sums those same differences. Both sides are the
+          // same numbers, so the check could not fail for any implementation.
+          //
+          // The PUBLISHED HEIGHT is a different raster. The cover pass partitions the height delta
+          // into layers, so what it charged to cover plus what it charged to bedrock must equal the
+          // lowering the solver actually published, and what it credited as deposition must equal
+          // the rise. A partition that clamps a layer and forgets to charge the remainder — the
+          // failure this whole story exists to prevent — makes the two disagree. Nothing here reads
+          // soil, sediment or sand.
+          if (primA && base && led && Number.isFinite(led.reliefHeightM)) {
+            const rel = led.reliefHeightM
+            let lower = 0, rise = 0, absH = 0
+            for (let i = 0; i < N; i++) {
+              const dh = primA[i] - base[i]
+              if (dh < 0) lower += A * (-dh) * rel; else rise += A * dh * rel
+              absH += A * Math.abs(dh) * rel
+            }
+            const charged = (led.coverConsumedM3 || 0) + (led.bedrockDetachedM3 || 0)
+            r.heightLowerM3 = lower
+            r.heightRiseM3 = rise
+            r.chargedVsLoweringErr = Math.abs(charged - lower)
+            r.depositVsRiseErr = Math.abs((led.depositedM3 || 0) - rise)
+            // FLOAT32 UNIT, and measured rather than assumed. The first draft used the double unit
+            // and read heightBookErr = 3.957 m3 against a bound of ~1e-4 — not a defect in the
+            // partition but the wrong error model: production stores a1/d1/s1 through Math.fround
+            // (hydraulic.js:93), so the charged sum carries float32 quantisation that no double
+            // reduction bound can cover. Exactly the mismatch S3.5e measured for HydroFix, in the
+            // opposite direction: there a tight bound exposed an error in the oracle's model, and
+            // so does this. The rejected double model is kept and required to FAIL, so the choice
+            // stays a live delta rather than a claim.
+            r.heightBookBound = boundFor(N, absH)
+            r.heightBookBoundF64 = boundF64(N, absH)
+            r.heightBookCloses = r.chargedVsLoweringErr <= r.heightBookBound
+              && r.depositVsRiseErr <= r.heightBookBound
+            // The bound must be smaller than what it constrains, on every run.
+            r.heightBookArming = r.heightBookBound > 0 ? (lower + rise) / r.heightBookBound : 0
+            r.heightBookF64WouldFail = Math.max(r.chargedVsLoweringErr, r.depositVsRiseErr) > r.heightBookBoundF64
+          }
           r.dCoverM3 = dCover
           r.coverAbsChange = absChange
           r.minCoverAfter = minCoverAfter
@@ -806,6 +848,25 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   const bareBedrock = bare.map(r => ledNum(r, 'bedrockDetachedM3'))
 
   const gates = {
+    // --- the book closes against a raster it does not come from ---------------------------------
+    // coverBookCloses compares production's ledger against a re-sum of the SAME per-cell
+    // differences production accumulated it from, so it is an identity. This one compares the
+    // ledger against the published HEIGHT delta, which the cover partition writes to but never
+    // reads its book from. It runs on every population, itemised and refused alike, because it
+    // needs no loss term.
+    coverBookClosesAgainstThePublishedHeight: every(runs, r => r.heightBookCloses === true),
+    // 100x, not a round 1e3 picked to look strict. At an arming of A the bound can still see a loss
+    // of 1/A of the transport, so 100 means "this gate would catch 1% of the moved volume going
+    // missing". Measured worst case across all runs: 885, i.e. it catches 0.11%. The threshold is
+    // the weakest bound that is still worth having, not the strongest the current build achieves —
+    // pinning it at the measurement would make any future fixture change look like a regression.
+    heightBookBoundIsSmallerThanTheTransportItConstrains: every(runs, r => num(r.heightBookArming) !== null
+      && r.heightBookArming > 100),
+    // The rejected double model must still be demonstrably wrong, or the float32 choice above is a
+    // preference rather than a measurement.
+    thePureDoubleHeightBookModelIsDemonstrablyWrong: every(runs.filter(r => num(r.chargedVsLoweringErr) !== null
+      && r.chargedVsLoweringErr > 0), r => r.heightBookF64WouldFail === true),
+
     // --- the refused population is measured, even though it cannot be closed --------------------
     refusedPathsAreMeasuredNotSilent: refused.length > 0
       && refusedUn.every(u => u.frac !== null && Number.isFinite(u.frac) && u.transported > 0),
@@ -1019,7 +1080,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `runs=${runs.length} ledgers=${runs.filter(r => r.ledger).length} `
     + `deepBedrockDetached=[${deepBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
     + `bareBedrockDetached=[${bareBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
-    + `unaccountedRefused=${maxRefusedFrac === null ? 'n/a' : maxRefusedFrac.toFixed(4)} unaccountedItemised=${maxItemisedFrac === null ? 'n/a' : maxItemisedFrac.toExponential(2)} maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
+    + `heightBookErr=${fmt(Math.max(0, ...runs.map(r => num(r.chargedVsLoweringErr) === null ? 0 : r.chargedVsLoweringErr)))} heightBookArming=${fmt(Math.min(...runs.map(r => num(r.heightBookArming) === null ? 0 : r.heightBookArming)))} unaccountedRefused=${maxRefusedFrac === null ? 'n/a' : maxRefusedFrac.toFixed(4)} unaccountedItemised=${maxItemisedFrac === null ? 'n/a' : maxItemisedFrac.toExponential(2)} maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
     + `stackViolations=${runs.reduce((a, r) => a + ((r.stackIdentity && r.stackIdentity.violations) || 0), 0)} `
     + `maxStackResidualM=${fmt(Math.max(0, ...runs.map(r => (r.stackIdentity && r.stackIdentity.maxResidualM) || 0)))} `
     + `maxLossItemErr=${fmt(Math.max(0, ...runs.map(r => (typeof r.lossItemErr === 'number' ? r.lossItemErr : 0))))} `
