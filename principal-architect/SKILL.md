@@ -10,8 +10,8 @@ description: >-
   agent acts as a master architect and business analyst: it picks the altitude, derives content
   from evidence, writes user stories/acceptance criteria in the company's house format, and
   triages so only needed artifacts are produced. Captures software with C4, records decisions via
-  RFC→ADR, and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD. Conforms to
-  ISO/IEC/IEEE 42010, ISO/IEC 25010, ISO/IEC/IEEE 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42.
+  RFC→ADR, and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD.
+  Conforms to ISO 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42.
 ---
 
 # Architecture Docs
