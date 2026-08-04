@@ -22,6 +22,7 @@ import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } f
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
+import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, SUBGRAPH_VERSION } from './core/subgraph.js';
 import { LEGACY_PORTS, LEGACY_ROSTER, LEGACY_INS_LABELS } from './core/legacy-ports.js';
 import { serializeProject, parseProject, migrateProject, migrateV1toV2, migrateV2toV3, validateProject,
   PROJECT_SCHEMA_VERSION, PROJECT_FILE_EXTENSION, ProjectError } from './core/project.js';
@@ -4669,6 +4670,72 @@ $("#exportBtn").onclick=exportHeightmap;
    user action.
    ===================================================================== */
 
+// --- subgraph definitions and instance evaluation (S8.5 / S8.6) -------------------------------
+// Definitions are document state. Instances evaluate a definition's internal DAG in a PRIVATE node
+// list, so internal nodes never enter `nodes` and therefore never reach the palette, selection, or
+// the parent's serialisation. That is the difference between encapsulation and macro expansion.
+let subgraphDefinitions = {};
+export function getSubgraphDefinitions(){ return subgraphDefinitions; }
+export function defineSubgraph(def){
+  subgraphDefinitions = registerDefinition(subgraphDefinitions, def);
+  nodes.forEach(nd=>{ if(nd.type==='subgraph') markDirtyFrom(nd.id); });
+  return subgraphDefinitions[def.id];
+}
+export function clearSubgraphDefinitions(){ subgraphDefinitions = {}; }
+
+// Immutable-result cache, keyed by the full ADR-004 identity. Two identical instances share an
+// entry; two with different overrides can never collide, which is what stops one instance's state
+// leaking into another.
+const SUBGRAPH_CACHE = new Map();
+export function subgraphCacheSize(){ return SUBGRAPH_CACHE.size; }
+export function clearSubgraphCache(){ SUBGRAPH_CACHE.clear(); }
+
+function parseOverrides(text){
+  const out = {};
+  for(const line of String(text||'').split(/\r?\n/)){
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(-?[0-9.]+)\s*$/);
+    if(m) out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+
+export function evaluateSubgraphInstance(params, ins, node){
+  const def = subgraphDefinitions[String(params.definitionId||'').trim()];
+  if(!def) return null;                       // unknown definition renders flat, visibly, not fatally
+  const overrides = parseOverrides(params.overrides);
+  const key = instanceCacheKey({ definition: def, overrides, seed: terrainDef.seed,
+    context: { res: RES, lattice: terrainDef.lattice },
+    upstreamKeys: [ins[0] ? String(ins[0].length) : 'null'] });
+  if(SUBGRAPH_CACHE.has(key)) return SUBGRAPH_CACHE.get(key);
+
+  // Evaluate the internal DAG against a PRIVATE node list. `local` never touches `nodes`.
+  const local = new Map();
+  for(const n of def.nodes) local.set(n.localId, { ...n, params:{ ...(n.params||{}), ...overrides }, _field:null });
+  const inbound = new Map();
+  for(const e of (def.edges||[])) if(!e.disabled) inbound.set(e.to, e);
+  const evalLocal = (localId, guard) => {
+    if(guard.has(localId)) return null;
+    guard.add(localId);
+    const n = local.get(localId);
+    if(!n){ guard.delete(localId); return null; }
+    if(n._field){ guard.delete(localId); return n._field; }
+    const upstream = inbound.get(localId);
+    const inputField = upstream ? evalLocal(upstream.from, guard) : (ins[0]||null);
+    const type = TYPES[n.type];
+    let f;
+    try{ f = type ? type.eval(n.params, [inputField, null, null], n) : newField(); }
+    catch(err){ console.error('subgraph', n.type, err); f = newField(); }
+    if(f && f.values instanceof Map) f = f.values.values().next().value;
+    n._field = f;
+    guard.delete(localId);
+    return f;
+  };
+  const outPort = (def.outputs||[])[0];
+  const result = outPort ? evalLocal(outPort.from, new Set()) : null;
+  if(result) SUBGRAPH_CACHE.set(key, result);
+  return result;
+}
+
 // --- New Terrain dialog and creation preflight (S9.2) -----------------------------------------
 // THE RULE IS: NOTHING IS ALLOCATED UNTIL THE USER CONFIRMS. Today `newTerrainDocument` gates on a
 // confirm() and then synchronously builds and evaluates, and there is no preflight anywhere — so
@@ -4830,6 +4897,7 @@ function collectProjectState(){
   const palettes=collectCustomSatmaps();
   const vars=getDocumentVariables();
   const domain=getWorldDomain();
+  const usedDefs=referencedDefinitions(subgraphDefinitions,nodes).map(id=>subgraphDefinitions[id]);
   return{
     terrain:{...terrainDef},
     build:{res:RES,quality:BUILD_QUALITY,resLock:SCALE_RES},
@@ -4844,6 +4912,7 @@ function collectProjectState(){
     ...(palettes?{palettes}:{}),
     domain,
     ...(vars.length?{variables:vars}:{}),
+    ...(usedDefs.length?{definitions:usedDefs}:{}),
     workspace:{
       selectedId:selected?selected.id:null,
       selectedEdgeKey:selectedEdge||null,
@@ -4878,6 +4947,8 @@ export const DOMAIN={getWorldDomain,setWorldDomain,domainFromLegacy,deriveResolu
 
 export const FEASIBILITY_API={assessCreation,decomposePages,formatBytes};
 
+export const SUBGRAPHS={defineSubgraph,getSubgraphDefinitions,clearSubgraphDefinitions,clearSubgraphCache,subgraphCacheSize,definitionHash,findRecursion,validateDefinition,instanceCacheKey,referencedDefinitions,SUBGRAPH_VERSION};
+
 // Restoring is deliberately close to restoreGraph: same runtime-field reset, same H_SCALE recompute.
 // Undo history is CLEARED, not carried — an undo across an Open would splice two unrelated
 // documents together and the result would be neither.
@@ -4892,6 +4963,7 @@ function applyProjectDocument(doc){
   if(doc.palettes&&doc.palettes.satmaps)for(const [name,stops] of Object.entries(doc.palettes.satmaps))SATMAPS[name]=stops;
   if(Array.isArray(doc.variables))setDocumentVariables(doc.variables);
   if(doc.domain)worldDomain={...doc.domain};
+  if(Array.isArray(doc.definitions)){clearSubgraphDefinitions();for(const d of doc.definitions)subgraphDefinitions=registerDefinition(subgraphDefinitions,d);}
 
   nodes=nextNodes;
   // Derive the legacy slot from the stable port id. That is the whole point of v2: the wire
@@ -7541,7 +7613,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 214 symbols (28 writable, 186 read-only).
+ * 215 symbols (28 writable, 187 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7590,7 +7662,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 186 read-only. Getters hand out the LIVE value: 6 of
+  // 187 read-only. Getters hand out the LIVE value: 6 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("terrainDef", () => terrainDef, __ro("terrainDef"))
@@ -7608,20 +7680,20 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
   __def("resolveColor", () => resolveColor, __ro("resolveColor"))
   __def("cloneParams", () => cloneParams, __ro("cloneParams"))
+  __def("fieldW", () => fieldW, __ro("fieldW"))
   __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
   __def("buildProps", () => buildProps, __ro("buildProps"))
-  __def("fieldW", () => fieldW, __ro("fieldW"))
   __def("glc", () => glc, __ro("glc"))
   __def("canyonFieldCPU", () => canyonFieldCPU, __ro("canyonFieldCPU"))
   __def("GPU", () => GPU, __ro("GPU"))
   __def("updateViewport", () => updateViewport, __ro("updateViewport"))
   __def("select", () => select, __ro("select"))
+  __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
   __def("curField", () => curField, __ro("curField"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
   __def("u", () => u, __ro("u"))
-  __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
   __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
   __def("VARS", () => VARS, __ro("VARS"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
@@ -7634,21 +7706,21 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("frameHero", () => frameHero, __ro("frameHero"))
   __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
+  __def("blankGraph", () => blankGraph, __ro("blankGraph"))
+  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
-  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("planView", () => planView, __ro("planView"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
+  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("transformField", () => transformField, __ro("transformField"))
-  __def("blankGraph", () => blankGraph, __ro("blankGraph"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
   __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
-  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("simulateTerrainWind", () => simulateTerrainWind, __ro("simulateTerrainWind"))
   __def("sun", () => sun, __ro("sun"))
   __def("syncDisplayState", () => syncDisplayState, __ro("syncDisplayState"))
@@ -7775,6 +7847,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("SKIRT_PRESETS", () => SKIRT_PRESETS, __ro("SKIRT_PRESETS"))
   __def("smooth", () => smooth, __ro("smooth"))
   __def("snapshotIsEditorOnly", () => snapshotIsEditorOnly, __ro("snapshotIsEditorOnly"))
+  __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("surfaceHeight", () => surfaceHeight, __ro("surfaceHeight"))
   __def("thermalErodeHex", () => thermalErodeHex, __ro("thermalErodeHex"))
   __def("viewportHeightFrame", () => viewportHeightFrame, __ro("viewportHeightFrame"))

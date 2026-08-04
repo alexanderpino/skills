@@ -219,6 +219,15 @@ export function canonicalProject(state) {
   // WorldDomain/1 — the authoritative frame. Emitted before graph, because everything in the graph
   // is interpreted against it.
   if (isPlainObject(state.domain)) doc.domain = canonicalValue(state.domain, 'domain')
+  // Subgraph definitions the graph actually references, embedded so a shared document is
+  // self-contained. Sorted by id for normal form. canonicalProject builds the document from an
+  // EXPLICIT field list rather than copying state wholesale — which is why a new block has to be
+  // added here to appear at all, and why the oracle caught its absence rather than a silent partial.
+  if (Array.isArray(state.definitions) && state.definitions.length) {
+    doc.definitions = state.definitions
+      .map(d => canonicalValue(d, `definition ${d && d.id}`))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  }
   // Variables are document state, sorted by id so the file is a normal form like everything else.
   if (Array.isArray(state.variables) && state.variables.length) {
     doc.variables = state.variables

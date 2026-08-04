@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 86,
+  "nodeCount": 87,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -74,6 +74,7 @@
     "softclip": "f1971d74:a671945f",
     "stampn": "4e87387a:3e4f65d7",
     "streampower": "de0bb6c7:dfd0997e",
+    "subgraph": "0:0",
     "surface": "2639c8ef:af12b2b|ex_roughen=2622dd32:2bb7edfb|ex_distress=262c8d5a:b00d6abe|ex_groundtexture=26246463:f394b3b0|ex_rocknoise=613c9ee9:b5fb3200|ex_bulbous=37a87f98:a527c773|ex_pockmarks=a6a81e4f:7e8b03f6|ex_contours=b123221a:b64ea8f0|ex_grid=8f8b60ba:49a1b646",
     "switch": "263bdef7:bcf4a390",
     "tectonic": "6490b46c:75aeb0ab",
