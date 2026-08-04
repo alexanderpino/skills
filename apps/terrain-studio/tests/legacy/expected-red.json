@@ -15,12 +15,5 @@
     "An entry is removed in the same commit that makes its oracle green. If an entry is still here",
     "when its story ships, that is a defect in the story, not paperwork."
   ],
-  "entries": [
-    {
-      "oracle": "_verify_cover_erosion.js",
-      "story": "S3.3 cover-aware transport",
-      "reason": "hydraulic declares no cover inputs and emits no state rasters",
-      "beforeGreen": "solidVolumeMatchesNetTransport is the one frame-sensitive gate. The decision is TWO NAMED FRAMES: viewport keeps autolevel, physical nodes take a stable datum via an explicit adapter. Restate that gate against the stable frame."
-    }
-  ]
+  "entries": []
 }

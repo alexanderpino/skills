@@ -262,7 +262,15 @@ function installHarness(cfg) {
     fold: ['A', 'M'], directionalwarp: ['A', 'D', 'M'],
     // --- erosion ---
     thermal: ['A', 'M'], fracture: ['A', 'M'], streampower: ['A', 'B', 'M'],
-    hydraulic: ['A', 'M'],
+    // S3.3 gave Hydraulic three new slots: Soil depth (m), Sediment depth (m), Precipitation
+    // (mm/yr). They are wired here rather than left null because the claim worth pinning is that
+    // ATTACHING COVER MOVES NOTHING — the baseline below is unchanged from the pre-S3.3 build with
+    // three sources hanging off the node. As with regolith, a perlin into a strictly-typed metre
+    // port is a fixture and not a legal UI edge; the digest wires by slot and never consults
+    // canConnect, and what it needs from a source is determinism. The cover arithmetic itself is
+    // demand-gated (this evaluator passes no ctx, so no cover output is demanded) and is gated by
+    // _verify_cover_erosion.js, which reads the rasters and the physical-volume ledger.
+    hydraulic: ['A', 'M', 'B', 'C', 'D'],
     erosion2: ['A', 'M'], hydrofix: ['A', 'M'],
     surface: ['A', 'M'],
     // --- surface / geology ---

@@ -299,6 +299,30 @@ const LEGACY_PORTS_RAW = {
     in: [
       { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
       { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+      // S3.3 — the explicit cover and forcing inputs. Added after seeding, for the same three
+      // reasons `d_deposits.sedimentState` above was: the adapter's own data is where a ROSTERED
+      // type has to gain a port (registry.js:98 drops a type out of the adapter the moment it
+      // declares `inputs:`, and _verify_port_contract.js's `insDrift` anchor is DERIVED from these
+      // rows, so adding here keeps the anchor exact); a physical semantic is legal because these
+      // are NEW slots no shipped document uses and cover thickness in metres is not ADR-005's
+      // disputed elevation frame; and stable new ids are not a regeneration of the frozen ones.
+      //
+      // OPTIONAL, not required, and that is a decision rather than an oversight. Every hydraulic
+      // node in every saved graph has these slots unwired, and a required input would refuse them
+      // all. Unwired means "this graph carries no cover", which is bare bedrock — the honest
+      // reading, and the one that keeps an unwired graph byte-identical to the pre-S3.3 build.
+      // The selectors' `MISSING_REQUIRED_INPUT` rule (core/cover-state.js) is about a node whose
+      // ONLY job is to carry a state; hydraulic's job is transport, and it has a defined answer
+      // with no cover.
+      { id: "soilDepth", name: "Soil depth", semantic: "soilDepth", unit: "m",
+        lens: "state", legacySlot: 2 },
+      { id: "sedimentDepth", name: "Sediment depth", semantic: "sedimentDepth", unit: "m",
+        lens: "state", legacySlot: 3 },
+      // ADR-005: "Precipitation remains mm/yr". The unit is the authored one, not metres, because
+      // the interesting numbers live at 1e2..1e3 mm/yr and authoring them in m/yr puts a typo below
+      // the eye's resolution — the same argument ports.js records for the `mmPerYr` unit itself.
+      { id: "precipitation", name: "Precipitation", semantic: "precipitation", unit: "mmPerYr",
+        lens: "derived", legacySlot: 4 },
     ],
     out: { id: 'out', name: 'Out' },
   },

@@ -50,6 +50,15 @@
 // therefore the only frame-sensitive assertion in the file. It is labelled as such at its definition
 // and in the report.
 //
+// DECIDED SINCE, and the reason this paragraph is amended rather than deleted. The open decision was
+// closed as TWO NAMED FRAMES (ADR-005 / src/core/height-frame.js): the viewport keeps
+// `display-autolevel`, and a physical node takes metres from a stable datum through the explicit
+// adapter. Hydraulic's solidTop is therefore `physical-stable`, and the assertion above holds as
+// written. That is now itself gated — `physicalFrameIsStableNotAutolevel` measures which of the two
+// frames production actually used, on this file's own authored base field, and requires the
+// autolevelled alternative to disagree on the same fixture so the check is not vacuous. Nothing was
+// baked in: the frame-free gates below are unchanged and remain frame-free.
+//
 // COVER-BEFORE-BEDROCK IS ARMED BY THREE FIXTURES, not by one absolute comparison. A single
 // "bedrock did not move" claim is satisfied for free by a kernel that never touches bedrock at all,
 // so the discriminator is the PAIR:
@@ -79,6 +88,8 @@ const MUTATIONS = [
   'sand-nonzero',                // sandDepth stops being zero although no aeolian process ships
   'square-area-on-hex',          // the hex ledger integrates with s^2 instead of sqrt(3)/2*s^2
   'identity-ignores-deposition', // deposited material never reaches the explicit cover layer
+  'loss-derived-from-field-sums',// the loss term becomes eroded-deposited: a closure that cannot fail
+  'cover-alters-published-height',// wiring cover moves the terrain: an unauthorised C3 re-bless
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -140,6 +151,12 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       sedIn: portOk(findIn('sedimentDepth'), 'm'),
       precipIn: portOk(findIn('precipitation'), 'mmPerYr'),
       solidTopOut: portOk(findOut('solidTop'), 'm'),
+      // S3.3 EXTENSION. The stack identity solidTop = bedrockHeight + soilDepth + sedimentDepth +
+      // sandDepth was, as this file first shipped, only ever checked as a VOLUME. It is a
+      // per-sample statement and the term that makes it readable off a port is `bedrockHeight`,
+      // which production now publishes; asserting it sample-by-sample is strictly stronger than
+      // integrating it, and three of the five mutations turn the per-sample form red.
+      bedrockOut: portOk(findOut('bedrockHeight'), 'm'),
       soilOut: portOk(findOut('soilDepth'), 'm'),
       sedOut: portOk(findOut('sedimentDepth'), 'm'),
       sandOut: portOk(findOut('sandDepth'), 'm'),
@@ -191,6 +208,20 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
             led.coverConsumedM3 = 0
           }
         }
+        if (mutation === 'cover-alters-published-height' && soilIn) {
+          // WIRING COVER MOVES THE TERRAIN. Sprint-03 pre-authorises a stated `C3` re-bless for
+          // Hydraulic, and this is the shape of one taken without saying so: the same graph erodes
+          // differently the moment a soil field is attached, so every downstream digest, thumbnail
+          // and saved document changes and nothing announces it. The perturbation is applied only
+          // where cover exists, so the UNWIRED evaluation below — which is the pre-S3.3 call shape,
+          // two arguments and no state demand — comes back untouched and the two stop matching.
+          const h = vals.get(primaryId)
+          if (h && h.length === soilIn.length) {
+            const m = Float32Array.from(h)
+            for (let i = 0; i < m.length; i++) if (soilIn[i] > 0) m[i] = Math.fround(m[i] * 1.000001)
+            vals.set(primaryId, m)
+          }
+        }
         if (mutation === 'identity-ignores-deposition') {
           // Deposition happens in the height field but is never credited to the explicit cover
           // layer — the `d_deposits`-as-prediction world S3.3 exists to end. The ledger still
@@ -209,6 +240,17 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
               kind: 'scalarRaster', storage: 'R32F', components: 1, semantic: 'sandDepth',
               unit: 'm', lens: 'state' }])
           }
+        }
+        if (mutation === 'loss-derived-from-field-sums' && led) {
+          // THE DEFECT THIS SUITE KEEPS FINDING, in a new place. The boundary loss stops being a
+          // quantity the solver accumulated over cells or particles the published field does not
+          // control, and becomes `eroded - deposited` — a subtraction of the very two sums it is
+          // then compared against. `ledgerMassCloses` CANNOT see this: under it that gate holds
+          // exactly, for any implementation, including one that deletes the terrain. Only the
+          // itemisation gate can, which is the whole reason itemisation is asserted and not merely
+          // printed.
+          led.exportedOrSuspendedM3 = (led.coverConsumedM3 || 0) + (led.bedrockDetachedM3 || 0)
+            - (led.depositedM3 || 0)
         }
         if (mutation === 'square-area-on-hex' && terrainDef.lattice === 'hex' && led) {
           // The hex ledger integrates depth with the SQUARE cell area over a square row count.
@@ -304,7 +346,8 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         if (sPre >= 0) ins[sPre] = precip
 
         const nd = { id: 9001, type: 'hydraulic', params: null }
-        const demanded = new Set([primaryId, 'out', 'height', 'solidTop', 'soilDepth', 'sedimentDepth', 'sandDepth'])
+        const demanded = new Set([primaryId, 'out', 'height', 'solidTop', 'bedrockHeight',
+          'soilDepth', 'sedimentDepth', 'sandDepth'])
 
         // --- BEFORE: both stages disabled. Contractually an identity pass that echoes cover and
         //     publishes an all-zero cover ledger. It is also how the before-state solidTop is
@@ -315,6 +358,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         const ledB = grabLedger()
         const soilB = grab(vB, 'soilDepth'), sedB = grab(vB, 'sedimentDepth')
         const sandB = grab(vB, 'sandDepth'), topB = grab(vB, 'solidTop')
+        const bedB = grab(vB, 'bedrockHeight')
         r.before = {
           hasState: !!(soilB && sedB && sandB && topB),
           echoesSoil: bitEqual(soilB, soil0),
@@ -336,6 +380,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         const led = grabLedger()
         const soilA = grab(vA, 'soilDepth'), sedA = grab(vA, 'sedimentDepth')
         const sandA = grab(vA, 'sandDepth'), topA = grab(vA, 'solidTop')
+        const bedA = grab(vA, 'bedrockHeight')
         const primA = grab(vA, primaryId)
         r.after = {
           hasState: !!(soilA && sedA && sandA && topA),
@@ -351,6 +396,108 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         }
         r.ledger = led
         r.ran = !!(led && r.after.hasState && r.before.hasState)
+
+        // --- S3.3 EXTENSION: the byte-identity control ------------------------------------------
+        // The SAME transport pass called the way the pre-S3.3 build was called: two arguments, no
+        // cover attached, no state demanded. Sprint-03 pre-authorises a stated `C3` re-bless for
+        // Hydraulic, but only as a stated one — a graph that wires no cover must produce the terrain
+        // it produced yesterday, byte for byte, and that has to be MEASURED rather than argued from
+        // the fact that the digest recipe happens not to demand a state port. Taken after the ledger
+        // snapshot above, because a third evaluation replaces hydroMassDiag.
+        const rawU = TYPES.hydraulic.eval(nd.params, [ins[0], null], nd, { demanded: new Set([primaryId]) })
+        const primU = grab(readValues(rawU), primaryId)
+        r.unwiredLength = primU ? primU.length : null
+        r.unwiredMatchesWired = bitEqual(primU, primA)
+
+        // --- S3.3 EXTENSION: the solid-stack identity, PER SAMPLE ------------------------------
+        //   solidTop = bedrockHeight + soilDepth + sedimentDepth + sandDepth
+        // asserted at every sample of BOTH passes, not integrated. The tolerance is derived, not
+        // picked: each published raster is Float32, the sum is formed in double, so the largest
+        // legitimate residual is a few units in the last place of the biggest term. 2^-23 is one
+        // Float32 ulp relative, and 4x that over the sum of magnitudes covers the rounding of the
+        // stored difference plus the reduction. A residual above it is a stack that does not close.
+        //
+        // ABSENCE OF EVIDENCE IS RED: `samples` must reach 2N, so a missing bedrockHeight raster or
+        // a short one fails here rather than silently checking nothing.
+        const F32_ULP = Math.pow(2, -23)
+        const stack = (top, bed, so, se, sa) => {
+          const acc = { samples: 0, violations: 0, maxResidualM: 0, maxRatio: 0 }
+          if (!top || !bed || !so || !se || !sa) return acc
+          const n = Math.min(top.length, bed.length, so.length, se.length, sa.length)
+          if (n !== N) return acc
+          for (let i = 0; i < n; i++) {
+            const res = top[i] - (bed[i] + so[i] + se[i] + sa[i])
+            const mag = Math.abs(top[i]) + Math.abs(bed[i]) + Math.abs(so[i]) + Math.abs(se[i]) + Math.abs(sa[i])
+            const tol = 4 * F32_ULP * mag + 1e-6
+            acc.samples++
+            if (!(Math.abs(res) <= tol)) acc.violations++
+            if (Math.abs(res) > acc.maxResidualM) acc.maxResidualM = Math.abs(res)
+            const ratio = Math.abs(res) / tol
+            if (ratio > acc.maxRatio) acc.maxRatio = ratio
+          }
+          return acc
+        }
+        // --- S3.3 EXTENSION: WHICH FRAME solidTop is actually in ---------------------------------
+        // The header says exactly one gate here is frame-sensitive and that the decision was open
+        // when this file was written. It is now taken — two named frames, and a physical node takes
+        // `physical-stable`. That is a claim about production's arithmetic, so it is measured, not
+        // read off a label: the BEFORE pass moved no material, so its solidTop must be the base
+        // field this file AUTHORED, mapped through the datum and relief production reports.
+        //
+        // AND THE COMPARISON IS ARMED IN PLACE. A bound only means something between two measured
+        // endpoints, so the autolevelled alternative is evaluated on the same fixture and required
+        // to DISAGREE by three orders of magnitude more than the tolerance. If the two frames
+        // happened to coincide here, the agreement above would be evidence of nothing.
+        if (topB && led && Number.isFinite(led.datumM) && Number.isFinite(led.reliefHeightM)) {
+          const dat = led.datumM, rel = led.reliefHeightM
+          let mn = Infinity, mx = -Infinity
+          for (let i = 0; i < N; i++) { const v = base[i]; if (v < mn) mn = v; if (v > mx) mx = v }
+          const span = (mx - mn) || 1
+          let maxStable = 0, maxAuto = 0
+          for (let i = 0; i < N; i++) {
+            const ds = Math.abs(topB[i] - (dat + base[i] * rel))
+            const da = Math.abs(topB[i] - (dat + (base[i] - mn) / span * rel))
+            if (ds > maxStable) maxStable = ds
+            if (da > maxAuto) maxAuto = da
+          }
+          r.frame = { name: typeof led.frame === 'string' ? led.frame : null, datumM: dat, reliefHeightM: rel,
+            maxErrVsStableM: maxStable, maxErrVsAutolevelM: maxAuto,
+            tolM: 4 * Math.pow(2, -23) * (Math.abs(dat) + Math.abs(rel)) + 1e-6 }
+        }
+
+        const sB = stack(topB, bedB, soilB, sedB, sandB), sA = stack(topA, bedA, soilA, sedA, sandA)
+        r.stackIdentity = {
+          samples: sB.samples + sA.samples, expected: 2 * N,
+          violations: sB.violations + sA.violations,
+          maxResidualM: Math.max(sB.maxResidualM, sA.maxResidualM),
+          maxRatio: Math.max(sB.maxRatio, sA.maxRatio),
+        }
+
+        // --- S3.3 EXTENSION: the loss term must be ITEMISED, not derived -----------------------
+        // Every number the ledger prints for the boundary is asserted here, because a quantity
+        // worth printing is worth failing on. `exportedOrSuspendedM3` must equal its own named
+        // components — boundary export plus still-suspended load minus the NAMED mass source the
+        // CPU brush creates at the border (legacy.js erode1; the same term _verify_erosion_mass.js
+        // G2 gates as `sumIn - sumOut = exported + lost - brushClipGain`). The three are each
+        // accumulated by the solver over cells or particles the published field does not control.
+        //
+        // This is what `ledgerMassCloses` cannot do: replace the loss with `eroded - deposited` and
+        // that gate holds by construction — the `loss-derived-from-field-sums` mutation is exactly
+        // that substitution, and this is the gate it turns red.
+        if (led) {
+          const fin = v => (typeof v === 'number' && Number.isFinite(v)) ? v : null
+          const b = fin(led.boundaryExportedM3), s = fin(led.suspendedM3), g = fin(led.brushClipGainM3) || 0
+          const e = fin(led.exportedOrSuspendedM3)
+          const itemSum = (b === null ? NaN : b) + (s === null ? NaN : s) - g
+          const absSum = Math.abs(b || 0) + Math.abs(s || 0) + Math.abs(g) + Math.abs(e || 0)
+          // Double-precision reassociation only: three products summed versus one product of the
+          // sum. 8 * eps * sum(|term|) is that bound written out, plus a floor for an all-zero book.
+          r.lossBound = 8 * Number.EPSILON * absSum + 1e-9
+          r.lossItemErr = (e === null || !Number.isFinite(itemSum)) ? null : Math.abs(e - itemSum)
+          r.lossSource = typeof led.lossSource === 'string' ? led.lossSource : null
+          r.lossItemised = r.lossItemErr !== null && r.lossItemErr <= r.lossBound
+            && !!r.lossSource && b !== null && s !== null
+        }
 
         // --- the frame-free readings -----------------------------------------------------------
         if (soilA && sedA && sandA && soilB && sedB && sandB) {
@@ -396,12 +543,37 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         // fieldMin/fieldMax metadata before it means anything.
         if (topA && topB && led) {
           const A = r.areaExpected
-          let dSolid = 0, abs = 0
-          for (let i = 0; i < N; i++) { dSolid += A * (topA[i] - topB[i]); abs += A * (Math.abs(topA[i]) + Math.abs(topB[i])) }
+          let dSolid = 0, abs = 0, moved = 0
+          for (let i = 0; i < N; i++) {
+            dSolid += A * (topA[i] - topB[i])
+            abs += A * (Math.abs(topA[i]) + Math.abs(topB[i]))
+            moved += A * Math.abs(topA[i] - topB[i])
+          }
           r.dSolidM3 = dSolid
           r.solidBound = boundFor(N, abs)
           r.solidErr = Math.abs(dSolid + (led.exportedOrSuspendedM3 || 0))
           r.solidCloses = r.solidErr <= r.solidBound
+
+          // S3.3 EXTENSION — THE SAME CLAIM, SCALED BY THE TRANSPORT INSTEAD OF THE ELEVATIONS.
+          // `abs` above sums ELEVATIONS, which carry the datum and the full relief, so the bound it
+          // produces is set by how high the terrain is rather than by how much material moved.
+          // MEASURED on the shipping square GPU fixture: bound 6.351e7 m3 against an export term of
+          // 2.292e5 m3 — a factor of 277. Zeroing the loss term there leaves solidErr at 2.292e5 and
+          // the gate above still passes, so on that path it cannot see the quantity it is about.
+          // (The suite is not blind to it — `ledgerMassCloses` scales its bound by the ledger's own
+          // terms and does go red — but this gate is the only one that ties the published solidTop
+          // RASTER to the ledger, and that tie was slack exactly where ADR-002 says CPU evidence
+          // does not carry: the GPU path.)
+          //
+          // `moved` is the volume the pass actually displaced, which is the magnitude this identity
+          // is made of. THE ARMING ENDPOINT IS MEASURED IN PLACE, on every run, as the second half
+          // of the gate: |exported| must exceed the bound. That inequality is the proof that a build
+          // which dropped the loss term would land at solidErr = |dSolid| = |exported| > bound and
+          // go red — arming checked continuously rather than once in a control.
+          r.movedVolumeM3 = moved
+          r.solidTransportBound = boundFor(N, moved + Math.abs(led.exportedOrSuspendedM3 || 0))
+          r.solidClosesAgainstTransport = r.solidErr <= r.solidTransportBound
+          r.solidGateArming = Math.abs(led.exportedOrSuspendedM3 || 0) / r.solidTransportBound
         }
       } catch (e) {
         r.error = String((e && e.message) || e)
@@ -513,6 +685,52 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     // --- the one frame-sensitive claim (see the header) ------------------------------------------
     solidVolumeMatchesNetTransport: every(runs, r => r.solidCloses === true),
 
+    // --- S3.3 EXTENSIONS -------------------------------------------------------------------------
+    // The frame decision the expected-red register left open, closed and MEASURED: solidTop is the
+    // authored field through a stable datum, and the autolevelled alternative is evaluated on the
+    // same fixture and shown to disagree, so the agreement is evidence rather than a coincidence.
+    physicalFrameIsStableNotAutolevel: every(runs, r => !!r.frame && r.frame.name === 'physical-stable'
+      && num(r.frame.maxErrVsStableM) !== null && r.frame.maxErrVsStableM <= r.frame.tolM
+      && num(r.frame.maxErrVsAutolevelM) !== null && r.frame.maxErrVsAutolevelM > 1e3 * r.frame.tolM),
+    // The same solid-volume claim under a bound scaled by the transport rather than by the
+    // elevations, plus the arming endpoint measured on every run: the bound must be SMALLER than
+    // the export term it constrains, or the closure above is insensitive to it. See the derivation
+    // at the measurement — the shipped bound is 277x too loose on the square GPU path.
+    solidVolumeBoundIsSmallerThanTheTermItConstrains: every(runs,
+      r => r.solidClosesAgainstTransport === true
+        && num(r.solidGateArming) !== null && r.solidGateArming > 1),
+    // The story's headline identity, at every sample of both passes rather than under an integral.
+    // Armed by three of the six mutations: bedrock-first-kernel and identity-ignores-deposition
+    // both hand back a cover raster that no longer matches the bedrock the node computed, and
+    // sand-nonzero adds a quarter metre of aeolian cover to a stack that has none.
+    solidStackIdentityClosesPerSample: report.ports.bedrockOut === true
+      && every(runs, r => !!r.stackIdentity && r.stackIdentity.samples === r.stackIdentity.expected
+        && r.stackIdentity.expected > 0 && r.stackIdentity.violations === 0),
+    // The boundary loss must be the sum of its own NAMED components, never a difference of the two
+    // field sums it is compared against. Armed by loss-derived-from-field-sums, which is the only
+    // mutation `ledgerMassCloses` is structurally unable to detect.
+    coverLossIsItemizedNotDerived: every(runs, r => r.lossItemised === true),
+    // Cover changes the BOOKS, not the terrain. S3.3 implements transport ORDER — loose cover first,
+    // bedrock second — and not a differential-erodibility law, which nobody has specified and which
+    // would be a fabricated constant. So the published height with cover attached must be the
+    // published height without it, bit for bit, and the `C3` re-bless stays unspent. Armed by
+    // cover-alters-published-height.
+    coverDoesNotMoveThePublishedHeight: every(runs, r => r.unwiredMatchesWired === true
+      && r.unwiredLength === r.N),
+    // A PRECONDITION gate, in the same category as `hexRowCountIsNotRes` above and deliberately not
+    // armed by a mutation. `coverInputPortsDeclared` reads DESCRIPTORS, and for soilDepth and
+    // sedimentDepth the three fixtures prove the values reach the arithmetic — deep, bare and mixed
+    // produce three different ledgers from the same terrain. `precipitation` has no such witness:
+    // nothing consumes it in S3.3, so a descriptor pointing at a slot the evaluator never reads
+    // would look exactly like a working port. This makes production say which slot it indexed and
+    // whether a field of the right length arrived there, so "declared" and "filled" are two separate
+    // measured claims rather than one.
+    precipitationSlotIsFilledAndDeclaredUnconsumed: every(runs, r => !!r.ledger
+      && r.ledger.precipitationWired === true && r.ledger.precipitationConsumed === false
+      && r.ledger.precipitationSlot === report.ports.slots.precip
+      && r.ledger.soilSlot === report.ports.slots.soil
+      && r.ledger.sedimentSlot === report.ports.slots.sed),
+
     // --- the shipping square GPU path is separate evidence from the compatibility path -----------
     gpuSquarePathMeasured: report.gpuAvailable === true
       && runs.some(r => r.gpu === true && r.lattice === 'square' && r.ran === true),
@@ -559,6 +777,16 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `deepBedrockDetached=[${deepBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
     + `bareBedrockDetached=[${bareBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
     + `maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
+    + `stackViolations=${runs.reduce((a, r) => a + ((r.stackIdentity && r.stackIdentity.violations) || 0), 0)} `
+    + `maxStackResidualM=${fmt(Math.max(0, ...runs.map(r => (r.stackIdentity && r.stackIdentity.maxResidualM) || 0)))} `
+    + `maxLossItemErr=${fmt(Math.max(0, ...runs.map(r => (typeof r.lossItemErr === 'number' ? r.lossItemErr : 0))))} `
+    + `lossSources=[${Array.from(new Set(runs.map(r => r.lossSource || 'none'))).sort().join(',')}] `
+    + `unwiredMatchesWired=${runs.filter(r => r.unwiredMatchesWired === true).length}/${runs.length} `
+    + `minSolidArming=${fmt(Math.min(...runs.map(r => num(r.solidGateArming) === null ? 0 : r.solidGateArming)))} `
+    + `maxSolidErr=${fmt(Math.max(0, ...runs.map(r => num(r.solidErr) === null ? 0 : r.solidErr)))} `
+    + `frame=${(runs.find(r => r.frame) || { frame: {} }).frame.name || 'n/a'} `
+    + `maxErrVsStableM=${fmt(Math.max(0, ...runs.map(r => (r.frame && r.frame.maxErrVsStableM) || 0)))} `
+    + `maxErrVsAutolevelM=${fmt(Math.max(0, ...runs.map(r => (r.frame && r.frame.maxErrVsAutolevelM) || 0)))} `
     + `failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
   console.log(JSON.stringify({ ...report, gates, errors, ok }, null, 2))
   await browser.close()
