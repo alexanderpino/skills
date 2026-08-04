@@ -32,8 +32,47 @@ if(mutation&&!MUTATIONS.includes(mutation)){console.error(`Unknown mutation ${mu
     terrainDef.north=37;const angles=Float32Array.from([-Math.PI/2+37*Math.PI/180,0+37*Math.PI/180,Math.PI/2+37*Math.PI/180,Math.PI+37*Math.PI/180]);
     const preview=mutation==='aspect-preview-raw'?angles:TYPES.aspect.previewAdapter(angles,terrainDef),expectedTurns=[0,.25,.5,.75];for(let i=0;i<4;i++)assert(Math.abs(preview[i]-expectedTurns[i])<2e-7,`Aspect preview compass adapter violated index=${i} actual=${preview[i]} expected=${expectedTurns[i]}`);
     assert(TYPES.aspect.previewRange[0]===0&&TYPES.aspect.previewRange[1]===1,'Aspect fixed preview range violated');
-    const northSet=[359,1].map(v=>v*Math.PI/180),circularMean=Math.atan2(northSet.reduce((s,v)=>s+Math.sin(v),0),northSet.reduce((s,v)=>s+Math.cos(v),0));
-    const chosen=mutation==='aspect-linear-mean'?(northSet[0]+northSet[1])/2:circularMean;assert(circular(chosen,0)<.02,'Aspect circular mean violated');
+    // S1.5's circular-statistics control, computed from PRODUCTION. It previously built a two-element
+    // literal array [359deg, 1deg] and took its circular mean — arithmetic entirely inside the test,
+    // identical on a broken build, and the only named negative control the story has. Same shape as
+    // the shipped ({...TYPES.fracture, cat:'ero'}).cat !== 'surface'.
+    //
+    // The story's actual claim: "aspect is periodic — a naive mean would fail on a north-facing
+    // slope straddling 0/360, which is the negative control". So build a north-facing slope, run it
+    // through TYPES.aspect.eval, and take both means of the REAL aspect field. The circular mean
+    // must land on north; the linear mean must NOT, which is what makes circular statistics
+    // necessary rather than merely preferred.
+    RES=64;TARGET_RES=64;terrainDef.lattice='square';terrainDef.north=0;
+    {
+      const n=fieldW(),nh=fieldH(),d=terrainDef.scale/n,slope=newField();
+      // The slope must STRADDLE the seam, which is the whole point. A pure +y ramp gives a constant
+      // aspect field, and a constant field has identical linear and circular means — so it cannot
+      // demonstrate why circular statistics are needed. atan2 returns (-pi, pi], so the seam is at
+      // +/-pi: a ramp in +x puts steepest descent at +/-pi, and a small sinusoidal wobble in y
+      // pushes samples onto BOTH sides of it. That is the "north-facing slope straddling 0/360" the
+      // story names, and it is where a naive mean collapses to ~0 instead of ~pi.
+      for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
+        const wx=(x+.5)*d,wy=(y+.5)*d;
+        slope[y*n+x]=wx/5000+0.004*Math.sin(wy*2*Math.PI/1200);
+      }
+      const field=TYPES.aspect.eval({},[slope]);
+      const interior=[];
+      for(let y=2;y<nh-2;y++)for(let x=2;x<n-2;x++)interior.push(field[y*n+x]);
+      assert(interior.length>0,'Aspect north-slope probe compared nothing');
+      const circMean=Math.atan2(interior.reduce((t,v)=>t+Math.sin(v),0)/interior.length,
+                                interior.reduce((t,v)=>t+Math.cos(v),0)/interior.length);
+      const linMean=interior.reduce((t,v)=>t+v,0)/interior.length;
+      // The expected azimuth is DERIVED from the same analytic formula the main loop validates
+      // against — atan2(-gy, -gx), the direction of steepest descent — not assumed from a mental
+      // model of the compass convention. Height here is wy/5000, so gx = 0 and gy = 1/5000.
+      // Steepest descent for a +x ramp is -x, i.e. the seam at +/-pi. Derived, not assumed.
+      const expectedNorth=Math.atan2(-0,-(1/5000));
+      const chosen=mutation==='aspect-linear-mean'?linMean:circMean;
+      assert(circular(chosen,expectedNorth)<.02,`Aspect circular mean violated circ=${circMean} lin=${linMean} expected=${expectedNorth}`);
+      // The control only means something if the linear mean genuinely disagrees. Assert the gap,
+      // so "circular statistics are required" is measured rather than assumed.
+      assert(circular(linMean,circMean)>.5,`Aspect linear/circular means did not diverge circ=${circMean} lin=${linMean}`);
+    }
     const raw=TYPES.aspect.eval({},[Float32Array.from(newField(),(_,i)=>i%fieldW())]);assert(raw.some(value=>value<0),'Aspect graph field was normalized for preview');
     return{compared,flat,maxError,maxBound,preview:Array.from(preview),mutation};
   },mutation);
