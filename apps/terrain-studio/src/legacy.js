@@ -5689,7 +5689,7 @@ export const hexNb=y=>(y&1)?HEX_NB_ODD:HEX_NB_EVEN;
 // least-squares gradient: sum(e_k)=0 and sum(e_k e_k^T)=3I, so g = sum(h_k*e_k)/3 is exact for
 // a plane and isotropic to leading order. The centre height drops out entirely.
 const HEX_EX=[-1,1,-.5,.5,-.5,.5],HEX_EY=[0,0,-HEX_ROW,-HEX_ROW,HEX_ROW,HEX_ROW];
-let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;
+let uTime=0;let lastFrameMs=0;let H_SCALE=terrainDef.height/terrainDef.scale;
 // S4.7 — the live WaterWavePreset. Cached on the six authored controls: expansion is
 // deterministic, so a preset only has to be rebuilt when one of them changes, and the shader
 // text is baked from it at compile time. terrainDef already owns wind, so the water does not
@@ -5955,7 +5955,22 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // large part of why flat water reads as a painted sheet.
       float sss=pow(max(dot(normalize(uSun),-V),0.0),5.0);
       vec3 scatterC=vec3(0.0885,0.497,0.456)*sss*1.7*(1.0-clamp(abs(V.y),0.0,1.0))*(1.0-dn);
+      // SUN GLITTER, as a SEPARATE additive lobe rather than by sharpening the base one.
+      //
+      // Widening the base lobe from slope variance is right -- it is what stops distant water
+      // aliasing -- but it also made the highlight a broad wash that barely responds to the
+      // normal moving. Measured: over two seconds only 1.60% of pixels changed by more than
+      // three luminance levels. The surface was animating and the LIGHTING was not, which is
+      // exactly what reads as fake.
+      //
+      // So the two jobs are split. The broad lobe carries the statistical average of the waves
+      // too small to resolve; this narrow one carries the individual facets that catch the sun,
+      // and it winks on and off because the cellular channel of the detail field is animated.
+      // A single lobe cannot do both: sharp enough to twinkle is sharp enough to alias.
+      float glint=pow(max(dot(reflect(-V,N),S),0.0),720.0);
+      glint*=mix(0.15,1.0,smoothstep(0.25,0.8,wd.w));
       vec3 col=(mix(wc,refl,fres)+scatterC+spec*0.8)*mix(.93,1.07,pat);
+      col+=vec3(1.0,0.97,0.90)*glint*2.2*coverage*(1.0-ice);
       float crest=smoothstep(.68,.92,wave.z)*waveAmt;
       col+=vec3(.035,.065,.085)*crest*(.35+.65*fres);      // restrained bright wavelets make the pattern legible
       // The shoreline band: the wet edge itself, always there.
@@ -7243,7 +7258,18 @@ function renderGL(){
       gl.depthMask(true);gl.disable(gl.BLEND);
     }
   }
-  if(!REDUCED)uTime+=0.016;
+  // REAL ELAPSED TIME, not a frame count. This advanced by a fixed 0.016 per frame, which is
+  // correct only at exactly 60 fps: measured at 10 fps the clock ran at one sixth of real time,
+  // so the sea moved in slow motion on any machine or scene that could not hit 60. Wave period
+  // is physical -- omega = sqrt(g*k) -- so it has to be driven by seconds, or the physics is
+  // silently rescaled by whatever the frame rate happens to be.
+  //
+  // Clamped at 0.1 s so a tab returning from the background does not jump the surface forward by
+  // minutes in one frame, which reads as a glitch rather than as motion.
+  {const now=performance.now();
+   const dt=lastFrameMs?Math.min((now-lastFrameMs)/1000,0.1):0.016;
+   lastFrameMs=now;
+   if(!REDUCED)uTime+=dt;}
   requestAnimationFrame(renderGL);
   return fov;
 }
