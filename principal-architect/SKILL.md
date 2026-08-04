@@ -157,7 +157,8 @@ decision is rediscovered the expensive way; (2) in greenfield, document the **sl
 you are touching**, not the whole repo. Scope the bootstrap to the change.
 
 Two things are **never optional** when an HLD or SAD is produced or materially changed: the
-**threat model** (STRIDE → OWASP Top 10:2025) and the **FinOps cost estimate**. And wherever
+**threat model** (STRIDE → the OWASP lens matching the surface: web, API, or LLM Top 10)
+and the **FinOps cost estimate**. And wherever
 possible the whole set is enforced as **Architecture-as-Code in CI** — front-matter/ADR
 linting, conformance-checklist validation, diagram rendering, architecture fitness functions,
 and an Infracost cost gate (`references/automation.md`).
@@ -297,7 +298,9 @@ indexes them. Full guidance, status transitions, and supersession rules are in
 `references/conventions.md`; standards background in `references/standards.md`.
 
 ### Security, privacy & cost are mandatory in HLD and SAD
-Every HLD and SAD carries a **threat model** (STRIDE mapped to OWASP Top 10:2025) and a
+Every HLD and SAD carries a **threat model** (STRIDE mapped to the OWASP lens that matches
+the surface — web Top 10:2025, API Security Top 10:2023, or LLM Applications Top 10:2025 —
+with the target ASVS 5.0 level as a `C.xx`) and a
 **FinOps cost-estimate matrix** (provider calculators + Infracost). These are not optional
 sections — set `security-reviewed`/`cost-reviewed: true` when signed off. Where the system
 processes **personal or regulated data**, §8 also carries a **DPIA** (`references/privacy.md`)

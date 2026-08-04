@@ -109,8 +109,11 @@ multi-region) is an ADR, and its price shows up in §9.
 
 ## 8. Security & privacy — threat model + DPIA (mandatory)
 Threat-model every system. Use **STRIDE** per element of the L1/L2 diagrams and map
-findings to the **OWASP Top 10:2025** (https://owasp.org/Top10/2025/). One row per
-credible threat; sign off by setting `security-reviewed: true`.
+findings to the **OWASP lens that matches the surface**: web/app → **Top 10:2025**
+(https://owasp.org/Top10/2025/), published APIs/events → **API Security Top 10:2023**,
+LLM components → **Top 10 for LLM Applications:2025**. State the target **OWASP ASVS 5.0
+verification level** (L1/L2/L3) as a constraint (`C.xx`) — it decides how deep the
+controls go. One row per credible threat; sign off by setting `security-reviewed: true`.
 
 | Element / data flow | STRIDE category | Threat | OWASP 2025 | Mitigation | Owner |
 |---|---|---|---|---|---|

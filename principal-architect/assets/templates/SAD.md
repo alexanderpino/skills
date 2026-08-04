@@ -100,8 +100,11 @@ PRD quality-driver form; these often drive the integration and technology choice
 
 ## 8. Security & privacy — threat model + DPIA (mandatory)
 Threat-model the **end-to-end** solution, with extra attention to the integration points
-and trust boundaries between systems. Use **STRIDE** per element/flow and map to
-**OWASP Top 10:2025** (https://owasp.org/Top10/2025/); sign off with `security-reviewed: true`.
+and trust boundaries between systems. Use **STRIDE** per element/flow and map to the
+**OWASP lens matching each surface** — web/app → **Top 10:2025**
+(https://owasp.org/Top10/2025/), APIs/events between systems → **API Security Top
+10:2023**, LLM components → **Top 10 for LLM Applications:2025**. State the target
+**ASVS 5.0 level** (L1/L2/L3) per system; sign off with `security-reviewed: true`.
 
 | Element / integration | STRIDE | Threat | OWASP 2025 | Mitigation | Owner |
 |---|---|---|---|---|---|
