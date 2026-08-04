@@ -344,14 +344,41 @@ const EXPECTED_DELIVERY_ROWS = EXPECTED_COMPLIANT_COUNT + 1   // 4 movers + hydr
       const semantics = (def && Array.isArray(def.outputs))
         ? def.outputs.map(p => p && p.semantic).filter(Boolean) : []
       const targets = Array.isArray(row.coUpdates) ? row.coUpdates.slice() : []
+      // DECLARED IS NOT DELIVERED, and the Sprint 3 audit was right that this stopped at declared.
+      // Matching an output SEMANTIC proves a port exists; it says nothing about whether anything
+      // ever fills it, which is the exact half-gate this sprint kept finding one level down. So the
+      // node is EVALUATED with its co-update targets demanded and the returned map is read.
+      const filled = [], unfilled = []
+      if (def && typeof def.eval === 'function') {
+        const W = fieldW(), H = fieldH(), N = W * H
+        const src = new Float32Array(N)
+        for (let i = 0; i < N; i++) src[i] = 0.35 + 0.3 * Math.sin(i * 0.011)
+        const ids = targets.map(t => {
+          const port = (def.outputs || []).find(pp => pp && pp.semantic === t)
+          return port ? port.id : null
+        }).filter(Boolean)
+        const nd = { id: 7100, type: row.node, params: {} }
+        for (const pr of (def.params || [])) nd.params[pr.key] = pr.def
+        try {
+          const raw = def.eval(nd.params, [src, null, null, null, null], nd, { demanded: new Set(ids) })
+          const vals = (raw && raw.values instanceof Map) ? raw.values : null
+          for (let k = 0; k < targets.length; k++) {
+            const id = ids[k]
+            const f = vals && id ? vals.get(id) : null
+            // A port that yields nothing, or a zero-length field, is declared and not delivered.
+            if (f && f.length === N) filled.push(targets[k]); else unfilled.push(targets[k])
+          }
+        } catch (e) { for (const t of targets) unfilled.push(t) }
+      } else { for (const t of targets) unfilled.push(t) }
       return {
         node: row.node, hasType: !!def, outputSemantics: semantics, targets,
         missing: targets.filter(t => !semantics.includes(t)),
+        filled, unfilled,
       }
     })
     out.undeliveredCoUpdates = out.coUpdateDelivery
-      .filter(d => !d.hasType || d.targets.length === 0 || d.missing.length > 0)
-      .map(d => d.node + ':' + (d.hasType ? (d.missing.join(',') || 'no-targets') : 'no-type'))
+      .filter(d => !d.hasType || d.targets.length === 0 || d.missing.length > 0 || d.unfilled.length > 0)
+      .map(d => d.node + ':' + (d.hasType ? ((d.missing.concat(d.unfilled)).join(',') || 'no-targets') : 'no-type'))
 
     // --- every writer is a real registered node type ---------------------------------------------
     out.writersRegistered = writers.map(w => ({ node: w, inTypes: !!knownTypes[w] }))
@@ -460,7 +487,9 @@ const EXPECTED_DELIVERY_ROWS = EXPECTED_COMPLIANT_COUNT + 1   // 4 movers + hydr
     compliantRowsDeliverTheirCoUpdates: (report.coUpdateDelivery || []).length === EXPECTED_DELIVERY_ROWS
       && (report.undeliveredCoUpdates || []).length === 0
       && (report.coUpdateDelivery || []).every(d => d.hasType === true && d.targets.length > 0
-        && d.outputSemantics.length > 0),
+        && d.outputSemantics.length > 0
+        // ...and every target actually came back with a field.
+        && Array.isArray(d.filled) && d.filled.length === d.targets.length && d.unfilled.length === 0),
 
     // 10. The corpus is real: non-empty, and every entry is a node type the registry actually ships.
     writerCorpusNonEmptyAndRegistered: writers.length > 0 && (report.writersNotInTypes || []).length === 0,

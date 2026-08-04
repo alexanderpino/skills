@@ -349,6 +349,13 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         heightDigest: digest(work.height), hasSediment: !!work.sediment, hasVelocity: !!work.velocity,
         sedimentStats: stats(work.sediment), velocityLen: work.velocity ? work.velocity.length : null,
         velocityStats: stats(work.velocity),
+        // THE UNIT, CHECKED AGAINST THE NUMBERS. isVelocityPort only ever compared the string
+        // 'mPerS' on the descriptor, so a field carrying the solver's DIMENSIONLESS flow — cells
+        // per iteration — would have satisfied every velocity gate while being mislabelled by a
+        // factor of the cell size. gpu.js:530 converts with mps = cellM * gk / dt, so m/s values
+        // scale with the cell and dimensionless ones do not. Recorded here; the bound is derived
+        // in the gate from the same cell size, not picked.
+        cellSizeM: terrainDef.scale / RES,
         ledger: work.ledger, volumes: readVolumes(work.ledger),
       }
       // HEIGHT-ONLY DEMAND, the other half of ADR-002's two paths. The state path renders a
@@ -653,6 +660,14 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       && sq.work.velocityLen === 2 * sq.cells
       && !!sq.work.velocityStats && sq.work.velocityStats.finite === true
       && sq.work.velocityStats.abs > 0 && sq.work.velocityStats.negatives > 0,
+    // The declared unit must match the MAGNITUDES. PIPE_SECONDS_PER_REFERENCE_ITERATION is 1, so a
+    // metres-per-second field is on the order of the cell size; the solver's dimensionless flow is
+    // on the order of 1. At the fixture's cell size those differ by ~2 orders of magnitude, so 5%
+    // of a cell per second separates them with room to spare and without pinning a measured value.
+    velocityMagnitudesAreMetresPerSecondNotCellsPerStep: !!sq && !!sq.work.velocityStats
+      && Number.isFinite(sq.work.cellSizeM) && sq.work.cellSizeM > 0
+      && Math.max(Math.abs(sq.work.velocityStats.min), Math.abs(sq.work.velocityStats.max))
+         > 0.05 * sq.work.cellSizeM,
 
     // --- ADR-002's OTHER path: height-only demand ----------------------------------------------
     heightIdenticalWithAndWithoutStateDemand: L.length === 2 && L.every(m => m.bare
