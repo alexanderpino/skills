@@ -480,6 +480,38 @@ const YEARS = 1000                       // the authored duration for the main f
       declaredDefault: pDur ? pDur.def : undefined,
     }
 
+    // DOES THE REFUSAL REACH THE AUTHOR? Everything above tests the PLUGIN. The Sprint 3 audit
+    // found the claim "duration is required authored data with no default" was true of the plugin
+    // and FALSE OF THE PRODUCT: evalGraph, evalGraphProgressive and evalExact each caught the
+    // throw, logged it to a console nobody has open, substituted newField() and cleared _dirty. A
+    // node that refuses to run rendered as flat terrain and said nothing. So this drives the real
+    // graph evaluator and reads what an author would actually be shown.
+    if (T) {
+      newTerrainDocument(false, '', true)
+      const nd = makeNode(T, 200, 200)
+      nd.params.durationYears = null
+      markDirtyFrom(nd.id)
+      evalGraph()
+      out.surfaced = {
+        evalError: nd._evalError || null,
+        // The MESSAGE is for the author and is deliberately human — "Duration (years) is required
+        // authored data and has no default". The CODE is for machines. Requiring the code to appear
+        // inside the message would push machine identifiers into the UI, so both are carried and
+        // both are checked: the author gets prose that names the parameter, a gate gets the code.
+        code: nd._evalErrorCode || null,
+        namesTheCode: nd._evalErrorCode === CONTRACT.missingDurationCode,
+        messageNamesTheParameter: typeof nd._evalError === 'string' && /duration/i.test(nd._evalError),
+        // ...and it must CLEAR when the author fixes it, or the marker is permanent and useless.
+        clearedAfterFix: (() => {
+          nd.params.durationYears = 1000
+          markDirtyFrom(nd.id); evalGraph()
+          return nd._evalError == null
+        })(),
+      }
+    } else {
+      out.surfaced = { evalError: null, namesTheCode: false, clearedAfterFix: false }
+    }
+
     // Non-negativity across the whole corpus, plus a long duration where an unstable step would
     // overshoot and a naive clamp would hide it.
     const long = fixture({ res: 64, lattice: 'square', years: 100000 })
@@ -504,6 +536,11 @@ const YEARS = 1000                       // the authored duration for the main f
   const near = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b))
 
   const gates = {
+    // ...and the refusal is VISIBLE. A requirement the product swallows is not a requirement.
+    theRefusalReachesTheAuthor: report.surfaced.namesTheCode === true
+      && report.surfaced.messageNamesTheParameter === true
+      && report.surfaced.clearedAfterFix === true,
+
     // --- the node exists at all. RED TODAY: this is the story's named absence. -------------------
     producerRegistered: report.discovery.type !== null && report.discovery.producerCount === 1
       && report.discovery.discoveredBy === 'declared'
@@ -550,6 +587,7 @@ const YEARS = 1000                       // the authored duration for the main f
 
     // --- duration has NO default ---------------------------------------------------------------------
     durationHasNoProductionDefault: !!durd && durd.def == null,
+    // The plugin refuses...
     missingDurationIsATypedError: report.duration.missingCode === CONTRACT.missingDurationCode
       && report.duration.missingReturnedField === false
       && report.duration.nullCode === CONTRACT.missingDurationCode

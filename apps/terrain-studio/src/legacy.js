@@ -3268,7 +3268,7 @@ export function evalExact(id,guard){
   // The exact path is a fold used by Transform chains: it does not populate the per-output cache,
   // because it deliberately does not own node state. It reads ports the same way, so the three
   // paths cannot disagree about which output an edge carries.
-  let f;try{f=evaluateNodeValues(nd,ins).get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);}catch(err){console.error("exact",nd.type,err);f=newField();}
+  let f;try{f=evaluateNodeValues(nd,ins).get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);nd._evalError=null;nd._evalErrorCode=null;}catch(err){console.error("exact",nd.type,err);nd._evalError=String(err&&err.message||err);nd._evalErrorCode=(err&&err.code)||null;f=newField();}
   guard.delete(id);return f;
 }
 
@@ -3489,8 +3489,18 @@ function evalGraph(){
     const ins=nodeInputs(nd).map((_,s)=>{const e=inputEdge(id,s);
       if(!e||!want.has(s))return null;const up=ev(e.from,guard);return readInputValue(e,up);});
     const nt0=performance.now();let f,values;
-    try{values=evaluateNodeValues(nd,ins);f=values.get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);}
-    catch(err){console.error("node",nd.type,err);f=newField();values=new Map([[primaryPortId(nd),f]]);}
+    try{values=evaluateNodeValues(nd,ins);f=values.get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);nd._evalError=null;nd._evalErrorCode=null;}
+    catch(err){
+      // A THROWN EVAL IS A VISIBLE FAILURE, not a flat field. Every one of these three paths
+      // caught, logged to a console nobody has open, substituted newField() and cleared _dirty —
+      // so a node that REFUSES to run renders as flat terrain and says nothing. The Sprint 3
+      // audit found the sharpest case: S3.2 requires a Regolith duration to be authored with no
+      // default, the plugin correctly throws when it is missing, and the product swallowed it.
+      // The claim "duration is required" was true of the plugin and false of the application.
+      // _inputError already draws a marker on the node and prints in the inspector; this uses
+      // the same surface rather than inventing a second one.
+      console.error("node",nd.type,err);nd._evalError=String(err&&err.message||err);nd._evalErrorCode=(err&&err.code)||null;
+      f=newField();values=new Map([[primaryPortId(nd),f]]);}
     nd._lastMs=performance.now()-nt0;
     // _field stays a read-only ALIAS of the primary scalar raster, per ADR-002. Semantic data lives
     // in the per-output cache; nothing may write through the alias to reach it.
@@ -3530,8 +3540,8 @@ async function evalGraphProgressive(label="Building terrain"){
       if(!edge||!wantSlots.has(slot))return null;return readInputValue(edge,(nodeById(edge.from)||{})._field||null);});
     const nt0=performance.now();let f;
     let values;
-    try{values=evaluateNodeValues(nd,ins);f=values.get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);}
-    catch(err){console.error("node",nd.type,err);f=newField();}
+    try{values=evaluateNodeValues(nd,ins);f=values.get(primaryPortId(nd));f=propagateFieldMetadata(f,ins,def);nd._evalError=null;nd._evalErrorCode=null;}
+    catch(err){console.error("node",nd.type,err);nd._evalError=String(err&&err.message||err);nd._evalErrorCode=(err&&err.code)||null;f=newField();}
     nd._lastMs=performance.now()-nt0;nd._outputs=values||new Map([[primaryPortId(nd),f]]);
     nd._field=f;nd._dirty=false;nd._thumb=null;evals++;
     if(nd.type!=="water"&&nd.type!=="snow")colorDirty=true;
@@ -3730,7 +3740,7 @@ function drawNode(nd){
   if(nd._thumb){gx.drawImage(nd._thumb,tx,ty,TH,TH);}else{gx.fillStyle=css("--panel3");gx.fillRect(tx,ty,TH,TH);}
   if(nd._lastMs!=null){gx.fillStyle=css("--faint");gx.font="9px "+css("--mono");gx.textBaseline="alphabetic";
     gx.fillText(nd._lastMs<10?nd._lastMs.toFixed(1)+" ms":Math.round(nd._lastMs)+" ms",nd.x+7,nd.y+h-7);}
-  if(nd._inputError){gx.beginPath();gx.arc(nd.x+nd.w-9,nd.y+h-8,4,0,7);gx.fillStyle=css("--bad");gx.fill();}
+  if(nd._inputError||nd._evalError){gx.beginPath();gx.arc(nd.x+nd.w-9,nd.y+h-8,4,0,7);gx.fillStyle=css("--bad");gx.fill();}
   gx.strokeStyle=css("--line");gx.lineWidth=1;gx.strokeRect(tx+.5,ty+.5,TH-1,TH-1);
   // ports
   nodeInputs(nd).forEach((nm,s)=>{const p=portPos(nd,"in",s);drawPort(p,cc,hoverPort&&hoverPort.node===nd.id&&hoverPort.which==="in"&&hoverPort.slot===s);
@@ -4283,9 +4293,13 @@ function buildProps(){
   const def=TYPES[selected.type];sw.style.background=css(CAT[def.cat].c);
   title.firstChild.textContent=def.name;sub.textContent=def.desc;
   body.innerHTML="";
-  if(selected._inputError){const warning=document.createElement("div");warning.className="hint";
+  // An input problem and a thrown evaluation are both failures the author has to see. The input
+  // message wins when both are set, because it names the cause and the throw is usually its
+  // consequence.
+  const nodeProblem=selected._inputError||selected._evalError;
+  if(nodeProblem){const warning=document.createElement("div");warning.className="hint";
     warning.style.cssText="border-color:var(--bad);color:var(--bad);margin-bottom:10px";
-    warning.textContent=selected._inputError;body.appendChild(warning);}
+    warning.textContent=nodeProblem;body.appendChild(warning);}
   if(def.migrateParams)def.migrateParams(selected.params);
   // Graphs saved by older Studio versions (and concise hand-authored defaults) may not carry
   // parameters introduced later. Hydrate them from the schema before formatting or evaluating.
