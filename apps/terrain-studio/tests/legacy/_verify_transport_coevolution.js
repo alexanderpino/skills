@@ -73,6 +73,11 @@ const MUTATIONS = [
   // S3.5c. `coUpdates` was documentation until this control existed: nothing checked that a row's
   // targets were maps the node can actually publish, so a compliant row could name anything at all.
   'compliant-row-claims-undelivered-coupdate',
+  // S3.5e. The same hazard at the OTHER end of the widened delivery scope. `hydrofix` is the first
+  // non-transport row to name co-update targets, and until the delivery check stopped filtering on
+  // `class === 'materialTransport'` its claims were graded by nothing at all. This puts an
+  // undeliverable target on THAT row, so the widening is armed rather than merely written down.
+  'conditioning-row-claims-undelivered-coupdate',
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -80,7 +85,18 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
 //   materialTransport   sprint-03:28, :177-190  (Hydraulic, Thermal, Stream Power, Erosion 2)
 //   surfaceExpression   sprint-03:192-194       (Rock Fracture as an authored surface expression)
 //   generator           sprint-03:62            ("generator, surface expression, or material transport")
-//   latticeConditioning R0 review               (hydrofix; DISPUTED against sprint-03:28/:189-190)
+//   latticeConditioning R0 review + the kernel  (hydrofix — SETTLED in S3.5e, see below)
+//
+// THE HYDROFIX DISPUTE IS SETTLED AND THE SPRINT DOCUMENT LOST. `sprint-03-cover-layer.md:28` lists
+// HydroFix among the four "existing transport nodes"; `hydroFixField` (src/legacy.js:3119-3158) has
+// two write paths into the field it publishes and neither can raise a cell — `out[i] -= mask[i]*cut`
+// at :3153 and `if(out[r]>target) out[r]=target` at :3155-3156 — so nothing anywhere receives
+// material. Measured across 14 runs in tests/legacy/_verify_hydrofix_coevolution.js: zero risen
+// cells on every one. It is conditioning, and `:28` is a misclassification recorded as such rather
+// than quietly diverged from. The sprint's S3.5 body at `:189-190` was right about what was OWED —
+// "the low-amplitude conditioning delta and its removed/exported volume" — and that ledger shipped
+// in S3.5e. This entry stays `latticeConditioning`, which is the value it always had; what changed
+// is that it is now a measurement rather than a review opinion under dispute.
 const REVIEWED = {
   hydraulic: 'materialTransport',
   thermal: 'materialTransport',
@@ -132,15 +148,41 @@ const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUN
 // doctrine requires, and absent on two of three engines). All four rows therefore now name the same
 // two targets. These are exact equalities and not floors, because every one of them is at the only
 // value the current manifest can produce:
-//   coUpdateTargets     2   soilDepth, sedimentDepth — the union over four identical rows
-//   transport sets      1   all four rows carry the same pair
-//   signatures          4   1 transport set + the three non-transport classes, each with an empty
-//                           set. That is the MAXIMUM, not a floor with slack under it.
+//   coUpdateTargets     2   soilDepth, sedimentDepth — the union over every row that names any
+//   transport sets      1   all four movers carry the same pair
+//   signatures          4   materialTransport|soil+sediment, latticeConditioning|soil+sediment,
+//                           surfaceExpression|(empty), generator|(empty)
 // `compliant-row-claims-undelivered-coupdate` moves all three at once (it puts `wetness` back on a
 // compliant row), so the numbers are armed rather than merely recorded.
+//
+// S3.5e RE-COMPOSED THE SIGNATURE SET WITHOUT MOVING ITS COUNT, and that is worth stating because a
+// number that stays put through a real change is exactly what a stale expectation looks like. It was
+// "1 transport set + three non-transport classes with EMPTY sets"; `hydrofix` moved from
+// `latticeConditioning|` to `latticeConditioning|soilDepth+sedimentDepth`, which is a different
+// signature that happens to be equally distinct from the other three. So 4 is still the maximum and
+// still an exact equality — but it is no longer true that only movers carry targets, and
+// `conditioning-row-claims-undelivered-coupdate` is what keeps the new composition honest.
 const EXPECTED_COUPDATE_TARGETS = ['soilDepth', 'sedimentDepth']
 const EXPECTED_TRANSPORT_COUPDATE_SETS = 1
 const EXPECTED_SIGNATURES = 4
+// S3.5e — THE DELIVERY SCOPE, WIDENED AND THEREFORE RE-COUNTED. The delivery check used to filter on
+// `class === 'materialTransport'`, which was right while movers were the only rows naming co-update
+// targets. `hydrofix` broke that assumption: it is `latticeConditioning` — it carves and transports
+// nothing — yet it changes `soilDepth` and `sedimentDepth`, so its row names them. Under the old
+// filter those two claims would have been graded by NOTHING, which is the declared-but-never-graded
+// half-gate one class to the left of where this file already found it once.
+//
+// So delivery is now measured over every row that is COMPLIANT and names targets, whatever its
+// class: the four movers plus hydrofix. This is an exact equality and not a floor — 5 is the only
+// value the current manifest can produce, and `conditioning-row-claims-undelivered-coupdate` arms
+// the new fifth row from its own end while `compliant-row-claims-undelivered-coupdate` keeps arming
+// the transport end.
+//
+// `EXPECTED_COUPDATE_TARGETS` is deliberately UNCHANGED at two: hydrofix names the same pair the
+// movers do, so the union does not move. The widening changes what is CHECKED, not what is claimed —
+// and a widening that also moved the headline numbers would have made it impossible to say which
+// change moved which gate.
+const EXPECTED_DELIVERY_ROWS = EXPECTED_COMPLIANT_COUNT + 1   // 4 movers + hydrofix
 
 ;(async () => {
   const browser = await chromium.launch({ executablePath: EXE,
@@ -217,6 +259,15 @@ const EXPECTED_SIGNATURES = 4
       manifest = manifest.map(r => r.node === 'erosion2'
         ? { ...r, coUpdates: r.coUpdates.concat('wetness') } : r)
     }
+    // ...and the same defect on the CONDITIONING row, which the delivery check could not see at all
+    // until S3.5e widened it off `class`. `hydrofix` genuinely publishes solidTop/bedrockHeight/
+    // soilDepth/sedimentDepth/sandDepth and nothing else, so `wetness` is a registered state map it
+    // has no port for — the identical shape, reached from the end of the manifest the old filter
+    // excluded.
+    if (mutation === 'conditioning-row-claims-undelivered-coupdate') {
+      manifest = manifest.map(r => r.node === 'hydrofix'
+        ? { ...r, coUpdates: r.coUpdates.concat('wetness') } : r)
+    }
     if (mutation === 'class-without-owner') classIds = classIds.concat('aeolianTransport')
     if (mutation === 'writers-list-empty') {
       // The LIVE ledger legacy.js exposes. DOCTRINE is a read-only global binding but a plain
@@ -282,8 +333,13 @@ const EXPECTED_SIGNATURES = 4
     // the only surface a downstream reader can wire. An exempt row is skipped on purpose: its whole
     // point is that the co-update has not been built yet, and grading it here would make the ledger
     // and this gate say the same thing twice.
-    out.coUpdateDelivery = (manifest || []).filter(row => row.class === 'materialTransport'
-      && row.compliant === true).map(row => {
+    //
+    // S3.5e: THE FILTER IS NO LONGER ON CLASS. It was `class === 'materialTransport' && compliant`,
+    // which silently excluded `hydrofix` the moment that row became a compliant conditioning node
+    // naming two real co-update targets — the exact shape this check exists to catch, one class to
+    // the left. It is now every COMPLIANT row that names targets, whatever its class.
+    out.coUpdateDelivery = (manifest || []).filter(row => row.compliant === true
+      && Array.isArray(row.coUpdates) && row.coUpdates.length > 0).map(row => {
       const def = knownTypes[row.node] || null
       const semantics = (def && Array.isArray(def.outputs))
         ? def.outputs.map(p => p && p.semantic).filter(Boolean) : []
@@ -390,12 +446,18 @@ const EXPECTED_SIGNATURES = 4
       && (comp.unowned || []).length === 0,
 
     // 9b. S3.5c — AND A COMPLIANT ROW DELIVERS WHAT IT NAMES. Every co-update target of every
-    //     compliant transport row is a declared output port semantic on that node's registered type.
-    //     The `length > 0` term is the absence-of-evidence guard: with no compliant rows this list is
-    //     empty and "nothing was undelivered" would be true of nothing at all. Armed by
-    //     `compliant-row-claims-undelivered-coupdate`, which puts `wetness` back on the erosion2 row
-    //     — a registered state map the node has no port for, which is exactly why S3.5c removed it.
-    compliantRowsDeliverTheirCoUpdates: (report.coUpdateDelivery || []).length === EXPECTED_COMPLIANT_COUNT
+    //     compliant row is a declared output port semantic on that node's registered type. The
+    //     `length` term is the absence-of-evidence guard: with no compliant rows this list would be
+    //     empty and "nothing was undelivered" would be true of nothing at all.
+    //
+    //     S3.5e WIDENED THE SCOPE OFF `class` AND THE COUNT MOVED 4 -> 5. `hydrofix` became a
+    //     compliant `latticeConditioning` row naming two real co-update targets, and the old
+    //     transport-only filter would have graded neither of them. The count is an exact equality
+    //     against EXPECTED_DELIVERY_ROWS, so a row silently dropping out of scope is red rather than
+    //     invisible. Armed from BOTH ends now: `compliant-row-claims-undelivered-coupdate` puts
+    //     `wetness` on the erosion2 row and `conditioning-row-claims-undelivered-coupdate` puts it on
+    //     the hydrofix row — the end that was unreachable before the widening.
+    compliantRowsDeliverTheirCoUpdates: (report.coUpdateDelivery || []).length === EXPECTED_DELIVERY_ROWS
       && (report.undeliveredCoUpdates || []).length === 0
       && (report.coUpdateDelivery || []).every(d => d.hasType === true && d.targets.length > 0
         && d.outputSemantics.length > 0),

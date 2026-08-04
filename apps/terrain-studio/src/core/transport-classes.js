@@ -53,6 +53,15 @@
 // `erosion2` row in S3.5c and from the `hydraulic` row here — the second time on measured evidence
 // about the field itself rather than on its absence, which the row records in full.
 //
+// S3.5e — THE LAST DISPUTED ROW, AND THE ONE THAT IS NOT A MOVER. `hydrofix` shipped
+// `compliant: null` with an empty co-update list and a DISPUTED note, because the R0 review and
+// sprint-03:28 disagreed about whether it transports. The kernel settles it: it does not. But it
+// carves, so it changes the cover stack anyway, and its row now names the two targets it delivers.
+// That made `hydrofix` the FIRST non-transport row to carry co-update targets, which is why both
+// `coUpdateTargets` below and the oracle's delivery check widened from "transport rows" to "every
+// row that names targets" — under the old scope this row's claims would have been invisible to the
+// gates that grade them.
+//
 // CLASSES
 // -------
 // `materialTransport`    moves material, and therefore MUST co-update the auxiliary maps its
@@ -64,13 +73,27 @@
 // `surfaceExpression`    expresses authored surface detail.
 // `generator`            creates height with nothing upstream.
 //
+// THE CLASS AND THE CO-UPDATE LIST ARE TWO DIFFERENT QUESTIONS, and S3.5e is where that stopped
+// being a distinction without a difference. `class` answers "does this node MOVE material";
+// `coUpdates` answers "does it change state somebody else owns". `hydrofix` answers NO to the first
+// and YES to the second — it carves, so material leaves the cover stack, but nothing anywhere
+// receives it. Its row therefore stays `latticeConditioning` and still names
+// `soilDepth` + `sedimentDepth`. Only the `materialTransport` rows are REQUIRED to name targets
+// (TRANSPORT_WITHOUT_COUPDATE); a row of any class that names them is graded on delivering them.
+//
 // A NOTE ON THE TAXONOMY vs THE SPRINT TEXT
 // -----------------------------------------
 // `sprint-03-cover-layer.md:62` and `:197` name only THREE buckets — "generator, surface expression,
 // or material transport". `latticeConditioning` is a fourth, added by the R0 review for `hydrofix`,
-// which the sprint's S3.5 body (`:189-190`) instead lists among the transport nodes to migrate. The
-// classification here is the reviewed one; the row records the dispute in `note` so the disagreement
-// is a dated decision rather than an oversight. See the oracle report for the file:line citations.
+// which the sprint's S3.5 story row (`:28`) instead lists among the transport nodes to migrate.
+//
+// THAT DISPUTE IS NOW SETTLED, ON THE KERNEL RATHER THAN ON EITHER DOCUMENT, and the sprint is the
+// one that was wrong: `hydroFixField` cannot raise a cell on any path (src/legacy.js:3153,
+// :3155-3156), and 14 measured runs found zero risen cells, so nothing is transported and `:28` is a
+// misclassification. The sprint's S3.5 BODY at `:189-190` was right about the substance — it asks for
+// "the low-amplitude conditioning delta and its removed/exported volume", calls the artefact a
+// conditioning delta in its own words, and that ledger is now delivered. The `hydrofix` row carries
+// the full evidence and the file:line citations.
 
 /** The class ids this manifest claims to define. Every one of them must own at least one row. */
 export const TRANSPORT_CLASS_IDS = Object.freeze([
@@ -257,13 +280,60 @@ export const TRANSPORT_CLASSES = Object.freeze([
   Object.freeze({
     node: 'hydrofix',
     class: 'latticeConditioning',
-    coUpdates: Object.freeze([]),
-    compliant: null,
-    ownerSprint: null,
-    why: 'Low-amplitude hydrological conditioning of the lattice: it removes sinks, it does not model a transporting process.',
-    note: 'DISPUTED against sprint-03:28 and :189-190, which list HydroFix among the transport nodes and require '
-      + 'a removed/exported volume ledger. R0 review classifies it as conditioning; the carved-volume report is '
-      + 'still owed and is tracked by S3.5 as a conditioning delta, not as material transport.',
+    // S3.5, FIFTH NODE — and the row that closes the sprint's one open classification dispute. It is
+    // a CONDITIONING row that nevertheless names co-update targets, which is not a contradiction:
+    // the class answers "does it move material", the targets answer "does it change state that
+    // somebody else owns". HydroFix answers no to the first and yes to the second.
+    //
+    // THE DISPUTE IS SETTLED ON THE KERNEL, AND THE KERNEL SAYS CONDITIONING. `hydroFixField`
+    // (src/legacy.js:3119-3158) has exactly two write paths into the field it returns and NEITHER CAN
+    // RAISE A CELL:
+    //   :3153       `out[i] -= mask[i]*cut`, the corridor downcut, mask in [0,1] and
+    //               cut = relief*(.0003+.0072*downcut)*fix >= 0
+    //   :3155-3156  `target = out[i]-eps; if(out[r]>target) out[r]=target`, the descent enforcement,
+    //               which lowers a RECEIVER to just under its donor and never the reverse
+    // Measured over 14 runs (square and hex, deep/bare/mixed cover, both slider regimes, masked and
+    // unmasked): risen cells 0 and max published rise 0.000000 on every one. NO CELL ANYWHERE
+    // RECEIVES MATERIAL, so there is no transport to co-evolve and `materialTransport` would be the
+    // wrong class. sprint-03:28, which lists HydroFix among the four "existing transport nodes", is
+    // WRONG on that point and is recorded as wrong here rather than silently diverged from.
+    //
+    // THE PREVIOUS `why` WAS ALSO WRONG, IN A WAY THAT MATTERED. It said the node "removes sinks",
+    // which describes the PRIORITY-FLOOD WORKING COPY at :3120 — that fill does raise, measured at
+    // 907 of 4096 cells on square and 1041 of 4736 on hex — and not the published field, which is
+    // monotone non-increasing. Reading the fill as the node's effect is what made "conditioning"
+    // sound like "changes nothing anybody owns", and that inference is what this row got wrong.
+    //
+    // BECAUSE sprint-03:189-190 WAS RIGHT ON THE SUBSTANCE. "Report the low-amplitude conditioning
+    // delta and its removed/exported volume; it may not silently discard carved bedrock" is exactly
+    // what was owed: what the carve cuts through is the COVER STACK, and before S3.5 the node had no
+    // cover ports at all, so a breach through five metres of soil charged itself to bedrock and
+    // nothing said so. Note that :189-190 calls the artefact a "conditioning delta" in the sprint's
+    // own words — the sprint text and the R0 review disagree only at :28, and only about the class.
+    //
+    // THE LEDGER ITEMISES BY THE LAYER THE MATERIAL CAME OUT OF — `coverConsumedM3` accumulated from
+    // the published cover rasters and `bedrockCarvedM3` from what is left of the carve after local
+    // cover is exhausted, each accumulated independently and each compared against a strip the oracle
+    // recomputes from the input cover and the published delta. It publishes NO export budget (the
+    // only figure available is consumed+carved, a restatement of the terms it would be checked
+    // against) and NO split between its two mechanisms (the kernel accumulates neither; the measured
+    // ratio between them runs 41x to 269x, so a guessed split would be wrong by that factor). What it
+    // DOES claim is the corridor downcut's per-cell ceiling, computed from the node's own parameters
+    // and the input field's range, and declined under a mask like Stream Power's uplift term.
+    // Evidence: tests/legacy/_verify_hydrofix_coevolution.js.
+    coUpdates: Object.freeze(['soilDepth', 'sedimentDepth']),
+    compliant: true,
+    ownerSprint: 'S3.5',
+    why: 'Conditions drainage by CARVING: monotone non-increasing on every measured run, so it '
+      + 'transports nothing — but it cuts through the cover stack and owed a removed-volume ledger.',
+    note: 'RECORDED DECISION (was DISPUTED). Classified `latticeConditioning` on kernel evidence: '
+      + 'src/legacy.js:3153 and :3155-3156 can only lower, and 14 measured runs found zero risen '
+      + 'cells, so no cell receives material. sprint-03:28 is wrong to list it among the transport '
+      + 'nodes; sprint-03:189-190 is right that a removed-volume ledger was owed, and it is now '
+      + 'delivered. Consumes loose cover before bedrock and deposits nothing — there is no additive '
+      + 'term in the kernel at all. Reports the corridor downcut ceiling it applied; declines both an '
+      + 'export budget and a downcut/breach split rather than deriving either from the terms it would '
+      + 'be checked against. Declares no precipitation port: the kernel has no rain term.',
   }),
   Object.freeze({
     node: 'fracture',
@@ -364,9 +434,17 @@ export function classifyHeightWriters(writers, options = {}) {
   const populated = new Set(manifest.map(row => row.class))
   for (const id of classIds) if (!populated.has(id)) problems.push({ code: 'CLASS_WITHOUT_ROWS', class: id })
 
+  // THE UNION OVER EVERY ROW THAT DECLARES TARGETS, not only the transport rows. It was
+  // transport-only until S3.5e, when `hydrofix` — a `latticeConditioning` row — became the first
+  // non-transport node to name co-update state: it carves through the cover stack without moving
+  // material anywhere. Under the old scope its targets would have been invisible to gate 6, so the
+  // manifest could have named an unregistered map on that row and read as coverage, which is the
+  // declared-but-never-graded half-gate one class to the left. The VALUE is unchanged at
+  // ['soilDepth','sedimentDepth'] because hydrofix names the same pair the four movers do — this
+  // widens what is checked, not what is claimed.
   const transportRows = manifest.filter(isTransport)
   const coUpdateTargets = []
-  for (const row of transportRows) for (const target of (row.coUpdates || [])) {
+  for (const row of manifest) for (const target of (row.coUpdates || [])) {
     if (!coUpdateTargets.includes(target)) coUpdateTargets.push(target)
   }
 

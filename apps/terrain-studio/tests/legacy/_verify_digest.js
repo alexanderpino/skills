@@ -297,7 +297,17 @@ function installHarness(cfg) {
     // cover arithmetic is demand-gated (this evaluator passes no ctx, so no cover output is
     // demanded) and is gated by _verify_erosion2_coevolution.js, which reads the rasters and the
     // physical-volume ledger.
-    erosion2: ['A', 'M', 'B', 'C'], hydrofix: ['A', 'M'],
+    erosion2: ['A', 'M', 'B', 'C'],
+    // S3.5 gave HydroFix the same two slots after its frozen In/Mask row: Soil depth (m) at slot 2
+    // and Sediment depth (m) at slot 3 — erosion2's numbers, since this row has no Uplift input to
+    // work around either. Wired for the reason thermal's, streampower's, hydraulic's and erosion2's
+    // are: the claim worth pinning is that ATTACHING COVER MOVES NOTHING, and a null slot would pin
+    // nothing at all. A perlin into a strictly-typed metre port is a fixture and not a legal UI
+    // edge; the digest wires by slot and never consults canConnect, and what it needs from a source
+    // is determinism. The cover arithmetic is demand-gated (this evaluator passes no ctx, so no
+    // cover output is demanded) and is gated by _verify_hydrofix_coevolution.js, which reads the
+    // rasters and the physical-volume ledger.
+    hydrofix: ['A', 'M', 'B', 'C'],
     surface: ['A', 'M'],
     // --- surface / geology ---
     // Regolith takes carried soil depth (metres) and an optional dimensionless climate multiplier.

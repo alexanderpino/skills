@@ -353,6 +353,33 @@ const LEGACY_PORTS_RAW = {
     in: [
       { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
       { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+      // S3.5 — the explicit cover inputs, added on the same three grounds as `erosion2`'s (whose
+      // slot numbers these are: this row's frozen head is also In/Mask, so cover lands at 2 and 3).
+      // A ROSTERED type has to gain a port in the adapter's own data; a physical semantic is legal
+      // because these are NEW slots no shipped document uses; and stable new ids are not a
+      // regeneration of the frozen ones.
+      //
+      // WHY A CONDITIONING NODE TAKES COVER AT ALL. `hydroFixField` is monotone non-increasing: the
+      // corridor downcut (src/legacy.js:3153) subtracts, the descent enforcement (:3155-3156) only
+      // ever lowers a receiver, and measured over 12 fixtures on both lattices not one cell of 4096
+      // was ever raised. It therefore CARVES THROUGH THE COVER STACK — sand, then sediment, then
+      // soil, then bedrock — and before this row existed it could not see the layers it was cutting,
+      // so a 2 m breach through 5 m of soil charged itself to bedrock. That is the silent cover
+      // destruction sprint-03:190 forbids, and it is why the row is here even though the node
+      // transports nothing. See src/core/transport-classes.js for the settled classification.
+      //
+      // OPTIONAL, for the reason erosion2's are: every hydrofix node in every saved graph has these
+      // slots unwired, unwired means "this graph carries no cover", and the kernel has a defined
+      // answer on bare bedrock. A REQUIRED input here would refuse the bundled Canyon Landscape
+      // setup, whose canyon -> erosion2 -> hydrofix chain _verify_canyon_process.js pins.
+      //
+      // No `precipitation`, for the reason Thermal, Stream Power and Erosion 2 declare none: there
+      // is no rain term anywhere in `hydroFixField`, and a port nothing consumes is the
+      // declared-but-never-filled half-gate.
+      { id: "soilDepth", name: "Soil depth", semantic: "soilDepth", unit: "m",
+        lens: "state", legacySlot: 2 },
+      { id: "sedimentDepth", name: "Sediment depth", semantic: "sedimentDepth", unit: "m",
+        lens: "state", legacySlot: 3 },
     ],
     out: { id: 'out', name: 'Out' },
   },
