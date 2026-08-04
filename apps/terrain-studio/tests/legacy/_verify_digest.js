@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 88;   // 87 + `chokepoint`, Route's S8.1 sibling identity node
+const REQUIRED_NODE_COUNT = 89;   // 88 + `regolith`, S3.2's physical soil producer
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -265,6 +265,12 @@ function installHarness(cfg) {
     hydraulic: ['A', 'M'],
     erosion2: ['A', 'M'], hydrofix: ['A', 'M'],
     surface: ['A', 'M'],
+    // --- surface / geology ---
+    // Regolith takes carried soil depth (metres) and an optional dimensionless climate multiplier.
+    // A perlin in each slot is a fixture, not a legal graph edge — the Soil port is strictly typed
+    // `soilDepth`/m and canConnect would refuse this pairing in the UI. The digest wires by slot and
+    // never consults canConnect, and what it needs from a source is determinism, which perlin has.
+    regolith: ['A', 'M'],
     // --- masks ---
     slopemask: ['A'], heightmask: ['A'], tempmask: ['T'],
     // --- data maps ---
@@ -371,6 +377,13 @@ function installHarness(cfg) {
     });
     if (type === 'drawmask') nd.params.strokes = DRAW_STROKES();
     if (type === 'import') nd._dem = SYNTH_DEM();
+    // Regolith's Duration is REQUIRED AUTHORED DATA with no production default (S3.2), so a
+    // default-parameter Regolith node refuses to evaluate — by design, and gated by
+    // _verify_soildepth.js:durationHasNoProductionDefault. The digest therefore has to author one,
+    // exactly as it authors a stroke for drawmask and a DEM for import: a node type whose defaults
+    // cannot produce a field is otherwise SKIPPED, which is the digest's own failure mode. 1000 yr
+    // is the acceptance oracle's fixture. Guarded on == null so an EXERCISE override still wins.
+    if (type === 'regolith' && nd.params.durationYears == null) nd.params.durationYears = 1000;
     const t0 = performance.now();
     const field = ev(nd.id, new Set());
     return { nd, field, ms: performance.now() - t0,

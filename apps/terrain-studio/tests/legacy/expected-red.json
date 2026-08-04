@@ -23,12 +23,6 @@
       "beforeGreen": "AUDIT BLOCKER: the volume-closure guard trusts exportedDerived, a self-declared literal that is already false-negative on the shipped pipe ledger (gpu.js:415 sets exportedDerived:false while its only loss term IS a sum difference). Replace with an independently accumulated boundary term before this may go green."
     },
     {
-      "oracle": "_verify_soildepth.js",
-      "story": "S3.2 regolith producer",
-      "reason": "no regolith producer node exists; soilDepth is not a registered semantic",
-      "beforeGreen": "Heimsath fixture is analytic and frame-independent; no known blocker."
-    },
-    {
       "oracle": "_verify_cover_reader.js",
       "story": "S3.4 explicit state selectors",
       "reason": "no cover-state selector nodes are registered",

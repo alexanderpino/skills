@@ -263,6 +263,24 @@ const YEARS = 1000                       // the authored duration for the main f
       }
     }
 
+    // RE-READ THE DESCRIPTORS. out.ports above was snapshotted BEFORE the mutation block, so a
+    // control that replaces DEF.inputs — `climate-modulation-required` does exactly that — left the
+    // snapshot showing the pre-mutation value. climateModulationIsOptional's `required === false`
+    // clause could therefore never fail, and a build declaring climate required while its eval
+    // still tolerated an absent field would have passed. The behavioural half of that control was
+    // armed, so the row read ARMED and the descriptor half was silently unmeasured: half a gate,
+    // which is the shape this project keeps finding.
+    {
+      const post = portsOf({ id: 9002, type: T || 'absent', params: {} })
+      const climPost = (post.inputs || []).find(p => p && p.id === CONTRACT.climateInputId) || null
+      const soilPost = (post.inputs || []).find(p => p && (p.id === CONTRACT.soilInputId || p.semantic === 'soilDepth')) || null
+      out.ports.climateInput = climPost
+        ? { id: climPost.id, unit: climPost.unit, semantic: climPost.semantic, required: !!climPost.required } : null
+      out.ports.soilInput = soilPost
+        ? { id: soilPost.id, unit: soilPost.unit, semantic: soilPost.semantic, required: !!soilPost.required } : null
+      out.ports.rereadAfterMutation = true
+    }
+
     // ---------- calling production ------------------------------------------------------------------
     const call = (params, ins) => {
       if (!DEF || typeof DEF.eval !== 'function') return { err: 'PRODUCER_ABSENT', field: null }
@@ -509,7 +527,8 @@ const YEARS = 1000                       // the authored duration for the main f
       && report.duration.nanCode === CONTRACT.badDurationCode,
 
     // --- climate modulation is optional, and is genuinely read when supplied -------------------------
-    climateModulationIsOptional: !!report.ports.climateInput && report.ports.climateInput.required === false
+    climateModulationIsOptional: report.ports.rereadAfterMutation === true
+      && !!report.ports.climateInput && report.ports.climateInput.required === false
       && report.ports.climateInput.unit === 'none' && report.climate.absentErr === null,
     climateOneIsIdenticalToNoClimate: report.climate.oneErr === null && report.climate.oneIsIdentity === true,
     climateMultiplierActuallyModulates: report.climate.halfErr === null

@@ -49,7 +49,10 @@ export const AUX_MAPS = Object.freeze({
   moisture: { lens: 'derived', kind: 'scalarRaster', unit: 'none', status: 'planned', owner: 'S5.2' },
 
   // --- cover, all state: path-dependent and co-updated -----------------------------------------
-  soilDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'planned', owner: 'S3.2' },
+  // S3.2 landed this one: `regolith` declares a real typed `soilDepth` output — scalarRaster,
+  // metres, state lens — so the row is no longer a plan. `status` is a claim about production and
+  // _verify_soildepth.js checks it against the live registry, so it cannot be promoted early.
+  soilDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S3.2' },
   sedimentDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'planned', owner: 'S3.1' },
   sandDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'planned', owner: 'S7.3' },
   wetness: { lens: 'state', kind: 'scalarRaster', unit: 'none', status: 'planned', owner: 'S3.3' },

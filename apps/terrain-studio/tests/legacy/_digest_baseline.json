@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 88,
+  "nodeCount": 89,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -59,6 +59,7 @@
     "normals": "263bdef7:bcf4a390|port_normal=1f285761:9468881b",
     "output": "7b0de484:d4ae72f5",
     "perlin": "5601956f:473ffde7",
+    "regolith": "efe6c64e:2a06eda2",
     "ridged": "9cb9f837:843dbcb0",
     "route": "263bdef7:bcf4a390",
     "rugged": "58cd1479:cf0cafdb",
