@@ -33,6 +33,7 @@ of this boundary.
 | `flowVelocity` | m/s, world-space `(u, v)` | RG32F | The engine's fluid driver (`03`; hydrology handoff, `SKILL.md`). Includes the nearshore surface circulation — longshore current, rip feeders/jets, tidal-inlet and river-mouth jets (`12`) — extended across the surf band, never stopped at the waterline |
 | `curvature` | 1/m, signed | R32F | Derived after final geometry, from R32F height (`06`) |
 | `scatter[i]` | positions + attrs | Point list | World-space |
+| `liquidBody[i]` | per-body record | Record list, not a raster | **The liquid's identity** (`28`), one per lake / river reach / sea / lava flow: causal state (`chl`, `cdom_a440`, `spm`, lithology class, mean depth), rheology (`viscosity`, `yield_stress`, `shear_index`, `emission_temperature`), derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour) and QA fields (`secchi_depth_m`, `jerlov_type`, `forel_ule_index`). The engine builds its per-body `sigma` and scatter colour from this — ocean, clear lake and turbid river must never share one global constant (terrain-renderer `12`) |
 
 Plus a manifest, and the manifest is not optional:
 
