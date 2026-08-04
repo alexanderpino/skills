@@ -72,20 +72,49 @@
 //   d_deposits prediction is non-zero on 10501/16384 (square) and 12023/18944 (hex) of the cells
 //   of that same inert control — which is the endpoint that arms the zero test.
 //
-// MUTATIONS. All five replace the live TYPES.hydraulic ENTRY (never write through it: the legacy
+// GREEN-RUN NUMBERS (S3.1 landed; same build, RES=128, fbm seed 7). Recorded because a gate whose
+// green reading nobody wrote down is a gate nobody can tell has drifted:
+//   square 16384 cells: ports [out, sediment, velocity], source still 'legacy-adapter' (the frozen
+//     row keeps the primary and both inputs; the two state rows are appended by `extraOutputs`).
+//     One readback with state demanded and one without, and the two heights are BYTE-IDENTICAL.
+//     ledger budgetScope 'kernel': eroded 3.2369e8 m3, deposited 1.7782e8 m3, suspended 1.2902e8,
+//     boundaryExported 1.6846e7, exportedOrSuspended 1.4587e8. Closure residual 26.906 m3 against a
+//     gamma-bound of 6.32e5 (4.2e-8 relative). Apron agreement 1.9e-6 over 4352 disjoint cells.
+//     Sediment support 0.4432 vs the prediction's 0.5746. Velocity -34.9..+36.3 m/s, 32768 finite
+//     components, 16066 negative — a real signed field, not a filled-in zero raster.
+//   hex 148 rows: ports declared identically, NO velocity VALUE (engine=droplets). budgetScope
+//     'node': eroded 1.8445e9, deposited 5.0929e8, exportedOrSuspended 1.3520e9, brushClipGain
+//     1.6838e7. Closure residual -8.80 m3 against 4.21e6; WITHOUT the named source it is -1.6838e7
+//     and RED, which is how this file knows the term is load-bearing rather than slack.
+//   Both lattices: the integral of the published raster equals depositedM3 to delta EXACTLY 0 (the
+//   ledger sums the same float32 values the port publishes), and the two inert controls still
+//   measure maxAbsHeightDelta EXACTLY 0 with the sediment channel identically zero.
+//
+// WHAT THE SEDIMENT CHANNEL IS, measured rather than assumed: net material added to the SOLID BED.
+// On the pipe path that is the state texture's RED channel against the padded input, NOT the
+// returned height — the height folds the still-suspended blue channel in at settle, and counting
+// suspended load as deposition would lay a thin positive film on nearly every wet cell (support
+// 0.4432 bed-based; the height-based figure is higher and closer to the prediction it must be
+// distinguishable from). On every other engine the returned field IS the bed, so the node's own
+// aggradation is the same quantity.
+//
+// MUTATIONS. All six replace the live TYPES.hydraulic ENTRY (never write through it: the legacy
 // port descriptors are Object.freeze'd at legacy-ports.js:540-541, so a write-through would be a
 // silent no-op under sloppy-mode page.evaluate). `mutationPerturbedTheRegistry` proves the
-// registry actually moved before any other gate is believed — measured ok for all five today.
+// registry actually moved before any other gate is believed — measured ok for all six today.
 //
-// HONESTY ABOUT WHAT THE MUTATIONS PROVE TODAY. Only `ledger-readbacks-hardcoded` discriminates on
-// this build: it moves `oneReadbackPerEvaluation` from a measured green (1 readback) to a measured
-// red (2), which is a control armed between two measured endpoints right now. The other four
-// perturb the sediment CHANNEL, and there is no channel yet — they land on the registry (proven by
-// mutationPerturbedTheRegistry) and the run stays red at the declaration gate. They become
-// discriminating the moment S3.1 declares the port, and NOT before; that is a property of writing
-// the gate first, not of the controls being weak. Do not "fix" this by having the mutant supply a
-// stand-in sediment raster: an oracle that grades its own stand-in is the vacuity this suite keeps
-// finding.
+// HONESTY ABOUT WHAT THE MUTATIONS PROVE. Written red-first, only `ledger-readbacks-hardcoded`
+// discriminated: the other four perturbed a sediment CHANNEL that did not exist yet, so they landed
+// on the registry (proven by mutationPerturbedTheRegistry) and the run stayed red at the
+// declaration gate. That was a property of writing the gate first, not of the controls being weak,
+// and it is now resolved — with the port declared, all six turn a NAMED gate red against a green
+// unmutated run. Do not "fix" a non-discriminating control by having the mutant supply a stand-in
+// sediment raster: an oracle that grades its own stand-in is the vacuity this suite keeps finding.
+//
+// `height-deleted` is the control the closure gates exist for. It zeroes the published field and
+// touches nothing else, so every loss term — the apron ring on the pipe path, the per-droplet
+// export counter on the CPU path — reports exactly what it reported before. A closure assembled out
+// of nested sums over the same cells cannot see that; publishedHeightClosesAgainstItemizedLoss can.
 const { chromium } = require('playwright-core')
 const path = require('path')
 
@@ -101,6 +130,7 @@ const MUTATIONS = [
   'sediment-omitted',          // the port and its value are dropped from the registry entry's result
   'ledger-readbacks-hardcoded',// two solver passes are run while the ledger still claims one readback
   'sediment-normalized-units', // the depth raster ships normalized instead of in metres
+  'height-deleted',            // the node publishes a flat field while the ledger reports real transport
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -190,6 +220,13 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
             else if (mutation === 'sediment-normalized-units') values.set(sed.id, scaled(v, 1 / (terrainDef.height || 1)))
           }
         }
+        // The "implementation that deletes the terrain" made concrete. Every LOSS term in the
+        // ledger is accumulated by production over a cell set the published field does not
+        // control — the apron ring on the pipe path, the per-droplet export counter on the CPU
+        // path — so zeroing what the node publishes moves the field side of the budget and leaves
+        // the loss side exactly where it was. A closure that cannot see this is a closure written
+        // out of nested sums, which is the defect this file exists to refuse.
+        if (mutation === 'height-deleted' && height) values.set(pid, new Float32Array(height.length))
         return { values }
       }
       TYPES.hydraulic = { ...ORIGINAL, eval: wrapped, outputs: mutantOutputs }
@@ -247,6 +284,17 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       eroded: ['erodedM3', 'detachedM3', 'bedrockDetachedM3', 'consumedM3', 'erodedVolumeM3'],
       deposited: ['depositedM3', 'depositedCoverM3', 'depositedVolumeM3'],
       loss: ['exportedOrSuspendedM3', 'exportedM3', 'boundaryExportM3', 'exportedOrSuspendedVolumeM3'],
+      // A NAMED mass SOURCE. The CPU droplet solver's erosion brush is clipped at the border: the
+      // clipped cells remove nothing while the droplet still credits itself the full amount, so
+      // mass appears from nowhere (legacy.js erode1, ledgered as brushClipGain, and the identity
+      // _verify_erosion_mass.js G2 already gates is sumIn-sumOut = exported + lost - brushClipGain).
+      // This is NOT a tolerance and it is not a free parameter: it must be NAMED by the ledger, it
+      // is measured to be load-bearing (namedMassSourceIsLoadBearingAndBounded shows the same
+      // closure red without it) and measured to be bounded (0.91% of eroded volume on hex, exactly
+      // 0 on the pipe path, which has no brush).
+      gain: ['brushClipGainM3', 'massSourceM3'],
+      suspended: ['suspendedM3'],
+      boundary: ['boundaryExportedM3'],
     }
     const pick = (led, names) => {
       for (const k of names) if (led && Number.isFinite(led[k])) return { key: k, value: led[k] }
@@ -258,6 +306,14 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       readbacksClaimed: led && Number.isFinite(led.readbacks) ? led.readbacks : null,
       cellArea: pick(led, LEDGER_KEYS.cellArea), eroded: pick(led, LEDGER_KEYS.eroded),
       deposited: pick(led, LEDGER_KEYS.deposited), loss: pick(led, LEDGER_KEYS.loss),
+      gain: pick(led, LEDGER_KEYS.gain), suspended: pick(led, LEDGER_KEYS.suspended),
+      boundary: pick(led, LEDGER_KEYS.boundary),
+      // The two DISJOINT-CELL-SET readings of the same physical quantity on the pipe path. `apron*`
+      // is accumulated over the ring only; `cropExchange` over the core only. Their agreement is
+      // the one closure statement no subtraction of nested sums can fake.
+      apronCells: led && Number.isFinite(led.apronCells) ? led.apronCells : null,
+      cropExchange: led && Number.isFinite(led.cropExchange) ? led.cropExchange : null,
+      exportedToApron: led && Number.isFinite(led.exportedToApron) ? led.exportedToApron : null,
     })
 
     // ---- one lattice ------------------------------------------------------------------------
@@ -292,7 +348,18 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         typed: work.typed, keys: work.keys, err: work.err, readbacks: work.readbacks,
         heightDigest: digest(work.height), hasSediment: !!work.sediment, hasVelocity: !!work.velocity,
         sedimentStats: stats(work.sediment), velocityLen: work.velocity ? work.velocity.length : null,
+        velocityStats: stats(work.velocity),
         ledger: work.ledger, volumes: readVolumes(work.ledger),
+      }
+      // HEIGHT-ONLY DEMAND, the other half of ADR-002's two paths. The state path renders a
+      // two-texel atlas and reads THAT; the height path reads the state texture straight. Both must
+      // return the same bytes, because _verify_digest.js pins the height path and would not notice
+      // a state path that quietly diverged from it.
+      const bare = evaluate(baseParams(), fbm, false)
+      m.bare = {
+        typed: bare.typed, keys: bare.keys, readbacks: bare.readbacks, err: bare.err,
+        heightIdentical: bytesEqual(work.height, bare.height),
+        carriesState: !!bare.sediment || !!bare.velocity,
       }
       // Height-side quantities the oracle derives itself, in double, in m3.
       if (work.height && work.height.length === N) {
@@ -434,13 +501,60 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   const within = (delta, absSum, gamma) => Number.isFinite(delta) && Number.isFinite(absSum)
     && Math.abs(delta) <= gamma * Math.max(absSum, 0)
 
-  const closureOf = m => {
+  // THE LEDGER CLOSURE. `exportedDerived === false` is a PRECONDITION, not the evidence: a ledger
+  // whose only loss term is sumIn-sumOut closes for any implementation and is refused outright. The
+  // evidence is that the loss term is accumulated somewhere the field side cannot reach — the apron
+  // ring (a cell set DISJOINT from the core) on the pipe path, the per-droplet export counter on
+  // the CPU path — so an implementation that destroyed or invented mass moves one side and not the
+  // other. `gain` is a NAMED mass SOURCE, never an unnamed slack: absent the key it is 0, and
+  // namedMassSourceIsLoadBearingAndBounded measures that including it changes the verdict.
+  const closureOf = (m, useGain = true) => {
     const v = m && m.work && m.work.volumes
     if (!v || !v.present || v.exportedDerived !== false) return null
     if (!v.eroded || !v.deposited || !v.loss) return null
-    const residual = v.eroded.value - v.deposited.value - v.loss.value
+    const gain = useGain && v.gain ? v.gain.value : 0
+    const residual = v.eroded.value - v.deposited.value - v.loss.value + gain
     const scale = Math.abs(v.eroded.value) + Math.abs(v.deposited.value) + Math.abs(v.loss.value)
-    return { residual, scale, ok: within(residual, scale, m.gamma), terms: v }
+      + Math.abs(gain)
+    return { residual, scale, gain, ok: within(residual, scale, m.gamma), terms: v }
+  }
+  // THE SAME CLOSURE AGAINST THE RASTER THE NODE PUBLISHED, not against the ledger's own field
+  // terms. `netErodedM3` / `netDepositedM3` are computed by THIS FILE from the fixture and the
+  // returned height; the loss and the source come from production's independent accumulators. That
+  // asymmetry is the whole point — it is what makes the `height-deleted` control fail here, and a
+  // closure assembled entirely inside the ledger could not.
+  const publishedClosureOf = m => {
+    const v = m && m.work && m.work.volumes
+    if (!v || !v.present || v.exportedDerived !== false || !v.loss) return null
+    if (!Number.isFinite(m.work.netErodedM3) || !Number.isFinite(m.work.netDepositedM3)) return null
+    // The published height carries any load still suspended at truncation (the pipe path folds the
+    // blue channel in at settle), so the loss to close a HEIGHT budget against is boundary export
+    // alone — the ledger's own suspended term, subtracted by name.
+    const suspended = v.suspended ? v.suspended.value : 0
+    const gain = v.gain ? v.gain.value : 0
+    const loss = v.loss.value - suspended
+    const residual = m.work.netErodedM3 - m.work.netDepositedM3 - loss + gain
+    const scale = Math.abs(m.work.netErodedM3) + Math.abs(m.work.netDepositedM3)
+      + Math.abs(loss) + Math.abs(gain)
+    return { residual, scale, loss, gain, ok: within(residual, scale, m.gamma) }
+  }
+  // G3g's pattern, restated for this fixture. Core loss (sumIn-sumOut over the core) and apron gain
+  // (apronOut-apronIn over the ring) measure the same transport over cell sets with no member in
+  // common, so a kernel that deleted or invented mass would move them apart.
+  //
+  // BOTH ENDPOINTS MEASURED, because this one cannot be armed through the eval wrapper — it reads
+  // production's own accumulators, so the delta has to be a production delta. Shipped kernel:
+  // 1.9e-6 relative over 4352 apron cells. Same kernel with the CORE output scaled by 0.99 (a
+  // gpu.js one-line probe, a kernel that deletes 1% of the terrain and nothing else): cropExchange
+  // 90.471 against an unmoved exportedToApron 4.246, rel 0.953 — 500,000x the noise, and RED. The
+  // 1e-3 bound sits ~500x above the noise and ~1000x below that, the same bound chosen the same
+  // way as _verify_erosion_mass.js G3g.
+  const apronAgreementOf = m => {
+    const v = m && m.work && m.work.volumes
+    if (!v || !Number.isFinite(v.cropExchange) || !Number.isFinite(v.exportedToApron)) return null
+    if (!(v.apronCells > 0)) return null
+    return { apronCells: v.apronCells, cropExchange: v.cropExchange, exportedToApron: v.exportedToApron,
+      rel: Math.abs(v.exportedToApron - v.cropExchange) / Math.max(1e-9, Math.abs(v.cropExchange)) }
   }
   const integralOf = m => {
     const v = m && m.work && m.work.volumes
@@ -456,6 +570,9 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   }
 
   const closureSq = sq && closureOf(sq), closureHx = hx && closureOf(hx)
+  const closureHxNoGain = hx && closureOf(hx, false)
+  const publishedSq = sq && publishedClosureOf(sq), publishedHx = hx && publishedClosureOf(hx)
+  const apronSq = sq && apronAgreementOf(sq)
   const integralSq = sq && integralOf(sq), integralHx = hx && integralOf(hx)
 
   const gates = {
@@ -496,6 +613,21 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     ledgerCellAreaMatchesLattice: L.length === 2 && L.every(areaOk),
     volumeClosureSquare: !!(closureSq && closureSq.ok),
     volumeClosureHex: !!(closureHx && closureHx.ok),
+    // The two DISJOINT-SET statements. Neither can be satisfied by an implementation that deletes
+    // the terrain: publishedHeightClosesAgainstItemizedLoss reads the field side out of the raster
+    // the node returned and the loss side out of production's own accumulators, and
+    // coreLossMatchesApronGain compares two readings of the same transport over cell sets with no
+    // member in common.
+    publishedHeightClosesAgainstItemizedLoss: !!(publishedSq && publishedSq.ok)
+      && !!(publishedHx && publishedHx.ok),
+    coreLossMatchesApronGain: !!(apronSq && apronSq.apronCells > 0 && apronSq.rel <= 1e-3),
+    // ARMED ON THIS RUN: the named mass source is load-bearing (the same closure without it is red
+    // on hex today) and bounded (0 on the pipe path, which has no erosion brush at all). Both
+    // endpoints are measured here, so this cannot become a slack term nobody notices.
+    namedMassSourceIsLoadBearingAndBounded: !!(closureHx && closureHx.terms.gain)
+      && closureHx.gain > 0 && !!(closureHxNoGain && closureHxNoGain.ok === false)
+      && closureHx.gain <= 0.05 * Math.abs(closureHx.terms.eroded.value)
+      && !!closureSq && (closureSq.terms.gain ? closureSq.terms.gain.value : 0) === 0,
     sedimentIntegralMatchesLedgerSquare: !!(integralSq && integralSq.ok),
     sedimentIntegralMatchesLedgerHex: !!(integralHx && integralHx.ok),
     sedimentIsFiniteNonNegativeMetres: L.length === 2 && L.every(m => {
@@ -511,6 +643,20 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       && !!hx && hx.work.readbacks === 0,
     ledgerReadbackClaimMatchesCount: !!sq && sq.work.volumes.readbacksClaimed === sq.work.readbacks
       && sq.work.volumes.readbacksClaimed === 1,
+
+    // --- the velocity VALUE, not just its descriptor -------------------------------------------
+    // The port would be a lie if nothing filled it. Two components per cell, interleaved, finite,
+    // and not identically zero — a flow field of all zeros on an eroding fbm surface would mean the
+    // atlas pass read the wrong textures, which is precisely the failure a descriptor-only gate
+    // would have shipped.
+    velocityIsFilledOnPipes: !!sq && sq.work.hasVelocity === true
+      && sq.work.velocityLen === 2 * sq.cells
+      && !!sq.work.velocityStats && sq.work.velocityStats.finite === true
+      && sq.work.velocityStats.abs > 0 && sq.work.velocityStats.negatives > 0,
+
+    // --- ADR-002's OTHER path: height-only demand ----------------------------------------------
+    heightIdenticalWithAndWithoutStateDemand: L.length === 2 && L.every(m => m.bare
+      && m.bare.err === null && m.bare.heightIdentical === true && m.bare.carriesState === false),
 
     // --- repeatability -----------------------------------------------------------------------
     sedimentRepeatableSameSeed: L.length === 2 && L.every(m => m.repeat.sedimentPresent && m.repeat.sedimentIdentical),
@@ -558,10 +704,16 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       + `predictionNonZero=${m.inert.predictionNonZero}/${m.cells} (${num(m.inert.predictionShare)})`)
     console.log(`    flat: maxHeightDelta=${num(m.flat.maxAbsHeightDelta)} sediment=${m.flat.hasSediment} allZero=${m.flat.sedimentAllZero}`)
     console.log(`    repeat: height=${m.repeat.heightIdentical} sediment=${m.repeat.sedimentIdentical}`)
+    console.log(`    heightOnlyDemand: ${JSON.stringify(m.bare)}`)
+    console.log(`    velocityStats: ${JSON.stringify(m.work.velocityStats)} len=${m.work.velocityLen}`)
   }
   console.log(`  demand: ${JSON.stringify(dm)}`)
   console.log(`  closure square: ${JSON.stringify(closureSq)}`)
   console.log(`  closure hex:    ${JSON.stringify(closureHx)}`)
+  console.log(`  closure hex WITHOUT the named source (must be red): ${JSON.stringify(closureHxNoGain)}`)
+  console.log(`  published-raster closure square: ${JSON.stringify(publishedSq)}`)
+  console.log(`  published-raster closure hex:    ${JSON.stringify(publishedHx)}`)
+  console.log(`  apron agreement (disjoint cell sets): ${JSON.stringify(apronSq)}`)
   console.log(`  integral square: ${JSON.stringify(integralSq)}  hex: ${JSON.stringify(integralHx)}`)
   for (const [name, pass] of Object.entries(gates)) console.log(`  ${pass ? 'ok  ' : 'RED '} ${name}`)
   if (report.fatal) console.log('  FATAL-IN-PAGE ' + report.fatal)

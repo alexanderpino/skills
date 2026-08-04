@@ -119,7 +119,26 @@ export function attachLegacyPorts(types) {
       continue
     }
     def.inputs = row.in
-    def.outputs = row.out ? [row.out] : []
+    // EXTRA OUTPUTS ON AN ADAPTED TYPE (S3.1). A roster type may PUBLISH additional outputs without
+    // leaving the adapter, by listing them in `extraOutputs`. The frozen row still owns its inputs
+    // and its one primary, which is the whole point: hydraulic did not author its input ports, it
+    // inherited them, and declaring `outputs:` instead would flip it to source:'declared' — a form
+    // that skips the adapter entirely and would leave `def.inputs` unset, silently dropping the
+    // 'in'/'mask' descriptors a v1 document's edges resolve against.
+    //
+    // The appended rows are validated here, on the same path and with the same refusal as a
+    // self-declaring plugin. That matters: an adapter row is data nobody can get wrong, but an
+    // `extraOutputs` block is a plugin authoring descriptors, and those are exactly the ones that
+    // went nine plugins deep before anything checked them.
+    const extra = Array.isArray(def.extraOutputs) ? def.extraOutputs : []
+    def.outputs = row.out ? [row.out, ...extra] : [...extra]
+    if (extra.length) {
+      const problems = validatePortList({ inputs: def.inputs, outputs: def.outputs, source: 'legacy-adapter' })
+      if (problems.length) {
+        throw new Error(`plugin ${type} declares invalid extraOutputs: `
+          + problems.map(p => `${p.code} ${p.message}`).join(' | '))
+      }
+    }
     def.ports = {
       version: PORTS_VERSION,
       source: 'legacy-adapter',

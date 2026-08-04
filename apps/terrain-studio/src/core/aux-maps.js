@@ -57,11 +57,16 @@ export const AUX_MAPS = Object.freeze({
   // about who fills it: the explicit state selectors (`s_sedimentDepth`, `s_sandDepth`) declare
   // real typed scalarRaster/metre/state ports for both, and d_deposits now takes `sedimentDepth`
   // on a typed slot. `owner` is unchanged and deliberately so — it names the sprint that owns the
-  // PRODUCER, and neither has one yet: S3.1 emits sediment depth out of the hydraulic solver and
-  // S7.3 is the first thing that will deposit sand. A named port with no producer is exactly the
-  // state this row should describe, and calling it `planned` while three plugins declare it would
-  // be the registry disagreeing with the registry.
-  sedimentDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S3.1' },
+  // PRODUCER, and neither has one yet. This row used to name S3.1 and that was wrong, discovered
+  // when S3.1 shipped: the hydraulic solver emits `sediment`, which is a TRANSPORT quantity — how
+  // much material a pass moved — and ports.js is explicit that `sedimentDepth` is a LAYER
+  // THICKNESS, how much is lying there. They are different fields and conflating them is precisely
+  // what the two separate semantics exist to prevent. The thing that turns transport into a change
+  // in cover thickness is S3.3's cover-aware deposition, so S3.3 owns this row. S7.3 is the first
+  // thing that will deposit sand. A named port with no producer is exactly the state this row
+  // should describe, and calling it `planned` while three plugins declare it would be the registry
+  // disagreeing with the registry.
+  sedimentDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S3.3' },
   sandDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S7.3' },
   wetness: { lens: 'state', kind: 'scalarRaster', unit: 'none', status: 'planned', owner: 'S3.3' },
 

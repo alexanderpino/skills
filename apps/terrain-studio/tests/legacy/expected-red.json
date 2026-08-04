@@ -17,12 +17,6 @@
   ],
   "entries": [
     {
-      "oracle": "_verify_sediment_state.js",
-      "story": "S3.1 hydraulic state outputs",
-      "reason": "hydraulic declares no sediment/velocity ports yet",
-      "beforeGreen": "AUDIT BLOCKER RESOLVED: the pipe ledger now accumulates the apron ring over a cell set DISJOINT from the core (gpu.js), so core loss and boundary gain are independent measurements rather than differences of nested sums. The oracle must assert their agreement instead of trusting exportedDerived. Measured: cropExchange 3.632687 vs exportedToApron 3.632644, 1.2e-5 relative."
-    },
-    {
       "oracle": "_verify_cover_erosion.js",
       "story": "S3.3 cover-aware transport",
       "reason": "hydraulic declares no cover inputs and emits no state rasters",

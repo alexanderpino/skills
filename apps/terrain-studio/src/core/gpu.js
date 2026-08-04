@@ -8,7 +8,10 @@
 //
 // TWO HAZARDS CARRIED OVER UNCHANGED, documented rather than silently inherited:
 //   * GPU.rt() never frees. Render targets are cached by key+"_"+n, so every distinct RES leaves
-//     its allocations resident and applyWorkingResolution() does not invalidate them.
+//     its allocations resident and applyWorkingResolution() does not invalidate them. rtWH() shares
+//     that cache and therefore that hazard: the state atlas is 2*simN x simN RGBA32F (~40 MB at
+//     RES=1024) and stays resident once state has been demanded even once. It is allocated only on
+//     the state-demand path, so a height-only session never pays it.
 //   * GPU.prog() caches by key while IGNORING the source, so two call sites sharing a key get a
 //     stale program. Both predate this extraction and neither is worsened by it.
 //
@@ -18,13 +21,18 @@
 // path with no error at all - a silent capability downgrade the digest cannot catch, because the
 // CPU path produces valid output.
 import { makeProg, u } from './gl-util.js';
-import { fieldW, fieldH, normalize, terrainDef, XF, USE_GPU, clamp } from '../legacy.js';
+import { fieldW, fieldH, normalize, terrainDef, XF, USE_GPU, clamp, cellSizeM } from '../legacy.js';
 
 let gl = null;
 export const setGL = (ctx) => { gl = ctx; };
 
 export const GPU={
-  ok:null,floatBlend:false,vs:null,progs:{},rts:{},fbo:null,
+  // `readbacks` counts every gl.readPixels this module performs. ADR-002 allows ONE
+  // synchronisation point per hydraulic evaluation, and until now the ledger's `readbacks:1` was a
+  // literal in an object rather than a count of anything - a two-pass implementation would have
+  // gone on claiming one. readRGBA/readRGBAWH are the only readPixels call sites in the app, so
+  // incrementing here makes the claim a measurement.
+  ok:null,floatBlend:false,vs:null,progs:{},rts:{},fbo:null,readbacks:0,
   init(){
     if(this.ok!==null)return this.ok;
     this.ok=false;
@@ -74,7 +82,31 @@ export const GPU={
   uploadRGBA(key,n,rgba){const t=this.rt(key,n);
     gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,n,n,0,gl.RGBA,gl.FLOAT,rgba);return t;},
   readRGBA(target,n){this.bind(target,n);
-    const rgba=new Float32Array(n*n*4);gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);   // shape-ok: readback must match the square texture it reads
+    const rgba=new Float32Array(n*n*4);this.readbacks++;gl.readPixels(0,0,n,n,gl.RGBA,gl.FLOAT,rgba);   // shape-ok: readback must match the square texture it reads
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);return rgba;},
+  // ---- NON-SQUARE targets, for the state ATLAS only ----------------------------------------
+  // Every other target in this module is square because the kernels are square (see the note on
+  // read()). ADR-002's state-demand path needs ONE readback carrying two texels per cell, which is
+  // a 2w x h surface: packing it into a square texture would either waste 4x the memory or force a
+  // second readback, and a second readback is the exact thing the ADR forbids.
+  rtWH(key,w,h){const k=key+"_"+w+"x"+h;let t=this.rts[k];
+    if(!t){t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,w,h,0,gl.RGBA,gl.FLOAT,null);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      this.rts[k]=t;}
+    return t;},
+  bindWH(target,w,h){gl.bindFramebuffer(gl.FRAMEBUFFER,this.fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target,0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D,null,0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT2,gl.TEXTURE_2D,null,0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0]);gl.viewport(0,0,w,h);},
+  runWH(prog,w,h,target,setup){
+    this.bindWH(target,w,h);gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
+    gl.useProgram(prog);if(setup)setup(prog);
+    gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,null);},
+  readRGBAWH(target,w,h){this.bindWH(target,w,h);
+    const rgba=new Float32Array(w*h*4);this.readbacks++;gl.readPixels(0,0,w,h,gl.RGBA,gl.FLOAT,rgba);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);return rgba;},
   // shape-ok: reads back a GPU TEXTURE and the textures allocated above are square, so the readback must keep matching what was uploaded - it stays n*n, NOT n*nh.
   // Making hex textures n x latticeRows(n) belongs with the GPU hex kernels, not here - the readback
@@ -334,6 +366,39 @@ const GPU_PIPE_STATE_FS=`#version 300 es
     float er=cap>sediment?min(uErode*(cap-sediment),uErCap):0.0;
     float dep=cap<=sediment?min(uDeposit*(sediment-cap),sediment):0.0;
     frag=vec4(b+dep-er,water,sediment+er-dep,1.0);}`;
+// THE STATE ATLAS — ADR-002's two-texel-per-cell RGBA32F layout, S3.1.
+//
+// The simulation above computes a per-cell velocity every iteration (`transport`, `depth`, `speed`
+// in GPU_PIPE_STATE_FS) and throws it away: only the state texture survives, and GPU.read() then
+// keeps one channel of that. This pass is what stops the throwing-away, and the constraint it is
+// written against is that demanding state must NOT cost a second synchronisation point.
+//
+// Layout: texel (2x, y) is the state RGBA (bed, water, sediment, 1) copied verbatim; texel
+// (2x+1, y) is (vx, vy, speed, 1) in CELLS PER ITERATION. One readPixels covers both.
+//
+// The velocity is not a new model. It is the SAME expression the last state pass evaluated, fed the
+// SAME two inputs: uPrev is the state that pass read (after the loop's final swap the previous
+// state is in `next`), uF is the flux it read. So `speed` here is bit-for-bit the number the
+// capacity law used, not a plausible-looking reconstruction of it — which is the difference between
+// exposing state and inventing it.
+const GPU_PIPE_ATLAS_FS=`#version 300 es
+  precision highp float;precision highp int;out vec4 frag;
+  uniform sampler2D uState,uPrev,uF;uniform int uN;uniform float uRain;
+  bool inside(ivec2 p){return p.x>=0&&p.y>=0&&p.x<uN&&p.y<uN;}
+  vec4 F(ivec2 p){return inside(p)?texelFetch(uF,p,0):vec4(0.0);}
+  void main(){
+    ivec2 t=ivec2(gl_FragCoord.xy);ivec2 p=ivec2(t.x>>1,t.y);
+    vec4 s=texelFetch(uState,p,0);
+    if((t.x&1)==0){frag=s;return;}
+    vec4 own=F(p);
+    float inL=F(p+ivec2(-1,0)).y,inR=F(p+ivec2(1,0)).x;
+    float inT=F(p+ivec2(0,-1)).w,inB=F(p+ivec2(0,1)).z;
+    vec2 transport=0.5*vec2(own.y-own.x+inL-inR,own.w-own.z+inT-inB);
+    float water0=texelFetch(uPrev,p,0).g+uRain;
+    float depth=max(0.001,0.5*(water0+s.g));
+    vec2 v=transport/depth;float sp=length(v);
+    if(sp>8.0)v*=8.0/sp;                      // the solver's own min(8.0, |transport|/depth)
+    frag=vec4(v,min(8.0,sp),1.0);}`;
 // One mass ledger per KERNEL run (raw engine, last-run-wins), top-level so verification can read
 // it from page.evaluate (_verify_erosion_mass.js). The budget it must close: sumIn - sumOut =
 // exported (+ lost, only when a caller opts out of settling). It is NOT a node ledger: erosion2
@@ -392,16 +457,49 @@ function runHydraulicPipeState(inp,{iters=48,capacity=6,erode=0.35,deposit=0.28,
       gl.uniform1f(u(p,"uKS"),gk);gl.uniform1f(u(p,"uErCap"),0.0025/gk);});
     let t=state;state=next;next=t;t=flux;flux=nextFlux;nextFlux=t;
   }
-  return{state,n,nh,simN,apron,padded:padded.field};
+  // After the final swap `state`/`flux` hold iteration N's outputs and `next` holds iteration N's
+  // INPUT state. The state pass of iteration N read exactly (next, flux), so those two are what the
+  // atlas needs to reproduce that pass's velocity without re-running the simulation.
+  return{state,prev:next,flux,rain,n,nh,simN,apron,padded:padded.field};
 }
-export function gpuHydraulicPipes(inp,opts={}){
-  const{state,n,nh,simN,apron,padded}=runHydraulicPipeState(inp,opts);
+// The pipe solver's iteration is its unit of time. There is no calibrated physical duration in the
+// model - rain, evaporation and the flux gain are all per-iteration rates - so a velocity port
+// cannot exist without STATING one, and stating it is the only honest option: leaving the field in
+// cells/iteration and labelling the port mPerS would be a fabricated unit, and refusing to publish
+// velocity at all would keep C2 open. One reference iteration is one model second; under Res Lock
+// (gridK = k) the same world transport takes k x the iterations, so one iteration is 1/k s and the
+// metres-per-second conversion is cellSizeM * k - which is res-lock invariant, because cellSizeM
+// falls by the same k.
+const PIPE_SECONDS_PER_REFERENCE_ITERATION=1;
+export function gpuHydraulicPipes(inp,opts={},sink=null){
+  const rb0=GPU.readbacks;
+  const{state,prev,flux,rain,n,nh,simN,apron,padded}=runHydraulicPipeState(inp,opts);
   // Terminal settle. The state texture's blue channel is sediment still suspended when the
   // iterations end, in the SAME normalized-height units as bed (the state shader exchanges the
   // two strictly 1:1). GPU.read keeps only red, so this load used to vanish at readback - 92% of
   // net-eroded volume at reference settings - which is why the production hydraulic path could
   // never finish a fan or a delta. Green (water) is never added - it is rain.
-  const rgba=GPU.readRGBA(state,simN);
+  //
+  // TWO DEMANDS, ONE SYNCHRONISATION POINT (ADR-002). Height-only keeps the plain RGBA readback.
+  // State demand renders the two-texel atlas first and reads THAT once; the simulation above is
+  // identical either way, which is a claim _verify_sediment_state.js measures
+  // (heightIdenticalWithAndWithoutStateDemand) rather than one this comment asserts.
+  let rgba,vel=null;
+  if(sink){
+    const w=simN*2,atlas=GPU.rtWH("pipeAtlas",w,simN),pA=GPU.prog("pipeAtlas",GPU_PIPE_ATLAS_FS);
+    GPU.runWH(pA,w,simN,atlas,p=>{
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,state);gl.uniform1i(u(p,"uState"),0);
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,prev);gl.uniform1i(u(p,"uPrev"),1);
+      gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,flux);gl.uniform1i(u(p,"uF"),2);
+      gl.uniform1i(u(p,"uN"),simN);gl.uniform1f(u(p,"uRain"),rain);});
+    const packed=GPU.readRGBAWH(atlas,w,simN);
+    rgba=new Float32Array(simN*simN*4);vel=new Float32Array(simN*simN*4);
+    for(let y=0;y<simN;y++)for(let x=0;x<simN;x++){
+      const s=(y*w+x*2)*4,d=(y*simN+x)*4;
+      rgba[d]=packed[s];rgba[d+1]=packed[s+1];rgba[d+2]=packed[s+2];rgba[d+3]=packed[s+3];
+      vel[d]=packed[s+4];vel[d+1]=packed[s+5];vel[d+2]=packed[s+6];vel[d+3]=packed[s+7];
+    }
+  }else rgba=GPU.readRGBA(state,simN);
   const o=new Float32Array(n*nh);let sumIn=0,sumOut=0,settled=0,sumSimOut=0;
   for(let i=0;i<simN*simN;i++)sumSimOut+=rgba[i*4]+rgba[i*4+2];
   // THE APRON RING, ACCUMULATED IN ITS OWN RIGHT. Every loss term here used to be a difference of
@@ -422,23 +520,55 @@ export function gpuHydraulicPipes(inp,opts={}){
     const si=(y*simN+x)*4;
     apronIn+=padded[y*simN+x];apronOut+=rgba[si]+rgba[si+2];apronCells++;
   }
+  // S3.1 state, read out of the SAME single readback. `hs` denormalises to metres (ADR-005), the
+  // cell area is the square lattice constant (the pipe kernel never runs on hex - gpuReady()
+  // refuses it), and both sums are accumulated from the float32 values that are PUBLISHED, so the
+  // ledger's depositedM3 is the integral of the raster rather than a parallel double-precision
+  // reckoning of it.
+  const hs=terrainDef.height||1,gk=opts.gridK>0?opts.gridK:1;
+  const cellM=cellSizeM(),cellAreaM2=cellM*cellM;
+  const mps=cellM*gk/PIPE_SECONDS_PER_REFERENCE_ITERATION;
+  const sedM=sink?new Float32Array(n*nh):null,velMps=sink?new Float32Array(n*nh*2):null;
+  let depSumM=0,eroSumM=0;
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
-    const i=y*n+x,si=((y+apron)*simN+x+apron)*4;
+    const i=y*n+x,pi=(y+apron)*simN+x+apron,si=pi*4;
     o[i]=rgba[si]+rgba[si+2];
     settled+=rgba[si+2];sumIn+=inp[i];sumOut+=o[i];
+    // The BED delta, not the height delta. The returned height folds the still-suspended blue
+    // channel in at settle time, and suspended load is material IN TRANSPORT, not deposited cover;
+    // counting it as deposition would put a thin positive film on nearly every wet cell and turn
+    // a state channel back into something a prediction could imitate.
+    const dBed=rgba[si]-padded[pi];
+    if(dBed>0){const m=Math.fround(dBed*hs);if(sedM)sedM[i]=m;depSumM+=m;}
+    else eroSumM-=dBed*hs;
+    if(velMps){velMps[i*2]=vel[si]*mps;velMps[i*2+1]=vel[si+1]*mps;}
   }
-  const sumSimIn=fieldSum(padded);
+  const sumSimIn=fieldSum(padded),exportedToApron=apronOut-apronIn;
   hydroMassDiag={engine:"pipes",settle:true,boundaryPolicy:"continuation-apron-closed-wall",
     boundaryApronCells:apron,sumIn,sumOut,settled,cropExchange:sumIn-sumOut,
     sumSimIn,sumSimOut,
     // Itemized: accumulated over the apron ring, a disjoint cell set from the core. `exportedDerived`
     // now reports the truth about THIS field rather than being a constant.
-    apronCells,apronIn,apronOut,exportedToApron:apronOut-apronIn,exported:apronOut-apronIn,
+    apronCells,apronIn,apronOut,exportedToApron,exported:exportedToApron,
     exportedDerived:false,
     // Total non-conservation across the WHOLE simulated domain, apron included. This is what the
     // field named `lost` always was, and it is NOT export: material leaving the core is still inside
     // the padded domain. It should be ~0, and calling it "lost" hid that.
-    nonConservation:sumSimIn-sumSimOut,lost:sumSimIn-sumSimOut};
+    nonConservation:sumSimIn-sumSimOut,lost:sumSimIn-sumSimOut,
+    // --- S3.1: the same budget in PHYSICAL VOLUME ------------------------------------------
+    // erodedM3 - depositedM3 - exportedOrSuspendedM3 reduces algebraically to
+    // (cropExchange - exportedToApron) * hs * area = nonConservation * hs * area. Core and apron
+    // are DISJOINT cell sets, so that residual is a measurement of whether this kernel conserves
+    // mass, not an identity: an implementation that deleted the terrain would drive erodedM3 to the
+    // whole input volume while the apron gain went the other way, and the residual would be ~100%
+    // of the budget instead of the ~1e-7 it is.
+    cellAreaM2,heightScaleM:hs,latticeArea:"square",budgetScope:"kernel",
+    erodedM3:eroSumM*cellAreaM2,depositedM3:depSumM*cellAreaM2,
+    suspendedM3:settled*hs*cellAreaM2,
+    boundaryExportedM3:exportedToApron*hs*cellAreaM2,
+    exportedOrSuspendedM3:(exportedToApron+settled)*hs*cellAreaM2,
+    readbacks:GPU.readbacks-rb0};
+  if(sink){sink.deposited=sedM;sink.velocity=velMps;sink.w=n;sink.h=nh;sink.engine="pipes";}
   return o;
 }
 
@@ -636,17 +766,22 @@ function runHydraulicDropletTexture(heightTex,opts={},key="droplet"){
 }
 export function gpuHydraulicDroplets(inp,opts={}){
   if(!gpuDropletsReady())throw new Error("GPU droplet erosion requires WebGL2 float render targets and EXT_float_blend");
+  const rb0=GPU.readbacks;
   const n=fieldW(),sumIn=fieldSum(inp),height=GPU.upload("dropletHeightA",n,inp);
   const result=GPU.read(runHydraulicDropletTexture(height,opts,"droplet"),n),sumOut=fieldSum(result);
   const exportedOrSuspended=sumIn-sumOut;
   hydroMassDiag={engine:"gpu-droplets",settle:false,terminalDeposit:false,
     terminalPolicy:"suspend-at-lifetime",sumIn,sumOut,settled:0,
     exported:exportedOrSuspended,exportedOrSuspended,exportedDerived:true,
-    unresolvedIncluded:true,lost:0,...lastDropletRunMeta,stages:["droplets"],readbacks:1};
+    unresolvedIncluded:true,lost:0,...lastDropletRunMeta,stages:["droplets"],
+    // COUNTED, not claimed. This field was the literal `1` and would have gone on saying 1 through
+    // a two-pass rewrite; GPU.readbacks is incremented at the only readPixels call sites there are.
+    readbacks:GPU.readbacks-rb0};
   return result;
 }
 export function gpuHydraulicCombined(inp,{pipes={},droplets={}}={}){
   if(!gpuDropletsReady())throw new Error("Combined hydraulic GPU path requires WebGL2 float blending");
+  const rb0=GPU.readbacks;
   const sumIn=fieldSum(inp),pipe=runHydraulicPipeState(inp,pipes,"combinedPipe");
   const settleProg=GPU.prog("pipeSettle",GPU_PIPE_SETTLE_FS),pipeHeight=GPU.rt("combinedPipeHeight",pipe.n);
   GPU.run(settleProg,pipe.n,pipeHeight,p=>{bindTex(p,"uS",0,pipe.state);
@@ -659,7 +794,7 @@ export function gpuHydraulicCombined(inp,{pipes={},droplets={}}={}){
     pipeBoundaryPolicy:"continuation-apron-closed-wall",pipeBoundaryApronCells:pipe.apron,
     sumIn,sumOut,settled:0,exported:exportedOrSuspended,exportedOrSuspended,
     exportedDerived:true,unresolvedIncluded:true,lost:0,
-    ...lastDropletRunMeta,stages:["pipes","droplets"],readbacks:1};
+    ...lastDropletRunMeta,stages:["pipes","droplets"],readbacks:GPU.readbacks-rb0};
   return result;
 }
 // GPU compute is square-texture end to end: every kernel taps ivec2 +-(1,0) neighbours and the
