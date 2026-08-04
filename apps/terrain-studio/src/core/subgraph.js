@@ -130,14 +130,48 @@ export function registerDefinition(defs, def) {
 }
 
 /**
+ * Content key for ONE upstream field.
+ *
+ * The caller used to pass `[String(ins[0].length)]`, which is the same string for every field in the
+ * document because every field is RES*RES. Two instances of the same definition with the same
+ * overrides and DIFFERENT inputs therefore collided on one cache entry and the second silently
+ * rendered the first's terrain — measured with instance A fed by perlin and instance D fed by
+ * ridged returning the identical Float32Array object, not merely equal values.
+ *
+ * The digest reads the raw 32-bit words, so it is bit-exact rather than tolerance-based; -0 and NaN
+ * payloads key differently from 0 and NaN, which costs a cache miss and never a wrong result. It is
+ * O(N) against an evaluation that is O(N x definition nodes), so it is a fraction of what it guards.
+ */
+export function fieldKey(field) {
+  if (field == null) return 'null'
+  if (!ArrayBuffer.isView(field)) return 'x' + String(field)
+  const words = new Uint32Array(field.buffer, field.byteOffset, field.byteLength >>> 2)
+  let a = 0x811c9dc5, b = 0x01000193
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]
+    a = Math.imul(a ^ (w & 0xffff), 16777619) >>> 0
+    a = Math.imul(a ^ (w >>> 16), 16777619) >>> 0
+    b = (Math.imul(b + w, 2654435761) ^ (b >>> 7)) >>> 0
+  }
+  return words.length.toString(16) + ':' + a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0')
+}
+
+/**
  * Cache identity for one instance evaluation. ADR-004 names every term: full definition
  * hash/version, instance overrides, context/substrate, effective seed, demanded output, and the
  * upstream port keys.
  *
  * Two identical instances therefore share a key and may share an immutable cached result; two
  * instances with different overrides never can, which is what keeps them from aliasing state.
+ *
+ * `definitionClosure` is the TRANSITIVE set of definitions this one instantiates, as [id, hash]
+ * pairs. The top-level hash alone was not enough: a definition's own content is unchanged when a
+ * definition it *contains* changes or disappears, so a nested edit left the parent's key identical
+ * and the cache returned a result computed from a definition that no longer existed. Measured — a
+ * document reloaded with the inner definition dropped produced byte-identical output with every
+ * node forced dirty.
  */
-export function instanceCacheKey({ definition, overrides = {}, demandedOutput = 'out', seed = 0, context = {}, upstreamKeys = [] } = {}) {
+export function instanceCacheKey({ definition, overrides = {}, demandedOutput = 'out', seed = 0, context = {}, upstreamKeys = [], definitionClosure = [] } = {}) {
   const hash = definition.hash || definitionHash(definition)
   const parts = [
     'sg', hash, 'v' + definition.version,
@@ -145,8 +179,27 @@ export function instanceCacheKey({ definition, overrides = {}, demandedOutput = 
     demandedOutput, String(seed),
     JSON.stringify(Object.keys(context).sort().map(k => [k, context[k]])),
     upstreamKeys.join(','),
+    JSON.stringify([...definitionClosure].sort()),
   ]
   return parts.join('|')
+}
+
+/** [id, hash] for every definition reachable from `def`, itself included, sorted and stable. */
+export function closureHashes(defs, def) {
+  const out = []
+  const seen = new Set()
+  const visit = id => {
+    if (!id || seen.has(id)) return
+    seen.add(id)
+    const d = defs[id]
+    // A MISSING definition is recorded as such rather than skipped. Skipping it would make "the
+    // definition vanished" and "the definition was never referenced" produce the same key, which is
+    // the precise shape of the staleness bug this term exists to prevent.
+    out.push([id, d ? (d.hash || definitionHash(d)) : 'MISSING'])
+    for (const n of ((d && d.nodes) || [])) if (n.type === 'subgraph' && n.params) visit(n.params.definitionId)
+  }
+  visit(def && def.id)
+  return out.sort()
 }
 
 /** Definitions a document must embed: every one an instance references, transitively. */

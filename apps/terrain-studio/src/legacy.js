@@ -22,7 +22,7 @@ import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } f
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
-import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, SUBGRAPH_VERSION } from './core/subgraph.js';
+import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
 import { LEGACY_PORTS, LEGACY_ROSTER, LEGACY_INS_LABELS } from './core/legacy-ports.js';
 import { serializeProject, parseProject, migrateProject, migrateV1toV2, migrateV2toV3, validateProject,
   PROJECT_SCHEMA_VERSION, PROJECT_FILE_EXTENSION, ProjectError } from './core/project.js';
@@ -4714,9 +4714,16 @@ export function evaluateSubgraphInstance(params, ins, node){
   const def = subgraphDefinitions[String(params.definitionId||'').trim()];
   if(!def) return null;                       // unknown definition renders flat, visibly, not fatally
   const overrides = parseOverrides(params.overrides);
+  // upstreamKeys was `[String(ins[0].length)]`. Every field is RES*RES, so that term was the same
+  // string for every input in the document and never discriminated: two instances of one definition
+  // with equal overrides and DIFFERENT upstream collided on a single entry, and the second returned
+  // the first's Float32Array — the same object, not merely equal values. Content digests now.
+  // definitionClosure covers the second half of the same defect: a parent's own content does not
+  // change when a definition it contains does, so a nested edit left the key identical.
   const key = instanceCacheKey({ definition: def, overrides, seed: terrainDef.seed,
     context: { res: RES, lattice: terrainDef.lattice },
-    upstreamKeys: [ins[0] ? String(ins[0].length) : 'null'] });
+    upstreamKeys: (ins||[]).map(fieldKey),
+    definitionClosure: closureHashes(subgraphDefinitions, def) });
   if(SUBGRAPH_CACHE.has(key)) return SUBGRAPH_CACHE.get(key);
 
   // Evaluate the internal DAG against a PRIVATE node list. `local` never touches `nodes`.
@@ -5014,7 +5021,7 @@ export const DOMAIN={getWorldDomain,setWorldDomain,domainFromLegacy,deriveResolu
 
 export const FEASIBILITY_API={assessCreation,decomposePages,formatBytes};
 
-export const SUBGRAPHS={defineSubgraph,getSubgraphDefinitions,clearSubgraphDefinitions,clearSubgraphCache,subgraphCacheSize,definitionHash,findRecursion,validateDefinition,instanceCacheKey,referencedDefinitions,SUBGRAPH_VERSION};
+export const SUBGRAPHS={defineSubgraph,getSubgraphDefinitions,clearSubgraphDefinitions,clearSubgraphCache,subgraphCacheSize,definitionHash,findRecursion,validateDefinition,instanceCacheKey,referencedDefinitions,closureHashes,fieldKey,SUBGRAPH_VERSION};
 
 // Restoring is deliberately close to restoreGraph: same runtime-field reset, same H_SCALE recompute.
 // Undo history is CLEARED, not carried — an undo across an Open would splice two unrelated
