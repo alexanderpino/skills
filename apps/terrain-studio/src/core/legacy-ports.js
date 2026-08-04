@@ -524,6 +524,25 @@ const LEGACY_PORTS_RAW = {
     in: [
       { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
       { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 1, role: 'mask' },
+      // S3.5 — the explicit cover inputs, added for exactly the three reasons the `hydraulic` row
+      // above records: a ROSTERED type has to gain a port in the adapter's own data (registry.js:98
+      // drops a type out of the adapter the moment it declares `inputs:`, and LEGACY_INS_LABELS —
+      // the `insDrift` anchor — is DERIVED from these rows); a physical semantic is legal because
+      // these are NEW slots no shipped document uses and cover thickness in metres is not ADR-005's
+      // disputed elevation frame; and stable new ids are not a regeneration of the frozen ones.
+      //
+      // OPTIONAL, for the same measured reason: every thermal node in every saved graph has these
+      // slots unwired, and unwired means "this graph carries no cover", which is bare bedrock.
+      // Talus relaxation has a defined answer with no cover, so a REQUIRED input here would refuse
+      // every document that ships.
+      //
+      // Thermal takes no `precipitation`: dry mass-wasting past the angle of repose has no rain
+      // term in either kernel (src/legacy.js:2277/2300, src/core/gpu.js:206), and declaring a port
+      // nothing consumes is the "declared but never filled" half-gate this sprint already found.
+      { id: "soilDepth", name: "Soil depth", semantic: "soilDepth", unit: "m",
+        lens: "state", legacySlot: 2 },
+      { id: "sedimentDepth", name: "Sediment depth", semantic: "sedimentDepth", unit: "m",
+        lens: "state", legacySlot: 3 },
     ],
     out: { id: 'out', name: 'Out' },
   },

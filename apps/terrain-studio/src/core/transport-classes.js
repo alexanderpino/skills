@@ -18,11 +18,17 @@
 //
 // THE RED BASELINE IS DATA, NOT ABSENCE
 // -------------------------------------
-// Every `materialTransport` row ships `compliant: false`. That is not a placeholder: today none of
-// the four transport nodes co-updates any cover state, because no cover state exists yet (see
-// `DOCTRINE_STAGES.hydraulicCoEvolution` in ./doctrine.js — armed in S3, reason "no cover state to
-// co-update yet"). S3.5 flips these to `true` one node at a time, and each flip is a measured
+// Every `materialTransport` row shipped `compliant: false`. That was not a placeholder: at the time
+// none of the four transport nodes co-updated any cover state, because no cover state existed yet
+// (see `DOCTRINE_STAGES.hydraulicCoEvolution` in ./doctrine.js — armed in S3, reason "no cover state
+// to co-update yet"). S3.5 flips these to `true` one node at a time, and each flip is a measured
 // before/after with the exemption ledger one entry shorter.
+//
+// POSITION, measured 2026-08-04: 1 of 4 compliant (`thermal`). The remaining three are separate
+// commits by explicit decision (D21: one node per commit, each with a digest delta naming that node
+// and nothing else). `hydraulic`'s cover-first consumption landed in S3.3 and is gated by
+// _verify_cover_erosion.js; only its LEDGER FLIP is outstanding, and it is deliberately not taken
+// here because a commit that moved two rows could not say which change moved which gate.
 //
 // CLASSES
 // -------
@@ -82,10 +88,18 @@ export const TRANSPORT_CLASSES = Object.freeze([
     node: 'thermal',
     class: 'materialTransport',
     coUpdates: Object.freeze(['soilDepth', 'sedimentDepth']),
-    compliant: false,
+    // S3.5, FIRST NODE. Talus relaxation now consumes loose cover before bedrock and moves the same
+    // volume into downslope `sedimentDepth` in the relaxation pass, co-updated with the height it
+    // publishes. The stack identity solidTop = bedrock + soil + sediment + sand is asserted per
+    // sample, and the boundary term is a named physical zero (both kernels omit off-grid
+    // neighbours) rather than a difference of the other terms.
+    // Evidence: tests/legacy/_verify_thermal_coevolution.js.
+    compliant: true,
     ownerSprint: 'S3.5',
     why: 'Talus relaxation moves the same volume downslope; sprint-03:184-185 requires it into sedimentDepth.',
-    note: 'Consumes loose cover before bedrock once cover state exists.',
+    note: 'Consumes loose cover before bedrock; deposition lands in the explicit sediment layer. '
+      + 'Declares no precipitation port: dry mass-wasting has no rain term in either kernel, and a '
+      + 'port nothing consumes is a declared-but-never-filled half-gate.',
   }),
   Object.freeze({
     node: 'streampower',

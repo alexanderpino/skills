@@ -261,7 +261,15 @@ function installHarness(cfg) {
     match: ['A', 'B'], softclip: ['A', 'M'], flip: ['A', 'M'], transpose: ['A', 'M'],
     fold: ['A', 'M'], directionalwarp: ['A', 'D', 'M'],
     // --- erosion ---
-    thermal: ['A', 'M'], fracture: ['A', 'M'], streampower: ['A', 'B', 'M'],
+    // S3.5 gave Thermal two new slots: Soil depth (m) and Sediment depth (m). They are WIRED rather
+    // than left null for the same reason hydraulic's are — the claim worth pinning is that
+    // ATTACHING COVER MOVES NOTHING, and a null slot would pin nothing at all. As with regolith and
+    // hydraulic, a perlin into a strictly-typed metre port is a fixture and not a legal UI edge; the
+    // digest wires by slot and never consults canConnect, and what it needs from a source is
+    // determinism. The cover arithmetic is demand-gated (this evaluator passes no ctx, so no cover
+    // output is demanded) and is gated by _verify_thermal_coevolution.js, which reads the rasters
+    // and the physical-volume ledger.
+    thermal: ['A', 'M', 'B', 'C'], fracture: ['A', 'M'], streampower: ['A', 'B', 'M'],
     // S3.3 gave Hydraulic three new slots: Soil depth (m), Sediment depth (m), Precipitation
     // (mm/yr). They are wired here rather than left null because the claim worth pinning is that
     // ATTACHING COVER MOVES NOTHING — the baseline below is unchanged from the pre-S3.3 build with

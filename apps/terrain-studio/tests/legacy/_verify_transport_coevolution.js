@@ -42,7 +42,14 @@ const MUTATIONS = [
   'class-without-owner',          // a declared class no row owns
   'writers-list-empty',           // production reports no height writers — absence of evidence
   'coupdate-target-unregistered', // a co-update target that is not a registered STATE aux map
-  'transport-claims-compliant',   // the red baseline moves: a transport row claims compliance
+  // The compliance reading, armed from BOTH sides. `transport-claims-compliant` targets a node that
+  // is NOT yet compliant (so it moves the count up and the ledger down); `transport-drops-compliance`
+  // targets the one that IS (so it moves them back the other way). Before S3.5 landed its first node
+  // only the first of these was possible, and it targeted `thermal`; repointing it was mandatory,
+  // because a control that flips a row to the value production already holds is not a control at
+  // all — it is a silent no-op that reads as coverage.
+  'transport-claims-compliant',   // a still-exempt transport row claims compliance
+  'transport-drops-compliance',   // the compliant transport row reverts to exempt
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -62,7 +69,22 @@ const REVIEWED = {
 }
 const SPRINT_FOUR = ['hydraulic', 'thermal', 'streampower', 'erosion2']
 const EXPECTED_TRANSPORT_COUNT = SPRINT_FOUR.length   // 4
-const EXPECTED_COMPLIANT_COUNT = 0                    // the measured RED baseline S3.5 will move
+// S3.5 IN PROGRESS — the count moved, and that transition is the story's evidence.
+//
+// This shipped as `0` and was asserted as a hard number so that the first compliant node would turn
+// this oracle RED and force the update into the same commit as the implementation. That has now
+// happened once: `thermal` consumes loose cover before bedrock, moves what slides into
+// `sedimentDepth`, and closes the solid stack per sample (tests/legacy/_verify_thermal_coevolution.js).
+// The number is 1, and it is still a hard number: the next node to land turns this red again.
+//
+// The list is what makes the count non-vacuous. `compliantCount === 1` alone would be satisfied by
+// ANY one of the four claiming compliance; naming which one is what a mutation can contradict —
+// `transport-claims-compliant` flips a node that is NOT yet compliant, and `transport-drops-compliance`
+// flips the one that is back, so the reading is armed from both sides.
+const EXPECTED_COMPLIANT = ['thermal']
+const EXPECTED_NON_COMPLIANT = SPRINT_FOUR.filter(node => !EXPECTED_COMPLIANT.includes(node))
+const EXPECTED_COMPLIANT_COUNT = EXPECTED_COMPLIANT.length   // 1
+const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUNT   // 3
 
 ;(async () => {
   const browser = await chromium.launch({ executablePath: EXE,
@@ -124,7 +146,10 @@ const EXPECTED_COMPLIANT_COUNT = 0                    // the measured RED baseli
     if (mutation === 'unclassified-writer') manifest = manifest.filter(r => r.node !== 'thermal')
     if (mutation === 'transport-without-coupdate') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, coUpdates: [] } : r)
     if (mutation === 'coupdate-target-unregistered') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, coUpdates: ['topsoilThickness'] } : r)
-    if (mutation === 'transport-claims-compliant') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, compliant: true } : r)
+    // `streampower` is still exempt, so claiming compliance for it genuinely moves the count.
+    if (mutation === 'transport-claims-compliant') manifest = manifest.map(r => r.node === 'streampower' ? { ...r, compliant: true } : r)
+    // ...and `thermal` is the one node that IS compliant, so reverting it moves the count the other way.
+    if (mutation === 'transport-drops-compliance') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, compliant: false } : r)
     if (mutation === 'class-without-owner') classIds = classIds.concat('aeolianTransport')
     if (mutation === 'writers-list-empty') {
       // The LIVE ledger legacy.js exposes. DOCTRINE is a read-only global binding but a plain
@@ -246,14 +271,19 @@ const EXPECTED_COMPLIANT_COUNT = 0                    // the measured RED baseli
       && classIdsExpected.every(id => counts[id] > 0)
       && Object.values(counts).every(n => n > 0),
 
-    // 8. THE RED BASELINE, ASSERTED AS NUMBERS. Four movers, none compliant. S3.5 moves this.
-    redBaselineAllTransportNonCompliant: comp.transportCount === EXPECTED_TRANSPORT_COUNT
+    // 8. THE COMPLIANCE COUNT, ASSERTED AS NUMBERS AND AS NAMES. Four movers; exactly the nodes in
+    //    EXPECTED_COMPLIANT are compliant and exactly the rest are not. Started at 0/4, now 1/4.
+    complianceCountIsTheMeasuredPosition: comp.transportCount === EXPECTED_TRANSPORT_COUNT
       && comp.compliantCount === EXPECTED_COMPLIANT_COUNT
-      && (comp.nonCompliant || []).slice().sort().join(',') === SPRINT_FOUR.slice().sort().join(','),
+      && (comp.nonCompliant || []).slice().sort().join(',') === EXPECTED_NON_COMPLIANT.slice().sort().join(',')
+      && transportRows.filter(x => x.compliant === true).map(x => x.node).sort().join(',')
+        === EXPECTED_COMPLIANT.slice().sort().join(','),
 
-    // 9. The ledger S3.5 drains: four entries, each filed under the transport rule and each with a
-    //    later owner. "An exemption without a later owner is forbidden" (sprint-03:194).
-    exemptionLedgerIsTheMeasuredBefore: ledger.length === EXPECTED_TRANSPORT_COUNT
+    // 9. The ledger S3.5 drains: one entry per mover that is not yet compliant, each filed under the
+    //    transport rule and each with a later owner. "An exemption without a later owner is
+    //    forbidden" (sprint-03:194). It was 4; it is now 3; S3.5's acceptance is 0.
+    exemptionLedgerIsTheMeasuredPosition: ledger.length === EXPECTED_LEDGER_COUNT
+      && ledger.map(e => e.node).sort().join(',') === EXPECTED_NON_COMPLIANT.slice().sort().join(',')
       && ledger.every(e => e.rule === 'materialTransportCoEvolution' && !!e.ownerSprint)
       && (comp.unowned || []).length === 0,
 
