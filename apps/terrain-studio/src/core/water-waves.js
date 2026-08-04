@@ -335,17 +335,35 @@ export function glslWaterDetail(preset, fnName = 'waterDetail') {
   // Non-harmonic ratios, and all three below the shortest Gerstner wavelength so the bands do not
   // overlap. Ratios 1 : 2.153 : 4.637 share no small-integer relationship, so the octaves never
   // line up into a repeating beat the eye can lock onto.
+  // THE SLOPE SPECTRUM MUST DESCEND. Slope contribution is amplitude times wavenumber, so an
+  // amplitude series that falls slower than the wavelength does makes the FINEST octave dominate the
+  // normal — the first version of this ran 0.390 / 0.462 / 0.546, ascending at 1.185 per octave,
+  // which is the classic driver of shimmer and moire on distant water. These amplitudes give
+  // 0.464 / 0.395 / 0.336, descending at 0.85, in line with what shipped ocean shaders use.
   const OCT = [
-    { lambda: 1.40, amp: 1.00, drift: 0.35 },
-    { lambda: 0.65, amp: 0.55, drift: 0.62 },
-    { lambda: 0.28, amp: 0.28, drift: 0.95 },
+    { lambda: 1.40, amp: 1.000, drift: 0.35 },
+    { lambda: 0.65, amp: 0.395, drift: 0.62 },
+    { lambda: 0.28, amp: 0.145, drift: 0.95 },
   ]
   const norm = OCT.reduce((a, o) => a + o.amp, 0)
   const lines = OCT.map((o, i) => {
     const k = 1 / o.lambda
+    // ROTATE EACH OCTAVE. Value noise lives on a square lattice and carries strong axis-aligned
+    // structure; three octaves sampled from the same unrotated lattice reinforce it, which puts a
+    // faint grid back into a field built specifically to have no grid. The angles are 90*frac(i/phi)
+    // — 0, 55.62, 21.25 degrees — maximally separated within the lattice's own 90-degree symmetry,
+    // rather than a fixed step that could land back on it.
+    const PHI = (1 + Math.sqrt(5)) / 2
+    const ang = (Math.PI / 2) * ((i / PHI) % 1)
+    const c = Math.cos(ang), sn = Math.sin(ang)
+    const qr = `vec2(${f(c)}*q.x+${f(sn)}*q.y, ${f(-sn)}*q.x+${f(c)}*q.y)`
     return `  { float fd=clamp(${f(o.lambda)}/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`
-      + ` if(fd>0.0){ vec3 n=vnoise2(q*${f(k)} + vec2(${f(o.drift * (i % 2 ? -1 : 1))},${f(o.drift * 0.6)})*t);`
-      + ` g += (${f(o.amp / norm)})*fd*${f(k)}*vec2(n.y,n.z); h += (${f(o.amp / norm)})*fd*n.x; } }`
+      + ` if(fd>0.0){ vec2 qq=${qr}*${f(k)};`
+      + ` vec3 n=vnoise2(qq + vec2(${f(o.drift * (i % 2 ? -1 : 1))},${f(o.drift * 0.6)})*t);`
+      // The gradient comes back in the ROTATED frame and has to be rotated out again, or every
+      // octave's highlights are tilted against the one below it.
+      + ` vec2 gr=vec2(${f(c)}*n.y-${f(sn)}*n.z, ${f(sn)}*n.y+${f(c)}*n.z);`
+      + ` g += (${f(o.amp / norm)})*fd*${f(k)}*gr; h += (${f(o.amp / norm)})*fd*n.x; } }`
   })
   return [
     `// generated from WaterWavePreset v${WATER_WAVE_VERSION} — ${OCT.length} detail octaves, wind (${f(wx)},${f(wz)})`,
@@ -367,7 +385,12 @@ export function glslWaterDetail(preset, fnName = 'waterDetail') {
     `  for(int j=-1;j<=1;j++){ for(int i=-1;i<=1;i++){`,
     `    vec2 g=vec2(float(i),float(j));`,
     `    vec2 o=vec2(h21(n+g), h21(n+g+17.0));`,
-    `    o=0.5+0.45*sin(t*0.8+6.2831*o);`,
+    // EVERY FEATURE POINT ORBITS AT ITS OWN RATE. Driving them all at one frequency gives the whole
+    // cell field a common period — at t*0.8 it re-synchronised every 7.854 s and the sparkle pulsed
+    // in unison, which is the cellular version of exactly the banding this function exists to avoid.
+    // Deriving the rate from the point's own hash means no two share a period and the field never
+    // returns to a previous configuration.
+    `    o=0.5+0.45*sin(t*(0.45+0.85*o.x)+6.2831*o);`,
     `    float d=length(g+o-fp);`,
     `    if(d<f1){ f2=f1; f1=d; } else if(d<f2){ f2=d; }`,
     `  } }`,

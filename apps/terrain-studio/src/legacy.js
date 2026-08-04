@@ -5813,7 +5813,7 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
-    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
     ${(waterShaderSources.forwardDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
     void main(){
       float shoreAA=.0008+uShoreSmooth*.0018;
@@ -5844,7 +5844,11 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       vec3 baseN=normalize(mix(gerN,vSnowN,snowCov));
       vec3 N=normalize(baseN+waveAmt*vec3(wave.x,0.,wave.y)); // snow uses its raised top normal; waves perturb liquid only
       vec3 V=normalize(uCam-vW);vec3 S=normalize(uSun);
-      float fres=pow(1.0-max(dot(N,V),0.0),3.0);             // Fresnel — reflective at grazing angles
+      // Schlick with water's actual F0. n=1.333 gives F0=((1.333-1)/(1.333+1))^2=0.02037, and the
+      // exponent is 5, not 3. This pass had neither: no F0 at all and an exponent of 3, while the
+      // deferred pass a thousand lines down used the correct form — the same water shaded two
+      // different ways depending on which path drew it.
+      float fres=0.02+0.98*pow(1.0-max(dot(N,V),0.0),5.0);
       float dn=clamp(max(vDepth,0.)/(uH*0.35),0.0,1.0);      // depth attenuation: shallow teal -> deep blue
       vec3 wc=mix(vec3(0.28,0.58,0.62),vec3(0.03,0.12,0.30),dn);
       vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),110.0);
@@ -5988,7 +5992,7 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);}
       float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
         return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
-      float detailNoise(vec2 p){return vnoise(p)+.5*vnoise(p*2.07+9.2);}
+      float detailNoise(vec2 p){return vnoise(p)+.5*vnoise(p*2.07+9.2);}
       ${(waterShaderSources.deferredDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       float signedWaterDepth(vec2 uv){
         float ws=Wat(uv)*uH;if(uHasSea>0.5)ws=max(ws,uSeaLevel*uH);
