@@ -673,6 +673,63 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
             r.heightBookArming = r.heightBookBound > 0 ? (lower + rise) / r.heightBookBound : 0
             r.heightBookF64WouldFail = Math.max(r.chargedVsLoweringErr, r.depositVsRiseErr) > r.heightBookBoundF64
           }
+          // BEDROCK, AGAINST THE ORACLE'S OWN ARITHMETIC.
+          //
+          // The Sprint 3 audit rated solidStackIdentityClosesPerSample definitional and it was
+          // right: hydraulic.js:111 computes bedrock = top - cover, so solidTop = bedrock + soil +
+          // sediment + sand cannot fail. Production is not wrong to compute it that way — that IS
+          // what bedrock means — so the fix belongs in the gate.
+          //
+          // This is the falsifiable half. The BEFORE bedrock is built from the cover THIS FILE
+          // authored (soil0/sed0, before production saw them) and the base height this file made,
+          // through the stable frame; the AFTER bedrock is the raster production published. Their
+          // difference must equal the bedrockDetachedM3 production booked. A partition that charges
+          // the wrong amount to bedrock — or charges nothing where cover ran out — fails here, and
+          // no rearrangement of top - cover can make it pass.
+          if (bedA && base && led && Number.isFinite(led.reliefHeightM) && Number.isFinite(led.datumM)) {
+            const rel = led.reliefHeightM, dat = led.datumM
+            let dropped = 0, absBed = 0
+            for (let i = 0; i < N; i++) {
+              const before = dat + base[i] * rel - (soil0[i] + sed0[i])
+              const d = before - bedA[i]
+              dropped += A * d
+              // CATASTROPHIC CANCELLATION, so the bound scales with the MAGNITUDES, not the change.
+              // Everywhere else in this file the rule is "scale with what moved, never with what is
+              // standing there" — three bounds were wrong that way this sprint. Here the opposite
+              // is correct and for a stateable reason: `d` is the difference of two absolute
+              // elevations near 2600 m, each carrying float32 quantisation of ~2.4e-4 m, and the
+              // difference is small. The error is set by the operands, not the result. Scaling with
+              // |d| gave a bound of ~1e-4 against a measured 36 m3 residual that is pure rounding.
+              absBed += A * (Math.abs(before) + Math.abs(bedA[i]))
+            }
+            r.bedrockDroppedM3 = dropped
+            r.bedrockChargedErr = Math.abs(dropped - (led.bedrockDetachedM3 || 0))
+            r.bedrockBound = boundFor(N, absBed + Math.abs(led.bedrockDetachedM3 || 0))
+            r.bedrockCloses = r.bedrockChargedErr <= r.bedrockBound
+            r.bedrockArming = r.bedrockBound > 0
+              ? Math.abs(led.bedrockDetachedM3 || 0) / r.bedrockBound : 0
+            // THE SUMMED FORM IS ILL-CONDITIONED AND IS NOT GATED. Measured: bedrockArming 0.245,
+            // i.e. the bound came out FOUR TIMES LARGER than the charge it was meant to constrain,
+            // because differencing two ~2600 m absolute elevations to recover a small charge lets
+            // the operands set the error. A bound that cannot see its own term vanish is not a
+            // bound, so the reading is kept as evidence and the CLAIM is made per sample instead.
+            //
+            // Per sample there is no accumulation: bedrock must not move where cover survived. One
+            // millimetre is ~4 ulp at this elevation, and a real mis-charge is centimetres upward.
+            let bedMoved = 0, coverSurvived = 0, maxBedMove = 0
+            for (let i = 0; i < N; i++) {
+              const before = dat + base[i] * rel - (soil0[i] + sed0[i])
+              const cover1 = soilA[i] + sedA[i] + sandA[i]
+              if (!(cover1 > 1e-6)) continue        // cover exhausted here: bedrock MAY be cut
+              coverSurvived++
+              const m = Math.abs(before - bedA[i])
+              if (m > maxBedMove) maxBedMove = m
+              if (m > 1e-3) bedMoved++
+            }
+            r.bedrockCellsWithCoverLeft = coverSurvived
+            r.bedrockMovedUnderCover = bedMoved
+            r.bedrockMaxMoveUnderCoverM = maxBedMove
+          }
           r.dCoverM3 = dCover
           r.coverAbsChange = absChange
           r.minCoverAfter = minCoverAfter
@@ -970,6 +1027,18 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     // Armed by three of the six mutations: bedrock-first-kernel and identity-ignores-deposition
     // both hand back a cover raster that no longer matches the bedrock the node computed, and
     // sand-nonzero adds a quarter metre of aeolian cover to a stack that has none.
+    // What production books as bedrock must match what the published bedrock raster actually lost,
+    // measured from cover THIS FILE authored. Unlike the stack identity below, no rearrangement of
+    // `bedrock = top - cover` can satisfy it.
+    bedrockChargeMatchesThePublishedBedrock: every(runs, r => r.bedrockCloses === true),
+    // Cover-before-bedrock, read off the PUBLISHED bedrock raster rather than inferred from the
+    // ledger: wherever cover survived the pass, bedrock has not moved. Per sample, so nothing
+    // accumulates, and the fixture must actually contain such cells or the claim is empty.
+    bedrockUnmovedWhereCoverSurvived: every(runs, r => num(r.bedrockCellsWithCoverLeft) > 0
+      && r.bedrockMovedUnderCover === 0),
+    // Kept, and honestly labelled: this one IS definitional (hydraulic.js:111 computes bedrock as
+    // top minus cover). It proves the four rasters are mutually consistent and that none is stale
+    // or absent — worth having, but it is not evidence about the partition.
     solidStackIdentityClosesPerSample: report.ports.bedrockOut === true
       && every(runs, r => !!r.stackIdentity && r.stackIdentity.samples === r.stackIdentity.expected
         && r.stackIdentity.expected > 0 && r.stackIdentity.violations === 0),
@@ -1080,7 +1149,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `runs=${runs.length} ledgers=${runs.filter(r => r.ledger).length} `
     + `deepBedrockDetached=[${deepBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
     + `bareBedrockDetached=[${bareBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
-    + `heightBookErr=${fmt(Math.max(0, ...runs.map(r => num(r.chargedVsLoweringErr) === null ? 0 : r.chargedVsLoweringErr)))} heightBookArming=${fmt(Math.min(...runs.map(r => num(r.heightBookArming) === null ? 0 : r.heightBookArming)))} unaccountedRefused=${maxRefusedFrac === null ? 'n/a' : maxRefusedFrac.toFixed(4)} unaccountedItemised=${maxItemisedFrac === null ? 'n/a' : maxItemisedFrac.toExponential(2)} maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
+    + `bedrockUnderCover=${Math.max(0, ...runs.map(r => num(r.bedrockMovedUnderCover) === null ? 0 : r.bedrockMovedUnderCover))}/${Math.min(...runs.map(r => num(r.bedrockCellsWithCoverLeft) === null ? 0 : r.bedrockCellsWithCoverLeft))} bedrockArming=${fmt(Math.min(...runs.filter(r => num(r.bedrockArming) !== null && r.bedrockArming > 0).map(r => r.bedrockArming)))} bedrockChargedErr=${fmt(Math.max(0, ...runs.map(r => num(r.bedrockChargedErr) === null ? 0 : r.bedrockChargedErr)))} heightBookErr=${fmt(Math.max(0, ...runs.map(r => num(r.chargedVsLoweringErr) === null ? 0 : r.chargedVsLoweringErr)))} heightBookArming=${fmt(Math.min(...runs.map(r => num(r.heightBookArming) === null ? 0 : r.heightBookArming)))} unaccountedRefused=${maxRefusedFrac === null ? 'n/a' : maxRefusedFrac.toFixed(4)} unaccountedItemised=${maxItemisedFrac === null ? 'n/a' : maxItemisedFrac.toExponential(2)} maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
     + `stackViolations=${runs.reduce((a, r) => a + ((r.stackIdentity && r.stackIdentity.violations) || 0), 0)} `
     + `maxStackResidualM=${fmt(Math.max(0, ...runs.map(r => (r.stackIdentity && r.stackIdentity.maxResidualM) || 0)))} `
     + `maxLossItemErr=${fmt(Math.max(0, ...runs.map(r => (typeof r.lossItemErr === 'number' ? r.lossItemErr : 0))))} `
