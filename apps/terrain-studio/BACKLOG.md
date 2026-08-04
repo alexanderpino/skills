@@ -648,6 +648,47 @@ that makes a broken gate look thorough.
 | W7 | Corpus: one chapter 26 · **DONE** `f8ddd62` | Scoped as "re-author three lost citations"; the premise was wrong twice. Nothing was lost — `26-hexagonal-lattice.md` was **ours**, main never had it, and a merge cannot delete what the other side never had. The real defect was a **duplicate chapter 26**: two live files on the `26` token with divergent tiers. Consolidated into main-s `26-hexagonal-grids.md`, duplicate deleted, `08`-s inbound link repointed. Four citation families carried (verified absent from the **installed** corpus: Wang & Ai 0, Hasslacher 0, Sivaswamy 0, absence-record 0), plus three index rows. Attribution corrected under review: Wang & Ai 2018 does **not** introduce D6 (de Sousa 2006 predates); both papers are single-receiver drainage-*structure* results that ground routing and **nothing downstream** — they do not license hex erosion; six-fold is *smallest sufficient*, not necessary; HPP/FHP are P as physics, **F** as a transfer onto terrain. |
 | W8 | Merge `origin/main` · **DONE** `a7cc8f8` | 45 conflicts, two classes. 43 studio paths were rename/delete (we moved, main deleted) — resolved to our version at the new path, staged bytes identical to pre-merge HEAD. `SKILL.md` + `00-index.md` taken from main. Digest 60/60 after. Note the merge commit message contains an error corrected in `33f17fe`: it says main *deleted* `26-hexagonal-lattice.md`. Main never had it. |
 | W9 | Weathering defaults | C7's real finding: `dirt` ships at 0.01, effectively off. Defaults change → digest re-bless. |
+| W14 | **Sprint 3 audit — S3.3 UNSUPPORTED, 3 blockers** | The exit gate is green (108/108 sweep, digest 92/92) and the audit still rates S3.3 unsupported. Detail below. S3.1/S3.2/S3.4/S3.5 are PARTIAL. **Verification incomplete**: 17 of 27 findings were independently reproduced before the run hit a session limit; the rest are unverified and marked so. |
+
+### W14 detail — Sprint 3 post-sprint audit
+
+Verdicts: **S3.3 UNSUPPORTED**; S3.1, S3.2, S3.4, S3.5 **PARTIAL**. Five findings were confirmed by
+independent reproduction; eight confirmed minor; four refuted outright (the auditors were told not to
+pad, and four of their own findings did not survive checking).
+
+**S3.3's three blockers are one family: the conservation gates do not run where it matters.**
+
+1. **The refusal is a total conservation exemption.** `_verify_cover_erosion.js:777` splits runs into
+   `itemised` and `refused`, and *every* conservation gate — `ledgerMassCloses`,
+   `solidVolumeMatchesNetTransport`, `coverLossIsItemizedNotDerived` and both bound-arming gates — is
+   scoped to `itemised` alone. The `refused` bucket is **the two shipping GPU engines**. Measured
+   there: **7.085e8 m³ unaccounted, 85.96% of transported volume**, `ledgerErr` 880× over its own
+   bound — and the oracle is green. Publishing no claim was the right call for provenance; letting
+   it also skip conservation was not.
+2. **`coverBookCloses` is algebraic.** Production accumulates `coverConsumedM3`/`depositedM3` from
+   exactly the per-cell differences of the rasters it publishes, and the oracle differences against
+   production's own identity pass. Both sides are the same numbers.
+3. **The solid-stack identity is definitional** — `hydraulic.js:111` computes `bedrock[i]` such that
+   `solidTop = bedrock + soil + sediment + sand` cannot fail.
+
+Other confirmed majors:
+- **S3.1** the velocity port's *value* and unit are ungated: `isVelocityPort` checks `unit === 'mPerS'`
+  as a string on the descriptor, never against a number.
+- **S3.1/S3.3** `coverLossIsItemizedNotDerived` measures an **assignment, not provenance**:
+  `resolveCoverLoss` defines `netM = exportedM + suspendedM − gainM`, so the "itemised" value is a
+  sum of the terms it is checked against.
+- **S3.2** *"duration is required authored data with no production default"* is true of the plugin
+  and **false of the product**: `evalGraph` (`legacy.js:3493`), `evalGraphProgressive` (`:3534`) and
+  `evalExact` (`:3271`) each catch every exception out of `def.eval`, substitute `newField()` and
+  clear `_dirty`. The refusal never reaches the author — the node renders flat and says nothing.
+- **S3.5** `compliantRowsDeliverTheirCoUpdates` is a **declaration check wearing a delivery name**: it
+  matches output semantics, so a port that exists and is never filled satisfies it.
+
+Also recorded: `producerOf` is read by nothing in production (`grep -rn producerOf src/` → one hit,
+the declaration itself) — it is a test-facing marker, which is honest but should be said out loud;
+and `sandDepthIsZero` asserts a constant, since hydraulic has no sand input and `coverPass` sets
+`a0 = 0`.
+
 | W13 | **Node-responsibility audit — 10 cross-cutting patterns** | 100 plugins read, 70 raw findings, deduped below. Pattern 1's live bug is fixed (`1cfc647`); the rest are recorded, not fixed. Each is a *missing abstraction*, not a bug in one node — which is why they are listed as patterns rather than as 70 tickets. |
 
 ### W13 detail — the ten patterns, most valuable first
