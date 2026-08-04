@@ -4686,13 +4686,62 @@ $("#exportBtn").onclick=exportHeightmap;
 // list, so internal nodes never enter `nodes` and therefore never reach the palette, selection, or
 // the parent's serialisation. That is the difference between encapsulation and macro expansion.
 let subgraphDefinitions = {};
+// ADR-004: "Instances pin (definitionId, version, fullHash). Old instances never float." The table
+// above holds the LATEST of each id — what the palette offers and what a new instance binds to. It
+// cannot hold two versions at once, so with it alone a v2 registration silently rewrote every
+// existing instance's terrain: measured, outerPack's live hash moved from 77337d1c317dcf0f to the
+// v2 hash and every instance's output moved with it. The archive keeps every version ever
+// registered, keyed by id@version, so a pinned instance keeps computing exactly what it computed.
+let subgraphArchive = {};
+const archiveKey = (id, version) => String(id) + '@' + String(version);
 export function getSubgraphDefinitions(){ return subgraphDefinitions; }
+export function getSubgraphArchive(){ return subgraphArchive; }
 export function defineSubgraph(def){
   subgraphDefinitions = registerDefinition(subgraphDefinitions, def);
-  nodes.forEach(nd=>{ if(nd.type==='subgraph') markDirtyFrom(nd.id); });
-  return subgraphDefinitions[def.id];
+  const stored = subgraphDefinitions[def.id];
+  subgraphArchive = { ...subgraphArchive, [archiveKey(def.id, def.version)]: stored };
+  // Only instances OF THIS DEFINITION need re-evaluating. Marking every subgraph node dirty was
+  // wasted work on every unrelated instance; pinned instances of another version are untouched
+  // because their archived definition did not move.
+  nodes.forEach(nd=>{ if(nd.type==='subgraph' && String(nd.params&&nd.params.definitionId||'').trim()===def.id) markDirtyFrom(nd.id); });
+  return stored;
 }
-export function clearSubgraphDefinitions(){ subgraphDefinitions = {}; }
+export function clearSubgraphDefinitions(){ subgraphDefinitions = {}; subgraphArchive = {}; }
+
+/**
+ * Resolve the definition an instance is bound to, honouring its pin.
+ *
+ * Returns { def, problem }. A problem is a VISIBLE failure, never a silent substitution: S8.6 says
+ * "missing definitions and incompatible versions fail visibly" and ADR-004 says migrations are
+ * explicit and never best-effort rewiring. An unpinned instance (one authored before pinning, or
+ * one just dropped) binds to the latest and is stamped by stampInstancePin below.
+ */
+export function resolveInstanceDefinition(params){
+  const id = String(params&&params.definitionId||'').trim();
+  if(!id) return { def:null, problem:null };
+  const pinnedVersion = params.version;
+  const pinnedHash = params.hash;
+  if(pinnedVersion==null||pinnedVersion==='') {
+    const def = subgraphDefinitions[id];
+    return { def: def||null, problem: def?null:{ code:'SUBGRAPH_UNKNOWN', id } };
+  }
+  const def = subgraphArchive[archiveKey(id, pinnedVersion)];
+  if(!def) return { def:null, problem:{ code:'SUBGRAPH_VERSION_UNSUPPORTED', id, version:pinnedVersion } };
+  if(pinnedHash && def.hash && String(pinnedHash)!==String(def.hash)){
+    return { def:null, problem:{ code:'SUBGRAPH_HASH_CONFLICT', id, version:pinnedVersion, pinned:String(pinnedHash), actual:String(def.hash) } };
+  }
+  return { def, problem:null };
+}
+/** Stamp an unpinned instance with the version and hash it actually bound to, once. */
+export function stampInstancePin(node){
+  if(!node||node.type!=='subgraph'||!node.params) return null;
+  if(node.params.version!=null&&node.params.version!=='') return null;
+  const def = subgraphDefinitions[String(node.params.definitionId||'').trim()];
+  if(!def) return null;
+  node.params.version = def.version;
+  node.params.hash = def.hash || definitionHash(def);
+  return node.params;
+}
 
 // Immutable-result cache, keyed by the full ADR-004 identity. Two identical instances share an
 // entry; two with different overrides can never collide, which is what stops one instance's state
@@ -4711,7 +4760,12 @@ function parseOverrides(text){
 }
 
 export function evaluateSubgraphInstance(params, ins, node){
-  const def = subgraphDefinitions[String(params.definitionId||'').trim()];
+  const resolved = resolveInstanceDefinition(params);
+  const def = resolved.def;
+  // A pin that cannot be honoured is recorded on the node so the inspector can say which version
+  // and hash were asked for, then renders flat. Silently evaluating against a different definition
+  // is the behaviour ADR-004 forbids in the words "old instances never float".
+  if(node) node._pinProblem = resolved.problem || null;
   if(!def) return null;                       // unknown definition renders flat, visibly, not fatally
   const overrides = parseOverrides(params.overrides);
   // upstreamKeys was `[String(ins[0].length)]`. Every field is RES*RES, so that term was the same
@@ -4971,7 +5025,16 @@ function collectProjectState(){
   const palettes=collectCustomSatmaps();
   const vars=getDocumentVariables();
   const domain=getWorldDomain();
+  // Embed the LATEST of each referenced id, plus every archived version a pinned instance still
+  // points at. Embedding only the latest would drop the very definitions the pins exist to protect,
+  // and the document would reload with instances failing on a version it no longer carries.
   const usedDefs=referencedDefinitions(subgraphDefinitions,nodes).map(id=>subgraphDefinitions[id]);
+  const embedded=new Set(usedDefs.map(d=>archiveKey(d.id,d.version)));
+  for(const nd of nodes){
+    if(nd.type!=='subgraph'||!nd.params)continue;
+    const k=archiveKey(String(nd.params.definitionId||'').trim(),nd.params.version);
+    if(nd.params.version!=null&&subgraphArchive[k]&&!embedded.has(k)){embedded.add(k);usedDefs.push(subgraphArchive[k]);}
+  }
   return{
     terrain:{...terrainDef},
     build:{res:RES,quality:BUILD_QUALITY,resLock:SCALE_RES},
@@ -5021,7 +5084,7 @@ export const DOMAIN={getWorldDomain,setWorldDomain,domainFromLegacy,deriveResolu
 
 export const FEASIBILITY_API={assessCreation,decomposePages,formatBytes};
 
-export const SUBGRAPHS={defineSubgraph,getSubgraphDefinitions,clearSubgraphDefinitions,clearSubgraphCache,subgraphCacheSize,definitionHash,findRecursion,validateDefinition,instanceCacheKey,referencedDefinitions,closureHashes,fieldKey,SUBGRAPH_VERSION};
+export const SUBGRAPHS={defineSubgraph,getSubgraphDefinitions,getSubgraphArchive,resolveInstanceDefinition,stampInstancePin,clearSubgraphDefinitions,clearSubgraphCache,subgraphCacheSize,definitionHash,findRecursion,validateDefinition,instanceCacheKey,referencedDefinitions,closureHashes,fieldKey,SUBGRAPH_VERSION};
 
 // Restoring is deliberately close to restoreGraph: same runtime-field reset, same H_SCALE recompute.
 // Undo history is CLEARED, not carried — an undo across an Open would splice two unrelated
@@ -5037,7 +5100,24 @@ function applyProjectDocument(doc){
   if(doc.palettes&&doc.palettes.satmaps)for(const [name,stops] of Object.entries(doc.palettes.satmaps))SATMAPS[name]=stops;
   if(Array.isArray(doc.variables))setDocumentVariables(doc.variables);
   if(doc.domain)worldDomain={...doc.domain};
-  if(Array.isArray(doc.definitions)){clearSubgraphDefinitions();for(const d of doc.definitions)subgraphDefinitions=registerDefinition(subgraphDefinitions,d);}
+  if(Array.isArray(doc.definitions)){
+    clearSubgraphDefinitions();
+    for(const d of doc.definitions){
+      // VERIFY THE HASH THE DOCUMENT STATES. registerDefinition recomputes and stores its own, so a
+      // document claiming a hash its content does not produce used to load without a word — the
+      // conflict path is unreachable on load because the table was just cleared. A corrupt or
+      // tampered definition is a visible load error, not something to quietly correct.
+      if(d&&d.hash){
+        const actual=definitionHash(d);
+        if(String(d.hash)!==String(actual))
+          throw new Error('definition '+d.id+' v'+d.version+' states hash '+d.hash+' but its content hashes to '+actual);
+      }
+      subgraphDefinitions=registerDefinition(subgraphDefinitions,d);
+      const stored=subgraphDefinitions[d.id];
+      if(stored&&stored.version===d.version)subgraphArchive={...subgraphArchive,[archiveKey(d.id,d.version)]:stored};
+      else subgraphArchive={...subgraphArchive,[archiveKey(d.id,d.version)]:{...d,hash:definitionHash(d)}};
+    }
+  }
 
   nodes=nextNodes;
   // Derive the legacy slot from the stable port id. That is the whole point of v2: the wire
@@ -7764,11 +7844,12 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("GPU", () => GPU, __ro("GPU"))
   __def("updateViewport", () => updateViewport, __ro("updateViewport"))
   __def("select", () => select, __ro("select"))
+  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
   __def("curField", () => curField, __ro("curField"))
-  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
+  __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("u", () => u, __ro("u"))
   __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
@@ -7786,7 +7867,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("blankGraph", () => blankGraph, __ro("blankGraph"))
   __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
-  __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))

@@ -49,6 +49,8 @@ const MUTATIONS = [
   'same-content-for-both-upstreams',// the two upstream fields stop differing, so sharing is right
   'field-key-length-only',          // the pre-fix expression: key an input by its length
   'closure-term-omitted',           // the pre-fix key: no transitive definition hashes
+  'instance-pin-stripped',          // the pre-fix instance: no version/hash, so it floats to latest
+  'embedded-hash-is-honest',        // the document states the hash its content really produces
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -321,6 +323,58 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       keyStableForEqualContent: FK(inP) === FK(inP2),
     }
 
+    // --- PHASE 4e: A PINNED INSTANCE DOES NOT FOLLOW A VERSION BUMP --------------------------
+    // ADR-004: "Instances pin (definitionId, version, fullHash). Old instances never float."
+    // Measured before this existed: registering outerPack v2 moved the live hash from
+    // 77337d1c317dcf0f to the v2 hash and every instance's output moved with it, silently.
+    SG.clearSubgraphCache()
+    const pinDefs = SG.getSubgraphDefinitions()
+    const pinnedNode = { id: 902, type: 'subgraph', params: { definitionId: 'outerPack', overrides: 'gamma = 0.6' } }
+    SG.stampInstancePin(pinnedNode)
+    const pinnedV = pinnedNode.params.version, pinnedH = pinnedNode.params.hash
+    // The pre-fix instance carried neither field, so it resolved to whatever was latest.
+    if (mutation === 'instance-pin-stripped') { delete pinnedNode.params.version; delete pinnedNode.params.hash }
+    const beforeBump = digestField(TYPES.subgraph.eval(pinnedNode.params, [inP], pinnedNode))
+    let bumped = copy(pinDefs.outerPack)
+    bumped.version = (pinDefs.outerPack.version || 1) + 1
+    bumped.nodes[1].params.inLo = 0.19
+    SG.defineSubgraph(bumped)
+    SG.clearSubgraphCache()
+    const afterBump = digestField(TYPES.subgraph.eval(pinnedNode.params, [inP], pinnedNode))
+    // A FRESH instance must see the new version, or "did not move" would also be true of a build
+    // that stopped evaluating definitions at all.
+    const freshNode = { id: 903, type: 'subgraph', params: { definitionId: 'outerPack', overrides: 'gamma = 0.6' } }
+    SG.stampInstancePin(freshNode)
+    const freshDigest = digestField(TYPES.subgraph.eval(freshNode.params, [inP], freshNode))
+    // A pin naming a version that is not in the archive must fail VISIBLY, not fall back.
+    const ghost = { id: 904, type: 'subgraph', params: { definitionId: 'outerPack', version: 97, hash: 'deadbeef', overrides: '' } }
+    TYPES.subgraph.eval(ghost.params, [inP], ghost)
+    out.pin = {
+      stamped: pinnedV != null && !!pinnedH,
+      pinnedVersion: pinnedV, freshVersion: freshNode.params.version,
+      beforeBump, afterBump, heldItsVersion: beforeBump === afterBump,
+      freshFollowedTheBump: freshDigest !== beforeBump,
+      ghostProblem: ghost._pinProblem ? ghost._pinProblem.code : null,
+    }
+
+    // --- PHASE 4f: A DOCUMENT'S STATED DEFINITION HASH IS VERIFIED ON LOAD -------------------
+    // registerDefinition recomputes and stores its own hash, and applyProjectDocument clears the
+    // table first, so the same-id/version conflict path is unreachable on load: a document stating
+    // deadbeefdeadbeef loaded with loadErr null and the registry silently carrying the right hash.
+    const corruptDoc = JSON.parse(pristine)
+    if (Array.isArray(corruptDoc.definitions) && corruptDoc.definitions.length) {
+      corruptDoc.definitions[0] = { ...corruptDoc.definitions[0] }
+      if (mutation !== 'embedded-hash-is-honest') corruptDoc.definitions[0].hash = 'deadbeefdeadbeef'
+    }
+    let corruptErr = null
+    try { loadProjectText(JSON.stringify(corruptDoc)) } catch (e) { corruptErr = String(e.message || e).slice(0, 160) }
+    out.corrupt = {
+      documentsCarryDefinitions: Array.isArray(corruptDoc.definitions) && corruptDoc.definitions.length > 0,
+      refused: corruptErr !== null,
+      message: corruptErr,
+    }
+    loadProjectText(pristine)
+
     // --- PHASE 4d: A NESTED DEFINITION IS PART OF ITS PARENT'S IDENTITY ----------------------
     // outerPack's own content does not change when innerPack does, so the parent's hash alone left
     // the key identical and the cache served a result computed from a definition that had gone.
@@ -397,6 +451,12 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       && report.upstream.keyStableForEqualContent === true,
     nestedDefinitionIsPartOfParentIdentity: report.closure.reachesNested === true
       && report.closure.missingChangesKey === true,
+    pinnedInstanceDoesNotFollowAVersionBump: report.pin.stamped === true
+      && report.pin.heldItsVersion === true && report.pin.freshFollowedTheBump === true
+      && report.pin.freshVersion > report.pin.pinnedVersion,
+    unknownPinnedVersionFailsVisibly: report.pin.ghostProblem === 'SUBGRAPH_VERSION_UNSUPPORTED',
+    statedDefinitionHashIsVerifiedOnLoad: report.corrupt.documentsCarryDefinitions === true
+      && report.corrupt.refused === true,
     // Absence of evidence is failure: a run that compared nothing, saved nothing, or evaluated two
     // instances into the same picture proves none of the above.
     evidenceNonEmpty: report.bytes > 500 && report.nodeCount >= 7 && report.instancesDiffer === true
@@ -414,7 +474,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `roundTrip=${report.roundTrip.outputIdentical}/${report.roundTrip.topologyIdentical}/${report.roundTrip.fixedPoint} `
     + `cache=${report.cache.size1}/${report.cache.size2}/${report.cache.size3} shared=${report.cache.shared} `
     + `cone=${report.invalidation.moved.join('+') || 'none'} upstreamSep=${report.upstream.differentObject} `
-    + `closure=${report.closure.ids.join('>')} failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
+    + `closure=${report.closure.ids.join('>')} pin=v${report.pin.pinnedVersion}->v${report.pin.freshVersion}/${report.pin.heldItsVersion} corrupt=${report.corrupt.refused} failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
   console.log(JSON.stringify({ ...report, gates, errors, ok }, null, 2))
   await browser.close()
   process.exit(ok ? 0 : 1)

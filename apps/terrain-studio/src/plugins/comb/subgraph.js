@@ -20,6 +20,11 @@ export default definePlugin({
   desc: 'Instantiate a reusable subgraph definition. Internal nodes stay encapsulated.',
   params: [
     P.text('definitionId', 'Definition', '', 1),
+    // ADR-004: instances pin (definitionId, version, fullHash) and old instances never float. Both
+    // are stamped on first resolve rather than typed; they are shown so an author can SEE which
+    // version an instance is bound to, which is the whole point of a pin.
+    P.text('version', 'Version', '', 1),
+    P.text('hash', 'Content hash', '', 1),
     P.text('overrides', 'Overrides', '', 3),
   ],
   inputs: [
