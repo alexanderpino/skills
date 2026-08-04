@@ -219,7 +219,8 @@ more. Read `CUSTOMER ||--o{ ORDER` as "one customer places zero-or-more orders".
 For any entity whose **states drive behaviour** (order, claim, subscription,
 document): the state diagram is often the clearest specification of the business
 rules, and each transition names the operation that causes it. Keep it to the states
-the system actually distinguishes.
+the system actually distinguishes. The notation is the UML state machine
+(UML is standardised as **ISO/IEC 19505**), so it needs no legend.
 
 ```mermaid
 stateDiagram-v2

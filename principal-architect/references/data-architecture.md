@@ -5,7 +5,17 @@ the method behind that row. The principal architect's data concerns are *structu
 who owns which data, how it's stored, how schemas evolve without breaking consumers,
 and where data flows. Field-level enterprise data modelling belongs to a data-architect
 role (orientation: **DAMA-DMBOK**, 2nd ed. — data governance, modelling, quality,
-metadata); here we keep the lean subset a system architect must get right.
+metadata; the ISO counterpart for data-quality *management* is the **ISO 8000**
+family); here we keep the lean subset a system architect must get right.
+
+**Data quality has its own ISO model.** The skill's quality drivers name ISO/IEC 25010
+characteristics for the *system*; for the *data itself* the SQuaRE family provides
+**ISO/IEC 25012** — the data quality model (accuracy, completeness, consistency,
+currentness, credibility; plus system-dependent characteristics like availability,
+portability, recoverability). When a driver is about the data rather than the
+software — "orders must be complete and current to within 5 minutes" — write the
+`Q.xx` against the 25012 characteristic, same 6-part scenario form, same
+response-measure discipline (`standards.md`).
 
 **The anti-pattern this file exists to prevent:** the big detached ERD. A wall-chart
 data model maintained apart from the code rots faster than any other artifact. Model
@@ -47,6 +57,11 @@ Abadi 2012). Polyglot persistence is normal; every store added is an operational
 | Sub-ms lookups, ephemeral state | in-memory KV | durability limits; cache-invalidation burden |
 | Relationship traversal as the primary query | graph | niche expertise; bulk-analytics mismatch |
 | Append-only facts, audit, replay | event log / event store | projections to maintain; GDPR erasure needs crypto-shredding (`privacy.md`) |
+
+Query-language portability is part of the trade-off: relational stores share
+**ISO/IEC 9075** (SQL) and graph stores now have **ISO/IEC 39075:2024** (GQL), while
+most document/KV/wide-column APIs are proprietary — a lock-in consequence to record
+in the store-selection ADR.
 
 ## 3. Schema evolution — change without breakage
 

@@ -63,8 +63,12 @@ the existing artifacts carry the AI obligations, and the skill's job is to make 
 
 1. **Classify the risk tier first** (EU AI Act: prohibited / high-risk per Annex III /
    transparency-only / minimal). The tier is a constraint (`C.xx`) and decides how much of
-   the rest applies. Outside the EU, **NIST AI RMF 1.0** (govern·map·measure·manage) is the
-   voluntary counterpart; **ISO/IEC 42001:2023** the certifiable management system.
+   the rest applies. The ISO/IEC backbone: **22989:2022** (concepts & terminology — use its
+   vocabulary in the docs), **23894:2023** (AI risk management guidance), **42001:2023**
+   (the certifiable AI management system — the 27001 of AI), and **42005:2025** (AI system
+   impact assessment — the AI counterpart of the DPIA above; where both apply, run them
+   together as one §8 assessment). Outside the EU, **NIST AI RMF 1.0**
+   (govern·map·measure·manage) is the voluntary counterpart.
 2. **Model quality targets are ordinary `Q.xx` scenarios** — accuracy, groundedness,
    refusal behaviour, latency; response measure = the eval threshold, means of verification
    = the eval suite (run in CI as a fitness function, `automation.md`).
