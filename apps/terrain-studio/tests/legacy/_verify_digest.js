@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 92;   // 89 + S3.4's three explicit cover-state selectors
+const REQUIRED_NODE_COUNT = 94;   // 92 + S4.1 Depression Policy and S4.2 Physical Flow
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -328,6 +328,11 @@ function installHarness(cfg) {
     // --- data maps ---
     d_slope: ['A'], d_height: ['A'], d_sunshadow: ['A'],
     normals: ['A'],
+    // Sprint 4 hydrology. Both take a height-like surface on their first input; flow_physical's
+    // second port is optional precipitation and IS wired: the digest warns when a recipe covers
+    // fewer slots than the node declares, and an unexercised port is an unexercised code path.
+    depression: ['A'],
+    flow_physical: ['A','B'],
     route: ['A'], chokepoint: ['A'], edge: ['M'],
     switch: ['A','B','C'], gate: ['A'],
     mathnode: ['A','B','C'],

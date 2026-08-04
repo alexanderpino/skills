@@ -1,0 +1,263 @@
+// S4.1 + S4.2 — physical flow routing and the depression policy it runs over.
+//
+// The shipped `d_flow` node returns normalize(log1p(accumulation)): a picture. You cannot ask it how
+// many square metres drain to a point. These are the typed physical products, and this oracle checks
+// them as PHYSICS — against analytic surfaces whose answers are known in closed form, in double
+// precision, with no browser.
+//
+// The plan names two mutations explicitly ("mutations omitting either conversion factor must fail"),
+// and they are the reason the unit conversions are spelled out rather than folded into one constant:
+// dropping 1e-3 is wrong by a thousand, dropping seconds-per-year by thirty million, and both look
+// like tuning problems rather than unit problems when you only ever see a normalised picture.
+const path = require('path')
+const fs = require('fs')
+const { pathToFileURL } = require('url')
+
+const mutation = (process.argv.find(v => v.startsWith('--mutate=')) || '').slice(9) || process.env.MC_MUTATION || null
+const MUTATIONS = [
+  'no-mm-conversion',      // drop 1e-3: discharge wrong by 1000x
+  'no-seconds-conversion', // drop /31536000: discharge wrong by 3.15e7
+  'drop-by-elevation',     // weight receivers by drop instead of slope: diagonals win for being further
+  'single-receiver',       // all water to the steepest neighbour: divergence becomes impossible
+  'fill-writes-solid',     // the depression policy returns the conditioned surface as solid height
+  'breach-is-fill',        // breach mapped onto priority fill -- the failure the plan names
+]
+const PATCHES = {
+  'no-mm-conversion': [['out[i] = (mmYr * 1e-3) * cellAreaM2Value / SECONDS_PER_YEAR',
+                        'out[i] = mmYr * cellAreaM2Value / SECONDS_PER_YEAR']],
+  'no-seconds-conversion': [['out[i] = (mmYr * 1e-3) * cellAreaM2Value / SECONDS_PER_YEAR',
+                             'out[i] = (mmYr * 1e-3) * cellAreaM2Value']],
+  'drop-by-elevation': [['const ww = Math.pow(slope, exponent)', 'const ww = Math.pow(drop, exponent)']],
+  'single-receiver': [['for (let k = 0; k < nbCount; k++) wgt[base + k] /= total',
+                       'let bk = -1, bv = -1; for (let k = 0; k < nbCount; k++) { if (wgt[base + k] > bv) { bv = wgt[base + k]; bk = k } }\n' +
+                       '      for (let k = 0; k < nbCount; k++) wgt[base + k] = (k === bk ? 1 : 0)']],
+  'fill-writes-solid': [['return { routingSurface: filled, depressionDepth: depth, conditioningDelta: delta }',
+                         'for (let i = 0; i < N; i++) h[i] = filled[i]\n    return { routingSurface: filled, depressionDepth: depth, conditioningDelta: delta }']],
+  // NOT `rs[p] = ceiling`: ceiling is min'd with rs[p] on the line above, so that "mutation" is
+  // bit-identical to the original and scored as armed while proving nothing.
+  'breach-is-fill': [['  // BREACH. The basin floor stays put',
+    "  if (mode === 'breach') { const d2 = new Float32Array(N); for (let i = 0; i < N; i++) d2[i] = filled[i] - h[i];"
+    + " return { routingSurface: filled, depressionDepth: depth, conditioningDelta: d2 } }\n"
+    + "  // BREACH. The basin floor stays put"]],
+}
+if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
+
+const W = 64, H = 64, N = W * H, CELL = 10   // 10 m cells, 640 m square domain
+
+/** An inclined plane draining due +x. Steepest descent is exactly +x everywhere. */
+function plane() {
+  const h = new Float32Array(N)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) h[y * W + x] = 1 - x / W
+  return h
+}
+/** A single closed pit in an otherwise sloping surface. Its spill is known by construction. */
+function pitted() {
+  const h = plane()
+  for (let y = 28; y < 36; y++) for (let x = 28; x < 36; x++) h[y * W + x] -= 0.30
+  return h
+}
+
+;(async () => {
+  const src = path.resolve(__dirname, '../../src/core/hydrology.js')
+  let M = null, loadErr = null
+  try {
+    if (!mutation) { M = await import(pathToFileURL(src).href) }
+    else {
+      let text = fs.readFileSync(src, 'utf8')
+      for (const [anchor, repl] of PATCHES[mutation]) {
+        const hits = text.split(anchor).length - 1
+        if (hits !== 1) { console.error(`FATAL anchor for ${mutation} matched ${hits}, expected 1`); process.exit(2) }
+        text = text.replace(anchor, repl)
+      }
+      M = await import('data:text/javascript;base64,' + Buffer.from(text, 'utf8').toString('base64'))
+    }
+  } catch (e) { loadErr = String(e.message || e).slice(0, 200) }
+
+  const assertions = []
+  const check = (name, cond, detail) => { assertions.push({ name, ok: !!cond, detail }); return !!cond }
+  if (!check('module loads', M !== null, loadErr)) return report()
+
+  const area = M.cellAreaM2(CELL, false)
+  check('square cell area is the square of the spacing', Math.abs(area - CELL * CELL) < 1e-9, area)
+  // A hex row is sqrt(3)/2 of a column, so its cell is NOT s^2. Getting this wrong scales every
+  // drainage area on the hex lattice by 15% — a bias small enough to look like a tuning constant.
+  const hexArea = M.cellAreaM2(CELL, true)
+  check('hex cell area carries the sqrt(3)/2 row pitch',
+    Math.abs(hexArea - CELL * CELL * Math.sqrt(3) / 2) < 1e-9, hexArea)
+
+  // --- direction on an analytic plane -----------------------------------------------------------
+  const hp = plane()
+  const wp = M.mfdWeights(hp, W, H, { cellSizeM: CELL })
+  let worstAngle = 0
+  for (let y = 8; y < H - 8; y++) for (let x = 8; x < W - 8; x++) {
+    const i = y * W + x
+    const ang = Math.abs(Math.atan2(wp.dirZ[i], wp.dirX[i]))
+    if (ang > worstAngle) worstAngle = ang
+  }
+  // One lattice angular quantum on D8 is 45 degrees; the plan's bound. A correct router is far
+  // inside it on a plane, but the bound is the one the plan states.
+  check('flow direction on a plane matches steepest descent within one lattice quantum',
+    worstAngle <= Math.PI / 4 + 1e-6, { worstAngleDeg: +(worstAngle * 180 / Math.PI).toFixed(4) })
+  check('flow direction on a plane is essentially exact', worstAngle < 1e-3,
+    { worstAngleDeg: +(worstAngle * 180 / Math.PI).toFixed(6) })
+
+  // OFF-AXIS PLANE, at 22.5 degrees: exactly halfway between a lattice axis and a diagonal, which is
+  // the direction of maximum ambiguity and therefore where a weighting error is largest. Weighting
+  // receivers by DROP instead of SLOPE overweights the diagonal by its extra sqrt(2) of distance and
+  // pulls the direction toward it. Measured, that is 0.000 degrees of error for slope-weighting and
+  // 0.326 for drop-weighting; the bound below sits between two measured builds.
+  //
+  // The axis/diagonal accumulation balance does NOT distinguish them (0.9825 against 0.9808) because
+  // MFD spreads to every downslope neighbour and the bias largely cancels in the totals. Direction is
+  // where it survives, so direction is what this asserts.
+  const tilt = 22.5 * Math.PI / 180, gx = Math.cos(tilt), gz = Math.sin(tilt)
+  const ho = new Float32Array(N)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) ho[y * W + x] = 1 - (x * gx + y * gz) / W
+  const wo = M.mfdWeights(ho, W, H, { cellSizeM: CELL })
+  let sx = 0, sz = 0, cnt = 0
+  for (let y = 8; y < H - 8; y++) for (let x = 8; x < W - 8; x++) {
+    const i = y * W + x; sx += wo.dirX[i]; sz += wo.dirZ[i]; cnt++
+  }
+  const measuredDeg = Math.atan2(sz / cnt, sx / cnt) * 180 / Math.PI
+  check('flow direction is unbiased on an off-axis plane',
+    Math.abs(measuredDeg - 22.5) < 0.15, { trueDeg: 22.5, measuredDeg: +measuredDeg.toFixed(4) })
+
+  // --- drainage area conserves ------------------------------------------------------------------
+  const supply = new Float64Array(N).fill(area)
+  const acc = M.mfdAccumulate(hp, supply, W, H, wp)
+  // Every cell's area must arrive SOMEWHERE. Summing what leaves the domain is the mass-conservation
+  // check the doctrine calls the most under-used assertion in terrain work: a router that loses
+  // water silently still produces a plausible-looking river network.
+  let exported = 0
+  for (let y = 0; y < H; y++) exported += acc[y * W + (W - 1)]
+  const domain = N * area
+  check('drainage area at the outlets equals the domain area within one cell',
+    Math.abs(exported - domain) <= area, { exported, domain, diff: exported - domain })
+
+  // --- discharge units --------------------------------------------------------------------------
+  const zero = M.mfdAccumulate(hp, M.precipToSupply(0, area, N), W, H, wp)
+  let zmax = 0
+  for (let i = 0; i < N; i++) zmax = Math.max(zmax, zero[i])
+  check('zero precipitation gives exactly zero discharge', zmax === 0, { zmax })
+
+  const P = 1000   // mm/yr
+  const q = M.mfdAccumulate(hp, M.precipToSupply(P, area, N), W, H, wp)
+  let qOut = 0
+  for (let y = 0; y < H; y++) qOut += q[y * W + (W - 1)]
+  // The plan's formula, written out: mm/yr -> m/yr -> m3/yr -> m3/s.
+  const expected = P * 1e-3 * domain / M.SECONDS_PER_YEAR
+  check('uniform precipitation integrates to the plan formula',
+    Math.abs(qOut - expected) <= expected * 1e-6 + 1e-12,
+    { qOut, expected, relErr: Math.abs(qOut - expected) / expected })
+  check('seconds per year is the plan figure', M.SECONDS_PER_YEAR === 31536000, M.SECONDS_PER_YEAR)
+
+  // --- MFD must actually spread on divergent ground ---------------------------------------------
+  // A cone drains radially: every azimuth carries equal area. A single-receiver router cannot do
+  // this and instead produces spokes — the failure this codebase already found once in its D8 path.
+  const cone = new Float32Array(N)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    cone[y * W + x] = 1 - Math.hypot(x - W / 2, y - H / 2) / (W / 2)
+  }
+  const wc = M.mfdWeights(cone, W, H, { cellSizeM: CELL })
+  let multi = 0, any = 0
+  for (let i = 0; i < N; i++) {
+    let nz = 0
+    for (let k = 0; k < wc.nbCount; k++) if (wc.wgt[i * wc.nbCount + k] > 1e-6) nz++
+    if (nz > 0) any++
+    if (nz > 1) multi++
+  }
+  check('cells were routed at all', any > N * 0.5, { any, N })
+  check('flow diverges on a cone rather than forming single threads',
+    multi > any * 0.5, { multiReceiverCells: multi, routedCells: any })
+
+  // --- axis/diagonal balance --------------------------------------------------------------------
+  // Radial drainage must carry equal area along every azimuth. Weighting by DROP instead of SLOPE
+  // makes the diagonal win everywhere simply for being sqrt(2) further away.
+  const accCone = M.mfdAccumulate(cone, new Float64Array(N).fill(area), W, H, wc)
+  const cx = W / 2 | 0, cy = H / 2 | 0, r = 24
+  const axis = (accCone[cy * W + (cx + r)] + accCone[cy * W + (cx - r)]
+    + accCone[(cy + r) * W + cx] + accCone[(cy - r) * W + cx]) / 4
+  const dg = Math.round(r / Math.SQRT2)
+  const diag = (accCone[(cy + dg) * W + (cx + dg)] + accCone[(cy - dg) * W + (cx - dg)]
+    + accCone[(cy + dg) * W + (cx - dg)] + accCone[(cy - dg) * W + (cx + dg)]) / 4
+  const ratio = axis > 0 && diag > 0 ? Math.min(axis, diag) / Math.max(axis, diag) : 0
+  check('radial drainage is balanced between axes and diagonals', ratio > 0.55,
+    { axis: +axis.toFixed(1), diag: +diag.toFixed(1), ratio: +ratio.toFixed(3) })
+
+  // --- S4.1 depression policy -------------------------------------------------------------------
+  const hpit = pitted()
+  const solidBefore = Float32Array.from(hpit)
+  const fill = M.depressionPolicy(hpit, W, H, { mode: 'fill', cellSizeM: CELL })
+  const breach = M.depressionPolicy(hpit, W, H, { mode: 'breach', cellSizeM: CELL })
+  const preserve = M.depressionPolicy(hpit, W, H, { mode: 'preserve', cellSizeM: CELL })
+
+  // THE CONTRACT THAT MATTERS: no mode may touch the solid height. Conditioning is a derived
+  // routing surface, not terrain — writing it back is the armed failure the plan names.
+  let solidChanged = 0
+  for (let i = 0; i < N; i++) if (hpit[i] !== solidBefore[i]) solidChanged++
+  check('no policy mode alters the solid height', solidChanged === 0, { solidChanged })
+
+  check('preserve leaves the routing surface bit-identical to the input',
+    preserve.routingSurface.every((v, i) => v === solidBefore[i]), null)
+
+  // Fill must RAISE the basin; breach must NOT.
+  let fillRaised = 0, breachRaised = 0, breachLowered = 0
+  for (let i = 0; i < N; i++) {
+    if (fill.routingSurface[i] > solidBefore[i] + 1e-6) fillRaised++
+    if (breach.routingSurface[i] > solidBefore[i] + 1e-6) breachRaised++
+    if (breach.routingSurface[i] < solidBefore[i] - 1e-9) breachLowered++
+  }
+  check('fill raises the basin to its spill', fillRaised > 40, { fillRaised })
+  check('breach raises nothing', breachRaised === 0, { breachRaised })
+  check('breach cuts an outlet path', breachLowered > 0, { breachLowered })
+
+  // The three modes must give DIFFERENT routing topology, or the policy is a label.
+  //
+  // Counting outlet CELLS was the first metric here and it was too coarse to be a topology check:
+  // breach and preserve both reported 72, because cutting a path out of a basin does not change how
+  // many cells have nowhere lower to send water. What actually distinguishes the modes is WHERE THE
+  // WATER ENDS UP — an endorheic basin traps its catchment, a filled or breached one does not.
+  // Measured as what is TRAPPED, not what is exported. Summing the four domain edges was the first
+  // attempt and it reported 1.67 of the domain area leaving: water that enters on one edge and
+  // leaves by another gets counted at both. Trapping has no such ambiguity — an INTERIOR cell with
+  // nowhere lower to send water is a pit, and whatever accumulates there never left.
+  const trappedFraction = rs => {
+    const wgt = M.mfdWeights(rs, W, H, { cellSizeM: CELL })
+    const a = M.mfdAccumulate(rs, new Float64Array(N).fill(area), W, H, wgt)
+    let trapped = 0
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const i = y * W + x
+      if (wgt.outlet[i]) trapped += a[i]
+    }
+    return trapped / (N * area)
+  }
+  const ef = trappedFraction(fill.routingSurface)
+  const eb = trappedFraction(breach.routingSurface)
+  const ep = trappedFraction(preserve.routingSurface)
+  check('preserve keeps the basin endorheic, trapping its catchment', ep > 0.01,
+    { preserveTrapped: +ep.toFixed(4) })
+  check('fill leaves nothing trapped', ef < 0.001, { fillTrapped: +ef.toFixed(6) })
+  check('breach leaves nothing trapped', eb < 0.001, { breachTrapped: +eb.toFixed(6) })
+  // ...and the surfaces themselves must be three different fields, not two aliases and a label.
+  const differs = (a, b) => { for (let i = 0; i < N; i++) if (a[i] !== b[i]) return true; return false }
+  check('the three routing surfaces are pairwise distinct',
+    differs(fill.routingSurface, breach.routingSurface)
+    && differs(breach.routingSurface, preserve.routingSurface)
+    && differs(fill.routingSurface, preserve.routingSurface), null)
+
+  check('assertion inventory non-empty', assertions.length >= 22, assertions.length)
+  report()
+
+  function report() {
+    let ok = assertions.every(a => a.ok)
+    if (mutation) {
+      if (ok) console.error(`FAIL mutation ${mutation} was not detected — this probe is vacuous`)
+      ok = false
+    }
+    const failed = assertions.filter(a => !a.ok).map(a => a.name)
+    console.log(`${ok ? 'PASS' : 'FAIL'}  physical flow assertions=${assertions.length} `
+      + `failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
+    if (!ok || process.env.MC_VERBOSE) console.log(JSON.stringify(assertions.filter(a => !a.ok), null, 2))
+    process.exit(ok ? 0 : 1)
+  }
+})().catch(e => { console.error('FATAL', e.stack || e); process.exit(2) })

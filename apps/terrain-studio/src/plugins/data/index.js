@@ -1,5 +1,7 @@
 // Every data plugin. Imported for the side effect of registering with core/registry.js.
 import './normals.js'
+import './depression.js'
+import './flow_physical.js'
 import './d_slope.js'
 import './d_height.js'
 import './d_sunshadow.js'

@@ -53,6 +53,12 @@ export const UNITS = Object.freeze({
   // required authored data for the production law and has no default: a duration nobody stated is
   // not a duration of 1.
   mmPerYr: { dim: 'L/T' }, yr: { dim: 'T' },
+  // Sprint 4. Drainage area is the quantity `d_flow` could never express: it returns
+  // normalize(log1p(accumulation)), a picture, so a catchment cannot be read off it or checked
+  // against the domain. m2 makes that checkable. m3PerS is discharge, and it exists as its own unit
+  // rather than being folded into a volume because the per-second part is exactly what the two
+  // conversion factors in precipToSupply produce, and both are armed against being dropped.
+  m2: { dim: 'L^2' }, m3PerS: { dim: 'L^3/T' },
 })
 
 export const SEMANTICS = Object.freeze({
@@ -61,6 +67,20 @@ export const SEMANTICS = Object.freeze({
   // shipped showcase wires it into d_temperature's slot labelled "Relative height".
   relativeHeight: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   mask: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
+  // --- Sprint 4, hydrology -------------------------------------------------------------------
+  // A ROUTING SURFACE IS NOT TERRAIN, and giving it its own semantic is what stops it being wired
+  // somewhere that renders or collides. It is a conditioned copy of the height that exists purely
+  // so flow has a consistent surface to run over; the solid height it came from is untouched.
+  routingSurface: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
+  depressionDepth: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
+  // Signed: positive where fill raised the surface, negative where breach cut it.
+  conditioningDelta: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
+  precipitation: { kind: 'scalarRaster', defaultUnit: 'mmPerYr', continuous: true },
+  drainageArea: { kind: 'scalarRaster', defaultUnit: 'm2', continuous: true },
+  discharge: { kind: 'scalarRaster', defaultUnit: 'm3PerS', continuous: true },
+  // Horizontal by construction, carried as a 3-vector with y zero so no consumer mistakes it for a
+  // 3-D velocity. Distinct from `flow`, which is the log-compressed accumulation picture.
+  flowDirection: { kind: 'vectorRaster', defaultUnit: 'none', continuous: true },
   temperature: { kind: 'scalarRaster', defaultUnit: 'degC', continuous: true },
   sunVisibility: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   solarExposure: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
