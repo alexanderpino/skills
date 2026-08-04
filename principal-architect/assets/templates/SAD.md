@@ -4,6 +4,7 @@ title: <Solution name> — Solution Architecture Document
 status: current               # draft | in-review | current | deprecated | superseded
 version: 0.1.0
 updated: <YYYY-MM-DD>
+last-reviewed: <YYYY-MM-DD>    # stamp when re-verified without editing; linter warns when stale
 entity-of-interest: <the solution — may span multiple systems>
 level: solution
 domain: <business domain>
@@ -75,7 +76,10 @@ sequenceDiagram
 
 ## 5. Data architecture (solution scope)
 Data ownership across the solution, the shared/canonical models, data flows, residency
-and migration concerns. Which system is the source of truth for each entity.
+and migration concerns. Which system is the source of truth for each entity — one owning
+system per dataset; everything else integrates through a contract, never a shared
+writable store (`references/data-architecture.md`). The operational↔analytical seam is
+an integration like any other.
 
 ## 6. Technology selections
 The concrete platforms/products chosen and **why** (this is where vendor/product choice
@@ -128,7 +132,9 @@ on the IaC; sign off with `cost-reviewed: true`.
 
 ## 10. Deployment & operations
 How the solution is deployed and run across environments; the deployment view; key
-operational concerns (observability, SLAs, DR).
+operational concerns. State the solution-wide **SLOs** (with SLIs and error budgets)
+and **RTO/RPO**, per `references/operability.md` — an availability target here
+constrains every member system's design below it.
 
 ## 11. Risks, roadmap & traceability
 - **Risks** and mitigations (and accepted risks).

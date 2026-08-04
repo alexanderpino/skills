@@ -91,6 +91,9 @@ classDiagram
 | A specific runtime collaboration over time | `sequenceDiagram` | SD (sometimes HLD) |
 | A dynamic step-by-step across elements | `C4Dynamic` | SD |
 | Data-type relationships (composition/association) | `classDiagram` | SD/HLD |
+| Entities & relationships in a data store | `erDiagram` | SD |
+| An entity's lifecycle states & transitions | `stateDiagram-v2` | SD |
+| A business process across roles/systems | BPMN-style `flowchart` (lanes) | EA / SAD |
 
 Pick the **highest level that answers the question** and stop. Don't draw a
 component diagram when a container diagram suffices.
@@ -187,6 +190,48 @@ classDiagram
 `*--` = composition (child can't exist without parent). `o--` = association
 (logical link).
 
+## Entity–relationship (SD) — data at rest
+
+Crow's-foot ER for the stored entities of the slice you're designing — scope it to
+the change, and **generate from the real schema** (migrations, ORM models,
+`information_schema`) where you can rather than hand-drawing; a detached
+whole-database ERD rots fastest of all diagrams (`references/data-architecture.md`).
+Attributes only where they carry the point — keys, discriminators, the field the
+change is about.
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  ORDER ||--|{ ORDER_LINE : contains
+  ORDER }o--o| PAYMENT : "settled by"
+  ORDER {
+    string id PK
+    string customer_id FK
+    string status "see lifecycle diagram"
+  }
+```
+
+Cardinality: `||` exactly one · `o|` zero or one · `}o` zero or more · `}|` one or
+more. Read `CUSTOMER ||--o{ ORDER` as "one customer places zero-or-more orders".
+
+## Entity lifecycle (SD) — stateDiagram
+
+For any entity whose **states drive behaviour** (order, claim, subscription,
+document): the state diagram is often the clearest specification of the business
+rules, and each transition names the operation that causes it. Keep it to the states
+the system actually distinguishes. The notation is the UML state machine
+(UML is standardised as **ISO/IEC 19505**), so it needs no legend.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> Submitted : submit
+  Submitted --> Approved : approve
+  Submitted --> Rejected : reject
+  Rejected --> Draft : revise
+  Approved --> [*]
+```
+
 ## Flowchart fallback
 
 C4 mermaid blocks may render imperfectly in some viewers. If a renderer chokes,
@@ -248,6 +293,37 @@ flowchart TB
   classDef app fill:#cfe2f3,stroke:#333
   classDef tech fill:#d9ead3,stroke:#333
 ```
+
+**Business process view (enterprise/solution, BPMN-style):** when a change alters a
+*business process* — who does what, in what order, across roles or systems — a process
+view earns its place; a capability map says what the organisation does, not how a case
+flows through it. The standard notation is **BPMN 2.0** (OMG; also ISO/IEC 19510:2013).
+Mermaid has **no native BPMN**, so the default is a flowchart that keeps BPMN's core
+vocabulary — subgraphs as **lanes** (one per role/system), diamonds as **gateways**,
+stadium shapes as start/end **events**:
+
+```mermaid
+flowchart LR
+  subgraph L1[Customer]
+    s([start]) --> apply[Submit application]
+  end
+  subgraph L2[Underwriting]
+    apply --> check{Complete?}
+    check -- no --> reject([rejected])
+    check -- yes --> assess[Assess risk]
+  end
+  subgraph L3[Policy system]
+    assess --> issue[Issue policy] --> e([done])
+  end
+```
+
+Two rules: (1) if the organisation already **authors or executes** real BPMN
+(Camunda, bpmn.io, a process engine), conform to the house style — keep the `.bpmn`
+2.0 XML as the source of truth under `diagrams/` and link it, exactly as an OpenAPI
+spec is linked via `api-spec:`; the mermaid sketch is at most a readable summary.
+(2) Process views live at enterprise/solution altitude (a process step realized by a
+system is the hand-off into that system's HLD) — inside one system, a `sequenceDiagram`
+is the right tool, not BPMN.
 
 **Solution landscape (solution):** use a C4 `C4Context`/System-Landscape or a flowchart
 spanning the systems involved (see the SAD template §3). Show systems as nodes,

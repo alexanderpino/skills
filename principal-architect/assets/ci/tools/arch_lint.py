@@ -7,7 +7,9 @@ uses PyYAML for front-matter parsing if available, otherwise a built-in parser.
 
 Checks (run a subset or `all`):
   frontmatter  - required fields, allowed status/level values, ADR/RFC id format,
-                 supersession links, mandatory Threat-model + FinOps sections in HLD/SAD.
+                 supersession links, mandatory Threat-model + FinOps sections in HLD/SAD,
+                 staleness of current/accepted living docs (ADR/RFC exempt —
+                 decision records are immutable; --max-age-days, 0 disables).
   conformance  - ISO/IEC/IEEE 42010: every concern framed by a known viewpoint,
                  every view governed by exactly one known viewpoint, ≥1 stakeholder/
                  concern/viewpoint/view, ≥1 ADR; conformance-checklist has no ❌.
@@ -166,8 +168,38 @@ def doc_kind(path, fm):
     if name.lower() == "readme.md": return "INDEX"
     return name.replace(".md", "").upper()
 
+# ---------- helpers: freshness ----------
+def _as_date(v):
+    """Coerce a front-matter value to datetime.date, or None. PyYAML yields
+    date objects; the mini parser yields strings; templates hold placeholders."""
+    import datetime as _dt
+    if isinstance(v, _dt.datetime): return v.date()
+    if isinstance(v, _dt.date): return v
+    if isinstance(v, str):
+        try:
+            return _dt.date.fromisoformat(v.strip())
+        except ValueError:
+            return None
+    return None
+
+def check_staleness(path, fm, kind, status, max_age):
+    """WARN when a LIVING doc hasn't been reviewed/edited within max_age days.
+    ADRs and RFCs are exempt: decision records are immutable history — an old
+    accepted ADR is healthy; it gets superseded, never re-reviewed."""
+    if not max_age or kind in ("INDEX", "ADR", "RFC") or status not in ("current", "accepted"):
+        return
+    import datetime as _dt
+    newest = max(filter(None, (_as_date(fm.get(k)) for k in ("last-reviewed", "updated", "date"))),
+                 default=None)
+    if newest is None:
+        return  # missing/unparseable dates are reported by the existing checks
+    age = (_dt.date.today() - newest).days
+    if age > max_age:
+        add(WARN, path, f"stale: last reviewed/updated {age} days ago (> {max_age}); "
+                        f"re-verify and stamp 'last-reviewed:'")
+
 # ---------- check: frontmatter ----------
-def check_frontmatter(root, strict, house=None):
+def check_frontmatter(root, strict, house=None, max_age=180):
     house = house or {}
     files = md_files(root)
     adr_ids, adr_status, adr_links = {}, {}, {}
@@ -194,6 +226,7 @@ def check_frontmatter(root, strict, house=None):
             add(ERROR, path, f"invalid level '{lvl}'")
         if kind not in ("INDEX",) and not (fm.get("updated") or fm.get("date")):
             add(WARN, path, "missing a date field ('updated' or 'date')")
+        check_staleness(path, fm, kind, status, max_age)
         # unfilled template placeholders
         for k, v in fm.items():
             if isinstance(v, str) and PLACEHOLDER.search(v):
@@ -375,6 +408,9 @@ def main():
     ap.add_argument("--root", default="docs/architecture")
     ap.add_argument("--src", default="src")
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    ap.add_argument("--max-age-days", type=int, default=180, metavar="N",
+                    help="warn when a current/accepted doc's last-reviewed/updated date "
+                         "is older than N days (default 180; 0 disables)")
     ap.add_argument("--house", metavar="PATH", help="house-profile.yaml to enforce (auto-detected if present)")
     ap.add_argument("--emit-frontmatter", metavar="PATH", help="dump front-matter to YAML for Spectral")
     args = ap.parse_args()
@@ -393,12 +429,12 @@ def main():
 
     adr_ids, adr_status = {}, {}
     if args.check in ("frontmatter", "all"):
-        adr_ids, adr_status = check_frontmatter(args.root, args.strict, house)
+        adr_ids, adr_status = check_frontmatter(args.root, args.strict, house, args.max_age_days)
     if args.check in ("conformance", "all"):
         check_conformance(args.root)
     if args.check in ("drift", "all"):
         if not adr_ids:
-            adr_ids, adr_status = check_frontmatter(args.root, args.strict, house)  # need ADR map
+            adr_ids, adr_status = check_frontmatter(args.root, args.strict, house, args.max_age_days)  # need ADR map
         check_drift(args.root, args.src, adr_ids, adr_status)
     if args.check in ("links", "all"):
         check_links(args.root)

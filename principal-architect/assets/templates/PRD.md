@@ -64,6 +64,18 @@ What each stakeholder wants, and what they should be able to do with the system.
 
 <!-- Repeat the Q-block per quality driver. -->
 
+> **Operational qualities become SLOs.** Where a `Q.xx` targets reliability or
+> performance *in operation*, its response measure is the **SLO** and its means of
+> verification the **SLI** (see `references/operability.md`). Don't set the target
+> tighter than the driver justifies — each extra nine has an architecture and a cost
+> attached; the utility tree below is where that gets argued.
+
+> **AI/ML behaviour is specified the same way.** A model-backed feature's quality
+> targets (accuracy, groundedness, refusal rate, latency) are ordinary `Q.xx`
+> scenarios: the response measure is the eval threshold, the means of verification
+> the eval suite. No separate requirements formalism — see `references/privacy.md`
+> for the regulatory side.
+
 ### Quality / utility tree (prioritisation)
 Prioritise the scenarios above so design effort goes where it matters (ATAM):
 ISO 25010 characteristic → refinement → scenario, each rated for **business value**

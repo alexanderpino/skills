@@ -79,6 +79,7 @@ validate and filter it. Bold = required on every doc; the rest apply where relev
 | **`status`** | `draft` \| `in-review` \| `current`/`accepted` \| `proposed` \| `deprecated` \| `superseded` \| `rejected` \| `withdrawn`; user stories also use `ready` \| `in-progress` \| `done` | all |
 | **`level`** | `enterprise` \| `solution` \| `software` | all |
 | **`updated`** / `date` | ISO 8601 date | all |
+| `last-reviewed` | ISO 8601 date — when the doc was last *confirmed still true*; a review is not an edit, so this can advance while `updated` stands still | AD/EA/SAD/HLD (recommended) |
 | `owner` | string (accountable team/person) | all (recommended) |
 | `version` | semver | AD/EA/SAD/HLD |
 | `domain` | string | solution/software |
@@ -212,5 +213,10 @@ burying the fact in prose — prose is for humans, front-matter is for agents.
 
 - Imperative, concrete, short. A doc nobody updates is a liability.
 - Prefer linking by ID over restating. Single source of truth per fact.
-- Date everything you change (`date:` / `updated:`).
+- Date everything you change (`date:` / `updated:`). When you *verify* a long-lived doc
+  without changing it, stamp `last-reviewed:` — `arch_lint.py` warns when a `current`/
+  `accepted` **living** doc (AD/PRD/HLD/SD/SAD/EA) has gone unreviewed too long (default
+  180 days), because a stale "living" doc misleads exactly as much as a wrong one.
+  **ADRs and RFCs are exempt**: decision records are immutable history — an old accepted
+  ADR is healthy; it gets superseded, never re-reviewed.
 - Diagrams live inside the doc they explain, not in a separate gallery.
