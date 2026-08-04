@@ -5,7 +5,7 @@
 // module-evaluation time (the params array) comes from core/params.js, outside the cycle.
 import { definePlugin } from '../../core/registry.js'
 import { P } from '../../core/params.js'
-import { WIND_MAX_MPS, clamp, lerp, newField, projectWindMassConsistent, tagWindField, terrainDef, windBearingVector, windDivergenceRms, windVectorFromField } from '../../legacy.js'
+import { WIND_MAX_MPS, clamp, lerp, newField, projectWindMassConsistent, tagWindField, terrainDef, windBearingVector, widthForLength, windDivergenceRms, windVectorFromField } from '../../legacy.js'
 
 export default definePlugin({
   type: "d_windmodify",
@@ -39,7 +39,17 @@ cat:"data",name:"Wind Modify",ins:["Wind","Driver","Mask"],desc:"Sets a regional
       // blend: mass consistency must survive regional editing. The diagnostics are stamped with
       // THIS projection's before/after - the first version stamped before=inherited and
       // after=post-override, an inverted signal under the shared key names.
-      const n2=Math.round(Math.sqrt(N)),cell=terrainDef.scale/n2;
+      // fieldW(), NOT sqrt(N). A hex field is RES x round(RES*2/sqrt(3)), so its cell count is
+      // never a perfect square and this guessed 550 where the width is 512 — measured. Both
+      // helpers below take a WIDTH and derive the row count themselves via latticeRows, so they
+      // were already hex-correct; handing them a fabricated width made the divergence sum and the
+      // mass-consistency projection read across row boundaries. Every sample stayed finite, which
+      // is why nothing caught it: the wind was simply wrong, quietly, on hex.
+      // widthForLength, NOT sqrt(N) and NOT fieldW(). sqrt(N) is exact on square and returns 550
+      // against a real 512 on hex, so both helpers below — which take a WIDTH and derive rows
+      // themselves — read across row boundaries. fieldW() is equally wrong: this node is also
+      // evaluated on fields that are not the working grid, by atFeatureScale and by fixtures.
+      const n2=widthForLength(N),cell=terrainDef.scale/n2;
       const before=windDivergenceRms(u,v,n2,cell);
       const doProject=p.consistency!=="off";
       const proj=doProject?projectWindMassConsistent(u,v,n2,cell,Math.min(96,Math.max(36,Math.round(Math.sqrt(n2)*6)))):{u,v};
