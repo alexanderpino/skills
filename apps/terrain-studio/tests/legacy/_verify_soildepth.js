@@ -123,13 +123,33 @@ const YEARS = 1000                       // the authored duration for the main f
     const bySemantic = Object.entries(registry).filter(([, d]) => d && Array.isArray(d.outputs)
       && d.outputs.some(p => p && p.semantic === 'soilDepth'))
     const byName = CONTRACT.candidateTypes.filter(t => registry[t])
-    const T = bySemantic.length ? bySemantic[0][0] : (byName[0] || null)
+    // A SEMANTIC IS NOT AN IDENTITY. Discovery by `outputs[].semantic === 'soilDepth'` was
+    // unambiguous when this oracle was written and stopped being so inside the same sprint: S3.4's
+    // selectors publish soilDepth too, so `bySemantic[0]` started returning whichever the registry
+    // happened to iterate first and the gate reported the producer missing while it sat there
+    // registered and digesting. Nothing was wrong with either node.
+    //
+    // A producer INTEGRATES OVER TIME; a selector reads a wire. The duration parameter is the thing
+    // only the producer can have — the contract already requires it to exist with no default — so
+    // it is the discriminator, with the name list as a fallback and first-match as a last resort.
+    const hasDuration = d => Array.isArray(d.params)
+      && d.params.some(pr => pr && typeof pr.key === 'string' && /duration/i.test(pr.key))
+    const producers = bySemantic.filter(([, d]) => hasDuration(d))
+    const T = producers.length ? producers[0][0]
+      : (byName[0] || (bySemantic.length ? bySemantic[0][0] : null))
     const DEF = T ? registry[T] : null
     out.discovery = {
       bySemantic: bySemantic.map(([t]) => t),
       byName,
       type: T,
-      producerCount: bySemantic.length,
+      // Count PRODUCERS, not publishers. `bySemantic.length` was the count when only a producer
+      // could publish soilDepth; S3.4's selectors republish it on their outputs, legitimately, so
+      // that number is now "how many nodes carry the semantic" and says nothing about uniqueness of
+      // the thing under test. Both are reported: the gate wants exactly one producer, and a rising
+      // publisher count is information rather than a failure.
+      producerCount: producers.length,
+      publisherCount: bySemantic.length,
+      producers: producers.map(([t]) => t),
       registrySize: Object.keys(registry).length,
     }
 
@@ -475,7 +495,8 @@ const YEARS = 1000                       // the authored duration for the main f
 
   const gates = {
     // --- the node exists at all. RED TODAY: this is the story's named absence. -------------------
-    producerRegistered: report.discovery.type !== null && report.discovery.producerCount === 1,
+    producerRegistered: report.discovery.type !== null && report.discovery.producerCount === 1
+      && report.discovery.publisherCount >= report.discovery.producerCount,
     soilDepthSemanticRegistered: !!report.semantic && report.semantic.kind === 'scalarRaster'
       && report.semantic.defaultUnit === 'm',
     soilDepthIsAStatePortInMetres: !!report.ports.output && report.ports.output.unit === 'm'

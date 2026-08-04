@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 89;   // 88 + `regolith`, S3.2's physical soil producer
+const REQUIRED_NODE_COUNT = 92;   // 89 + S3.4's three explicit cover-state selectors
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -271,6 +271,14 @@ function installHarness(cfg) {
     // `soilDepth`/m and canConnect would refuse this pairing in the UI. The digest wires by slot and
     // never consults canConnect, and what it needs from a source is determinism, which perlin has.
     regolith: ['A', 'M'],
+    // S3.4's explicit cover-state selectors. Each returns its connected port's exact bytes, so the
+    // digest of a wired selector IS the digest of its source — it appears in the LOW-SENSITIVITY
+    // report below and belongs there, because identity is the whole of what these nodes promise.
+    // The claims that carry real weight (a typed missing-input refusal on a disconnected port, a
+    // WIRED zero field evaluating clean, a rewire moving the result) are not digest-shaped and are
+    // gated by _verify_cover_reader.js. What this recipe pins is that all three still evaluate, at
+    // the declared arity, returning a full-length field.
+    s_soilDepth: ['A'], s_sedimentDepth: ['A'], s_sandDepth: ['A'],
     // --- masks ---
     slopemask: ['A'], heightmask: ['A'], tempmask: ['T'],
     // --- data maps ---
@@ -283,7 +291,7 @@ function installHarness(cfg) {
     subgraph: ['A'],
     d_temperature: ['H', 'S'], d_heat: ['T', 'D', 'M'],
     d_wind: ['A'], d_windmodify: ['W', 'D', 'M'],
-    d_curvature: ['A'], d_flow: ['A'], d_occlusion: ['A'], d_deposits: ['A'],
+    d_curvature: ['A'], d_flow: ['A'], d_occlusion: ['A'], d_deposits: ['A', null],
     d_wear: ['A'], d_peaks: ['A'], d_texture: ['A'], aspect: ['A'],
     // --- effects (passthrough) ---
     water: ['A', 'T'], snow: ['A', 'T', 'W'], satmap: ['A', 'D', 'M'],
@@ -291,6 +299,21 @@ function installHarness(cfg) {
     satmapblend: ['SAT', 'SAT2', 'M'], colormixer: ['SAT', 'SAT2', 'SAT3'],
     // --- output ---
     output: ['A'],
+  };
+
+  // A recipe entry of `null` means DECLARED BUT DELIBERATELY UNWIRED. It still occupies its slot,
+  // so the arity check below is unchanged and a new input cannot be hidden by shortening a recipe —
+  // but nothing is attached to it, and the reason has to be stated here or build() refuses.
+  //
+  // This exists because for one slot in the app, wiring it DESTROYS coverage rather than adding it.
+  // Everything else in this table gains from a source; that one loses everything it had.
+  const UNWIRED_REASON = {
+    'd_deposits:1': 'S3.4 made this the OPTIONAL explicit Sediment state override, and a connected '
+      + 'state makes d_deposits return that input byte-for-byte. Wiring a perlin here would replace '
+      + "the morphological closing in this digest with an identity passthrough of the source — "
+      + 'deleting the only coverage depositsField() has anywhere in the gate, on the very node whose '
+      + 'radius control was once found dead. The prediction branch is what this recipe pins; the '
+      + 'override branch is gated by _verify_cover_reader.js:depositsReturnsConnectedStateIdentity.',
   };
 
   // Auxiliary FIELDS each node hangs off itself (dotted paths allowed). These carry the actual
@@ -371,6 +394,16 @@ function installHarness(cfg) {
     const nd = mk(type, over);
     const recipe = WIRING[type];
     recipe.forEach((key, slot) => {
+      if (key === null) {
+        // Absence of evidence is a failure, not a pass: an unexplained hole in a recipe is
+        // indistinguishable from a slot somebody forgot, so it throws and the type is SKIPPED,
+        // which `complete` already refuses.
+        if (!UNWIRED_REASON[type + ':' + slot]) {
+          throw new Error('wiring recipe leaves slot ' + slot + ' unwired with no stated reason — '
+            + 'add "' + type + ':' + slot + '" to UNWIRED_REASON or wire it');
+        }
+        return;
+      }
       const source = src(key);
       if (!source) throw new Error('wiring recipe slot ' + slot + ' uses unsupported source ' + key);
       wire(source, nd, slot);

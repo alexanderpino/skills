@@ -1,2 +1,5 @@
 import './surface.js'
 import './regolith.js'
+import './s_soildepth.js'
+import './s_sedimentdepth.js'
+import './s_sanddepth.js'

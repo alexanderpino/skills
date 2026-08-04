@@ -23,12 +23,6 @@
       "beforeGreen": "AUDIT BLOCKER RESOLVED: the pipe ledger now accumulates the apron ring over a cell set DISJOINT from the core (gpu.js), so core loss and boundary gain are independent measurements rather than differences of nested sums. The oracle must assert their agreement instead of trusting exportedDerived. Measured: cropExchange 3.632687 vs exportedToApron 3.632644, 1.2e-5 relative."
     },
     {
-      "oracle": "_verify_cover_reader.js",
-      "story": "S3.4 explicit state selectors",
-      "reason": "no cover-state selector nodes are registered",
-      "beforeGreen": "Confirm d_deposits stays an explicitly labelled prediction and is never silently substituted."
-    },
-    {
       "oracle": "_verify_cover_erosion.js",
       "story": "S3.3 cover-aware transport",
       "reason": "hydraulic declares no cover inputs and emits no state rasters",

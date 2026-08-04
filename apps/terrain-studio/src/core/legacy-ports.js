@@ -124,6 +124,25 @@ const LEGACY_PORTS_RAW = {
   "d_deposits": {
     in: [
       { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
+      // S3.4 — the OPTIONAL explicit sediment-state override, and the one row in this table that
+      // was ADDED after seeding rather than measured at it. Three notes, because "frozen" is a real
+      // property of this file and adding to it needs its reasons on the record:
+      //
+      //   WHY HERE AND NOT IN THE PLUGIN. `rosterFullyAdapted` (_verify_port_contract.js:294)
+      //   asserts all 79 rostered types are served by the adapter, and registry.js:98 opts a type
+      //   out of the adapter the moment it declares its own `inputs`. LEGACY_INS_LABELS is DERIVED
+      //   from these rows, so adding the slot here keeps the `ins`-drift anchor exact instead of
+      //   breaking it. A rostered type that gains a port has to gain it in the adapter's own data.
+      //
+      //   WHY A PHYSICAL SEMANTIC IS LEGAL ON THIS ONE. The header gives two reasons adapted ports
+      //   are untyped: ADR-005's unresolved height frame, and that typing an existing port would
+      //   refuse wiring the app ships today. Neither applies — this is a NEW slot that no shipped
+      //   document uses, and cover depth in metres is not the disputed elevation frame.
+      //
+      //   THIS IS NOT A REGENERATION. The header's freeze is against recomputing ids from display
+      //   names, which would rewrite every saved edge. `sedimentState` is a new stable id.
+      { id: "sedimentState", name: "Sediment state", semantic: "sedimentDepth", unit: "m",
+        lens: "state", legacySlot: 1 },
     ],
     out: { id: 'out', name: 'Out' },
   },

@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 89,
+  "nodeCount": 92,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -63,6 +63,9 @@
     "ridged": "9cb9f837:843dbcb0",
     "route": "263bdef7:bcf4a390",
     "rugged": "58cd1479:cf0cafdb",
+    "s_sandDepth": "263bdef7:bcf4a390",
+    "s_sedimentDepth": "263bdef7:bcf4a390",
+    "s_soilDepth": "263bdef7:bcf4a390",
     "satmap": "263bdef7:bcf4a390|driver=71ece1e6:9f23adf9|color=a9b42879:f657c9c6",
     "satmapblend": "263bdef7:bcf4a390|color=421f78ff:447670f9",
     "sculpt": "25fb343e:3016b952",

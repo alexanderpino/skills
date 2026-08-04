@@ -53,8 +53,16 @@ export const AUX_MAPS = Object.freeze({
   // metres, state lens — so the row is no longer a plan. `status` is a claim about production and
   // _verify_soildepth.js checks it against the live registry, so it cannot be promoted early.
   soilDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S3.2' },
-  sedimentDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'planned', owner: 'S3.1' },
-  sandDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'planned', owner: 'S7.3' },
+  // S3.4 promoted these two from `planned` to `port`. `status` is a claim about what EXISTS, not
+  // about who fills it: the explicit state selectors (`s_sedimentDepth`, `s_sandDepth`) declare
+  // real typed scalarRaster/metre/state ports for both, and d_deposits now takes `sedimentDepth`
+  // on a typed slot. `owner` is unchanged and deliberately so — it names the sprint that owns the
+  // PRODUCER, and neither has one yet: S3.1 emits sediment depth out of the hydraulic solver and
+  // S7.3 is the first thing that will deposit sand. A named port with no producer is exactly the
+  // state this row should describe, and calling it `planned` while three plugins declare it would
+  // be the registry disagreeing with the registry.
+  sedimentDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S3.1' },
+  sandDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S7.3' },
   wetness: { lens: 'state', kind: 'scalarRaster', unit: 'none', status: 'planned', owner: 'S3.3' },
 
   // --- hydrology -------------------------------------------------------------------------------
