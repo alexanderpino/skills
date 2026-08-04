@@ -11,3 +11,4 @@ apps/*/.playwright/
 
 # Mission Control state: SQLite db + evidence. Tooling, not product.
 .mission-control/
+mission-control/tests/.tmp/

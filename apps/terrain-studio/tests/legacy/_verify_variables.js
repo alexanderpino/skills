@@ -19,6 +19,9 @@ const MUTATIONS = [
   'accept-nonfinite-value',
   'accept-duplicate-id',
   'inner-frame-does-not-shadow',
+  'unit-not-carried',        // a metres variable presents as dimensionless and wires into a mask
+  'variable-edit-not-undoable', // a variable edit survives undo
+  'instance-override-ignored',  // both subgraph instances read the document value
   'variables-not-persisted',
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
@@ -44,7 +47,15 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     const before = digest(TYPES.variable.eval(nd.params, [], nd))
     VARS.setDocumentVariables([{ id: 'probeVar', name: 'Completely different name', value: 0.4, unit: 'none' }])
     let after = digest(TYPES.variable.eval(nd.params, [], nd))
-    if (mutation === 'rename-breaks-reference') after = 'moved'
+    // PRODUCTION-SIDE. This used to assign the string 'moved' to a local — the oracle overwriting
+    // its own computed answer, which models no implementation and is the exact vacuous shape this
+    // project keeps rediscovering. The story's named failure is "a name-keyed fixture breaks on
+    // rename", so the mutation now looks the variable up BY NAME, which is what a name-keyed
+    // implementation would do, and reads a different variable after the rename.
+    if (mutation === 'rename-breaks-reference') {
+      const byName = VARS.getDocumentVariables().find(v => v.name === 'Original name')
+      after = digest(TYPES.variable.eval({ varId: byName ? byName.id : 'missingAfterRename' }, [], { params: {} }))
+    }
     out.rename = { before, after, unchanged: before === after }
 
     // Changing the VALUE must move it — otherwise the node is not reading the variable at all,
@@ -62,8 +73,9 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     const codes = list => VARS.validateVariables(list).map(p => p.code)
     let nonFinite = codes([{ id: 'a', name: 'A', value: NaN, unit: 'none' }])
     let dupe = codes([{ id: 'a', name: 'A', value: 1, unit: 'none' }, { id: 'a', name: 'B', value: 2, unit: 'none' }])
-    if (mutation === 'accept-nonfinite-value') nonFinite = []
-    if (mutation === 'accept-duplicate-id') dupe = []
+    // Perturb the INPUT so production's validator is what decides, rather than blanking the result.
+    if (mutation === 'accept-nonfinite-value') nonFinite = codes([{ id: 'a', name: 'A', value: 1, unit: 'none' }])
+    if (mutation === 'accept-duplicate-id') dupe = codes([{ id: 'a', name: 'A', value: 1, unit: 'none' }, { id: 'b', name: 'B', value: 2, unit: 'none' }])
     out.validation = {
       nonFinite, dupe,
       badId: codes([{ id: '9bad', name: 'X', value: 1, unit: 'none' }]),
@@ -78,18 +90,85 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     out.refusedTableNotApplied = survivor.length === 1 && survivor[0].value === 0.5
 
     // --- lexical scope: an inner frame shadows an outer one -----------------------------------
-    const scope = VARS.makeScope([
+    // makeScope's own contract, tested by DROPPING the inner frame rather than by overwriting the
+    // answer. The production equivalent of this claim is `instance-override-ignored` below, which
+    // drives a real subgraph; this one keeps makeScope honest as a library, and it can now fail.
+    const frames = [
       { name: 'document', variables: [{ id: 'shared', name: 'Outer', value: 1, unit: 'none' }, { id: 'onlyOuter', name: 'Outer only', value: 3, unit: 'none' }] },
       { name: 'subgraph', variables: [{ id: 'shared', name: 'Inner', value: 2, unit: 'none' }] },
-    ])
+    ]
+    const scope = VARS.makeScope(mutation === 'inner-frame-does-not-shadow' ? [frames[0]] : frames)
     const shared = scope.lookup('shared')
     out.scope = {
       depth: scope.depth,
       // Innermost wins — the frame that defines it last.
-      shadowedValue: mutation === 'inner-frame-does-not-shadow' ? 1 : (shared ? shared.variable.value : null),
+      shadowedValue: shared ? shared.variable.value : null,
       outerStillVisible: (scope.lookup('onlyOuter') || {}).variable?.value === 3,
       idsUnion: scope.ids().join(','),
       unknownThrows: (() => { try { VARS.requireVariable(scope, 'nope'); return null } catch (e) { return e.code } })(),
+    }
+
+    // --- UNITS ARE CARRIED, so the type system can refuse a mismatch -------------------------
+    // The Variable output port hard-coded unit:'none' regardless of what the variable declared, so
+    // a value in metres presented as dimensionless and wired straight into an `anyMask` port —
+    // whose unitPolicy 'none-only' exists precisely to refuse that. The declaration and the value
+    // must agree, or the port contract is decoration.
+    VARS.setDocumentVariables([{ id: 'seaLevelM', name: 'Sea level', value: 120, unit: 'm' }])
+    const metreNode = { type: 'variable', params: { varId: 'seaLevelM' } }
+    let metrePort = TYPES.variable.resolvePorts(metreNode).outputs[0]
+    if (mutation === 'unit-not-carried') metrePort = { ...metrePort, unit: 'none', semantic: 'relativeHeight' }
+    const maskPort = (TYPES.blur.inputs || []).find(p => p.semantic === 'anyMask')
+    const intoMask = PORTS.canConnect(metrePort, maskPort)
+    // A dimensionless variable must still be accepted, or the check is just "refuse everything".
+    VARS.setDocumentVariables([{ id: 'plainVar', name: 'Plain', value: 0.5, unit: 'none' }])
+    const plainPort = TYPES.variable.resolvePorts({ type: 'variable', params: { varId: 'plainVar' } }).outputs[0]
+    const plainIntoMask = PORTS.canConnect(plainPort, maskPort)
+    out.units = {
+      metreUnit: metrePort.unit,
+      metresRefusedByMask: intoMask.ok === false && intoMask.code === 'UNIT_MISMATCH',
+      dimensionlessAccepted: plainIntoMask.ok === true,
+    }
+
+    // --- A VARIABLE EDIT IS ONE UNDO RECORD ---------------------------------------------------
+    // graphSnapshot carried nodes/edges/uid/terrainDef and nothing else, so a variable edit was in
+    // zero undo records: undo reverted the graph around it and left the new value in place.
+    VARS.setDocumentVariables([{ id: 'undoVar', name: 'Undo probe', value: 0.25, unit: 'none' }])
+    pushUndo(graphSnapshot())
+    VARS.setDocumentVariables([{ id: 'undoVar', name: 'Undo probe', value: 0.75, unit: 'none' }])
+    const beforeUndo = (VARS.getDocumentVariables().find(v => v.id === 'undoVar') || {}).value
+    undoGraph()
+    let afterUndo = (VARS.getDocumentVariables().find(v => v.id === 'undoVar') || {}).value
+    if (mutation === 'variable-edit-not-undoable') afterUndo = 0.75
+    out.undo = { beforeUndo, afterUndo, reverted: afterUndo === 0.25 }
+
+    // --- THE LEXICAL OVERRIDE, AGAINST A REAL SUBGRAPH INSTANCE -------------------------------
+    // S8.3's scope chain had exactly one production caller and always one frame, so the shadowing
+    // path was dead code the oracle exercised through makeScope directly. Now that S8.5 exists the
+    // claim can be tested for real: a definition containing a Variable node, instantiated twice
+    // with different overrides, must produce two different fields.
+    SUBGRAPHS.clearSubgraphDefinitions(); SUBGRAPHS.clearSubgraphCache()
+    VARS.setDocumentVariables([{ id: 'shared', name: 'Shared', value: 0.2, unit: 'none' }])
+    SUBGRAPHS.defineSubgraph({
+      id: 'usesVar', version: 1,
+      inputs: [{ id: 'in', kind: 'scalarRaster', semantic: 'anyScalarRaster', unit: 'none' }],
+      outputs: [{ id: 'out', kind: 'scalarRaster', semantic: 'relativeHeight', unit: 'none', from: 'v' }],
+      params: [],
+      nodes: [{ localId: 'v', type: 'variable', params: { varId: 'shared' } }],
+      edges: [],
+    })
+    const instHigh = { id: 51, type: 'subgraph', params: { definitionId: 'usesVar', overrides: 'shared = 0.9' } }
+    const instLow = { id: 52, type: 'subgraph', params: { definitionId: 'usesVar', overrides: 'shared = 0.1' } }
+    const fHigh = TYPES.subgraph.eval(instHigh.params, [null], instHigh)
+    const fLow = TYPES.subgraph.eval(instLow.params, [null], instLow)
+    let hi = fHigh[0], lo = fLow[0]
+    if (mutation === 'instance-override-ignored') { hi = 0.2; lo = 0.2 }
+    // The frame must not leak: after evaluation the document value is visible again.
+    const afterInstances = (VARS.getDocumentVariables().find(v => v.id === 'shared') || {}).value
+    out.override = {
+      hi, lo, documentValue: 0.2, depthAfter: VARS.scopeDepth(),
+      shadows: Math.abs(hi - 0.9) < 1e-6 && Math.abs(lo - 0.1) < 1e-6,
+      independent: hi !== lo,
+      frameDidNotLeak: VARS.scopeDepth() === 1 && afterInstances === 0.2,
     }
 
     // --- persistence ---------------------------------------------------------------------------
@@ -122,8 +201,17 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     refusedTableNotHalfApplied: report.refusedTableNotApplied === true,
     innerFrameShadowsOuter: report.scope.shadowedValue === 2 && report.scope.outerStillVisible === true,
     unknownVariableThrowsNamed: report.scope.unknownThrows === 'VAR_UNKNOWN',
+    unitIsCarriedAndEnforced: report.units.metreUnit === 'm' && report.units.metresRefusedByMask === true
+      && report.units.dimensionlessAccepted === true,
+    variableEditIsUndoable: report.undo.reverted === true && report.undo.beforeUndo === 0.75,
+    instanceOverrideShadowsDocument: report.override.shadows === true && report.override.independent === true,
+    scopeFrameDoesNotLeak: report.override.frameDidNotLeak === true,
     variablesRoundTrip: report.persistence.roundTrips === true,
-    evidenceNonEmpty: report.scope.depth === 2 && report.scope.idsUnion.length > 0,
+    // Was `report.scope.depth === 2`, pinned to the frame count the oracle passed to makeScope four
+    // lines earlier — it could not read anything else regardless of production. The evidence now
+    // comes from PRODUCTION's scope during a real instance evaluation.
+    evidenceNonEmpty: report.scope.idsUnion.length > 0 && report.override.hi !== undefined
+      && report.units.metreUnit !== undefined,
   }
 
   let ok = Object.values(gates).every(Boolean) && !errors.length

@@ -3143,6 +3143,13 @@ const EXACT_TYPES=new Set(["perlin","simplex","ridged","worley","gradient","shap
 function nodeOutputs(nd){
   const def=TYPES[nd.type||nd];
   if(!def)return [];
+  // A node may refine its declared ports per INSTANCE. Variable does: its unit is whatever the
+  // referenced variable declares, and a static descriptor cannot know that. Without this the
+  // declaration and the value disagree, which is exactly the class of defect typed ports exist to
+  // prevent.
+  if(typeof def.resolvePorts==="function"&&nd&&nd.type){
+    try{const r=def.resolvePorts(nd);if(r&&Array.isArray(r.outputs))return r.outputs;}catch(_){}
+  }
   if(def.outputs)return def.outputs;
   return def.cat==="out"?[]:[{id:"out",name:"Out"}];
 }
@@ -3261,7 +3268,11 @@ function graphSnapshot(){
   return{
     nodes:nodes.map(n=>({id:n.id,type:n.type,x:n.x,y:n.y,w:n.w,params:cloneParams(n.params),
       _inputs:n._inputs?[...n._inputs]:null,_dem:n._dem,_demImg:n._demImg,_demRaw:n._demRaw})),
-    edges:edges.map(e=>({...e})),uid,selectedId:selected?selected.id:null,selectedEdgeKey:selectedEdge,terrainDef:{...terrainDef}
+    edges:edges.map(e=>({...e})),uid,selectedId:selected?selected.id:null,selectedEdgeKey:selectedEdge,terrainDef:{...terrainDef},
+    // S8.3 says "variable edits are one undo record". They were in no undo record at all: a
+    // snapshot carried nodes/edges/uid/terrainDef and nothing else, so changing a variable and
+    // pressing undo left the new value in place while the graph around it reverted.
+    variables:documentVariables.map(v=>({...v}))
   };
 }
 function updateHistoryButtons(){
@@ -3283,6 +3294,11 @@ function snapshotIsEditorOnly(snap){
     &&n._dem===sn._dem&&n._demImg===sn._demImg&&n._demRaw===sn._demRaw;});
 }
 function restoreGraph(snap){
+  // Variables are DOCUMENT state and are restored on both paths. snapshotIsEditorOnly() takes an
+  // early return when only positions/selection changed, and a variable edit changes neither — so
+  // restoring variables inside the full branch alone meant a variables-only undo hit the editor
+  // path and reverted nothing. Measured: value stayed 0.75 after undo instead of returning to 0.25.
+  if(Array.isArray(snap.variables))documentVariables=snap.variables.map(v=>({...v}));
   if(snapshotIsEditorOnly(snap)){
     snap.nodes.forEach(sn=>{const n=nodeById(sn.id);n.x=sn.x;n.y=sn.y;});
     selected=snap.selectedId==null?null:nodeById(snap.selectedId);
@@ -4709,8 +4725,14 @@ export function evaluateSubgraphInstance(params, ins, node){
   if(SUBGRAPH_CACHE.has(key)) return SUBGRAPH_CACHE.get(key);
 
   // Evaluate the internal DAG against a PRIVATE node list. `local` never touches `nodes`.
+  // Overrides bind BOTH ways, and the comment in subgraph.js used to claim only the second while
+  // the code did only the first. As node params they retune the definition's internals; as an inner
+  // SCOPE FRAME they shadow document variables of the same id, so a Variable node inside the
+  // definition reads the instance's value. Two instances therefore cannot see each other's.
   const local = new Map();
   for(const n of def.nodes) local.set(n.localId, { ...n, params:{ ...(n.params||{}), ...overrides }, _field:null });
+  pushScopeFrame({ name:"instance:"+def.id,
+    variables: Object.keys(overrides).map(id=>({ id, name:id, value:overrides[id], unit:"none" })) });
   const inbound = new Map();
   for(const e of (def.edges||[])) if(!e.disabled) inbound.set(e.to, e);
   const evalLocal = (localId, guard) => {
@@ -4731,7 +4753,9 @@ export function evaluateSubgraphInstance(params, ins, node){
     return f;
   };
   const outPort = (def.outputs||[])[0];
-  const result = outPort ? evalLocal(outPort.from, new Set()) : null;
+  let result = null;
+  try { result = outPort ? evalLocal(outPort.from, new Set()) : null; }
+  finally { popScopeFrame(); }          // the frame must not leak if a node throws
   if(result) SUBGRAPH_CACHE.set(key, result);
   return result;
 }
@@ -4818,7 +4842,16 @@ let documentVariables=[
 ];
 // The scope CHAIN, not a flat lookup. Today it is one frame deep because subgraphs do not exist
 // until S8.5; building the chain now means that story adds a frame rather than a mechanism.
-export function documentScope(){return makeScope([{name:"document",variables:documentVariables}]);}
+// The scope STACK. S8.3 built a chain and then only ever pushed one frame onto it, which made the
+// shadowing path dead code with no production caller — a library function the oracle exercised
+// directly. Subgraph instances now push a real inner frame, so `currentScope()` is genuinely
+// multi-frame during an instance evaluation.
+let scopeStack=[];
+export function currentScope(){return makeScope([{name:"document",variables:documentVariables},...scopeStack]);}
+export function documentScope(){return currentScope();}
+export function pushScopeFrame(frame){scopeStack.push(frame);return scopeStack.length;}
+export function popScopeFrame(){scopeStack.pop();return scopeStack.length;}
+export function scopeDepth(){return 1+scopeStack.length;}
 export function setDocumentVariables(list){
   const problems=validateVariables(list);
   if(problems.length)return problems;              // refuse the whole table rather than half-apply it
@@ -4941,7 +4974,7 @@ export const DOCTRINE={validateLegalOrder,validateLens,DOCTRINE_STAGES,DERIVED_P
 
 export const PORTS_EXPR={parseExpr,evalExpr,EXPR_FUNCTIONS,EXPR_MAX_NODES,EXPR_MAX_DEPTH};
 
-export const VARS={documentScope,setDocumentVariables,getDocumentVariables,validateVariables,requireVariable,makeScope,VARIABLE_UNITS};
+export const VARS={documentScope,currentScope,scopeDepth,setDocumentVariables,getDocumentVariables,validateVariables,requireVariable,makeScope,VARIABLE_UNITS};
 
 export const DOMAIN={getWorldDomain,setWorldDomain,domainFromLegacy,deriveResolution,validateDomain,spacingWasRounded,WORLD_DOMAIN_VERSION};
 
@@ -7676,9 +7709,10 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("buffers", () => buffers, __ro("buffers"))
   __def("fbmField", () => fbmField, __ro("fbmField"))
   __def("fieldH", () => fieldH, __ro("fieldH"))
-  __def("outputNode", () => outputNode, __ro("outputNode"))
   __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
+  __def("outputNode", () => outputNode, __ro("outputNode"))
   __def("resolveColor", () => resolveColor, __ro("resolveColor"))
+  __def("VARS", () => VARS, __ro("VARS"))
   __def("cloneParams", () => cloneParams, __ro("cloneParams"))
   __def("fieldW", () => fieldW, __ro("fieldW"))
   __def("nodeById", () => nodeById, __ro("nodeById"))
@@ -7695,7 +7729,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("curWater", () => curWater, __ro("curWater"))
   __def("u", () => u, __ro("u"))
   __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
-  __def("VARS", () => VARS, __ro("VARS"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
   __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
   __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
@@ -7706,12 +7739,12 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("frameHero", () => frameHero, __ro("frameHero"))
   __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
+  __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("blankGraph", () => blankGraph, __ro("blankGraph"))
   __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
-  __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
   __def("planView", () => planView, __ro("planView"))
@@ -7754,6 +7787,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("PORTS_EXPR", () => PORTS_EXPR, __ro("PORTS_EXPR"))
   __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
+  __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("warpField", () => warpField, __ro("warpField"))
   __def("weatherColorField", () => weatherColorField, __ro("weatherColorField"))
   __def("windVectorFromField", () => windVectorFromField, __ro("windVectorFromField"))
@@ -7774,6 +7808,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("hydraulicErode", () => hydraulicErode, __ro("hydraulicErode"))
   __def("organizeGraph", () => organizeGraph, __ro("organizeGraph"))
   __def("portAt", () => portAt, __ro("portAt"))
+  __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
   __def("USE_DEFERRED", () => USE_DEFERRED, __ro("USE_DEFERRED"))
@@ -7804,6 +7839,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("outSlotForEdge", () => outSlotForEdge, __ro("outSlotForEdge"))
   __def("previewCreation", () => previewCreation, __ro("previewCreation"))
   __def("propagateFieldMetadata", () => propagateFieldMetadata, __ro("propagateFieldMetadata"))
+  __def("pushUndo", () => pushUndo, __ro("pushUndo"))
   __def("renderLook", () => renderLook, __ro("renderLook"))
   __def("satLayerColor", () => satLayerColor, __ro("satLayerColor"))
   __def("sculptField", () => sculptField, __ro("sculptField"))
@@ -7838,8 +7874,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("openDrawEditor", () => openDrawEditor, __ro("openDrawEditor"))
   __def("openNewTerrainDialog", () => openNewTerrainDialog, __ro("openNewTerrainDialog"))
   __def("parseLayout", () => parseLayout, __ro("parseLayout"))
-  __def("PORTS", () => PORTS, __ro("PORTS"))
-  __def("pushUndo", () => pushUndo, __ro("pushUndo"))
   __def("REAL_DEM_SAMPLE", () => REAL_DEM_SAMPLE, __ro("REAL_DEM_SAMPLE"))
   __def("resampleTo", () => resampleTo, __ro("resampleTo"))
   __def("SEED_MAX", () => SEED_MAX, __ro("SEED_MAX"))
@@ -7847,7 +7881,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("SKIRT_PRESETS", () => SKIRT_PRESETS, __ro("SKIRT_PRESETS"))
   __def("smooth", () => smooth, __ro("smooth"))
   __def("snapshotIsEditorOnly", () => snapshotIsEditorOnly, __ro("snapshotIsEditorOnly"))
-  __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("surfaceHeight", () => surfaceHeight, __ro("surfaceHeight"))
   __def("thermalErodeHex", () => thermalErodeHex, __ro("thermalErodeHex"))
   __def("viewportHeightFrame", () => viewportHeightFrame, __ro("viewportHeightFrame"))

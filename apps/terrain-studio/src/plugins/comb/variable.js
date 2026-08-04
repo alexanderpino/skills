@@ -9,7 +9,7 @@
 // app. The `info` panel reports which id resolved and from which scope frame.
 import { definePlugin } from '../../core/registry.js'
 import { P } from '../../core/params.js'
-import { newField, documentScope } from '../../legacy.js'
+import { newField, currentScope } from '../../legacy.js'
 
 export default definePlugin({
   type: 'variable',
@@ -24,12 +24,26 @@ export default definePlugin({
       semantic: 'relativeHeight', unit: 'none', primary: true, lens: 'derived' },
   ],
   info: (node) => {
-    const hit = documentScope().lookup(String(node.params.varId || '').trim())
+    const hit = currentScope().lookup(String(node.params.varId || '').trim())
     if (!hit) return `<b>VAR_UNKNOWN</b> — no variable with id ${JSON.stringify(node.params.varId)}`
     return `<b>${hit.variable.name}</b> = ${hit.variable.value} ${hit.variable.unit} <span class="muted">(frame ${hit.frame})</span>`
   },
+  // The declared output above is a PLACEHOLDER. A variable carries a unit, and hard-coding
+  // unit:'none' here meant a variable declared in metres presented as dimensionless — so it wired
+  // straight into an `anyMask` port, whose unitPolicy 'none-only' exists precisely to refuse that.
+  // resolvePorts refines the descriptor per instance from the variable actually referenced, so the
+  // declaration and the value agree.
+  resolvePorts: (node) => {
+    const hit = currentScope().lookup(String((node && node.params && node.params.varId) || '').trim())
+    const unit = hit ? hit.variable.unit : 'none'
+    return {
+      inputs: [],
+      outputs: [{ id: 'out', name: 'Out', kind: 'scalarRaster', storage: 'R32F', components: 1,
+        semantic: unit === 'none' ? 'relativeHeight' : 'height', unit, primary: true, lens: 'derived' }],
+    }
+  },
   eval: (p) => {
-    const hit = documentScope().lookup(String(p.varId || '').trim())
+    const hit = currentScope().lookup(String(p.varId || '').trim())
     return newField(hit ? hit.variable.value : 0)
   },
 })
