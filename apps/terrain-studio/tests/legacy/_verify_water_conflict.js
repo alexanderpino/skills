@@ -37,6 +37,8 @@ const MUTATIONS = [
   'target-resets-to-terrain', // the ratchet restarts each step, so a long climb reads as one step
   'no-descent-epsilon',       // a dead-flat canal reports zero conflict
   'ignore-flow-opposition',   // a guide drawn backwards up its own river reports as aligned
+  'plugin-emits-height',      // guardrail 1: the water-family node grows a terrain-height output
+  'plugin-drops-deficit',     // the node evaluates cleanly and stamps an all-zero delta raster
 ]
 const PATCHES = {
   // Three taps, centred, ends held. This is exactly the "remove sampling noise" filter someone adds
@@ -69,6 +71,20 @@ const PATCHES = {
     '      alignment[i] = (tx / tl) * f.x + (tz / tl) * f.z',
     '      alignment[i] = 1',
   ]],
+}
+// Mutations that patch the PLUGIN rather than the core module. Both are sprint-level failures the
+// core arithmetic cannot see: a water-family node that grows a height output, and a node that
+// evaluates without error while reporting nothing.
+const PLUGIN_PATCHES = {
+  'plugin-emits-height': [
+    ["    { id: 'conflicts', name: 'Conflicts', kind: 'featureSet', storage: 'RECORDS', components: 1,",
+      "    { id: 'height', name: 'Height', kind: 'scalarRaster', storage: 'R32F', components: 1,\n"
+      + "      semantic: 'relativeHeight', unit: 'none', lens: 'continued' },\n"
+      + "    { id: 'conflicts', name: 'Conflicts', kind: 'featureSet', storage: 'RECORDS', components: 1,"],
+    ["    const values = new Map([['conditioningDelta', delta]])",
+      "    const values = new Map([['conditioningDelta', delta], ['height', src]])"],
+  ],
+  'plugin-drops-deficit': [['        if (!(rep.deficit[i] > 0)) continue', '        if (rep.deficit[i] >= 0) continue']],
 }
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -104,21 +120,29 @@ const flatline = () => {
   return h
 }
 
+/** Patch a module's source text and return an importable data URL, or the plain file URL when this
+ *  run has no patch for it. Every anchor must match exactly once: an anchor that has drifted out of
+ *  the source would otherwise leave the module unmodified and score the mutation as armed. */
+const dataUrl = text => 'data:text/javascript;base64,' + Buffer.from(text, 'utf8').toString('base64')
+const patched = (file, patches) => {
+  if (!patches) return pathToFileURL(file).href
+  let text = fs.readFileSync(file, 'utf8')
+  for (const [anchor, repl] of patches) {
+    const hits = text.split(anchor).length - 1
+    if (hits !== 1) { console.error(`FATAL anchor for ${mutation} matched ${hits}, expected 1`); process.exit(2) }
+    text = text.replace(anchor, repl)
+  }
+  return dataUrl(text)
+}
+
 ;(async () => {
   const src = path.resolve(__dirname, '../../src/core/water-conflict.js')
+  // ONE core href, shared by the direct import below and by the plugin's rewritten import, so a
+  // mutation reaches the node exactly as it reaches the module. Loading the plugin against the
+  // pristine file would leave every plugin assertion permanently green — coverage that cannot fail.
+  const coreHref = patched(src, mutation ? PATCHES[mutation] : null)
   let M = null, loadErr = null
-  try {
-    if (!mutation) { M = await import(pathToFileURL(src).href) }
-    else {
-      let text = fs.readFileSync(src, 'utf8')
-      for (const [anchor, repl] of PATCHES[mutation]) {
-        const hits = text.split(anchor).length - 1
-        if (hits !== 1) { console.error(`FATAL anchor for ${mutation} matched ${hits}, expected 1`); process.exit(2) }
-        text = text.replace(anchor, repl)
-      }
-      M = await import('data:text/javascript;base64,' + Buffer.from(text, 'utf8').toString('base64'))
-    }
-  } catch (e) { loadErr = String(e.message || e).slice(0, 200) }
+  try { M = await import(coreHref) } catch (e) { loadErr = String(e.message || e).slice(0, 200) }
 
   const assertions = []
   const check = (name, cond, detail) => { assertions.push({ name, ok: !!cond, detail }); return !!cond }
@@ -411,14 +435,129 @@ const flatline = () => {
     flatAlignWorst === 0 && flat.opposedCount === 0, { flatAlignWorst, opposedCount: flat.opposedCount })
 
   // ==============================================================================================
+  // THE NODE — loaded with legacy stubbed, so the plugin's own wiring is measured, not assumed
+  // ==============================================================================================
+  // A plugin that computes the right thing and returns an empty field passes every assertion above.
+  // The only way to know the node works is to run the node, so its two impure imports are replaced:
+  // `legacy.js` by a stub built from THIS FILE's fixture constants (it cannot drift from them), and
+  // `core/water-conflict.js` by whichever href this run is using.
+  const pluginPath = path.resolve(__dirname, '../../src/plugins/data/water_conflict.js')
+  const coreDir = p => pathToFileURL(path.resolve(__dirname, '../../src/core/' + p)).href
+  const legacyStub = dataUrl(
+    `export const newField=()=>new Float32Array(${W * H});export const fieldW=()=>${W};export const fieldH=()=>${H};`
+    + `export const cellSizeM=()=>${CELL};export const isHex=()=>false;export const terrainDef={height:${HEIGHT_M}};`
+    + 'export const HEX_ROW=Math.sqrt(3)/2;')
+  let pluginText = fs.readFileSync(pluginPath, 'utf8')
+  for (const [anchor, repl] of (mutation && PLUGIN_PATCHES[mutation]) || []) {
+    const hits = pluginText.split(anchor).length - 1
+    if (hits !== 1) { console.error(`FATAL plugin anchor for ${mutation} matched ${hits}, expected 1`); process.exit(2) }
+    pluginText = pluginText.replace(anchor, repl)
+  }
+  const rewrites = [
+    ["'../../core/registry.js'", JSON.stringify(coreDir('registry.js'))],
+    ["'../../core/params.js'", JSON.stringify(coreDir('params.js'))],
+    ["'../../core/water-conflict.js'", JSON.stringify(coreHref)],
+    ["'../../legacy.js'", JSON.stringify(legacyStub)],
+  ]
+  for (const [from, to] of rewrites) {
+    if (pluginText.split(from).length - 1 !== 1) { console.error(`FATAL plugin import rewrite ${from} did not match exactly once`); process.exit(2) }
+    pluginText = pluginText.replace(from, to)
+  }
+  const PORTS = await import(coreDir('ports.js'))
+  const def = (await import(dataUrl(pluginText))).default
+
+  const portProblems = PORTS.validatePortList({ inputs: def.inputs, outputs: def.outputs, source: 'declared' })
+  check('the node\'s declared ports validate against the S2.1 vocabulary',
+    portProblems.length === 0 && def.inputs.length === 3 && def.outputs.length >= 2,
+    { problems: portProblems, inputs: def.inputs.length, outputs: def.outputs.length })
+
+  const flowRaster = new Float32Array(N * 3)
+  for (let i = 0; i < N; i++) { flowRaster[i * 3] = wRamp.dirX[i]; flowRaster[i * 3 + 2] = wRamp.dirZ[i] }
+  const guideText = `${GX0 * CELL},${ROW * CELL}\n${GX1 * CELL},${ROW * CELL}`
+  const featureGuide = [{ id: 'g1', points: [{ x: GX0 * CELL, z: ROW * CELL }, { x: GX1 * CELL, z: ROW * CELL }] }]
+
+  const runNode = (field, params, ins) => {
+    const before = Float32Array.from(field)
+    const out = def.eval(params, ins, null, null)
+    let changed = 0
+    for (let i = 0; i < N; i++) if (field[i] !== before[i]) changed++
+    touched.push({ label: `node:${params.branch}`, changed })
+    return out
+  }
+
+  const hRampNode = ramp()
+  const nodeOut = runNode(hRampNode, { branch: 'breach', guide: '' }, [hRampNode, flowRaster, featureGuide])
+  const nodeDelta = nodeOut.values.get('conditioningDelta')
+  const nodeRecords = nodeOut.values.get('conflicts')
+  // GUARDRAIL 1, at the node boundary: no height port declared, no height value returned.
+  const heightish = k => /height/i.test(String(k))
+  check('the water-family node declares no terrain-height output and returns none',
+    def.outputs.every(o => !heightish(o.id) && !heightish(o.semantic))
+    && ![...nodeOut.values.keys()].some(heightish),
+    { outputs: def.outputs.map(o => o.id), values: [...nodeOut.values.keys()] })
+
+  // The delta raster must actually carry the measured cut. An all-zero raster from a node that
+  // exited cleanly is the doctrine's "framebuffer read all zeros" — red, not green.
+  let stamped = 0, deepest = 0, deepestCell = -1
+  for (let i = 0; i < N; i++) {
+    if (nodeDelta[i] === 0) continue
+    stamped++
+    if (nodeDelta[i] < deepest) { deepest = nodeDelta[i]; deepestCell = i }
+  }
+  const crestCell = ROW * W + XC
+  // 12, derived: the 24 conflicted samples sit at half-cell spacing, so they pair up two to a
+  // column (round-half-up puts u=24.5 and u=25 both on column 25), covering columns 25..36.
+  check('the node stamps the measured deficit into its delta raster',
+    stamped === 12 && deepestCell === crestCell && deepest === -Math.fround(rmp.maxDeficit)
+    && deepest < 0 && nodeDelta[ROW * W + GX0] === 0,
+    { stamped, deepest, deepestCell, crestCell, coreMax: -Math.fround(rmp.maxDeficit), conflictSamples: rmp.conflictCount })
+
+  check('the node reports the same conflict the core module measured',
+    Array.isArray(nodeRecords) && nodeRecords.length === 1
+    && nodeRecords[0].maxDeficitM === rmp.maxDeficitM && nodeRecords[0].conflictCount === rmp.conflictCount
+    && nodeRecords[0].flowSupplied === true && nodeRecords[0].conflicts.length === rmp.conflicts.length,
+    nodeRecords && nodeRecords[0] && { maxDeficitM: nodeRecords[0].maxDeficitM, conflictCount: nodeRecords[0].conflictCount })
+  check('the node offers the branch the author selected, and says it does not write terrain',
+    nodeRecords[0].proposal && nodeRecords[0].proposal.mode === 'breach'
+    && nodeRecords[0].proposal.writesHeight === false && nodeRecords[0].proposal.undoable === true,
+    nodeRecords[0].proposal && { mode: nodeRecords[0].proposal.mode, writesHeight: nodeRecords[0].proposal.writesHeight })
+
+  // The text fallback has to reach the same guide as the feature set, or the gate is testing one
+  // input path and the app is using the other.
+  const hRampText = ramp()
+  const textOut = runNode(hRampText, { branch: 'hydrofix', guide: guideText }, [hRampText, flowRaster, null])
+  const textRecords = textOut.values.get('conflicts')
+  check('an authored text guide reaches the same measurement as a feature-set guide',
+    textRecords.length === 1 && textRecords[0].maxDeficitM === rmp.maxDeficitM
+    && textRecords[0].samples === rmp.count,
+    { maxDeficitM: textRecords[0].maxDeficitM, samples: textRecords[0].samples })
+  check('selecting the HydroFix branch labels it as the one that writes terrain',
+    textRecords[0].proposal.writesHeight === true && textRecords[0].proposal.nodeType === 'hydrofix',
+    { nodeType: textRecords[0].proposal.nodeType, writesHeight: textRecords[0].proposal.writesHeight })
+
+  // A guide that drains: empty delta raster, no offer. This is the negative control for the stamp
+  // assertion above — without it "all zeros" and "correct" are indistinguishable.
+  const hPlaneNode = plane()
+  const cleanOut = runNode(hPlaneNode, { branch: 'breach', guide: '' }, [hPlaneNode, null,
+    [{ id: 'clean', points: [{ x: GX0 * CELL, z: ROW * CELL }, { x: GX1 * CELL, z: ROW * CELL }] }]])
+  const cleanDelta = cleanOut.values.get('conditioningDelta')
+  const cleanRecords = cleanOut.values.get('conflicts')
+  let cleanNonZero = 0
+  for (let i = 0; i < N; i++) if (cleanDelta[i] !== 0) cleanNonZero++
+  check('a draining guide produces an empty delta raster and no offer',
+    cleanNonZero === 0 && cleanRecords[0].proposal === null && cleanRecords[0].conflictCount === 0
+    && cleanRecords[0].flowSupplied === false,
+    { cleanNonZero, proposal: cleanRecords[0].proposal, flowSupplied: cleanRecords[0].flowSupplied })
+
+  // ==============================================================================================
   // GUARDRAIL 1 — the surface handed in comes back untouched, on every fixture
   // ==============================================================================================
   const dirty = touched.filter(t => t.changed !== 0)
   check('no analysis wrote a single sample back into the routing surface',
-    touched.length >= 5 && dirty.length === 0,
+    touched.length >= 8 && dirty.length === 0,
     { calls: touched.length, dirty: dirty.map(d => `${d.label}:${d.changed}`) })
 
-  check('assertion inventory non-empty', assertions.length >= 27, assertions.length)
+  check('assertion inventory non-empty', assertions.length >= 38, assertions.length)
   report()
 
   function report() {

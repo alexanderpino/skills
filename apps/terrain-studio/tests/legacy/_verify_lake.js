@@ -134,6 +134,24 @@ function bowl(hex) {
   return h
 }
 
+/**
+ * The same bowl on the 0..1 `relativeHeight` scale the rest of the app works in.
+ *
+ * IT EXISTS BECAUSE OF A MEASUREMENT, not for variety. The routing fill tilts its flats by 2e-7 so a
+ * router can cross a lake instead of terminating on it. At the metre-scale fixture above, the Float32
+ * ulp at 60 m is 7.15e-6 — thirty-eight times LARGER than that tilt — so `60 + 2e-7` rounds straight
+ * back to 60 and the tilt is not merely small, it is not there. Every flatness assertion in this file
+ * passed with the routing fill substituted in, and the gate runner scored the mutation VACUOUS. At
+ * 0.6 the ulp is 7.15e-8 and the tilt is fully representable, so this is the scale on which "the lake
+ * surface came out of the ROUTING fill" is a visible defect at all.
+ */
+function bowlUnit() {
+  const h = bowl(false)
+  const out = new Float32Array(N)
+  for (let i = 0; i < N; i++) out[i] = h[i] / PLATEAU
+  return out
+}
+
 /** Two bowls with different spills, sharing a plateau. Separate water bodies with separate levels. */
 function twin() {
   const h = new Float32Array(N)
@@ -339,6 +357,39 @@ function plane() {
   check('shore distance matches the analytic circular shoreline within one lattice step',
     analyticDev <= CELL * Math.SQRT2, { maxDeviationM: +analyticDev.toFixed(3), boundM: +(CELL * Math.SQRT2).toFixed(3) })
 
+  // === the same bowl on the NORMALISED height scale ==============================================
+  // See bowlUnit(): this is the only scale in the suite on which the routing fill's 2e-7 flat tilt is
+  // representable in Float32 at all, so it is the only place a lake surface built from the routing
+  // fill can be caught. The quantum fact is asserted rather than left as a remark, because if it ever
+  // stopped holding the fixture would silently stop covering anything.
+  check('the routing flat tilt is below the Float32 quantum at metre scale but not at unit scale',
+    Math.fround(SPILL + 2e-7) === Math.fround(SPILL) && Math.fround(0.6 + 2e-7) !== Math.fround(0.6),
+    { ulpAt60: Math.fround(SPILL) * Math.pow(2, -23), ulpAt0p6: Math.fround(0.6) * Math.pow(2, -23), tilt: 2e-7 })
+
+  const unitSolid = bowlUnit()
+  const unitBefore = Float32Array.from(unitSolid)
+  const ur = M.lakes(unitSolid, W, H, { cellSizeM: CELL })
+  let unitChanged = 0
+  for (let i = 0; i < N; i++) if (unitSolid[i] !== unitBefore[i]) unitChanged++
+  check('the Lake node writes no height on the normalised fixture', unitChanged === 0, { unitChanged })
+  check('the normalised bowl produced one lake with wet cells',
+    ur.lakeCount === 1 && ur.wetCount > 100 && ur.basins.length === 1,
+    { lakeCount: ur.lakeCount, wetCount: ur.wetCount })
+  const unitLevel = ur.basins.length ? ur.basins[0].level : NaN
+  let unitNotFlat = 0, unitWet = 0, unitDryDepth = 0
+  for (let i = 0; i < N; i++) {
+    if (ur.lakeId[i] === 0) { unitWet++; if (ur.surface[i] !== unitLevel) unitNotFlat++ }
+    else if (ur.depth[i] !== 0) unitDryDepth++
+  }
+  check('the normalised lake surface is one Float32 value across the whole water body',
+    unitWet > 100 && unitNotFlat === 0, { unitWet, unitNotFlat, unitLevel })
+  check('the normalised lake has exactly zero depth outside the water body',
+    unitDryDepth === 0, { unitDryDepth })
+  check('the normalised lake level is bit-identical to its spill elevation',
+    ur.spills.length === 1 && unitLevel === ur.spills[0].elevation
+    && unitLevel === Math.fround(SPILL / PLATEAU),
+    { unitLevel, spill: ur.spills.length ? ur.spills[0].elevation : null, analytic: Math.fround(SPILL / PLATEAU) })
+
   // === the same bowl on a HEX lattice ============================================================
   // Odd hex rows sit half a column across. A separable distance transform that ignores that offset is
   // wrong by up to half a cell everywhere, which no sign or zero assertion can see.
@@ -496,7 +547,7 @@ function plane() {
       'each pending port declares the kind and unit the report specifies']) check(n, false, 'port block did not parse')
   }
 
-  check('assertion inventory non-empty', assertions.length >= 38, assertions.length)
+  check('assertion inventory non-empty', assertions.length >= 45, assertions.length)
   report()
 
   /** Max absolute difference between the module's |shoreDistance| and a brute-force nearest-source

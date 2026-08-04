@@ -108,7 +108,22 @@ export function expandPreset(controls = {}) {
       phases.push(rand() * Math.PI * 2)
       // Sea state moves energy from swell into chop without changing the authored maximum.
       const tilt = b === 0 ? (1 - 0.35 * seaState) : (1 + 0.5 * seaState * b)
-      amps.push(BAND_WEIGHT[b] * tilt * (0.75 + 0.5 * rand()))
+      // AMPLITUDE SCALES WITH WAVELENGTH, and leaving it out was a real defect with a very visible
+      // signature. Assigning amplitude per BAND alone, independent of the wavelength inside it, gave
+      // the chop band roughly a metre of amplitude at 1.6 m wavelength — a steepness of 2*pi*A/L
+      // near 4, which is a 77-degree wave face. Nothing in the ocean does that. Measured on the
+      // shipped preset the steepest term ran 4.2458, and the result on screen was a crumpled-foil
+      // surface the user described as bubble plastic.
+      //
+      // The steepness clamp did not catch it: it bounds the SUM of Q*k*A and responds by driving Q
+      // toward zero, which flattens the horizontal displacement while leaving the vertical amplitude
+      // — and therefore the NORMAL — exactly as steep as before. So the surface stopped folding and
+      // went on looking like foil.
+      //
+      // Real seas sit near a common limiting steepness across the whole spectrum: a 100 m swell is
+      // metres tall and a 1 m ripple is centimetres tall. Making amplitude proportional to
+      // wavelength gives every term a comparable A/L, which is what the physics actually says.
+      amps.push(BAND_WEIGHT[b] * tilt * (0.75 + 0.5 * rand()) * lam)
     }
   }
 
