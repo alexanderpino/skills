@@ -236,6 +236,40 @@ const TERMS = 12
     check('GLSL is byte-identical between calls', glsl2 === glsl)
   }
 
+  // --- BOTH PASSES, THE SAME SOURCE ---------------------------------------------------------------
+  // ADR-006's instrumentation requirement, and the reason it exists: if the forward colour pass and
+  // the deferred mask/depth pass displace by different functions, the mask and the shaded surface
+  // part company along every crest and the water grows a hairline of un-shaded pixels tracking each
+  // wave. Comparing the injected TEXT is the strongest available check short of reading back both
+  // buffers, and it is exact — two hand-maintained copies would pass a "looks similar" test and
+  // fail this one on the first edit to either.
+  //
+  // This runs in the browser because the sources are recorded when the programs are compiled.
+  if (!mutation) {
+    const { chromium } = require('playwright-core')
+    const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
+      ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+      : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
+    const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'))
+    let shared = null
+    try {
+      const b = await chromium.launch({ executablePath: EXE,
+        args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] })
+      const pg = await b.newPage({ viewport: { width: 900, height: 600 } })
+      await pg.goto(URL, { waitUntil: 'load' })
+      await pg.waitForTimeout(1800)
+      shared = await pg.evaluate(() => ({
+        mask: waterShaderSources.mask ? waterShaderSources.mask.length : 0,
+        forward: waterShaderSources.forward ? waterShaderSources.forward.length : 0,
+        identical: !!waterShaderSources.mask && waterShaderSources.mask === waterShaderSources.forward,
+        terms: (waterShaderSources.mask || '').split('float th=').length - 1,
+      }))
+      await b.close()
+    } catch (e) { shared = { error: String(e.message || e).slice(0, 120) } }
+    check('both water passes received the same displacement source',
+      !!shared && shared.identical === true && shared.terms === TERMS, shared)
+  }
+
   // Absence of evidence is a failure.
   check('assertion inventory non-empty', assertions.length >= 14, assertions.length)
 

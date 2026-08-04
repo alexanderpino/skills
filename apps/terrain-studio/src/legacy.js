@@ -5661,6 +5661,11 @@ let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;
 // re-author it — the node-responsibility audit found four copies of wind direction in the tree
 // and this is deliberately not a fifth.
 let _wavePreset=null,_wavePresetKey="";
+// WHAT EACH WATER PROGRAM ACTUALLY RECEIVED. ADR-006 requires the forward colour pass and the
+// deferred mask/depth pass to displace by the SAME function; recording the injected text makes
+// that checkable instead of a claim, which is the "shader instrumentation" the story asks for.
+export const waterShaderSources={mask:null,forward:null};
+export function waveGlsl(name){return glslGerstner(currentWaterPreset(),name||"gerstnerDisp");}
 export function currentWaterPreset(){
   const c={windDirectionDeg:terrainDef.windDirection==null?300:terrainDef.windDirection,
     windSpeedMps:terrainDef.windSpeed==null?10:terrainDef.windSpeed,
@@ -5764,15 +5769,27 @@ function initGL(){
       OUT=vec4(linearToSrgb(acesF(col*exp2(uExposure))),1.);}`;
   terrainProg=makeProg(tVs,tFs);
   // ---------- STAGE 2: translucent water ----------
+  // S4.7 — the forward pass displaces by the SAME generated source as the mask pass and carries the
+  // analytic wave normal. Injecting one text into both is the only way the mask and the shaded
+  // surface can agree along a crest; two hand-written copies drift on the first edit.
+  // The WebGL1 fallback below is deliberately left flat: it has no deferred pass to disagree with,
+  // and a second unshared implementation there is exactly what this change exists to avoid.
   const wVs=(g2?`#version 300 es
-    in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;in vec3 asnowN;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;out vec3 vSnowN;
-    uniform mat4 uMVP;uniform float uH;uniform float uScale;
-    void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`
+    in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;in vec3 asnowN;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;out vec3 vSnowN;out vec3 vWaveN;
+    uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;
+${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
+    void main(){
+      vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vXZ=axz;vWN=awn;vSnowN=asnowN;
+      vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, WN);
+      float wet=clamp(vDepth*40.0,0.0,1.0)*uWaveAmp;
+      vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
+      vW=vec3(axz.x+d.x*wet/uScale, aw*uH+ais/uScale+d.y*wet/uScale, axz.y+d.z*wet/uScale);
+      gl_Position=uMVP*vec4(vW,1.);}`
   :`attribute vec2 axz;attribute float ah;attribute float aw;attribute float ais;attribute float aice;attribute vec3 awn;attribute vec3 asnowN;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform mat4 uMVP;uniform float uH;uniform float uScale;
     void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
-    precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;out vec4 frag;
+    precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;out vec4 frag;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
@@ -5844,7 +5861,7 @@ function initGL(){
     const wmVs=`#version 300 es
       in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;
       uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;
-${glslGerstner(currentWaterPreset(), 'gerstnerDisp').split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
+${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       void main(){
         vDepth=(aw-ah)*uH;
         vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, N);
@@ -6990,6 +7007,7 @@ function renderGL(){
     if(scene.water&&!wire){
       gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
       setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uScale"),terrainDef.scale);gl.uniform1f(u(waterProg,"uTime"),uTime);
+      gl.uniform1f(u(waterProg,"uWaveAmp"),scene.water?(waterLook.strength==null?1:waterLook.strength):0);
       gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
@@ -7992,7 +8010,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 227 symbols (28 writable, 199 read-only).
+ * 225 symbols (28 writable, 197 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -8041,7 +8059,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 199 read-only. Getters hand out the LIVE value: 8 of
+  // 197 read-only. Getters hand out the LIVE value: 8 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("TYPES", () => TYPES, __ro("TYPES"))
@@ -8103,6 +8121,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("planView", () => planView, __ro("planView"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
   __def("transformField", () => transformField, __ro("transformField"))
+  __def("waterShaderSources", () => waterShaderSources, __ro("waterShaderSources"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
   __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
@@ -8131,7 +8150,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
   __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("syncWindReadout", () => syncWindReadout, __ro("syncWindReadout"))
-  __def("waterMaskProg", () => waterMaskProg, __ro("waterMaskProg"))
   __def("waterProg", () => waterProg, __ro("waterProg"))
   __def("bakeThumb", () => bakeThumb, __ro("bakeThumb"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
@@ -8169,6 +8187,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
   __def("USE_DEFERRED", () => USE_DEFERRED, __ro("USE_DEFERRED"))
+  __def("waterMaskProg", () => waterMaskProg, __ro("waterMaskProg"))
   __def("blendFields", () => blendFields, __ro("blendFields"))
   __def("blurField", () => blurField, __ro("blurField"))
   __def("buildField", () => buildField, __ro("buildField"))
@@ -8212,11 +8231,9 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("cameraNear", () => cameraNear, __ro("cameraNear"))
   __def("CANYON_STYLE_ID", () => CANYON_STYLE_ID, __ro("CANYON_STYLE_ID"))
   __def("canyonField", () => canyonField, __ro("canyonField"))
-  __def("currentWaterPreset", () => currentWaterPreset, __ro("currentWaterPreset"))
   __def("curveAt", () => curveAt, __ro("curveAt"))
   __def("FEASIBILITY_API", () => FEASIBILITY_API, __ro("FEASIBILITY_API"))
   __def("gbuf", () => gbuf, __ro("gbuf"))
-  __def("glslGerstner", () => glslGerstner, __ro("glslGerstner"))
   __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
   __def("gpuWarp", () => gpuWarp, __ro("gpuWarp"))
   __def("graphIdsFrom", () => graphIdsFrom, __ro("graphIdsFrom"))
@@ -8229,7 +8246,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("openDrawEditor", () => openDrawEditor, __ro("openDrawEditor"))
   __def("openNewTerrainDialog", () => openNewTerrainDialog, __ro("openNewTerrainDialog"))
   __def("parseLayout", () => parseLayout, __ro("parseLayout"))
-  __def("presetBounds", () => presetBounds, __ro("presetBounds"))
   __def("REAL_DEM_SAMPLE", () => REAL_DEM_SAMPLE, __ro("REAL_DEM_SAMPLE"))
   __def("resampleTo", () => resampleTo, __ro("resampleTo"))
   __def("SEED_MAX", () => SEED_MAX, __ro("SEED_MAX"))
