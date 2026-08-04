@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 87,
+  "nodeCount": 88,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -8,6 +8,7 @@
     "blend": "c48e1431:49293fa1",
     "blur": "261a0003:67ed747f",
     "canyon": "67e762f5:71c2a5e5",
+    "chokepoint": "263bdef7:bcf4a390",
     "clampn": "263bdef7:bcf4a390|ex=2820b6be:250f1044",
     "colorerosion": "263bdef7:bcf4a390|color=7a8219fe:78c773e8",
     "colormixer": "263bdef7:bcf4a390|color=2698d433:e935593e",

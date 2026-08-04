@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 87;   // 86 + `subgraph`, the S8.5 definition instance
+const REQUIRED_NODE_COUNT = 88;   // 87 + `chokepoint`, Route's S8.1 sibling identity node
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -270,7 +270,7 @@ function installHarness(cfg) {
     // --- data maps ---
     d_slope: ['A'], d_height: ['A'], d_sunshadow: ['A'],
     normals: ['A'],
-    route: ['A'], edge: ['M'],
+    route: ['A'], chokepoint: ['A'], edge: ['M'],
     switch: ['A','B','C'], gate: ['A'],
     mathnode: ['A','B','C'],
     variable: [],

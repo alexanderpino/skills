@@ -21,14 +21,20 @@ export default definePlugin({
   params: [],
   // Declared ports: this is a new plugin and may not use the legacy adapter.
   inputs: [
+    // `kindFrom` says this port adapts to whatever arrives. Without it a Route declaring
+    // scalarRaster refused the registry's only vectorRaster the moment connection-time checking
+    // arrived — and S8.1 requires identity "for scalar and vector fixtures". The nominal
+    // kind/storage pair still has to be self-consistent for validatePort.
     { id: 'in', name: 'In', kind: 'scalarRaster', storage: 'R32F', components: 1,
-      semantic: 'anyScalarRaster', unit: 'none', role: 'data', required: true },
+      semantic: 'anyScalarRaster', unit: 'none', role: 'data', required: true,
+      kindFrom: { mode: 'inherit' } },
   ],
   outputs: [
     // No `semantic` or `unit` of its own — they are inherited from the input at evaluation time.
     // validatePortList rejects a port that declares both, which is what keeps this honest.
     { id: 'out', name: 'Out', kind: 'scalarRaster', storage: 'R32F', components: 1,
-      primary: true, lens: 'derived', semanticFrom: { mode: 'inherit', port: 'in' } },
+      primary: true, lens: 'derived',
+      semanticFrom: { mode: 'inherit', port: 'in' }, kindFrom: { mode: 'inherit', port: 'in' } },
   ],
   // Returns the SAME array object, not a copy: identity means identity, and copying would make a
   // Route cost a full field allocation per evaluation for no reason.

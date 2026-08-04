@@ -18,6 +18,7 @@ const mutation = (process.argv.find(v => v.startsWith('--mutate=')) || '').slice
 const MUTATIONS = [
   'route-drops-type',     // the story's named failure: Route loses source type/unit
   'route-copies-values',  // Route perturbs bytes instead of being identity
+  'identity-refuses-vectors', // the identity ports stop adapting and refuse the vector fixture
   'edge-eight-neighbour', // square Edge uses 8-neighbourhood -> ring thickness is anisotropic
   'edge-fills-interior',  // Edge returns the whole mask instead of its boundary
 ]
@@ -37,24 +38,66 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     const out = { mutation: mutation || null, lattices: {} }
     const w = () => RES, h = () => (terrainDef.lattice === 'hex' ? Math.round(RES * 2 / Math.sqrt(3)) : RES)
 
-    // --- Route: identity, exactly ------------------------------------------------------------
+    // --- Route and Chokepoint: identity, exactly, for BOTH kinds -------------------------------
+    // Both controls here used to assign the answer in this file — `routed = Float32Array.from(src)`
+    // and `inheritsSemantic = mutation === 'route-drops-type' ? false : ...`. That proved the test
+    // could edit a local and nothing whatever about the node. They now replace entries in the LIVE
+    // registry, so everything measured below comes out of production's descriptors and eval.
+    if (mutation === 'route-drops-type') {
+      for (const t of ['route', 'chokepoint']) {
+        TYPES[t].outputs = (TYPES[t].outputs || []).map(p => p.semanticFrom
+          ? { ...p, semanticFrom: undefined, kindFrom: undefined, semantic: 'relativeHeight', unit: 'none' } : p)
+      }
+    }
+    if (mutation === 'route-copies-values') {
+      for (const t of ['route', 'chokepoint']) {
+        const real = TYPES[t].eval
+        TYPES[t].eval = (p, ins, n, c) => { const copy = Float32Array.from(real(p, ins, n, c)); copy[7] += 1e-6; return copy }
+      }
+    }
+    if (mutation === 'identity-refuses-vectors') {
+      for (const t of ['route', 'chokepoint']) {
+        TYPES[t].inputs = (TYPES[t].inputs || []).map(p => ({ ...p, kindFrom: undefined }))
+      }
+    }
+
     const src = new Float32Array(w() * h())
     for (let i = 0; i < src.length; i++) src[i] = Math.sin(i * 0.017) * 0.5 + 0.5
-    let routed = TYPES.route.eval({}, [src], {})
-    if (mutation === 'route-copies-values') { routed = Float32Array.from(src); routed[7] += 1e-6 }
-    out.route = {
-      sameLength: routed.length === src.length,
-      // Identity means the SAME object, not an equal copy — a copy would cost a field allocation
-      // per evaluation for no reason.
-      sameObject: routed === src,
-      byteIdentical: (() => { for (let i = 0; i < src.length; i++) if (routed[i] !== src[i]) return false; return true })(),
-      nullInputSafe: TYPES.route.eval({}, [null], {}).length === src.length,
+    // S8.1 names "scalar and vector fixtures", so the vector case is measured, not assumed. Three
+    // components per cell is what the registry's one vectorRaster (normals.normal) actually emits.
+    const vec = new Float32Array(w() * h() * 3)
+    for (let i = 0; i < vec.length; i++) vec[i] = Math.cos(i * 0.011)
+
+    out.identity = {}
+    for (const t of ['route', 'chokepoint']) {
+      const scalarOut = TYPES[t].eval({}, [src], {})
+      const vectorOut = TYPES[t].eval({}, [vec], {})
+      const p = (TYPES[t].outputs || [])[0] || {}
+      out.identity[t] = {
+        sameLength: scalarOut.length === src.length,
+        // Identity means the SAME object, not an equal copy — a copy would cost a field allocation
+        // per evaluation for no reason.
+        sameObject: scalarOut === src,
+        byteIdentical: (() => { for (let i = 0; i < src.length; i++) if (scalarOut[i] !== src[i]) return false; return true })(),
+        vectorSameObject: vectorOut === vec,
+        vectorByteIdentical: (() => { for (let i = 0; i < vec.length; i++) if (vectorOut[i] !== vec[i]) return false; return true })(),
+        nullInputSafe: TYPES[t].eval({}, [null], {}).length === src.length,
+        // The typed identity: the output must INHERIT semantic and kind, never declare its own.
+        inheritsSemantic: !!(p.semanticFrom && p.semanticFrom.mode === 'inherit') && p.semantic === undefined && p.unit === undefined,
+        inheritsKind: !!(p.kindFrom && p.kindFrom.mode === 'inherit'),
+      }
     }
-    // The typed identity: Route's output must INHERIT its semantic, not declare one.
-    const rOut = (TYPES.route.outputs || [])[0] || {}
-    out.route.inheritsSemantic = mutation === 'route-drops-type'
-      ? false
-      : !!(rOut.semanticFrom && rOut.semanticFrom.mode === 'inherit') && rOut.semantic === undefined && rOut.unit === undefined
+    // Connection time, through production's canConnect: an identity node must ACCEPT the registry's
+    // vectorRaster while an ordinary scalar input still refuses it. Without both halves this reads
+    // as green under a build that simply stopped checking kinds.
+    const vecPort = (TYPES.normals.outputs || []).find(p => p.kind === 'vectorRaster')
+    out.wire = {
+      vectorPortFound: !!vecPort,
+      intoRoute: !!PORTS.canConnect(vecPort, (TYPES.route.inputs || [])[0]).ok,
+      intoChokepoint: !!PORTS.canConnect(vecPort, (TYPES.chokepoint.inputs || [])[0]).ok,
+      intoBlend: !!PORTS.canConnect(vecPort, (TYPES.blend.inputs || [])[0]).ok,
+      blendCode: PORTS.canConnect(vecPort, (TYPES.blend.inputs || [])[0]).code || null,
+    }
 
     // --- Edge: the analytic disc, on both lattices ---------------------------------------------
     for (const lattice of ['square', 'hex']) {
@@ -140,9 +183,16 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
 
   const sq = report.lattices.square, hx = report.lattices.hex
   const gates = {
-    routeIsIdentity: report.route.sameObject === true && report.route.byteIdentical === true
-      && report.route.sameLength === true && report.route.nullInputSafe === true,
-    routeInheritsTypeAndUnit: report.route.inheritsSemantic === true,
+    identityPreservesScalarBytes: ['route', 'chokepoint'].every(t => report.identity[t].sameObject === true
+      && report.identity[t].byteIdentical === true && report.identity[t].sameLength === true
+      && report.identity[t].nullInputSafe === true),
+    identityPreservesVectorBytes: ['route', 'chokepoint'].every(t => report.identity[t].vectorSameObject === true
+      && report.identity[t].vectorByteIdentical === true),
+    identityInheritsTypeAndUnit: ['route', 'chokepoint'].every(t => report.identity[t].inheritsSemantic === true
+      && report.identity[t].inheritsKind === true),
+    identityPortsAdmitVectorsAndOrdinaryPortsDoNot: report.wire.vectorPortFound === true
+      && report.wire.intoRoute === true && report.wire.intoChokepoint === true
+      && report.wire.intoBlend === false && report.wire.blendCode === 'KIND_MISMATCH',
     edgeRingOnDiscSquare: sq.ringCount > 0 && sq.outsideDisc === 0 && sq.interiorHits === 0
       && sq.withinOneCell === true && sq.perimeterPlausible === true,
     edgeRingOnDiscHex: hx.ringCount > 0 && hx.outsideDisc === 0 && hx.interiorHits === 0
@@ -158,7 +208,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     ok = false
   }
   const failed = Object.entries(gates).filter(([, v]) => !v).map(([k]) => k)
-  console.log(`${ok ? 'PASS' : 'FAIL'}  flow control route=${report.route.sameObject} `
+  console.log(`${ok ? 'PASS' : 'FAIL'}  flow control route=${report.identity.route.sameObject} choke=${report.identity.chokepoint.sameObject} vec=${report.wire.intoRoute}/${report.wire.intoBlend} `
     + `ringSq=${sq.ringCount} ringHex=${hx.ringCount} constSq=${sq.constInteriorCount} illegalSq=${sq.illegalRingCells} `
     + `failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
   console.log(JSON.stringify({ ...report, gates, errors, ok }, null, 2))

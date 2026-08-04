@@ -217,11 +217,25 @@ export function validatePortList({ inputs = [], outputs = [], source = 'declared
 export function canConnect(sourcePort, destPort) {
   if (!sourcePort || !destPort) return { ok: false, code: 'PORT_ID_INVALID', reason: 'missing port descriptor' }
 
-  if (sourcePort.kind !== destPort.kind) {
-    return { ok: false, code: 'KIND_MISMATCH', reason: `${sourcePort.name || sourcePort.id} carries ${sourcePort.kind}, ${destPort.name || destPort.id} expects ${destPort.kind}` }
-  }
-  if ((sourcePort.components ?? 1) !== (destPort.components ?? 1)) {
-    return { ok: false, code: 'COMPONENTS_MISMATCH', reason: `${sourcePort.components ?? 1}-component source into a ${destPort.components ?? 1}-component input` }
+  // KIND ADAPTS ONLY WHERE A PORT SAYS IT DOES. `kindFrom` marks a port that carries whatever
+  // arrives rather than one fixed kind — the typed identity nodes of S8.1, whose whole contract is
+  // that output kind, semantic and unit equal the input's. Its story requires "scalar AND vector
+  // fixtures", and without this a Route declaring scalarRaster would refuse the only vectorRaster
+  // in the registry the moment connection-time checking arrived, which is exactly what happened.
+  //
+  // This is NOT a wildcard for ordinary nodes: a port must opt in, an input's `kindFrom` says "I
+  // adapt", and an output's says "my kind is not knowable until evaluation" — the same deferral
+  // `semanticFrom` already uses, applied to the kind axis. Both sides skip the components check
+  // with it, because a 3-component vector through a nominally 1-component identity is the case.
+  const destAdaptsKind = destPort.kindFrom != null
+  const srcDefersKind = sourcePort.kindFrom != null
+  if (!destAdaptsKind && !srcDefersKind) {
+    if (sourcePort.kind !== destPort.kind) {
+      return { ok: false, code: 'KIND_MISMATCH', reason: `${sourcePort.name || sourcePort.id} carries ${sourcePort.kind}, ${destPort.name || destPort.id} expects ${destPort.kind}` }
+    }
+    if ((sourcePort.components ?? 1) !== (destPort.components ?? 1)) {
+      return { ok: false, code: 'COMPONENTS_MISMATCH', reason: `${sourcePort.components ?? 1}-component source into a ${destPort.components ?? 1}-component input` }
+    }
   }
 
   const generic = GENERICS[destPort.semantic]
