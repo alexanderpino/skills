@@ -419,3 +419,45 @@ export function glslWaterDetail(preset, fnName = 'waterDetail') {
     `}`,
   ].join('\n')
 }
+
+/** Deep-water reference: below this depth a wave starts to feel the bottom. */
+export const SHOAL_BREAK_RATIO = 0.78   // McCowan: a wave breaks near 0.78 x the local depth
+export const SHOAL_MAX_GAIN = 2.6       // cap, so a numerically tiny depth cannot make an infinite wave
+
+/**
+ * Wave amplitude in water of a given depth.
+ *
+ * The shoreline used to be handled by fading amplitude to ZERO as depth fell, which is backwards:
+ * it made the sea glassiest exactly where real water is roughest. Waves entering shallow water slow
+ * down, shorten and GROW — Green's law puts the amplitude at depth^(-1/4) — and they keep growing
+ * until the crest outruns the wave and it breaks, at roughly 0.78 of the local depth.
+ *
+ * Three regimes, and the gate checks all three:
+ *   deep      (depth >= ref)  amplitude is what the author asked for; the bottom is not felt
+ *   shoaling  (falling depth) amplitude rises as (ref/depth)^(1/4), capped
+ *   breaking  (very shallow)  amplitude is clamped to 0.78*depth and therefore FALLS to zero at
+ *                             the waterline, which is what makes surf rear up and then collapse
+ *
+ * All lengths in metres. This is the double-precision definition; `glslShoal` emits the same law.
+ */
+export function shoalAmplitude(ampM, depthM, refM) {
+  const d = Math.max(depthM, 0)
+  if (d <= 0) return 0
+  const ref = Math.max(refM, 1e-6)
+  const gain = Math.min(Math.pow(Math.max(ref / d, 1), 0.25), SHOAL_MAX_GAIN)
+  const dry = Math.min(d * 2, 1)          // the last half-metre, so no wave stands on dry land
+  return Math.min(ampM * gain, SHOAL_BREAK_RATIO * d) * dry
+}
+
+/** The same law as GLSL, so the shaders and the oracle cannot drift apart. */
+export function glslShoal(fnName = 'shoalAmp') {
+  return [
+    `float ${fnName}(float ampM, float depthM, float refM){`,
+    `  float d=max(depthM,0.0);`,
+    `  if(d<=0.0) return 0.0;`,
+    `  float gain=min(pow(max(max(refM,1e-6)/d,1.0),0.25),${SHOAL_MAX_GAIN.toFixed(4)});`,
+    `  float dry=min(d*2.0,1.0);`,
+    `  return min(ampM*gain,${SHOAL_BREAK_RATIO.toFixed(4)}*d)*dry;`,
+    `}`,
+  ].join('\n')
+}

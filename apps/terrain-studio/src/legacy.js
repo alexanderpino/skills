@@ -20,7 +20,7 @@ import { AUX_MAPS, AUX_LENSES, SIDE_CHANNEL_LEDGER, semanticDebt, debtByOwner, v
 import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, HEIGHT_WRITERS } from './core/doctrine.js';
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
-import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, presetBounds } from './core/water-waves.js';
+import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, glslShoal, presetBounds } from './core/water-waves.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
@@ -5668,12 +5668,13 @@ let _wavePreset=null,_wavePresetKey="";
 // WHAT EACH WATER PROGRAM ACTUALLY RECEIVED. ADR-006 requires the forward colour pass and the
 // deferred mask/depth pass to displace by the SAME function; recording the injected text makes
 // that checkable instead of a claim, which is the "shader instrumentation" the story asks for.
-export const waterShaderSources={mask:null,forward:null,forwardDetail:null,deferredDetail:null};
+export const waterShaderSources={mask:null,forward:null,forwardDetail:null,deferredDetail:null,forwardShoal:null,maskShoal:null};
 export function waveGlsl(name){return glslGerstner(currentWaterPreset(),name||"gerstnerDisp");}
 // The detail layer is generated and recorded exactly like the geometry, and for the same reason:
 // it was the one piece of water GLSL still hand-copied into two passes, and it is the piece that
 // rotted into two plane sinusoids no artist could author or steer.
 export function detailGlsl(name){return glslWaterDetail(currentWaterPreset(),name||"waterDetail");}
+export function shoalGlsl(name){return glslShoal(name||"shoalAmp");}
 export function currentWaterPreset(){
   const c={windDirectionDeg:terrainDef.windDirection==null?300:terrainDef.windDirection,
     windSpeedMps:terrainDef.windSpeed==null?10:terrainDef.windSpeed,
@@ -5789,6 +5790,7 @@ function initGL(){
   const wVs=(g2?`#version 300 es
     in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;in vec3 asnowN;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;out vec3 vSnowN;out vec3 vWaveN;
     uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;
+${(waterShaderSources.forwardShoal=shoalGlsl()).split(/\r?\n/).map(l => '' + l).join(String.fromCharCode(10))}
 ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
     void main(){
       vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vXZ=axz;vWN=awn;vSnowN=asnowN;
@@ -5809,11 +5811,9 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       //   surf   - the breaking limit: a wave can never be taller than 0.78 x the water under it,
       //            which is what makes the swell rear up and then collapse as it reaches the beach
       //   dry    - a hard cutoff over the last centimetres so no wave stands on dry land
-      float depthM=max((aw-ah)*uTerrainHeight,0.001);
-      float shoal=clamp(pow(max(uShoalRefM/depthM,1.0),0.25),1.0,2.6);
-      float dry=clamp(depthM*2.0,0.0,1.0);
-      float amp=min(uWaveAmp*shoal,0.78*depthM)*dry;
-      float wet=dry;
+      float depthM=max((aw-ah)*uTerrainHeight,0.0);
+      float amp=shoalAmp(uWaveAmp,depthM,uShoalRefM);
+      float wet=min(depthM*2.0,1.0);
       vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
       vW=vec3(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale);
       gl_Position=uMVP*vec4(vW,1.);}`
@@ -5894,6 +5894,7 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     const wmVs=`#version 300 es
       in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;
       uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
+${(waterShaderSources.maskShoal=shoalGlsl()).split(/\r?\n/).map(l => '' + l).join(String.fromCharCode(10))}
 ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       void main(){
         vDepth=(aw-ah)*uH;
@@ -5915,11 +5916,9 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
           //   surf   - the breaking limit: a wave can never be taller than 0.78 x the water under it,
           //            which is what makes the swell rear up and then collapse as it reaches the beach
           //   dry    - a hard cutoff over the last centimetres so no wave stands on dry land
-        float depthM=max((aw-ah)*uTerrainHeight,0.001);
-        float shoal=clamp(pow(max(uShoalRefM/depthM,1.0),0.25),1.0,2.6);
-        float dry=clamp(depthM*2.0,0.0,1.0);
-        float amp=min(uWaveAmp*shoal,0.78*depthM)*dry;
-        float wet=dry;
+        float depthM=max((aw-ah)*uTerrainHeight,0.0);
+        float amp=shoalAmp(uWaveAmp,depthM,uShoalRefM);
+        float wet=min(depthM*2.0,1.0);
         vWaveN=normalize(mix(vec3(0.,1.,0.),N,wet));
         gl_Position=uMVP*vec4(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale, 1.);
       }`;
@@ -6977,12 +6976,15 @@ function drawWaterDepth(MVP,ex,ey,ez){
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
 }
 function shoalReferenceM(){
-  // The depth at which shoaling starts to matter. Physically that is roughly half the wavelength,
-  // but tying it to the authored wave height keeps one control: a 12 m swell starts rearing up in
-  // about 24 m of water, which is where a real one does. Floored so a flat-calm sea still has a
-  // sane reference rather than dividing by nothing.
-  const a=(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM);
-  return Math.max(4, a*2);
+  // The depth at which a wave starts to feel the bottom is HALF ITS WAVELENGTH, not some multiple
+  // of its height. Referencing it to amplitude was wrong and the curve showed it: with ref = 2*A the
+  // breaking limit bound before the Green's-law gain could raise anything, so the wave never grew --
+  // it only ever got clipped. Taking half the longest wavelength in the preset gives ~95 m for ocean
+  // swell, and the swell then rears up through tens of metres of water the way it should.
+  const p=currentWaterPreset();
+  let longest=0;
+  for(const t of (p&&p.terms)||[]) if(t.lambda>longest) longest=t.lambda;
+  return Math.max(4, longest*0.5);
 }
 function mppPerUnitDistance(){
   // The fade needs metres per pixel, and only the JS side knows the projection. Deriving it
