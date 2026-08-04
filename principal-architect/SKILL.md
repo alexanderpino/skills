@@ -212,7 +212,10 @@ slice you touched.
 Use the templates in `assets/templates/`. Fill them; don't paste them empty.
 Naming, IDs, and front-matter conventions that keep everything greppable are in
 `references/conventions.md` — **follow them exactly**, because the searchability
-the user wants depends on consistent IDs and front-matter, not prose.
+the user wants depends on consistent IDs and front-matter, not prose. The prose
+itself must read like a senior architect wrote it, not a generator — plain,
+specific, committed; neutral context, decided decisions; no sentence that would
+be true of any system. Voice rules and the tells to avoid: `references/writing-style.md`.
 
 ### Enterprise & solution documents (when at those altitudes)
 - **`enterprise-architecture.md`** *(enterprise)* — TOGAF-structured Architecture
@@ -421,6 +424,10 @@ manifest in the index README). Condensed:
 - `references/significance.md` — is this change architecturally significant / ADR-worthy?
 - `references/conventions.md` — IDs, the machine-readable front-matter schema, naming,
   status lifecycle, the `ARCH-REF:` marker, grep patterns. Read before editing any doc.
+- `references/writing-style.md` — **prose, tone & voice**: the SEI seven rules,
+  value-neutral context vs committed decisions (Nygård), altitude of language
+  (Hohpe's elevator), precision habits (Brown/Fowler), and the tells of generated
+  text with the any-system test that kills them. Read before writing any substantial prose.
 - `references/standards.md` — the full standards mapping and ISO required-content lists
   (42010:2022, 25010:2023, 29148, TOGAF/ArchiMate, C4, STRIDE/OWASP, FinOps, SAR).
 - `references/mermaid-guide.md` — C4 L1–L4 copy-paste snippets, the mandate table,
