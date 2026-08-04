@@ -7,8 +7,9 @@ description: >-
   smooth voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
   raymarching (Voxel Space lineage), tiled streaming, splatmaps and virtual texturing,
   GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
-  rivers, fullscreen-triangle pass), snow and weather state, auxiliary maps, vegetation and
-  scatter, roads/decals/deformation, physics handoff, tool viewports, and the artifact
+  shoal/shore-aware waves and breakers, rivers, fullscreen-triangle pass), snow and weather
+  state, auxiliary maps, vegetation and scatter, roads/decals/deformation, physics handoff,
+  tool viewports, and the artifact
   catalogue. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at scale, or
   streaming large worlds - even if 'terrain' is never said (heightmap renderer, Minecraft clone,
   planet renderer). Not for terrain generation (terrain-architect) or BRDF math
@@ -471,7 +472,7 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/09-planetary-precision.md` | Precision doctrine (camera-relative, rebasing, per-patch frames); reversed-Z/log depth; cube-sphere quadtrees; orbit-to-ground LOD; horizon culling; ECEF/ENU frames; procedural-on-demand planets |
 | `references/10-lighting-shadows.md` | CSM at km scale (splits, snapping, caster culling); heightfield ray-marched and horizon-map shadows; virtual shadow maps; terrain AO/GI; normal pipeline across LOD; aerial perspective, the fullscreen-triangle skybox seam, volumetric-fog boundary, god rays (post-process vs volumetric), volumetric-cloud seams, cloud shadows; time-of-day invalidation |
 | `references/11-verification-failures.md` | **The review chapter.** Failure catalogue (symptom → mechanism → fix → route); metrics and budget assertions; test controls (flat plane, analytic terrain, teleport, flythrough); mandatory debug views; profiling method; regression strategy |
-| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, flow-mapped rivers, interactive GPU sim patches, optics (reflection/refraction/absorption, foam, underwater), shoreline integration, pass ordering |
+| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, shoal/shore-aware shallow-water waves (dispersion, shoaling, refraction, breakers, run-up, wave–current interaction; the shore-wave band; wave particles/packets), flow-mapped rivers, interactive GPU sim patches, optics (reflection/refraction/absorption, foam, underwater), shoreline integration, pass ordering |
 | `references/13-snow-weather-surface-state.md` | Seasons/snow evolution; camera-following state targets; deformable snow/mud/sand (deferred deformation); physical transient depth/compaction/melt lifecycle within the generator's envelope; post-RVT overlay doctrine; wetness/puddles/drying; VFX reaction boundary; persistence |
 | `references/14-auxiliary-maps-runtime.md` | **The aux-map consumer's manual.** Registry table (map → consumers → format → lifecycle); packing/residency/mip rules; derived-vs-shipped; cross-system fan-out and terrain/VFX/PostFX ownership; single-source-of-truth; dynamic writeback discipline |
 | `references/15-vegetation-scatter.md` | Vegetation & scatter evolution: CPU placement → GPU procedural instancing/culling; grass and wind; tree LOD/impostors/HLOD; alpha/overdraw doctrine; mandatory seating on the rendered morphed/displaced surface; weather/atmosphere consistency; budgets |

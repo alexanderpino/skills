@@ -4,7 +4,8 @@ Water on terrain — oceans, rivers, lakes — arrives from the generation side 
 surface datums, a depth field, a flow field. Everything that moves is made here. This chapter owns
 the engine side of that handoff: water surface geometry and its LOD (meshed or the meshless
 screen-space pass), ambient wave synthesis
-(Gerstner and FFT), flow-driven river surfaces, local interactive simulation, water shading
+(Gerstner and FFT), shoal- and shore-aware shallow-water waves (shoaling, refraction, breakers,
+run-up), flow-driven river surfaces, local interactive simulation, water shading
 composition, shoreline integration, and the transparency/pass-ordering discipline water forces on
 the frame. Deep BRDF/scattering math routes to the physically-based-rendering skill; generation of
 water bodies, routing, and flow fields routes to terrain-architect (its `03`/`04` hydrology and the
@@ -14,6 +15,7 @@ Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-re
 [Surface geometry & LOD](#surface-geometry--lod) ·
 [Screen-space water: the fullscreen-triangle pass](#screen-space-water-the-fullscreen-triangle-pass) ·
 [Ambient waves: Gerstner and FFT](#ambient-waves-gerstner-and-fft) ·
+[Shallow water: shoaling, refraction, and breakers](#shallow-water-shoaling-refraction-and-breakers) ·
 [Rivers: flow-driven surfaces](#rivers-flow-driven-surfaces) ·
 [Interactive simulation patches](#interactive-simulation-patches) ·
 [Shading and optics](#shading-and-optics) · [Shoreline integration](#shoreline-integration) ·
@@ -29,7 +31,7 @@ inputs, and the doctrine is that they are *sufficient*:
 |---|---|---|
 | `waterSurface` | Flat elevation per body (sea level for oceans, spill level per lake, a downstream-monotone profile per river) | The datum every wave displaces from; the gameplay swim/buoyancy surface |
 | Water depth | Scalar field: `waterSurface - solidTop`, 0 on dry land | Absorption ramp, shoaling, shoreline fade, sim boundary |
-| Flow / velocity | 2D vector field (m/s), from routing + discharge | Flow-map advection, foam alignment, particle steering, sim boundary inflow |
+| Flow / velocity | 2D vector field (m/s), from routing + discharge, plus the nearshore surface circulation — longshore current, rip jets, inlet/river-mouth jets (terrain-architect `12`) | Flow-map advection, foam alignment, particle steering, sim boundary inflow, wave–current interaction |
 | Shore distance | Signed/unsigned distance to the waterline | Shoreline foam bands, wet-sand band (`13`/`14`), LOD bias near the line |
 
 The solid terrain below the water is real terrain — bathymetry generated to dry-land standards —
@@ -234,16 +236,199 @@ displacement. **Choppiness** (the horizontal displacement scale) sharpens crests
 — and past ~1.0 it drives `J` negative over large areas, which reads as geometry
 self-intersection shimmer. Clamp choppiness so folding stays rare-and-foamed, not constant.
 
-**Shallow water is a modification, not a simulation.** Near shore, deep-water synthesis is
-wrong: real waves shorten, slow, steepen, and refract toward the shoreline as depth drops. The
-production treatment reads the depth field and applies approximations — depth-attenuated
-amplitude (fade displacement to ~0 as depth → 0, or waves poke through the beach),
-depth-shortened wavelength (dispersion: celerity ~ `sqrt(g·depth)` when shallow), and a
-shoaling-style amplitude bump just before the fade. Be honest in review: these are *plausibility
-approximations* driven by the exported depth field, not shallow-water simulation — they will not
-produce true refraction patterns or breaking dynamics, and claiming otherwise misroutes bug
-reports. Breaking-wave hero moments are authored (flipbooks, meshes, particles), keyed off depth
-and shore distance.
+Ambient synthesis as described above is a *deep-water* model: it assumes the bottom is
+infinitely far away. The moment the exported depth field says otherwise, the next section owns
+the waves.
+
+## Shallow water: shoaling, refraction, and breakers
+
+Deep-water synthesis is wrong wherever the bottom matters, and the surf zone is exactly where
+players judge water hardest — everyone has stood on a beach; almost no one has floated
+mid-ocean. Real waves entering shallow water shorten, slow, steepen, bend until their crests
+parallel the depth contours, grow just before they break, break where height outruns depth, and
+run up the beach as foam. Every one of those cues is drivable from the exported depth field, and
+a sea that ignores them — wind-aligned swell marching diagonally through knee-deep water onto
+the sand — is the single most common realism failure in shipped water. Doctrine unchanged from
+the ambient section: everything here is a *plausibility approximation driven by data*, not a
+fluid simulation, and reviews should name the tier honestly so bug reports route correctly.
+
+### The physics worth stealing
+
+Linear (Airy) wave theory is coastal-engineering canon, cheap enough to evaluate per vertex,
+and supplies the entire cue list:
+
+- **Dispersion**: `ω² = g·k·tanh(k·h)` relates frequency ω, wavenumber `k = 2π/L`, and local
+  depth `h`. Deep limit (`h > L/2`): `c ≈ sqrt(g/k)` — long waves travel faster. Shallow limit
+  (`h < L/20`): `c ≈ sqrt(g·h)` — celerity depends on depth alone.
+- **Period is conserved; wavelength is not.** A wave train keeps its ω as it crosses depth
+  changes, so as `h` drops, `k` must rise: wavelengths compress and crests bunch toward shore.
+  Solve `k(ω, h)` (a few Newton iterations) offline into a small 2D LUT — never per frame.
+- **Shoaling**: energy-flux conservation through the slowdown pumps amplitude up; the shallow
+  asymptote is Green's law, `a ∝ h^(-1/4)`. The visual: waves visibly *grow* just before
+  breaking, then die. Amplitude ramps monotonically *up* then cuts — never a plain fade.
+- **Refraction**: the end of a crest sitting in deeper water outruns the end in shallower
+  water, so crests rotate toward alignment with depth contours — surf arrives near
+  shore-parallel regardless of wind direction, wraps around headlands, and focuses on points.
+  This is the strongest single cue in the list.
+- **Breaking**: a wave breaks when its height reaches roughly the local depth —
+  `H ≈ 0.78·h` (the McCowan-type criterion). *How* it breaks is classified by the
+  surf-similarity (Iribarren) number `ξ = tanβ / sqrt(H/L₀)` (β = beach slope, L₀ = deep-water
+  wavelength): low ξ → **spilling** (foam crumbling down the face — flat sandy beaches), mid ξ
+  → **plunging** (the curling tube — steeper beaches, reef edges), high ξ → **surging /
+  collapsing** (no real break, water sloshing up rock). Slope and depth are both in the
+  handoff, so *breaker character per shore is data-driven authoring*, not a global setting.
+
+| Visible cue | Physics | Real-time treatment | Driving data |
+|---|---|---|---|
+| Crests bunch and slow near shore | Dispersion, ω conserved | Wavelength/phase-speed from a `k(ω,h)` LUT | Filtered depth |
+| Waves grow just before the break | Green's-law shoaling | `h^(-1/4)`-style amplitude gain, clamped, then cut at break | Filtered depth |
+| Surf parallel to every shoreline | Refraction | Travel-time (eikonal) phase field; or blend wave direction toward −∇(shore distance) by shallowness | Depth + shore distance/normal |
+| A line of breakers, type varies by coast | `H ≈ 0.78·h`; Iribarren ξ | Break mask where amplitude/depth crosses threshold; breaker profile (spill/plunge/surge) chosen by slope mask | Depth + beach-slope mask |
+| Foam born at the break, dying up the beach | Turbulent bore, swash | Foam lifecycle keyed to break mask + phase; decays into run-up streaks | Break mask, shore distance |
+| Wet dark sand band that follows the surf | Run-up / swash envelope | Max-recent-run-up envelope feeds the wetness overlay (`13`/`14`) | Run-up height, shore distance |
+| Steep breaking chop at river mouths; rips cut smooth lanes through the surf | Wave–current interaction (Doppler-shifted dispersion) | Modulate amplitude, steepness, and break threshold by opposition `dot(waveDir, −flow)`; force chop where opposing flow approaches group speed | Flow field + depth |
+
+### Tier 1 — depth-modulated ambient synthesis
+
+The baseline that every water system should ship: keep the FFT/Gerstner cascades and modulate
+them by the depth field at sample time — amplitude attenuated toward zero as depth → 0 (with
+the shoaling bump first: gain, then cut), wavelength compressed by sampling the cascades
+through a depth-driven UV warp or by cross-fading to a pre-generated "shallow" spectrum
+variant, and chop/steepness raised as `a/h` grows so near-shore crests sharpen. For Gerstner
+sums, per-wave depth response is direct: evaluate each wave's `k(ω,h)` and Green's gain at the
+vertex. Honest limits, stated in review: phases stay wind-aligned (no true refraction — the
+diagonal-surf tell survives anywhere the shore is visible), nothing breaks, and depth-warped
+UVs shear the cascade textures if pushed hard. Tier 1 alone is acceptable only where the
+camera never lingers on a beach.
+
+### Tier 2 — the shore-wave band (production default)
+
+The look players call "realistic waves" is a **separate, authored wave train owned by the surf
+zone**, cross-faded with the ambient sea over a blend band offshore. Its components:
+
+- **Phase from travel time, not from wind.** Precompute (at import/cook, from the bathymetry)
+  a wave-travel-time field `τ(x)`: the arrival time of a wavefront propagating shoreward at
+  depth-dependent speed `c(h) = sqrt(g·h)` (an eikonal/fast-marching solve, seeded from deep
+  water). Iso-lines of τ *are* refracted wavefronts — crests wrap headlands, focus on points,
+  and align to every shore for free. The cheap fallback — phase straight from the
+  shore-distance field — is acceptable for simple coasts but cannot focus or wrap correctly;
+  say which one shipped. Animate `phase = τ/T − t/T` and the crests march shoreward forever.
+- **Profile, not sine.** Displace a crest profile (authored 1D shape or steepened Gerstner)
+  along the phase; steepen it as `a/h` rises; asymmetrize it (steep front face, long back)
+  approaching the break. Where the `H ≈ 0.78·h` mask trips, hand over to the breaker
+  treatment: spilling = foam front crawling down the face (profile + animated foam, cheap,
+  right answer for most beaches); plunging = an authored curl — flipbook, skinned mesh, or
+  particle sheet — placed along the break line (hero-tier, budget it); surging = no break,
+  boosted run-up against the slope mask that says "rock".
+- **Sets and groupiness.** One global period reads as a metronome. Superpose two or three
+  periods (7–14 s band) with a slow group envelope so big sets arrive irregularly, and jitter
+  phase slightly along-shore. The group envelope is also the run-up driver: big set → big
+  run-up → wet-sand band advances (`13`).
+- **Foam lifecycle.** Foam is born on the break mask, advected shoreward with the bore, decays
+  exponentially into streaks in the swash, and is dragged back by an ebb phase — one
+  accumulating foam target with decay, exactly the machinery of the Jacobian whitecap
+  accumulator, reused. Hand the *final* foam edge to the shoreline-foam band of
+  [Shoreline integration](#shoreline-integration); they must share phase or the surf and the
+  shore argue.
+- **Energy bookkeeping in the blend band.** Cross-fade ambient cascades *down* as the
+  shore-wave band fades *in* (by depth or τ), never add them — added energy doubles wave
+  height exactly where shoaling is also boosting it, and the blend band becomes a wall of
+  water.
+
+```hlsl
+// Shore-wave band evaluation, per vertex/pixel; all fields from the handoff + cook
+float  h     = FilteredDepth(xz);                  // bathymetry smoothed at ~L scale
+float  tau   = WaveTravelTime(xz);                 // eikonal precompute, speed sqrt(g*h)
+float  A     = A0 * GroupEnvelope(tau, t)          // sets: slow multi-period envelope
+             * ShoalGain(h)                        // Green's-law bump, clamped
+             * saturate(h / hFade);                // and the final cut at the sand
+float  phase = frac(tau / T - t / T);              // crests march shoreward
+float  brk   = smoothstep(0.70, 0.85, A * profilePeak / max(h, 1e-3)); // H ~ 0.78 h
+float  disp  = A * CrestProfile(phase, /*steepen by*/ A / max(h, 1e-3));
+// brk gates the breaker treatment (spill foam / plunge construct / surge run-up by slope mask)
+```
+
+### Tier 3 — wave particles and packets
+
+The simulation-grade tier: Lagrangian carriers of wave energy advected over the bathymetry and
+rasterized into a displacement field each frame. **Wave particles** (Yuksel et al.) made it
+real-time — each particle a small wavefront segment that subdivides as fronts spread. Production
+water systems of that era are documented in Gonzalez-Ochoa's GDC 2012 *Uncharted* talk (ocean
+mesh LOD, wave generation, flow shader); that the shipped technique was specifically wave
+particles is commonly repeated but **not confirmed** against the talk — treat it as `?` and do
+not cite it as the shipped implementation. **Wave packets / water surface wavelets** (Jeschke & Wojtan and successors) carry a
+full dispersive wave *group* per carrier, so refraction, dispersion, and shoaling over
+arbitrary bathymetry emerge rather than being painted. Cost honesty: this tier buys emergent
+shore behavior and object interaction with research-grade machinery — tens of thousands of
+carriers, a rasterization pass, careful LOD — and in production it is usually *targeted*
+(wakes, a hero cove) while Tiers 1–2 still carry the open sea. It does not replace the
+interactive sim patch: particles carry traveling waves; the patch owns local
+splash-and-ripple response. They can share the rasterize-to-overlay stage.
+
+### Shoal awareness is depth awareness, not distance awareness
+
+Key the system off **depth**, never off distance-to-shore alone. An offshore sandbar or reef
+must brighten the water color ramp, steepen and break its own line of surf — hundreds of
+meters from any shoreline — and let the reformed, smaller wave travel on to break again at the
+beach. Double surf lines over bars are a signature of real coasts, and they fall out for free
+when shoaling, breaking, and the travel-time solve all read bathymetry; they are *impossible*
+when the surf system is keyed to the shoreline distance field. Shore distance drives only what
+genuinely belongs to the waterline: run-up, wet sand, and the final foam edge.
+
+### Wave–current interaction: the flow field's part
+
+The fourth handoff input — the flow field — modifies shallow-water waves, and the shore-wave
+band must read it or the two water systems of this chapter visibly ignore each other where
+they meet. The physics: in a current `U`, the observed frequency Doppler-shifts,
+`ω = σ + k·U`, with the intrinsic frequency still obeying `σ² = g·k·tanh(k·h)`. Waves running
+*against* a current shorten and steepen (energy piles into a slower-advancing train); when the
+opposing current approaches the wave group speed, the waves are **blocked** — they cannot
+propagate upstream and must steepen until they break. Waves riding a *following* current
+lengthen and flatten. The visible cases are exactly the seams between this section and the
+rivers section: a river mouth at outflow (a line of steep, breaking, directionless chop over
+the bar, even in a mild sea), tidal inlets, and rip currents — narrow outbound flows that
+block incoming surf locally and read as smooth dark lanes cutting through the breaker line,
+with their foam streaked *seaward*.
+
+The real-time treatment is modulation, not simulation — same doctrine as the rest of the
+section. From the shore band's own quantities: wave direction is `normalize(∇τ)`, opposition
+is its dot with the negated flow, and everything keys off that scalar:
+
+```hlsl
+float2 U    = DecodeFlow(FlowField.Sample(s, uv));        // handoff flow field, m/s
+float  cg   = sqrt(9.81 * max(h, hMin));                  // shallow-water group speed: c_g = c
+                                                          // (NO 1/2 — that is the deep-water
+                                                          //  c_g = c/2 relation, wrong here)
+float  opp  = dot(normalize(gradTau), -U) / cg;           // 1 ~ blocking
+A          *= 1.0 + kSteepen * saturate(opp);             // shorten/steepen against flow
+brk         = max(brk, smoothstep(0.8, 1.2, opp));        // blocked -> forced break/chop
+// opp < 0 (following current): mild lengthen/flatten — scale A and steepness down slightly
+```
+
+Where `opp` crosses the blocking range, stop drawing a coherent marching wave train at all:
+replace the band locally with steep short chop plus a persistent foam patch (the
+river-mouth-bar look), and let the rivers section's flow-mapped surface own the water inside
+the outflow. Foam in the surf zone advects by the *sum* of bore motion and the flow field, so
+rip and outflow foam streaks point seaward for free. Two refinements, both honestly optional:
+fold `U` into the travel-time solve as an anisotropic speed term (`c(h) + U·dir`) so current
+refraction lands in the precompute — valid only for static flows like river mouths, since τ is
+baked; and modulate at runtime for tidal flows if the game has them. State the limits in
+review: this is Doppler-flavored amplitude/steepness shaping — there is no momentum exchange,
+no actual blocking dynamics, and rip currents must exist in the exported flow field to appear
+(inventing them renderer-side violates the handoff doctrine — route to terrain-architect).
+
+### Data contract additions
+
+Per the chapter's rule — extend the handoff, don't derive hydrology renderer-side — the
+shore-wave system asks the pipeline for: **filtered depth** (bathymetry smoothed at roughly
+the wavelength being modulated; raw bathymetry noise makes wave response flicker and the break
+line dither), a **beach-slope / breaker-class mask** (from the generator's slope analysis —
+this is what keeps spilling foam off cliff faces), the **shore normal** (gradient of the shore
+distance field, for run-up direction and foam advection), and the **travel-time field** τ
+(derived data, baked at import/cook from bathymetry — cheap to store, one R16 channel).
+Wave–current interaction needs *no* new data — the flow field is already in the handoff; the
+only optional addition is baking static flow into the τ solve as above.
+Max shore-wave amplitude joins max ambient amplitude in the culling-bounds inflation.
 
 ## Rivers: flow-driven surfaces
 
@@ -400,13 +585,15 @@ reaction on land. A hard intersection ribbon is not a shoreline architecture.
   fade" node family in engine material editors). This removes the hard polygonal intersection
   line. It is a *cosmetic* fade — the swim volume still starts at the datum; do not let gameplay
   read the faded visual edge.
-- **Wet-sand band**: drive a wetness band above the waterline from wave run-up (max recent
-  shoreline wave amplitude) plus the exported wetness map — darkened albedo, boosted specular,
+- **Wet-sand band**: drive a wetness band above the waterline from wave run-up (the max-recent
+  run-up envelope of the shore-wave band —
+  [Shallow water](#shallow-water-shoaling-refraction-and-breakers)) plus the exported wetness map — darkened albedo, boosted specular,
   handled by the surface-state system (`13`) consuming aux maps per `14`. The band must *move*
   with the waves' run-up envelope, lagging and drying, or the beach reads as painted.
 - **Shoreline foam**: an advected foam texture in a band defined by shore distance, phase-driven
-  so it pulses with the incoming wave cadence (tie its phase to the dominant shallow-water wave
-  phase, or foam and waves visibly disagree).
+  so it pulses with the incoming wave cadence — tie its phase to the shore-wave band's
+  travel-time phase (the same `τ/T − t/T`), or foam and waves visibly disagree; where a
+  shore-wave foam lifecycle exists, this band is its final decay stage, not a second system.
 - **LOD co-discipline**: the water mesh's LOD at the shoreline must be matched (or biased finer)
   relative to the terrain tile's LOD, and both must refine together, or the intersection line
   *crawls* on LOD transitions — a `11` catalogue symptom whose fix is contract (shared SSE
@@ -455,6 +642,33 @@ Water is the classic hard transparency case, and the frame must be structured fo
   spectrum/foam variation layer.
 - **Choppiness self-intersection shimmer**: chop cranked past the folding limit; `J` negative
   everywhere; crests z-fight themselves. Clamp chop; spend `J` on foam instead.
+- **Wind-aligned surf**: swell crosses shallow water at the wind angle and hits the beach
+  diagonally — no shore-wave tier, or Tier 1 shipped where the camera lives on the coast. Add
+  the shore-wave band; refraction (crests parallel to shore) is the cue the eye checks first.
+- **Waves marching through the beach**: displacement still non-zero at depth 0; crests poke
+  through the sand. The depth-attenuation ramp is missing or keyed to the wrong depth source
+  (scene depth instead of the bathymetry field).
+- **Metronome surf**: the whole coastline breaks in unison on one global period. Superpose 2–3
+  periods with a group envelope and jitter phase along-shore; sets must arrive irregularly.
+- **Sandbars and reefs stay glassy**: shoaling/breaking keyed to shore distance, so offshore
+  shoals never shoal. Key everything off the (filtered) depth field; the double surf line over
+  a bar should fall out for free.
+- **Breakers on cliffs**: spilling foam crawling up rock faces — the break mask fired on depth
+  alone. Gate breaker *type* by the beach-slope/breaker-class mask (Iribarren logic): steep
+  shores surge, they don't spill.
+- **Doubled energy in the blend band**: shore-wave band added on top of un-attenuated ambient
+  cascades; a wall of water stands exactly where shoaling also boosts amplitude. Cross-fade
+  energy between the systems, never sum them.
+- **Break-line dither/flicker**: the `H ≈ 0.78·h` mask evaluated against raw bathymetry noise.
+  Filter depth at the wavelength scale before it drives wave response.
+- **Foam double-count in the surf zone**: Jacobian whitecaps and breaker foam both firing on
+  the same crests. In the shore band, the breaker lifecycle owns foam; fade the Jacobian
+  accumulator out with the ambient cascades.
+- **Surf marches unchanged across the river mouth**: the shore-wave band reads only depth, so
+  incoming waves ignore the outflow that should steepen, block, and break them — and rip
+  currents in the flow field leave no lanes in the breaker line. Modulate the band by
+  opposition to the flow field (wave–current interaction, above); where flow data shows no
+  rip/outflow, the missing feature is generation-side — route to terrain-architect.
 - **Refraction leaking objects above water**: missing depth reject on the distorted sample. The
   single most common shipped water bug; the fix is four shader lines (above).
 - **SSR dropout at grazing/screen edge**: mirror-bright water goes flat exactly at the horizon
@@ -535,6 +749,40 @@ Water is the classic hard transparency case, and the frame must be structured fo
   (fullscreen effect between transparents and post, meniscus handling).
 - **F** — Depth-reject refraction fix, SSR fallback hierarchy, underwater state machine, planar
   one-body ceiling: ubiquitous production practice; no single canonical citation.
+- **P** — Linear (Airy) wave theory — dispersion `ω² = gk·tanh(kh)`, shallow-water celerity
+  `sqrt(g·h)`, Green's-law shoaling `a ∝ h^(-1/4)`, refraction: coastal-engineering canon;
+  textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
+  (1991). Constants quoted from model knowledge of the textbooks, not re-derived.
+- **P** — Breaker criterion `H ≈ 0.78·h` (McCowan lineage) and surf-similarity/breaker
+  classification via the Iribarren number: Battjes, "Surf Similarity", *Proceedings of the 14th
+  International Conference on Coastal Engineering*, Copenhagen, ASCE, 1974, 466–480 (verified
+  2026-08 — note several citation databases propagate a wrong "Honolulu, 446–480"; Honolulu was
+  the 15th ICCE, 1976).
+- **P** — Wave–current interaction (Doppler-shifted dispersion `ω = σ + k·U`, steepening
+  against opposing flow, blocking near group speed): Peregrine, "Interaction of Water Waves
+  and Currents", *Advances in Applied Mechanics* 16, 1976.
+  [Semantic Scholar (verified 2026-08)](https://www.semanticscholar.org/paper/Interaction-of-Water-Waves-and-Currents-Peregrine/ead4947119505f48eaa8adaa4a3d78da7c722fad).
+  The renderer-side opposition-scalar treatment is F-tier practice, not from the paper.
+- **P** — Yuksel, House & Keyser, "Wave Particles" (SIGGRAPH 2007, ACM TOG 26(3)): Lagrangian
+  wave carriers rasterized to a height field; object interaction.
+  [Author page (verified 2026-08)](https://www.cemyuksel.com/research/waveparticles/).
+- **T** — Gonzalez-Ochoa, "Water Technology of Uncharted" (GDC 2012, Naughty Dog): shipped
+  ocean/beach water — mesh LOD, wave generation, flow shader.
+  [GDC Vault (verified 2026-08)](https://gdcvault.com/play/1015309/Water-Technology-of).
+  Whether the shipped waves were specifically *wave particles* is **`?`** — widely repeated,
+  not verified against the talk.
+- **P** — Jeschke & Wojtan, "Water Wave Packets" (SIGGRAPH 2017); Jeschke, Skřivan,
+  Müller-Fischer, Chentanez, Macklin & Wojtan, "Water Surface Wavelets" (SIGGRAPH 2018):
+  dispersive Lagrangian wave groups; emergent refraction/shoaling over bathymetry.
+  [ACM DL (verified 2026-08)](https://dl.acm.org/doi/10.1145/3197517.3201336).
+- **T** — Ang, Catling, Ciardi & Kozin, "The Technical Art of Sea of Thieves" (SIGGRAPH 2018
+  Talks): stylized FFT water and its supplements in a shipped open-sea title.
+  [ACM DL (verified 2026-08)](https://dl.acm.org/doi/10.1145/3214745.3214820).
+- **F** — The travel-time (eikonal) shore phase field, breaker-profile authoring
+  (spill/plunge/surge constructs), group-envelope "sets", foam lifecycle, and blend-band
+  widths: production practice assembled from multiple talks and community writeups; no single
+  canonical source. The `0.70–0.85` break-mask window and `hFade` style constants are tuning
+  ranges, not measured standards.
 - **?** — Attribution of specific shallow-water shoaling approximations to particular shipped
-  titles: multiple GDC/SIGGRAPH-Advances talks cover it; treat any specific title claim as
-  unverified.
+  titles beyond the two talks above: multiple GDC/SIGGRAPH-Advances talks cover it; treat any
+  further specific title claim as unverified.

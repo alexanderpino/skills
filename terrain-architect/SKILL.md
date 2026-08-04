@@ -623,7 +623,9 @@ of Part 2 ("caused, not carved"):
   both are lost (Part 2, the layer stack).
 - **Export the drivers, not the effects.** So the engine can render rapids, waterfalls, and
   particles, the tool emits the data that *drives* them: flow maps / velocity vector fields
-  (`FlowField`, from routing and discharge, `03`), water depth maps, and analysis-derived
+  (`FlowField`, from routing and discharge, `03`, **plus the nearshore surface circulation —
+  longshore current, rip and tidal-inlet jets, `12`** — the field must not stop at the
+  waterline), water depth maps, and analysis-derived
   masks (gradient, constriction, wetness — `06`). The engine consumes these to steer its own
   particle systems and fluid shaders. Foam, spray, splash, and wave displacement are never
   in the export.
@@ -633,7 +635,9 @@ of Part 2 ("caused, not carved"):
   terrain, generated to the same standards as dry land (`12`). The tool puts no waves,
   ripples, or chop on that plane; Gerstner/FFT wave synthesis is the engine's, and it needs
   the flat datum plus depth to run correctly (wave shoaling, shoreline foam, and swim
-  volumes are all functions of the depth field the tool exported).
+  volumes are all functions of the depth field the tool exported) — plus, for shore-aware
+  surf, the **flow field** (waves steepen and break against an opposing current) and a
+  wavelength-scale **filtered** depth copy (raw bathymetry noise dithers the break line).
 
 ---
 
@@ -748,7 +752,7 @@ they are easy to get subtly wrong, and the versions here have been checked.
 | `references/09-verification.md` | Validation suite, diagnostics, visual review modes, failure catalogue, review checklist, mass-conservation and resolution-consistency checks |
 | `references/10-primitives-ops-filters.md` | Primitives, SDF, heightfield operators, smooth min/max, sculpting, stamps, splines, filters (Gaussian/median/bilateral/guided/anisotropic), morphology, authored warps |
 | `references/11-geological.md` | Strata, terracing, folding, diapirism, lithology, outcrops, karst, weathering & soil production, weathering microforms, volcanic landforms, explosive volcanism, duricrust & relief inversion, impact craters, overhangs — and when the heightfield is the wrong representation |
-| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion & deposition (U-valleys, cirques, fjords, moraines, drumlins, eskers, outwash), outburst floods; coastal & marine erosion, cliff retreat, platforms, longshore drift, spits/barriers, coastal dunes, marine terraces, deltas, reefs & atolls; seafloor subsidence, seamounts, submarine canyons & turbidity currents |
+| `references/12-glacial-coastal.md` | Glacier flow (SIA, Glen's law), glacial erosion & deposition (U-valleys, cirques, fjords, moraines, drumlins, eskers, outwash), outburst floods; coastal & marine erosion, cliff retreat, platforms, longshore drift, spits/barriers, surf-zone morphodynamics (breaker bars, rip channels, nearshore circulation), tidal inlets & ebb/flood deltas, coastal dunes, marine terraces, deltas, reefs & atolls; seafloor subsidence, seamounts, submarine canyons & turbidity currents |
 | `references/13-climate-ecosystem.md` | Lapse rate, terrain-aware wind flow fields, orographic precipitation, rain shadow, snow line, avalanches; ecosystem simulation and competition; biogenic landforms; fire & burned land; multi-biome worlds / regional composition |
 | `references/14-graph-runtime.md` | **The substrate.** Node & parameter model, typed ports, content-addressed caching, dirty propagation, preview pyramid, region invalidation, scheduling, serialisation |
 | `references/15-gpu-realtime.md` | GPU patterns per algorithm family, determinism on GPU, formats, amortisation, realtime tier classification (per-frame / interactive / amortised / baked) |

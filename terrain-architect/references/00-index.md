@@ -177,6 +177,10 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Deltas, alluvial fans | Deposition-dominant hydraulic erosion at a base level (`04`, `12`) |
 | Coastal cliffs, sea stacks, coastal arches, coastal caves | Wave erosion band + hardness variation (`12`) |
 | Spits, tombolos, barrier islands, bay bars | Longshore drift + deposition + sheltering (`12`) |
+| Breaker bar (longshore/crescentic), bar-trough profile | Cross-shore flux convergence at the breakpoint; crest near depth `H_b/γ` (`12`) |
+| Rip channels & bar–rip rhythm | Setup-gradient circulation scouring gaps through the bar; quasi-rhythmic, O(100 m) (`12`) |
+| Tidal inlet (barrier breach) | Tidal prism sets the throat area, `A_inlet = C_OB·P_tide^0.85` (`12`) |
+| Ebb-tidal delta / flood-tidal delta | Inlet jet decelerating seaward / lagoonward; fed by intercepted longshore drift (`12`) |
 | Marine terraces | Wave-cut platform loop across a sea-level / uplift history (`12`) |
 | Rias (drowned valleys) | Fluvial valley network + sea-level rise (`03`, `12`) |
 | Natural arches, hoodoos | Differential erosion of layered rock; needs a **non-heightfield representation** (`11`) |
@@ -284,11 +288,16 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Coastal erosion / cliff retreat | F | No canonical graphics paper. Coastal engineering: Bruun 1962. **In practice a look, not a simulation** (`12`). |
 | Mangrove coast (biogenic muddy progradation) | P | Woodroffe 1992; Furukawa et al. 1997; Alongi 2008 — traps mud, damps waves, keeps pace with sea level (`12`) |
 | Chenier / chenier plain | P | Otvos & Price 1979; Augustinus 1989 — coarse ridges on mud, marking mud-supply lulls (`12`) |
-| Longshore transport | F | CERC formula; measured basis Komar & Inman 1970 (coastal engineering, not graphics). Drives spits/tombolos/barriers (`12`) |
+| Longshore transport (the CERC transport *closure*) | F | CERC formula; measured basis Komar & Inman 1970 (coastal engineering, not graphics). Drives spits/tombolos/barriers (`12`). Note the split: the transport formula is empirical F-tier, but the **longshore current that does the transporting** is P-tier dynamics — next rows |
 | Marine terrace / wave-cut platform | F | Coastal notch loop across a sea-level/uplift history (`12`). A look, not a sim. |
 | Lacustrine (lake) shore erosion / lake terraces | F | The coastal loop at lake level; lake-level history → shoreline terraces. Gilbert 1890 (Lake Bonneville) (`12`) |
 | Gilbert (lacustrine) delta | P | Gilbert 1890 — topset/foreset/bottomset delta prograding into standing water (`12`) |
-| Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
+| Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode **below wave base**; the surf zone is the one bounded exception and gets a real morphodynamic step (`12`) |
+| Surf-zone morphodynamic loop (radiation stress → currents → transport → Exner) | P (loop) / L (realisation) | Radiation stress: Longuet-Higgins & Stewart 1962 (JFM 13(4), 481–504) for priority, **1964** (Deep-Sea Res. 11(4), 529–562) for the nearshore set-up/circulation exposition; longshore current Longuet-Higgins 1970 (JGR 75(33), two parts). Sediment continuity is the **classical Exner** equation — Paola & Voller 2005 is the *generalisation* (uplift, compaction, dual interfaces), not the plain form (`12`) |
+| Undertow & breakpoint bar (bar crest at depth ≈ `H_b/γ`; storm/calm migration) | P | Svendsen 1984, Coastal Eng. 8(4), 347–365 (undertow); Bailard 1981, JGR 86(C11), 10938–10954 (energetics total load — distinct from Bailard & Inman 1981, JGR 86(C3), the bedload paper) (`12`) |
+| Beach states (reflective ↔ dissipative; bar–rip templates) | P | Wright & Short 1984, Marine Geology 56(1–4), 93–118 — `Ω = H_b/(w_s·T)`; <1 / 1–6 / >6 (`12`) |
+| Rip currents (setup-gradient circulation; bar-gap scour feedback) | P | Bowen 1969, JGR 74(23), 5467–5478; review MacMahan, Thornton & Reniers 2006, Coastal Eng. 53(2–3), 191–208 — spacing O(100 m), quasi-rhythmic (`12`) |
+| Tidal inlet equilibrium & ebb/flood tidal deltas | P (prism–area) / L (landforms) | O'Brien 1969, ASCE J. Waterways & Harbors Div. 95(WW1), 43–52 — `A_inlet = C_OB·P_tide^0.85`; first form O'Brien 1931. Do not merge with the similarly-titled 1966 ICCE paper. Deltas are compositions (`12`) |
 | Tides / intertidal zone / tidal flats | F | Authored oscillation of the water plane; astronomy, a look. Water is a dynamic layer (`08`, `12`) |
 | Seafloor age–depth subsidence (ridge → abyssal plain) | P | Parsons & Sclater 1977 (√age half-space); Stein & Stein 1992 (GDH1 plate model) (`12`) |
 | Hotspot track / seamount / guyot | P (age progression) / P-hypothesis (plume) | Wilson 1963; Morgan 1971; Hess 1946 (guyot truncation) (`11`, `12`) |
