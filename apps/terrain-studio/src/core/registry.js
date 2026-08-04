@@ -1,4 +1,4 @@
-import { PORTS_VERSION } from './ports.js'
+import { PORTS_VERSION, validatePortList } from './ports.js'
 import { LEGACY_PORTS } from './legacy-ports.js'
 
 // The plugin registry.
@@ -96,6 +96,20 @@ export function attachLegacyPorts(types) {
     if (!def || typeof def !== 'object') continue
     if (def.ports) continue                       // already attached (a second mergePlugins call)
     if (def.inputs || def.outputs) {              // self-declaring plugin — not the adapter's business
+      // ...but it IS the adapter's business that the declaration is well-formed. validatePortList
+      // shipped with S2.1 and, until now, only ever ran against rows the adapter itself had just
+      // built from the frozen legacy table — the adapter reporting on itself. Every self-declaring
+      // plugin skipped it here, and _verify_port_contract.js skipped them again by testing only
+      // `ports.source === 'legacy-adapter'`, so nine plugins declared ports no code had checked.
+      //
+      // Measured before enforcing: all nine validate clean, so this closes a hole rather than
+      // starting a fight. It THROWS, because a plugin whose ports are malformed cannot be wired
+      // correctly and loading it anyway just moves the failure somewhere less legible.
+      const problems = validatePortList({ inputs: def.inputs || [], outputs: def.outputs || [], source: 'declared' })
+      if (problems.length) {
+        throw new Error(`plugin ${type} declares invalid ports: `
+          + problems.map(p => `${p.code} ${p.message}`).join(' | '))
+      }
       def.ports = { version: PORTS_VERSION, source: 'declared', roster: false, dynamic: null, groups: def.portGroups || {} }
       continue
     }

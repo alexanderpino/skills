@@ -1,7 +1,7 @@
 import { GPU, gpuFbm, gpuThermal, gpuWarp, gpuHydraulicPipes, gpuHydraulicDroplets,
   gpuHydraulicCombined, gpuReady, gpuDropletsReady, hydroMassDiag, setHydroMassDiag,
   setGL as setGpuGL } from './core/gpu.js';
-import { mergePlugins } from './core/registry.js';
+import { mergePlugins, attachLegacyPorts } from './core/registry.js';
 import './plugins/out/index.js';
 import './plugins/data/index.js';
 import './plugins/effect/index.js';
@@ -5074,7 +5074,7 @@ export const PROJECT={serializeProject,parseProject,migrateProject,validateProje
 
 // Same reason as PROJECT: an imported binding cannot be bridged, so the typed-port surface is
 // republished from a legacy.js-declared const for the S2.1 oracle.
-export const PORTS={canConnect,validatePortList,GENERICS,SEMANTICS,UNITS,RANGE,LEGACY_PORTS,LEGACY_ROSTER,LEGACY_INS_LABELS};
+export const PORTS={canConnect,validatePortList,attachLegacyPorts,GENERICS,SEMANTICS,UNITS,RANGE,LEGACY_PORTS,LEGACY_ROSTER,LEGACY_INS_LABELS};
 
 // The aux-map registry, republished for the S2.4 oracle for the same reason as PORTS and PROJECT:
 // an imported binding cannot be bridged.
@@ -8016,5 +8016,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("wireVerdict", () => wireVerdict, __ro("wireVerdict"))
 }
 // ==== TEST BRIDGE END ====
+
 
 

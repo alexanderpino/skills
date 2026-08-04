@@ -27,6 +27,7 @@ const MUTATIONS = [
   'single-output-geometry',// two outputs drawn on top of each other -> the second is unclickable
   'sink-without-primary',  // the graph sink loses its value -> the whole terrain goes undefined
   'eager-allocation',      // undemanded outputs computed anyway -> demand-driven is a claim only
+  'declared-ports-are-valid', // the bad-plugin fixture stops being bad, so there is nothing to refuse
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -63,17 +64,46 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     }
     out.insDrift = insDrift
 
-    // Exactly one primary output per adapted type that has one.
+    // DECLARED plugins are validated too, now. This loop used to skip every type whose
+    // ports.source was not 'legacy-adapter', and attachLegacyPorts skipped them as well, so the
+    // only descriptors validatePortList had ever seen were ones the adapter itself had just built
+    // from the frozen table — the adapter reporting on itself. Nine plugins declared ports that no
+    // code checked. Measured at the time of the fix: all nine validate clean.
+    const declaredTypes = types.filter(t => TYPES[t].ports && TYPES[t].ports.source === 'declared')
+    out.declaredCount = declaredTypes.length
+
+    // Exactly one primary output per type that has one, adapter-built or self-declared.
     const primaryProblems = []
     for (const t of types) {
       const def = TYPES[t]
-      if (!def.ports || def.ports.source !== 'legacy-adapter') continue
+      const src = def.ports && def.ports.source
+      if (src !== 'legacy-adapter' && src !== 'declared') continue
       let outputs = def.outputs || []
       if (mutation === 'drop-primary' && t === 'perlin') outputs = outputs.map(p => ({ ...p, primary: false }))
-      const probs = validatePortList({ inputs: def.inputs || [], outputs, source: 'legacy-adapter' })
+      const probs = validatePortList({ inputs: def.inputs || [], outputs, source: src })
       if (probs.length) primaryProblems.push({ type: t, codes: probs.map(p => p.code) })
     }
     out.registrationProblems = primaryProblems
+
+    // Does registration actually REFUSE a malformed declaration? Driven through production's own
+    // attachLegacyPorts, not through validatePortList directly, because the defect was never that
+    // the validator was wrong — it was that nothing called it on this path.
+    const badPlugin = {
+      cat: 'comb', name: 'Bad', ins: ['In'], params: [], eval: () => null,
+      inputs: [{ id: 'in', name: 'In', kind: 'scalarRaster', storage: 'R32F', components: 1,
+        semantic: 'anyScalarRaster', unit: 'none', role: 'data' }],
+      // A unit that is not in the vocabulary. Under the mutation the fixture is made VALID instead,
+      // so there is nothing to refuse and the gate below must go red — the same shape as asking a
+      // corrupt-hash gate to load an honest document.
+      outputs: [{ id: 'out', name: 'Out', kind: 'scalarRaster', storage: 'R32F', components: 1,
+        semantic: 'relativeHeight', unit: mutation === 'declared-ports-are-valid' ? 'none' : 'furlongs',
+        primary: true, lens: 'derived' }],
+    }
+    let badRefusal = null
+    try { PORTS.attachLegacyPorts({ __badplugin: badPlugin }); badRefusal = null }
+    catch (e) { badRefusal = String(e.message || e).slice(0, 160) }
+    out.badPluginRefused = badRefusal !== null
+    out.badPluginMessage = badRefusal
 
     // --- every shipped edge must stay legal --------------------------------------------------
     // Build each template graph the app can produce and check every edge against the matrix.
@@ -265,6 +295,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     noUnregisteredTypes: report.unregistered.length === 0,
     insUnchanged: report.insDrift.length === 0,
     registrationClean: report.registrationProblems.length === 0,
+    declaredPluginsAreValidated: report.declaredCount >= 9 && report.badPluginRefused === true,
     shippedEdgesAllLegal: report.refusedShipped.length === 0,
     // SELF-CONSISTENT rather than pinned. This was `maskSlots === 30`, and adding the Edge node in
     // S8.1 — which has a Mask input — made it 31 and turned the gate red. That is the gate working,
@@ -300,7 +331,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   }
   const failed = Object.entries(gates).filter(([, v]) => !v).map(([k]) => k)
   console.log(`${ok ? 'PASS' : 'FAIL'}  port contract types=${report.typeCount} adapted=${report.adapted}/${report.rosterCount} `
-    + `shippedEdges=${report.shippedEdgesChecked} refused=${report.refusedShipped.length} maskSlots=${report.maskSlots}/${report.maskRoleSlots} maskRefused=${report.maskRefusals.length} `
+    + `shippedEdges=${report.shippedEdgesChecked} refused=${report.refusedShipped.length} declared=${report.declaredCount} maskSlots=${report.maskSlots}/${report.maskRoleSlots} maskRefused=${report.maskRefusals.length} `
     + `failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
   console.log(JSON.stringify({ ...report, gates, errors, ok }, null, 2))
   await browser.close()
