@@ -48,6 +48,11 @@ export const UNITS = Object.freeze({
   none: { dim: '1' }, m: { dim: 'L' }, mPerCell: { dim: 'L/cell' }, m3: { dim: 'L^3' },
   degC: { dim: 'Theta' }, K: { dim: 'Theta' }, mPerS: { dim: 'L/T' },
   rad: { dim: 'A' }, deg: { dim: 'A' }, percent: { dim: '1' }, days: { dim: 'T' },
+  // Sprint 3. Regolith production is cited in mm/yr (Heimsath et al. 1997) and authoring it in
+  // metres per year would put the interesting numbers at 1e-4, where a typo is invisible. `yr` is
+  // required authored data for the production law and has no default: a duration nobody stated is
+  // not a duration of 1.
+  mmPerYr: { dim: 'L/T' }, yr: { dim: 'T' },
 })
 
 export const SEMANTICS = Object.freeze({
@@ -77,6 +82,23 @@ export const SEMANTICS = Object.freeze({
   texture: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   uplift: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
   sediment: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  // --- Sprint 3: the solid stack as explicit STATE, in metres --------------------------------
+  // `sediment` above is a transport quantity — how much material a pass moved. These are LAYER
+  // THICKNESSES, which is a different thing: they persist between passes, they are what a
+  // transport node consumes cover from, and solidTop = bedrockHeight + soilDepth + sedimentDepth
+  // + sandDepth is the identity S3.3 has to close. Naming one of them `sediment` would have made
+  // "how much moved" and "how much is lying there" the same port.
+  soilDepth: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  sedimentDepth: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  sandDepth: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  solidTop: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  // The STABLE physical frame, distinct from `relativeHeight` (autolevel, field-dependent) and
+  // from `height`. The decision on record is two named frames: the viewport keeps autolevel, and
+  // physical nodes take metres from a stable datum through an explicit adapter. An absolute
+  // elevation that moves when the field's range moves cannot carry a conservation identity.
+  bedrockHeight: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  precipitation: { kind: 'scalarRaster', defaultUnit: 'mmPerYr', continuous: true },
+  regolithProduction: { kind: 'scalarRaster', defaultUnit: 'mmPerYr', continuous: true },
   colorDriver: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   color: { kind: 'vectorRaster', defaultUnit: 'none', continuous: true },
   basinId: { kind: 'labelRaster', defaultUnit: 'none', continuous: false },
