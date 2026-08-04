@@ -4960,6 +4960,13 @@ export function confirmNewTerrain(){
   if(problems.length){toast("Cannot create: "+problems[0].code);return false;}
   terrainDef=createTerrainDef({...terrainDef,scale:p.width,lattice:p.lattice==="hex-pointy-odd-r"?"hex":"square"});
   H_SCALE=terrainDef.height/terrainDef.scale;
+  // APPLY THE COLUMN COUNT THE AUTHOR JUST CHOSE. It used to be recorded in the WorldDomain and
+  // never reach the evaluator, so a document created at 493 columns still evaluated at whatever RES
+  // happened to be — and the separate "working resolution" control was the only thing that set the
+  // real grid. That is why picking 1024 after creating a terrain was unreadable: it silently halved
+  // the sample spacing of a world whose spacing the author had just stated in metres.
+  DOC_SAMPLES=p.cols;
+  applyPreviewDetail(PREVIEW_DETAIL);
   closeNewTerrainDialog();
   // Only NOW does anything allocate.
   newTerrainDocument(p.template==="default",p.template==="canyon"?"canyon":null,true);
@@ -7271,15 +7278,56 @@ function applyWorkingResolution(next){
   RES=next;nodes.forEach(n=>{n._dirty=true;n._thumb=null;if(n.type==="import")n._dem=null;});
   buildIndex();
 }
+// PREVIEW DETAIL IS NOT RESOLUTION, and conflating them is what made the old control unreadable.
+//
+// The document has a sample count — chosen in New Terrain, in the same dialog that states the world
+// extent in metres, so the two together fix the sample spacing. That is a physical property of the
+// terrain and every erosion parameter is denominated in it. Preview detail is a FRACTION of that
+// grid used for a cheaper evaluation, and it changes cost and fidelity and nothing else.
+//
+// The old absolute selector offered 128..4096 with no reference to the document at all, so choosing
+// 1024 on a 512-sample world silently doubled the resolution and halved the spacing — a different
+// simulation, presented as a preview setting.
+export let DOC_SAMPLES=512;
+export let PREVIEW_DETAIL=1;
+export function setDocumentSamples(n){DOC_SAMPLES=Math.max(2,Math.round(n));return DOC_SAMPLES;}
+export function documentSamples(){return DOC_SAMPLES;}
+export function previewDetail(){return PREVIEW_DETAIL;}
+/** Resolve preview detail against the document grid. Returns the sample count it selected. */
+export function applyPreviewDetail(fraction){
+  PREVIEW_DETAIL=Math.min(1,Math.max(0.05,Number(fraction)||1));
+  const next=Math.max(2,Math.round(DOC_SAMPLES*PREVIEW_DETAIL));
+  TARGET_RES=next;
+  // Large grids stay queued for an explicit Build, exactly as the old control did — that behaviour
+  // was about cost, not about what the number meant, so it survives unchanged.
+  if(next>=1024){if(AUTO){AUTO=false;const b=$("#autoBtn");if(b)b.classList.remove("on");}}
+  else if(next!==RES)applyWorkingResolution(next);
+  syncDetailReadout();
+  return next;
+}
+/** Say what the setting actually produced: sample count and the resulting spacing in metres. */
+export function syncDetailReadout(){
+  const el=$("#detailReadout");if(!el)return null;
+  const d=getWorldDomain();
+  const cols=Math.max(2,Math.round(DOC_SAMPLES*PREVIEW_DETAIL));
+  const rows=terrainDef.lattice==="hex"?Math.round(cols*2/Math.sqrt(3)):cols;
+  const widthM=(d&&d.extentM&&d.extentM.width)||terrainDef.scale||0;
+  // vertex posting spans n-1 intervals; deriveResolution owns the same rule for the create dialog.
+  const spacing=cols>1?widthM/(cols-1):0;
+  const text=`${cols} × ${rows} samples · ${spacing?spacing.toPrecision(4):"—"} m per sample`
+    +(PREVIEW_DETAIL<1?` · ${Math.round(PREVIEW_DETAIL*100)}% of the document's ${DOC_SAMPLES}`:"");
+  el.textContent=text;
+  return {cols,rows,spacing,detail:PREVIEW_DETAIL,documentSamples:DOC_SAMPLES};
+}
 $("#buildBtn").onclick=()=>{if(TARGET_RES!==RES)applyWorkingResolution(TARGET_RES);nodes.forEach(n=>n._dirty=true);syncBuildProfile();evalGraphProgressive("Building terrain");};
 $("#resSel").onchange=e=>{
-  TARGET_RES=parseInt(e.target.value);
-  if(TARGET_RES>=1024){
-    if(AUTO){AUTO=false;$("#autoBtn").classList.remove("on");}
-    syncBuildProfile();toast(TARGET_RES+"² queued — Auto off, use Build");return;
-  }
-  if(TARGET_RES!==RES)applyWorkingResolution(TARGET_RES);
-  syncBuildProfile();toast("Resolution "+RES+"²");evalGraph();};
+  const next=applyPreviewDetail(parseFloat(e.target.value));
+  syncBuildProfile();
+  if(next>=1024){toast(next+"² queued — Auto off, use Build");return;}
+  toast(`Preview detail ${Math.round(previewDetail()*100)}% · ${next}²`);evalGraph();};
+// Resizing is an EXPLICIT act, stated in the same terms as creating: extent, sample count, spacing.
+// It reuses the New Terrain dialog rather than inventing a second vocabulary for the same numbers.
+if($("#resizeBtn"))$("#resizeBtn").onclick=()=>openNewTerrainDialog();
 $("#qualitySel").onchange=e=>{BUILD_QUALITY=e.target.value;nodes.forEach(n=>n._dirty=true);
   toast(BUILD_QUALITY==="final"?"Final simulation budgets":"Interactive preview budgets");
   syncBuildProfile();evalGraph();};
@@ -7864,7 +7912,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 217 symbols (28 writable, 189 read-only).
+ * 222 symbols (28 writable, 194 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7892,12 +7940,12 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
   __def("cam", () => cam, (v) => { cam = v })
   __def("selectedEdge", () => selectedEdge, (v) => { selectedEdge = v })
-  __def("scene", () => scene, (v) => { scene = v })
   __def("uid", () => uid, (v) => { uid = v })
+  __def("scene", () => scene, (v) => { scene = v })
   __def("XF", () => XF, (v) => { XF = v })
+  __def("SCALE_RES", () => SCALE_RES, (v) => { SCALE_RES = v })
   __def("undoStack", () => undoStack, (v) => { undoStack = v })
   __def("view", () => view, (v) => { view = v })
-  __def("SCALE_RES", () => SCALE_RES, (v) => { SCALE_RES = v })
   __def("BUILD_QUALITY", () => BUILD_QUALITY, (v) => { BUILD_QUALITY = v })
   __def("historyReady", () => historyReady, (v) => { historyReady = v })
   __def("redoStack", () => redoStack, (v) => { redoStack = v })
@@ -7913,7 +7961,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 189 read-only. Getters hand out the LIVE value: 7 of
+  // 194 read-only. Getters hand out the LIVE value: 8 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("TYPES", () => TYPES, __ro("TYPES"))
@@ -7922,38 +7970,40 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("makeNode", () => makeNode, __ro("makeNode"))
   __def("evalGraph", () => evalGraph, __ro("evalGraph"))
   __def("newField", () => newField, __ro("newField"))
-  __def("gnoise", () => gnoise, __ro("gnoise"))
   __def("buildIndex", () => buildIndex, __ro("buildIndex"))
-  __def("buffers", () => buffers, __ro("buffers"))
+  __def("gnoise", () => gnoise, __ro("gnoise"))
   __def("fbmField", () => fbmField, __ro("fbmField"))
-  __def("VARS", () => VARS, __ro("VARS"))
+  __def("buffers", () => buffers, __ro("buffers"))
   __def("fieldH", () => fieldH, __ro("fieldH"))
+  __def("fieldW", () => fieldW, __ro("fieldW"))
+  __def("VARS", () => VARS, __ro("VARS"))
+  __def("GPU", () => GPU, __ro("GPU"))
   __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
   __def("outputNode", () => outputNode, __ro("outputNode"))
+  __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("resolveColor", () => resolveColor, __ro("resolveColor"))
   __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("cloneParams", () => cloneParams, __ro("cloneParams"))
-  __def("fieldW", () => fieldW, __ro("fieldW"))
+  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
   __def("buildProps", () => buildProps, __ro("buildProps"))
   __def("glc", () => glc, __ro("glc"))
   __def("canyonFieldCPU", () => canyonFieldCPU, __ro("canyonFieldCPU"))
-  __def("GPU", () => GPU, __ro("GPU"))
   __def("select", () => select, __ro("select"))
   __def("updateViewport", () => updateViewport, __ro("updateViewport"))
   __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
+  __def("AUXMAPS", () => AUXMAPS, __ro("AUXMAPS"))
   __def("curField", () => curField, __ro("curField"))
-  __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
   __def("u", () => u, __ro("u"))
+  __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
   __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
   __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
   __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
-  __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
   __def("portPos", () => portPos, __ro("portPos"))
   __def("PORTS_EXPR", () => PORTS_EXPR, __ro("PORTS_EXPR"))
   __def("renderGL", () => renderGL, __ro("renderGL"))
@@ -7961,17 +8011,18 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("activePreviewNode", () => activePreviewNode, __ro("activePreviewNode"))
   __def("frameHero", () => frameHero, __ro("frameHero"))
-  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
   __def("blankGraph", () => blankGraph, __ro("blankGraph"))
   __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
+  __def("DOCTRINE", () => DOCTRINE, __ro("DOCTRINE"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
   __def("planView", () => planView, __ro("planView"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
   __def("transformField", () => transformField, __ro("transformField"))
+  __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
   __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
@@ -7994,6 +8045,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("erosion2Field", () => erosion2Field, __ro("erosion2Field"))
   __def("gpuFbm", () => gpuFbm, __ro("gpuFbm"))
   __def("gpuHydraulicDroplets", () => gpuHydraulicDroplets, __ro("gpuHydraulicDroplets"))
+  __def("gpuReady", () => gpuReady, __ro("gpuReady"))
   __def("nearestUpstreamNode", () => nearestUpstreamNode, __ro("nearestUpstreamNode"))
   __def("nodeOutputs", () => nodeOutputs, __ro("nodeOutputs"))
   __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
@@ -8003,15 +8055,17 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("bakeThumb", () => bakeThumb, __ro("bakeThumb"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
   __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
+  __def("documentSamples", () => documentSamples, __ro("documentSamples"))
   __def("exactChain", () => exactChain, __ro("exactChain"))
   __def("linkDrop", () => linkDrop, __ro("linkDrop"))
   __def("nodeH", () => nodeH, __ro("nodeH"))
+  __def("previewDetail", () => previewDetail, __ro("previewDetail"))
   __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
   __def("warpField", () => warpField, __ro("warpField"))
   __def("weatherColorField", () => weatherColorField, __ro("weatherColorField"))
   __def("windVectorFromField", () => windVectorFromField, __ro("windVectorFromField"))
-  __def("AUXMAPS", () => AUXMAPS, __ro("AUXMAPS"))
+  __def("applyPreviewDetail", () => applyPreviewDetail, __ro("applyPreviewDetail"))
   __def("bakeCurve", () => bakeCurve, __ro("bakeCurve"))
   __def("buildSatLUT", () => buildSatLUT, __ro("buildSatLUT"))
   __def("cameraEye", () => cameraEye, __ro("cameraEye"))
@@ -8024,10 +8078,11 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("drawGraph", () => drawGraph, __ro("drawGraph"))
   __def("edgeByKey", () => edgeByKey, __ro("edgeByKey"))
   __def("evalExact", () => evalExact, __ro("evalExact"))
-  __def("gpuReady", () => gpuReady, __ro("gpuReady"))
+  __def("hexNb", () => hexNb, __ro("hexNb"))
   __def("hydraulicErode", () => hydraulicErode, __ro("hydraulicErode"))
   __def("organizeGraph", () => organizeGraph, __ro("organizeGraph"))
   __def("portAt", () => portAt, __ro("portAt"))
+  __def("previewCreation", () => previewCreation, __ro("previewCreation"))
   __def("pushUndo", () => pushUndo, __ro("pushUndo"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
@@ -8038,9 +8093,9 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("buildField", () => buildField, __ro("buildField"))
   __def("canyonBeds", () => canyonBeds, __ro("canyonBeds"))
   __def("CAT", () => CAT, __ro("CAT"))
-  __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
   __def("colorErodeField", () => colorErodeField, __ro("colorErodeField"))
   __def("combine", () => combine, __ro("combine"))
+  __def("confirmNewTerrain", () => confirmNewTerrain, __ro("confirmNewTerrain"))
   __def("curveFromExponent", () => curveFromExponent, __ro("curveFromExponent"))
   __def("curWaterLiquid", () => curWaterLiquid, __ro("curWaterLiquid"))
   __def("DOMAIN", () => DOMAIN, __ro("DOMAIN"))
@@ -8053,16 +8108,15 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("gpuHydraulicPipes", () => gpuHydraulicPipes, __ro("gpuHydraulicPipes"))
   __def("gpuThermal", () => gpuThermal, __ro("gpuThermal"))
   __def("HEX_SQUARE_WORLD", () => HEX_SQUARE_WORLD, __ro("HEX_SQUARE_WORLD"))
-  __def("hexNb", () => hexNb, __ro("hexNb"))
   __def("maskApply", () => maskApply, __ro("maskApply"))
   __def("normalize", () => normalize, __ro("normalize"))
   __def("occlusionField", () => occlusionField, __ro("occlusionField"))
   __def("outSlotForEdge", () => outSlotForEdge, __ro("outSlotForEdge"))
-  __def("previewCreation", () => previewCreation, __ro("previewCreation"))
   __def("propagateFieldMetadata", () => propagateFieldMetadata, __ro("propagateFieldMetadata"))
   __def("renderLook", () => renderLook, __ro("renderLook"))
   __def("satLayerColor", () => satLayerColor, __ro("satLayerColor"))
   __def("sculptField", () => sculptField, __ro("sculptField"))
+  __def("setDocumentSamples", () => setDocumentSamples, __ro("setDocumentSamples"))
   __def("slopeOf", () => slopeOf, __ro("slopeOf"))
   __def("smax", () => smax, __ro("smax"))
   __def("smin", () => smin, __ro("smin"))
@@ -8077,9 +8131,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("cameraNear", () => cameraNear, __ro("cameraNear"))
   __def("CANYON_STYLE_ID", () => CANYON_STYLE_ID, __ro("CANYON_STYLE_ID"))
   __def("canyonField", () => canyonField, __ro("canyonField"))
-  __def("confirmNewTerrain", () => confirmNewTerrain, __ro("confirmNewTerrain"))
   __def("curveAt", () => curveAt, __ro("curveAt"))
-  __def("DOCTRINE", () => DOCTRINE, __ro("DOCTRINE"))
   __def("FEASIBILITY_API", () => FEASIBILITY_API, __ro("FEASIBILITY_API"))
   __def("gbuf", () => gbuf, __ro("gbuf"))
   __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
@@ -8101,6 +8153,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("smooth", () => smooth, __ro("smooth"))
   __def("snapshotIsEditorOnly", () => snapshotIsEditorOnly, __ro("snapshotIsEditorOnly"))
   __def("surfaceHeight", () => surfaceHeight, __ro("surfaceHeight"))
+  __def("syncDetailReadout", () => syncDetailReadout, __ro("syncDetailReadout"))
   __def("thermalErodeHex", () => thermalErodeHex, __ro("thermalErodeHex"))
   __def("viewportHeightFrame", () => viewportHeightFrame, __ro("viewportHeightFrame"))
   __def("WIND_MAX_MPS", () => WIND_MAX_MPS, __ro("WIND_MAX_MPS"))

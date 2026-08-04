@@ -26,7 +26,8 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   // probe below, and evalGraph() ends in finishGraphEvaluation() which itself calls updateViewport
   // (legacy.js:3155), so curField is rebuilt from the new document rather than left holding L0's.
   // This is byte-for-byte the app's own boot path: defaultGraph(); evalGraph(); (legacy.js:6538).
-  // It also has to happen HERE, before #resSel is moved to 2048: that queues a resolution without
+  // It also has to happen HERE, before #resSel is moved to full detail on a 2048-sample document:
+  // that queues a resolution without
   // rebuilding (legacy.js:6051) and the "· Queued" it leaves in the chip is load-bearing for the
   // lattice assertions, so no build may run after it.
   const setup=await page.evaluate(()=>{
@@ -44,7 +45,12 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     resolutions:[...resSel.options].map(o=>+o.value)}));
   await page.locator('#buildProfileBtn').click();
   const profileOpen=await page.evaluate(()=>({open:!buildSettings.hidden,controls:['resSel','qualitySel','gpuBtn','scaleBtn'].every(id=>!!document.getElementById(id))}));
-  await page.locator('#resSel').selectOption('2048');
+  // #resSel now carries FRACTIONS of the document's own grid, not absolute sample counts — the old
+  // absolute list let a 1024 selection halve the sample spacing of a 512-sample world, which is a
+  // different simulation presented as a preview setting. The queue-on-large behaviour is unchanged
+  // and still worth gating, so the document is set large and full detail is selected to reach it.
+  await page.evaluate(() => { setDocumentSamples(2048); });
+  await page.locator('#resSel').selectOption('1');
   const queued=await page.evaluate(()=>({active:RES,target:TARGET_RES,auto:AUTO,detail:profileDetail.textContent}));
   await page.screenshot({path:path.resolve(__dirname,'_shot_toolbar_profile.png')});
   await page.locator('#commandBtn').click();
@@ -83,7 +89,7 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
     &&!lattice.square.includes('Hex')&&lattice.hex.includes('Hex')
     &&!lattice.undone.includes('Hex')&&lattice.redone.includes('Hex')&&!lattice.restored.includes('Hex')
     &&lattice.hex.includes('CPU')&&lattice.redone.includes('CPU')   /* hex forces the CPU path */
-    &&[512,1024,2048,4096].every(n=>initial.resolutions.includes(n))
+    &&[0.25,0.5,0.75,1].every(n=>initial.resolutions.includes(n))
     &&profileOpen.open&&profileOpen.controls&&queued.active===512&&queued.target===2048&&!queued.auto&&queued.detail.includes('Queued')
     &&filtered.profileClosed&&filtered.menu&&filtered.visible.length===1&&filtered.visible[0]==='find-water'
     &&located.selected==='water'&&located.menuClosed&&keyboardOpen

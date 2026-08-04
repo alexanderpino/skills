@@ -719,12 +719,14 @@ select.sg-btn{appearance:auto}
         </button>
         <section class="top-popover build-settings" id="buildSettings" aria-label="Build settings" hidden>
           <div class="top-popover-head"><b>Build profile</b><small>preview runtime</small></div>
-          <div class="build-setting"><label for="resSel">Working resolution</label>
-            <select class="inp" id="resSel" title="Working resolution">
-              <option value="128">128²</option><option value="192">192²</option><option value="256">256²</option>
-              <option value="512" selected>512²</option><option value="1024">1024²</option>
-              <option value="2048">2048²</option><option value="4096">4096²</option>
+          <div class="build-setting"><label for="resSel">Preview detail</label>
+            <select class="inp" id="resSel" title="What fraction of the document's own grid to evaluate. This changes cost and fidelity only — the terrain's size and sample spacing are set when you create or resize it.">
+              <option value="0.25">25%</option><option value="0.5">50%</option>
+              <option value="0.75">75%</option><option value="1" selected>100% (full)</option>
             </select></div>
+          <div class="build-setting-note" id="detailReadout">&nbsp;</div>
+          <div class="build-setting"><label>Terrain size</label>
+            <button class="btn setting-toggle" id="resizeBtn" type="button" title="Change the document's sample count and extent explicitly, the same way New Terrain sets them">Resize terrain…</button></div>
           <div class="build-setting"><label for="qualitySel">Simulation quality</label>
             <select class="inp" id="qualitySel" title="Interactive caps simulation travel for responsive previews; Final uses the full resolution-scaled budget">
               <option value="interactive" selected>Interactive</option><option value="final">Final</option>
