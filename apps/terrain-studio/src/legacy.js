@@ -5797,8 +5797,23 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // shader does one multiply rather than re-deriving the projection it cannot see.
       float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
       vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, WN);
-      float wet=clamp(vDepth*40.0,0.0,1.0);
-      float amp=wet*uWaveAmp;
+      // SHOALING, which this had exactly backwards. The old fade took the waves to ZERO as water got
+      // shallower, so the sea went glassy precisely where real water is at its roughest. Waves
+      // entering shallow water slow down, shorten, and GROW: Green's law gives amplitude rising as
+      // depth^(-1/4). They keep growing until the crest outruns the wave and it breaks, which
+      // happens at a height of about 0.78 of the local depth (the McCowan limit).
+      //
+      // So three factors, not one:
+      //   shoal  - amplitude gain from Green's law, referenced to a deep-water depth and capped so
+      //            a numerically tiny depth cannot produce an infinite wave
+      //   surf   - the breaking limit: a wave can never be taller than 0.78 x the water under it,
+      //            which is what makes the swell rear up and then collapse as it reaches the beach
+      //   dry    - a hard cutoff over the last centimetres so no wave stands on dry land
+      float depthM=max((aw-ah)*uTerrainHeight,0.001);
+      float shoal=clamp(pow(max(uShoalRefM/depthM,1.0),0.25),1.0,2.6);
+      float dry=clamp(depthM*2.0,0.0,1.0);
+      float amp=min(uWaveAmp*shoal,0.78*depthM)*dry;
+      float wet=dry;
       vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
       vW=vec3(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale);
       gl_Position=uMVP*vec4(vW,1.);}`
@@ -5807,11 +5822,11 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
     precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;out vec4 frag;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
     ${(waterShaderSources.forwardDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
@@ -5878,7 +5893,7 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     // the same normalised axis, so one conversion serves all three components.
     const wmVs=`#version 300 es
       in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;
-      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;
+      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
 ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       void main(){
         vDepth=(aw-ah)*uH;
@@ -5888,8 +5903,23 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         // so a dry cell is untouched and the shore grows no fringe of waves standing on land.
         // uWaveAmp is the authored height IN METRES and can be 30+. Using one value for both made
         // the normal's mix() extrapolate far past 1 and produced nonsense shading.
-        float wet=clamp(vDepth*40.0,0.0,1.0);
-        float amp=wet*uWaveAmp;
+        // SHOALING, which this had exactly backwards. The old fade took the waves to ZERO as water got
+          // shallower, so the sea went glassy precisely where real water is at its roughest. Waves
+          // entering shallow water slow down, shorten, and GROW: Green's law gives amplitude rising as
+          // depth^(-1/4). They keep growing until the crest outruns the wave and it breaks, which
+          // happens at a height of about 0.78 of the local depth (the McCowan limit).
+          //
+          // So three factors, not one:
+          //   shoal  - amplitude gain from Green's law, referenced to a deep-water depth and capped so
+          //            a numerically tiny depth cannot produce an infinite wave
+          //   surf   - the breaking limit: a wave can never be taller than 0.78 x the water under it,
+          //            which is what makes the swell rear up and then collapse as it reaches the beach
+          //   dry    - a hard cutoff over the last centimetres so no wave stands on dry land
+        float depthM=max((aw-ah)*uTerrainHeight,0.001);
+        float shoal=clamp(pow(max(uShoalRefM/depthM,1.0),0.25),1.0,2.6);
+        float dry=clamp(depthM*2.0,0.0,1.0);
+        float amp=min(uWaveAmp*shoal,0.78*depthM)*dry;
+        float wet=dry;
         vWaveN=normalize(mix(vec3(0.,1.,0.),N,wet));
         gl_Position=uMVP*vec4(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale, 1.);
       }`;
@@ -6940,10 +6970,19 @@ function drawWaterDepth(MVP,ex,ey,ez){
   setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);gl.uniform1f(u(waterMaskProg,"uScale"),terrainDef.scale);
   gl.uniform1f(u(waterMaskProg,"uTime"),uTime);   // the SAME clock the forward pass uses — ADR-006 requires one time
   gl.uniform3f(u(waterMaskProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterMaskProg,"uMppK"),mppPerUnitDistance());
+  gl.uniform1f(u(waterMaskProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterMaskProg,"uShoalRefM"),shoalReferenceM());
   gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
   bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+}
+function shoalReferenceM(){
+  // The depth at which shoaling starts to matter. Physically that is roughly half the wavelength,
+  // but tying it to the authored wave height keeps one control: a 12 m swell starts rearing up in
+  // about 24 m of water, which is where a real one does. Floored so a flat-calm sea still has a
+  // sane reference rather than dividing by nothing.
+  const a=(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM);
+  return Math.max(4, a*2);
 }
 function mppPerUnitDistance(){
   // The fade needs metres per pixel, and only the JS side knows the projection. Deriving it
@@ -7025,7 +7064,7 @@ function renderGL(){
       gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
-      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterProg,"uMppK"),mppPerUnitDistance());
+      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterProg,"uMppK"),mppPerUnitDistance());gl.uniform1f(u(waterProg,"uShoalRefM"),shoalReferenceM());
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
       bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"ais",1,buffers.iceSnow);bindAttr(waterProg,"aice",1,buffers.ice);
       bindAttr(waterProg,"awn",3,buffers.wnrm);bindAttr(waterProg,"asnowN",3,buffers.iceSnowNrm);
