@@ -404,6 +404,24 @@ export function gpuHydraulicPipes(inp,opts={}){
   const rgba=GPU.readRGBA(state,simN);
   const o=new Float32Array(n*nh);let sumIn=0,sumOut=0,settled=0,sumSimOut=0;
   for(let i=0;i<simN*simN;i++)sumSimOut+=rgba[i*4]+rgba[i*4+2];
+  // THE APRON RING, ACCUMULATED IN ITS OWN RIGHT. Every loss term here used to be a difference of
+  // sums over NESTED cell sets — `cropExchange: sumIn-sumOut` and `lost: sumSimIn-sumSimOut` — so
+  // any closure identity computed from them held by construction, for any implementation, including
+  // one that deleted the terrain. A Sprint 3 audit found the guard meant to catch that
+  // (`exportedDerived:false`) was itself a hardcoded literal on this very object: the ledger
+  // declared itself itemized while its only loss term was a subtraction.
+  //
+  // Core and apron are DISJOINT, so accumulating the apron separately gives a genuinely independent
+  // reading of the same physical quantity. If the kernel conserves mass, what leaves the core
+  // arrives in the apron: (sumIn - sumOut) == (apronOut - apronIn) to within float error. If it
+  // does not, the two disagree — which no subtraction of nested sums could ever show.
+  let apronIn=0,apronOut=0,apronCells=0;
+  for(let y=0;y<simN;y++)for(let x=0;x<simN;x++){
+    const inCore=(y>=apron&&y<apron+nh&&x>=apron&&x<apron+n);
+    if(inCore)continue;
+    const si=(y*simN+x)*4;
+    apronIn+=padded[y*simN+x];apronOut+=rgba[si]+rgba[si+2];apronCells++;
+  }
   for(let y=0;y<nh;y++)for(let x=0;x<n;x++){
     const i=y*n+x,si=((y+apron)*simN+x+apron)*4;
     o[i]=rgba[si]+rgba[si+2];
@@ -412,7 +430,15 @@ export function gpuHydraulicPipes(inp,opts={}){
   const sumSimIn=fieldSum(padded);
   hydroMassDiag={engine:"pipes",settle:true,boundaryPolicy:"continuation-apron-closed-wall",
     boundaryApronCells:apron,sumIn,sumOut,settled,cropExchange:sumIn-sumOut,
-    sumSimIn,sumSimOut,exported:0,exportedDerived:false,lost:sumSimIn-sumSimOut};
+    sumSimIn,sumSimOut,
+    // Itemized: accumulated over the apron ring, a disjoint cell set from the core. `exportedDerived`
+    // now reports the truth about THIS field rather than being a constant.
+    apronCells,apronIn,apronOut,exportedToApron:apronOut-apronIn,exported:apronOut-apronIn,
+    exportedDerived:false,
+    // Total non-conservation across the WHOLE simulated domain, apron included. This is what the
+    // field named `lost` always was, and it is NOT export: material leaving the core is still inside
+    // the padded domain. It should be ~0, and calling it "lost" hid that.
+    nonConservation:sumSimIn-sumSimOut,lost:sumSimIn-sumSimOut};
   return o;
 }
 

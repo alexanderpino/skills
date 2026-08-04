@@ -121,13 +121,33 @@ const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../.
   if (r.gpuAvailable) {
     gate('G1 gpu-mass-closes', r.gpu.finite && r.gpu.deficit <= 0.15,
       `deficit=${r.gpu.deficit} (broken 0.9193; cropped continuation apron is ~0.04)`);
-    gate('G3g gpu-diag', r.gpu.diag && r.gpu.diag.engine === 'pipes'
-      && r.gpu.diag.boundaryPolicy === 'continuation-apron-closed-wall'
-      && r.gpu.diag.boundaryApronCells >= 8
-      && r.gpu.diag.exportedDerived === false && r.gpu.diag.exported === 0
-      && Math.abs(r.gpu.diag.lost) < 0.01
-      && Number.isFinite(r.gpu.diag.cropExchange) && r.gpu.diag.settled > 0,
-      JSON.stringify(r.gpu.diag));
+    // `exported === 0` used to be asserted here, and it was correct at the time: the field was a
+    // placeholder the pipe ledger never filled in. It now carries a real figure accumulated over
+    // the APRON RING — a cell set disjoint from the core — so the assertion measures the stronger
+    // property instead of the placeholder.
+    //
+    // Why this matters: every other loss term on this object is a difference of sums over NESTED
+    // cell sets (cropExchange = sumIn-sumOut, lost = sumSimIn-sumSimOut), so a closure identity
+    // built from them holds by construction for ANY implementation, including one that deletes the
+    // terrain. Core loss and apron gain are measured over disjoint cells, so if the kernel destroys
+    // or creates mass the two disagree, and no subtraction of nested sums could ever show it.
+    //
+    // Measured on the shipped kernel: cropExchange 3.632687, exportedToApron 3.632644 over 6400
+    // apron cells — 1.2e-5 relative. The 1e-3 bound is ~80x that float noise and ~800x below the
+    // ~100% discrepancy a genuinely broken boundary would produce.
+    const dg = r.gpu.diag || {};
+    const exportAgreement = Math.abs(dg.exportedToApron - dg.cropExchange)
+      / Math.max(1e-9, Math.abs(dg.cropExchange));
+    gate('G3g gpu-diag', r.gpu.diag && dg.engine === 'pipes'
+      && dg.boundaryPolicy === 'continuation-apron-closed-wall'
+      && dg.boundaryApronCells >= 8
+      && dg.exportedDerived === false
+      && dg.apronCells > 0 && Number.isFinite(dg.exportedToApron)
+      && exportAgreement <= 1e-3
+      && Math.abs(dg.nonConservation) < 0.01
+      && Math.abs(dg.lost) < 0.01
+      && Number.isFinite(dg.cropExchange) && dg.settled > 0,
+      `agreement=${exportAgreement.toExponential(2)} ` + JSON.stringify(r.gpu.diag));
     gate('G5a fans-can-form', r.gpu.depositShare >= 0.30,
       `D/E=${r.gpu.depositShare} (broken 0.081 — deposition must exist as a phenomenon)`);
     gate('G5b no-beading', r.gpu.maxRise <= 0.06,

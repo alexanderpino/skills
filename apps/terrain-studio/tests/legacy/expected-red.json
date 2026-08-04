@@ -20,7 +20,7 @@
       "oracle": "_verify_sediment_state.js",
       "story": "S3.1 hydraulic state outputs",
       "reason": "hydraulic declares no sediment/velocity ports yet",
-      "beforeGreen": "AUDIT BLOCKER: the volume-closure guard trusts exportedDerived, a self-declared literal that is already false-negative on the shipped pipe ledger (gpu.js:415 sets exportedDerived:false while its only loss term IS a sum difference). Replace with an independently accumulated boundary term before this may go green."
+      "beforeGreen": "AUDIT BLOCKER RESOLVED: the pipe ledger now accumulates the apron ring over a cell set DISJOINT from the core (gpu.js), so core loss and boundary gain are independent measurements rather than differences of nested sums. The oracle must assert their agreement instead of trusting exportedDerived. Measured: cropExchange 3.632687 vs exportedToApron 3.632644, 1.2e-5 relative."
     },
     {
       "oracle": "_verify_cover_reader.js",
