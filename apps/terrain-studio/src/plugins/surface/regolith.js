@@ -105,6 +105,14 @@ export const heimsathDepthM = (h0M, p0MmPerYr, hStarM, years, climate) => {
 }
 
 export default definePlugin({
+  // IDENTITY IS DECLARED, NOT INFERRED. The S3.2 gate discovered its producer by output
+  // semantic, then by semantic plus a /duration/i parameter, and BOTH collapsed inside one
+  // sprint: S3.4's selectors republish `soilDepth`, and S3.5c gave erosion2 both a soilDepth
+  // output and a duration slider, so it satisfied every heuristic and sorted first. Three
+  // failures of the same shape is a design answer, not a third patch: a node that PRODUCES a
+  // field says so, and everything else is a consumer or a republisher no matter what it
+  // happens to declare.
+  producerOf: ['soilDepth'],
   type: 'regolith',
   cat: 'surface',
   name: 'Regolith',

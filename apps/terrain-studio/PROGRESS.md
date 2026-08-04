@@ -316,10 +316,84 @@ turns green without the register being pruned.
 | Story | State | Gate |
 |---|---|---|
 | S3.1 hydraulic state outputs | **done** `bfe18e8` | sediment state 6/6 armed, 30 gates |
-| S3.2 regolith producer | **done** `e3114c4` | soildepth 4/4 armed, 22 gates |
-| S3.3 cover-aware transport | in flight | cover erosion, registered red |
+| S3.2 regolith producer | **done** `e3114c4` | soildepth 4/4 armed, 22 gates — **now red, see below** |
+| S3.3 cover-aware transport | **done** | cover erosion 8/8 armed, 36 gates, register pruned |
 | S3.4 explicit state selectors | **done** `c468185` | cover reader 8/8 armed |
-| S3.5 transport co-evolution | pending, D21 authorised | transport co-evolution manifest green |
+| S3.5 transport co-evolution | **done** — ledger 4 → 0 | transport co-evolution 8/8 armed |
+
+### S3.5 — the exemption ledger reached zero
+
+Four commits, one node each (D21), each with a digest delta naming that node and nothing else. **Not
+one of the four needed a re-bless**: the cover work is demand-gated, so a graph that wires no cover
+publishes the field it published yesterday, byte for byte, and `_verify_digest.js` — which evaluates
+with no `ctx` at all — never sees the typed return.
+
+    transport=4 compliant=4 ledger=0 coUpdateTargets=2 deliveryRows=4 undelivered=[]
+    npm run verify -- _verify_digest.js     92/92 bit-identical, skipped 0
+
+`hydraulic` was last. Its implementation was S3.3's and is untouched; only the ledger reading was
+outstanding. Three things had to be settled to flip it honestly.
+
+**`wetness` was dropped, on measurement rather than convenience.** The pipe solver does carry a
+per-cell water column that S3.1's atlas already reads back, so publishing it would have cost no
+second synchronisation point — the question was whether it is a wetness map. It is not, on five
+independent readings plus the doctrine:
+
+| Reading | Measured |
+|---|---|
+| Magnitude is the iteration slider | mean 0.00888 (8 iters) → 0.07870 (360), tracking the no-flow `(w+rain)·evap` recursion to within 1%; **51.3% converged** at the shipped 48 |
+| Pattern is not stable either | Pearson r vs the 48-iteration field: 0.493 / 0.762 / 1.000 / 0.686 / 0.418 / **0.176** |
+| Not Res-Lock invariant | gridK 1/2/3 → means 0.0404 / 0.0393 / 0.0373, correlations 1.000 / 0.433 / 0.316 |
+| It is a depth, not an index | normalised height units × relief = metres; that is `waterDepth` (S4.4), and normalising it needs a reference nobody has measured |
+| One engine of three | GPU droplets return no water key; the CPU droplet ledger has none; hex has no pipe solver |
+
+And sprint-02:194 / `BACKLOG §2` require `wetness` **split, not averaged** — the state map is
+path-dependent *saturation*, and "a plugin declaring one does not satisfy the other". Nothing carries
+wetness into this node or out of it, so there is no history for a co-update to preserve. The producer
+the plan names is S5.3/S5.4; `aux-maps.js` now says so instead of naming S3.3, which shipped without
+it. `coUpdateTargets` fell 3 → 2 and the `evidenceNonEmpty` bounds were **re-measured, not relaxed**:
+signatures 5 → 4, transport co-update sets 2 → 1, targets 3 → 2, all now exact equalities at the only
+values the manifest can produce, with the target names asserted rather than just the count.
+
+**`transport-claims-compliant` was retired, not repointed.** With no exempt row left it could only
+assign a value production already holds. What replaces it is the opposite direction taken twice —
+`transport-drops-compliance` on the first row S3.5 flipped and the new `hydraulic-drops-compliance`
+on the last. Both make `exemptionLedger` emit a real entry again, which is what keeps
+`ledger.length === 0` from being an assertion about a function that can no longer produce entries.
+
+**And extending `_verify_cover_erosion.js` found three half-gates in it — including the one this
+sprint has now hit four times.**
+
+1. **The cover-book bound scaled with standing cover, not with what moved.** On the shipping square
+   GPU path the shipped bound sat **2.26×** under the transport it constrains, so the closure could
+   not have seen 40% of the book go missing. Corrected to the double unit over the absolute per-cell
+   *change*: arming 4.8e11 … 2.2e12. Both endpoints are re-measured every run, so the rejected bound
+   is a live delta rather than a note.
+2. **The ledger bound had no arming at all.** Measured 4.2× on the pipe path, 282–340× on the droplet
+   paths — tight, armed, and now asserted. Its float32 unit is kept deliberately: the loss side is
+   the solver's own float32 accumulation and the residual is the kernel's real non-conservation.
+3. **The refusal had never been exercised.** `resolveCoverLoss` publishes nothing for `gpu-droplets`
+   and `gpu-combined`, whose export is `sumIn - sumOut` — but every run was pipe-only, so no run ever
+   reached either engine under cover demand. That refusal was a claim in the manifest with no gate
+   behind it. Two runs now reach them and it is graded on four readings, including *which engine
+   actually ran*, so a silent fallback to the CPU droplet kernel cannot pass as a refusal.
+
+Armed controls: cover erosion **8/8**, transport co-evolution **8/8**, zero vacuous.
+
+### Defect found, NOT fixed here: `_verify_soildepth.js` is red in the tree
+
+Measured red **before and after** this change, identically — `git stash` on the unmodified tree
+reproduces the same 14 failed gates. It is S3.2's gate and the cause is S3.5's own work:
+
+    FAIL soildepth producer=erosion2 ... failed=[producerRegistered, ...14]
+
+Discovery is by output semantic `soilDepth`, discriminated by "a producer integrates over time" — a
+param matching `/duration/i`. That discriminator was itself the repair for an earlier collapse of the
+same kind. It has now collapsed again: `erosion2` gained a `soilDepth` output in S3.5c **and** has a
+`duration` slider, so it satisfies both tests and sorts first. The gate is behaving correctly; the
+discriminator needs a third form (the Heimsath `p0`/`hStar` params are the obvious candidate, being
+the thing only the producer can have). Left alone deliberately — it is outside this commit's files
+and fixing it here would confound the one-node-per-commit delta.
 
 Node types **88 → 92**. Preconditions that had to be built first because the sprint assumed them:
 the port vocabulary (`soilDepth`, `sedimentDepth`, `sandDepth`, `solidTop`, `bedrockHeight`,

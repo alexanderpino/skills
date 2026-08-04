@@ -21,9 +21,19 @@
 // transport count and the compliant count as HARD NUMBERS, and names which rows hold which value.
 // Every node S3.5 makes compliant therefore turns this oracle red and forces the update into the
 // same commit as the implementation — that is the intended behaviour, and it is what makes the
-// position a measurement rather than a comment. It has now fired three times: 0 -> 1 (thermal),
-// 1 -> 2 (streampower), 2 -> 3 (erosion2). `--mutate=transport-claims-compliant` and
-// `--mutate=transport-drops-compliance` demonstrate it biting from both sides today.
+// position a measurement rather than a comment. It fired four times: 0 -> 1 (thermal),
+// 1 -> 2 (streampower), 2 -> 3 (erosion2), 3 -> 4 (hydraulic), and the ledger is now EMPTY.
+//
+// AN EMPTY LEDGER IS EXACTLY THE SHAPE THIS FILE WAS BUILT TO STOP BEING. The whole reason
+// src/core/transport-classes.js exists is that S3.5's acceptance line — "the final exemption ledger
+// contains no material-transport entry" — was originally an empty grep over a structure nobody had
+// built, green on day one and green forever. Reaching a genuine zero brings the same hazard back
+// wearing a different hat: `ledger.length === 0` is also what a broken `exemptionLedger` returns.
+// So the zero is armed. `--mutate=transport-drops-compliance` reverts the FIRST row S3.5 flipped and
+// `--mutate=hydraulic-drops-compliance` reverts the LAST; either one makes the ledger emit a real
+// entry again, which is what proves the emptiness is a reading of four examined rows. The old
+// up-side control `transport-claims-compliant` is RETIRED, because with no exempt row left it could
+// only assign a value production already holds — a silent no-op that reads as coverage.
 //
 // EXPECTATION SOURCE
 // ------------------
@@ -44,14 +54,22 @@ const MUTATIONS = [
   'class-without-owner',          // a declared class no row owns
   'writers-list-empty',           // production reports no height writers — absence of evidence
   'coupdate-target-unregistered', // a co-update target that is not a registered STATE aux map
-  // The compliance reading, armed from BOTH sides. `transport-claims-compliant` targets a node that
-  // is NOT yet compliant (so it moves the count up and the ledger down); `transport-drops-compliance`
-  // targets the one that IS (so it moves them back the other way). Before S3.5 landed its first node
-  // only the first of these was possible, and it targeted `thermal`; repointing it was mandatory,
-  // because a control that flips a row to the value production already holds is not a control at
-  // all — it is a silent no-op that reads as coverage.
-  'transport-claims-compliant',   // a still-exempt transport row claims compliance
-  'transport-drops-compliance',   // the compliant transport row reverts to exempt
+  // THE COMPLIANCE READING, AND WHY ITS UP-SIDE CONTROL IS GONE. Until S3.5d this pair was armed
+  // from both directions: `transport-claims-compliant` flipped a still-exempt row UP (count up,
+  // ledger down) and `transport-drops-compliance` flipped a compliant row back DOWN. The ledger has
+  // now reached 0, so there is no exempt row left for the up-side control to target — flipping any
+  // row to `compliant: true` assigns the value production already holds, which is a silent no-op
+  // that reads as coverage. It is RETIRED rather than repointed; its job finished the moment the
+  // ledger emptied.
+  //
+  // WHAT REPLACES IT IS THE OTHER DIRECTION, TAKEN TWICE, FROM OPPOSITE ENDS OF THE MANIFEST.
+  // `ledger.length === 0` is the vacuous-search shape this whole module was built to stop being —
+  // it is equally true of an `exemptionLedger` that can no longer emit anything at all. Each of
+  // these makes it emit a real row again: one targets the FIRST node S3.5 made compliant, the other
+  // targets the LAST, so the zero is demonstrated to be a reading of the manifest rather than a
+  // property of the function.
+  'transport-drops-compliance',   // the first compliant row (thermal) reverts to exempt
+  'hydraulic-drops-compliance',   // ...and the last one (hydraulic), the row S3.5d moved
   // S3.5c. `coUpdates` was documentation until this control existed: nothing checked that a row's
   // targets were maps the node can actually publish, so a compliant row could name anything at all.
   'compliant-row-claims-undelivered-coupdate',
@@ -74,11 +92,11 @@ const REVIEWED = {
 }
 const SPRINT_FOUR = ['hydraulic', 'thermal', 'streampower', 'erosion2']
 const EXPECTED_TRANSPORT_COUNT = SPRINT_FOUR.length   // 4
-// S3.5 IN PROGRESS — the count moved, and that transition is the story's evidence.
+// S3.5 COMPLETE — the count moved four times, and that sequence is the story's whole evidence.
 //
 // This shipped as `0` and was asserted as a hard number so that the first compliant node would turn
-// this oracle RED and force the update into the same commit as the implementation. That has now
-// happened three times:
+// this oracle RED and force the update into the same commit as the implementation. It has now done
+// so four times, 0 -> 1 -> 2 -> 3 -> 4:
 //   thermal      consumes loose cover before bedrock and moves what slides into `sedimentDepth`
 //                (tests/legacy/_verify_thermal_coevolution.js)
 //   streampower  consumes loose cover before bedrock, stays detachment-limited so it deposits
@@ -90,16 +108,39 @@ const EXPECTED_TRANSPORT_COUNT = SPRINT_FOUR.length   // 4
 //                and names the two stages that raise the surface without transporting anything, and
 //                publishes only the SOLE hydraulic stage's own solver counters where there is one
 //                (tests/legacy/_verify_erosion2_coevolution.js)
-// The number is 3, and it is still a hard number: the last node to land turns this red again.
+//   hydraulic    the S3.3 implementation, whose ledger reading was the only thing outstanding:
+//                cover-first consumption from the published delta, deposition into the explicit
+//                sediment layer, the apron ring as an itemised boundary term on the pipe path, the
+//                droplet counters on the CPU path, and NO claim at all on the two engines whose
+//                export is `exportedDerived: true` (tests/legacy/_verify_cover_erosion.js)
+// The number is 4, which is the ceiling, and it is still a hard number: any row reverting turns
+// this red.
 //
-// The list is what makes the count non-vacuous. `compliantCount === 3` alone would be satisfied by
-// ANY three of the four claiming compliance; naming which ones is what a mutation can contradict —
-// `transport-claims-compliant` flips a node that is NOT yet compliant, and `transport-drops-compliance`
-// flips one that is back, so the reading is armed from both sides.
-const EXPECTED_COMPLIANT = ['thermal', 'streampower', 'erosion2']
+// The list is what makes the count non-vacuous. `compliantCount === 4` alone would be satisfied by
+// four rows of any names; naming them is what a mutation can contradict. With the count at its
+// ceiling the only perturbation left is downward, so it is taken from both ends of the sprint —
+// `transport-drops-compliance` on the first row S3.5 flipped and `hydraulic-drops-compliance` on
+// the last.
+const EXPECTED_COMPLIANT = ['hydraulic', 'thermal', 'streampower', 'erosion2']
 const EXPECTED_NON_COMPLIANT = SPRINT_FOUR.filter(node => !EXPECTED_COMPLIANT.includes(node))
-const EXPECTED_COMPLIANT_COUNT = EXPECTED_COMPLIANT.length   // 3
-const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUNT   // 1
+const EXPECTED_COMPLIANT_COUNT = EXPECTED_COMPLIANT.length   // 4
+const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUNT   // 0 — S3.5's acceptance
+// THE CO-UPDATE TARGET SET, RE-MEASURED RATHER THAN RELAXED. S3.5c's note predicted this: `hydraulic`
+// was the last row carrying `wetness`, and its own commit removed the target after MEASURING the
+// pipe solver's water column (see the row in src/core/transport-classes.js — a rain-accumulation
+// transient, iteration- and Res-Lock-dependent, a depth rather than the split saturation state
+// doctrine requires, and absent on two of three engines). All four rows therefore now name the same
+// two targets. These are exact equalities and not floors, because every one of them is at the only
+// value the current manifest can produce:
+//   coUpdateTargets     2   soilDepth, sedimentDepth — the union over four identical rows
+//   transport sets      1   all four rows carry the same pair
+//   signatures          4   1 transport set + the three non-transport classes, each with an empty
+//                           set. That is the MAXIMUM, not a floor with slack under it.
+// `compliant-row-claims-undelivered-coupdate` moves all three at once (it puts `wetness` back on a
+// compliant row), so the numbers are armed rather than merely recorded.
+const EXPECTED_COUPDATE_TARGETS = ['soilDepth', 'sedimentDepth']
+const EXPECTED_TRANSPORT_COUPDATE_SETS = 1
+const EXPECTED_SIGNATURES = 4
 
 ;(async () => {
   const browser = await chromium.launch({ executablePath: EXE,
@@ -161,16 +202,12 @@ const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUN
     if (mutation === 'unclassified-writer') manifest = manifest.filter(r => r.node !== 'thermal')
     if (mutation === 'transport-without-coupdate') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, coUpdates: [] } : r)
     if (mutation === 'coupdate-target-unregistered') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, coUpdates: ['topsoilThickness'] } : r)
-    // REPOINTED AGAIN IN S3.5c. This targeted `streampower` until S3.5b and `erosion2` until S3.5c;
-    // a control that flips a row to the value production already holds is not a control at all, it
-    // is a silent no-op that reads as coverage. `hydraulic` is now the ONLY exempt transport row, so
-    // it is the only target for which claiming compliance genuinely moves the count up and the
-    // ledger down. When its own flip lands there will be no such target left, and this control has
-    // to be retired rather than repointed — its job is done the moment the ledger reaches 0.
-    if (mutation === 'transport-claims-compliant') manifest = manifest.map(r => r.node === 'hydraulic' ? { ...r, compliant: true } : r)
-    // ...and `thermal` is one of the three that ARE compliant, so reverting it moves the count the
-    // other way.
+    // All four transport rows are compliant, so the only perturbation that moves the count is a
+    // revert. Both ends of S3.5 are armed: `thermal` was the first row it flipped and `hydraulic`
+    // the last. Either one puts an entry back in the ledger, which is what keeps `ledger.length ===
+    // 0` from being an assertion about a function that can no longer produce entries.
     if (mutation === 'transport-drops-compliance') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, compliant: false } : r)
+    if (mutation === 'hydraulic-drops-compliance') manifest = manifest.map(r => r.node === 'hydraulic' ? { ...r, compliant: false } : r)
     // A COMPLIANT row names a co-update target its node does not publish. `wetness` is the real
     // candidate and not an invented one: it is a registered STATE aux map, `hydraulic`'s row carries
     // it today, and `erosion2` carried it until S3.5c measured that `erosion2Field` hands back one
@@ -335,10 +372,19 @@ const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUN
       && transportRows.filter(x => x.compliant === true).map(x => x.node).sort().join(',')
         === EXPECTED_COMPLIANT.slice().sort().join(','),
 
-    // 9. The ledger S3.5 drains: one entry per mover that is not yet compliant, each filed under the
+    // 9. THE LEDGER S3.5 DRAINED: one entry per mover that is not yet compliant, each filed under the
     //    transport rule and each with a later owner. "An exemption without a later owner is
-    //    forbidden" (sprint-03:194). It was 4; it is now 3; S3.5's acceptance is 0.
-    exemptionLedgerIsTheMeasuredPosition: ledger.length === EXPECTED_LEDGER_COUNT
+    //    forbidden" (sprint-03:194). It was 4, then 3, 2, 1 — and it is now 0, which is S3.5's
+    //    acceptance line.
+    //
+    //    AN EMPTINESS NEEDS A DENOMINATOR. `ledger.length === 0` is also true of a manifest with no
+    //    transport rows in it and of an `exemptionLedger` that cannot emit anything, so the term
+    //    that makes this a reading is `transportCount === 4` — four movers were examined and none of
+    //    them was exempt. The `every` and `unowned` clauses below are vacuous on an empty list by
+    //    construction and are kept for the moment a row comes BACK: both mutations below put one
+    //    there, and they are what those clauses then grade.
+    exemptionLedgerIsTheMeasuredPosition: comp.transportCount === EXPECTED_TRANSPORT_COUNT
+      && ledger.length === EXPECTED_LEDGER_COUNT
       && ledger.map(e => e.node).sort().join(',') === EXPECTED_NON_COMPLIANT.slice().sort().join(',')
       && ledger.every(e => e.rule === 'materialTransportCoEvolution' && !!e.ownerSprint)
       && (comp.unowned || []).length === 0,
@@ -368,25 +414,27 @@ const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUN
     defaultManifestIsProductionManifest: report.defaultsAreProduction === true,
 
     // 13. Absence of evidence is failure. A corpus, distinct rows, and more than one class.
-    //     WHAT THESE NUMBERS ARE, checked against what the collections actually hold rather than
-    //     left as round figures. A signature is `class|coUpdates`, so the achievable count is
-    //     (distinct transport co-update sets) + (the three non-transport classes, each with an empty
-    //     set). S3.5b gave streampower the same co-update set as thermal, and S3.5c gave erosion2 the
-    //     same one again — `wetness` came OFF that row when `compliantRowsDeliverTheirCoUpdates`
-    //     measured that the node has no port for it — so there are 2 transport sets and the signature
-    //     count is 2 + 3 = 5, which is the MAXIMUM the current manifest can produce, not a floor with
-    //     slack under it. `>= 5` therefore reads "no two classes have collapsed onto each other"; if
-    //     a later story adds a third co-update set it should move to 6.
-    //     NOTE FOR THE LAST FLIP: `hydraulic` is now the only row carrying `wetness`, and it does not
-    //     publish a wetness port either. If its own commit removes the target the same way, this file
-    //     loses a co-update set and `coUpdateTargets` falls from 3 to 2 — both `>=` terms below would
-    //     then need re-measuring rather than relaxing.
-    //     Measured 2026-08-04: signatures 5, transport co-update sets 2, co-update targets 3.
+    //     RE-MEASURED IN S3.5d, NOT RELAXED — which is what the note this replaces asked for. When
+    //     `hydraulic` dropped `wetness` all four transport rows collapsed onto one co-update set, so
+    //     three of these numbers moved DOWN, and a `>=` bound that survived the move unchanged would
+    //     have been slack rather than a reading. They are now exact equalities against the constants
+    //     derived at the head of this file, each of which is the only value the current manifest can
+    //     produce:
+    //       signatures        5 -> 4   1 transport set + 3 empty non-transport classes (the maximum)
+    //       transport sets    2 -> 1   all four rows carry soilDepth + sedimentDepth
+    //       coUpdate targets  3 -> 2   their union, asserted BY NAME and not only by count
+    //     Asserting the names is what stops a future row swapping a target for another registered
+    //     state map and leaving the count alone. Armed by `compliant-row-claims-undelivered-coupdate`,
+    //     which restores `wetness` on a compliant row and moves all three back up together, and by
+    //     `transport-without-coupdate` and `coupdate-target-unregistered`, which each split the set a
+    //     different way. Measured 2026-08-04: signatures 4, transport co-update sets 1, targets 2.
     evidenceNonEmpty: writers.length > 0 && classified.length > 0
       && (report.distinct || {}).distinctClasses === 4
-      && (report.distinct || {}).distinctSignatures >= 5
-      && (report.distinct || {}).distinctCoUpdateSets >= 2
-      && (c.coUpdateTargets || []).length >= 3,
+      && (report.distinct || {}).distinctSignatures === EXPECTED_SIGNATURES
+      && (report.distinct || {}).distinctCoUpdateSets === EXPECTED_TRANSPORT_COUPDATE_SETS
+      && (c.coUpdateTargets || []).length === EXPECTED_COUPDATE_TARGETS.length
+      && (c.coUpdateTargets || []).slice().sort().join(',')
+        === EXPECTED_COUPDATE_TARGETS.slice().sort().join(','),
   }
 
   let ok = Object.values(gates).every(Boolean) && !errors.length

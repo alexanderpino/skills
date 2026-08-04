@@ -24,27 +24,42 @@
 // to co-update yet"). S3.5 flips these to `true` one node at a time, and each flip is a measured
 // before/after with the exemption ledger one entry shorter.
 //
-// POSITION, measured 2026-08-04: 3 of 4 compliant (`thermal`, `streampower`, `erosion2`). The last
-// one is a separate commit by explicit decision (D21: one node per commit, each with a digest delta
-// naming that node and nothing else — and all three nodes so far have needed no re-bless at all,
-// because the cover work is demand-gated and the published field never moved). `hydraulic`'s
-// cover-first consumption landed in S3.3 and is gated by _verify_cover_erosion.js; only its LEDGER
-// FLIP is outstanding, and it is deliberately not taken here because a commit that moved two rows
-// could not say which change moved which gate.
+// POSITION, measured 2026-08-04: 4 of 4 compliant, and THE EXEMPTION LEDGER IS EMPTY. It went
+// 4 -> 3 -> 2 -> 1 -> 0, one node per commit by explicit decision (D21: each commit's digest delta
+// names that node and nothing else — and not one of the four needed a re-bless at all, because the
+// cover work is demand-gated and the published field never moved). The last row to flip was
+// `hydraulic`, whose cover-first consumption had shipped in S3.3 and been gated by
+// _verify_cover_erosion.js since; only the ledger reading was outstanding, and it was held back to
+// its own commit because a commit that moved two rows could not say which change moved which gate.
 //
-// `coUpdates` IS NOW A DELIVERED CLAIM, NOT A STATEMENT OF INTENT. Until S3.5c nothing anywhere
+// AN EMPTY LEDGER IS THE VACUOUS-SEARCH SHAPE, AND THAT IS WHY THE EMPTINESS IS ARMED. S3.5's
+// acceptance is "the final exemption ledger contains no material-transport entry", and this file
+// exists because that clause was originally an empty grep over a structure nobody had built. Now
+// that the list has genuinely reached zero the same hazard returns in a new form — a `ledger.length
+// === 0` assertion is also true of a function that can no longer produce entries at all. So
+// `_verify_transport_coevolution.js` keeps `transport-drops-compliance` and gains
+// `hydraulic-drops-compliance`: either one makes `exemptionLedger` emit a real row again, from a
+// different end of the manifest, which is what proves the zero is a reading. The control that used
+// to push a row the other way, `transport-claims-compliant`, is RETIRED rather than repointed —
+// with no exempt row left there is nothing for it to flip that production does not already hold,
+// and a control that assigns the value production already has is a no-op reading as coverage.
+//
+// `coUpdates` IS A DELIVERED CLAIM, NOT A STATEMENT OF INTENT. Until S3.5c nothing anywhere
 // checked that a row's co-update targets were things the node can actually publish, so a
 // `compliant: true` row naming a map the node never produces would have read as coverage — the
 // declared-but-never-filled half-gate, in manifest form. `_verify_transport_coevolution.js`'s
 // `compliantRowsDeliverTheirCoUpdates` closes that: every target of a COMPLIANT row must be a
-// declared output port semantic on that node's registered type. That is what removed `wetness` from
-// the `erosion2` row (see the row's own note); `hydraulic` still carries it and is still exempt, so
-// the gate does not yet reach it — when its flip lands, its row has to answer the same question.
+// declared output port semantic on that node's registered type. It removed `wetness` from the
+// `erosion2` row in S3.5c and from the `hydraulic` row here — the second time on measured evidence
+// about the field itself rather than on its absence, which the row records in full.
 //
 // CLASSES
 // -------
 // `materialTransport`    moves material, and therefore MUST co-update the auxiliary maps its
-//                        process touches (soil / sediment / wetness).
+//                        process touches. All four rows resolved to `soilDepth` + `sedimentDepth`:
+//                        the solid stack is what these kernels move. `wetness` was on two of them
+//                        as an aspiration and is on neither now — see the `hydraulic` row for the
+//                        measurement that settled it.
 // `latticeConditioning`  conditions the lattice without transporting material.
 // `surfaceExpression`    expresses authored surface detail.
 // `generator`            creates height with nothing upstream.
@@ -89,11 +104,70 @@ export const TRANSPORT_CLASSES = Object.freeze([
   Object.freeze({
     node: 'hydraulic',
     class: 'materialTransport',
-    coUpdates: Object.freeze(['soilDepth', 'sedimentDepth', 'wetness']),
-    compliant: false,
-    ownerSprint: 'S3.3',
-    why: 'Pipe/Droplet detach, carry and deposit solid material; the ledger is computed and discarded (C3).',
-    note: 'Cover-aware consumption and in-pass co-update land in S3.3; the state outputs themselves in S3.1.',
+    // `wetness` LEAVES this list in S3.5, and unlike erosion2's removal — which turned on the node
+    // having no water field at all — this one had a real candidate and was settled by MEASURING it.
+    // The pipe solver DOES carry a per-cell water column (GPU_PIPE_STATE_FS writes
+    // `vec4(b+dep-er, water, sediment+er-dep, 1.0)`, src/core/gpu.js:368) and it is already inside
+    // S3.1's single readback, so publishing it would have cost no second synchronisation point. It
+    // is still not a wetness map, on five independent readings taken at RES 64, square, GPU pipe
+    // kernel, shipped parameters:
+    //
+    //   1. ITS MAGNITUDE IS THE ITERATION SLIDER, NOT THE TERRAIN. Mean water column 0.00888 at
+    //      8 iterations rising monotonically to 0.07870 at 360 — an 8.9x range across the node's own
+    //      legal slider — and it tracks the NO-FLOW rain/evaporation accumulation
+    //      `w_{n+1} = (w_n + rain) * evap` to within 0.3-1.0% at every one of those points
+    //      (measured/analytic 0.990, 0.993, 0.995, 1.000, 1.002, 1.003). At the shipped default of
+    //      48 iterations the field stands at 51.3% of its own equilibrium: an unconverged transient.
+    //   2. THE SPATIAL PATTERN IS NOT STABLE EITHER, so there is no scale-free structure hiding
+    //      under an iteration-dependent magnitude. Pearson r against the 48-iteration field:
+    //      0.493 (8), 0.762 (24), 1.000 (48), 0.686 (96), 0.418 (192), 0.176 (360). Normalising
+    //      each field by its own mean leaves per-cell differences of 1.9-2.9x.
+    //   3. IT IS NOT RES-LOCK INVARIANT. At one authored iteration count, gridK 1/2/3 give means
+    //      0.0404/0.0393/0.0373 and pattern correlations 1.000/0.433/0.316. Res Lock exists to hold
+    //      the published result steady across resolution; this field moves with it.
+    //   4. IT IS A DEPTH, AND THE REGISTRY ALREADY NAMES THAT FIELD SEPARATELY. The channel is in
+    //      normalised height units (x terrainDef.height gives metres) driven by an uncalibrated
+    //      per-iteration rain of `0.0012/gk`. That is `waterDepth` (unit 'm', owner S4.4), not
+    //      `wetness` (unit 'none'). Turning a depth into a dimensionless index needs a REFERENCE
+    //      depth nobody has measured — the identical fabricated constant this node's own
+    //      `precipitation` port already refuses (`precipitationConsumed: false`).
+    //   5. IT EXISTS ON ONE ENGINE OF THREE. A droplet sink comes back with no water key at all and
+    //      the CPU droplet ledger has no water field; water there is a per-particle scalar in the
+    //      dyn texture, never a cell field. Hex has no pipe solver by construction.
+    //
+    // AND THE DOCTRINE SAYS THIS IS THE WRONG FIELD, INDEPENDENTLY OF ALL FIVE. sprint-02:194-195
+    // and BACKLOG §2 require `wetness` SPLIT, not averaged: the state map is path-dependent
+    // SATURATION and the derived companion is TWI, and "a plugin declaring one does not satisfy the
+    // other". Nothing carries wetness into this node — the state texture is uploaded with water = 0
+    // on every call — and nothing carries it out, so there is no path-dependence for a state map to
+    // be about. The co-evolution rule exists to stop a mover DESTROYING carried history; hydraulic
+    // destroys none, because none exists. The producer the plan does name is S5.3/S5.4
+    // (sprint-05:26, :27, :165, :172 — "melt co-updates wetness"), and src/core/aux-maps.js now
+    // says so instead of naming S3.3, which shipped without it.
+    coUpdates: Object.freeze(['soilDepth', 'sedimentDepth']),
+    // S3.5, FOURTH AND LAST NODE — the flip that empties the ledger. The implementation is S3.3's
+    // and is unchanged by this commit: cover-aware consumption strips sand, then sediment, then
+    // soil, then bedrock from the PUBLISHED delta, deposition lands in the explicit sediment layer,
+    // and the stack identity solidTop = bedrock + soil + sediment + sand is asserted per sample.
+    // What was outstanding was only the ledger reading, and it is deliberately a commit of its own
+    // (D21) so the digest delta and the gate delta each name one node.
+    //
+    // THE BOUNDARY TERM IS ITEMISED WHERE AN ENGINE NAMES ONE AND REFUSED WHERE NONE DOES. The pipe
+    // path publishes the APRON RING, accumulated over a cell set disjoint from the core
+    // (src/core/gpu.js:516-522); the CPU droplet path publishes per-particle `exported`, `lost` and
+    // `brushClipGain`; the GPU droplet and combined paths are `exportedDerived: true` — their export
+    // IS sumIn-sumOut — so they publish no claim and say which engine refused
+    // (`resolveCoverLoss`, src/plugins/ero/hydraulic.js).
+    // Evidence: tests/legacy/_verify_cover_erosion.js.
+    compliant: true,
+    ownerSprint: 'S3.5',
+    why: 'Pipe/Droplet detach, carry and deposit solid material; the ledger was computed and discarded (C3).',
+    note: 'Consumes loose cover before bedrock and deposits into the explicit sediment layer. '
+      + 'Declares `precipitation` and reports it WIRED and NOT CONSUMED rather than inventing the '
+      + 'reference rain a mm/yr conversion would need. Declines `wetness`: the pipe solver\'s water '
+      + 'column is a rain-accumulation transient whose magnitude and pattern both move with the '
+      + 'iteration slider, it is a depth rather than the split saturation state doctrine requires, '
+      + 'and two of the three engines have no cell water field at all.',
   }),
   Object.freeze({
     node: 'thermal',

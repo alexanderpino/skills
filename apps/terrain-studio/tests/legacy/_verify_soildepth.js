@@ -132,9 +132,17 @@ const YEARS = 1000                       // the authored duration for the main f
     // A producer INTEGRATES OVER TIME; a selector reads a wire. The duration parameter is the thing
     // only the producer can have — the contract already requires it to exist with no default — so
     // it is the discriminator, with the name list as a fallback and first-match as a last resort.
+    // DECLARED, not inferred. This discovery has now collapsed twice on heuristics: `bySemantic[0]`
+    // broke when S3.4's selectors republished soilDepth, and the /duration/i discriminator that
+    // replaced it broke when S3.5c gave erosion2 both a soilDepth output and a duration slider. A
+    // producer now SAYS it is one (`producerOf`), and the heuristics survive only as a fallback for
+    // a build where nothing declares — which is itself reported, so the fallback cannot hide.
+    const declaredProducers = Object.entries(registry).filter(([, d]) => d && Array.isArray(d.producerOf)
+      && d.producerOf.includes('soilDepth'))
     const hasDuration = d => Array.isArray(d.params)
       && d.params.some(pr => pr && typeof pr.key === 'string' && /duration/i.test(pr.key))
-    const producers = bySemantic.filter(([, d]) => hasDuration(d))
+    const inferred = bySemantic.filter(([, d]) => hasDuration(d))
+    const producers = declaredProducers.length ? declaredProducers : inferred
     const T = producers.length ? producers[0][0]
       : (byName[0] || (bySemantic.length ? bySemantic[0][0] : null))
     const DEF = T ? registry[T] : null
@@ -148,6 +156,8 @@ const YEARS = 1000                       // the authored duration for the main f
       // the thing under test. Both are reported: the gate wants exactly one producer, and a rising
       // publisher count is information rather than a failure.
       producerCount: producers.length,
+      declaredProducers: declaredProducers.map(([t]) => t),
+      discoveredBy: declaredProducers.length ? 'declared' : (inferred.length ? 'inferred' : 'fallback'),
       publisherCount: bySemantic.length,
       producers: producers.map(([t]) => t),
       registrySize: Object.keys(registry).length,
@@ -496,6 +506,7 @@ const YEARS = 1000                       // the authored duration for the main f
   const gates = {
     // --- the node exists at all. RED TODAY: this is the story's named absence. -------------------
     producerRegistered: report.discovery.type !== null && report.discovery.producerCount === 1
+      && report.discovery.discoveredBy === 'declared'
       && report.discovery.publisherCount >= report.discovery.producerCount,
     soilDepthSemanticRegistered: !!report.semantic && report.semantic.kind === 'scalarRaster'
       && report.semantic.defaultUnit === 'm',

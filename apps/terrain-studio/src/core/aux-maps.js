@@ -68,7 +68,25 @@ export const AUX_MAPS = Object.freeze({
   // disagreeing with the registry.
   sedimentDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S3.3' },
   sandDepth: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'port', owner: 'S7.3' },
-  wetness: { lens: 'state', kind: 'scalarRaster', unit: 'none', status: 'planned', owner: 'S3.3' },
+  // OWNER CORRECTED IN S3.5, and the row stays `planned` on purpose. It named S3.3, and S3.3 has
+  // shipped without it — a row naming a sprint that came and went is the registry disagreeing with
+  // the tree. The candidate producer was hydraulic: its pipe solver carries a per-cell water column
+  // that S3.1's atlas already reads back, so publishing it would have cost no second sync point.
+  // Measured before deciding, and it is not this field. The column is a rain-accumulation transient
+  // — mean 0.00888 at 8 iterations to 0.07870 at 360, tracking the no-flow `(w+rain)*evap` recursion
+  // to within 1%, and only 51.3% converged at the shipped 48 — whose spatial pattern also moves with
+  // the slider (Pearson r 0.176 between the 48- and 360-iteration fields) and with Res Lock. It is
+  // additionally a DEPTH in normalised height units, which is `waterDepth` below, not a
+  // dimensionless index; normalising it would need a reference depth nobody has measured, the same
+  // fabricated constant hydraulic's `precipitation` port refuses. And two of hydraulic's three
+  // engines have no cell water field at all.
+  //
+  // WHAT THIS ROW IS STILL FOR is the SPLIT sprint-02:194-195 and BACKLOG §2 require: the state map
+  // is path-dependent SATURATION, its derived companion is TWI, and "a plugin declaring one does not
+  // satisfy the other". The plan's producer for that is Sprint 5 — sprint-05:26 gives S5.3
+  // "meltwater/wetness", :27 and :165 give S5.4 "melt co-updates wetness", :172 closes it with a
+  // melt ledger — so `owner` names S5.3, the first story that can fill it.
+  wetness: { lens: 'state', kind: 'scalarRaster', unit: 'none', status: 'planned', owner: 'S5.3' },
 
   // --- hydrology -------------------------------------------------------------------------------
   waterSurface: { lens: 'state', kind: 'scalarRaster', unit: 'm', status: 'planned', owner: 'S4.4' },

@@ -74,6 +74,40 @@
 // fieldH() = round(RES*2/sqrt(3)) rows, NOT RES (src/legacy.js:161-168). Both are asserted against
 // values this file computes in double precision from terrainDef.scale/RES, never against whatever
 // production reports about itself.
+//
+// ---------------------------------------------------------------------------------------------
+// S3.5d EXTENSION — this file is also the evidence for hydraulic's COMPLIANCE FLIP
+// ---------------------------------------------------------------------------------------------
+// S3.5's last node made `hydraulic` compliant in src/core/transport-classes.js, emptying the
+// exemption ledger. No new implementation was needed — S3.3's cover pass is unchanged — so the
+// question this file had to answer is whether the claims that row now makes were actually gated.
+// Three were not, and it is the same file rather than a new one because a second oracle over the
+// same node and the same fixtures is how a suite ends up with a gate nobody can locate.
+//
+// 1. THE COVER-BOOK BOUND SCALED WITH THE WRONG THING, and it was this file's own copy of the
+//    defect S3.5b measured at 1e9x too loose elsewhere. `coverBookBound` used the Float32 unit over
+//    the sum of STANDING cover thicknesses — on the deep fixture, 500 m under every cell whether or
+//    not a grain moved. MEASURED on the shipping square GPU path: the shipped bound sat 2.26x under
+//    the transport it constrains, so the closure could not have seen 40% of the book go missing.
+//    The correct unit is DOUBLE over the absolute per-cell CHANGE (production accumulates its book
+//    from the published float32 rasters and so does this file, so the float32 rounding is common to
+//    both sides and cancels term by term). Corrected arming: 4.8e11 .. 2.2e12. Both endpoints are
+//    re-measured on every run — `theLooseCoverBookBoundIsDemonstrablyTooLoose` recomputes the
+//    rejected bound on the same fixture in the same pass — so this is a live delta, not a note.
+// 2. THE LEDGER BOUND HAD NO ARMING AT ALL. `ledgerMassCloses` kept the Float32 unit, correctly —
+//    the loss side comes from the solver's own float32 accumulations and the residual is dominated
+//    by the kernel's real non-conservation, so a double unit would go red on physics — but nothing
+//    checked it was smaller than the loss term. Measured: 4.2x on the pipe path, 282-340x on the
+//    droplet paths. Tight, armed, and now asserted rather than assumed.
+// 3. THE REFUSAL HAD NEVER BEEN EXERCISED. `resolveCoverLoss` publishes a boundary term only where
+//    a solver names one independently, and publishes NOTHING for `gpu-droplets` and `gpu-combined`,
+//    whose export is sumIn - sumOut (`exportedDerived: true`). Every run in this file was pipe-only,
+//    so no run had ever reached either engine under cover demand: the refusal was a claim in the
+//    manifest with no gate behind it — the declared-but-never-filled shape, one level up. Two runs
+//    now reach them, and the refusal is graded on four readings (flag false, reason names the
+//    derived export, none of the four loss keys present, and the engine that ran is the one
+//    expected — so a silent fallback to the CPU droplet kernel, which WOULD publish an honest
+//    itemised claim, cannot pass as a refusal).
 const { chromium } = require('playwright-core')
 const path = require('path')
 
@@ -90,6 +124,9 @@ const MUTATIONS = [
   'identity-ignores-deposition', // deposited material never reaches the explicit cover layer
   'loss-derived-from-field-sums',// the loss term becomes eroded-deposited: a closure that cannot fail
   'cover-alters-published-height',// wiring cover moves the terrain: an unauthorised C3 re-bless
+  // S3.5d. The same defect on the OTHER side of the fence: an engine that has no itemised export
+  // stops refusing and publishes one anyway.
+  'derived-export-engine-claims-a-loss',
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -112,12 +149,22 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     const PRECIP_MM_YR = 1200
     const SQRT3_2 = Math.sqrt(3) / 2 // computed here in double, never read back from production
 
-    // Float32 reduction bound, computed rather than inherited (sprint-03:108-111).
-    // gamma_n = (n*2^-24)/(1 - n*2^-24); a sum of N Float32 terms carries at most
+    // Reduction bounds, computed rather than inherited (sprint-03:108-111).
+    // gamma_n = (n*u)/(1 - n*u); a sum of N terms each carrying unit roundoff u accumulates at most
     // gamma_(N-1)*sum(|term|). Production reduces too, so the two-sided bound uses 2N terms.
-    const U = Math.pow(2, -24)
-    const gamma = n => (n * U) / (1 - n * U)
-    const boundFor = (nTerms, absSum) => 2 * gamma(Math.max(1, 2 * nTerms)) * absSum + 1e-6
+    //
+    // TWO UNITS, AND WHICH ONE APPLIES IS A PROPERTY OF THE ARITHMETIC, NOT A DIAL.
+    //   boundF32  the quantity passes through a Float32 accumulation on at least one side — the
+    //             solver's own apron/particle sums are float32 texture reads, and the physical
+    //             non-conservation of the GPU kernel lands here too.
+    //   boundF64  BOTH sides are double reductions over the SAME float32 samples, so the float32
+    //             rounding is common to both and cancels term by term; only the reduction ordering
+    //             is left. This is the correct unit for the cover book, and using the float32 one
+    //             there was this file's own instance of the defect S3.5b measured at 1e9x too loose.
+    const U32 = Math.pow(2, -24), U64 = Math.pow(2, -53)
+    const gammaOf = (u, n) => (n * u) / (1 - n * u)
+    const boundFor = (nTerms, absSum) => 2 * gammaOf(U32, Math.max(1, 2 * nTerms)) * absSum + 1e-6
+    const boundF64 = (nTerms, absSum) => 2 * gammaOf(U64, Math.max(1, 2 * nTerms)) * absSum + 1e-9
 
     const sumD = f => { let s = 0; for (let i = 0; i < f.length; i++) s += f[i]; return s }
     const absSumD = f => { let s = 0; for (let i = 0; i < f.length; i++) s += Math.abs(f[i]); return s }
@@ -252,6 +299,23 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
           led.exportedOrSuspendedM3 = (led.coverConsumedM3 || 0) + (led.bedrockDetachedM3 || 0)
             - (led.depositedM3 || 0)
         }
+        if (mutation === 'derived-export-engine-claims-a-loss' && led && led.lossClaimed === false) {
+          // THE REFUSAL COLLAPSES. `gpuHydraulicDroplets` and `gpuHydraulicCombined` both define
+          // `exported` as sumIn - sumOut and flag it (`exportedDerived: true`), so the node declines
+          // to publish a boundary term for them. Here it publishes one anyway, and the value is
+          // `consumed + detached - deposited` — a restatement of the three terms it is then compared
+          // against. `ledgerMassCloses` cannot see this: under it that identity holds EXACTLY, for
+          // any implementation, including one that deletes the terrain. Only the refusal gate can,
+          // which is the whole reason the refusal is asserted rather than merely printed.
+          // Guarded on `lossClaimed === false` so it reaches only the runs that legitimately refuse;
+          // on the itemised runs it is a no-op and the log says so.
+          delete led.lossClaimed
+          led.exportedOrSuspendedM3 = (led.coverConsumedM3 || 0) + (led.bedrockDetachedM3 || 0)
+            - (led.depositedM3 || 0)
+          led.boundaryExportedM3 = led.exportedOrSuspendedM3
+          led.suspendedM3 = 0
+          led.lossSource = 'gpu-sum-difference'
+        }
         if (mutation === 'square-area-on-hex' && terrainDef.lattice === 'hex' && led) {
           // The hex ledger integrates depth with the SQUARE cell area over a square row count.
           // Every reported volume is then 1/(sqrt(3)/2) = 1.1547x too large, and stops matching the
@@ -289,9 +353,31 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     }
 
     const beforeParams = { pipeEnabled: false, dropletEnabled: false, feat: 1, engine: null }
-    const afterParams = { pipeEnabled: true, dropletEnabled: false, engine: null, feat: 1,
-      pipeIters: 48, pipeErode: 0.35, pipeDeposit: 0.28, pipeCapacity: 6, pipeInertia: 0.05,
-      radius: 2, seed: 1 }
+    // THREE STAGE CONFIGURATIONS, and the last two are not variety — they are the only way to reach
+    // the engines whose boundary export is DERIVED. `resolveCoverLoss` (src/plugins/ero/hydraulic.js)
+    // publishes a loss term only where the solver NAMES one independently: the pipe kernel's apron
+    // ring, or the CPU droplet solver's per-particle counters. `gpuHydraulicDroplets` and
+    // `gpuHydraulicCombined` both define `exported` as sumIn - sumOut and say so
+    // (`exportedDerived: true`, src/core/gpu.js:775, :796), which is a closure that holds by
+    // construction for any implementation including one that deletes the terrain — so on those two
+    // the node must publish NO claim and name the reason. Until S3.5d nothing ran them under cover
+    // demand, so that refusal was a claim in the manifest with no gate behind it.
+    const DROPLET_COMMON = { droplets: 12000, lifetime: 48, dropletErode: 0.35, dropletDeposit: 0.28,
+      dropletCapacity: 6, dropletInertia: 0.05, evap: 0.02, gravity: 4, radius: 2, seed: 1 }
+    const STAGE_MODES = {
+      // Pipe only. Square + GPU reaches `gpuHydraulicPipes` (apron ring, itemised); square + CPU and
+      // hex fall to `hydraulicErode` (per-particle counters, itemised).
+      pipe: { params: { pipeEnabled: true, dropletEnabled: false, engine: null, feat: 1,
+        pipeIters: 48, pipeErode: 0.35, pipeDeposit: 0.28, pipeCapacity: 6, pipeInertia: 0.05,
+        radius: 2, seed: 1 }, claim: 'itemised' },
+      // Droplet only on the GPU -> `gpu-droplets`, exportedDerived.
+      droplet: { params: { pipeEnabled: false, dropletEnabled: true, engine: null, feat: 1,
+        ...DROPLET_COMMON }, claim: 'refused', engineExpected: 'gpu-droplets' },
+      // Both stages on the GPU -> the single fused `gpu-combined` kernel, also exportedDerived.
+      combined: { params: { pipeEnabled: true, dropletEnabled: true, engine: null, feat: 1,
+        pipeIters: 48, pipeErode: 0.35, pipeDeposit: 0.28, pipeCapacity: 6, pipeInertia: 0.05,
+        ...DROPLET_COMMON }, claim: 'refused', engineExpected: 'gpu-combined' },
+    }
 
     const readValues = raw => (raw && raw.values instanceof Map)
       ? raw.values : new Map([[primaryId, raw]])
@@ -305,9 +391,24 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         return JSON.parse(JSON.stringify(hydroMassDiag.cover))
       } catch (e) { return null }
     }
+    // The RAW engine name, which lives beside `.cover` rather than inside it. Without it a GPU run
+    // that silently fell back to the CPU kernel would read as coverage — the fallback is legitimate
+    // production behaviour (`gpuReady()`, `gpuDropletsReady()`), so which kernel ran has to be
+    // measured rather than inferred from the flags this file set.
+    const grabEngine = () => {
+      try {
+        return (typeof hydroMassDiag !== 'undefined' && hydroMassDiag
+          && typeof hydroMassDiag.engine === 'string') ? hydroMassDiag.engine : null
+      } catch (e) { return null }
+    }
 
-    const runOne = (lattice, useGpu, fixture) => {
-      const r = { key: `${lattice}/${useGpu ? 'gpu' : 'cpu'}/${fixture}`, lattice, gpu: !!useGpu,
+    const runOne = (lattice, useGpu, fixture, stage) => {
+      const mode = STAGE_MODES[stage || 'pipe']
+      const afterParams = mode.params
+      const r = { key: `${lattice}/${useGpu ? 'gpu' : 'cpu'}/${fixture}`
+          + (stage && stage !== 'pipe' ? '/' + stage : ''),
+        lattice, gpu: !!useGpu, stage: stage || 'pipe', claimExpected: mode.claim,
+        engineExpected: mode.engineExpected || null,
         fixture, error: null, ran: false }
       try {
         terrainDef.lattice = lattice
@@ -378,6 +479,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
         const rawA = TYPES.hydraulic.eval(nd.params, ins, nd, { demanded })
         const vA = readValues(rawA)
         const led = grabLedger()
+        r.engine = grabEngine()
         const soilA = grab(vA, 'soilDepth'), sedA = grab(vA, 'sedimentDepth')
         const sandA = grab(vA, 'sandDepth'), topA = grab(vA, 'solidTop')
         const bedA = grab(vA, 'bedrockHeight')
@@ -497,29 +599,52 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
           r.lossSource = typeof led.lossSource === 'string' ? led.lossSource : null
           r.lossItemised = r.lossItemErr !== null && r.lossItemErr <= r.lossBound
             && !!r.lossSource && b !== null && s !== null
+          // ...AND THE REFUSAL, READ AS PUBLISHED. On an engine whose export is sumIn - sumOut the
+          // node must publish `lossClaimed: false`, name which engine refused, and carry NONE of the
+          // four loss keys — a partially-populated refusal is a claim wearing a disclaimer.
+          r.lossClaimed = led.lossClaimed !== false
+          r.lossKeys = ['exportedOrSuspendedM3', 'boundaryExportedM3', 'suspendedM3', 'brushClipGainM3']
+            .filter(k => Object.prototype.hasOwnProperty.call(led, k))
         }
 
         // --- the frame-free readings -----------------------------------------------------------
         if (soilA && sedA && sandA && soilB && sedB && sandB) {
           const A = r.areaExpected
-          let dCover = 0, absTerms = 0, minCoverAfter = Infinity, maxSedRise = -Infinity
+          let dCover = 0, absChange = 0, absStanding = 0, minCoverAfter = Infinity, maxSedRise = -Infinity
           for (let i = 0; i < N; i++) {
             const c1 = soilA[i] + sedA[i] + sandA[i]
             const c0 = soilB[i] + sedB[i] + sandB[i]
             dCover += A * (c1 - c0)
-            absTerms += A * (Math.abs(c1) + Math.abs(c0))
+            // WHAT THE BOUND SCALES WITH — the whole point of the S3.5d correction here.
+            //   absChange    the cover this pass actually MOVED. Production accumulates its book
+            //                from the published float32 rasters (src/plugins/ero/hydraulic.js
+            //                coverPass) and so does this line, from the same values, so the only
+            //                residual is double reduction ordering.
+            //   absStanding  the cover LYING THERE. The bound this file shipped with. On the deep
+            //                fixture that is 500 m over every cell whether or not a grain moved, so
+            //                the tolerance grew with the fixture instead of with the transport.
+            //                Kept, measured, and required BELOW the threshold the corrected one
+            //                passes, so the correction is a live delta rather than a claim.
+            absChange += A * Math.abs(c1 - c0)
+            absStanding += A * (Math.abs(c1) + Math.abs(c0))
             if (c1 < minCoverAfter) minCoverAfter = c1
             const rise = sedA[i] - sedB[i]
             if (rise > maxSedRise) maxSedRise = rise
           }
           r.dCoverM3 = dCover
-          r.coverAbsTerms = absTerms
+          r.coverAbsChange = absChange
           r.minCoverAfter = minCoverAfter
           r.maxSedimentRiseM = maxSedRise
-          r.coverBookBound = boundFor(N, absTerms)
+          r.coverBookBound = boundF64(N, absChange)
+          r.coverBookBoundLoose = boundFor(N, absStanding)
           if (led) {
             r.coverBookErr = Math.abs(dCover - ((led.depositedM3 || 0) - (led.coverConsumedM3 || 0)))
             r.coverBookCloses = r.coverBookErr <= r.coverBookBound
+            const transported = Math.abs(led.coverConsumedM3 || 0) + Math.abs(led.bedrockDetachedM3 || 0)
+              + Math.abs(led.depositedM3 || 0)
+            r.transportedM3 = transported
+            r.coverBookArming = r.coverBookBound > 0 ? transported / r.coverBookBound : 0
+            r.coverBookArmingLoose = r.coverBookBoundLoose > 0 ? transported / r.coverBookBoundLoose : 0
           }
         }
         if (led) {
@@ -528,8 +653,16 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
           const abs = Math.abs(led.coverConsumedM3 || 0) + Math.abs(led.bedrockDetachedM3 || 0)
             + Math.abs(led.depositedM3 || 0) + Math.abs(led.exportedOrSuspendedM3 || 0)
           r.ledgerErr = Math.abs(lhs - rhs)
+          // FLOAT32 UNIT HERE, AND DELIBERATELY — unlike the cover book above. The loss side comes
+          // from the SOLVER's own float32 accumulations (the apron ring sums texture reads over
+          // simN^2 cells; the droplet counters accumulate per particle), and the residual is
+          // dominated by the kernel's real non-conservation rather than by reduction ordering. A
+          // double unit here would go red on physics. The ARMING is asserted separately below so the
+          // looser unit cannot hide a dropped loss term.
           r.ledgerBound = boundFor(N, abs)
           r.ledgerCloses = r.ledgerErr <= r.ledgerBound
+          r.ledgerArming = r.ledgerBound > 0
+            ? Math.abs(led.exportedOrSuspendedM3 || 0) / r.ledgerBound : 0
           r.areaReportedOk = Math.abs((led.cellAreaM2 || 0) - r.areaExpected) <= 1e-9 * r.areaExpected
           r.ledgerLatticeOk = led.lattice === lattice
           r.ledgerRowsOk = led.rows === r.rowsExpected
@@ -585,14 +718,28 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     // shipping square path and must read as red, not as a silent skip.
     out.gpuAvailable = false
     try { out.gpuAvailable = !!(typeof GPU !== 'undefined' && GPU && GPU.init && GPU.init()) } catch (e) { out.gpuAvailable = false }
+    // The particle-brush accumulator needs WebGL2 float BLENDING, which is a separate capability
+    // from a float render target. It is what selects `gpuHydraulicDroplets`/`gpuHydraulicCombined`
+    // over the CPU compatibility path, so an unavailable one is absence of evidence for the two
+    // derived-export engines and must read as red, not as a silent skip.
+    out.gpuDropletsAvailable = false
+    try { out.gpuDropletsAvailable = !!(typeof gpuDropletsReady === 'function' && gpuDropletsReady()) }
+    catch (e) { out.gpuDropletsAvailable = false }
 
     const plan = []
     for (const fx of ['deep', 'bare', 'mixed']) {
-      plan.push(['square', false, fx])
-      if (out.gpuAvailable) plan.push(['square', true, fx])
-      plan.push(['hex', false, fx])
+      plan.push(['square', false, fx, 'pipe'])
+      if (out.gpuAvailable) plan.push(['square', true, fx, 'pipe'])
+      plan.push(['hex', false, fx, 'pipe'])
     }
-    for (const [lat, gpu, fx] of plan) out.runs.push(runOne(lat, gpu, fx))
+    // The two engines whose export is DERIVED, on the mixed fixture so both cover regimes are live
+    // in the same pass. Square + GPU only: `gpuDropletsReady()` is what routes to them and it is
+    // false on hex by construction, which is also why the node's hex path has no such refusal.
+    if (out.gpuAvailable && out.gpuDropletsAvailable) {
+      plan.push(['square', true, 'mixed', 'droplet'])
+      plan.push(['square', true, 'mixed', 'combined'])
+    }
+    for (const [lat, gpu, fx, stage] of plan) out.runs.push(runOne(lat, gpu, fx, stage))
 
     // restore
     try {
@@ -622,6 +769,13 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   const deep = byFixture('deep'), bare = byFixture('bare'), mixed = byFixture('mixed')
   const led = r => r.ledger || null
   const ledNum = (r, k) => (r.ledger && typeof r.ledger[k] === 'number') ? r.ledger[k] : null
+  // THE TWO POPULATIONS, split by whether an engine NAMES its boundary export. Everything about the
+  // cover stack — the stack identity, the cover book, cover-before-bedrock, sand, the frame — is
+  // asserted over BOTH, because none of it involves the loss term. Everything that closes AGAINST
+  // the loss term is asserted over the itemised population only, because on the other one there is
+  // deliberately no such term to close against; that population is graded by the refusal gate.
+  const itemised = runs.filter(r => r.claimExpected === 'itemised')
+  const refused = runs.filter(r => r.claimExpected === 'refused')
 
   const maxCoverBookErr = Math.max(0, ...runs.map(r => num(r.coverBookErr) === null ? 0 : r.coverBookErr))
   const deepBedrock = deep.map(r => ledNum(r, 'bedrockDetachedM3'))
@@ -658,7 +812,27 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
 
     // --- conservation, entirely in frame-free thicknesses and volumes ----------------------------
     coverBookCloses: every(runs, r => r.coverBookCloses === true),
-    ledgerMassCloses: every(runs, r => r.ledgerCloses === true),
+    // S3.5d — THE BOUND IS SMALLER THAN THE TERM IT CONSTRAINS, measured on every run rather than
+    // argued once. WHAT IT SCALES WITH is the absolute per-cell cover CHANGE: the thickness this
+    // pass moved. It used to scale with the sum of STANDING thicknesses, which on the deep fixture
+    // is 500 m over every cell whether or not a grain moved — the defect S3.5b measured at 1e9x too
+    // loose, sitting unnoticed in this file the whole time. The threshold is 1e6: far above anything
+    // a terrain-scaled bound reaches and far below the arithmetic ceiling (boundF64 is
+    // 2*gamma64(2N) relative, ~1.5e-12 at N ~ 4e3, so the ratio cannot exceed ~6.6e11 however tight
+    // the implementation), so a silent loosening of four orders is caught rather than merely absent.
+    coverBookBoundIsSmallerThanTheTransport: every(runs, r => num(r.coverBookArming) !== null
+      && r.coverBookArming > 1e6),
+    // ...and the OTHER endpoint, so the correction is a live delta rather than a claim about a
+    // version nobody can re-run. The rejected bound is recomputed on the same fixture in the same
+    // run and must FAIL the threshold the corrected one passes.
+    theLooseCoverBookBoundIsDemonstrablyTooLoose: every(runs, r => num(r.coverBookArmingLoose) !== null
+      && r.coverBookArmingLoose < 1e6 && num(r.coverBookArming) !== null && r.coverBookArming > 1e6),
+    ledgerMassCloses: every(itemised, r => r.ledgerCloses === true),
+    // ...and THAT bound is smaller than the loss term too, or the closure is insensitive to the very
+    // quantity it exists to check. Measured on every itemised run: an implementation that dropped
+    // the boundary term would land at ledgerErr = |exported| and must therefore exceed the bound.
+    ledgerBoundIsSmallerThanTheLossItConstrains: every(itemised, r => num(r.ledgerArming) !== null
+      && r.ledgerArming > 1),
     // Deposition must land in the EXPLICIT sediment raster, not only in the height field. A build
     // that lowers solid height and predicts deposits morphologically passes every volume sum above
     // and fails here — which is the whole point of making cover state rather than a look-alike.
@@ -683,7 +857,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       && runs.some(r => r.lattice === 'hex' && r.ran === true),
 
     // --- the one frame-sensitive claim (see the header) ------------------------------------------
-    solidVolumeMatchesNetTransport: every(runs, r => r.solidCloses === true),
+    solidVolumeMatchesNetTransport: every(itemised, r => r.solidCloses === true),
 
     // --- S3.3 EXTENSIONS -------------------------------------------------------------------------
     // The frame decision the expected-red register left open, closed and MEASURED: solidTop is the
@@ -696,7 +870,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     // elevations, plus the arming endpoint measured on every run: the bound must be SMALLER than
     // the export term it constrains, or the closure above is insensitive to it. See the derivation
     // at the measurement — the shipped bound is 277x too loose on the square GPU path.
-    solidVolumeBoundIsSmallerThanTheTermItConstrains: every(runs,
+    solidVolumeBoundIsSmallerThanTheTermItConstrains: every(itemised,
       r => r.solidClosesAgainstTransport === true
         && num(r.solidGateArming) !== null && r.solidGateArming > 1),
     // The story's headline identity, at every sample of both passes rather than under an integral.
@@ -709,7 +883,38 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     // The boundary loss must be the sum of its own NAMED components, never a difference of the two
     // field sums it is compared against. Armed by loss-derived-from-field-sums, which is the only
     // mutation `ledgerMassCloses` is structurally unable to detect.
-    coverLossIsItemizedNotDerived: every(runs, r => r.lossItemised === true),
+    coverLossIsItemizedNotDerived: every(itemised, r => r.lossItemised === true),
+    // S3.5d — AND WHERE NO ENGINE NAMES ONE, THE NODE PUBLISHES NOTHING AND SAYS WHY. This is the
+    // other half of the same rule, and until now it was a claim in the manifest with no gate behind
+    // it: no run reached `gpuHydraulicDroplets` or `gpuHydraulicCombined` under cover demand, so the
+    // refusal path had never been exercised at all. Both define `exported` as sumIn - sumOut and
+    // flag it (`exportedDerived: true`, src/core/gpu.js:775, :796), which closes by construction for
+    // any implementation including one that deletes the terrain.
+    //
+    // FOUR SEPARATE READINGS, because a partial refusal is a claim wearing a disclaimer: the flag is
+    // false, the reason names the derived export, NOT ONE of the four loss keys is present, and the
+    // engine that actually ran is the one this file expected — a silent fallback to the CPU droplet
+    // kernel would otherwise publish an honest itemised claim here and read as coverage.
+    // Armed by `derived-export-engine-claims-a-loss`.
+    derivedExportEnginesPublishNoLossClaim: every(refused, r => r.lossClaimed === false
+      && r.lossSource === 'engine-export-is-derived'
+      && Array.isArray(r.lossKeys) && r.lossKeys.length === 0
+      && r.engine === r.engineExpected),
+    // ...over BOTH of them, and over a real transport rather than a printed nothing. Without this
+    // the gate above would be satisfied by a population of one, or of none.
+    bothDerivedExportEnginesMeasured: report.gpuDropletsAvailable === true
+      && refused.length === 2
+      && new Set(refused.map(r => r.engine)).size === 2
+      && refused.every(r => r.ran === true && num(r.transportedM3) !== null && r.transportedM3 > 0),
+    // A PRECONDITION gate, in the same category as `hexRowCountIsNotRes` and deliberately unarmed by
+    // a mutation: it establishes that the ITEMISED population reached both of its engines too — the
+    // pipe kernel's apron ring on square+GPU, the CPU droplet solver's particle counters on square
+    // +CPU and hex. A build where `gpuReady()` quietly went false would run one engine three times
+    // and every closure above would still pass.
+    bothItemisedEnginesMeasured: itemised.some(r => r.engine === 'pipes' && r.ran === true
+      && r.lossSource === 'pipe-apron-ring')
+      && itemised.some(r => r.engine === 'droplets' && r.ran === true
+        && r.lossSource === 'droplet-particle-counters'),
     // Cover changes the BOOKS, not the terrain. S3.3 implements transport ORDER — loose cover first,
     // bedrock second — and not a differential-erodibility law, which nobody has specified and which
     // would be a fabricated constant. So the published height with cover attached must be the
@@ -735,7 +940,9 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     gpuSquarePathMeasured: report.gpuAvailable === true
       && runs.some(r => r.gpu === true && r.lattice === 'square' && r.ran === true),
     gpuSquarePathCloses: report.gpuAvailable === true
-      && every(runs.filter(r => r.gpu === true), r => r.coverBookCloses === true && r.ledgerCloses === true),
+      && every(itemised.filter(r => r.gpu === true),
+        r => r.coverBookCloses === true && r.ledgerCloses === true)
+      && every(refused, r => r.coverBookCloses === true),
 
     // --- absence of evidence is a failure --------------------------------------------------------
     // 3 cover configurations x 2 lattices = 6 genuinely different authored cover fields, and the
@@ -764,9 +971,13 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `solidTopOut=${report.ports.solidTopOut} sandOut=${report.ports.sandOut}`)
   console.log('vocabulary ' + JSON.stringify(report.vocabulary))
   for (const r of runs) {
-    console.log(`  ${r.key.padEnd(20)} W=${r.W} H=${r.H} area=${fmt(r.areaExpected)} `
-      + `ledger=${r.ledger ? JSON.stringify(r.ledger) : 'ABSENT'} `
-      + `dCover=${fmt(r.dCoverM3)} coverBookErr=${fmt(r.coverBookErr)} minCover=${fmt(r.minCoverAfter)} `
+    console.log(`  ${r.key.padEnd(26)} W=${r.W} H=${r.H} area=${fmt(r.areaExpected)} `
+      + `engine=${r.engine || '-'} claim=${r.claimExpected} lossClaimed=${r.lossClaimed} `
+      + `lossSrc=${r.lossSource || '-'} lossKeys=[${(r.lossKeys || []).join(',')}] `
+      + `dCover=${fmt(r.dCoverM3)} coverBookErr=${fmt(r.coverBookErr)} `
+      + `bound=${fmt(r.coverBookBound)} arming=${fmt(r.coverBookArming)} `
+      + `boundLoose=${fmt(r.coverBookBoundLoose)} armingLoose=${fmt(r.coverBookArmingLoose)} `
+      + `ledgerArming=${fmt(r.ledgerArming)} minCover=${fmt(r.minCoverAfter)} `
       + `err=${r.error || 'none'}`)
   }
   for (const [k, v] of Object.entries(gates)) console.log(`${v ? 'PASS' : 'FAIL'}  ${k}`)
@@ -781,9 +992,16 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `maxStackResidualM=${fmt(Math.max(0, ...runs.map(r => (r.stackIdentity && r.stackIdentity.maxResidualM) || 0)))} `
     + `maxLossItemErr=${fmt(Math.max(0, ...runs.map(r => (typeof r.lossItemErr === 'number' ? r.lossItemErr : 0))))} `
     + `lossSources=[${Array.from(new Set(runs.map(r => r.lossSource || 'none'))).sort().join(',')}] `
+    + `engines=[${Array.from(new Set(runs.map(r => r.engine || '-'))).sort().join(',')}] `
+    + `itemised=${itemised.length} refused=${refused.length} `
     + `unwiredMatchesWired=${runs.filter(r => r.unwiredMatchesWired === true).length}/${runs.length} `
-    + `minSolidArming=${fmt(Math.min(...runs.map(r => num(r.solidGateArming) === null ? 0 : r.solidGateArming)))} `
-    + `maxSolidErr=${fmt(Math.max(0, ...runs.map(r => num(r.solidErr) === null ? 0 : r.solidErr)))} `
+    // Scoped to the itemised population, like the gates that read them: a refused run has no loss
+    // term, so folding its absent arming into a MINIMUM would print 0 and read as an unarmed gate.
+    + `minCoverBookArming=${fmt(Math.min(...runs.map(r => num(r.coverBookArming) === null ? 0 : r.coverBookArming)))} `
+    + `maxCoverBookArmingLoose=${fmt(Math.max(0, ...runs.map(r => num(r.coverBookArmingLoose) === null ? 1e99 : r.coverBookArmingLoose)))} `
+    + `minLedgerArming=${fmt(Math.min(...itemised.map(r => num(r.ledgerArming) === null ? 0 : r.ledgerArming)))} `
+    + `minSolidArming=${fmt(Math.min(...itemised.map(r => num(r.solidGateArming) === null ? 0 : r.solidGateArming)))} `
+    + `maxSolidErr=${fmt(Math.max(0, ...itemised.map(r => num(r.solidErr) === null ? 0 : r.solidErr)))} `
     + `frame=${(runs.find(r => r.frame) || { frame: {} }).frame.name || 'n/a'} `
     + `maxErrVsStableM=${fmt(Math.max(0, ...runs.map(r => (r.frame && r.frame.maxErrVsStableM) || 0)))} `
     + `maxErrVsAutolevelM=${fmt(Math.max(0, ...runs.map(r => (r.frame && r.frame.maxErrVsAutolevelM) || 0)))} `
