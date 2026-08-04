@@ -35,6 +35,8 @@ const MUTATIONS = [
   'preset-not-deterministic',   // the same controls expand to different terms
   'harmonic-wavelengths',       // wavelength ratios become integer multiples, so crests repeat
   'zero-amplitude-drifts',      // amplitude 0 no longer returns the datum exactly
+  'fade-disabled',              // the Nyquist fade is stripped, so sub-pixel waves still displace
+  'bounds-understated',         // the declared reach is smaller than the displacement it must cover
 ]
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -82,7 +84,13 @@ const TERMS = 12
   const src = path.resolve(__dirname, '../../src/core/water-waves.js')
   let M = null, loadErr = null
   try {
-    if (!mutation) { M = await import(pathToFileURL(src).href) }
+    // These two mutate the FIXTURE, not the module: one strips the fade from the shader text the
+    // browser compiles, the other understates the declared bound in this file. Both must load the
+    // real module -- routing them through the source patcher threw on a missing PATCHES entry and
+    // went red at "module loads", which the delta rule scored as armed. It was not: the check the
+    // mutation targets had not run at all.
+    const inTestMutation = mutation === 'fade-disabled' || mutation === 'bounds-understated'
+    if (!mutation || inTestMutation) { M = await import(pathToFileURL(src).href) }
     else {
       let text = fs.readFileSync(src, 'utf8')
       for (const [anchor, repl] of PATCHES[mutation]) {
@@ -190,6 +198,36 @@ const TERMS = 12
     check('normal is analytic, not finite-differenced', false, 'gerstnerAt missing')
   }
 
+  // --- the declared reach must actually contain the surface ---------------------------------------
+  // ADR-006 inflates the water bounds by the declared vertical amplitude and horizontal chop, so
+  // that a displaced crest is never culled or clipped against bounds computed for a flat plane.
+  // Nothing in the renderer culls today, which is exactly why this is checked here and not left to
+  // be discovered later: the number a future culler will trust has to be right BEFORE it is trusted.
+  // The claim is one-sided -- the bound must COVER the displacement, and be finite enough to be
+  // worth having. A bound of infinity would satisfy "covers" and be useless.
+  if (M && typeof M.presetBounds === 'function' && typeof M.gerstnerAt === 'function' && terms.length === TERMS) {
+    let b = M.presetBounds(preset)
+    if (mutation === 'bounds-understated') b = { verticalM: b.verticalM * 0.5, horizontalM: b.horizontalM * 0.5 }
+    let peakV = 0, peakH = 0
+    for (let i = 0; i < 4000; i++) {
+      // A coprime stride over a wide span so the samples do not land on one phase of the swell and
+      // report a reach the rest of the surface exceeds.
+      const x = (i * 7.31) % 2000, z = (i * 11.17) % 2000, t = (i * 0.37) % 20
+      const g = M.gerstnerAt(x, z, t, preset, 0)
+      peakV = Math.max(peakV, Math.abs(g.y))
+      peakH = Math.max(peakH, Math.abs(g.x - x), Math.abs(g.z - z))
+    }
+    check('the sampled surface actually moves', peakV > 0 && peakH > 0, { peakV, peakH })
+    check('declared vertical reach covers the displacement', peakV <= b.verticalM + 1e-9,
+      { peakV, declared: b.verticalM })
+    check('declared horizontal reach covers the chop', peakH <= b.horizontalM + 1e-9,
+      { peakH, declared: b.horizontalM })
+    // Not slack to the point of meaninglessness: the sum of amplitudes is at most a few times the
+    // peak any real sample reaches, because the terms do not all crest together.
+    check('the declared reach is tight enough to be useful',
+      Number.isFinite(b.verticalM) && b.verticalM < peakV * 4, { peakV, declared: b.verticalM })
+  }
+
   // --- zero amplitude is the datum, exactly --------------------------------------------------------
   if (M && typeof M.expandPreset === 'function' && typeof M.gerstnerAt === 'function') {
     let flat = null, p0 = null
@@ -245,33 +283,85 @@ const TERMS = 12
   // fail this one on the first edit to either.
   //
   // This runs in the browser because the sources are recorded when the programs are compiled.
-  if (!mutation) {
+  if (!mutation || mutation === 'fade-disabled') {
     const { chromium } = require('playwright-core')
     const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
       ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
       : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
     const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'))
-    let shared = null
+    shared = null
     try {
       const b = await chromium.launch({ executablePath: EXE,
         args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] })
       const pg = await b.newPage({ viewport: { width: 900, height: 600 } })
       await pg.goto(URL, { waitUntil: 'load' })
       await pg.waitForTimeout(1800)
-      shared = await pg.evaluate(() => ({
-        mask: waterShaderSources.mask ? waterShaderSources.mask.length : 0,
-        forward: waterShaderSources.forward ? waterShaderSources.forward.length : 0,
-        identical: !!waterShaderSources.mask && waterShaderSources.mask === waterShaderSources.forward,
-        terms: (waterShaderSources.mask || '').split('float th=').length - 1,
-      }))
+      shared = await pg.evaluate(mut => {
+        // THE FADE, MEASURED BY RUNNING IT. The generated GLSL is compiled and evaluated on the GPU
+        // at two pixel scales; nothing here re-implements the fade on the CPU, because a CPU mirror
+        // would only prove the mirror agrees with itself. `mpp` is metres per pixel: at 0 the pixels
+        // are infinitely fine and every term must survive; at 4000 a single pixel spans four
+        // kilometres and all twelve wavelengths -- the longest swell included -- are far below
+        // Nyquist, so the surface must go flat. A build that ignores mpp reads the same at both.
+        // The source is taken from what the MASK PASS ACTUALLY RECEIVED, not regenerated. That
+        // makes this probe a measurement of the shipped text rather than of a second call that
+        // happens to agree with it -- and it needs no new page-visible global.
+        const src = waterShaderSources.mask
+        const c = document.createElement('canvas'); c.width = 32; c.height = 32
+        const g = c.getContext('webgl2')
+        const sh = (ty, txt) => { const o = g.createShader(ty); g.shaderSource(o, txt); g.compileShader(o)
+          if (!g.getShaderParameter(o, g.COMPILE_STATUS)) throw new Error(g.getShaderInfoLog(o)); return o }
+        const fs = `#version 300 es
+precision highp float; out vec4 o; uniform float uMpp;
+${mut === 'fade-disabled' ? src.replace(/float fd=clamp\([^;]*;/g, 'float fd=1.0;') : src}
+void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, N);
+  o=vec4(d.y*0.5+0.5, N.y, 0.0, 1.0); }`
+        const pr = g.createProgram()
+        g.attachShader(pr, sh(g.VERTEX_SHADER, ['#version 300 es','in vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'].join(String.fromCharCode(10))))
+        g.attachShader(pr, sh(g.FRAGMENT_SHADER, fs)); g.linkProgram(pr)
+        if (!g.getProgramParameter(pr, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(pr))
+        g.useProgram(pr)
+        const b = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, b)
+        g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), g.STATIC_DRAW)
+        const la = g.getAttribLocation(pr, 'a'); g.enableVertexAttribArray(la)
+        g.vertexAttribPointer(la, 2, g.FLOAT, false, 0, 0)
+        const reach = mpp => {
+          g.uniform1f(g.getUniformLocation(pr, 'uMpp'), mpp)
+          g.drawArrays(g.TRIANGLES, 0, 3)
+          const px = new Uint8Array(32 * 32 * 4); g.readPixels(0, 0, 32, 32, g.RGBA, g.UNSIGNED_BYTE, px)
+          let m = 0; for (let i = 0; i < px.length; i += 4) m = Math.max(m, Math.abs(px[i] - 127.5))
+          return m / 127.5
+        }
+        return {
+          mask: waterShaderSources.mask ? waterShaderSources.mask.length : 0,
+          forward: waterShaderSources.forward ? waterShaderSources.forward.length : 0,
+          identical: !!waterShaderSources.mask && waterShaderSources.mask === waterShaderSources.forward,
+          terms: (waterShaderSources.mask || '').split('float th=').length - 1,
+          fades: (src.match(/float fd=clamp/g) || []).length,
+          reachSharp: reach(0), reachCoarse: reach(4000),
+        }
+      }, mutation)
+      const _unused = (() => ({
+}))
       await b.close()
     } catch (e) { shared = { error: String(e.message || e).slice(0, 120) } }
     check('both water passes received the same displacement source',
       !!shared && shared.identical === true && shared.terms === TERMS, shared)
+    // Every term fades independently, because they span two orders of magnitude of wavelength: the
+    // chop must go over the horizon while the swell, hundreds of metres long, stays.
+    check('every term carries its own Nyquist fade', !!shared && shared.fades === TERMS,
+      { fades: shared && shared.fades, expected: TERMS })
+    // ABSENCE OF EVIDENCE. If the sharp probe read flat too, the ratio below would be 0/0 and the
+    // fade check would pass on a shader that displaces nothing at all.
+    check('the sharp-pixel probe actually displaces', !!shared && shared.reachSharp > 0.05,
+      { reachSharp: shared && shared.reachSharp })
+    check('displacement fades out below one projected pixel',
+      !!shared && shared.reachCoarse < shared.reachSharp * 0.05,
+      { reachSharp: shared && shared.reachSharp, reachCoarse: shared && shared.reachCoarse })
   }
 
   // Absence of evidence is a failure.
-  check('assertion inventory non-empty', assertions.length >= 14, assertions.length)
+  check('assertion inventory non-empty', assertions.length >= 21, assertions.length)
 
   let ok = assertions.every(a => a.ok)
   if (mutation) {
@@ -279,7 +369,9 @@ const TERMS = 12
     ok = false
   }
   const failed = assertions.filter(a => !a.ok).map(a => a.name)
+  const _sh = (typeof shared === 'undefined' || !shared) ? {} : shared
   console.log(`${ok ? 'PASS' : 'FAIL'}  gerstner terms=${terms.length} steepness=${steep.toFixed(4)} `
+    + `reachSharp=${(_sh.reachSharp==null?-1:_sh.reachSharp).toFixed(4)} reachCoarse=${(_sh.reachCoarse==null?-1:_sh.reachCoarse).toFixed(4)} `
     + `harmonics=${harmonic} assertions=${assertions.length} failed=[${failed.join(',')}] mutation=${mutation || 'none'}`)
   if (!ok || process.env.MC_VERBOSE) console.log(JSON.stringify(assertions.filter(a => !a.ok), null, 2))
   process.exit(ok ? 0 : 1)

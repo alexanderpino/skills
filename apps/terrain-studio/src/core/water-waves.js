@@ -252,22 +252,31 @@ export function glslGerstner(preset, fnName = 'gerstnerDisp') {
     const k = 2 * Math.PI / t.lambda
     const om = Math.sqrt(GRAVITY * k)
     const dx = Math.cos(t.dirRad), dz = Math.sin(t.dirRad)
-    return `  { float th=${f(k)}*(${f(dx)}*p.x+${f(dz)}*p.y)-${f(om)}*t+${f(t.phase)};`
+    // NYQUIST FADE, per term. A wave whose wavelength has shrunk below a couple of pixels cannot
+    // be drawn -- it aliases into crawling noise that no amount of supersampling settles, and at
+    // grazing angles the far water is exactly where every short term lands. Each term carries its
+    // own fade because they differ by two orders of magnitude in wavelength: the chop should
+    // vanish over the horizon while the swell, still hundreds of metres long, stays. Full
+    // strength at four pixels, gone at two. `mpp` is metres per pixel AT THIS VERTEX, so the
+    // fade is per-vertex distance-dependent rather than one global LOD switch.
+    return `  { float fd=clamp(${f(t.lambda)}/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`
+      + ` float th=${f(k)}*(${f(dx)}*p.x+${f(dz)}*p.y)-${f(om)}*t+${f(t.phase)};`
       + ` float c=cos(th), s=sin(th);`
       // EVERY COEFFICIENT IS PARENTHESISED and carries its own sign. Emitting `nx+=-${value}` put a
       // unary minus in front of a literal that is itself often negative, producing `+=--1.2e-5`,
       // which GLSL parses as a decrement and rejects with "l-value required". The sign belongs in
       // the number, not in the operator.
-      + ` d.x+=(${f(t.Q * t.A * dx)})*c; d.y+=(${f(t.A)})*s; d.z+=(${f(t.Q * t.A * dz)})*c;`
-      + ` nx+=(${f(-t.Q * t.A * dx * dx * k)})*s; ny+=(${f(t.A * dx * k)})*c; nz+=(${f(-t.Q * t.A * dz * dx * k)})*s;`
-      + ` mx+=(${f(-t.Q * t.A * dx * dz * k)})*s; my+=(${f(t.A * dz * k)})*c; mz+=(${f(-t.Q * t.A * dz * dz * k)})*s; }`
+      + ` float c2=c*fd, s2=s*fd;`
+      + ` d.x+=(${f(t.Q * t.A * dx)})*c2; d.y+=(${f(t.A)})*s2; d.z+=(${f(t.Q * t.A * dz)})*c2;`
+      + ` nx+=(${f(-t.Q * t.A * dx * dx * k)})*s2; ny+=(${f(t.A * dx * k)})*c2; nz+=(${f(-t.Q * t.A * dz * dx * k)})*s2;`
+      + ` mx+=(${f(-t.Q * t.A * dx * dz * k)})*s2; my+=(${f(t.A * dz * k)})*c2; mz+=(${f(-t.Q * t.A * dz * dz * k)})*s2; }`
   })
   // Tangents are accumulated alongside, never differenced — the ADR forbids a finite-difference
   // normal, and doing it here as well as on the CPU is what keeps the two implementations the same
   // function rather than two approximations of one.
   return [
     `// generated from WaterWavePreset v${WATER_WAVE_VERSION} — ${terms.length} terms, steepness ${(preset && preset.steepness || 0).toFixed(4)}`,
-    `vec3 ${fnName}(vec2 p, float t, out vec3 N){`,
+    `vec3 ${fnName}(vec2 p, float t, float mpp, out vec3 N){`,
     `  vec3 d=vec3(0.0);`,
     `  float nx=1.0, ny=0.0, nz=0.0;`,   // dP/dx
     `  float mx=0.0, my=0.0, mz=1.0;`,   // dP/dz

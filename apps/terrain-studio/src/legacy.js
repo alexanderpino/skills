@@ -5788,7 +5788,11 @@ function initGL(){
 ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
     void main(){
       vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vXZ=axz;vWN=awn;vSnowN=asnowN;
-      vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, WN);
+      // Metres per pixel AT THIS VERTEX: distance to the eye times the angular size of one
+      // pixel, converted out of grid space. uMppK carries uScale*2*tan(fov/2)/height so the
+      // shader does one multiply rather than re-deriving the projection it cannot see.
+      float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
+      vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, WN);
       float wet=clamp(vDepth*40.0,0.0,1.0);
       float amp=wet*uWaveAmp;
       vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
@@ -5799,11 +5803,11 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
     precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;out vec4 frag;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
-    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;
+    uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
     uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
     vec3 waveData(vec2 p,float t){
@@ -5869,11 +5873,12 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     // the same normalised axis, so one conversion serves all three components.
     const wmVs=`#version 300 es
       in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;
-      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;
+      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;
 ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       void main(){
         vDepth=(aw-ah)*uH;
-        vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, N);
+        float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
+        vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, N);
         // TWO SEPARATE FACTORS, and conflating them was a real bug. wet is a 0..1 shoreline fade
         // so a dry cell is untouched and the shore grows no fringe of waves standing on land.
         // uWaveAmp is the authored height IN METRES and can be 30+. Using one value for both made
@@ -6941,15 +6946,24 @@ function drawTerrain(MVP,M,ex,ey,ez,deferred){
     gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
   }
 }
-function drawWaterDepth(MVP){
+function drawWaterDepth(MVP,ex,ey,ez){
   if(!scene.water||!waterMaskProg)return;
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);gl.useProgram(waterMaskProg);
   setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);gl.uniform1f(u(waterMaskProg,"uScale"),terrainDef.scale);
   gl.uniform1f(u(waterMaskProg,"uTime"),uTime);   // the SAME clock the forward pass uses — ADR-006 requires one time
+  gl.uniform3f(u(waterMaskProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterMaskProg,"uMppK"),mppPerUnitDistance());
   gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
   bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+}
+function mppPerUnitDistance(){
+  // The fade needs metres per pixel, and only the JS side knows the projection. Deriving it
+  // here rather than in each shader keeps one definition, and keeps the two passes fading
+  // identically -- a mask that faded differently from the colour pass would reintroduce
+  // exactly the crest-hairline the single-source rule exists to prevent.
+  const fov=Number.isFinite(cam.fov)?cam.fov:1.05, h=(glc&&glc.height)||1;
+  return terrainDef.scale*2*Math.tan(fov/2)/h;
 }
 function renderGL(){
   if(!gl){return;}
@@ -6978,7 +6992,7 @@ function renderGL(){
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER,gbuf.fbo);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,gbuf.waterFbo);
     gl.blitFramebuffer(0,0,glc.width,glc.height,0,0,glc.width,glc.height,gl.DEPTH_BUFFER_BIT,gl.NEAREST);
     gl.bindFramebuffer(gl.FRAMEBUFFER,gbuf.waterFbo);gl.viewport(0,0,glc.width,glc.height);
-    gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);drawWaterDepth(MVP);
+    gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);drawWaterDepth(MVP,ex,ey,ez);
     // PASS 2: fullscreen triangle -> screen (sky + water-surface refraction)
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,glc.width,glc.height);
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
@@ -7023,7 +7037,7 @@ function renderGL(){
       gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
-      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);
+      gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterProg,"uMppK"),mppPerUnitDistance());
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
       bindAttr(waterProg,"aw",1,buffers.wsurf);bindAttr(waterProg,"ais",1,buffers.iceSnow);bindAttr(waterProg,"aice",1,buffers.ice);
       bindAttr(waterProg,"awn",3,buffers.wnrm);bindAttr(waterProg,"asnowN",3,buffers.iceSnowNrm);
