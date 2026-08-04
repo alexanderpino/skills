@@ -776,12 +776,44 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   // deliberately no such term to close against; that population is graded by the refusal gate.
   const itemised = runs.filter(r => r.claimExpected === 'itemised')
   const refused = runs.filter(r => r.claimExpected === 'refused')
+  // THE REFUSED POPULATION IS NOT EXEMPT FROM BEING MEASURED, only from being closed. The Sprint 3
+  // audit rated this story UNSUPPORTED for exactly this: every loss-dependent gate is scoped to the
+  // itemised runs — correctly, there is no term to close against on the others — and the effect was
+  // that the two SHIPPING GPU engines had no conservation reading at all. Measured there:
+  // 7.085e8 m3 unaccounted, 85.96% of transported volume, ledgerErr 880x its own bound, oracle green.
+  //
+  // Refusing to ATTRIBUTE a loss is honest. Refusing to MEASURE the hole it leaves is not. The
+  // residual is already computed on every run, so it is now reported and bounded by a pinned
+  // ceiling. That ceiling records current state; it is a deficiency on the record, not a pass mark.
+  // It falls when the droplet engines itemise their export the way the pipe path does with its
+  // apron ring, and a change that makes it worse fails here.
+  const unaccounted = runs.map(r => ({ key: r.key, claim: r.claimExpected,
+    err: num(r.ledgerErr), transported: num(r.transportedM3),
+    frac: (num(r.ledgerErr) !== null && num(r.transportedM3) > 0) ? r.ledgerErr / r.transportedM3 : null }))
+  const refusedUn = unaccounted.filter(u => u.claim === 'refused')
+  const maxRefusedFrac = refusedUn.length ? Math.max(...refusedUn.map(u => u.frac === null ? 1 : u.frac)) : null
+  const maxItemisedFrac = unaccounted.filter(u => u.claim === 'itemised' && u.frac !== null).length
+    ? Math.max(...unaccounted.filter(u => u.claim === 'itemised' && u.frac !== null).map(u => u.frac)) : null
+  // PINNED FROM MEASUREMENT, and the two numbers say the whole thing:
+  //     itemised paths   6.25e-7 of transported volume unaccounted
+  //     refused paths    0.8596  of transported volume unaccounted   (gpu-droplets, gpu-combined)
+  // A factor of 1.4 million between them. The ceiling sits just above the measured worst case so a
+  // regression fails, and deliberately NOT at a round number that would look like a target.
+  const UNACCOUNTED_CEILING = 0.87
 
   const maxCoverBookErr = Math.max(0, ...runs.map(r => num(r.coverBookErr) === null ? 0 : r.coverBookErr))
   const deepBedrock = deep.map(r => ledNum(r, 'bedrockDetachedM3'))
   const bareBedrock = bare.map(r => ledNum(r, 'bedrockDetachedM3'))
 
   const gates = {
+    // --- the refused population is measured, even though it cannot be closed --------------------
+    refusedPathsAreMeasuredNotSilent: refused.length > 0
+      && refusedUn.every(u => u.frac !== null && Number.isFinite(u.frac) && u.transported > 0),
+    unaccountedVolumeDoesNotGrow: maxRefusedFrac !== null && maxRefusedFrac <= UNACCOUNTED_CEILING,
+    // The itemised paths must remain FAR better than the refused ones, or the ceiling above would be
+    // quietly normalising the whole story rather than one population.
+    itemisedPathsAccountForNearlyEverything: maxItemisedFrac !== null && maxItemisedFrac < 1e-3,
+
     // --- the declared surface ------------------------------------------------------------------
     coverInputPortsDeclared: report.ports.soilIn === true && report.ports.sedIn === true
       && report.ports.precipIn === true,
@@ -987,7 +1019,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     + `runs=${runs.length} ledgers=${runs.filter(r => r.ledger).length} `
     + `deepBedrockDetached=[${deepBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
     + `bareBedrockDetached=[${bareBedrock.map(v => v === null ? 'n/a' : fmt(v)).join(',')}] `
-    + `maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
+    + `unaccountedRefused=${maxRefusedFrac === null ? 'n/a' : maxRefusedFrac.toFixed(4)} unaccountedItemised=${maxItemisedFrac === null ? 'n/a' : maxItemisedFrac.toExponential(2)} maxCoverBookErr=${fmt(maxCoverBookErr)} gpu=${report.gpuAvailable} `
     + `stackViolations=${runs.reduce((a, r) => a + ((r.stackIdentity && r.stackIdentity.violations) || 0), 0)} `
     + `maxStackResidualM=${fmt(Math.max(0, ...runs.map(r => (r.stackIdentity && r.stackIdentity.maxResidualM) || 0)))} `
     + `maxLossItemErr=${fmt(Math.max(0, ...runs.map(r => (typeof r.lossItemErr === 'number' ? r.lossItemErr : 0))))} `
