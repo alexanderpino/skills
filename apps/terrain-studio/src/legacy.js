@@ -20,7 +20,7 @@ import { AUX_MAPS, AUX_LENSES, SIDE_CHANNEL_LEDGER, semanticDebt, debtByOwner, v
 import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, HEIGHT_WRITERS } from './core/doctrine.js';
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
-import { expandPreset as expandWavePreset, glslGerstner, presetBounds } from './core/water-waves.js';
+import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, presetBounds } from './core/water-waves.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
@@ -5668,8 +5668,12 @@ let _wavePreset=null,_wavePresetKey="";
 // WHAT EACH WATER PROGRAM ACTUALLY RECEIVED. ADR-006 requires the forward colour pass and the
 // deferred mask/depth pass to displace by the SAME function; recording the injected text makes
 // that checkable instead of a claim, which is the "shader instrumentation" the story asks for.
-export const waterShaderSources={mask:null,forward:null};
+export const waterShaderSources={mask:null,forward:null,forwardDetail:null,deferredDetail:null};
 export function waveGlsl(name){return glslGerstner(currentWaterPreset(),name||"gerstnerDisp");}
+// The detail layer is generated and recorded exactly like the geometry, and for the same reason:
+// it was the one piece of water GLSL still hand-copied into two passes, and it is the piece that
+// rotted into two plane sinusoids no artist could author or steer.
+export function detailGlsl(name){return glslWaterDetail(currentWaterPreset(),name||"waterDetail");}
 export function currentWaterPreset(){
   const c={windDirectionDeg:terrainDef.windDirection==null?300:terrainDef.windDirection,
     windSpeedMps:terrainDef.windSpeed==null?10:terrainDef.windSpeed,
@@ -5809,28 +5813,8 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
-    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
-    vec3 waveData(vec2 p,float t){
-      float s=max(uRippleScale,.05);
-      if(uPattern==0){
-        float a=sin(p.x*46.*s+t*1.7),b=sin(p.y*37.*s-t*1.15);
-        float c=sin(p.y*46.*s+t*1.35),d=sin(p.x*34.*s+t*.95);
-        return vec3(.032*a+.021*b,.032*c+.021*d,.5+.22*a+.16*b+.08*c);
-      }
-      if(uPattern==1){
-        vec2 d1=normalize(vec2(.93,.37)),d2=normalize(vec2(.72,-.69));
-        float a=sin(dot(p,d1)*58.*s+t*1.9),b=sin(dot(p,d2)*24.*s+t*.74+a*.35);
-        return vec3(.042*(d1.x*a+d2.x*b*.38),.042*(d1.y*a+d2.y*b*.38),.5+.28*a+.15*b);
-      }
-      if(uPattern==2){
-        vec2 q1=p-vec2(.36,-.22),q2=p-vec2(-.48,.31);
-        float r1=max(length(q1),.001),r2=max(length(q2),.001);
-        float a=sin(r1*54.*s-t*2.0),b=sin(r2*43.*s-t*1.45);
-        vec2 g=.034*(q1/r1*a+q2/r2*b*.72);
-        return vec3(g,.5+.23*a+.18*b);
-      }
-      return vec3(0.,0.,.5);
-    }
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
+    ${(waterShaderSources.forwardDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
     void main(){
       float shoreAA=.0008+uShoreSmooth*.0018;
       // Dry vertices encode "no water" as exactly zero depth. Centering smoothstep around zero
@@ -5839,8 +5823,25 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       if(coverage<=.005)discard;
       float ice=clamp(vIce,0.0,1.0);
       float snowCov=smoothstep(.015,.10,vIceSnow)*ice;
-      float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage*(1.0-ice);vec3 wave=waveData(vXZ,t);
-      vec3 baseN=normalize(mix(vWN,vSnowN,snowCov));
+      // Detail is a SHADING band only, below ~1.5 m: it never reaches the silhouette and never
+      // double-counts energy with the Gerstner terms above it. vXZ is grid space, the function
+      // takes metres.
+      float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage*(1.0-ice);
+      float mppF=length(uCam-vW)*uMppK;
+      vec4 wd=waterDetail(vXZ*uScale,t,mppF);
+      vec3 wave=vec3(wd.x,wd.y,0.5+0.5*wd.z);
+      // THE GERSTNER NORMAL WAS COMPUTED AND THROWN AWAY. Both vertex shaders evaluate the analytic
+      // normal and export vWaveN; this shader declared it as an input and never read a single
+      // component of it. The surface was DISPLACED by twelve broadband, non-parallel, non-harmonic
+      // waves and LIT as a flat plane perturbed by two plane sinusoids -- which is precisely the
+      // banding, and no amount of new noise would have fixed it while the real normal stayed unused.
+      //
+      // Whiteout blend, not a lerp: tangents add and the up-components multiply, which composes two
+      // slope fields without flattening either. A lerp toward the wave normal would wash out the
+      // underlying water surface tilt that rivers and shorelines depend on.
+      float liquid=coverage*(1.0-ice);
+      vec3 gerN=normalize(vec3(vWN.x+vWaveN.x*liquid, vWN.y*mix(1.0,vWaveN.y,liquid), vWN.z+vWaveN.z*liquid));
+      vec3 baseN=normalize(mix(gerN,vSnowN,snowCov));
       vec3 N=normalize(baseN+waveAmt*vec3(wave.x,0.,wave.y)); // snow uses its raised top normal; waves perturb liquid only
       vec3 V=normalize(uCam-vW);vec3 S=normalize(uSun);
       float fres=pow(1.0-max(dot(N,V),0.0),3.0);             // Fresnel — reflective at grazing angles
@@ -5906,7 +5907,7 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       precision highp float;in vec2 vUv;out vec4 frag;
       uniform sampler2D gColor;uniform highp sampler2D gDepth;uniform sampler2D gW;uniform sampler2D gH;uniform sampler2D gIce;uniform sampler2D gIceSnow;
       uniform sampler2D gWaterMask;uniform highp sampler2D gWaterDepth;
-      uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;
+      uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;uniform float uMppK;uniform float uScale;
       uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze,uRowScale,uROWS,uHpx,uZScale;
       uniform float uTerrainHeight,uSeaTemp,uLapseRate,uSnowfall,uSnowMeltDays,uSnowMeltRate,uHasSnow;
       uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
@@ -5987,28 +5988,8 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);}
       float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
         return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
-      float detailNoise(vec2 p){return vnoise(p)+.5*vnoise(p*2.07+9.2);}
-      vec3 waveData(vec2 p,float t){
-        float s=max(uRippleScale,.05);
-        if(uPattern==0){
-          float a=sin(p.x*46.*s+t*1.7),b=sin(p.y*37.*s-t*1.15);
-          float c=sin(p.y*46.*s+t*1.35),d=sin(p.x*34.*s+t*.95);
-          return vec3(.032*a+.021*b,.032*c+.021*d,.5+.22*a+.16*b+.08*c);
-        }
-        if(uPattern==1){
-          vec2 d1=normalize(vec2(.93,.37)),d2=normalize(vec2(.72,-.69));
-          float a=sin(dot(p,d1)*58.*s+t*1.9),b=sin(dot(p,d2)*24.*s+t*.74+a*.35);
-          return vec3(.042*(d1.x*a+d2.x*b*.38),.042*(d1.y*a+d2.y*b*.38),.5+.28*a+.15*b);
-        }
-        if(uPattern==2){
-          vec2 q1=p-vec2(.36,-.22),q2=p-vec2(-.48,.31);
-          float r1=max(length(q1),.001),r2=max(length(q2),.001);
-          float a=sin(r1*54.*s-t*2.0),b=sin(r2*43.*s-t*1.45);
-          vec2 g=.034*(q1/r1*a+q2/r2*b*.72);
-          return vec3(g,.5+.23*a+.18*b);
-        }
-        return vec3(0.,0.,.5);
-      }
+      float detailNoise(vec2 p){return vnoise(p)+.5*vnoise(p*2.07+9.2);}
+      ${(waterShaderSources.deferredDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       float signedWaterDepth(vec2 uv){
         float ws=Wat(uv)*uH;if(uHasSea>0.5)ws=max(ws,uSeaLevel*uH);
         return ws-Ht(uv)*uH;
@@ -6088,7 +6069,10 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         float su=wup*uH+fieldLinear(gIceSnow,wuv+vec2(0.,uWpx))*uH/uTerrainHeight;
         vec3 snowN=normalize(vec3((sl-sr)*uRES*.25,1.0,(sd-su)*uRES*.25));
         N=normalize(mix(N,snowN,iceSnowCov));
-        float t=uTime*uRippleSpeed;vec3 wave=waveData(Pwater.xz,t);float waveAmt=uRipple*waterCov*(1.0-ice);
+        float t=uTime*uRippleSpeed;float waveAmt=uRipple*waterCov*(1.0-ice);
+        float mppF=length(uCam-Pwater)*uMppK;
+        vec4 wd=waterDetail(Pwater.xz*uScale,t,mppF);
+        vec3 wave=vec3(wd.x,wd.y,0.5+0.5*wd.z);
         N=normalize(N+waveAmt*vec3(wave.x,0.,wave.y));
         vec3 Vd=normalize(uCam-Pwater);
         float surfaceSh=shadowT(Pwater,S),surfaceAo=aoAt(wuv,Pwater.y);
@@ -6997,7 +6981,7 @@ function renderGL(){
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,glc.width,glc.height);
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);
     gl.useProgram(compProg);setM(compProg,"uInvMVP",mat4inv(MVP));
-    {const sd=sunDir();gl.uniform3f(u(compProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);
+    {const sd=sunDir();gl.uniform3f(u(compProg,"uSun"),sd[0],sd[1],sd[2]);}gl.uniform3f(u(compProg,"uCam"),ex,ey,ez);gl.uniform1f(u(compProg,"uMppK"),mppPerUnitDistance());gl.uniform1f(u(compProg,"uScale"),terrainDef.scale);
     gl.uniform1i(u(compProg,"uStyle"),shadeMode);gl.uniform1f(u(compProg,"uExposure"),renderLook.exposure);gl.uniform1f(u(compProg,"uHaze"),renderLook.haze);
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
     gl.uniform1f(u(compProg,"uRipple"),waterRipple);gl.uniform1f(u(compProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(compProg,"uRippleSpeed"),waterRippleSpeed);

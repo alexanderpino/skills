@@ -286,3 +286,113 @@ export function glslGerstner(preset, fnName = 'gerstnerDisp') {
     `}`,
   ].join('\n')
 }
+
+/**
+ * Generate the surface-detail GLSL both water fragment passes use.
+ *
+ * WHY THIS EXISTS. The wave GEOMETRY was Gerstner, but the shading detail on top of it was a hand
+ * written function called `waveData`, hand-duplicated in the forward and deferred passes, whose
+ * default "wind" pattern was two plane sinusoids:
+ *
+ *     a = sin(dot(p,d1)*58*s + t*1.9)
+ *     b = sin(dot(p,d2)*24*s + t*0.74 + a*0.35)
+ *
+ * Two coherent plane waves have straight, parallel, exactly periodic lines of equal phase. They
+ * cannot produce anything but banding, and no amount of wave geometry underneath hides it, because
+ * the sinusoids were the only thing the LIGHTING responded to. This function replaces them, and it
+ * is generated from the preset for the same reason `glslGerstner` is: the one piece of water GLSL
+ * that stayed hand-copied is the one that drifted.
+ *
+ * WHAT KILLS BANDING. A dense spectrum plus broken long-range coherence. Three octaves at
+ * non-harmonic ratios give the density; a domain warp driven by a lower-frequency octave destroys
+ * the coherence, so equal-phase lines meander instead of running straight. Anisotropy along the
+ * wind is what makes it read as wind chop rather than generic lumps.
+ *
+ * DERIVATIVES ARE ANALYTIC. ADR-006 forbids finite-difference normals, and the rule extends here:
+ * value noise carries its own exact gradient, so the detail contributes a real slope rather than a
+ * sampled approximation of one.
+ *
+ * THE DETAIL OWNS BELOW ~1.5 m. Above that is the Gerstner terms' job. If the two bands overlapped
+ * they would double-count energy in the mid band, and the surface would read as too rough for its
+ * own wave height.
+ *
+ * `p` is in METRES and `mpp` is metres per pixel, exactly as for the geometry.
+ */
+export function glslWaterDetail(preset, fnName = 'waterDetail') {
+  const terms = (preset && preset.terms) || []
+  // The wind direction, recovered as the mean heading of the swell band. Taking it from the preset
+  // rather than hardcoding a vector is what stops the detail from banding ACROSS the swell: the old
+  // pattern used fixed directions (.93,.37) and (.72,-.69) no matter which way the weather blew.
+  const swell = terms.slice(0, 4)
+  let sx = 0, sz = 0
+  for (const t of swell) { sx += Math.cos(t.dirRad); sz += Math.sin(t.dirRad) }
+  const wlen = Math.hypot(sx, sz) || 1
+  const wx = sx / wlen, wz = sz / wlen
+  const f = v => {
+    if (!Number.isFinite(v)) throw new Error('glslWaterDetail: non-finite value')
+    return v.toPrecision(9)
+  }
+  // Non-harmonic ratios, and all three below the shortest Gerstner wavelength so the bands do not
+  // overlap. Ratios 1 : 2.153 : 4.637 share no small-integer relationship, so the octaves never
+  // line up into a repeating beat the eye can lock onto.
+  const OCT = [
+    { lambda: 1.40, amp: 1.00, drift: 0.35 },
+    { lambda: 0.65, amp: 0.55, drift: 0.62 },
+    { lambda: 0.28, amp: 0.28, drift: 0.95 },
+  ]
+  const norm = OCT.reduce((a, o) => a + o.amp, 0)
+  const lines = OCT.map((o, i) => {
+    const k = 1 / o.lambda
+    return `  { float fd=clamp(${f(o.lambda)}/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`
+      + ` if(fd>0.0){ vec3 n=vnoise2(q*${f(k)} + vec2(${f(o.drift * (i % 2 ? -1 : 1))},${f(o.drift * 0.6)})*t);`
+      + ` g += (${f(o.amp / norm)})*fd*${f(k)}*vec2(n.y,n.z); h += (${f(o.amp / norm)})*fd*n.x; } }`
+  })
+  return [
+    `// generated from WaterWavePreset v${WATER_WAVE_VERSION} — ${OCT.length} detail octaves, wind (${f(wx)},${f(wz)})`,
+    `float h21(vec2 p){ p=fract(p*vec2(0.1031,0.1030)); p+=dot(p,p.yx+33.33); return fract((p.x+p.y)*p.x); }`,
+    // Value noise WITH ITS EXACT GRADIENT. The quintic-free cubic smoothstep is used deliberately:
+    // its derivative is cheap and continuous, which is all the normal needs.
+    `vec3 vnoise2(vec2 p){`,
+    `  vec2 i=floor(p), fr=fract(p);`,
+    `  vec2 u=fr*fr*(3.0-2.0*fr), du=6.0*fr*(1.0-fr);`,
+    `  float a=h21(i), b=h21(i+vec2(1.,0.)), c=h21(i+vec2(0.,1.)), d=h21(i+vec2(1.,1.));`,
+    `  float k1=b-a, k2=c-a, k3=a-b-c+d;`,
+    `  return vec3(a+k1*u.x+k2*u.y+k3*u.x*u.y, du.x*(k1+k3*u.y), du.y*(k2+k3*u.x));`,
+    `}`,
+    // Voronoi F2-F1 edge distance. This is the CELL STRUCTURE of sunlight sparkle on real water and
+    // of the highlight cells in stylised water. It feeds the mask channel only, never the normal:
+    // cellular fields have derivative discontinuities at cell borders and would facet the shading.
+    `float voroEdge(vec2 p, float t){`,
+    `  vec2 n=floor(p), fp=fract(p); float f1=8.0, f2=8.0;`,
+    `  for(int j=-1;j<=1;j++){ for(int i=-1;i<=1;i++){`,
+    `    vec2 g=vec2(float(i),float(j));`,
+    `    vec2 o=vec2(h21(n+g), h21(n+g+17.0));`,
+    `    o=0.5+0.45*sin(t*0.8+6.2831*o);`,
+    `    float d=length(g+o-fp);`,
+    `    if(d<f1){ f2=f1; f1=d; } else if(d<f2){ f2=d; }`,
+    `  } }`,
+    `  return clamp(f2-f1,0.0,1.0);`,
+    `}`,
+    `vec4 ${fnName}(vec2 p, float t, float mpp){`,
+    // Rotate into the wind frame and stretch along it: chop is elongated across the wind, which is
+    // what makes a noise field read as WIND chop instead of isotropic lumps.
+    `  mat2 R=mat2(${f(wx)},${f(-wz)},${f(wz)},${f(wx)});`,
+    `  vec2 q=R*p; q.x*=0.55;`,
+    // DOMAIN WARP. This is the part that actually destroys long-range coherence: sampling the field
+    // at a position that is itself perturbed by a lower-frequency field means equal-phase lines
+    // meander rather than running straight across the surface.
+    `  vec3 w=vnoise2(q*0.22+vec2(t*0.05,0.0));`,
+    `  q+=1.6*vec2(w.y,w.z);`,
+    `  vec2 g=vec2(0.0); float h=0.0;`,
+    ...lines,
+    // Undo the anisotropic stretch and the rotation on the GRADIENT, not just the position: a
+    // gradient transforms by the inverse transpose, and skipping this tilts every highlight.
+    `  g.x*=0.55;`,
+    `  g=vec2(${f(wx)}*g.x+${f(wz)}*g.y, ${f(-wz)}*g.x+${f(wx)}*g.y);`,
+    // The sparkle mask fades with distance too, or it aliases into crawling static on far water.
+    `  float mf=clamp(2.0/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`,
+    `  float cell=mf>0.0?voroEdge(q*0.5,t):0.0;`,
+    `  return vec4(g, h, cell*mf);`,
+    `}`,
+  ].join('\n')
+}
