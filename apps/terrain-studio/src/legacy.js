@@ -121,7 +121,7 @@ let satComposite=0;                             // 1 when a SatMap layer stack i
 function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
 let renderLook={exposure:-0.15,haze:0.28};     // scene-linear look development; exposure is in stops
-let waterLook={style:"realistic",bandSteps:5,pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55,waveDisplacement:1,amplitudeM:12,seaState:.55,bodyKind:"ocean"};
+let waterLook={style:"realistic",bandSteps:5,pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55,waveDisplacement:1,amplitudeM:5,seaState:.55,bodyKind:"ocean"};
 // waveDisplacement is SEPARATE from `strength` on purpose. `strength` drives the legacy ripple
 // SHADING (uRipple), so wiring the geometric displacement to it too made the two impossible to
 // tell apart: a gate that varied `strength` and saw 99% of pixels change was reading the ripple,
@@ -5862,7 +5862,17 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // that form where the water shoals and travel with the waves, which is what surf is.
       vBreak=shoalAmpBreak(uWaveAmp,depthM,uShoalRefM);
       vCrest=d.y;
-      vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
+      // THE NORMAL HAS TO CARRY THE AMPLITUDE. gerstnerDisp returns a UNIT normal built from the
+      // unit-amplitude preset, so it describes a 1 m sea no matter how tall the waves actually
+      // are; measured rms slope 0.0307 (1.75 deg) against Cox-Munk's 0.2328 (13.1 deg) at 10 m/s.
+      //
+      // Rescaled in SLOPE space, not by scaling the normal. Multiplying the normal's tangential
+      // part directly lets 1 + amp*nx pass through zero and the tangent frame inverts -- measured
+      // rms slope 44263 at amp 12. Reconstructing from (slope.x, 1, slope.z) has y > 0 by
+      // construction, so it cannot invert however steep the sea gets.
+      vec2 wslope=(WN.xz/max(WN.y,1e-4))*amp;
+      vec3 Namp=normalize(vec3(wslope.x,1.0,wslope.y));
+      vWaveN=normalize(mix(vec3(0.,1.,0.),Namp,wet));
       vW=vec3(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale);
       gl_Position=uMVP*vec4(vW,1.);}`
   :`attribute vec2 axz;attribute float ah;attribute float aw;attribute float ais;attribute float aice;attribute vec3 awn;attribute vec3 asnowN;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
@@ -6057,14 +6067,31 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         float wet=min(depthM*2.0,1.0);
         vBreak=shoalAmpBreak(uWaveAmp,depthM,uShoalRefM);
         vCrest=d.y;
-        vWaveN=normalize(mix(vec3(0.,1.,0.),N,wet));
+        // THE NORMAL HAS TO CARRY THE AMPLITUDE. gerstnerDisp returns a UNIT normal built from the
+        // unit-amplitude preset, so it describes a 1 m sea no matter how tall the waves actually
+        // are; measured rms slope 0.0307 (1.75 deg) against Cox-Munk's 0.2328 (13.1 deg) at 10 m/s.
+        //
+        // Rescaled in SLOPE space, not by scaling the normal. Multiplying the normal's tangential
+        // part directly lets 1 + amp*nx pass through zero and the tangent frame inverts -- measured
+        // rms slope 44263 at amp 12. Reconstructing from (slope.x, 1, slope.z) has y > 0 by
+        // construction, so it cannot invert however steep the sea gets.
+        vec2 wslope=(N.xz/max(N.y,1e-4))*amp;
+        vec3 Namp=normalize(vec3(wslope.x,1.0,wslope.y));
+        vWaveN=normalize(mix(vec3(0.,1.,0.),Namp,wet));
         gl_Position=uMVP*vec4(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale, 1.);
       }`;
     const wmFs=`#version 300 es
       precision highp float;in float vDepth;in vec3 vWaveN;in float vBreak;in float vCrest;out vec4 frag;
       // The analytic wave normal is carried through so the deferred pass reads the SAME normal the
       // displacement produced, rather than re-deriving one and disagreeing along every crest.
-      void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,vWaveN.y*0.5+0.5,1.0);}`;
+      // .b/.a CARRY THE TANGENTIAL WAVE NORMAL, not its y. The y component alone is nearly useless:
+      // it is close to 1 everywhere and says nothing about which way the surface tilts. x and z are
+      // the whole signal, and y reconstructs from them because the normal is unit length.
+      //
+      // This channel used to hold vWaveN.y and NOTHING EVER SAMPLED IT. gWaterMask was read in one
+      // place, .r only, so the analytic Gerstner normal was computed per vertex, packed, and thrown
+      // away -- which is why the deferred sea was lit as a mirror-flat plane.
+      void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,vWaveN.x*0.5+0.5,vWaveN.z*0.5+0.5);}`;
     waterMaskProg=makeProg(wmVs,wmFs);
   }
   // ---------- DEFERRED water + analytic sky — the fullscreen-triangle technique (WebGL2) ----------
@@ -6207,7 +6234,8 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         float z=texture(gDepth,vUv).r;
         vec4 clip=vec4(vUv*2.-1.,z*2.-1.,1.);vec4 wp=uInvMVP*clip;vec3 Pw=wp.xyz/wp.w;
         vec3 viewDir=normalize(Pw-uCam),S=normalize(uSun);
-        float waterMask=texture(gWaterMask,vUv).r;
+        vec4 waterG=texture(gWaterMask,vUv);
+        float waterMask=waterG.r;
         if(z>=0.99999&&waterMask<.5){frag=vec4(displayMap(skyCol(viewDir)),1.);return;} // background: analytic sky (skydome technique)
         vec4 g=texture(gColor,vUv);vec3 albedo=g.rgb;float rough=g.a;
         vec2 bedUv=worldUV(Pw.xz);
@@ -6230,7 +6258,19 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         if(waterCov<=.001){frag=vec4(displayMap(atmos(dryCol,Pw)),1.);return;}
         // ---- WATER (screen-space): lit lakebed refraction + Beer–Lambert + Fresnel sky reflection ----
         float wl=Wat(wuv-vec2(uWpx,0.)),wr=Wat(wuv+vec2(uWpx,0.)),wdn=Wat(wuv-vec2(0.,uWpx)),wup=Wat(wuv+vec2(0.,uWpx));
-        vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface normal (flat lakes, sloped rivers)
+        vec3 N=normalize(vec3((wl-wr)*uWScale,1.0,(wdn-wup)*uWScale)); // water-surface BODY normal (flat lakes, sloped rivers)
+        // THE WAVE NORMAL, finally read. For a sea the body normal above is exactly (0,1,0) -- the
+        // water height is constant, so every one of those four taps is equal -- and until now that
+        // constant was the entire normal the deferred path used. The sea was a roughness-free mirror
+        // of the sky with a broad static highlight, at every pixel, at every time.
+        //
+        // Whiteout blend rather than a lerp: tangents add and the up-components multiply, so the
+        // wave rides ON the body normal instead of replacing it. A river's slope and a lake's tilt
+        // survive underneath the waves.
+        vec2 wnXZ=waterG.ba*2.0-1.0;
+        float wnY=sqrt(max(1.0-dot(wnXZ,wnXZ),0.0));
+        vec3 waveN=vec3(wnXZ.x,wnY,wnXZ.y);
+        N=normalize(vec3(N.x+waveN.x, N.y*max(waveN.y,1e-3), N.z+waveN.z));
         float ice=clamp(fieldLinear(gIce,wuv),0.0,1.0);
         float iceSnowDepth=fieldLinear(gIceSnow,wuv);
         float iceSnowCov=smoothstep(.015,.10,iceSnowDepth);
