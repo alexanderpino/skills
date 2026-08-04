@@ -21,13 +21,17 @@ export const MFD_EXPONENT = 1.1
 export const SECONDS_PER_YEAR = 31536000   // the plan's exact figure, not 365.25 days
 
 /** Square D8 offsets with their true centre-to-centre distances in cell units. */
-const NB_SQUARE = [
+// EXPORTED so lakes.js (S4.4) walks the same one-ring this router does. A second copy of the offsets
+// in another module is a copy that can drift: the lake labeller decides which wet cells are one water
+// body, and if its connectivity ever disagreed with the flood's, a basin could be filled as one unit
+// and then labelled as two.
+export const NB_SQUARE = [
   [-1, 0, 1], [1, 0, 1], [0, -1, 1], [0, 1, 1],
   [-1, -1, Math.SQRT2], [1, 1, Math.SQRT2], [-1, 1, Math.SQRT2], [1, -1, Math.SQRT2],
 ]
 /** Hex D6 one-ring. Six equidistant neighbours, so there is no diagonal case to get wrong. */
-const HEX_ROW = Math.sqrt(3) / 2
-function hexNeighbours(y) {
+export const HEX_ROW = Math.sqrt(3) / 2
+export function hexNeighbours(y) {
   const odd = y & 1 ? 1 : 0
   return [
     [-1, 0, 1], [1, 0, 1],

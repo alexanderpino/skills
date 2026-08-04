@@ -396,6 +396,27 @@ export function glslWaterDetail(preset, fnName = 'waterDetail') {
     `  } }`,
     `  return clamp(f2-f1,0.0,1.0);`,
     `}`,
+    // THE VARIANCE THE FADE THREW AWAY, as a function of the same mpp.
+    //
+    // The Nyquist fade is correct — an octave below two pixels can only alias — but removing it
+    // without accounting for it makes distant water PERFECTLY SMOOTH, and a perfectly smooth
+    // dielectric with a needle-sharp highlight is exactly what "looks like plastic" means. The
+    // energy has to go somewhere, and physically it goes into roughness: sub-pixel waves widen the
+    // specular lobe instead of glinting individually.
+    //
+    // Slope variance of one sinusoidal octave of amplitude a and wavenumber k is (a*k)^2/2. What the
+    // fade removed is the (1-fd) share of it, so the sum below is the roughness the shading must add
+    // back. The terrain path already does this (see the `rough` term in shadeSurface); water did not.
+    `float ${fnName}Var(float mpp){`,
+    `  float v=0.0;`,
+    ...OCT.map(o => {
+      const k = 1 / o.lambda
+      const slope = (o.amp / norm) * k
+      return `  { float fd=clamp(${f(o.lambda)}/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`
+        + ` float lost=1.0-fd; v += lost*lost*${f(slope * slope * 0.5)}; }`
+    }),
+    `  return v;`,
+    `}`,
     `vec4 ${fnName}(vec2 p, float t, float mpp){`,
     // Rotate into the wind frame and stretch along it: chop is elongated across the wind, which is
     // what makes a noise field read as WIND chop instead of isotropic lumps.
@@ -459,5 +480,30 @@ export function glslShoal(fnName = 'shoalAmp') {
     `  float dry=min(d*2.0,1.0);`,
     `  return min(ampM*gain,${SHOAL_BREAK_RATIO.toFixed(4)}*d)*dry;`,
     `}`,
+    // Emitted beside it from the SAME constants, so surf can never disagree with the amplitude clamp
+    // it is derived from.
+    `float ${fnName}Break(float ampM, float depthM, float refM){`,
+    `  float d=max(depthM,0.0);`,
+    `  if(d<=0.0) return 0.0;`,
+    `  float gain=min(pow(max(max(refM,1e-6)/d,1.0),0.25),${SHOAL_MAX_GAIN.toFixed(4)});`,
+    `  return min(1.0,(ampM*gain)/(${SHOAL_BREAK_RATIO.toFixed(4)}*d));`,
+    `}`,
   ].join('\n')
+}
+
+/**
+ * How close a wave is to breaking, 0..1, where 1 means it is breaking now.
+ *
+ * This is the SURF CRITERION, and it is the same number the amplitude clamp already uses: the
+ * shoaled height over the McCowan limit of 0.78*depth. Driving foam from it rather than from a
+ * distance-to-shore is what produces surf that arrives in bands parallel to the beach — depth
+ * contours run parallel to a shore, so the locus where a wave first exceeds its limit does too, and
+ * it moves further out on a bigger swell exactly as real surf does.
+ */
+export function breakFraction(ampM, depthM, refM) {
+  const d = Math.max(depthM, 0)
+  if (d <= 0) return 0
+  const ref = Math.max(refM, 1e-6)
+  const gain = Math.min(Math.pow(Math.max(ref / d, 1), 0.25), SHOAL_MAX_GAIN)
+  return Math.min(1, (ampM * gain) / (SHOAL_BREAK_RATIO * d))
 }

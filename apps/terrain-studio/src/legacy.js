@@ -21,6 +21,7 @@ import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, H
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
 import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, glslShoal, presetBounds } from './core/water-waves.js';
+import { BIOMES, BIOME_KEYS, DEFAULT_BIOME, biomeTerrainOverrides, biomeSeaLevel, biomePrecipMmYr } from './core/biomes.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
@@ -4961,7 +4962,7 @@ export function previewCreation(){
     if(bad){bad.textContent="Cannot create: "+reason;bad.dataset.mode="rejected";}
     $("#ntCreate").disabled=true;
     pendingNewTerrain={cols,rows,width,height,unit:($("#ntUnit")||{}).value||"m",resMode:res.mode,
-      lattice:$("#ntLattice").value,template:$("#ntTemplate").value,
+      lattice:$("#ntLattice").value,template:$("#ntTemplate").value,biome:($("#ntBiome")&&$("#ntBiome").value)||DEFAULT_BIOME,
       verdict:{mode:"rejected",code:"DIMENSIONS_INVALID",reason}};
     return pendingNewTerrain;
   }
@@ -4975,15 +4976,39 @@ export function previewCreation(){
   }
   $("#ntCreate").disabled=verdict.mode==="rejected"||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0;
   pendingNewTerrain={cols,rows,width,height,unit:($("#ntUnit")||{}).value||"m",resMode:res.mode,
-    lattice:$("#ntLattice").value,template:$("#ntTemplate").value,verdict};
+    lattice:$("#ntLattice").value,template:$("#ntTemplate").value,biome:($("#ntBiome")&&$("#ntBiome").value)||DEFAULT_BIOME,verdict};
   return pendingNewTerrain;
 }
+// Build the biome list FROM THE MODULE, never from markup. A hardcoded <option> list is a second
+// copy of the table that drifts the moment a preset is added, and the drift is silent: the option
+// still selects, it just selects a key nothing answers to.
+function populateBiomes(){
+  const sel=$("#ntBiome");if(!sel||sel.options.length)return;
+  for(const k of BIOME_KEYS){
+    const o=document.createElement("option");
+    o.value=k;o.textContent=BIOMES[k].label;if(k===DEFAULT_BIOME)o.selected=true;
+    sel.appendChild(o);
+  }
+  syncBiomeNote();
+  sel.addEventListener("change",syncBiomeNote);
+}
+function syncBiomeNote(){
+  const sel=$("#ntBiome"),note=$("#ntBiomeNote");if(!sel||!note)return;
+  const b=BIOMES[sel.value]||BIOMES[DEFAULT_BIOME];
+  // State the numbers, not just the mood. "Cold and damp" is a vibe; "sea 4 degC, lapse 5.8, snow
+  // from 690 m" is something an author can check against what they then see on the terrain.
+  const snow=b.lapseRate>0?b.seaTemp/b.lapseRate*1000:0;
+  note.textContent=b.note+"  ·  sea "+b.seaTemp+" °C · lapse "+b.lapseRate+" °C/km · "
+    +(snow>0?"0 °C at "+Math.round(snow)+" m":"below freezing at sea level")
+    +" · "+b.precipMmYr+" mm/yr";
+}
 export function openNewTerrainDialog(){
+  populateBiomes();
   $("#newTerrainDialog").hidden=false;previewCreation();
 }
 export function closeNewTerrainDialog(){$("#newTerrainDialog").hidden=true;pendingNewTerrain=null;}
 // Live preflight on every edit, so the readout is never stale relative to the inputs.
-for(const id of ["ntCols","ntRows","ntWidth","ntHeight","ntLattice","ntTemplate","ntUnit","ntResMode","ntSpacing","ntDensity"]){
+for(const id of ["ntCols","ntRows","ntWidth","ntHeight","ntLattice","ntTemplate","ntUnit","ntResMode","ntSpacing","ntDensity","ntBiome"]){
   const el=$("#"+id);if(el){el.addEventListener("input",()=>previewCreation());el.addEventListener("change",()=>previewCreation());}
 }
 if($("#ntCancel"))$("#ntCancel").onclick=closeNewTerrainDialog;
@@ -5014,6 +5039,12 @@ export function confirmNewTerrain(){
   applyPreviewDetail(PREVIEW_DETAIL);
   closeNewTerrainDialog();
   // Only NOW does anything allocate.
+  // THE BIOME IS APPLIED BEFORE THE DOCUMENT IS BUILT, not after. The opening graph is evaluated
+  // once as it is created, and a climate written afterwards would leave that first frame showing
+  // the previous world's temperature -- which is exactly the class of defect where the app looks
+  // right on the second interaction and wrong on the first.
+  pendingBiome=p.biome||DEFAULT_BIOME;
+  terrainDef=createTerrainDef({...terrainDef,...biomeTerrainOverrides(pendingBiome)});
   newTerrainDocument(p.template==="default",p.template==="canyon"?"canyon":null,true);
   return true;
 }
@@ -5669,6 +5700,17 @@ let _wavePreset=null,_wavePresetKey="";
 // deferred mask/depth pass to displace by the SAME function; recording the injected text makes
 // that checkable instead of a claim, which is the "shader instrumentation" the story asks for.
 export const waterShaderSources={mask:null,forward:null,forwardDetail:null,deferredDetail:null,forwardShoal:null,maskShoal:null};
+const SKY_GLSL=`
+      vec3 skyCol(vec3 d){d=normalize(d);float h=d.y;
+        vec3 zen=vec3(0.10,0.24,0.55),hor=vec3(0.62,0.70,0.80);
+        float t=pow(clamp(h,0.,1.),0.42);vec3 c=mix(hor,zen,t);
+        c=mix(c,vec3(0.42,0.45,0.50),smoothstep(0.0,-0.12,h));
+        float sd=max(dot(d,normalize(uSun)),0.);
+        c+=vec3(8.0,6.4,4.2)*pow(sd,1200.);
+        c+=vec3(1.2,0.72,0.38)*pow(sd,10.)*0.20;
+        c+=vec3(0.8,0.42,0.20)*pow(sd,3.5)*0.10*(1.0-t);
+        return c;}
+`;
 export function waveGlsl(name){return glslGerstner(currentWaterPreset(),name||"gerstnerDisp");}
 // The detail layer is generated and recorded exactly like the geometry, and for the same reason:
 // it was the one piece of water GLSL still hand-copied into two passes, and it is the piece that
@@ -5788,7 +5830,7 @@ function initGL(){
   // The WebGL1 fallback below is deliberately left flat: it has no deferred pass to disagree with,
   // and a second unshared implementation there is exactly what this change exists to avoid.
   const wVs=(g2?`#version 300 es
-    in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;in vec3 asnowN;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;out vec3 vSnowN;out vec3 vWaveN;
+    in vec2 axz;in float ah;in float aw;in float ais;in float aice;in vec3 awn;in vec3 asnowN;out float vDepth;out float vIceSnow;out float vIce;out vec3 vW;out vec2 vXZ;out vec3 vWN;out vec3 vSnowN;out vec3 vWaveN;out float vBreak;out float vCrest;
     uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;
 ${(waterShaderSources.forwardShoal=shoalGlsl()).split(/\r?\n/).map(l => '' + l).join(String.fromCharCode(10))}
 ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
@@ -5814,6 +5856,12 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       float depthM=max((aw-ah)*uTerrainHeight,0.0);
       float amp=shoalAmp(uWaveAmp,depthM,uShoalRefM);
       float wet=min(depthM*2.0,1.0);
+      // SURF. vBreak is how close this wave is to the McCowan limit; vCrest is where in the wave
+      // cycle the vertex sits. Foam needs BOTH: breaking alone gives one wide band over the whole
+      // shallow zone, and crest alone puts foam on open ocean. Together they give lines of foam
+      // that form where the water shoals and travel with the waves, which is what surf is.
+      vBreak=shoalAmpBreak(uWaveAmp,depthM,uShoalRefM);
+      vCrest=d.y;
       vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
       vW=vec3(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale);
       gl_Position=uMVP*vec4(vW,1.);}`
@@ -5821,10 +5869,10 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     uniform mat4 uMVP;uniform float uH;uniform float uScale;
     void main(){vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vW=vec3(axz.x,aw*uH+ais/uScale,axz.y);vXZ=axz;vWN=awn;vSnowN=asnowN;gl_Position=uMVP*vec4(vW,1.);}`);
   const wFs=(g2?`#version 300 es
-    precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;out vec4 frag;
+    precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;in float vBreak;in float vCrest;out vec4 frag;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
-    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform float uToon;uniform float uBandSteps;`
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform float uToon;uniform float uBandSteps;`+SKY_GLSL+``
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
@@ -5883,16 +5931,47 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
         dnq=(floor(sc)+smoothstep(0.5-bw,0.5+bw,fract(sc))+0.5)/uBandSteps;
       }
       vec3 wc=mix(vec3(0.28,0.58,0.62),vec3(0.03,0.12,0.30),clamp(dnq,0.0,1.0));
-      vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),110.0);
+      // ROUGHNESS FROM THE VARIANCE THE NYQUIST FADE REMOVED. Fading sub-pixel octaves out is
+      // correct, but doing it without putting their slope variance back into the roughness
+      // leaves distant water perfectly smooth with a needle-sharp highlight -- a mirror-flat
+      // dielectric, which is exactly the plastic look. Blinn exponent n = 2/m^2 - 2 for slope
+      // variance m^2, clamped so the near field stays sharp and the far field cannot blow up.
+      float lostVar=waterDetailVar(mppF);
+      float m2=clamp(lostVar+1.8e-2/110.0,1.8e-2/110.0,0.16);
+      float specPow=clamp(2.0/m2-2.0,8.0,110.0);
+      vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),specPow)*(specPow/110.0);
       // Cel specular: a threshold with a narrow AA band, lerped in by hardness so the same path
       // serves both looks. The soft lobe is what realistic water wants; the hard one is the toon
       // highlight that reads as a shape rather than a sheen.
       spec=mix(spec,smoothstep(0.005,0.011,spec),uToon);
       float pat=clamp(.5+(wave.z-.5)*waveAmt*1.6,0.,1.);
-      vec3 col=(mix(wc,vec3(0.55,0.68,0.82),fres*0.55)+spec*0.8)*mix(.93,1.07,pat);
+      // REFLECT THE ACTUAL SKY. This mixed toward a hardcoded vec3, which is plastic by
+      // construction: a real water surface takes its colour at grazing angles from whatever is
+      // above it, and a constant cannot vary with view direction, wave normal or sun position.
+      // The deferred pass has always used skyCol here; the forward pass now shares the same text.
+      vec3 refl=skyCol(reflect(-V,N));
+      // Sub-surface: light that entered the water, scattered, and came back out. It is what
+      // makes a wave glow green when you look INTO the sun through it, and its absence is a
+      // large part of why flat water reads as a painted sheet.
+      float sss=pow(max(dot(normalize(uSun),-V),0.0),5.0);
+      vec3 scatterC=vec3(0.0885,0.497,0.456)*sss*1.7*(1.0-clamp(abs(V.y),0.0,1.0))*(1.0-dn);
+      vec3 col=(mix(wc,refl,fres)+scatterC+spec*0.8)*mix(.93,1.07,pat);
       float crest=smoothstep(.68,.92,wave.z)*waveAmt;
       col+=vec3(.035,.065,.085)*crest*(.35+.65*fres);      // restrained bright wavelets make the pattern legible
+      // The shoreline band: the wet edge itself, always there.
       float foam=(1.0-smoothstep(0.0,.022+uShoreSmooth*.006,max(vDepth,0.)))*uFoam*coverage;
+      // SURF, which is a different thing and the one that dominates a real coastline. Foam forms
+      // where the wave is at or past its breaking limit AND near its crest, so it appears as
+      // lines that travel shoreward rather than as a halo around the land. Broken up by the
+      // detail layer's cellular channel so the lines are ragged, not drawn with a compass.
+      float breaking=smoothstep(0.55,0.98,vBreak);
+      float crest=smoothstep(0.05,0.55,vCrest);
+      float ragged=mix(0.55,1.0,wd.w);
+      float surf=breaking*crest*ragged*coverage*(1.0-ice)*uFoam*3.2;
+      // Spent foam: past the break the water stays aerated even in the troughs, which is what
+      // fills the swash zone between the lines instead of leaving hard gaps.
+      surf+=breaking*smoothstep(0.35,1.0,vBreak)*0.35*ragged*coverage*(1.0-ice)*uFoam;
+      foam=clamp(foam+surf,0.0,1.0);
       // The shoreline edge is the load-bearing feature of the stylised look -- it is the one
       // thing BotW spends a whole extra screen-space pass on. Hardened here rather than added
       // as a second effect: same foam signal, steeper transfer.
@@ -5934,7 +6013,7 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     // convert to this space by /uScale: `axz` is grid space over `uScale` metres and the vertical is
     // the same normalised axis, so one conversion serves all three components.
     const wmVs=`#version 300 es
-      in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;
+      in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;out float vBreak;out float vCrest;
       uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;uniform vec3 uCam;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
 ${(waterShaderSources.maskShoal=shoalGlsl()).split(/\r?\n/).map(l => '' + l).join(String.fromCharCode(10))}
 ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
@@ -5961,11 +6040,13 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         float depthM=max((aw-ah)*uTerrainHeight,0.0);
         float amp=shoalAmp(uWaveAmp,depthM,uShoalRefM);
         float wet=min(depthM*2.0,1.0);
+        vBreak=shoalAmpBreak(uWaveAmp,depthM,uShoalRefM);
+        vCrest=d.y;
         vWaveN=normalize(mix(vec3(0.,1.,0.),N,wet));
         gl_Position=uMVP*vec4(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale, 1.);
       }`;
     const wmFs=`#version 300 es
-      precision highp float;in float vDepth;in vec3 vWaveN;out vec4 frag;
+      precision highp float;in float vDepth;in vec3 vWaveN;in float vBreak;in float vCrest;out vec4 frag;
       // The analytic wave normal is carried through so the deferred pass reads the SAME normal the
       // displacement produced, rather than re-deriving one and disagreeing along every crest.
       void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,vWaveN.y*0.5+0.5,1.0);}`;
@@ -6190,7 +6271,10 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         wc+=vec3(.025,.050,.075)*crest;                             // small-scale reflected wave crests
         float fres=.02+.98*pow(1.0-max(dot(N,Vd),0.0),5.0);         // dielectric water F0 ≈ 0.02
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
-        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*surfaceSh;
+        float lostVarD=waterDetailVar(mppF);
+        float m2D=clamp(lostVarD+2.0/240.0*0.5,2.0/240.0*0.5,0.16);
+        float specPowD=clamp(2.0/m2D-2.0,10.0,240.0);
+        vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),specPowD)*(specPowD/240.0)*0.95*surfaceSh;
         spec=mix(spec,smoothstep(0.005,0.011,spec)*surfaceSh,uToon);
         float edgeW=max(shoreAA*5.0,.0015);
         float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov*(1.0-ice);
@@ -8025,7 +8109,12 @@ function newTerrainDocument(withDefault,template="",alreadyConfirmed){
   const ready=historyReady;historyReady=false;
   nodes=[];edges=[];uid=1;selected=null;selectedEdge=null;importTarget=null;
   undoStack.length=0;redoStack.length=0;previewMode="output";
-  terrainDef=createTerrainDef();
+  // The biome applies here, not only on the dialog path. createTerrainDef's own defaults put the
+  // sea at 6 degC, which on a 2600 m world is BELOW FREEZING over most of the relief -- the
+  // opening document rendered ice, and ice bypasses every water shading path there is. The
+  // default biome is a climate someone chose; the constructor defaults are just constructor
+  // defaults.
+  terrainDef=createTerrainDef(biomeTerrainOverrides(pendingBiome));
   H_SCALE=terrainDef.height/terrainDef.scale;scene={water:null,snow:null,satmap:null};
   if(template==="canyon")canyonGraph();else if(withDefault)defaultGraph();else blankGraph();
   nodes.forEach(n=>{n._dirty=true;n._thumb=null;});
@@ -8116,21 +8205,53 @@ function showcaseGraph(){
    lattices as of MC-4), and every later layer is gated by masks.
 
    Promotion order from here: L1 erosion, L2 cover, L3 water, L4 climate/snow, L5 dressing. */
+// The biome chosen in the New Terrain dialog, read by the opening graph. A module-level value
+// rather than a parameter because layer0Graph is also called by defaultGraph() from paths that
+// have no dialog -- and those must still get a coherent world rather than an undefined one.
+let pendingBiome=DEFAULT_BIOME;
 function layer0Graph(){
-  const base=makeNode("perlin",60,60);base.params={seed:7,freq:2.2,octaves:6,lac:2,gain:0.5};
-  const detail=makeNode("ridged",60,240);detail.params={seed:12,freq:5,octaves:5,lac:2.1,gain:0.55};
-  const mix=makeNode("blend",260,140);mix.params={factor:0.35};
-  const height=makeNode("d_height",260,320);
-  const mask=makeNode("heightmask",460,320);Object.assign(mask.params,{lo:0.45,hi:0.95,feather:0.18});
-  const relief=makeNode("levels",460,140);Object.assign(relief.params,{inLo:0.02,inHi:0.98,gamma:1.05});
-  const out=makeNode("output",680,140);out.params={norm:"on"};
-  edges.push({from:base.id,to:mix.id,slot:0});
-  edges.push({from:detail.id,to:mix.id,slot:1});
-  edges.push({from:mix.id,to:relief.id,slot:0});
-  edges.push({from:mix.id,to:height.id,slot:0});
-  edges.push({from:height.id,to:mask.id,slot:0});
-  edges.push({from:relief.id,to:out.id,slot:0});
-  selected=base;
+  // THE OPENING DOCUMENT IS A CLAIM ABOUT WHAT THIS TOOL IS FOR. Two octaves of noise blended into
+  // an output says "procedural texture generator". Two tectonic plate systems blended, then flooded
+  // to a sea level, says "this models a process and then puts water on it" -- which is the actual
+  // thesis, and it shows a coastline in the first frame instead of a grey lump.
+  //
+  // Two uplifts rather than one: a single plate system gives one mountain belt across the tile and
+  // reads as a ridge. Two at different seeds interfere, and the SECOND IS DELIBERATELY WEAKER
+  // (continental uplift 0.28 against 0.52) so it reads as a lower, older range against a higher
+  // young one rather than as two equal ridges fighting.
+  const plates=makeNode("tectonic",60,60);
+  // ELEVATION for the first: plate interiors and ocean basins, which is what puts a coastline on
+  // the tile at all.
+  // BOTH ARE OROGEN, the node's own default output. `elev` returns plate-interior elevations,
+  // which are piecewise-constant per plate: blending two of those gives flat tops separated by
+  // vertical walls, which is exactly what the first version of this rendered. Orogen is the
+  // mountain-belt field along the boundaries, and two of them at different plate counts read as
+  // ranges crossing ranges.
+  Object.assign(plates.params,{seed:3,plates:8,warp:0.58,orogen:0.42,ocean:0.42,land:0.55,output:"orogen"});
+  const older=makeNode("tectonic",60,300);
+  // OROGEN for the second, not a second elevation field. Two `elev` outputs blended give two sets
+  // of plate plateaus averaged together -- flat tops and vertical walls, which is what the first
+  // version of this rendered. Orogen is the mountain-belt field along plate boundaries, so the
+  // blend reads as ranges standing on continents rather than as terraces.
+  // The second is the LOWER, OLDER range: less continental uplift and a wider, softer orogen, so
+  // it reads as worn-down ground the young belt stands on rather than as an equal ridge.
+  Object.assign(older.params,{seed:17,plates:15,warp:0.66,orogen:0.30,ocean:0.5,land:0.26,output:"orogen"});
+  const mix=makeNode("blend",320,150);mix.params={factor:0.42};
+  // Sea level well above the node default of 0.12. At the default the water sits in a few hollows
+  // and is easy to miss; at 0.30 the tile has a real coastline, which is the thing worth seeing.
+  const sea=makeNode("water",560,150);
+  // Sea level comes from the biome: an arid world opens with almost no standing water and a
+  // boreal one with lakes, which is the difference the preset exists to express.
+  Object.assign(sea.params,{mode:"sea",level:biomeSeaLevel(pendingBiome),shoreSmooth:1.35,foam:0.18});
+  const out=makeNode("output",790,150);out.params={norm:"on"};
+  edges.push({from:plates.id,to:mix.id,slot:0});
+  edges.push({from:older.id,to:mix.id,slot:1});
+  edges.push({from:mix.id,to:sea.id,slot:0});
+  edges.push({from:sea.id,to:out.id,slot:0});
+  // Select the OUTPUT, not the first generator. collectScene walks the primary chain from the active
+  // preview node, so selecting the base leaves scene.water null and the opening frame is dry -- the
+  // exact trap that cost four attempts to confirm the wave work.
+  selected=out;
 }
 
 // The opening document. Points at the highest PROVEN layer; move it up as layers are promoted.

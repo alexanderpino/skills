@@ -1098,7 +1098,10 @@ select.sg-btn{appearance:auto}
     <label for="ntLattice">Lattice</label>
     <select id="ntLattice"><option value="square">Square</option><option value="hex-pointy-odd-r">Hex (pointy, odd-r)</option></select>
     <label for="ntTemplate">Start from</label>
-    <select id="ntTemplate"><option value="blank">Blank</option><option value="default">Default setup</option><option value="canyon">Canyon landscape</option></select>
+    <select id="ntTemplate"><option value="blank">Blank</option><option value="default" selected>Default setup</option><option value="canyon">Canyon landscape</option></select>
+    <label for="ntBiome">Biome</label>
+    <select id="ntBiome" title="Sets latitude, sea temperature, lapse rate, wind and base elevation together. Every field stays editable afterwards."></select>
+    <span></span><div id="ntBiomeNote" class="hint" style="grid-column:2">&nbsp;</div>
 
     <span></span><div id="ntDerived" class="nt-derived" style="grid-column:2">&nbsp;</div>
     <span></span><div id="ntReadout" class="hint" style="grid-column:2">&nbsp;</div>
