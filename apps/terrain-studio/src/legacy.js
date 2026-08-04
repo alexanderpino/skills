@@ -215,7 +215,7 @@ function sampleBilinear(f,x,y){            // x,y in grid coords (= world positi
   const a=f[i],b=f[i+1],c=f[i+n],d=f[i+n+1];
   return lerp(lerp(a,b,fx),lerp(c,d,fx),fy);
 }
-function fieldRange(f){let mn=1e9,mx=-1e9;for(let i=0;i<f.length;i++){const v=f[i];if(v<mn)mn=v;if(v>mx)mx=v;}return[mn,mx];}
+export function fieldRange(f){let mn=1e9,mx=-1e9;for(let i=0;i<f.length;i++){const v=f[i];if(v<mn)mn=v;if(v>mx)mx=v;}return[mn,mx];}
 export function normalize(f){const[mn,mx]=fieldRange(f);const d=mx-mn||1;const o=newField();for(let i=0;i<f.length;i++)o[i]=(f[i]-mn)/d;return o;}
 
 /* --------------------------------------------------- hash & gradients -- */
@@ -1480,7 +1480,7 @@ function canyonFieldCPU(p){
   return o;
 }
 export function canyonField(p){return canyonFieldCPU(p);}
-function fbm2(x,y,seed,oct){                      // small fbm helper for the domain distortion
+export function fbm2(x,y,seed,oct){                      // small fbm helper for the domain distortion
   let s=0,amp=1,f=1,tot=0;
   for(let k=0;k<oct;k++){s+=(gnoise(x*f,y*f,seed+k*7)-0.5)*2*amp;tot+=amp;amp*=0.5;f*=2;}
   return s/(tot||1);
