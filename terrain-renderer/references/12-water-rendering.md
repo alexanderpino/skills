@@ -286,6 +286,7 @@ and supplies the entire cue list:
 | A line of breakers, type varies by coast | `H ≈ 0.78·h`; Iribarren ξ | Break mask where amplitude/depth crosses threshold; breaker profile (spill/plunge/surge) chosen by slope mask | Depth + beach-slope mask |
 | Foam born at the break, dying up the beach | Turbulent bore, swash | Foam lifecycle keyed to break mask + phase; decays into run-up streaks | Break mask, shore distance |
 | Wet dark sand band that follows the surf | Run-up / swash envelope | Max-recent-run-up envelope feeds the wetness overlay (`13`/`14`) | Run-up height, shore distance |
+| Steep breaking chop at river mouths; rips cut smooth lanes through the surf | Wave–current interaction (Doppler-shifted dispersion) | Modulate amplitude, steepness, and break threshold by opposition `dot(waveDir, −flow)`; force chop where opposing flow approaches group speed | Flow field + depth |
 
 ### Tier 1 — depth-modulated ambient synthesis
 
@@ -372,6 +373,46 @@ when shoaling, breaking, and the travel-time solve all read bathymetry; they are
 when the surf system is keyed to the shoreline distance field. Shore distance drives only what
 genuinely belongs to the waterline: run-up, wet sand, and the final foam edge.
 
+### Wave–current interaction: the flow field's part
+
+The fourth handoff input — the flow field — modifies shallow-water waves, and the shore-wave
+band must read it or the two water systems of this chapter visibly ignore each other where
+they meet. The physics: in a current `U`, the observed frequency Doppler-shifts,
+`ω = σ + k·U`, with the intrinsic frequency still obeying `σ² = g·k·tanh(k·h)`. Waves running
+*against* a current shorten and steepen (energy piles into a slower-advancing train); when the
+opposing current approaches the wave group speed, the waves are **blocked** — they cannot
+propagate upstream and must steepen until they break. Waves riding a *following* current
+lengthen and flatten. The visible cases are exactly the seams between this section and the
+rivers section: a river mouth at outflow (a line of steep, breaking, directionless chop over
+the bar, even in a mild sea), tidal inlets, and rip currents — narrow outbound flows that
+block incoming surf locally and read as smooth dark lanes cutting through the breaker line,
+with their foam streaked *seaward*.
+
+The real-time treatment is modulation, not simulation — same doctrine as the rest of the
+section. From the shore band's own quantities: wave direction is `normalize(∇τ)`, opposition
+is its dot with the negated flow, and everything keys off that scalar:
+
+```hlsl
+float2 U    = DecodeFlow(FlowField.Sample(s, uv));        // handoff flow field, m/s
+float  cg   = 0.5 * sqrt(9.81 * max(h, hMin));            // ~shallow group speed
+float  opp  = dot(normalize(gradTau), -U) / cg;           // 1 ~ blocking
+A          *= 1.0 + kSteepen * saturate(opp);             // shorten/steepen against flow
+brk         = max(brk, smoothstep(0.8, 1.2, opp));        // blocked -> forced break/chop
+// opp < 0 (following current): mild lengthen/flatten — scale A and steepness down slightly
+```
+
+Where `opp` crosses the blocking range, stop drawing a coherent marching wave train at all:
+replace the band locally with steep short chop plus a persistent foam patch (the
+river-mouth-bar look), and let the rivers section's flow-mapped surface own the water inside
+the outflow. Foam in the surf zone advects by the *sum* of bore motion and the flow field, so
+rip and outflow foam streaks point seaward for free. Two refinements, both honestly optional:
+fold `U` into the travel-time solve as an anisotropic speed term (`c(h) + U·dir`) so current
+refraction lands in the precompute — valid only for static flows like river mouths, since τ is
+baked; and modulate at runtime for tidal flows if the game has them. State the limits in
+review: this is Doppler-flavored amplitude/steepness shaping — there is no momentum exchange,
+no actual blocking dynamics, and rip currents must exist in the exported flow field to appear
+(inventing them renderer-side violates the handoff doctrine — route to terrain-architect).
+
 ### Data contract additions
 
 Per the chapter's rule — extend the handoff, don't derive hydrology renderer-side — the
@@ -381,6 +422,8 @@ line dither), a **beach-slope / breaker-class mask** (from the generator's slope
 this is what keeps spilling foam off cliff faces), the **shore normal** (gradient of the shore
 distance field, for run-up direction and foam advection), and the **travel-time field** τ
 (derived data, baked at import/cook from bathymetry — cheap to store, one R16 channel).
+Wave–current interaction needs *no* new data — the flow field is already in the handoff; the
+only optional addition is baking static flow into the τ solve as above.
 Max shore-wave amplitude joins max ambient amplitude in the culling-bounds inflation.
 
 ## Rivers: flow-driven surfaces
@@ -617,6 +660,11 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **Foam double-count in the surf zone**: Jacobian whitecaps and breaker foam both firing on
   the same crests. In the shore band, the breaker lifecycle owns foam; fade the Jacobian
   accumulator out with the ambient cascades.
+- **Surf marches unchanged across the river mouth**: the shore-wave band reads only depth, so
+  incoming waves ignore the outflow that should steepen, block, and break them — and rip
+  currents in the flow field leave no lanes in the breaker line. Modulate the band by
+  opposition to the flow field (wave–current interaction, above); where flow data shows no
+  rip/outflow, the missing feature is generation-side — route to terrain-architect.
 - **Refraction leaking objects above water**: missing depth reject on the distorted sample. The
   single most common shipped water bug; the fix is four shader lines (above).
 - **SSR dropout at grazing/screen edge**: mirror-bright water goes flat exactly at the horizon
@@ -704,6 +752,11 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **P** — Breaker criterion `H ≈ 0.78·h` (McCowan lineage) and surf-similarity/breaker
   classification via the Iribarren number: Battjes, "Surf Similarity" (Coastal Engineering
   Conference, 1974) and standard coastal-engineering references.
+- **P** — Wave–current interaction (Doppler-shifted dispersion `ω = σ + k·U`, steepening
+  against opposing flow, blocking near group speed): Peregrine, "Interaction of Water Waves
+  and Currents", *Advances in Applied Mechanics* 16, 1976.
+  [Semantic Scholar (verified 2026-08)](https://www.semanticscholar.org/paper/Interaction-of-Water-Waves-and-Currents-Peregrine/ead4947119505f48eaa8adaa4a3d78da7c722fad).
+  The renderer-side opposition-scalar treatment is F-tier practice, not from the paper.
 - **P** — Yuksel, House & Keyser, "Wave Particles" (SIGGRAPH 2007, ACM TOG 26(3)): Lagrangian
   wave carriers rasterized to a height field; object interaction.
   [Author page (verified 2026-08)](https://www.cemyuksel.com/research/waveparticles/).

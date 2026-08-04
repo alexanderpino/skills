@@ -111,6 +111,7 @@ right fix.
 | Projected-grid water surface | `12` | Johanson, Lund University master's thesis, 2004 | P | [lth.se PDF](https://fileadmin.cs.lth.se/graphics/theses/projects/projgrid/projgrid-lq.pdf) |
 | Linear (Airy) wave theory: dispersion, shoaling (Green's law), refraction | `12` | Coastal-engineering canon; textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists* (1991) | P | — |
 | Breaker criterion (H ≈ 0.78·h) & surf-similarity breaker classification (Iribarren ξ) | `12` | McCowan lineage; Battjes, "Surf Similarity", Coastal Engineering Conference 1974 | P | — |
+| Wave–current interaction (Doppler-shifted dispersion, blocking at group speed) | `12` | Peregrine, "Interaction of Water Waves and Currents", *Advances in Applied Mechanics* 16, 1976 | P | [Semantic Scholar](https://www.semanticscholar.org/paper/Interaction-of-Water-Waves-and-Currents-Peregrine/ead4947119505f48eaa8adaa4a3d78da7c722fad) |
 | Wave particles (Lagrangian wave carriers → height field) | `12` | Yuksel, House & Keyser, SIGGRAPH 2007 (ACM TOG 26(3)) | P | [cemyuksel.com](https://www.cemyuksel.com/research/waveparticles/) |
 | Wave packets / water surface wavelets (dispersive Lagrangian wave groups) | `12` | Jeschke & Wojtan, SIGGRAPH 2017; Jeschke, Skřivan, Müller-Fischer, Chentanez, Macklin & Wojtan, SIGGRAPH 2018 | P | [ACM DL](https://dl.acm.org/doi/10.1145/3197517.3201336) |
 | Shipped shore/ocean water systems (wave particles in production; stylized FFT + shore treatment) | `12` | Gonzalez-Ochoa, "Water Technology of Uncharted", GDC 2012; Ang, Catling, Ciardi & Kozin, "The Technical Art of Sea of Thieves", SIGGRAPH 2018 Talks | T | [gdcvault.com](https://gdcvault.com/play/1015309/Water-Technology-of) |
@@ -227,7 +228,10 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   rows are textbook coastal engineering cited from model knowledge — constants (H ≈ 0.78·h,
   h^(-1/4) shoaling) are standard values, not re-derived, and the Dean & Dalrymple citation
   was not web-checked; the eikonal travel-time phase field, breaker-profile constructs, and
-  break-mask tuning windows are F-tier practice with no canonical source.
+  break-mask tuning windows are F-tier practice with no canonical source. Wave–current row
+  added 2026-08: Peregrine 1976 attribution web-verified; the opposition-scalar modulation
+  and blocking-range constants in the chapter are F-tier renderer practice, not from the
+  paper.
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-
