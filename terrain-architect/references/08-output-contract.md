@@ -30,7 +30,7 @@ of this boundary.
 | `soilDepth` | m | R32F | **State map** — co-evolved through erosion (`11`, `27`); a component of `solidTop` |
 | `strataHardness` | erodibility `K` | R32F | The exposed-surface slice of the strata stack, re-sampled as erosion exhumes (`11`) |
 | `wetness` | [0,1] state + TWI derived | R32F ×2 | Two maps, shipped separately — sim-residual puddling (`13`) and topographic potential (`06`); never averaged (`27`) |
-| `flowVelocity` | m/s, world-space `(u, v)` | RG32F | The engine's fluid driver (`03`; hydrology handoff, `SKILL.md`) |
+| `flowVelocity` | m/s, world-space `(u, v)` | RG32F | The engine's fluid driver (`03`; hydrology handoff, `SKILL.md`). Includes the nearshore surface circulation — longshore current, rip feeders/jets, tidal-inlet and river-mouth jets (`12`) — extended across the surf band, never stopped at the waterline |
 | `curvature` | 1/m, signed | R32F | Derived after final geometry, from R32F height (`06`) |
 | `scatter[i]` | positions + attrs | Point list | World-space |
 

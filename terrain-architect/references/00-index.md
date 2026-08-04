@@ -289,6 +289,11 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Lacustrine (lake) shore erosion / lake terraces | F | The coastal loop at lake level; lake-level history → shoreline terraces. Gilbert 1890 (Lake Bonneville) (`12`) |
 | Gilbert (lacustrine) delta | P | Gilbert 1890 — topset/foreset/bottomset delta prograding into standing water (`12`) |
 | Shoreface / submarine equilibrium profile | F | Dean 1991 equilibrium profile (`depth ∝ dist^⅔`), coastal engineering — author, don't erode (`12`) |
+| Surf-zone morphodynamic loop (radiation stress → currents → transport → Exner) | P (loop) / L (realisation) | Longuet-Higgins & Stewart 1962 (radiation stress); Longuet-Higgins 1970 (longshore current); Exner balance, generalized Paola & Voller 2005 (`12`) |
+| Undertow & breakpoint bar (bar crest ≈ `H_b/γ`; storm/calm migration) | P | Svendsen 1984 (undertow); Bailard 1981 (energetics transport) (`12`) |
+| Beach states (reflective ↔ dissipative; bar–rip templates) | P | Wright & Short 1984, Marine Geology 56 — `Ω = H_b/(w_s·T)`; <1 / 1–6 / >6 (`12`) |
+| Rip currents (setup-gradient circulation; bar-gap scour feedback) | P | Bowen 1969, JGR 74; review MacMahan, Thornton & Reniers 2006, Coastal Engineering 53 (`12`) |
+| Tidal inlet equilibrium & ebb/flood tidal deltas | P (prism–area) / L (landforms) | O'Brien 1969, ASCE J. Waterways & Harbors 95 — `A = C·P^0.85`; deltas are compositions (`12`) |
 | Tides / intertidal zone / tidal flats | F | Authored oscillation of the water plane; astronomy, a look. Water is a dynamic layer (`08`, `12`) |
 | Seafloor age–depth subsidence (ridge → abyssal plain) | P | Parsons & Sclater 1977 (√age half-space); Stein & Stein 1992 (GDH1 plate model) (`12`) |
 | Hotspot track / seamount / guyot | P (age progression) / P-hypothesis (plume) | Wilson 1963; Morgan 1971; Hess 1946 (guyot truncation) (`11`, `12`) |

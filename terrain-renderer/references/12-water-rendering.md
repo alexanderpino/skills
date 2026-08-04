@@ -31,7 +31,7 @@ inputs, and the doctrine is that they are *sufficient*:
 |---|---|---|
 | `waterSurface` | Flat elevation per body (sea level for oceans, spill level per lake, a downstream-monotone profile per river) | The datum every wave displaces from; the gameplay swim/buoyancy surface |
 | Water depth | Scalar field: `waterSurface - solidTop`, 0 on dry land | Absorption ramp, shoaling, shoreline fade, sim boundary |
-| Flow / velocity | 2D vector field (m/s), from routing + discharge | Flow-map advection, foam alignment, particle steering, sim boundary inflow |
+| Flow / velocity | 2D vector field (m/s), from routing + discharge, plus the nearshore surface circulation — longshore current, rip jets, inlet/river-mouth jets (terrain-architect `12`) | Flow-map advection, foam alignment, particle steering, sim boundary inflow, wave–current interaction |
 | Shore distance | Signed/unsigned distance to the waterline | Shoreline foam bands, wet-sand band (`13`/`14`), LOD bias near the line |
 
 The solid terrain below the water is real terrain — bathymetry generated to dry-land standards —
