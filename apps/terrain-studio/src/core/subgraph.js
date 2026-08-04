@@ -133,8 +133,9 @@ export function registerDefinition(defs, def) {
  * Content key for ONE upstream field.
  *
  * The caller used to pass `[String(ins[0].length)]`, which is the same string for every field in the
- * document because every field is RES*RES. Two instances of the same definition with the same
- * overrides and DIFFERENT inputs therefore collided on one cache entry and the second silently
+ * document because every field is RES*RES.  shape-ok: prose describing a fixed defect, no alloc.
+ * Two instances of the same definition with the same overrides and DIFFERENT inputs therefore
+ * collided on one cache entry, and the second silently
  * rendered the first's terrain — measured with instance A fed by perlin and instance D fed by
  * ridged returning the identical Float32Array object, not merely equal values.
  *

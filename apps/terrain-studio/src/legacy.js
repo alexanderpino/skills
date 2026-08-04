@@ -3948,7 +3948,8 @@ function addNodeAt(type,world,connect){
     // Drag-out quick create wires the new node immediately, so it is a connection time too. The
     // node is kept either way — the user asked for it — but an illegal wire is refused and said so,
     // rather than being made silently because it arrived through the menu instead of the canvas.
-    const verdict=linkDrop(connect.from,connect.fromSlot||0,nd.id,slot,{replacing:connect.original});
+    // records:false — makeNode() above already opened the undo record for this whole gesture.
+    const verdict=linkDrop(connect.from,connect.fromSlot||0,nd.id,slot,{replacing:connect.original,records:false});
     if(!verdict.ok)toast(verdict.reason||("Added unconnected: "+verdict.code));
   }
   select(nd);requestEval();return nd;
@@ -4768,7 +4769,8 @@ export function evaluateSubgraphInstance(params, ins, node){
   if(node) node._pinProblem = resolved.problem || null;
   if(!def) return null;                       // unknown definition renders flat, visibly, not fatally
   const overrides = parseOverrides(params.overrides);
-  // upstreamKeys was `[String(ins[0].length)]`. Every field is RES*RES, so that term was the same
+  // upstreamKeys was `[String(ins[0].length)]`. Every field is RES*RES — shape-ok: prose, no alloc —
+  // so that term was the same
   // string for every input in the document and never discriminated: two instances of one definition
   // with equal overrides and DIFFERENT upstream collided on a single entry, and the second returned
   // the first's Float32Array — the same object, not merely equal values. Content digests now.
@@ -4964,6 +4966,10 @@ function wireVerdict(fromNode,fromSlot,toNode,toSlot){
 // The single mutating entry point for "the user connected two ports". Every rejection returns
 // BEFORE recordHistory, so a refused drop leaves the graph and the undo stack untouched — the old
 // mouseup handler already took that care for cycles and it is preserved for type refusals.
+// `opts.records:false` suppresses the undo record because the CALLER has already opened one that
+// covers the whole gesture. Quick create is the case: makeNode() records, and having linkDrop record
+// again split one authoring action into two undo entries — measured, the first undo removed the new
+// edge and left the node stranded (nodes 8, edges 6 where 7 and 6 were expected).
 function linkDrop(fromId,fromSlot,toId,toSlot,opts){
   const from=nodeById(fromId),to=nodeById(toId);
   if(!from||!to)return{ok:false,code:"PORT_ID_INVALID",reason:"that endpoint no longer exists"};
@@ -4971,7 +4977,7 @@ function linkDrop(fromId,fromSlot,toId,toSlot,opts){
   if(wouldCycle(fromId,toId))return{ok:false,code:"CYCLE",reason:"That would create a cycle"};
   const verdict=wireVerdict(from,fromSlot,to,toSlot);
   if(!verdict.ok)return verdict;
-  recordHistory();
+  if(!opts||opts.records!==false)recordHistory();
   if(opts&&opts.replacing)edges=edges.filter(x=>x!==opts.replacing);
   edges=edges.filter(x=>!(x.to===toId&&x.slot===toSlot));
   edges.push({from:fromId,fromPort:(nodeOutputs(from)[fromSlot||0]||{}).id||undefined,
