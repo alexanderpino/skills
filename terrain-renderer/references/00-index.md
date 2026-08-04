@@ -109,6 +109,12 @@ right fix.
 | Gerstner/trochoidal wave sums | `12` | Classical; GPU form in GPU Gems ch. 1 (Finch) | F/D | [developer.nvidia.com](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models) |
 | Flow mapping (rivers) | `12` | Vlachos, "Water Flow in Portal 2", SIGGRAPH 2010 | T | [steamstatic PDF](https://cdn.akamai.steamstatic.com/apps/valve/2010/siggraph2010_vlachos_waterflow.pdf) |
 | Projected-grid water surface | `12` | Johanson, Lund University master's thesis, 2004 | P | [lth.se PDF](https://fileadmin.cs.lth.se/graphics/theses/projects/projgrid/projgrid-lq.pdf) |
+| Linear (Airy) wave theory: dispersion, shoaling (Green's law), refraction | `12` | Coastal-engineering canon; textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists* (1991) | P | — |
+| Breaker criterion (H ≈ 0.78·h) & surf-similarity breaker classification (Iribarren ξ) | `12` | McCowan lineage; Battjes, "Surf Similarity", Coastal Engineering Conference 1974 | P | — |
+| Wave particles (Lagrangian wave carriers → height field) | `12` | Yuksel, House & Keyser, SIGGRAPH 2007 (ACM TOG 26(3)) | P | [cemyuksel.com](https://www.cemyuksel.com/research/waveparticles/) |
+| Wave packets / water surface wavelets (dispersive Lagrangian wave groups) | `12` | Jeschke & Wojtan, SIGGRAPH 2017; Jeschke, Skřivan, Müller-Fischer, Chentanez, Macklin & Wojtan, SIGGRAPH 2018 | P | [ACM DL](https://dl.acm.org/doi/10.1145/3197517.3201336) |
+| Shipped shore/ocean water systems (wave particles in production; stylized FFT + shore treatment) | `12` | Gonzalez-Ochoa, "Water Technology of Uncharted", GDC 2012; Ang, Catling, Ciardi & Kozin, "The Technical Art of Sea of Thieves", SIGGRAPH 2018 Talks | T | [gdcvault.com](https://gdcvault.com/play/1015309/Water-Technology-of) |
+| Travel-time (eikonal) shore phase fields, breaker-profile authoring, group-envelope sets | `12` | Production practice, no canonical source | F | — |
 | Fullscreen-triangle pass (screen-space water, skybox, aux composites) | `12` `16` `10` | Community canon (Bilodeau GDC 2014 vertex-shader-tricks lineage; multiple writeups) | F/T | [slideshare Bilodeau](https://www.slideshare.net/DevCentralAMD/vertex-shader-tricks-bill-bilodeau) |
 | Cloud shadows (projected scrolling coverage) | `10` | Standard practice, no canonical source | F | — |
 | Volumetric cloudscapes (terrain seams: depth, one sky state) | `10` | Schneider, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2015/The%20Real-time%20Volumetric%20Cloudscapes%20of%20Horizon%20-%20Zero%20Dawn%20-%20ARTR.pdf) |
@@ -161,6 +167,8 @@ Branded system → what it actually is → where in this skill.
 | Comanche / Outcast / Delta Force "voxel" terrain | 2.5D heightmap column raycasting (Voxel Space) — no true voxels | `18` |
 | UE 5.8 Mesh Terrain | Experimental 3D modifier-stack terrain rendered through Nanite | `03`, family `02` |
 | Portal 2 water | Flow mapping over a static surface | `12` |
+| Uncharted (3) water | Wave-particle interactive waves + ocean mesh LOD | `12` |
+| Sea of Thieves water | Stylized FFT cascades + shore/foam treatments | `12` |
 | Rise of the Tomb Raider / Batman: Arkham Origins / GoW Ragnarök snow | Deferred deformation (top-down capture → displacement) | `13` |
 | Horizon Zero Dawn / Ghost of Tsushima vegetation | GPU-driven procedural placement + procedural grass | `15` |
 | Gaea / World Machine-class tool viewports | Preview pyramid + derived-field passes + shading modes | `16` |
@@ -211,10 +219,15 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   engine-feature specifics are version-sensitive.
 - `08`, `11`: work-graphs production readiness is `?` by construction; triangles-per-pixel
   target bands and budget numbers are practice bands, not standards.
-- `12`: shallow-water shoaling approximations attributed to no specific title (multiple talks
-  cover it); fullscreen-triangle rationale is community canon (F), not a paper; attribution
+- `12`: fullscreen-triangle rationale is community canon (F), not a paper; attribution
   corrections applied 2026-07 (Johanson 2004 Lund; Kass & Miller SIGGRAPH 1990; Bruneton,
-  Neyret & Holzschuch CGF 2010).
+  Neyret & Holzschuch CGF 2010). Shoal/shore-wave rows added 2026-08: Yuksel 2007,
+  Jeschke & Wojtan 2017/2018, Gonzalez-Ochoa GDC 2012, and the Sea of Thieves SIGGRAPH 2018
+  talk were web-verified (attribution only, not content); the Airy/McCowan/Battjes physics
+  rows are textbook coastal engineering cited from model knowledge — constants (H ≈ 0.78·h,
+  h^(-1/4) shoaling) are standard values, not re-derived, and the Dean & Dalrymple citation
+  was not web-checked; the eikonal travel-time phase field, breaker-profile constructs, and
+  break-mask tuning windows are F-tier practice with no canonical source.
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-
