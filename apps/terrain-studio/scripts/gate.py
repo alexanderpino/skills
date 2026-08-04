@@ -89,6 +89,18 @@ def check_oracle(oracle):
         # A parse/setup failure produces no verdict line at all; surface the tail so it is not silent.
         rows.append(("green:detail", False, "", " | ".join(out.strip().splitlines()[-3:])[:160]))
 
+    # WHAT THE UNMUTATED RUN ALREADY FAILS. A mutation is armed only if it makes gates fail that
+    # were NOT already failing, and without this baseline the check is trivially satisfied by any
+    # oracle that is red for its own reasons.
+    #
+    # That is not hypothetical. A RED-FIRST oracle — one written before its feature exists, as
+    # Sprint 3's Ready condition requires — fails every gate on every run. Each mutated run
+    # therefore exited non-zero with a non-empty failed=[...] list, and every row scored ARMED
+    # while arming nothing whatever. Measured on _verify_sediment_state.js: four of five mutations
+    # produced a failed=[...] list byte-identical to the unmutated run, because they perturbed a
+    # port that does not exist yet, and all four read as armed.
+    green_failed = set(failed_gates(out))
+
     muts = declared_mutations(oracle)
     if not muts:
         # Absence of evidence is failure: an oracle with no declared mutation has no armed control.
@@ -104,8 +116,17 @@ def check_oracle(oracle):
             status, note = False, "NOT ARMED — mutated run exited 0"
         else:
             gates = failed_gates(out)
-            status = bool(gates)
-            note = ("red: " + ",".join(gates)) if gates else "red but named no gate"
+            new_gates = [g for g in gates if g not in green_failed]
+            if not gates:
+                status, note = False, "red but named no gate"
+            elif not new_gates:
+                # Red, but no redder than the unmutated run. The mutation moved nothing.
+                status = False
+                note = ("NOT ARMED — same failures as the unmutated run ("
+                        + ",".join(sorted(green_failed)[:3]) + (", ..." if len(green_failed) > 3 else "") + ")")
+            else:
+                status = True
+                note = "red: " + ",".join(new_gates)
         all_armed = all_armed and status
         rows.append((f"mutate:{name}", status, f"{secs:.0f}s", note[:120]))
     return green_ok and all_armed, rows
