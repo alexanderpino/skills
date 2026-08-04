@@ -149,6 +149,14 @@ cat > "$WORK/src/bus.py" <<'EOF'
 def publish(event): ...
 EOF
 
+# Keep fixture dates current so the good tree never draws staleness warnings
+# as wall-clock time advances past the authored dates.
+TODAY="$(date +%F)"
+for f in "$ROOT/AD.md" "$ROOT/conformance-checklist.md" "$ROOT/software/HLD.md" \
+         "$ROOT/decisions/ADR-0001-demo.md" "$ROOT/decisions/rfc/RFC-0001-demo.md"; do
+  sedi "s/2026-06-20/$TODAY/" "$f"
+done
+
 echo "== 1. arch_lint on a CONFORMANT tree (expect exit 0) =="
 "$PY" "$LINT" all --root "$ROOT" --src "$WORK/src"
 rc=$?
@@ -193,7 +201,9 @@ echo "$OUT" | grep -q "still has" && ok "caught unresolved conformance gap" || b
 echo "== 5. arch_lint on the committed worked example (expect exit 0) =="
 EX="$UNIT/examples/brownfield-api-keys"
 if [ -d "$EX/docs/architecture" ]; then
-  EXOUT="$("$PY" "$LINT" all --root "$EX/docs/architecture" --src "$EX/src" 2>&1)"
+  # --max-age-days 0: the example's committed dates are pinned, so staleness
+  # there is wall-clock noise, not a regression signal for this assertion.
+  EXOUT="$("$PY" "$LINT" all --root "$EX/docs/architecture" --src "$EX/src" --max-age-days 0 2>&1)"
   rc=$?
   echo "$EXOUT" | sed 's/^/    | /'
   { [ "$rc" -eq 0 ] && echo "$EXOUT" | grep -q "0 error"; } \
@@ -225,9 +235,33 @@ STRIDE mapped to OWASP Top 10:2025.
 ## 9. FinOps — cost estimate
 Cost estimate matrix.
 EOF
+# An equally old ACCEPTED ADR must NOT warn: decision records are immutable
+# history — they get superseded, never re-reviewed.
+mkdir -p "$SROOT/decisions"
+cat > "$SROOT/decisions/ADR-0001-old-decision.md" <<'EOF'
+---
+id: ADR-0001
+title: A healthy old decision
+status: accepted
+level: software
+date: 2020-01-01
+---
+# ADR-0001: A healthy old decision
+## Status
+Accepted
+## Context
+x
+## Decision
+We will x.
+## Consequences
+y.
+EOF
 SOUT="$("$PY" "$LINT" frontmatter --root "$SROOT" 2>&1)"
 echo "$SOUT" | grep -q "stale: last reviewed/updated" \
   && ok "stale current doc warned" || bad "missed staleness warning"
+echo "$SOUT" | grep "stale:" | grep -q "ADR-0001" \
+  && bad "old accepted ADR must be exempt from staleness" \
+  || ok "old accepted ADR exempt from staleness"
 SOUT0="$("$PY" "$LINT" frontmatter --root "$SROOT" --max-age-days 0 2>&1)"
 echo "$SOUT0" | grep -q "stale: " \
   && bad "--max-age-days 0 should disable staleness" || ok "--max-age-days 0 disables staleness"

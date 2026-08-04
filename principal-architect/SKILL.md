@@ -333,8 +333,9 @@ After any create/update:
   its ID, title, status, date, and one-line summary.
 - If an ADR moved to `superseded`, update both the old and new records' links.
 - When you verify a long-lived doc is still true *without* editing it, stamp
-  `last-reviewed:` — `arch_lint.py` warns when a `current`/`accepted` doc goes
-  unreviewed past the threshold (default 180 days).
+  `last-reviewed:` — `arch_lint.py` warns when a `current`/`accepted` living doc goes
+  unreviewed past the threshold (default 180 days). ADRs/RFCs are exempt: decision
+  records are immutable history — supersede them, don't re-review them.
 - Honour the correspondence rules (AD.md §7): update every corresponding view, SD,
   and diagram in the *same* change so the views stay consistent.
 

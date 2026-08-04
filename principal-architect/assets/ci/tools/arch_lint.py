@@ -8,7 +8,8 @@ uses PyYAML for front-matter parsing if available, otherwise a built-in parser.
 Checks (run a subset or `all`):
   frontmatter  - required fields, allowed status/level values, ADR/RFC id format,
                  supersession links, mandatory Threat-model + FinOps sections in HLD/SAD,
-                 staleness of current/accepted docs (--max-age-days, 0 disables).
+                 staleness of current/accepted living docs (ADR/RFC exempt —
+                 decision records are immutable; --max-age-days, 0 disables).
   conformance  - ISO/IEC/IEEE 42010: every concern framed by a known viewpoint,
                  every view governed by exactly one known viewpoint, ≥1 stakeholder/
                  concern/viewpoint/view, ≥1 ADR; conformance-checklist has no ❌.
@@ -182,8 +183,10 @@ def _as_date(v):
     return None
 
 def check_staleness(path, fm, kind, status, max_age):
-    """WARN when a live doc hasn't been reviewed/edited within max_age days."""
-    if not max_age or kind == "INDEX" or status not in ("current", "accepted"):
+    """WARN when a LIVING doc hasn't been reviewed/edited within max_age days.
+    ADRs and RFCs are exempt: decision records are immutable history — an old
+    accepted ADR is healthy; it gets superseded, never re-reviewed."""
+    if not max_age or kind in ("INDEX", "ADR", "RFC") or status not in ("current", "accepted"):
         return
     import datetime as _dt
     newest = max(filter(None, (_as_date(fm.get(k)) for k in ("last-reviewed", "updated", "date"))),

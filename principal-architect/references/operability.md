@@ -23,7 +23,7 @@ and **ISO/IEC 27031** ground the recovery targets (below).
 - **SLO — service level objective.** The target for an SLI over a period:
   "99.9% of requests succeed, rolling 30 days." This is the `Q.xx` **response
   measure**, operationalised. (An SLA is an SLO with contractual penalties — a
-  business document under service level management, **ISO/IEC 20000-1** §8.3.3;
+  business document under **ISO/IEC 20000-1** service level management;
   the architecture works to the SLO.)
 - **Error budget.** `1 − SLO` — the failure the target *permits* (99.9% ⇒ 43.8
   min/month). It turns reliability into a spendable resource: budget left → ship;

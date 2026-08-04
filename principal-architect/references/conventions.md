@@ -215,6 +215,8 @@ burying the fact in prose — prose is for humans, front-matter is for agents.
 - Prefer linking by ID over restating. Single source of truth per fact.
 - Date everything you change (`date:` / `updated:`). When you *verify* a long-lived doc
   without changing it, stamp `last-reviewed:` — `arch_lint.py` warns when a `current`/
-  `accepted` doc has gone unreviewed too long (default 180 days), because a stale "living"
-  doc misleads exactly as much as a wrong one.
+  `accepted` **living** doc (AD/PRD/HLD/SD/SAD/EA) has gone unreviewed too long (default
+  180 days), because a stale "living" doc misleads exactly as much as a wrong one.
+  **ADRs and RFCs are exempt**: decision records are immutable history — an old accepted
+  ADR is healthy; it gets superseded, never re-reviewed.
 - Diagrams live inside the doc they explain, not in a separate gallery.

@@ -203,7 +203,7 @@ change is about.
 erDiagram
   CUSTOMER ||--o{ ORDER : places
   ORDER ||--|{ ORDER_LINE : contains
-  ORDER }o--|| PAYMENT : "settled by"
+  ORDER }o--o| PAYMENT : "settled by"
   ORDER {
     string id PK
     string customer_id FK
