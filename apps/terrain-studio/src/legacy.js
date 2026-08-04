@@ -20,6 +20,7 @@ import { AUX_MAPS, AUX_LENSES, SIDE_CHANNEL_LEDGER, semanticDebt, debtByOwner, v
 import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, HEIGHT_WRITERS } from './core/doctrine.js';
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
+import { expandPreset as expandWavePreset, glslGerstner, presetBounds } from './core/water-waves.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
@@ -5653,7 +5654,24 @@ export const hexNb=y=>(y&1)?HEX_NB_ODD:HEX_NB_EVEN;
 // least-squares gradient: sum(e_k)=0 and sum(e_k e_k^T)=3I, so g = sum(h_k*e_k)/3 is exact for
 // a plane and isotropic to leading order. The centre height drops out entirely.
 const HEX_EX=[-1,1,-.5,.5,-.5,.5],HEX_EY=[0,0,-HEX_ROW,-HEX_ROW,HEX_ROW,HEX_ROW];
-let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;   // vertical exaggeration = the real vertical ratio
+let uTime=0;let H_SCALE=terrainDef.height/terrainDef.scale;
+// S4.7 — the live WaterWavePreset. Cached on the six authored controls: expansion is
+// deterministic, so a preset only has to be rebuilt when one of them changes, and the shader
+// text is baked from it at compile time. terrainDef already owns wind, so the water does not
+// re-author it — the node-responsibility audit found four copies of wind direction in the tree
+// and this is deliberately not a fifth.
+let _wavePreset=null,_wavePresetKey="";
+export function currentWaterPreset(){
+  const c={windDirectionDeg:terrainDef.windDirection==null?300:terrainDef.windDirection,
+    windSpeedMps:terrainDef.windSpeed==null?10:terrainDef.windSpeed,
+    seaState:waterLook&&waterLook.seaState!=null?waterLook.seaState:0.55,
+    seed:terrainDef.seed==null?1:terrainDef.seed,
+    maxAmplitudeM:waterLook&&waterLook.amplitudeM!=null?waterLook.amplitudeM:1.2,
+    bodyKind:waterLook&&waterLook.bodyKind?waterLook.bodyKind:"ocean"};
+  const key=JSON.stringify(c);
+  if(key!==_wavePresetKey){_wavePreset=expandWavePreset(c);_wavePresetKey=key;}
+  return _wavePreset;
+}   // vertical exaggeration = the real vertical ratio
 let TEMP_UNIT="C";try{TEMP_UNIT=localStorage.getItem("terrainStudioTempUnit")==="F"?"F":"C";}catch(_){}
 const REDUCED=typeof matchMedia!=="undefined"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Water extent and snow accumulation are GRAPH NODES. Water motion/refraction is a global renderer
@@ -5815,12 +5833,32 @@ function initGL(){
   if(g2){
     // Rasterise the actual fluid surface into its own depth layer. The compositor can then reconstruct
     // a water-plane world position instead of pretending the visible lakebed pixel is the surface.
+    // S4.7 — THE WATER MESH IS DISPLACED, not just shaded. Until now this vertex shader placed the
+    // surface at a flat `aw*uH` and every wave was a colour perturbation downstream, which is why
+    // the water read as a striped plane and its silhouette against the terrain was a straight line.
+    //
+    // The Gerstner source is GENERATED FROM THE PRESET and injected here, so the displacement the
+    // depth pass rasterises is the same function the CPU oracle checks in double precision. Metres
+    // convert to this space by /uScale: `axz` is grid space over `uScale` metres and the vertical is
+    // the same normalised axis, so one conversion serves all three components.
     const wmVs=`#version 300 es
-      in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;uniform mat4 uMVP;uniform float uH;uniform float uScale;
-      void main(){vDepth=(aw-ah)*uH;gl_Position=uMVP*vec4(axz.x,aw*uH+ais/uScale,axz.y,1.);}`;
+      in vec2 axz;in float ah;in float aw;in float ais;out float vDepth;out vec3 vWaveN;
+      uniform mat4 uMVP;uniform float uH;uniform float uScale;uniform float uTime;uniform float uWaveAmp;
+${glslGerstner(currentWaterPreset(), 'gerstnerDisp').split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
+      void main(){
+        vDepth=(aw-ah)*uH;
+        vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, N);
+        // Displacement is scaled by the wet fraction so a dry cell is untouched and the shoreline
+        // does not develop a fringe of waves standing on land.
+        float wet=clamp(vDepth*40.0,0.0,1.0)*uWaveAmp;
+        vWaveN=normalize(mix(vec3(0.,1.,0.),N,wet));
+        gl_Position=uMVP*vec4(axz.x+d.x*wet/uScale, aw*uH+ais/uScale+d.y*wet/uScale, axz.y+d.z*wet/uScale, 1.);
+      }`;
     const wmFs=`#version 300 es
-      precision highp float;in float vDepth;out vec4 frag;
-      void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,0.0,1.0);}`;
+      precision highp float;in float vDepth;in vec3 vWaveN;out vec4 frag;
+      // The analytic wave normal is carried through so the deferred pass reads the SAME normal the
+      // displacement produced, rather than re-deriving one and disagreeing along every crest.
+      void main(){if(vDepth<=0.00001)discard;frag=vec4(1.0,vDepth,vWaveN.y*0.5+0.5,1.0);}`;
     waterMaskProg=makeProg(wmVs,wmFs);
   }
   // ---------- DEFERRED water + analytic sky — the fullscreen-triangle technique (WebGL2) ----------
@@ -6878,6 +6916,8 @@ function drawWaterDepth(MVP){
   if(!scene.water||!waterMaskProg)return;
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);gl.useProgram(waterMaskProg);
   setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);gl.uniform1f(u(waterMaskProg,"uScale"),terrainDef.scale);
+  gl.uniform1f(u(waterMaskProg,"uTime"),uTime);   // the SAME clock the forward pass uses — ADR-006 requires one time
+  gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?(waterLook.strength==null?1:waterLook.strength):0);
   bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
@@ -7952,7 +7992,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 224 symbols (28 writable, 196 read-only).
+ * 227 symbols (28 writable, 199 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7975,9 +8015,9 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("RES", () => RES, (v) => { RES = v })
   __def("nodes", () => nodes, (v) => { nodes = v })
   __def("edges", () => edges, (v) => { edges = v })
-  __def("selected", () => selected, (v) => { selected = v })
-  __def("TARGET_RES", () => TARGET_RES, (v) => { TARGET_RES = v })
   __def("USE_GPU", () => USE_GPU, (v) => { USE_GPU = v })
+  __def("TARGET_RES", () => TARGET_RES, (v) => { TARGET_RES = v })
+  __def("selected", () => selected, (v) => { selected = v })
   __def("cam", () => cam, (v) => { cam = v })
   __def("selectedEdge", () => selectedEdge, (v) => { selectedEdge = v })
   __def("uid", () => uid, (v) => { uid = v })
@@ -8001,7 +8041,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 196 read-only. Getters hand out the LIVE value: 8 of
+  // 199 read-only. Getters hand out the LIVE value: 8 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
   __def("TYPES", () => TYPES, __ro("TYPES"))
@@ -8009,22 +8049,22 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("gl", () => gl, __ro("gl"))
   __def("makeNode", () => makeNode, __ro("makeNode"))
   __def("evalGraph", () => evalGraph, __ro("evalGraph"))
-  __def("newField", () => newField, __ro("newField"))
   __def("buildIndex", () => buildIndex, __ro("buildIndex"))
+  __def("newField", () => newField, __ro("newField"))
+  __def("fieldH", () => fieldH, __ro("fieldH"))
+  __def("fieldW", () => fieldW, __ro("fieldW"))
   __def("gnoise", () => gnoise, __ro("gnoise"))
   __def("fbmField", () => fbmField, __ro("fbmField"))
   __def("buffers", () => buffers, __ro("buffers"))
-  __def("fieldH", () => fieldH, __ro("fieldH"))
-  __def("fieldW", () => fieldW, __ro("fieldW"))
-  __def("VARS", () => VARS, __ro("VARS"))
   __def("GPU", () => GPU, __ro("GPU"))
+  __def("VARS", () => VARS, __ro("VARS"))
   __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
   __def("outputNode", () => outputNode, __ro("outputNode"))
+  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("PORTS", () => PORTS, __ro("PORTS"))
   __def("resolveColor", () => resolveColor, __ro("resolveColor"))
   __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("cloneParams", () => cloneParams, __ro("cloneParams"))
-  __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
   __def("buildProps", () => buildProps, __ro("buildProps"))
   __def("glc", () => glc, __ro("glc"))
@@ -8033,17 +8073,19 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("updateViewport", () => updateViewport, __ro("updateViewport"))
   __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
+  __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
   __def("AUXMAPS", () => AUXMAPS, __ro("AUXMAPS"))
   __def("curField", () => curField, __ro("curField"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
-  __def("u", () => u, __ro("u"))
   __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
+  __def("u", () => u, __ro("u"))
   __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("streamPowerErode", () => streamPowerErode, __ro("streamPowerErode"))
   __def("waterLook", () => waterLook, __ro("waterLook"))
   __def("canyonEvolutionState", () => canyonEvolutionState, __ro("canyonEvolutionState"))
   __def("fieldMetadata", () => fieldMetadata, __ro("fieldMetadata"))
+  __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("portPos", () => portPos, __ro("portPos"))
   __def("PORTS_EXPR", () => PORTS_EXPR, __ro("PORTS_EXPR"))
   __def("renderGL", () => renderGL, __ro("renderGL"))
@@ -8053,7 +8095,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("frameHero", () => frameHero, __ro("frameHero"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
   __def("blankGraph", () => blankGraph, __ro("blankGraph"))
-  __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
@@ -8062,7 +8103,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("planView", () => planView, __ro("planView"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
   __def("transformField", () => transformField, __ro("transformField"))
-  __def("cellSizeM", () => cellSizeM, __ro("cellSizeM"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
   __def("EXACT_TYPES", () => EXACT_TYPES, __ro("EXACT_TYPES"))
@@ -8091,12 +8131,14 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
   __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("syncWindReadout", () => syncWindReadout, __ro("syncWindReadout"))
+  __def("waterMaskProg", () => waterMaskProg, __ro("waterMaskProg"))
   __def("waterProg", () => waterProg, __ro("waterProg"))
   __def("bakeThumb", () => bakeThumb, __ro("bakeThumb"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
   __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
   __def("documentSamples", () => documentSamples, __ro("documentSamples"))
   __def("exactChain", () => exactChain, __ro("exactChain"))
+  __def("gpuDropletsReady", () => gpuDropletsReady, __ro("gpuDropletsReady"))
   __def("linkDrop", () => linkDrop, __ro("linkDrop"))
   __def("nodeH", () => nodeH, __ro("nodeH"))
   __def("previewDetail", () => previewDetail, __ro("previewDetail"))
@@ -8127,7 +8169,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("snoise", () => snoise, __ro("snoise"))
   __def("syncCompass", () => syncCompass, __ro("syncCompass"))
   __def("USE_DEFERRED", () => USE_DEFERRED, __ro("USE_DEFERRED"))
-  __def("waterMaskProg", () => waterMaskProg, __ro("waterMaskProg"))
   __def("blendFields", () => blendFields, __ro("blendFields"))
   __def("blurField", () => blurField, __ro("blurField"))
   __def("buildField", () => buildField, __ro("buildField"))
@@ -8144,7 +8185,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("duplicateSel", () => duplicateSel, __ro("duplicateSel"))
   __def("edgeKey", () => edgeKey, __ro("edgeKey"))
   __def("encodeTemperatureC", () => encodeTemperatureC, __ro("encodeTemperatureC"))
-  __def("gpuDropletsReady", () => gpuDropletsReady, __ro("gpuDropletsReady"))
   __def("gpuHydraulicPipes", () => gpuHydraulicPipes, __ro("gpuHydraulicPipes"))
   __def("gpuThermal", () => gpuThermal, __ro("gpuThermal"))
   __def("HEX_SQUARE_WORLD", () => HEX_SQUARE_WORLD, __ro("HEX_SQUARE_WORLD"))
@@ -8172,9 +8212,11 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("cameraNear", () => cameraNear, __ro("cameraNear"))
   __def("CANYON_STYLE_ID", () => CANYON_STYLE_ID, __ro("CANYON_STYLE_ID"))
   __def("canyonField", () => canyonField, __ro("canyonField"))
+  __def("currentWaterPreset", () => currentWaterPreset, __ro("currentWaterPreset"))
   __def("curveAt", () => curveAt, __ro("curveAt"))
   __def("FEASIBILITY_API", () => FEASIBILITY_API, __ro("FEASIBILITY_API"))
   __def("gbuf", () => gbuf, __ro("gbuf"))
+  __def("glslGerstner", () => glslGerstner, __ro("glslGerstner"))
   __def("gpuHydraulicCombined", () => gpuHydraulicCombined, __ro("gpuHydraulicCombined"))
   __def("gpuWarp", () => gpuWarp, __ro("gpuWarp"))
   __def("graphIdsFrom", () => graphIdsFrom, __ro("graphIdsFrom"))
@@ -8187,6 +8229,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("openDrawEditor", () => openDrawEditor, __ro("openDrawEditor"))
   __def("openNewTerrainDialog", () => openNewTerrainDialog, __ro("openNewTerrainDialog"))
   __def("parseLayout", () => parseLayout, __ro("parseLayout"))
+  __def("presetBounds", () => presetBounds, __ro("presetBounds"))
   __def("REAL_DEM_SAMPLE", () => REAL_DEM_SAMPLE, __ro("REAL_DEM_SAMPLE"))
   __def("resampleTo", () => resampleTo, __ro("resampleTo"))
   __def("SEED_MAX", () => SEED_MAX, __ro("SEED_MAX"))

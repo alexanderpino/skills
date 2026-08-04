@@ -213,6 +213,29 @@ const TERMS = 12
     check('horizontal Jacobian positive outside the foam band', sampled >= 4096 && minJ > 0, { minJ, sampled })
   } else if (M) check('horizontal Jacobian positive outside the foam band', false, 'horizontalJacobian missing')
 
+  // --- the generated GLSL must be syntactically sound -------------------------------------------
+  // This is here because it shipped broken. Coefficients were emitted as `nx+=-${value}` and the
+  // values are often negative, producing `+=--1.2e-5` — which GLSL parses as a decrement and
+  // rejects with "l-value required (can't modify a const)". The water oracles caught it only
+  // indirectly, by failing to compile a program; a text that cannot be valid GLSL should not need a
+  // GPU to be recognised as such.
+  if (M && typeof M.glslGerstner === 'function' && preset) {
+    let glsl = null
+    try { glsl = M.glslGerstner(preset) } catch (e) { glsl = null }
+    check('GLSL is generated', typeof glsl === 'string' && glsl.length > 200, glsl && glsl.length)
+    check('GLSL has no accidental decrement', typeof glsl === 'string' && !/--/.test(glsl)
+      && !/\+=\s*-/.test(glsl) && !/-=\s*-/.test(glsl),
+      typeof glsl === 'string' ? (glsl.match(/.{0,24}(--|\+=\s*-).{0,24}/) || [''])[0] : 'n/a')
+    // Every term must appear, or a preset could expand to twelve and emit three.
+    check('GLSL carries every term', typeof glsl === 'string'
+      && (glsl.match(/float th=/g) || []).length === TERMS,
+      typeof glsl === 'string' ? (glsl.match(/float th=/g) || []).length : 'n/a')
+    // Two calls must produce identical text, or the two passes cannot be given the same source.
+    let glsl2 = null
+    try { glsl2 = M.glslGerstner(preset) } catch (e) {}
+    check('GLSL is byte-identical between calls', glsl2 === glsl)
+  }
+
   // Absence of evidence is a failure.
   check('assertion inventory non-empty', assertions.length >= 14, assertions.length)
 

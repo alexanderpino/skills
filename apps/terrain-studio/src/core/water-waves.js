@@ -223,3 +223,57 @@ export function presetBounds(preset) {
   for (const t of terms) { vertical += t.A; horizontal += t.Q * t.A }
   return { verticalM: vertical, horizontalM: horizontal }
 }
+
+/**
+ * Generate the GLSL both water passes use.
+ *
+ * ONE SOURCE, not two copies. The forward colour pass and the deferred water-mask/depth pass must
+ * displace by the same function at the same time or the mask and the shaded surface disagree along
+ * every crest — a hairline of un-shaded water tracking each wave. ADR-006 requires the same function
+ * and the same time in both, so the text is emitted once from the preset and injected into both
+ * programs, and a gate compares the two injected strings rather than trusting that they match.
+ *
+ * The terms are baked as literals rather than passed as uniforms. A preset is immutable once
+ * expanded, twelve terms is 60 floats of uniform pressure per pass, and a baked constant lets the
+ * driver fold the trigonometry — but the deciding reason is that a baked source is COMPARABLE:
+ * two passes either got the same text or they did not.
+ *
+ * `p` is in METRES. The caller converts, because only the caller knows its own coordinate space.
+ */
+export function glslGerstner(preset, fnName = 'gerstnerDisp') {
+  const terms = (preset && preset.terms) || []
+  const f = v => {
+    if (!Number.isFinite(v)) throw new Error('glslGerstner: non-finite term value')
+    // Enough digits to round-trip a float32 exactly, so the shader evaluates the preset the CPU
+    // oracle checked rather than a rounded neighbour of it.
+    return v.toPrecision(9)
+  }
+  const lines = terms.map(t => {
+    const k = 2 * Math.PI / t.lambda
+    const om = Math.sqrt(GRAVITY * k)
+    const dx = Math.cos(t.dirRad), dz = Math.sin(t.dirRad)
+    return `  { float th=${f(k)}*(${f(dx)}*p.x+${f(dz)}*p.y)-${f(om)}*t+${f(t.phase)};`
+      + ` float c=cos(th), s=sin(th);`
+      // EVERY COEFFICIENT IS PARENTHESISED and carries its own sign. Emitting `nx+=-${value}` put a
+      // unary minus in front of a literal that is itself often negative, producing `+=--1.2e-5`,
+      // which GLSL parses as a decrement and rejects with "l-value required". The sign belongs in
+      // the number, not in the operator.
+      + ` d.x+=(${f(t.Q * t.A * dx)})*c; d.y+=(${f(t.A)})*s; d.z+=(${f(t.Q * t.A * dz)})*c;`
+      + ` nx+=(${f(-t.Q * t.A * dx * dx * k)})*s; ny+=(${f(t.A * dx * k)})*c; nz+=(${f(-t.Q * t.A * dz * dx * k)})*s;`
+      + ` mx+=(${f(-t.Q * t.A * dx * dz * k)})*s; my+=(${f(t.A * dz * k)})*c; mz+=(${f(-t.Q * t.A * dz * dz * k)})*s; }`
+  })
+  // Tangents are accumulated alongside, never differenced — the ADR forbids a finite-difference
+  // normal, and doing it here as well as on the CPU is what keeps the two implementations the same
+  // function rather than two approximations of one.
+  return [
+    `// generated from WaterWavePreset v${WATER_WAVE_VERSION} — ${terms.length} terms, steepness ${(preset && preset.steepness || 0).toFixed(4)}`,
+    `vec3 ${fnName}(vec2 p, float t, out vec3 N){`,
+    `  vec3 d=vec3(0.0);`,
+    `  float nx=1.0, ny=0.0, nz=0.0;`,   // dP/dx
+    `  float mx=0.0, my=0.0, mz=1.0;`,   // dP/dz
+    ...lines,
+    `  N=normalize(cross(vec3(mx,my,mz), vec3(nx,ny,nz)));`,
+    `  return d;`,
+    `}`,
+  ].join('\n')
+}
