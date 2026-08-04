@@ -20,7 +20,7 @@ import { AUX_MAPS, AUX_LENSES, SIDE_CHANNEL_LEDGER, semanticDebt, debtByOwner, v
 import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, HEIGHT_WRITERS } from './core/doctrine.js';
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
-import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION } from './core/world-domain.js';
+import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
 import { LEGACY_PORTS, LEGACY_ROSTER, LEGACY_INS_LABELS } from './core/legacy-ports.js';
@@ -4830,12 +4830,96 @@ export function evaluateSubgraphInstance(params, ins, node){
 // answer by losing their work. The preflight is pure arithmetic on counts and byte sizes; it never
 // touches a Float32Array, which is what _verify_new_terrain.js spies on.
 let pendingNewTerrain=null;
+
+// AUTHORING UNITS AND RESOLUTION MODE.
+//
+// The dialog used to ask for metres and a column/row count and nothing else, which forced the
+// author to do the division that decides the only number that matters physically: how far apart
+// two samples are. Every erosion parameter in this app is denominated in cell size, so a graph
+// authored at one spacing and rebuilt at another is a different simulation.
+//
+// Three ways to say the same thing, because different sources state it differently:
+//   explicit-samples  columns x rows          — what a game engine's landscape asks for
+//   spacing           distance per point      — GIS cell size / ground sample distance, the way
+//                                               every DEM, GeoTIFF and SRTM tile is published
+//   density           points per unit         — the reciprocal, which is how some tools phrase it
+// Extents are authored in the selected unit and converted to metres HERE; the domain is stored in
+// metres always, so nothing downstream has to know a unit was ever chosen. AUTHORING_UNITS is the
+// same table world-domain.js validates against, not a second copy.
+function ntUnitFactor(){ return AUTHORING_UNITS[($("#ntUnit")||{}).value] || 1; }
+function ntResolutionFrom(widthM,heightM,posting){
+  // vertex posting spans n-1 intervals across the extent; legacy-cell spans n. deriveResolution
+  // owns that arithmetic and the rounding rule, so this asks it rather than repeating it.
+  const mode=($("#ntResMode")||{}).value||"explicit-samples";
+  const f=ntUnitFactor();
+  if(mode==="explicit-samples"){
+    return {mode:"explicit-samples",requestedSpacingM:null,
+      sampleCount:{columns:parseInt($("#ntCols").value,10),rows:parseInt($("#ntRows").value,10)}};
+  }
+  let spacingM;
+  if(mode==="spacing")spacingM=parseFloat($("#ntSpacing").value)*f;
+  else{
+    const perUnit=parseFloat($("#ntDensity").value);
+    spacingM=perUnit>0?f/perUnit:NaN;              // points per unit -> metres per point
+  }
+  if(!Number.isFinite(spacingM)||spacingM<=0)return {mode,requestedSpacingM:spacingM,sampleCount:{columns:NaN,rows:NaN}};
+  const derived=deriveResolution({extentM:{width:widthM,height:heightM},posting,
+    resolution:{mode:"spacing",requestedSpacingM:{x:spacingM,y:spacingM}}});
+  return {mode,requestedSpacingM:spacingM,sampleCount:derived.sampleCount,actualSpacingM:derived.actualSpacingM};
+}
+function ntSyncUnitLabels(){
+  const u=($("#ntUnit")||{}).value||"m";
+  for(const el of document.querySelectorAll("[data-unitlabel]"))el.textContent=u;
+  for(const el of document.querySelectorAll("[data-unitlabel-per]"))el.textContent=u+" / point";
+  for(const el of document.querySelectorAll("[data-unitlabel-inv]"))el.textContent="points / "+u;
+  const mode=($("#ntResMode")||{}).value||"explicit-samples";
+  for(const el of document.querySelectorAll("#newTerrainDialog [data-mode]"))el.hidden=el.dataset.mode!==mode;
+}
+
 export function previewCreation(){
-  const cols=parseInt($("#ntCols").value,10),rows=parseInt($("#ntRows").value,10);
-  const width=parseFloat($("#ntWidth").value),height=parseFloat($("#ntHeight").value);
+  ntSyncUnitLabels();
+  const f=ntUnitFactor();
+  const width=parseFloat($("#ntWidth").value)*f,height=parseFloat($("#ntHeight").value)*f;
+  const posting="vertex";
+  const res=ntResolutionFrom(width,height,posting);
+  const cols=res.sampleCount.columns,rows=res.sampleCount.rows;
   // liveFields is MEASURED from the graph that will exist, not guessed: a blank document holds one
   // field, the templates hold as many as their node count.
   const liveFields=Math.max(1,nodes.length||1);
+  // FINITE, not valid. A too-small-but-finite count (1 x 4) must still reach assessCreation, which
+  // rejects it with its own DIMENSIONS_INVALID code; intercepting it here produced a rejection
+  // carrying no code and broke the caller that reads one. This guard exists only for the new
+  // failure mode the spacing/density modes introduce: a non-finite count from a blank or zero field.
+  const dims=Number.isFinite(cols)&&Number.isFinite(rows);
+  // Say what was actually derived, in both directions, so the author never has to trust a division
+  // they cannot see. spacingWasRounded is the honest part: a requested spacing rarely divides the
+  // extent exactly, and silently shipping a different one is how a graph's parameters stop meaning
+  // what they said.
+  const der=$("#ntDerived");
+  if(der){
+    if(!dims||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0){der.textContent="\u2014";}
+    else{
+      const sx=width/(posting==="vertex"?cols-1:cols),sy=height/(posting==="vertex"?rows-1:rows);
+      const u=($("#ntUnit")||{}).value||"m",inv=AUTHORING_UNITS[u]||1;
+      const rounded=res.mode!=="explicit-samples"&&res.requestedSpacingM>0
+        &&(Math.abs(res.requestedSpacingM-sx)>1e-9||Math.abs(res.requestedSpacingM-sy)>1e-9);
+      der.innerHTML=`${cols} \u00d7 ${rows} points \u00b7 ${(sx/inv).toPrecision(4)} \u00d7 ${(sy/inv).toPrecision(4)} ${u} per point`
+        +(rounded?` <span class="nt-warn">\u00b7 rounded from ${(res.requestedSpacingM/inv).toPrecision(4)} ${u}</span>`:"");
+    }
+  }
+  if(!dims){
+    // A rejected preflight still RETURNS a verdict-shaped record. Returning null here broke every
+    // caller that reads .verdict — including the oracle — and turned "this size is refused" into a
+    // TypeError, which is the wrong failure for a case the dialog is supposed to handle calmly.
+    const bad=$("#ntReadout");
+    const reason="resolution is not a finite sample count";
+    if(bad){bad.textContent="Cannot create: "+reason;bad.dataset.mode="rejected";}
+    $("#ntCreate").disabled=true;
+    pendingNewTerrain={cols,rows,width,height,unit:($("#ntUnit")||{}).value||"m",resMode:res.mode,
+      lattice:$("#ntLattice").value,template:$("#ntTemplate").value,
+      verdict:{mode:"rejected",code:"DIMENSIONS_INVALID",reason}};
+    return pendingNewTerrain;
+  }
   const verdict=assessCreation({sampleCount:{columns:cols,rows:rows},liveFields});
   const out=$("#ntReadout");
   if(verdict.mode==="rejected"){out.textContent="Cannot create: "+verdict.reason;out.dataset.mode="rejected";}
@@ -4845,7 +4929,8 @@ export function previewCreation(){
     out.dataset.mode=verdict.mode;
   }
   $("#ntCreate").disabled=verdict.mode==="rejected"||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0;
-  pendingNewTerrain={cols,rows,width,height,lattice:$("#ntLattice").value,template:$("#ntTemplate").value,verdict};
+  pendingNewTerrain={cols,rows,width,height,unit:($("#ntUnit")||{}).value||"m",resMode:res.mode,
+    lattice:$("#ntLattice").value,template:$("#ntTemplate").value,verdict};
   return pendingNewTerrain;
 }
 export function openNewTerrainDialog(){
@@ -4853,10 +4938,11 @@ export function openNewTerrainDialog(){
 }
 export function closeNewTerrainDialog(){$("#newTerrainDialog").hidden=true;pendingNewTerrain=null;}
 // Live preflight on every edit, so the readout is never stale relative to the inputs.
-for(const id of ["ntCols","ntRows","ntWidth","ntHeight","ntLattice","ntTemplate"]){
-  const el=$("#"+id);if(el)el.addEventListener("input",()=>previewCreation());
+for(const id of ["ntCols","ntRows","ntWidth","ntHeight","ntLattice","ntTemplate","ntUnit","ntResMode","ntSpacing","ntDensity"]){
+  const el=$("#"+id);if(el){el.addEventListener("input",()=>previewCreation());el.addEventListener("change",()=>previewCreation());}
 }
 if($("#ntCancel"))$("#ntCancel").onclick=closeNewTerrainDialog;
+if($("#ntClose"))$("#ntClose").onclick=closeNewTerrainDialog;
 if($("#ntCreate"))$("#ntCreate").onclick=confirmNewTerrain;
 
 export function confirmNewTerrain(){
@@ -4864,7 +4950,7 @@ export function confirmNewTerrain(){
   if(!p||p.verdict.mode==="rejected")return false;
   const domain={
     version:WORLD_DOMAIN_VERSION,originM:{x:0,y:0},extentM:{width:p.width,height:p.height},
-    authoringUnits:{horizontal:"m",vertical:"m"},lattice:p.lattice,posting:"vertex",
+    authoringUnits:{horizontal:p.unit||"m",vertical:"m"},lattice:p.lattice,posting:"vertex",
     resolution:{mode:"explicit-samples",sampleCount:{columns:p.cols,rows:p.rows},actualSpacingM:{x:1,y:1}},
     vertical:{datum:{kind:"unknown",offsetM:0},rangeM:{min:0,max:terrainDef.height||2600}},
   };

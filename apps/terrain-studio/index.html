@@ -519,6 +519,35 @@ select.sg-btn{appearance:auto}
 .draw-editor[hidden]{display:none}
 .draw-editor{position:fixed;inset:0;z-index:92;display:grid;place-items:center;padding:22px;
   background:rgba(4,7,11,.76);backdrop-filter:blur(8px)}
+/* New Terrain popup. .draw-editor already supplies the dimmed, blurred, centred backdrop; what
+   was missing was the CARD — draw-editor-head/body/foot appeared in the markup with no rule
+   anywhere, so the fields sat directly on the backdrop and read as an overlay rather than a
+   dialog. Sized to its content, unlike .draw-shell which is a full-bleed workspace. */
+.popup-shell{width:min(460px,calc(100vw - 36px));max-height:calc(100vh - 44px);display:flex;flex-direction:column;
+  overflow:hidden;background:var(--panel);border:1px solid var(--line2);border-radius:12px;
+  box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.03) inset}
+.draw-editor-head{flex:none;display:flex;align-items:baseline;gap:10px;padding:13px 15px 11px;
+  border-bottom:1px solid var(--line);background:var(--bg2)}
+.draw-editor-head b{font-size:13px}
+.draw-editor-head .muted{font-size:10.5px;color:var(--muted)}
+.popup-x{margin-left:auto;align-self:center;width:22px;height:22px;flex:none;display:grid;place-items:center;
+  border:1px solid transparent;border-radius:5px;background:none;color:var(--muted);font-size:15px;line-height:1;
+  cursor:pointer;padding:0}
+.popup-x:hover{border-color:var(--line2);color:#dbe6f2;background:rgba(255,255,255,.04)}
+.draw-editor-body{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:auto minmax(0,1fr);
+  gap:9px 12px;align-items:center;padding:14px 15px}
+.draw-editor-body>label{font-size:11px;color:var(--muted);white-space:nowrap}
+.draw-editor-body>input,.draw-editor-body>select{min-width:0}
+.draw-editor-foot{flex:none;display:flex;justify-content:flex-end;gap:8px;padding:11px 15px;
+  border-top:1px solid var(--line);background:var(--bg2)}
+/* A number plus its unit, so the unit is never guessed from a label that has drifted. */
+.nt-num{display:flex;align-items:center;gap:0;min-width:0}
+.nt-num input{flex:1;min-width:0;border-top-right-radius:0;border-bottom-right-radius:0}
+.nt-unit{flex:none;padding:0 8px;height:26px;display:grid;place-items:center;font:10px var(--mono);
+  color:var(--muted);border:1px solid var(--line2);border-left:0;border-radius:0 5px 5px 0;background:var(--bg2)}
+.nt-derived{font:10.5px var(--mono);color:var(--muted)}
+.nt-warn{color:#e3b341}
+.draw-editor-body [hidden]{display:none}
 .draw-shell{width:min(1040px,calc(100vw - 44px));height:min(780px,calc(100vh - 44px));display:flex;flex-direction:column;
   overflow:hidden;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 30px 90px rgba(0,0,0,.65)}
 .draw-head{height:52px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
@@ -1012,25 +1041,53 @@ select.sg-btn{appearance:auto}
 <!-- New Terrain (S9.2). A fourth detached overlay, following the #drawEditor / #pathEditor
      convention exactly: role=dialog, aria-modal, hidden, same .draw-editor styling. -->
 <div class="draw-editor" id="newTerrainDialog" role="dialog" aria-modal="true" aria-labelledby="newTerrainTitle" hidden>
+ <div class="popup-shell">
   <div class="draw-editor-head">
     <b id="newTerrainTitle">New terrain</b>
     <span class="muted" id="newTerrainSub">Set the world before anything is allocated</span>
+    <button class="popup-x" id="ntClose" type="button" aria-label="Close">&#215;</button>
   </div>
-  <div class="draw-editor-body" style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;padding:12px">
-    <label for="ntWidth">Width (m)</label><input id="ntWidth" type="number" min="1" step="1" value="5000">
-    <label for="ntHeight">Height (m)</label><input id="ntHeight" type="number" min="1" step="1" value="5000">
-    <label for="ntCols">Columns</label><input id="ntCols" type="number" min="2" step="1" value="512">
-    <label for="ntRows">Rows</label><input id="ntRows" type="number" min="2" step="1" value="512">
+  <div class="draw-editor-body">
+    <label for="ntUnit">Units</label>
+    <select id="ntUnit">
+      <option value="m">Metres</option><option value="km">Kilometres</option>
+      <option value="ft">Feet</option><option value="mi">Miles</option>
+    </select>
+    <label for="ntWidth">Width</label>
+    <div class="nt-num"><input id="ntWidth" type="number" min="0" step="any" value="5000"><span class="nt-unit" data-unitlabel>m</span></div>
+    <label for="ntHeight">Height</label>
+    <div class="nt-num"><input id="ntHeight" type="number" min="0" step="any" value="5000"><span class="nt-unit" data-unitlabel>m</span></div>
+
+    <label for="ntResMode">Resolution by</label>
+    <select id="ntResMode">
+      <option value="explicit-samples">Grid &#8212; columns &#215; rows</option>
+      <option value="spacing">Sample spacing &#8212; distance per point</option>
+      <option value="density">Point density &#8212; points per unit</option>
+    </select>
+
+    <label for="ntCols" data-mode="explicit-samples">Columns</label>
+    <input id="ntCols" type="number" min="2" step="1" value="512" data-mode="explicit-samples">
+    <label for="ntRows" data-mode="explicit-samples">Rows</label>
+    <input id="ntRows" type="number" min="2" step="1" value="512" data-mode="explicit-samples">
+
+    <label for="ntSpacing" data-mode="spacing">Spacing</label>
+    <div class="nt-num" data-mode="spacing"><input id="ntSpacing" type="number" min="0" step="any" value="10"><span class="nt-unit" data-unitlabel-per>m / point</span></div>
+    <label for="ntDensity" data-mode="density">Density</label>
+    <div class="nt-num" data-mode="density"><input id="ntDensity" type="number" min="0" step="any" value="0.1"><span class="nt-unit" data-unitlabel-inv>points / m</span></div>
+
     <label for="ntLattice">Lattice</label>
     <select id="ntLattice"><option value="square">Square</option><option value="hex-pointy-odd-r">Hex (pointy, odd-r)</option></select>
     <label for="ntTemplate">Start from</label>
     <select id="ntTemplate"><option value="blank">Blank</option><option value="default">Default setup</option><option value="canyon">Canyon landscape</option></select>
+
+    <span></span><div id="ntDerived" class="nt-derived" style="grid-column:2">&nbsp;</div>
     <span></span><div id="ntReadout" class="hint" style="grid-column:2">&nbsp;</div>
   </div>
   <div class="draw-editor-foot">
     <button class="btn" id="ntCancel" type="button">Cancel</button>
     <button class="btn primary" id="ntCreate" type="button">Create</button>
   </div>
+ </div>
 </div>
 <div class="toast" id="toast"></div>
 
