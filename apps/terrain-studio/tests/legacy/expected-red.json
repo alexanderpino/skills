@@ -1,0 +1,19 @@
+{
+  "why": [
+    "Sprint 3's Ready condition requires its acceptance fixtures to be OBSERVED RED before the",
+    "implementation exists — a gate first seen green is a gate that has never been seen to fail.",
+    "Writing those oracles therefore makes the sweep red, and the two obvious ways out are both",
+    "bad: not committing them loses the evidence that they were red first, and naming them so the",
+    "sweep skips them means nobody ever runs them.",
+    "",
+    "So a red-first oracle is REGISTERED here instead, with the story that will make it green. The",
+    "sweep reports it as `red (expected)` rather than a failure — and, crucially, FAILS if one of",
+    "these turns green, because a stale register is how an expected-red entry quietly becomes a",
+    "permanent excuse. An entry naming a file that does not exist is also a failure: absence of",
+    "evidence is not a pass.",
+    "",
+    "An entry is removed in the same commit that makes its oracle green. If an entry is still here",
+    "when its story ships, that is a defect in the story, not paperwork."
+  ],
+  "entries": []
+}
