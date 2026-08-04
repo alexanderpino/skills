@@ -133,12 +133,17 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
     // graphSnapshot carried nodes/edges/uid/terrainDef and nothing else, so a variable edit was in
     // zero undo records: undo reverted the graph around it and left the new value in place.
     VARS.setDocumentVariables([{ id: 'undoVar', name: 'Undo probe', value: 0.25, unit: 'none' }])
-    pushUndo(graphSnapshot())
+    // The mutation reproduces the PRE-FIX BUILD rather than editing the answer: it strips the
+    // variables block out of the snapshot, which is exactly what graphSnapshot() used to emit. Real
+    // pushUndo, real undoGraph, real restoreGraph then run against it, so what is measured below is
+    // production's restore behaviour on a v-less snapshot, not a literal assigned by this file.
+    const snap = graphSnapshot()
+    if (mutation === 'variable-edit-not-undoable') delete snap.variables
+    pushUndo(snap)
     VARS.setDocumentVariables([{ id: 'undoVar', name: 'Undo probe', value: 0.75, unit: 'none' }])
     const beforeUndo = (VARS.getDocumentVariables().find(v => v.id === 'undoVar') || {}).value
     undoGraph()
-    let afterUndo = (VARS.getDocumentVariables().find(v => v.id === 'undoVar') || {}).value
-    if (mutation === 'variable-edit-not-undoable') afterUndo = 0.75
+    const afterUndo = (VARS.getDocumentVariables().find(v => v.id === 'undoVar') || {}).value
     out.undo = { beforeUndo, afterUndo, reverted: afterUndo === 0.25 }
 
     // --- THE LEXICAL OVERRIDE, AGAINST A REAL SUBGRAPH INSTANCE -------------------------------
@@ -156,12 +161,17 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
       nodes: [{ localId: 'v', type: 'variable', params: { varId: 'shared' } }],
       edges: [],
     })
-    const instHigh = { id: 51, type: 'subgraph', params: { definitionId: 'usesVar', overrides: 'shared = 0.9' } }
-    const instLow = { id: 52, type: 'subgraph', params: { definitionId: 'usesVar', overrides: 'shared = 0.1' } }
+    // Same discipline here. The pre-fix build merged overrides into node params, where the Variable
+    // node never read them, so BOTH instances resolved 'shared' from the document. Dropping the
+    // override text reproduces that build exactly and then runs the real subgraph evaluator; the
+    // measured hi/lo below come out of production either way.
+    const ovHigh = mutation === 'instance-override-ignored' ? '' : 'shared = 0.9'
+    const ovLow = mutation === 'instance-override-ignored' ? '' : 'shared = 0.1'
+    const instHigh = { id: 51, type: 'subgraph', params: { definitionId: 'usesVar', overrides: ovHigh } }
+    const instLow = { id: 52, type: 'subgraph', params: { definitionId: 'usesVar', overrides: ovLow } }
     const fHigh = TYPES.subgraph.eval(instHigh.params, [null], instHigh)
     const fLow = TYPES.subgraph.eval(instLow.params, [null], instLow)
-    let hi = fHigh[0], lo = fLow[0]
-    if (mutation === 'instance-override-ignored') { hi = 0.2; lo = 0.2 }
+    const hi = fHigh[0], lo = fLow[0]
     // The frame must not leak: after evaluation the document value is visible again.
     const afterInstances = (VARS.getDocumentVariables().find(v => v.id === 'shared') || {}).value
     out.override = {

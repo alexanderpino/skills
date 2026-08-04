@@ -3768,17 +3768,10 @@ window.addEventListener("mouseup",e=>{
     const inside=e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;
     const w=toWorld(e.clientX-r.left,e.clientY-r.top);const port=inside?portAt(w.x,w.y):null;
     if(port&&port.which==="in"&&port.node!==linking.from){
-      if(wouldCycle(linking.from,port.node))toast("That would create a cycle");
-      else{                                                              // mutate ONLY on a valid drop (don't clobber the input on reject)
-        recordHistory();
-        if(linking.original)edges=edges.filter(x=>x!==linking.original);
-        edges=edges.filter(x=>!(x.to===port.node&&x.slot===port.slot));
-        const src=nodeById(linking.from),dstNode=nodeById(port.node);
-        const fromPort=src?(nodeOutputs(src)[linking.fromSlot||0]||{}).id:null;
-        edges.push({from:linking.from,fromPort:fromPort||undefined,to:port.node,
-          toPort:dstNode?inPortIdForSlot(dstNode,port.slot):undefined,slot:port.slot});
-        markDirtyFrom(port.node);requestEval();
-      }
+      // Cycles, self-links and type refusals all land here now, and all of them leave the graph
+      // exactly as it was — linkDrop mutates only after every check has passed.
+      const verdict=linkDrop(linking.from,linking.fromSlot||0,port.node,port.slot,{replacing:linking.original});
+      if(!verdict.ok)toast(verdict.reason||("Cannot connect ("+verdict.code+")"));
     }else if(inside&&!nodeAt(w.x,w.y)&&!edgeAt(w.x,w.y)){
       // Gaea-style drag-out quick create: keep the graph unchanged until the user actually
       // chooses a compatible node. Releasing on empty space is therefore cancellable, and an
@@ -3952,9 +3945,11 @@ function addNodeAt(type,world,connect){
   if(connect&&slot<0)return null;
   const nd=makeNode(type,world.x-nd0w(type)/2,world.y-30);
   if(connect){
-    if(connect.original)edges=edges.filter(e=>e!==connect.original);
-    edges=edges.filter(e=>!(e.to===nd.id&&e.slot===slot));
-    edges.push({from:connect.from,to:nd.id,slot});markDirtyFrom(nd.id);
+    // Drag-out quick create wires the new node immediately, so it is a connection time too. The
+    // node is kept either way — the user asked for it — but an illegal wire is refused and said so,
+    // rather than being made silently because it arrived through the menu instead of the canvas.
+    const verdict=linkDrop(connect.from,connect.fromSlot||0,nd.id,slot,{replacing:connect.original});
+    if(!verdict.ok)toast(verdict.reason||("Added unconnected: "+verdict.code));
   }
   select(nd);requestEval();return nd;
 }
@@ -4884,6 +4879,45 @@ function nodeInPorts(nd){
   return out;
 }
 function inPortIdForSlot(nd,slot){const p=nodeInPorts(nd);return (p[slot]&&p[slot].id)||null;}
+
+// --- Connection-time type rejection — S8.2 and S8.5 ----------------------------------------------
+//
+// canConnect arrived with typed ports in S2.1 and was imported here from that first cut, but until
+// now the only caller was the test bridge: `grep -n canConnect src/legacy.js` returned the import
+// and the re-export and nothing else. The library refused a wire and the editor made it anyway, so
+// both stories' "rejected at connection time" clauses were gated by oracles exercising the library
+// rather than the application. The verdict has to live on the drop path itself, which is this.
+//
+// The verdict reads the LIVE descriptor tables rather than a hard-coded pair list, so changing a
+// port's unit or semantic changes what the editor accepts in the same edit — which is also how the
+// gate proves the check is wired in at all: mutate the table, and the editor's answer must move.
+function wireVerdict(fromNode,fromSlot,toNode,toSlot){
+  if(!fromNode||!toNode)return{ok:false,code:"PORT_ID_INVALID",reason:"missing endpoint"};
+  const src=nodeOutputs(fromNode)[fromSlot||0],dst=nodeInPorts(toNode)[toSlot];
+  // A slot with no declared descriptor predates typed ports. Refusing those would make the editor
+  // unusable on every node still carrying only a legacy `ins` label, so they are permitted and
+  // marked untyped — recorded as a known hole, not laundered into a silent "ok".
+  if(!src||!dst)return{ok:true,untyped:true};
+  return canConnect(src,dst);
+}
+// The single mutating entry point for "the user connected two ports". Every rejection returns
+// BEFORE recordHistory, so a refused drop leaves the graph and the undo stack untouched — the old
+// mouseup handler already took that care for cycles and it is preserved for type refusals.
+function linkDrop(fromId,fromSlot,toId,toSlot,opts){
+  const from=nodeById(fromId),to=nodeById(toId);
+  if(!from||!to)return{ok:false,code:"PORT_ID_INVALID",reason:"that endpoint no longer exists"};
+  if(fromId===toId)return{ok:false,code:"SELF_LINK",reason:"A node cannot feed itself"};
+  if(wouldCycle(fromId,toId))return{ok:false,code:"CYCLE",reason:"That would create a cycle"};
+  const verdict=wireVerdict(from,fromSlot,to,toSlot);
+  if(!verdict.ok)return verdict;
+  recordHistory();
+  if(opts&&opts.replacing)edges=edges.filter(x=>x!==opts.replacing);
+  edges=edges.filter(x=>!(x.to===toId&&x.slot===toSlot));
+  edges.push({from:fromId,fromPort:(nodeOutputs(from)[fromSlot||0]||{}).id||undefined,
+    to:toId,toPort:inPortIdForSlot(to,toSlot)||undefined,slot:toSlot});
+  markDirtyFrom(toId);requestEval();
+  return{ok:true,untyped:!!verdict.untyped};
+}
 function slotForInPortId(nd,portId){const p=nodeInPorts(nd);const i=p.findIndex(x=>x.id===portId);return i<0?null:i;}
 // Back-fill port identity onto any edge that predates it. Called before a save and after template
 // construction; an edge whose endpoints have gone is left for deleteEdge to clean up.
@@ -7646,7 +7680,7 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
 
 // ==== TEST BRIDGE BEGIN — generated, do not edit (npm run bridge:apply) ====
 /* GENERATED by scripts/generate-bridge.mjs from bridge-surface.json — do not edit.
- * 215 symbols (28 writable, 187 read-only).
+ * 217 symbols (28 writable, 189 read-only).
  * Regenerate: npm run bridge:gen   Verify coverage: node _verify_bridge.js --check
  *
  * Appended to src/legacy.js AFTER the app source, so each accessor closes over the real
@@ -7677,9 +7711,9 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("scene", () => scene, (v) => { scene = v })
   __def("uid", () => uid, (v) => { uid = v })
   __def("XF", () => XF, (v) => { XF = v })
+  __def("undoStack", () => undoStack, (v) => { undoStack = v })
   __def("view", () => view, (v) => { view = v })
   __def("SCALE_RES", () => SCALE_RES, (v) => { SCALE_RES = v })
-  __def("undoStack", () => undoStack, (v) => { undoStack = v })
   __def("BUILD_QUALITY", () => BUILD_QUALITY, (v) => { BUILD_QUALITY = v })
   __def("historyReady", () => historyReady, (v) => { historyReady = v })
   __def("redoStack", () => redoStack, (v) => { redoStack = v })
@@ -7695,11 +7729,11 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("AUTO", () => AUTO, (v) => { AUTO = v })
   __def("TEMP_UNIT", () => TEMP_UNIT, (v) => { TEMP_UNIT = v })
 
-  // 187 read-only. Getters hand out the LIVE value: 6 of
+  // 189 read-only. Getters hand out the LIVE value: 6 of
   // these are patched through by tests (TYPES.blur.eval = ..., gl.bindBuffer = ...), which a
   // copy-returning getter would silently discard.
-  __def("terrainDef", () => terrainDef, __ro("terrainDef"))
   __def("TYPES", () => TYPES, __ro("TYPES"))
+  __def("terrainDef", () => terrainDef, __ro("terrainDef"))
   __def("gl", () => gl, __ro("gl"))
   __def("makeNode", () => makeNode, __ro("makeNode"))
   __def("evalGraph", () => evalGraph, __ro("evalGraph"))
@@ -7711,11 +7745,11 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("fieldH", () => fieldH, __ro("fieldH"))
   __def("graphSnapshot", () => graphSnapshot, __ro("graphSnapshot"))
   __def("outputNode", () => outputNode, __ro("outputNode"))
-  __def("resolveColor", () => resolveColor, __ro("resolveColor"))
   __def("VARS", () => VARS, __ro("VARS"))
+  __def("resolveColor", () => resolveColor, __ro("resolveColor"))
+  __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("cloneParams", () => cloneParams, __ro("cloneParams"))
   __def("fieldW", () => fieldW, __ro("fieldW"))
-  __def("nodeById", () => nodeById, __ro("nodeById"))
   __def("showcaseGraph", () => showcaseGraph, __ro("showcaseGraph"))
   __def("buildProps", () => buildProps, __ro("buildProps"))
   __def("glc", () => glc, __ro("glc"))
@@ -7725,6 +7759,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("select", () => select, __ro("select"))
   __def("CANYON_EVOLUTION_CACHE", () => CANYON_EVOLUTION_CACHE, __ro("CANYON_EVOLUTION_CACHE"))
   __def("curField", () => curField, __ro("curField"))
+  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("curHgt", () => curHgt, __ro("curHgt"))
   __def("curWater", () => curWater, __ro("curWater"))
   __def("u", () => u, __ro("u"))
@@ -7735,21 +7770,21 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("portPos", () => portPos, __ro("portPos"))
   __def("renderGL", () => renderGL, __ro("renderGL"))
   __def("sampleBilinear", () => sampleBilinear, __ro("sampleBilinear"))
+  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("activePreviewNode", () => activePreviewNode, __ro("activePreviewNode"))
   __def("frameHero", () => frameHero, __ro("frameHero"))
   __def("hydroMassDiag", () => hydroMassDiag, __ro("hydroMassDiag"))
   __def("priorityFloodFill", () => priorityFloodFill, __ro("priorityFloodFill"))
   __def("undoGraph", () => undoGraph, __ro("undoGraph"))
   __def("blankGraph", () => blankGraph, __ro("blankGraph"))
-  __def("loadProjectText", () => loadProjectText, __ro("loadProjectText"))
   __def("markDirtyFrom", () => markDirtyFrom, __ro("markDirtyFrom"))
+  __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
   __def("simulateSnowLayer", () => simulateSnowLayer, __ro("simulateSnowLayer"))
   __def("togglePlanView", () => togglePlanView, __ro("togglePlanView"))
   __def("xfFromParams", () => xfFromParams, __ro("xfFromParams"))
   __def("graphMenu", () => graphMenu, __ro("graphMenu"))
   __def("planView", () => planView, __ro("planView"))
   __def("refreshWater", () => refreshWater, __ro("refreshWater"))
-  __def("saveProjectText", () => saveProjectText, __ro("saveProjectText"))
   __def("transformField", () => transformField, __ro("transformField"))
   __def("compProg", () => compProg, __ro("compProg"))
   __def("curIceSnow", () => curIceSnow, __ro("curIceSnow"))
@@ -7763,7 +7798,6 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("curWaterIce", () => curWaterIce, __ro("curWaterIce"))
   __def("fieldRange", () => fieldRange, __ro("fieldRange"))
   __def("inputEdge", () => inputEdge, __ro("inputEdge"))
-  __def("newTerrainDocument", () => newTerrainDocument, __ro("newTerrainDocument"))
   __def("nodeInputs", () => nodeInputs, __ro("nodeInputs"))
   __def("redoGraph", () => redoGraph, __ro("redoGraph"))
   __def("satComposite", () => satComposite, __ro("satComposite"))
@@ -7775,19 +7809,20 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("gpuFbm", () => gpuFbm, __ro("gpuFbm"))
   __def("gpuHydraulicDroplets", () => gpuHydraulicDroplets, __ro("gpuHydraulicDroplets"))
   __def("nearestUpstreamNode", () => nearestUpstreamNode, __ro("nearestUpstreamNode"))
+  __def("nodeOutputs", () => nodeOutputs, __ro("nodeOutputs"))
   __def("SATMAPS", () => SATMAPS, __ro("SATMAPS"))
+  __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("syncWindReadout", () => syncWindReadout, __ro("syncWindReadout"))
   __def("waterProg", () => waterProg, __ro("waterProg"))
   __def("bakeThumb", () => bakeThumb, __ro("bakeThumb"))
   __def("canyonCacheKey", () => canyonCacheKey, __ro("canyonCacheKey"))
   __def("curSolidSurfaceY", () => curSolidSurfaceY, __ro("curSolidSurfaceY"))
   __def("exactChain", () => exactChain, __ro("exactChain"))
+  __def("linkDrop", () => linkDrop, __ro("linkDrop"))
   __def("nodeH", () => nodeH, __ro("nodeH"))
-  __def("nodeOutputs", () => nodeOutputs, __ro("nodeOutputs"))
   __def("PORTS_EXPR", () => PORTS_EXPR, __ro("PORTS_EXPR"))
   __def("PROJECT", () => PROJECT, __ro("PROJECT"))
   __def("refreshPreview", () => refreshPreview, __ro("refreshPreview"))
-  __def("SUBGRAPHS", () => SUBGRAPHS, __ro("SUBGRAPHS"))
   __def("warpField", () => warpField, __ro("warpField"))
   __def("weatherColorField", () => weatherColorField, __ro("weatherColorField"))
   __def("windVectorFromField", () => windVectorFromField, __ro("windVectorFromField"))
@@ -7885,6 +7920,7 @@ if (import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === "test"))
   __def("thermalErodeHex", () => thermalErodeHex, __ro("thermalErodeHex"))
   __def("viewportHeightFrame", () => viewportHeightFrame, __ro("viewportHeightFrame"))
   __def("WIND_MAX_MPS", () => WIND_MAX_MPS, __ro("WIND_MAX_MPS"))
+  __def("wireVerdict", () => wireVerdict, __ro("wireVerdict"))
 }
 // ==== TEST BRIDGE END ====
 
