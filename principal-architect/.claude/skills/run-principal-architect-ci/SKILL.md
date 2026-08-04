@@ -47,7 +47,7 @@ bash .claude/skills/run-principal-architect-ci/driver.sh
 ```
 
 Prints a per-assertion `PASS`/`FAIL` log and ends with `DRIVER OK` (exit 0) or
-`DRIVER FAILED` (exit 1). Last verified run: **12 passed, 0 failed**. What it
+`DRIVER FAILED` (exit 1). Last verified run: **15 passed, 0 failed**. What it
 asserts, in order:
 
 1. `arch_lint all` exits **0** on a conformant 42010 fixture tree.
@@ -65,6 +65,12 @@ asserts, in order:
    default; an equally old **accepted ADR draws none** (decision records are
    immutable history — exempt by design); and `--max-age-days 0` silences the
    check entirely. Fixture dates are fixed in the past, so this stays time-proof.
+
+7. **House doc families classify consistently**: ids with an uppercase
+   ID-scheme prefix (`SDM-a`, `SDM-b`, …) aggregate into one detector type
+   (`SDM:` in the profile), the detected house rule is then *enforced* on a new
+   family member missing a mandatory section, and a per-solution `SAD-<name>`
+   id does not escape the mandatory threat-model/FinOps checks.
 
 Time-proofing: the *good*-tree fixture dates are rewritten to today's date at
 run time, and the worked-example assertion passes `--max-age-days 0` (its
