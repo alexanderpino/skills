@@ -186,8 +186,64 @@ every declared mutation — and fails on both `NOT ARMED` (mutated run exited 0)
 Page arithmetic for arbitrary dimensions was derived independently and matches ADR-009 exactly:
 `16384²` → 64×64 pages, terminal core 255×255; `1573×13789` → 7×54 pages, terminal core 36×220.
 
-**Next:** post-sprint audit of Sprints 1 and 2 (in progress), then S9.3 import provenance and
-S8.5/S8.6 subgraphs.
+### The Sprint 1+2 audit, and what it cost to answer
+
+An adversarial audit returned **8/8 UNSUPPORTED with 124 gaps**. Most of it was real. Verified and
+fixed, in the order found:
+
+1. **`_verify_port_contract.js` was red in the tree.** S8.1's Edge node has a Mask input, taking
+   `maskSlots` from 30 to 31 against a pinned literal. I ran `--core` after that story but not the
+   affected oracle, so I shipped a red gate and reported it green. The pin is gone: the gate now
+   asserts every `role:'mask'` port also declares `semantic:'anyMask'` and accepts a dimensionless
+   generator, which cannot go stale on a new masked node.
+2. **`gate.py` parsed zero mutations for 7 of 17 oracles** — the regex required the closing bracket
+   at line start. Controls visible to the runner: **57 → 107**.
+3. **`_verify_landforms` and `_verify_surface` were failing unmutated** on
+   `"WebSocket closed without opened."` — Vite's dev client with no socket to attach to in
+   middleware mode. I had documented this exact hazard when building the WebGPU probe and then
+   filtered it in that one oracle instead of fixing the source. It is timing-dependent, so the
+   83/83 sweep reported earlier was **luck**. Fixed at the runner (`/@vite/client` served as a
+   no-op); all ten per-oracle suppressions removed.
+4. **`mutationReached` was computed, printed and never asserted**, with `ok` forced false under any
+   mutation — so every mutated run exited 1 whether or not the mutation broke anything, and none of
+   Sprint 1's 37 controls had ever been *shown* to detect what it claims. Running them properly for
+   the first time: **17/17 landforms, 20/20 surface**.
+5. **`worldMapping` was an Array carrying an `.ok` property** — non-index properties do not survive
+   `page.evaluate` serialisation, so it was `true` in the page and `undefined` in Node.
+6. **Four visual controls were dead** in every automated run (only checked inside `--visual`, which
+   the sweep never passes), and `visual: {runs: [], ok: true}` passed on an empty capture set.
+7. **Constant-true controls replaced**: landforms compared two hard-coded literal arrays; S1.5's
+   only control computed its circular mean from test-side literals. Both now measure production —
+   and the replacements are themselves proven falsifiable.
+8. **Two fixtures were red for the wrong reason**: `raw-odd-r-transpose` reversed an array instead
+   of transposing (now fails on **hex only**, which is the point), and `match-cdf` substituted a
+   scaled source instead of a histogram match.
+9. **A wall-clock gate failed on contention** — canyon `buildMs` 4447 in-sweep vs 1742/1797/1736
+   standalone. Fixed by measuring best-of-three, **bound unchanged at 3000**.
+
+**One audit finding did not reproduce.** It claimed the spectral scale-invariance gate "passes on
+the broken build" with `wavelengthDelta` exactly 0. Measured: 1737.66 against a 39.06 bound — the
+gate catches it. Recorded rather than dropped, because how much of the remaining findings to act on
+depends on the audit's hit rate.
+
+### Sprint 8 — complete
+
+| Story | What landed |
+|---|---|
+| S8.1 | Route (typed identity) + Edge (4-neighbour square / 6-neighbour hex boundary) |
+| S8.2 | Switch / Gate — unselected branches never evaluated, via `demandInputs` |
+| S8.3 | Typed variables + lexical scope chain, rename-safe by stable id |
+| S8.4 | Safe Math — parsed AST, allowlist, bounded size/depth, no `eval` |
+| S8.5/S8.6 | Versioned subgraphs — content identity, recursion refused at registration, instance cache |
+
+Node types **79 → 87**. Digest **87/87, skipped 0**. Eleven oracles armed, **zero vacuous**.
+
+More defects the gates caught in new work: `constructor` escaping the Safe Math allowlist via the
+prototype chain; the graph sink losing its terrain while the digest stayed green; a v2 edge accepted
+without source identity; `definitionHash` changing on every save/load because it was key-order
+dependent.
+
+**Next:** Sprint 8 post-sprint audit, then S9.3, then the physical stack S3 → S4 → S5.
 
 ---
 
