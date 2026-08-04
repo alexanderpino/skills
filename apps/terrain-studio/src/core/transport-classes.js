@@ -24,11 +24,13 @@
 // to co-update yet"). S3.5 flips these to `true` one node at a time, and each flip is a measured
 // before/after with the exemption ledger one entry shorter.
 //
-// POSITION, measured 2026-08-04: 1 of 4 compliant (`thermal`). The remaining three are separate
-// commits by explicit decision (D21: one node per commit, each with a digest delta naming that node
-// and nothing else). `hydraulic`'s cover-first consumption landed in S3.3 and is gated by
-// _verify_cover_erosion.js; only its LEDGER FLIP is outstanding, and it is deliberately not taken
-// here because a commit that moved two rows could not say which change moved which gate.
+// POSITION, measured 2026-08-04: 2 of 4 compliant (`thermal`, `streampower`). The remaining two are
+// separate commits by explicit decision (D21: one node per commit, each with a digest delta naming
+// that node and nothing else — and both nodes so far have needed no re-bless at all, because the
+// cover work is demand-gated and the published field never moved). `hydraulic`'s cover-first
+// consumption landed in S3.3 and is gated by _verify_cover_erosion.js; only its LEDGER FLIP is
+// outstanding, and it is deliberately not taken here because a commit that moved two rows could not
+// say which change moved which gate.
 //
 // CLASSES
 // -------
@@ -105,12 +107,31 @@ export const TRANSPORT_CLASSES = Object.freeze([
     node: 'streampower',
     class: 'materialTransport',
     // Detachment-limited: it models no deposition (sprint-03:186 forbids inventing any), so its
-    // co-update is the cover it consumes, and its ledger is exported/suspended only.
-    coUpdates: Object.freeze(['soilDepth']),
-    compliant: false,
+    // co-update is the cover it CONSUMES.
+    //
+    // `sedimentDepth` joined this list in S3.5, and the reason is the stack, not the process. A
+    // standing sediment layer sits ABOVE soil (ADR-005), so a channel cuts it first — the node has to
+    // READ it to strip in the right order, and a node that published `sedimentDepth` without reading
+    // it would write zeros over a real layer, which is the state destruction this sprint exists to
+    // stop. It still never ADDS to it: `depositedM3` is a published constant zero and the oracle
+    // reads the raster back to prove no cell's cover rose.
+    coUpdates: Object.freeze(['soilDepth', 'sedimentDepth']),
+    // S3.5, SECOND NODE. Fluvial incision now consumes loose cover before bedrock and carries the
+    // thicknesses through untouched where the surface rises, co-updated with the height it publishes.
+    // The stack identity solidTop = bedrock + soil + sediment + sand is asserted per sample. The
+    // ledger itemises the UPLIFT SOURCE — Udt * iters * sum over the kernel's interior, computed from
+    // the node's inputs and never from the published delta — and publishes NO boundary budget at all:
+    // the rim is forced to base level every iteration (src/legacy.js:2198, :2269) and detached
+    // material is credited to nobody, neither of which the solver accumulates, so a figure would be a
+    // restatement of the terms it was compared against rather than a measurement.
+    // Evidence: tests/legacy/_verify_streampower_coevolution.js.
+    compliant: true,
     ownerSprint: 'S3.5',
     why: 'Incision detaches material and reports no destination for it.',
-    note: 'Stays detachment-limited; owes an explicit exported/suspended ledger, not a deposition field.',
+    note: 'Stays detachment-limited: consumes loose cover before bedrock and deposits nothing. '
+      + 'Reports the uplift source it applied; declines a boundary budget rather than deriving one '
+      + 'from the terms it would be checked against. Declares no precipitation port: the kernel has '
+      + 'no rain term, and a port nothing consumes is a declared-but-never-filled half-gate.',
   }),
   Object.freeze({
     node: 'erosion2',

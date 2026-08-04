@@ -493,6 +493,34 @@ const LEGACY_PORTS_RAW = {
       { id: "in", name: "In", semantic: "anyScalarRaster", legacySlot: 0 },
       { id: "uplift", name: "Uplift", semantic: "anyScalarRaster", legacySlot: 1 },
       { id: "mask", name: "Mask", semantic: "anyMask", legacySlot: 2, role: 'mask' },
+      // S3.5 — the explicit cover inputs, added for the same three reasons hydraulic's (:302) and
+      // thermal's (:529) were: the adapter's own data is where a ROSTERED type has to gain a port
+      // (registry.js drops a type out of the adapter the moment it declares `inputs:`, and
+      // LEGACY_INS_LABELS — _verify_port_contract.js's `insDrift` anchor — is DERIVED from these
+      // rows); a physical semantic is legal because these are NEW slots no shipped document uses and
+      // cover thickness in metres is not ADR-005's disputed elevation frame; and stable new ids are
+      // not a regeneration of the frozen ones.
+      //
+      // OPTIONAL, for the same measured reason: every streampower node in every saved graph has
+      // these slots unwired, and unwired means "this graph carries no cover", which is bare bedrock.
+      // Fluvial incision has a defined answer with no cover, so a REQUIRED input would refuse every
+      // document that ships.
+      //
+      // SEDIMENT DEPTH IS AN INPUT EVEN THOUGH THE NODE DEPOSITS NOTHING, and that is the point.
+      // sprint-03:186 keeps Stream Power detachment-limited, so it never ADDS to this layer — but a
+      // standing sediment layer sits ABOVE soil in the stack (ADR-005), and a channel cuts what is on
+      // top of it first. A node that published `sedimentDepth` without reading it would write zeros
+      // over a real layer, which is the state destruction this whole sprint exists to stop
+      // (src/plugins/ero/hydraulic.js:266-271 records the same rule for the sand slot).
+      //
+      // Stream Power takes no `precipitation`: the kernel's only forcing terms are `Udt` and the
+      // Uplift raster (src/legacy.js:2201-2202), there is no rain term anywhere in it, and declaring
+      // a port nothing consumes is the "declared but never filled" half-gate this sprint has already
+      // found repeatedly.
+      { id: "soilDepth", name: "Soil depth", semantic: "soilDepth", unit: "m",
+        lens: "state", legacySlot: 3 },
+      { id: "sedimentDepth", name: "Sediment depth", semantic: "sedimentDepth", unit: "m",
+        lens: "state", legacySlot: 4 },
     ],
     out: { id: 'out', name: 'Out' },
   },

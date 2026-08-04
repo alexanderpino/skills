@@ -73,15 +73,19 @@ const EXPECTED_TRANSPORT_COUNT = SPRINT_FOUR.length   // 4
 //
 // This shipped as `0` and was asserted as a hard number so that the first compliant node would turn
 // this oracle RED and force the update into the same commit as the implementation. That has now
-// happened once: `thermal` consumes loose cover before bedrock, moves what slides into
-// `sedimentDepth`, and closes the solid stack per sample (tests/legacy/_verify_thermal_coevolution.js).
-// The number is 1, and it is still a hard number: the next node to land turns this red again.
+// happened twice:
+//   thermal      consumes loose cover before bedrock and moves what slides into `sedimentDepth`
+//                (tests/legacy/_verify_thermal_coevolution.js)
+//   streampower  consumes loose cover before bedrock, stays detachment-limited so it deposits
+//                nothing, itemises its uplift source and declines a boundary budget it cannot
+//                support (tests/legacy/_verify_streampower_coevolution.js)
+// The number is 2, and it is still a hard number: the next node to land turns this red again.
 //
-// The list is what makes the count non-vacuous. `compliantCount === 1` alone would be satisfied by
-// ANY one of the four claiming compliance; naming which one is what a mutation can contradict —
+// The list is what makes the count non-vacuous. `compliantCount === 2` alone would be satisfied by
+// ANY two of the four claiming compliance; naming which ones is what a mutation can contradict —
 // `transport-claims-compliant` flips a node that is NOT yet compliant, and `transport-drops-compliance`
-// flips the one that is back, so the reading is armed from both sides.
-const EXPECTED_COMPLIANT = ['thermal']
+// flips one that is back, so the reading is armed from both sides.
+const EXPECTED_COMPLIANT = ['thermal', 'streampower']
 const EXPECTED_NON_COMPLIANT = SPRINT_FOUR.filter(node => !EXPECTED_COMPLIANT.includes(node))
 const EXPECTED_COMPLIANT_COUNT = EXPECTED_COMPLIANT.length   // 1
 const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUNT   // 3
@@ -146,8 +150,11 @@ const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUN
     if (mutation === 'unclassified-writer') manifest = manifest.filter(r => r.node !== 'thermal')
     if (mutation === 'transport-without-coupdate') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, coUpdates: [] } : r)
     if (mutation === 'coupdate-target-unregistered') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, coUpdates: ['topsoilThickness'] } : r)
-    // `streampower` is still exempt, so claiming compliance for it genuinely moves the count.
-    if (mutation === 'transport-claims-compliant') manifest = manifest.map(r => r.node === 'streampower' ? { ...r, compliant: true } : r)
+    // REPOINTED IN S3.5b. This targeted `streampower` until that node became compliant; a control
+    // that flips a row to the value production already holds is not a control at all, it is a silent
+    // no-op that reads as coverage. `erosion2` is still exempt, so claiming compliance for it
+    // genuinely moves the count up and the ledger down.
+    if (mutation === 'transport-claims-compliant') manifest = manifest.map(r => r.node === 'erosion2' ? { ...r, compliant: true } : r)
     // ...and `thermal` is the one node that IS compliant, so reverting it moves the count the other way.
     if (mutation === 'transport-drops-compliance') manifest = manifest.map(r => r.node === 'thermal' ? { ...r, compliant: false } : r)
     if (mutation === 'class-without-owner') classIds = classIds.concat('aeolianTransport')
@@ -301,6 +308,15 @@ const EXPECTED_LEDGER_COUNT = EXPECTED_TRANSPORT_COUNT - EXPECTED_COMPLIANT_COUN
     defaultManifestIsProductionManifest: report.defaultsAreProduction === true,
 
     // 13. Absence of evidence is failure. A corpus, distinct rows, and more than one class.
+    //     WHAT THESE NUMBERS ARE, checked against what the collections actually hold rather than
+    //     left as round figures. A signature is `class|coUpdates`, so the achievable count is
+    //     (distinct transport co-update sets) + (the three non-transport classes, each with an empty
+    //     set). S3.5b gave streampower the same co-update set as thermal — both consume soil and
+    //     sediment, only hydraulic and erosion2 also touch wetness — so there are 2 transport sets
+    //     and the signature count is 2 + 3 = 5, which is the MAXIMUM the current manifest can
+    //     produce, not a floor with slack under it. `>= 5` therefore reads "no two classes have
+    //     collapsed onto each other"; if a later story adds a third co-update set it should move to
+    //     6. Measured 2026-08-04: signatures 5, transport co-update sets 2, co-update targets 3.
     evidenceNonEmpty: writers.length > 0 && classified.length > 0
       && (report.distinct || {}).distinctClasses === 4
       && (report.distinct || {}).distinctSignatures >= 5
