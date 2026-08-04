@@ -120,7 +120,11 @@ let satComposite=0;                             // 1 when a SatMap layer stack i
 function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
 let renderLook={exposure:-0.15,haze:0.28};     // scene-linear look development; exposure is in stops
-let waterLook={pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55}; // global renderer, independent of Water nodes
+let waterLook={pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55,waveDisplacement:1,amplitudeM:12,seaState:.55,bodyKind:"ocean"};
+// waveDisplacement is SEPARATE from `strength` on purpose. `strength` drives the legacy ripple
+// SHADING (uRipple), so wiring the geometric displacement to it too made the two impossible to
+// tell apart: a gate that varied `strength` and saw 99% of pixels change was reading the ripple,
+// not the mesh. One control, two effects, and no way to attribute a difference to either. // global renderer, independent of Water nodes
 function sunDir(){const ce=Math.cos(sun.el);return[ce*Math.cos(sun.az),Math.sin(sun.el),ce*Math.sin(sun.az)];}
 // A real, public-domain USGS/SRTM heightmap (Colorado Plateau, 128²) embedded so a real-world area
 // is one click — an in-browser fetch of the AWS SRTM bucket is impossible (the bucket sends no CORS
@@ -5671,7 +5675,11 @@ export function currentWaterPreset(){
     windSpeedMps:terrainDef.windSpeed==null?10:terrainDef.windSpeed,
     seaState:waterLook&&waterLook.seaState!=null?waterLook.seaState:0.55,
     seed:terrainDef.seed==null?1:terrainDef.seed,
-    maxAmplitudeM:waterLook&&waterLook.amplitudeM!=null?waterLook.amplitudeM:1.2,
+    // UNIT AMPLITUDE, deliberately. The twelve terms are baked into the shader as literals, so
+    // anything folded into them costs a recompile to change. Expanding at 1 m and carrying the
+    // authored height as a uniform makes the Wave height slider a uniform write, and leaves the
+    // recompile for sea state and body kind, which genuinely reshape the spectrum.
+    maxAmplitudeM:1,
     bodyKind:waterLook&&waterLook.bodyKind?waterLook.bodyKind:"ocean"};
   const key=JSON.stringify(c);
   if(key!==_wavePresetKey){_wavePreset=expandWavePreset(c);_wavePresetKey=key;}
@@ -5781,9 +5789,10 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     void main(){
       vDepth=(aw-ah)*uH;vIceSnow=ais;vIce=aice;vXZ=axz;vWN=awn;vSnowN=asnowN;
       vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, WN);
-      float wet=clamp(vDepth*40.0,0.0,1.0)*uWaveAmp;
+      float wet=clamp(vDepth*40.0,0.0,1.0);
+      float amp=wet*uWaveAmp;
       vWaveN=normalize(mix(vec3(0.,1.,0.),WN,wet));
-      vW=vec3(axz.x+d.x*wet/uScale, aw*uH+ais/uScale+d.y*wet/uScale, axz.y+d.z*wet/uScale);
+      vW=vec3(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale);
       gl_Position=uMVP*vec4(vW,1.);}`
   :`attribute vec2 axz;attribute float ah;attribute float aw;attribute float ais;attribute float aice;attribute vec3 awn;attribute vec3 asnowN;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform mat4 uMVP;uniform float uH;uniform float uScale;
@@ -5865,11 +5874,14 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       void main(){
         vDepth=(aw-ah)*uH;
         vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, N);
-        // Displacement is scaled by the wet fraction so a dry cell is untouched and the shoreline
-        // does not develop a fringe of waves standing on land.
-        float wet=clamp(vDepth*40.0,0.0,1.0)*uWaveAmp;
+        // TWO SEPARATE FACTORS, and conflating them was a real bug. wet is a 0..1 shoreline fade
+        // so a dry cell is untouched and the shore grows no fringe of waves standing on land.
+        // uWaveAmp is the authored height IN METRES and can be 30+. Using one value for both made
+        // the normal's mix() extrapolate far past 1 and produced nonsense shading.
+        float wet=clamp(vDepth*40.0,0.0,1.0);
+        float amp=wet*uWaveAmp;
         vWaveN=normalize(mix(vec3(0.,1.,0.),N,wet));
-        gl_Position=uMVP*vec4(axz.x+d.x*wet/uScale, aw*uH+ais/uScale+d.y*wet/uScale, axz.y+d.z*wet/uScale, 1.);
+        gl_Position=uMVP*vec4(axz.x+d.x*amp/uScale, aw*uH+ais/uScale+d.y*amp/uScale, axz.y+d.z*amp/uScale, 1.);
       }`;
     const wmFs=`#version 300 es
       precision highp float;in float vDepth;in vec3 vWaveN;out vec4 frag;
@@ -6934,7 +6946,7 @@ function drawWaterDepth(MVP){
   gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.disable(gl.BLEND);gl.useProgram(waterMaskProg);
   setM(waterMaskProg,"uMVP",MVP);gl.uniform1f(u(waterMaskProg,"uH"),H_SCALE);gl.uniform1f(u(waterMaskProg,"uScale"),terrainDef.scale);
   gl.uniform1f(u(waterMaskProg,"uTime"),uTime);   // the SAME clock the forward pass uses — ADR-006 requires one time
-  gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?(waterLook.strength==null?1:waterLook.strength):0);
+  gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
   bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
@@ -7007,7 +7019,7 @@ function renderGL(){
     if(scene.water&&!wire){
       gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
       setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uScale"),terrainDef.scale);gl.uniform1f(u(waterProg,"uTime"),uTime);
-      gl.uniform1f(u(waterProg,"uWaveAmp"),scene.water?(waterLook.strength==null?1:waterLook.strength):0);
+      gl.uniform1f(u(waterProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
       gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
@@ -7812,6 +7824,8 @@ function syncWaterLookValues(){
   $("#waterScaleVal").textContent=waterLook.scale.toFixed(2)+"×";
   $("#waterSpeedVal").textContent=waterLook.speed.toFixed(2)+"×";
   $("#waterRefractionVal").textContent=Math.round(waterLook.refraction*100)+"%";
+  const wh=$("#waveHeightVal");if(wh)wh.textContent=(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM).toFixed(1)+" m";
+  const ws=$("#waveSeaVal");if(ws)ws.textContent=Math.round((waterLook.seaState==null?.55:waterLook.seaState)*100)+"%";
 }
 $("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);syncLookValues();};
 $("#sunEl").oninput=e=>{sun.el=parseFloat(e.target.value);syncLookValues();};
@@ -7822,6 +7836,18 @@ $("#waterStrength").oninput=e=>{waterLook.strength=parseFloat(e.target.value);sy
 $("#waterScale").oninput=e=>{waterLook.scale=parseFloat(e.target.value);syncWaterLookValues();};
 $("#waterSpeed").oninput=e=>{waterLook.speed=parseFloat(e.target.value);syncWaterLookValues();};
 $("#waterRefraction").oninput=e=>{waterLook.refraction=parseFloat(e.target.value);syncWaterLookValues();};
+// The Gerstner controls REBUILD THE PROGRAMS, because the twelve terms are baked into the
+// shader as literals — that is what lets the two passes be compared byte for byte, and the
+// price is that changing a control is a recompile rather than a uniform write. Cheap enough
+// for an authoring action, and it keeps one definition instead of two.
+// Only the SPECTRUM needs a recompile — sea state and body kind change wavelengths and
+// directions, which are baked. Wave height is a uniform and deliberately does not come here.
+function rebuildWaterPrograms(){
+  if(gl){initGL();buildIndex();nodes.forEach(n=>{n._dirty=true;});evalGraph();}
+}
+if($("#waveHeight"))$("#waveHeight").oninput=e=>{waterLook.amplitudeM=parseFloat(e.target.value);syncWaterLookValues();};
+if($("#waveSea"))$("#waveSea").oninput=e=>{waterLook.seaState=parseFloat(e.target.value);syncWaterLookValues();rebuildWaterPrograms();};
+if($("#waveBody"))$("#waveBody").onchange=e=>{waterLook.bodyKind=e.target.value;rebuildWaterPrograms();};
 syncLookValues();syncWaterLookValues();
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{

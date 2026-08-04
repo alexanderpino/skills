@@ -870,8 +870,20 @@ select.sg-btn{appearance:auto}
           <option value="cross">Cross ripples</option><option value="wind" selected>Wind waves</option>
           <option value="rings">Interference rings</option><option value="none">None</option>
         </select>
-        <div class="field"><div class="frow"><label for="waterStrength">Wave strength</label><output id="waterStrengthVal">55%</output></div>
+        <div class="field"><div class="frow"><label for="waterStrength">Ripple shading</label><output id="waterStrengthVal">55%</output></div>
           <input type="range" id="waterStrength" min="0" max="1" step="0.01" value="0.55"></div>
+        <!-- S4.7 — the Gerstner authoring surface. ADR-006 names exactly these controls and none of
+             them existed: the preset was expanded from defaults nobody could reach, at 1.2 m of
+             amplitude on a five-kilometre world, which is invisible. "Wave height" is the one that
+             makes the displacement visible at all. -->
+        <div class="field"><div class="frow"><label for="waveHeight">Wave height</label><output id="waveHeightVal">12.0 m</output></div>
+          <input type="range" id="waveHeight" min="0" max="60" step="0.1" value="12"></div>
+        <div class="field"><div class="frow"><label for="waveSea">Sea state</label><output id="waveSeaVal">55%</output></div>
+          <input type="range" id="waveSea" min="0" max="1" step="0.01" value="0.55"></div>
+        <div class="field"><div class="frow"><label for="waveBody">Water body</label></div>
+          <select class="inp" id="waveBody" title="Wavelength bands: an ocean carries swell a lake never does, and a river neither">
+            <option value="ocean" selected>Ocean</option><option value="lake">Lake</option><option value="river">River</option>
+          </select></div>
         <div class="field"><div class="frow"><label for="waterScale">Wave scale</label><output id="waterScaleVal">1.00×</output></div>
           <input type="range" id="waterScale" min="0.25" max="3" step="0.01" value="1"></div>
         <div class="field"><div class="frow"><label for="waterSpeed">Animation speed</label><output id="waterSpeedVal">1.00×</output></div>
