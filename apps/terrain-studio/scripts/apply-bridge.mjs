@@ -47,7 +47,17 @@ if (i !== -1 && j < i) {
   process.exit(2)
 }
 
-const region = `${BEGIN}\n${block}\n${END}\n`
+// LINE ENDINGS ARE NOT CONTENT. src/legacy.js sits in the working tree as CRLF (`git ls-files
+// --eol` reports `i/lf w/crlf`) while src/testing/bridge-block.js is LF, and there is no
+// .gitattributes to reconcile them. Comparing the two raw made `current === region` impossible, so
+// `npm run bridge:verify` reported the region stale on a tree where it had just been applied — a
+// gate that is permanently red is as useless as one that never fails, and this one had gone unrun
+// long enough that nothing noticed. Compare normalised; WRITE in the file's own ending so the next
+// comparison is naturally equal and the file does not become half CRLF and half LF.
+const fileUsesCrlf = /\r\n/.test(legacy)
+const withFileEol = text => (fileUsesCrlf ? text.replace(/\r?\n/g, '\r\n') : text.replace(/\r\n/g, '\n'))
+const sameIgnoringEol = (a, b) => a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n')
+const region = withFileEol(`${BEGIN}\n${block}\n${END}\n`)
 const check = process.argv.includes('--check')
 
 if (i === -1) {
@@ -59,21 +69,34 @@ if (i === -1) {
   writeFileSync(legacyPath, legacy, 'utf8')
   console.log(`bridge: region CREATED in src/legacy.js (${block.split('\n').length} lines)`)
 } else {
-  const current = legacy.slice(i, j + END.length + 1)
-  if (current === region) {
-    // NOT an early exit. The is-last assertion below has to run on this path too: the region can be
-    // byte-identical and still be in the wrong place, because someone appended after it. That is
-    // not hypothetical - it happened the first time this script was used, when the service-worker
-    // registration was appended to the end of legacy.js and this branch reported "already current"
-    // and returned 0 without looking.
+  // `j + END.length + 1` assumed the line ending after END was ONE character. Under CRLF it kept
+  // the \r and dropped the \n, so `current` ended one byte short of `region` and no amount of
+  // newline normalisation could make them equal — which is why the region still read as stale
+  // immediately after a successful apply. Consume the whole terminator, however long it is.
+  let endOfRegion = j + END.length
+  if (legacy[endOfRegion] === '\r') endOfRegion++
+  if (legacy[endOfRegion] === '\n') endOfRegion++
+  const current = legacy.slice(i, endOfRegion)
+  if (sameIgnoringEol(current, region)) {
+    // Still NOT an early exit. The is-last assertion below has to run on this path too: the region
+    // can be byte-identical and still be in the wrong place, because someone appended after it.
+    // That is not hypothetical - it happened the first time this script was used, when the
+    // service-worker registration was appended to the end of legacy.js and this branch reported
+    // "already current" and returned 0 without looking.
+    //
+    // What it no longer does is FALL THROUGH TO THE WRITE. It used to: the if/else-if chain had no
+    // branch that skipped writeFileSync, so `bridge:apply` printed "already current" and then
+    // "REPLACED" in the same run, and `--check` would have rewritten a source file on its way to
+    // reporting success. A check that mutates what it is checking is not a check.
     console.log(`bridge: region already current (${block.split('\n').length} lines)`)
   } else if (check) {
     console.error('FAIL: the bridge region in src/legacy.js is stale. Run: npm run bridge:apply')
     process.exit(1)
+  } else {
+    legacy = legacy.slice(0, i) + region + legacy.slice(endOfRegion)
+    writeFileSync(legacyPath, legacy, 'utf8')
+    console.log(`bridge: region REPLACED in src/legacy.js (${block.split('\n').length} lines)`)
   }
-  legacy = legacy.slice(0, i) + region + legacy.slice(j + END.length + 1)
-  writeFileSync(legacyPath, legacy, 'utf8')
-  console.log(`bridge: region REPLACED in src/legacy.js (${block.split('\n').length} lines)`)
 }
 
 // The whole point is that the block ends up INSIDE the module and LAST. Assert both rather than
