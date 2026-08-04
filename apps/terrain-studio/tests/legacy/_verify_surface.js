@@ -7,7 +7,13 @@ const EXE = process.env.STUDIO_CHROME || (process.platform === 'win32'
   : '/opt/pw-browsers/chromium-1194/chrome-linux/chrome');
 const URL = process.env.STUDIO_URL || ('file://' + path.resolve(__dirname, '../../index.html'));
 const STYLES = ['roughen', 'distress', 'groundtexture', 'rocknoise', 'bulbous', 'pockmarks', 'contours', 'grid'];
-const VISUAL = process.argv.includes('--visual');
+// A visual mutation FORCES the capture on. flat-render and unfrozen-framebuffer are checked only
+// inside the --visual block; without it they rendered nothing and still exited 1, reporting a
+// violation never observed. The sweep never passes --visual, so both were dead in every automated
+// run. Same defect, same fix, as _verify_landforms.
+const VISUAL_MUTATIONS = ['flat-render', 'unfrozen-framebuffer'];
+const VISUAL = process.argv.includes('--visual')
+  || VISUAL_MUTATIONS.includes((process.argv.find(a => a.startsWith('--mutate=')) || '').slice(9));
 const SUMMARY = process.argv.includes('--summary');
 const flagValue = name => process.argv.find(argument => argument.startsWith(`--${name}=`))?.split('=')[1];
 const VISUAL_STYLE = flagValue('visual-style');
@@ -373,7 +379,10 @@ const EXPECTED = {
     && result.category === 'Surface / Geology' && result.geometry && result.quickCreate
     && result.expected.every(key => result.keys.includes(key)));
 
-  const visual = { runs: [], ok: true };
+  // Absence of evidence is failure: when a capture was requested, an EMPTY run set is red. This
+  // initialised to ok:true and stayed so whenever the capture block did not execute, which is how
+  // the 45-degree visual matrix was satisfied by capturing nothing in every automated run.
+  const visual = { runs: [], ok: !VISUAL };
   if (VISUAL) {
     const evidenceDir = path.resolve(__dirname, '../../.sweep-logs/MC-S03'); mkdirSync(evidenceDir, { recursive: true });
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -432,6 +441,19 @@ const EXPECTED = {
     && measured.styleDefault === 'roughen' && manifestOk && measured.copyHonest && lifecycle.ok && analytic.ok && ui.ok && visual.ok && !errors.length;
   console.log(`surface lifecycle ${JSON.stringify(lifecycle)}`);
   console.log(`surface registration registered=${measured.registered} styles=${measured.styles?.length || 0} manifest=${manifestOk ? 'pass' : 'fail'} latticeRuns=${analytic.runs.length} samples=${analytic.runs.reduce((sum, run) => sum + run.samples, 0)} mutationReached=${analytic.mutationReached}`);
+  // The gates, NAMED, in the shape scripts/gate.py scores — without a failed=[...] line the runner
+  // cannot tell a red-because-a-gate-broke from a red-for-any-other-reason.
+  const namedGates = { registration: measured.registered === true, manifest: manifestOk,
+    invalid: analytic.invalid.ok, runs: analytic.runs.every(run => run.ok),
+    scaleEstimators: analytic.scaleEstimators.ok, ui: ui.ok, lifecycle: lifecycle.ok, visual: visual.ok };
+  console.log(`surface failed=[${Object.entries(namedGates).filter(([, v]) => !v).map(([k]) => k).join(',')}] mutation=${analytic.mutation || 'none'}`);
+
+  // ASSERT mutationReached. `ok` is forced false under ANY mutation, so a mutated run exited 1
+  // whether or not the mutation broke anything — exit status carried no information about whether
+  // the control works. Now a mutated run that leaves every gate green says so, and gate.py reads it.
+  if (analytic.mutation && !analytic.mutationReached) {
+    console.error(`FAIL mutation ${analytic.mutation} was not detected — that control is vacuous`);
+  }
   if (analytic.mutation) console.log(`MUTATION ${analytic.mutation} violated ${analytic.violatedFormula}`);
   if (!SUMMARY) console.log(JSON.stringify({ lifecycle, measured, analytic, ui, visual, errors, ok }, null, 2));
   else if (VISUAL) console.log(`visual runs=${visual.runs.length} minTerrain=${Math.min(...visual.runs.map(run => run.terrainPixels))} minChanged=${Math.min(...visual.runs.map(run => run.changedFraction))} fov=${Math.min(...visual.runs.map(run => run.fovDeg))}`);
