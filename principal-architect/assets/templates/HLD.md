@@ -119,6 +119,12 @@ credible threat; sign off by setting `security-reviewed: true`.
 > STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation disclosure ·
 > **D**enial of service · **E**levation of privilege. Treat trust boundaries (where data
 > crosses an element) as the priority. A significant residual risk becomes an ADR.
+> For managed/cloud services, split every mitigation per the **shared responsibility
+> model** — **ISO/IEC 27017** allocates each control between cloud provider and customer,
+> and the provider boundary is itself a trust boundary. Accept the provider's
+> certifications (ISO/IEC 27001/27017/27018, CSA STAR) as evidence for their side —
+> verify certificate scope covers the services you use; your side still appears in the
+> table with an owner.
 
 ### Privacy & data protection (DPIA)
 **Mandatory where the system processes personal or otherwise regulated data** — else state

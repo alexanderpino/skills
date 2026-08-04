@@ -83,7 +83,12 @@ an integration like any other.
 
 ## 6. Technology selections
 The concrete platforms/products chosen and **why** (this is where vendor/product choice
-lives, unlike enterprise Phase D). Each significant selection is an ADR.
+lives, unlike enterprise Phase D). Each significant selection is an ADR. For cloud
+services, name the **service category** in ISO/IEC 22123 terms (IaaS/PaaS/SaaS —
+plus FaaS/serverless): managed-vs-self-hosted is the build-vs-buy axis, so the ADR's
+consequences record **lock-in and data-egress cost**, and the provider's SLA
+(structured per **ISO/IEC 19086**) becomes an input to the solution SLOs (§10) — a
+99.9% dependency caps what you can promise above it.
 
 | Selection | Choice | Alternatives considered | Rationale | ADR |
 |---|---|---|---|---|
@@ -104,6 +109,11 @@ and trust boundaries between systems. Use **STRIDE** per element/flow and map to
 
 > Cross-system flows are the highest-risk surface; model A03 Software Supply Chain Failures
 > for third-party/SaaS dependencies. A significant residual risk becomes an ADR.
+> For every managed/cloud service in the solution, split mitigations per the **shared
+> responsibility model** (**ISO/IEC 27017** allocates controls between provider and
+> customer; the provider boundary is a trust boundary). Provider certifications
+> (ISO/IEC 27001/27017/27018, CSA STAR) are evidence for their side — check the
+> certificate's scope; the customer-side controls stay in the table with an owner.
 
 ### Privacy & data protection (DPIA)
 **Mandatory where personal/regulated data crosses the solution** (often across systems and
