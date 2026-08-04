@@ -120,7 +120,7 @@ let satComposite=0;                             // 1 when a SatMap layer stack i
 function satDrawerOpen(){const d=document.getElementById("satgen");return !!(d&&d.classList.contains("open"));}
 let sun={az:0.55,el:0.85};                     // sun direction (radians); drives shading + cast shadows
 let renderLook={exposure:-0.15,haze:0.28};     // scene-linear look development; exposure is in stops
-let waterLook={pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55,waveDisplacement:1,amplitudeM:12,seaState:.55,bodyKind:"ocean"};
+let waterLook={style:"realistic",bandSteps:5,pattern:"wind",strength:.55,scale:1,speed:1,refraction:.55,waveDisplacement:1,amplitudeM:12,seaState:.55,bodyKind:"ocean"};
 // waveDisplacement is SEPARATE from `strength` on purpose. `strength` drives the legacy ripple
 // SHADING (uRipple), so wiring the geometric displacement to it too made the two impossible to
 // tell apart: a gate that varied `strength` and saw 99% of pixels change was reading the ripple,
@@ -5824,11 +5824,11 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
     precision highp float;in float vDepth;in float vIceSnow;in float vIce;in vec3 vW;in vec2 vXZ;in vec3 vWN;in vec3 vSnowN;in vec3 vWaveN;out vec4 frag;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
-    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform float uToon;uniform float uBandSteps;`
   :`precision highp float;varying float vDepth;varying float vIceSnow;varying float vIce;varying vec3 vW;varying vec2 vXZ;varying vec3 vWN;varying vec3 vSnowN;
     uniform vec3 uSun;uniform vec3 uCam;uniform float uTime;uniform float uH;uniform float uMppK;uniform float uTerrainHeight;uniform float uShoalRefM;
     uniform float uTerrainHeight,uSeaTemp,uLapseRate,uScale;
-    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;`)+`
+    uniform float uRipple,uRippleScale,uRippleSpeed,uShoreSmooth,uFoam;uniform int uPattern;uniform float uToon;uniform float uBandSteps;`)+`
     ${(waterShaderSources.forwardDetail=detailGlsl('waterDetail')).split(/\r?\n/).map(l => '    ' + l).join(String.fromCharCode(10))}
     void main(){
       float shoreAA=.0008+uShoreSmooth*.0018;
@@ -5865,17 +5865,59 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // different ways depending on which path drew it.
       float fres=0.02+0.98*pow(1.0-max(dot(N,V),0.0),5.0);
       float dn=clamp(max(vDepth,0.)/(uH*0.35),0.0,1.0);      // depth attenuation: shallow teal -> deep blue
-      vec3 wc=mix(vec3(0.28,0.58,0.62),vec3(0.03,0.12,0.30),dn);
+      // STYLISED GRADE. One shader path, one set of signals; the look is a transfer function on
+      // them, not a second program. Quantise the DEPTH, not the colour: posterising after the mix
+      // lands on the RGB lattice, off the gradient line, and spaces the bands unevenly. Quantising
+      // first gives exactly uBandSteps colours, all on the gradient. Band centres (+0.5) rather
+      // than floors, so the top band is not degenerate.
+      //
+      // This depth is GEOMETRIC vertical depth, not a screen-space depth difference, which is what
+      // makes banding viable here at all: a screen-space difference is the ray's path length
+      // through water, so the band boundaries would slide across the surface as the camera moved.
+      float dnq=dn;
+      if(uToon>0.5){
+        // Antialias on the PRE-quantised depth. fwidth of the posterised value is zero inside a
+        // band and a full step at the seam, which draws a bright line instead of a soft edge.
+        float bw=fwidth(dn)*uBandSteps;
+        float sc=dn*uBandSteps;
+        dnq=(floor(sc)+smoothstep(0.5-bw,0.5+bw,fract(sc))+0.5)/uBandSteps;
+      }
+      vec3 wc=mix(vec3(0.28,0.58,0.62),vec3(0.03,0.12,0.30),clamp(dnq,0.0,1.0));
       vec3 Hh=normalize(V+S);float spec=pow(max(dot(N,Hh),0.0),110.0);
+      // Cel specular: a threshold with a narrow AA band, lerped in by hardness so the same path
+      // serves both looks. The soft lobe is what realistic water wants; the hard one is the toon
+      // highlight that reads as a shape rather than a sheen.
+      spec=mix(spec,smoothstep(0.005,0.011,spec),uToon);
       float pat=clamp(.5+(wave.z-.5)*waveAmt*1.6,0.,1.);
       vec3 col=(mix(wc,vec3(0.55,0.68,0.82),fres*0.55)+spec*0.8)*mix(.93,1.07,pat);
       float crest=smoothstep(.68,.92,wave.z)*waveAmt;
       col+=vec3(.035,.065,.085)*crest*(.35+.65*fres);      // restrained bright wavelets make the pattern legible
       float foam=(1.0-smoothstep(0.0,.022+uShoreSmooth*.006,max(vDepth,0.)))*uFoam*coverage;
+      // The shoreline edge is the load-bearing feature of the stylised look -- it is the one
+      // thing BotW spends a whole extra screen-space pass on. Hardened here rather than added
+      // as a second effect: same foam signal, steeper transfer.
+      foam=mix(foam,smoothstep(0.35,0.5,foam),uToon);
       col=mix(col,vec3(0.9,0.95,1.0),foam*(1.0-ice));
       float frost=.5+.5*sin(vXZ.x*91.0+sin(vXZ.y*47.0)*2.0);
       vec3 iceCol=mix(vec3(.38,.55,.68),vec3(.63,.76,.84),.35+.25*frost);
       col=mix(col,iceCol,ice);
+      // HUE-PRESERVING POSTERISE. Quantising the depth ramp alone did not read as cartoon and the
+      // gate said so: flatness rose only 24%, because Fresnel, specular and the wave normal still
+      // vary continuously WITHIN each depth band, so no region is actually flat. Cartoon water is
+      // flat regions with hard edges, which means the composed shading has to be quantised too.
+      //
+      // Quantise the LUMINANCE and rescale, rather than each channel independently: per-channel
+      // posterisation drags colours onto the RGB lattice and shifts hue band by band. This keeps
+      // the hue and steps only the brightness, which is what cel shading actually is.
+      if(uToon>0.5){
+        float lum=max(max(col.r,col.g),col.b);
+        if(lum>1e-4){
+          float sc=clamp(lum,0.0,0.999)*uBandSteps;
+          float bw=max(fwidth(lum)*uBandSteps,1e-5);
+          float q=(floor(sc)+smoothstep(0.5-bw,0.5+bw,fract(sc))+0.5)/uBandSteps;
+          col*=q/lum;
+        }
+      }
       col=mix(col,vec3(.91,.95,.98),snowCov);
       float alpha=mix(clamp(mix(0.45,0.9,dn)+fres*0.22+foam*0.35,0.0,1.0),.98,max(ice,snowCov))*coverage;`
     +(g2?`frag=vec4(col,alpha);}`:`gl_FragColor=vec4(col,alpha);}`);
@@ -5943,7 +5985,7 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;uniform float uMppK;uniform float uScale;
       uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze,uRowScale,uROWS,uHpx,uZScale;
       uniform float uTerrainHeight,uSeaTemp,uLapseRate,uSnowfall,uSnowMeltDays,uSnowMeltRate,uHasSnow;
-      uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;
+      uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;uniform float uToon;uniform float uBandSteps;
       const float PI=3.14159265;
       const vec3 SUNCOL=vec3(1.0,0.92,0.78);                         // warm daylight, scene-linear
       vec3 linearToSrgb(vec3 c){c=max(c,vec3(0.0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
@@ -6118,8 +6160,29 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
                          texture(gColor,refrUv).g,
                          texture(gColor,clamp(refrUv-refrOff*.02,vec2(.002),vec2(.998))).b);
         vec3 bed=shadeSurface(bedAlb,Nt,Pw,0.82,sh,ao);            // light the rough lakebed (albedo was unlit in the g-buffer)
-        vec3 sigma=vec3(2.6,1.10,.45);                              // Beer–Lambert: red dies first, blue travels furthest
+        // Beer-Lambert. Pure water's real absorption (Pope & Fry 1997) is 0.340 / 0.0565 / 0.0092
+        // per metre -- a red:blue ratio of 37:1. The old sigma was 13 : 5.5 : 2.25, only 5.8:1, far
+        // less spectrally selective than water actually is, which is why deep water read grey-blue
+        // instead of blue. Scaled to keep the same overall extinction depth, with the real ratio.
+        vec3 sigma=vec3(3.40,0.565,0.092);
         vec3 trans=exp(-sigma*thick*5.0);
+        // The stylised grade quantises the DEPTH SIGNAL, not the composed colour, for the same
+        // reason as the forward pass: posterising the colour lands off the gradient. Here the depth
+        // signal is the transmittance itself, and thickness is a geometric column, not a
+        // screen-space depth difference, so the bands hold still as the camera moves.
+        if(uToon>0.5){
+          // BAND A NORMALISED QUANTITY. Quantising the raw thickness put almost every fragment in
+          // one band: thick is a world-space column, typically far below 1, so clamping it to
+          // 0..1 and cutting that into five left the whole surface in the first slice. Mapping
+          // through 1-exp(-k*thick) first spreads the visible range over the full 0..1 interval,
+          // and inverting it afterwards keeps Beer-Lambert exact rather than approximating it.
+          float tn=1.0-exp(-thick*6.0);
+          float bw=max(fwidth(tn),1e-5)*uBandSteps;
+          float sc=clamp(tn,0.0,0.999)*uBandSteps;
+          float tnq=(floor(sc)+smoothstep(0.5-bw,0.5+bw,fract(sc))+0.5)/uBandSteps;
+          float thickq=-log(max(1.0-clamp(tnq,0.0,0.999),1e-4))/6.0;
+          trans=exp(-sigma*thickq*5.0);
+        }
         vec3 scatter=vec3(.018,.080,.140)*(1.0-trans);
         float pat=clamp(.5+(wave.z-.5)*waveAmt*1.6,0.,1.);
         vec3 wc=(bed*trans+scatter)*mix(.93,1.07,pat);              // subtle visible pattern follows the normal motion
@@ -6128,9 +6191,28 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         float fres=.02+.98*pow(1.0-max(dot(N,Vd),0.0),5.0);         // dielectric water F0 ≈ 0.02
         vec3 refl=skyCol(reflect(-Vd,N));                           // Fresnel sky reflection
         vec3 Hh=normalize(Vd+S);float spec=pow(max(dot(N,Hh),0.),240.)*0.95*surfaceSh;
+        spec=mix(spec,smoothstep(0.005,0.011,spec)*surfaceSh,uToon);
         float edgeW=max(shoreAA*5.0,.0015);
         float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov*(1.0-ice);
+        foam=mix(foam,smoothstep(0.35,0.5,foam),uToon);
         vec3 col=mix(wc,refl,fres)+spec*SUNCOL; col=mix(col,vec3(.78,.86,.92),foam);
+        // HUE-PRESERVING POSTERISE. Quantising the depth ramp alone did not read as cartoon and the
+          // gate said so: flatness rose only 24%, because Fresnel, specular and the wave normal still
+          // vary continuously WITHIN each depth band, so no region is actually flat. Cartoon water is
+          // flat regions with hard edges, which means the composed shading has to be quantised too.
+          //
+          // Quantise the LUMINANCE and rescale, rather than each channel independently: per-channel
+          // posterisation drags colours onto the RGB lattice and shifts hue band by band. This keeps
+          // the hue and steps only the brightness, which is what cel shading actually is.
+          if(uToon>0.5){
+          float lum=max(max(col.r,col.g),col.b);
+          if(lum>1e-4){
+            float sc=clamp(lum,0.0,0.999)*uBandSteps;
+            float bw=max(fwidth(lum)*uBandSteps,1e-5);
+            float q=(floor(sc)+smoothstep(0.5-bw,0.5+bw,fract(sc))+0.5)/uBandSteps;
+            col*=q/lum;
+          }
+        }
         col*=mix(0.65,1.0,surfaceSh);                               // use the fluid/ice surface, not the submerged bed, for shadowing
         float frost=vnoise(wuv*83.0)+.5*vnoise(wuv*211.0+19.0);
         float cracks=1.0-smoothstep(.015,.055,abs(fract((wuv.x+wuv.y*.37)*37.0+frost*.18)-.5));
@@ -7031,6 +7113,7 @@ function renderGL(){
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
     gl.uniform1f(u(compProg,"uRipple"),waterRipple);gl.uniform1f(u(compProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(compProg,"uRippleSpeed"),waterRippleSpeed);
     gl.uniform1f(u(compProg,"uRefraction"),waterRefraction);
+    gl.uniform1f(u(compProg,"uToon"),waterLook.style==="toon"?1:0);gl.uniform1f(u(compProg,"uBandSteps"),Math.max(2,waterLook.bandSteps||5));
     gl.uniform1f(u(compProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(compProg,"uFoam"),waterFoam);gl.uniform1i(u(compProg,"uPattern"),waterPattern);
     gl.uniform1f(u(compProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(compProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(compProg,"uLapseRate"),terrainDef.lapseRate);
     gl.uniform1f(u(compProg,"uSnowfall"),snowfall);gl.uniform1f(u(compProg,"uSnowMeltDays"),snowMeltDays);gl.uniform1f(u(compProg,"uSnowMeltRate"),snowMeltRate);gl.uniform1f(u(compProg,"uHasSnow"),snowEffect?1:0);
@@ -7065,6 +7148,7 @@ function renderGL(){
       gl.uniform1f(u(waterProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
       gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
+      gl.uniform1f(u(waterProg,"uToon"),waterLook.style==="toon"?1:0);gl.uniform1f(u(waterProg,"uBandSteps"),Math.max(2,waterLook.bandSteps||5));
       gl.uniform1f(u(waterProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(waterProg,"uFoam"),waterFoam);gl.uniform1i(u(waterProg,"uPattern"),waterPattern);
       gl.uniform3f(u(waterProg,"uSun"),0.5,0.8,0.35);gl.uniform3f(u(waterProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterProg,"uMppK"),mppPerUnitDistance());gl.uniform1f(u(waterProg,"uShoalRefM"),shoalReferenceM());
       bindAttr(waterProg,"axz",2,buffers.gridXZ);bindAttr(waterProg,"ah",1,buffers.hgt);
@@ -7891,6 +7975,11 @@ function rebuildWaterPrograms(){
 if($("#waveHeight"))$("#waveHeight").oninput=e=>{waterLook.amplitudeM=parseFloat(e.target.value);syncWaterLookValues();};
 if($("#waveSea"))$("#waveSea").oninput=e=>{waterLook.seaState=parseFloat(e.target.value);syncWaterLookValues();rebuildWaterPrograms();};
 if($("#waveBody"))$("#waveBody").onchange=e=>{waterLook.bodyKind=e.target.value;rebuildWaterPrograms();};
+// The look is a UNIFORM, not a recompile: it grades signals the shader already computes, so
+// switching it costs one uniform write rather than rebuilding both water programs.
+if($("#waterStyle"))$("#waterStyle").onchange=e=>{waterLook.style=e.target.value;requestRender();};
+if($("#waterBands"))$("#waterBands").oninput=e=>{waterLook.bandSteps=parseInt(e.target.value,10);
+  const o=$("#waterBandsVal");if(o)o.textContent=e.target.value;requestRender();};
 syncLookValues();syncWaterLookValues();
 function typing(){const t=document.activeElement&&document.activeElement.tagName;return t==="INPUT"||t==="SELECT"||t==="TEXTAREA";}
 window.addEventListener("keydown",e=>{

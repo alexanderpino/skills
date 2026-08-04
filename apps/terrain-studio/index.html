@@ -880,6 +880,12 @@ select.sg-btn{appearance:auto}
           <input type="range" id="waveHeight" min="0" max="60" step="0.1" value="12"></div>
         <div class="field"><div class="frow"><label for="waveSea">Sea state</label><output id="waveSeaVal">55%</output></div>
           <input type="range" id="waveSea" min="0" max="1" step="0.01" value="0.55"></div>
+        <div class="field"><div class="frow"><label for="waterStyle">Look</label></div>
+          <select class="inp" id="waterStyle" title="Realistic shades continuously; stylised quantises depth into bands and hardens the shoreline and highlights">
+            <option value="realistic" selected>Realistic</option><option value="toon">Stylised</option>
+          </select></div>
+        <div class="field"><div class="frow"><label for="waterBands">Depth bands</label><output id="waterBandsVal">5</output></div>
+          <input type="range" id="waterBands" min="2" max="12" step="1" value="5"></div>
         <div class="field"><div class="frow"><label for="waveBody">Water body</label></div>
           <select class="inp" id="waveBody" title="Wavelength bands: an ocean carries swell a lake never does, and a river neither">
             <option value="ocean" selected>Ocean</option><option value="lake">Lake</option><option value="river">River</option>
