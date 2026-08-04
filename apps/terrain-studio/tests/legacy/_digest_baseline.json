@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 94,
+  "nodeCount": 97,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -50,6 +50,7 @@
     "import": "5694eef6:d7f47aab",
     "invert": "70442115:a1cf9bde",
     "island": "60b1fd6e:1a4d7696",
+    "lake": "263bdef7:bcf4a390|port_waterSurface=ffaffd84:7c0028bc|port_waterDepth=d9742341:8fa7cccf|port_shoreDistance=abcc9798:4f1f5c23|port_basinId=add2d180:b39ad200|port_basins=9e49207c:123096|port_spills=e91de1b3:42846",
     "layout": "d8454784:2cf20779",
     "levels": "263bdef7:bcf4a390|ex=69ad9c27:988ef7cb",
     "match": "6c2e3a11:36c65a07",
@@ -63,6 +64,7 @@
     "perlin": "5601956f:473ffde7",
     "regolith": "efe6c64e:2a06eda2",
     "ridged": "9cb9f837:843dbcb0",
+    "rivers": "263bdef7:bcf4a390|port_channelMask=2bb7f534:16744f98|port_channelWidth=4de0ed61:c378452b|port_waterDepth=25fbbe73:fc6022a4|port_waterSurface=4c379def:23ea8ee4",
     "route": "263bdef7:bcf4a390",
     "rugged": "58cd1479:cf0cafdb",
     "s_sandDepth": "263bdef7:bcf4a390",
@@ -95,6 +97,7 @@
     "volcano": "a4f31322:d197ffb3",
     "warp": "3ad3d1a6:ef19167f",
     "water": "263bdef7:bcf4a390|filled=123042f:c1bd235a|accum=8d06cd91:933f145a",
+    "water_conflict": "0:0|port_conflicts=741638a5:2",
     "weathering": "263bdef7:bcf4a390|color=655dd8f:845b97df",
     "worley": "6f0e0983:ee0d1128"
   },

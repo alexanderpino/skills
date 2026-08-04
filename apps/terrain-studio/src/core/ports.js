@@ -81,6 +81,22 @@ export const SEMANTICS = Object.freeze({
   // Horizontal by construction, carried as a 3-vector with y zero so no consumer mistakes it for a
   // 3-D velocity. Distinct from `flow`, which is the log-compressed accumulation picture.
   flowDirection: { kind: 'vectorRaster', defaultUnit: 'none', continuous: true },
+  // --- Sprint 4, standing water -----------------------------------------------------------------
+  // The elevation of a water SURFACE, in metres. Distinct from height and from routingSurface: a
+  // lake surface is flat across the whole lake at its spill elevation, which is exactly the property
+  // that makes it not a terrain field and not a conditioned copy of one.
+  waterSurface: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  // Thickness of the water column, zero on dry land. Metres, so it can be swum in and reasoned about
+  // rather than being a 0..1 "wetness".
+  waterDepth: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  // SIGNED distance to the shoreline: positive offshore, zero on the shoreline, negative inland.
+  // The sign is the point — an unsigned distance cannot tell a beach from a headland — so this must
+  // never be constrained to a unit range.
+  shoreDistance: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
+  // Channel width in metres, from hydraulic geometry (width scales as a power of discharge). Its own
+  // semantic rather than a generic length: a width is a property of a channel at a point, and wiring
+  // one into a height or a depth port is the kind of mistake the type system exists to refuse.
+  channelWidth: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
   temperature: { kind: 'scalarRaster', defaultUnit: 'degC', continuous: true },
   sunVisibility: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
   solarExposure: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },

@@ -39,6 +39,31 @@ const MUTATIONS = [
   'ignore-flow-opposition',   // a guide drawn backwards up its own river reports as aligned
   'plugin-emits-height',      // guardrail 1: the water-family node grows a terrain-height output
   'plugin-drops-deficit',     // the node evaluates cleanly and stamps an all-zero delta raster
+  // The nine below arm the half of the acceptance wording the first seven never touched. Before
+  // they existed, 25 of this file's assertions had never been observed to fail, and the entire
+  // conditioning-branch clause -- "accepting the offer adds a visible, undoable branch; it never
+  // turns on a hidden carve" -- rested on assertions no mutation could turn red. One of them,
+  // flow-z-from-y-slot, was a genuine escape: the suite stayed green under it.
+  'offer-hidden-carve',       // the branch that writes terrain is offered as if it were free
+  'offer-on-clean-guide',     // a guide that drains is still offered a conditioning branch
+  'branch-not-undoable',      // the offered branch is marked as not undoable
+  'ratchet-ignores-terrain',  // the target ignores the ground, so a draining guide reports a deficit
+  'sink-is-a-direction',      // a sink's (0,0) is read as a direction that agrees with the guide
+  'missing-flow-reads-aligned', // no flow field wired is reported as flow that agrees
+  'hex-row-offset-dropped',   // odd hex rows sheared half a column
+  'height-scale-defaults-to-1', // a vertical scale nobody stated is treated as 1 and still called m
+  'flow-z-from-y-slot',       // the interleaved raster's z is read from the y slot, which is 0
+  'text-guide-axes-swapped',  // the authored text guide's x and z are read the wrong way round
+  // FALSE POSITIVES and REFUSALS. `ratchet-ignores-terrain` turned out NOT to reach the plan's
+  // "a valid downhill guide emits zero conflict" clause -- letting the target run away from the
+  // ground drives the deficit NEGATIVE, and the aggregates floor at zero, so the clean guide still
+  // reads clean. It took a mutation that subtracts the allowance unconditionally to break it. The
+  // four after it arm the refusals, each of which turns a malformed input into a clean report.
+  'always-subtract-epsilon',  // the allowance is charged even where the ground already provides it
+  'flow-supplied-always-true', // a report with no flow field claims one was wired
+  'unknown-branch-ignored',   // an unknown branch yields no offer instead of an error
+  'spacing-cap-removed',      // guide spacing coarser than half a cell is accepted
+  'zero-length-guide-accepted', // a guide with no length is reported as a guide with no conflict
 ]
 const PATCHES = {
   // Three taps, centred, ends held. This is exactly the "remove sampling noise" filter someone adds
@@ -71,6 +96,69 @@ const PATCHES = {
     '      alignment[i] = (tx / tl) * f.x + (tz / tl) * f.z',
     '      alignment[i] = 1',
   ]],
+  // --- the conditioning-branch half of the acceptance gate ------------------------------------
+  // The story's own sentence: the offer "never turns on a hidden carve". The way that goes wrong is
+  // not a carve appearing in this node -- guardrail 1 covers that -- it is the ONE branch that does
+  // write terrain being handed to the author labelled as free.
+  'offer-hidden-carve': [[
+    "  hydrofix: { nodeType: 'hydrofix', params: {}, writesHeight: true,",
+    "  hydrofix: { nodeType: 'hydrofix', params: {}, writesHeight: false,",
+  ]],
+  // An offer on a guide that already drains. Harmless-looking, and it is how an author is trained to
+  // accept conditioning without reading it -- which is the mechanism by which the carve stops being
+  // an explicit choice.
+  'offer-on-clean-guide': [['  if (!report.hasConflict) return null', '  if (false) return null']],
+  'branch-not-undoable': [['    undoable: true,', '    undoable: false,']],
+  // FALSE POSITIVES, the other half of "a valid downhill guide emits zero conflict". Dropping the
+  // Math.min lets the ratchet run away from the ground it is supposed to track, so a guide that
+  // drains perfectly well is reported as impossible. Every mutation above understates a conflict;
+  // this is the only one that invents one.
+  'ratchet-ignores-terrain': [[
+    '    target[i] = Math.min(elevation[i], target[i - 1] - step)',
+    '    target[i] = target[i - 1] - step',
+  ]],
+  // `mfdWeights` gives a sink (0,0). Read as a direction it has zero dot product with everything,
+  // which scores as "not opposed" — a cell with nowhere to send water reported as agreeing.
+  'sink-is-a-direction': [[
+    '  if (!(len > 0)) return { x: 0, z: 0, known: false, index: i }',
+    '  if (!(len > 0)) return { x: 0, z: 0, known: true, index: i }',
+  ]],
+  'missing-flow-reads-aligned': [[
+    '      const f = sampleFlowWorld(flow, w, hgt, g.x[i], g.z[i], { cellSizeM, hex })\n      if (!f.known) continue',
+    '      const f = sampleFlowWorld(flow, w, hgt, g.x[i], g.z[i], { cellSizeM, hex })\n'
+    + '      if (!f.known) { flowKnown[i] = 1; alignment[i] = 1; opposition[i] = 0; continue }',
+  ]],
+  // The scalar sampler's odd-row offset. Four-space indent: the flow sampler carries the same line
+  // at two spaces, and this anchor must not reach it.
+  'hex-row-offset-dropped': [['    const off = hex && (r & 1) ? 0.5 : 0', '    const off = 0']],
+  // The dimensionless report that still reads as metres — the S4.2 mm->m defect class.
+  'height-scale-defaults-to-1': [
+    ['    cellSizeM, heightScaleM, hex = false, flow = null,', '    cellSizeM, heightScaleM = 1, hex = false, flow = null,'],
+    ['  if (!Number.isFinite(heightScaleM) || heightScaleM <= 0) {', '  if (false) {'],
+  ],
+  'flow-z-from-y-slot': [['  const zi = components >= 3 ? 2 : 1', '  const zi = 1']],
+  // The descent allowance charged UNCONDITIONALLY instead of only where the ground fails to supply
+  // it. One misplaced bracket, and it is the only mutation in this file that makes a guide which
+  // drains perfectly well report a conflict at every single sample — the plan's "a valid downhill
+  // guide emits zero conflict" read from the other side.
+  'always-subtract-epsilon': [[
+    '    target[i] = Math.min(elevation[i], target[i - 1] - step)',
+    '    target[i] = Math.min(elevation[i], target[i - 1]) - step',
+  ]],
+  // "flowSupplied:false is a different claim from the guide agreeing with the flow" — the node's own
+  // comment. This makes them the same claim, which is how an unrouted graph starts reading clean.
+  'flow-supplied-always-true': [[
+    '    alignment, opposition, flowKnown, flowSupplied,',
+    '    alignment, opposition, flowKnown, flowSupplied: true,',
+  ]],
+  // The three refusals below all fail the same way: a malformed input becomes a CLEAN REPORT rather
+  // than an error, which is this project's "absence of evidence dressed up as a pass".
+  'unknown-branch-ignored': [['  if (!branch) throw new Error(', '  if (!branch) return null; if (false) throw new Error(']],
+  'spacing-cap-removed': [[
+    '  if (!Number.isFinite(spacingCells) || spacingCells <= 0 || spacingCells > GUIDE_SPACING_CELLS) {',
+    '  if (false) {',
+  ]],
+  'zero-length-guide-accepted': [['  if (!(total > 0)) throw new Error(', '  if (false) throw new Error(']],
 }
 // Mutations that patch the PLUGIN rather than the core module. Both are sprint-level failures the
 // core arithmetic cannot see: a water-family node that grows a height output, and a node that
@@ -85,6 +173,12 @@ const PLUGIN_PATCHES = {
       "    const values = new Map([['conditioningDelta', delta], ['height', src]])"],
   ],
   'plugin-drops-deficit': [['        if (!(rep.deficit[i] > 0)) continue', '        if (rep.deficit[i] >= 0) continue']],
+  // The authored-text path is the only guide source that exists until S4.3 lands, and x/z is exactly
+  // the pair a parser gets backwards. Nothing else in this file re-derives the text guide.
+  'text-guide-axes-swapped': [[
+    'pts.push({ x: m[0], z: m[1] })',
+    'pts.push({ x: m[1], z: m[0] })',
+  ]],
 }
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -232,6 +326,33 @@ const patched = (file, patches) => {
   check('hex sampling honours the odd-row half-column offset', hexSamples > 3000 && hexWorst < 1e-9,
     { hexSamples, hexWorst })
 
+  // The graph-side bridge, asserted DIRECTLY rather than through a fixture. A vectorRaster port
+  // arrives interleaved [x, y, z] and the y slot is zero by construction for flowDirection, so
+  // reading z out of slot 1 silently flattens the whole flow field onto the x axis.
+  //
+  // It has to be asserted here because no fixture in this file can catch it. Measured: with
+  // `zi = 1` the unpack disagrees with the correct one on 124 of the ramp's 4096 cells, and NOT ONE
+  // of those cells is sampled by any guide in this oracle — every guide runs along a row where
+  // dirZ is already zero. The whole suite stayed green under that mutation until this check existed.
+  // 0.25*i and 1-0.125*i are dyadic, so the round trip through Float32 is exact and the bound is 0.
+  const vecN = 8
+  const vecRaster = new Float32Array(vecN * 3)
+  for (let i = 0; i < vecN; i++) {
+    vecRaster[i * 3] = 0.25 * i; vecRaster[i * 3 + 1] = 0; vecRaster[i * 3 + 2] = 1 - 0.125 * i
+  }
+  const unpacked = M.flowFromVectorRaster(vecRaster, vecN, 3)
+  let unpackWorst = 0
+  for (let i = 0; i < vecN; i++) {
+    unpackWorst = Math.max(unpackWorst, Math.abs(unpacked.dirX[i] - 0.25 * i),
+      Math.abs(unpacked.dirZ[i] - (1 - 0.125 * i)))
+  }
+  // A raster shorter than the declared sample count is a wiring error, not a field of zeros.
+  let threwShortRaster = false
+  try { M.flowFromVectorRaster(new Float32Array(9), vecN, 3) } catch (_) { threwShortRaster = true }
+  check('the interleaved flow raster unpacks x from slot 0 and z from slot 2',
+    unpackWorst === 0 && unpacked.dirZ[0] === 1 && unpacked.dirX[vecN - 1] === 1.75 && threwShortRaster,
+    { unpackWorst, dirZ0: unpacked.dirZ[0], dirXlast: unpacked.dirX[vecN - 1], threwShortRaster })
+
   // ==============================================================================================
   // PLANE — a guide drawn downhill, and the same guide drawn backwards
   // ==============================================================================================
@@ -359,8 +480,10 @@ const patched = (file, patches) => {
   check('every sample on the climb matches k*(rise+eps)', rampRel < 1e-10, { worstRelErr: rampRel })
 
   // CLOSED FORM: past the crest the deficit falls by (s - eps) per step and first reaches zero at
-  // ceil(peak/(s-eps)). Measured 8.20, so 9 — not near an integer, which is why the index is
-  // assertable rather than a coin toss.
+  // ceil(peak/(s-eps)). Measured 0.031561279296875 / 0.0038867950439453124 = 8.1201, so 9 — not
+  // near an integer, which is why the index is assertable rather than a coin toss. (The figure
+  // 8.20 stood here before and was never the measured ratio; the conclusion was right and the
+  // number quoted for it was not.)
   const decayPerStep = S_CELL * 0.5 - epsRamp * 0.5
   const closedFirstZero = Math.ceil(rampPeak / decayPerStep)
   let firstZero = -1

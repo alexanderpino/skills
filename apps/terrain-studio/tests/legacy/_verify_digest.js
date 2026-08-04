@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 94;   // 92 + S4.1 Depression Policy and S4.2 Physical Flow
+const REQUIRED_NODE_COUNT = 97;   // 94 + S4.4 Lake, S4.5 Rivers, S4.6 Water Conflict
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -333,6 +333,11 @@ function installHarness(cfg) {
     // fewer slots than the node declares, and an unexercised port is an unexercised code path.
     depression: ['A'],
     flow_physical: ['A','B'],
+    // Sprint 4 standing water. Every slot the node declares is wired: the digest warns when a recipe
+    // covers fewer, and an unexercised port is an unexercised code path.
+    lake: ['A'],
+    rivers: ['A','B'],
+    water_conflict: ['A','B','C'],
     route: ['A'], chokepoint: ['A'], edge: ['M'],
     switch: ['A','B','C'], gate: ['A'],
     mathnode: ['A','B','C'],
@@ -500,6 +505,23 @@ function installHarness(cfg) {
     }
 
     const head = digest(primary);
+// Canonical JSON for a feature list: keys sorted, numbers rounded to a fixed precision so a
+// float that differs in its last bit between runs does not read as a behaviour change. Ordering of
+// the list itself is preserved deliberately — for a featureSet whose ids are join keys, the order
+// IS part of the contract.
+function stableJson(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableJson).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableJson(v[k])).join(',') + '}';
+  }
+  if (typeof v === 'number') return Number.isFinite(v) ? v.toPrecision(9) : String(v);
+  return JSON.stringify(v);
+}
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0') + ':' + String(str.length);
+}
     const parts = [head];
     const diag = { ms: Math.round(r.ms), primary: stats(primary), aux: {},
       identity: !!(r.slot0 && digest(r.slot0) === head) };
@@ -507,7 +529,12 @@ function installHarness(cfg) {
     // Non-primary declared outputs, folded under their port id. A vectorRaster is 3 interleaved
     // components per sample, so its length is 3*RES*RES and the fold covers every component.
     for (const [portId, value] of (nd._digestPorts || [])) {
-      const d = digest(value);
+      // A featureSet is a list of records, not a raster, so the numeric fold cannot read it and
+      // reported INVALID(Array) — which blocked the whole sweep from being blessed and, worse, meant
+      // the CONTENTS of every feature list went unhashed. The lake node's basin records were already
+      // found shipping seven unconstrained fields; leaving their port unhashed here is the same
+      // hole one layer down. Hashing the canonical JSON covers every field and every ordering.
+      const d = Array.isArray(value) ? fnv1a(stableJson(value)) : digest(value);
       if (d === null) {
         parts.push('port_' + portId + '=INVALID(' + (value == null ? String(value)
           : (value.constructor && value.constructor.name) || typeof value) + ')');

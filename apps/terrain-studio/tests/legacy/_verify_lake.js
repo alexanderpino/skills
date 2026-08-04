@@ -21,10 +21,12 @@
 // Pure-module: it imports src/core/lakes.js under plain node and checks the physics in double
 // precision. No browser, no legacy.js, no framebuffer to read back as zeros.
 //
-// The plugin's PORT BLOCK is checked too, statically, because three of the semantics it declares are
-// not in ports.js yet (that file is owned elsewhere and the additions are in the story report). The
-// check validates every port ports.js already knows and pins the three pending ones to the exact kind
-// and unit the report asks for, so the request and the code cannot drift while they wait.
+// The plugin's PORT BLOCK is checked too, statically. Three of its semantics -- waterSurface,
+// waterDepth and shoreDistance -- did not exist in ports.js when this oracle was written, so it
+// asserted they were ABSENT and pinned the kind and unit they should arrive with. That tripwire
+// fired the moment they landed, which is what forced this comment and that block to be rewritten
+// rather than left describing a world that no longer existed. They are in ports.js now and the
+// check is the stronger one it was standing in for: every declared port validates for real.
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
@@ -604,34 +606,42 @@ function plane() {
     check('the Lake node exposes no water-level parameter',
       params.length === 1 && params[0].id === 'minCells', { params: params.map(p => p.id) })
 
-    // Everything ports.js already knows must validate for real, today. `waterSurface`, `waterDepth`
-    // and `shoreDistance` are the three semantics the story report asks to be added; until they land,
-    // they are pinned here to the exact kind and unit that request specifies.
-    const PENDING = { waterSurface: 'm', waterDepth: 'm', shoreDistance: 'm' }
+    // THE THREE SEMANTICS HAVE LANDED. This block used to assert that `waterSurface`, `waterDepth`
+    // and `shoreDistance` were still ABSENT from ports.js — a deliberate tripwire, so that the day
+    // someone added them the oracle would fail and force this to be rewritten rather than quietly
+    // continuing to describe a world that no longer existed. It fired exactly as intended.
+    //
+    // The claim it is replaced by is the stronger one it was standing in for: every declared port
+    // validates for real, and the three carry the kind and unit that were asked for. `shoreDistance`
+    // is SIGNED — positive offshore, negative inland — so it must not be range-constrained.
+    const REQUIRED = { waterSurface: 'm', waterDepth: 'm', shoreDistance: 'm' }
     const known = p => !!(Ports.SEMANTICS[p.semantic] || Ports.GENERICS[p.semantic])
-    const live = outputs.filter(known)
-    const pending = outputs.filter(p => !known(p))
+    const unknown = outputs.filter(p => !known(p))
     check('every Lake input validates against ports.js',
       Ports.validatePortList({ inputs, outputs: [], source: 'declared' }).length === 0,
       Ports.validatePortList({ inputs, outputs: [], source: 'declared' }))
-    check('every Lake output whose semantic ports.js already knows validates',
-      live.length >= 4 && Ports.validatePortList({ inputs: [], outputs: live, source: 'declared' }).length === 0,
-      { liveOutputs: live.map(p => p.id), problems: Ports.validatePortList({ inputs: [], outputs: live, source: 'declared' }) })
-    check('the pending semantics are exactly the three the report asks ports.js for',
-      pending.length === Object.keys(PENDING).length
-      && pending.every(p => PENDING[p.semantic] !== undefined),
-      { pending: pending.map(p => p.semantic), expected: Object.keys(PENDING) })
-    check('each pending port declares the kind and unit the report specifies',
-      pending.every(p => p.kind === 'scalarRaster' && p.storage === 'R32F' && p.unit === PENDING[p.semantic]),
-      pending.map(p => ({ id: p.id, semantic: p.semantic, kind: p.kind, unit: p.unit })))
+    check('every Lake output has a semantic ports.js knows', unknown.length === 0,
+      { unknown: unknown.map(p => p.semantic) })
+    check('every Lake output validates against ports.js',
+      outputs.length >= 7 && Ports.validatePortList({ inputs: [], outputs, source: 'declared' }).length === 0,
+      { outputs: outputs.map(p => p.id), problems: Ports.validatePortList({ inputs: [], outputs, source: 'declared' }) })
+    check('the three water semantics carry the kind and unit specified',
+      Object.keys(REQUIRED).every(sem => {
+        const d = Ports.SEMANTICS[sem]
+        const port = outputs.find(p => p.semantic === sem)
+        return d && d.kind === 'scalarRaster' && d.defaultUnit === REQUIRED[sem]
+          && port && port.kind === 'scalarRaster' && port.storage === 'R32F' && port.unit === REQUIRED[sem]
+      }),
+      Object.keys(REQUIRED).map(sem => ({ sem, def: Ports.SEMANTICS[sem] })))
   } else {
     for (const n of ['the Lake plugin declares one input and seven outputs',
       'the primary output is the untouched solid top, not water',
       'the Lake node exposes no water-level parameter',
       'every Lake input validates against ports.js',
-      'every Lake output whose semantic ports.js already knows validates',
-      'the pending semantics are exactly the three the report asks ports.js for',
-      'each pending port declares the kind and unit the report specifies']) check(n, false, 'port block did not parse')
+
+      'every Lake output has a semantic ports.js knows',
+      'every Lake output validates against ports.js',
+      'the three water semantics carry the kind and unit specified']) check(n, false, 'port block did not parse')
   }
 
   check('assertion inventory non-empty', assertions.length >= 45, assertions.length)
