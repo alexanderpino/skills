@@ -306,6 +306,54 @@ with an options object made three "templates" measure the same graph three times
 Controls now armed on these six stories: **flow control 5, connect-time 3, variables 8, math 11,
 subgraph 7, subgraph persistence 18** — every one seen red, zero vacuous.
 
+### Sprint 3 — the cover layer, red-first throughout
+
+Sprint 3's Ready condition requires its acceptance fixtures **observed red before the implementation
+exists**. Four were written that way, each failing by named gates rather than throwing, and each
+registered in `tests/legacy/expected-red.json` so the sweep prints them every run and fails if one
+turns green without the register being pruned.
+
+| Story | State | Gate |
+|---|---|---|
+| S3.1 hydraulic state outputs | **done** `bfe18e8` | sediment state 6/6 armed, 30 gates |
+| S3.2 regolith producer | **done** `e3114c4` | soildepth 4/4 armed, 22 gates |
+| S3.3 cover-aware transport | in flight | cover erosion, registered red |
+| S3.4 explicit state selectors | **done** `c468185` | cover reader 8/8 armed |
+| S3.5 transport co-evolution | pending, D21 authorised | transport co-evolution manifest green |
+
+Node types **88 → 92**. Preconditions that had to be built first because the sprint assumed them:
+the port vocabulary (`soilDepth`, `sedimentDepth`, `sandDepth`, `solidTop`, `bedrockHeight`,
+`precipitation`, `mmPerYr`, `yr`), the two-frame height adapter (**D20**), and the transport-class
+manifest — because S3.5's acceptance says "the exemption ledger contains no material-transport
+entry" and *that ledger had never been built*, so the clause passed vacuously over a structure that
+did not exist.
+
+**The measurement that mattered most.** The hydraulic mass ledger closed by construction: every loss
+term was a difference of sums over *nested* cell sets, so the identity held for any implementation
+including one that deletes the terrain — and the guard meant to catch exactly that, `exportedDerived`,
+was a hardcoded `false` on the same object. The apron ring is now accumulated over a cell set
+**disjoint** from the core:
+
+    cropExchange     3.632687   core loss
+    exportedToApron  3.632644   apron gain, independent
+    agreement        1.2e-5 relative
+
+S3.1's armed closure goes further: it recomputes the field side in the oracle and takes the loss side
+from production's accumulators, so a `height-deleted` mutation leaves a residual of **99.9% of the
+budget** against a bound 1000× smaller. It cannot pass for an implementation that deletes the terrain.
+
+**Three half-gates found, all by running things rather than reading them.** Port descriptors
+snapshotted *before* a mutation block, so the assertion read pre-mutation values and could never
+fail. Discovery by output semantic that broke the moment a second node legitimately published the
+same semantic — a producer *integrates over time*, a selector reads a wire, so the duration parameter
+is the discriminator. And a descriptor-only check that would have passed on a port declared but never
+filled.
+
+**And one in the instrument itself.** `gate.py` scored a mutation ARMED whenever the mutated run
+exited non-zero, never comparing against the unmutated run — so a red-first oracle armed every
+control it declared while arming nothing. Measured on the first four: 4 of 5 false. Arming is now a
+**delta**.
+
 **DELIVERY RECOVERY — risk-based fast path adopted, 2026-08-02.**
 
 Canonical execution policy: [docs/plan/DELIVERY.md](docs/plan/DELIVERY.md). Quality is unchanged,
