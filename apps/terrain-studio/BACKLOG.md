@@ -54,6 +54,51 @@ file. The check that would have caught it — `ls` on the working tree — cost 
 
 ## 1. Decisions taken
 
+### D20 — Two named height frames · DONE `108399f`
+The viewport keeps **autolevel** exactly as it ships; physical nodes take metres from a **stable
+datum** through an explicit adapter (`src/core/height-frame.js`). ADR-005 specifies only the
+autolevel conversion and `metricHeightField` implements it, but autolevel is *field-dependent*:
+eroding the terrain moves `fieldMin`/`fieldMax`, so bedrock nobody touched changes elevation and
+S3.3's solid-top identity fails for reasons unrelated to the physics. Measured, one sample edited:
+untouched samples move **0.00 m** under the stable frame and **952.39 m** under autolevel. This is
+ADR-005's own "versioned boundary adapter" option taken literally, and it leaves the recorded
+2.12×-flatter regression untouched because the display path does not change.
+
+### D21 — Transport re-bless is authorised, one node per commit · DECIDED
+Thermal, Stream Power, Erosion 2 and HydroFix **may** change their shipped output for S3.5, because
+cover-first consumption is the story's entire content. Each lands in its own commit whose baseline
+delta must read `CHANGED existing: ['<that node>']` and nothing else. A commit whose delta names a
+node it did not intend to change is refused.
+
+### D22 — Resampling is a node, not an Import parameter · DECIDED (delegated)
+**Create-from-heightmap** is a fourth New Terrain source: the file's IHDR dimensions lock the sample
+count, the author supplies one number (pixels per unit), and the extent is *derived* as
+`(cols−1) × spacing` — vertex posting, so `n` posts span `n−1` intervals. Selecting a file runs
+`describeSource` on the **bytes only**, so a 40000² PNG can be refused by `assessCreation` without
+ever being decoded. Lattice is locked to square: placing a square raster on odd-r hex *is* a
+resample, and offering it would rebuild silent resampling inside the anti-silent-resampling feature.
+
+**Import decodes and records provenance; it does not scale.** `14-graph-runtime.md:342` requires
+resampling be "a first-class pattern (an explicit `resample` node with a stated filter) rather than
+an accident", and the doctrine's own erode-coarse-then-upsample pipeline needs that node with no
+Import anywhere — folding it into Import means building it twice. A fit inside Import would also
+make its output a function of document state, invisible in the graph.
+
+Staged, because today every edge carries a `RES × fieldH()` field and an off-grid raster cannot flow
+until S9.9/S2.3:
+- **Stage A (now):** create-from-heightmap; importing a *mismatched* file into an existing document
+  raises a choice — new terrain / resample to document grid / cancel — stamping `fit` on the node
+  and showing a badge with the true source dimensions. Same kernel as today, but chosen, displayed
+  and reversible.
+- **Stage B (with S9.9 + S2.3):** the `resample` plugin lands, `fit` collapses to `native`, and the
+  port layer gains a `GRID_MISMATCH` refusal with one-click insert.
+
+Migration: existing Import nodes load byte-identical and are stamped `fit:'legacy-resample'` — a
+*name* for what the build already does, the same pattern as `posting:'legacy-cell'`. Never mutate a
+document on load; the digest is the proof. **To measure before Stage A ships:** whether the bilinear
+fit and the legacy `drawImage` path are bit-identical for image sources. If not, the two `fit`
+values must stay distinct or migrated documents drift.
+
 ### D1 — A hex field is `RES × round(RES·2/√3)`, giving a square world · DONE
 `512 × 591`. Equilateral cells, no squash, no crop. Costs **+15.5% cells** at equal `cellSize`,
 which `26` names as the trap: the "13.4% fewer samples" saving only materialises if you take a ~15%
