@@ -274,8 +274,9 @@ export function lakes(solidTop, w, hgt, { hex = false, cellSizeM = 1, minCells =
       }
     }
     // THE SPILL IS THE LOWEST RIM CELL, and among cells tied at that elevation the one with the
-    // lowest escape beyond it. The tiebreak is not cosmetic: on the analytic bowl below, the whole
-    // shoreline ring sits at exactly the fill elevation, so "lowest rim" alone has ~90 equally valid
+    // lowest escape beyond it. The tiebreak is not cosmetic: on the analytic bowl the gate uses,
+    // 12 of the 120 rim cells sit at exactly the fill elevation (counted, not estimated — an
+    // earlier version of this comment said ~90), so "lowest rim" alone has twelve equally valid
     // answers and only one of them is the notch the water actually leaves through. Ranking ties by
     // the lowest surface among their own non-lake neighbours picks the notch, because that is what
     // "downhill from here leads away" means. Index order is the final tiebreak so the result is

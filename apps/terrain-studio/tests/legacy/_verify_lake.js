@@ -43,6 +43,17 @@ const MUTATIONS = [
   'edt-even-rows-only',        // the real defect this oracle caught: square EDT skips every odd row
   'hex-ignores-stagger',       // hex EDT ignores the half-column row offset
   'label-range-wrong',         // basinId port declares a noLabel sentinel inside its own label range
+  // --- the basin RECORD, added after an adversarial pass ------------------------------------------
+  // Seven of the twelve fields in every basin record reached the featureSet port constrained by
+  // nothing. Measured, one defect at a time, against the 58 assertions that were here before:
+  // floorElevation = Infinity, rimCells = 0, areaM2 = 0, spill = (-1,-1), and a basin id that does
+  // not index the label raster ALL scored PASS. The node was shipping numbers no gate had read.
+  'floor-never-measured',      // floorElevation is never taken from the terrain under the lake
+  'rim-count-zero',            // rimCells reports 0 for every basin
+  'area-ignores-hex',          // areaM2 uses cell^2 on the hex lattice, dropping the sqrt(3)/2
+  'basin-id-not-join-key',     // the raster is compacted, the record keeps its pre-compaction id
+  'no-id-compaction',          // ids are never compacted: labels(0, lakeCount-1) becomes a lie
+  'basin-spill-not-reported',  // the basin record's own spill fields are never filled in
 ]
 // Patches are applied to the CORE module or to the PLUGIN file, whichever the failure lives in.
 const PATCHES = {
@@ -82,6 +93,18 @@ const PATCHES = {
   ] },
   'label-range-wrong': { plugin: [[
     'range: RANGE.labels(0, 2147483646, -1)', 'range: RANGE.labels(0, 2147483646, 0)']] },
+  'floor-never-measured': { core: [[
+    'if (solidTop[i] < floor) floor = solidTop[i]', 'floor = Infinity']] },
+  'rim-count-zero': { core: [['rimCells: rim.size,', 'rimCells: 0,']] },
+  // Caught ONLY on the hex fixture, and deliberately so: on a square lattice cellArea IS cell^2, so
+  // this patch is a no-op there. The hex bowl is what turns it into a defect.
+  'area-ignores-hex': { core: [[
+    'areaM2: cells.length * cellArea,', 'areaM2: cells.length * cellSizeM * cellSizeM,']] },
+  'basin-id-not-join-key': { core: [[
+    '      id, level, cellCount', '      id: components.indexOf(cells), level, cellCount']] },
+  'no-id-compaction': { core: [['const id = kept.length', 'const id = components.indexOf(cells)']] },
+  'basin-spill-not-reported': { core: [[
+    'spillIndex, spillX: sx, spillY: sy,', 'spillIndex: -1, spillX: -1, spillY: -1,']] },
 }
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -160,6 +183,27 @@ function twin() {
   }
   for (let x = 0; x <= 16; x++) { const i = 48 * W + x; h[i] = Math.min(h[i], 60 - 0.5 * (16 - x)) }
   for (let x = 77; x < W; x++) { const i = 48 * W + x; h[i] = Math.min(h[i], 40 - 0.5 * (x - 77)) }
+  return h
+}
+
+/**
+ * A SMALL basin in scan order first, then a LARGE one, so `minCells` suppresses component 0 and the
+ * survivor has to be RENUMBERED from 1 to 0.
+ *
+ * twin() cannot arm that. Its first component is the 305-cell lake that survives, so a build which
+ * never compacted the ids would still hand the survivor id 0 and every assertion would pass.
+ * Measured here: component 0 is 69 cells at level 60, component 1 is 193 at level 40, and minCells
+ * sits at 120 — between the two, not at either.
+ */
+function smallFirst() {
+  const h = new Float32Array(N)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    h[y * W + x] = Math.min(PLATEAU, 12 * Math.hypot(x - 26, y - 24), 5 * Math.hypot(x - 64, y - 70))
+  }
+  // Both channels start exactly on their own rim contour — 12*5 = 60 and 5*8 = 40 — so each notch
+  // mouth is the unique rim cell with somewhere lower to go, exactly as in bowl().
+  for (let x = 0; x <= 21; x++) { const i = 24 * W + x; h[i] = Math.min(h[i], 60 - 0.5 * (21 - x)) }
+  for (let x = 72; x < W; x++) { const i = 70 * W + x; h[i] = Math.min(h[i], 40 - 0.5 * (x - 72)) }
   return h
 }
 
@@ -260,7 +304,9 @@ function plane() {
   check('the spill sits on the lowest rim cell',
     rim.has(spill.index) && solid[spill.index] === rimMin && rimMin === level,
     { onRim: rim.has(spill.index), spillSolid: solid[spill.index], rimMin, level })
-  // Ninety cells of shoreline sit at exactly 60 m; only one of them has anywhere lower to go. The
+  // Twelve of the 120 rim cells sit at exactly 60 m — counted, not estimated; an earlier version of
+  // this comment said ninety. Only one of the twelve has anywhere lower to go, which is what makes
+  // the escape tiebreak load-bearing and is why `spill-ignores-escape` is red. The
   // spill is the outlet, not just any cell tied at the fill elevation.
   check('the spill is the notch the water actually leaves through',
     spill.x === NOTCH_X && spill.y === NOTCH_Y, { spillX: spill.x, spillY: spill.y, notch: [NOTCH_X, NOTCH_Y] })
@@ -353,6 +399,15 @@ function plane() {
     if (dev > analyticDev) analyticDev = dev
     sampled++
   }
+  // --- the basin RECORD, field by field ----------------------------------------------------------
+  // Everything above reads the RASTERS. The `basins` featureSet is a separate product and it was
+  // going out unread: see the mutation list. Every field is recomputed here from the label raster
+  // and the terrain, which is what the record claims to describe.
+  checkBasinRecords('bowl', r, solid, false)
+  check('the basin record carries the analytic notch as its own spill',
+    basin.spillX === NOTCH_X && basin.spillY === NOTCH_Y && basin.spillIndex === NOTCH_Y * W + NOTCH_X,
+    { spillX: basin.spillX, spillY: basin.spillY, spillIndex: basin.spillIndex })
+
   check('the analytic circle was sampled', sampled > 1000, { sampled })
   check('shore distance matches the analytic circular shoreline within one lattice step',
     analyticDev <= CELL * Math.SQRT2, { maxDeviationM: +analyticDev.toFixed(3), boundM: +(CELL * Math.SQRT2).toFixed(3) })
@@ -421,6 +476,10 @@ function plane() {
   check('shore distance is exactly Euclidean on the hex lattice, stagger included',
     edtErrHex === 0, { maxErrorM: edtErrHex })
 
+  // The hex records, and the only place areaM2 is a statement about anything: a hex cell is
+  // cell^2 * sqrt(3)/2, and on the square lattice a build that forgot the factor is indistinguishable.
+  checkBasinRecords('hex bowl', rh, solidHex, true)
+
   // === two basins, two levels, two ids ===========================================================
   const twoSolid = twin()
   const twoBefore = Float32Array.from(twoSolid)
@@ -446,6 +505,7 @@ function plane() {
       nA > 50 && nB > 50 && flatA === 0 && flatB === 0, { nA, nB, flatA, flatB })
     check('the two label sets are disjoint and cover both bodies',
       nA === a.cellCount && nB === b.cellCount, { nA, cellCountA: a.cellCount, nB, cellCountB: b.cellCount })
+    checkBasinRecords('two basins', two, twoSolid, false)
   } else {
     check('the two lakes sit at different levels, each at its own spill', false, { lakeCount: two.lakeCount })
     check('the two lakes are at the analytic notch elevations', false, null)
@@ -468,6 +528,33 @@ function plane() {
     { lakeCount: sup.lakeCount, cellCount: sup.basins.length ? sup.basins[0].cellCount : -1 })
   check('a suppressed lake leaves the surface back on the terrain', supRaised === 0, { supRaised })
   check('the depth identity still holds exactly after suppression', supViolations === 0, { supViolations })
+  if (sup.basins.length) checkBasinRecords('after suppression', sup, supSolid, false)
+  else check('after suppression: every basin record\'s id is its own index, so basinId joins to it',
+    false, 'no basin survived suppression')
+
+  // --- SUPPRESSING THE FIRST COMPONENT -----------------------------------------------------------
+  // The one arrangement twin() cannot produce. If the survivor is component 1 and the ids are never
+  // compacted, the label raster carries a 1 while lakeCount is 1, and the basinId port's declared
+  // labels(0, lakeCount-1) is a lie that no other fixture here can see.
+  const sfSolid = smallFirst()
+  const sfAll = M.lakes(sfSolid, W, H, { cellSizeM: CELL })
+  check('the small basin really is the one scanned first',
+    sfAll.lakeCount === 2 && sfAll.basins[0].cellCount === 69 && sfAll.basins[1].cellCount === 193
+    && sfAll.basins[0].level === 60 && sfAll.basins[1].level === 40,
+    { counts: sfAll.basins.map(b => b.cellCount), levels: sfAll.basins.map(b => b.level) })
+  const sf = M.lakes(sfSolid, W, H, { cellSizeM: CELL, minCells: 120 })
+  let sfLabelBad = 0, sfWet = 0
+  for (let i = 0; i < N; i++) {
+    if (sf.depth[i] > 0) { sfWet++; if (sf.lakeId[i] !== 0) sfLabelBad++ }
+    else if (sf.lakeId[i] !== M.NO_LAKE) sfLabelBad++
+  }
+  check('suppressing component 0 renumbers the survivor to 0, in the record and in the raster',
+    sf.lakeCount === 1 && sf.basins.length === 1 && sf.basins[0].id === 0
+    && sf.basins[0].cellCount === 193 && sfWet === 193 && sfLabelBad === 0,
+    { lakeCount: sf.lakeCount, id: sf.basins.length ? sf.basins[0].id : null, sfWet, sfLabelBad })
+  if (sf.basins.length) checkBasinRecords('small-first', sf, sfSolid, false)
+  else check('small-first: every basin record\'s id is its own index, so basinId joins to it',
+    false, 'no basin survived suppression')
 
   // === no depression at all ======================================================================
   const flat = plane()
@@ -568,6 +655,60 @@ function plane() {
       if (e > worst) worst = e
     }
     return worst
+  }
+
+  /**
+   * Every field of every basin RECORD, recomputed from the label raster and the terrain the record
+   * claims to describe — not from the module's own intermediates.
+   *
+   * This exists because seven of the twelve fields were unread. Measured against the 58 assertions
+   * that were here before this helper: floorElevation = Infinity PASSED, rimCells = 0 PASSED,
+   * areaM2 = 0 PASSED, spillIndex/X/Y = -1 PASSED, and a record id that no longer indexes the label
+   * raster PASSED. `basinId` is only meaningful as a join key into these records, so an id that does
+   * not equal its own array position makes the whole featureSet unaddressable.
+   */
+  function checkBasinRecords(tag, res, solidField, hex) {
+    const cellArea = hex ? CELL * CELL * HEX_ROW : CELL * CELL
+    const n = res.basins.length
+    const cellsOf = new Int32Array(n), floorOf = new Float64Array(n).fill(Infinity)
+    const rimOf = []
+    for (let k = 0; k < n; k++) rimOf.push(new Set())
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, id = res.lakeId[i]
+      if (id < 0 || id >= n) continue
+      cellsOf[id]++
+      if (solidField[i] < floorOf[id]) floorOf[id] = solidField[i]
+      for (const d of nbOf(y, hex)) {
+        const xx = x + d[0], yy = y + d[1]
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue
+        if (res.lakeId[yy * W + xx] !== id) rimOf[id].add(yy * W + xx)
+      }
+    }
+    let idBad = 0, countBad = 0, areaBad = 0, floorBad = 0, rimBad = 0, spillBad = 0
+    for (let k = 0; k < n; k++) {
+      const b = res.basins[k], s = res.spills[k]
+      if (b.id !== k) idBad++
+      if (b.cellCount !== cellsOf[k]) countBad++
+      if (b.areaM2 !== b.cellCount * cellArea) areaBad++
+      if (b.floorElevation !== floorOf[k]) floorBad++
+      if (b.rimCells !== rimOf[k].size) rimBad++
+      // The record's own spill fields, not the spill feature's: they are a second copy and a second
+      // copy is a second chance to be wrong. Both must name a real cell — -1 is not a spill.
+      if (!s || s.lakeId !== k || b.spillIndex !== s.index || b.spillX !== s.x || b.spillY !== s.y
+        || b.spillIndex < 0 || b.spillIndex !== b.spillY * W + b.spillX) spillBad++
+    }
+    // n > 0 first: with no records every count above is zero and every check below is vacuous.
+    check(`${tag}: every basin record's id is its own index, so basinId joins to it`,
+      n > 0 && idBad === 0, { basins: n, idBad })
+    check(`${tag}: cellCount and areaM2 agree with the label raster and the lattice cell area`,
+      n > 0 && countBad === 0 && areaBad === 0,
+      { countBad, areaBad, cellArea, areas: res.basins.map(b => b.areaM2) })
+    check(`${tag}: floorElevation is the lowest terrain under the lake`,
+      n > 0 && floorBad === 0, { floorBad, measured: Array.from(floorOf), reported: res.basins.map(b => b.floorElevation) })
+    check(`${tag}: rimCells counts the independently derived rim`,
+      n > 0 && rimBad === 0, { rimBad, measured: rimOf.map(s => s.size), reported: res.basins.map(b => b.rimCells) })
+    check(`${tag}: the basin record's own spill fields name the same real cell as the spill feature`,
+      n > 0 && spillBad === 0, { spillBad, reported: res.basins.map(b => [b.spillX, b.spillY, b.spillIndex]) })
   }
 
   function literalAfter(src, key) {
