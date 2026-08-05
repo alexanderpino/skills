@@ -20,7 +20,7 @@ import { AUX_MAPS, AUX_LENSES, SIDE_CHANNEL_LEDGER, semanticDebt, debtByOwner, v
 import { validateLegalOrder, validateLens, DOCTRINE_STAGES, DERIVED_PRODUCERS, HEIGHT_WRITERS } from './core/doctrine.js';
 import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } from './core/expr.js';
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
-import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, glslShoal, presetBounds } from './core/water-waves.js';
+import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, glslShoal } from './core/water-waves.js';
 import { BIOMES, BIOME_KEYS, DEFAULT_BIOME, biomeTerrainOverrides, biomeSeaLevel, biomePrecipMmYr } from './core/biomes.js';
 import { MAX_STEEPNESS as MAX_WAVE_STEEPNESS } from './core/water-waves.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';

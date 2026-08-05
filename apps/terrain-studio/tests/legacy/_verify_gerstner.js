@@ -435,6 +435,33 @@ void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, 0.0, N
       { steepness: +steep.steepness.toFixed(6), bound: M.MAX_STEEPNESS })
   }
 
+  // --- SCOPE TRIPWIRE: the bounds clause has nothing to inflate --------------------------------
+  //
+  // S4.7 says "Inflate water bounds by declared vertical amplitude and horizontal chop" and
+  // "sampled displaced vertices remain inside inflated bounds". The Sprint 4 audit found
+  // presetBounds is never called by the renderer, and it is right — but the reason is that THERE
+  // ARE NO BOUNDS. Measured: zero occurrences of frustum, cull, sceneBounds or boundingBox in
+  // legacy.js. Nothing culls the water, so there is no bound to inflate and nothing that could
+  // clip a displaced crest.
+  //
+  // The half of the clause that IS meetable — that the declared reach actually covers the
+  // displacement — is asserted above, over 4000 samples. What cannot be met is the other half,
+  // and pretending otherwise by calling presetBounds somewhere decorative would be worse than
+  // saying so.
+  //
+  // Asserted rather than written in a report, so it FAILS the day culling appears — which is
+  // exactly when a displaced crest can first be clipped and the inflation becomes load-bearing.
+  {
+    const lg2 = require('fs').readFileSync(path.resolve(__dirname, '../../src/legacy.js'), 'utf8')
+    const culls = /frustum|cullFace\(|sceneBounds|boundingBox|cullWater/.test(lg2)
+    check('nothing culls the water yet, so the bounds-inflation clause has nothing to inflate',
+      !culls,
+      { rendererCulls: culls,
+        note: 'When this fails, culling landed: inflate the water bounds by presetBounds() '
+          + 'vertical and horizontal reach before testing a crest against them, and only then '
+          + 'may S4.7 bounds inflation be called met.' })
+  }
+
   check('assertion inventory non-empty', assertions.length >= 26, assertions.length)
 
   let ok = assertions.every(a => a.ok)
