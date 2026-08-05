@@ -22,6 +22,7 @@ import { parseExpr, evalExpr, EXPR_FUNCTIONS, EXPR_MAX_NODES, EXPR_MAX_DEPTH } f
 import { makeScope, validateVariables, requireVariable, VARIABLE_UNITS } from './core/variables.js';
 import { expandPreset as expandWavePreset, glslGerstner, glslWaterDetail, glslShoal, presetBounds } from './core/water-waves.js';
 import { BIOMES, BIOME_KEYS, DEFAULT_BIOME, biomeTerrainOverrides, biomeSeaLevel, biomePrecipMmYr } from './core/biomes.js';
+import { MAX_STEEPNESS as MAX_WAVE_STEEPNESS } from './core/water-waves.js';
 import { domainFromLegacy, deriveResolution, validateDomain, spacingWasRounded, WORLD_DOMAIN_VERSION, AUTHORING_UNITS } from './core/world-domain.js';
 import { assessCreation, decomposePages, formatBytes } from './core/feasibility.js';
 import { registerDefinition, definitionHash, findRecursion, validateDefinition, instanceCacheKey, referencedDefinitions, closureHashes, fieldKey, SUBGRAPH_VERSION } from './core/subgraph.js';
@@ -7199,10 +7200,26 @@ function drawWaterDepth(MVP,ex,ey,ez){
   gl.uniform3f(u(waterMaskProg,"uCam"),ex,ey,ez);gl.uniform1f(u(waterMaskProg,"uMppK"),mppPerUnitDistance());
   gl.uniform1f(u(waterMaskProg,"uCellM"),cellSizeM());
   gl.uniform1f(u(waterMaskProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterMaskProg,"uShoalRefM"),shoalReferenceM());
-  gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
+  gl.uniform1f(u(waterMaskProg,"uWaveAmp"),scene.water?waveAmpMetres():0);
   bindAttr(waterMaskProg,"axz",2,buffers.gridXZ);bindAttr(waterMaskProg,"ah",1,buffers.hgt);bindAttr(waterMaskProg,"aw",1,buffers.wsurf);bindAttr(waterMaskProg,"ais",1,buffers.iceSnow);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
   gl.drawElements(gl.TRIANGLES,buffers.count,buffers.u32?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+}
+export function waveAmpMetres(){
+  // THE STEEPNESS BOUND HAS TO BE APPLIED AT THE RUNTIME AMPLITUDE, not at the amplitude the
+  // preset was expanded with. currentWaterPreset() expands at maxAmplitudeM = 1 so that height can
+  // ride as a uniform instead of forcing a recompile per slider pixel -- but that means the Q
+  // clamp inside expandPreset solved sum(Q*k*A) <= 0.85 for a ONE METRE sea. Multiply by a runtime
+  // amplitude and the real steepness scales with it: measured 1.6486 at the old 12 m default,
+  // 1.94x the declared bound, squarely in the fold regime.
+  //
+  // It did not visibly fold only because the mesh fade happens to zero the eight short terms, which
+  // is protection by accident rather than by the invariant. Clamped here so the bound holds for any
+  // amplitude the slider can reach.
+  const want=(waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM);
+  const st=currentWaterPreset().steepness;
+  const cap=st>1e-6?MAX_WAVE_STEEPNESS/st:Infinity;
+  return Math.min(want,cap);
 }
 function shoalReferenceM(){
   // The depth at which a wave starts to feel the bottom is HALF ITS WAVELENGTH, not some multiple
@@ -7292,7 +7309,7 @@ function renderGL(){
     if(scene.water&&!wire){
       gl.useProgram(waterProg);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
       setM(waterProg,"uMVP",MVP);gl.uniform1f(u(waterProg,"uH"),H_SCALE);gl.uniform1f(u(waterProg,"uScale"),terrainDef.scale);gl.uniform1f(u(waterProg,"uTime"),uTime);
-      gl.uniform1f(u(waterProg,"uWaveAmp"),scene.water?((waterLook.waveDisplacement==null?1:waterLook.waveDisplacement)*(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM)):0);
+      gl.uniform1f(u(waterProg,"uWaveAmp"),scene.water?waveAmpMetres():0);
       gl.uniform1f(u(waterProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(waterProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(waterProg,"uLapseRate"),terrainDef.lapseRate);
       gl.uniform1f(u(waterProg,"uRipple"),waterRipple);gl.uniform1f(u(waterProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(waterProg,"uRippleSpeed"),waterRippleSpeed);
       gl.uniform1f(u(waterProg,"uToon"),waterLook.style==="toon"?1:0);gl.uniform1f(u(waterProg,"uBandSteps"),Math.max(2,waterLook.bandSteps||5));
@@ -8109,7 +8126,14 @@ function syncWaterLookValues(){
   $("#waterScaleVal").textContent=waterLook.scale.toFixed(2)+"×";
   $("#waterSpeedVal").textContent=waterLook.speed.toFixed(2)+"×";
   $("#waterRefractionVal").textContent=Math.round(waterLook.refraction*100)+"%";
-  const wh=$("#waveHeightVal");if(wh)wh.textContent=(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM).toFixed(1)+" m";
+  const wh=$("#waveHeightVal");if(wh){
+    // Report what the SHADER gets, not what the slider says. The steepness clamp caps amplitude at
+    // the fold bound -- about 6.2 m for the shipped preset -- so past that point dragging the
+    // slider changed nothing while the readout cheerfully reported a height the water never had.
+    // The old range went to 60 m, so nine tenths of its travel was inert.
+    const want=(waterLook.amplitudeM==null?1.2:waterLook.amplitudeM), got=waveAmpMetres();
+    wh.textContent=got.toFixed(1)+" m"+(got<want-0.05?" (capped — steeper folds)":"");
+  }
   const ws=$("#waveSeaVal");if(ws)ws.textContent=Math.round((waterLook.seaState==null?.55:waterLook.seaState)*100)+"%";
 }
 $("#sunAz").oninput=e=>{sun.az=parseFloat(e.target.value);syncLookValues();};

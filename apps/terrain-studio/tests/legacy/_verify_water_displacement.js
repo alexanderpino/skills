@@ -120,13 +120,16 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   // do is stay the same when the authored height doubles.
   await frame(0); const tFlatA = await tiles()
   await frame(0); const tFlatB = await tiles()
-  await page.evaluate(() => { waterLook.amplitudeM = 10 })   // INSIDE THE AUTHORED RANGE. This was 120 against 240, both far
+  await page.evaluate(() => { waterLook.amplitudeM = 2 })    // BELOW THE STEEPNESS CLAMP. The runtime amplitude is now capped so
+  // sum(Q*k*A) respects the 0.85 fold bound, which for the shipped preset is 6.19 m. Testing at 10
+  // and 30 measured the SAME frame twice -- both clamp to 6.19 -- and the scaling assertion caught
+  // it, correctly. A control that saturates cannot be tested past its saturation point.   // INSIDE THE AUTHORED RANGE. This was 120 against 240, both far
   // outside the 0-60 m the slider offers, chosen when the wave normal carried no amplitude at all and
   // the signal was tiny. Now that it does, the normal saturates long before 120 m -- a normalised
   // normal can only tilt so far -- so doubling from 120 measured almost no further change. Testing a
   // control outside its own domain is not a stronger test, it is a different one.
   await frame(mutation === 'amplitude-ignored' ? 0 : 1); const tWaved = await tiles()
-  await page.evaluate(() => { waterLook.amplitudeM = 30 })
+  await page.evaluate(() => { waterLook.amplitudeM = 6 })
   await frame(mutation === 'amplitude-ignored' ? 0 : 1); const tDouble = await tiles()
   const noiseFraction = tileDiff(tFlatA, tFlatB) / 255
   const changedFraction = tileDiff(tFlatB, tWaved) / 255

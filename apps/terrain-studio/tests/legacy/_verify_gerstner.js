@@ -374,6 +374,8 @@ void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, 0.0, N
     const halved = factors.length >= 2 && factors.every(f => f === '*0.5')
     check('both passes convert the grid attribute to metres the same way',
       halved, { factors })
+    // Even at the slider maximum the shipped steepness must respect the bound. This is the
+    // assertion that was missing: the clamp is only meaningful where an author can actually reach.
     check('a declared wavelength covers that many metres of world',
       shared && shared.attrSpan != null
       && Math.abs(shared.attrSpan * 0.5 * shared.worldScale - shared.worldScale) < 1e-6,
@@ -390,7 +392,50 @@ void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, 0.0, N
   }
 
   // Absence of evidence is a failure.
-  check('assertion inventory non-empty', assertions.length >= 21, assertions.length)
+  // --- the bound must hold at the amplitude actually SHIPPED, not the one it was solved for ------
+  //
+  // currentWaterPreset() expands at maxAmplitudeM = 1 so wave height can ride as a uniform rather
+  // than recompiling per slider pixel. That means expandPreset solved sum(Q*k*A) <= 0.85 for a ONE
+  // METRE sea, and the real steepness scales with whatever the uniform carries: measured 1.6486 at
+  // the old 12 m default, 1.94x the bound and squarely in the fold regime. It did not visibly fold
+  // only because the mesh fade happens to zero the eight short terms — protection by accident, not
+  // by the invariant. Twenty-seven assertions checked the preset; none checked what was shipped.
+  //
+  // The clamp lives in legacy.js because it needs waterLook, which is not importable here, so this
+  // asserts the arithmetic the clamp must satisfy AND that the raw unclamped call site is gone.
+  if (M && typeof M.expandPreset === 'function') {
+    const shipped = M.expandPreset({ windDirectionDeg: 300, windSpeedMps: 10, seaState: 0.55,
+      seed: 1, maxAmplitudeM: 1, bodyKind: 'ocean' })
+    const cap = M.MAX_STEEPNESS / shipped.steepness
+    check('the unit-amplitude preset leaves headroom for a real wave height',
+      cap > 1 && Number.isFinite(cap),
+      { capMetres: +cap.toFixed(3), unitSteepness: +shipped.steepness.toFixed(4) })
+    const lg = require('fs').readFileSync(path.resolve(__dirname, '../../src/legacy.js'), 'utf8')
+    const hasClamp = lg.includes('function waveAmpMetres()') && lg.includes('MAX_WAVE_STEEPNESS/st')
+    const rawRemains = lg.includes('uWaveAmp"),scene.water?((waterLook.waveDisplacement')
+    check('the runtime amplitude is clamped to the steepness bound before it reaches the shader',
+      hasClamp && !rawRemains, { hasClamp, rawUnclampedSiteRemains: rawRemains })
+    check('the default wave height is inside the fold bound',
+      shipped.steepness * 5 <= M.MAX_STEEPNESS + 1e-6,
+      { atDefault5m: +(shipped.steepness * 5).toFixed(4), bound: M.MAX_STEEPNESS })
+
+    // THE CLAMP HAS TO BE TESTED WHERE IT BINDS. Every steepness assertion above this line ran on a
+    // unit-amplitude preset whose raw steepness is 0.1374 — comfortably under the 0.85 bound, so the
+    // Q clamp is already a no-op there. That is why `steepness-unclamped` scored VACUOUS: deleting a
+    // clamp that never fires changes nothing, and the mutation was reported ARMED for two commits
+    // while proving nothing at all. A big amplitude is the only place the clamp has work to do.
+    const steep = M.expandPreset({ windDirectionDeg: 300, windSpeedMps: 10, seaState: 0.55,
+      seed: 1, maxAmplitudeM: 40, bodyKind: 'ocean' })
+    let rawSteep = 0
+    for (const t of steep.terms) rawSteep += (2 * Math.PI / t.lambda) * t.A
+    check('the clamp actually binds at a large authored amplitude', rawSteep > M.MAX_STEEPNESS * 2,
+      { rawUnclamped: +rawSteep.toFixed(4), bound: M.MAX_STEEPNESS })
+    check('a steep preset is still brought inside the bound',
+      steep.steepness <= M.MAX_STEEPNESS + 1e-9 && M.steepnessOk(steep),
+      { steepness: +steep.steepness.toFixed(6), bound: M.MAX_STEEPNESS })
+  }
+
+  check('assertion inventory non-empty', assertions.length >= 26, assertions.length)
 
   let ok = assertions.every(a => a.ok)
   if (mutation) {
