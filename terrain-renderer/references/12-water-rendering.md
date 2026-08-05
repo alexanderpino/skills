@@ -62,9 +62,9 @@ derive hydrology renderer-side.
 
 Water is not one rendering problem. A mirror-calm lake and a storm sea share a surface model and
 almost nothing else: which techniques matter, which dominate the frame, and which can be switched
-off entirely all change with energy. The Beaufort scale — whose sea descriptions were standardised
-against wind force by the WMO in 1955 — is the right spine, because its descriptors are *visual
-observations* and therefore map directly onto rendering features.
+off entirely all change with energy. The Beaufort scale — long since given standard wind-speed and
+sea-state equivalents by the meteorological bodies — is the right spine, because its descriptors
+are *visual observations* and therefore map directly onto rendering features.
 
 | Bft | Wind (kt) | Observed sea (NOAA/WMO wording) | What the renderer must switch on |
 |---|---|---|---|
@@ -89,7 +89,7 @@ conspicuous by 15 m/s (~4% of the surface), and Force 3 is 7–10 kt ≈ 3.6–5
 agreeing on where foam starts is a good sign both are right — and a strong argument for driving
 foam from wind rather than from a hand-tuned constant.
 
-The **WMO sea state code** (adopted 1970, built on the Douglas scale) is the parallel system, and
+The **WMO sea state code** (built on the Douglas scale) is the parallel system, and
 it classifies the *sea* rather than the *wind* — useful when swell arrives from a distant storm and
 local wind does not explain the surface. Significant wave height `H_s` (the mean of the highest
 third, and `≈ 4·sqrt(m₀)` from the spectrum's zeroth moment) is its currency and the natural
@@ -1230,23 +1230,26 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **P** — Babin, Morel, Fournier-Sicre, Fell & Stramski (Limnology & Oceanography 48(2), 843–859,
   2003): mass-specific scattering, ≈0.5 m²/g for mineral-dominated suspended matter at 555 nm —
   the concentration-to-optics bridge.
-- **F/synthesis** — **Glacial-flour turquoise.** The popular Rayleigh/Tyndall explanation is
+- **P/synthesis** — **Glacial-flour turquoise.** The popular Rayleigh/Tyndall explanation is
   physically wrong (rock flour is 2–65 µm, 10–100× the wavelength — Mie/geometric regime, where
   scattering is nearly wavelength-independent). The mechanism given in this chapter — flat
-  backscatter shortens the photon path, over which `a_water` still removes red — is **synthesis
-  from verified relations, not a quoted result**: a targeted search found *no* peer-reviewed
-  optical study of proglacial-lake colour with measured reflectance, particle-size distribution
-  and IOPs together. Treat the mechanism as sound but underived, and say so if challenged.
-- **D** — Beaufort wind force scale with WMO sea descriptions (standardised against wind force by
-  the WMO in 1955): the observational ladder used for
-  [Sea states](#sea-states-the-energy-ladder). Descriptor wording taken verbatim from NOAA's Storm
-  Prediction Center table (fetched 2026-08) — whitecaps first at Force 3, spray at Force 5, foam
-  streaks at Force 7, spindrift at Force 8, "sea completely white" at Force 12.
-  [NOAA SPC](https://www.spc.noaa.gov/faq/tornado/beaufort.html). The **WMO sea state code**
-  (built on the Douglas scale) is the parallel sea-based classification; `H_s` as the
-  mean of the highest third and `≈ 4·sqrt(m₀)` is standard oceanography. ⚠️ The two dates quoted
-  in this chapter — the 1955 WMO wind/sea correspondence and the 1970 adoption of the sea state
-  code — came from secondary sources, not from WMO documents; treat as believed-correct.
+  backscatter shortens the photon path, over which `a_water` still removes red — is corroborated
+  by measured-reflectance limnology: glacial-lake reflectance studies relate colour to suspended
+  sediment and report that **finer grains at fixed concentration shift the reflectance peak
+  shorter and brighten the water** (Everest-region in-situ + satellite study, *Mountain Research
+  and Development* 37(1), 2017; high-elevation U.S. Rocky Mountain lakes, *Environmental Research
+  Letters* 17, 2022). The full first-principles chain is assembled here rather than quoted from a
+  single proglacial-lake IOP study; the mechanism is sound and now grounded.
+- **D** — Beaufort wind force scale with its standard sea descriptions: the observational ladder
+  used for [Sea states](#sea-states-the-energy-ladder). Descriptor wording taken verbatim from
+  NOAA's Storm Prediction Center table (fetched 2026-08) — whitecaps first at Force 3, spray at
+  Force 5, foam streaks at Force 7, spindrift at Force 8, "sea completely white" at Force 12.
+  [NOAA SPC](https://www.spc.noaa.gov/faq/tornado/beaufort.html). The **WMO sea state code** (built
+  on the Douglas scale) is the parallel sea-based classification; `H_s` as the mean of the highest
+  third and `≈ 4·sqrt(m₀)` is standard oceanography. Adoption dates for the Douglas scale and the
+  WMO codes conflict across secondary sources (Douglas 1921/1929; WMO wave codes 1946/1947/1970)
+  and are deliberately **not** stated as fact here — only the NOAA descriptor wording is
+  authoritative in this section.
 - **P** — Capillary–gravity dispersion `ω² = (gk + (σ/ρ)k³)·tanh(kh)` and its **minimum phase speed
   ≈ 23.1 cm/s at ≈ 1.73 cm wavelength** — the hard short-wavelength bound used in
   [Calm water](#calm-water-the-low-energy-regime). Classical fluid mechanics; the constants were

@@ -100,10 +100,10 @@ rises steeply with density error, which forces tiny timesteps or tolerates visib
 
 | Variant | Approach | Trade |
 |---|---|---|
-| **PCISPH** | Predictive-corrective: iterate pressure to drive predicted density error to zero | Larger steps than WCSPH; iteration cost |
-| **IISPH** | Implicit formulation of the pressure Poisson problem | Better convergence at low compressibility |
-| **DFSPH** | Enforce *both* zero density error and zero divergence | Large stable steps; the modern SPH default |
-| **PBF** | Reformulate density as a **positional constraint** solved by Position Based Dynamics | Very large steps, unconditionally stable, game-grade |
+| **PCISPH** (Solenthaler & Pajarola 2009) | Predictive-corrective: iterate pressure to drive predicted density error to zero, without a global Poisson solve | Larger steps than WCSPH; iteration cost |
+| **IISPH** (Ihmsen et al. 2014) | Implicit discretisation of the pressure Poisson equation | Better convergence at low compressibility |
+| **DFSPH** (Bender & Koschier 2015) | Enforce *both* zero density error and zero divergence (two solvers) | Large stable steps; the modern SPH default |
+| **PBF** (Macklin & Müller-Fischer 2013) | Reformulate density as a **positional constraint** solved by Position Based Dynamics | Very large steps, unconditionally stable, game-grade |
 
 **Position Based Fluids (Macklin & Müller-Fischer, SIGGRAPH 2013) is the one games actually use.**
 It inherits PBD's stability, tolerates large timesteps, and slots into a unified solver alongside
@@ -311,12 +311,15 @@ Tiers per `00`: **P** paper · **T** talk · **D** docs · **F** folklore · **?
   (I3D 2009, 91–98): sphere impostors → depth smoothing → normal reconstruction → thickness pass.
   Verified 2026-08.
 - **P** — Kelvin wake half-angle `arcsin(1/3) ≈ 19.47°`, speed-independent in deep water because
-  deep-water group velocity is half the phase velocity. Classical (Lord Kelvin); the constant and
-  its derivation were verified 2026-08, the original 19th-century citation was not chased.
-- **?** — **SPH incompressibility variants.** PCISPH (Solenthaler & Pajarola), IISPH (Ihmsen et
-  al.), DFSPH (Bender & Koschier) are correctly named and correctly characterised here, but their
-  exact years, venues and author lists were **not** verified in this pass. Check before citing
-  them formally; the mechanism descriptions are safe, the bibliographic details are not.
+  deep-water group velocity is half the phase velocity. William Thomson (Lord Kelvin), "On Ship
+  Waves", *Proceedings of the Institution of Mechanical Engineers* 38, 409–434 (1887). Verified
+  2026-08.
+- **P** — **SPH incompressibility variants** (verified 2026-08): Solenthaler & Pajarola,
+  "Predictive-Corrective Incompressible SPH", *ACM TOG* 28(3) (SIGGRAPH 2009), 40:1–40:6;
+  Ihmsen, Cornelis, Solenthaler, Horvath & Teschner, "Implicit Incompressible SPH", *IEEE TVCG*
+  20(3), 426–435 (2014); Bender & Koschier, "Divergence-Free Smoothed Particle Hydrodynamics",
+  *ACM SIGGRAPH/Eurographics Symposium on Computer Animation* (SCA 2015) — DFSPH enforces
+  incompressibility on both position and velocity level, compression below 0.01%.
 - **F** — Probe-point buoyancy, diffuse-particle spray/foam/bubble classification, sim-domain fade
   fractions, sleep/promote hysteresis, and the debug-view list: universal production practice with
   no single canonical source.

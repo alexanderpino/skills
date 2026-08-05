@@ -151,8 +151,8 @@ right fix.
 | APIC (affine particle-in-cell) | `19` | Jiang, Schroeder, Selle, Teran & Stomakhin, ACM TOG 34(4), Art. 51, 2015 | P | [ACM DL](https://dl.acm.org/doi/10.1145/2766996) |
 | MPM for yield-stress / multi-phase materials | `19` | Stomakhin, Schroeder, Chai, Teran & Selle, SIGGRAPH 2013 | P | [Disney Animation](https://disneyanimation.com/publications/a-material-point-method-for-snow-simulation/) |
 | Screen-space fluid rendering (curvature flow) | `19` | van der Laan, Green & Sainz, I3D 2009, 91–98 | P | [ACM DL](https://dl.acm.org/doi/10.1145/1507149.1507164) |
-| Kelvin wake half-angle `arcsin(1/3) ≈ 19.47°`, speed-independent in deep water | `19` | Classical (Lord Kelvin); constant verified, original citation not chased | P/? | — |
-| SPH incompressibility variants (PCISPH / IISPH / DFSPH) | `19` | Solenthaler & Pajarola; Ihmsen et al.; Bender & Koschier — **bibliographic details unverified** | ? | — |
+| Kelvin wake half-angle `arcsin(1/3) ≈ 19.47°`, speed-independent in deep water | `19` | William Thomson (Kelvin), "On Ship Waves", Proc. IMechE 38, 409–434 (1887) | P | — |
+| SPH incompressibility variants (PCISPH / IISPH / DFSPH) | `19` | Solenthaler & Pajarola, ACM TOG 28(3), 2009; Ihmsen et al., IEEE TVCG 20(3), 426–435, 2014; Bender & Koschier, SCA 2015 | P | [DFSPH](https://animation.rwth-aachen.de/publication/054/) |
 
 ## Engine & shipped-system crosswalk
 
@@ -247,17 +247,19 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   constants in the chapter are F-tier renderer practice, not from the paper. The shallow-water
   group speed in that chapter's snippet was corrected 2026-08 (`c_g = √(g·d)`; the earlier
   `½√(g·d)` was the deep-water relation). Energy-spectrum sections (sea states / calm / aerated,
-  2026-08): Beaufort descriptors are verbatim from NOAA SPC (D-tier, fetched); the 1955/1970 WMO
-  dates are secondary-sourced; the capillary minimum (23.1 cm/s @ 1.73 cm) and Kelvin angle were
-  verified against standard references without chasing original derivations; foam optics are from
-  Dierssen 2019 (fetched; sole author verified); the waterfall sheet→ligament→droplet cascade is
-  classical instability theory with no waterfall-specific canonical citation; the pure-water RGB
-  absorption triple was corrected 2026-08 to match its stated 610/550/450 nm sample points.
-- `19`: PCISPH/IISPH/DFSPH are correctly characterised but their years/venues/author lists are
-  **unverified** (`?` in the chapter — check before citing); the Kelvin-wake constant is verified
-  but the original Kelvin citation was not chased; probe-point buoyancy, the spray/foam/bubble
-  split, domain-fade fractions and budget guidance are F-tier production practice with no
-  canonical source.
+  2026-08): Beaufort descriptors are verbatim from NOAA SPC (D-tier, fetched); Douglas/WMO
+  adoption dates conflict across secondary sources and are deliberately not asserted; the capillary
+  minimum (23.1 cm/s @ 1.73 cm) and Kelvin angle were verified against standard references; foam
+  optics are from Dierssen 2019 (fetched; sole author verified); the waterfall
+  sheet→ligament→droplet cascade is classical instability theory with no waterfall-specific
+  canonical citation; the pure-water RGB absorption triple was corrected 2026-08 to match its
+  stated 610/550/450 nm sample points. Glacial-flour turquoise upgraded from synthesis-only to
+  P/synthesis — corroborated by glacial-lake reflectance studies (MRD 37(1) 2017; ERL 17 2022),
+  the Rayleigh explanation stays refuted.
+- `19`: PCISPH (Solenthaler & Pajarola 2009), IISPH (Ihmsen et al. 2014), DFSPH (Bender & Koschier
+  2015) and the Kelvin-wake citation (Thomson 1887) were all **web-verified 2026-08** — the `?`
+  flags are cleared. Probe-point buoyancy, the spray/foam/bubble split, domain-fade fractions and
+  budget guidance remain F-tier production practice with no canonical source.
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-

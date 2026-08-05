@@ -192,6 +192,29 @@ Named presets, each a point in the three-scalar space with a distinct cause chai
 Amazon terminology (Sioli's whitewater / blackwater / clearwater) maps directly onto catchment
 geology, which is why it is a *generation* classification and not just a description.
 
+### Jerlov presets, with numbers
+
+The oceanic and coastal Jerlov types are the standard classification, and Solonenko & Mobley
+(2015) publish a matched `K_d`/constituent set per type — a directly usable `{type → constants}`
+lookup (values `K_d` at 490 nm, m⁻¹; Chl in mg/m³):
+
+| Type | `K_d(490)` | Chl | Character |
+|---|---|---|---|
+| I | 0.029 | 0.010 | Clearest ocean — deep blue, near-black at depth |
+| IA | 0.032 | 0.027 | Clear tropical blue |
+| IB | 0.039 | 0.037 | Blue, slight green cast |
+| II | 0.064 | 0.044 | Blue-green |
+| III | 0.109 | 0.177 | Green, productive |
+| 1C | 0.120 | 1.00 | Coastal green |
+| 3C | 0.197 | 1.28 | Turbid green |
+| 5C | 0.319 | 3.95 | Green-brown |
+| 7C | 0.560 | 8.4 | Brown-green, murky |
+| 9C | 1.00 | 9.1 | Very turbid inland/coastal |
+
+`Z_SD ≈ 1/min_λ K_d`, so a type-I sea sees ~30 m down and a 9C harbour under a metre — the range
+this whole system has to span. These are the *presets*; the causal chain above is how a generated
+body lands between them.
+
 ## Beyond water: the rheological axis
 
 Water is **Newtonian**: `τ = μ·γ̇`, no threshold, no memory. Two departures matter:
@@ -292,10 +315,11 @@ producer gap named at the top of this file; register the fields in `08` and `27`
   visibility" (*Remote Sensing of Environment* 169, 139–149, 2015): `Z_SD ≈ 1/min_λ K_d`.
 - **P** — Jerlov, *Marine Optics* 2nd ed. (Elsevier, 1976), Tables XXVI–XXVII; Solonenko & Mobley,
   "Inherent optical properties of Jerlov water types" (*Applied Optics* 54(17), 5392–5401, 2015);
-  Morel (1988) for the Jerlov↔chlorophyll ladder. ⚠️ **The numeric `K_d(λ)` tables in all three are
-  paywalled and were not obtained** — figures circulating in blog posts and asset packs are largely
-  untraced. Either extract from source, or generate the oceanic series by running the
-  Solonenko & Mobley `K_d(a,b)` relation forward from the chlorophyll ladder, and **say which**.
+  Morel (1988) for the Jerlov↔chlorophyll ladder. The per-type `K_d(490)` and Chl values in the
+  preset table were **extracted from Solonenko & Mobley 2015 (Tables 3–8), fetched 2026-08**;
+  their `M`/`α` CDOM parameters and small/large particle concentrations are in the same tables if
+  a fuller reconstruction is needed. Williamson et al. (*L&O Letters* 8(5), 2023) give depth
+  profiles for all ten types (paywalled, not obtained).
 - **P** — Babin, Morel, Fournier-Sicre, Fell & Stramski (*Limnology & Oceanography* 48(2), 843–859,
   2003): mass-specific scattering ≈0.5 m²/g for mineral-dominated SPM at 555 nm.
 - **P** — Carlson, "A trophic state index for lakes" (*L&O* 22(2), 361–369, 1977): the
@@ -321,10 +345,18 @@ producer gap named at the top of this file; register the fields in `08` and `27`
   123–134, 2008); Crisp & Baloga, "A model for lava flows with two thermal components" (*JGR* 95(B2),
   1255–1270, 1990) — exposed-core area fraction 0.001–0.1. Glen, "The creep of polycrystalline ice"
   (*Proc. R. Soc. A* 228, 519–538, 1955) — `n ≈ 3`.
-- **F / synthesis** — **Glacial-flour turquoise.** The popular Rayleigh/Tyndall explanation is
-  physically wrong at 2–65 µm particle size. The mechanism given above is **synthesis from verified
-  relations, not a quoted result**: a targeted search found no peer-reviewed optical study of
-  proglacial-lake colour combining measured reflectance, particle-size distribution and IOPs. Sound
-  but underived — say so if challenged.
+- **P / synthesis** — **Glacial-flour turquoise.** The popular Rayleigh/Tyndall explanation is
+  physically wrong at 2–65 µm particle size (that is the Mie/geometric regime, near
+  wavelength-independent scattering). The scattering-plus-red-absorption mechanism given above is
+  now grounded in measured-reflectance limnology: in-situ and satellite reflectance studies of
+  glacial lakes relate colour to suspended-sediment load and grain size, and report the diagnostic
+  relationship that **decreasing grain size at fixed concentration shifts the reflectance peak to
+  shorter wavelengths and brightens the water** — which is the concentration/particle→hue knob this
+  chapter uses. Sources: Everest-region in-situ + satellite reflectance study (*Mountain Research
+  and Development* 37(1), 2017); high-elevation U.S. Rocky Mountain lake-colour study
+  (*Environmental Research Letters* 17, 2022). What remains unlocated is a *single* study combining
+  measured reflectance, particle-size distribution and a full IOP decomposition for one proglacial
+  lake; the mechanism is sound and now corroborated, the complete first-principles chain is still
+  assembled here rather than quoted.
 - **L** — The driver→constituent table, the seven doctrine rules, the archetype presets and the
   export schema are this skill's composition over the P-tier relations above.
