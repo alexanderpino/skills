@@ -1,6 +1,6 @@
 {
   "res": 256,
-  "nodeCount": 97,
+  "nodeCount": 99,
   "skipped": [],
   "digests": {
     "add": "dc52fc4e:d3a9ae7",
@@ -98,6 +98,8 @@
     "warp": "3ad3d1a6:ef19167f",
     "water": "263bdef7:bcf4a390|filled=123042f:c1bd235a|accum=8d06cd91:933f145a",
     "water_conflict": "0:0|port_conflicts=741638a5:2",
+    "water_regimes": "263bdef7:bcf4a390|port_foam=96800000:2600000|port_ice=0:0|port_rapids=96800000:2600000|port_river=0:0|port_shore=0:0|port_lake=0:0|port_velocity=6d13b5da:e8a6cade",
+    "water_source": "263bdef7:bcf4a390|port_discharge=9ebf:183a7|port_sourceSupply=0:0|port_sources=741638a5:2|port_guides=741638a5:2",
     "weathering": "263bdef7:bcf4a390|color=655dd8f:845b97df",
     "worley": "6f0e0983:ee0d1128"
   },

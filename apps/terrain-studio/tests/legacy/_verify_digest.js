@@ -95,7 +95,7 @@ const VERBOSE = flag('verbose');
 const RES = parseInt(flagVal('res', '256'), 10);
 const REPEAT = flag('repeat') ? Math.max(1, parseInt(flagVal('repeat', '2'), 10)) : 1;
 const BASELINE = path.resolve(scriptDir, '_digest_baseline.json');
-const REQUIRED_NODE_COUNT = 97;   // 94 + S4.4 Lake, S4.5 Rivers, S4.6 Water Conflict
+const REQUIRED_NODE_COUNT = 99;   // 97 + S4.3 Water Source, S4.9 Water Regimes
 
 // Node types proven non-deterministic and therefore EXCLUDED FROM THE GATE.
 // Populate ONLY from evidence (a --repeat run that disagreed), always with the reason.
@@ -338,6 +338,8 @@ function installHarness(cfg) {
     lake: ['A'],
     rivers: ['A','B'],
     water_conflict: ['A','B','C'],
+    water_source: ['A','B','C'],
+    water_regimes: ['A','B','T','M','A'],
     route: ['A'], chokepoint: ['A'], edge: ['M'],
     switch: ['A','B','C'], gate: ['A'],
     mathnode: ['A','B','C'],
