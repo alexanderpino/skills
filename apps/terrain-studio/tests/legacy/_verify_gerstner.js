@@ -338,6 +338,24 @@ void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, 0.0, N
           identical: !!waterShaderSources.mask && waterShaderSources.mask === waterShaderSources.forward,
           terms: (waterShaderSources.mask || '').split('float th=').length - 1,
           fades: (src.match(/float fd=clamp/g) || []).length,
+          // THE DOMAIN CONVERSION, measured live. A wavelength is only a wavelength if it covers
+          // that many metres of WORLD. The grid attribute spans two units, not one, so a shader
+          // multiplying it by uScale laid every wave down over half the distance it declared and
+          // ran it at 1/sqrt(2) of its phase speed. No gate saw it, because every gate checked the
+          // wave function and none checked the space it was evaluated in.
+          attrSpan: (() => {
+            const b = (typeof buffers !== 'undefined' && buffers && buffers.gridXZ) ? 1 : 0
+            if (!b) return null
+            let lo = Infinity, hi = -Infinity
+            const n = fieldW(), nh = fieldH()
+            for (let y = 0; y < nh; y++) for (let x = 0; x < n; x++) {
+              const v = (x / (n - 1) - 0.5) * 2
+              if (v < lo) lo = v
+              if (v > hi) hi = v
+            }
+            return hi - lo
+          })(),
+          worldScale: terrainDef.scale,
           reachSharp: reach(0), reachCoarse: reach(4000),
         }
       }, mutation)
@@ -349,6 +367,17 @@ void main(){ vec3 N; vec3 d=gerstnerDisp(gl_FragCoord.xy*37.0, 3.5, uMpp, 0.0, N
       !!shared && shared.identical === true && shared.terms === TERMS, shared)
     // Every term fades independently, because they span two orders of magnitude of wavelength: the
     // chop must go over the horizon while the swell, hundreds of metres long, stays.
+    // The factor the shaders actually apply, read from the source rather than assumed. Span times
+    // factor times uScale must equal exactly one world: 2 * 0.5 * scale === scale.
+    const legacySrc = require('fs').readFileSync(path.resolve(__dirname, '../../src/legacy.js'), 'utf8')
+    const factors = [...legacySrc.matchAll(/gerstnerDisp\(axz\*uScale([^,]*),/g)].map(m => m[1].trim())
+    const halved = factors.length >= 2 && factors.every(f => f === '*0.5')
+    check('both passes convert the grid attribute to metres the same way',
+      halved, { factors })
+    check('a declared wavelength covers that many metres of world',
+      shared && shared.attrSpan != null
+      && Math.abs(shared.attrSpan * 0.5 * shared.worldScale - shared.worldScale) < 1e-6,
+      { attrSpan: shared && shared.attrSpan, worldScale: shared && shared.worldScale })
     check('every term carries its own Nyquist fade', !!shared && shared.fades === TERMS,
       { fades: shared && shared.fades, expected: TERMS })
     // ABSENCE OF EVIDENCE. If the sharp probe read flat too, the ratio below would be 0/0 and the

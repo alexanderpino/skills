@@ -5840,7 +5840,13 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // pixel, converted out of grid space. uMppK carries uScale*2*tan(fov/2)/height so the
       // shader does one multiply rather than re-deriving the projection it cannot see.
       float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
-      vec3 WN; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, uCellM, WN);
+      // METRES, and this was out by exactly 2. The grid attribute spans [-1,+1] -- two units --
+      // over a world uScale metres across (see the xz fill: (x/(n-1)-0.5)*2), so axz*uScale covers
+      // 10 km on a 5 km world. Every wavelength laid down HALF the world distance it claimed, and
+      // since omega = sqrt(g*k) comes from the DECLARED wavelength, every wave crawled at exactly
+      // 1/sqrt(2) = 0.7071 of its correct phase speed. Measured across all twelve terms: 0.7071.
+      // Water moving 29% too slow reads as syrup.
+      vec3 WN; vec3 d=gerstnerDisp(axz*uScale*0.5, uTime, mpp, uCellM, WN);
       // SHOALING, which this had exactly backwards. The old fade took the waves to ZERO as water got
       // shallower, so the sea went glassy precisely where real water is at its roughest. Waves
       // entering shallow water slow down, shorten, and GROW: Green's law gives amplitude rising as
@@ -5901,7 +5907,7 @@ ${(waterShaderSources.forward=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => 
       // takes metres.
       float t=uTime*uRippleSpeed,waveAmt=uRipple*coverage*(1.0-ice);
       float mppF=length(uCam-vW)*uMppK;
-      vec4 wd=waterDetail(vXZ*uScale,t,mppF);
+      vec4 wd=waterDetail(vXZ*uScale*0.5,t,mppF);
       vec3 wave=vec3(wd.x,wd.y,0.5+0.5*wd.z);
       // THE GERSTNER NORMAL WAS COMPUTED AND THROWN AWAY. Both vertex shaders evaluate the analytic
       // normal and export vWaveN; this shader declared it as an input and never read a single
@@ -6045,7 +6051,8 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       void main(){
         vDepth=(aw-ah)*uH;
         float mpp=length(uCam-vec3(axz.x, aw*uH+ais/uScale, axz.y))*uMppK;
-        vec3 N; vec3 d=gerstnerDisp(axz*uScale, uTime, mpp, uCellM, N);
+        // Half: axz spans two units, not one. See the forward pass.
+        vec3 N; vec3 d=gerstnerDisp(axz*uScale*0.5, uTime, mpp, uCellM, N);
         // TWO SEPARATE FACTORS, and conflating them was a real bug. wet is a 0..1 shoreline fade
         // so a dry cell is untouched and the shore grows no fringe of waves standing on land.
         // uWaveAmp is the authored height IN METRES and can be 30+. Using one value for both made
@@ -6282,7 +6289,7 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         N=normalize(mix(N,snowN,iceSnowCov));
         float t=uTime*uRippleSpeed;float waveAmt=uRipple*waterCov*(1.0-ice);
         float mppF=length(uCam-Pwater)*uMppK;
-        vec4 wd=waterDetail(Pwater.xz*uScale,t,mppF);
+        vec4 wd=waterDetail(Pwater.xz*uScale*0.5,t,mppF);
         vec3 wave=vec3(wd.x,wd.y,0.5+0.5*wd.z);
         N=normalize(N+waveAmt*vec3(wave.x,0.,wave.y));
         vec3 Vd=normalize(uCam-Pwater);
