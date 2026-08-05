@@ -825,3 +825,66 @@ into two shaders and was the one piece of water GLSL outside that rule — and t
   normal-compensated shoreline foam, and slope-variance specular AA to replace the fixed exponents.
 - Defect 3's fixes (descending spectrum, per-octave rotation, aperiodic sparkle) are verified by
   arithmetic and by the banding oracle staying at 0.000, but none has a mutation of its own.
+
+---
+
+## Sprint 4 audit — verdict: NOT CLOSEABLE
+
+Four auditors plus adversarial cross-checks. The synthesis agent died on the session limit, so this
+is assembled from the six that completed; treat story-level counts as indicative and the individual
+findings below as evidence-backed (each carried a command and its output).
+
+**The headline is not that stories are incomplete. It is that several gates are green on claims they
+do not test.** Four failure modes were named up front and the audit found all four still present.
+
+### Confirmed UNSUPPORTED, with evidence
+
+| Story | Clause | Finding |
+|---|---|---|
+| S4.1 | acceptance gate is `_verify_depression_policy.js` | that file does not exist; the assertions live in `_verify_physical_flow.js` |
+| S4.1 | "Fill raises each basin **exactly to its lowest spill**" | the oracle asserts `fillRaised > 40` — a *count*. The level is never compared to the spill at all |
+| S4.1 | analytic **nested**-basin fixture | no nested fixture anywhere. A probe shows the code is correct; nothing tests it |
+| S4.1 | `conditioningDelta:m`, physical units | declared `unit: 'none'` in ports.js, not metres |
+| S4.1 | emit basin IDs and spill features | the node declares four outputs; neither is among them |
+| S4.2 | "assert all output units/ranges" | no range or unit assertion on any emitted port |
+| S4.3 | movable point/spline objects | no placement editor exists; the only authoring surface is a text parameter |
+| S4.3 | undo/redo | not implemented |
+| S4.5 | NaN discharge guard | the module states the guard; an injected defect passed |
+| S4.5 | lattice-mismatch refusal | unarmed |
+| S4.6 | accepting the offer adds a visible undoable branch | one call site, not reachable from the app |
+| S4.7 | "sampled displaced vertices remain inside inflated bounds" | `presetBounds` is never called by the renderer |
+| S4.7 | "displaced silhouette **instead of** a flat plane with animated normal noise" | **the evidence oracle cannot tell the two apart — zeroing the vertical displacement does not fail it** |
+| S4.8 | all clauses | not implemented. GGX was written, verified against a CPU oracle, and reverted for blowing the sea to white |
+| S4.9 | ice, causal foam, no-ocean-swell-on-rivers | green in the module, UNSUPPORTED in the shipping renderer |
+
+### The pattern, and it is the same one all sprint
+
+Three of the four named failure modes recur here, and the S4.7 row is the worst instance yet: an
+oracle that measures *something changed on screen* while the story's claim is *the geometry moved
+rather than the shading*. Zeroing `d.y` — deleting the entire displacement — leaves it green. That
+is the S4.10 evidence gate certifying the exact thing S4.7 exists to rule out.
+
+The recurring shape across all of them: **the module is gated, the renderer is not.** S4.9's ice,
+foam and river-swell clauses are all about pixels and all asserted against the core. So is S4.7's
+silhouette. A core module can be perfect while the shader ignores it — which is precisely what the
+deferred-normal defect turned out to be.
+
+### Exit gate
+
+Sprint 4 does not close. Blocking, in order:
+
+1. **S4.7's evidence oracle is vacuous on its central claim.** Fix first; everything else is
+   ordinary incompleteness, this one is a gate asserting something untrue.
+2. S4.1's fill-to-spill assertion is a count, not a level.
+3. S4.8 unimplemented.
+4. The module-versus-renderer split in S4.9: either gate the shader or move those clauses to S4.10
+   and mark them open. They must not stay green where they are.
+5. S4.3's authoring surface (placement, undo/redo) — real work, honestly absent rather than
+   mis-gated.
+
+### Not confident about
+
+The synthesis never ran, so there is no single ranked cross-checked list; two of four cross-checks
+also died. One auditor argued some S4.5 items were graded against module comments rather than the
+sprint doc's three acceptance bullets, which would inflate that story's failure count. Re-run the
+audit when the session limit resets.
