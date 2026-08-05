@@ -1,6 +1,6 @@
 ---
 name: gauntlet-loop
-description: Run a Gauntlet Loop — an adversarial build-and-judge quality loop where a lead agent splits a goal into independently judgeable lanes, each with a builder and a separate blind critic in fresh context, iterating against a frozen external quality bar until an agreed stop condition fires. Built for agentic environments with subagents, file access, and version control (Claude Code, Cowork, or equivalent); it degrades in plain chat and says so. Use whenever the user wants to push an inspectable artifact — rendering, UI, prose, code, research output, specs — well past "good enough" toward a reference-class standard through many autonomous rounds, especially long unattended runs. Trigger on "gauntlet", "gauntlet loop", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X", or any request for open-ended quality iteration without a fixed round count. Do not trigger for ordinary code review, bug fixing, or small bounded edits — those want a single pass, not a loop.
+description: Run an adversarial build-and-judge quality loop (Gauntlet Loop) to push inspectable artifacts toward a reference-class standard via autonomous rounds. Trigger on "gauntlet", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
 ---
 
 # Gauntlet Loop
@@ -163,10 +163,10 @@ Per lane, per round:
 
 1. **Build.** Spawn a builder with the lane goal, the bar path, the current
    artifact, and the last named gap. Not the previous builder's reasoning.
-   → `agents/builder.md`
+   → `references/builder.md`
 2. **Snapshot.** Commit the pre-round champion (git; conventions in
    `references/state-and-resume.md`). Nothing is merged yet.
-3. **Judge — two comparisons, both blind where possible** (→ `agents/critic.md`,
+3. **Judge — two comparisons, both blind where possible** (→ `references/critic.md`,
    `references/blind-protocol.md`):
    - **Promotion:** challenger vs champion. Challenger wins → promote. Loses →
      revert. This is the regression guard; skip it only on the very first round
@@ -189,7 +189,7 @@ and prefer the full split whenever a round's outcome will trigger retirement.
 
 At the end of each wave, spawn one fresh agent over the *whole* artifact to
 resolve seams between independently-improved parts. Mandate: coherence, not
-redesign. → `agents/smoother.md`
+redesign. → `references/smoother.md`
 
 Skip it when lanes are genuinely independent. Never skip it on a shared visual
 surface, a single document, or a single rendering pipeline. Then check
@@ -278,5 +278,5 @@ Read at the relevant phase, not upfront:
 - `references/failure-modes.md` — full diagnosis and repair
 - `references/example-run.md` — one annotated run
 
-Subagents: `agents/builder.md`, `agents/critic.md`, `agents/smoother.md`.
+Subagents: `references/builder.md`, `references/critic.md`, `references/smoother.md`.
 Tooling: `scripts/gauntlet.py` (init / log-round / status / report).
