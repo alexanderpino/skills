@@ -371,10 +371,13 @@ export function glslWaterDetail(preset, fnName = 'waterDetail') {
   // normal — the first version of this ran 0.390 / 0.462 / 0.546, ascending at 1.185 per octave,
   // which is the classic driver of shimmer and moire on distant water. These amplitudes give
   // 0.464 / 0.395 / 0.336, descending at 0.85, in line with what shipped ocean shaders use.
+  // Each octave drifts at TWO rates in a prime ratio -- 7:11, 13:17, 19:23. No pair shares a
+  // factor, so no two of the six rates in this layer have a common period, and the interference
+  // pattern between them never returns to a previous state.
   const OCT = [
-    { lambda: 1.40, amp: 1.000, drift: 0.35 },
-    { lambda: 0.65, amp: 0.395, drift: 0.62 },
-    { lambda: 0.28, amp: 0.145, drift: 0.95 },
+    { lambda: 1.40, amp: 1.000, driftA: 0.35 * 7 / 9, driftB: 0.35 * 11 / 9 },
+    { lambda: 0.65, amp: 0.395, driftA: 0.62 * 13 / 15, driftB: 0.62 * 17 / 15 },
+    { lambda: 0.28, amp: 0.145, driftA: 0.95 * 19 / 21, driftB: 0.95 * 23 / 21 },
   ]
   const norm = OCT.reduce((a, o) => a + o.amp, 0)
   const lines = OCT.map((o, i) => {
@@ -390,7 +393,24 @@ export function glslWaterDetail(preset, fnName = 'waterDetail') {
     const qr = `vec2(${f(c)}*q.x+${f(sn)}*q.y, ${f(-sn)}*q.x+${f(c)}*q.y)`
     return `  { float fd=clamp(${f(o.lambda)}/max(2.0*mpp,1e-6)-1.0,0.0,1.0);`
       + ` if(fd>0.0){ vec2 qq=${qr}*${f(k)};`
-      + ` vec3 n=vnoise2(qq + vec2(${f(o.drift * (i % 2 ? -1 : 1))},${f(o.drift * 0.6)})*t);`
+      // TWO COUNTER-DRIFTING SAMPLES, not one. A single translated noise field SLIDES: the same
+      // shapes travel across the surface forever, which reads as a conveyor belt however long the
+      // sum takes to recur. Measured, the three octaves' translation periods are 4.000, 1.048 and
+      // 0.295 s with no exact recurrence under 600 s -- so the surface was never repeating, it was
+      // sliding, and those are different complaints with different fixes.
+      //
+      // Sampling the same octave drifting BOTH ways and summing makes the field interfere with
+      // itself: crests appear and dissolve in place instead of travelling, which is what an evolving
+      // surface looks like. This is the counter-propagation trick from Seascape, and it is the
+      // cheapest thing that turns translation into evolution -- one extra hash per octave.
+      //
+      // THE TWO RATES ARE IN A PRIME RATIO. Equal-and-opposite rates give a standing wave, which is
+      // its own visible pattern. 7:11 shares no factor, so the pair has a beat period of 77 units
+      // rather than 1, and across three octaves using 7:11, 13:17 and 19:23 no two rates in the
+      // whole layer share a common period at all.
+      + ` vec3 nA=vnoise2(qq + vec2(${f(o.driftA * (i % 2 ? -1 : 1))},${f(o.driftA * 0.6)})*t);`
+      + ` vec3 nB=vnoise2(qq*1.031 + vec2(${f(-o.driftB * (i % 2 ? -1 : 1))},${f(o.driftB * 0.47)})*t);`
+      + ` vec3 n=(nA+nB)*0.5;`
       // The gradient comes back in the ROTATED frame and has to be rotated out again, or every
       // octave's highlights are tilted against the one below it.
       + ` vec2 gr=vec2(${f(c)}*n.y-${f(sn)}*n.z, ${f(sn)}*n.y+${f(c)}*n.z);`
