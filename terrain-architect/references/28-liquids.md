@@ -88,10 +88,11 @@ function** says *where the scattered light goes*, and natural water is strongly 
 the Petzold measurements that everyone's water model descends from show a phase function peaked hard
 in the forward direction, which is the same fact as `b_f ≳ 50·b_b` above, expressed as an angle
 rather than a ratio. Real-time renderers do not evaluate a measured phase function; they take a
-single asymmetry parameter `g` and feed it to a Henyey-Greenstein-style lobe — Unreal's Single Layer
-Water shading model exposes exactly three inputs, **scattering coefficients, absorption coefficients
-and a phase `g`**, which is a useful confirmation that the split this chapter exports is the one the
-engine side wants (terrain-renderer `12`). So ship `phase_g` alongside `a` and `b_b`: positive and
+single asymmetry parameter `g` and feed it to a Henyey-Greenstein-style lobe (Unreal's Single Layer
+Water documents a Schlick phase function, the standard cheap HG approximation). That shader's inputs
+are **scattering coefficients, absorption coefficients and a phase `g`** — plus a colour-scale term
+for what is seen through the water — which is useful confirmation that the split this chapter exports
+is the one the engine side wants (terrain-renderer `12`). So ship `phase_g` alongside `a` and `b_b`: positive and
 large for turbid, particle-loaded water (mineral suspensions scatter forward hardest), lower for
 water whose scattering is molecular. Two failure modes it prevents: pre-summing `a + b_b` into one
 "extinction" — which discards the difference between bright-and-murky (sediment) and

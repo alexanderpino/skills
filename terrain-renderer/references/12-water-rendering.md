@@ -1079,8 +1079,9 @@ Water is the classic hard transparency case, and the frame must be structured fo
    it needs multiple light/environment sources, scene-color access, and a BRDF that doesn't fit
    the G-buffer. Budget it as forward: it pays full lighting cost per pixel, which is why water
    area on screen is a load-bearing profiling axis (`11`).
-7. **The dedicated single-layer pass**: the fourth structural option, and the one shipped
-   engines increasingly take. Draw the water surface as *opaque* geometry into the G-buffer, let
+7. **The dedicated single-layer pass**: a structural alternative to sorting rather than a rule
+   about it, and the route Unreal's Single Layer Water takes. Draw the water surface as *opaque*
+   geometry into the G-buffer, let
    it receive ordinary deferred lighting and shadows, then run one dedicated pass — after
    lighting, before regular translucency — that integrates a homogeneous participating medium
    between the surface and the opaque scene behind it. Sorting disappears (water is opaque
@@ -1107,7 +1108,7 @@ against the version you ship on.
 
 | Part | What it is | Read as |
 |---|---|---|
-| **Water Zone** | A bounded actor owning water rendering over a region: zone extent, render-target resolution, the water mesh, the info texture, optional local-only tessellation in a sliding window around the view. Multiple zones coexist under World Partition | The water surface's **paging/streaming unit** — the camera-following overlay doctrine (`13`, `14`) applied to water |
+| **Water Zone** | A *bounded* actor owning water rendering over a region: zone extent, render-target resolution, the water mesh, the info texture, optional local-only tessellation in a sliding window around the view (**?** whether and how several zones compose in one world is version-sensitive — check your release) | The water surface's **paging/streaming unit** — the camera-following overlay doctrine (`13`, `14`) applied to water |
 | **Water Body actors** | Ocean / Lake / River / Island / Custom — splines (or a static mesh) with per-point metadata | `bodyType` plus per-body geometry: terrain-architect's `liquidBody` record (`28`), *authored* rather than generated |
 | **Water mesh** | A quadtree of tiles over the zone, LOD as concentric rings around the camera, tiles morphing between levels | The world-space grid of [Surface geometry & LOD](#surface-geometry--lod) |
 | **Water Info Texture** | One top-down capture of every water body **and the ground beneath them**, into a render-target array everything downstream samples | A runtime-rasterized version of the generator's handoff fields |
@@ -1117,14 +1118,16 @@ against the version you ship on.
 
 Documented behavior: the quadtree is traversed each frame to produce the visible tile set; tiles are
 generated **only where a body's spline says water exists**, so open land costs nothing; each LOD is a
-concentric ring around the camera carrying half the vertex density of the ring inside it; transitions
-**morph** (four quads collapse into one when coarsening, one expands into sixteen when refining)
-rather than swapping. Defaults worth knowing as orders of magnitude: `Tile Size` 2400 uu (24 m),
-`Extent in Tiles` 64 as a radius from the centre — so the default zone is roughly 1.5 km out, ~3 km
-across, which is a useful reminder that a *bounded* water zone has to be sized against the view
-distance and not left at its default — with `LODScale` setting where morphing begins and
-`Tessellation Factor` setting vertex density inside a tile — Epic notes lakes and oceans benefit most
-from raising it, because they are the bodies carrying real displacement.
+concentric ring around the camera, each successive ring carrying half the vertices of the one inside
+it; and transitions **morph** rather than swap — Epic's wording is that four quads become a single
+quad when dropping a level, or become sixteen when gaining one.
+
+Defaults worth knowing as orders of magnitude: `Tile Size` 2400 uu (24 m) and `Extent in Tiles` 64
+as a radius from the centre, so an untouched zone reaches roughly 1.5 km out and ~3 km across. That
+number is the useful one: a *bounded* water zone must be sized against the game's view distance, and
+the default is smaller than most open worlds need. `LODScale` sets where morphing begins;
+`Tessellation Factor` sets vertex density inside a tile, and Epic notes lakes and oceans benefit most
+from raising it — they are the bodies carrying real displacement.
 
 The **Far Distance Mesh** is the infinite-ocean skirt, shipped, complete with the failure it exists
 to fix: Epic states that an ocean body can hit its maximum extent "without completely filling the
@@ -1136,21 +1139,36 @@ the horizon.
 
 ### The Water Info Texture: fuse the handoff into one sampleable field
 
-The zone renders, top-down, all of its water bodies *and the terrain under them* — landscape proxies
-intersecting the zone bounds can be auto-included as "ground actors" — into a render target (a
-texture **array** in current versions; the single-target form is deprecated). Knobs that reveal the
-design: a half-precision toggle choosing **16 or 32 bits per channel**, a **capture Z offset** that
-places the capture plane above the highest water in the zone, a **velocity blur radius** applied in a
-"finalize water info" pass, and an explicit rebuild/update path. Everything downstream — the surface
-material, shore fade, flow, gameplay queries — samples that one texture.
+The zone renders its water bodies top-down into a render target (a texture **array** in current
+versions; the single-target form is deprecated). Knobs that reveal the design: a half-precision
+toggle choosing **16 or 32 bits per channel**, a **capture Z offset** that places the capture plane
+above the highest water in the zone, a **velocity blur radius** applied in a "finalize water info"
+pass, and an explicit rebuild/update path. Everything downstream — the surface material, shore fade,
+flow, gameplay queries — samples that one texture.
+
+The capture is not water-only: the zone registers **ground actors** (landscape proxies intersecting
+its bounds can be auto-included) and carries a `GroundZMin`, so the terrain beneath the water
+participates. Epic's documentation does not spell out the channel layout, and this chapter
+deliberately does not guess it — what the API surface establishes is that **water and ground are
+captured into one field together**, which is the load-bearing architectural fact. Treat any specific
+channel packing you read elsewhere as unverified.
 
 Name the technique independently of the engine: **rasterize the water layer stack into one
 view-independent field, and let every consumer read it.** The virtues are the ones `14` argues for —
 one surface truth, one coordinate frame, no consumer re-deriving hydrology — and the fact that the
 capture holds *ground* alongside water is terrain-architect's layer stack (`08`) made concrete: water
-surface and solid top in one texture, depth being their difference. Any engine can build this; a
+surface and solid top in one field, depth being their difference. Any engine can build this; a
 project with no generator handoff can build it *from* its authored water and get most of the
 chapter's depth-driven cues immediately.
+
+One tension to resolve deliberately, because it cuts against
+[the handoff](#the-handoff-seen-from-the-render-side): rasterizing bodies into a capture is
+*re-deriving* depth and flow that a generator may already have shipped. Both can be true — the
+capture is the right *delivery mechanism* (one field, one frame, sampled by everyone), and the
+generator's fields are the right *content*. Where the handoff exists, the capture should be populated
+from the exported depth, flow and shore-distance rather than recomputed from spline geometry, or the
+two disagree at exactly the shoreline. Re-derivation is the fallback for pipelines with no generator,
+not the default.
 
 The costs are the price of any texture-shaped truth, and each is a review question:
 
@@ -1218,14 +1236,16 @@ their length; lakes are **closed** loops whose points must all sit at **one elev
 closed loops around a shoreline; **Island** bodies exist only to push terrain above water; **Custom**
 bodies are static meshes and — a real trap — do *not* carve terrain and do not use the water mesh.
 Carving runs through a Landmass landscape brush writing into a Landscape **edit layer**: it is
-non-destructive, and it is inert unless the landscape has edit layers enabled, which is the
-documented cause of the classic "my river hovers above the ground" symptom. The brush exposes a depth
+non-destructive, and Epic documents that it only edits the landscape when edit layers are enabled —
+which is the requirement behind the classic "my river hovers above the ground" symptom (the
+symptom→cause link is this chapter's, not Epic's). The brush exposes a depth
 curve multiplied by each spline point's depth, falloff by angle or by fixed width, an edge offset
 producing a flat shore shelf, and blend modes (alpha / min / max / additive — the last preserving the
 underlying detail rather than replacing it).
 
-Three consequences matter on the rendering side; the generation-side half of this handoff is
-terrain-architect's `27`:
+Three consequences matter on the rendering side. The Landscape-contract half — brush ordering, edit
+layers, collision, and the fact that this brush family is not water-specific — is `03`; the
+generation-side half is terrain-architect's `27`:
 
 - **The bathymetry the water reads was authored by the same spline that drew the water.** Depth is
   self-consistent by construction, so shore fade, shoaling and the colour ramp cannot disagree with
@@ -1262,8 +1282,8 @@ unhandled it reads as two shaders arguing along a line.
    belong in the budget sheet (`11`) like any other terrain pass.
 
 Honesty about tier: this section is engine documentation (D/N), not measurement, and Water has
-changed shape across releases — single render target → texture array, a global water mesh → bounded
-zones with local-only tessellation. Community reports of version-specific breakage (notably water
+changed shape across releases — single render target → texture array, and a single Water Mesh actor
+(as documented in the UE4-era pages) → bounded Water Zones with local-only tessellation. Community reports of version-specific breakage (notably water
 interaction under World Partition) are F-tier and worth checking against your release. Treat every
 constant above as a shipped default, not a law, and treat the *architecture* — one paged zone, one
 fused info capture, a sparse morphing quadtree, one wave evaluator, an opaque-surface volume pass —

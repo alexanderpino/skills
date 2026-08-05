@@ -234,8 +234,8 @@ determines what the curve is allowed to contain**:
 
 A curve entering the solve carries **causes**; a curve leaving it carries **measurements**; only a
 curve applied after the solve carries **height**, and then only for features that were built rather
-than eroded. Every "my spline mountains look fake" complaint is a `CAUSE_SEED` landform authored as a
-`POST_SOLVE_STAMP`.
+than eroded. Nearly every "my spline mountains look fake" complaint is a `CAUSE_SEED` landform
+authored as a `POST_SOLVE_STAMP`.
 
 ### The ordering rule
 
@@ -258,8 +258,11 @@ shallow and feathered, and it pays the re-derive cost.
 
 ### A range is a divide, not a ridgeline
 
-Extruding a curve into a Gaussian ridge produces a **smooth wall**: no valleys, no spurs, no
-drainage divide, no reason for anything to be where it is. The fix is already in `02` — put the curve
+Extruding a curve into a Gaussian ridge produces a **smooth wall**. It technically *is* a divide —
+water runs off both flanks — but it is the wrong kind: no valleys, no spurs, and a crest line that
+runs exactly where the curve was drawn instead of wandering where competing headward erosion put it.
+A real divide is an emergent, sinuous boundary between two growing networks. The fix is already in
+`02` — put the curve
 into the uplift field (`U = A·exp(-d²/2σ²)` along the polyline) and let stream power and hillslope
 diffusion dissect it. The valley network is the product; the curve only says *where the rock came up*.
 
@@ -276,10 +279,14 @@ Per-station attributes a range curve should carry, and the tells if it doesn't:
 Three couplings a curve-placed range must also honour, because they are what make it read as
 *present in the world* rather than pasted onto it:
 
-- **Drainage crosses it.** A range that no river cuts through is a tell. An antecedent river holds
-  its course through rising rock and leaves a **water gap**; an abandoned one leaves a **wind gap**
-  notched in the divide (`20`). If a big trunk river already exists in the domain, let it keep its
-  path through the new uplift rather than diverting it — that *is* the antecedent case.
+- **Its effect on existing drainage is decided, not ignored.** Plenty of real ranges are clean
+  divides that nothing crosses, so a range without a water gap is not automatically wrong — but a
+  range dropped into a domain that *already has a trunk river* has to resolve what happened to it.
+  Two legitimate outcomes: the river is defeated and diverted along the front, or it holds its course
+  through the rising rock and leaves a **water gap** (the antecedent case; an abandoned one leaves a
+  **wind gap** notched in the divide — `20`). The defect is the third outcome, where the uplift is
+  stamped and the exported flow field still shows the old river running straight through a solid
+  ridge.
 - **It casts a rain shadow.** Place the range in the climate solve too, or the leeward side stays as
   wet as the windward one and the vegetation, snow line and erosion rates all disagree with the
   topography (`13`).
@@ -296,8 +303,8 @@ crosswalk:
 
 | Gorge kind | Cause to seed | Cross-section | Route |
 |---|---|---|---|
-| Fluvial canyon / **entrenched meander** | Channel path + discharge, with uplift or base-level fall | V, and the bends keep a meander wavelength inherited from a *much wider* former floodplain | `03`, `04`, blueprint in `20` |
-| **Slot canyon** | Path along a joint set; flash-flood abrasion in massive rock | Width 1–10 m against 10–100 m depth; scalloped, overhanging walls | `20`, `16` |
+| Fluvial canyon / **entrenched meander** | Channel path + discharge, with uplift or base-level fall | V; and the bends are a *fossil planform* — set when the river was free to migrate on a floodplain, then incised vertically into rock, so the walls are rock rather than cutbanks (`20`) | `03`, `04`, blueprint in `20` |
+| **Slot canyon** | Path along a joint set; flash-flood abrasion in massive rock | Width an order of magnitude or two below depth (metres against tens of metres); scalloped, overhanging walls — the overhang is non-heightfield (`11`) | `20`, `16` |
 | **Fault / joint-guided gorge** | A weakness line in `strataHardness`, *not* a height cut | Straight runs with abrupt angular bends at joint intersections | `11` |
 | **Glacial trough** | Ice flowline + thickness | **U**, with hanging tributaries and truncated spurs | `12` |
 | **Box canyon / sapping** | A spring line at the head | Theatre-headed amphitheatre terminus, no tributary network above it | `11`, `20` |
@@ -308,13 +315,17 @@ Five invariants apply to all of them, and each is a cheap assertion:
    carved by nothing" tell (`20`); its floor must connect to the drainage network at both ends.
 2. **The floor is monotone downstream.** Same defect, and same check, as the uphill river of `27`.
 3. **Two widths, not one.** The channel on the floor is sized by hydraulic geometry (`03`); the
-   *gorge* is sized by wall retreat over the incision history. Authoring one number for both gives
-   either a slot with a river too big for it or a canyon with a stream lost in the bottom.
+   *gorge* is sized by wall retreat over the incision history. Ship both. Collapsing them to one
+   number gives a river that exactly fills its canyon at every station — the single clearest tell
+   that the gorge was swept rather than incised.
 4. **The walls record the rock.** Strata benching where resistance alternates (`11`), talus at repose
    at the base (`05`), caprock overhangs. Constant-slope unbenched walls are an extruded profile.
-5. **Tributaries hang or notch, consistently.** Fast trunk incision leaves tributaries perched with
-   waterfalls at the junction (`04`); slow incision lets them meet at grade. Pick one; a gorge with
-   both is telling two histories.
+5. **Whether a tributary hangs follows from its own power, not from taste.** A trunk incising faster
+   than a tributary can keep up leaves that tributary perched, with a waterfall at the junction
+   (`04`). Since incision scales with discharge, the realistic pattern is *graded*: small tributaries
+   hang, large ones keep pace and meet at grade, in the same gorge. The defect is hanging assigned
+   arbitrarily — a big tributary perched above a trickle that meets at grade is telling two
+   histories.
 
 ### The cross-section vocabulary
 
@@ -327,9 +338,12 @@ curve_landform:
   role                 # CAUSE_SEED | POST_SOLVE_STAMP | SOLVE_PROJECTION   (above)
   vertices[]:
     xy
-    z                  # crest elevation (range) or floor elevation (gorge/valley/road)
+    z                  # STAMP / PROJECTION only: crest elevation (range) or floor elevation
+                       #   (gorge, valley, road). A CAUSE_SEED range MUST NOT carry a crest
+                       #   elevation - the crest is an erosion product; use amplitude instead
     halfWidth_m        # the feature's own half-width at this station
-    amplitude_m        # uplift magnitude for a CAUSE_SEED; metres above/below for a STAMP
+    amplitude_m        # CAUSE_SEED: the process magnitude (uplift A, incision rate, ice thickness)
+                       # STAMP:      metres above / below the surrounding surface
     asymmetry          # [-1,1]: which flank is steeper
   falloff              # ANGLE (extend the flank at a slope until it meets terrain) | WIDTH (fixed)
   profile              # V | U | slot | box | flat | authored 1D cross-section curve

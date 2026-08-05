@@ -350,8 +350,9 @@ Nothing in the machinery above is water-specific. The engine-side primitive is a
 terrain through a non-destructive brush layer**, and engines ship it in general form: Unreal's
 Landscape Splines deform height and paint weights along a curve from per-control-point width and
 falloff, and Landmass custom brushes build a landmass *from a spline* with a falloff angle, blend
-mode and capped/uncapped top — the water bodies are one instance of a base class, not the feature
-itself (terrain-renderer `03`). So the same handoff serves ridgelines, gorges, escarpments, terraces,
+mode and capped/uncapped top. The water bodies' brushes are one member of that general
+blueprint-brush family, not the family itself (terrain-renderer `03`). So the same handoff serves
+ridgelines, gorges, escarpments, terraces,
 levees and road corridors, using `10`'s `curve_landform` record as the wire format.
 
 **When to ship a landform as a curve rather than only as height.** Rasters are sufficient when the
@@ -373,10 +374,10 @@ as a `CAUSE_SEED` (re-running uplift or incision engine-side) is a different and
 and it must say so, because the two cannot be blended.
 
 **`carveOwner` applies to every curve landform, not just water**, and the double-carve defect has the
-same shape: a range incised by the erosion solve and then *raised again* by an engine brush becomes a
-smooth wall sitting on top of its own dissected flanks; a gorge cut twice becomes a slot inside a
-canyon. Declare it per landform, and where the engine owns the cut, ship pre-carve height plus the
-curve.
+same shape one process over: a range raised by uplift and dissected by erosion, then raised *again*
+by a brush, ends up as a smooth wall sitting on its own dissected flanks; a gorge cut twice becomes a
+slot inside a canyon. Declare it per landform, and where the engine owns the edit, ship the
+pre-brush height plus the curve.
 
 **Two invariants beyond the water set.** A ridgeline curve must be a **drainage divide** in the
 exported flow field — flow on both sides runs away from it, and if the engine's brush raises it
