@@ -259,6 +259,15 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   where hillslope becomes channel, and what sets drainage density. Determines the upstream sources
   of the channel network (`03`). Same authors as the SHALSTAB landslide model (`05`); earlier form
   Montgomery & Dietrich 1988, Nature 336, 232–234.
+- **Ekman, V.W. (1905).** *On the influence of the earth's rotation on ocean-currents.* Arkiv för
+  Matematik, Astronomi och Fysik 2(11). — Wind-driven surface current deflected ~45° from the wind
+  (right in the N hemisphere, left in the S) by Coriolis; the basis for sourcing a defensible
+  ocean far-field direction from the wind (`03` ocean flow). Surface-drift 45° is the classic
+  theoretical value (a look), not a per-site guarantee.
+- **Ocean gyres / western intensification** — standard physical oceanography: subtropical gyres
+  turn clockwise (N) / anticlockwise (S), western boundary currents fast, narrow and intensified.
+  No single canonical citation; used here only as authored flavour for a basin-scale current, never
+  a simulation (`03`).
 
 ## Analysis
 
