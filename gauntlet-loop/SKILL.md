@@ -80,13 +80,14 @@ gauntlet/
 ├── bar/             # frozen bar artifacts — never edited after intake
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
+├── workbench.html   # live Kanban board (updated via #gauntlet-state JSON)
 └── report.md        # drafted by the script at the end, completed by you
 ```
 
 ```bash
-python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf --budget-waves 12
+python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf --bar-kind reference --budget-waves 12
 python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
-    --mode blind --winner other --margin clear --severity major --gap "..." \
+    --mode blind --winner other --margin clear --score 7 --severity major --gap "..." \
     --evidence shots/w2r3.png
 python3 scripts/gauntlet.py status    # streaks, revert rate, fired stop conditions
 python3 scripts/gauntlet.py report    # draft the end-of-run report from the log
@@ -99,8 +100,9 @@ validation is the point. Full layout, git conventions and the resume protocol:
 ## Phase 0 — The contract
 
 Never start looping without this settled. Read `references/intake.md`, then put a
-compact contract in front of the user and get confirmation. Infer or propose
-everything you can; only **stop conditions** and **budget** genuinely require the
+compact contract in front of the user and get confirmation. 
+First, you must set up the **Live Kanban Workbench** by copying the HTML template to `gauntlet/workbench.html` and opening it in the user's browser.
+Infer or propose everything you can; only **stop conditions** and **budget** genuinely require the
 user, because they encode how much time and money the run may spend.
 
 | Field | What it fixes |
@@ -224,6 +226,7 @@ worth less than one that says exactly where the artifact is still weak.
   wandering downhill one plausible-sounding round at a time.
 - **Every comparison goes through the log.** State the model remembers is state
   the run will lose.
+- **Language Rules (ASD-STE100).** All visible text on the Kanban board (goals, gaps, next fixes) and reports must use Simplified Technical English: max 20-25 words per sentence, active voice, one instruction per sentence, no AI marketing language.
 
 ## Failure modes
 

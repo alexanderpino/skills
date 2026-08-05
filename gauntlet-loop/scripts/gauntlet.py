@@ -28,6 +28,7 @@ DEFAULT_CONFIG = {
     "stops": {"bar_met_n": 2, "clean_streak_n": 2, "budget_waves": 12},
     "dimensions": ["overall"],
     "lanes": [],
+    "bar_kind": "reference",
 }
 
 
@@ -76,6 +77,10 @@ def cmd_init(args):
         cfg["stops"]["clean_streak_n"] = args.clean_streak_n
     if args.budget_waves is not None:
         cfg["stops"]["budget_waves"] = args.budget_waves
+    if args.bar_kind:
+        if args.bar_kind not in ("reference", "acceptance criteria", "hybrid"):
+            die("bar-kind must be one of: reference, acceptance criteria, hybrid")
+        cfg["bar_kind"] = args.bar_kind
     (root / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
     for name, header in (
         ("contract.md", "# Gauntlet contract\n\n(goal / bar / inspection / stops / budget / autonomy / workbench)\n"),
@@ -110,6 +115,8 @@ def cmd_log_round(args):
         die(f"winner must be one of {WINNERS} (in champion mode: ours=challenger, other=champion)")
     if args.margin not in MARGINS:
         die(f"margin must be one of {MARGINS}")
+    if args.score is None or not (0 <= args.score <= 10):
+        die("score must be an integer between 0 and 10")
     if not args.evidence:
         die("evidence is required — a verdict with nothing inspected is not a round")
 
@@ -122,6 +129,7 @@ def cmd_log_round(args):
         "mode": args.mode,
         "winner": args.winner,
         "margin": args.margin,
+        "score": args.score,
         "evidence": args.evidence,
         "critic_framing": args.critic_framing,
     }
@@ -291,6 +299,7 @@ def main():
     p = sub.add_parser("init")
     p.add_argument("--lanes", help="comma-separated initial lane names")
     p.add_argument("--dimensions", help="comma-separated bar dimensions (default: overall)")
+    p.add_argument("--bar-kind", help="reference|acceptance criteria|hybrid")
     p.add_argument("--bar-met-n", type=int)
     p.add_argument("--clean-streak-n", type=int)
     p.add_argument("--budget-waves", type=int)
@@ -305,6 +314,7 @@ def main():
     p.add_argument("--mode", required=True, help="blind|rubric (vs bar) or champion (promotion)")
     p.add_argument("--winner", required=True, help="ours|other")
     p.add_argument("--margin", required=True, help="decisive|clear|thin")
+    p.add_argument("--score", type=int, required=True, help="0-10 integer score")
     p.add_argument("--severity", help="major|minor|none — bar modes only")
     p.add_argument("--gap", help="the named gap — required unless severity none")
     p.add_argument("--evidence", required=True, help="path/measurement actually inspected")

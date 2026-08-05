@@ -4,6 +4,13 @@ The contract exists because an unattended loop cannot ask permission later. Ever
 field here is something that becomes expensive or impossible to change once the
 loop is running.
 
+## Phase 0: The Workbench (Must be step 1)
+
+Before proposing a contract, you must set up the live progress board.
+1. Copy the provided HTML template to `gauntlet/workbench.html`.
+2. Open this file directly in the user's browser (e.g. using `start`, `open`, or `xdg-open`).
+3. Sub-agents MUST ONLY edit the `#gauntlet-state` JSON block within this HTML file. Never generate or rewrite the HTML structure itself.
+
 ## How to run intake without interrogating anyone
 
 Most of the contract you can propose. Only two things genuinely require the user:
@@ -20,6 +27,7 @@ one with a one-line justification and let them override it.
 
 ```
 GOAL     <destination, one sentence — not an implementation plan>
+BAR KIND <reference | acceptance criteria | hybrid>
 BAR      <the concrete comparator, and where its files live>
 INSPECT  <how a critic reaches the real output each round>
 LANES    <your proposed initial split, or "to be cut after first look">
@@ -36,6 +44,11 @@ BENCH    <where progress is visible>
 the lighting hold up against these three reference frames" is a destination. If
 they insist on the route, take it — but note that you are giving up the model's
 judgement about approach, which is where a lot of the method's value sits.
+
+**Bar Kind.** Must be one of three explicit types:
+- `reference`: compare against an existing product or URL.
+- `acceptance criteria`: compare against a checklist or test suite.
+- `hybrid`: a combination of both.
 
 **Bar.** See `bar-selection.md`. Freeze the artifacts under `gauntlet/bar/` now,
 before any lane runs.
@@ -83,7 +96,7 @@ Initialise the state directory as part of confirming the contract:
 
 ```bash
 python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
-    --bar-met-n 2 --clean-streak-n 2 --budget-waves <N>
+    --bar-kind <kind> --bar-met-n 2 --clean-streak-n 2 --budget-waves <N>
 ```
 
 

@@ -4,7 +4,21 @@ A long unattended run needs a surface the user can glance at without interruptin
 it. Interrupting to ask for status costs a context switch on both sides and is the
 main reason people stop letting loops run long enough to work.
 
-Build one page, update it as you go, and tell the user where it is.
+## The Live Kanban Workbench
+
+The workbench is an HTML file (`gauntlet/workbench.html`) that serves as a live Progress Board (Kanban).
+During Phase 0, the lead agent copies a provided HTML template to this location and opens it in the user's browser.
+
+**CRITICAL RULE:** You and all sub-agents MUST ONLY edit the `#gauntlet-state` JSON block inside this HTML file. You must NEVER generate, modify, or rewrite the HTML structure itself.
+
+## Language Rules (ASD-STE100)
+
+All visible text on the Kanban board (goals, gaps, next fixes) must be written in Simplified Technical English:
+1. Maximum sentence length: 20-25 words.
+2. Use active voice always.
+3. One instruction or statement per sentence.
+4. ZERO AI marketing language (no "amazing", "leverage", "streamline", "delve").
+5. Be direct and objective.
 
 ## What it needs
 
@@ -14,10 +28,6 @@ Build one page, update it as you go, and tell the user where it is.
   screenshots, rendered pages, drafts, benchmark numbers, test output
 - Champion history, so a user can see whether it is still climbing
 - Reverts, visibly — a run that reverts often looks different from one that does not
-
-Do not over-specify the format. A single self-contained HTML file works well
-because it opens from a phone. A markdown file works when there is nothing visual.
-Match the artifact: a perf run wants a chart, a rendering run wants images.
 
 ## Round log schema
 
@@ -35,6 +45,7 @@ Two record shapes share the file, distinguished by `mode`:
   "ts": "2026-08-05T14:31:02+00:00",
   "wave": 3, "lane": "terrain-lighting", "dimension": "visual", "round": 7,
   "mode": "blind", "winner": "other", "margin": "thin",
+  "score": 7,
   "severity": "minor",
   "gap": "no contact shadow where rock meets ground plane",
   "evidence": "gauntlet/shots/w3-terrain-r7.png",
@@ -49,6 +60,7 @@ Two record shapes share the file, distinguished by `mode`:
   "ts": "2026-08-05T14:29:41+00:00",
   "wave": 3, "lane": "terrain-lighting", "dimension": "visual", "round": 7,
   "mode": "champion", "winner": "ours", "margin": "clear",
+  "score": 8,
   "action": "promoted", "champion_ref": "4f2a91c",
   "evidence": "gauntlet/shots/w3-terrain-r7-champ.png",
   "critic_framing": "default"
