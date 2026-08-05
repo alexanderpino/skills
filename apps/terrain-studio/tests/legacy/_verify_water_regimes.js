@@ -828,7 +828,38 @@ const gridField = key => {
     velMoving === 1024 && velWorst < 1e-6 && velStandingNonZero === 0,
     { velMoving, velWorst, velStandingNonZero })
 
-  check('assertion inventory non-empty', assertions.length >= 30, assertions.length)
+  // --- SCOPE TRIPWIRE: what this oracle does NOT cover -------------------------------------------
+  //
+  // The Sprint 4 audit found three S4.9 clauses — ice suppressing waves, causal foam, and no ocean
+  // swell on rivers — asserted against the CORE and green, while the shipping renderer does none of
+  // them. That is the worst kind of green: a story reads as met because a module is right, and the
+  // module is not what anyone looks at.
+  //
+  // The cause is architectural, not a missing line. `waterLook.bodyKind` is a GLOBAL: it selects one
+  // wave preset that is baked into the shader at compile time and applied to every wet vertex. There
+  // is no per-cell body kind, so the renderer cannot give a river different waves from the sea beside
+  // it, however correct BODY_FETCH_M.river === 0 is in here.
+  //
+  // Rather than leave that as prose in a report nobody re-reads, it is asserted. This FAILS the day
+  // someone makes body kind per-cell — which is exactly when these three clauses stop being
+  // core-only and the oracle must be extended to the pixels. A tripwire that fires on the fix is how
+  // the lake oracle's pending-semantics check worked, and it fired correctly.
+  {
+    const lg = require('fs').readFileSync(path.resolve(__dirname, '../../src/legacy.js'), 'utf8')
+    const perCell = /uBodyKind|aBodyKind|in float aBody|bodyKind\s*\[/.test(lg)
+    check('body kind is still a GLOBAL, so the three renderer clauses remain core-only',
+      !perCell,
+      { perCellBodyKind: perCell,
+        note: 'When this fails, body kind became per-cell: extend this oracle to assert ice '
+          + 'suppression, causal foam and river-vs-ocean waves ON THE RENDERED PIXELS, and only '
+          + 'then may S4.9 clauses 9f/9g/9h be called met.' })
+    // ...and the core claim it stands in for must actually hold, or the tripwire guards nothing.
+    check('the core does distinguish a river from an ocean by fetch',
+      M.BODY_FETCH_M && M.BODY_FETCH_M.river === 0 && M.BODY_FETCH_M.ocean > 0,
+      { river: M.BODY_FETCH_M && M.BODY_FETCH_M.river, ocean: M.BODY_FETCH_M && M.BODY_FETCH_M.ocean })
+  }
+
+  check('assertion inventory non-empty', assertions.length >= 32, assertions.length)
 
   // The readings this gate turns on, printed so a reviewer can see the fixture actually produced
   // them. Every one of them is asserted above; none is diagnostic-only.
