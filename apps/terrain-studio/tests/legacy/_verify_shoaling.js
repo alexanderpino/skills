@@ -31,16 +31,21 @@ const MUTATIONS = [
 ]
 const PATCHES = {
   'no-shoaling': [[
-    'const gain = Math.min(Math.pow(Math.max(ref / d, 1), 0.25), SHOAL_MAX_GAIN)',
-    'const gain = 1',
+    // ANCHORED ON THE LINE THAT FOLLOWS, because the Green's-law gain is now written twice: once
+    // in shoalAmplitude and once in breakFraction, which was added later for the surf criterion.
+    // The bare gain line matched both, the patcher refused to guess, and the mutation ABORTED at
+    // exit 2 — so gate.py saw a red with no failed=[] and reported 'red but named no gate'. It
+    // had been half-armed ever since. The `dry` damping exists only in shoalAmplitude.
+    'const gain = Math.min(Math.pow(Math.max(ref / d, 1), 0.25), SHOAL_MAX_GAIN)\n  const dry = Math.min(d * 2, 1)',
+    'const gain = 1\n  const dry = Math.min(d * 2, 1)',
   ]],
   'no-breaking': [[
     'return Math.min(ampM * gain, SHOAL_BREAK_RATIO * d) * dry',
     'return ampM * gain * dry',
   ]],
   'fade-to-zero': [[
-    'const gain = Math.min(Math.pow(Math.max(ref / d, 1), 0.25), SHOAL_MAX_GAIN)',
-    'const gain = Math.min(d / Math.max(ref, 1e-6), 1)',
+    'const gain = Math.min(Math.pow(Math.max(ref / d, 1), 0.25), SHOAL_MAX_GAIN)\n  const dry = Math.min(d * 2, 1)',
+    'const gain = Math.min(d / Math.max(ref, 1e-6), 1)\n  const dry = Math.min(d * 2, 1)',
   ]],
 }
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
