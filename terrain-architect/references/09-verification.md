@@ -347,6 +347,7 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Channels drawn up onto smooth hillslopes | No channel-initiation threshold | Start channels where area×slope crosses the channel-head value (`03`); hillslope above it (`05`) |
 | Big river vanishes crossing a dry region | Discharge read off local area, not routed `Q` | Route `Q` (sourced upstream) so a river carries its far-catchment water across a desert (`03`) |
 | Ocean is flat zero flow, or a uniform arrow into the cliffs | No far-field current, or seeded but not coast-deflected | Seed a wind/Coriolis direction at edge tiles; bend it shore-parallel near the coast (`03`, `12`) |
+| Headwaters in a rain shadow / springs with no structural reason | Sources scattered by hand, not derived from process | Locate each origin from a cause in the graph: orographic rain, fault/contact springs, snowline melt (`03`, `13`, `11`) |
 | Lake rendered with ocean swell, or a current | Water-body type never detected/exported | Tag `bodyType` (lake=wind-waves-only via fetch, no flow); export it in `liquidBody` (`03`, `28`) |
 | Mountain tarn has rolling swell | No fetch limit; deep-water waves on a small body | Wind waves grow with fetch (`e~√fetch`); a small pond has almost none (`03`, `12`) |
 | River runs at channel speed into the sea/lake | No backwater; base-level deceleration missing | Fade velocity to near-zero as the surface slope flattens at base level (`03`) |

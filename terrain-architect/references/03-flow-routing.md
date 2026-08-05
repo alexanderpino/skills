@@ -717,6 +717,17 @@ channel-initiation value — do not draw channels up onto ground the hydrology l
 and do not run routing's single-cell threads across what should read as smooth colluvial hollow
 (`06` convergence).
 
+**Origins are derived, not scattered.** A flow field's sources are a *claim about the terrain's
+process history* (the skill's spine doctrine, `SKILL.md`), so **suggest them from the fields the
+world already has** rather than dropping point sources by hand: orographic precipitation (`13`)
+puts the big **headwaters** on the windward, wet uplands; structural geology puts **springs** on
+fault lines (`02`) and permeable-over-impermeable **lithology contacts** (`11`); elevation and
+climate put **snow/glacial melt** on the high ground (`13`, `12`); the karst network puts
+**resurgences** at its sink exits (`11`). A river whose headwaters sit in a rain shadow, or a
+spring with no structural reason to be there, is an origin that contradicts the terrain — the tell
+that sources were placed for convenience instead of derived. The table below is the catalogue;
+the rule is that each entry is *located by a cause already in the graph*.
+
 **Kinds of source, and where each comes from:**
 
 | Source | How to place it | Notes |
