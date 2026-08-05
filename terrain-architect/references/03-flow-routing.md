@@ -673,8 +673,9 @@ you have a spring, a river entering from off-map, or non-uniform rainfall. The f
 **discharge `Q`** (m³/s, or m³ per timestep) instead of bare area:
 
 ```
-Q[c] = localRain[c] * cellArea            # distributed source — the precip field from 13
-     + pointSource[c]                     # springs, authored inflows (m³/s injected at c)
+Q[c] = C[c] * localRain[c] * cellArea     # distributed source: RUNOFF, not raw precip —
+     + pointSource[c]                     #   C = runoff coefficient (the water balance, below)
+                                          # springs, authored inflows (m³/s injected at c)
 # accumulate Q downstream with the SAME stack as A (above) — sources just seed the accumulation
 ```
 
@@ -815,7 +816,8 @@ fields already computed:
 
 ```
 bodyType(cell) =
-    SEA        if waterSurface == globalSeaLevel                 # below/at sea level (03 sea level)
+    SEA        if waterSurface == globalSeaLevel and connectedToBoundaryOcean
+               # at the datum AND connected — an inland lake that happens to sit at sea level is a LAKE
     LAKE       if lakeMask   and area >= lakeMinArea             # filled depression, flat spill plane
     POND/POOL  if lakeMask   and area <  lakeMinArea             # same, but small — no meaningful fetch
     RIVER      if channelMask and width >= riverMinWidth         # high accumulation, hydraulic-geometry width
@@ -847,7 +849,7 @@ the still ones.
   is set by **fetch** — the over-water distance the wind crosses before reaching a point — together
   with wind speed and duration. That is a computed field, not a flow one: the `12` wave-exposure
   sweep already produces it (`e ~ Σ w·√(fetch)`, wave energy ∝ √fetch), and it runs unchanged on a
-  lake (`isWater`, not `isOcean`). So a lake's export is the **body-type tag** (below) plus that
+  lake (`isWater`, not `isOcean`). So a lake's export is the **body-type tag** (above) plus that
   fetch/exposure field and the wind field (`13`) — the engine grows fetch-limited wind waves from
   them, with **no swell and no through-flow**. `residence time = volume / Q` stays a clarity and
   ecology figure (`28`), not a current.
@@ -879,8 +881,8 @@ the still ones.
   - **Deflect it along the coast.** A current cannot flow into land: near shore it must bend to
     **follow the coastline**, split at headlands, and speed up through straits (continuity again).
     Blend from the pure far-field vector offshore to **shore-parallel** at the coast over a
-    shoreline-distance band — the same distance-blend the shore-wave band uses (`12`) — and hand the
-    surf band off to layer 1. Without this the ocean is a flat arrow field flowing into cliffs; with
+    shoreline-distance band — the same distance-blend the engine's shore-wave band uses
+    (terrain-renderer `12`) — and hand the surf band off to layer 1. Without this the ocean is a flat arrow field flowing into cliffs; with
     it, it reads as a current that wraps the coast.
 
   Be honest about the tier: layers 1–2 are grounded (surf-zone physics, wind drift); the far-field
@@ -889,9 +891,12 @@ the still ones.
   tile.
 
 **What not to do.** Do not export a normalised direction field — speed is data the engine needs
-(`27`); do not leave lakes and open water at zero; do not run channel-speed flow into a shoreline;
-and never bake foam, chop, or wave motion into the velocity field — it carries the *current*, and
-the engine makes the motion (`08`, whitewater-is-caused).
+(`27`). Do not leave the *sea* at zero — it carries nearshore circulation, wind drift and the
+far-field current (above); a lake's near-zero interior, by contrast, is *correct* — but its
+`bodyType` tag and fetch field must still ship or the surface is dead, not still. Do not run
+channel-speed flow into a shoreline (backwater, above). And never bake foam, chop, or wave motion
+into the velocity field — it carries the *current*, and the engine makes the motion (`08`,
+whitewater-is-caused).
 
 ## Domain boundaries
 

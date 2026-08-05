@@ -242,7 +242,8 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Manning, R. (1891).** *On the flow of water in open channels and pipes.* Transactions of the
   Institution of Civil Engineers of Ireland 20, 161–207. — The open-channel velocity relation
   `v = (1/n)·R^(2/3)·S^(1/2)`; the basis for setting flow-field speed from slope and roughness
-  (`03` flow-velocity field). Standard hydraulics; used here as a look calibrator.
+  (`03` flow-velocity field). Standard hydraulics; used here as a look calibrator. Citation
+  web-verified 2026-08.
 - **Leopold, L.B. & Maddock, T. (1953).** *The hydraulic geometry of stream channels and some
   physiographic implications.* USGS Professional Paper 252. — Downstream hydraulic geometry
   `w ∝ Q^0.5`, `d ∝ Q^0.4`, `v ∝ Q^0.1`; the discharge→width/depth/velocity scaling behind the
@@ -260,7 +261,8 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
   of the channel network (`03`). Same authors as the SHALSTAB landslide model (`05`); earlier form
   Montgomery & Dietrich 1988, Nature 336, 232–234.
 - **Ekman, V.W. (1905).** *On the influence of the earth's rotation on ocean-currents.* Arkiv för
-  Matematik, Astronomi och Fysik 2(11). — Wind-driven surface current deflected ~45° from the wind
+  Matematik, Astronomi och Fysik 2(11), 1–52 (web-verified 2026-08). — Wind-driven surface current
+  deflected ~45° from the wind
   (right in the N hemisphere, left in the S) by Coriolis; the basis for sourcing a defensible
   ocean far-field direction from the wind (`03` ocean flow). Surface-drift 45° is the classic
   theoretical value (a look), not a per-site guarantee.
