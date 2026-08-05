@@ -210,6 +210,20 @@
         "Kills Fresnel reflection under foam",
         "Drives whitecap/spray/streak onset from wind via the Beaufort-consistent gates with one wind value shared across wave spectrum, foam and glitter"
       ]
+    },
+    {
+      "id": 17,
+      "prompt": "We want Wind Waker-style water for our island game - flat cartoon sea with those foam rings. And later we might add drivable water sections like Mario Kart World where you ride waves. Does that throw away all the water tech we built for our realistic prototype?",
+      "expected_output": "No - stylization replaces band content, never contracts. The flat colour still comes from the depth field, the foam rings ARE a shore-distance band (the same exported field realistic shoreline foam consumes) drawn as authored scrolling ring patterns (Voronoi + flow-offset UVs is the standard recreation, per community analysis of Wind Waker - flagged as F-tier reconstruction, Nintendo publishes nothing). Do NOT reach for FFT cascades or Cox-Munk glitter. Drivable water is a contract escalation, not a look: waves become gameplay liquid state under the fluid authority contract - deterministic wave function evaluated identically by rendering and vehicle physics (zero-tolerance one-evaluator rule: a mismatch is a broken road), CPU/server-owned, network-synchronized in multiplayer.",
+      "files": [],
+      "assertions": [
+        "States the doctrine: stylization swaps band content (authored patterns, ramps, flat colour) while every contract (depth, shore distance, flow, bodyType, LOD, authority) is unchanged",
+        "Identifies Wind Waker foam rings as a shore-distance band consuming the same exported field as realistic shoreline foam",
+        "Does not prescribe FFT spectra / physical glitter for the stylized look",
+        "Flags Wind Waker mechanism claims as community reconstruction (F-tier), not first-party",
+        "Treats drivable water as gameplay liquid state: deterministic waves, one evaluator shared by physics and rendering with zero tolerance, server ownership and network sync",
+        "Keeps cosmetic detail layers separate from anything the vehicle touches"
+      ]
     }
   ]
 }

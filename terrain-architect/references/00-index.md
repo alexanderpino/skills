@@ -244,6 +244,14 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | River meandering, bank erosion, oxbow cutoff | P | Ikeda, Parker & Sawai 1981 (bend theory — curvature-driven migration); Howard & Knutson 1984 (`03`) |
 | Channel patterns — braided / meandering / straight | P | Leopold & Wolman 1957, USGS Professional Paper 282-B (`03`) |
 | River widening / depth estimation | F | Hydraulic geometry scaling (`w ∝ Q^0.5`, Leopold & Maddock 1953) |
+| Flow-velocity field synthesis (direction × magnitude across water bodies) | P (physics) / L (synthesis) | Continuity `v = Q/(w·d)`; Manning `v = (1/n)R^(2/3)S^(1/2)`; Froude `Fr = v/√(gd)` regime; secondary flow in bends; backwater at base level; per-body (streams/lakes/estuaries/oceans) (`03`) |
+| Open-channel velocity (Manning) & flow regime (Froude) | P | Standard open-channel hydraulics; roughness `n` ≈ 0.03 gravel–0.15 vegetated; `Fr=1` critical, hydraulic jump (`03`) |
+| Water balance: precipitation → runoff / ET / infiltration | P | Budyko 1974 aridity-index partitioning; runoff coefficient `C`; arid basins run ephemeral losing streams; infiltration → baseflow/springs (`03`, `13`) |
+| Channel initiation / drainage density (network sources) | P | Montgomery & Dietrich 1992 (Science 255) — channel head at an area×slope threshold; hillslope above, channel below; climate/lithology set density (`03`, `05`) |
+| Water-source kinds (rain, spring, karst, snowmelt, boundary inflow, sink) | P/L | Discharge `Q` = distributed precip + point sources; springs at lithology contacts/faults; Št'ava 2008 authored inflows (`03`, `04`, `11`) |
+| Ocean flow: base level + wind drift + far-field current | P (Ekman) / L (look) | Ocean is the sink, not a source; far-field current seeded at edge tiles from wind + Coriolis (Ekman ~45°, gyre CW-N/CCW-S), deflected shore-parallel near coast; authored, not simulated (`03`, `12`, `13`) |
+| Water-body type detection & export | L | Classify sea/lake/pond/river/stream/estuary/wetland from fill mask + accumulation + sea level; export `bodyType` so the engine picks the surface model (`03`, `28`) |
+| Lakes: near-zero flow, wind-wave surface | P/L | `flowVelocity ≈ 0` (slow outlet through-current only); the surface is fetch-limited **wind waves** (`e~√fetch`, `12` sweep), not swell or current; residence `= volume/Q` is clarity not current (`03`, `28`) |
 | Channel-reach morphology (cascade / step-pool / pool-riffle) | P | Montgomery & Buffington 1997, GSA Bulletin 109(5) (`03`) |
 | Hydrology-based terrain (river network first) | P | Génevaux et al. 2013, ACM TOG 32(4), SIGGRAPH '13 (`03`) |
 | Water sources & discharge routing (`Q` vs area) | P | Springs / inflows as source terms (Št'ava 2008); route `Q`, stream power on `Q^m` (`03`, `04`) |
@@ -302,6 +310,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Water constituents: chlorophyll / CDOM / suspended sediment | P | Bricaud-form `a_ph`; CDOM `a₄₄₀·exp[−S(λ−440)]`, S≈0.012–0.022; mineral `b_p(555)/SPM ≈ 0.5 m²/g` (Babin et al. 2003). **CDOM darkens, sediment brightens — opposite controls** (`28`) |
 | Jerlov water types; Forel-Ule index | P | Jerlov 1976 Tables XXVI–XXVII; Solonenko & Mobley 2015; Morel 1988 ladder; FU/hue-angle Pitarch et al. 2021. ⚠️ Numeric `K_d` tables paywalled — generate or cite honestly (`28`) |
 | Secchi depth ↔ attenuation | P | Lee et al. 2015 — `Z_SD ≈ 1/min_λ K_d`, replacing the classical constant (best classical fit: Holmes 1970, 1.44) (`28`) |
+| Per-liquid index of refraction (Fresnel F0) | P | Water 1.33→F0 0.02; seawater/brine 1.341–1.397 (Maykut & Light, Appl. Opt. 34, 1995); natural liquids span ~1.31–1.47, F0 ~0.018–0.036 — ship per body, never hardcode (`28`) |
 | Glacial-flour turquoise | F/synthesis | Popular Rayleigh explanation is **wrong** (2–65 µm ≫ λ). Flat backscatter shortens photon path; `a_w` removes red over it. No peer-reviewed optical study located (`28`) |
 | Yield-stress liquids: Bingham / Herschel-Bulkley | P | Bingham 1922; Herschel & Bulkley 1926; **Papanastasiou 1987** regularization. `h_c = τ_y/(ρg sinθ)` sets deposit thickness; levées are diagnostic — Hulme 1974 (`28`, `19`) |
 | Mud vs debris flow rheology | P | O'Brien & Julien 1988 — μ and τ_y rise **exponentially** with sediment concentration; Iverson 1997 — coarse debris flows are pore-pressure governed, not single-phase (`28`, `05`) |

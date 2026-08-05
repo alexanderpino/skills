@@ -153,6 +153,9 @@ right fix.
 | Screen-space fluid rendering (curvature flow) | `19` | van der Laan, Green & Sainz, I3D 2009, 91–98 | P | [ACM DL](https://dl.acm.org/doi/10.1145/1507149.1507164) |
 | Kelvin wake half-angle `arcsin(1/3) ≈ 19.47°`, speed-independent in deep water | `19` | William Thomson (Kelvin), "On Ship Waves", Proc. IMechE 38, 409–434 (1887) | P | — |
 | SPH incompressibility variants (PCISPH / IISPH / DFSPH) | `19` | Solenthaler & Pajarola, ACM TOG 28(3), 2009; Ihmsen et al., IEEE TVCG 20(3), 426–435, 2014; Bender & Koschier, SCA 2015 | P | [DFSPH](https://animation.rwth-aachen.de/publication/054/) |
+| Stylized water (authored patterns over unchanged contracts) | `12` | Community canon; Gordon's Wind Waker ocean analysis is the canonical breakdown | F | [medium.com](https://medium.com/@gordonnl/the-ocean-170fdfd659f1) |
+| TotK water-resistance physics (projected-area drag) | `19` | Dohta, Takayama & Osada, "Tunes of the Kingdom", GDC 2024 | T | [gdcvault.com](https://gdcvault.com/play/1034667/Tunes-of-the-Kingdom-Evolving) |
+| Water as drivable gameplay surface (deterministic waves as collision) | `19` `12` | Wave Race 64 → Mario Kart World lineage; press/footage reconstruction, no first-party talk | F | — |
 
 ## Engine & shipped-system crosswalk
 
@@ -179,6 +182,9 @@ Branded system → what it actually is → where in this skill.
 | Portal 2 water | Flow mapping over a static surface | `12` |
 | Uncharted (3) water | Ocean mesh LOD + wave generation + flow shader; wave-particle lineage claimed but not confirmed against the talk (`?`) | `12` |
 | Sea of Thieves water | Stylized FFT cascades + shore/foam treatments | `12` |
+| The Wind Waker sea | Authored-pattern stylized water: flat colour + scrolling foam rings consuming the shore-distance field | `12` |
+| Zelda: Tears of the Kingdom water | Cel look (community-observed) + projected-area water-resistance physics (GDC 2024) | `12`, `19` |
+| Mario Kart World / Wave Race lineage | Water as drivable gameplay surface: deterministic waves as collision + trick ramps; interactive waves as gameplay state | `19`, `12` |
 | Rise of the Tomb Raider / Batman: Arkham Origins / GoW Ragnarök snow | Deferred deformation (top-down capture → displacement) | `13` |
 | Horizon Zero Dawn / Ghost of Tsushima vegetation | GPU-driven procedural placement + procedural grass | `15` |
 | Gaea / World Machine-class tool viewports | Preview pyramid + derived-field passes + shading modes | `16` |
@@ -259,7 +265,12 @@ certain are consolidated here so a reviewer knows where to spend verification ef
 - `19`: PCISPH (Solenthaler & Pajarola 2009), IISPH (Ihmsen et al. 2014), DFSPH (Bender & Koschier
   2015) and the Kelvin-wake citation (Thomson 1887) were all **web-verified 2026-08** — the `?`
   flags are cleared. Probe-point buoyancy, the spray/foam/bubble split, domain-fade fractions and
-  budget guidance remain F-tier production practice with no canonical source.
+  budget guidance remain F-tier production practice with no canonical source. Nintendo water
+  (2026-08): the TotK projected-area drag has a first-party GDC 2024 talk (T, verified); everything
+  else — Wind Waker mechanism, TotK's cel look, Mario Kart World's drivable waves — is community
+  reconstruction or launch-window press (F), and Mario Kart World's especially so; the *doctrine*
+  those examples illustrate (same contracts, authored bands; deterministic waves as gameplay state)
+  is this skill's own, not a citation.
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-

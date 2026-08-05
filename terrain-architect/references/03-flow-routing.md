@@ -6,7 +6,8 @@ Contents: [Order of operations](#order-of-operations) · [Depression handling](#
 [Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) ·
 [Meandering & bank erosion](#meandering--bank-erosion) ·
 [River terraces](#river-terraces) · [Avulsion, crevasse splays & delta lobes](#avulsion-crevasse-splays--delta-lobes) ·
-[Water sources & discharge](#water-sources--discharge) · [Domain boundaries](#domain-boundaries) ·
+[Water sources & discharge](#water-sources--discharge) ·
+[The flow-velocity field](#the-flow-velocity-field) · [Domain boundaries](#domain-boundaries) ·
 [Sea level](#sea-level) · [Choosing](#choosing)
 
 ## Order of operations
@@ -672,8 +673,9 @@ you have a spring, a river entering from off-map, or non-uniform rainfall. The f
 **discharge `Q`** (m³/s, or m³ per timestep) instead of bare area:
 
 ```
-Q[c] = localRain[c] * cellArea            # distributed source — the precip field from 13
-     + pointSource[c]                     # springs, authored inflows (m³/s injected at c)
+Q[c] = C[c] * localRain[c] * cellArea     # distributed source: RUNOFF, not raw precip —
+     + pointSource[c]                     #   C = runoff coefficient (the water balance, below)
+                                          # springs, authored inflows (m³/s injected at c)
 # accumulate Q downstream with the SAME stack as A (above) — sources just seed the accumulation
 ```
 
@@ -682,6 +684,50 @@ precip field (`13`), `Q` and `A` diverge — and **`Q` is the physically correct
 power becomes `∂h/∂t = U − K·Q^m·S^n`, and wetness (`06`) and river width (above) scale with `Q`,
 not `A`. This is the one change that lets a big river cross a dry region without pretending the
 desert it flows through fed it — the Nile and the Colorado are exactly this.
+
+**Not all rain becomes flow — the water balance.** `localRain · cellArea` is the *precipitation*, not
+the runoff. Over a catchment, precipitation splits three ways: **runoff** (what reaches the channel),
+**evapotranspiration** (returned to the air), and **infiltration** (into the ground). Only the first
+seeds `Q` directly:
+
+```
+runoff = C · localRain            # C = runoff coefficient in [0,1]
+# C is high (→1) for wet, steep, impermeable, bare, or frozen ground;
+#   low (→0) for arid, flat, permeable, vegetated, or deep-soil ground
+```
+
+The long-term split is set by the **aridity index** `PET/P` (Budyko 1974): where potential
+evaporation exceeds precipitation, most rain evaporates and `C` is small — arid basins run
+**ephemeral, losing** streams that shrink downstream (the opposite of a humid river). This is *the*
+reason a desert's drainage looks nothing like a rainforest's at the same relief, and why you cannot
+read discharge off drainage area alone. **Infiltration is not lost water:** it becomes the baseflow
+and springs that re-emerge downstream (the spring source, below) — so a permeable catchment moves
+water from fast surface runoff to slow, sustained, spatially-shifted discharge. Couple `C` to the
+climate (`13`) and lithology/soil (`11`, `18`); a single global `C` is fine for one climate and
+wrong for a world that spans several.
+
+**Where the channel network begins — channel initiation.** A source is not only *how much* water
+but *where a channel first exists*. Above a threshold of contributing area × slope the flow
+concentrates enough to cut and hold a channel; below it the ground is unchannelled **hillslope**,
+shaped by diffusion (`05`), not routing. That threshold — a **channel head** (Montgomery & Dietrich
+1992) — is the upstream tip of every stream, and the density of heads sets the **drainage density**:
+wet, soft, steep, sparsely-vegetated terrain divides into a fine dense network with channel heads
+high on the slopes; arid, hard, or well-vegetated terrain carries a sparse coarse one. So the
+generator determines the network's *sources* by where `A·Sᵏ` (or a `Q` threshold) crosses the
+channel-initiation value — do not draw channels up onto ground the hydrology leaves as hillslope,
+and do not run routing's single-cell threads across what should read as smooth colluvial hollow
+(`06` convergence).
+
+**Origins are derived, not scattered.** A flow field's sources are a *claim about the terrain's
+process history* (the skill's spine doctrine, `SKILL.md`), so **suggest them from the fields the
+world already has** rather than dropping point sources by hand: orographic precipitation (`13`)
+puts the big **headwaters** on the windward, wet uplands; structural geology puts **springs** on
+fault lines (`02`) and permeable-over-impermeable **lithology contacts** (`11`); elevation and
+climate put **snow/glacial melt** on the high ground (`13`, `12`); the karst network puts
+**resurgences** at its sink exits (`11`). A river whose headwaters sit in a rain shadow, or a
+spring with no structural reason to be there, is an origin that contradicts the terrain — the tell
+that sources were placed for convenience instead of derived. The table below is the catalogue;
+the rule is that each entry is *located by a cause already in the graph*.
 
 **Kinds of source, and where each comes from:**
 
@@ -704,6 +750,153 @@ springs and entering rivers as explicit inputs to the sim, not decoration.
 **Sinks** are the mirror image — a cell that *removes* water: a doline swallowing a stream (`11`),
 or an endorheic basin that only evaporates (the Dead Sea, the Aral). Mark them so depression
 handling leaves them unfilled and accumulation terminates there instead of forcing an outlet.
+
+## The flow-velocity field
+
+`flowVelocity` is a **first-class export**, not a by-product of routing (`08`, `27`). The engine
+consumes it for flow-mapped water, foam alignment, particle steering, buoyancy drag and
+wave–current interaction (terrain-renderer `12`), and a river whose surface all flows at one speed
+in one direction is as dead a tell as a constant-width channel. Routing gives the field its
+**direction**; its **magnitude and structure** come from physics, and the whole point is that
+several factors modulate it. Direction is the steepest-descent/`D∞`/`MFD` vector already computed;
+everything below sets the speed and bends the streamlines off pure downslope.
+
+**Continuity is the factor that makes it look alive.** Discharge is conserved along a reach, so
+
+```
+Q = v · w · d      ⇒      v = Q / (w · d)         # w = width, d = depth (hydraulic geometry, above)
+```
+
+A river therefore **speeds up where it narrows or shallows** (a gorge, a bedrock constriction, a
+bridge) and **slows where it widens or deepens** (a pool, a floodplain, a reservoir) — at constant
+`Q`. This single relation, applied over the width field, is what turns a flat velocity map into one
+that surges through canyons and stills in pools. It is also the Venturi behind a river-mouth jet and
+a tidal inlet (`12`).
+
+**Slope and roughness set the base speed (Manning).** For a reach of gradient `S` and bed roughness
+`n`,
+
+```
+v = (1/n) · R^(2/3) · S^(1/2)          # Manning; R = hydraulic radius ≈ depth for wide channels
+# n ≈ 0.03 gravel bed · 0.035 natural stream · 0.05–0.15 vegetated / floodplain · 0.012 smooth rock
+```
+
+Steeper and smoother is faster; a vegetated, rough, or shallow reach is slower for the same slope.
+This is the term that makes mountain headwaters race and lowland reaches crawl, independent of
+discharge. (Manning is standard open-channel hydraulics; use it as a *look* calibrator, not a
+guarantee.)
+
+**Regime — is it tranquil or a rapid?** The Froude number `Fr = v / sqrt(g·d)` splits flow into
+**subcritical** (`Fr < 1`, deep, tranquil, glassy) and **supercritical** (`Fr > 1`, shallow, fast,
+broken-surface rapid), with a **hydraulic jump** where a supercritical reach abruptly returns to
+subcritical (the standing white wall below a spillway or a boulder). This is the generation-side
+*cause* the engine renders as whitewater: mark reaches by `Fr` and hand the renderer a turbulence
+intensity, never foam (`12`; whitewater-is-caused, above). Knickpoints and steep constrictions are
+where `Fr` crosses 1.
+
+**Bends add secondary flow.** In a meander the fastest surface flow crosses from the inner bank
+upstream to the **outer bank** at the bend apex (the thalweg), and a helical secondary circulation
+runs outward at the surface and inward along the bed — the mechanism that erodes the cut bank and
+builds the point bar (`Meandering & bank erosion`, above). For the field: bias speed and direction
+toward the outer bank through bends rather than centring the flow, or the river reads as a canal.
+
+**Base level slows everything.** Approaching a lake, the sea, or any standing water, the water-surface
+slope flattens, so `S → 0` and Manning velocity collapses — a **backwater**. This deceleration is
+exactly why sediment drops and deltas build (`Avulsion, crevasse splays & delta lobes`, above; `12`
+deltas): the flow field must fade to near-zero at the shoreline, not run at channel speed into a wall.
+
+### Detecting the water-body type
+
+Before any of this can be applied, the generator must **know which kind of water each body is** —
+and it must *export that tag*, because the engine animates each type from a different model and has
+no other way to tell a lake from a bay. A lake gets wind waves only; a river gets flow; the sea
+gets swell, tide and nearshore circulation. Get the class wrong and you put ocean swell on a
+mountain tarn or a current down a still lake. The classification is **free** — it falls out of
+fields already computed:
+
+```
+bodyType(cell) =
+    SEA        if waterSurface == globalSeaLevel and connectedToBoundaryOcean
+               # at the datum AND connected — an inland lake that happens to sit at sea level is a LAKE
+    LAKE       if lakeMask   and area >= lakeMinArea             # filled depression, flat spill plane
+    POND/POOL  if lakeMask   and area <  lakeMinArea             # same, but small — no meaningful fetch
+    RIVER      if channelMask and width >= riverMinWidth         # high accumulation, hydraulic-geometry width
+    STREAM     if channelMask and width <  riverMinWidth         # low-order channel
+    ESTUARY    if lakeMask/channel adjacent to SEA and tidal     # brackish, bidirectional (12 tidal inlets)
+    WETLAND    if shallow, low-slope, saturated (13 moisture)    # sheet flow, no defined channel
+```
+
+`lakeMask` is the filled-vs-original test from [Lakes](#lakes); `channelMask` is a flow-accumulation
+threshold; sea is the global datum ([Sea level](#sea-level)). Ship `bodyType` per body in the
+`liquidBody` record (`28`, `08`/`27`) so the engine selects the right surface model. The tag also
+routes the flow field itself — the per-body regimes below are indexed by it.
+
+### Per water body
+
+The factors above are universal; how they combine differs by body, and the type tag above selects
+which apply. Each is a distinct `flowVelocity` regime the generator must fill correctly — including
+the still ones.
+
+- **Streams & rivers.** Direction from routing, magnitude from Manning × continuity, bent by
+  secondary flow through meanders and split at braids/distributaries. Fast and supercritical in
+  steep constrictions, slow and subcritical in pools and wide reaches. The pipe/shallow-water sim
+  (`04`) produces this velocity field directly if you run one; otherwise synthesise it from the
+  fields above.
+- **Lakes & reservoirs — essentially no flow; wind makes the surface.** A lake's `flowVelocity` is
+  **near zero**: at most a slow **through-current** `v ≈ Q / (cross-sectional area)` on the line
+  from inlet to outlet, imperceptible in a broad lake and only worth exporting near a narrow outlet.
+  Do not invent an interior current. What actually animates a lake is **wind waves**, and their size
+  is set by **fetch** — the over-water distance the wind crosses before reaching a point — together
+  with wind speed and duration. That is a computed field, not a flow one: the `12` wave-exposure
+  sweep already produces it (`e ~ Σ w·√(fetch)`, wave energy ∝ √fetch), and it runs unchanged on a
+  lake (`isWater`, not `isOcean`). So a lake's export is the **body-type tag** (above) plus that
+  fetch/exposure field and the wind field (`13`) — the engine grows fetch-limited wind waves from
+  them, with **no swell and no through-flow**. `residence time = volume / Q` stays a clarity and
+  ecology figure (`28`), not a current.
+- **Estuaries & deltas.** **Bidirectional**: the flow reverses with the tide (flood upstream, ebb
+  seaward), and the channel splits into distributaries that each carry a fraction of `Q`. Ship the
+  ebb (seaward) phase as the representative field unless the engine carries the tidal oscillation,
+  and let the distributary split follow the delta-lobe geometry (above; `12` tidal inlets).
+- **Oceans & seas — base level, not a source.** An ocean has no drainage *source*: it is the sink
+  every river ends in (`Sea level`, below). Its flow is therefore determined differently — not by
+  routing, but by wind and currents — and it has three layers:
+  1. **Nearshore circulation** — longshore current, rip feeders and jets, tidal-inlet and
+     river-mouth jets — generated by the surf-zone morphodynamics of `12`, filling `flowVelocity`
+     across the surf band.
+  2. **Wind-driven surface drift** — the prevailing wind (`13`) drags the surface; this is the
+     open-water texture, and it is also what raises the waves.
+  3. **The far-field current** — the basin-scale flow crossing the map.
+
+  **How to seed the far-field current — yes, from the edges.** A tile is a *window* onto a basin
+  whose gyre does not fit in it, so the current arrives at the map boundary and leaves at another —
+  exactly the **boundary-inflow** case used for a river entering off-map (above). Pick a **global
+  direction** and inject it at the upstream **edge tiles** as the seed, then let it propagate across
+  the domain. Two things make that direction physical rather than arbitrary, both cheap:
+  - **Source the direction from wind + Coriolis.** The wind-driven surface current runs ~**45° off
+    the prevailing wind** — to the *right* in the northern hemisphere, *left* in the southern
+    (Ekman); or, if the world has authored gyres, take the local **gyre limb** (gyres turn
+    **clockwise north, anticlockwise south**), with the western boundary current the fast narrow one
+    (western intensification). Either gives a defensible global vector from data the world already
+    has (`13`, latitude).
+  - **Deflect it along the coast.** A current cannot flow into land: near shore it must bend to
+    **follow the coastline**, split at headlands, and speed up through straits (continuity again).
+    Blend from the pure far-field vector offshore to **shore-parallel** at the coast over a
+    shoreline-distance band — the same distance-blend the engine's shore-wave band uses
+    (terrain-renderer `12`) — and hand the surf band off to layer 1. Without this the ocean is a flat arrow field flowing into cliffs; with
+    it, it reads as a current that wraps the coast.
+
+  Be honest about the tier: layers 1–2 are grounded (surf-zone physics, wind drift); the far-field
+  current is an **authored look** seeded from a physical direction, not a simulated circulation.
+  Gyres and western intensification are flavour an author adds, not behaviour that emerges from a
+  tile.
+
+**What not to do.** Do not export a normalised direction field — speed is data the engine needs
+(`27`). Do not leave the *sea* at zero — it carries nearshore circulation, wind drift and the
+far-field current (above); a lake's near-zero interior, by contrast, is *correct* — but its
+`bodyType` tag and fetch field must still ship or the surface is dead, not still. Do not run
+channel-speed flow into a shoreline (backwater, above). And never bake foam, chop, or wave motion
+into the velocity field — it carries the *current*, and the engine makes the motion (`08`,
+whitewater-is-caused).
 
 ## Domain boundaries
 

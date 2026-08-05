@@ -328,8 +328,9 @@ instead of being uniformly eroded.
 ```
 fetch(p, dir, maxDist):
     # how far can wind blow over open water before reaching p?
+    # isWater, not isOcean: the same sweep drives lake wind-waves (03 body-type LAKE), not just coasts
     d = 0
-    while d < maxDist and isOcean(p - dir * d):
+    while d < maxDist and isWater(p - dir * d):
         d += cellSize
     return d
 

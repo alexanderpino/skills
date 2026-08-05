@@ -333,6 +333,7 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Avulsion fires every step, or never | Superelevation threshold missing / wrong | Require `SE≳1` (one channel depth) + a flood trigger (`03`) |
 | Coral covers deep / aphotic seabed | No photic gate on placement | `density × inPhotic(depth)`; stop below compensation (`12`) |
 | Every water body is the same blue | No per-body optical descriptor; one global constant | Export `liquidBody[i]` — `a`, `b_b`, `K_d` from the three constituents (`28`, `08`) |
+| Brine/oil bodies reflect like fresh water | `ior` missing from the descriptor; engine hardcodes 1.33 | Export per-body `ior` (1.31–1.47 across liquids → F0 0.018–0.036) (`28`, `08`) |
 | Water hue does not change with depth | Flat colour instead of spectral absorption | Red must die first, then orange, yellow, green — drive from `a(λ)` (`28`) |
 | Deep clear water renders bright cyan | Clarity conflated with brightness | Reflectance goes as `b_b/a`; deep clear water is near-black, bright cyan is shallow-over-bright-bottom (`28`) |
 | Tannin-stained river looks like mud | CDOM modelled as turbidity | CDOM absorbs and does not scatter — it darkens; sediment brightens. Opposite controls (`28`) |
@@ -341,6 +342,16 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Surf zone has no bar, or the bar sits at an arbitrary depth | Cross-shore fluxes never converge at the breakpoint | Energetics profile step; bar crest near **depth** `d ≈ H_b/γ` (`12`) |
 | Rips on a dissipative beach / none on an intermediate one | Bar–rip template chosen by hand, beach state ignored | Pick the surf-zone template from `Ω = H_b/(w_s·T)` (`12`) |
 | `flowVelocity` is zero seaward of the waterline | Nearshore circulation never exported | Stamp longshore/rip/inlet currents into `flowVelocity` (`12`, `08`) |
+| River flows at one speed the whole length | Velocity not modulated by continuity/slope | `v = Q/(w·d)` (speed up in constrictions) × Manning slope term (`03`) |
+| Desert has the same drainage as a rainforest | Runoff = all rain; water balance ignored | Partition precip by runoff coefficient / aridity index; arid = ephemeral losing streams (`03`, `13`) |
+| Channels drawn up onto smooth hillslopes | No channel-initiation threshold | Start channels where area×slope crosses the channel-head value (`03`); hillslope above it (`05`) |
+| Big river vanishes crossing a dry region | Discharge read off local area, not routed `Q` | Route `Q` (sourced upstream) so a river carries its far-catchment water across a desert (`03`) |
+| Ocean is flat zero flow, or a uniform arrow into the cliffs | No far-field current, or seeded but not coast-deflected | Seed a wind/Coriolis direction at edge tiles; bend it shore-parallel near the coast (`03`, `12`) |
+| Headwaters in a rain shadow / springs with no structural reason | Sources scattered by hand, not derived from process | Locate each origin from a cause in the graph: orographic rain, fault/contact springs, snowline melt (`03`, `13`, `11`) |
+| Lake rendered with ocean swell, or a current | Water-body type never detected/exported | Tag `bodyType` (lake=wind-waves-only via fetch, no flow); export it in `liquidBody` (`03`, `28`) |
+| Mountain tarn has rolling swell | No fetch limit; deep-water waves on a small body | Wind waves grow with fetch (`e~√fetch`); a small pond has almost none (`03`, `12`) |
+| River runs at channel speed into the sea/lake | No backwater; base-level deceleration missing | Fade velocity to near-zero as the surface slope flattens at base level (`03`) |
+| Rapids/whitewater marked with no physical basis | Froude regime never computed | Mark reaches by `Fr = v/√(gd)`; hand the engine turbulence, never foam (`03`, `12`) |
 | Barrier coast with a big tidal prism but no inlet anywhere | Barrier stamped as an unbroken wall; prism–area relation never applied | Carve an inlet at `A_inlet = C_OB·P_tide^0.85` with ebb/flood deltas — and leave the lagoon itself a legitimate closed basin, never flood-filled (`12`, `03`) |
 | Range erodes straight down; peaks never rise | Isostatic rebound not coupled to erosion | Add flexural / erosional rebound alongside erosion (`02`) |
 | Seams or a pole pinch on a planet | Lat-long grid, or tile-local coords on a sphere | Cube-sphere / HEALPix + metric-corrected `Δs`; seam routing (`08`) |

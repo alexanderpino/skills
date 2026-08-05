@@ -210,6 +210,9 @@ for each probe p on the hull:
     F_drag      = -dragCoef * relativeVelocityAt(p)   # separate linear + angular terms
     ApplyForceAtPosition(body, F_buoy + F_drag, p)
 # torque falls out of applying at multiple offset points - this is what makes a boat pitch and roll
+# drag refinement with a shipped first-party citation: scale resistance by the PROJECTED AREA of
+# the body along its velocity (Tears of the Kingdom, GDC 2024) - a plate broadside drags far more
+# than edge-on, which is what makes rafts steer and paddles work
 ```
 
 Three probes float; four to eight give convincing pitch and roll; more buys little. The critical
@@ -264,6 +267,15 @@ cosmetic water authoritative. Deciding to promote is a **gameplay feature with a
 synchronisation design and a replication story** — which is why "can the player flood the
 basement?" is an architecture question asked at design time, not a shader question. Water that
 changes the navigable world also invalidates collision and navmesh: route that to `17`.
+
+The contract's strongest form is **water as a drivable surface** (the Wave Race → Mario Kart
+World lineage, `12`'s stylized section): vehicles ride the wave geometry and dynamic waves —
+including ones raised by gameplay events like explosions — serve as ramps. Then the *waves
+themselves* are gameplay liquid state: the wave function must be deterministic, evaluated
+identically by rendering and vehicle physics (the one-evaluator rule with zero tolerance — a
+mismatch is a broken road, not a floating-boat artifact), CPU/server-owned, and synchronized
+across the network in multiplayer. Cosmetic detail layers may ride on top; nothing the vehicle
+touches may come from them.
 
 ## Verification & failures
 
@@ -320,6 +332,14 @@ Tiers per `00`: **P** paper · **T** talk · **D** docs · **F** folklore · **?
   20(3), 426–435 (2014); Bender & Koschier, "Divergence-Free Smoothed Particle Hydrodynamics",
   *ACM SIGGRAPH/Eurographics Symposium on Computer Animation* (SCA 2015) — DFSPH enforces
   incompressibility on both position and velocity level, compression below 0.01%.
+- **T** — Dohta, Takayama & Osada, "Tunes of the Kingdom: Evolving Physics and Sounds for 'The
+  Legend of Zelda: Tears of the Kingdom'" (GDC 2024): water resistance from the projected area of
+  the body along its velocity — a shipped first-party refinement of the drag term.
+  [GDC Vault](https://gdcvault.com/play/1034667/Tunes-of-the-Kingdom-Evolving). Verified 2026-08.
+- **F** — Water as a drivable gameplay surface (Wave Race 64 → Mario Kart World lineage):
+  mechanism reconstruction from press and footage — Nintendo has published no talk; Mario Kart
+  World claims are launch-window coverage. The *doctrine* it exemplifies (deterministic
+  one-evaluator waves as gameplay state) is this skill's authority contract, not a citation.
 - **F** — Probe-point buoyancy, diffuse-particle spray/foam/bubble classification, sim-domain fade
   fractions, sleep/promote hysteresis, and the debug-view list: universal production practice with
   no single canonical source.

@@ -239,6 +239,37 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Lindsay, J.B. (2016).** *Efficient hybrid breaching-filling sink removal methods for flow
   path enforcement in digital elevation models.* Hydrological Processes 30(6), 846–857. —
   Breaching, and the hybrid breach/fill policy. The right default for terrain generation.
+- **Manning, R. (1891).** *On the flow of water in open channels and pipes.* Transactions of the
+  Institution of Civil Engineers of Ireland 20, 161–207. — The open-channel velocity relation
+  `v = (1/n)·R^(2/3)·S^(1/2)`; the basis for setting flow-field speed from slope and roughness
+  (`03` flow-velocity field). Standard hydraulics; used here as a look calibrator. Citation
+  web-verified 2026-08.
+- **Leopold, L.B. & Maddock, T. (1953).** *The hydraulic geometry of stream channels and some
+  physiographic implications.* USGS Professional Paper 252. — Downstream hydraulic geometry
+  `w ∝ Q^0.5`, `d ∝ Q^0.4`, `v ∝ Q^0.1`; the discharge→width/depth/velocity scaling behind the
+  flow-velocity field and channel widening (`03`).
+- **Froude regime / hydraulic jump** — standard open-channel hydraulics: `Fr = v/√(g·d)`, `Fr<1`
+  subcritical (tranquil), `Fr>1` supercritical (rapid), jump at the transition. No single
+  canonical citation; the generation-side *cause* of whitewater the engine renders (`03`, `12`).
+- **Budyko, M.I. (1974).** *Climate and Life.* Academic Press. — The supply–demand water balance:
+  long-term partitioning of precipitation into runoff vs evapotranspiration, controlled by the
+  aridity index `PET/P`. The basis for "not all rain becomes flow" and for arid-vs-humid discharge
+  (`03` water sources; `13` climate).
+- **Montgomery, D.R. & Dietrich, W.E. (1992).** *Channel initiation and the problem of landscape
+  scale.* Science 255(5046), 826–830. — The channel-head threshold (contributing area × slope):
+  where hillslope becomes channel, and what sets drainage density. Determines the upstream sources
+  of the channel network (`03`). Same authors as the SHALSTAB landslide model (`05`); earlier form
+  Montgomery & Dietrich 1988, Nature 336, 232–234.
+- **Ekman, V.W. (1905).** *On the influence of the earth's rotation on ocean-currents.* Arkiv för
+  Matematik, Astronomi och Fysik 2(11), 1–52 (web-verified 2026-08). — Wind-driven surface current
+  deflected ~45° from the wind
+  (right in the N hemisphere, left in the S) by Coriolis; the basis for sourcing a defensible
+  ocean far-field direction from the wind (`03` ocean flow). Surface-drift 45° is the classic
+  theoretical value (a look), not a per-site guarantee.
+- **Ocean gyres / western intensification** — standard physical oceanography: subtropical gyres
+  turn clockwise (N) / anticlockwise (S), western boundary currents fast, narrow and intensified.
+  No single canonical citation; used here only as authored flavour for a basin-scale current, never
+  a simulation (`03`).
 
 ## Analysis
 
