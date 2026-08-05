@@ -290,7 +290,12 @@ result is physical:
 
 ```
 liquid_body:
-  class                       # water | lava | mud | brine | ...  (selects the rheology bundle)
+  class                       # water | lava | mud | brine | ...  (the SUBSTANCE — rheology bundle)
+  bodyType                    # sea | lake | pond | river | stream | estuary | wetland (03)
+                              #   the HYDROLOGICAL type — selects the engine's surface/animation
+                              #   model: lake = wind waves only, river = flow, sea = swell+tide
+  fetchField                  # per-shoreline wave-exposure (12 sweep); the wind-wave driver for
+                              #   lakes and enclosed water — NOT a flow field
   # causal state
   chl_mg_m3, cdom_a440, spm_mg_L, spm_lithology_class, mean_depth_m
   # rheology (non-water, and 0/1/none for water)

@@ -760,23 +760,53 @@ slope flattens, so `S → 0` and Manning velocity collapses — a **backwater**.
 exactly why sediment drops and deltas build (`Avulsion, crevasse splays & delta lobes`, above; `12`
 deltas): the flow field must fade to near-zero at the shoreline, not run at channel speed into a wall.
 
+### Detecting the water-body type
+
+Before any of this can be applied, the generator must **know which kind of water each body is** —
+and it must *export that tag*, because the engine animates each type from a different model and has
+no other way to tell a lake from a bay. A lake gets wind waves only; a river gets flow; the sea
+gets swell, tide and nearshore circulation. Get the class wrong and you put ocean swell on a
+mountain tarn or a current down a still lake. The classification is **free** — it falls out of
+fields already computed:
+
+```
+bodyType(cell) =
+    SEA        if waterSurface == globalSeaLevel                 # below/at sea level (03 sea level)
+    LAKE       if lakeMask   and area >= lakeMinArea             # filled depression, flat spill plane
+    POND/POOL  if lakeMask   and area <  lakeMinArea             # same, but small — no meaningful fetch
+    RIVER      if channelMask and width >= riverMinWidth         # high accumulation, hydraulic-geometry width
+    STREAM     if channelMask and width <  riverMinWidth         # low-order channel
+    ESTUARY    if lakeMask/channel adjacent to SEA and tidal     # brackish, bidirectional (12 tidal inlets)
+    WETLAND    if shallow, low-slope, saturated (13 moisture)    # sheet flow, no defined channel
+```
+
+`lakeMask` is the filled-vs-original test from [Lakes](#lakes); `channelMask` is a flow-accumulation
+threshold; sea is the global datum ([Sea level](#sea-level)). Ship `bodyType` per body in the
+`liquidBody` record (`28`, `08`/`27`) so the engine selects the right surface model. The tag also
+routes the flow field itself — the per-body regimes below are indexed by it.
+
 ### Per water body
 
-The factors above are universal; how they combine differs by body, and each type is a distinct
-`flowVelocity` regime the generator must actually fill — including the ones usually left at zero.
+The factors above are universal; how they combine differs by body, and the type tag above selects
+which apply. Each is a distinct `flowVelocity` regime the generator must fill correctly — including
+the still ones.
 
 - **Streams & rivers.** Direction from routing, magnitude from Manning × continuity, bent by
   secondary flow through meanders and split at braids/distributaries. Fast and supercritical in
   steep constrictions, slow and subcritical in pools and wide reaches. The pipe/shallow-water sim
   (`04`) produces this velocity field directly if you run one; otherwise synthesise it from the
   fields above.
-- **Lakes & reservoirs — not zero.** A lake with an inlet and an outlet carries a slow
-  **through-current** along the line connecting them, `v ≈ Q / (cross-sectional area)`, negligible
-  in a broad lake and noticeable in a narrow one or near the outlet. Its **residence time** is
-  `volume / Q` — a clarity and ecology driver (`28`), and the reason a flushed lake and a stagnant
-  one differ. Away from the through-line the interior is near-still and dominated by
-  **wind-driven surface drift** — a thin downwind current from the wind field (`13`), the cause of
-  the downwind-shore pile-up and seiche. Export a small, structured field, not a flat zero.
+- **Lakes & reservoirs — essentially no flow; wind makes the surface.** A lake's `flowVelocity` is
+  **near zero**: at most a slow **through-current** `v ≈ Q / (cross-sectional area)` on the line
+  from inlet to outlet, imperceptible in a broad lake and only worth exporting near a narrow outlet.
+  Do not invent an interior current. What actually animates a lake is **wind waves**, and their size
+  is set by **fetch** — the over-water distance the wind crosses before reaching a point — together
+  with wind speed and duration. That is a computed field, not a flow one: the `12` wave-exposure
+  sweep already produces it (`e ~ Σ w·√(fetch)`, wave energy ∝ √fetch), and it runs unchanged on a
+  lake (`isWater`, not `isOcean`). So a lake's export is the **body-type tag** (below) plus that
+  fetch/exposure field and the wind field (`13`) — the engine grows fetch-limited wind waves from
+  them, with **no swell and no through-flow**. `residence time = volume / Q` stays a clarity and
+  ecology figure (`28`), not a current.
 - **Estuaries & deltas.** **Bidirectional**: the flow reverses with the tide (flood upstream, ebb
   seaward), and the channel splits into distributaries that each carry a fraction of `Q`. Ship the
   ebb (seaward) phase as the representative field unless the engine carries the tidal oscillation,
