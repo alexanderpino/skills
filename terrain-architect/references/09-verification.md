@@ -333,6 +333,7 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Avulsion fires every step, or never | Superelevation threshold missing / wrong | Require `SE≳1` (one channel depth) + a flood trigger (`03`) |
 | Coral covers deep / aphotic seabed | No photic gate on placement | `density × inPhotic(depth)`; stop below compensation (`12`) |
 | Every water body is the same blue | No per-body optical descriptor; one global constant | Export `liquidBody[i]` — `a`, `b_b`, `K_d` from the three constituents (`28`, `08`) |
+| Brine/oil bodies reflect like fresh water | `ior` missing from the descriptor; engine hardcodes 1.33 | Export per-body `ior` (1.31–1.47 across liquids → F0 0.018–0.036) (`28`, `08`) |
 | Water hue does not change with depth | Flat colour instead of spectral absorption | Red must die first, then orange, yellow, green — drive from `a(λ)` (`28`) |
 | Deep clear water renders bright cyan | Clarity conflated with brightness | Reflectance goes as `b_b/a`; deep clear water is near-black, bright cyan is shallow-over-bright-bottom (`28`) |
 | Tannin-stained river looks like mud | CDOM modelled as turbidity | CDOM absorbs and does not scatter — it darkens; sediment brightens. Opposite controls (`28`) |

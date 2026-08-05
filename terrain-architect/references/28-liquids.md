@@ -215,6 +215,29 @@ lookup (values `K_d` at 490 nm, m⁻¹; Chl in mg/m³):
 this whole system has to span. These are the *presets*; the causal chain above is how a generated
 body lands between them.
 
+## Refraction is a per-liquid property
+
+Index of refraction is one of the six defining axes, and it is the one most often wrongly treated
+as a universal constant. The engine's surface Fresnel term and its refraction bending both key off
+`ior` (`F0 = ((n−1)/(n+1))²`), and across natural liquids `n` varies enough to matter:
+
+| Liquid | `n` (≈589 nm) | Fresnel `F0` | Source |
+|---|---|---|---|
+| Ice | 1.31 | 0.018 | standard optics |
+| Pure / fresh water | 1.33 | 0.020 | standard optics |
+| Seawater (35 ‰) | 1.34 | 0.021 | Maykut & Light (Appl. Opt. 34, 1995) |
+| Saturated brine (≈240 ‰) | ~1.40 | 0.028 | Maykut & Light 1995 (freezing-brine series) |
+| Oil / hydrocarbon | ~1.47 | 0.036 | commonly cited; verify per fluid |
+
+That is a **~2× spread in surface reflectance** (F0 0.018→0.036) — a brine pool visibly reflects
+more than the fresh lake beside it, and an oil slick more still. So `ior` ships per body; the
+engine must not hardcode 1.33. Two special cases: **emissive liquids** (lava) are dominated by
+their own blackbody radiance, so surface Fresnel is a minor term and IOR is low-priority there;
+and a **surface film** (oil on water) is optically a thin high-IOR layer over a low-IOR body,
+which is what produces thin-film iridescence — a layered-Fresnel effect the engine renders, flagged
+here by the film's presence, not a single-IOR value. Wave *refraction* (crests bending over
+bathymetry) is unrelated — that is the depth-driven process of `12`, not this optical constant.
+
 ## Beyond water: the rheological axis
 
 Water is **Newtonian**: `τ = μ·γ̇`, no threshold, no memory. Two departures matter:
@@ -273,6 +296,8 @@ liquid_body:
   # rheology (non-water, and 0/1/none for water)
   viscosity_Pa_s, yield_stress_Pa, shear_index_n, emission_temperature_K
   # derived optics — the renderer's per-body descriptor
+  ior                         # index of refraction — drives the surface Fresnel F0 and
+                              #   refraction bending; do NOT let the engine hardcode 1.33
   a_RGB, b_b_RGB              # or full a(λ), b(λ) if the engine takes spectra
   c_RGB                       # beam attenuation: sharp sightlines
   K_d_RGB                     # diffuse attenuation: the depth-tinted column

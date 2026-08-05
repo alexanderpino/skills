@@ -38,7 +38,7 @@ inputs, and the doctrine is that they are *sufficient*:
 | Water depth | Scalar field: `waterSurface - solidTop`, 0 on dry land | Absorption ramp, shoaling, shoreline fade, sim boundary |
 | Flow / velocity | 2D vector field (m/s), from routing + discharge, plus the nearshore surface circulation — longshore current, rip jets, inlet/river-mouth jets (terrain-architect `12`) | Flow-map advection, foam alignment, particle steering, sim boundary inflow, wave–current interaction |
 | Shore distance | Signed/unsigned distance to the waterline | Shoreline foam bands, wet-sand band (`13`/`14`), LOD bias near the line |
-| `liquidBody[i]` | Per-body record (terrain-architect `28`, registered in its `08`/`27`): derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour), causal state, QA fields (Secchi, Jerlov/Forel-Ule class) | **The source of `sigmaPerBody` and `scatterColorPerBody`** — see [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from). Beam attenuation `c` drives sharp sightlines; `K_d` drives the diffuse depth column |
+| `liquidBody[i]` | Per-body record (terrain-architect `28`, registered in its `08`/`27`): `ior`, derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour), causal state, QA fields (Secchi, Jerlov/Forel-Ule class) | **The source of `sigmaPerBody`, `scatterColorPerBody`, and the Fresnel `F0`** — see [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from). `ior` drives surface Fresnel and refraction bending (never hardcode 1.33); beam attenuation `c` drives sharp sightlines; `K_d` drives the diffuse depth column |
 
 The solid terrain below the water is real terrain — bathymetry generated to dry-land standards —
 and it is the collision floor, the refraction target, and the depth source. Two hard rules fall
@@ -719,10 +719,14 @@ color = lerp(refracted_underwater, reflected_environment, Fresnel(NdotV))
       + foam + sun_glint
 ```
 
-- **Fresnel** is the blend, and its `F0` is a water-specific number that is easy to get wrong:
-  from IOR 1.33, `F0 = ((1.33−1)/(1.33+1))² ≈ 0.02` — **half** the generic dielectric default of
-  0.04 (which is IOR 1.5, glass/plastic). Ship the default and calm water reads too reflective and
-  faintly plastic even before the distance-filtering problems compound it. Use the roughness-aware
+- **Fresnel** is the blend, and its `F0` comes from the body's index of refraction — a
+  **per-body** value, not a constant. Fresh water is IOR 1.33 → `F0 = ((1.33−1)/(1.33+1))² ≈ 0.02`,
+  **half** the generic dielectric default of 0.04 (which is IOR 1.5, glass/plastic); ship the
+  default and calm water reads too reflective and faintly plastic even before the
+  distance-filtering problems compound it. But natural liquids span IOR ~1.31–1.47 (ice → seawater
+  → brine → oil), i.e. `F0` from ~0.018 to ~0.036 — a **2× reflectance spread**, so a brine pool
+  reflects visibly more than the lake beside it. Take `ior` from the `liquidBody` descriptor
+  (terrain-architect `28`) rather than hardcoding 1.33. Use the roughness-aware
   form of [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) at
   grazing angles; the `F0 = ((n−1)/(n+1))²` derivation and the amplitude-Fresnel details route to
   physically-based-rendering.
@@ -1141,6 +1145,8 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **Water too reflective / faintly plastic even when calm**: Fresnel `F0` left at the generic
   dielectric 0.04 (IOR 1.5). Water is IOR 1.33 → `F0 ≈ 0.02`; the default doubles surface
   reflectance.
+- **Every liquid equally reflective**: `F0` hardcoded to water's value. Brine, oil and meltwater
+  differ (IOR ~1.31–1.47, `F0` ~0.018–0.036); take `ior` from the `liquidBody` descriptor.
 - **Refraction leaking objects above water**: missing depth reject on the distorted sample. The
   single most common shipped water bug; the fix is four shader lines (above).
 - **SSR dropout at grazing/screen edge**: mirror-bright water goes flat exactly at the horizon
@@ -1332,7 +1338,11 @@ Water is the classic hard transparency case, and the frame must be structured fo
   one-body ceiling: ubiquitous production practice; no single canonical citation.
 - **P** — Optical refraction constants for water: IOR ≈ 1.33 → Fresnel `F0 = ((n−1)/(n+1))² ≈ 0.02`
   and Snell's-window critical angle `arcsin(1/1.33) ≈ 48.6°`. Standard optics (Snell, Fresnel);
-  arithmetic verified 2026-08. The screen-space UV-distortion refraction is an approximation of
+  arithmetic verified 2026-08. IOR is a **per-body** property from `liquidBody` (terrain-architect
+  `28`), not a constant: natural liquids span ~1.31–1.47 (`F0` ~0.018–0.036). Seawater/brine values
+  (1.341 at 35 ‰ rising to 1.397 at 240 ‰) from Maykut & Light, "Refractive-index measurements in
+  freezing sea-ice and sodium chloride brines", *Applied Optics* 34, 950–961 (1995); verified
+  2026-08. The screen-space UV-distortion refraction is an approximation of
   Snell bending, not the ray-traced result — the amplitude-Fresnel and Snell derivations live in
   physically-based-rendering (`pbr-fundamentals`, `volumes-and-sss`).
 - **P** — Linear (Airy) wave theory — dispersion `ω² = gk·tanh(kh)`, shallow-water celerity
