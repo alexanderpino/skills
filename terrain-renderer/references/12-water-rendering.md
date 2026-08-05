@@ -1283,8 +1283,9 @@ unhandled it reads as two shaders arguing along a line.
 
 Honesty about tier: this section is engine documentation (D/N), not measurement, and Water has
 changed shape across releases — single render target → texture array, and a single Water Mesh actor
-(as documented in the UE4-era pages) → bounded Water Zones with local-only tessellation. Community reports of version-specific breakage (notably water
-interaction under World Partition) are F-tier and worth checking against your release. Treat every
+(as documented in the UE4-era pages) → bounded Water Zones with local-only tessellation. Community
+reports of version-specific breakage (notably water interaction under World Partition) are F-tier
+and worth checking against your release. Treat every
 constant above as a shipped default, not a law, and treat the *architecture* — one paged zone, one
 fused info capture, a sparse morphing quadtree, one wave evaluator, an opaque-surface volume pass —
 as the transferable part.

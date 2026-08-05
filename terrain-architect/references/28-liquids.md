@@ -92,8 +92,9 @@ single asymmetry parameter `g` and feed it to a Henyey-Greenstein-style lobe (Un
 Water documents a Schlick phase function, the standard cheap HG approximation). That shader's inputs
 are **scattering coefficients, absorption coefficients and a phase `g`** — plus a colour-scale term
 for what is seen through the water — which is useful confirmation that the split this chapter exports
-is the one the engine side wants (terrain-renderer `12`). So ship `phase_g` alongside `a` and `b_b`: positive and
-large for turbid, particle-loaded water (mineral suspensions scatter forward hardest), lower for
+is the one the engine side wants (terrain-renderer `12`). So ship `phase_g` alongside `a` and `b_b`:
+positive and large for turbid, particle-loaded water (mineral suspensions scatter forward
+hardest), lower for
 water whose scattering is molecular. Two failure modes it prevents: pre-summing `a + b_b` into one
 "extinction" — which discards the difference between bright-and-murky (sediment) and
 dark-and-clear (CDOM) — and leaving `g` at zero, which makes every water body isotropic and kills
