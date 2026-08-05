@@ -26,6 +26,23 @@
 //   reversing the flow field                       exactly negates the phase travel
 //   the calm/ripple/turbulent weights              sum to exactly 1
 //   the five regime masks on a wet sample          sum to exactly 1
+//
+// -------------------------------------------------------------------------------------------------
+// SECOND PASS — NINE DEFECTS THIS ORACLE LET THROUGH ON ITS FIRST VERSION.
+//
+// Each was injected into the shipped core one at a time and the suite stayed PASS with failed=[] —
+// 45 assertions and 21 armed mutations saw none of them. They were not code defects: the code was
+// right and NOTHING was holding it there. The pattern in all nine is one pattern. The fixture only
+// ever visits the ENDS of a quantity, so everything about its middle is free.
+//
+//   ice is only ever exactly 0 or exactly 1 in the grid  -> partial-ice behaviour was unconstrained
+//   aeration is only ever exactly 0 or exactly 1         -> FOAM_REGIME_MIN was unconstrained
+//   persistence is called with one of its two terms 0    -> max and sum are equal there
+//   depths are 2 and 20 against a shore depth of 12      -> the boundary comparison was free
+//   the continuity bound separates smooth from a STEP    -> but not from a LINEAR wedge
+//
+// The additions below are marked `2ND PASS` and each carries the two measured builds its bound sits
+// between. Ten new mutations arm them.
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
@@ -60,6 +77,17 @@ const MUTATIONS = [
   // --- the node ----------------------------------------------------------------------------------
   'plugin-emits-height',       // guardrail 1: the water-family node grows a terrain-height output
   'plugin-ignores-temperature',// the node computes ice from nothing and reports open water
+  // --- 2ND PASS: the nine defects the first version of this oracle stayed green on ---------------
+  'ice-ramp-is-linear',        // a linear wedge: slope discontinuity exactly at the ice edge
+  'partial-ice-claims-regime', // a 0.1%-frozen lake is masked as solid ice
+  'foam-double-damped-by-ice', // surf damped twice, so a half-frozen shore goes grey
+  'rapids-at-a-trickle',       // the rapids threshold collapses: lightly rippled river becomes whitewater
+  'rapids-never-arrive',       // the rapids threshold runs away: near-critical flow stays a river
+  'lake-chop-ignores-fetch',   // a lake swells correctly and chops like the open ocean
+  'foam-persistence-sums',     // surviving foam ADDS to new foam, so foam exceeds 1
+  'shore-swallows-the-lake-edge', // water exactly at the reference depth is shore, not lake
+  'channel-q-excludes-threshold', // discharge exactly at the channel-forming value is not a river
+  'absent-temperature-freezes',// an unwired Temperature port defaults to -10 degC and ices the world
 ]
 const PATCHES = {
   // A river's fetch is EXACTLY zero on purpose; anything else and Gerstner displacement reaches it.
@@ -111,6 +139,30 @@ const PATCHES = {
     + '    }']],
   'dry-cells-are-wet': [['  if (!(depthM > 0)) return out', '  if (depthM < 0) return out']],
   'short-raster-reads-zero': [["    if (typeof f.length !== 'number' || f.length < N) {", '    if (false) {']],
+  // --- 2ND PASS ------------------------------------------------------------------------------------
+  // Each of these was injected into the shipped core and the FIRST version of this oracle returned
+  // PASS failed=[] on every one of them.
+  'ice-ramp-is-linear': [[
+    'const smooth01 = u => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u))',
+    'const smooth01 = u => (u <= 0 ? 0 : u >= 1 ? 1 : u)']],
+  'partial-ice-claims-regime': [[
+    '  if (out.ice >= 1) out.regime = REGIME.ICE', '  if (out.ice > 0) out.regime = REGIME.ICE']],
+  'foam-double-damped-by-ice': [['    swellM: disp.swellM,', '    swellM: out.swellM,']],
+  'rapids-at-a-trickle': [['export const FOAM_REGIME_MIN = 0.5', 'export const FOAM_REGIME_MIN = 0.02']],
+  'rapids-never-arrive': [['export const FOAM_REGIME_MIN = 0.5', 'export const FOAM_REGIME_MIN = 0.99']],
+  'lake-chop-ignores-fetch': [[
+    '  const chopM = Math.min(Math.max(chopAmpM, 0) * scale, roomM)',
+    '  const chopM = Math.min(Math.max(chopAmpM, 0), roomM)']],
+  'foam-persistence-sums': [['  return Math.max(cause, kept)', '  return cause + kept']],
+  'shore-swallows-the-lake-edge': [[
+    '  else if (depthM < shoreDepth(opts)) out.regime = REGIME.SHORE',
+    '  else if (depthM <= shoreDepth(opts)) out.regime = REGIME.SHORE']],
+  'channel-q-excludes-threshold': [[
+    '  else if ((Number(sample.dischargeM3S) || 0) >= channelFormingQ(opts)) out.regime = REGIME.RIVER',
+    '  else if ((Number(sample.dischargeM3S) || 0) > channelFormingQ(opts)) out.regime = REGIME.RIVER']],
+  'absent-temperature-freezes': [[
+    '      temperatureC: at(fields.temperatureC, i, 20),',
+    '      temperatureC: at(fields.temperatureC, i, -10),']],
 }
 // Mutations that patch the PLUGIN rather than the core module.
 const PLUGIN_PATCHES = {
@@ -267,6 +319,15 @@ const gridField = key => {
   check('lake amplitude is never above and always below the same ocean preset',
     lakeAbove === 0 && deepEnough > 0 && lakeStrictlyBelow === deepEnough,
     { lakeAbove, lakeStrictlyBelow, deepEnough })
+  // 2ND PASS — ...AND SO DOES THE CHOP. Everything above measures the SWELL. A lake that swells at
+  // the correct sqrt(fetch) fraction and chops like the open ocean satisfies every one of them, and
+  // chop is the term a lake is supposed to be made of. Measured: drop the fetch scale from the chop
+  // term alone and this ratio goes from 0.063245553203 to exactly 1 while nothing else moves.
+  const deepChopRatio = lakeD[DEPTH_SAMPLES - 1].chopM / sea[DEPTH_SAMPLES - 1].chopM
+  check('a lake carries the same sqrt(fetch) fraction of the CHOP as of the swell',
+    sea[DEPTH_SAMPLES - 1].chopM > 0 && lakeD[DEPTH_SAMPLES - 1].chopM > 0
+    && Math.abs(deepChopRatio - Math.sqrt(0.004)) < 1e-15 && Math.abs(deepChopRatio - deepRatio) < 1e-15,
+    { deepChopRatio, deepRatio, closed: Math.sqrt(0.004) })
 
   // A RIVER RECEIVES NOTHING. Not "a little" — exactly zero, at every depth, for both bands.
   let riverNonZero = 0
@@ -370,6 +431,20 @@ const gridField = key => {
   // The bound sits between two MEASURED builds: smoothstep over 4 degrees sampled every 0.01 degree
   // steps by at most 1.5*0.0025 = 0.00375 per sample; a threshold steps by exactly 1.
   check('the ice transition is continuous rather than a threshold', iceJump < 0.05, { iceJump })
+  // 2ND PASS — THE RAMP'S SHAPE, NOT JUST ITS CONTINUITY. The bound above separates smoothstep from
+  // a THRESHOLD, whose step is 1.0. It does not separate it from a LINEAR wedge: measured, a linear
+  // ramp over the same four degrees steps 0.0025 per 0.01 degC against smoothstep's 0.00375, and
+  // both sail under 0.05. But C1 at the ENDS is the entire stated reason smoothstep was chosen — a
+  // linear ramp has a slope discontinuity exactly where the temperature field crosses the threshold,
+  // which is a hard line drawn across the ice edge in the one place the transition must be invisible.
+  // The end slope over the largest slope is what tells them apart, and both endpoints are measured:
+  // the shipped cubic gives 4.9917e-3, the same ramp made linear gives exactly 1.
+  const iceEndStep = Math.max(Math.abs(M.iceFraction(-0.01) - M.iceFraction(0)),
+    Math.abs(M.iceFraction(M.ICE_SOLID_C) - M.iceFraction(M.ICE_SOLID_C + 0.01)))
+  const iceEndRatio = iceJump > 0 ? iceEndStep / iceJump : 1
+  check('the phase ramp flattens at BOTH ends — it is C1, not a linear wedge',
+    iceJump > 0 && iceEndStep > 0 && iceEndRatio < 0.05,
+    { iceEndStep, iceJump, iceEndRatio, cubicMeasured: 4.991708e-3, linearMeasured: 1 })
 
   const baseAmp = M.regimeAmplitude('ocean', SWELL_M, 20, REF_M, 0)
   let iceAmpWorst = 0, iceAmpBack = 0, prevAmp = Infinity
@@ -476,6 +551,18 @@ const gridField = key => {
     M.foamPersistence(0, 1, 10) === 1 && M.foamPersistence(1, 0, 0) === 1
     && M.foamPersistence(1, 0, 5 * TAU) < 0.01 && M.foamPersistence(1, 0, 5 * TAU) > 0,
     { instant: M.foamPersistence(0, 1, 10), after5Tau: M.foamPersistence(1, 0, 5 * TAU) })
+  // 2ND PASS — BOTH TERMS LIVE AT ONCE, which is the only case that distinguishes MAX from SUM.
+  // Every persistence call above has either no new foam or no surviving foam, and max and sum agree
+  // identically whenever one of them is zero — so the choice between them, which is the whole design
+  // of the function, was tested by none of them. A wake trailing a boat is exactly the case where
+  // both are live. Measured: max 0.8561064820506427, sum 1.6561064820506428 — foam above 1, which is
+  // out of range for a mask port and reads as a solid white river.
+  const survivingA = 0.9 * Math.exp(-0.1 / TAU), survivingB = 0.6 * Math.exp(-0.05 / TAU)
+  const bothLive = M.foamPersistence(0.9, 0.8, 0.1)
+  check('persistence takes the MAX of new and surviving foam, never their sum, and stays inside [0,1]',
+    survivingA > 0.8 && bothLive === Math.max(0.8, survivingA)
+    && M.foamPersistence(0.6, 0.5, 0.05) === Math.max(0.5, survivingB) && bothLive <= 1,
+    { bothLive, max: Math.max(0.8, survivingA), sumWouldBe: 0.8 + survivingA })
 
   // ================================================================================================
   // THE PARTITION — six analytic bands, one regime each, counts known before the module runs
@@ -558,6 +645,91 @@ const gridField = key => {
   let throughBed = 0
   for (let i = 0; i < N; i++) if (fields.depthM[i] > 0 && cls.total[i] > BREAK * fields.depthM[i] * (1 + 1e-12)) throughBed++
   check('no classified sample displaces the surface past its own breaking limit', throughBed === 0, { throughBed })
+
+  // ================================================================================================
+  // 2ND PASS — THE MIDDLE OF EVERY QUANTITY THE GRID ONLY VISITS THE ENDS OF
+  //
+  // Every ice cell in the grid is exactly 1 frozen and every other cell exactly 0. Every flowing
+  // cell is exactly 0 or exactly 1 aerated. Every depth is 2 or 20 against a shore depth of 12.
+  // That is why the five defects below were all invisible: each lives strictly between two ends the
+  // fixture never samples. Each check names the two measured builds its bound sits between.
+  // ================================================================================================
+
+  // ONLY FULL COVER CLAIMS THE ICE REGIME. A lake at 99.9% ice is still a lake whose motion is
+  // damped; firing the regime on ANY ice snaps a whole basin to solid mirror the instant a
+  // temperature field dips below zero — which is precisely the snap the smooth ramp exists to
+  // prevent, arriving one line further down. Measured: at -3.9265 degC the fraction is 0.99900 and
+  // the regime is LAKE; at exactly -4 it is 1 and the regime is ICE. Fire it on any ice at all and
+  // the first of those becomes ICE while all six grid counts stay identical.
+  const barelyCold = M.classifyCell({ depthM: 20, temperatureC: -0.0735 }, opts)
+  const nearlyFrozen = M.classifyCell({ depthM: 20, temperatureC: -3.9265 }, opts)
+  const fullyFrozen = M.classifyCell({ depthM: 20, temperatureC: M.ICE_SOLID_C }, opts)
+  check('only FULL ice cover claims the ice regime — a 99.9% frozen lake is still a lake',
+    barelyCold.ice > 0 && barelyCold.ice < 0.01 && barelyCold.regime === M.REGIME.LAKE
+    && nearlyFrozen.ice > 0.99 && nearlyFrozen.ice < 1 && nearlyFrozen.regime === M.REGIME.LAKE
+    && fullyFrozen.ice === 1 && fullyFrozen.regime === M.REGIME.ICE,
+    { barelyIce: barelyCold.ice, barelyRegime: barelyCold.regime, nearlyIce: nearlyFrozen.ice,
+      nearlyRegime: nearlyFrozen.regime, fullRegime: fullyFrozen.regime })
+
+  // FOAM IS DAMPED BY ICE EXACTLY ONCE. `foamIntensity` applies the suppression itself, so the swell
+  // handed to it must be the PRE-ice amplitude; handing it the post-ice swell damps the surf twice
+  // and a half-frozen shore goes quietly grey. Nothing above can see it, because at full ice both
+  // spellings give exactly zero and the grid has no other kind of ice cell. Measured: shore foam
+  // 0.0951775385353801 open and 0.04758876926769005 at half cover — EXACTLY half. Damped twice it is
+  // 0.023794384633845023, exactly a quarter, and the ratio below moves from 0.5 to 0.25.
+  const shoreOpen = M.classifyCell({ depthM: 2, temperatureC: 20 }, opts)
+  const shoreHalfIce = M.classifyCell({ depthM: 2, temperatureC: -2 }, opts)
+  check('foam under PARTIAL ice is damped exactly once — a half-frozen shore keeps half its surf',
+    shoreOpen.foam > 0 && shoreOpen.regime === M.REGIME.SHORE && shoreHalfIce.ice === 0.5
+    && shoreHalfIce.foam === shoreOpen.foam * 0.5,
+    { open: shoreOpen.foam, half: shoreHalfIce.foam, ratio: shoreHalfIce.foam / shoreOpen.foam })
+
+  // THE RAPIDS THRESHOLD, TESTED WHERE IT BINDS. Every flowing cell in the grid has an aeration
+  // fraction of exactly 0 (Fr 0.309) or exactly 1 (Fr 2.183), so FOAM_REGIME_MIN is constrained by
+  // nothing whatever: measured, ANY value in (0, 1] leaves all six counts byte-identical. These two
+  // cells straddle it, and their gradients are SOLVED from the target Froude number rather than
+  // chosen, so the fixture stays analytic. Measured: Fr 0.70 gives aeration 0.15625 and must stay a
+  // RIVER — a rippled reach is not whitewater; Fr 0.95 gives 0.95703 and must be a RAPID. Collapse
+  // the threshold to 0.02 and the first becomes a rapid; run it out to 0.99 and the second stays a
+  // river. Both directions are armed.
+  const slopeForFroude = (fr, d) => Math.pow(fr * Math.sqrt(WAVES.GRAVITY * d) * MANNING_N / Math.pow(d, 2 / 3), 2)
+  const lightlyAerated = M.classifyCell({ depthM: 1.5, dischargeM3S: 5, slope: slopeForFroude(0.70, 1.5) }, opts)
+  const heavilyAerated = M.classifyCell({ depthM: 1.5, dischargeM3S: 5, slope: slopeForFroude(0.95, 1.5) }, opts)
+  const lightAeration = M.rapidFoam(lightlyAerated.froude), heavyAeration = M.rapidFoam(heavilyAerated.froude)
+  check('the rapids threshold binds: a lightly aerated river is a river, a heavily aerated one is a rapid',
+    Math.abs(lightlyAerated.froude - 0.70) < 1e-12 && Math.abs(heavilyAerated.froude - 0.95) < 1e-12
+    && lightAeration > 0.05 && lightAeration < 0.45 && heavyAeration > 0.55 && heavyAeration <= 1
+    && lightlyAerated.regime === M.REGIME.RIVER && heavilyAerated.regime === M.REGIME.FOAM,
+    { lightFr: lightlyAerated.froude, lightAeration, lightRegime: lightlyAerated.regime,
+      heavyFr: heavilyAerated.froude, heavyAeration, heavyRegime: heavilyAerated.regime })
+
+  // THE TWO AUTHORED THRESHOLDS ARE REACHED, NOT EXCEEDED. The grid's depths are 2 and 20 against a
+  // shore depth of 12 and its discharges are 0 and 5 against a channel-forming 0.1, so both
+  // comparisons could be strict or not and not one count would move. Water exactly AT the reference
+  // depth is a LAKE, and that is not a convention: it is the depth where `shoalAmplitude`'s gain is
+  // exactly 1, i.e. where the bottom is not yet felt. Measured: 11.999 m -> shore, 12 m -> lake;
+  // 0.0999 m3/s -> shore, 0.1 -> river.
+  check('the shore band stops short of the reference depth: water exactly at it is a lake',
+    M.classifyCell({ depthM: SHORE_DEPTH - 0.001 }, opts).regime === M.REGIME.SHORE
+    && M.classifyCell({ depthM: SHORE_DEPTH }, opts).regime === M.REGIME.LAKE
+    && M.shoreDepth(opts) === SHORE_DEPTH,
+    { justUnder: M.classifyCell({ depthM: SHORE_DEPTH - 0.001 }, opts).regime,
+      exactly: M.classifyCell({ depthM: SHORE_DEPTH }, opts).regime })
+  check('discharge that REACHES the channel-forming value is a river, not merely discharge above it',
+    M.classifyCell({ depthM: 1.5, dischargeM3S: CHANNEL_Q * 0.999 }, opts).regime === M.REGIME.SHORE
+    && M.classifyCell({ depthM: 1.5, dischargeM3S: CHANNEL_Q }, opts).regime === M.REGIME.RIVER
+    && M.channelFormingQ(opts) === CHANNEL_Q,
+    { justUnder: M.classifyCell({ depthM: 1.5, dischargeM3S: CHANNEL_Q * 0.999 }, opts).regime,
+      exactly: M.classifyCell({ depthM: 1.5, dischargeM3S: CHANNEL_Q }, opts).regime })
+
+  // AN OMITTED FIELD IS OPEN WATER, NOT ICE. `classifyRegimes` fills an absent temperature from a
+  // default, and that default is the single number deciding what an UNWIRED Temperature port does to
+  // a domain. Every fixture above supplies the raster, so the default was reached by nothing.
+  // Measured: omitted -> ice 0 and 8 lake cells; a default of -10 degC -> ice 1 and 8 ice cells.
+  const noTemp = M.classifyRegimes({ depthM: Float64Array.from({ length: 8 }, () => 20) }, 8, opts)
+  check('an omitted temperature raster is open water, not ice',
+    noTemp.counts.lake === 8 && noTemp.counts.ice === 0 && noTemp.ice[0] === 0 && noTemp.wet === 8,
+    { counts: noTemp.counts, ice0: noTemp.ice[0] })
 
   // A SHORT RASTER IS REFUSED, not read as zeros. Half a domain silently classified as dry is the
   // doctrine's "framebuffer read zeros" — red, not green.
@@ -669,6 +841,13 @@ const gridField = key => {
     frRiver: +frRiver.toFixed(6), frRapid: +frRapid.toFixed(6),
     counts: cls.counts, wet: cls.wet, zeroSwellCells: zeroSwell, zeroFoamCells: zeroFoam,
     foamDecay1s: +oneStep.toFixed(12), foamDecay10x100ms: +manySteps.toFixed(12),
+    // 2ND PASS readings. Every one is asserted above; none is diagnostic-only.
+    lakeChopOverOcean: +deepChopRatio.toFixed(12), iceEndSlopeRatio: +iceEndRatio.toFixed(9),
+    nearlyFrozenIce: +nearlyFrozen.ice.toFixed(9), nearlyFrozenRegime: nearlyFrozen.regime,
+    shoreFoamOpen: +shoreOpen.foam.toFixed(12), shoreFoamHalfIce: +shoreHalfIce.foam.toFixed(12),
+    lightAeration: +lightAeration.toFixed(9), lightRegime: lightlyAerated.regime,
+    heavyAeration: +heavyAeration.toFixed(9), heavyRegime: heavilyAerated.regime,
+    foamPersistBothLive: +bothLive.toFixed(12), foamPersistSumWouldBe: +(0.8 + survivingA).toFixed(12),
   }))
   report()
 
