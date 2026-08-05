@@ -83,6 +83,23 @@ governs the *ambient light column* with depth. Because forward scattering domina
 (`b_f` ≳ 50·`b_b`), `c` is typically **5–20× larger** than `K_d`. Export both and label them;
 collapsing them into one "extinction" makes water look far murkier than it is.
 
+**Scattering has a direction, and engines ask for it.** `a` and `b` say *how much*; the **phase
+function** says *where the scattered light goes*, and natural water is strongly forward-scattering —
+the Petzold measurements that everyone's water model descends from show a phase function peaked hard
+in the forward direction, which is the same fact as `b_f ≳ 50·b_b` above, expressed as an angle
+rather than a ratio. Real-time renderers do not evaluate a measured phase function; they take a
+single asymmetry parameter `g` and feed it to a Henyey-Greenstein-style lobe (Unreal's Single Layer
+Water documents a Schlick phase function, the standard cheap HG approximation). That shader's inputs
+are **scattering coefficients, absorption coefficients and a phase `g`** — plus a colour-scale term
+for what is seen through the water — which is useful confirmation that the split this chapter exports
+is the one the engine side wants (terrain-renderer `12`). So ship `phase_g` alongside `a` and `b_b`:
+positive and large for turbid, particle-loaded water (mineral suspensions scatter forward
+hardest), lower for
+water whose scattering is molecular. Two failure modes it prevents: pre-summing `a + b_b` into one
+"extinction" — which discards the difference between bright-and-murky (sediment) and
+dark-and-clear (CDOM) — and leaving `g` at zero, which makes every water body isotropic and kills
+the forward glow through a sunlit wave crest.
+
 **The authoring handle.** Lee et al. (2015) showed the classical Secchi relation is not derivable
 from radiative transfer and replaced it with a strikingly clean result:
 
@@ -304,6 +321,11 @@ liquid_body:
   ior                         # index of refraction — drives the surface Fresnel F0 and
                               #   refraction bending; do NOT let the engine hardcode 1.33
   a_RGB, b_b_RGB              # or full a(λ), b(λ) if the engine takes spectra
+                              #   ship SEPARATELY, never pre-summed: engines take absorption and
+                              #   scattering as distinct shader inputs (terrain-renderer 12)
+  phase_g                     # scattering asymmetry, [-1,1]; forward-peaked in natural water and
+                              #   strongest in particle-loaded water. The engine's phase-function
+                              #   input; 0 (isotropic) is a visible wrong default
   c_RGB                       # beam attenuation: sharp sightlines
   K_d_RGB                     # diffuse attenuation: the depth-tinted column
   scatter_colour              # the multiple-scattering body colour
@@ -388,5 +410,15 @@ producer gap named at the top of this file; register the fields in `08` and `27`
   measured reflectance, particle-size distribution and a full IOP decomposition for one proglacial
   lake; the mechanism is sound and now corroborated, the complete first-principles chain is still
   assembled here rather than quoted.
+- **P/?** — Forward-peaked volume scattering in natural water: the canonical measurements are
+  Petzold, *Volume Scattering Functions for Selected Ocean Waters* (Scripps Institution of
+  Oceanography ref. 72-78, 1972), whose "average particle" phase function underlies most ocean-optics
+  models. Cited from model knowledge and **not web-verified**; the load-bearing claim in this chapter
+  is only the direction (forward-peaked, more so with particle load), which is the same fact as the
+  `b_f ≳ 50·b_b` ratio taken from the sources above. The single-`g` Henyey-Greenstein reduction is
+  the real-time approximation, not the measurement.
+- **D** — That engine water shaders take **absorption, scattering and a phase `g` as three separate
+  inputs**: Epic's Single Layer Water shading-model documentation (fetched 2026-08) — the reason
+  this chapter exports them unsummed. See terrain-renderer `12`.
 - **L** — The driver→constituent table, the seven doctrine rules, the archetype presets and the
   export schema are this skill's composition over the P-tier relations above.

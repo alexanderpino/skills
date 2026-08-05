@@ -831,6 +831,18 @@ Note that both Unreal and Unity want `2^n + 1` heightmaps and `2^n` masks — wh
 vertex/pixel distinction showing up in the shipped API. That's confirmation the distinction is
 real, not pedantry.
 
+**Rasters are not the whole emit.** Engine water systems are spline-first — a river is an open curve
+and a lake a closed one, with per-point width, depth and velocity, and in the dominant workflow those
+curves *carve the terrain heightfield* through the engine's own brush/edit-layer stack. An emitter
+that ships only `waterSurface` and `waterDepth` therefore hands the engine water it cannot
+instantiate, and someone re-traces the channels by hand. Every water body needs a **vector**
+counterpart alongside its fields, satisfying invariants the engine cannot check (a lake polygon
+planar at its spill elevation, a river polyline monotone downstream, widths from hydraulic geometry),
+plus one manifest field naming **who carves** — the tool, the engine, or the tool with an engine
+refinement pass. The schema, the invariants and the double-carve defect are `27`'s vector-water
+section; the same section covers exclusion volumes, the one thing a height-plus-datum export
+structurally cannot say.
+
 **The emitter must not resample.** If the emitter is resampling to fit the engine's expected
 resolution, the graph produced the wrong resolution and should be fixed. Resampling in the
 emitter reintroduces every artefact the graph was careful to avoid.

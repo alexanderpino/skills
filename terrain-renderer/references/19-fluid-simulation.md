@@ -221,6 +221,16 @@ at the same time value, or the boat visibly floats above or sinks into its own w
 renderer displaces on the GPU, either evaluate the analytic waves again on the CPU or read back
 with a declared frame latency and accept it (`17`'s async-readback discipline).
 
+**Amortize the queries; they are the real cost.** Wave evaluation on the CPU is what floating things
+actually cost — probes × bodies × frames, each a Gerstner sum or a cascade fetch — and the shipped
+answer is to spread it: update a fixed **number of probe points per frame** round-robin rather than
+every probe every tick, and let a quiescent body **pause for N frames** between updates entirely,
+with rigid-body integration carrying it in between. Unreal's buoyancy component exposes exactly these
+two dials, which is a good sign they are the right ones. Two rules make it safe: the latency is
+*declared* (a fast hull in a heavy sea is where it shows, and the fix is a higher rate for hero
+bodies, never a global raise), and the round-robin order is stable, or probes on the same hull sample
+different times and the boat shivers.
+
 **Bodies displacing the fluid.** For a heightfield, inject a negative displacement (or a velocity
 source) at the hull's footprint each step — that is a wake, and it costs almost nothing. This is
 the cheapest genuinely two-way coupling available and it covers boats, swimming characters and
@@ -340,6 +350,12 @@ Tiers per `00`: **P** paper · **T** talk · **D** docs · **F** folklore · **?
   mechanism reconstruction from press and footage — Nintendo has published no talk; Mario Kart
   World claims are launch-window coverage. The *doctrine* it exemplifies (deterministic
   one-evaluator waves as gameplay state) is this skill's authority contract, not a citation.
+- **D/F** — Amortized buoyancy queries (round-robin probe updates per frame, whole-body pause
+  between updates): the two dials are shipped as `N Points Per Frame` and `N Frames Pause` on
+  Unreal's buoyancy component, surfaced from Epic's water-waves/buoyancy documentation in 2026-08
+  search rather than a page-by-page read (**?** on the exact names per version). The technique and
+  the stable-ordering/declared-latency rules are standard practice. The wider Water-plugin
+  architecture, including the shared CPU/GPU wave evaluator, is `12`'s engine-native section.
 - **F** — Probe-point buoyancy, diffuse-particle spray/foam/bubble classification, sim-domain fade
   fractions, sleep/promote hysteresis, and the debug-view list: universal production practice with
   no single canonical source.
