@@ -853,9 +853,30 @@ do not test.** Four failure modes were named up front and the audit found all fo
 | S4.5 | lattice-mismatch refusal | unarmed |
 | S4.6 | accepting the offer adds a visible undoable branch | one call site, not reachable from the app |
 | S4.7 | "sampled displaced vertices remain inside inflated bounds" | `presetBounds` is never called by the renderer |
-| S4.7 | "displaced silhouette **instead of** a flat plane with animated normal noise" | **the evidence oracle cannot tell the two apart — zeroing the vertical displacement does not fail it** |
+| S4.7 | "displaced silhouette **instead of** a flat plane with animated normal noise" | ~~the evidence oracle cannot tell the two apart~~ **REFUTED — see correction below** |
 | S4.8 | all clauses | not implemented. GGX was written, verified against a CPU oracle, and reverted for blowing the sea to white |
 | S4.9 | ice, causal foam, no-ocean-swell-on-rivers | green in the module, UNSUPPORTED in the shipping renderer |
+
+### CORRECTION: the audit's most serious finding does not reproduce
+
+The claim was that S4.7's evidence oracle cannot distinguish a displaced silhouette from a flat
+plane with animated normals, because zeroing the vertical displacement leaves it green. That would
+have been the worst defect in the sprint: a gate certifying the exact thing its story exists to
+rule out.
+
+Measured directly. Deleting `d.y*amp/uScale` from the vertex position at both call sites — removing
+the vertical displacement while leaving the horizontal chop and the normal untouched:
+
+    _verify_water_displacement.js   FAIL
+    _verify_water_evidence.js       FAIL
+
+Both catch it. Source restored, both green again. The finding is REFUTED and the gate is sound on
+its central claim.
+
+Recorded rather than quietly deleted, because it cuts both ways: an audit hunting vacuous gates
+produced a false positive, and the only thing that separated it from the eleven TRUE findings in
+the same report was running the experiment. The other rows carried commands and outputs; this one
+carried a claim. That distinction is the whole discipline.
 
 ### The pattern, and it is the same one all sprint
 
