@@ -6,7 +6,8 @@ Contents: [Order of operations](#order-of-operations) · [Depression handling](#
 [Lakes](#lakes) · [Channel morphology](#channel-morphology-mountain-rivers) ·
 [Meandering & bank erosion](#meandering--bank-erosion) ·
 [River terraces](#river-terraces) · [Avulsion, crevasse splays & delta lobes](#avulsion-crevasse-splays--delta-lobes) ·
-[Water sources & discharge](#water-sources--discharge) · [Domain boundaries](#domain-boundaries) ·
+[Water sources & discharge](#water-sources--discharge) ·
+[The flow-velocity field](#the-flow-velocity-field) · [Domain boundaries](#domain-boundaries) ·
 [Sea level](#sea-level) · [Choosing](#choosing)
 
 ## Order of operations
@@ -704,6 +705,93 @@ springs and entering rivers as explicit inputs to the sim, not decoration.
 **Sinks** are the mirror image — a cell that *removes* water: a doline swallowing a stream (`11`),
 or an endorheic basin that only evaporates (the Dead Sea, the Aral). Mark them so depression
 handling leaves them unfilled and accumulation terminates there instead of forcing an outlet.
+
+## The flow-velocity field
+
+`flowVelocity` is a **first-class export**, not a by-product of routing (`08`, `27`). The engine
+consumes it for flow-mapped water, foam alignment, particle steering, buoyancy drag and
+wave–current interaction (terrain-renderer `12`), and a river whose surface all flows at one speed
+in one direction is as dead a tell as a constant-width channel. Routing gives the field its
+**direction**; its **magnitude and structure** come from physics, and the whole point is that
+several factors modulate it. Direction is the steepest-descent/`D∞`/`MFD` vector already computed;
+everything below sets the speed and bends the streamlines off pure downslope.
+
+**Continuity is the factor that makes it look alive.** Discharge is conserved along a reach, so
+
+```
+Q = v · w · d      ⇒      v = Q / (w · d)         # w = width, d = depth (hydraulic geometry, above)
+```
+
+A river therefore **speeds up where it narrows or shallows** (a gorge, a bedrock constriction, a
+bridge) and **slows where it widens or deepens** (a pool, a floodplain, a reservoir) — at constant
+`Q`. This single relation, applied over the width field, is what turns a flat velocity map into one
+that surges through canyons and stills in pools. It is also the Venturi behind a river-mouth jet and
+a tidal inlet (`12`).
+
+**Slope and roughness set the base speed (Manning).** For a reach of gradient `S` and bed roughness
+`n`,
+
+```
+v = (1/n) · R^(2/3) · S^(1/2)          # Manning; R = hydraulic radius ≈ depth for wide channels
+# n ≈ 0.03 gravel bed · 0.035 natural stream · 0.05–0.15 vegetated / floodplain · 0.012 smooth rock
+```
+
+Steeper and smoother is faster; a vegetated, rough, or shallow reach is slower for the same slope.
+This is the term that makes mountain headwaters race and lowland reaches crawl, independent of
+discharge. (Manning is standard open-channel hydraulics; use it as a *look* calibrator, not a
+guarantee.)
+
+**Regime — is it tranquil or a rapid?** The Froude number `Fr = v / sqrt(g·d)` splits flow into
+**subcritical** (`Fr < 1`, deep, tranquil, glassy) and **supercritical** (`Fr > 1`, shallow, fast,
+broken-surface rapid), with a **hydraulic jump** where a supercritical reach abruptly returns to
+subcritical (the standing white wall below a spillway or a boulder). This is the generation-side
+*cause* the engine renders as whitewater: mark reaches by `Fr` and hand the renderer a turbulence
+intensity, never foam (`12`; whitewater-is-caused, above). Knickpoints and steep constrictions are
+where `Fr` crosses 1.
+
+**Bends add secondary flow.** In a meander the fastest surface flow crosses from the inner bank
+upstream to the **outer bank** at the bend apex (the thalweg), and a helical secondary circulation
+runs outward at the surface and inward along the bed — the mechanism that erodes the cut bank and
+builds the point bar (`Meandering & bank erosion`, above). For the field: bias speed and direction
+toward the outer bank through bends rather than centring the flow, or the river reads as a canal.
+
+**Base level slows everything.** Approaching a lake, the sea, or any standing water, the water-surface
+slope flattens, so `S → 0` and Manning velocity collapses — a **backwater**. This deceleration is
+exactly why sediment drops and deltas build (`Avulsion, crevasse splays & delta lobes`, above; `12`
+deltas): the flow field must fade to near-zero at the shoreline, not run at channel speed into a wall.
+
+### Per water body
+
+The factors above are universal; how they combine differs by body, and each type is a distinct
+`flowVelocity` regime the generator must actually fill — including the ones usually left at zero.
+
+- **Streams & rivers.** Direction from routing, magnitude from Manning × continuity, bent by
+  secondary flow through meanders and split at braids/distributaries. Fast and supercritical in
+  steep constrictions, slow and subcritical in pools and wide reaches. The pipe/shallow-water sim
+  (`04`) produces this velocity field directly if you run one; otherwise synthesise it from the
+  fields above.
+- **Lakes & reservoirs — not zero.** A lake with an inlet and an outlet carries a slow
+  **through-current** along the line connecting them, `v ≈ Q / (cross-sectional area)`, negligible
+  in a broad lake and noticeable in a narrow one or near the outlet. Its **residence time** is
+  `volume / Q` — a clarity and ecology driver (`28`), and the reason a flushed lake and a stagnant
+  one differ. Away from the through-line the interior is near-still and dominated by
+  **wind-driven surface drift** — a thin downwind current from the wind field (`13`), the cause of
+  the downwind-shore pile-up and seiche. Export a small, structured field, not a flat zero.
+- **Estuaries & deltas.** **Bidirectional**: the flow reverses with the tide (flood upstream, ebb
+  seaward), and the channel splits into distributaries that each carry a fraction of `Q`. Ship the
+  ebb (seaward) phase as the representative field unless the engine carries the tidal oscillation,
+  and let the distributary split follow the delta-lobe geometry (above; `12` tidal inlets).
+- **Oceans & seas.** The nearshore surface circulation — longshore current, rip feeders and jets,
+  tidal-inlet and river-mouth jets — is generated by the surf-zone morphodynamics of `12` and
+  belongs in `flowVelocity` across the surf band. Beyond that, **wind-driven surface drift** from
+  the wind field (`13`) gives the open surface its texture. Basin-scale currents (gyres,
+  western-boundary currents) are **out of scope as a simulation** — if a world needs them they are
+  an authored vector field laid over the surface, a look, not a product of routing; say so.
+
+**What not to do.** Do not export a normalised direction field — speed is data the engine needs
+(`27`); do not leave lakes and open water at zero; do not run channel-speed flow into a shoreline;
+and never bake foam, chop, or wave motion into the velocity field — it carries the *current*, and
+the engine makes the motion (`08`, whitewater-is-caused).
 
 ## Domain boundaries
 

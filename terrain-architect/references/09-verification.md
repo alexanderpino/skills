@@ -342,6 +342,10 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Surf zone has no bar, or the bar sits at an arbitrary depth | Cross-shore fluxes never converge at the breakpoint | Energetics profile step; bar crest near **depth** `d ≈ H_b/γ` (`12`) |
 | Rips on a dissipative beach / none on an intermediate one | Bar–rip template chosen by hand, beach state ignored | Pick the surf-zone template from `Ω = H_b/(w_s·T)` (`12`) |
 | `flowVelocity` is zero seaward of the waterline | Nearshore circulation never exported | Stamp longshore/rip/inlet currents into `flowVelocity` (`12`, `08`) |
+| River flows at one speed the whole length | Velocity not modulated by continuity/slope | `v = Q/(w·d)` (speed up in constrictions) × Manning slope term (`03`) |
+| Lakes and open water export zero flow | Through-current, wind drift and tides ignored | Slow inlet→outlet current `v≈Q/area` + wind-driven surface drift (`03`, `13`) |
+| River runs at channel speed into the sea/lake | No backwater; base-level deceleration missing | Fade velocity to near-zero as the surface slope flattens at base level (`03`) |
+| Rapids/whitewater marked with no physical basis | Froude regime never computed | Mark reaches by `Fr = v/√(gd)`; hand the engine turbulence, never foam (`03`, `12`) |
 | Barrier coast with a big tidal prism but no inlet anywhere | Barrier stamped as an unbroken wall; prism–area relation never applied | Carve an inlet at `A_inlet = C_OB·P_tide^0.85` with ebb/flood deltas — and leave the lagoon itself a legitimate closed basin, never flood-filled (`12`, `03`) |
 | Range erodes straight down; peaks never rise | Isostatic rebound not coupled to erosion | Add flexural / erosional rebound alongside erosion (`02`) |
 | Seams or a pole pinch on a planet | Lat-long grid, or tile-local coords on a sphere | Cube-sphere / HEALPix + metric-corrected `Δs`; seam routing (`08`) |

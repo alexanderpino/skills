@@ -244,6 +244,9 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | River meandering, bank erosion, oxbow cutoff | P | Ikeda, Parker & Sawai 1981 (bend theory — curvature-driven migration); Howard & Knutson 1984 (`03`) |
 | Channel patterns — braided / meandering / straight | P | Leopold & Wolman 1957, USGS Professional Paper 282-B (`03`) |
 | River widening / depth estimation | F | Hydraulic geometry scaling (`w ∝ Q^0.5`, Leopold & Maddock 1953) |
+| Flow-velocity field synthesis (direction × magnitude across water bodies) | P (physics) / L (synthesis) | Continuity `v = Q/(w·d)`; Manning `v = (1/n)R^(2/3)S^(1/2)`; Froude `Fr = v/√(gd)` regime; secondary flow in bends; backwater at base level; per-body (streams/lakes/estuaries/oceans) (`03`) |
+| Open-channel velocity (Manning) & flow regime (Froude) | P | Standard open-channel hydraulics; roughness `n` ≈ 0.03 gravel–0.15 vegetated; `Fr=1` critical, hydraulic jump (`03`) |
+| Lake through-flow & residence time | P/L | `v ≈ Q/area` along the inlet→outlet line; residence `= volume/Q`; wind-driven surface drift from the `13` wind field — lakes are not zero-flow (`03`, `28`) |
 | Channel-reach morphology (cascade / step-pool / pool-riffle) | P | Montgomery & Buffington 1997, GSA Bulletin 109(5) (`03`) |
 | Hydrology-based terrain (river network first) | P | Génevaux et al. 2013, ACM TOG 32(4), SIGGRAPH '13 (`03`) |
 | Water sources & discharge routing (`Q` vs area) | P | Springs / inflows as source terms (Št'ava 2008); route `Q`, stream power on `Q^m` (`03`, `04`) |

@@ -239,6 +239,17 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Lindsay, J.B. (2016).** *Efficient hybrid breaching-filling sink removal methods for flow
   path enforcement in digital elevation models.* Hydrological Processes 30(6), 846–857. —
   Breaching, and the hybrid breach/fill policy. The right default for terrain generation.
+- **Manning, R. (1891).** *On the flow of water in open channels and pipes.* Transactions of the
+  Institution of Civil Engineers of Ireland 20, 161–207. — The open-channel velocity relation
+  `v = (1/n)·R^(2/3)·S^(1/2)`; the basis for setting flow-field speed from slope and roughness
+  (`03` flow-velocity field). Standard hydraulics; used here as a look calibrator.
+- **Leopold, L.B. & Maddock, T. (1953).** *The hydraulic geometry of stream channels and some
+  physiographic implications.* USGS Professional Paper 252. — Downstream hydraulic geometry
+  `w ∝ Q^0.5`, `d ∝ Q^0.4`, `v ∝ Q^0.1`; the discharge→width/depth/velocity scaling behind the
+  flow-velocity field and channel widening (`03`).
+- **Froude regime / hydraulic jump** — standard open-channel hydraulics: `Fr = v/√(g·d)`, `Fr<1`
+  subcritical (tranquil), `Fr>1` supercritical (rapid), jump at the transition. No single
+  canonical citation; the generation-side *cause* of whitewater the engine renders (`03`, `12`).
 
 ## Analysis
 
