@@ -12,9 +12,9 @@ water bodies, routing, and flow fields routes to terrain-architect (its `03`/`04
 `08`/`27` output contract).
 
 Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-render-side) ·
+[Sea states: the energy ladder](#sea-states-the-energy-ladder) ·
 [Surface geometry & LOD](#surface-geometry--lod) ·
 [Screen-space water: the fullscreen-triangle pass](#screen-space-water-the-fullscreen-triangle-pass) ·
-[Sea states: the energy ladder](#sea-states-the-energy-ladder) ·
 [Ambient waves: Gerstner and FFT](#ambient-waves-gerstner-and-fft) ·
 [Calm water: the low-energy regime](#calm-water-the-low-energy-regime) ·
 [Shallow water: shoaling, refraction, and breakers](#shallow-water-shoaling-refraction-and-breakers) ·
@@ -38,6 +38,7 @@ inputs, and the doctrine is that they are *sufficient*:
 | Water depth | Scalar field: `waterSurface - solidTop`, 0 on dry land | Absorption ramp, shoaling, shoreline fade, sim boundary |
 | Flow / velocity | 2D vector field (m/s), from routing + discharge, plus the nearshore surface circulation — longshore current, rip jets, inlet/river-mouth jets (terrain-architect `12`) | Flow-map advection, foam alignment, particle steering, sim boundary inflow, wave–current interaction |
 | Shore distance | Signed/unsigned distance to the waterline | Shoreline foam bands, wet-sand band (`13`/`14`), LOD bias near the line |
+| `liquidBody[i]` | Per-body record (terrain-architect `28`, registered in its `08`/`27`): derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour), causal state, QA fields (Secchi, Jerlov/Forel-Ule class) | **The source of `sigmaPerBody` and `scatterColorPerBody`** — see [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from). Beam attenuation `c` drives sharp sightlines; `K_d` drives the diffuse depth column |
 
 The solid terrain below the water is real terrain — bathymetry generated to dry-land standards —
 and it is the collision floor, the refraction target, and the depth source. Two hard rules fall
@@ -83,8 +84,8 @@ Three transitions are worth hard-coding as feature gates, because they are obser
 rather than art direction: **whitecaps begin at Force 3**, **spray begins at Force 5**, and **foam
 streaks begin at Force 7**. They also cross-validate the coverage model in
 [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic): Monahan's
-`W = 3.84e-6·U^3.41` puts whitecaps at essentially zero around 5 m/s and dominant by 15 m/s, and
-Force 3 is 7–10 kt ≈ 3.6–5.1 m/s. An empirical formula and a 19th-century observational scale
+`W = 3.84e-6·U^3.41` puts whitecap coverage at essentially zero around 5 m/s (~0.1%) and
+conspicuous by 15 m/s (~4% of the surface), and Force 3 is 7–10 kt ≈ 3.6–5.1 m/s. An empirical formula and a 19th-century observational scale
 agreeing on where foam starts is a good sign both are right — and a strong argument for driving
 foam from wind rather than from a hand-tuned constant.
 
@@ -292,7 +293,9 @@ opposite end of the energy ladder, the low-wind case has its own failure modes.
 
 Beaufort 0–2 is not "the easy case with the waves turned down". It is a distinct regime that
 breaks several assumptions the rest of this chapter relies on, and it is where a water renderer
-most often looks *obviously* synthetic — because there is nothing left to hide behind.
+most often looks *obviously* synthetic — because there is nothing left to hide behind. The
+classic failure on a millpond is one of two: the sea goes to patent leather, or to a black void
+with one searing highlight.
 
 **There is a smallest possible wave, and it is not zero.** Including surface tension, the
 dispersion relation is
@@ -304,8 +307,10 @@ omega^2 = ( g*k + (sigma/rho)*k^3 ) * tanh(k*h)      # sigma = surface tension, 
 The `k³` term means phase speed *rises* again for very short waves, so it has a **minimum: about
 23.1 cm/s, at a wavelength of about 1.73 cm.** Below that wavelength you are in the capillary
 regime (surface tension restoring), above it the gravity regime. Two consequences: a spectrum has
-a natural high-frequency cutoff around a couple of centimetres — synthesising detail finer than
-that is inventing physics — and wind cannot raise waves at all until it can push past that minimum
+a natural high-frequency cutoff around a couple of centimetres — ripples finer than the minimum
+are *damped out rather than supported*, so a renderer that keeps adding finer normal-map octaves
+to "sharpen" calm water is fabricating detail the physics forbids, and will alias for its
+trouble — and wind cannot raise waves at all until it can push past that minimum
 speed, which is why a breeze produces *patches* of ripple ("cat's paws") separated by glassy
 water rather than uniform texture.
 
@@ -314,9 +319,11 @@ specular lobe collapses toward a Dirac, and energy conservation makes what survi
 narrows. The result is a single blown-out pixel-ish highlight instead of a sun reflection with
 finite extent. The fix is the same one that saves distant water: **clamp the slope variance to a
 minimum corresponding to the solar disc** (0.53°), so even a perfectly still surface produces a
-sun image of the right angular size. This is the low-energy end of the same machinery described in
-[Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) — variance is the
-common currency at both extremes.
+sun image of the right angular size — Bruneton et al. state the clamp explicitly. This is the
+low-energy end of the same machinery described in
+[Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic), and the symmetry
+is exact: the far sea is calm *in the pixel footprint*. Variance is the common currency at both
+extremes.
 
 **What actually sells calm water is reflection fidelity, not the surface.** With slope variance
 near zero the water is a mirror, so every reflection error is presented at full strength and
@@ -327,11 +334,21 @@ choice precisely because it is the case where SSR's failure modes are most visib
 
 **Slicks and wind shadows are variance features.** Surface films damp capillary and short gravity
 waves — Cox & Munk measured slicked water at **2–3× lower** total mean-square slope than clean sea
-— so an oil slick, a wind shadow behind an island or a current convergence line renders as a
+(per [Sun glitter](#sun-glitter-the-sparkle-path)) — so an oil slick, a wind shadow behind an
+island or a current convergence line renders as a
 **smooth mirror patch against rougher water**, not as a dark decal. Modulate the local
 slope-variance field; the albedo barely changes. This is also why calm water is rarely uniformly
-calm: real still water is a patchwork of glassy and faintly-textured regions, and a perfectly
+calm: real still water is a patchwork of glassy and faintly-textured regions — much of what makes
+a real calm sea look alive rather than like a plane — and a perfectly
 uniform mirror reads as fake almost as strongly as a uniformly rough one.
+
+**Residual swell survives dead calm.** Long-period swell is generated by distant weather and
+propagates for thousands of kilometres, so a glassy surface still rises and falls on a long,
+very low-amplitude undulation. Killing all displacement at low wind gives a rigid sheet; keep a
+long-wavelength, low-amplitude component alive and **decouple it from local wind**, or moored
+boats and shorelines stop breathing. (This is also the case the WMO sea-state code exists for —
+sea classified by the *sea*, not the wind — see
+[Sea states](#sea-states-the-energy-ladder).)
 
 **Bands that vanish, and one that does not.** In this regime foam is *absent* (below Force 3),
 spray is absent (below Force 5), whitecap machinery contributes nothing, and displacement is
@@ -340,58 +357,6 @@ instead. What does *not* vanish is the water-body optics of
 [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from):
 with no surface agitation to scatter light, depth-dependent absorption and the bottom return are
 the entire look of a calm shallow lake.
-
-## Calm water: the low-energy regime
-
-Calm water is not "the easy case with the waves turned down". It is its own regime with its own
-failure modes, and most ocean renderers that look superb in a stiff breeze fall apart on a
-millpond — the sea goes to patent leather, or to a black void with one searing highlight.
-
-**Why dead calm breaks a wave-based renderer.** Every technique in this chapter derives its
-shading from *slope*. Drive the wave amplitude toward zero and slope variance goes with it; the
-specular lobe collapses toward a Dirac, and energy conservation concentrates the surviving
-highlight into something arbitrarily bright and arbitrarily small. That is the same mechanism as
-the distance problem — the far sea is calm *in the pixel footprint* — and it takes the same fix,
-in its simplest form: **clamp the slope variance from below at a value matching the solar disc**,
-so a mirror sea produces a finite, correctly-sized reflection of the sun rather than a
-one-pixel-wide singularity or nothing at all. Bruneton et al. do exactly this and say so.
-
-**Water is never perfectly flat, and there is a smallest possible wave.** Below the gravity-wave
-regime, surface tension takes over as the restoring force, giving the full dispersion relation
-
-```
-omega^2 = ( g*k + (sigma/rho)*k^3 ) * tanh(k*h)
-#   g*k        gravity-restored  -> long waves
-#   sigma/rho  surface-tension-restored -> capillary ripples (sigma = surface tension)
-```
-
-The two terms trade off, so phase speed has a **minimum** at a wavelength of order centimetres:
-there is a shortest wave water can carry, and ripples finer than that are damped out rather than
-supported. Practically this means the ripple cascade has a hard floor — a renderer that keeps
-adding finer and finer normal-map octaves to "sharpen" calm water is fabricating detail the
-physics forbids, and it will alias for its trouble. It also means the first thing a breath of wind
-does is generate *capillary* ripples, which is why water visibly "darkens" and loses its mirror in
-patches before any swell appears — the cat's paw.
-
-**At low energy the reflection is the whole image.** With little slope to break it up, essentially
-everything the viewer sees is the environment, mirrored. Budget accordingly: this is the one
-regime where reflection *fidelity* — a real SSR/planar result rather than a coarse cubemap —
-dominates perceived quality, and where SSR dropout is most visible because there is no wave chop
-to hide the seam. Conversely the expensive wave machinery can be scaled back hard; spend the
-saved budget on the reflection.
-
-**Glassy patches are structure, not uniformity.** Real calm water is rarely uniformly calm. Wind
-shadows behind headlands and vessels, surface films, and current-convergence lines all damp the
-short waves locally, and — per [Sun glitter](#sun-glitter-the-sparkle-path) — a film cuts
-mean-square slope by a factor of 2–3. Those patches read as mirror-smooth streaks against a
-slightly textured background, and they are much of what makes a real calm sea look alive rather
-than like a plane. Render them as *local reductions of the slope-variance field*.
-
-**Residual swell survives dead calm.** Long-period swell is generated by distant weather and
-propagates for thousands of kilometres, so a glassy surface still rises and falls on a long, very
-low-amplitude undulation. Killing all displacement at low wind gives a rigid sheet; keep a
-long-wavelength, low-amplitude component alive and decouple it from local wind, or moored boats
-and shorelines stop breathing.
 
 ## Shallow water: shoaling, refraction, and breakers
 
@@ -820,7 +785,10 @@ at the end of this section.
 Most water shaders expose `sigma` and a scatter colour as art-directed swatches. They are
 measurable physical quantities, and picking them from oceanography instead of from a colour
 picker is the cheapest realism win in the whole chapter — it is what separates "blue-tinted
-glass" from *this specific water*.
+glass" from *this specific water*. The generation-side producer of this descriptor is
+terrain-architect's liquid property bundle (its `28`, exported as `liquidBody[i]` in its
+`08`/`27` contract) — when the pipeline ships it, consume it rather than re-authoring; this
+section is the theory for reviewing those values and the fallback for pipelines that lack them.
 
 **Pure water is blue for a spectroscopic reason.** Its visible absorption is the high-order
 overtone band of the O–H stretch — vibrational, not electronic — which is why absorption is
@@ -831,7 +799,8 @@ than blue-violet. In practice red is gone by ~5 m, orange by ~10 m, yellow by ~2
 
 ```
 sigma_RGB ~= (a + b_b) evaluated at ~610 / ~550 / ~450 nm
-a_water   ~= (0.29, 0.056, 0.0045) m^-1     # pure water, R/G/B, from Pope & Fry 1997
+a_water   ~= (0.25, 0.056, 0.0092) m^-1     # pure water at 610/550/450 nm, Pope & Fry 1997
+#   the absolute minimum is 0.0044 m^-1 at 418 nm - deep violet, below a typical B channel
 ```
 
 **Three constituents move water off pure blue,** and they are worth exposing as the shader's
@@ -1008,7 +977,8 @@ W  ~=  0.5 + 0.5 * erf( (sqrt(2)/(2*sigma_A)) * (eps - mu_A) )
 Foam then has a correct *fractional coverage* at every distance instead of a binary mask.
 Ground-truth the amount against Monahan & O'Muircheartaigh's whitecap–wind relation,
 `W = 3.84e-6 * U^3.41` (U at 10 m): the exponent is steep enough that foam is essentially absent
-at 5 m/s and dominant by 15 m/s, so coverage must be driven by wind, not by a constant.
+at 5 m/s (~0.1% coverage) and conspicuous by 15 m/s (~4%), so coverage must be driven by wind,
+not by a constant.
 
 **Cause four: everything else that flattens distance.** Missing aerial perspective (the horizon
 keeps full contrast and saturation and reads as a hard shell — share the atmosphere LUT with
@@ -1273,8 +1243,10 @@ Water is the classic hard transparency case, and the frame must be structured fo
   Prediction Center table (fetched 2026-08) — whitecaps first at Force 3, spray at Force 5, foam
   streaks at Force 7, spindrift at Force 8, "sea completely white" at Force 12.
   [NOAA SPC](https://www.spc.noaa.gov/faq/tornado/beaufort.html). The **WMO sea state code**
-  (adopted 1970, built on the Douglas scale) is the parallel sea-based classification; `H_s` as the
-  mean of the highest third and `≈ 4·sqrt(m₀)` is standard oceanography.
+  (built on the Douglas scale) is the parallel sea-based classification; `H_s` as the
+  mean of the highest third and `≈ 4·sqrt(m₀)` is standard oceanography. ⚠️ The two dates quoted
+  in this chapter — the 1955 WMO wind/sea correspondence and the 1970 adoption of the sea state
+  code — came from secondary sources, not from WMO documents; treat as believed-correct.
 - **P** — Capillary–gravity dispersion `ω² = (gk + (σ/ρ)k³)·tanh(kh)` and its **minimum phase speed
   ≈ 23.1 cm/s at ≈ 1.73 cm wavelength** — the hard short-wavelength bound used in
   [Calm water](#calm-water-the-low-energy-regime). Classical fluid mechanics; the constants were
@@ -1282,8 +1254,10 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **P** — Whitecap and foam optics: **void fraction 60–99%**, **mean bubble diameter 0.16–1 mm**,
   visible reflectance **~50% fresh breaking / ~40% active whitecap / ~18% thin residual foam**, and
   NIR reflectance troughs at **~750, 980, 1200 nm** from liquid-water absorption enhanced by
-  multiple passes through bubble walls. From the hyperspectral whitecap study in *Frontiers in
-  Earth Science* 7:14 (2019), fetched and extracted 2026-08.
+  multiple passes through bubble walls. Dierssen, H.M., "Hyperspectral Measurements,
+  Parameterizations, and Atmospheric Correction of Whitecaps and Foam From Visible to Shortwave
+  Infrared for Ocean Color Remote Sensing", *Frontiers in Earth Science* 7:14 (2019), fetched and
+  extracted 2026-08; sole author verified 2026-08.
   [Open access](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2019.00014/full).
   **Koepke (1984)'s ~22%** is a *time-averaged effective* whitecap reflectance from film-density
   measurements and under-represents fresh foam — correct for sea-average radiometry, wrong for a

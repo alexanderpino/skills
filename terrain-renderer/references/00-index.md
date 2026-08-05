@@ -246,7 +246,18 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   Peregrine 1976 attribution web-verified; the opposition-scalar modulation and blocking-range
   constants in the chapter are F-tier renderer practice, not from the paper. The shallow-water
   group speed in that chapter's snippet was corrected 2026-08 (`c_g = √(g·d)`; the earlier
-  `½√(g·d)` was the deep-water relation).
+  `½√(g·d)` was the deep-water relation). Energy-spectrum sections (sea states / calm / aerated,
+  2026-08): Beaufort descriptors are verbatim from NOAA SPC (D-tier, fetched); the 1955/1970 WMO
+  dates are secondary-sourced; the capillary minimum (23.1 cm/s @ 1.73 cm) and Kelvin angle were
+  verified against standard references without chasing original derivations; foam optics are from
+  Dierssen 2019 (fetched; sole author verified); the waterfall sheet→ligament→droplet cascade is
+  classical instability theory with no waterfall-specific canonical citation; the pure-water RGB
+  absorption triple was corrected 2026-08 to match its stated 610/550/450 nm sample points.
+- `19`: PCISPH/IISPH/DFSPH are correctly characterised but their years/venues/author lists are
+  **unverified** (`?` in the chapter — check before citing); the Kelvin-wake constant is verified
+  but the original Kelvin citation was not chased; probe-point buoyancy, the spray/foam/bubble
+  split, domain-fade fractions and budget guidance are F-tier production practice with no
+  canonical source.
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-

@@ -484,6 +484,22 @@
         "Keeps the lagoon a legitimate closed basin that flow routing must not fill, even once an inlet is cut",
         "Distinguishes P-tier physics from the L/F-tier graph realisation rather than tiering the whole thing as a look"
       ]
+    },
+    {
+      "id": 37,
+      "prompt": "Our world has a glacial lake, a peat-bog river, and a chalk stream, and in-engine they all render as the same generic blue. The engine team says give us the right per-body constants. What should the generator export and how do we derive the values?",
+      "expected_output": "Exports liquidBody[i] per the 08/27 contract: causal state (chl, cdom_a440, spm, lithology class, depth) plus derived optics (a, b_b, c, K_d per channel, scatter colour) and QA fields (Secchi, Jerlov/Forel-Ule). Derives each body from its causes: glacial = fine rock flour, flat-spectrum backscatter, low CDOM -> milky turquoise (and rejects the Rayleigh-scattering folklore); peat river = high CDOM absorption with no scattering -> transparent-but-dark amber/near-black, not turbid; chalk stream = aquifer-filtered, everything low -> gin-clear. Uses CDOM-darkens vs sediment-brightens as opposite controls, Z_SD = 1/min Kd as the authoring handle, and distinguishes beam attenuation c from diffuse K_d.",
+      "files": [],
+      "assertions": [
+        "Exports a per-body liquidBody record (causal state + derived optics + QA fields), not one global water colour",
+        "Derives glacial turquoise from fine flat-spectrum mineral backscatter plus water's red absorption, explicitly rejecting the Rayleigh/Tyndall explanation",
+        "Models the peat river via CDOM: strong blue absorption, zero scattering, transparent-but-dark - and does not reach for a turbidity slider",
+        "Chalk stream: groundwater filtration gives near-zero SPM and CDOM, gin-clear with colour from the bed/weed, not the water",
+        "States the opposite-controls rule: CDOM darkens, sediment brightens",
+        "Uses Secchi depth = 1/min Kd as the artist-legible authoring handle",
+        "Distinguishes beam attenuation (c, sightlines) from diffuse attenuation (K_d, light column), roughly 5-20x apart",
+        "Ties each body's constituents to causes already in the graph (glacier, peat cover, lithology) rather than hand-authoring"
+      ]
     }
   ]
 }

@@ -116,8 +116,11 @@ controls. Blackwater is *transparent and dark*; turbid water is *opaque and pale
 turbidity slider to make a tannin-stained river gives you mud.
 
 **Concentration → optics bridge** (Babin et al. 2003): mineral-dominated suspended matter
-contributes `b_p(555)/SPM ≈ 0.5 m²/g`, i.e. 1 mg/L adds ≈5×10⁻⁴ m⁻¹ to `b`. Organic-dominated is
-roughly double that per unit mass, because mineral grains are denser.
+contributes `b_p(555)/SPM ≈ 0.5 m²/g` — and since 1 mg/L = 1 g/m³, **each mg/L of mineral load
+adds ≈0.5 m⁻¹ to `b` at 555 nm**. (Dimension-check it: a coastal few-mg/L water then has `b` of
+order 1 m⁻¹, and a 1000 mg/L silt river has `b ≈ 500 m⁻¹` — a millimetre-scale photon path, i.e.
+opaque mud. Both are right.) Organic-dominated matter is roughly double that per unit mass,
+because mineral grains are denser.
 
 **Glacial turquoise is not Rayleigh scattering.** The popular explanation is physically impossible:
 rock flour is 2–65 µm, **10–100× the wavelength**, squarely Mie/geometric where scattering is
