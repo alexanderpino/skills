@@ -39,8 +39,17 @@ const MUTATIONS = [
   'ports-offer-carve',     // the node declares AND computes a carved-terrain output
   'mask-unclamped',        // coverage fraction left unclamped: a "fraction" of 8.5 on a real river
   'ignore-bankfull',       // the bankfull slider wired to nothing
+  // The module's own stated refusals. Both were written as deliberate guards with comments
+  // explaining why, and neither had an assertion until the Sprint 4 audit found them.
+  'nan-propagates',        // `qb < t` instead of `!(qb >= t)`: NaN enters the channel and spreads
+  'lattice-mismatch-clamped', // size to the shorter array instead of throwing: a river on wrong ground
 ]
 const PATCHES = {
+  // NaN fails BOTH comparisons, so the negated form skips the cell and the plain form enters it.
+  'nan-propagates': [['    if (!(qb >= channelHeadQM3PerS)) continue',
+    '    if (qb < channelHeadQM3PerS) continue']],
+  'lattice-mismatch-clamped': [['  if (solidTopM.length < N || dischargeM3PerS.length < N) {',
+    '  if (false) {']],
   'carve-in-place': [[
     '    waterSurface[i] = solidTopM[i] + dM',
     '    solidTopM[i] -= dM\n    waterSurface[i] = solidTopM[i] + dM',
@@ -483,7 +492,56 @@ function yValley() {
   check('the port block is valid apart from the pending semantics', unexpected.length === 0,
     { unexpected: unexpected.map(p => `${p.code} ${p.message}`), pendingReported: problems.length - unexpected.length })
 
-  check('assertion inventory non-empty', assertions.length >= 28, assertions.length)
+  // --- the module's own stated refusals, which nothing was checking ------------------------------
+  //
+  // Both of these are written in rivers.js as deliberate guards with comments explaining why they
+  // exist, and the Sprint 4 audit found neither had an assertion. A guard nobody tests is a comment.
+  //
+  // NaN DISCHARGE. The threshold is written `!(qb >= t)` rather than `qb < t` specifically so a NaN
+  // falls out of the channel instead of propagating: NaN fails both comparisons, so the negated form
+  // skips the cell while the plain form would enter it and produce NaN width, depth and mask. The
+  // audit injected exactly that and it passed — measured, the mutated guard channelises every cell
+  // and puts NaN on three output ports.
+  {
+    const bed = flatBed()
+    const qNaN = new Float32Array(N)
+    for (let i = 0; i < N; i++) qNaN[i] = Number.NaN
+    // A few real cells alongside, so this is not "everything is NaN so nothing happens".
+    for (let x = 10; x < 20; x++) qNaN[32 * W + x] = 500
+    const rn = M.riverFields(bed, qNaN, W, H, { widthCoefficient: KW, depthCoefficient: KD, cellSizeM: CELL })
+    const finite = arr => { for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) return false; return true }
+    check('a NaN discharge produces no NaN on any output port',
+      finite(rn.channelWidth) && finite(rn.waterDepth) && finite(rn.channelMask) && finite(rn.waterSurface),
+      { width: finite(rn.channelWidth), depth: finite(rn.waterDepth),
+        mask: finite(rn.channelMask), surface: finite(rn.waterSurface) })
+    // ABSENCE OF EVIDENCE: if the ten real cells produced no channel either, "no NaN" would be
+    // satisfied by a function that did nothing at all.
+    let channelled = 0
+    for (let i = 0; i < N; i++) if (rn.channelMask[i] > 0) channelled++
+    check('the finite cells alongside the NaNs still form a channel', channelled > 0 && channelled < N / 4,
+      { channelled, N })
+  }
+
+  // LATTICE MISMATCH. Fields wired from two different lattices arrive as arrays of different
+  // lengths. Sizing the output to whichever is shorter would draw a plausible river over the wrong
+  // ground, so rivers.js throws. Nothing asserted that it throws.
+  {
+    let threw = false, msg = ''
+    try {
+      M.riverFields(flatBed(), new Float32Array(N - W), W, H,
+        { widthCoefficient: KW, depthCoefficient: KD, cellSizeM: CELL })
+    } catch (e) { threw = true; msg = String(e.message || e) }
+    check('a lattice-mismatched discharge field is refused, not silently truncated',
+      threw && /expected/.test(msg), { threw, msg: msg.slice(0, 90) })
+    let threwBed = false
+    try {
+      M.riverFields(new Float32Array(N - 1), new Float32Array(N), W, H,
+        { widthCoefficient: KW, depthCoefficient: KD, cellSizeM: CELL })
+    } catch (e) { threwBed = true }
+    check('a lattice-mismatched BED is refused too, not only the discharge', threwBed, { threwBed })
+  }
+
+  check('assertion inventory non-empty', assertions.length >= 32, assertions.length)
   report()
 
   function report() {
