@@ -24,7 +24,8 @@ Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-re
 [Shading and optics](#shading-and-optics) ·
 [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) ·
 [Shoreline integration](#shoreline-integration) ·
-[Transparency & pass ordering](#transparency--pass-ordering) · [Pitfalls](#pitfalls) ·
+[Transparency & pass ordering](#transparency--pass-ordering) ·
+[Stylized water](#stylized-water-same-contracts-different-bands) · [Pitfalls](#pitfalls) ·
 [Sources & provenance](#sources--provenance)
 
 ## The handoff, seen from the render side
@@ -1077,6 +1078,43 @@ Water is the classic hard transparency case, and the frame must be structured fo
    it needs multiple light/environment sources, scene-color access, and a BRDF that doesn't fit
    the G-buffer. Budget it as forward: it pays full lighting cost per pixel, which is why water
    area on screen is a load-bearing profiling axis (`11`).
+
+## Stylized water: same contracts, different bands
+
+Everything in this chapter up to here derives the water's look from physics. A large class of
+shipped water — Nintendo's above all — *authors* the look instead, and the doctrine for it is
+one sentence: **stylization replaces the band content, never the contracts.** The three bands
+(geometry, material, shading) get hand-authored patterns, ramps and flat colour instead of
+spectra and BRDFs — but the depth field, shore distance, flow field, `bodyType`, LOD/streaming,
+pass ordering and the authority contract are exactly the same machinery, consuming the same
+generator handoff. Answer a "make Wind Waker water" request by swapping band content, not by
+reaching for FFT cascades and Cox–Munk glitter — that is the name-the-paradigm rule applied to
+style.
+
+- **The Wind Waker** (community-documented; Nathan Gordon's graphics analysis is the canonical
+  breakdown): a flat-colour sea with **scrolling foam-ring patterns**, layered and wiggled by a
+  displacement map, coarser layers at distance. The load-bearing observation: those foam rings
+  are a **shore-distance band** — the *same exported field* our realistic shoreline foam
+  consumes, drawn as an authored ring texture instead of an advected froth mask. Standard
+  recreations use a Voronoi pattern with flow-offset UVs plus intersection foam. Depth still
+  drives the colour split; shores still drive the foam; only the *content* is authored.
+- **Tears of the Kingdom**: the cel look is community-observed (no first-party rendering talk),
+  but the water *physics* has a real one — Nintendo's GDC 2024 talk describes computing **water
+  resistance from the projected area along an object's velocity**: probe-style buoyancy/drag,
+  i.e. `19`'s machinery, now with a shipped first-party citation.
+- **Mario Kart World / Wave Race lineage**: the most instructive case, because it is not a look
+  at all — the water is a **drivable gameplay surface**. Vehicles ride the wave geometry, waves
+  serve as trick ramps, and surface explosions *raise new waves players trick off* — dynamic
+  displacement that is gameplay-authoritative. Consequences, both owned by `19`: the
+  one-evaluator rule (physics and renderer sample the same wave function) is **absolute** here —
+  on drivable water a mismatch is not a floating-boat artifact, it is a broken road — and
+  interactive waves are **gameplay liquid state** under the fluid authority contract:
+  deterministic, CPU/server-owned, and network-synchronized in a multiplayer racer. The
+  stylized look rides on top of that contract, not instead of it.
+
+Honesty: Nintendo publishes almost nothing about rendering internals — every mechanism claim
+above except the TotK physics talk is community reconstruction or press/footage observation
+(F-tier), and Mario Kart World's is from launch-window coverage. Say so when citing.
 
 ## Pitfalls
 
