@@ -228,6 +228,9 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Morphological dilation/erosion/opening/closing | P | Serra 1982, *Image Analysis and Mathematical Morphology* |
 | Distance transform | P | Felzenszwalb & Huttenlocher 2012, *Distance Transforms of Sampled Functions*, Theory of Computing 8; also Danielsson 1980, Meijster 2000 |
 | Signed distance fields | P | Frisken et al. 2000, *Adaptively Sampled Distance Fields*, SIGGRAPH |
+| Curve-driven landforms: the three roles (`CAUSE_SEED` / `POST_SOLVE_STAMP` / `SOLVE_PROJECTION`) and the ordering rule | Doctrine | `10` — the role decides what the curve may contain: causes in, measurements out, literal height only for features no process made. Ranges seed uplift (`02`) and gorges seed incision or a weakness line (`03`, `04`, `11`, `12`); the landform is *produced*, never extruded |
+| Curve cross-section vocabulary (half-width, amplitude, asymmetry, angle-vs-width falloff, profile, blend, edge offset, capped/uncapped) | F | `10` — generalised from what engine curve brushes expose (UE Landscape Splines' width/falloff, Landmass custom brushes' falloff angle / blend mode / capped tops; terrain-renderer `03`), so a `SOLVE_PROJECTION` export drops into them |
+| Spline-landform failure catalogue (the wall, the trench, the orphan, the chopped range, corner-cutting, erased detail, the missing rain shadow) | Engineering check | `10` — the tells that make curve-authored ranges and gorges read as drawn |
 | Laplacian / edge detection / band-pass | F | Standard image processing |
 | Bicubic / Lanczos reconstruction | F | Standard signal processing |
 | Twist / Bend / Shear / Fold | F | Coordinate warps. No papers. (`10`) |
@@ -613,6 +616,7 @@ P/F-tier producers.
 | Vector water: spline bodies with per-vertex width/depth/velocity, planar-lake & monotone-river invariants, junction topology | Doctrine over `03` | `27` — engine water systems are spline-first (Unreal Water/Landmass bodies carving Landscape through edit layers, terrain-renderer `03`/`12`, D-tier docs fetched 2026-08); the vector export is a projection of `03`'s solve, never a second authoring |
 | Who carves the channel: `tool` / `engine` / `tool-then-engine-refine`, and the double-carve defect | Doctrine | `27` — the manifest names it; engines carve non-destructively into a layer stack, so ship pre-carve height plus vectors where the engine owns the cut |
 | Water exclusion volumes (voids under water) | Contract gap | `27` — a height-plus-datum export says everything below the datum is wet; sea caves and chambers under lakes need a volumetric exception list (or `11`'s per-column stack) |
+| Vector landforms beyond water: ridgelines, gorge floors, escarpments, road corridors as exported curves | Doctrine over `10` | `27` — engine curve brushes are a general family, not a water feature (terrain-renderer `03`); export the curve whenever something downstream must *act* on the feature (re-carve, follow, flatten to, spawn along), not merely draw it. Ridgeline curves must be divides in the exported flow field; gorge floors monotone and drainage-connected |
 | Handoff verification (layer-stack budget, dry-snow attribution, derived-map re-derivation, vector/raster agreement, carve-policy match) | Engineering check | `27`, registered in `09`'s checklist; runnable: `reference-impl/tests/asserts.py` (`assert_layer_budget`), `reference-impl/snow.py` (`dry_snow_attribution`) |
 
 ## Node types (N-tier) — not algorithms

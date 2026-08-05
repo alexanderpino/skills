@@ -10,6 +10,7 @@ Contents: [Why this chapter exists](#why-this-chapter-exists) ·
 [Vector layer](#vector-layer) ·
 [Dynamic climate interplay — the Snow Rule](#dynamic-climate-interplay--the-snow-rule) ·
 [Vector water: the spline & carve handoff](#vector-water-what-the-engines-water-bodies-need) ·
+[Beyond water: vector landforms](#beyond-water-vector-landforms) ·
 [The handoff contract](#the-handoff-contract) · [Verification](#verification)
 
 ## Why this chapter exists
@@ -185,6 +186,7 @@ terrain with. The tool must therefore ship its water as *geometry* as well as fi
 | `waterBodyVector[i]` | Polyline / polygon with per-vertex attributes | Routing, lakes, hydraulic geometry (`03`); bathymetry (`12`) | The spline form of the same water the rasters describe — never a second, independent authoring of where water is. Full schema and invariants in [Vector water](#vector-water-what-the-engines-water-bodies-need). |
 | `shorelineLoop` | Closed polygon at the sea datum | Sea level (`03`), coastal solve (`12`) | The ocean body's extent; also the seed for shore-distance and the engine's far-water ring |
 | `waterExclusionVolume[i]` | Axis-aligned or oriented boxes / convex volumes | Authored, or from the per-column material stack (`11`) where voids exist | The volumetric exception a 2.5D depth field cannot express — a dry cave under a river, an air pocket beneath a lake. Without it, any void under water floods by definition |
+| `curveLandform[i]` | Polyline with per-station cross-section attributes | `10`'s curve-driven landforms; ranges from `02`, gorges from `03`/`04`/`11`/`12` | **Water is not the only landform engines instantiate from curves.** Ridgelines, gorges, escarpments, terraces and road corridors all have first-class spline/brush representations engine-side (terrain-renderer `03`). Ship them where the engine must re-author, re-place or re-carve the feature after handoff — see [Beyond water](#beyond-water-vector-landforms) |
 
 Slope and aspect ship implicitly (the engine can derive them from `height` in one pass) but *may*
 ship explicitly when the engine's terrain system cannot be trusted to derive them at matching
@@ -342,6 +344,46 @@ re-carving compose instead of accumulating. Never ship a height that has been ca
   (raise the landform, or lower the spill elevation) and export terrain that already satisfies it;
   an engine-side raise is a silent divergence between the tool's world and the shipped one.
 
+### Beyond water: vector landforms
+
+Nothing in the machinery above is water-specific. The engine-side primitive is a **curve that carves
+terrain through a non-destructive brush layer**, and engines ship it in general form: Unreal's
+Landscape Splines deform height and paint weights along a curve from per-control-point width and
+falloff, and Landmass custom brushes build a landmass *from a spline* with a falloff angle, blend
+mode and capped/uncapped top — the water bodies are one instance of a base class, not the feature
+itself (terrain-renderer `03`). So the same handoff serves ridgelines, gorges, escarpments, terraces,
+levees and road corridors, using `10`'s `curve_landform` record as the wire format.
+
+**When to ship a landform as a curve rather than only as height.** Rasters are sufficient when the
+engine's job is to render what the tool produced. Ship the curve as well whenever the engine must
+*act* on the feature after handoff:
+
+| Reason | Example |
+|---|---|
+| The feature moves during production | A designer needs the gorge 200 m north after the terrain is imported; with the curve, the brush re-carves — without it, someone re-sculpts by hand |
+| The engine re-carves at a different resolution or on a different landscape | Re-import, LOD proxies, a second landscape actor for a DLC region |
+| Other systems key off the feature's *identity*, not its shape | Roads following a valley curve, AI navigation lanes, spawn rules along a ridgeline, audio zones in a canyon |
+| The feature must be flattened or fitted for gameplay after generation | A buildable terrace, a level-boundary escarpment |
+
+**The three roles carry over unchanged, and so does the discipline.** A curve leaving this skill is a
+`SOLVE_PROJECTION` (`10`): it is a *trace of what the simulation produced*, carrying measured
+attributes, and it must agree with the rasters — the vector/raster round-trip check above applies to
+ridgelines and gorge floors exactly as it does to river centrelines. A curve that the engine will use
+as a `CAUSE_SEED` (re-running uplift or incision engine-side) is a different and much rarer handoff,
+and it must say so, because the two cannot be blended.
+
+**`carveOwner` applies to every curve landform, not just water**, and the double-carve defect has the
+same shape: a range incised by the erosion solve and then *raised again* by an engine brush becomes a
+smooth wall sitting on top of its own dissected flanks; a gorge cut twice becomes a slot inside a
+canyon. Declare it per landform, and where the engine owns the cut, ship pre-carve height plus the
+curve.
+
+**Two invariants beyond the water set.** A ridgeline curve must be a **drainage divide** in the
+exported flow field — flow on both sides runs away from it, and if the engine's brush raises it
+further, that must stay true. A gorge-floor curve must be **monotone downstream and connected to the
+drainage network at both ends**, the same check as a river polyline. Both are cheap, and both catch
+the defect that makes engine-side re-placement look drawn (`10`'s failure catalogue).
+
 ## The handoff contract
 
 The mechanics extend the Output Contract (`08`); nothing here overrides it.
@@ -392,9 +434,14 @@ The `09` posture applies: every claim above is checkable, so check it.
   within tolerance; assert every lake polygon is planar at its spill elevation and every river
   polyline is downstream-monotone in `z`. These are three cheap loops that catch the defects an
   engine's spline-driven water system cannot catch for you (above).
-- **Carve policy declared.** The manifest names a `carveOwner`, and the exported height matches it:
-  under `engine` the channels must *not* already be incised; under `tool` they must be. A build that
-  ships both is the double-carve defect waiting to happen.
+- **Carve policy declared.** The manifest names a `carveOwner` per curve landform, and the exported
+  height matches it: under `engine` the feature must *not* already be cut or raised; under `tool` it
+  must be. A build that ships both is the double-carve defect waiting to happen.
+- **Curve landforms agree with the fields.** A ridgeline curve must be a divide in the exported flow
+  field (flow runs away from it on both sides); a gorge-floor curve must be monotone downstream and
+  connected to the drainage network at both ends; every curve's `halfWidth` must bracket the feature
+  actually present in the height. Same three-loop shape as the water check, and it catches the
+  engine-side re-placement defects in `10`'s failure catalogue.
 - **The cause test, by eye.** Render `moisture`, `snowDepth`, and `windVector` together (`09`
   review modes): drifts must sit leeward, snow must track moisture + altitude and not altitude
   alone, wet valleys must be the ones water actually reached. If the auxiliary maps look

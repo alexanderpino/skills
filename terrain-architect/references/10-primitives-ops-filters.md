@@ -5,7 +5,8 @@ reviews them. Most of the damage in a terrain graph is done here, quietly.
 
 Contents: [Primitives](#primitives) · [SDF](#distance-fields-frisken-et-al-2000) ·
 [Heightfield operators](#heightfield-operators) · [Smooth min/max](#smooth-min--max) ·
-[Sculpting](#sculpting) · [Filtering](#filtering) · [Bilateral](#bilateral-tomasi--manduchi-1998) ·
+[Sculpting](#sculpting) · [Curve-driven landforms](#curve-driven-landforms) ·
+[Filtering](#filtering) · [Bilateral](#bilateral-tomasi--manduchi-1998) ·
 [Guided](#guided-filter-he-sun--tang-2010) · [Anisotropic diffusion](#anisotropic-diffusion-perona--malik-1990) ·
 [Morphology](#morphology-serra-1982) · [Warps](#warps)
 
@@ -205,7 +206,170 @@ h = lerp(curveElevationAt(p), h, smoothstep(0, 1, t))
 spacing is uneven and the valley floor undulates). This is how roads, riverbeds, and authored
 valleys get cut. Note it is a *hard authored constraint* — run it before erosion and erosion
 will remove it; run it after erosion and it will cut across the drainage. Usually: before, and
-then re-cut a shallow version after.
+then re-cut a shallow version after. The full doctrine for curve-authored landforms — mountain
+ranges and gorges included — is the next section.
+
+## Curve-driven landforms
+
+The spline deform above is a *mechanism*; this section is the discipline around it, because the
+curve is the single most-used art-direction handle in terrain ("a range along here, a gorge through
+there") and the one most likely to produce terrain that reads as drawn. Engines have converged on the
+same primitive from the other side — Unreal's Landscape Splines deform height and paint weights along
+a curve from per-control-point **width and falloff** with a cosine-blended edge, and Landmass custom
+brushes build a *landmass from a spline* with a falloff angle, a blend mode, capped/uncapped tops and
+optional erosion/noise effects, all writing non-destructively into an edit layer. So the vocabulary
+below is shared across the tool/engine boundary (terrain-renderer `03`, `27`), which makes getting it
+right on this side worth more than usual.
+
+### Three directions a curve can cross the pipeline
+
+The recurring mistake is treating every curve the same. There are three roles, and **the role
+determines what the curve is allowed to contain**:
+
+| Role | The curve is | Carries | Right for |
+|---|---|---|---|
+| **`CAUSE_SEED`** — input, *before* the solve | A seed for a **driver field**: an uplift ridge or fault trace (`02`), a discharge injection or base-level line (`03`), a weakness line in `strataHardness` (`11`), a glacier flowline (`12`) | Position + the magnitude of a *process parameter*. **Never final height** | Anything a process makes: ranges, gorges, valleys, canyons, escarpments |
+| **`POST_SOLVE_STAMP`** — *after* the solve | A direct height edit with a cross-section | Literal metres | Features no natural process made: roads, terraces, canals, levees, quarries, earthworks, gameplay flattening |
+| **`SOLVE_PROJECTION`** — output, *after* the solve | A trace of what the simulation produced | Position + *measured* attributes (channel width from hydraulic geometry, depth, velocity) | The handoff — engine water bodies and spline landforms (`27`) |
+
+A curve entering the solve carries **causes**; a curve leaving it carries **measurements**; only a
+curve applied after the solve carries **height**, and then only for features that were built rather
+than eroded. Every "my spline mountains look fake" complaint is a `CAUSE_SEED` landform authored as a
+`POST_SOLVE_STAMP`.
+
+### The ordering rule
+
+This is the Legal Order (`SKILL.md`) applied to curves, and it decides the result more than any
+profile parameter:
+
+```
+range   : curve -> uplift field U(x)          -> stream power + diffusion   # valleys are PRODUCED
+gorge   : curve -> channel seed + base-level  -> bedrock incision           # walls are PRODUCED
+         (or) curve -> strataHardness weakness -> erosion exploits it       # fault/joint-guided
+glacial : curve -> flowline + ice thickness   -> SIA + abrasion (12)        # U-profile is PRODUCED
+road    : erosion -> curve stamp -> re-derive normals/AO/curvature (06, 08)
+```
+
+Two consequences worth stating outright: a `CAUSE_SEED` curve **must run before erosion**, or the
+process it seeds never happens; and any `POST_SOLVE_STAMP` **invalidates every derived map** —
+normals, AO, curvature, insolation, flow — so it either runs before the derived-map bake or the bake
+runs again. The "cut, erode, re-cut shallow" compromise above is legitimate, but the re-cut must be
+shallow and feathered, and it pays the re-derive cost.
+
+### A range is a divide, not a ridgeline
+
+Extruding a curve into a Gaussian ridge produces a **smooth wall**: no valleys, no spurs, no
+drainage divide, no reason for anything to be where it is. The fix is already in `02` — put the curve
+into the uplift field (`U = A·exp(-d²/2σ²)` along the polyline) and let stream power and hillslope
+diffusion dissect it. The valley network is the product; the curve only says *where the rock came up*.
+
+Per-station attributes a range curve should carry, and the tells if it doesn't:
+
+| Attribute | What it does | Tell when missing |
+|---|---|---|
+| `amplitude` (uplift `A`, not crest height) | Sets relief through the erosion budget | Crest elevation authored directly → constant-height ridge with no relief hierarchy |
+| `halfWidth` (σ) | Range width, and with `A` the flank gradient | A range the same width along its whole length |
+| `asymmetry` | Vergence: thrust belts are steep on one flank, long-sloped on the other | Symmetric range — the "extruded Gaussian" giveaway |
+| `plunge` at the ends | Ranges die out into their foreland | A range chopped flat at the domain edge or ending mid-plain |
+| segmentation / en-echelon offset | Real ranges are segmented, not one smooth arc | A single continuous sweep with no structural junctions |
+
+Three couplings a curve-placed range must also honour, because they are what make it read as
+*present in the world* rather than pasted onto it:
+
+- **Drainage crosses it.** A range that no river cuts through is a tell. An antecedent river holds
+  its course through rising rock and leaves a **water gap**; an abandoned one leaves a **wind gap**
+  notched in the divide (`20`). If a big trunk river already exists in the domain, let it keep its
+  path through the new uplift rather than diverting it — that *is* the antecedent case.
+- **It casts a rain shadow.** Place the range in the climate solve too, or the leeward side stays as
+  wet as the windward one and the vegetation, snow line and erosion rates all disagree with the
+  topography (`13`).
+- **Its drainage density sets its spur spacing.** Ridge-to-ridge spacing on the flanks comes out of
+  the erosion solve; if it was authored, it will be uniform, and uniform spur spacing is visible from
+  a kilometre away.
+
+### A gorge is an incision history, not a trench
+
+Same failure one process over: subtracting a swept prism gives uniform width, uniform wall angle, a
+flat floor, no talus, no benching and no tributaries. Which gorge is wanted decides which cause to
+seed — the geology of each lives in the chapters routed below, and this table is the *authoring*
+crosswalk:
+
+| Gorge kind | Cause to seed | Cross-section | Route |
+|---|---|---|---|
+| Fluvial canyon / **entrenched meander** | Channel path + discharge, with uplift or base-level fall | V, and the bends keep a meander wavelength inherited from a *much wider* former floodplain | `03`, `04`, blueprint in `20` |
+| **Slot canyon** | Path along a joint set; flash-flood abrasion in massive rock | Width 1–10 m against 10–100 m depth; scalloped, overhanging walls | `20`, `16` |
+| **Fault / joint-guided gorge** | A weakness line in `strataHardness`, *not* a height cut | Straight runs with abrupt angular bends at joint intersections | `11` |
+| **Glacial trough** | Ice flowline + thickness | **U**, with hanging tributaries and truncated spurs | `12` |
+| **Box canyon / sapping** | A spring line at the head | Theatre-headed amphitheatre terminus, no tributary network above it | `11`, `20` |
+
+Five invariants apply to all of them, and each is a cheap assertion:
+
+1. **It has an inlet and an outlet.** A gorge that starts and ends in flat ground is the "canyon
+   carved by nothing" tell (`20`); its floor must connect to the drainage network at both ends.
+2. **The floor is monotone downstream.** Same defect, and same check, as the uphill river of `27`.
+3. **Two widths, not one.** The channel on the floor is sized by hydraulic geometry (`03`); the
+   *gorge* is sized by wall retreat over the incision history. Authoring one number for both gives
+   either a slot with a river too big for it or a canyon with a stream lost in the bottom.
+4. **The walls record the rock.** Strata benching where resistance alternates (`11`), talus at repose
+   at the base (`05`), caprock overhangs. Constant-slope unbenched walls are an extruded profile.
+5. **Tributaries hang or notch, consistently.** Fast trunk incision leaves tributaries perched with
+   waterfalls at the junction (`04`); slow incision lets them meet at grade. Pick one; a gorge with
+   both is telling two histories.
+
+### The cross-section vocabulary
+
+One record covers ranges, gorges, valleys, roads and levees — and it is deliberately close to what
+engine brushes expose, so a `SOLVE_PROJECTION` export drops straight into them (`27`):
+
+```
+curve_landform:
+  kind                 # range | gorge | valley | escarpment | terrace | road | levee | ...
+  role                 # CAUSE_SEED | POST_SOLVE_STAMP | SOLVE_PROJECTION   (above)
+  vertices[]:
+    xy
+    z                  # crest elevation (range) or floor elevation (gorge/valley/road)
+    halfWidth_m        # the feature's own half-width at this station
+    amplitude_m        # uplift magnitude for a CAUSE_SEED; metres above/below for a STAMP
+    asymmetry          # [-1,1]: which flank is steeper
+  falloff              # ANGLE (extend the flank at a slope until it meets terrain) | WIDTH (fixed)
+  profile              # V | U | slot | box | flat | authored 1D cross-section curve
+  blend                # min | max | add | alpha | smax          (Stamp, above)
+  edgeOffset_m         # flat shelf before the falloff starts (berm, shoulder, shore shelf)
+  cap                  # capped (plateau / mesa top) | uncapped (peak)
+```
+
+Three of those get chosen wrongly often enough to call out:
+
+- **`falloff` by angle, not by width, for natural landforms.** An angle falloff extends the flank at
+  a *slope* until it meets the existing surface, so the same range is narrow in a valley and wide on
+  a plain — which is the graded-slope behaviour real terrain has (`05`, repose) and the reason engine
+  brushes offer it. Fixed-width falloff is for engineered features, where a constant footprint is the
+  point.
+- **`blend`: `alpha` replaces, and replacing destroys.** An alpha-blended stamp over eroded terrain
+  flattens exactly the high-frequency detail the erosion solve produced. Cut with `min`, raise with
+  `add` or `smax`, and the detail survives inside the feature. This is the same rule as `27`'s
+  double-carve defect, one level up.
+- **`profile` is not free.** V, U, slot and box each name a *process*; picking one that contradicts
+  the cause seeded (a V-shaped "glacial valley", a U-shaped flash-flood slot) is a claim the terrain
+  will contradict everywhere else — the hanging tributaries, the talus, the drainage.
+
+### Failure catalogue
+
+- **The wall** — a range as an extruded Gaussian: smooth flanks, no valleys, no spurs. Seed uplift
+  and run erosion.
+- **The trench** — a gorge as a subtracted prism: uniform width and wall angle, flat floor, no talus,
+  no benching, no tributaries.
+- **The orphan** — a gorge or valley connected to no drainage at either end.
+- **The uphill gorge** — floor not monotone downstream.
+- **The chopped range** — ends abruptly instead of plunging into its foreland.
+- **Corner-cutting** — polyline resampled coarser than the falloff width, so the swept profile
+  short-cuts every bend and the feature leaves its own curve.
+- **Terraced walls** — a stamp evaluated into quantised height instead of R32F (`08` precision).
+- **Detail erased** — alpha-blend stamping over eroded terrain (above).
+- **The dry lee that isn't** — a range added after the climate solve: no rain shadow, no asymmetric
+  vegetation or snow line (`13`).
+- **The smooth saddle** — two overlapping range curves blended into a gentle col; real ranges meet in
+  structural junctions, and the saddle between them is a drainage divide with valleys climbing to it.
 
 ## Filtering
 

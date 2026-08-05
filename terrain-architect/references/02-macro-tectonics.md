@@ -100,6 +100,15 @@ A **constant uplift plus stream power** is the cheapest route to a genuinely rea
 dissected landscape. It is worth proposing whenever someone reaches for a 12-node noise stack
 to get valleys.
 
+**The spline rows above are the only legitimate way to draw a mountain range.** A curve feeding `U`
+is a *cause seed*: the crest, the spurs, the valley network and the flank gradients are all produced
+by the erosion that follows. A curve extruded straight into height is a smooth wall with none of
+those, and no amount of noise on top fixes it. The per-station attributes such a curve should carry
+(uplift amplitude rather than crest elevation, half-width, vergence asymmetry, end plunge,
+en-echelon segmentation), the couplings it must honour (water and wind gaps where drainage crosses
+the rising range, the rain shadow it casts in `13`), and the same treatment for gorges are in `10`'s
+curve-driven-landforms section.
+
 Boundary condition matters more here than anywhere else: the domain edge is usually the base
 level (`h = 0`, fixed). Erosion cuts headward from the edges inward. If all four edges are
 fixed at zero, you get a dome — and, before the dome, a fringe of short edge-perpendicular
