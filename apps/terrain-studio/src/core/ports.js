@@ -72,9 +72,13 @@ export const SEMANTICS = Object.freeze({
   // somewhere that renders or collides. It is a conditioned copy of the height that exists purely
   // so flow has a consistent surface to run over; the solid height it came from is untouched.
   routingSurface: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
-  depressionDepth: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
+  // METRES, not 'none'. S4.1 asks for a signed conditioningDelta:m, and a depth an author reads to
+  // decide whether a basin matters is useless as a fraction of an unstated range. The ROUTING
+  // SURFACE stays unitless on purpose: it is a conditioned copy of relativeHeight and feeds a
+  // router that expects the input's own units, so converting it would be a unit error, not a fix.
+  depressionDepth: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
   // Signed: positive where fill raised the surface, negative where breach cut it.
-  conditioningDelta: { kind: 'scalarRaster', defaultUnit: 'none', continuous: true },
+  conditioningDelta: { kind: 'scalarRaster', defaultUnit: 'm', continuous: true },
   precipitation: { kind: 'scalarRaster', defaultUnit: 'mmPerYr', continuous: true },
   drainageArea: { kind: 'scalarRaster', defaultUnit: 'm2', continuous: true },
   discharge: { kind: 'scalarRaster', defaultUnit: 'm3PerS', continuous: true },

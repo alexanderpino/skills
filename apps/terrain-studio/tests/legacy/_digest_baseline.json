@@ -31,7 +31,7 @@
     "d_wind": "d8475edd:4c98b50d|wind_u=e2578670:47d014d2|wind_v=74652e76:70a8999f|wind_speed=964d998a:f4a5179",
     "d_windmodify": "6f088ad1:600daba6|wind_u=e2c08a7d:cee44275|wind_v=9298251e:81e0237|wind_speed=b2ab7603:8f0a661f|ex=f4da2304:1a304eee|ex_wind_u=bba34294:d1e7400a|ex_wind_v=2a2098e4:7a911bf6|ex_wind_speed=842b0eff:d88ba48c",
     "deflate": "a9a019c1:2701ff7",
-    "depression": "263bdef7:bcf4a390|port_routingSurface=ffbb86c0:9b19b7dc|port_depressionDepth=d97fa79e:5d1e5907|port_conditioningDelta=d97fa79e:5d1e5907",
+    "depression": "263bdef7:bcf4a390|port_routingSurface=ffbb86c0:9b19b7dc|port_depressionDepth=f87e77e2:4082275c|port_conditioningDelta=f87e77e2:4082275c",
     "dilate": "a2ade0df:c8827752",
     "directionalwarp": "1f18b57a:caa00c3a",
     "drawmask": "d9df5eac:d735aa08",

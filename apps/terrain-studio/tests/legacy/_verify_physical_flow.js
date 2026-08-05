@@ -403,7 +403,31 @@ function nested() {
     check('sinks carry exactly zero direction, not a stale one', sinkNonZero === 0, { sinkNonZero })
   }
 
-  check('assertion inventory non-empty', assertions.length >= 30, assertions.length)
+  // --- S4.1: conditioningDelta:m, which the story asks for and the port did not carry -----------
+  //
+  // The Sprint 4 audit found depressionDepth and conditioningDelta declared unit 'none'. They are
+  // DIFFERENCES an author reads to decide whether a basin matters, and a depth expressed as a
+  // fraction of an unstated range cannot be read at all.
+  //
+  // The conversion lives in the PLUGIN, not the module, and that is deliberate: hydrology.js is
+  // pure and DOM-free precisely so this oracle can run it under plain node, and it has no idea how
+  // many metres the input's 0..1 range spans. So what is asserted here is the CONTRACT — the ports
+  // declare metres, and the plugin multiplies by the vertical range. routingSurface must stay
+  // unitless: it is a conditioned copy of relativeHeight feeding a router that expects the input's
+  // own units, so converting it would be a unit error rather than a fix.
+  {
+    const pl = require('fs').readFileSync(path.resolve(__dirname, '../../src/plugins/data/depression.js'), 'utf8')
+    const declaresM = /semantic: 'depressionDepth', unit: 'm'/.test(pl)
+      && /semantic: 'conditioningDelta', unit: 'm'/.test(pl)
+    const converts = /terrainDef\.height/.test(pl) && /toM\(r\.depressionDepth\)/.test(pl)
+      && /toM\(r\.conditioningDelta\)/.test(pl)
+    const routingUnitless = /semantic: 'routingSurface', unit: 'none'/.test(pl)
+    check('depth and delta ports declare metres', declaresM, { declaresM })
+    check('the plugin converts them by the vertical range', converts, { converts })
+    check('the routing surface stays in the input units, not metres', routingUnitless, { routingUnitless })
+  }
+
+  check('assertion inventory non-empty', assertions.length >= 33, assertions.length)
   report()
 
   function report() {

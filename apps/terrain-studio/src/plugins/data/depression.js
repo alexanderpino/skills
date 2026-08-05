@@ -14,7 +14,7 @@
 // three modes, and the oracle asserts it bitwise.
 import { definePlugin } from '../../core/registry.js'
 import { P } from '../../core/params.js'
-import { newField, fieldW, fieldH, isHex } from '../../legacy.js'
+import { newField, fieldW, fieldH, isHex, terrainDef } from '../../legacy.js'
 import { depressionPolicy } from '../../core/hydrology.js'
 
 export default definePlugin({
@@ -44,11 +44,11 @@ export default definePlugin({
     { id: 'routingSurface', name: 'Routing', kind: 'scalarRaster', storage: 'R32F', components: 1,
       semantic: 'routingSurface', unit: 'none', lens: 'derived' },
     { id: 'depressionDepth', name: 'Depth', kind: 'scalarRaster', storage: 'R32F', components: 1,
-      semantic: 'depressionDepth', unit: 'none', lens: 'derived' },
+      semantic: 'depressionDepth', unit: 'm', lens: 'derived' },
     // Signed, so the author can see what conditioning WOULD change: positive where fill raised the
     // surface, negative where breach cut it, zero under preserve.
     { id: 'conditioningDelta', name: 'Delta', kind: 'scalarRaster', storage: 'R32F', components: 1,
-      semantic: 'conditioningDelta', unit: 'none', lens: 'derived' },
+      semantic: 'conditioningDelta', unit: 'm', lens: 'derived' },
   ],
 
   eval: (p, ins, node, ctx) => {
@@ -64,8 +64,15 @@ export default definePlugin({
       const w = fieldW(), h = fieldH()
       const r = depressionPolicy(src, w, h, { mode: p.mode || 'fill', hex: isHex() })
       values.set('routingSurface', r.routingSurface)
-      values.set('depressionDepth', r.depressionDepth)
-      values.set('conditioningDelta', r.conditioningDelta)
+      // CONVERTED HERE, not in the module. hydrology.js is pure and DOM-free precisely so an
+      // oracle can run it with no browser; it has no idea how many metres the input's 0..1
+      // range spans. The plugin does, so the plugin is where a normalised difference becomes a
+      // physical one. Doing it in the module would drag terrainDef into a file that exists to
+      // be free of it.
+      const vertM = terrainDef.height
+      const toM = f => { const o = newField(); for (let i = 0; i < o.length; i++) o[i] = f[i] * vertM; return o }
+      values.set('depressionDepth', toM(r.depressionDepth))
+      values.set('conditioningDelta', toM(r.conditioningDelta))
     }
     // The primary is chosen by the port carrying `primary: true`, not by a key in this object —
     // returning one here would be ignored and would read as if it were doing something.
