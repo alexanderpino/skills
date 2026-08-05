@@ -53,6 +53,16 @@ const MUTATIONS = [
   'frozen-clock',                // the "advanced" frame is rendered at the same time as the first
   'parity-halved-domain',        // the real historical defect: one pass samples half the world
   'software-renderer',           // the frame budget is measured on SwiftShader
+  // --- added by the S4.10 adversarial review: six defects that scored GREEN against the first
+  //     version of this oracle, and the assertions that now catch them. Each was injected into
+  //     src/core/water-evidence.js one at a time and run; each produced NO new failing gate.
+  'contention-filter-one-sided', // the filter drops on the water side only, biasing the difference
+  'contention-filter-lies-about-retention', // it keeps the fastest fifth and reports full retention
+  'coverage-fraction-halved',    // a stride error halves every reported coverage fraction
+  'blank-detector-blind',        // frameStats can no longer see a blank frame
+  'coverage-agreement-inflated', // the parity metric scores a real 20% mismatch as perfect
+  'clock-ignores-stalls',        // a clock that never advances at all reports as monotone
+  'repeat-floor-is-not-a-repeat', // the same-time noise floor is sampled at a different time
 ]
 const PATCHES = {
   'percentile-is-mean': [['  return list[rank - 1]',
@@ -67,6 +77,17 @@ const PATCHES = {
     "  if (false && SOFTWARE_RENDERER_RE.test(renderer)) return 'software'"]],
   'budget-ignores-cost': [['  const withinBudget = measured && p95Ms <= budgetMs',
     '  const withinBudget = measured']],
+  // The six review defects. `repeat-floor-is-not-a-repeat` is a FIXTURE mutation and has no entry
+  // here — it moves the noise-floor grab in the browser rather than patching the metrics.
+  'contention-filter-one-sided': [['    if (on[i] <= capOn && off[i] <= capOff) { keptOn.push(on[i]); keptOff.push(off[i]) }',
+    '    if (on[i] <= capOn) { keptOn.push(on[i]); keptOff.push(off[i]) }']],
+  'contention-filter-lies-about-retention': [['    dropped: on.length - keptOn.length, retention: keptOn.length / on.length, capOn, capOff,',
+    '    dropped: on.length - keptOn.length, retention: 1, capOn, capOff,']],
+  'coverage-fraction-halved': [['  return n / mask.length', '  return n / mask.length / 2']],
+  'blank-detector-blind': [['    blank: !(pixels > 0) || seen.size <= 1 || nonZero === 0,', '    blank: false,']],
+  'coverage-agreement-inflated': [['  const agreement = empty ? 0 : intersection / union',
+    '  const agreement = empty ? 0 : Math.min(1, (intersection / union) * 1.25)']],
+  'clock-ignores-stalls': [['    if (d === 0) stalled++', '    if (false) stalled++']],
 }
 if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation ${mutation}`); process.exit(2) }
 
@@ -191,6 +212,38 @@ async function loadCore(file, patchKey) {
   check('emptyCoverageIsNotAgreement', emptyPair.agreement === 0 && emptyPair.empty === true, notes.coverage.empty)
   check('identicalCoverageScoresExactlyOne', WE.coverageAgreement(same, same).agreement === 1, null)
   check('shiftedCoverageScoresBelowOne', WE.coverageAgreement(same, shifted).agreement < 1, notes.coverage.shifted)
+  // "BELOW ONE" IS NOT A CONSTRAINT ON THE TOLERANCE, only on the sign, and the tolerance is the
+  // whole metric. Measured in review: a coverageAgreement patched to report min(1, IoU * 1.25) —
+  // a parity check that scores a real 20% coverage mismatch as perfect — passed every assertion in
+  // this file. The fixture's intersection-over-union is known exactly from its own definition:
+  // `same` is [40,160) and `shifted` is [60,180), so the intersection is [60,160) = 100 samples and
+  // the union is [40,180) = 140. The metric must report that number, not merely something under 1.
+  check('shiftedCoverageScoresTheExactIntersectionOverUnion',
+    Math.abs(WE.coverageAgreement(same, shifted).agreement - 100 / 140) < 1e-12,
+    { got: WE.coverageAgreement(same, shifted).agreement, expectedByHand: 100 / 140 })
+
+  // --- the contention filter, on a sample whose right answer is known by construction -----------
+  // The filter is the only thing between a busy machine and the frame budget, and two of its
+  // documented properties were asserted by nothing. Measured in review, both of these scored GREEN:
+  //   * a filter applied to the WATER SIDE ONLY, which keeps a fast water frame paired with a slow
+  //     control frame and so biases the paired difference downward — the module's own comment names
+  //     symmetry as the reason it cannot do that;
+  //   * a filter that kept only the fastest fifth of the pairs (30 of 120 silently removed) while
+  //     reporting retention 1.0 — precisely the "filter that quietly kept three pairs" the module
+  //     says the retention value exists to prevent.
+  // Ten pairs, each contended on exactly one side, in different pairs. The median of both samples is
+  // 1 and the cap is 1.5, so the answer is arithmetic, not a threshold: 8 pairs survive, all of them
+  // at 1 on both sides, and the retention is exactly 0.8.
+  const conOn = [1, 1, 1, 1, 9, 1, 1, 1, 1, 1]   // pair 4 contended on the water side
+  const conOff = [1, 1, 9, 1, 1, 1, 1, 1, 1, 1]  // pair 2 contended on the control side
+  const filt = WE.rejectContendedPairs(conOn, conOff)
+  notes.contention = { offered: filt.offered, kept: filt.kept, dropped: filt.dropped,
+    retention: filt.retention, capOn: filt.capOn, capOff: filt.capOff, on: filt.on, off: filt.off }
+  check('theContentionFilterDropsAPairContendedOnEitherSide',
+    filt.kept === 8 && filt.dropped === 2 && filt.on.length === 8 && filt.off.length === 8
+    && filt.on.every(v => v === 1) && filt.off.every(v => v === 1), notes.contention)
+  check('theContentionFilterReportsTheRetentionItActuallyAchieved',
+    filt.retention === 0.8 && filt.retention === filt.kept / filt.offered, notes.contention)
 
   // --- the 60 second path, and the reset pulse -------------------------------------------------
   // The shipped preset, expanded exactly as the renderer expands it (terrainDef defaults: wind 300
@@ -435,13 +488,19 @@ async function loadCore(file, patchKey) {
 
     // ---- pixel evidence ------------------------------------------------------------------------
     const dt = mutation === 'frozen-clock' ? 0 : 0.7
-    const pixels = await page.evaluate(async advance => {
+    // THE SAME-TIME REPEAT IS THE NOISE FLOOR every presented-frame bound below is stated against,
+    // and until review it was measured, printed, and compared with nothing. `repeat-floor-is-not-a-
+    // repeat` samples it at T + dt instead — what a floor probe that is not actually a repeat looks
+    // like — which collapses the floor onto the signal and must turn those bounds red.
+    const repeatAt = mutation === 'repeat-floor-is-not-a-repeat' ? 3.5 + dt : 3.5
+    const pixels = await page.evaluate(async o => {
+      const advance = o.advance
       const H = window.__S410, W = window.__WE
       H.freeze()
       try {
         H.warm(30, 3.5)
         const a = H.grab(3.5)                       // water, time T
-        const aAgain = H.grab(3.5)                  // water, time T again — determinism
+        const aAgain = H.grab(o.repeatAt)           // water, time T again — determinism
         const b = H.grab(3.5 + advance)             // water, time T + dt
         const keep = scene.water
         scene = Object.assign({}, scene, { water: null })
@@ -469,6 +528,12 @@ async function loadCore(file, patchKey) {
           size: [a.w, a.h],
           statsWater: W.frameStats(a.px),
           statsDry: W.frameStats(dry.px),
+          // THE RED ENDPOINT FOR BLANKNESS, measured in the same run on a buffer of the same size.
+          // `theRenderedFrameIsNonBlank` reads three fields that frameStats itself computes, so a
+          // frameStats that cannot see a blank frame satisfies it — measured in review, a patch
+          // hard-coding `blank: false` produced no failing gate anywhere in this file. A detector
+          // has to be shown rejecting something.
+          statsBlankControl: W.frameStats(new Uint8Array(a.px.length)),
           waterCount: part.waterCount, dryCount: part.dryCount, pixels: part.pixels,
           waterFraction: part.waterCount / part.pixels,
           waterChanged: W.changedWithin(a.px, b.px, part.waterMask, { tol: 0 }),
@@ -487,7 +552,7 @@ async function loadCore(file, patchKey) {
           dryFrameRepeatBytes: H.bytesDiffering(dry.px, dryAgain.px),
         }
       } finally { H.thaw() }
-    }, dt)
+    }, { advance: dt, repeatAt })
     const px = pixels
     notes.pixels = {
       size: px.size, advanceSeconds: dt,
@@ -515,6 +580,20 @@ async function loadCore(file, patchKey) {
     check('theWaterMaskTargetIsNonEmpty', px.targetsOk === true && px.maskCoverageFraction > 0.02,
       { maskCoverageFraction: notes.pixels.maskCoverageFraction, targetsOk: px.targetsOk })
     check('dryPixelSetIsNonEmpty', px.dryCount > 0, px.dryCount)
+    check('theBlankFrameDetectorRejectsABlankFrame',
+      px.statsBlankControl.blank === true && px.statsBlankControl.nonZeroFraction === 0
+      && px.statsBlankControl.distinctLevels <= 1, px.statsBlankControl)
+    // TWO INDEPENDENT ROUTES TO THE SAME NUMBER, and only a floor stood between them. `waterFraction`
+    // is the set of PRESENTED pixels that change when the water is taken out of the scene;
+    // `maskCoverageFraction` is the set of pixels the water-mask RENDER TARGET marks as rasterised
+    // water. Different buffers, different functions, no shared code. Measured over nine runs they
+    // agree to 0.24-0.28% of each other, while a coverageFraction patched to report half — which
+    // cleared the 0.02 floor comfortably and produced no failing gate — puts them 50.1% apart. The
+    // 2% bound sits between those two measured populations.
+    check('theTwoIndependentWaterCoverageMeasuresAgree',
+      Math.abs(px.maskCoverageFraction - px.waterFraction) < 0.02 * px.waterFraction,
+      { fromPresentedFrame: notes.pixels.waterFraction, fromMaskTarget: notes.pixels.maskCoverageFraction,
+        relativeDifference: +(Math.abs(px.maskCoverageFraction - px.waterFraction) / px.waterFraction).toFixed(5) })
 
     // BIT-IDENTITY IS ASSERTED WHERE THE APPLICATION OWNS THE BITS. Both of these are exactly zero,
     // measured; the presented frame is not, and the isolation probe says why (see H.readTarget).
@@ -539,10 +618,23 @@ async function loadCore(file, patchKey) {
     //   advance 0.7 s, dry pixels        0.000221    advance 0.7 s, water pixels       (see notes)
     // The bounds below sit between those two columns; `frozen-clock` collapses the water column onto
     // the repeat column and turns the first of them red.
+    // THE FLOOR IS NOW IN THE CONDITION, not only in the comment. As first written these two bounds
+    // were the constants 0.10 and 0.01 — chosen numbers — while the repeat floor the comment says
+    // they "sit between" was computed, printed and compared with nothing. Measured over seven runs
+    // on the capture machine, in the same run and on the same masks:
+    //   water pixels move 184x to 234x their own same-time repeat floor
+    //   dry pixels move   1.51x to 1.78x theirs
+    // The factor of 10 below sits between those two populations, 5.6x above the dry one and 18x
+    // below the water one, and both endpoints are re-measured on every run. `repeat-floor-is-not-a-
+    // repeat` collapses the floor onto the signal and is the armed control.
     check('waterPixelsChangeUnderTimeAdvance',
-      px.waterChanged.empty === false && px.waterChanged.fraction > 0.10, notes.pixels.presented)
+      px.waterChanged.empty === false && px.waterChanged.fraction > 0.10
+      && px.repeatWater.empty === false && px.waterChanged.fraction > px.repeatWater.fraction * 10,
+      notes.pixels.presented)
     check('dryTerrainPixelsAreUnmovedByTimeAdvance',
-      px.dryChanged.empty === false && px.dryChanged.fraction < 0.01, notes.pixels.presented)
+      px.dryChanged.empty === false && px.dryChanged.fraction < 0.01
+      && px.repeatDry.empty === false && px.dryChanged.fraction < px.repeatDry.fraction * 10,
+      notes.pixels.presented)
     check('theWaterSignalIsFarAboveTheDryResidue',
       px.dryChanged.fraction * 20 < px.waterChanged.fraction, notes.pixels.presented)
 
@@ -563,9 +655,31 @@ async function loadCore(file, patchKey) {
       minAdvance: +clock.scan.minAdvance.toExponential(3), maxAdvance: +clock.scan.maxAdvance.toFixed(5),
       backwards: clock.scan.backwards, stalled: clock.scan.stalled,
     }
+    // A DEAD CLOCK PASSED BOTH OF THE ORIGINAL TWO ASSERTIONS. Measured directly against clockScan
+    // in review: a trace of 120 identical readings has backwards = 0 (nothing ever decreased) and
+    // maxAdvance = 0 (so it is trivially under the 100 ms clamp), and both gates scored green on a
+    // renderer whose clock never moved — which is the defect this section exists to catch, and the
+    // one `--mutate=frozen-clock` does NOT reach, because it only freezes the pixel probe's dt.
+    // `stalled`, `monotone`, `span` and `minAdvance` were all computed, printed in notes.clock, and
+    // asserted by nothing. They carry the claim; they are now in the conditions.
     check('theShippedClockNeverRunsBackwardsOverOneHundredAndTwentyFrames',
       clock.scan.backwards === 0 && clock.scan.readings === 120, notes.clock)
+    check('theShippedClockNeverStallsOverOneHundredAndTwentyFrames',
+      clock.scan.stalled === 0 && clock.scan.monotone === true && clock.scan.minAdvance > 0, notes.clock)
     check('theShippedClockStaysUnderItsOwnHundredMillisecondClamp', clock.scan.clamped === true, notes.clock)
+    // THE RED ENDPOINT, measured in the same run over the same number of readings: the same scan
+    // applied to a clock that did not move. Without it "the clock advanced" is a claim about a probe
+    // nobody has ever seen return the other answer.
+    const deadClock = ctx.WE.clockScan(new Array(120).fill(3.5))
+    notes.clock.stoppedClockControl = { span: deadClock.span, stalled: deadClock.stalled,
+      backwards: deadClock.backwards, monotone: deadClock.monotone, clamped: deadClock.clamped }
+    check('theClockScanRejectsAStoppedClock',
+      deadClock.monotone === false && deadClock.stalled === 119 && deadClock.span === 0
+      && deadClock.backwards === 0 && deadClock.clamped === true, notes.clock.stoppedClockControl)
+    // The two endpoints must be far apart, or "it advanced" is a reading of floating-point dust.
+    // Measured: the shipped trace spans 0.625-0.630 s over 120 frames; the stopped control spans 0.
+    check('theShippedClockIsSeparatedFromTheStoppedControl',
+      clock.scan.span > deadClock.span + 0.05, { shipped: notes.clock.span, stopped: deadClock.span })
 
     // ---- forward / deferred geometry parity ---------------------------------------------------
     const parity = await page.evaluate(async opts => {
@@ -888,8 +1002,21 @@ void main(){ if (vDepth <= 0.00001) discard; frag = vec4(gl_FragCoord.z, vDepth,
       check(`allFramesWereTimedAt_${vp.name}`, timing.kept + timing.dropped >= pairs * 0.9 && timing.discarded < pairs * 0.1,
         { kept: timing.kept, dropped: timing.dropped, discarded: timing.discarded })
       // A measurement taken on a machine that was busy for most of it is not a measurement.
-      check(`theMachineWasQuietEnoughToMeasureAt_${vp.name}`, timing.retention > 0.5,
-        { retention: +timing.retention.toFixed(3), kept: timing.kept, offered: timing.kept + timing.dropped })
+      //
+      // RETENTION IS CROSS-CHECKED, NOT TRUSTED. `timing.retention` is the filter's own report of
+      // itself, and measured in review a filter patched to keep only the fastest fifth removed 30 of
+      // 120 desktop pairs while reporting retention 1.0 — and every gate here stayed green. The
+      // independent reading is the pair count that actually reached pairedCost (`c.pairs`, counted
+      // by pairedCost from the array it was handed) over the pairs this loop offered (the loop
+      // constant, less the frames the timer could not resolve). The two must agree.
+      const offeredPairs = pairs - timing.discarded
+      const observedRetention = offeredPairs > 0 ? c.pairs / offeredPairs : 0
+      notes[key].observedRetention = +observedRetention.toFixed(3)
+      check(`theMachineWasQuietEnoughToMeasureAt_${vp.name}`,
+        timing.retention > 0.5 && observedRetention > 0.5
+        && Math.abs(timing.retention - observedRetention) < 1e-6,
+        { reportedRetention: +timing.retention.toFixed(3), observedRetention: +observedRetention.toFixed(3),
+          pairsReachingTheStatistic: c.pairs, offered: offeredPairs, kept: timing.kept, dropped: timing.dropped })
       check(`theTimerResolvesTheWaterPassAt_${vp.name}`, c.costP50 > 0 && c.onP50 > c.offP50, notes[key])
       const passVerdict = ctx.WE.budgetVerdict({ p95Ms: c.costP50, budgetMs: passBudget, rendererClass })
       const tailVerdict = ctx.WE.budgetVerdict({ p95Ms: c.costP95, budgetMs: tailBudget, rendererClass })
