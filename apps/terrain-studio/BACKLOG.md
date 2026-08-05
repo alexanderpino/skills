@@ -916,7 +916,28 @@ stopped rendering entirely: `blue = 0.0`, zero water pixels. Two GLSL compile er
     ERROR: 0:42: 'uCam' : undeclared identifier
     ERROR: 0:4: 'uTerrainHeight' : redefinition
 
-The `uSlopeVar` declaration was appended to a uniform string that is not unique to the compositor,
+I first wrote that the `uSlopeVar` declaration had been appended to a uniform string shared by more
+than one shader. **That is wrong, and measuring it is what showed it.** All three candidate anchors,
+including the one actually used, occur exactly once in legacy.js:
+
+    uniform sampler2D gWaterMask;                     1
+    uniform mat4 uInvMVP;                             1
+    uniform float uWaveAmp;uniform float uShoalRefM;  1   <- the one used
+
+So the insertion landed in the compositor and nowhere else, and the cause of
+
+    ERROR: 0:42: 'uCam' : undeclared identifier
+    ERROR: 0:4: 'uTerrainHeight' : redefinition
+
+is STILL UNDIAGNOSED. `uTerrainHeight` at line 4 of some program points at a shader other than the
+compositor — plausibly the water-mask pass, which already declares it — which would mean the GGX
+edit perturbed a shared template rather than the one block it targeted. That is a hypothesis, not a
+finding; the next attempt should capture the failing shader source itself rather than trusting it.
+
+The correction is left in rather than tidied away because a plausible wrong diagnosis in a backlog
+entry is worse than none: the next attempt would have spent its budget making an anchor unique that
+already was. ~~The original claim:~~ the declaration was appended to a uniform string that is not
+unique to the compositor,
 so it landed in a shader that already had those names and broke two programs at once. Reverted.
 
 **For the next attempt:** the shading maths and the Cox-Munk floor are both settled — reuse them.
