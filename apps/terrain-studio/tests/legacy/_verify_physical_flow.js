@@ -71,6 +71,31 @@ function pitted() {
   return h
 }
 
+/**
+ * TWO BASINS IN SERIES, which the story calls for and no fixture had.
+ *
+ * The single-pit fixture cannot distinguish a correct fill from one that raises everything to a
+ * single global level, because there IS only one level in it. This one has two, and they must come
+ * out different:
+ *
+ *   the UPPER pit sits on high ground (small x) and spills downslope into the lower one
+ *   the LOWER pit is deeper and further downslope, and spills to the domain edge
+ *
+ * A fill that solves each basin against its own rim produces two distinct levels. A fill that solves
+ * one level for the whole domain — the failure mode the story names — produces one. The gap between
+ * them is the assertion.
+ *
+ * The upper pit is deliberately shallow enough that the lower basin's fill NEVER reaches it: if the
+ * lower level rose above the upper rim the two would merge into one body and the fixture would
+ * quietly stop testing nesting at all.
+ */
+function nested() {
+  const h = plane()
+  for (let y = 26; y < 32; y++) for (let x = 12; x < 18; x++) h[y * W + x] -= 0.10   // upper, shallow
+  for (let y = 30; y < 40; y++) for (let x = 40; x < 50; x++) h[y * W + x] -= 0.35   // lower, deep
+  return h
+}
+
 ;(async () => {
   const src = path.resolve(__dirname, '../../src/core/hydrology.js')
   let M = null, loadErr = null
@@ -297,6 +322,44 @@ function pitted() {
     && differs(breach.routingSurface, preserve.routingSurface)
     && differs(fill.routingSurface, preserve.routingSurface), null)
 
+  // --- S4.1: the analytic NESTED-basin fixture the story asks for ---------------------------------
+  //
+  // The single-pit fixture cannot tell a per-basin fill from a fill-everything-to-one-level, because
+  // it contains exactly one level. Two basins in series do: each must reach ITS OWN spill.
+  {
+    const hn = nested()
+    const solidN = Float32Array.from(hn)
+    const fn = M.depressionPolicy(hn, W, H, { mode: 'fill', cellSizeM: CELL })
+    const levelIn = (x0, x1, y0, y1) => {
+      let lo = Infinity, hi = -Infinity, n = 0
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = y * W + x
+        if (fn.routingSurface[i] > solidN[i] + 1e-6) { n++; lo = Math.min(lo, fn.routingSurface[i]); hi = Math.max(hi, fn.routingSurface[i]) }
+      }
+      return { lo, hi, n }
+    }
+    const up = levelIn(12, 18, 26, 32), lowr = levelIn(40, 50, 30, 40)
+    check('both nested basins filled', up.n > 8 && lowr.n > 20, { upperCells: up.n, lowerCells: lowr.n })
+    check('each nested basin is flat within itself',
+      up.hi - up.lo < 1e-4 && lowr.hi - lowr.lo < 1e-4,
+      { upperSpread: +(up.hi - up.lo).toExponential(2), lowerSpread: +(lowr.hi - lowr.lo).toExponential(2) })
+    // THE ASSERTION THE SINGLE-PIT FIXTURE COULD NOT MAKE. One global level gives a difference of
+    // zero. The upper basin sits upslope on a plane falling in +x, so its level must be HIGHER.
+    check('the two basins reach DIFFERENT levels, each its own spill',
+      up.lo - lowr.lo > 0.05,
+      { upperLevel: +up.lo.toFixed(5), lowerLevel: +lowr.lo.toFixed(5), gap: +(up.lo - lowr.lo).toFixed(5) })
+    // ...and they must stay separate. If the lower fill rose above the upper basin's floor the two
+    // would merge and this fixture would silently stop testing nesting.
+    let upperFloor = Infinity
+    for (let y = 26; y < 32; y++) for (let x = 12; x < 18; x++) upperFloor = Math.min(upperFloor, solidN[y * W + x])
+    check('the lower fill never reaches the upper basin, so they remain two bodies',
+      lowr.hi < upperFloor, { lowerLevel: +lowr.hi.toFixed(5), upperFloor: +upperFloor.toFixed(5) })
+    // Solid height untouched here too — the guardrail applies to every fixture, not just the first.
+    let changed = 0
+    for (let i = 0; i < N; i++) if (hn[i] !== solidN[i]) changed++
+    check('the nested fixture solid height is untouched', changed === 0, { changed })
+  }
+
   // --- S4.2: "assert all output units/ranges" -----------------------------------------------------
   //
   // The Sprint 4 audit found this clause had NO assertion behind it at all. Every physical claim was
@@ -340,7 +403,7 @@ function pitted() {
     check('sinks carry exactly zero direction, not a stale one', sinkNonZero === 0, { sinkNonZero })
   }
 
-  check('assertion inventory non-empty', assertions.length >= 25, assertions.length)
+  check('assertion inventory non-empty', assertions.length >= 30, assertions.length)
   report()
 
   function report() {
