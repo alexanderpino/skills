@@ -32,7 +32,8 @@ BAR      <the concrete comparator, and where its files live>
 INSPECT  <how a critic reaches the real output each round>
 LANES    <your proposed initial split, or "to be cut after first look">
 STOP     <which conditions are armed, with thresholds>
-BUDGET   <waves / wall clock / tokens — always set>
+BUDGET   <waves / wall clock / tokens — always set; stops and offers an extension
+         when it runs out. Optional hard cap: the ceiling extensions may not cross>
 AUTONOMY <unattended until stop | check in between waves>
 BENCH    <where progress is visible>
 ```
@@ -68,6 +69,18 @@ wave, add one smoother call per wave. State the projected total in the contract
 block ("8 waves ≈ 40–60 subagent invocations") so "budget: 8 waves" is a number
 they can actually evaluate. Parallel lanes raise the burn rate, not the total.
 
+Say what happens when it runs out, at intake, so nobody has to guess later: the
+run **stops**, reports, and comes back with an extension offer — a next block of
+waves, priced, with the log's read on whether the artifact is still improving.
+That makes the first budget a cheap first checkpoint rather than a bet on the
+whole run, and users pick a realistic number instead of an inflated one.
+
+**Hard cap (optional).** For users who want long unattended running, pair a small
+budget with a cap rather than setting one huge budget:
+`--budget-waves 8 --hard-cap-waves 20`. The budget is where you stop and report;
+the cap is the ceiling no extension may cross. Without a cap, every extension
+needs the user again — which is the safe default, not a shortcoming.
+
 **Autonomy.** If the user wants check-ins, the natural boundary is the end of a
 wave, after smoothing — the artifact is coherent there and a decision is cheap.
 Mid-lane check-ins fragment the loop for no benefit.
@@ -96,7 +109,8 @@ Initialise the state directory as part of confirming the contract:
 
 ```bash
 python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
-    --bar-kind <kind> --bar-met-n 2 --clean-streak-n 2 --budget-waves <N>
+    --bar-kind <kind> --bar-met-n 2 --clean-streak-n 2 --budget-waves <N> \
+    [--hard-cap-waves <M>]
 ```
 
 

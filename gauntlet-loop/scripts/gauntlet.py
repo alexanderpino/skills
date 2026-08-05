@@ -9,6 +9,7 @@ Commands:
   init        Create the gauntlet/ state directory and config
   log-round   Append one validated comparison record to rounds.jsonl
   status      Per-lane/per-dimension streaks, revert rate, fired stop conditions
+  extend      Raise the wave budget after the user grants an extension
   report      Draft the end-of-run gauntlet report from the log
 """
 
@@ -25,11 +26,25 @@ SEVERITIES = ("major", "minor", "none")
 ACTIONS = ("promoted", "reverted")
 
 DEFAULT_CONFIG = {
-    "stops": {"bar_met_n": 2, "clean_streak_n": 2, "budget_waves": 12},
+    "stops": {
+        "bar_met_n": 2,
+        "clean_streak_n": 2,
+        "budget_waves": 12,
+        # Absolute ceiling no extension may cross. null = no ceiling agreed, in
+        # which case every extension needs the user again.
+        "hard_cap_waves": None,
+    },
     "dimensions": ["overall"],
     "lanes": [],
     "bar_kind": "reference",
+    # Granted budget extensions, appended by `extend`. The run's history of
+    # "the budget ran out and the user chose to keep going".
+    "extensions": [],
 }
+
+# One builder call plus up to two critic calls per lane per wave, plus one
+# smoother call per wave. Used to price an extension before it is granted.
+CALLS_PER_LANE_ROUND = 3
 
 
 def die(msg):
@@ -41,7 +56,24 @@ def load_config(root):
     p = root / "config.json"
     if not p.exists():
         die(f"{p} not found — run init first")
-    return json.loads(p.read_text())
+    cfg = json.loads(p.read_text())
+    # Backfill fields a config written by an older run will not have, so a
+    # resumed run can still be extended.
+    cfg.setdefault("extensions", [])
+    cfg.setdefault("stops", {})
+    for k, v in DEFAULT_CONFIG["stops"].items():
+        cfg["stops"].setdefault(k, v)
+    return cfg
+
+
+def save_config(root, cfg):
+    (root / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
+
+
+def initial_budget(cfg):
+    """The budget agreed at intake, before any extension."""
+    ext = cfg.get("extensions") or []
+    return ext[0]["from_waves"] if ext else cfg["stops"]["budget_waves"]
 
 
 def load_rounds(root):
@@ -66,7 +98,11 @@ def cmd_init(args):
         die(f"{root}/config.json already exists (use --force to overwrite config only)")
     for d in ("bar",):
         (root / d).mkdir(parents=True, exist_ok=True)
-    cfg = dict(DEFAULT_CONFIG)
+    cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy — stops is nested
+    if (root / "config.json").exists():
+        # A re-cut re-inits with --force. Extensions the user already granted
+        # are run history, not configuration — carry them across.
+        cfg["extensions"] = json.loads((root / "config.json").read_text()).get("extensions", [])
     if args.lanes:
         cfg["lanes"] = [s.strip() for s in args.lanes.split(",") if s.strip()]
     if args.dimensions:
@@ -77,11 +113,15 @@ def cmd_init(args):
         cfg["stops"]["clean_streak_n"] = args.clean_streak_n
     if args.budget_waves is not None:
         cfg["stops"]["budget_waves"] = args.budget_waves
+    if args.hard_cap_waves is not None:
+        if args.hard_cap_waves < cfg["stops"]["budget_waves"]:
+            die("hard-cap-waves is below budget-waves — the cap is the ceiling extensions may not cross")
+        cfg["stops"]["hard_cap_waves"] = args.hard_cap_waves
     if args.bar_kind:
         if args.bar_kind not in ("reference", "acceptance criteria", "hybrid"):
             die("bar-kind must be one of: reference, acceptance criteria, hybrid")
         cfg["bar_kind"] = args.bar_kind
-    (root / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
+    save_config(root, cfg)
     for name, header in (
         ("contract.md", "# Gauntlet contract\n\n(goal / bar / inspection / stops / budget / autonomy / workbench)\n"),
         ("ownership.md", "# File ownership — refreshed every wave\n\n| lane | owned paths |\n|---|---|\n"),
@@ -221,6 +261,208 @@ def _lane_dim_status(rounds, cfg):
     return out, retired_lanes
 
 
+MARGIN_RANK = {"decisive": 3, "clear": 2, "thin": 1}
+SEVERITY_RANK = {"major": 3, "minor": 2, "none": 1}
+
+
+def _recent_revert_rate(rounds, window=6):
+    champ = [r for r in rounds if r["mode"] == "champion"][-window:]
+    if len(champ) < 4:
+        return None
+    return sum(1 for r in champ if r.get("action") == "reverted") / len(champ)
+
+
+def _dimension_trend(bar_recs, window=4):
+    """Is this dimension still moving? Computed from the log, not from feeling."""
+    recs = bar_recs[-window:]
+    if len(recs) < 2:
+        return {"improving": None, "note": "too few bar rounds to read a trend"}
+    scores = [r["score"] for r in recs]
+    score_delta = scores[-1] - scores[0]
+    sev = [SEVERITY_RANK.get(r.get("severity"), 3) for r in recs]
+    severity_easing = sev[-1] < sev[0]
+    margins = [MARGIN_RANK[r["margin"]] for r in recs]
+    # Narrowing = losing by less than we used to. Only meaningful while losing.
+    losing = [r for r in recs if r["winner"] == "other"]
+    margin_narrowing = len(losing) >= 2 and margins[-1] < margins[0]
+    improving = score_delta > 0 or severity_easing or margin_narrowing
+    bits = [f"score {scores[0]}→{scores[-1]}"]
+    if severity_easing:
+        bits.append("severity easing")
+    if margin_narrowing:
+        bits.append("margin narrowing")
+    if not improving:
+        bits.append("flat")
+    return {"improving": improving, "note": ", ".join(bits)}
+
+
+def _extension_evidence(rounds, cfg, per, retired):
+    """Evidence and a verdict for the extend-or-stop decision.
+
+    Verdict is one of: nothing-open, improving, mixed, at-ceiling. It is a
+    reading of the log, not a decision — granting an extension is the user's.
+    """
+    open_dims = sorted(k for k, s in per.items() if not s["retired"])
+    lines = []
+    trends = {}
+    for key in open_dims:
+        lane, dim = key
+        bar_recs = [
+            r for r in rounds
+            if r["lane"] == lane and r["dimension"] == dim and r["mode"] in ("blind", "rubric")
+        ]
+        t = _dimension_trend(bar_recs)
+        trends[key] = t
+        mark = {True: "still moving", False: "flat", None: "unknown"}[t["improving"]]
+        gap = per[key]["open_gap"] or "no gap named in the last verdict"
+        lines.append(f"  [{lane} / {dim}] {mark} ({t['note']}) — open gap: {gap}")
+
+    revert_rate = _recent_revert_rate(rounds)
+    if revert_rate is not None:
+        lines.append(f"  recent revert rate: {int(revert_rate * 100)}%")
+
+    moving = [k for k, t in trends.items() if t["improving"] is True]
+    flat = [k for k, t in trends.items() if t["improving"] is False]
+    if not open_dims:
+        verdict = "nothing-open"
+    elif not moving and not flat:
+        # Every open dimension has too little history to read. Not a ceiling.
+        verdict = "unclear"
+    elif not moving:
+        verdict = "at-ceiling"
+    elif flat and revert_rate is not None and revert_rate > 0.5:
+        verdict = "at-ceiling"
+    elif len(moving) == len(open_dims):
+        verdict = "improving"
+    else:
+        verdict = "mixed"
+    return lines, verdict, sorted({lane for lane, _ in open_dims} - retired)
+
+
+VERDICT_READS = {
+    "nothing-open": "every judged dimension has retired — an extension buys polish, not gap closure",
+    "improving": "every open dimension is still moving — an extension is likely to buy real gains",
+    "mixed": "some dimensions are still moving and some are flat — extend on the moving ones, or re-cut",
+    "unclear": "too few bar rounds on the open dimensions to read a trend — say so rather than selling the extension",
+    "at-ceiling": "no open dimension is still moving — recommend stopping or re-cutting, not extending",
+}
+
+
+def _projected_calls(waves, open_lanes):
+    lanes = max(1, len(open_lanes))
+    return waves * (lanes * CALLS_PER_LANE_ROUND + 1)
+
+
+def _print_extension_offer(rounds, cfg, per, retired, max_wave):
+    """Printed when the budget stop fires. The run stops either way; this is the
+    material the user needs to decide whether to fund more waves."""
+    budget = cfg["stops"]["budget_waves"]
+    cap = cfg["stops"].get("hard_cap_waves")
+    lines, verdict, open_lanes = _extension_evidence(rounds, cfg, per, retired)
+    print("\nBUDGET DEPLETED — stop cleanly, report, then OFFER AN EXTENSION.")
+    print("Do not extend on your own. Do not keep running while you ask.\n")
+    print("Evidence for the offer:")
+    for line in lines or ["  (no open dimensions logged)"]:
+        print(line)
+    print(f"\n  read: {VERDICT_READS[verdict]}")
+    if verdict == "nothing-open":
+        print("\n  Nothing is open. Raise the bar (announced) or stop — do not fund waves"
+              " against an artifact that has already retired every dimension.")
+        return
+    if cap is not None and budget >= cap:
+        print(f"\n  Hard cap of {cap} waves reached — no extension may be granted. Stop and report.")
+        return
+    if verdict == "at-ceiling":
+        print("\n  Offer the stop, not the waves: recommend re-cutting the lanes or ending the run."
+              " `extend` refuses this read without --force.")
+    else:
+        suggested = min(4, cap - budget) if cap is not None else 4
+        print(f"\nSuggested next wave block: {min(2, suggested)}–{suggested} waves"
+              f" (~{_projected_calls(min(2, suggested), open_lanes)}–{_projected_calls(suggested, open_lanes)}"
+              f" subagent calls over {len(open_lanes) or 1} open lane(s)).")
+    if cap is not None:
+        print(f"Hard cap: {cap} waves — {cap - budget} wave(s) of extension remain.")
+    print("If the user grants it:")
+    print("  python3 scripts/gauntlet.py extend --waves <N> --reason \"<evidence from the log>\"")
+    print(f"(current: wave {max_wave} of {budget})")
+
+
+def cmd_extend(args):
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    stops = cfg["stops"]
+    budget = stops["budget_waves"]
+    cap = stops.get("hard_cap_waves")
+
+    if args.waves <= 0:
+        die("--waves must be a positive number of additional waves")
+    reason = (args.reason or "").strip()
+    if len(reason) < 12:
+        die(
+            "--reason is required and must cite the log — an extension without evidence is "
+            "budget creep. Say what is still moving and what it will close."
+        )
+
+    max_wave = max((r["wave"] for r in rounds), default=0)
+    if not rounds and not args.force:
+        die("no rounds logged — raise --budget-waves at init instead of extending a run that has not started")
+    if max_wave < budget and not args.force:
+        die(
+            f"budget is not depleted (wave {max_wave} of {budget}) — extend when it runs out, "
+            "so the decision is made on evidence. Use --force to override."
+        )
+
+    new_budget = budget + args.waves
+    if cap is not None and new_budget > cap:
+        die(
+            f"extension would take the budget to {new_budget} waves, past the agreed hard cap of {cap}. "
+            f"Grant at most {max(0, cap - budget)} more wave(s), or ask the user to raise the cap."
+        )
+
+    first = initial_budget(cfg)
+    if args.waves > first:
+        print(
+            f"warning: a {args.waves}-wave extension is larger than the whole original budget "
+            f"({first}) — extend in small blocks so each one is decided on fresh evidence",
+            file=sys.stderr,
+        )
+
+    per, retired = _lane_dim_status(rounds, cfg) if rounds else ({}, set())
+    _, verdict, open_lanes = _extension_evidence(rounds, cfg, per, retired)
+    if verdict == "at-ceiling" and not args.force:
+        die(
+            "the log shows no open dimension still moving — extending here spends the user's money on "
+            "a ceiling. Re-cut the lanes or stop. Use --force if the user was shown this and chose to "
+            "continue anyway."
+        )
+
+    cfg["extensions"].append({
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "at_wave": max_wave,
+        "from_waves": budget,
+        "to_waves": new_budget,
+        "waves": args.waves,
+        "reason": reason,
+        "log_read": verdict,
+        "forced": bool(args.force),
+        # The one worth flagging in the report: the log said "ceiling" and the
+        # user funded more waves regardless.
+        "against_log_read": bool(args.force and verdict == "at-ceiling"),
+    })
+    stops["budget_waves"] = new_budget
+    save_config(root, cfg)
+
+    n = len(cfg["extensions"])
+    print(f"budget extended: {budget} → {new_budget} waves (+{args.waves}); extension {n} of this run")
+    print(f"  projected: ~{_projected_calls(args.waves, open_lanes)} subagent calls over "
+          f"{len(open_lanes) or 1} open lane(s)")
+    print(f"  log read at grant time: {verdict}")
+    if cap is not None:
+        print(f"  hard cap {cap} waves — {cap - new_budget} wave(s) of extension remain")
+    print("Record the extension in contract.md and on the workbench, then resume at the wave boundary.")
+
+
 def cmd_status(args):
     root = Path(args.root)
     cfg = load_config(root)
@@ -232,7 +474,13 @@ def cmd_status(args):
     max_wave = max(r["wave"] for r in rounds)
     budget = cfg["stops"]["budget_waves"]
 
-    print(f"wave {max_wave} of {budget} budgeted\n")
+    ext = cfg.get("extensions") or []
+    ext_note = (
+        f" (initial {initial_budget(cfg)}, extended {len(ext)}×: "
+        + ", ".join(f"+{e['waves']}" for e in ext) + ")"
+        if ext else ""
+    )
+    print(f"wave {max_wave} of {budget} budgeted{ext_note}\n")
     for (lane, dim), s in sorted(per.items()):
         flag = " RETIRED" if s["retired"] else ""
         print(f"[{lane} / {dim}]{flag}")
@@ -260,6 +508,9 @@ def cmd_status(args):
     else:
         print("no stop condition fired")
 
+    if max_wave >= budget:
+        _print_extension_offer(rounds, cfg, per, retired, max_wave)
+
 
 def cmd_report(args):
     root = Path(args.root)
@@ -270,6 +521,24 @@ def cmd_report(args):
     per, retired = _lane_dim_status(rounds, cfg)
     lines = ["# Gauntlet report (draft — lead agent completes the judgement fields)", ""]
     lines += [f"Waves run: {max(r['wave'] for r in rounds)} of {cfg['stops']['budget_waves']} budgeted", ""]
+    ext = cfg.get("extensions") or []
+    if ext:
+        lines += [
+            f"## Budget extensions ({len(ext)}; initial budget {initial_budget(cfg)} waves)",
+            "",
+        ]
+        for e in ext:
+            forced = " *(granted against the log read)*" if e.get("against_log_read") else ""
+            lines.append(
+                f"- at wave {e['at_wave']}: +{e['waves']} → {e['to_waves']} waves"
+                f" — {e['reason']} [log read: {e.get('log_read', 'n/a')}]{forced}"
+            )
+        lines += [
+            "",
+            "(lead agent: say whether each extension paid for itself — it is the cheapest"
+            " lesson in the report for the next run)",
+            "",
+        ]
     blind = sum(1 for r in rounds if r["mode"] == "blind")
     rubric = sum(1 for r in rounds if r["mode"] == "rubric")
     lines += [f"Verdict evidence: {blind} blind rounds, {rubric} rubric rounds (not equivalent evidence)", ""]
@@ -303,6 +572,8 @@ def main():
     p.add_argument("--bar-met-n", type=int)
     p.add_argument("--clean-streak-n", type=int)
     p.add_argument("--budget-waves", type=int)
+    p.add_argument("--hard-cap-waves", type=int,
+                   help="absolute ceiling extensions may not cross (optional; agreed at intake)")
     p.add_argument("--force", action="store_true")
     p.set_defaults(fn=cmd_init)
 
@@ -325,6 +596,13 @@ def main():
 
     p = sub.add_parser("status")
     p.set_defaults(fn=cmd_status)
+
+    p = sub.add_parser("extend", help="raise the wave budget after the user grants an extension")
+    p.add_argument("--waves", type=int, required=True, help="additional waves granted")
+    p.add_argument("--reason", required=True, help="the user's grant, justified from the log")
+    p.add_argument("--force", action="store_true",
+                   help="override the depleted-budget and at-ceiling guards (user chose anyway)")
+    p.set_defaults(fn=cmd_extend)
 
     p = sub.add_parser("report")
     p.set_defaults(fn=cmd_report)

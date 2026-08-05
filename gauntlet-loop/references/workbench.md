@@ -22,7 +22,9 @@ All visible text on the Kanban board (goals, gaps, next fixes) must be written i
 
 ## What it needs
 
-- Current wave, active lanes, elapsed time and budget consumed
+- Current wave, active lanes, elapsed time and budget consumed — including any
+  granted extensions (`wave 9 of 11: initial 8, extended +3`), so the user can
+  see at a glance what the run has cost against what they agreed to
 - Per lane: rounds run, current verdict, current named gap, clean-streak counter
 - **Evidence over time** — the artifact evolving, in whatever form it takes:
   screenshots, rendered pages, drafts, benchmark numbers, test output
@@ -98,6 +100,7 @@ fields. It must cover:
 - The gaps that closed
 - **The gaps still open** — the section the user actually needs
 - Blind versus rubric round counts
+- Any budget extensions, with the reason each was granted and whether it paid off
 - Whether the loop was still improving at the stop
 
 Keep the open-gaps section unsoftened. A report that reads as a victory lap is

@@ -105,6 +105,24 @@ include the structural element, or stop and report it as an open gap with a
 recommendation. Burning budget on a ceiling is the most common way a long run
 wastes money while looking busy.
 
+## Budget creep
+
+**Signal.** Extension after extension, each one "nearly there". The run is at
+wave 26 of an agreed 8, and no single grant looked unreasonable at the time.
+
+**Cause.** Extensions offered on optimism instead of on the log, or granted in
+blocks too large to be re-decided. Sunk cost does the rest — every extension makes
+the next one feel cheaper, on both sides of the conversation.
+
+**Repair.** Extend in blocks of 2–4 waves, never open-endedly, so each grant is
+decided on fresh evidence. Every grant carries a reason drawn from the log and is
+recorded in `config.json` and the report — `extend` enforces both, refuses a grant
+before the budget is actually depleted, and refuses an `at-ceiling` log read
+without `--force`. For long unattended runs, agree a `hard_cap_waves` at intake:
+the budget becomes the checkpoint, the cap the ceiling. And when the honest read
+is "flat", say so — recommending a stop is the whole point of being the one who
+can read the log.
+
 ## Inspection rot
 
 **Signal.** Critics stop citing specific evidence, or cite the same stale evidence
