@@ -343,6 +343,9 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | Rips on a dissipative beach / none on an intermediate one | Bar–rip template chosen by hand, beach state ignored | Pick the surf-zone template from `Ω = H_b/(w_s·T)` (`12`) |
 | `flowVelocity` is zero seaward of the waterline | Nearshore circulation never exported | Stamp longshore/rip/inlet currents into `flowVelocity` (`12`, `08`) |
 | River flows at one speed the whole length | Velocity not modulated by continuity/slope | `v = Q/(w·d)` (speed up in constrictions) × Manning slope term (`03`) |
+| Desert has the same drainage as a rainforest | Runoff = all rain; water balance ignored | Partition precip by runoff coefficient / aridity index; arid = ephemeral losing streams (`03`, `13`) |
+| Channels drawn up onto smooth hillslopes | No channel-initiation threshold | Start channels where area×slope crosses the channel-head value (`03`); hillslope above it (`05`) |
+| Big river vanishes crossing a dry region | Discharge read off local area, not routed `Q` | Route `Q` (sourced upstream) so a river carries its far-catchment water across a desert (`03`) |
 | Lake rendered with ocean swell, or a current | Water-body type never detected/exported | Tag `bodyType` (lake=wind-waves-only via fetch, no flow); export it in `liquidBody` (`03`, `28`) |
 | Mountain tarn has rolling swell | No fetch limit; deep-water waves on a small body | Wind waves grow with fetch (`e~√fetch`); a small pond has almost none (`03`, `12`) |
 | River runs at channel speed into the sea/lake | No backwater; base-level deceleration missing | Fade velocity to near-zero as the surface slope flattens at base level (`03`) |

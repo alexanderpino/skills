@@ -684,6 +684,39 @@ power becomes `∂h/∂t = U − K·Q^m·S^n`, and wetness (`06`) and river widt
 not `A`. This is the one change that lets a big river cross a dry region without pretending the
 desert it flows through fed it — the Nile and the Colorado are exactly this.
 
+**Not all rain becomes flow — the water balance.** `localRain · cellArea` is the *precipitation*, not
+the runoff. Over a catchment, precipitation splits three ways: **runoff** (what reaches the channel),
+**evapotranspiration** (returned to the air), and **infiltration** (into the ground). Only the first
+seeds `Q` directly:
+
+```
+runoff = C · localRain            # C = runoff coefficient in [0,1]
+# C is high (→1) for wet, steep, impermeable, bare, or frozen ground;
+#   low (→0) for arid, flat, permeable, vegetated, or deep-soil ground
+```
+
+The long-term split is set by the **aridity index** `PET/P` (Budyko 1974): where potential
+evaporation exceeds precipitation, most rain evaporates and `C` is small — arid basins run
+**ephemeral, losing** streams that shrink downstream (the opposite of a humid river). This is *the*
+reason a desert's drainage looks nothing like a rainforest's at the same relief, and why you cannot
+read discharge off drainage area alone. **Infiltration is not lost water:** it becomes the baseflow
+and springs that re-emerge downstream (the spring source, below) — so a permeable catchment moves
+water from fast surface runoff to slow, sustained, spatially-shifted discharge. Couple `C` to the
+climate (`13`) and lithology/soil (`11`, `18`); a single global `C` is fine for one climate and
+wrong for a world that spans several.
+
+**Where the channel network begins — channel initiation.** A source is not only *how much* water
+but *where a channel first exists*. Above a threshold of contributing area × slope the flow
+concentrates enough to cut and hold a channel; below it the ground is unchannelled **hillslope**,
+shaped by diffusion (`05`), not routing. That threshold — a **channel head** (Montgomery & Dietrich
+1992) — is the upstream tip of every stream, and the density of heads sets the **drainage density**:
+wet, soft, steep, sparsely-vegetated terrain divides into a fine dense network with channel heads
+high on the slopes; arid, hard, or well-vegetated terrain carries a sparse coarse one. So the
+generator determines the network's *sources* by where `A·Sᵏ` (or a `Q` threshold) crosses the
+channel-initiation value — do not draw channels up onto ground the hydrology leaves as hillslope,
+and do not run routing's single-cell threads across what should read as smooth colluvial hollow
+(`06` convergence).
+
 **Kinds of source, and where each comes from:**
 
 | Source | How to place it | Notes |

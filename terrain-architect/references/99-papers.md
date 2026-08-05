@@ -250,6 +250,15 @@ These errors circulate widely in terrain-generation reference tables. Do not pro
 - **Froude regime / hydraulic jump** — standard open-channel hydraulics: `Fr = v/√(g·d)`, `Fr<1`
   subcritical (tranquil), `Fr>1` supercritical (rapid), jump at the transition. No single
   canonical citation; the generation-side *cause* of whitewater the engine renders (`03`, `12`).
+- **Budyko, M.I. (1974).** *Climate and Life.* Academic Press. — The supply–demand water balance:
+  long-term partitioning of precipitation into runoff vs evapotranspiration, controlled by the
+  aridity index `PET/P`. The basis for "not all rain becomes flow" and for arid-vs-humid discharge
+  (`03` water sources; `13` climate).
+- **Montgomery, D.R. & Dietrich, W.E. (1992).** *Channel initiation and the problem of landscape
+  scale.* Science 255(5046), 826–830. — The channel-head threshold (contributing area × slope):
+  where hillslope becomes channel, and what sets drainage density. Determines the upstream sources
+  of the channel network (`03`). Same authors as the SHALSTAB landslide model (`05`); earlier form
+  Montgomery & Dietrich 1988, Nature 336, 232–234.
 
 ## Analysis
 
