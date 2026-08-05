@@ -62,7 +62,8 @@ Settle these before anything else:
 - **Writes are confined** to the project workspace and the `gauntlet/` state
   directory. Builders write only files they own this wave (`references/decomposition.md`). **Mission Control Integration:** If running under Mission Control, the Gauntlet Loop MUST initialize inside the assigned private worktree (`mc/<id>`), never at the repository root. All lanes cut must strictly respect the Implementer's Mission Control semantic leases.
 - **The budget stop is always armed.** An unattended loop without a ceiling is not
-  safe to agree to, so never offer one.
+  safe to agree to, so never offer one. When the budget depletes the run *stops* —
+  then you may **offer an extension in waves**. You may never take one.
 - **Subagents are what make critics honest.** Each critic needs its own clean
   context. Without subagents the method degrades — see "Degraded mode" below.
 
@@ -90,6 +91,7 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --mode blind --winner other --margin clear --score 7 --severity major --gap "..." \
     --evidence shots/w2r3.png
 python3 scripts/gauntlet.py status    # streaks, revert rate, fired stop conditions
+python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only after the user grants it
 python3 scripts/gauntlet.py report    # draft the end-of-run report from the log
 ```
 
@@ -111,7 +113,7 @@ user, because they encode how much time and money the run may spend.
 | **Bar** | The concrete external comparator, per dimension. |
 | **Inspection** | How a critic will actually reach the output each round. |
 | **Stop** | Which conditions are armed, with thresholds → `config.json`. |
-| **Budget** | Hard ceiling on waves / wall clock / tokens. Always armed. |
+| **Budget** | Ceiling on waves / wall clock / tokens. Always armed. Say that it is a checkpoint: when it runs out the run stops and you come back with an extension offer. Optionally agree a **hard cap** no extension may cross. |
 | **Autonomy** | Unattended until a stop fires, or check in at wave boundaries. |
 | **Workbench** | Where progress is visible without interrupting the run. |
 
@@ -212,6 +214,50 @@ promote the best champion — not necessarily the latest challenger — then run
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.
 
+## Phase 5b — when the budget depletes, offer an extension
+
+A budget stop means the money ran out, not that the artifact is done. Those are
+different facts and the user is owed both. So: stop the run, report, and then put
+one extension offer in front of them — **a next block of waves**, priced.
+
+`gauntlet.py status` prints the offer material as soon as the budget fires: the
+open dimensions, whether each is still moving (score trend, severity easing,
+margin narrowing), the recent revert rate, and its read of the log. Present that,
+not a vibe:
+
+```
+Budget depleted at wave 8. Stopped, smoothed, report written.
+  imagery/visual   still moving — score 5→7, severity major→minor; open gap: <gap>
+  imagery/perf     flat for 3 rounds; revert rate 60%
+Extension of 3 waves ≈ 30 subagent calls. My read: worth it for visual, not perf.
+Extend 3 waves on imagery/visual only, re-cut, or stop here?
+```
+
+Rules for the offer:
+
+- **The user grants it. You never self-extend**, and you never keep the loop
+  running while you ask. A budget that extends itself is not a budget.
+- **Offer a block, not an open tap.** Two to four waves, sized so the next
+  decision is made on fresh evidence. If it looks like it needs another twelve,
+  that is a re-cut or a new run, not an extension.
+- **Price it in the same units as intake** — waves and projected subagent calls
+  for the lanes still open, not the retired ones.
+- **Lead with the honest read.** Say "still improving", "flat", or "too few
+  rounds to tell" and back it from the log. Selling an extension you do not
+  believe in is the most expensive thing you can do in this skill.
+- **Recommend stopping when the evidence says stop.** At a ceiling, with every
+  dimension retired, with a broken inspection path, or on downhill drift, the
+  correct offer is "stop" or "re-cut" — `extend` refuses that log read without
+  `--force`, and a bar the artifact has passed calls for raising the bar instead.
+- **Record it.** `gauntlet.py extend --waves N --reason "<evidence>"` writes the
+  grant into `config.json` and the report; then note it in `contract.md` and on
+  the workbench. Extensions are run history, and an unrecorded one is how a
+  4-wave run quietly becomes a 30-wave one.
+
+If the user pre-agreed a hard cap at intake, it is the real ceiling — extensions
+stop there and the script refuses to cross it. Full protocol:
+`references/stop-conditions.md`.
+
 ## Non-negotiables
 
 - **No builder grades its own homework.** Separate agent, fresh context, always.
@@ -226,6 +272,8 @@ worth less than one that says exactly where the artifact is still weak.
   wandering downhill one plausible-sounding round at a time.
 - **Every comparison goes through the log.** State the model remembers is state
   the run will lose.
+- **The budget is extended by the user or not at all.** Stop first, offer second,
+  resume only on a grant — and log the grant with its reason.
 - **Language Rules (ASD-STE100).** All visible text on the Kanban board (goals, gaps, next fixes) and reports must use Simplified Technical English: max 20-25 words per sentence, active voice, one instruction per sentence, no AI marketing language.
 
 ## Failure modes
@@ -242,6 +290,7 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Downhill drift | Late output worse than mid-run | Champion commits; revert losers; per-dimension bars |
 | Context bleed | Critic echoes builder's justifications | Critic gets artifact + bar only |
 | Ceiling denial | Same gap recurs; reverts climb | Re-cut or stop; `status` surfaces the signal |
+| Budget creep | Extensions granted repeatedly, each "nearly there" | Block-sized extensions, evidence per grant, hard cap |
 | Inspection rot | Stale or missing evidence | Re-verify the path at every wave boundary |
 
 ## Degraded mode (no subagents)
@@ -261,6 +310,10 @@ adds one call per wave. A 3-lane, 10-wave run is therefore roughly 100 subagent
 invocations. Parallel lanes raise the burn *rate*, not the total. When the
 projected total looks disproportionate to the artifact, say so before starting.
 
+Price an extension the same way, over the lanes still open — a 3-wave extension
+on one surviving lane is ~12 calls, not another hundred. That arithmetic is what
+makes "3 more waves?" a question the user can actually answer.
+
 ## Worked example
 
 `references/example-run.md` walks one compact run end to end — contract, round
@@ -275,7 +328,7 @@ Read at the relevant phase, not upfront:
 - `references/bar-selection.md` — bar taxonomies; dimensions; finding a bar
 - `references/decomposition.md` — lane sizing, ownership, parallel vs serial
 - `references/blind-protocol.md` — honest blind comparison; champion mode; rubric fallback
-- `references/stop-conditions.md` — the four conditions and their mechanics
+- `references/stop-conditions.md` — the four conditions, their mechanics, and the budget-extension protocol
 - `references/state-and-resume.md` — directory layout, git conventions, resuming a run
 - `references/workbench.md` — live progress surface; log schema
 - `references/failure-modes.md` — full diagnosis and repair

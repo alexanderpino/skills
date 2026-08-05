@@ -113,6 +113,40 @@ STOP CONDITIONS FIRED / SIGNALLED:
   - judgment signal: revert rate over 50% in recent rounds — likely at the ceiling
 ```
 
+## Variant: the same run stopping on budget
+
+Had `imagery` still been closing gaps at wave 8, the budget would have fired
+first. Then the run stops, smooths, reports — and comes back with an offer rather
+than a farewell. `status` at the boundary:
+
+```
+wave 8 of 8 budgeted
+
+BUDGET DEPLETED — stop cleanly, report, then OFFER AN EXTENSION.
+
+Evidence for the offer:
+  [imagery / visual] still moving (score 5→7, severity easing) — open gap: grain
+                     texture reads as compression, not intent
+  recent revert rate: 17%
+
+  read: every open dimension is still moving — an extension is likely to buy real gains
+
+Suggested next wave block: 2–4 waves (~8–16 subagent calls over 1 open lane(s)).
+```
+
+Put to the user in four lines — what stopped, what is open, whether it is still
+moving, what more costs — and answered with "yes, three":
+
+```bash
+python3 scripts/gauntlet.py extend --waves 3 \
+    --reason "imagery/visual score 5→7, severity major→minor, 1 revert in 6; grain gap still closeable"
+```
+
+Waves 9–11 then run on `imagery` alone; the report shows `initial 8, extended 1×:
++3` and says whether those three waves earned their keep. Had the read come back
+`at-ceiling` instead, the offer would have been "stop, or re-cut `imagery` around
+the source assets" — and `extend` would have refused the grant without `--force`.
+
 ## The report (abridged)
 
 - Bar: three reference heroes (visual) + LCP/CLS budgets (perf); never moved
