@@ -15,6 +15,7 @@ no packaging or build step.
 | [`book-writer`](book-writer/) | Book Writing | Write full-length fiction and non-fiction books through a reusable author persona, with the full apparatus of a real book (figures, citations, footnotes, TOC, index) and a research/fact-check workflow. |
 | [`principal-architect`](principal-architect/) | Architecture & business analysis | Master enterprise/solution/software architecture skill: consult and maintain living architecture docs (PRD/HLD/SD/SAD/AD, ADRs, user stories) as a gate around planning and code changes. Conforms to ISO/IEC/IEEE 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42, with STRIDE/OWASP threat models, FinOps estimates, and Architecture-as-Code CI. |
 | [`mission-control`](mission-control/) | Agent orchestration | Command-and-control orchestrator for autonomous multi-agent development pipelines. Runs a continuous plan→build loop: an Architect decomposes goals into a prioritized backlog, Scouts research, then Implementers execute against a file-ownership ledger, gated by mechanical verifiers and code review. |
+| [`gauntlet-loop`](gauntlet-loop/) | Quality iteration | Run an adversarial build-and-judge loop that pushes an inspectable artifact past "good enough" toward a reference-class bar: split the goal into independently judgeable lanes, give each a builder and a *separate* blind critic in fresh context, guard every round with a champion/challenger revert, and iterate until an armed stop condition fires. Ships an intake contract, per-dimension bars, named failure modes, and stdlib-only state tooling. Method credited to Matt Shumer. |
 | [`reasoning-matrix`](reasoning-matrix/) | Reasoning & ideation | Generate genuinely non-obvious insights on hard, open-ended questions by crossing a problem's building blocks against a curated set of reasoning lenses, then filtering the results for novelty *and* validity so what survives is both new and true. For lateral thinking, hypothesis generation, and getting past the obvious answer. |
 | [`terrain-renderer`](terrain-renderer/) | Terrain rendering | Principal terrain-rendering authority to 2026 AAA production standards — every major paradigm end to end: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (the Nanite family), UE Landscape/Nanite Landscape, blocky chunked voxel worlds (greedy/binary meshing, voxel AO), smooth voxel isosurfaces (marching cubes, Transvoxel, dual contouring), tiled streaming, terrain materials & virtual texturing, GPU-driven culling, planetary rendering & float-precision doctrine, terrain lighting/shadows, plus the full dynamic surface — water (Gerstner/FFT, flow-mapped rivers, fullscreen-triangle pass), snow/wetness/weather state & deformation, auxiliary-map consumption, vegetation/grass & scatter, roads/decals/runtime modification, physics handoff, tool-viewport previews — and the artifact catalogue (cracks, popping, swimming, shimmer). Consumes `terrain-architect`'s generated fields; routes BRDF math to `physically-based-rendering`. |
 | [`terrain-architect`](terrain-architect/) | Terrain generation | Principal-level terrain generation expertise — the algorithms with verified citations (noise/FBM, tectonic uplift, hydraulic/thermal/glacial/coastal/marine/aeolian erosion, mass wasting, rivers incl. meanders & waterfalls, lakes, karst, desert, periglacial, volcanoes, impact craters, climate & multi-biome worlds, ecosystems, scatter, surface materials, splatmap/albedo/normal/AO synthesis & compositing) and the substrate for building terrain tools (Gaea/World Machine-class, or realtime): typed fields, graph runtimes, caching, preview pyramids, GPU patterns. Also diagnoses wrong terrain (seams, terracing, stalled rivers). |
@@ -34,6 +35,7 @@ npx skills add github:alexanderpino/skills/physically-based-rendering
 npx skills add github:alexanderpino/skills/book-writer
 npx skills add github:alexanderpino/skills/principal-architect
 npx skills add github:alexanderpino/skills/mission-control
+npx skills add github:alexanderpino/skills/gauntlet-loop
 npx skills add github:alexanderpino/skills/reasoning-matrix
 npx skills add github:alexanderpino/skills/terrain-architect
 npx skills add github:alexanderpino/skills/terrain-renderer
@@ -85,6 +87,11 @@ skills/
 │   ├── SKILL.md                       # router + core mental model
 │   ├── references/                    # load-on-demand deep dives
 │   └── scripts/                       # pipeline state machine CLI
+├── gauntlet-loop/                    # unpacked, reviewable skill
+│   ├── SKILL.md                       # router + the loop's phases
+│   ├── references/                    # load-on-demand deep dives (intake, bars, blind protocol, stops…)
+│   ├── agents/                        # subagent briefs (builder, critic, smoother)
+│   └── scripts/                       # deterministic run-state CLI (init/log-round/status/report)
 ├── terrain-architect/                # unpacked, reviewable skill
 │   ├── SKILL.md                       # router + core mental model
 │   └── references/                    # load-on-demand deep dives (noise, erosion, flow, graph runtime, GPU…)
