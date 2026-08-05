@@ -884,3 +884,48 @@ removes the ~9.8 m colour quantisation.
 **Not yet verified:** whether the colour attribute is additionally built on the square index grid,
 which would explain the "square on hex" part independently of the interpolation. Check before
 fixing — the two causes need different work and the screenshot is consistent with either.
+
+## S4.8 — AAA deferred optics: two failed attempts, and what each one taught
+
+Not implemented. Reverted twice. Recording both diagnoses because the second attempt was much
+closer than the first and the next one should not start from scratch.
+
+**Attempt 1 — the maths was right, the roughness was not.** GGX with derivative-variance roughness,
+verified against a double-precision CPU oracle at fixed vectors (`worst = 0.480`, 4/4 mutations
+armed, F0 derived from n = 1.333 rather than quoted). It blew the sea to white and was reverted.
+
+Diagnosed afterwards, and this is the useful part. The roughness floor was carried over from the old
+Blinn exponent: minimum slope variance 0.00417, i.e. roughness 0.065. At that roughness the GGX peak
+is **17832**, or **363 after Fresnel**. Clamping the result does not help — a GGX lobe that tall is
+also wide, so clamping spreads a large white area instead of a highlight.
+
+    roughness   peak D    peak D*F0
+    0.065        17832        363.3     <- attempt 1
+    0.150          629         12.8
+    0.233          114          2.3     <- Cox-Munk at 10 m/s
+    0.300           39          0.8
+
+**The floor should be a measurement of the sea, not a leftover of the previous lobe.** Cox & Munk
+1954: `sigma^2 = 0.003 + 5.12e-3 * U` for wind speed U at mast height. At 10 m/s that is 0.0542,
+roughness 0.233, peak 2.3 after Fresnel — a highlight. The Nyquist-removed variance should still ADD
+to that floor, so sub-pixel waves widen the lobe with distance and the horizon stops aliasing.
+
+**Attempt 2 — the floor was right, the plumbing was wrong.** Implemented exactly that, and the water
+stopped rendering entirely: `blue = 0.0`, zero water pixels. Two GLSL compile errors:
+
+    ERROR: 0:42: 'uCam' : undeclared identifier
+    ERROR: 0:4: 'uTerrainHeight' : redefinition
+
+The `uSlopeVar` declaration was appended to a uniform string that is not unique to the compositor,
+so it landed in a shader that already had those names and broke two programs at once. Reverted.
+
+**For the next attempt:** the shading maths and the Cox-Munk floor are both settled — reuse them.
+The work is entirely in the plumbing: add `uSlopeVar` to the compositor's OWN uniform block by an
+anchor unique to that shader, verify with the page-error probe BEFORE running the oracles, and only
+then re-add `_verify_water_aaa.js` (deleted on the first revert; its GGX block extraction, CPU
+oracle and four mutations were sound and are in the git history at the first attempt's commit).
+
+Note that the three oracles which caught both failures — banding, default document, style — caught
+them via `the water is liquid, not ice` and `water pixels were found to measure`. Neither is a
+specular assertion. They caught a shading catastrophe because they assert the water is *there* and
+*blue*, which is worth remembering when writing cheap guards.
