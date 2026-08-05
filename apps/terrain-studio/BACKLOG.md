@@ -852,3 +852,35 @@ had been testing the library the whole time.
 - **Weathering defaults** — `dirt` at 0.01 is effectively off. Change (and re-bless the digest), or
   is that deliberate art direction?
 - **Does the skill still ship a single-file build?** Phase F of the architecture plan assumes yes.
+
+## W27 — satmap diagonal streaks follow the mesh triangulation
+
+**Reported from a screenshot**, not yet fixed, at the user's request. Recorded now so the diagnosis
+is not lost.
+
+Symptom: long diagonal light/dark streaks across terrain under every satmap gradient. The reporter's
+two observations are the diagnostic pair — *"it feels as if it's on the edges of a grid cell"* and
+*"it's also square on the hex map"*.
+
+**Square on hex rules out the lattice.** Whatever produces it assumes a square grid regardless of
+`terrainDef.lattice`, so it is not the hex row pitch, the odd-row stagger, or the D6 one-ring.
+
+Measured cause, as far as reading goes: terrain colour is a **per-vertex attribute**. `col` is
+declared `in vec3 col` on the terrain vertex shader (`legacy.js:5753`), passed straight through as
+`vCol` (`:5755`), and read in the fragment shader (`:5786`). So the satmap is evaluated once per
+vertex and then LINEARLY INTERPOLATED across each triangle. On a 5 km world at 512 samples that is
+one colour sample per ~9.8 m, interpolated over triangles whose diagonal runs one way — which is
+exactly the shape of the streaks.
+
+The satmap itself is a 1-D gradient LUT sampled at `vec2(sc, 0.5)`, so this is not a UV problem: it
+is interpolating the *result* of a lookup instead of interpolating the *parameter* and looking up
+per pixel. Any non-linearity in the gradient — and a satmap gradient is mostly non-linearity — then
+shows the triangulation.
+
+**Fix direction:** carry the scalar that drives the gradient as the varying and do the LUT lookup in
+the fragment shader, so the interpolation happens in parameter space where it is linear. That also
+removes the ~9.8 m colour quantisation.
+
+**Not yet verified:** whether the colour attribute is additionally built on the square index grid,
+which would explain the "square on hex" part independently of the interpolation. Check before
+fixing — the two causes need different work and the screenshot is consistent with either.
