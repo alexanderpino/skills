@@ -5700,7 +5700,7 @@ let _wavePreset=null,_wavePresetKey="";
 // WHAT EACH WATER PROGRAM ACTUALLY RECEIVED. ADR-006 requires the forward colour pass and the
 // deferred mask/depth pass to displace by the SAME function; recording the injected text makes
 // that checkable instead of a claim, which is the "shader instrumentation" the story asks for.
-export const waterShaderSources={mask:null,forward:null,forwardDetail:null,deferredDetail:null,forwardShoal:null,maskShoal:null};
+export const waterShaderSources={mask:null,forward:null,forwardDetail:null,deferredDetail:null,forwardShoal:null,maskShoal:null,deferredShoal:null};
 const SKY_GLSL=`
       vec3 skyCol(vec3 d){d=normalize(d);float h=d.y;
         vec3 zen=vec3(0.10,0.24,0.55),hor=vec3(0.62,0.70,0.80);
@@ -6116,7 +6116,8 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
       uniform mat4 uInvMVP;uniform vec3 uCam,uSun;uniform int uStyle;uniform float uMppK;uniform float uScale;
       uniform float uH,uTime,uSeaLevel,uHasSea,uWScale,uWpx,uRES,uExposure,uHaze,uRowScale,uROWS,uHpx,uZScale;
       uniform float uTerrainHeight,uSeaTemp,uLapseRate,uSnowfall,uSnowMeltDays,uSnowMeltRate,uHasSnow;
-      uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;uniform float uToon;uniform float uBandSteps;
+      uniform float uRipple,uRippleScale,uRippleSpeed,uRefraction,uShoreSmooth,uFoam;uniform int uPattern;uniform vec2 uPx;uniform float uToon;uniform float uBandSteps;uniform float uWaveAmp;uniform float uShoalRefM;
+${(waterShaderSources.deferredShoal=shoalGlsl()).split(/\r?\n/).map(l => '      ' + l).join(String.fromCharCode(10))}
       const float PI=3.14159265;
       const vec3 SUNCOL=vec3(1.0,0.92,0.78);                         // warm daylight, scene-linear
       vec3 linearToSrgb(vec3 c){c=max(c,vec3(0.0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
@@ -6341,6 +6342,22 @@ ${(waterShaderSources.mask=waveGlsl('gerstnerDisp')).split(/\r?\n/).map(l => '  
         spec=mix(spec,smoothstep(0.005,0.011,spec)*surfaceSh,uToon);
         float edgeW=max(shoreAA*5.0,.0015);
         float foam=(1.0-smoothstep(shoreAA,edgeW,max(shoreDepth,0.0)))*uFoam*waterCov*(1.0-ice);
+        // SURF, in the pass that actually ships. vBreak and vCrest are computed in BOTH vertex
+        // shaders and consumed only by the FORWARD fragment shader, so the deferred compositor --
+        // the path WebGL2 always takes -- rendered a flat shore. Same defect as the wave normal:
+        // computed per vertex, packed, and never read.
+        //
+        // Recomputed here from depth rather than carried in the G-buffer, because all four
+        // channels of gWaterMask are already spoken for (mask, depth, normal x, normal z) and the
+        // compositor has the water column anyway. Same generated law, so surf cannot disagree
+        // with the amplitude clamp it derives from.
+        float depthMc=max(shoreDepth*uTerrainHeight,0.0);
+        float breakingC=smoothstep(0.55,0.98,shoalAmpBreak(uWaveAmp,depthMc,uShoalRefM));
+        float crestC=smoothstep(0.05,0.55,wd.z);
+        float raggedC=mix(0.55,1.0,wd.w);
+        float surfC=breakingC*crestC*raggedC*waterCov*(1.0-ice)*uFoam*3.2;
+        surfC+=breakingC*smoothstep(0.35,1.0,shoalAmpBreak(uWaveAmp,depthMc,uShoalRefM))*0.35*raggedC*waterCov*(1.0-ice)*uFoam;
+        foam=clamp(foam+surfC,0.0,1.0);
         foam=mix(foam,smoothstep(0.35,0.5,foam),uToon);
         vec3 col=mix(wc,refl,fres)+spec*SUNCOL; col=mix(col,vec3(.78,.86,.92),foam);
         // HUE-PRESERVING POSTERISE. Quantising the depth ramp alone did not read as cartoon and the
@@ -7277,6 +7294,7 @@ function renderGL(){
     gl.uniform1f(u(compProg,"uH"),H_SCALE);gl.uniform1f(u(compProg,"uTime"),uTime);
     gl.uniform1f(u(compProg,"uRipple"),waterRipple);gl.uniform1f(u(compProg,"uRippleScale"),waterRippleScale);gl.uniform1f(u(compProg,"uRippleSpeed"),waterRippleSpeed);
     gl.uniform1f(u(compProg,"uRefraction"),waterRefraction);
+    gl.uniform1f(u(compProg,"uWaveAmp"),scene.water?waveAmpMetres():0);gl.uniform1f(u(compProg,"uShoalRefM"),shoalReferenceM());
     gl.uniform1f(u(compProg,"uToon"),waterLook.style==="toon"?1:0);gl.uniform1f(u(compProg,"uBandSteps"),Math.max(2,waterLook.bandSteps||5));
     gl.uniform1f(u(compProg,"uShoreSmooth"),waterShoreSmooth);gl.uniform1f(u(compProg,"uFoam"),waterFoam);gl.uniform1i(u(compProg,"uPattern"),waterPattern);
     gl.uniform1f(u(compProg,"uTerrainHeight"),terrainDef.height);gl.uniform1f(u(compProg,"uSeaTemp"),terrainDef.seaTemp);gl.uniform1f(u(compProg,"uLapseRate"),terrainDef.lapseRate);
