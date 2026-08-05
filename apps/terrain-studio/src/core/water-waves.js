@@ -34,14 +34,28 @@ export const BODY_KINDS = Object.freeze(['ocean', 'lake', 'river'])
 // capillary/chop. A lake has no ocean swell and a river has neither — the ranges, not the term
 // count, are what makes a body kind mean something.
 const BANDS = Object.freeze({
-  ocean: [[62, 190], [11, 44], [1.6, 7.5]],
+  // OCEAN SWELL RUNS TO 400 m, not 190. The narrow band was the measured cause of a visible
+  // recurrence: 62-190 m gives periods 6.30-11.03 s, a 1.751:1 window, and with only four terms
+  // displacing (the rest are below the mesh limit) several return near a full cycle together. A
+  // close-camera probe showed the frame diverging steadily to 4 s and then dropping BACK at 8 s.
+  // 62-400 m spans 6.30-16.01 s, 2.540:1, so no small set of terms comes round together.
+  //
+  // 400 m is not arbitrary: a fully developed sea at 15 m/s has a peak wavelength near 350 m, and
+  // long swell from a distant storm runs longer still. The old 190 m ceiling described a short fetch.
+  ocean: [[62, 400], [11, 44], [1.6, 7.5]],
   lake: [[18, 52], [4.5, 15], [0.7, 3.2]],
   river: [[6, 17], [1.8, 5.2], [0.35, 1.4]],
 })
 
 // Directional spread per band, in radians either side of the wind. Swell is nearly unidirectional;
 // chop is not. A single spread for all three would make every band look like the same wave.
-const SPREAD = [0.22, 0.55, 1.05]
+//
+// SWELL WIDENED 0.22 -> 0.42. At +/-12.6 degrees the four displacing terms sat inside a 19.5-degree
+// cone and the sea read as corduroy: parallel ridges rather than interfering crests. Unreal's water
+// ships DirectionAngularSpreadDeg = 1325 over sixteen waves, effectively uniform. +/-24 degrees is
+// still recognisably swell -- real swell IS directional -- while giving the four terms enough
+// angular separation to interfere instead of stacking.
+const SPREAD = [0.42, 0.62, 1.05]
 
 // Relative amplitude weight per band before normalisation to the authored maximum.
 const BAND_WEIGHT = [1.0, 0.45, 0.16]
