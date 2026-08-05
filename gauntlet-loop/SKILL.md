@@ -60,7 +60,7 @@ Settle these before anything else:
   so the run's first champion is a known state and a full abort is one command.
   If the project has no VCS, `git init` it (with the user's consent) before wave 1.
 - **Writes are confined** to the project workspace and the `gauntlet/` state
-  directory. Builders write only files they own this wave (`references/decomposition.md`).
+  directory. Builders write only files they own this wave (`references/decomposition.md`). **Mission Control Integration:** If running under Mission Control, the Gauntlet Loop MUST initialize inside the assigned private worktree (`mc/<id>`), never at the repository root. All lanes cut must strictly respect the Implementer's Mission Control semantic leases.
 - **The budget stop is always armed.** An unattended loop without a ceiling is not
   safe to agree to, so never offer one.
 - **Subagents are what make critics honest.** Each critic needs its own clean

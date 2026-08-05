@@ -72,7 +72,7 @@ touch-list path has no explicit target, it becomes a conservative file lease.
 
 Acceptance criteria are executable commands or objective diffs. Include tests
 for semantic boundary conditions: new/deleted/renamed nodes, imports, and
-fallback behavior when relevant.
+fallback behavior when relevant. If the item is a quality-ceiling task (e.g., visual matching, optimization), explicitly define the **Reference Bar** and **Inspection Path** to be used by a Gauntlet Loop.
 
 In maximize mode, `splittable: true` may propose a small skeleton and disjoint
 parts. Still document the whole original item; the Architect decides.
@@ -123,6 +123,7 @@ defines scope and done.
 - Treat native execution as degraded. Preserve the warning/evidence.
 - Record criterion results, per-target changes, senior judgment calls, and
   out-of-scope suggestions.
+- **Gauntlet Loop Execution:** If the item demands a strict quality/performance bar, spawn a Gauntlet Loop. You MUST initialize `gauntlet/` inside your `mc/<id>` worktree. You MUST ensure Gauntlet lanes never violate your semantic leases. The final Gauntlet champion is your handoff commit.
 
 Senior implementers may bridge a small research gap and document the decision.
 Juniors stop after the same failure twice or genuine uncertainty. A clean

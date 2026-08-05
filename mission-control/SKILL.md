@@ -129,7 +129,9 @@ Record:
 
 ## Phase 1: architecture gate
 
-Spawn the Architect using `references/roles.md`. It produces prioritized,
+**Strategic Design (Principal Architect):** If the `principal-architect` skill is installed, the Orchestrator MUST invoke it first. The Principal Architect generates the PRD, High-Level Design (HLD), C4 diagrams, and defines the system boundaries. 
+
+Once the design is settled, spawn the Mission Control Architect using `references/roles.md`. It translates the Principal Architect's design into prioritized,
 constraint-carrying backlog items. If throughput is maximized, front-load
 interfaces/scaffolding that unlock siblings and keep sibling predicted semantic
 targets disjoint. Never manufacture filler.
@@ -195,6 +197,8 @@ python scripts/pipeline.py --root .mission-control transition MC-7 building
 
 Implementers edit and commit only in their worktree. Build/test commands run
 through the sandbox lifecycle:
+
+**Quality-Ceiling Tasks (Gauntlet Loop):** If the backlog item requires hitting a strict quality, performance, or visual bar, the Implementer should run a **Gauntlet Loop** to optimize the artifact. The Gauntlet Loop MUST be initialized and executed entirely *inside* the `mc/<id>` worktree. Its champion/challenger iterations remain private to the worktree, and the Gauntlet's final champion commit becomes the Implementer's handoff.
 
 ```bash
 python scripts/pipeline.py --root .mission-control sandbox prepare MC-7
