@@ -51,7 +51,28 @@ def declared_mutations(oracle):
     # check. The runner did report "no MUTATIONS allowlist declared" rather than passing them, so
     # nothing went green that should not have — but 37 declared controls were never executed by
     # the tool whose whole job is to execute them.
-    m = re.search(r"const MUTATIONS\s*=\s*\[(.*?)\]", src, re.S)
+    # BRACKET-BALANCED, not non-greedy. `(.*?)\]` stops at the FIRST closing bracket, so a single
+    # "]" inside an explanatory comment truncates the allowlist -- measured on _verify_water_sources:
+    # 61 declared mutations, 41 discovered, and the runner still printed ALL GATES GREEN. Twenty
+    # armed controls silently never ran, which is this project's standing failure mode arriving one
+    # level up: not a vacuous gate, but a vacuous GATE RUNNER.
+    start = re.search(r"const MUTATIONS\s*=\s*\[", src)
+    m = None
+    if start:
+        i = start.end() - 1
+        depth = 0
+        for j in range(i, len(src)):
+            c = src[j]
+            if c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    class _M:
+                        def __init__(self, g): self._g = g
+                        def group(self, n): return self._g
+                    m = _M(src[i + 1:j])
+                    break
     if not m:
         return []
     # Strip the trailing // comment on each entry BEFORE extracting the quoted name. Every mutation
