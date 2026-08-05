@@ -144,6 +144,15 @@ right fix.
 | Procedural AABB + intersection shader for RT heightfields | `18` | DXR procedural-geometry sample; Vulkan RT procedural primitive model | D/F | [Microsoft sample](https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry) |
 | Opacity micromaps (alpha-tested RT geometry; not displacement) | `15` `18` | DXR opacity-micromap support and `VK_EXT_opacity_micromap` | D | [DirectX-Specs](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html) |
 | Displacement micromaps (terrain trajectory; capability-sensitive) | `18` | `VK_NV_displacement_micromap`; platform support remains non-universal | D/? | [Khronos registry](https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chapters/VK_NV_displacement_micromap.html) |
+| Stable semi-Lagrangian grid fluid | `19` | Stam, "Stable Fluids", SIGGRAPH 99, 121–128 | P | [author page](https://www.dgp.toronto.edu/public_user/stam/reality/Research/pub.html) |
+| SPH for interactive fluids | `19` | Müller, Charypar & Gross, SCA 2003, 154–159 | P | [EG digital library](https://diglib.eg.org/handle/10.2312/SCA.SCA03.154-159) |
+| Position Based Fluids (the games default) | `19` | Macklin & Müller-Fischer, ACM TOG 32(4), SIGGRAPH 2013 | P | [author page](http://blog.mmacklin.com/position-based-fluids/) |
+| FLIP in graphics (and sand-as-fluid) | `19` | Zhu & Bridson, ACM TOG 24(3), 965–972, SIGGRAPH 2005 | P | [ACM DL](https://dl.acm.org/citation.cfm?id=1073298) |
+| APIC (affine particle-in-cell) | `19` | Jiang, Schroeder, Selle, Teran & Stomakhin, ACM TOG 34(4), Art. 51, 2015 | P | [ACM DL](https://dl.acm.org/doi/10.1145/2766996) |
+| MPM for yield-stress / multi-phase materials | `19` | Stomakhin, Schroeder, Chai, Teran & Selle, SIGGRAPH 2013 | P | [Disney Animation](https://disneyanimation.com/publications/a-material-point-method-for-snow-simulation/) |
+| Screen-space fluid rendering (curvature flow) | `19` | van der Laan, Green & Sainz, I3D 2009, 91–98 | P | [ACM DL](https://dl.acm.org/doi/10.1145/1507149.1507164) |
+| Kelvin wake half-angle `arcsin(1/3) ≈ 19.47°`, speed-independent in deep water | `19` | Classical (Lord Kelvin); constant verified, original citation not chased | P/? | — |
+| SPH incompressibility variants (PCISPH / IISPH / DFSPH) | `19` | Solenthaler & Pajarola; Ihmsen et al.; Bender & Koschier — **bibliographic details unverified** | ? | — |
 
 ## Engine & shipped-system crosswalk
 
