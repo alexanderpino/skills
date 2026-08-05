@@ -890,6 +890,14 @@ the still ones.
   Gyres and western intensification are flavour an author adds, not behaviour that emerges from a
   tile.
 
+**Ship each body as a curve as well as a field.** Everything above is raster; every engine water
+system instantiates its bodies from **splines** — an open polyline per river with per-vertex width,
+depth and velocity, a closed loop per lake at one spill elevation — and in the common workflow those
+splines carve the terrain. The centreline, the hydraulic-geometry width and the spill elevation are
+all already solved here, so the vector export is a projection of this section's results, never a
+second authoring of where the water is. Schema, invariants (planar lakes, monotone rivers, declared
+junctions) and the carve-ownership policy are `27`.
+
 **What not to do.** Do not export a normalised direction field — speed is data the engine needs
 (`27`). Do not leave the *sea* at zero — it carries nearshore circulation, wind drift and the
 far-field current (above); a lake's near-zero interior, by contrast, is *correct* — but its

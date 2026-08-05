@@ -25,6 +25,7 @@ Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-re
 [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) ·
 [Shoreline integration](#shoreline-integration) ·
 [Transparency & pass ordering](#transparency--pass-ordering) ·
+[Engine-native water](#engine-native-water-the-ue-water-plugin-read-as-architecture) ·
 [Stylized water](#stylized-water-same-contracts-different-bands) · [Pitfalls](#pitfalls) ·
 [Sources & provenance](#sources--provenance)
 
@@ -1078,6 +1079,195 @@ Water is the classic hard transparency case, and the frame must be structured fo
    it needs multiple light/environment sources, scene-color access, and a BRDF that doesn't fit
    the G-buffer. Budget it as forward: it pays full lighting cost per pixel, which is why water
    area on screen is a load-bearing profiling axis (`11`).
+7. **The dedicated single-layer pass**: the fourth structural option, and the one shipped
+   engines increasingly take. Draw the water surface as *opaque* geometry into the G-buffer, let
+   it receive ordinary deferred lighting and shadows, then run one dedicated pass — after
+   lighting, before regular translucency — that integrates a homogeneous participating medium
+   between the surface and the opaque scene behind it. Sorting disappears (water is opaque
+   geometry), the surface gets the full deferred light set for free, and the volume integration
+   is one screen-space pass. The price is absolute: **one water depth layer per pixel**, so no
+   water can be seen through water. Choose it when the world has one water surface per sightline
+   and choose per-body sorted transparency when it does not; the decision is made at
+   architecture time because it decides the shading model, not a material setting. Worked
+   example, with its inputs and limits, in
+   [Engine-native water](#engine-native-water-the-ue-water-plugin-read-as-architecture).
+
+## Engine-native water: the UE Water plugin, read as architecture
+
+Most teams inside a licensed engine never assemble the machinery above from parts — they inherit a
+water system and then discover its contracts the hard way. Unreal's Water plugin is the most widely
+deployed of these, and it is worth reading not as a feature list but as **one complete, shipped set
+of answers to this chapter's questions**: its answers are mostly the ones recommended here, which
+is corroboration; where they differ, the differences are load-bearing and teach something. Tier is
+D/N throughout (engine docs and branded feature names), the facts below were checked against Epic's
+documentation in 2026-08, and Water has moved substantially across releases — verify constants
+against the version you ship on.
+
+### The five parts, and this chapter's name for each
+
+| Part | What it is | Read as |
+|---|---|---|
+| **Water Zone** | A bounded actor owning water rendering over a region: zone extent, render-target resolution, the water mesh, the info texture, optional local-only tessellation in a sliding window around the view. Multiple zones coexist under World Partition | The water surface's **paging/streaming unit** — the camera-following overlay doctrine (`13`, `14`) applied to water |
+| **Water Body actors** | Ocean / Lake / River / Island / Custom — splines (or a static mesh) with per-point metadata | `bodyType` plus per-body geometry: terrain-architect's `liquidBody` record (`28`), *authored* rather than generated |
+| **Water mesh** | A quadtree of tiles over the zone, LOD as concentric rings around the camera, tiles morphing between levels | The world-space grid of [Surface geometry & LOD](#surface-geometry--lod) |
+| **Water Info Texture** | One top-down capture of every water body **and the ground beneath them**, into a render-target array everything downstream samples | A runtime-rasterized version of the generator's handoff fields |
+| **Single Layer Water** | A shading model: opaque surface in the base pass + a participating-medium pass beneath it | Option 7 of [Transparency & pass ordering](#transparency--pass-ordering) |
+
+### The water mesh confirms the world-space grid — including the skirt
+
+Documented behavior: the quadtree is traversed each frame to produce the visible tile set; tiles are
+generated **only where a body's spline says water exists**, so open land costs nothing; each LOD is a
+concentric ring around the camera carrying half the vertex density of the ring inside it; transitions
+**morph** (four quads collapse into one when coarsening, one expands into sixteen when refining)
+rather than swapping. Defaults worth knowing as orders of magnitude: `Tile Size` 2400 uu (24 m),
+`Extent in Tiles` 64 as a radius from the centre — so the default zone is roughly 1.5 km out, ~3 km
+across, which is a useful reminder that a *bounded* water zone has to be sized against the view
+distance and not left at its default — with `LODScale` setting where morphing begins and
+`Tessellation Factor` setting vertex density inside a tile — Epic notes lakes and oceans benefit most
+from raising it, because they are the bodies carrying real displacement.
+
+The **Far Distance Mesh** is the infinite-ocean skirt, shipped, complete with the failure it exists
+to fix: Epic states that an ocean body can hit its maximum extent "without completely filling the
+level, leaving a gap between the horizon line and the water". It uses its own material slot — the
+near field and the horizon ring are *different materials*, i.e. the three-bands doctrine expressed in
+asset structure rather than as a shader branch. That is a pattern worth copying: when the far field
+must be normal-map-only, make it a separate material so nobody accidentally ships displacement to
+the horizon.
+
+### The Water Info Texture: fuse the handoff into one sampleable field
+
+The zone renders, top-down, all of its water bodies *and the terrain under them* — landscape proxies
+intersecting the zone bounds can be auto-included as "ground actors" — into a render target (a
+texture **array** in current versions; the single-target form is deprecated). Knobs that reveal the
+design: a half-precision toggle choosing **16 or 32 bits per channel**, a **capture Z offset** that
+places the capture plane above the highest water in the zone, a **velocity blur radius** applied in a
+"finalize water info" pass, and an explicit rebuild/update path. Everything downstream — the surface
+material, shore fade, flow, gameplay queries — samples that one texture.
+
+Name the technique independently of the engine: **rasterize the water layer stack into one
+view-independent field, and let every consumer read it.** The virtues are the ones `14` argues for —
+one surface truth, one coordinate frame, no consumer re-deriving hydrology — and the fact that the
+capture holds *ground* alongside water is terrain-architect's layer stack (`08`) made concrete: water
+surface and solid top in one texture, depth being their difference. Any engine can build this; a
+project with no generator handoff can build it *from* its authored water and get most of the
+chapter's depth-driven cues immediately.
+
+The costs are the price of any texture-shaped truth, and each is a review question:
+
+- **Resolution is a whole-zone budget, spent uniformly.** One render-target resolution spans the
+  entire zone extent, so a 5 m river inside a 4 km zone gets a handful of texels across its width:
+  thin bodies alias, banks quantize, and near-bank flow blurs toward the ground value. There is no
+  per-body detail level. Measure **texels across the narrowest body that matters**, not zone size —
+  if the answer is under ~8, either the zone shrinks or the resolution rises.
+- **Precision is a visible choice.** Half precision saves memory and spends Z accuracy in exactly
+  the channels that drive shore fade and the wave-attenuation ramp — the two places the eye is
+  already looking.
+- **It is a cache, so it needs an invalidation contract** (`SKILL.md` Part 3). Moving a body, moving
+  the zone, or editing the terrain beneath it must dirty the capture; a stale capture is a river
+  whose flow field points at last frame's channel. Anything rendering outside the normal frame loop —
+  offline movie-render paths are the documented case — has to force the update explicitly.
+
+### Waves as a data asset, evaluated twice
+
+Waves live in a **Water Waves** asset assigned per water body: a Gerstner generator with `Num Waves`
+(default 16), min/max wavelength and amplitude with falloff curves, a dominant wind angle plus
+angular spread, small/large-wave steepness, and a seed with a randomness term — a *parameterized
+band*, not a sampled spectrum. That is squarely the Gerstner column of
+[Ambient waves](#ambient-waves-gerstner-and-fft), with the documented consequences: visible
+periodicity over open water and cost linear in wave count. Custom generators derive from the same
+base class, which is where an FFT backend would go.
+
+The load-bearing detail is the **second evaluation**: buoyancy re-evaluates the same Gerstner sum on
+the CPU. That is the one-evaluator rule of `19` implemented for you — and the technique that makes it
+affordable is worth stealing wholesale. The buoyancy component exposes **`N Points Per Frame`** and
+**`N Frames Pause`**: probe points update round-robin across frames, and a body can idle for N frames
+between updates. Wave queries are the CPU cost of floating anything, so amortizing them across frames
+— with rigid-body integration carrying the object between updates — is how a fleet of floating props
+stays affordable. Declare the latency it buys: a fast boat in a heavy sea is where it shows, and the
+fix there is more points per frame for the hero body only, not a global raise.
+
+### Single Layer Water: what the shipped shader interface asks for
+
+The surface is drawn opaque/masked in the base pass; a dedicated pass **after deferred lighting and
+before regular translucency** integrates a homogeneous participating medium beneath it. Its material
+inputs are the physical ones: **scattering coefficients**, **absorption coefficients** — separately,
+not one lumped extinction — a **phase-asymmetry term** (`PhaseG`, forward-scattering toward the sun
+at positive values, isotropic at zero), and a colour-scale multiplier on what is seen through the
+water; opacity blends the volume's response against the surface BRDF.
+
+Two lessons, one of them a correction to the shorthand used earlier in this chapter:
+
+- **The a/b split with a phase term is the right shader interface.** `sigma` as used in
+  [Shading and optics](#shading-and-optics) is `a + b_b` already collapsed; the engine that shipped
+  asks for `a` and `b` separately plus `g` — which is exactly what terrain-architect's `28` exports
+  and this chapter's own optics section derives. Where the pipeline has that descriptor, wire
+  absorption and scattering to their own inputs instead of pre-summing them: the sum discards the
+  forward-scattering behaviour that separates a bright-but-murky silty river from a
+  dark-but-transparent tannin one (the CDOM-darkens/sediment-brightens rule).
+- **The single depth layer is an architectural limit, not a quality setting.** One water surface per
+  pixel means no water seen through water: a river under a bridge over a lake, a fall crossing a
+  pool, a pond on an island viewed at a grazing angle across the sea. Where the frame needs stacked
+  bodies, this pass cannot express them and per-body sorted transparency is the fallback. Low-end
+  paths drop the volume integration and revert to plain translucency, so the look must survive that
+  degrade — check it on the lowest tier before art-directing on the highest.
+
+### Bodies are splines, and the splines carve the terrain
+
+Rivers are **open** splines with per-point depth, width and velocity, free to change elevation along
+their length; lakes are **closed** loops whose points must all sit at **one elevation**; oceans are
+closed loops around a shoreline; **Island** bodies exist only to push terrain above water; **Custom**
+bodies are static meshes and — a real trap — do *not* carve terrain and do not use the water mesh.
+Carving runs through a Landmass landscape brush writing into a Landscape **edit layer**: it is
+non-destructive, and it is inert unless the landscape has edit layers enabled, which is the
+documented cause of the classic "my river hovers above the ground" symptom. The brush exposes a depth
+curve multiplied by each spline point's depth, falloff by angle or by fixed width, an edge offset
+producing a flat shore shelf, and blend modes (alpha / min / max / additive — the last preserving the
+underlying detail rather than replacing it).
+
+Three consequences matter on the rendering side; the generation-side half of this handoff is
+terrain-architect's `27`:
+
+- **The bathymetry the water reads was authored by the same spline that drew the water.** Depth is
+  self-consistent by construction, so shore fade, shoaling and the colour ramp cannot disagree with
+  the mesh. This is why engine-native workflows get a plausible shoreline nearly for free, and why a
+  generator-driven pipeline must be at least as careful: if the depth field and the water surface
+  come from different passes, they can drift.
+- **A carve is a terrain edit with an owner.** Keeping it in its own edit layer is `07`/`13`'s
+  overlay doctrine applied to the *source* data rather than the runtime composite — the same reason
+  RVT must not bake transient state.
+- **Exclusion volumes carve the volume, not the surface** — a region where gameplay behaves as
+  though it were not underwater. That is the one thing a 2.5D depth field structurally cannot
+  express (an air pocket under a lake, a dry cave beneath a river), and any water contract shipping
+  only a depth raster needs the same escape hatch.
+
+River-to-lake and river-to-ocean junctions get dedicated **transition materials**. Generalize it: the
+boundary between two water bodies is a contract like a LOD seam, and it needs a declared owner and
+blend — surface height, flow direction, foam phase and optics all change across it, and left
+unhandled it reads as two shaders arguing along a line.
+
+### What to check when inheriting a water system
+
+1. Does the zone's extent cover the **worst view** in the game, or does the water end inside the
+   draw distance? If it ends, is the far ring present and does it share the atmosphere state (`10`)?
+2. **Texels across the narrowest body that matters** in the shared info capture — not zone size.
+3. Does the physics/gameplay wave query use the **same evaluator** as the surface, and at what
+   amortization latency?
+4. Is there **stacked water** anywhere in the level? Find it before an artist does; a single-layer
+   path cannot draw it.
+5. Are terrain carves in their **own edit layer**, and does re-running generation preserve them?
+6. Does the underwater state key off collision that the body actually generates?
+7. Is the capture **invalidated** by everything that can move a body, the zone, or the terrain
+   beneath it?
+8. Instrument it: the engine ships a water-mesh stat (`stat watermesh`) — tile counts and mesh cost
+   belong in the budget sheet (`11`) like any other terrain pass.
+
+Honesty about tier: this section is engine documentation (D/N), not measurement, and Water has
+changed shape across releases — single render target → texture array, a global water mesh → bounded
+zones with local-only tessellation. Community reports of version-specific breakage (notably water
+interaction under World Partition) are F-tier and worth checking against your release. Treat every
+constant above as a shipped default, not a law, and treat the *architecture* — one paged zone, one
+fused info capture, a sparse morphing quadtree, one wave evaluator, an opaque-surface volume pass —
+as the transferable part.
 
 ## Stylized water: same contracts, different bands
 
@@ -1209,6 +1399,34 @@ above except the TotK physics talk is community reconstruction or press/footage 
   water fizzes. De-jitter the sample and provide displaced-surface motion vectors.
 - **Waterfall without a feeding flow field**: the construct exists, the river above ignores it.
   Generation-graph defect — route to terrain-architect, do not patch with particles.
+- **Stacked water through a single-depth-layer pass**: a river under a bridge over a lake, a fall
+  crossing a pool, a pond on an island seen across the sea — the second surface simply is not there.
+  This is the shading model's structural limit, not a bug to tune; either the level avoids stacked
+  bodies or those bodies go through sorted transparency instead.
+- **Absorption and scattering collapsed into one extinction**: a single `sigma` cannot distinguish
+  bright-and-murky (sediment) from dark-and-clear (CDOM), and the phase asymmetry that aims
+  scattering at the sun is gone with it. Wire `a`, `b` and `g` to their own inputs where the shader
+  takes them, from the `liquidBody` descriptor (terrain-architect `28`).
+- **Shared water capture sized to the zone, not the river**: one top-down info texture spanning
+  kilometres gives a narrow river a handful of texels across, so banks quantize and flow smears into
+  the ground value. Budget by texels-across-narrowest-body; shrink the zone or raise the resolution.
+- **Stale water capture**: a body, the zone, or the terrain beneath moved, and nothing dirtied the
+  top-down capture — flow points at last frame's channel and the shore fade sits off the bank. Every
+  cached field needs its invalidation contract named, including this one; paths that render outside
+  the frame loop must force the update.
+- **Water hovering above the terrain it was supposed to carve**: the spline-driven brush is writing
+  to a landscape edit-layer stack that is disabled, or to a layer the final composite doesn't
+  include. Nothing about the water surface is wrong — the bathymetry under it was never written.
+- **Two water bodies meeting with no junction contract**: river into lake, lake into sea. Surface
+  height, flow, foam phase and optics all change across the line, and un-owned it reads as two
+  shaders arguing. Declare a transition material and which side owns the boundary, exactly as for a
+  LOD seam.
+- **Every floating prop sampling waves every frame**: CPU wave queries are the real cost of buoyancy
+  at fleet scale. Update probe points round-robin across frames and let rigid-body integration carry
+  the object between samples; raise the rate for hero bodies only, and state the latency.
+- **Ocean that stops short of the horizon**: a finite water body large enough to look infinite still
+  ends, leaving a band of sky-coloured nothing between the water edge and the horizon line. That gap
+  is what the far-distance ring exists for; it must share the datum and the atmosphere state (`10`).
 - **Screen-space water: grazing-ray precision**: near the horizon `rayDir.y → 0` and `t`
   explodes; float error shreds the last pixel rows into stripes. Camera-relative math (`09`),
   clamp `t` against the far plane, and fade into the sky/fog band before the guards ever trip.
@@ -1420,6 +1638,33 @@ above except the TotK physics talk is community reconstruction or press/footage 
   widths: production practice assembled from multiple talks and community writeups; no single
   canonical source. The `0.70–0.85` break-mask window and `hFade` style constants are tuning
   ranges, not measured standards.
+- **D/N** — **Unreal Engine Water plugin** (the engine-native section): Epic documentation, fetched
+  2026-08. Architecture and defaults —
+  [Water System](https://dev.epicgames.com/documentation/en-us/unreal-engine/water-system-in-unreal-engine);
+  quadtree tiles, concentric-ring LOD, 4↔1 morphing, `Tile Size` 2400 uu, `Extent in Tiles` 64,
+  `LODScale`, `Tessellation Factor`, far-distance mesh and the stated horizon-gap reason —
+  [Water Meshing System and Surface Rendering](https://dev.epicgames.com/documentation/en-us/unreal-engine/water-meshing-system-and-surface-rendering-in-unreal-engine);
+  body types, spline metadata (river depth/width/velocity), the all-one-elevation lake rule, Island
+  and Custom bodies, the Landmass brush with its depth curve / falloff modes / edge offset / blend
+  modes, the edit-layers requirement, and exclusion volumes —
+  [Water Body Actors](https://dev.epicgames.com/documentation/en-us/unreal-engine/water-body-actors-in-unreal-engine);
+  the pass position, scattering/absorption/`PhaseG`/colour-scale inputs, the single-depth-layer limit
+  and the low-end fallback —
+  [Single Layer Water Shading Model](https://dev.epicgames.com/documentation/en-us/unreal-engine/single-layer-water-shading-model-in-unreal-engine);
+  Gerstner generator parameters (`Num Waves` 16, wavelength/amplitude ranges and falloffs, dominant
+  wind angle and spread, steepness, seed) and the custom-generator base class —
+  [Water Waves Asset](https://dev.epicgames.com/documentation/en-us/unreal-engine/simulating-waves-using-the-water-waves-asset-in-unreal-engine);
+  zone properties — water-info texture **array** (single-target form deprecated), half-precision
+  toggle, capture Z offset, velocity-blur radius in the finalize pass, `ZoneExtent`,
+  `RenderTargetResolution`, local-only tessellation with its sliding-window extent, auto-include
+  landscapes as ground actors, `GroundZMin`, `MarkForRebuild`/`Update` —
+  [AWaterZone API](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Plugins/Water/AWaterZone).
+  ⚠️ Engine docs drift by release and Water has changed shape repeatedly; re-verify constants.
+- **F/?** — The buoyancy amortization controls (`N Points Per Frame`, `N Frames Pause`) and the note
+  that buoyancy is CPU-evaluated come from Epic's water-waves/buoyancy documentation as surfaced in
+  search, not from a page-by-page read — the *technique* (round-robin probe updates with declared
+  latency) is the transferable part and is standard practice. Community reports of version-specific
+  Water breakage under World Partition are forum-tier and deliberately not asserted as fact.
 - **?** — Attribution of specific shallow-water shoaling approximations to particular shipped
   titles beyond the two talks above: multiple GDC/SIGGRAPH-Advances talks cover it; treat any
   further specific title claim as unverified.

@@ -1,7 +1,8 @@
 # Engine-Native Terrain: Unreal Landscape & Friends
 
 This chapter owns the engine-native terrain systems — primarily Unreal's Landscape and its UE5
-satellites (Nanite Landscape, RVT, World Partition), plus the experimental Mesh Terrain system
+satellites (Nanite Landscape, RVT, World Partition, and the Water/Landmass plugins where they write
+into terrain), plus the experimental Mesh Terrain system
 introduced in UE 5.8, with a comparative appendix for Unity, Godot,
 O3DE, and CryEngine. It exists because engine terrain is a *contract you inherit*, not an
 architecture you choose: the win is knowing which knobs map onto the theory in `01`/`02`/`07`, and
@@ -14,6 +15,7 @@ Contents: [Landscape anatomy](#landscape-anatomy) ·
 [Nanite Landscape](#nanite-landscape) ·
 [Mesh Terrain (5.8+)](#ue-58-mesh-terrain-experimental) ·
 [Materials & RVT](#landscape-materials--rvt) ·
+[Water & Landmass](#water--landmass-the-water-systems-contract-with-landscape) ·
 [World scale](#world-scale-world-partition--lwc) ·
 [Import / roundtrip](#import--roundtrip-contract) ·
 [Performance doctrine](#performance-doctrine-checklists) ·
@@ -270,6 +272,61 @@ permutation and sampler pressure above interact: a "cheap" fifth layer can simul
 weightmap texture, a permutation, and blow the sampler budget on that component only — the bug
 appears as one component failing to compile or rendering the error material.
 
+## Water & Landmass: the water system's contract with Landscape
+
+Engine-native water is a *second* terrain system that writes into the first, and the seams between
+them are where projects lose time. The rendering-side architecture of Unreal's Water plugin — zones,
+the water mesh quadtree, the water-info capture, Single Layer Water, the wave asset — is `12`'s
+[engine-native water](12-water-rendering.md#engine-native-water-the-ue-water-plugin-read-as-architecture)
+section; what belongs *here* is the part that is a Landscape contract.
+
+**Water bodies edit the heightfield through the edit-layer stack.** A river, lake, ocean or island
+body carries a Landmass landscape brush that writes height (and can paint weights) into a Landscape
+**edit layer**, using a depth curve scaled by each spline point's depth, a falloff that is either
+angle-based (extend at an angle until it meets terrain) or width-based (a fixed band), an edge offset
+producing a flat shore shelf, and a blend mode (alpha / min / max / additive). Three consequences:
+
+- **Edit layers are not optional.** The brush only writes when the landscape has edit layers enabled;
+  without them the water renders at its datum over unmodified ground and the body appears to hover.
+  This is the single most-reported symptom of the whole system and it is a configuration fact, not a
+  material bug.
+- **Brush order is composition order.** Overlapping bodies resolve by their position in the layer
+  stack and their blend modes, so two bodies fighting for the same ground is a stacking question, not
+  a tuning one. Prefer `min` for carving and `additive` where the bed's authored detail must survive
+  — a full-replace blend flattens exactly the high-frequency relief the generator was careful to put
+  in the channel (terrain-architect `08`).
+- **The runtime sees the flattened result.** Edit layers are editor-side (see
+  [Landscape anatomy](#landscape-anatomy)); the carve is baked into the same 16-bit height the
+  renderer streams. Anything that reruns generation and re-imports height must preserve, or
+  reproduce, the water layer — and the import contract below is where that decision gets recorded.
+
+**Collision, not just shading, comes from the carve.** The bathymetry the water shader reads for
+depth fade, shoaling and absorption is the same landscape height physics walks. That is a
+self-consistency win — the visible shoreline cannot disagree with the collision surface — and a
+constraint: the collision mip discipline of [Runtime LOD](#runtime-lod) applies to riverbeds too, and
+a coarse collision mip in a narrow carved channel is how characters walk on water.
+
+**What this changes about the import contract.** A generator that ships rivers as *rasters only*
+(depth + flow fields) has no way to drive the spline brushes, so the engine either carves nothing or
+an artist re-traces the channels by hand. The handoff that actually works ships **vector water**
+alongside the fields — centrelines with per-vertex width, depth and velocity, lake polygons at a
+single spill elevation, and the shoreline loop — which the importer converts into body actors whose
+brushes then carve terrain that agrees with the exported bathymetry. That is terrain-architect's `27`
+handoff; from this side, the requirement is simply that the emitter's vector output and its raster
+output describe the same water.
+
+**Pitfalls.** (1) Lake splines whose points are not all at one elevation — the body is a level
+surface by definition, and a tilted lake spline produces a carve that fights its own datum.
+(2) River splines authored with a non-monotone downstream profile: the engine will happily carve a
+river running uphill, because nothing in the actor knows about drainage; the check belongs upstream.
+(3) Static-mesh ("custom") water bodies do not carve and do not participate in the water mesh —
+convenient for a pool or an aquarium, wrong for anything that must meet terrain.
+(4) Water zone bounds and World Partition cells that disagree, so bodies straddling a boundary get a
+capture that is resident on one side and not the other. (5) A gameplay region that must be dry under
+water — a cave beneath a river — has no expression in a heightfield-plus-datum world; that is what
+water-body exclusion volumes are for, and it is a volumetric exception the raster contract cannot
+carry.
+
 ## World scale: World Partition & LWC
 
 **World Partition** (UE5) replaces World Composition with automatic grid-cell streaming: actors are
@@ -418,6 +475,13 @@ claim tagged **?** above must be verified against current engine docs before bei
   (unrealengine.com/news/unreal-engine-5-8-is-now-available) was seen in search results but not
   fetchable at write time — release-date and positioning claims lean on the docs + third-party
   corroboration.
+- **D** — Epic UE documentation, Water & Landmass (fetched 2026-08): "Water Body Actors" (body
+  types, river/lake spline metadata, the Landmass brush's depth curve, angle-vs-width falloff, edge
+  offset, blend modes, the *"only edits the landscape layer when the Landscape has Enable Edit
+  Layers checked"* requirement, Island bodies, custom bodies not carving, exclusion volumes);
+  "Water System"; "Water Meshing System and Surface Rendering". The rendering-side architecture and
+  its full citation list are `12`'s engine-native section. Brush-ordering guidance and the
+  additive-preserves-detail preference are this skill's composition over the documented modes.
 - **N** — engine-branded features whose names, not internals, are the claim: Nanite Landscape,
   Nanite tessellation/displacement, Virtual Heightfield Mesh, Landscape Streaming Proxy, Mesh
   Terrain / Mesh Partition, Terrain3D (Godot community), O3DE Terrain Gem, Unity Draw Instanced

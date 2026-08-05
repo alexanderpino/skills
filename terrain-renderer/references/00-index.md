@@ -107,6 +107,11 @@ right fix.
 | Failure catalogue, debug views, budget assertions | `11` | This skill's consolidation | F | — |
 | FFT/spectral ocean synthesis | `12` | Tessendorf, "Simulating Ocean Water", SIGGRAPH course notes | T/P | [clemson.edu PDF](https://people.computing.clemson.edu/~jtessen/reports/papers_files/coursenotes2004.pdf) |
 | Gerstner/trochoidal wave sums | `12` | Classical; GPU form in GPU Gems ch. 1 (Finch) | F/D | [developer.nvidia.com](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models) |
+| UE Water plugin: bounded water zone, sparse quadtree water mesh, fused top-down water-info capture | `12` `03` | Epic docs (fetched 2026-08) — version-sensitive | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/water-meshing-system-and-surface-rendering-in-unreal-engine) |
+| Single Layer Water (opaque surface + participating-medium pass after deferred lighting) | `12` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/single-layer-water-shading-model-in-unreal-engine) |
+| Spline water bodies carving terrain via Landscape edit layers (Landmass brushes) | `03` `12` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/water-body-actors-in-unreal-engine) |
+| Gerstner wave *data asset* with a shared CPU/GPU evaluator | `12` `19` | Epic docs | D/N | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/simulating-waves-using-the-water-waves-asset-in-unreal-engine) |
+| Amortized CPU buoyancy queries (points-per-frame, frames-pause) | `19` | Epic Water docs via search; technique is standard practice | D/F/? | — |
 | Flow mapping (rivers) | `12` | Vlachos, "Water Flow in Portal 2", SIGGRAPH 2010 | T | [steamstatic PDF](https://cdn.akamai.steamstatic.com/apps/valve/2010/siggraph2010_vlachos_waterflow.pdf) |
 | Projected-grid water surface | `12` | Johanson, Lund University master's thesis, 2004 | P | [lth.se PDF](https://fileadmin.cs.lth.se/graphics/theses/projects/projgrid/projgrid-lq.pdf) |
 | Linear (Airy) wave theory: dispersion, shoaling (Green's law), refraction | `12` | Coastal-engineering canon; textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists* (1991) | P | — |
@@ -179,6 +184,7 @@ Branded system → what it actually is → where in this skill.
 | Battlefield-class battlefield cratering | Heightfield delta overlays (destruction tier 2) | `17` |
 | Comanche / Outcast / Delta Force "voxel" terrain | 2.5D heightmap column raycasting (Voxel Space) — no true voxels | `18` |
 | UE 5.8 Mesh Terrain | Experimental 3D modifier-stack terrain rendered through Nanite | `03`, family `02` |
+| UE Water plugin (ocean / lake / river / island bodies) | Bounded zone + sparse morphing quadtree surface + fused water-info capture + Gerstner wave asset + single-depth-layer volume pass; bodies carve Landscape through edit layers | `12`, carve side `03` |
 | Portal 2 water | Flow mapping over a static surface | `12` |
 | Uncharted (3) water | Ocean mesh LOD + wave generation + flow shader; wave-particle lineage claimed but not confirmed against the talk (`?`) | `12` |
 | Sea of Thieves water | Stylized FFT cascades + shore/foam treatments | `12` |
@@ -262,6 +268,16 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   stated 610/550/450 nm sample points. Glacial-flour turquoise upgraded from synthesis-only to
   P/synthesis — corroborated by glacial-lake reflectance studies (MRD 37(1) 2017; ERL 17 2022),
   the Rayleigh explanation stays refuted.
+- `12`, `03` (engine-native water, added 2026-08): every claim in the UE Water sections is D/N-tier
+  engine documentation fetched 2026-08 — architecture, quadtree/tile defaults, body types and spline
+  metadata, Landmass brush modes and the edit-layers requirement, Single Layer Water's inputs and its
+  single-depth-layer limit, Gerstner wave-asset parameters, and the `AWaterZone` properties (info
+  texture **array**, half-precision toggle, capture Z offset, velocity-blur radius, local-only
+  tessellation, ground actors). **Not** verified: the water-info texture's channel packing (the
+  chapters deliberately describe *what it fuses*, not which channel holds what) and the buoyancy
+  amortization property names, which came from search snippets rather than a fetched page (`?`).
+  Community reports of version-specific Water breakage under World Partition are forum-tier and are
+  flagged, not asserted. Everything here drifts by engine release; re-verify constants at time of use.
 - `19`: PCISPH (Solenthaler & Pajarola 2009), IISPH (Ihmsen et al. 2014), DFSPH (Bender & Koschier
   2015) and the Kelvin-wake citation (Thomson 1887) were all **web-verified 2026-08** — the `?`
   flags are cleared. Probe-point buoyancy, the spray/foam/bubble split, domain-fade fractions and

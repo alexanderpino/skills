@@ -48,6 +48,13 @@ not the same — the gap between "the paper exists" and "the number is right" is
   explicit flux→thickness conversion `ΔL = q·Δt/cellSize` (`19`), exactly as the pipe model does
   (`04`). Units analysis is a code-free error detector and is worth running on any equation added.
 
+- **Engine-side claims (added 2026-08)** — the vector-water/carve material in `27` and the phase-`g`
+  addition in `28` rest on Epic's Water, Water Body Actors and Single Layer Water documentation,
+  fetched 2026-08. Those are **D/N-tier and version-sensitive**: they establish what a shipped engine
+  *asks for*, not what is universally true, and Unreal's Water plugin has changed shape repeatedly.
+  The doctrine built on top of them — the six export invariants, the carve-ownership policy, the
+  double-carve defect — is this skill's composition, not documentation.
+
 This is deliberately honest, not reassuring. Errors *have* surfaced and been fixed by exactly this
 process — a reversed crater transition, a Braun/Gain author swap, an `H⁴`-vs-`H⁵` flux slip — so
 assume more remain until the pseudocode is implemented and the numbers independently reviewed. The
@@ -310,6 +317,7 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Water constituents: chlorophyll / CDOM / suspended sediment | P | Bricaud-form `a_ph`; CDOM `a₄₄₀·exp[−S(λ−440)]`, S≈0.012–0.022; mineral `b_p(555)/SPM ≈ 0.5 m²/g` (Babin et al. 2003). **CDOM darkens, sediment brightens — opposite controls** (`28`) |
 | Jerlov water types; Forel-Ule index | P | Jerlov 1976 Tables XXVI–XXVII; Solonenko & Mobley 2015; Morel 1988 ladder; FU/hue-angle Pitarch et al. 2021. ⚠️ Numeric `K_d` tables paywalled — generate or cite honestly (`28`) |
 | Secchi depth ↔ attenuation | P | Lee et al. 2015 — `Z_SD ≈ 1/min_λ K_d`, replacing the classical constant (best classical fit: Holmes 1970, 1.44) (`28`) |
+| Scattering **direction**: forward-peaked phase function, exported as `phase_g` | P/? (measurement) + D (shader interface) | Petzold 1972 (Scripps 72-78) for the measured VSF — cited from model knowledge, **not web-verified**; the transferable fact is the direction, equivalent to `b_f ≳ 50·b_b`. Engines take absorption, scattering and `g` as three separate inputs (Epic Single Layer Water docs, fetched 2026-08), which is why `28` exports them unsummed (`28`, terrain-renderer `12`) |
 | Per-liquid index of refraction (Fresnel F0) | P | Water 1.33→F0 0.02; seawater/brine 1.341–1.397 (Maykut & Light, Appl. Opt. 34, 1995); natural liquids span ~1.31–1.47, F0 ~0.018–0.036 — ship per body, never hardcode (`28`) |
 | Glacial-flour turquoise | F/synthesis | Popular Rayleigh explanation is **wrong** (2–65 µm ≫ λ). Flat backscatter shortens photon path; `a_w` removes red over it. No peer-reviewed optical study located (`28`) |
 | Yield-stress liquids: Bingham / Herschel-Bulkley | P | Bingham 1922; Herschel & Bulkley 1926; **Papanastasiou 1987** regularization. `h_c = τ_y/(ρg sinθ)` sets deposit thickness; levées are diagnostic — Hulme 1974 (`28`, `19`) |
@@ -602,7 +610,10 @@ P/F-tier producers.
 | The Masking Doctrine (raw causes out; no baked diffuse / predefined materials in the runtime handoff) | Doctrine | `27` — the hydrology handoff (`SKILL.md`) generalised to the whole export surface; `08`'s satmap demoted to a preview/review product |
 | Standard map registry (climate / geology / hydrology / geometry) | — | Producers all routed: moisture & temperature & wind `13`, insolation `06`, soil depth `11`, strata hardness `11`, state wetness `13` / TWI `06`, flow velocity `03`, curvature & AO `06` |
 | The Snow Rule ("no moisture = no new snow") + its three displacement channels | Doctrine over P | Gating already in `13`'s snowStep (`precip · (T<0)`); displacement: wind-loading (Werner shadow-zone logic, `05`/`13`), avalanches (Cordonnier et al. 2018, `13`), glacial flow (SIA, `12`) — nothing else moves snow |
-| Handoff verification (layer-stack budget, dry-snow attribution, derived-map re-derivation) | Engineering check | `27`, registered in `09`'s checklist; runnable: `reference-impl/tests/asserts.py` (`assert_layer_budget`), `reference-impl/snow.py` (`dry_snow_attribution`) |
+| Vector water: spline bodies with per-vertex width/depth/velocity, planar-lake & monotone-river invariants, junction topology | Doctrine over `03` | `27` — engine water systems are spline-first (Unreal Water/Landmass bodies carving Landscape through edit layers, terrain-renderer `03`/`12`, D-tier docs fetched 2026-08); the vector export is a projection of `03`'s solve, never a second authoring |
+| Who carves the channel: `tool` / `engine` / `tool-then-engine-refine`, and the double-carve defect | Doctrine | `27` — the manifest names it; engines carve non-destructively into a layer stack, so ship pre-carve height plus vectors where the engine owns the cut |
+| Water exclusion volumes (voids under water) | Contract gap | `27` — a height-plus-datum export says everything below the datum is wet; sea caves and chambers under lakes need a volumetric exception list (or `11`'s per-column stack) |
+| Handoff verification (layer-stack budget, dry-snow attribution, derived-map re-derivation, vector/raster agreement, carve-policy match) | Engineering check | `27`, registered in `09`'s checklist; runnable: `reference-impl/tests/asserts.py` (`assert_layer_budget`), `reference-impl/snow.py` (`dry_snow_attribution`) |
 
 ## Node types (N-tier) — not algorithms
 
