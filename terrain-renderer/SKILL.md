@@ -1,13 +1,13 @@
 ---
 name: terrain-renderer
 description: >-
-  Principal terrain-rendering authority for real-time worlds to 2026 AAA standards, across every
+  Principal terrain-rendering authority for real-time worlds, across every
   paradigm: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (Nanite
   family), engine-native terrain (UE Landscape, Nanite Landscape, Mesh Terrain), blocky and
   smooth voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
   raymarching, tiled streaming, splatmaps and virtual texturing,
   GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
-  shore-aware breakers, rivers, fullscreen-triangle pass, SPH/PBF fluid sim, buoyancy,
+  shore breakers, rivers, fullscreen-triangle pass, SPH/PBF fluid sim, buoyancy,
   whitewater), snow and weather
   state, auxiliary maps, vegetation and scatter, roads/decals/deformation, physics handoff,
   and tool viewports. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at
