@@ -719,6 +719,13 @@ color = lerp(refracted_underwater, reflected_environment, Fresnel(NdotV))
       + foam + sun_glint
 ```
 
+- **Fresnel** is the blend, and its `F0` is a water-specific number that is easy to get wrong:
+  from IOR 1.33, `F0 = ((1.33−1)/(1.33+1))² ≈ 0.02` — **half** the generic dielectric default of
+  0.04 (which is IOR 1.5, glass/plastic). Ship the default and calm water reads too reflective and
+  faintly plastic even before the distance-filtering problems compound it. Use the roughness-aware
+  form of [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) at
+  grazing angles; the `F0 = ((n−1)/(n+1))²` derivation and the amplitude-Fresnel details route to
+  physically-based-rendering.
 - **Reflection** is a fallback hierarchy, never a single source: SSR first (correct for local
   objects), planar reflection for the hero body when budget allows (see
   [Transparency & pass ordering](#transparency--pass-ordering)), distant cubemap/sky capture
@@ -726,8 +733,12 @@ color = lerp(refracted_underwater, reflected_environment, Fresnel(NdotV))
   reflected ray leaves the screen exactly where water is most reflective), and the fallback must
   match the SSR result in brightness or the dropout draws a line. Grazing-angle Fresnel makes
   water the most brutal SSR-consistency test in the frame.
-- **Refraction**: sample the scene-color copy with a normal-driven UV distortion, clamped by
-  view depth so near-surface distortion doesn't grab pixels metres away. The canonical artifact:
+- **Refraction**: the normal-driven UV distortion below is a **screen-space approximation of
+  Snell's-law bending** at the surface (`n_air·sinθ_i = n_water·sinθ_t`, water IOR ≈ 1.33) — it
+  offsets the lookup by the surface normal rather than tracing the bent ray, which is why it is
+  cheap and why it cannot handle a surface steep enough to see *around* an obstacle. Sample the
+  scene-color copy, clamped by view depth so near-surface distortion doesn't grab pixels metres
+  away. The canonical artifact:
   a distorted sample lands on an object *above* the water (a dock post, a character's torso),
   smearing it into the water. The fix is a depth reject — if the refracted sample's scene depth
   is closer than the water surface, fall back to the undistorted UV:
@@ -773,8 +784,10 @@ at the end of this section.
   caustics are out of budget scope; route the theory to physically-based-rendering.
 - **Underwater camera state** is a real state machine, not a fog tweak: on submersion switch to
   underwater fog (aggressive, chromatic, from the same `sigma`), render the surface from below
-  (total internal reflection outside Snell's window — the bright circle overhead is a cheap,
-  high-value cue), and handle the half-submerged frame explicitly. The waterline crossing is
+  (total internal reflection outside **Snell's window** — for water→air the critical angle is
+  `arcsin(1/1.33) ≈ 48.6°`, so the whole above-water world compresses into a ~97°-wide bright
+  circle overhead and everything outside it mirrors the bottom; a cheap, high-value cue), and
+  handle the half-submerged frame explicitly. The waterline crossing is
   either a hard cut (acceptable, hide with a droplet/meniscus overlay for a frame or two) or a
   true split-screen meniscus (render both states, mask by the wave-displaced waterline in screen
   space — expensive, hero-camera only). The untreated version — one frame of neither-state
@@ -1125,6 +1138,9 @@ Water is the classic hard transparency case, and the frame must be structured fo
   currents in the flow field leave no lanes in the breaker line. Modulate the band by
   opposition to the flow field (wave–current interaction, above); where flow data shows no
   rip/outflow, the missing feature is generation-side — route to terrain-architect.
+- **Water too reflective / faintly plastic even when calm**: Fresnel `F0` left at the generic
+  dielectric 0.04 (IOR 1.5). Water is IOR 1.33 → `F0 ≈ 0.02`; the default doubles surface
+  reflectance.
 - **Refraction leaking objects above water**: missing depth reject on the distorted sample. The
   single most common shipped water bug; the fix is four shader lines (above).
 - **SSR dropout at grazing/screen edge**: mirror-bright water goes flat exactly at the horizon
@@ -1314,6 +1330,11 @@ Water is the classic hard transparency case, and the frame must be structured fo
   (fullscreen effect between transparents and post, meniscus handling).
 - **F** — Depth-reject refraction fix, SSR fallback hierarchy, underwater state machine, planar
   one-body ceiling: ubiquitous production practice; no single canonical citation.
+- **P** — Optical refraction constants for water: IOR ≈ 1.33 → Fresnel `F0 = ((n−1)/(n+1))² ≈ 0.02`
+  and Snell's-window critical angle `arcsin(1/1.33) ≈ 48.6°`. Standard optics (Snell, Fresnel);
+  arithmetic verified 2026-08. The screen-space UV-distortion refraction is an approximation of
+  Snell bending, not the ray-traced result — the amplitude-Fresnel and Snell derivations live in
+  physically-based-rendering (`pbr-fundamentals`, `volumes-and-sss`).
 - **P** — Linear (Airy) wave theory — dispersion `ω² = gk·tanh(kh)`, shallow-water celerity
   `sqrt(g·h)`, Green's-law shoaling `a ∝ h^(-1/4)`, refraction: coastal-engineering canon;
   textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
