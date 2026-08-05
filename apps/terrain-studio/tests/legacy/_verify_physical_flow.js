@@ -22,6 +22,8 @@ const MUTATIONS = [
   'fill-writes-solid',     // the depression policy returns the conditioned surface as solid height
   'breach-is-fill',        // breach mapped onto priority fill -- the failure the plan names
   'fill-to-fixed-level',   // fill to a constant instead of the spill: the old count-based check passed this
+  'direction-not-normalized', // dirX/dirZ keep the raw weighted sum: the declared unit vector is not one
+  'sink-keeps-direction',  // a cell with nowhere to send water still reports a heading
 ]
 const PATCHES = {
   'no-mm-conversion': [['out[i] = (mmYr * 1e-3) * cellAreaM2Value / SECONDS_PER_YEAR',
@@ -36,6 +38,12 @@ const PATCHES = {
                          'for (let i = 0; i < N; i++) h[i] = filled[i]\n    return { routingSurface: filled, depressionDepth: depth, conditioningDelta: delta }']],
   // NOT `rs[p] = ceiling`: ceiling is min'd with rs[p] on the line above, so that "mutation" is
   // bit-identical to the original and scored as armed while proving nothing.
+  // The units/ranges clause had no assertion behind it, so neither of these could have been
+  // detected: a direction that is not a unit vector, and a sink that claims a heading.
+  'direction-not-normalized': [['      if (ml > 0) { dirX[i] = mx / ml; dirZ[i] = mz / ml }',
+    '      if (ml > 0) { dirX[i] = mx; dirZ[i] = mz }']],
+  'sink-keeps-direction': [['      if (total <= 0) { outlet[i] = 1; continue }',
+    '      if (total <= 0) { outlet[i] = 1; dirX[i] = 1; dirZ[i] = 0; continue }']],
   // THE MUTATION THE OLD ASSERTION COULD NOT SEE. Filling to a fixed 0.62 still raises well over
   // 40 cells, so `fillRaised > 40` passed it happily. Only comparing the LEVEL to an
   // independently derived spill catches it.
@@ -288,6 +296,49 @@ function pitted() {
     differs(fill.routingSurface, breach.routingSurface)
     && differs(breach.routingSurface, preserve.routingSurface)
     && differs(fill.routingSurface, preserve.routingSurface), null)
+
+  // --- S4.2: "assert all output units/ranges" -----------------------------------------------------
+  //
+  // The Sprint 4 audit found this clause had NO assertion behind it at all. Every physical claim was
+  // about the routing maths; nothing checked that the numbers leaving the ports were in their
+  // declared units or inside possible bounds. A drainage area in CELLS rather than m2, or a
+  // direction that is not a unit vector, would have passed everything above.
+  //
+  // Bounds are derived, not chosen: the smallest possible catchment is one cell's own area, the
+  // largest is the whole domain, and both come from the fixture rather than from a constant.
+  {
+    const accU = M.mfdAccumulate(hp, new Float64Array(N).fill(area), W, H, wp)
+    let minA = Infinity, maxA = -Infinity
+    for (let i = 0; i < N; i++) { minA = Math.min(minA, accU[i]); maxA = Math.max(maxA, accU[i]) }
+    check('drainage area is in m2, never below one cell nor above the domain',
+      minA >= area - 1e-6 && maxA <= N * area + area,
+      { minM2: +minA.toFixed(3), oneCellM2: area, maxM2: +maxA.toFixed(1), domainM2: N * area })
+    // A ridge cell drains only itself. If the minimum were much larger, the units are not m2 --
+    // in CELLS the minimum would be exactly 1, which this catches for any cell size but 1 m.
+    check('the driest cell drains exactly its own area', Math.abs(minA - area) < 1e-6,
+      { minM2: +minA.toFixed(6), expected: area })
+
+    const qU = M.mfdAccumulate(hp, M.precipToSupply(1000, area, N), W, H, wp)
+    let minQ = Infinity, maxQ = -Infinity
+    for (let i = 0; i < N; i++) { minQ = Math.min(minQ, qU[i]); maxQ = Math.max(maxQ, qU[i]) }
+    // Discharge cannot be negative, and the whole domain's rain is its ceiling.
+    const domainQ = 1000 * 1e-3 * (N * area) / M.SECONDS_PER_YEAR
+    check('discharge is non-negative and bounded by the domain rainfall',
+      minQ >= 0 && maxQ <= domainQ * (1 + 1e-6),
+      { minQ: +minQ.toExponential(3), maxQ: +maxQ.toExponential(3), domainQ: +domainQ.toExponential(3) })
+
+    // flowDirection is declared a unit vector. Every routed cell must carry length 1; every sink
+    // must carry exactly zero -- a sink with a direction is a cell claiming to send water somewhere
+    // it does not send it.
+    let badLen = 0, sinkNonZero = 0, routed = 0
+    for (let i = 0; i < N; i++) {
+      const L = Math.hypot(wp.dirX[i], wp.dirZ[i])
+      if (wp.outlet[i]) { if (L > 1e-6) sinkNonZero++ } else { routed++; if (Math.abs(L - 1) > 1e-5) badLen++ }
+    }
+    check('routed cells exist to check', routed > N * 0.5, { routed, N })
+    check('flow direction is a unit vector wherever water is routed', badLen === 0, { badLen, routed })
+    check('sinks carry exactly zero direction, not a stale one', sinkNonZero === 0, { sinkNonZero })
+  }
 
   check('assertion inventory non-empty', assertions.length >= 25, assertions.length)
   report()
