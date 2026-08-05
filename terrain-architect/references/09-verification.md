@@ -332,6 +332,12 @@ Symptom → mechanism → minimal fix. Ordered roughly by how often they occur.
 | River terraces slope downstream / aren't parallel | Treads not cut at a base level | Bevel each strath at the current base level — horizontal (`03`) |
 | Avulsion fires every step, or never | Superelevation threshold missing / wrong | Require `SE≳1` (one channel depth) + a flood trigger (`03`) |
 | Coral covers deep / aphotic seabed | No photic gate on placement | `density × inPhotic(depth)`; stop below compensation (`12`) |
+| Every water body is the same blue | No per-body optical descriptor; one global constant | Export `liquidBody[i]` — `a`, `b_b`, `K_d` from the three constituents (`28`, `08`) |
+| Water hue does not change with depth | Flat colour instead of spectral absorption | Red must die first, then orange, yellow, green — drive from `a(λ)` (`28`) |
+| Deep clear water renders bright cyan | Clarity conflated with brightness | Reflectance goes as `b_b/a`; deep clear water is near-black, bright cyan is shallow-over-bright-bottom (`28`) |
+| Tannin-stained river looks like mud | CDOM modelled as turbidity | CDOM absorbs and does not scatter — it darkens; sediment brightens. Opposite controls (`28`) |
+| Glacial lake is the same blue as the sea | Rock flour not driving flat-spectrum backscatter | Fine SPM + low CDOM + depth → milky turquoise; gate on `a_CDOM(440) < ~0.5` (`28`, `12`) |
+| A yield-stress liquid spreads to level | `τ_y` not applied, or solver unregularized | Arrest at `h_c = τ_y/(ρg sinθ)` with levées; use Papanastasiou regularization (`28`, `19`) |
 | Surf zone has no bar, or the bar sits at an arbitrary depth | Cross-shore fluxes never converge at the breakpoint | Energetics profile step; bar crest near **depth** `d ≈ H_b/γ` (`12`) |
 | Rips on a dissipative beach / none on an intermediate one | Bar–rip template chosen by hand, beach state ignored | Pick the surf-zone template from `Ω = H_b/(w_s·T)` (`12`) |
 | `flowVelocity` is zero seaward of the waterline | Nearshore circulation never exported | Stamp longshore/rip/inlet currents into `flowVelocity` (`12`, `08`) |

@@ -144,6 +144,15 @@ right fix.
 | Procedural AABB + intersection shader for RT heightfields | `18` | DXR procedural-geometry sample; Vulkan RT procedural primitive model | D/F | [Microsoft sample](https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry) |
 | Opacity micromaps (alpha-tested RT geometry; not displacement) | `15` `18` | DXR opacity-micromap support and `VK_EXT_opacity_micromap` | D | [DirectX-Specs](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html) |
 | Displacement micromaps (terrain trajectory; capability-sensitive) | `18` | `VK_NV_displacement_micromap`; platform support remains non-universal | D/? | [Khronos registry](https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chapters/VK_NV_displacement_micromap.html) |
+| Stable semi-Lagrangian grid fluid | `19` | Stam, "Stable Fluids", SIGGRAPH 99, 121–128 | P | [author page](https://www.dgp.toronto.edu/public_user/stam/reality/Research/pub.html) |
+| SPH for interactive fluids | `19` | Müller, Charypar & Gross, SCA 2003, 154–159 | P | [EG digital library](https://diglib.eg.org/handle/10.2312/SCA.SCA03.154-159) |
+| Position Based Fluids (the games default) | `19` | Macklin & Müller-Fischer, ACM TOG 32(4), SIGGRAPH 2013 | P | [author page](http://blog.mmacklin.com/position-based-fluids/) |
+| FLIP in graphics (and sand-as-fluid) | `19` | Zhu & Bridson, ACM TOG 24(3), 965–972, SIGGRAPH 2005 | P | [ACM DL](https://dl.acm.org/citation.cfm?id=1073298) |
+| APIC (affine particle-in-cell) | `19` | Jiang, Schroeder, Selle, Teran & Stomakhin, ACM TOG 34(4), Art. 51, 2015 | P | [ACM DL](https://dl.acm.org/doi/10.1145/2766996) |
+| MPM for yield-stress / multi-phase materials | `19` | Stomakhin, Schroeder, Chai, Teran & Selle, SIGGRAPH 2013 | P | [Disney Animation](https://disneyanimation.com/publications/a-material-point-method-for-snow-simulation/) |
+| Screen-space fluid rendering (curvature flow) | `19` | van der Laan, Green & Sainz, I3D 2009, 91–98 | P | [ACM DL](https://dl.acm.org/doi/10.1145/1507149.1507164) |
+| Kelvin wake half-angle `arcsin(1/3) ≈ 19.47°`, speed-independent in deep water | `19` | William Thomson (Kelvin), "On Ship Waves", Proc. IMechE 38, 409–434 (1887) | P | — |
+| SPH incompressibility variants (PCISPH / IISPH / DFSPH) | `19` | Solenthaler & Pajarola, ACM TOG 28(3), 2009; Ihmsen et al., IEEE TVCG 20(3), 426–435, 2014; Bender & Koschier, SCA 2015 | P | [DFSPH](https://animation.rwth-aachen.de/publication/054/) |
 
 ## Engine & shipped-system crosswalk
 
@@ -237,7 +246,20 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   Peregrine 1976 attribution web-verified; the opposition-scalar modulation and blocking-range
   constants in the chapter are F-tier renderer practice, not from the paper. The shallow-water
   group speed in that chapter's snippet was corrected 2026-08 (`c_g = √(g·d)`; the earlier
-  `½√(g·d)` was the deep-water relation).
+  `½√(g·d)` was the deep-water relation). Energy-spectrum sections (sea states / calm / aerated,
+  2026-08): Beaufort descriptors are verbatim from NOAA SPC (D-tier, fetched); Douglas/WMO
+  adoption dates conflict across secondary sources and are deliberately not asserted; the capillary
+  minimum (23.1 cm/s @ 1.73 cm) and Kelvin angle were verified against standard references; foam
+  optics are from Dierssen 2019 (fetched; sole author verified); the waterfall
+  sheet→ligament→droplet cascade is classical instability theory with no waterfall-specific
+  canonical citation; the pure-water RGB absorption triple was corrected 2026-08 to match its
+  stated 610/550/450 nm sample points. Glacial-flour turquoise upgraded from synthesis-only to
+  P/synthesis — corroborated by glacial-lake reflectance studies (MRD 37(1) 2017; ERL 17 2022),
+  the Rayleigh explanation stays refuted.
+- `19`: PCISPH (Solenthaler & Pajarola 2009), IISPH (Ihmsen et al. 2014), DFSPH (Bender & Koschier
+  2015) and the Kelvin-wake citation (Thomson 1887) were all **web-verified 2026-08** — the `?`
+  flags are cleared. Probe-point buoyancy, the spray/foam/bubble split, domain-fade fractions and
+  budget guidance remain F-tier production practice with no canonical source.
 - `13`: RotTR snow-deformation attribution corrected 2026-07 to the GPU Pro 7 chapter
   (Michels & Sikachev; SIGGRAPH 2015 talk form); God of War row pinned to Surricchio GDC 2023.
   Still open: Horizon Frozen Wilds snow attribution (T/?, no primary talk found); wrapped-

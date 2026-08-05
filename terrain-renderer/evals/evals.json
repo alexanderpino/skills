@@ -178,6 +178,38 @@
         "States the honest limit: amplitude/steepness shaping only, no momentum exchange or true blocking dynamics",
         "Routes missing rip/outflow data upstream to terrain-architect rather than inventing currents renderer-side"
       ]
+    },
+    {
+      "id": 15,
+      "prompt": "Players can break a dam in our game and the water needs to actually pour through, flood the valley below, and knock objects around. Right now we just have an FFT ocean shader. What simulation approach should we use, and how do we draw the result?",
+      "expected_output": "Runs the representation procedure: overturning/pouring water rules out heightfield-only, but the flood body itself is a volume best served by shallow-water/pipe simulation over the terrain, with particles (PBF as the games default) for the pour, splash and debris interaction - a hybrid, not one solver. Screen-space fluid rendering for the particle liquid (sphere depth, smoothing, normal reconstruction, thickness shading) with spray/foam/bubble diffuse classes. Buoyancy via hull probe points sharing the same wave/height evaluator as rendering. Critically, identifies this as GAMEPLAY liquid state under the fluid authority contract: server-owned, replicated, persisted, collision/navmesh invalidated - not a cosmetic GPU effect.",
+      "files": [],
+      "assertions": [
+        "Chooses a hybrid: heightfield/shallow-water for the flood body plus particles for pour/splash, not a single representation",
+        "Names the structural limit driving the choice: a heightfield cannot overturn, splash or separate",
+        "Recommends PBF (or an incompressibility-corrected SPH variant) rather than naive stiff-equation SPH, with stability/large-timestep reasoning",
+        "Describes screen-space fluid rendering: particle depth, smoothing (curvature flow/bilateral), normals from smoothed depth, thickness-based absorption",
+        "Layers diffuse spray/foam/bubble particles as classified debris rather than simulating them as fluid",
+        "Applies the fluid authority contract: a flood that harms players is gameplay state (server-owned, replicated, persisted), never promoted automatically from cosmetic GPU water",
+        "Notes collision/navmesh invalidation when water changes the navigable world",
+        "Physics and rendering must sample the same surface evaluator (boats/objects float on what is drawn)"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Our ocean looks fine in a moderate breeze but fails at both extremes: on calm days it's a black mirror with one blinding dot for a sun, and in storms the breaking crests look like white-painted plastic. What's wrong?",
+      "expected_output": "Diagnoses both ends of the energy ladder. Calm: slope variance collapsing to a Dirac - clamp variance to the solar disc (0.53 deg); reflection fidelity dominates the budget; capillary cutoff means no detail below ~1.7 cm; keep residual long-period swell decoupled from local wind. Storm: aerated water is a different material - void fraction 60-99%, white from multiple scattering; foam albedo is a decay curve (~50% fresh, ~40% active, ~18% residual, not one constant, and not Koepke's 22% time-average); foam kills the Fresnel term beneath it; sea-state gates (whitecaps at Force 3, spray at Force 5, streaks at Force 7) driven by one shared wind value.",
+      "files": [],
+      "assertions": [
+        "Explains the calm failure as slope variance to zero collapsing the specular lobe toward a Dirac, fixed by clamping variance to the solar disc size",
+        "States that reflection fidelity dominates perceived quality on calm water and budgets should shift there",
+        "Mentions the capillary-gravity minimum (~23 cm/s at ~1.7 cm) as a hard lower bound on synthesised wave detail",
+        "Keeps a long-wavelength residual swell alive at zero local wind",
+        "Treats aerated water as a scattering two-phase medium (high void fraction), not a foam texture over transparent water",
+        "Uses a foam albedo decay curve (fresh ~50% to residual ~18%) rather than a single constant, and distinguishes Koepke's ~22% as a time-average",
+        "Kills Fresnel reflection under foam",
+        "Drives whitecap/spray/streak onset from wind via the Beaufort-consistent gates with one wind value shared across wave spectrum, foam and glitter"
+      ]
     }
   ]
 }

@@ -12,13 +12,18 @@ water bodies, routing, and flow fields routes to terrain-architect (its `03`/`04
 `08`/`27` output contract).
 
 Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-render-side) ·
+[Sea states: the energy ladder](#sea-states-the-energy-ladder) ·
 [Surface geometry & LOD](#surface-geometry--lod) ·
 [Screen-space water: the fullscreen-triangle pass](#screen-space-water-the-fullscreen-triangle-pass) ·
 [Ambient waves: Gerstner and FFT](#ambient-waves-gerstner-and-fft) ·
+[Calm water: the low-energy regime](#calm-water-the-low-energy-regime) ·
 [Shallow water: shoaling, refraction, and breakers](#shallow-water-shoaling-refraction-and-breakers) ·
+[Aerated water: foam, spray and whitewater](#aerated-water-foam-spray-and-whitewater) ·
 [Rivers: flow-driven surfaces](#rivers-flow-driven-surfaces) ·
 [Interactive simulation patches](#interactive-simulation-patches) ·
-[Shading and optics](#shading-and-optics) · [Shoreline integration](#shoreline-integration) ·
+[Shading and optics](#shading-and-optics) ·
+[Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) ·
+[Shoreline integration](#shoreline-integration) ·
 [Transparency & pass ordering](#transparency--pass-ordering) · [Pitfalls](#pitfalls) ·
 [Sources & provenance](#sources--provenance)
 
@@ -33,6 +38,7 @@ inputs, and the doctrine is that they are *sufficient*:
 | Water depth | Scalar field: `waterSurface - solidTop`, 0 on dry land | Absorption ramp, shoaling, shoreline fade, sim boundary |
 | Flow / velocity | 2D vector field (m/s), from routing + discharge, plus the nearshore surface circulation — longshore current, rip jets, inlet/river-mouth jets (terrain-architect `12`) | Flow-map advection, foam alignment, particle steering, sim boundary inflow, wave–current interaction |
 | Shore distance | Signed/unsigned distance to the waterline | Shoreline foam bands, wet-sand band (`13`/`14`), LOD bias near the line |
+| `liquidBody[i]` | Per-body record (terrain-architect `28`, registered in its `08`/`27`): derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour), causal state, QA fields (Secchi, Jerlov/Forel-Ule class) | **The source of `sigmaPerBody` and `scatterColorPerBody`** — see [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from). Beam attenuation `c` drives sharp sightlines; `K_d` drives the diffuse depth column |
 
 The solid terrain below the water is real terrain — bathymetry generated to dry-land standards —
 and it is the collision floor, the refraction target, and the depth source. Two hard rules fall
@@ -51,6 +57,48 @@ out of the contract, and both are load-bearing:
 When the renderer needs something the contract lacks (per-body bounding volumes, max wave
 amplitude for conservative culling bounds, river width fields), extend the contract; do not
 derive hydrology renderer-side.
+
+## Sea states: the energy ladder
+
+Water is not one rendering problem. A mirror-calm lake and a storm sea share a surface model and
+almost nothing else: which techniques matter, which dominate the frame, and which can be switched
+off entirely all change with energy. The Beaufort scale — long since given standard wind-speed and
+sea-state equivalents by the meteorological bodies — is the right spine, because its descriptors
+are *visual observations* and therefore map directly onto rendering features.
+
+| Bft | Wind (kt) | Observed sea (NOAA/WMO wording) | What the renderer must switch on |
+|---|---|---|---|
+| 0 | <1 | "Sea surface smooth and mirror-like" | Reflection fidelity is everything; **minimum slope-variance clamp** or the sun becomes a Dirac |
+| 1 | 1–3 | "Scaly ripples, no foam crests" | Capillary detail only — normal-map band, no displacement |
+| 2 | 4–6 | "Small wavelets, crests glassy, no breaking" | Displacement begins; still no foam anywhere |
+| **3** | **7–10** | "Large wavelets, crests begin to break, **scattered whitecaps**" | **Foam turns on here** — the Jacobian/coverage path starts contributing |
+| 4 | 11–16 | "Small waves, numerous whitecaps" | Whitecap coverage climbs steeply; glitter path widens |
+| **5** | **17–21** | "Moderate waves, many whitecaps, **some spray**" | **Spray particles turn on**; foam becomes a major albedo term |
+| 6 | 22–27 | "Larger waves, whitecaps common, more spray" | Aerated water is now a first-class material, not a decal |
+| **7** | **28–33** | "Waves 13–19 ft, **white foam streaks off breakers**" | **Streaked, advected foam** — orientation along wind matters |
+| 8 | 34–40 | "Edges of crests begin to break into **spindrift**, foam blown in streaks" | Wind-torn spray leaving the crest; strong aerial perspective |
+| 9–11 | 41–63 | "Dense streaks of foam, spray may reduce visibility" → "foam patches cover sea" | Spray becomes atmospheric — a participating medium, not sprites |
+| 12 | 64+ | "Sea completely white with driving spray" | Foam coverage saturates; the surface is barely water any more |
+
+Three transitions are worth hard-coding as feature gates, because they are observational facts
+rather than art direction: **whitecaps begin at Force 3**, **spray begins at Force 5**, and **foam
+streaks begin at Force 7**. They also cross-validate the coverage model in
+[Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic): Monahan's
+`W = 3.84e-6·U^3.41` puts whitecap coverage at essentially zero around 5 m/s (~0.1%) and
+conspicuous by 15 m/s (~4% of the surface), and Force 3 is 7–10 kt ≈ 3.6–5.1 m/s. An empirical formula and a 19th-century observational scale
+agreeing on where foam starts is a good sign both are right — and a strong argument for driving
+foam from wind rather than from a hand-tuned constant.
+
+The **WMO sea state code** (built on the Douglas scale) is the parallel system, and
+it classifies the *sea* rather than the *wind* — useful when swell arrives from a distant storm and
+local wind does not explain the surface. Significant wave height `H_s` (the mean of the highest
+third, and `≈ 4·sqrt(m₀)` from the spectrum's zeroth moment) is its currency and the natural
+parameter to expose in a wave-spectrum UI.
+
+**One wind, every consumer.** The same wind speed must drive the wave spectrum, the whitecap
+coverage, the glitter slope variance, the spray rate and the foam streak direction. Wiring them
+separately is how you get a mirror-calm sea covered in foam, or a gale with a needle-sharp sun
+highlight — both instantly wrong, and both common.
 
 ## Surface geometry & LOD
 
@@ -237,8 +285,78 @@ displacement. **Choppiness** (the horizontal displacement scale) sharpens crests
 self-intersection shimmer. Clamp choppiness so folding stays rare-and-foamed, not constant.
 
 Ambient synthesis as described above is a *deep-water* model: it assumes the bottom is
-infinitely far away. The moment the exported depth field says otherwise, the next section owns
-the waves.
+infinitely far away. The moment the exported depth field says otherwise,
+[Shallow water](#shallow-water-shoaling-refraction-and-breakers) owns the waves — and at the
+opposite end of the energy ladder, the low-wind case has its own failure modes.
+
+## Calm water: the low-energy regime
+
+Beaufort 0–2 is not "the easy case with the waves turned down". It is a distinct regime that
+breaks several assumptions the rest of this chapter relies on, and it is where a water renderer
+most often looks *obviously* synthetic — because there is nothing left to hide behind. The
+classic failure on a millpond is one of two: the sea goes to patent leather, or to a black void
+with one searing highlight.
+
+**There is a smallest possible wave, and it is not zero.** Including surface tension, the
+dispersion relation is
+
+```
+omega^2 = ( g*k + (sigma/rho)*k^3 ) * tanh(k*h)      # sigma = surface tension, rho = density
+```
+
+The `k³` term means phase speed *rises* again for very short waves, so it has a **minimum: about
+23.1 cm/s, at a wavelength of about 1.73 cm.** Below that wavelength you are in the capillary
+regime (surface tension restoring), above it the gravity regime. Two consequences: a spectrum has
+a natural high-frequency cutoff around a couple of centimetres — ripples finer than the minimum
+are *damped out rather than supported*, so a renderer that keeps adding finer normal-map octaves
+to "sharpen" calm water is fabricating detail the physics forbids, and will alias for its
+trouble — and wind cannot raise waves at all until it can push past that minimum
+speed, which is why a breeze produces *patches* of ripple ("cat's paws") separated by glassy
+water rather than uniform texture.
+
+**Dead calm is genuinely hard, for a specific reason.** As slope variance → 0, a microfacet
+specular lobe collapses toward a Dirac, and energy conservation makes what survives brighter as it
+narrows. The result is a single blown-out pixel-ish highlight instead of a sun reflection with
+finite extent. The fix is the same one that saves distant water: **clamp the slope variance to a
+minimum corresponding to the solar disc** (0.53°), so even a perfectly still surface produces a
+sun image of the right angular size — Bruneton et al. state the clamp explicitly. This is the
+low-energy end of the same machinery described in
+[Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic), and the symmetry
+is exact: the far sea is calm *in the pixel footprint*. Variance is the common currency at both
+extremes.
+
+**What actually sells calm water is reflection fidelity, not the surface.** With slope variance
+near zero the water is a mirror, so every reflection error is presented at full strength and
+undamped: SSR dropout at screen edges, missing off-screen geometry, a low-resolution cubemap
+fallback, a reflection that disagrees with the real scene. Rough water hides all of these; calm
+water audits them. Budget accordingly — for a still lake, planar reflection is often the honest
+choice precisely because it is the case where SSR's failure modes are most visible.
+
+**Slicks and wind shadows are variance features.** Surface films damp capillary and short gravity
+waves — Cox & Munk measured slicked water at **2–3× lower** total mean-square slope than clean sea
+(per [Sun glitter](#sun-glitter-the-sparkle-path)) — so an oil slick, a wind shadow behind an
+island or a current convergence line renders as a
+**smooth mirror patch against rougher water**, not as a dark decal. Modulate the local
+slope-variance field; the albedo barely changes. This is also why calm water is rarely uniformly
+calm: real still water is a patchwork of glassy and faintly-textured regions — much of what makes
+a real calm sea look alive rather than like a plane — and a perfectly
+uniform mirror reads as fake almost as strongly as a uniformly rough one.
+
+**Residual swell survives dead calm.** Long-period swell is generated by distant weather and
+propagates for thousands of kilometres, so a glassy surface still rises and falls on a long,
+very low-amplitude undulation. Killing all displacement at low wind gives a rigid sheet; keep a
+long-wavelength, low-amplitude component alive and **decouple it from local wind**, or moored
+boats and shorelines stop breathing. (This is also the case the WMO sea-state code exists for —
+sea classified by the *sea*, not the wind — see
+[Sea states](#sea-states-the-energy-ladder).)
+
+**Bands that vanish, and one that does not.** In this regime foam is *absent* (below Force 3),
+spray is absent (below Force 5), whitecap machinery contributes nothing, and displacement is
+negligible — so the geometry and foam budgets collapse and can be spent on reflection quality
+instead. What does *not* vanish is the water-body optics of
+[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from):
+with no surface agitation to scatter light, depth-dependent absorption and the bottom return are
+the entire look of a calm shallow lake.
 
 ## Shallow water: shoaling, refraction, and breakers
 
@@ -430,6 +548,96 @@ Wave–current interaction needs *no* new data — the flow field is already in 
 only optional addition is baking static flow into the τ solve as above.
 Max shore-wave amplitude joins max ambient amplitude in the culling-bounds inflation.
 
+## Aerated water: foam, spray and whitewater
+
+When a wave breaks, a fall lands, or a rapid churns, air is entrained and the result is **not water
+with foam painted on it — it is a different material**. Treating it as a texture on a transparent
+surface is the single most common reason breaking waves, rapids and waterfalls read as wet plastic:
+the surface underneath keeps doing Fresnel and refraction when physically there is nothing left to
+see through.
+
+**The physics, and the numbers that matter.** Whitecaps and foam are weakly-absorbing,
+strongly-scattering two-phase media. Measured **void fractions run 60–99%** in surface whitecaps —
+i.e. liquid water is only ~1–40% of the volume — with **mean bubble diameters of 0.16–1 mm**.
+Whiteness comes from **multiple scattering across thousands of air–water interfaces**, not from
+pigment, which is why foam is broadband white in the visible where water barely absorbs.
+
+**Foam albedo is a decay curve, not a constant** — and this is the most useful single fact here:
+
+| State | Visible reflectance | Reads as |
+|---|---|---|
+| Fresh, intense breaking | **~50%** | Brilliant white, the moment of the break |
+| Active whitecap | **~40%** | The body of the foam |
+| Thin residual foam / bubble plume | **~18%** | The dissipating streak behind the crest |
+
+The widely-quoted **~22% (Koepke 1984)** is a *time-averaged effective* whitecap reflectance
+derived from film density, and it under-represents fresh foam — it is the right number for
+averaging a whole sea over time, and the wrong number for a hero breaking wave. Ship the decay,
+not the average: foam should be born bright and fade to a dim streak, with reflectance falling as
+the bubble plume thins. A constant-albedo foam texture is why most game foam looks like paint.
+
+**Foam is not spectrally flat.** Reflectance drops sharply into the near-infrared, with troughs at
+roughly **750, 980 and 1200 nm** corresponding to liquid-water absorption bands — bubbles lengthen
+the path through water and *enhance* its absorption. Visible-band rendering can treat foam as
+white, but any NIR-sensitive pass (some sensor/thermal views, certain stylised looks) must not.
+
+**Three classes, one seeding criterion.** Production splits aerated water into sets that behave
+differently and cost differently — see `19` for the simulation side:
+
+| Class | Where | Motion | Cheapest honest rendering |
+|---|---|---|---|
+| **Spray** | Above the surface | Ballistic — gravity + drag, decoupled from the fluid | Bright short-lived sprites; at high wind becomes a *participating medium*, not sprites |
+| **Foam** | On the surface | Advected with the surface flow, decaying | Albedo layer that **kills the Fresnel term beneath it** |
+| **Bubbles** | Below the surface | Buoyant, advected, rising to feed foam | Density term in the water volume; brightens *and* opacifies from below |
+
+Seed all three from the same criterion — the Jacobian/folding signal of
+[Ambient waves](#ambient-waves-gerstner-and-fft) offshore, the break mask of
+[Shallow water](#shallow-water-shoaling-refraction-and-breakers) inshore, and turbulence
+intensity in rivers — so the classes stay consistent with each other and with the wave that made
+them.
+
+**Aerated water changes the water's own optics, not just its albedo.** Where bubble density is
+high, scattering swamps absorption: the body colour washes out toward white, transparency
+collapses, and the depth-based colour ramp of
+[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from)
+stops applying. Practically, blend `sigma`/scatter toward a high-albedo, high-scattering,
+short-mean-free-path set as the aeration mask rises, and drive Fresnel to zero underneath. Foam
+that still reflects the sky is an instant tell.
+
+**Backlit crests.** A thin, sunlit-from-behind wave face glows green-turquoise because light is
+transmitted through a thin water sheet carrying suspended scatterers. The standard cheap
+approximation is view-dependent translucency (Barré-Brisebois & Bouchard, GDC 2011 / GPU Pro 2 —
+shipped in Frostbite): compute transmitted light from `dot(V, −L)` distorted along the normal, and
+scale it by a **thickness** proxy. For waves the thickness proxy is free: crest height above the
+mean plane, or the inverse of the wave's local thickness at the crest. Gate it on the sun being
+*behind* the wave relative to the camera, or every crest glows all day.
+
+**Waterfalls are a construct, and the physics tells you how to build it.** A falling sheet does
+not stay a sheet: aerodynamic waves grow on its surface until the sheet ruptures, fragments
+contract into ligaments (Rayleigh–Taylor), and the ligaments break into droplets by the
+**Rayleigh–Plateau** instability, whose most unstable mode for an inviscid column is around
+**9× the radius**. So the correct visual cascade down a fall is
+**coherent sheet → perforated/streaky sheet → ligaments → droplets and mist**, and the transition
+distance shortens as discharge falls. Build a fall as that progression, not as one scrolling
+texture:
+
+```
+lip        : coherent sheet - the nappe. Scrolling normals, high transparency, sharp edge
+upper fall : sheet perforating - streaks and holes appear, foam mask climbs
+lower fall : ligaments/droplets - switch to particle-dominated, sheet mesh fades out
+impact     : maximum aeration - opaque white, ~50% albedo, Fresnel killed
+plunge pool: bubble plume rising, foam disc advecting outward and decaying to ~18%
+mist       : lit volumetric column; wets surrounding rock (13) and can carry a rainbow
+```
+
+All of it *steered* by the generator's exported discharge and drop height, none of it in the
+export. Two consequences follow: a tall fall must be **particle-dominated at the bottom and
+sheet-dominated at the top** (a single sheet mesh all the way down is the classic wet-ribbon
+look), and the mist plume is a **lit participating medium**, not a billboard disc — it is the
+element that grounds the fall in the scene, because it scatters sunlight and shadows the rock
+behind it. The recurring structural defect remains the one in
+[Rivers](#rivers-flow-driven-surfaces): a fall authored where the flow field does not support it.
+
 ## Rivers: flow-driven surfaces
 
 Rivers cannot use ambient synthesis — their motion is *directed*, and the direction is exactly
@@ -551,7 +759,10 @@ causticMask = 1.0 - saturate(verticalDepth / causticFadeDepth);
 `rayDistance` controls optical extinction along the camera path; `verticalDepth` controls the
 shore regime, caustic survival, and shallow-wave response. They are related but not
 interchangeable. `sigma` and scatter color belong to the water-body descriptor — ocean, clear
-lake, and turbid river must not share one global absorption constant.
+lake, and turbid river must not share one global absorption constant. What that descriptor
+contains, and where its numbers come from, is
+[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from)
+at the end of this section.
 - **Foam** is three masks with one compositor: shoreline foam (depth + shore distance, advected
   along shore tangent), whitecaps (Jacobian, above), flow foam (rivers, above). Composite as an
   opaque-ish albedo layer that *kills* the Fresnel reflection under it — foam is scattering
@@ -568,6 +779,225 @@ lake, and turbid river must not share one global absorption constant.
   true split-screen meniscus (render both states, mask by the wave-displaced waterline in screen
   space — expensive, hero-camera only). The untreated version — one frame of neither-state
   garbage at the crossing — is a certified review catch.
+
+### Water-body optical identity: where `sigma` actually comes from
+
+Most water shaders expose `sigma` and a scatter colour as art-directed swatches. They are
+measurable physical quantities, and picking them from oceanography instead of from a colour
+picker is the cheapest realism win in the whole chapter — it is what separates "blue-tinted
+glass" from *this specific water*. The generation-side producer of this descriptor is
+terrain-architect's liquid property bundle (its `28`, exported as `liquidBody[i]` in its
+`08`/`27` contract) — when the pipeline ships it, consume it rather than re-authoring; this
+section is the theory for reviewing those values and the fallback for pipelines that lack them.
+
+**Pure water is blue for a spectroscopic reason.** Its visible absorption is the high-order
+overtone band of the O–H stretch — vibrational, not electronic — which is why absorption is
+minimal in the blue and climbs steeply into the red. Pope & Fry's measurements put the minimum
+at **0.0044 m⁻¹ at 418 nm**, against **0.62 m⁻¹ at 700 nm**: red is ~140× more strongly absorbed
+than blue-violet. In practice red is gone by ~5 m, orange by ~10 m, yellow by ~20 m, green by
+~40 m. That single ratio is the entire shallow→deep colour ramp, and it is *not* sky reflection.
+
+```
+sigma_RGB ~= (a + b_b) evaluated at ~610 / ~550 / ~450 nm
+a_water   ~= (0.25, 0.056, 0.0092) m^-1     # pure water at 610/550/450 nm, Pope & Fry 1997
+#   the absolute minimum is 0.0044 m^-1 at 418 nm - deep violet, below a typical B channel
+```
+
+**Three constituents move water off pure blue,** and they are worth exposing as the shader's
+actual authoring dials because each has a *distinct* visual signature:
+
+| Constituent | Optical effect | Reads as |
+|---|---|---|
+| **Chlorophyll** (phytoplankton) | Absorbs blue (~440 nm) *and* red (~675 nm), leaving a transmission window at 550–570 nm | Green. Productive lakes, coastal blooms; pea-soup opaque at high load |
+| **CDOM** / tannins / "gelbstoff" | Absorbs steeply toward blue, `a(λ) = a₄₄₀·exp[−S(λ−440)]`, `S ≈ 0.012–0.022 nm⁻¹`. **Scatters not at all** | Transparent but *dark*. Tea/amber shallow, near-black deep |
+| **Suspended mineral sediment** | Scattering, near spectrally *flat* (`b_b ∝ λ^−0.5…−1` vs λ^−4.3 for water molecules) | Adds white → raises brightness. Turquoise → green → ochre as load climbs |
+
+The critical distinction for a shader author: **CDOM darkens, sediment brightens.** They are not
+interchangeable "murkiness" sliders. Blackwater (Rio Negro, `a_CDOM(440) ≈ 9 m⁻¹`) kills blue
+within ~11 cm but passes red to ~1.4 m — so it reads amber in the shallows and, because CDOM
+contributes *no* backscatter, near-black and mirror-like over the channel. Model that with a
+turbidity slider and you get mud instead.
+
+**Glacial turquoise is not Rayleigh scattering.** This is stated all over the web and is
+physically impossible: rock flour is 2–65 µm, 10–100× the wavelength, firmly in the Mie/geometric
+regime where scattering is nearly *wavelength-independent*. The real mechanism is a two-step:
+flat-spectrum backscatter shortens the mean photon path to order a metre, and over that short
+path `a_water` still removes red efficiently while barely touching blue-green. Concentration is
+therefore the *hue* knob — more flour shifts it paler and greener, less goes deeper blue — which
+is exactly why proglacial lake chains get bluer downstream as flour settles out, and why the same
+lake drifts in hue across the melt season.
+
+**Authoring handle: Secchi depth.** The cleanest bridge between an artist-legible dial and the
+shader is `Z_SD ≈ 1 / min_λ K_d` (Lee et al. 2015) — "you can see four metres down" fixes the
+minimum of the diffuse attenuation spectrum, and *which wavelength* that minimum sits at is the
+water's hue. Author clarity plus a water class; solve for `sigma`.
+
+**One trap worth stating:** `c = a + b` (beam attenuation) and `K_d` (diffuse attenuation) are
+different coefficients, and `c` is typically 5–20× larger because forward scattering dominates
+(`b_f` ≳ 50·`b_b`). Use `c` for a *sharp sightline* — how fast a submerged object's own radiance
+is lost, i.e. refracted lookthrough — and `K_d` for the *diffuse light column*, i.e. depth-tinted
+volumetric fog. Driving both from one constant makes water look far murkier than it is.
+
+**Clear does not mean bright.** Reflectance goes as `b_b/a`; in the clearest water `b_b` is
+molecular only and tiny, so deep clear water returns almost nothing and reads **near-black with a
+blue cast**, with all apparent brightness coming off the surface. Shallow clear water over bright
+sand is luminous cyan because the *bottom* is the return path. A shader that maps "clear →
+bright cyan" gets the tropical shallows right and the drop-off catastrophically wrong; the reef
+edge is exactly where `b_b` stops being bottom-dominated and becomes molecular.
+
+**Presets.** Jerlov's water types (oceanic I, IA, IB, II, III; coastal 1C–9C) are the standard
+classification, defined by the spectral shape of `K_d`, and Morel's chlorophyll ladder maps them
+to a look (type I ≈ 0–0.01 mg/m³, deepest blue; III ≈ 1.5–2.0, green and productive). Ship them
+as named presets rather than as sliders. Honest caveat: the numeric `K_d(λ)` tables live in
+Jerlov (1976) Tables XXVI–XXVII and Solonenko & Mobley (2015), both paywalled — the values
+circulating in blog posts and asset packs are mostly untraced. Either extract them from the
+source, or generate the oceanic series by running the Solonenko & Mobley `K_d(a,b)` relation
+forward from the chlorophyll ladder, and say which you did.
+
+### Sun glitter: the sparkle path
+
+`sun_glint` in the composition formula above is not a decorative extra — it is the single
+brightest thing on a sunlit sea, and getting it wrong is the most common reason ocean renders
+read as vinyl. The failure is structural, not a tuning problem.
+
+**The physics.** The sun's disc subtends **0.53°** — about 1/8000 of the hemisphere. The
+sea-surface slope distribution is enormously wider: Cox & Munk photographed sun glitter from
+aircraft and fitted mean-square slope against wind speed,
+
+```
+sigma_c^2 = 0.003 + 1.92e-3 * W        # crosswind component
+sigma_u^2 = 0.000 + 3.16e-3 * W        # up/downwind component
+sigma_c^2 + sigma_u^2 = 0.003 + 5.12e-3 * W
+#   W = wind speed in m/s AT 12.5 m (not the 10 m of standard wind data — convert)
+#   valid 1-14 m/s; at 14 m/s total mss ~= (tan 16 deg)^2, i.e. rms slope ~= 0.28
+```
+
+so the reflected-direction spread is **tens of degrees** while the source is a fraction of one.
+The distribution is *anisotropic* — `sigma_u^2/sigma_c^2` averages about 1.34, ranging 1.0–1.8
+with steadier wind giving stronger anisotropy — so the glitter pattern is an ellipse elongated
+along the wind, not a disc.
+
+**Why the naive version inverts the physics.** A sharp specular lobe (high Blinn-Phong exponent,
+low GGX alpha) on a normal-mapped surface produces one small blown-out highlight where the mirror
+direction lands. Reality is the opposite: a *glitter path* stretching tens of degrees toward the
+observer, made of thousands of individually resolvable facets winking on and off. A tight lobe is
+not "glitter that needs more contrast" — it is the wrong shape of function.
+
+**Three tiers, and the first two are not alternatives.**
+
+| Tier | Mechanism | Use |
+|---|---|---|
+| Statistical BRDF | Evaluate a microfacet BRDF whose NDF **is** the Cox–Munk anisotropic Gaussian, with Smith masking. Ross et al. 2005 is the standard analytic form; it is what Bruneton's ocean uses | **The base. Always.** Correct energy and lobe width at every distance |
+| Discrete glints | Count actual facets reflecting toward the eye within the pixel footprint — Deliot & Belcour's binomial-law method is the current real-time state of the art | Near-to-mid field, where individual sparkles resolve |
+| Noise-perturbed specular | Scroll a noise texture through the specular term | Indie tier. Cheap, reads acceptably, physically unfounded |
+
+Tier 1 gives correct *statistics*; tier 2 gives correct *granularity*. Shipping tier 2 alone
+gives sparkle that does not integrate to the right brightness; shipping tier 1 alone gives a
+correct but slightly too-smooth glitter path in the near field. Production is tier 1 everywhere
+plus tier 2 within a fade radius.
+
+**Wind is a rendering parameter here, not just an animation one.** Because mean-square slope is a
+function of wind speed, the glitter path *widens and dulls* as wind rises, and *narrows and
+intensifies* as it drops. Wire the same wind that drives the wave spectrum into the glitter
+variance or the two disagree — a mirror-calm sea with a wide glitter path is an instant tell.
+
+**Slicks are a slope-variance effect, not a colour effect.** Cox & Munk also measured oil-slicked
+water: films damp capillary and short gravity waves, cutting total mean-square slope by a factor
+of **2–3** and eliminating the skewness entirely. So an oil slick, a wind shadow behind an island,
+or a current-convergence line should be rendered as a **local reduction of the slope-variance
+field** — which makes it appear as a smooth mirror-like patch against rough sea — not as a dark
+albedo decal. This is the mechanism behind every "glassy streak" on a real ocean.
+
+## Distance and filtering: why far water turns to plastic
+
+Water that reads beautifully at 50 m routinely reads as shrink-wrapped perspex at 5 km — a
+glossy, uniform dome with one hot highlight. This is not an art problem and it is not fixed by
+better textures. It is a filtering failure with four distinct causes, and it is the single most
+common complaint about otherwise-good ocean renderers.
+
+**The core mechanism: thrown-away slope variance.** As distance grows, the number of waves inside
+one pixel footprint grows without bound. Per-pixel normals computed from displaced geometry
+converge to the *mean* normal — vertical — and all the slope variance those waves carried is
+silently discarded. With near-zero variance the specular lobe collapses toward a Dirac; energy
+conservation then makes the surviving highlight *brighter* as it narrows. One shading sample per
+pixel hits or misses it essentially at random as the camera moves, so you get sparkling fireflies
+at best and a mirror-flat plastic sheet everywhere else. MSAA does not help — the highlight is
+smaller than the geometry it sits on.
+
+**The fix is to move the variance rather than lose it.** Bruneton, Neyret & Holzschuch's ocean
+model is built exactly around this: wave trains are attenuated out of the geometry as their
+wavelength drops below the projected grid cell, out of the normal map as it drops below the pixel,
+and everything removed is accumulated into a **2×2 slope-variance tensor in the wind frame** that
+widens the BRDF lobe. Because it is the *same* quantity moved between representations, the
+transition is seamless by construction — displaced geometry near, normal detail mid, statistical
+BRDF far, with no popping and no discontinuity.
+
+```
+# per wave train i, with w_r = the fraction NOT resolved by geometry or normals:
+sigma_x^2, sigma_y^2  =  SUM_i  (k_i,x^2, k_i,y^2)/||k_i||^2 * (1 - sqrt(1 - ||k_i||^2 * w_r^2 * h_i^2))
+#   axes are along/across the wind - i.e. exactly the Cox-Munk ellipse from the glitter section
+#   practical trick: total variance for ALL waves on the CPU, subtract the RESOLVED waves in the
+#   shader, so shader cost scales with resolved wave count and is MINIMAL for distant views
+```
+
+Two details worth stealing verbatim: Nyquist argues the geometry cutoff should be 2 grid cells,
+but that over-blurs in practice — Bruneton et al. use **N_min = 1.0, N_max = 2.5** with a
+smoothstep between. And the variance must be **clamped to a minimum** matching the solar disc,
+or dead-calm water still produces a Dirac (see [Calm water](#calm-water-the-low-energy-regime)).
+
+**Cause two: Fresnel that ignores roughness.** Plain Schlick assumes a *smooth* surface. On a
+rough surface at grazing incidence, microfacet masking means the effective reflectance is
+substantially lower than Schlick predicts. Ship plain Schlick on a low-variance distant ocean and
+the horizon band goes to near-100% mirror — that is precisely the chrome-dome look. The fix is
+one line, fitted for `sigma_v < 0.5`:
+
+```hlsl
+float  sigma_v2 = sigma_x2*cos2Phi + sigma_y2*sin2Phi;        // slope variance toward the viewer
+float  sigma_v  = sqrt(sigma_v2);
+float  F = R + (1.0-R) * pow(1.0-cosThetaV, 5.0)
+             * exp(-2.69*sigma_v) / (1.0 + 22.7*pow(sigma_v, 1.5));   // Bruneton et al. 2010
+```
+
+Also make sure the Smith masking/shadowing term is present in the sun lobe — that is what stops
+grazing-angle over-brightening, and with a statistical BRDF you get wave self-shadowing from it
+for free rather than needing a shadow map.
+
+**Cause three: binary whitecaps.** A per-pixel Jacobian threshold (as in
+[Ambient waves](#ambient-waves-gerstner-and-fft)) is correct up close and *disintegrates* at
+distance: sub-pixel foam either aliases into shimmer or vanishes, so the far sea loses the
+speckle that tells the eye it is rough. The prefilterable fix assumes the Jacobian is normally
+distributed within the footprint and integrates the coverage in closed form:
+
+```
+W  ~=  0.5 + 0.5 * erf( (sqrt(2)/(2*sigma_A)) * (eps - mu_A) )
+#   mu_A, sigma_A^2 = mean and variance of the Jacobian over the pixel footprint
+#   BOTH are linearly prefilterable -> free hardware mipmapping and aniso filtering
+```
+
+Foam then has a correct *fractional coverage* at every distance instead of a binary mask.
+Ground-truth the amount against Monahan & O'Muircheartaigh's whitecap–wind relation,
+`W = 3.84e-6 * U^3.41` (U at 10 m): the exponent is steep enough that foam is essentially absent
+at 5 m/s (~0.1% coverage) and conspicuous by 15 m/s (~4%), so coverage must be driven by wind,
+not by a constant.
+
+**Cause four: everything else that flattens distance.** Missing aerial perspective (the horizon
+keeps full contrast and saturation and reads as a hard shell — share the atmosphere LUT with
+terrain, per `10`); a constant sky tint instead of a *variance-filtered* environment fetch, which
+throws away the sky gradient the reflection should carry; and missing water-leaving radiance
+(`I_sea ≈ L_sea·(1 − F̄)`), without which the surface only reflects and never transmits, so it has
+no volume at all — the literal shrink-wrap reading. A cheap trick worth knowing: put non-zero
+radiance *below* the horizon in the environment map, since downward-reflected rays physically
+re-reflect or refract; without it distant wave troughs go too dark.
+
+**The unifying idea.** Cox & Munk's slope statistics, Bruneton's variance-fed BRDF, Toksvig and
+LEAN and Kaplanyan-style NDF filtering, and prefilterable whitecap coverage are all the same
+move: **carry a prefilterable statistic of unresolved sub-pixel surface variation alongside the
+resolved geometry, and let the shading model consume it.** Build the pipeline around that one
+principle and correct glitter, correct distant roughness, correct foam coverage and freedom from
+specular aliasing all fall out together. Bruneton's analytic form is preferable where the
+spectrum is known (no screen-space derivative error, exact at grazing angles); Kaplanyan/Tokuyoshi
+geometric specular AA is the numerical fallback for residual curvature. Route the general
+normal-variance-to-roughness math to physically-based-rendering.
 
 ## Shoreline integration
 
@@ -664,6 +1094,32 @@ Water is the classic hard transparency case, and the frame must be structured fo
 - **Foam double-count in the surf zone**: Jacobian whitecaps and breaker foam both firing on
   the same crests. In the shore band, the breaker lifecycle owns foam; fade the Jacobian
   accumulator out with the ambient cascades.
+- **One blown highlight instead of a glitter path**: a sharp specular lobe on water. The sun is
+  0.53° wide; the sea-slope distribution is tens of degrees. The lobe shape is wrong, not its
+  intensity — evaluate a Cox–Munk-width statistical BRDF and add discrete glints on top.
+- **Glitter that ignores wind**: wave spectrum driven by wind speed, glitter variance hard-coded.
+  Mean-square slope is a function of wind — a mirror-calm sea with a wide glitter path, or a gale
+  with a needle highlight, both read as broken. One wind, both consumers.
+- **Slicks painted as dark decals**: a surface film's real effect is halving-to-thirding the local
+  mean-square slope, which makes it a *smooth mirror patch*, not a stain. Modulate the
+  slope-variance field, not albedo.
+- **Distant sea turns to plastic**: slope variance from sub-pixel waves discarded instead of being
+  folded into BRDF roughness. The lobe collapses toward a Dirac and energy conservation brightens
+  what survives. Track the variance tensor and feed it the leftovers (Bruneton).
+- **Chrome-dome horizon**: plain Schlick Fresnel on a low-variance distant ocean drives grazing
+  reflectance to ~100%. Use the roughness-aware Fresnel fit and keep Smith masking in the sun lobe.
+- **Whitecaps shimmer or vanish at distance**: a binary per-pixel Jacobian threshold cannot be
+  filtered. Switch to prefilterable statistical coverage over the footprint's Jacobian mean and
+  variance; ground the amount against `W = 3.84e-6·U^3.41`.
+- **Deep clear water rendered bright cyan**: reflectance goes as `b_b/a`, and in clear water `b_b`
+  is molecular and tiny — deep clear water is near-black. Bright cyan is *shallow* water over a
+  bright bottom. Getting this backwards kills every reef drop-off.
+- **Tannin-stained water modelled with a turbidity slider**: CDOM absorbs and does not scatter, so
+  blackwater is transparent-but-dark (amber shallow, near-black deep). Raising scattering gives
+  mud. They are opposite controls.
+- **Clear tropical water looks washed out**: blue absorption taken from Smith & Baker (1981),
+  which is ~3.4× too high there due to scattering contamination. Use Pope & Fry (1997) above
+  380 nm.
 - **Surf marches unchanged across the river mouth**: the shore-wave band reads only depth, so
   incoming waves ignore the outflow that should steepen, block, and break them — and rip
   currents in the flow field leave no lanes in the breaker line. Modulate the band by
@@ -718,8 +1174,117 @@ Water is the classic hard transparency case, and the frame must be structured fo
   [Slides PDF (Valve)](https://cdn.akamai.steamstatic.com/apps/valve/2010/siggraph2010_vlachos_waterflow.pdf).
 - **P** — Bruneton, Neyret & Holzschuch, "Real-time Realistic Ocean Lighting using Seamless
   Transitions from Geometry to BRDF" (Computer Graphics Forum 29(2), 2010): the principled
-  treatment of wave detail crossing from geometry band to shading band.
+  treatment of wave detail crossing from geometry band to shading band — the slope-variance
+  tensor, the roughness-aware Fresnel fit, and the variance-filtered environment fetch used in
+  [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic).
   [HAL open access](https://inria.hal.science/inria-00443630).
+- **P** — Cox & Munk, "Measurement of the Roughness of the Sea Surface from Photographs of the
+  Sun's Glitter" (Journal of the Optical Society of America 44(11), 838–850, 1954): the
+  sea-surface slope distribution and its wind-speed regressions; the foundation of every
+  statistical glitter model. Wind speed is referenced at **12.5 m**, and the fit is calibrated
+  only over 1–14 m/s — do not extrapolate to storm winds. Verified 2026-08 against the paper.
+  [DOI 10.1364/JOSA.44.000838](https://doi.org/10.1364/JOSA.44.000838).
+- **P** — Ross, Dion & Potvin, "Detailed analytical approach to the Gaussian surface
+  bidirectional reflectance distribution function specular component applied to the sea surface"
+  (JOSA A 22(11), 2442–2453, 2005): the Gaussian-slope microfacet BRDF with Smith masking that
+  Bruneton's model evaluates. The analytic base tier for glitter.
+- **P** — Discrete-glint rendering lineage: Jakob, Hašan, Yan, Lawrence, Ramamoorthi & Marschner,
+  "Discrete Stochastic Microfacet Models" (ACM TOG 33(4), SIGGRAPH 2014); Yan, Hašan, Jakob,
+  Lawrence, Marschner & Ramamoorthi, "Rendering Glints on High-Resolution Normal-Mapped Specular
+  Surfaces" (ACM TOG 33(4), 2014); Yan, Hašan, Marschner & Ramamoorthi, "Position-Normal
+  Distributions for Efficient Rendering of Specular Microstructure" (ACM TOG 35(4), 2016);
+  Zirr & Kaplanyan, "Real-time Rendering of Procedural Multiscale Materials" (I3D 2016);
+  Chermain, Sauvage, Dischler & Dachsbacher (CGF 39(7), Pacific Graphics 2020) and Chermain,
+  Lucas, Sauvage, Dischler & Dachsbacher (I3D 2021) for real-time procedural glints;
+  **Deliot & Belcour, "Real-Time Rendering of Glinty Appearances using Distributed Binomial Laws
+  on Anisotropic Grids" (HPG 2023, Best Paper; CGF 42(8))** — the current real-time state of the
+  art. Author lists verified 2026-08.
+- **P** — Dupuy & Bruneton, "Real-time Animation and Rendering of Ocean Whitecaps" (SIGGRAPH Asia
+  2012 Technical Briefs, Article 15): the prefilterable statistical whitecap coverage
+  (`W ≈ ½ + ½·erf(...)` over the Jacobian's footprint mean and variance). The direct sequel that
+  fills the gap Bruneton et al. 2010 explicitly left open — that paper states it does **not**
+  handle whitecaps. [Code](https://github.com/jdupuy/whitecaps).
+- **P** — Monahan & O'Muircheartaigh, "Optimal Power-Law Description of Oceanic Whitecap Coverage
+  Dependence on Wind Speed" (Journal of Physical Oceanography 10(12), 2094–2099, 1980):
+  `W = 3.84×10⁻⁶·U^3.41` (U at 10 m). The oceanographic ground truth for how much foam a given
+  wind should produce.
+- **P** — Pope & Fry, "Absorption spectrum (380–700 nm) of pure water. II. Integrating cavity
+  measurements" (Applied Optics 36(33), 8710–8723, 1997): the modern pure-water absorption
+  spectrum; minimum **0.0044 m⁻¹ at 418 nm**. Use this above 380 nm.
+  ⚠️ **Do not use Smith & Baker (1981) for blue absorption** — that era's measurements were
+  scattering-contaminated and give `a(420)` ~3.4× too high, which desaturates clear water.
+  Smith & Baker remains correct for UV (<380 nm) and for `K_d`.
+- **P** — Braun & Smirnov, "Why is water blue?" (Journal of Chemical Education 70(8), 612, 1993):
+  water's visible absorption is vibrational O–H overtone spectroscopy, not sky reflection.
+- **P** — Lee et al., "Secchi disk depth: A new theory and mechanistic model for underwater
+  visibility" (Remote Sensing of Environment 169, 139–149, 2015): shows the classical Secchi
+  relation is not derivable from radiative transfer and replaces it with `Z_SD ≈ 1/min_λ K_d` —
+  the artist-dial-to-`sigma` bridge. The classical `K_PAR = 1.44/Z_SD` constant is Holmes (1970),
+  the best-performing of ~13 published constants spanning 1.27–1.86.
+- **P** — Jerlov, *Marine Optics* 2nd ed. (Elsevier, 1976), Tables XXVI–XXVII; Solonenko & Mobley,
+  "Inherent optical properties of Jerlov water types" (Applied Optics 54(17), 5392–5401, 2015);
+  Morel (1988) for the Jerlov↔chlorophyll ladder. The water-type presets.
+  ⚠️ **The numeric `K_d(λ)` tables in all three are paywalled and were NOT obtained** — values
+  circulating in blog posts and asset packs are largely untraced. Either extract from source or
+  generate the oceanic series from the Solonenko & Mobley `K_d(a,b)` relation, and say which.
+- **P** — Babin, Morel, Fournier-Sicre, Fell & Stramski (Limnology & Oceanography 48(2), 843–859,
+  2003): mass-specific scattering, ≈0.5 m²/g for mineral-dominated suspended matter at 555 nm —
+  the concentration-to-optics bridge.
+- **P/synthesis** — **Glacial-flour turquoise.** The popular Rayleigh/Tyndall explanation is
+  physically wrong (rock flour is 2–65 µm, 10–100× the wavelength — Mie/geometric regime, where
+  scattering is nearly wavelength-independent). The mechanism given in this chapter — flat
+  backscatter shortens the photon path, over which `a_water` still removes red — is corroborated
+  by measured-reflectance limnology: glacial-lake reflectance studies relate colour to suspended
+  sediment and report that **finer grains at fixed concentration shift the reflectance peak
+  shorter and brighten the water** (Everest-region in-situ + satellite study, *Mountain Research
+  and Development* 37(1), 2017; high-elevation U.S. Rocky Mountain lakes, *Environmental Research
+  Letters* 17, 2022). The full first-principles chain is assembled here rather than quoted from a
+  single proglacial-lake IOP study; the mechanism is sound and now grounded.
+- **D** — Beaufort wind force scale with its standard sea descriptions: the observational ladder
+  used for [Sea states](#sea-states-the-energy-ladder). Descriptor wording taken verbatim from
+  NOAA's Storm Prediction Center table (fetched 2026-08) — whitecaps first at Force 3, spray at
+  Force 5, foam streaks at Force 7, spindrift at Force 8, "sea completely white" at Force 12.
+  [NOAA SPC](https://www.spc.noaa.gov/faq/tornado/beaufort.html). The **WMO sea state code** (built
+  on the Douglas scale) is the parallel sea-based classification; `H_s` as the mean of the highest
+  third and `≈ 4·sqrt(m₀)` is standard oceanography. Adoption dates for the Douglas scale and the
+  WMO codes conflict across secondary sources (Douglas 1921/1929; WMO wave codes 1946/1947/1970)
+  and are deliberately **not** stated as fact here — only the NOAA descriptor wording is
+  authoritative in this section.
+- **P** — Capillary–gravity dispersion `ω² = (gk + (σ/ρ)k³)·tanh(kh)` and its **minimum phase speed
+  ≈ 23.1 cm/s at ≈ 1.73 cm wavelength** — the hard short-wavelength bound used in
+  [Calm water](#calm-water-the-low-energy-regime). Classical fluid mechanics; the constants were
+  web-verified 2026-08 against standard references, the original derivation was not chased.
+- **P** — Whitecap and foam optics: **void fraction 60–99%**, **mean bubble diameter 0.16–1 mm**,
+  visible reflectance **~50% fresh breaking / ~40% active whitecap / ~18% thin residual foam**, and
+  NIR reflectance troughs at **~750, 980, 1200 nm** from liquid-water absorption enhanced by
+  multiple passes through bubble walls. Dierssen, H.M., "Hyperspectral Measurements,
+  Parameterizations, and Atmospheric Correction of Whitecaps and Foam From Visible to Shortwave
+  Infrared for Ocean Color Remote Sensing", *Frontiers in Earth Science* 7:14 (2019), fetched and
+  extracted 2026-08; sole author verified 2026-08.
+  [Open access](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2019.00014/full).
+  **Koepke (1984)'s ~22%** is a *time-averaged effective* whitecap reflectance from film-density
+  measurements and under-represents fresh foam — correct for sea-average radiometry, wrong for a
+  hero breaking wave. Earlier spectral work: Frouin et al. (JGR Oceans, 1996); Kokhanovsky
+  (JGR Oceans, 2004).
+- **T** — Barré-Brisebois & Bouchard, "Approximating Translucency for a Fast, Cheap and Convincing
+  Subsurface Scattering Look" (GDC 2011; also GPU Pro 2; shipped in Frostbite 2): the
+  view-dependent `dot(V, −L)` + thickness translucency approximation used for backlit wave crests.
+  Verified 2026-08. [Frostbite](https://www.ea.com/frostbite/news/approximating-translucency-for-a-fast-cheap-and-convincing-subsurface-scattering-look).
+- **P** — Liquid-sheet breakup cascade behind the waterfall progression: aerodynamic wave growth
+  ruptures the sheet, fragments contract into ligaments (Rayleigh–Taylor), ligaments break into
+  droplets by the **Rayleigh–Plateau** instability, most-unstable mode ≈ **9× the column radius**
+  for an inviscid jet. Classical instability theory; mechanism chain web-verified 2026-08, no
+  single canonical citation chased for the waterfall application specifically.
+- **F** — The waterfall build (nappe → perforated sheet → ligaments → droplets → plunge-pool plume
+  → lit mist), the three-class spray/foam/bubble split, and the sea-state feature gates as
+  *rendering* triggers: production practice assembled over the physics above. The physics is P/D;
+  the mapping to render features is this skill's composition.
+- **P** — Specular-aliasing / normal-variance-to-roughness lineage: Toksvig, "Mipmapping Normal
+  Maps" (Journal of Graphics Tools 10(3), 65–71, 2005); Olano & Baker, "LEAN Mapping" (I3D 2010,
+  181–188); Kaplanyan, Hill, Patney & Lefohn, "Filtering Distributions of Normals for Shading
+  Antialiasing" (HPG 2016); **Tokuyoshi & Kaplanyan, "Improved Geometric Specular Antialiasing"
+  (I3D 2019)** — the current default, and specifically better at grazing angles, which is where
+  a water horizon lives. The math routes to physically-based-rendering.
 - **P** — Johanson, "Real-time water rendering — introducing the projected grid concept" (MSc
   thesis, Lund University, 2004): the screen-space grid concept and its horizon-edge behavior,
   as compared in the geometry table.

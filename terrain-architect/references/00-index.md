@@ -298,6 +298,13 @@ end-to-end as regime settings over the Legal Order, see the **archetype blueprin
 | Beach states (reflective ↔ dissipative; bar–rip templates) | P | Wright & Short 1984, Marine Geology 56(1–4), 93–118 — `Ω = H_b/(w_s·T)`; <1 / 1–6 / >6 (`12`) |
 | Rip currents (setup-gradient circulation; bar-gap scour feedback) | P | Bowen 1969, JGR 74(23), 5467–5478; review MacMahan, Thornton & Reniers 2006, Coastal Eng. 53(2–3), 191–208 — spacing O(100 m), quasi-rhythmic (`12`) |
 | Tidal inlet equilibrium & ebb/flood tidal deltas | P (prism–area) / L (landforms) | O'Brien 1969, ASCE J. Waterways & Harbors Div. 95(WW1), 43–52 — `A_inlet = C_OB·P_tide^0.85`; first form O'Brien 1931. Do not merge with the similarly-titled 1966 ICCE paper. Deltas are compositions (`12`) |
+| Pure-water absorption spectrum (why water is blue) | P | Pope & Fry 1997, Appl. Opt. 36(33) — min 0.0044 m⁻¹ @418 nm, ~140× that in the red; vibrational-overtone origin Braun & Smirnov 1993. **Smith & Baker 1981 blue absorption is ~3.4× too high** (`28`) |
+| Water constituents: chlorophyll / CDOM / suspended sediment | P | Bricaud-form `a_ph`; CDOM `a₄₄₀·exp[−S(λ−440)]`, S≈0.012–0.022; mineral `b_p(555)/SPM ≈ 0.5 m²/g` (Babin et al. 2003). **CDOM darkens, sediment brightens — opposite controls** (`28`) |
+| Jerlov water types; Forel-Ule index | P | Jerlov 1976 Tables XXVI–XXVII; Solonenko & Mobley 2015; Morel 1988 ladder; FU/hue-angle Pitarch et al. 2021. ⚠️ Numeric `K_d` tables paywalled — generate or cite honestly (`28`) |
+| Secchi depth ↔ attenuation | P | Lee et al. 2015 — `Z_SD ≈ 1/min_λ K_d`, replacing the classical constant (best classical fit: Holmes 1970, 1.44) (`28`) |
+| Glacial-flour turquoise | F/synthesis | Popular Rayleigh explanation is **wrong** (2–65 µm ≫ λ). Flat backscatter shortens photon path; `a_w` removes red over it. No peer-reviewed optical study located (`28`) |
+| Yield-stress liquids: Bingham / Herschel-Bulkley | P | Bingham 1922; Herschel & Bulkley 1926; **Papanastasiou 1987** regularization. `h_c = τ_y/(ρg sinθ)` sets deposit thickness; levées are diagnostic — Hulme 1974 (`28`, `19`) |
+| Mud vs debris flow rheology | P | O'Brien & Julien 1988 — μ and τ_y rise **exponentially** with sediment concentration; Iverson 1997 — coarse debris flows are pore-pressure governed, not single-phase (`28`, `05`) |
 | Tides / intertidal zone / tidal flats | F | Authored oscillation of the water plane; astronomy, a look. Water is a dynamic layer (`08`, `12`) |
 | Seafloor age–depth subsidence (ridge → abyssal plain) | P | Parsons & Sclater 1977 (√age half-space); Stein & Stein 1992 (GDH1 plate model) (`12`) |
 | Hotspot track / seamount / guyot | P (age progression) / P-hypothesis (plume) | Wilson 1963; Morgan 1971; Hess 1946 (guyot truncation) (`11`, `12`) |

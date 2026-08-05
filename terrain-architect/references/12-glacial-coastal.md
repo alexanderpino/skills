@@ -805,7 +805,7 @@ compositions on top of the shoreface.
 A barrier coast (the longshore section) is not a sealed wall: the tide must fill and drain the
 lagoon behind it, and it does so through **inlets** whose geometry the tide itself maintains.
 **O'Brien's relation** (1969; first form 1931): at equilibrium, the inlet's minimum flow
-cross-section tracks the **tidal prism** `P` — the water volume exchanged per half tidal cycle:
+cross-section tracks the **tidal prism** `P_tide` — the water volume exchanged per half tidal cycle:
 
 ```
 P_tide  = tidalRange · bayArea            # tidal prism per half cycle; range from the tides section

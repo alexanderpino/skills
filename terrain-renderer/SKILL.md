@@ -1,16 +1,17 @@
 ---
 name: terrain-renderer
 description: >-
-  Principal terrain-rendering authority for real-time worlds to 2026 AAA standards, across every
+  Principal terrain-rendering authority for real-time worlds, across every
   paradigm: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (Nanite
-  family), engine-native terrain (UE Landscape, Nanite Landscape, 5.8 Mesh Terrain), blocky and
+  family), engine-native terrain (UE Landscape, Nanite Landscape, Mesh Terrain), blocky and
   smooth voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
-  raymarching (Voxel Space lineage), tiled streaming, splatmaps and virtual texturing,
+  raymarching, tiled streaming, splatmaps and virtual texturing,
   GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
-  shoal/shore-aware waves and breakers, rivers, fullscreen-triangle pass), snow and weather
+  shore breakers, rivers, fullscreen-triangle pass, SPH/PBF fluid sim, buoyancy,
+  whitewater), snow and weather
   state, auxiliary maps, vegetation and scatter, roads/decals/deformation, physics handoff,
-  tool viewports, and the artifact
-  catalogue. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at scale, or
+  and tool viewports. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at
+  scale, simulating water, or
   streaming large worlds - even if 'terrain' is never said (heightmap renderer, Minecraft clone,
   planet renderer). Not for terrain generation (terrain-architect) or BRDF math
   (physically-based-rendering).
@@ -88,7 +89,7 @@ runtime craters and tracks (`17`).
 Out of scope: generating the terrain data itself (route terrain-architect — including "why do
 my rivers stop", which is a generation-graph defect, not a rendering one); generic mesh
 rendering of props/characters; BRDF derivations (route physically-based-rendering); offline
-film-quality fluid sim; UI maps and minimaps. Falling rain and snow belong to VFX/particle
+film-quality fluid sim (the *real-time* tier is in scope and is `19`); UI maps and minimaps. Falling rain and snow belong to VFX/particle
 systems; lens and screen droplets belong to PostFX. Terrain owns only their **surface reaction**
 and the data those systems consume: depth/coverage for cave rejection, wetness, pooling,
 accumulation, and collision. A request containing "voxel" or "LOD" is not enough by itself; the
@@ -479,6 +480,7 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/16-tool-viewports.md` | Tool viewports for terrain authoring: WYSIWYG/export-parity contract, preview pyramid, dirty-region reupload, GPU derived-field passes (normals, hillshade, contours), shading-mode palette, brush echo loop, comparison harnesses |
 | `references/17-roads-decals-physics.md` | Roads evolution from z-fighting ribbons to conforming/RVT integration; decals and replayable VT injection; **the destruction ladder** with the GPU-cosmetic vs CPU/server-authoritative boundary; invalidation checklist; runtime craters/tracks; physics-collider handoff; gameplay queries |
 | `references/18-heightfield-raymarching.md` | Ray-marched heightfield terrain: the Voxel Space column raycaster (Comanche lineage, pseudocode + y-buffer), per-pixel GPU marching (cone step, maximum-mipmap traversal), the POM/relief near-field tier, heightfield rays as shared infrastructure (shadows/occlusion/picking), RT-era heightfields, hybrid compositing |
+| `references/19-fluid-simulation.md` | **Real-time fluid simulation.** The representation procedure (overturn? volume? coupling? scale?) and the tier ladder — heightfield (shallow-water/pipe), particles (SPH → PCISPH/IISPH/DFSPH → **PBF**, the games default), hybrid grid-particle (PIC → FLIP → **APIC**), MPM for yield-stress and multi-phase materials; screen-space fluid rendering vs isosurface meshing; diffuse spray/foam/bubble classes; probe-point buoyancy, two-way coupling and Kelvin wakes; sim domains, budgets and LOD; **the fluid authority contract** (cosmetic GPU vs gameplay/server state) |
 
 ## Cross-skill routing
 
