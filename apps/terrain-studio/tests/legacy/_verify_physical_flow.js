@@ -21,6 +21,7 @@ const MUTATIONS = [
   'single-receiver',       // all water to the steepest neighbour: divergence becomes impossible
   'fill-writes-solid',     // the depression policy returns the conditioned surface as solid height
   'breach-is-fill',        // breach mapped onto priority fill -- the failure the plan names
+  'fill-to-fixed-level',   // fill to a constant instead of the spill: the old count-based check passed this
 ]
 const PATCHES = {
   'no-mm-conversion': [['out[i] = (mmYr * 1e-3) * cellAreaM2Value / SECONDS_PER_YEAR',
@@ -35,6 +36,11 @@ const PATCHES = {
                          'for (let i = 0; i < N; i++) h[i] = filled[i]\n    return { routingSurface: filled, depressionDepth: depth, conditioningDelta: delta }']],
   // NOT `rs[p] = ceiling`: ceiling is min'd with rs[p] on the line above, so that "mutation" is
   // bit-identical to the original and scored as armed while proving nothing.
+  // THE MUTATION THE OLD ASSERTION COULD NOT SEE. Filling to a fixed 0.62 still raises well over
+  // 40 cells, so `fillRaised > 40` passed it happily. Only comparing the LEVEL to an
+  // independently derived spill catches it.
+  'fill-to-fixed-level': [['    for (let i = 0; i < N; i++) delta[i] = filled[i] - h[i]',
+    '    for (let i = 0; i < N; i++) { filled[i] = Math.max(h[i], 0.62); delta[i] = filled[i] - h[i] }']],
   'breach-is-fill': [['  // BREACH. The basin floor stays put',
     "  if (mode === 'breach') { const d2 = new Float32Array(N); for (let i = 0; i < N; i++) d2[i] = filled[i] - h[i];"
     + " return { routingSurface: filled, depressionDepth: depth, conditioningDelta: d2 } }\n"
@@ -208,6 +214,44 @@ function pitted() {
     if (breach.routingSurface[i] < solidBefore[i] - 1e-9) breachLowered++
   }
   check('fill raises the basin to its spill', fillRaised > 40, { fillRaised })
+
+  // THE LEVEL, NOT THE COUNT. The line above asserts that more than 40 cells got raised, which a
+  // fill to ANY level satisfies — a fill to a fixed 0.9, or to the domain maximum, passes it just as
+  // happily as a fill to the spill. The story's clause is "Fill raises each basin EXACTLY to its
+  // lowest spill", and that number was never compared to anything. The Sprint 4 audit found it.
+  //
+  // The spill is derived here INDEPENDENTLY of the module under test: walk the ring of cells that
+  // border the pit and take the lowest of them. That is what "lowest spill" means, computed from
+  // the original terrain rather than read back out of the thing being checked.
+  const PIT = { x0: 28, x1: 36, y0: 28, y1: 36 }
+  let independentSpill = Infinity
+  for (let y = PIT.y0 - 1; y <= PIT.y1; y++) {
+    for (let x = PIT.x0 - 1; x <= PIT.x1; x++) {
+      const inside = x >= PIT.x0 && x < PIT.x1 && y >= PIT.y0 && y < PIT.y1
+      const onRing = !inside && x >= PIT.x0 - 1 && x <= PIT.x1 && y >= PIT.y0 - 1 && y <= PIT.y1
+      if (onRing) independentSpill = Math.min(independentSpill, solidBefore[y * W + x])
+    }
+  }
+  // Every raised cell must sit at that one level. A fill that stopped short leaves cells below it;
+  // one that overshot puts them above. Both are caught by the same comparison.
+  let lo = Infinity, hi = -Infinity, raisedCells = 0
+  for (let y = PIT.y0; y < PIT.y1; y++) for (let x = PIT.x0; x < PIT.x1; x++) {
+    const i = y * W + x
+    if (fill.routingSurface[i] > solidBefore[i] + 1e-6) {
+      raisedCells++
+      lo = Math.min(lo, fill.routingSurface[i]); hi = Math.max(hi, fill.routingSurface[i])
+    }
+  }
+  check('the fixture basin actually filled', raisedCells > 20, { raisedCells })
+  // The flat epsilon tilts a filled surface by 2e-7 per flood step so routing can cross it, so the
+  // level is flat to that scale rather than bitwise. 1e-4 is far below the 0.30 pit depth and far
+  // above the epsilon.
+  check('the filled surface is one level across the basin', hi - lo < 1e-4,
+    { lo: +lo.toFixed(6), hi: +hi.toFixed(6), spread: +(hi - lo).toExponential(2) })
+  check('that level IS the independently derived lowest spill',
+    Math.abs(lo - independentSpill) < 1e-3,
+    { fillLevel: +lo.toFixed(6), independentSpill: +independentSpill.toFixed(6),
+      diff: +Math.abs(lo - independentSpill).toExponential(2) })
   check('breach raises nothing', breachRaised === 0, { breachRaised })
   check('breach cuts an outlet path', breachLowered > 0, { breachLowered })
 
@@ -245,7 +289,7 @@ function pitted() {
     && differs(breach.routingSurface, preserve.routingSurface)
     && differs(fill.routingSurface, preserve.routingSurface), null)
 
-  check('assertion inventory non-empty', assertions.length >= 22, assertions.length)
+  check('assertion inventory non-empty', assertions.length >= 25, assertions.length)
   report()
 
   function report() {
