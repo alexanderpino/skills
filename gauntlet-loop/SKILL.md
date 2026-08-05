@@ -1,6 +1,6 @@
 ---
 name: gauntlet-loop
-description: Run an adversarial build-and-judge quality loop (Gauntlet Loop) to push inspectable artifacts toward a reference-class standard via autonomous rounds. Trigger on "gauntlet", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
+description: Run an adversarial build-and-judge quality loop (Gauntlet Loop) to push inspectable artifacts toward a reference-class standard via autonomous rounds. Trigger on "gauntlet", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Also authors portable gauntlet prompts for running the method elsewhere — trigger on "write me a gauntlet prompt", "a gauntlet prompt for X", "gauntlet prompt I can paste". Do not trigger for ordinary code review or bug fixing.
 ---
 
 # Gauntlet Loop
@@ -35,6 +35,22 @@ Three properties make it a gauntlet rather than a review:
 2. **The builder never grades itself.** A builder has seen every decision it made
    and is therefore excellent at justifying them. Justification is the enemy here.
 3. **The round count is not scheduled.** Rounds are earned by gaps, not planned.
+
+## Two modes
+
+**Run mode** is the default and the rest of this file: you perform the loop here,
+with the state directory and the script.
+
+**Author mode** produces a *prompt* that will run a gauntlet somewhere this skill
+is not installed — another agent, another machine, a teammate, a scheduled job.
+Phase 0 is identical (a prompt built on an unconfirmed contract ships a soft bar
+and no inspection path); you then stop, render the contract into a prompt, and
+skip the waves. → `references/prompt-authoring.md`
+
+Choose author mode when the user asks for a prompt, or when the loop will
+demonstrably run elsewhere. If it is going to run *here*, run it — an emitted
+prompt loses the deterministic counting and the verdict validation, and offering
+one in place of a run you could have performed is a downgrade.
 
 ## When not to use this
 
@@ -274,6 +290,10 @@ stop there and the script refuses to cross it. Full protocol:
   the run will lose.
 - **The budget is extended by the user or not at all.** Stop first, offer second,
   resume only on a grant — and log the grant with its reason.
+- **No emitted prompt carries an uncapped loop.** "Loop until it's perfect" is
+  the shape users copy and the one thing this skill never offers. Every prompt
+  written in author mode ships a wave ceiling and an instruction to stop there
+  and ask — it will spend someone else's money unattended.
 - **Language Rules (ASD-STE100).** All visible text on the Kanban board (goals, gaps, next fixes) and reports must use Simplified Technical English: max 20-25 words per sentence, active voice, one instruction per sentence, no AI marketing language.
 
 ## Failure modes
@@ -333,6 +353,8 @@ Read at the relevant phase, not upfront:
 - `references/workbench.md` — live progress surface; log schema
 - `references/failure-modes.md` — full diagnosis and repair
 - `references/example-run.md` — one annotated run
+- `references/prompt-authoring.md` — author mode: emitting a portable gauntlet prompt
 
 Subagents: `references/builder.md`, `references/critic.md`, `references/smoother.md`.
 Tooling: `scripts/gauntlet.py` (init / log-round / status / report).
+Templates: `assets/prompt-template.md` (author mode, standalone tier).

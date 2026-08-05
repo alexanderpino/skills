@@ -117,3 +117,14 @@ python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
 Write the confirmed contract to `gauntlet/contract.md`. Every subagent that needs
 the goal, bar or rules reads it from there rather than from a paraphrase in a
 prompt — paraphrase drift across a long run is real and compounds.
+
+## In author mode
+
+Everything above still applies except the recording step. You are producing a
+prompt, not starting a run, so there is no state directory to initialise, no
+workbench to open, and no round zero to perform — the reader performs it.
+
+Confirm the contract with the user exactly as normal, then go to
+`prompt-authoring.md`. The contract is the input to the prompt; skipping its
+confirmation ships a soft bar and a missing inspection path to someone with no
+round zero to catch either.
