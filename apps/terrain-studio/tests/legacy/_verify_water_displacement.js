@@ -120,7 +120,13 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   // do is stay the same when the authored height doubles.
   await frame(0); const tFlatA = await tiles()
   await frame(0); const tFlatB = await tiles()
-  await page.evaluate(() => { waterLook.amplitudeM = 2 })    // BELOW THE STEEPNESS CLAMP. The runtime amplitude is now capped so
+  await page.evaluate(() => { waterLook.amplitudeM = 4 })   // 4 and 8 m, both inside the authored 0-8 range and under the
+  // 9.52 m fold cap. This was 2 and 6 until widening the swell band to 62-400 m spread the same
+  // authored amplitude over a wider spectrum: less energy per component, so the 2 m signal fell to
+  // 0.12% against a 0.17% noise-times-three bound and the gate went red for a REAL reason. Measured
+  // three times to confirm it was not a flake. Moving the test up the range is legitimate because
+  // the instrument has a noise floor and the control does not stop responding -- the scaling check
+  // was passing at 2.9x throughout. Tuning the BOUND would not have been.    // BELOW THE STEEPNESS CLAMP. The runtime amplitude is now capped so
   // sum(Q*k*A) respects the 0.85 fold bound, which for the shipped preset is 6.19 m. Testing at 10
   // and 30 measured the SAME frame twice -- both clamp to 6.19 -- and the scaling assertion caught
   // it, correctly. A control that saturates cannot be tested past its saturation point.   // INSIDE THE AUTHORED RANGE. This was 120 against 240, both far
@@ -129,7 +135,7 @@ if (mutation && !MUTATIONS.includes(mutation)) { console.error(`Unknown mutation
   // normal can only tilt so far -- so doubling from 120 measured almost no further change. Testing a
   // control outside its own domain is not a stronger test, it is a different one.
   await frame(mutation === 'amplitude-ignored' ? 0 : 1); const tWaved = await tiles()
-  await page.evaluate(() => { waterLook.amplitudeM = 6 })
+  await page.evaluate(() => { waterLook.amplitudeM = 8 })
   await frame(mutation === 'amplitude-ignored' ? 0 : 1); const tDouble = await tiles()
   const noiseFraction = tileDiff(tFlatA, tFlatB) / 255
   const changedFraction = tileDiff(tFlatB, tWaved) / 255
