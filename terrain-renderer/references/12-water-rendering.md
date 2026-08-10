@@ -787,10 +787,59 @@ at the end of this section.
   along shore tangent), whitecaps (Jacobian, above), flow foam (rivers, above). Composite as an
   opaque-ish albedo layer that *kills* the Fresnel reflection under it — foam is scattering
   froth, not glossy water, and reflective foam is an instant fake tell.
-- **Caustics**: an approximation, stated as such — an animated caustic texture (or a projection
-  of the wave normal map's focusing) on underwater terrain, masked by depth (fade out deep),
-  attenuated by the same extinction, and synced to the sun direction. Physically simulated
-  caustics are out of budget scope; route the theory to physically-based-rendering.
+- **Caustics**: the network of bright and dark cells a wavy surface projects onto whatever
+  receives its transmitted light — the reason a tide pool's sandy floor shimmers and a swimming
+  pool's tiles crawl with light. The mechanism is refraction acting as a lens with a
+  constantly-changing focal surface: neighbouring rays bent by adjacent patches of wave slope
+  either **converge** (a bright cell) or **spread** (a dim one), and the pattern moves because
+  the lens — the wave field — moves. Two consequences follow directly and both are already wired
+  into this chapter's machinery: caustics need **clear, shallow water** to survive at all (the
+  same extinction `T` that dims the refracted background in
+  [Shading and optics](#shading-and-optics) also dims the caustic pattern riding on top of it,
+  so a turbid river shows none and a tide pool shows them at full contrast — do not author a
+  separate turbidity control for caustics, consume the one that already exists), and they belong
+  on **any** lit submerged surface within reach of the light path — a rock face, a submerged
+  hull, a swimmer's legs — not glued to the terrain mesh as a projected decal.
+
+  *Tier 1 — animated flipbook, the baseline every water system should ship.* A handful of
+  pre-rendered or procedurally-generated caustic frames (Voronoi cells, or an offline caustic
+  bake), sampled at world-space XZ like the wave normal cascades, cross-blended between two
+  time-offset samples the same way [rivers](#rivers-flow-driven-surfaces) hide flow-map seams —
+  decorrelate scroll direction and rate from the wave normal layers above it or the two visibly
+  lock-step. Modulate by the existing `causticMask` (depth fade) and by `T` (the extinction from
+  [Shading and optics](#shading-and-optics)), so the same two quantities that dim the refracted
+  scene also dim the caustics riding on it — no separate falloff to author or get out of sync:
+
+```hlsl
+float2 causticUV = worldXZ * causticScale + windDir * t * causticScrollSpeed;
+float3 caustic    = lerp(SampleCaustic(causticUV, phase0), SampleCaustic(causticUV, phase1), w0)
+                   * causticMask                 // fades out in deep water (defined above)
+                   * dot(T, float3(0.3,0.3,0.3))  // and with the water's own extinction/turbidity
+                   * sunElevationFade;            // foreshortens/dims near the horizon, below
+underwaterLit += caustic * causticIntensity;      // additive, on the lit submerged surface
+```
+
+  *Tier 2 — procedural, from the wave field itself.* The same convergence/divergence that makes
+  the pattern is computable, not just paintable, and it is the same move as the whitecap
+  Jacobian above: applied to refraction instead of displacement. Sample the wave normal at a
+  small XZ offset pair around each shading point, refract a near-vertical ray through each
+  (Snell's law, water IOR from the `liquidBody` descriptor — never hardcode 1.33), and project
+  both onto the receiving depth; the **ratio of the offset rays' original spacing to their
+  projected spacing** is the caustic intensity — near 1 where rays run parallel, spiking where
+  they converge. A cheap 2–4-tap version of that ratio (sample the normal map at a small offset,
+  compare footprint separation before/after) is real-time-affordable per underwater pixel and
+  needs no extra geometry pass; the higher-fidelity version renders a distorted vertex grid
+  through the same refraction and lets overlapping, additively-blended triangles do the
+  brightening (Uralsky's *GPU Gems* treatment — see provenance). Either way this ties the
+  caustic pattern to the *actual* sea state instead of an authored loop: a storm and a millpond
+  produce visibly different caustic character for free, which a flipbook cannot do.
+
+  **Sun coupling, both tiers**: scale and elongate the pattern by solar elevation — near-overhead
+  sun gives tight, roughly circular cells; a low sun stretches and dims them, both because the
+  projection foreshortens at grazing incidence and because the light's path through the water
+  lengthens, so extinction — already in the formula above — does most of the dimming for free.
+  A caustic pattern that stays a fixed size and brightness all day is the tell that gives away
+  the flipbook.
 - **Underwater camera state** is a real state machine, not a fog tweak: on submersion switch to
   underwater fog (aggressive, chromatic, from the same `sigma`), render the surface from below
   (total internal reflection outside **Snell's window** — for water→air the critical angle is
@@ -1321,7 +1370,13 @@ style.
   on drivable water a mismatch is not a floating-boat artifact, it is a broken road — and
   interactive waves are **gameplay liquid state** under the fluid authority contract:
   deterministic, CPU/server-owned, and network-synchronized in a multiplayer racer. The
-  stylized look rides on top of that contract, not instead of it.
+  stylized look rides on top of that contract, not instead of it. One band that *is* legitimately
+  stylized here without touching physics: the foam lifecycle's decay curve
+  ([Aerated water](#aerated-water-foam-spray-and-whitewater)) is authored for **legibility, not
+  realism** — a real wake's foam thins to a streak in a second or two; an arcade racer's wake
+  trail persists far longer because it is a gameplay read (where did the pack just come from),
+  not a physical claim. That is band content changing, per the doctrine above — the injection
+  technique feeding it (`19`) and the one-evaluator rule are untouched.
 
 Honesty: Nintendo publishes almost nothing about rendering internals — every mechanism claim
 above except the TotK physics talk is community reconstruction or press/footage observation
@@ -1401,6 +1456,17 @@ above except the TotK physics talk is community reconstruction or press/footage 
   differ (IOR ~1.31–1.47, `F0` ~0.018–0.036); take `ior` from the `liquidBody` descriptor.
 - **Refraction leaking objects above water**: missing depth reject on the distorted sample. The
   single most common shipped water bug; the fix is four shader lines (above).
+- **Caustics with their own turbidity slider**: a second, independently-tuned fade fighting the
+  water's actual extinction — a murky river with crisp caustics, or a clear tide pool with none.
+  Drive the caustic mask from the same `T`/`causticMask` the refracted background already uses.
+- **Caustics glued to the flat seafloor only**: the pattern is authored as a decal on terrain and
+  never reaches a submerged rock face, a hull, or a swimmer — the tell that gives away a
+  projected texture rather than a light effect. Treat it as a modulation on whatever the light
+  path is lighting underwater, not terrain-mesh decoration.
+- **Caustics that never react to the sun or the sea state**: a fixed-size, fixed-brightness loop
+  running all day regardless of solar elevation or how rough the water is. Couple scale/dimming
+  to sun elevation and, at Tier 2, to the actual wave field — a storm and a millpond must look
+  different.
 - **SSR dropout at grazing/screen edge**: mirror-bright water goes flat exactly at the horizon
   and screen borders. Mandatory fallback chain with brightness-matched cubemap; never ship SSR-only.
 - **Waterline crawl on LOD change**: water and terrain refine on different schedules; the
@@ -1616,6 +1682,19 @@ above except the TotK physics talk is community reconstruction or press/footage 
   (fullscreen effect between transparents and post, meniscus handling).
 - **F** — Depth-reject refraction fix, SSR fallback hierarchy, underwater state machine, planar
   one-body ceiling: ubiquitous production practice; no single canonical citation.
+- **D/?** — Uralsky, "Rendering Water Caustics" (*GPU Gems*, 2004, Part I ch. 2 — immediately
+  following Finch's ch. 1 in the same Natural Effects section cited above): the refracted-ray
+  convergence mechanism — a distorted projector mesh whose overlapping, additively-blended
+  triangles brighten where rays converge — that Tier 2 above generalizes into a per-pixel
+  ratio test. Cited from model knowledge; chapter number and mechanism detail were **not fetched
+  or page-verified this session** — confirm against the source before treating the specifics
+  (grid resolution, blend mode) as an exact reproduction. The general principle — caustic
+  intensity as refracted-ray-footprint convergence, the same move as the whitecap Jacobian
+  applied to refraction instead of displacement — is the transferable, higher-confidence part.
+- **F** — Animated caustic flipbook/texture projection, cross-blended dual-phase sampling to hide
+  the loop, depth- and extinction-masked: ubiquitous production practice since the fixed-function
+  era; no single canonical citation, and not distinct in kind from the flow-mapping dual-sample
+  technique (Vlachos, above) already cited in this chapter.
 - **P** — Optical refraction constants for water: IOR ≈ 1.33 → Fresnel `F0 = ((n−1)/(n+1))² ≈ 0.02`
   and Snell's-window critical angle `arcsin(1/1.33) ≈ 48.6°`. Standard optics (Snell, Fresnel);
   arithmetic verified 2026-08. IOR is a **per-body** property from `liquidBody` (terrain-architect
