@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Gauntlet workbench</title>
 <!--
   Gauntlet workbench — a generic renderer for one spec document.
@@ -15,273 +16,659 @@
     python3 scripts/gauntlet.py board     # regenerates state.json + state.js
 
   Loading works two ways so the board runs however it was opened:
-    - opened over http://  → fetches state.json every few seconds, live
-    - opened as file://    → falls back to state.js, which sets window.GAUNTLET_STATE
-                             (browsers refuse to fetch() local files; a plain
-                             <script src> is still allowed)
+    - served over http:// → fetches state.json every few seconds, live
+    - opened as file://   → falls back to state.js, which sets window.GAUNTLET_STATE
+                            (browsers refuse to fetch() local files; a plain
+                            <script src> is still allowed)
 
   Anything missing from the spec is skipped rather than crashing, and anything
   malformed is reported in a banner at the top — a spec written by hand should
-  tell you what it got wrong, not fail silently. Schema: references/workbench.md.
+  tell you what it got wrong, not fail silently.
+
+  Spec contract: assets/state.schema.json. Prose: references/workbench.md.
 -->
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #f5f5f3; --panel: #ffffff; --sunk: #efefec;
-    --ink: #14171a; --muted: #5f6873; --faint: #8b94a0;
-    --line: #dcdfe3; --line-soft: #e8eaed;
-    --accent: #2f6f4f; --warn: #97590a; --stop: #a32c2c; --info: #2b5f9e;
-    --radius: 9px;
+/* ═══════════════════════════════════════════════════════════════════════
+   TOKENS
+   One scale for space, one ramp for type, three levels of surface, three
+   of text. Every value below comes from these; nothing is picked by eye at
+   the point of use.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+               "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono",
+               Menlo, Consolas, monospace;
+
+  /* 4px grid */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 72px;
+
+  --r-xs: 4px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 999px;
+
+  /* Light — the default. Dark redefines only these. */
+  --canvas:        #f6f7f9;
+  --surface:       #ffffff;
+  --surface-sunk:  #f0f2f4;
+  --surface-hover: #f7f8fa;
+  --hairline:      #e5e7ea;
+  --hairline-firm: #d4d8dd;
+
+  /* text-3 carries the 10.5px uppercase micro-labels, so it is set by
+     contrast against --canvas rather than by how quiet it looks. */
+  --text-1: #14171b;
+  --text-2: #545b64;
+  --text-3: #656c76;
+
+  --accent:     #0a63c9;
+  --accent-ink: #084f9f;
+  --accent-bg:  #eaf2fd;
+
+  --ok:     #15794a;  --ok-bg:     #e7f4ed;
+  --warn:   #8a5300;  --warn-bg:   #fdf1e0;
+  --danger: #a52121;  --danger-bg: #fdecec;
+
+  --shadow-1: 0 1px 1px rgba(17, 24, 39, .04), 0 1px 3px rgba(17, 24, 39, .05);
+  --shadow-2: 0 1px 2px rgba(17, 24, 39, .04), 0 6px 20px rgba(17, 24, 39, .07);
+
+  --ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+  --ease: cubic-bezier(.2, .7, .3, 1);
+}
+
+/* Dark: surfaces get lighter to signal elevation; shadows nearly vanish,
+   because a shadow on a dark ground reads as dirt rather than as depth. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas:        #101317;
+    --surface:       #191d22;
+    --surface-sunk:  #14181c;
+    --surface-hover: #1f242a;
+    --hairline:      #272d34;
+    --hairline-firm: #363e46;
+
+    --text-1: #e8eaed;
+    --text-2: #a3abb5;
+    --text-3: #838b95;
+
+    --accent:     #64a8f5;
+    --accent-ink: #8cc0fa;
+    --accent-bg:  #16263a;
+
+    --ok:     #5cc292;  --ok-bg:     #10261d;
+    --warn:   #d9a054;  --warn-bg:   #2a2013;
+    --danger: #ea8a8a;  --danger-bg: #2d1717;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .30);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, .34), 0 12px 28px rgba(0, 0, 0, .28);
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #131619; --panel: #1b1f23; --sunk: #16191d;
-      --ink: #e9ebed; --muted: #9aa3ae; --faint: #6d7681;
-      --line: #2b3137; --line-soft: #23282d;
-      --accent: #6cc79a; --warn: #d99a45; --stop: #e28585; --info: #79aae0;
-    }
-  }
-  [data-theme="dark"] {
-    --bg: #131619; --panel: #1b1f23; --sunk: #16191d;
-    --ink: #e9ebed; --muted: #9aa3ae; --faint: #6d7681;
-    --line: #2b3137; --line-soft: #23282d;
-    --accent: #6cc79a; --warn: #d99a45; --stop: #e28585; --info: #79aae0;
-  }
+}
+[data-theme="dark"] {
+  --canvas:        #101317;
+  --surface:       #191d22;
+  --surface-sunk:  #14181c;
+  --surface-hover: #1f242a;
+  --hairline:      #272d34;
+  --hairline-firm: #363e46;
 
-  * { box-sizing: border-box; }
-  html, body { max-width: 100%; overflow-x: hidden; }
-  body {
-    margin: 0; padding: 1.5rem 1.75rem 4rem; background: var(--bg); color: var(--ink);
-    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: inherit; }
-  h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
-  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
-       color: var(--faint); margin: 2rem 0 .75rem; font-weight: 600; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  --text-1: #e8eaed;
+  --text-2: #a3abb5;
+  --text-3: #838b95;
 
-  /* ---- header ------------------------------------------------------- */
-  header { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem;
-           align-items: baseline; margin-bottom: .35rem; }
-  .goal { color: var(--muted); font-size: .95rem; flex: 1 1 22rem; min-width: 0; }
-  .meta { color: var(--faint); font-size: .78rem; }
-  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-         background: var(--accent); margin-right: .35rem; vertical-align: baseline; }
-  .dot.stale { background: var(--warn); }
+  --accent:     #64a8f5;
+  --accent-ink: #8cc0fa;
+  --accent-bg:  #16263a;
 
-  /* ---- banners ------------------------------------------------------ */
-  .banner { border-radius: var(--radius); padding: .7rem .9rem; margin: 1rem 0;
-            font-size: .87rem; border: 1px solid var(--line); background: var(--panel); }
-  .banner.stop { border-color: var(--stop); }
-  .banner.stop b { color: var(--stop); }
-  .banner.warn { border-color: var(--warn); }
-  .banner.warn b { color: var(--warn); }
-  .banner ul { margin: .4rem 0 0; padding-left: 1.1rem; }
-  .banner li { margin: .15rem 0; }
+  --ok:     #5cc292;  --ok-bg:     #10261d;
+  --warn:   #d9a054;  --warn-bg:   #2a2013;
+  --danger: #ea8a8a;  --danger-bg: #2d1717;
 
-  /* ---- stat rail ---------------------------------------------------- */
-  .rail { display: grid; gap: .7rem; margin-top: 1.1rem;
-          grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
-  .stat { background: var(--panel); border: 1px solid var(--line);
-          border-radius: var(--radius); padding: .65rem .85rem .75rem; min-width: 0; }
-  .stat .k { font-size: .67rem; text-transform: uppercase; letter-spacing: .07em;
-             color: var(--faint); font-weight: 600; }
-  .stat .v { font-size: 1.2rem; font-variant-numeric: tabular-nums; margin-top: .1rem;
-             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stat .sub { font-size: .74rem; color: var(--muted); margin-top: .1rem; }
-  .meter { height: 4px; background: var(--line-soft); border-radius: 3px;
-           margin-top: .5rem; overflow: hidden; }
-  .meter > i { display: block; height: 100%; background: var(--accent);
-               transition: width .4s ease; }
-  .meter.warn > i { background: var(--warn); }
-  .meter.hot > i { background: var(--stop); }
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .30);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, .34), 0 12px 28px rgba(0, 0, 0, .28);
+}
 
-  /* ---- ladder ------------------------------------------------------- */
-  .ladder { display: flex; flex-wrap: wrap; gap: .5rem; }
-  .rung { flex: 1 1 9rem; background: var(--panel); border: 1px solid var(--line);
-          border-radius: var(--radius); padding: .55rem .75rem; opacity: .5; min-width: 0; }
-  .rung.done { opacity: .85; border-color: var(--accent); }
-  .rung.current { opacity: 1; border-color: var(--accent); border-width: 2px;
-                  padding: calc(.55rem - 1px) calc(.75rem - 1px); }
-  .rung .n { font-size: .67rem; color: var(--faint); letter-spacing: .07em;
-             text-transform: uppercase; font-weight: 600; }
-  .rung .name { font-weight: 600; }
-  .rung .d { font-size: .75rem; color: var(--muted); }
+/* ═══════════════════════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { max-width: 100%; overflow-x: hidden; }
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "kern" 1;
+}
+h1, h2, h3 { margin: 0; font-weight: 600; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
 
-  /* ---- kanban ------------------------------------------------------- */
-  .cols { display: grid; gap: 1rem;
-          grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
-  .col > h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
-              color: var(--faint); margin: 0 0 .6rem; font-weight: 600; }
-  .col > h3 .count { color: var(--ink); }
-  .card { background: var(--panel); border: 1px solid var(--line);
-          border-left: 3px solid var(--line); border-radius: var(--radius);
-          padding: .65rem .8rem; margin-bottom: .6rem; }
-  .col.flat .card { border-left-color: var(--warn); }
-  .col.shelved .card { border-left-color: var(--faint); }
-  .col.retired .card { border-left-color: var(--accent); }
-  .col.open .card { border-left-color: var(--info); }
-  .card .title { font-weight: 600; display: flex; justify-content: space-between;
-                 gap: .5rem; align-items: baseline; }
-  .card .title .dim { color: var(--muted); font-weight: 400; font-size: .9em; }
-  .card .nums { font-size: .76rem; color: var(--muted);
-                font-variant-numeric: tabular-nums; margin-top: .3rem; }
-  .card .gap { font-size: .87rem; margin-top: .45rem; }
-  .card .why { font-size: .78rem; color: var(--muted); margin-top: .4rem;
-               font-style: italic; }
-  .card .foot { font-size: .74rem; color: var(--faint); margin-top: .45rem;
-                word-break: break-all; }
-  .spark { display: block; margin-top: .45rem; }
-  .pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: .3rem; }
-  .pips i { width: 6px; height: 6px; border-radius: 50%; background: var(--line);
-            display: block; }
-  .pips i.on { background: var(--accent); }
-  .tag { display: inline-block; font-size: .68rem; padding: .05rem .4rem;
-         border-radius: 4px; border: 1px solid var(--line); color: var(--muted);
-         letter-spacing: .02em; white-space: nowrap; }
-  .tag.major { color: var(--stop); border-color: var(--stop); }
-  .tag.minor { color: var(--warn); border-color: var(--warn); }
-  .tag.none  { color: var(--accent); border-color: var(--accent); }
-  .tag.blind { color: var(--info); border-color: var(--info); }
-  .tag.reverted { color: var(--stop); border-color: var(--stop); }
-  .tag.promoted { color: var(--accent); border-color: var(--accent); }
-  .empty { color: var(--faint); font-size: .82rem; font-style: italic; }
+.shell { max-width: 1440px; margin: 0 auto; padding: 0 var(--s6) var(--s8); }
+@media (max-width: 720px) { .shell { padding: 0 var(--s4) var(--s7); } }
 
-  /* ---- rounds table ------------------------------------------------- */
-  .scroll { overflow-x: auto; border: 1px solid var(--line);
-            border-radius: var(--radius); background: var(--panel); }
-  table { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 46rem; }
-  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line-soft);
-           vertical-align: top; }
-  th { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
-       color: var(--faint); font-weight: 600; position: sticky; top: 0;
-       background: var(--panel); }
-  tr:last-child td { border-bottom: 0; }
-  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
-  td.gap { min-width: 14rem; }
-  .filters { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .6rem; }
-  .filters button { font: inherit; font-size: .76rem; padding: .2rem .6rem;
-                    border-radius: 999px; border: 1px solid var(--line);
-                    background: var(--panel); color: var(--muted); cursor: pointer; }
-  .filters button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+/* Type ramp */
+.t-display { font-size: 19px; line-height: 1.25; letter-spacing: -.02em; font-weight: 600; }
+.t-title   { font-size: 15px; line-height: 1.35; letter-spacing: -.01em; font-weight: 600; }
+.t-body    { font-size: 14px; line-height: 1.5; }
+.t-small   { font-size: 12.5px; line-height: 1.45; }
+.t-micro   { font-size: 10.5px; line-height: 1.3; letter-spacing: .07em;
+             text-transform: uppercase; font-weight: 650; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
 
-  .split { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
-  .list { background: var(--panel); border: 1px solid var(--line);
-          border-radius: var(--radius); padding: .7rem .9rem; font-size: .84rem; }
-  .list .k { font-size: .67rem; text-transform: uppercase; letter-spacing: .07em;
-             color: var(--faint); font-weight: 600; margin-bottom: .35rem; }
-  .list .row { display: flex; justify-content: space-between; gap: 1rem;
-               padding: .2rem 0; border-bottom: 1px solid var(--line-soft); }
-  .list .row:last-child { border-bottom: 0; }
-  .list .row .v { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
-  footer { margin-top: 2.5rem; color: var(--faint); font-size: .76rem; }
+/* ═══════════════════════════════════════════════════════════════════════
+   TOP BAR
+   ═══════════════════════════════════════════════════════════════════════ */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--canvas) 86%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--hairline);
+}
+.topbar-in {
+  max-width: 1440px; margin: 0 auto;
+  padding: var(--s4) var(--s6);
+  display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+}
+@media (max-width: 720px) { .topbar-in { padding: var(--s3) var(--s4); } }
+.brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; flex: 1 1 auto; }
+/* Narrow: the tools take their own line rather than being clipped off the
+   right edge, and the reload button drops to its icon. */
+@media (max-width: 640px) {
+  .brand { flex: 1 0 100%; }
+  .topbar-tools { width: 100%; flex-wrap: wrap; }
+  .topbar-tools .freshness { flex: 1 1 100%; }
+  #reload span { display: none; }
+  #reload { padding: 0 var(--s2); }
+}
+.mark { flex: none; color: var(--accent); }
+.brand-text { min-width: 0; }
+.brand .goal {
+  color: var(--text-2); font-size: 12.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 62ch;
+}
+.topbar-tools { display: flex; align-items: center; gap: var(--s3); flex: none; }
+
+.freshness { display: inline-flex; align-items: center; gap: var(--s2); color: var(--text-2); font-size: 12.5px; }
+.pulse { position: relative; width: 7px; height: 7px; flex: none; }
+.pulse i {
+  position: absolute; inset: 0; border-radius: 50%; background: var(--ok);
+}
+.pulse.live i::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: var(--ok); animation: ping 2.4s var(--ease) infinite;
+}
+@keyframes ping { 0% { opacity: .5; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(3); } }
+.pulse.stale i { background: var(--warn); }
+.pulse.dead i  { background: var(--danger); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  height: 30px; padding: 0 var(--s3);
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--text-2);
+  font-size: 12.5px; cursor: pointer;
+  transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.btn:hover { background: var(--surface-hover); color: var(--text-1); border-color: var(--hairline-firm); }
+.btn svg { flex: none; }
+
+/* Segmented control */
+.seg {
+  display: inline-flex; padding: 2px; gap: 2px;
+  background: var(--surface-sunk); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+}
+.seg button {
+  border: 0; background: transparent; cursor: pointer;
+  height: 24px; padding: 0 10px; border-radius: 4px;
+  color: var(--text-2); font-size: 12px; white-space: nowrap;
+  transition: background .16s var(--ease), color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.seg button:hover { color: var(--text-1); }
+.seg button[aria-checked="true"] {
+  background: var(--surface); color: var(--text-1);
+  box-shadow: var(--shadow-1); font-weight: 550;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SECTIONS
+   ═══════════════════════════════════════════════════════════════════════ */
+section { margin-top: var(--s7); }
+.sec-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s4);
+}
+.sec-head h2 { color: var(--text-3); }
+.sec-head .aside { color: var(--text-3); font-size: 12.5px; }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BANNERS
+   ═══════════════════════════════════════════════════════════════════════ */
+.banner {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--hairline); border-radius: var(--r-md);
+  background: var(--surface); box-shadow: var(--shadow-1);
+  margin-top: var(--s3); font-size: 13px;
+}
+.banner .ico { flex: none; margin-top: 1px; }
+.banner b { font-weight: 600; }
+.banner ul { margin: var(--s2) 0 0; padding-left: 18px; color: var(--text-2); }
+.banner li { margin: 2px 0; }
+.banner.danger { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 28%, transparent); }
+.banner.danger .ico, .banner.danger b { color: var(--danger); }
+.banner.warn { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 28%, transparent); }
+.banner.warn .ico, .banner.warn b { color: var(--warn); }
+.banner.info .ico { color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STAT TILES
+   ═══════════════════════════════════════════════════════════════════════ */
+.rail {
+  display: grid; gap: var(--s3); margin-top: var(--s5);
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+}
+.tile { padding: var(--s4); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tile .k { color: var(--text-3); }
+.tile .v {
+  font-size: 22px; line-height: 1.15; letter-spacing: -.022em; font-weight: 600;
+  margin-top: var(--s1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tile .v small { font-size: 14px; font-weight: 500; color: var(--text-3); letter-spacing: 0; }
+.tile .sub { color: var(--text-2); font-size: 12.5px; }
+.meter {
+  height: 4px; border-radius: var(--r-full); background: var(--surface-sunk);
+  overflow: hidden; margin-top: var(--s3);
+}
+.meter i {
+  display: block; height: 100%; border-radius: inherit; background: var(--accent);
+  transition: width .5s var(--ease);
+}
+.meter.ok i     { background: var(--ok); }
+.meter.warn i   { background: var(--warn); }
+.meter.danger i { background: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LADDER — a stepper, not four boxes
+   ═══════════════════════════════════════════════════════════════════════ */
+.ladder { display: grid; gap: var(--s3); grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.rung { position: relative; padding: var(--s4); overflow: hidden; }
+.rung::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--hairline-firm);
+}
+.rung.done::before    { background: var(--ok); }
+.rung.current::before { background: var(--accent); }
+.rung.locked          { background: var(--surface-sunk); box-shadow: none; }
+.rung.locked .rung-name, .rung.locked .rung-d { color: var(--text-3); }
+.rung-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.rung-top .t-micro { color: var(--text-3); }
+.rung.current .rung-top .t-micro { color: var(--accent); }
+.rung-name { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin-top: 2px; }
+.rung-d { color: var(--text-2); font-size: 12.5px; margin-top: var(--s2); }
+.rung-d + .rung-d { margin-top: 2px; }
+.rung-share {
+  color: var(--text-3); font-size: 12px; margin-top: var(--s3);
+  padding-top: var(--s2); border-top: 1px solid var(--hairline);
+}
+.rung .check { color: var(--ok); }
+
+.history { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s1); }
+.history .h {
+  display: flex; gap: var(--s2); align-items: baseline;
+  color: var(--text-2); font-size: 12.5px;
+}
+.history .h .w { color: var(--text-3); font-variant-numeric: tabular-nums; flex: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   KANBAN
+   ═══════════════════════════════════════════════════════════════════════ */
+.board { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); }
+.col-head {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-bottom: var(--s3); padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--hairline);
+}
+.col-head .t-micro { color: var(--text-2); }
+.col-head .chip {
+  margin-left: auto; min-width: 20px; height: 18px; padding: 0 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-sunk); border-radius: var(--r-full);
+  color: var(--text-2); font-size: 11px; font-weight: 600;
+}
+.col-head .swatch { width: 6px; height: 6px; border-radius: 2px; background: var(--text-3); }
+.col.open    .col-head .swatch { background: var(--accent); }
+.col.flat    .col-head .swatch { background: var(--warn); }
+.col.retired .col-head .swatch { background: var(--ok); }
+
+.lane {
+  padding: var(--s4); margin-bottom: var(--s3);
+  transition: box-shadow .18s var(--ease), transform .18s var(--ease);
+}
+.lane:hover { box-shadow: var(--shadow-2); }
+.lane-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+.lane-name { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.lane-name .dim { color: var(--text-2); font-weight: 400; }
+.lane-stats {
+  display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3);
+  color: var(--text-2); font-size: 12px; margin-top: var(--s2);
+}
+.lane-stats .s { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.lane-gap { margin-top: var(--s3); font-size: 13.5px; line-height: 1.45; }
+.lane-note { margin-top: var(--s2); color: var(--text-2); font-size: 12.5px; }
+.lane-foot {
+  margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--hairline);
+  color: var(--text-3); font-size: 11.5px;
+  display: flex; align-items: center; gap: var(--s2);
+}
+.lane-foot .path {
+  font-family: var(--font-mono); font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.streak { display: inline-flex; gap: 3px; align-items: center; }
+.streak i {
+  width: 12px; height: 4px; border-radius: var(--r-full); background: var(--hairline-firm);
+}
+.streak i.on { background: var(--ok); }
+.trendline { margin-top: var(--s3); color: var(--accent); display: block; }
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; height: 19px; padding: 0 7px;
+  border-radius: var(--r-full); font-size: 11px; font-weight: 600;
+  letter-spacing: .01em; white-space: nowrap;
+  background: var(--surface-sunk); color: var(--text-2);
+}
+.badge.major { background: var(--danger-bg); color: var(--danger); }
+.badge.minor { background: var(--warn-bg);   color: var(--warn); }
+.badge.none  { background: var(--ok-bg);     color: var(--ok); }
+.badge.blind { background: var(--accent-bg); color: var(--accent-ink); }
+.badge.promoted { background: var(--ok-bg);     color: var(--ok); }
+.badge.reverted { background: var(--danger-bg); color: var(--danger); }
+.badge.ghost { background: transparent; border: 1px solid var(--hairline-firm); color: var(--text-3); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TABLE
+   ═══════════════════════════════════════════════════════════════════════ */
+.table-wrap { overflow-x: auto; border-radius: var(--r-md); }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 900px; font-size: 13px; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface); color: var(--text-3);
+  font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; font-weight: 650;
+  text-align: left; padding: var(--s3) var(--s3); white-space: nowrap;
+  border-bottom: 1px solid var(--hairline);
+}
+tbody td {
+  padding: var(--s3); vertical-align: top;
+  border-bottom: 1px solid var(--hairline);
+  transition: background .12s var(--ease);
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-hover); }
+td.wr { color: var(--text-3); font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap; }
+td.lane-cell { font-weight: 550; white-space: nowrap; }
+td.dim-cell { color: var(--text-2); white-space: nowrap; }
+td.n { text-align: right; white-space: nowrap; color: var(--text-2); }
+td.gap-cell { min-width: 22ch; color: var(--text-1); }
+td.ev { max-width: 22ch; }
+td.ev span {
+  display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.win { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.win .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.win.ours .dot { background: var(--ok); }
+.win.other .dot { background: var(--text-3); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DEFINITION PANELS
+   ═══════════════════════════════════════════════════════════════════════ */
+.panels { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.panel { padding: var(--s4); }
+.panel h3 { color: var(--text-3); margin-bottom: var(--s3); }
+.panel .row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4);
+  padding: var(--s2) 0; border-bottom: 1px solid var(--hairline); font-size: 13px;
+}
+.panel .row:last-child { border-bottom: 0; padding-bottom: 0; }
+.panel .row .v { color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.panel .row .k { color: var(--text-1); }
+.bar-row { display: grid; gap: 6px; padding: var(--s2) 0; }
+.bar-row .top { display: flex; justify-content: space-between; gap: var(--s3); font-size: 13px; }
+.bar-row .track { height: 5px; border-radius: var(--r-full); background: var(--surface-sunk); overflow: hidden; }
+.bar-row .track i { display: block; height: 100%; background: var(--accent); border-radius: inherit;
+                    transition: width .5s var(--ease); }
+
+.empty {
+  padding: var(--s5) var(--s4); text-align: center;
+  color: var(--text-3); font-size: 12.5px; border: 1px dashed var(--hairline-firm);
+  border-radius: var(--r-md);
+}
+/* An empty column should read as "nothing here yet", not as a broken one —
+   so it holds roughly a card's worth of space rather than collapsing. */
+.col .empty {
+  min-height: 104px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+}
+.col .empty .why { color: var(--text-3); opacity: .8; font-size: 11.5px; }
+
+/* Skeleton */
+.skel { background: var(--surface-sunk); border-radius: var(--r-sm); position: relative; overflow: hidden; }
+.skel::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
+  animation: sweep 1.5s infinite;
+}
+@keyframes sweep { 100% { transform: translateX(100%); } }
+
+footer {
+  margin-top: var(--s8); padding-top: var(--s4); border-top: 1px solid var(--hairline);
+  color: var(--text-3); font-size: 12px; line-height: 1.6;
+}
+footer code { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Gauntlet workbench</h1>
-  <div class="goal" id="goal"></div>
-  <div class="meta" id="meta"><span class="dot"></span>loading…</div>
-</header>
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <svg class="mark" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <rect x="1.75" y="4.75" width="13.5" height="16.5" rx="3.25"
+              stroke="currentColor" stroke-width="1.5" opacity=".45"/>
+        <rect x="10.75" y="4.75" width="13.5" height="16.5" rx="3.25" fill="currentColor" opacity=".12"/>
+        <rect x="10.75" y="4.75" width="13.5" height="16.5" rx="3.25" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <div class="brand-text">
+        <h1 class="t-title">Gauntlet workbench</h1>
+        <div class="goal" id="goal"></div>
+      </div>
+    </div>
+    <div class="topbar-tools">
+      <span class="freshness" id="freshness" role="status" aria-live="polite">
+        <span class="pulse"><i></i></span><span id="freshness-text">loading</span>
+      </span>
+      <button class="btn" id="reload" title="Reload the spec">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3h-3"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Reload</span>
+      </button>
+      <div class="seg" id="theme" role="radiogroup" aria-label="Colour theme">
+        <button role="radio" data-theme-choice="auto"  aria-checked="true">Auto</button>
+        <button role="radio" data-theme-choice="light" aria-checked="false">Light</button>
+        <button role="radio" data-theme-choice="dark"  aria-checked="false">Dark</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-<div id="banners"></div>
-<div class="rail" id="rail"></div>
+<div class="shell">
+  <div id="banners"></div>
+  <div class="rail" id="rail"></div>
 
-<section id="ladder-section" hidden>
-  <h2>Effort ladder</h2>
-  <div class="ladder" id="ladder"></div>
-  <div class="meta" id="ladder-history" style="margin-top:.6rem"></div>
-</section>
+  <section id="ladder-section" hidden>
+    <div class="sec-head">
+      <h2 class="t-micro">Effort ladder</h2>
+      <div class="aside" id="ladder-aside"></div>
+    </div>
+    <div class="ladder" id="ladder"></div>
+    <div class="history" id="ladder-history"></div>
+  </section>
 
-<section>
-  <h2>Lanes</h2>
-  <div class="cols" id="cols"></div>
-</section>
+  <section id="lanes-section">
+    <div class="sec-head">
+      <h2 class="t-micro">Lanes</h2>
+      <div class="aside" id="lanes-aside"></div>
+    </div>
+    <div class="board" id="board"></div>
+  </section>
 
-<section id="rounds-section" hidden>
-  <h2>Rounds</h2>
-  <div class="filters" id="filters"></div>
-  <div class="scroll"><table id="rounds">
-    <thead><tr>
-      <th>W·R</th><th>Lane</th><th>Dim</th><th>Mode</th><th>Winner</th>
-      <th>Margin</th><th>Score</th><th>Sev</th><th>Gap</th><th>Evidence</th><th>Tok</th>
-    </tr></thead>
-    <tbody></tbody>
-  </table></div>
-</section>
+  <section id="rounds-section" hidden>
+    <div class="sec-head">
+      <h2 class="t-micro">Rounds</h2>
+      <div class="aside" id="rounds-aside"></div>
+    </div>
+    <div class="seg" id="mode-filter" role="radiogroup" aria-label="Filter by comparison mode"></div>
+    <div class="seg" id="lane-filter" role="radiogroup" aria-label="Filter by lane"
+         style="margin-left:var(--s2)"></div>
+    <div class="card table-wrap" style="margin-top:var(--s3)">
+      <table>
+        <caption class="sr-only">Recent rounds, newest first</caption>
+        <thead><tr>
+          <th scope="col">W·R</th><th scope="col">Lane</th><th scope="col">Dimension</th>
+          <th scope="col">Mode</th><th scope="col">Outcome</th><th scope="col">Margin</th>
+          <th scope="col" style="text-align:right">Score</th><th scope="col">Gap</th>
+          <th scope="col">Evidence</th><th scope="col" style="text-align:right">Tokens</th>
+        </tr></thead>
+        <tbody id="rounds-body"></tbody>
+      </table>
+    </div>
+  </section>
 
-<section id="detail-section" hidden>
-  <h2>Spend and history</h2>
-  <div class="split" id="detail"></div>
-</section>
+  <section id="detail-section" hidden>
+    <div class="sec-head"><h2 class="t-micro">Spend and history</h2></div>
+    <div class="panels" id="panels"></div>
+  </section>
 
-<footer id="footer"></footer>
+  <footer id="footer"></footer>
+</div>
 
 <script src="state.js" onerror="window.__stateJsMissing = true"></script>
 <script>
 "use strict";
 
-/* =====================================================================
+/* ═══════════════════════════════════════════════════════════════════════
    Gauntlet workbench renderer.
 
-   One job: turn a spec document into a page. It knows the shape of the
-   spec (see validate() for the contract it enforces) and nothing about
-   how a gauntlet works. Every section renders only if its data is
-   present, so a partial spec — an early run, or one written by hand —
-   produces a smaller board rather than an error.
-   ===================================================================== */
+   One job: turn a spec document into a page. It knows the shape of the spec
+   (validate() is the contract it enforces) and nothing about how a gauntlet
+   works. Every section renders only when its data is present, so a partial
+   spec produces a smaller board rather than an error.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 const POLL_MS = 5000;
+const STALE_MS = 15 * 60 * 1000;
+/* key, heading, sub-heading, and what an empty column should say — an empty
+   state that explains itself is worth more than one that says "none". */
 const COLUMNS = [
-  ["open",     "Open"],
-  ["flat",     "Flat — shelve or re-cut"],
-  ["shelved",  "Shelved"],
-  ["retired",  "Retired"],
+  ["open",    "Open",    "still earning rounds",
+   "No open dimensions", "every one has retired or been parked"],
+  ["flat",    "Flat",    "shelve or re-cut",
+   "Nothing has stalled", "every open dimension is still moving"],
+  ["shelved", "Shelved", "parked, not retired",
+   "Nothing parked", "no dimension has been taken off the schedule"],
+  ["retired", "Retired", "met the bar",
+   "Nothing retired yet", "no dimension has met bar-met or clean-streak"],
 ];
 const MODE_FILTERS = [["all", "All"], ["blind", "Blind"], ["rubric", "Rubric"], ["champion", "Promotion"]];
 
-let STATE = null;
-let modeFilter = "all";
-let laneFilter = "all";
+let STATE = null, modeFilter = "all", laneFilter = "all", polling = true;
 
-/* ---- tiny DOM helpers ---------------------------------------------- */
+/* ── DOM helpers ──────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (text !== undefined && text !== null) n.textContent = String(text);
   return n;
 }
-function clear(node) { node.replaceChildren(); return node; }
-function has(v) { return v !== undefined && v !== null && v !== ""; }
+const clear = n => (n.replaceChildren(), n);
+const has = v => v !== undefined && v !== null && v !== "";
 
-/* ---- formatting ----------------------------------------------------- */
+function icon(path, size = 15) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", size); svg.setAttribute("height", size);
+  svg.setAttribute("fill", "none"); svg.setAttribute("aria-hidden", "true");
+  const p = document.createElementNS(svg.namespaceURI, "path");
+  p.setAttribute("d", path);
+  p.setAttribute("stroke", "currentColor");
+  p.setAttribute("stroke-width", "1.5");
+  p.setAttribute("stroke-linecap", "round");
+  p.setAttribute("stroke-linejoin", "round");
+  svg.append(p);
+  return svg;
+}
+const ICONS = {
+  alert: "M8 5.5v3.2M8 11.2h.01M6.8 2.4 1.6 11.4a1.4 1.4 0 0 0 1.2 2.1h10.4a1.4 1.4 0 0 0 1.2-2.1L9.2 2.4a1.4 1.4 0 0 0-2.4 0Z",
+  info:  "M8 7.2v4M8 4.8h.01M14.5 8a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z",
+  check: "M3 8.4 6.2 11.6 13 4.8",
+};
+
+/* ── formatting ───────────────────────────────────────────────────────── */
+const EUR = new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" });
 function fmtTokens(n) {
   if (!has(n)) return "—";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return Math.round(n / 1e3) + "k";
   return String(n);
 }
-function fmtEur(n) { return has(n) ? "€" + Number(n).toFixed(2) : null; }
-function money(tokens, eur) {
-  const e = fmtEur(eur);
-  return e ? e : fmtTokens(tokens) + " tok";
-}
+const fmtEur = n => has(n) ? EUR.format(n) : null;
+const money = (tokens, eur) => fmtEur(eur) || (fmtTokens(tokens) + " tok");
 function ago(iso) {
   if (!has(iso)) return "";
-  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (!isFinite(secs)) return "";
-  if (secs < 90) return "just now";
-  if (secs < 5400) return Math.round(secs / 60) + " min ago";
-  if (secs < 172800) return Math.round(secs / 3600) + " h ago";
-  return Math.round(secs / 86400) + " d ago";
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (!isFinite(s)) return "";
+  if (s < 90) return "just now";
+  if (s < 5400) return Math.round(s / 60) + " min ago";
+  if (s < 172800) return Math.round(s / 3600) + " h ago";
+  return Math.round(s / 86400) + " d ago";
+}
+const basename = p => has(p) ? String(p).split("/").pop() : "";
+/* "1 lanes" is the kind of detail that makes a board look unfinished. */
+function plural(n, word, fallback) {
+  if (!has(n)) return fallback || ("all " + word + "s");
+  return n + " " + word + (n === 1 ? "" : "s");
 }
 
-/* ---- spec validation ------------------------------------------------
-   The board is happy to render a partial spec, but it says what was
-   missing. A hand-written state.json should be told what it got wrong.
-   -------------------------------------------------------------------- */
+/* ── spec validation ──────────────────────────────────────────────────── */
 const ENUMS = {
   mode: ["blind", "rubric", "champion"],
   winner: ["ours", "other"],
@@ -289,368 +676,509 @@ const ENUMS = {
   severity: ["major", "minor", "none"],
   action: ["promoted", "reverted"],
 };
-
 function validate(d) {
-  const problems = [];
+  const out = [];
   if (typeof d !== "object" || d === null) return ["spec is not an object"];
-  if (!has(d.wave)) problems.push("`wave` is missing");
-  if (!d.columns) problems.push("`columns` is missing — no lanes can be drawn");
-  else for (const [key] of COLUMNS) {
-    if (d.columns[key] !== undefined && !Array.isArray(d.columns[key]))
-      problems.push("`columns." + key + "` must be an array");
-  }
-  if (d.rounds !== undefined && !Array.isArray(d.rounds)) problems.push("`rounds` must be an array");
+  if (!has(d.wave)) out.push("`wave` is missing");
+  if (!d.columns) out.push("`columns` is missing — no lanes can be drawn");
+  else for (const [k] of COLUMNS)
+    if (d.columns[k] !== undefined && !Array.isArray(d.columns[k]))
+      out.push("`columns." + k + "` must be an array");
+  if (d.rounds !== undefined && !Array.isArray(d.rounds)) out.push("`rounds` must be an array");
   (Array.isArray(d.rounds) ? d.rounds : []).forEach((r, i) => {
-    for (const field of ["mode", "winner", "margin", "severity", "action"]) {
-      if (has(r[field]) && !ENUMS[field].includes(r[field]))
-        problems.push(`rounds[${i}].${field} = "${r[field]}" is not one of ${ENUMS[field].join(", ")}`);
-    }
+    for (const f of ["mode", "winner", "margin", "severity", "action"])
+      if (has(r[f]) && !ENUMS[f].includes(r[f]))
+        out.push(`rounds[${i}].${f} = "${r[f]}" is not one of ${ENUMS[f].join(", ")}`);
     if (has(r.score) && (r.score < 0 || r.score > 10))
-      problems.push(`rounds[${i}].score = ${r.score} is outside 0–10`);
+      out.push(`rounds[${i}].score = ${r.score} is outside 0–10`);
   });
   if (has(d.schema) && d.schema > 1)
-    problems.push(`spec says schema ${d.schema}; this board renders schema 1 — some sections may be missing`);
-  return problems;
+    out.push(`spec declares schema ${d.schema}; this board renders schema 1 — sections may be missing`);
+  return out;
 }
 
-/* ---- sparkline ------------------------------------------------------
-   Scores across a dimension's bar rounds. Fixed 0–10 scale, because a
-   self-scaling sparkline turns 6→6→6 into a dramatic climb.
-   -------------------------------------------------------------------- */
+/* ── sparkline ────────────────────────────────────────────────────────────
+   Scores across a dimension's bar rounds, on a fixed 0–10 scale. A
+   self-scaling sparkline would turn 6→6→6 into a dramatic climb, which is
+   the one thing this board must never do.
+   ───────────────────────────────────────────────────────────────────────── */
 function sparkline(scores) {
-  const W = 132, H = 22, PAD = 2;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const W = 220, H = 34, PAD = 3, NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.setAttribute("width", W); svg.setAttribute("height", H);
-  svg.setAttribute("class", "spark");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("class", "trendline");
+  svg.setAttribute("height", H);
+  svg.setAttribute("width", "100%");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "scores " + scores.join(", ") + " out of 10");
+  svg.setAttribute("aria-label", `scores out of 10: ${scores.join(", ")}`);
+
   const x = i => scores.length < 2 ? W / 2 : PAD + i * (W - 2 * PAD) / (scores.length - 1);
   const y = v => H - PAD - (Math.max(0, Math.min(10, v)) / 10) * (H - 2 * PAD);
-  const path = document.createElementNS(svg.namespaceURI, "path");
-  path.setAttribute("d", scores.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" "));
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke", "currentColor");
-  path.setAttribute("stroke-width", "1.5");
-  path.setAttribute("stroke-linejoin", "round");
-  path.setAttribute("opacity", ".65");
-  svg.append(path);
-  const last = document.createElementNS(svg.namespaceURI, "circle");
-  last.setAttribute("cx", x(scores.length - 1)); last.setAttribute("cy", y(scores[scores.length - 1]));
-  last.setAttribute("r", "2.2"); last.setAttribute("fill", "currentColor");
-  svg.append(last);
+  const pts = scores.map((v, i) => [x(i), y(v)]);
+  const line = pts.map(([px, py], i) => (i ? "L" : "M") + px.toFixed(1) + " " + py.toFixed(1)).join(" ");
+
+  const uid = "g" + Math.random().toString(36).slice(2, 8);
+  const defs = document.createElementNS(NS, "defs");
+  const grad = document.createElementNS(NS, "linearGradient");
+  grad.setAttribute("id", uid); grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
+  grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
+  for (const [off, op] of [["0%", ".22"], ["100%", "0"]]) {
+    const s = document.createElementNS(NS, "stop");
+    s.setAttribute("offset", off); s.setAttribute("stop-color", "currentColor");
+    s.setAttribute("stop-opacity", op);
+    grad.append(s);
+  }
+  defs.append(grad); svg.append(defs);
+
+  const area = document.createElementNS(NS, "path");
+  area.setAttribute("d", `${line} L ${x(scores.length - 1).toFixed(1)} ${H} L ${x(0).toFixed(1)} ${H} Z`);
+  area.setAttribute("fill", `url(#${uid})`);
+  svg.append(area);
+
+  const stroke = document.createElementNS(NS, "path");
+  stroke.setAttribute("d", line);
+  stroke.setAttribute("fill", "none");
+  stroke.setAttribute("stroke", "currentColor");
+  stroke.setAttribute("stroke-width", "1.75");
+  stroke.setAttribute("stroke-linejoin", "round");
+  stroke.setAttribute("stroke-linecap", "round");
+  stroke.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.append(stroke);
+
+  const dot = document.createElementNS(NS, "circle");
+  dot.setAttribute("cx", x(scores.length - 1)); dot.setAttribute("cy", y(scores[scores.length - 1]));
+  dot.setAttribute("r", "2.6"); dot.setAttribute("fill", "currentColor");
+  dot.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.append(dot);
   return svg;
 }
 
-function pips(done, total) {
-  const wrap = el("span", "pips");
-  for (let i = 0; i < total; i++) wrap.append(el("i", i < done ? "on" : null));
-  return wrap;
+function streak(done, total) {
+  const w = el("span", "streak");
+  w.setAttribute("aria-label", `${done} of ${total}`);
+  for (let i = 0; i < total; i++) w.append(el("i", i < done ? "on" : null));
+  return w;
 }
 
-/* ---- sections -------------------------------------------------------- */
+function badge(text, kind) { return el("span", "badge" + (kind ? " " + kind : ""), text); }
+
+/* ── theme ────────────────────────────────────────────────────────────── */
+function applyTheme(choice) {
+  if (choice === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", choice);
+  try { localStorage.setItem("gauntlet-theme", choice); } catch (e) { /* file:// or private mode */ }
+  for (const b of $("theme").querySelectorAll("[data-theme-choice]"))
+    b.setAttribute("aria-checked", String(b.dataset.themeChoice === choice));
+}
+(function initTheme() {
+  let saved = "auto";
+  try { saved = localStorage.getItem("gauntlet-theme") || "auto"; } catch (e) { /* ignore */ }
+  applyTheme(saved);
+  $("theme").addEventListener("click", e => {
+    const b = e.target.closest("[data-theme-choice]");
+    if (b) applyTheme(b.dataset.themeChoice);
+  });
+})();
+
+/* Roving-focus arrow keys for every segmented control on the page. */
+function wireSegKeys(group) {
+  group.addEventListener("keydown", e => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const items = [...group.querySelectorAll("button")];
+    const i = items.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    items[(i + (e.key === "ArrowRight" ? 1 : items.length - 1)) % items.length].focus();
+  });
+}
+["theme", "mode-filter", "lane-filter"].forEach(id => wireSegKeys($(id)));
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SECTIONS
+   ═══════════════════════════════════════════════════════════════════════ */
 function renderHeader(d) {
-  const goal = document.getElementById("goal");
-  clear(goal);
-  if (has(d.goal)) goal.textContent = d.goal;
-  const meta = clear(document.getElementById("meta"));
-  const stale = d.generated && (Date.now() - new Date(d.generated).getTime()) > 15 * 60000;
-  meta.append(el("span", "dot" + (stale ? " stale" : "")));
-  meta.append(document.createTextNode(
-    "spec " + ago(d.generated) + (has(d.bar_kind) ? " · bar: " + d.bar_kind : "")));
+  $("goal").textContent = has(d.goal) ? d.goal : "";
+  $("goal").title = has(d.goal) ? d.goal : "";
+  const stale = d.generated && (Date.now() - new Date(d.generated).getTime()) > STALE_MS;
+  const pulse = $("freshness").querySelector(".pulse");
+  pulse.className = "pulse " + (stale ? "stale" : polling ? "live" : "");
+  const bits = ["spec " + ago(d.generated)];
+  if (!polling) bits.push("static snapshot");
+  if (has(d.bar_kind)) bits.push("bar: " + d.bar_kind);
+  $("freshness-text").textContent = bits.join(" · ");
+}
+
+function banner(kind, iconPath, boldText, items) {
+  const b = el("div", "banner " + kind);
+  const ic = icon(iconPath); ic.classList.add("ico");
+  b.append(ic);
+  const body = el("div");
+  body.append(el("b", null, boldText));
+  if (items && items.length) {
+    const ul = el("ul");
+    items.forEach(t => ul.append(el("li", null, t)));
+    body.append(ul);
+  }
+  b.append(body);
+  return b;
 }
 
 function renderBanners(d) {
-  const box = clear(document.getElementById("banners"));
+  const box = clear($("banners"));
   const problems = validate(d);
-  if (problems.length) {
-    const b = el("div", "banner warn");
-    b.append(el("b", null, "This spec has problems the board worked around:"));
-    const ul = el("ul");
-    problems.forEach(p => ul.append(el("li", null, p)));
-    b.append(ul);
-    box.append(b);
-  }
-  if (Array.isArray(d.fired) && d.fired.length) {
-    const b = el("div", "banner stop");
-    b.append(el("b", null, "Stop conditions fired — the run should not still be running:"));
-    const ul = el("ul");
-    d.fired.forEach(f => ul.append(el("li", null, f)));
-    b.append(ul);
-    box.append(b);
-  }
+  if (Array.isArray(d.fired) && d.fired.length)
+    box.append(banner("danger", ICONS.alert,
+      "Stop conditions fired — this run should not still be running.", d.fired));
+  if (problems.length)
+    box.append(banner("warn", ICONS.alert,
+      "This spec has problems the board worked around:", problems));
   if (has(d.read_note)) {
-    const b = el("div", "banner");
-    b.append(el("b", null, "Log read: " + (d.read || "") + " — "));
-    b.append(document.createTextNode(d.read_note));
-    if (Array.isArray(d.evidence_lines) && d.evidence_lines.length) {
-      const ul = el("ul");
-      d.evidence_lines.forEach(l => ul.append(el("li", null, l)));
-      b.append(ul);
-    }
+    const b = banner("info", ICONS.info,
+      "Log read: " + (d.read || "unknown") + " — " + d.read_note,
+      Array.isArray(d.evidence_lines) ? d.evidence_lines : []);
     box.append(b);
   }
 }
 
-function stat(k, v, sub, frac) {
-  const s = el("div", "stat");
-  s.append(el("div", "k", k), el("div", "v", v));
-  if (has(sub)) s.append(el("div", "sub", sub));
+function tile(k, v, sub, frac, tone) {
+  const t = el("div", "card tile");
+  t.append(el("div", "k t-micro", k));
+  const val = el("div", "v");
+  if (Array.isArray(v)) { val.append(document.createTextNode(v[0])); val.append(el("small", null, " " + v[1])); }
+  else val.textContent = v;
+  t.append(val);
+  if (has(sub)) t.append(el("div", "sub", sub));
   if (has(frac)) {
-    const cls = "meter" + (frac >= 1 ? " hot" : frac >= 0.8 ? " warn" : "");
-    const m = el("div", cls);
+    const cls = tone || (frac >= 1 ? "danger" : frac >= .8 ? "warn" : "");
+    const m = el("div", "meter " + cls);
     const i = document.createElement("i");
-    i.style.width = Math.min(100, Math.max(0, frac * 100)).toFixed(0) + "%";
-    m.append(i);
-    s.append(m);
+    i.style.width = Math.min(100, Math.max(0, frac * 100)).toFixed(1) + "%";
+    m.append(i); t.append(m);
   }
-  return s;
+  return t;
 }
 
 function renderRail(d) {
-  const rail = clear(document.getElementById("rail"));
+  const rail = clear($("rail"));
   const ext = (d.extensions || []).reduce((a, e) => a + (e.waves || 0), 0);
-  rail.append(stat("wave", `${d.wave ?? "—"} / ${d.budget_waves ?? "—"}`,
-    ext ? `initial ${d.initial_budget_waves}, extended +${ext}` : null,
+  rail.append(tile("Wave",
+    [String(d.wave ?? "—"), "of " + (d.budget_waves ?? "—")],
+    ext ? `initial ${d.initial_budget_waves}, extended +${ext}` : "no extensions granted",
     d.budget_waves ? d.wave / d.budget_waves : null));
 
   const sp = d.spend || {};
-  rail.append(stat("spend", money(sp.tokens, sp.eur),
-    has(sp.budget_tokens) ? "of " + money(sp.budget_tokens, sp.budget_eur) : "no budget set",
+  rail.append(tile("Spend", money(sp.tokens, sp.eur),
+    has(sp.budget_tokens) ? "of " + money(sp.budget_tokens, sp.budget_eur) : "no budget set — waves are not money",
     has(sp.pct) ? sp.pct / 100 : null));
 
   if (has(sp.per_wave)) {
-    rail.append(stat("burn rate", money(sp.per_wave, sp.eur && sp.tokens ? sp.eur / sp.tokens * sp.per_wave : null) + "/wave",
-      has(sp.waves_left_at_rate) ? `~${sp.waves_left_at_rate} wave(s) left at this rate` : null));
+    const rate = sp.eur && sp.tokens ? sp.eur / sp.tokens : null;
+    rail.append(tile("Burn rate",
+      [rate ? EUR.format(sp.per_wave * rate) : fmtTokens(sp.per_wave), "per wave"],
+      has(sp.waves_left_at_rate) ? `~${sp.waves_left_at_rate} waves left at this rate` : null));
   }
   const t = d.tier || {};
-  if (has(t.index)) {
-    rail.append(stat("tier", `${t.index} · ${t.name || ""}`,
-      `${t.builder_model || "?"} / ${t.critic_model || "?"} · ~${t.calls_per_lane_round ?? "?"} calls per lane·round`));
-  }
+  if (has(t.index))
+    rail.append(tile("Effort tier", [String(t.index), t.name || ""],
+      `${t.builder_model || "?"} builder · ${t.critic_model || "?"} critic · ~${t.calls_per_lane_round ?? "?"} calls per lane·round`));
+
   const mix = d.evidence_mix;
-  if (mix && (mix.blind || mix.rubric)) {
-    rail.append(stat("evidence", `${mix.blind} blind`, `${mix.rubric} rubric — not equivalent`));
-  }
-  if (has(sp.total_rounds) && sp.total_rounds > 0 && sp.priced_rounds < sp.total_rounds) {
-    rail.append(stat("priced rounds", `${sp.priced_rounds} / ${sp.total_rounds}`,
-      "unpriced rounds make every projection a guess"));
-  }
+  if (mix && (mix.blind || mix.rubric))
+    rail.append(tile("Evidence", [String(mix.blind), "blind"],
+      `${mix.rubric} rubric — not equivalent evidence`));
+
+  if (has(sp.total_rounds) && sp.total_rounds > 0 && sp.priced_rounds < sp.total_rounds)
+    rail.append(tile("Priced rounds", [String(sp.priced_rounds), "of " + sp.total_rounds],
+      "unpriced rounds make every projection a guess",
+      sp.priced_rounds / sp.total_rounds, "warn"));
 }
 
 function renderLadder(d) {
-  const section = document.getElementById("ladder-section");
-  const t = d.tier || {};
-  if (!Array.isArray(t.ladder) || !t.ladder.length) { section.hidden = true; return; }
-  section.hidden = false;
-  const box = clear(document.getElementById("ladder"));
-  for (const rung of t.ladder) {
-    const n = el("div", "rung " + (rung.state || "locked"));
-    n.append(el("div", "n", `tier ${rung.index}` + (rung.state === "current" ? " · here" : "")));
-    n.append(el("div", "name", rung.name || ""));
-    const bits = [];
-    if (has(rung.share)) bits.push(Math.round(rung.share * 100) + "% of budget");
-    bits.push((rung.lanes || "all") + " lanes");
-    bits.push(rung.critic_calls === 1 ? "1 critic call" : rung.critic_calls + " critic calls");
-    bits.push(`${rung.builder_model}/${rung.critic_model}`);
-    n.append(el("div", "d", bits.join(" · ")));
+  const sec = $("ladder-section"), t = d.tier || {};
+  if (!Array.isArray(t.ladder) || !t.ladder.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  $("ladder-aside").textContent = has(t.allowance_tokens)
+    ? "allowance through this tier: " + fmtTokens(t.allowance_tokens) + " tok" : "";
+
+  const box = clear($("ladder"));
+  for (const r of t.ladder) {
+    const n = el("div", "card rung " + (r.state || "locked"));
+    const top = el("div", "rung-top");
+    top.append(el("span", "t-micro", `Tier ${r.index}` + (r.state === "current" ? " · here" : "")));
+    if (r.state === "done") { const c = icon(ICONS.check, 14); c.classList.add("check"); top.append(c); }
+    n.append(top);
+    n.append(el("div", "rung-name", r.name || ""));
+    n.append(el("div", "rung-d",
+      `${plural(r.lanes, "lane", "all lanes")} · ${plural(r.critic_calls, "critic call")}`));
+    n.append(el("div", "rung-d faint", `${r.builder_model} builder · ${r.critic_model} critic`));
+    if (has(r.share)) n.append(el("div", "rung-share", Math.round(r.share * 100) + "% of budget"));
     box.append(n);
   }
-  const hist = clear(document.getElementById("ladder-history"));
+
+  const hist = clear($("ladder-history"));
   const h = t.history || [];
-  if (h.length) {
-    hist.textContent = h.map(e =>
-      `escalated at wave ${e.at_wave}: ${e.from_tier}→${e.to_tier} (${e.reason})`).join("  ·  ");
-  } else {
-    hist.textContent = "no escalation yet — the run is still proving itself at the cheapest tier";
+  if (!h.length) {
+    hist.append(el("div", "h muted", "No escalation yet — the run is still proving itself at the cheapest tier."));
+  } else for (const e of h) {
+    const row = el("div", "h");
+    row.append(el("span", "w", `wave ${e.at_wave}`));
+    row.append(el("span", null,
+      `tier ${e.from_tier} → ${e.to_tier}${has(e.spend_at) ? " at " + fmtTokens(e.spend_at) + " tok spent" : ""} — ${e.reason || ""}`));
+    hist.append(row);
   }
 }
 
-function card(c, columnKey) {
-  const n = el("div", "card");
-  const title = el("div", "title");
-  const left = el("span", null, c.lane || "");
-  left.append(" ", el("span", "dim", c.dimension || ""));
-  title.append(left);
-  if (has(c.severity)) title.append(el("span", "tag " + c.severity, c.severity));
-  n.append(title);
+function laneCard(c, column) {
+  const n = el("div", "card lane");
+  const top = el("div", "lane-top");
+  const name = el("div", "lane-name", c.lane || "");
+  name.append(" ", el("span", "dim", c.dimension || ""));
+  top.append(name);
+  if (has(c.severity)) top.append(badge(c.severity, c.severity));
+  else if (column === "retired" && has(c.retired_by)) top.append(badge(c.retired_by, "none"));
+  n.append(top);
 
-  const nums = [];
-  if (has(c.bar_rounds)) nums.push(`${c.bar_rounds} bar rounds`);
-  if (has(c.promotions) || has(c.reverts)) nums.push(`${c.promotions || 0}↑ ${c.reverts || 0}↓`);
-  if (has(c.tokens) && c.tokens) nums.push(fmtTokens(c.tokens) + " tok");
-  const numRow = el("div", "nums", nums.join(" · "));
-  if (columnKey === "open" && has(c.bar_met_n)) {
-    numRow.append(document.createTextNode(" · bar-met"));
-    numRow.append(pips(c.bar_met_streak || 0, c.bar_met_n));
-    numRow.append(document.createTextNode(" clean"));
-    numRow.append(pips(c.clean_streak || 0, c.clean_streak_n));
+  const facts = [];
+  if (has(c.bar_rounds)) facts.push(plural(c.bar_rounds, "round"));
+  if (c.promotions) facts.push(`${c.promotions} promoted`);
+  if (c.reverts) facts.push(plural(c.reverts, "revert"));
+  if (c.tokens) facts.push(`${fmtTokens(c.tokens)} tok`);
+  if (facts.length) n.append(el("div", "lane-stats", facts.join(" · ")));
+
+  if (column === "open" && has(c.bar_met_n)) {
+    const s = el("div", "lane-stats");
+    const s1 = el("span", "s"); s1.append(el("span", "faint", "bar-met"), streak(c.bar_met_streak || 0, c.bar_met_n));
+    const s2 = el("span", "s"); s2.append(el("span", "faint", "clean"), streak(c.clean_streak || 0, c.clean_streak_n));
+    s.append(s1, s2);
+    n.append(s);
   }
-  n.append(numRow);
 
-  if (Array.isArray(c.margins) && c.margins.length)
-    n.append(el("div", "nums", c.margins.join(" → ")));
-  if (Array.isArray(c.scores) && c.scores.length) n.append(sparkline(c.scores));
-  if (has(c.gap)) n.append(el("div", "gap", c.gap));
-  if (has(c.trend)) n.append(el("div", "why", c.trend));
+  if (Array.isArray(c.margins) && c.margins.length) {
+    const m = el("div", "lane-stats");
+    m.append(el("span", "s faint", c.margins.join("  →  ")));
+    n.append(m);
+  }
+  if (Array.isArray(c.scores) && c.scores.length > 1) n.append(sparkline(c.scores));
+  if (has(c.gap)) n.append(el("div", "lane-gap", c.gap));
+  // The shelving reason already says why it stopped moving; printing the
+  // trend note beside it says the same thing twice.
+  if (has(c.trend) && !has(c.shelved_reason)) n.append(el("div", "lane-note", c.trend));
   if (has(c.shelved_reason))
-    n.append(el("div", "why", `shelved at wave ${c.shelved_at_wave}: ${c.shelved_reason}`));
-  if (has(c.retired_by)) n.append(el("div", "why", "retired on " + c.retired_by));
-  if (has(c.evidence)) n.append(el("div", "foot", "last evidence: " + c.evidence));
+    n.append(el("div", "lane-note", `Shelved at wave ${c.shelved_at_wave}: ${c.shelved_reason}`));
+  if (has(c.evidence)) {
+    const f = el("div", "lane-foot");
+    const p = el("span", "path", basename(c.evidence));
+    p.title = c.evidence;
+    f.append(el("span", "faint", "evidence"), p);
+    n.append(f);
+  }
   return n;
 }
 
-function renderColumns(d) {
-  const cols = clear(document.getElementById("cols"));
+function renderBoard(d) {
+  const board = clear($("board"));
   const data = d.columns || {};
-  for (const [key, label] of COLUMNS) {
+  let total = 0;
+  for (const [key, label, , emptyTitle, emptyWhy] of COLUMNS) {
     const cards = Array.isArray(data[key]) ? data[key] : [];
+    total += cards.length;
     const col = el("div", "col " + key);
-    const h = el("h3", null, label + " ");
-    h.append(el("span", "count", "(" + cards.length + ")"));
-    col.append(h);
-    if (!cards.length) col.append(el("div", "empty", "none"));
-    cards.forEach(c => col.append(card(c, key)));
-    cols.append(col);
+    const head = el("div", "col-head");
+    head.append(el("span", "swatch"));
+    head.append(el("span", "t-micro", label));
+    head.append(el("span", "chip", cards.length));
+    col.append(head);
+    if (!cards.length) {
+      const e = el("div", "empty");
+      e.append(el("div", null, emptyTitle), el("div", "why", emptyWhy));
+      col.append(e);
+    } else cards.forEach(c => col.append(laneCard(c, key)));
+    board.append(col);
   }
+  $("lanes-aside").textContent = total
+    ? `${total} lane/dimension pair${total === 1 ? "" : "s"}` : "";
+}
+
+function segButton(group, label, value, current, onPick) {
+  const b = el("button", null, label);
+  b.setAttribute("role", "radio");
+  b.setAttribute("aria-checked", String(current === value));
+  b.tabIndex = current === value ? 0 : -1;
+  b.onclick = () => onPick(value);
+  group.append(b);
 }
 
 function renderFilters(d) {
-  const box = clear(document.getElementById("filters"));
-  const lanes = ["all", ...new Set((d.rounds || []).map(r => r.lane).filter(Boolean))];
-  for (const [val, label] of MODE_FILTERS) {
-    const b = el("button", null, label);
-    b.setAttribute("aria-pressed", String(modeFilter === val));
-    b.onclick = () => { modeFilter = val; renderFilters(STATE); renderRounds(STATE); };
-    box.append(b);
-  }
-  if (lanes.length > 2) {
-    box.append(el("span", null, " "));
-    for (const lane of lanes) {
-      const b = el("button", null, lane === "all" ? "All lanes" : lane);
-      b.setAttribute("aria-pressed", String(laneFilter === lane));
-      b.onclick = () => { laneFilter = lane; renderFilters(STATE); renderRounds(STATE); };
-      box.append(b);
-    }
+  const modes = clear($("mode-filter"));
+  for (const [v, label] of MODE_FILTERS)
+    segButton(modes, label, v, modeFilter, val => { modeFilter = val; renderFilters(STATE); renderRounds(STATE); });
+
+  const lanesBox = clear($("lane-filter"));
+  const lanes = [...new Set((d.rounds || []).map(r => r.lane).filter(Boolean))];
+  lanesBox.hidden = lanes.length < 2;
+  if (lanes.length >= 2) {
+    segButton(lanesBox, "All lanes", "all", laneFilter, v => { laneFilter = v; renderFilters(STATE); renderRounds(STATE); });
+    for (const lane of lanes)
+      segButton(lanesBox, lane, lane, laneFilter, v => { laneFilter = v; renderFilters(STATE); renderRounds(STATE); });
   }
 }
 
 function renderRounds(d) {
-  const section = document.getElementById("rounds-section");
+  const sec = $("rounds-section");
   const rows = Array.isArray(d.rounds) ? d.rounds : [];
-  if (!rows.length) { section.hidden = true; return; }
-  section.hidden = false;
-  const tbody = clear(document.querySelector("#rounds tbody"));
+  if (!rows.length) { sec.hidden = true; return; }
+  sec.hidden = false;
   const shown = rows.filter(r =>
     (modeFilter === "all" || r.mode === modeFilter) &&
     (laneFilter === "all" || r.lane === laneFilter));
+  $("rounds-aside").textContent = shown.length === rows.length
+    ? `${rows.length} most recent` : `${shown.length} of ${rows.length}`;
+
+  const body = clear($("rounds-body"));
   if (!shown.length) {
-    const tr = el("tr");
-    const td = el("td", "empty", "no rounds match this filter");
-    td.colSpan = 11;
-    tr.append(td); tbody.append(tr);
+    const tr = el("tr"), td = el("td", "empty", "no rounds match this filter");
+    td.colSpan = 10; tr.append(td); body.append(tr);
     return;
   }
   for (const r of shown) {
     const tr = el("tr");
-    tr.append(el("td", "num", `${r.wave}·${r.round}`));
-    tr.append(el("td", null, r.lane || ""));
-    tr.append(el("td", null, r.dimension || ""));
+    tr.append(el("td", "wr", `${r.wave}·${r.round}`));
+    tr.append(el("td", "lane-cell", r.lane || ""));
+    tr.append(el("td", "dim-cell", r.dimension || ""));
+
     const mode = el("td");
-    mode.append(el("span", "tag " + (r.mode === "blind" ? "blind" : ""), r.mode || ""));
+    mode.append(badge(r.mode === "champion" ? "promotion" : r.mode || "",
+      r.mode === "blind" ? "blind" : "ghost"));
     tr.append(mode);
-    const win = el("td");
-    if (r.mode === "champion" && has(r.action)) win.append(el("span", "tag " + r.action, r.action));
-    else win.append(document.createTextNode(r.winner === "ours" ? "ours" : "bar"));
-    tr.append(win);
-    tr.append(el("td", null, r.margin || ""));
-    tr.append(el("td", "num", has(r.score) ? r.score + "/10" : "—"));
-    const sev = el("td");
-    if (has(r.severity)) sev.append(el("span", "tag " + r.severity, r.severity));
-    tr.append(sev);
-    tr.append(el("td", "gap", r.gap && r.gap !== "none" ? r.gap : ""));
-    tr.append(el("td", "num", r.evidence || ""));
-    tr.append(el("td", "num", has(r.tokens) ? fmtTokens(r.tokens) : "—"));
-    tbody.append(tr);
+
+    const out = el("td");
+    if (r.mode === "champion" && has(r.action)) out.append(badge(r.action, r.action));
+    else {
+      const w = el("span", "win " + (r.winner === "ours" ? "ours" : "other"));
+      w.append(el("span", "dot"), document.createTextNode(r.winner === "ours" ? "ours" : "bar wins"));
+      out.append(w);
+    }
+    tr.append(out);
+
+    tr.append(el("td", "dim-cell", r.margin || ""));
+    tr.append(el("td", "n", has(r.score) ? r.score + " / 10" : "—"));
+
+    const gap = el("td", "gap-cell");
+    if (has(r.gap) && r.gap !== "none") gap.textContent = r.gap;
+    else if (r.severity === "none") gap.append(badge("clean", "none"));
+    else gap.append(el("span", "faint", "—"));   // a promotion round has no gap by design
+    tr.append(gap);
+
+    const ev = el("td", "ev");
+    if (has(r.evidence)) {
+      const s = el("span", null, basename(r.evidence));
+      s.title = r.evidence;
+      ev.append(s);
+    }
+    tr.append(ev);
+    tr.append(el("td", "n", has(r.tokens) ? fmtTokens(r.tokens) : "—"));
+    body.append(tr);
   }
 }
 
-function renderDetail(d) {
-  const section = document.getElementById("detail-section");
-  const box = clear(document.getElementById("detail"));
-  const sp = d.spend || {};
-  let any = false;
-
-  const listOf = (title, entries) => {
-    if (!entries.length) return;
-    any = true;
-    const l = el("div", "list");
-    l.append(el("div", "k", title));
-    for (const [k, v] of entries) {
-      const row = el("div", "row");
-      row.append(el("span", null, k));
-      row.append(el("span", "v", v));
-      l.append(row);
-    }
-    box.append(l);
-  };
-
-  const rate = sp.eur && sp.tokens ? sp.eur / sp.tokens : null;
-  const asMoney = t => rate ? fmtEur(t * rate) : fmtTokens(t) + " tok";
-
-  listOf("Spend by role", Object.entries(sp.by_role || {})
-    .filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => [k, asMoney(v)]));
-
-  listOf("Spend by tier", Object.entries(sp.by_tier || {})
-    .filter(([, v]) => v > 0).sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([k, v]) => ["tier " + k, asMoney(v)]));
-
-  listOf("Budget extensions", (d.extensions || []).map(e =>
-    [`wave ${e.at_wave}: +${e.waves} wave(s)`, e.log_read || ""]));
-
-  const STOP_LABELS = {
-    bar_met_n: "wins in a row to retire",
-    clean_streak_n: "clean rounds to retire",
-    flat_rounds_n: "flat rounds before shelving",
-    hard_cap_waves: "hard cap (waves)",
-    hard_cap_tokens: "hard cap (tokens)",
-  };
-  listOf("Armed stops", Object.entries(d.stops || {})
-    .filter(([, v]) => has(v))
-    .map(([k, v]) => [STOP_LABELS[k] || k.replace(/_/g, " "),
-                      k === "hard_cap_tokens" ? fmtTokens(v) : String(v)]));
-
-  section.hidden = !any;
+function panel(title, build) {
+  const p = el("div", "card panel");
+  p.append(el("h3", "t-micro", title));
+  build(p);
+  return p;
 }
 
+function renderPanels(d) {
+  const sec = $("detail-section"), box = clear($("panels"));
+  const sp = d.spend || {};
+  const rate = sp.eur && sp.tokens ? sp.eur / sp.tokens : null;
+  const asMoney = t => rate ? EUR.format(t * rate) : fmtTokens(t) + " tok";
+  let any = false;
+
+  const bars = (title, entries) => {
+    const rows = entries.filter(([, v]) => v > 0);
+    if (!rows.length) return;
+    any = true;
+    const max = Math.max(...rows.map(([, v]) => v));
+    box.append(panel(title, p => {
+      for (const [k, v] of rows) {
+        const row = el("div", "bar-row");
+        const top = el("div", "top");
+        top.append(el("span", "k", k), el("span", "v", asMoney(v)));
+        row.append(top);
+        const track = el("div", "track");
+        const i = document.createElement("i");
+        i.style.width = (v / max * 100).toFixed(1) + "%";
+        track.append(i); row.append(track);
+        p.append(row);
+      }
+    }));
+  };
+
+  bars("Spend by role", Object.entries(sp.by_role || {}).sort((a, b) => b[1] - a[1]));
+  bars("Spend by tier", Object.entries(sp.by_tier || {}).sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => ["Tier " + k, v]));
+
+  const rowsOf = (title, entries) => {
+    if (!entries.length) return;
+    any = true;
+    box.append(panel(title, p => {
+      for (const [k, v] of entries) {
+        const row = el("div", "row");
+        row.append(el("span", "k", k), el("span", "v", v));
+        p.append(row);
+      }
+    }));
+  };
+
+  rowsOf("Budget extensions", (d.extensions || []).map(e =>
+    [`Wave ${e.at_wave} · +${e.waves} wave${e.waves === 1 ? "" : "s"}`, e.log_read || ""]));
+
+  const LABELS = {
+    bar_met_n: "Wins in a row to retire",
+    clean_streak_n: "Clean rounds to retire",
+    flat_rounds_n: "Flat rounds before shelving",
+    hard_cap_waves: "Hard cap (waves)",
+    hard_cap_tokens: "Hard cap (tokens)",
+  };
+  rowsOf("Armed thresholds", Object.entries(d.stops || {}).filter(([, v]) => has(v))
+    .map(([k, v]) => [LABELS[k] || k.replace(/_/g, " "),
+                      k === "hard_cap_tokens" ? fmtTokens(v) + " tok" : String(v)]));
+
+  sec.hidden = !any;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LOADING
+   http:// gets live polling. file:// cannot fetch, so it renders the
+   state.js bootstrap once and says so rather than looking broken.
+   ═══════════════════════════════════════════════════════════════════════ */
 function render(d) {
   STATE = d;
   renderHeader(d);
   renderBanners(d);
   renderRail(d);
   renderLadder(d);
-  renderColumns(d);
+  renderBoard(d);
   renderFilters(d);
   renderRounds(d);
-  renderDetail(d);
-  document.getElementById("footer").textContent =
-    "This board renders gauntlet/state.json. Regenerate it with " +
-    "`python3 scripts/gauntlet.py board`. Nobody edits this HTML, and nobody edits the spec by hand " +
-    "while the script owns it.";
+  renderPanels(d);
+  $("footer").replaceChildren(
+    document.createTextNode("This board renders "),
+    el("code", null, "gauntlet/state.json"),
+    document.createTextNode(". Regenerate it with "),
+    el("code", null, "python3 scripts/gauntlet.py board"),
+    document.createTextNode(". Nobody edits this HTML, and nobody hand-writes the spec while the script owns it."),
+  );
 }
 
 function fail(msg) {
-  const meta = clear(document.getElementById("meta"));
-  meta.append(el("span", "dot stale"));
-  meta.append(document.createTextNode(msg));
+  $("freshness").querySelector(".pulse").className = "pulse dead";
+  $("freshness-text").textContent = msg;
+  if (!STATE) $("board").replaceChildren(el("div", "empty", msg));
 }
 
-/* ---- loading --------------------------------------------------------
-   http:// gets live polling. file:// cannot fetch, so it renders the
-   state.js bootstrap once and says so rather than looking broken.
-   -------------------------------------------------------------------- */
-let polling = true;
 async function tick() {
   try {
     const r = await fetch("state.json", { cache: "no-store" });
@@ -658,12 +1186,8 @@ async function tick() {
     render(await r.json());
   } catch (e) {
     if (window.GAUNTLET_STATE) {
+      if (polling) polling = false;   // file:// — one static read, labelled as one
       render(window.GAUNTLET_STATE);
-      if (polling) {
-        polling = false;
-        document.getElementById("meta").append(document.createTextNode(
-          " · static snapshot (serve this directory over http for live updates)"));
-      }
     } else if (window.__stateJsMissing) {
       fail("no spec found — run `python3 scripts/gauntlet.py board`");
     } else {
@@ -671,6 +1195,8 @@ async function tick() {
     }
   }
 }
+
+$("reload").onclick = () => { if (polling) tick(); else location.reload(); };
 tick();
 setInterval(() => { if (polling) tick(); }, POLL_MS);
 </script>
