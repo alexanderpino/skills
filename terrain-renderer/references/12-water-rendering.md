@@ -1105,7 +1105,28 @@ Two consequences fall straight out, and both are load-bearing:
 | **2 · Caustic map from the real wave field** | Rasterize the refracted receiver positions from the light's view and accumulate; folds appear for free wherever several rays land in one texel | **The recommended default.** Shah, Konttinen & Pattanaik's caustics mapping and Wyman & Davis's image-space technique are the canonical formulations; GPU Gems 1 ch. 2 is the water-specific version. Costs one light-view pass over the wave grid |
 | **3 · Ray-traced / photon-mapped** | Photons traced through the surface (DXR), splatted or resampled | Hero water on RT hardware. Correct including multi-branch folds and the secondary caustics from total internal reflection. Theory routes to physically-based-rendering (`caustics.md`) |
 
-**Why the Voronoi fake is structurally wrong — and how to ship it anyway.** Worley `F2−F1` gives a
+**Why it resembles a caustic at all.** The resemblance is not a coincidence, and naming it tells
+you exactly where the approximation stops. Propagate a wavefront and two different singular sets
+appear: the **focal set**, where neighbouring rays cross and the ray-map Jacobian degenerates, and
+the **cut locus**, where fronts of equal travel time arrive at a point from two directions. A
+caustic is the focal set. `F2−F1` is the gap between the nearest and second-nearest seed distance,
+so its ridge set is precisely the **cut locus** of a family of circular fronts expanding from those
+seeds — and circular fronts never focus (the evolute of a circle is a single point), so a cell-noise
+field contains no focal set whatsoever. Both are bright-line networks born of front propagation;
+that is the whole of the similarity. The junction difference then follows by classification rather
+than by tuning: a planar cut locus generically meets in **triple junctions**, a focal set
+generically meets in **cusps**.
+
+**Which is why the approximation does not converge.** Adding octaves, jittering the seeds harder,
+or animating the feature points moves the field around *within the family of cut loci*; no amount
+of refinement produces a focal set. Compare the physical path, where adding wave components makes
+the fold network strictly more correct because they enter the same Jacobian. Voronoi is a
+legitimate approximation of the **appearance** and not a low-order approximation of the
+**mechanism** — budget it as a stand-in with a fixed quality ceiling, never as a base to improve
+on. If the shot needs better caustics than the fake gives, the move is to change tier, not to
+add octaves.
+
+**What separates it on screen — and how to ship it anyway.** Worley `F2−F1` gives a
 network of bright lines around dark cells, which is why it convinces on a still frame. Three
 things separate it from the real thing, all of them consequences of the fold/cusp classification:
 
@@ -1995,6 +2016,14 @@ above except the TotK physics talk is community reconstruction or press/footage 
   Optics* 18, North-Holland (1980), 257–346 — venue, volume and pages verified 2026-08; Whitney's
   attribution is from model knowledge and was not re-checked against the paper.
   [ADS](https://ui.adsabs.harvard.edu/abs/1980PrOpt..18..257B/abstract).
+- **P/F** — The focal-set vs cut-locus framing: that a Worley `F2−F1` ridge set is the cut locus of
+  circular fronts expanding from the seeds (equivalently the Voronoi edge set, where the two
+  nearest seeds tie), that circular fronts have a degenerate focal set (the evolute of a circle is
+  its centre), and that a planar cut locus generically has degree-3 vertices while a focal set
+  generically has cusps. Each piece is standard — singularity theory and computational geometry —
+  and the statements were checked for internal consistency here, but **no source was chased for
+  the combination**. It is this skill's account of why the fake resembles a caustic and why
+  refining it cannot converge; present it as an argument, not as a cited theorem.
 - **P** — Image-space caustic maps (Tier 2): Shah, Konttinen & Pattanaik, "Caustics Mapping: An
   Image-Space Technique for Real-Time Caustics", *IEEE TVCG* 13(2), 2007, 272–280
   ([IEEE Xplore](https://ieeexplore.ieee.org/document/4069236/)); Wyman & Davis, "Interactive
