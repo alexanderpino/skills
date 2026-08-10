@@ -1101,6 +1101,27 @@ gives sparkle that does not integrate to the right brightness; shipping tier 1 a
 correct but slightly too-smooth glitter path in the near field. Production is tier 1 everywhere
 plus tier 2 within a fade radius.
 
+**Check reachability before budgeting for glitter at all.** A glint needs the surface to supply the
+normal that bisects sun and eye, and the surface can only supply what its slope distribution
+contains. One half-vector settles it: `tilt = angle(normalize(L + V), up)`, read against the rms
+slope `s`.
+
+```
+tilt < ~2s   a glitter path -- the classic shimmering road
+tilt ~ 3s    sparse isolated glints; a 2D Gaussian slope field leaves ~1% of the
+             surface above 3 sigma in magnitude, and far less pointing the right way
+tilt > ~4s   nothing. What the water shows there is sky reflection, not sun
+```
+
+The common trap is a **low sun with a high camera**, because the two constraints multiply: the
+mirror elevation equals the sun's, *and* the observer must be near the anti-solar azimuth. A 21°
+sun viewed from a balcony 40° up and 70° off that azimuth needs ~47° of tilt — fifteen sigma, which
+is not "rare" but *never*. Move the same camera into the anti-solar azimuth and the requirement
+drops to ~9.5°, about 3 sigma, and sparse glints appear. Two payoffs: do not spend a glitter tier
+on a shot that cannot show one, and when matching reference photography, the **presence, sparsity
+or absence of sparkle reads back the camera's azimuth relative to the sun** — a free forensic
+check on a plate before you start tuning anything.
+
 **Glitter is a filter applied to the wave field, not a texture applied to the water.** Note what
 separates tiers 1 and 2 from tier 3: the first two are *functions of the slope field*, the third
 is not. That is the whole distinction, and it is the same structural argument the Voronoi caustic
