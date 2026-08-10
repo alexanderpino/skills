@@ -1017,6 +1017,41 @@ gives sparkle that does not integrate to the right brightness; shipping tier 1 a
 correct but slightly too-smooth glitter path in the near field. Production is tier 1 everywhere
 plus tier 2 within a fade radius.
 
+**Glitter is a filter applied to the wave field, not a texture applied to the water.** Note what
+separates tiers 1 and 2 from tier 3: the first two are *functions of the slope field*, the third
+is not. That is the whole distinction, and it is the same structural argument the Voronoi caustic
+fails ([Caustics](#caustics-the-other-half-of-the-light-path)) — applied above the surface instead
+of below it. A glint appears exactly where the surface normal is the half-vector between sun and
+eye, which is a **level set of the slope field**: the sparkle sits on crest and trough lines, not
+at independent random points. Four things follow, and each is a review test:
+
+1. **It is trackable.** Individual glints ride specific crests and travel with them. Over a second
+   of footage a viewer can follow one crest across the glitter path. Cell noise has no crests to
+   follow. Freeze a frame and the fake and the real thing look alike — which is precisely why a
+   noise-perturbed specular survives a screenshot review and dies on video. **The test for glitter
+   is temporal, not spatial**; judge it on a pan, never on a still.
+2. **It is dispersive, and that is the cheapest tell in the frame.** The field carries many scales
+   at once and each moves at its own speed: `c = ω/k` from `ω² = (gk + (σ/ρ)k³)·tanh(kh)`, with the
+   minimum at 23.1 cm/s / 1.73 cm ([Calm water](#calm-water-the-low-energy-regime)) and rising in
+   *both* directions from there. Across a pool-sized band — say 3 cm to 55 cm, entirely on the
+   gravity side of that minimum — the long components outrun the short ones by roughly **4:1**
+   (~0.25 m/s against ~0.93 m/s), so the eye sees fine ripples crawling while a longer swell
+   sweeps through them. A scrolled texture — noise, Voronoi, authored caustic sheet — advects
+   every scale at one velocity by construction and can never show this. Watch two scales at once
+   for two seconds; that is the entire test.
+3. **It is phase-locked to the caustics.** One slope field, two consumers: the same surface
+   curvature that makes the glint above the water makes the fold below it. Drive glitter from a
+   noise texture and the sparkle stops sitting above the bright line it caused — a mismatch that
+   reads as wrong long before anyone can say why. This is the one-evaluator rule (`19`) applied to
+   optics rather than to physics.
+4. **The "cells" are interference, not cells.** With a single wave train the glitter is a set of
+   parallel bands along the crests and the bed caustic is parallel stripes. Add trains from other
+   directions and both become a mosaic that photographs like a cell tessellation. Nothing turned
+   into noise — the components are all still there, still separable, still individually
+   followable. Reading that mosaic as "a Voronoi pattern" and reaching for cell noise inverts
+   cause and effect: the tessellated *look* is the output of a directional wave spectrum, and cell
+   noise reproduces the look while discarding everything that generated it.
+
 **Wind is a rendering parameter here, not just an animation one.** Because mean-square slope is a
 function of wind speed, the glitter path *widens and dulls* as wind rises, and *narrows and
 intensifies* as it drops. Wire the same wind that drives the wave spectrum into the glitter
@@ -1697,6 +1732,17 @@ above except the TotK physics talk is community reconstruction or press/footage 
 - **Caustics projected onto terrain only**: the bed lights up and every swimmer, step, ladder and
   prop in the water stays conspicuously unlit by the brightest thing in the scene. Project in world
   space onto whatever the pass finds below the water plane.
+- **Scrolled-texture water, revealed by dispersion**: every scale on the surface drifts at one
+  speed, so fine ripples and long waves move in lockstep. Real water is dispersive and the long
+  components outrun the short ones (~4:1 across a pool-sized band). Costs two seconds of footage
+  to catch and no amount of still-frame polish hides it — see
+  [Sun glitter](#sun-glitter-the-sparkle-path).
+- **Glitter reviewed on a still**: a noise-perturbed specular is indistinguishable from real
+  glitter in a screenshot and obviously wrong on a pan, because real glints ride crests and
+  trackably travel with them. Judge sparkle on video, always.
+- **Sparkle and caustics out of phase**: glitter driven from a noise texture, caustics from the
+  wave field (or vice versa). The bright surface glint no longer sits above the bright fold it
+  caused. One slope field feeds both, or neither is right.
 - **Caustics that animate on flat water**: a Tier 0/1 fake with no coupling to the wave field. A
   flat surface has a constant Jacobian and produces *no* caustic structure — drive the pattern's
   amplitude from the wave amplitude, or the trick announces itself the moment the water settles.
@@ -1966,6 +2012,13 @@ above except the TotK physics talk is community reconstruction or press/footage 
   standard optical data, quoted from model knowledge and **not** web-verified — treat the third
   decimal as indicative. The qualitative claim (fold sets separate per channel, so caustic edges
   fringe) is robust regardless.
+- **P/F** — Glitter as a level set of the slope field, and the four review tests that follow
+  (trackable crests, dispersive multi-scale motion, phase-lock with the caustics, interference
+  rather than cells). The geometry — a glint occurs where the normal is the sun/eye half-vector —
+  is definitional; the dispersion arithmetic (≈0.25 m/s at 3 cm against ≈0.93 m/s at 55 cm, from
+  `c = sqrt(g/k + σk/ρ)`) was derived and checked here. Framing these as *review tests*, and the
+  claim that a still frame cannot separate real glitter from noise-perturbed specular, is this
+  skill's composition — production observation, not a cited result.
 - **F** — The four-gate masking contract (depth fade, extinction along the light path, sun
   visibility at the surface entry point, irradiance-not-albedo) and the tier ladder as a whole:
   production practice assembled over the physics above. The shadow-at-entry-point rule is the one
