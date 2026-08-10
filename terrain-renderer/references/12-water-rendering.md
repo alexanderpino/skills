@@ -1168,6 +1168,33 @@ Two consequences fall straight out, and both are load-bearing:
   therefore smooth bright curves that close, run off, or terminate in cusps. It is not a cell
   tessellation — which is the specific reason the Voronoi fake reads wrong.
 
+### The focusing number: which regime the bed is in
+
+Whether a body shows a crisp caustic net, a soft wash, or nothing much is not a matter of taste,
+and it has a one-line estimate. A surface slope `s` turns the refracted ray by `s·(1 − 1/n)`, so at
+depth `d` the receiver point moves by `d·s·(1 − 1/n)`; focusing happens when that displacement's
+*gradient* reaches unity. With `k` the dominant wavenumber and `s` the rms slope:
+
+```
+F = d * (1 - 1/n) * s * k        # water: 1 - 1/1.333 = 0.25, so F ~= 0.25 * d * s * k
+    F << 1   below focus  -> a soft, wide brightness modulation; no network
+    F ~= 1   at focus     -> the crisp net, folds and cusps resolved
+    F >> 1   past focus   -> branches overlap into an unresolvable wash
+```
+
+(Near-normal sun; at low sun an obliquity factor enters and the pattern stretches along the sun
+azimuth.) Three practical readings:
+
+- **Cell size on the receiver is of the order of the dominant wavelength**, so measuring caustic
+  cells against a photograph is a direct readout of the wave field that produced them — a cheap
+  calibration check when matching reference.
+- **Lengthening the waves at fixed slope moves you *down* the ladder**, because `k` falls. "Lower
+  the wave frequency" alone does not give bigger caustics; it gives fainter ones.
+- **Holding the look while lengthening the waves costs `s ∝ λ`, i.e. amplitude `a = s/k ∝ λ²`.**
+  Big crisp caustics require genuinely big waves — going from 16 cm to 50 cm at constant `F` is a
+  ~10× rise in amplitude. A calm body cannot have a large-celled sharp net, and art direction that
+  asks for one is asking for a contradiction.
+
 ### The tier ladder
 
 | Tier | Mechanism | Verdict |
