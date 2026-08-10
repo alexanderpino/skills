@@ -174,6 +174,35 @@ you held. And prefer serial passes on coupled work — the canonical run's own
 finding is that sequential single-owner passes beat parallel fan-out decisively
 (`decomposition.md`), which makes the expensive default the worse one too.
 
+## Convoy
+
+**Signal.** Wave wall-clock is roughly the sum of every stage: builders idle
+while critics judge, critics idle while builders build, everything idles while
+the smoother runs. `status` shows elapsed time far above active time.
+
+**Cause.** Reading "sequential single-owner passes" as "one thing happens at a
+time". Ownership serialises writes; it says nothing about the clock.
+
+**Repair.** Pipeline stages of independent work: dispatch the next lane's
+builder while this lane's critics run; take oracle measurements and run `plan`
+while the smoother works. And let the revert rate pick the judging strategy —
+at a low rate, run the promotion and bar critics concurrently instead of paying
+serial latency for a conditional that almost never fires. → `pace.md`
+
+## Convergence tax
+
+**Signal.** A dimension has been on `minor` for four rounds, each round closing
+one cosmetic gap and surfacing the next. The verdicts are fine; the pace is not.
+
+**Cause.** The one-gap-per-round discipline applied past the point where it pays.
+Attribution matters while gaps are major; on a pile of cosmetics it costs a full
+round of latency per item to protect information nobody needs.
+
+**Repair.** A batch brief: fold the critic's second-order NOTES into one round
+that closes the listed minors together. The champion guard is what makes this
+safe — a batched round that regresses gets reverted like any other. `plan`
+suggests it when a dimension sits on a minor. → `pace.md`
+
 ## Judging nothing
 
 **Signal.** A verdict repeats the previous round almost verbatim. The gap text is

@@ -307,6 +307,13 @@ From tier 2 the split is the default. In both cases, escalate a *specific* verdi
 to a stronger critic when it comes back `thin` and will decide a retirement — a
 `decisive` verdict does not get better on a bigger model. → `references/cost-model.md`
 
+**Whether the two comparisons run serially or concurrently is a pace decision,
+and the log makes it**: at a low revert rate `status` recommends running them
+concurrently (the rare wasted bar verdict costs one call; serializing costs every
+round a critic's latency), at a high one it recommends staying serial. Pipeline
+across lanes too — dispatch the next lane's builder while this lane's critics
+run; ownership serialises writes, not the clock. → `references/pace.md`
+
 ## Phase 3b — Stop paying for stalled work
 
 At every wave boundary, `status` flags any dimension that has not moved in
@@ -449,6 +456,8 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Unmanaged fan-out | Every lane run every wave; parallel by default on coupled work | `plan` before the wave; serial unless genuinely independent |
 | Judging nothing | Verdicts repeat because the artifact never changed | No-change gate; `skip --reason-code no-change` and re-brief |
 | Model reads a number | A critic call spent restating a measurement | `--mode oracle`; call a model only to name a plateau |
+| Convoy | Wave time ≈ sum of every stage; critics idle while builders run and vice versa | Pipeline independent stages; judging strategy from the revert rate (`pace.md`) |
+| Convergence tax | One round per cosmetic gap once a dimension is down to minors | Batch the critic's NOTES into one brief; the champion guard makes it safe |
 
 ## Degraded mode (no subagents)
 
@@ -491,6 +500,7 @@ Read at the relevant phase, not upfront:
 
 - `references/intake.md` — the contract; cold start; cost expectations
 - `references/cost-model.md` — the effort ladder, model tiering, context discipline, honest pricing
+- `references/pace.md` — wall-clock: convergence per round, pipelining vs fan-out, judging strategy by revert rate
 - `references/bar-selection.md` — bar taxonomies; dimensions; finding a bar
 - `references/decomposition.md` — lane sizing, ownership, parallel vs serial
 - `references/blind-protocol.md` — honest blind comparison; champion mode; rubric fallback

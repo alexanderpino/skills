@@ -71,6 +71,14 @@ work costs many times more and scored worse. So:
 Parallel lanes also raise the burn *rate*, so a fan-out that turns out to be
 wrong costs its mistake faster than a serial pass would.
 
+**Serial ownership is not serial time.** Single ownership serialises *writes* —
+it does not require the run to idle between stages. While one lane's critics
+judge, the next lane's builder can already run: builders write disjoint paths
+and critics only read, so nothing about the regression guard or critic
+independence is touched. Pipelining stages of independent work is free speed;
+fan-out over coupled work is the thing the numbers above show to be slower
+*and* worse. Keep the two apart. → `pace.md`
+
 ## File ownership
 
 **One file, one owner, per wave.** Not per run — ownership can move between waves,

@@ -235,6 +235,108 @@ def total_spend(root, rounds=None):
             + sum(s.get("tokens") or 0 for s in load_spend(root)))
 
 
+def _parse_ts(s):
+    if not s:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def fmt_duration(s):
+    if s is None:
+        return "—"
+    s = int(s)
+    if s < 90:
+        return f"{s}s"
+    if s < 5400:
+        return f"{s / 60:.0f} min"
+    return f"{s / 3600:.1f} h"
+
+
+def _pace(rounds, spend, waves_remaining):
+    """Wall-clock read from the timestamps the ledgers already carry.
+
+    A wave's span is first-record-to-last-record within that wave, so it counts
+    real elapsed time including the lead agent's own orchestration between
+    calls — which is honest, because that time is part of the run. What it
+    cannot see is the duration of the first call in a wave, so treat the
+    figures as steering, not billing.
+    """
+    recs = []
+    for r in list(rounds) + list(spend):
+        t = _parse_ts(r.get("ts"))
+        if t is not None and r.get("wave") is not None:
+            recs.append((r["wave"], t, r))
+    if len(recs) < 2:
+        return None
+    by_wave = {}
+    for w, t, _ in recs:
+        by_wave.setdefault(w, []).append(t)
+    spans = {w: (max(ts) - min(ts)).total_seconds() for w, ts in by_wave.items()}
+    timed = {w: s for w, s in spans.items() if s > 0}
+    all_ts = [t for _, t, _ in recs]
+    elapsed = (max(all_ts) - min(all_ts)).total_seconds()
+    active = sum(timed.values())
+    avg = active / len(timed) if timed else None
+
+    # Optional --seconds per record splits the wave into stages, which is what
+    # tells you what to pipeline: a judge-dominated wave and a build-dominated
+    # wave call for different fixes.
+    stage = {"build": 0, "judge": 0, "smooth": 0, "other": 0}
+    any_sec = False
+    for r in rounds:
+        if r.get("seconds"):
+            any_sec = True
+            stage["judge"] += r["seconds"]
+    for s_ in spend:
+        if s_.get("seconds"):
+            any_sec = True
+            role = s_.get("role") or "other"
+            stage["build" if role == "builder" else "smooth" if role == "smoother" else "other"] \
+                += s_["seconds"]
+
+    return {
+        "waves_timed": len(timed),
+        "avg_wave_seconds": int(avg) if avg else None,
+        "last_wave_seconds": int(spans.get(max(by_wave), 0)) or None,
+        "active_seconds": int(active),
+        "elapsed_seconds": int(elapsed),
+        # Below five minutes of active time the rate is noise, not signal.
+        "waves_per_hour": round(len(timed) / (active / 3600), 1) if active >= 300 else None,
+        "projected_seconds_remaining": (
+            int(waves_remaining * avg)
+            if avg and waves_remaining and waves_remaining > 0 else None
+        ),
+        "stage_seconds": stage if any_sec else None,
+    }
+
+
+def _judging_advice(cfg, rounds):
+    """Serial, speculative, or collapsed judging — decided by the log.
+
+    From tier 2 a round runs two critic calls: promotion, then bar if promoted.
+    Serializing them is only load-bearing when reverts actually happen; when
+    promotions almost always succeed, the conditional buys nothing and costs
+    every round a full critic latency. The revert rate is the arbiter.
+    """
+    if cfg["effort"]["tier"] < 2:
+        return None  # tiers 0-1 already collapse into one screening call
+    rate = _recent_revert_rate(rounds, window=12)
+    if rate is None:
+        return None
+    pct = int(rate * 100)
+    if rate <= 0.15:
+        return (f"revert rate {pct}% — run the promotion and bar critics concurrently: "
+                "the rare wasted bar verdict costs one call, serializing costs every "
+                "round a critic's full latency")
+    if rate >= 0.35:
+        return (f"revert rate {pct}% — keep the two comparisons serial: speculative bar "
+                "verdicts would be thrown away, and the rate itself is a ceiling signal")
+    return None
+
+
 def fmt_tokens(n):
     if n >= 1_000_000:
         return f"{n / 1_000_000:.2f}M"
@@ -399,6 +501,7 @@ def cmd_log_round(args):
         # from the log instead of from opinion.
         "model": resolve_model(cfg, args.model) if args.model else None,
         "escalated_from": resolve_model(cfg, args.escalated_from) if args.escalated_from else None,
+        "seconds": args.seconds,
     }
 
     if args.mode == "champion":
@@ -446,6 +549,7 @@ def cmd_spend(args):
         "note": note,
         "tier": cfg["effort"]["tier"],
         "model": resolve_model(cfg, args.model) if args.model else None,
+        "seconds": args.seconds,
     }
     with (root / "spend.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
@@ -1126,6 +1230,29 @@ def cmd_status(args):
                   f"~{left / per_wave:.1f} wave(s) of budget left at this rate")
     else:
         print(f"spend {fmt_cost(cfg, spent)} — no token budget set; this run cannot tell you when to stop paying")
+
+    waves_remaining = max(0, budget - max_wave)
+    if tok_budget and spent and max_wave:
+        per_wave_tok = spent / max_wave
+        if per_wave_tok:
+            waves_remaining = min(waves_remaining, max(0.0, (tok_budget - spent) / per_wave_tok))
+    pace = _pace(rounds, load_spend(root), waves_remaining)
+    if pace and pace["avg_wave_seconds"]:
+        line = (f"pace: avg wave {fmt_duration(pace['avg_wave_seconds'])}"
+                + (f", {pace['waves_per_hour']} waves/hour" if pace.get("waves_per_hour") else "")
+                + f" · elapsed {fmt_duration(pace['elapsed_seconds'])}"
+                  f" (active {fmt_duration(pace['active_seconds'])})")
+        print(line)
+        if pace.get("projected_seconds_remaining"):
+            print(f"  ~{waves_remaining:.0f} more wave(s) ≈ "
+                  f"{fmt_duration(pace['projected_seconds_remaining'])} at this pace")
+        st = pace.get("stage_seconds")
+        if st:
+            print("  stages: " + " · ".join(
+                f"{k} {fmt_duration(v)}" for k, v in st.items() if v))
+    advice = _judging_advice(cfg, rounds)
+    if advice:
+        print(f"  judging: {advice}")
     print()
 
     for (lane, dim), s in sorted(per.items()):
@@ -1213,6 +1340,15 @@ def cmd_report(args):
                   f"({spent / tok_budget * 100:.0f}%)"]
     else:
         lines += [f"Spend: {fmt_cost(cfg, spent)} recorded (no token budget was set — say so)"]
+    pace = _pace(rounds, _load_jsonl(root / "spend.jsonl"), 0)
+    if pace and pace.get("avg_wave_seconds"):
+        line = (f"Pace: avg wave {fmt_duration(pace['avg_wave_seconds'])}, "
+                f"elapsed {fmt_duration(pace['elapsed_seconds'])} "
+                f"(active {fmt_duration(pace['active_seconds'])})")
+        st = pace.get("stage_seconds")
+        if st and (st.get("build") or st.get("judge")):
+            line += f" — build {fmt_duration(st['build'])}, judge {fmt_duration(st['judge'])}"
+        lines += [line]
     lines += [""]
 
     hist = cfg["effort"].get("history") or []
@@ -1370,6 +1506,14 @@ def build_state(root, cfg, rounds):
 
     bar_rounds = [r for r in rounds if r["mode"] in BAR_MODES]
     skips = _load_jsonl(root / "skips.jsonl")
+
+    waves_remaining = max(0, cfg["stops"]["budget_waves"] - max_wave)
+    if tok_budget and spent and max_wave:
+        per_wave_tok = spent / max_wave
+        waves_remaining = min(waves_remaining, max(0.0, (tok_budget - spent) / per_wave_tok))
+    pace = _pace(rounds, spend_recs, waves_remaining)
+    if pace:
+        pace["judging"] = _judging_advice(cfg, rounds)
     state = {
         "schema": STATE_SCHEMA_VERSION,
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -1443,6 +1587,7 @@ def build_state(root, cfg, rounds):
             "priced_rounds": sum(1 for r in rounds if r.get("tokens")),
             "total_rounds": sum(1 for r in rounds if r["mode"] != "oracle"),
         },
+        "pace": pace,
         "evidence_mix": {
             "blind": sum(1 for r in bar_rounds if r["mode"] == "blind"),
             "rubric": sum(1 for r in bar_rounds if r["mode"] == "rubric"),
@@ -1659,6 +1804,16 @@ def cmd_plan(args):
           "`skip --reason-code no-change` and re-brief instead of judging nothing")
     print("  - for a dimension with a numeric bar, take the measurement and log "
           "`--mode oracle`; a model does not need to read a number")
+    if any(sev == "minor" for _, sev, _, _ in run):
+        print("  - a dimension on a minor gap converges faster in one batch round: fold the "
+              "critic's second-order NOTES into the brief instead of spending a round per "
+              "cosmetic gap — the champion guard catches regressions")
+    if len(proposed_lanes) >= 2:
+        print("  - lanes with disjoint ownership can pipeline: dispatch the next lane's builder "
+              "while this lane's critics run — ownership serialises writes, not the clock")
+    advice = _judging_advice(cfg, rounds)
+    if advice:
+        print(f"  - {advice}")
 
 
 def cmd_board(args):
@@ -1736,6 +1891,9 @@ def main():
     p.add_argument("--escalated-from",
                    help="the model whose verdict this round re-judged, when a thin verdict was "
                         "escalated to a stronger critic; makes 'was the cheap critic enough?' measurable")
+    p.add_argument("--seconds", type=int,
+                   help="wall-clock seconds the calls behind this record took — lets `status` "
+                        "split a wave into build/judge/smooth and say what to pipeline")
     p.set_defaults(fn=cmd_log_round)
 
     p = sub.add_parser("spend", help="record spend not attached to a round (builders, smoother, lead passes)")
@@ -1743,6 +1901,7 @@ def main():
     p.add_argument("--role", default="builder", help="builder|smoother|lead|other")
     p.add_argument("--wave", type=int)
     p.add_argument("--model", help="model that did the work — a tier label (cheap|mid|high) or a model id")
+    p.add_argument("--seconds", type=int, help="wall-clock seconds the work took")
     p.add_argument("--note", required=True, help="what this bought")
     p.set_defaults(fn=cmd_spend)
 

@@ -656,6 +656,12 @@ function fmtTokens(n) {
   return String(n);
 }
 const fmtEur = n => has(n) ? EUR.format(n) : null;
+function fmtDur(s) {
+  if (!has(s)) return "—";
+  if (s < 90) return Math.round(s) + "s";
+  if (s < 5400) return Math.round(s / 60) + " min";
+  return (s / 3600).toFixed(1) + " h";
+}
 const money = (tokens, eur) => fmtEur(eur) || (fmtTokens(tokens) + " tok");
 function ago(iso) {
   if (!has(iso)) return "";
@@ -847,6 +853,8 @@ function renderBanners(d) {
       Array.isArray(d.evidence_lines) ? d.evidence_lines : []);
     box.append(b);
   }
+  if (d.pace && has(d.pace.judging))
+    box.append(banner("info", ICONS.info, "Judging strategy: ", [d.pace.judging]));
 }
 
 function tile(k, v, sub, frac, tone) {
@@ -886,6 +894,18 @@ function renderRail(d) {
       [rate ? EUR.format(sp.per_wave * rate) : fmtTokens(sp.per_wave), "per wave"],
       has(sp.waves_left_at_rate) ? `~${sp.waves_left_at_rate} waves left at this rate` : null));
   }
+  const pc = d.pace;
+  if (pc && has(pc.avg_wave_seconds)) {
+    const bits = [];
+    if (has(pc.waves_per_hour)) bits.push(pc.waves_per_hour + " waves/h");
+    if (has(pc.projected_seconds_remaining)) bits.push("~" + fmtDur(pc.projected_seconds_remaining) + " left at this pace");
+    const st = pc.stage_seconds;
+    if (st && (st.build || st.judge))
+      bits.push(`build ${fmtDur(st.build)} · judge ${fmtDur(st.judge)}`);
+    rail.append(tile("Pace", [fmtDur(pc.avg_wave_seconds), "per wave"],
+      bits.join(" · ") || "elapsed " + fmtDur(pc.elapsed_seconds)));
+  }
+
   const t = d.tier || {};
   if (has(t.index))
     rail.append(tile("Effort tier", [String(t.index), t.name || ""],

@@ -533,6 +533,83 @@
           }
         }
       }
+    },
+    "pace": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Wall-clock read derived from the timestamps the ledgers already carry. Wave spans include the lead agent's orchestration time between calls \u2014 steering figures, not billing figures.",
+      "properties": {
+        "waves_timed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "avg_wave_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "last_wave_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "active_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sum of per-wave spans \u2014 time the run was actually doing something."
+        },
+        "elapsed_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "First record to last record overall, idle gaps included."
+        },
+        "waves_per_hour": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Null until five minutes of active time exist \u2014 below that the rate is noise."
+        },
+        "projected_seconds_remaining": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Remaining waves (whichever budget binds first) times the average wave span."
+        },
+        "stage_seconds": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Build/judge/smooth split, present only when records carried --seconds. This is what says what to pipeline.",
+          "properties": {
+            "build": {
+              "type": "integer"
+            },
+            "judge": {
+              "type": "integer"
+            },
+            "smooth": {
+              "type": "integer"
+            },
+            "other": {
+              "type": "integer"
+            }
+          }
+        },
+        "judging": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Serial-vs-concurrent critic advice computed from the revert rate; null when the log is too thin or the rate is mid-range."
+        }
+      }
     }
   },
   "definitions": {
@@ -784,6 +861,13 @@
             "null"
           ],
           "description": "Model whose verdict this round re-judged, when a thin verdict was escalated to a stronger critic."
+        },
+        "seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Wall-clock seconds the calls behind this record took, when tracked."
         }
       }
     }

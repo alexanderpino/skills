@@ -50,8 +50,10 @@ user does not have to interrupt anything to see where the run got to.
 - **Banners** — stop conditions currently firing, in red; the log's read on
   whether the artifact is still moving; and any problems in the spec itself
 - **Stat rail** — wave against budget, spend against budget in the user's
-  currency, burn rate and waves left at that rate, current tier and its models,
-  the blind/rubric/oracle evidence mix, how many rounds are still unpriced, and
+  currency, burn rate and waves left at that rate, **pace** (average wave
+  duration, waves per hour, projected time remaining, and the build/judge split
+  when `--seconds` was tracked), current tier and its models, the
+  blind/rubric/oracle evidence mix, how many rounds are still unpriced, and
   **rounds not run** with the calls that restraint saved
 - **Effort ladder** — the four tiers with the current one marked, each showing
   its share of the budget and what it costs per round, plus every escalation and

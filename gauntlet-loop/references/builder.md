@@ -20,7 +20,10 @@ disk. If something was restated into your prompt instead, prefer the file.
 1. **Look at the bar first.** Not the gap description — the actual reference. The
    gap text is a pointer; the bar is the truth.
 2. **Close the named gap.** That is this round's job. Not a redesign, not the whole
-   lane, not adjacent things that also bother you.
+   lane, not adjacent things that also bother you. One exception exists and it is
+   explicit: a **batch brief** lists several small gaps together — close exactly
+   those, nothing else. Batch briefs happen late in a lane's life, when the gaps
+   left are cosmetic and one round per cosmetic would be convergence tax.
 3. **Inspect your own output before handing off.** Render it, run it, read it back.
    Handing a critic something you never looked at wastes a full round. This is
    not grading — you are checking the thing exists and runs, not judging whether
@@ -68,5 +71,10 @@ The temptation in a long loop is to fix everything you notice. Resist it. Lanes 
 sized so that gaps stay attributable — a round that changes six things teaches the
 loop nothing about which change mattered, and makes a lost round impossible to
 revert cleanly.
+
+A batch brief does not loosen this: the lead agent chose to trade attribution for
+convergence on gaps small enough that the champion guard alone protects the round.
+The list in the brief is still the boundary — a batch of three named minors is not
+an invitation to fix a fourth.
 
 Note the other things you spotted. The loop will reach them.
