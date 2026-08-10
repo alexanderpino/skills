@@ -98,6 +98,11 @@ the two or three misses that were coming. This is the difference between an
 experiment program and trial-and-error: trial-and-error responds to failure
 with another trial; an experiment program responds with a better hypothesis.
 
+A cause is also what re-opens parked work: `unshelve` asks for exactly this
+kind of new information, and a diagnosis that names why a shelved dimension
+stalled is the strongest grounds there are for reinvesting budget in it
+(`cost-model.md` §6).
+
 ## The failed-approaches ledger
 
 Every missed aim records its approach and how it missed. `plan` prints them

@@ -304,7 +304,9 @@ because nothing forced the question until the budget ran out.
 dimension flat for `flat_rounds_n` rounds, with the cost of running it again next
 to it. Shelve it (`gauntlet.py shelve`) and reallocate to lanes with gaps left.
 Shelved is parked, not retired: the report keeps the open gap, so this buys
-honesty as well as money.
+honesty as well as money. And the shelf is a transfer, not a cut — when new
+information arrives later (a diagnosis names the cause, a new asset lands),
+`unshelve` brings the dimension back and the freed budget flows in again.
 
 ## Inspection rot
 

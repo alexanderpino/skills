@@ -16,6 +16,7 @@ Commands:
   tier        Current effort tier, its allowance, and whether escalation is earned
   escalate    Move up the effort ladder once the evidence justifies the spend
   shelve      Park a flat dimension so it stops consuming calls
+  unshelve    Re-open a shelved dimension on new information — reinvest, not retry
   extend      Raise the wave budget after the user grants an extension
   report      Draft the end-of-run gauntlet report from the log
 """
@@ -983,6 +984,48 @@ def cmd_shelve(args):
     save_config(root, cfg)
     print(f"shelved {args.lane}/{args.dimension} — it stops consuming calls from the next wave")
     print("  it is parked, not retired: the report keeps its open gap")
+    print("  the calls it frees belong to the dimensions still moving — reinvest them;"
+          " and `unshelve` brings this one back the moment there is new information")
+
+
+def cmd_unshelve(args):
+    """Re-open a shelved dimension — reinvestment, not a retry.
+
+    Shelving freed budget; this is where it can flow back. The gate is that the
+    reason must be NEW information — a diagnosis round's cause, a new source
+    asset, a re-cut — because re-running a parked dimension on nothing but
+    leftover money is the failed-approaches ledger's purest violation: the same
+    ideas, retried on hope.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    reason = (args.reason or "").strip()
+    if len(reason) < 12:
+        die("--reason is required — state the NEW information (a diagnosis finding, a new "
+            "asset, a re-cut) that says this dimension can move now when it could not before. "
+            "Budget left over is not new information.")
+    entry = next((s for s in cfg.get("shelved", [])
+                  if s["lane"] == args.lane and s["dimension"] == args.dimension), None)
+    if entry is None:
+        die(f"{args.lane}/{args.dimension} is not shelved")
+    cfg["shelved"] = [s for s in cfg["shelved"] if s is not entry]
+    entry["unshelved_ts"] = datetime.datetime.now(
+        datetime.timezone.utc).isoformat(timespec="seconds")
+    entry["unshelved_reason"] = reason
+    cfg.setdefault("shelf_history", []).append(entry)
+    save_config(root, cfg)
+    print(f"unshelved {args.lane}/{args.dimension} — schedulable again from the next wave")
+    if entry.get("open_gap"):
+        print(f"  the gap it parked with: {entry['open_gap']}")
+    aim = _aim_status(rounds, _load_jsonl(root / "aims.jsonl"))
+    failed = [f for f in (aim or {}).get("failed", [])
+              if (f["lane"], f["dimension"]) == (args.lane, args.dimension)]
+    for f_ in failed:
+        print(f"  tried and missed before the shelf: \"{f_['approach']}\" ({f_['reason']})")
+    print("  the first aim back must carry the new reason in its hypothesis"
+          + (" — and must not be one of the approaches above" if failed else ""))
+    print("Record the unshelve in contract.md; the next `plan` will schedule it.")
 
 
 def _print_extension_offer(rounds, cfg, per, retired, max_wave):
@@ -1000,6 +1043,11 @@ def _print_extension_offer(rounds, cfg, per, retired, max_wave):
     if verdict == "nothing-open":
         print("\n  Nothing is open. Raise the bar (announced) or stop — do not fund waves"
               " against an artifact that has already retired every dimension.")
+        shelved_open = [s for s in cfg.get("shelved", []) if s.get("open_gap")]
+        if shelved_open:
+            print(f"  {len(shelved_open)} shelved dimension(s) still hold open gaps — remaining"
+                  " budget can be reinvested there: run a diagnosis round, and a new cause is"
+                  " grounds to `unshelve`.")
         return
     if cap is not None and budget >= cap:
         print(f"\n  Hard cap of {cap} waves reached — no extension may be granted. Stop and report.")
@@ -1921,14 +1969,32 @@ def cmd_plan(args):
     max_wave = max(r["wave"] for r in rounds)
     flat_n = cfg["stops"].get("flat_rounds_n", 3)
 
+    # A dimension unshelved after its last bar round is schedulable even though
+    # the log still calls it flat — the unshelve reason IS the new information
+    # the flat detector cannot see yet. One round back in, the log takes over.
+    unshelved = {}
+    for h in cfg.get("shelf_history", []):
+        ts = h.get("unshelved_ts")
+        if not ts:
+            continue
+        key = (h["lane"], h["dimension"])
+        last_bar = max((r["ts"] for r in rounds
+                        if r["lane"] == key[0] and r["dimension"] == key[1]
+                        and r["mode"] in BAR_MODES), default="")
+        # >= not >: timestamps have second resolution, and a same-second tie
+        # goes to the unshelve — it is by definition the later decision.
+        if ts >= last_bar:
+            unshelved[key] = h.get("unshelved_reason", "")
+
     run, hold = [], []
     for key, s in sorted(per.items()):
         lane, dim = key
         if s["shelved"]:
-            hold.append((key, "shelved", "parked; not scheduled"))
+            hold.append((key, "shelved",
+                         "parked; `unshelve` re-opens it — on new information only"))
         elif s["retired"]:
             hold.append((key, "retired", "met the bar"))
-        elif s["flat"]:
+        elif s["flat"] and key not in unshelved:
             hold.append((key, "flat", f"no movement in {flat_n} rounds — shelve or re-cut, do not re-run"))
         else:
             bar_recs = [r for r in rounds
@@ -1955,6 +2021,12 @@ def cmd_plan(args):
 
     if not run:
         print("Nothing is open. Raise the bar (announced), re-cut, or stop — do not run a wave.")
+        shelved_open = [s for s in cfg.get("shelved", []) if s.get("open_gap")]
+        for s in shelved_open:
+            print(f"  shelved with an open gap: [{s['lane']} / {s['dimension']}] — {s['open_gap']}")
+        if shelved_open:
+            print("  remaining budget can be reinvested there: a diagnosis round that names a new"
+                  " cause is grounds to `unshelve`. Money left over on its own is not.")
         return
 
     aim = _aim_status(rounds, _load_jsonl(root / "aims.jsonl"))
@@ -1965,6 +2037,8 @@ def cmd_plan(args):
         if d and d["scored"] >= 3 and d["hits"] / d["scored"] < 0.5:
             note = (f"  DIAGNOSE FIRST — {d['hits']}/{d['scored']} aims hit; another build "
                     "round is another guess")
+        if (lane, dim) in unshelved:
+            note = "  unshelved on new information — the first aim back must carry it"
         print(f"  [{lane} / {dim}]  severity {sev}{note}")
         if gap:
             print(f"      {gap}")
@@ -2122,6 +2196,13 @@ def main():
     p.add_argument("--reason", required=True)
     p.add_argument("--force", action="store_true", help="shelve a dimension the log does not call flat")
     p.set_defaults(fn=cmd_shelve)
+
+    p = sub.add_parser("unshelve", help="re-open a shelved dimension on new information")
+    p.add_argument("--lane", required=True)
+    p.add_argument("--dimension", required=True)
+    p.add_argument("--reason", required=True,
+                   help="the new information: a diagnosis finding, a new asset, a re-cut")
+    p.set_defaults(fn=cmd_unshelve)
 
     p = sub.add_parser("aim", help="state a round's hypothesis and expected outcome before it runs")
     p.add_argument("--wave", type=int, required=True)

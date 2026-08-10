@@ -327,8 +327,36 @@ lane stalls at wave 3 and keeps costing a builder plus two critics every wave
 until wave 12. The evidence was in the log from wave 3. Now it is on the screen
 at wave 3.
 
+### Reinvest what the shelf frees
+
+Shelving is a **transfer, not a cut**. The calls a parked dimension stops
+consuming belong to the dimensions still moving — a deeper wave on the open
+lanes, an earlier tier-3 polish, a raised bar once everything retires. The run's
+*result* must never get smaller because its *management* got better; that
+inversion is the entire point of managing it.
+
+And parked is not forgotten. The moment there is **new information** — a
+diagnosis round names the cause (`aim.md`), a new source asset lands, a re-cut
+changes what the lane is — the dimension comes back:
+
+```bash
+python3 scripts/gauntlet.py unshelve --lane imagery --dimension perf \
+    --reason "diagnosis: LCP floor was the source asset; new 400KB master replaces it"
+```
+
+`unshelve` demands the new information in `--reason`, prints the dimension's
+failed-approaches ledger on the way back in, and `plan` schedules the dimension
+again with a note that the first aim back must carry the new reason. Budget left
+over is not, by itself, new information — unshelving on leftover money is
+re-buying the stall at the price it already cost once.
+
 ## What this does not do
 
 None of this makes a gauntlet cheap. It makes it *proportionate*: cheap while the
 idea is unproven, expensive only where the log says expense is buying something,
 and priced throughout in the unit the user is actually spending.
+
+And none of it lowers the ceiling. The guards that buy quality — fresh-context
+critics, the blind protocol, the champion guard, the frozen bar, real-artifact
+inspection — are never the thing a cost decision trades away (`pace.md`, "What
+not to trade away"). Management moves the spend; it does not shrink the result.

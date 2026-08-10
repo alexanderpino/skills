@@ -135,6 +135,7 @@ python3 scripts/gauntlet.py tier      # current effort tier; is the next one ear
 python3 scripts/gauntlet.py escalate --reason "..."   # buy the next tier, on evidence
 python3 scripts/gauntlet.py status    # streaks, spend, burn rate, flat dimensions, stops
 python3 scripts/gauntlet.py shelve --lane a --dimension perf --reason "..."   # park a stalled dimension
+python3 scripts/gauntlet.py unshelve --lane a --dimension perf --reason "..." # reinvest — new information only
 python3 scripts/gauntlet.py board     # regenerate state.json for the workbench
 python3 scripts/gauntlet.py extend --waves 3 --tokens 5000000 --reason "..."  # only on a grant
 python3 scripts/gauntlet.py report    # draft the end-of-run report from the log
@@ -344,6 +345,21 @@ call flat, so this cannot quietly become a way to abandon work that was climbing
 A lane that stalls at wave 3 should cost three waves of calls, not twelve. The
 evidence is in the log from wave 3 — this is what puts it on the screen there.
 
+Parked is not forgotten, and the calls the shelf frees are a **transfer, not a
+cut** — they belong to the dimensions still moving. The moment there is *new
+information* — a diagnosis round names the cause, a new source asset lands, a
+re-cut changes what the lane is — bring the dimension back:
+
+```bash
+python3 scripts/gauntlet.py unshelve --lane imagery --dimension perf \
+    --reason "diagnosis: LCP floor was the source asset; new 400KB master replaces it"
+```
+
+`unshelve` demands that new information in `--reason`, prints the dimension's
+failed-approaches ledger on the way back in, and the first aim after it must
+carry the new reason in its hypothesis. Budget left over is not, on its own, a
+reason — that would be re-buying the stall.
+
 ## Phase 4 — Smooth
 
 At the end of each wave, spawn one fresh agent over the *whole* artifact to
@@ -412,6 +428,30 @@ Rules for the offer:
 If the user pre-agreed a hard cap at intake, it is the real ceiling — extensions
 stop there and the script refuses to cross it. Full protocol:
 `references/stop-conditions.md`.
+
+## The brake steers, it does not shrink
+
+Everything this skill adds to the published method — tiers, token budgets,
+plans, skips, shelving, aims — exists to *redirect* spend toward what buys
+quality, never to lower the ceiling. The result is the point; cost discipline is
+how an ambitious result stays affordable. Two rules keep that true:
+
+**The guards that buy quality are never traded for cost or speed.**
+Fresh-context critics, the blind protocol, the champion guard, the frozen bar,
+real-artifact inspection, per-dimension judging: these *are* the method's power,
+and every cost and pace decision routes around them, never through them
+(`references/pace.md`, "What not to trade away"). A cheaper critic is fine; a
+critic that saw the builder's reasoning is not cheaper — it is broken.
+
+**Savings are reinvested, not pocketed.** The budget is the user's ceiling, not
+a target to undershoot. Tokens freed by a skip, an oracle round, or a shelving
+flow to the dimensions still moving, to tier-3 polish (which exists precisely to
+spend 40% of the budget once the evidence supports it), to raising the bar once
+everything retires, or back into a shelved dimension the moment a diagnosis
+produces a new hypothesis (`unshelve`). Stopping early because the evidence says
+ceiling is management; stopping early while the log still says *moving*, with
+budget left, is the mirror image of budget creep — and the report should treat
+it as a finding, not a saving.
 
 ## Non-negotiables
 
