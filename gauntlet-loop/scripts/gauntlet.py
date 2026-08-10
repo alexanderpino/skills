@@ -2005,15 +2005,17 @@ def cmd_plan(args):
             run.append((key, sev, SEVERITY_RANK.get(sev, 3),
                         gap if gap and gap != "none" else None))
 
-    # Lanes declared at init that have never produced a round are invisible in
-    # the log; a plan that silently omits them is not a plan.
+    # Lane/dimension pairs declared at init that never produced a round are
+    # invisible in the log; a plan that silently omits them is not a plan. They
+    # rank ABOVE known majors: an unjudged dimension is a risk, not a zero — a
+    # named major is bounded, an unknown can still invalidate work everywhere.
     declared = cfg.get("lanes") or []
     dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
-    seen = {lane for lane, _ in per}
     for lane in declared:
-        if lane not in seen:
-            for dim in dims:
-                run.append(((lane, dim), "major", 3, "never run — no verdict exists yet"))
+        for dim in dims:
+            if (lane, dim) not in per:
+                run.append(((lane, dim), "unknown", 4,
+                            "never judged — price it with a survey verdict (critic only, no builder)"))
 
     run.sort(key=lambda x: -x[2])
     print(f"Plan for wave {max_wave + 1} — tier {cfg['effort']['tier']}, "
@@ -2077,6 +2079,10 @@ def cmd_plan(args):
     print("  - state every round's aim before its builder runs (`gauntlet.py aim`): the "
           "hypothesis, the approach, and what the verdict must show — never re-use an "
           "approach listed above as missed without a new reason to believe it")
+    if any(sev == "unknown" for _, sev, _, _ in run):
+        print("  - an unknown outranks a known major: buy its first verdict as a survey — "
+              "one cheap bar comparison of the artifact as it stands, no builder — before "
+              "spending build rounds anywhere it could invalidate")
     if any(sev == "minor" for _, sev, _, _ in run):
         print("  - a dimension on a minor gap converges faster in one batch round: fold the "
               "critic's second-order NOTES into the brief instead of spending a round per "

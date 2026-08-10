@@ -63,6 +63,29 @@ it at the current tier's price, or stop. `--force` exists for the case where the
 user was shown the failing gates and chose to fund it anyway; the report records
 that they did.
 
+### Aim the probe at the biggest risk
+
+Tier 0 runs one lane — and which one is not a free choice. A probe that proves
+the easy part proves nothing: the structural problem then surfaces at tier 2 or
+3, at tier 2 or 3 prices, under work that assumed it away. Point the probe at
+the lane whose failure would invalidate the most — the hardest inspection, the
+most novel generation, the foundational choice the other lanes build on. That
+is where a kill-verdict is cheapest and a pass-verdict de-risks the most budget.
+The whole point of paying 5% to learn something is to learn the *expensive*
+thing. → `decomposition.md`, "Order by risk, not by comfort"
+
+### The survey — breadth at critic prices
+
+The escalation to campaign is the moment the run commits build rounds across
+the full cut — and the moment to stop guessing where the gaps are. A survey is
+one bar comparison per never-judged lane/dimension: the artifact as it stands
+against the bar, a cheap critic or an oracle measurement, **no builders**. One
+cheap call per pair prices the whole landscape, and the campaign's first `plan`
+ranks measured gaps instead of assumed ones — `plan` ranks a never-judged pair
+above every known major until someone prices it. Breadth is bought with
+critics; depth is bought with builders; breadth bought with builders is
+fan-out, the shape the canonical run showed to be slower and worse.
+
 ### Descending the ladder
 
 There is no `de-escalate` command, because the cheaper move already exists:

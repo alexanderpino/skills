@@ -45,6 +45,54 @@ have not run yet cost nothing and can be re-cut for free.
 A lane's cost is `1 + (critic calls × dimensions)` calls per round. That is the
 number to have in mind when deciding whether a seventh lane earns its place.
 
+## Order by risk, not by comfort
+
+Which lane does the probe run? Which lane gets the first serial pass? The same
+answer both times: **the one whose failure would invalidate the most.**
+
+A POC that proves the easy part proves nothing — the run finds its structural
+problem at tier 2 prices instead of tier 0 prices, after other lanes have built
+on top of it. The probe is a *tracer bullet*: one thin shot through the riskiest
+part of the whole system — the hardest thing to inspect, the most novel work,
+the foundational choice everything else assumes — precisely because that is
+where a kill-verdict is cheapest and a pass-verdict is worth the most.
+
+The same ordering governs the serial passes: **structure before cosmetics,
+foundations before finish.** A lane whose outcome changes what "good" means for
+other lanes (layout before imagery placement; data model before the views on
+it; information architecture before paragraph polish) runs first, while the
+budget can still respond to what it finds. Polishing a lane that a later
+structural pass will invalidate is the most expensive kind of progress theatre.
+
+The test, per lane: *if this lane's verdict came back "structurally wrong",
+how much already-done work would it invalidate?* Rank by that number,
+descending. Comfort-ordering — easiest first, to see quick wins on the board —
+inverts it exactly.
+
+## Breadth-first or depth-first — buy them with different tools
+
+Both, and the method already owns the right instrument for each:
+
+**Breadth is for information. Buy it with critics.** Before committing build
+rounds across the full cut (the pilot → campaign escalation is the natural
+moment), a **survey** prices the whole landscape: one bar comparison per
+never-judged lane/dimension — the artifact *as it stands* against the bar, a
+cheap critic or an oracle measurement, **no builders**. Cost: one cheap call per
+pair. What it buys: `plan`'s first campaign ranking is measured instead of
+assumed, and the biggest real gap — not the biggest guessed one — gets the
+first build round. `plan` ranks a never-judged pair above every known major
+until someone prices it, because an unknown is a risk, not a zero.
+
+**Depth is for improvement. Buy it with builders.** Once the survey has mapped
+the gaps, build depth-first down the risk ranking: serial single-owner passes,
+one lane at a time, each driven by its named gap.
+
+**Never buy breadth with builders.** That is fan-out — the shape the canonical
+run measured as slower *and* worse (below). The failed pattern and the survey
+differ in exactly one word: parallel *building* versus parallel *judging*.
+Critics only read; six cheap verdicts in parallel cost less than one build
+round and collide with nothing.
+
 ## Parallel or serial — serial is the default
 
 Fan-out is the method's most visible feature and its most over-used one. The

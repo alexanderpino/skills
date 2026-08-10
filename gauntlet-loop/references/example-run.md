@@ -44,7 +44,13 @@ two cost nothing until they run, and can still be re-cut for free.
 
 ## Round zero — tier 0, the probe
 
-One build round on `typography` only, one collapsed critic call on a cheap model.
+One build round on `typography` only, one collapsed critic call on a cheap
+model. `typography` was chosen by risk, not comfort: it is the lane the other
+two build on (a type scale change moves every spacing decision in `layout`),
+and its bar is the hardest inspection in the cut — if the harness cannot show a
+critic optical tracking differences at 96px, it cannot show it anything
+subtler. A pass here de-risks the most; a kill here is cheapest.
+
 The verdict came back *"B's type hierarchy is stronger"* with no measurable
 specifics — too soft.
 
@@ -111,8 +117,17 @@ python3 scripts/gauntlet.py escalate --reason "typography 4→6 severity major�
 #   ~5 calls per lane per round (was 3)
 ```
 
-`imagery` joined the run here — its first round ever, at wave 2, and none of the
-budget went to it while the method was still unproven.
+Before the escalation was spent, `imagery` — never judged — got its price. Not a
+build round: a **survey**, one cheap bar comparison of the hero as it stood
+against the references, and one Lighthouse measurement for perf. Two verdicts
+(`visual` major: "stock photo reads generic against the references' shot-to-
+brief imagery"; `perf` major: LCP 3.4s) for one cheap critic call plus a free
+measurement — so the campaign's first `plan` ranked three *measured* lanes, not
+two measured and one guess. `plan` would have put `imagery` at the top unpriced
+anyway: a never-judged pair outranks every known major until someone prices it.
+
+`imagery`'s first build round then came at wave 2, and none of the budget went
+to building it while the method was still unproven.
 
 Similar records for `layout` (major: "reference uses a 12-col grid with content
 capped at 7 cols; ours spans full width"). Perf dimension logged via rubric mode

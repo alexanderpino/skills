@@ -125,7 +125,9 @@ The probe's hypothesis is not about the artifact — it is *"the inspection path
 works and the bar is sharp enough for a critic to cut with."* That is why
 unaimed-round accounting starts at tier 1: round zero is the experiment that
 validates the apparatus, and its expectations live in the escalation gates
-(`cost-model.md` §1) rather than in an aim record.
+(`cost-model.md` §1) rather than in an aim record. Point that experiment at the
+riskiest lane the cut contains — an apparatus proven on the easy case is not
+proven (`decomposition.md`, "Order by risk, not by comfort").
 
 ## What this costs
 

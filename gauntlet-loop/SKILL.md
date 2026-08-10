@@ -208,8 +208,15 @@ cannot see it the way you do.
 The lane test: *can a fresh critic look at this one thing and say which of two
 versions is better, without needing the rest?*
 
+Then **order the lanes by risk, not by comfort**: the lane whose failure would
+invalidate the most work runs first — structure before cosmetics, foundations
+before finish. The probe targets the top of that ranking, and the serial passes
+descend it. Easiest-first ordering finds the structural problem at tier-3
+prices, under work that assumed it away.
+
 Assign file ownership per lane in `gauntlet/ownership.md`. One file, one owner,
-per wave. Sizing, parallel-vs-serial, and re-cutting: `references/decomposition.md`.
+per wave. Sizing, risk ordering, breadth-vs-depth, parallel-vs-serial, and
+re-cutting: `references/decomposition.md`.
 
 ## Phase 2b — The effort ladder
 
@@ -235,6 +242,13 @@ inspection is live, the artifact is moving — are all computed from the log, an
 `escalate` refuses when one fails. That refusal is the mechanism working: it says
 more money would buy a bigger version of the problem you already have.
 
+Before buying the campaign tier, run a **survey**: one bar comparison per
+never-judged lane/dimension — the artifact as it stands, a cheap critic or an
+oracle measurement, **no builders**. It prices the whole landscape at one cheap
+call per pair, so the campaign's first `plan` ranks measured gaps instead of
+guessed ones. Breadth is bought with critics; depth with builders; breadth with
+builders is fan-out — the proven-worse shape. → `references/decomposition.md`
+
 The point of the shape: **an unpromising run dies having spent a fifth of the
 budget instead of all of it.** Say that at intake, because it is what makes an
 ambitious budget safe to agree to.
@@ -245,6 +259,12 @@ Tier 0 *is* round zero: one build and one critic verdict on a single lane. It
 surfaces the two failures that would otherwise waste hours — a broken inspection
 path, and a bar too soft for the critic to compare against. A vague round-zero
 verdict means fix the bar, not run the wave.
+
+**Aim it at the biggest risk.** The probe lane is the one whose failure would
+invalidate the most — the hardest inspection, the most novel work, the
+foundational choice the other lanes assume. A probe that proves the easy part
+proves nothing; the point of paying 5% to learn something is to learn the
+expensive thing while everything can still be re-cut for free.
 
 It is also the run's **price calibration**. Log what it cost
 (`log-round --tokens`, `spend --tokens`), then extrapolate to the proposed budget
@@ -516,6 +536,7 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Convoy | Wave time ≈ sum of every stage; critics idle while builders run and vice versa | Pipeline independent stages; judging strategy from the revert rate (`pace.md`) |
 | Convergence tax | One round per cosmetic gap once a dimension is down to minors | Batch the critic's NOTES into one brief; the champion guard makes it safe |
 | Build-and-hope | Rounds run with no stated expectation; misses look like bad luck | `aim` before every build; diagnose when the hit rate drops below half |
+| Comfort-first probe | POC proves the easy lane; the structural risk surfaces at tier 3 | Probe the riskiest lane; survey the rest before the campaign |
 
 ## Degraded mode (no subagents)
 

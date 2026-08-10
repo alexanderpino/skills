@@ -138,6 +138,28 @@ fails. The whole value of the shape is that a run which turns out to be
 unpromising costs a fifth of the budget instead of all of it — and you only get
 that if the first tier is genuinely small.
 
+## Comfort-first probe
+
+**Signal.** The probe passed easily, the pilot looked healthy — and the run's
+real problem surfaced at tier 2 or 3: a foundational choice was wrong, an
+unjudged dimension came back structurally broken, and lanes that built on top
+of it are now rework. The ladder's receipts all say the escalations were
+earned; the run still paid full price to learn what a probe could have said.
+
+**Cause.** The POC proved the easy part. The probe lane was chosen for a quick
+clean verdict (comfort), not for how much a verdict there would de-risk — and
+nothing priced the never-judged dimensions before the campaign committed build
+rounds across the full cut.
+
+**Repair.** Two orderings, both already in the doctrine. The probe targets the
+lane whose failure would invalidate the most — the tracer bullet through the
+riskiest part, where a kill-verdict is cheapest (`decomposition.md`, "Order by
+risk"). And before the campaign, a **survey** prices every never-judged
+lane/dimension with one cheap bar verdict apiece — critics only, no builders —
+so the first full `plan` ranks measured gaps. `plan` enforces the posture: a
+never-judged pair outranks every known major until someone prices it, because
+an unknown is a risk, not a zero.
+
 ## Unsatisfiable critic
 
 **Signal.** No verdict ever reaches severity `none`. Streaks never build. Every
