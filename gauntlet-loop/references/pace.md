@@ -57,6 +57,11 @@ here as speed mechanisms:
   round costs nothing and shows the plateau the moment it happens — a model is
   then called once, to name why, instead of narrating each measurement
   (`cost-model.md` §5).
+- **Aim before building.** A round with a stated hypothesis converges faster
+  than a guess, and a low hit rate caught early replaces the two or three
+  missing rounds that were coming with one cheap diagnosis (`aim.md`). Rounds
+  that miss are the slowest rounds there are — except the ones that miss the
+  same way twice.
 
 ## 2. Pipeline, don't fan out
 

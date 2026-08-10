@@ -83,6 +83,19 @@ Two lanes, not three: `typography` and `layout`. Mid-tier builders, cheap
 screening critics, one collapsed call each. No promotion comparisons (first round
 of each lane); one bar record per lane per dimension all the same.
 
+From tier 1 up, every round states its bet before the builder runs — the probe
+aimed at the loop itself, but from here the aims are about the artifact:
+
+```bash
+python3 scripts/gauntlet.py aim --wave 1 --lane typography --dimension visual --round 1 \
+  --hypothesis "headline tracking is default at 96px; the refs compensate optically, which is most of the perceived gap" \
+  --approach "size-stepped letter-spacing on display sizes" \
+  --expect-severity minor
+```
+
+The builder gets the hypothesis and approach in its brief; the round is now
+falsifiable. The verdict:
+
 ```bash
 python3 scripts/gauntlet.py log-round --wave 1 --lane typography --dimension visual \
   --round 1 --mode blind --winner other --margin decisive --score 4 --severity major \
@@ -133,8 +146,12 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane layout --dimension visual 
   --champion-ref 4f2a91c --evidence gauntlet/shots/w2-layout-champ.png --tokens 85000
 ```
 
-A losing round is data: the next builder got "close the grid gap *without*
-breaking 1280px" and succeeded in round 3.
+A losing round is data twice over. The round's aim ("switch the hero to the
+reference's 12-col grid", expect minor) scored **miss — reverted**, and the
+approach went into the failed ledger; the next round's aim had to say what would
+be different ("same grid, with explicit overflow containment at 1280px") rather
+than quietly trying the same thing again. That builder got "close the grid gap
+*without* breaking 1280px" and succeeded in round 3.
 
 ## Wave 3 — planning the wave instead of running it
 
@@ -198,7 +215,15 @@ That is roughly €25 of wave-6 and wave-7 calls that never happened. Under the 
 shape the same evidence sat unread in the log until the budget ran out.
 
 `imagery` visual kept losing on margin `thin` with gaps getting cosmetic ("grain
-texture in ref reads intentional; ours reads like compression").
+texture in ref reads intentional; ours reads like compression") — and its aims
+kept missing: 1 hit in 4 scored. `status` said what that means: *this dimension
+is not understood — diagnose before building again.* One read-only round on the
+cheap tier (`spend --role diagnostician`), given the artifact, the bar and the
+three failed hypotheses from the ledger, came back with the cause: the gap was
+never in the processing pipeline — the references shoot on film, and no filter
+makes a compressed stock photo read as intentional grain. Every prior aim had
+been a guess at the same wrong model. That cause became the report's
+recommendation instead of three more missed rounds.
 
 ## The stop
 
@@ -267,6 +292,10 @@ the source assets" — and `extend` would have refused the grant without `--forc
 - `imagery / perf`: **shelved** at wave 5, not retired — LCP 2.1s vs 1.5s target
 - `imagery / visual`: open — largest remaining gap: image texture quality vs references
 - Evidence: 14 blind, 1 rubric, 7 oracle rounds — `perf` was measured, not judged
+- Aims: 11 scored, 8 hit (73%) — `type-and-layout` hit 7 of 8 (the run understood
+  that lane); `imagery/visual` hit 1 of 4, and the diagnosis round found why:
+  the gap was the source asset, not the pipeline. Every miss's approach is in
+  the ledger; none was retried
 - Management: 5 rounds not run (2 no-change, 2 oracle-unchanged, 1 gap-too-small)
   ≈ €11 of critic calls never spent; lanes ran serially from wave 3 after the
   smoother reported the same seam twice

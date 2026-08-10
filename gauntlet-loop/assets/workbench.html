@@ -911,6 +911,15 @@ function renderRail(d) {
     rail.append(tile("Effort tier", [String(t.index), t.name || ""],
       `${shortModel(t.builder_model_id) || t.builder_model || "?"} builder · ${shortModel(t.critic_model_id) || t.critic_model || "?"} critic · ~${t.calls_per_lane_round ?? "?"} calls per lane·round`));
 
+  const aim = d.aim;
+  if (aim && aim.scored)
+    rail.append(tile("Aim",
+      [String(Math.round(aim.hit_rate * 100)) + "%", "hit"],
+      `${aim.hits}/${aim.scored} scored`
+      + (aim.pending ? ` · ${aim.pending} pending` : "")
+      + (aim.unbriefed_bar_rounds ? ` · ${aim.unbriefed_bar_rounds} unaimed` : ""),
+      aim.hit_rate, aim.hit_rate < 0.5 ? "warn" : "ok"));
+
   const esc = (d.models || {}).escalation;
   if (esc && esc.escalations)
     rail.append(tile("Critic escalations",
@@ -983,6 +992,7 @@ function laneCard(c, column) {
 
   const facts = [];
   if (has(c.bar_rounds)) facts.push(plural(c.bar_rounds, "round"));
+  if (c.aim && c.aim.scored) facts.push(`${c.aim.hits}/${c.aim.scored} aims hit`);
   if (c.promotions) facts.push(`${c.promotions} promoted`);
   if (c.reverts) facts.push(plural(c.reverts, "revert"));
   if (c.tokens) facts.push(`${fmtTokens(c.tokens)} tok`);

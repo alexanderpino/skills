@@ -9,6 +9,12 @@ against a bar you can look at yourself.
 - The bar (reference files, target measurement, competing implementation)
 - The current state of the artifact
 - The named gap from the last round, if there was one
+- The round's **aim** — the hypothesis (why the gap exists and why this change
+  should close it) and the named approach. Build the approach as stated; you are
+  the intervention in an experiment, and a builder that knows *why* the change
+  should work builds it better than one that only knows *what* to change. If the
+  hypothesis looks wrong from where you sit, say so in one sentence in your
+  handoff — that is evidence the lead agent wants
 - Your file ownership: the exact paths you may write to this round
 - **Your read budget:** the paths you may read to do it
 

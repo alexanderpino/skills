@@ -109,6 +109,7 @@ gauntlet/
 ├── bar/             # frozen bar artifacts — never edited after intake
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
+├── aims.jsonl       # each round's hypothesis and expected outcome, stated before it ran
 ├── skips.jsonl      # rounds deliberately not run, and what each saved
 ├── spend.jsonl      # token spend that produced no round: builders, smoother
 ├── state.json       # the workbench spec (script-written); state.js beside it for file://
@@ -127,6 +128,8 @@ python3 scripts/gauntlet.py log-round ... --model high --escalated-from cheap  #
 python3 scripts/gauntlet.py log-round ... --mode oracle --evidence "lighthouse: LCP 1.42s"  # measured, no critic
 python3 scripts/gauntlet.py spend --tokens 300000 --role builder --model high --note "lane a builder"
 python3 scripts/gauntlet.py plan --max-lanes 2   # which lanes earn a round, priced against running all
+python3 scripts/gauntlet.py aim --wave 4 --lane a --dimension visual --round 5 \
+    --hypothesis "..." --approach "..." --expect-severity none   # the bet, before the builder runs
 python3 scripts/gauntlet.py skip --wave 4 --lane a --dimension visual --reason-code no-change
 python3 scripts/gauntlet.py tier      # current effort tier; is the next one earned?
 python3 scripts/gauntlet.py escalate --reason "..."   # buy the next tier, on evidence
@@ -281,8 +284,18 @@ what the run chose not to spend.
 
 Per lane, per round:
 
+0. **Aim.** Before the builder runs, state the round's bet through
+   `gauntlet.py aim`: the **hypothesis** (why the gap exists and why this change
+   should close it), the **approach** (named, so a missed one is never quietly
+   retried), and the **expected verdict** (`--expect-severity` / `--expect-score`
+   — and it must improve on the last verdict, or the script refuses). A round
+   without an aim cannot miss, and a round that cannot miss teaches nothing.
+   The script scores every aim against what actually happened and prints the hit
+   rate — under 50% means the model of the artifact is wrong: **diagnose before
+   building again**. → `references/aim.md`
 1. **Build.** Spawn a builder with the lane goal, the bar path, the current
-   artifact, and the last named gap. Not the previous builder's reasoning.
+   artifact, the last named gap — and the round's aim, so it knows *why* the
+   change should work. Not the previous builder's reasoning.
    → `references/builder.md`
 2. **Snapshot.** Commit the pre-round champion (git; conventions in
    `references/state-and-resume.md`). Nothing is merged yet.
@@ -427,6 +440,10 @@ stop there and the script refuses to cross it. Full protocol:
   decision belongs — not the moment the budget runs out.
 - **Never judge an artifact that did not change.** The gate is free; the two
   critic calls it replaces are not.
+- **Every round states its expectation before it runs — and is scored against
+  it.** A hypothesis, an approach, an expected verdict, through `aim`, before the
+  builder. Misses become information; a low hit rate calls for a diagnosis round,
+  not another build; a missed approach is never retried without a new reason.
 - **A numeric bar is measured, not judged.** Log it `--mode oracle` and spend the
   model only on naming the gap when the number stops moving.
 - **The budget is extended by the user or not at all.** Stop first, offer second,
@@ -458,6 +475,7 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Model reads a number | A critic call spent restating a measurement | `--mode oracle`; call a model only to name a plateau |
 | Convoy | Wave time ≈ sum of every stage; critics idle while builders run and vice versa | Pipeline independent stages; judging strategy from the revert rate (`pace.md`) |
 | Convergence tax | One round per cosmetic gap once a dimension is down to minors | Batch the critic's NOTES into one brief; the champion guard makes it safe |
+| Build-and-hope | Rounds run with no stated expectation; misses look like bad luck | `aim` before every build; diagnose when the hit rate drops below half |
 
 ## Degraded mode (no subagents)
 
@@ -501,6 +519,7 @@ Read at the relevant phase, not upfront:
 - `references/intake.md` — the contract; cold start; cost expectations
 - `references/cost-model.md` — the effort ladder, model tiering, context discipline, honest pricing
 - `references/pace.md` — wall-clock: convergence per round, pipelining vs fan-out, judging strategy by revert rate
+- `references/aim.md` — rounds as experiments: hypothesis, expectation, hit rate, the diagnosis round
 - `references/bar-selection.md` — bar taxonomies; dimensions; finding a bar
 - `references/decomposition.md` — lane sizing, ownership, parallel vs serial
 - `references/blind-protocol.md` — honest blind comparison; champion mode; rubric fallback

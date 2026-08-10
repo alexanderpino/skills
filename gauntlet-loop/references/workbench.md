@@ -53,8 +53,10 @@ user does not have to interrupt anything to see where the run got to.
   currency, burn rate and waves left at that rate, **pace** (average wave
   duration, waves per hour, projected time remaining, and the build/judge split
   when `--seconds` was tracked), current tier and its models, the
-  blind/rubric/oracle evidence mix, how many rounds are still unpriced, and
-  **rounds not run** with the calls that restraint saved
+  blind/rubric/oracle evidence mix, how many rounds are still unpriced,
+  **rounds not run** with the calls that restraint saved, and the **aim hit
+  rate** — how many rounds met the expectation they stated before running,
+  tinted amber below half, with unaimed bar rounds counted beside it
 - **Effort ladder** — the four tiers with the current one marked, each showing
   its share of the budget and what it costs per round, plus every escalation and
   the evidence that bought it
@@ -166,6 +168,26 @@ warning — a run that cannot say what it spent cannot say when to stop spending
 `--model` (a tier label or a model id) on every round and every `spend`; pass
 `--escalated-from` when a round re-judges a cheaper critic's verdict. The pair
 turns "was the expensive critic worth it?" into arithmetic the report can do.
+
+**What each round expected** goes in `gauntlet/aims.jsonl` via `aim`, written
+*before* the round's builder runs — hypothesis, named approach, and the verdict
+the round must show if the hypothesis is right:
+
+```json
+{
+  "ts": "2026-08-05T14:12:20+00:00",
+  "wave": 3, "lane": "terrain-lighting", "dimension": "visual", "round": 7,
+  "hypothesis": "the rock reads as floating because no contact shadow grounds it",
+  "approach": "baked ambient-occlusion contact shadow at the rock base",
+  "expect_severity": "none"
+}
+```
+
+The script scores each aim against the round's actual records — hit, miss
+(reverted or fell short), pending — and the board carries the hit rate as a tile
+and per lane card. `aim` refuses an expectation that does not improve on the
+last verdict, and `log-round` warns on any tier-1+ bar round with no aim on
+record. → `aim.md`
 
 **Rounds you decided not to run** go in `gauntlet/skips.jsonl` via `skip`, with a
 reason code and a conservative estimate of the critic calls saved. Management

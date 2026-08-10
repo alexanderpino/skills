@@ -610,6 +610,70 @@
           "description": "Serial-vs-concurrent critic advice computed from the revert rate; null when the log is too thin or the rate is mid-range."
         }
       }
+    },
+    "aim": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Whether the run's rounds knew what they were aiming at. An aim states a hypothesis and an expected outcome before the build; the verdict then confirms or refutes it. The hit rate measures understanding \u2014 a dimension where aims keep missing needs a diagnosis, not more rounds.",
+      "properties": {
+        "scored": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hits": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "misses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Aims whose round has no verdict yet."
+        },
+        "hit_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unbriefed_bar_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bar rounds from tier 1 up that ran without a stated aim \u2014 rounds that could not miss, and so could not teach."
+        },
+        "failed": {
+          "type": "array",
+          "description": "Approaches that missed \u2014 never retried without a new reason.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lane": {
+                "type": "string"
+              },
+              "dimension": {
+                "type": "string"
+              },
+              "approach": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "reverted",
+                  "fell short"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -733,6 +797,21 @@
             "bar-met",
             "clean-streak"
           ]
+        },
+        "aim": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "This dimension's aim record: how many rounds stated an expectation and how many met it.",
+          "properties": {
+            "scored": {
+              "type": "integer"
+            },
+            "hits": {
+              "type": "integer"
+            }
+          }
         }
       }
     },

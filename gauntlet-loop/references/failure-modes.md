@@ -218,6 +218,27 @@ judgement — `skip --reason-code no-change`, then re-brief the builder with the
 reason. The canonical run used the same shape at the other end, gating a final
 pass on "zero visual change" with automated pixel-diffing.
 
+## Build-and-hope
+
+**Signal.** Rounds run, verdicts land, and nobody can say in advance what any of
+them will show. Misses read as bad luck rather than as wrong ideas. The same
+approach quietly gets tried twice. Asked "why did that round fail?", the honest
+answer is "it just didn't work".
+
+**Cause.** The loop measures everything *after* the fact and states nothing
+*before* it. A round with no stated expectation cannot be wrong — and so cannot
+teach. Verdicts say where the artifact is; only a prediction, scored, says
+whether anyone understood why.
+
+**Repair.** `gauntlet.py aim` before every builder from tier 1 up: hypothesis,
+named approach, expected verdict — and the expectation must improve on the last
+verdict, so nobody buys a hit rate by aiming at the floor (`aim.md`). Then read
+the hit rate as what it is: the run's measure of whether it understands the
+artifact. Under half, with three or more scored aims, more build rounds are more
+guesses at the same wrong model — run one read-only **diagnosis round** whose
+product is a cause, and never retry an approach from the failed ledger without a
+new reason to believe it.
+
 ## Model reads a number
 
 **Signal.** A critic call whose entire verdict restates a measurement the harness

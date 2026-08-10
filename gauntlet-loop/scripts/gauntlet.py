@@ -8,6 +8,7 @@ long context.
 Commands:
   init        Create the gauntlet/ state directory and config
   plan        Propose the next wave from the log, priced against running everything
+  aim         State a round's hypothesis and expected outcome before it runs
   log-round   Append one validated comparison record to rounds.jsonl
   skip        Record a round deliberately not run, and what it saved
   spend       Record token spend that is not attached to a logged round
@@ -530,6 +531,13 @@ def cmd_log_round(args):
     if args.tokens is None and args.mode != "oracle":
         print("  note: no --tokens on this record — the run cannot price itself without them",
               file=sys.stderr)
+    # An unaimed round cannot miss, and a round that cannot miss cannot teach.
+    if args.mode in BAR_MODES and cfg["effort"]["tier"] >= 1:
+        aims = _load_jsonl(root / "aims.jsonl")
+        if not any((a["lane"], a["dimension"], a["round"]) ==
+                   (args.lane, args.dimension, args.round) for a in aims):
+            print("  note: no aim on record for this round — state the hypothesis and expected "
+                  "outcome before the build next time (`gauntlet.py aim`)", file=sys.stderr)
 
 
 def cmd_spend(args):
@@ -1290,6 +1298,23 @@ def cmd_status(args):
         print(f"Oracle rounds: {oracle_n} of {sum(1 for r in rounds if r['mode'] in BAR_MODES)} "
               "bar rounds were measured, not judged — no critic tokens, and stronger evidence.\n")
 
+    aim = _aim_status(rounds, _load_jsonl(root / "aims.jsonl"))
+    if aim and aim["scored"]:
+        print(f"Aim: {aim['hits']} of {aim['scored']} scored rounds hit their stated expectation "
+              f"({int(aim['hit_rate'] * 100)}%)"
+              + (f"; {aim['pending']} pending" if aim["pending"] else "") + ".")
+        for (lane, dim), d in sorted(aim["per_dim"].items()):
+            if d["scored"] >= 3 and d["hits"] / d["scored"] < 0.5:
+                print(f"  [{lane} / {dim}] {d['hits']}/{d['scored']} hit — this dimension is not "
+                      "understood: diagnose before building again")
+                for f_ in [x for x in aim["failed"]
+                           if (x["lane"], x["dimension"]) == (lane, dim)][:3]:
+                    print(f"    tried and missed: \"{f_['approach']}\" ({f_['reason']})")
+        if aim["unbriefed_bar_rounds"]:
+            print(f"  {aim['unbriefed_bar_rounds']} bar round(s) ran without an aim — an unstated "
+                  "expectation cannot miss, or teach.")
+        print()
+
     esc = _escalation_evidence(rounds)
     if esc:
         print(f"Critic escalations: {esc['escalations']} — the stronger model agreed "
@@ -1411,6 +1436,28 @@ def cmd_report(args):
     lines += [f"Verdict evidence: {blind} blind, {rubric} rubric, {oracle} oracle rounds "
               "(not equivalent evidence — an oracle round was measured, not judged)", ""]
 
+    aim = _aim_status(rounds, _load_jsonl(root / "aims.jsonl"))
+    if aim and aim["scored"]:
+        lines += [
+            "## Did the rounds know what they were aiming at?", "",
+            f"{aim['scored']} round(s) ran with a stated aim; {aim['hits']} hit their "
+            f"expectation ({int(aim['hit_rate'] * 100)}%).",
+        ]
+        for (lane, dim), d in sorted(aim["per_dim"].items()):
+            lines.append(f"- **{lane} / {dim}** — {d['hits']}/{d['scored']} hit")
+        if aim["failed"]:
+            lines += ["", "Approaches that missed (do not retry these without a new reason):"]
+            for f_ in aim["failed"][:8]:
+                lines.append(f"- [{f_['lane']} / {f_['dimension']}] \"{f_['approach']}\" — {f_['reason']}")
+        if aim["unbriefed_bar_rounds"]:
+            lines += ["", f"{aim['unbriefed_bar_rounds']} bar round(s) ran without an aim."]
+        lines += [
+            "",
+            "(lead agent: a dimension with a low hit rate was not understood — say whether "
+            "a diagnosis or a re-cut fixed that, and carry the missed approaches into the "
+            "next run's aims.)", "",
+        ]
+
     skips = _load_jsonl(root / "skips.jsonl")
     if skips:
         saved = sum(s.get("tokens_saved_est") or 0 for s in skips)
@@ -1514,6 +1561,12 @@ def build_state(root, cfg, rounds):
     pace = _pace(rounds, spend_recs, waves_remaining)
     if pace:
         pace["judging"] = _judging_advice(cfg, rounds)
+    aim_full = _aim_status(rounds, _load_jsonl(root / "aims.jsonl"))
+    aim_spec = None
+    if aim_full:
+        aim_spec = {k: aim_full[k] for k in
+                    ("scored", "hits", "misses", "pending", "hit_rate", "unbriefed_bar_rounds")}
+        aim_spec["failed"] = aim_full["failed"][:8]
     state = {
         "schema": STATE_SCHEMA_VERSION,
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -1588,6 +1641,7 @@ def build_state(root, cfg, rounds):
             "total_rounds": sum(1 for r in rounds if r["mode"] != "oracle"),
         },
         "pace": pace,
+        "aim": aim_spec,
         "evidence_mix": {
             "blind": sum(1 for r in bar_rounds if r["mode"] == "blind"),
             "rubric": sum(1 for r in bar_rounds if r["mode"] == "rubric"),
@@ -1629,6 +1683,7 @@ def build_state(root, cfg, rounds):
             "tokens": sum(r.get("tokens") or 0 for r in recs),
             "trend": _dimension_trend(bar_recs, flat_n=cfg["stops"].get("flat_rounds_n", 3))["note"]
             if bar_recs else None,
+            "aim": (aim_full or {}).get("per_dim", {}).get((lane, dim)),
         }
         if s["shelved"]:
             shelf = next((x for x in cfg.get("shelved") or []
@@ -1659,6 +1714,139 @@ def build_state(root, cfg, rounds):
             "model": r.get("model"), "escalated_from": r.get("escalated_from"),
         })
     return state
+
+
+def cmd_aim(args):
+    """State a round's hypothesis and expected outcome before it runs.
+
+    An aim turns a round from an attempt into an experiment: why the gap
+    exists, what intervention should close it, and what the verdict must show
+    if the hypothesis is right. A round without an aim cannot miss — and a
+    round that cannot miss cannot teach the run anything.
+
+    The expectation must improve on the last verdict. An aim the artifact has
+    already met is not a bet, and allowing it would let a run buy a flattering
+    hit rate by aiming at the floor.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    if args.dimension not in dims:
+        die(f"dimension {args.dimension!r} is not declared in config.json ({', '.join(dims)})")
+    hypothesis = (args.hypothesis or "").strip()
+    if len(hypothesis) < 20:
+        die("--hypothesis must say why the gap exists and why this change should close it — "
+            "a hypothesis you cannot state is a guess you are about to pay for")
+    approach = (args.approach or "").strip()
+    if len(approach) < 5:
+        die("--approach must name the intervention — it is the key that stops a failed "
+            "approach from being retried in silence")
+    if args.expect_severity is None and args.expect_score is None:
+        die("state at least one expectation (--expect-severity minor|none and/or --expect-score N) — "
+            "without one the verdict cannot confirm or refute anything")
+    if args.expect_severity is not None and args.expect_severity not in ("minor", "none"):
+        die("--expect-severity must be minor or none — aiming at major is not an improvement")
+    if args.expect_score is not None and not (0 <= args.expect_score <= 10):
+        die("--expect-score must be 0-10")
+
+    rounds = load_rounds(root)
+    prior = [r for r in rounds
+             if r["lane"] == args.lane and r["dimension"] == args.dimension
+             and r["mode"] in BAR_MODES]
+    last = prior[-1] if prior else None
+    if last:
+        if args.expect_severity is not None:
+            last_rank = SEVERITY_RANK.get(last.get("severity") or "major", 3)
+            if SEVERITY_RANK[args.expect_severity] >= last_rank:
+                die(f"the last verdict is already severity {last.get('severity')} — the "
+                    "expectation must improve on it; an aim you have already met is not a bet")
+        if args.expect_score is not None and args.expect_score <= (last.get("score") or 0):
+            die(f"the last verdict already scored {last.get('score')} — expect a higher score, "
+                "or state a severity expectation instead")
+
+    rec = {
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "wave": args.wave,
+        "lane": args.lane,
+        "dimension": args.dimension,
+        "round": args.round,
+        "hypothesis": hypothesis,
+        "approach": approach,
+        "expect_severity": args.expect_severity,
+        "expect_score": args.expect_score,
+        "tier": cfg["effort"]["tier"],
+    }
+    with (root / "aims.jsonl").open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+    expects = []
+    if args.expect_severity:
+        expects.append(f"severity → {args.expect_severity}")
+    if args.expect_score is not None:
+        expects.append(f"score ≥ {args.expect_score}")
+    print(f"aimed: {args.lane}/{args.dimension} round {args.round} — {', '.join(expects)}")
+    print(f"  approach: {approach}")
+
+
+def _aim_status(rounds, aims):
+    """Score every aim against what actually happened.
+
+    Outcomes: hit (the verdict met every stated expectation), miss (the round
+    reverted, or the verdict fell short), pending (no verdict yet). The hit
+    rate is the run's measure of whether it understands the artifact — a
+    dimension where aims keep missing is not a dimension that needs more
+    rounds, it is one that needs a diagnosis.
+    """
+    if not aims:
+        return None
+    results = []
+    for a in aims:
+        key = (a["lane"], a["dimension"], a["round"])
+        champ = [r for r in rounds
+                 if (r["lane"], r["dimension"], r["round"]) == key and r["mode"] == "champion"]
+        bars = [r for r in rounds
+                if (r["lane"], r["dimension"], r["round"]) == key and r["mode"] in BAR_MODES]
+        if champ and champ[-1].get("action") == "reverted":
+            outcome, reason = "miss", "reverted"
+        elif not bars:
+            outcome, reason = "pending", None
+        else:
+            b = bars[-1]
+            ok = True
+            if a.get("expect_severity"):
+                ok = ok and (SEVERITY_RANK.get(b.get("severity") or "major", 3)
+                             <= SEVERITY_RANK[a["expect_severity"]])
+            if a.get("expect_score") is not None:
+                ok = ok and (b.get("score") or 0) >= a["expect_score"]
+            outcome, reason = ("hit", None) if ok else ("miss", "fell short")
+        results.append({"lane": a["lane"], "dimension": a["dimension"], "round": a["round"],
+                        "approach": a.get("approach"), "outcome": outcome, "reason": reason})
+
+    scored = [r for r in results if r["outcome"] != "pending"]
+    hits = sum(1 for r in scored if r["outcome"] == "hit")
+    per_dim = {}
+    for r in scored:
+        d = per_dim.setdefault((r["lane"], r["dimension"]), {"scored": 0, "hits": 0})
+        d["scored"] += 1
+        d["hits"] += 1 if r["outcome"] == "hit" else 0
+    failed = [{"lane": r["lane"], "dimension": r["dimension"],
+               "approach": r["approach"], "reason": r["reason"]}
+              for r in scored if r["outcome"] == "miss" and r.get("approach")]
+    aimed_keys = {(a["lane"], a["dimension"], a["round"]) for a in aims}
+    unbriefed = sum(
+        1 for r in rounds
+        if r["mode"] in BAR_MODES and (r.get("tier") or 0) >= 1
+        and (r["lane"], r["dimension"], r["round"]) not in aimed_keys
+    )
+    return {
+        "scored": len(scored),
+        "hits": hits,
+        "misses": len(scored) - hits,
+        "pending": len(results) - len(scored),
+        "hit_rate": round(hits / len(scored), 2) if scored else None,
+        "per_dim": per_dim,
+        "failed": failed,
+        "unbriefed_bar_rounds": unbriefed,
+    }
 
 
 SKIP_REASONS = {
@@ -1769,12 +1957,20 @@ def cmd_plan(args):
         print("Nothing is open. Raise the bar (announced), re-cut, or stop — do not run a wave.")
         return
 
+    aim = _aim_status(rounds, _load_jsonl(root / "aims.jsonl"))
     print("RUN (largest gap first):")
     for (lane, dim), sev, _, gap in run:
         note = "  clean — one more clean round retires it" if sev == "none" else ""
+        d = (aim or {}).get("per_dim", {}).get((lane, dim))
+        if d and d["scored"] >= 3 and d["hits"] / d["scored"] < 0.5:
+            note = (f"  DIAGNOSE FIRST — {d['hits']}/{d['scored']} aims hit; another build "
+                    "round is another guess")
         print(f"  [{lane} / {dim}]  severity {sev}{note}")
         if gap:
             print(f"      {gap}")
+        for f_ in [x for x in (aim or {}).get("failed", [])
+                   if (x["lane"], x["dimension"]) == (lane, dim)][:3]:
+            print(f"      tried and missed: \"{f_['approach']}\" ({f_['reason']})")
     if hold:
         print("\nHOLD:")
         for (lane, dim), why, detail in hold:
@@ -1804,6 +2000,9 @@ def cmd_plan(args):
           "`skip --reason-code no-change` and re-brief instead of judging nothing")
     print("  - for a dimension with a numeric bar, take the measurement and log "
           "`--mode oracle`; a model does not need to read a number")
+    print("  - state every round's aim before its builder runs (`gauntlet.py aim`): the "
+          "hypothesis, the approach, and what the verdict must show — never re-use an "
+          "approach listed above as missed without a new reason to believe it")
     if any(sev == "minor" for _, sev, _, _ in run):
         print("  - a dimension on a minor gap converges faster in one batch round: fold the "
               "critic's second-order NOTES into the brief instead of spending a round per "
@@ -1923,6 +2122,19 @@ def main():
     p.add_argument("--reason", required=True)
     p.add_argument("--force", action="store_true", help="shelve a dimension the log does not call flat")
     p.set_defaults(fn=cmd_shelve)
+
+    p = sub.add_parser("aim", help="state a round's hypothesis and expected outcome before it runs")
+    p.add_argument("--wave", type=int, required=True)
+    p.add_argument("--lane", required=True)
+    p.add_argument("--dimension", required=True)
+    p.add_argument("--round", type=int, required=True)
+    p.add_argument("--hypothesis", required=True,
+                   help="why the gap exists and why this change should close it")
+    p.add_argument("--approach", required=True,
+                   help="the intervention, named — the key that stops failed approaches being retried")
+    p.add_argument("--expect-severity", help="severity the verdict should reach: minor|none")
+    p.add_argument("--expect-score", type=int, help="score the verdict should reach")
+    p.set_defaults(fn=cmd_aim)
 
     p = sub.add_parser("plan", help="propose the next wave from the log, and price it against running everything")
     p.add_argument("--max-lanes", type=int, help="cap how many lanes this wave runs; the rest wait")
