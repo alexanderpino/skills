@@ -15,15 +15,24 @@
 
 ## Context
 
-What is the forcing function? Describe the problem, the constraints (platform,
-perf budget, team size, ship date), and the current behavior. Link to the
-issue tracker, design docs, and any prior art. Two to four paragraphs.
+Exactly two to four paragraphs. State only the forcing function: the problem,
+the constraints (platform, perf budget, team size, ship date), and the
+current behavior, with links to the issue tracker, design docs, and any prior
+art. Do not name, hint at, or rule in/out any specific solution, technology,
+API, or data structure here — that belongs in Decision. Do not include
+consequences, alternatives, or performance numbers; those have their own
+sections below.
 
 ## Decision
 
-One or two paragraphs stating the chosen approach in the active voice ("We
-will ..."). Name the specific APIs, data structures, and ownership model.
-Identify the engine-wide invariants that are added or changed.
+One or two paragraphs naming exactly one committed choice, stated in the
+active voice ("We will ..."). Name the specific APIs, data structures, and
+ownership model, and identify the engine-wide invariants that are added or
+changed. Present a single decision, not a menu or a hedge between options.
+Immediately after stating the choice, name every alternative considered (by
+the same name used in Alternatives Considered below) and give one concrete,
+specific reason each was rejected — a stated reason is required per
+alternative; "not chosen" or no reason at all is not acceptable.
 
 ## Consequences
 
