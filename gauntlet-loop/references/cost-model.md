@@ -62,26 +62,92 @@ on one surviving lane is cheaper than tier 2 on four.
 
 ## 2. Model tiering
 
-Roles do not need the same model, and running them all at the top is the second
-largest line in a gauntlet's bill.
+**The most expensive model is not the default.** It is one of several, chosen
+per role, and the choice is part of the contract the user agrees to — not a
+silent downgrade and not an unexamined maximum. A gauntlet runs many small,
+well-specified calls; most of them are classification work that a cheap model
+does as well as an expensive one, and running them all at the top is the second
+largest line in the bill.
+
+### The roster
+
+Tier labels resolve to real models through `config.json`, so a run can be
+re-pointed without touching any of this skill's logic:
+
+```bash
+python3 scripts/gauntlet.py init ... \
+    --models cheap=claude-haiku-4-5,mid=claude-sonnet-5,high=claude-opus-5
+```
+
+Those are the defaults. Published prices, USD per million tokens (2026-06-24 —
+check before quoting them as money):
+
+| Label | Model | Input | Output | Output cost vs `cheap` |
+|---|---|---|---|---|
+| `cheap` | `claude-haiku-4-5` | $1 | $5 | 1× |
+| `mid` | `claude-sonnet-5` | $3 | $15 | 3× |
+| `high` | `claude-opus-5` | $5 | $25 | 5× |
+| — | `claude-fable-5` | $10 | $50 | 10× |
+
+**The ratio is what a routing decision turns on**, not the absolute price. "This
+critic call costs 5× what the same call costs on the cheap tier" is actionable;
+"$25 per million tokens" is not.
+
+### Routing by role
 
 | Role | Tier | Why |
 |---|---|---|
-| Builder | high from tier 2 | Generation quality is the artifact. This is where the money should go. |
-| Bar critic | cheap → mid | Inspect, compare, classify: winner, margin, severity, one named gap. A structured judgement against a frozen reference, not open-ended reasoning. |
-| Promotion critic | cheap → mid | Strictly easier — two versions of the same thing, one question. |
-| Smoother | mid | Finds seams; it is explicitly forbidden from redesigning. |
-| Escalated critic | high | Only when a cheaper critic returned `thin` and the round decides a retirement. |
+| Builder | `mid` at tiers 0–1, `high` from tier 2 | Generation quality *is* the artifact. This is where the money should go, and where paying more is most defensible. |
+| Bar critic | `cheap` → `mid` | Inspect, compare, classify: winner, margin, severity, one named gap. A structured judgement against a frozen reference, not open-ended reasoning. |
+| Promotion critic | `cheap` → `mid` | Strictly easier — two versions of the same thing, one question. |
+| Smoother | `mid` | Finds seams; it is explicitly forbidden from redesigning. |
+| Escalated critic | `high` | Only when a cheaper critic returned `thin` **and** the round decides a retirement. |
 
-The escalation rule for critics is worth stating on its own: **run the cheap
-critic first, and buy the expensive one only for the verdicts that matter.** A
-`decisive` verdict from a cheap critic is as good as a `decisive` verdict from an
-expensive one. A `thin` verdict that will retire a lane is worth re-running at a
-higher tier.
+Record which model did what — `log-round --model`, `spend --model`. Without it
+the run cannot show where the money went, and "the expensive tier is worth it"
+stays an opinion.
 
-If verdicts from a cheap critic are systematically vaguer than the bar deserves,
-that is a real finding — raise the critic tier for that dimension and note it in
-the contract. Do not conclude it from one round.
+### Escalate specific verdicts, not the whole run
+
+**Run the cheap critic first, and buy the expensive one only for the verdicts
+that matter.** A `decisive` verdict from a cheap critic is as good as a
+`decisive` verdict from an expensive one — the two models are being asked which
+of two things is better, and they agree. A `thin` verdict that will retire a
+lane is the case worth re-running at a higher tier.
+
+When you do escalate, log it as an escalation:
+
+```bash
+python3 scripts/gauntlet.py log-round ... --model high --escalated-from mid
+```
+
+### Then let the run answer the question
+
+That flag is what turns model choice from belief into measurement. `status` and
+the report compare each escalated verdict against the one it replaced:
+
+```
+Critic escalations: 6 — the stronger model agreed 6× and overturned 0×
+  (100% agreement, 890k tok ≈ €8.01 spent).
+  The cheap critic is agreeing with the expensive one. Escalate less, or raise
+  the bar so the comparison is harder.
+```
+
+Read it in both directions. **High agreement is not reassurance that the money
+was well spent — it is evidence the cheap critic was already right**, and the
+escalations bought confirmation rather than information. A low agreement rate is
+the opposite finding: the cheap critic's verdicts are not load-bearing, and that
+dimension should run at a higher tier from the start.
+
+Either way the next run starts from evidence instead of from a guess, and that
+is the cheapest finding the report can carry.
+
+### What this does not license
+
+Do not silently move a run to a cheaper model because it looks expensive. The
+roster is in the contract; changing it changes what the user agreed to. If the
+evidence says a tier is wrong, say so with the numbers and let them decide —
+the same rule that governs budget extensions.
 
 ## 3. Context discipline
 

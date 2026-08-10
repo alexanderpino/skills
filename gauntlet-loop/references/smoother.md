@@ -47,6 +47,7 @@ LEFT ALONE: <seams you judged not worth touching, with reason>
 CONFLICTS: <lane vs lane, and which you preferred>
 STRUCTURAL: <anything that suggests the lane split itself is wrong>
 TOKENS: <your call's token count, if you were given one>
+MODEL: <the model you ran on, if you were told>
 ```
 
 That last field matters. If you keep finding the same seam wave after wave, the

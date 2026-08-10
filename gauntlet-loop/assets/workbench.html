@@ -440,6 +440,10 @@ td.ev span {
   display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.row-model {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3);
+  margin-top: 3px; white-space: nowrap;
+}
 .win { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .win .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .win.ours .dot { background: var(--ok); }
@@ -662,6 +666,9 @@ function ago(iso) {
   return Math.round(s / 86400) + " d ago";
 }
 const basename = p => has(p) ? String(p).split("/").pop() : "";
+/* "claude-sonnet-5" reads as "sonnet-5" in a dense row; the vendor prefix is
+   the same on every model here and carries no information. */
+const shortModel = m => has(m) ? String(m).replace(/^claude-/, "") : "";
 /* "1 lanes" is the kind of detail that makes a board look unfinished. */
 function plural(n, word, fallback) {
   if (!has(n)) return fallback || ("all " + word + "s");
@@ -881,7 +888,14 @@ function renderRail(d) {
   const t = d.tier || {};
   if (has(t.index))
     rail.append(tile("Effort tier", [String(t.index), t.name || ""],
-      `${t.builder_model || "?"} builder · ${t.critic_model || "?"} critic · ~${t.calls_per_lane_round ?? "?"} calls per lane·round`));
+      `${shortModel(t.builder_model_id) || t.builder_model || "?"} builder · ${shortModel(t.critic_model_id) || t.critic_model || "?"} critic · ~${t.calls_per_lane_round ?? "?"} calls per lane·round`));
+
+  const esc = (d.models || {}).escalation;
+  if (esc && esc.escalations)
+    rail.append(tile("Critic escalations",
+      [String(Math.round(esc.agreement_rate * 100)) + "%", "agreed"],
+      `${esc.escalations} escalated · ${esc.overturned} overturned · ${fmtTokens(esc.tokens)} tok`,
+      esc.agreement_rate, esc.agreement_rate >= 0.9 ? "warn" : ""));
 
   const mix = d.evidence_mix;
   if (mix && (mix.blind || mix.rubric))
@@ -911,7 +925,8 @@ function renderLadder(d) {
     n.append(el("div", "rung-name", r.name || ""));
     n.append(el("div", "rung-d",
       `${plural(r.lanes, "lane", "all lanes")} · ${plural(r.critic_calls, "critic call")}`));
-    n.append(el("div", "rung-d faint", `${r.builder_model} builder · ${r.critic_model} critic`));
+    n.append(el("div", "rung-d faint",
+      `${shortModel(r.builder_model)} builder · ${shortModel(r.critic_model)} critic`));
     if (has(r.share)) n.append(el("div", "rung-share", Math.round(r.share * 100) + "% of budget"));
     box.append(n);
   }
@@ -1050,6 +1065,14 @@ function renderRounds(d) {
     const mode = el("td");
     mode.append(badge(r.mode === "champion" ? "promotion" : r.mode || "",
       r.mode === "blind" ? "blind" : "ghost"));
+    if (has(r.model)) {
+      const m = el("div", "row-model", shortModel(r.model));
+      if (has(r.escalated_from)) {
+        m.textContent = shortModel(r.escalated_from) + " → " + shortModel(r.model);
+        m.title = "re-judged on a stronger critic";
+      }
+      mode.append(m);
+    }
     tr.append(mode);
 
     const out = el("td");
@@ -1115,6 +1138,42 @@ function renderPanels(d) {
       }
     }));
   };
+
+  /* Which model ran which role, what it costs relative to the cheapest tier,
+     and how much of the run it actually consumed. The multiplier is the number
+     a routing decision turns on — a tier carrying 80% of the spend at 5× is a
+     different situation from one carrying 5%. */
+  const roster = ((d.models || {}).roster || []).filter(m => m.id);
+  if (roster.length) {
+    any = true;
+    const totalTok = roster.reduce((a, m) => a + (m.tokens || 0), 0);
+    box.append(panel("Models", p => {
+      for (const m of roster) {
+        const row = el("div", "bar-row");
+        const top = el("div", "top");
+        const left = el("span", "k");
+        left.append(shortModel(m.id));
+        if (has(m.ratio)) left.append(" ", badge(m.ratio + "× cost", m.ratio >= 5 ? "minor" : "ghost"));
+        top.append(left);
+        top.append(el("span", "v", m.calls
+          ? `${m.calls} call${m.calls === 1 ? "" : "s"} · ${fmtTokens(m.tokens)} tok`
+          : "unused"));
+        row.append(top);
+        const track = el("div", "track");
+        const i = document.createElement("i");
+        i.style.width = totalTok ? ((m.tokens || 0) / totalTok * 100).toFixed(1) + "%" : "0%";
+        track.append(i); row.append(track);
+        p.append(row);
+      }
+      const note = el("div", "row");
+      note.append(el("span", "k faint",
+        (d.models.attributed_calls
+          ? "cost multipliers are output-token ratios"
+          : "no calls carry a model — pass --model to attribute them")
+        + (d.models.as_of ? ", priced " + d.models.as_of : "")));
+      p.append(note);
+    }));
+  }
 
   bars("Spend by role", Object.entries(sp.by_role || {}).sort((a, b) => b[1] - a[1]));
   bars("Spend by tier", Object.entries(sp.by_tier || {}).sort((a, b) => a[0].localeCompare(b[0]))

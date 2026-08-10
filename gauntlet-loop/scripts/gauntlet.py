@@ -37,6 +37,27 @@ ACTIONS = ("promoted", "reverted")
 # `lanes`/`dims` are ceilings for the tier (null = no ceiling). `critic_calls`
 # is the number of critic calls per lane per round: 1 = one collapsed screening
 # call answering promotion and bar together, 2 = the full split, per dimension.
+# Which model each tier label resolves to. The ladder speaks in labels so a run
+# can be re-pointed at different models without touching its logic; this is the
+# only place the labels become real model ids.
+#
+# Prices are USD per million tokens as published on 2026-06-24 — they are here
+# for the *ratios*, which is what a routing decision actually turns on. Check
+# the current numbers before quoting them as money.
+DEFAULT_MODELS = {
+    "cheap": "claude-haiku-4-5",
+    "mid": "claude-sonnet-5",
+    "high": "claude-opus-5",
+}
+
+MODEL_PRICES = {
+    "claude-haiku-4-5": {"in": 1.0, "out": 5.0},
+    "claude-sonnet-5": {"in": 3.0, "out": 15.0},
+    "claude-opus-5": {"in": 5.0, "out": 25.0},
+    "claude-fable-5": {"in": 10.0, "out": 50.0},
+}
+PRICES_AS_OF = "2026-06-24"
+
 DEFAULT_LADDER = [
     {"name": "probe", "share": 0.05, "lanes": 1, "dims": 1,
      "critic_calls": 1, "builder_model": "mid", "critic_model": "cheap"},
@@ -70,6 +91,9 @@ DEFAULT_CONFIG = {
     # Blended price of a million tokens, for printing the budget in the unit the
     # user thinks in. null = print tokens only.
     "cost_eur_per_mtok": None,
+    # Tier label → model id. Override at init when a run should use different
+    # models; the ladder and every reference file keep speaking in labels.
+    "models": dict(DEFAULT_MODELS),
     "effort": {
         "tier": 0,
         "ladder": DEFAULT_LADDER,
@@ -83,6 +107,29 @@ DEFAULT_CONFIG = {
     # "the budget ran out and the user chose to keep going".
     "extensions": [],
 }
+
+
+def resolve_model(cfg, label):
+    """Turn a tier label ('cheap') into a model id, or pass an id straight through."""
+    if not label:
+        return None
+    return (cfg.get("models") or DEFAULT_MODELS).get(label, label)
+
+
+def model_cost_ratio(cfg, label):
+    """How many times a model's output costs relative to the cheapest tier's.
+
+    This is the number a routing decision turns on: not "Opus costs $25" but
+    "this call costs 5× what the same call costs on the cheap tier". Returns
+    None for a model with no published price on file.
+    """
+    mid = resolve_model(cfg, label)
+    price = MODEL_PRICES.get(mid)
+    base = MODEL_PRICES.get(resolve_model(cfg, "cheap"))
+    if not price or not base or not base["out"]:
+        return None
+    ratio = price["out"] / base["out"]
+    return int(ratio) if ratio == int(ratio) else round(ratio, 1)
 
 
 def tier_spec(cfg, tier=None):
@@ -120,6 +167,9 @@ def load_config(root):
     cfg.setdefault("extensions", [])
     cfg.setdefault("shelved", [])
     cfg.setdefault("cost_eur_per_mtok", None)
+    models = cfg.setdefault("models", {})
+    for k, v in DEFAULT_MODELS.items():
+        models.setdefault(k, v)
     cfg.setdefault("stops", {})
     for k, v in DEFAULT_CONFIG["stops"].items():
         cfg["stops"].setdefault(k, v)
@@ -238,6 +288,14 @@ def cmd_init(args):
         cfg["stops"]["flat_rounds_n"] = args.flat_rounds_n
     if args.cost_per_mtok is not None:
         cfg["cost_eur_per_mtok"] = args.cost_per_mtok
+    if args.models:
+        for pair in args.models.split(","):
+            if "=" not in pair:
+                die(f"--models takes label=model pairs, got {pair!r} (e.g. cheap=claude-haiku-4-5)")
+            label, mid = (s.strip() for s in pair.split("=", 1))
+            if label not in DEFAULT_MODELS:
+                die(f"unknown tier label {label!r} — expected one of {', '.join(DEFAULT_MODELS)}")
+            cfg["models"][label] = mid
     if args.hard_cap_waves is not None:
         if args.hard_cap_waves < cfg["stops"]["budget_waves"]:
             die("hard-cap-waves is below budget-waves — the cap is the ceiling extensions may not cross")
@@ -271,8 +329,13 @@ def cmd_init(args):
     spec = tier_spec(cfg)
     print(f"initialised {root}/ — freeze bar artifacts into {root}/bar/ before wave 1")
     print(f"effort tier 0 ({spec['name']}): {spec['lanes'] or 'all'} lane(s), "
-          f"{spec['critic_calls']} critic call(s) per lane per round, "
-          f"builder={spec['builder_model']} critic={spec['critic_model']}")
+          f"{spec['critic_calls']} critic call(s) per lane per round")
+    print("  models: " + ", ".join(
+        f"{label}={resolve_model(cfg, label)}"
+        + (f" ({r}×)" if (r := model_cost_ratio(cfg, label)) else "")
+        for label in ("cheap", "mid", "high")))
+    print(f"  builder={resolve_model(cfg, spec['builder_model'])} "
+          f"critic={resolve_model(cfg, spec['critic_model'])}")
     allow = tier_allowance(cfg, 0)
     if allow:
         print(f"  tier allowance: {fmt_cost(cfg, allow)} of {fmt_cost(cfg, cfg['stops']['budget_tokens'])} total")
@@ -323,6 +386,12 @@ def cmd_log_round(args):
         "critic_framing": args.critic_framing,
         "tier": cfg["effort"]["tier"],
         "tokens": args.tokens,
+        # Which model produced this verdict, and — when this round re-judged an
+        # earlier verdict on a stronger model — which model's verdict it replaced.
+        # The pair is what makes "was the cheap critic good enough?" answerable
+        # from the log instead of from opinion.
+        "model": resolve_model(cfg, args.model) if args.model else None,
+        "escalated_from": resolve_model(cfg, args.escalated_from) if args.escalated_from else None,
     }
 
     if args.mode == "champion":
@@ -368,6 +437,7 @@ def cmd_spend(args):
         "tokens": args.tokens,
         "note": note,
         "tier": cfg["effort"]["tier"],
+        "model": resolve_model(cfg, args.model) if args.model else None,
     }
     with (root / "spend.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
@@ -949,6 +1019,38 @@ def cmd_extend(args):
     print("Record the extension in contract.md and on the workbench, then resume at the wave boundary.")
 
 
+def _escalation_evidence(rounds):
+    """Did paying for a stronger critic actually change the verdict?
+
+    Every round logged with --escalated-from re-judged an earlier verdict on a
+    more expensive model. Comparing the two tells you whether the cheap tier was
+    good enough — the one question about model choice that a run can answer from
+    its own log rather than from belief. A high agreement rate is an argument for
+    escalating less; a low one is an argument for escalating earlier.
+    """
+    esc = [r for r in rounds if r.get("escalated_from")]
+    if not esc:
+        return None
+    agreed = 0
+    for r in esc:
+        prior = [
+            p for p in rounds
+            if p["lane"] == r["lane"] and p["dimension"] == r["dimension"]
+            and p["round"] == r["round"] and p["mode"] == r["mode"]
+            and p.get("model") == r["escalated_from"]
+        ]
+        if prior and prior[-1]["winner"] == r["winner"] \
+                and prior[-1].get("severity") == r.get("severity"):
+            agreed += 1
+    return {
+        "escalations": len(esc),
+        "agreed": agreed,
+        "overturned": len(esc) - agreed,
+        "agreement_rate": round(agreed / len(esc), 2),
+        "tokens": sum(r.get("tokens") or 0 for r in esc),
+    }
+
+
 def _fired_stops(cfg, rounds, per, retired, max_wave, spent):
     """Every stop condition currently firing or signalling.
 
@@ -1000,8 +1102,11 @@ def cmd_status(args):
     spec = tier_spec(cfg)
     print(f"wave {max_wave} of {budget} budgeted{ext_note}")
     print(f"tier {cfg['effort']['tier']} ({spec['name']}) — "
-          f"~{calls_per_lane_round(cfg)} calls per lane per round, "
-          f"builder={spec['builder_model']} critic={spec['critic_model']}")
+          f"~{calls_per_lane_round(cfg)} calls per lane per round")
+    print(f"  builder {resolve_model(cfg, spec['builder_model'])}"
+          + (f" ({r}×)" if (r := model_cost_ratio(cfg, spec['builder_model'])) else "")
+          + f" · critic {resolve_model(cfg, spec['critic_model'])}"
+          + (f" ({r}×)" if (r := model_cost_ratio(cfg, spec['critic_model'])) else ""))
     if tok_budget:
         allow = tier_allowance(cfg)
         print(f"spend {fmt_cost(cfg, spent)} of {fmt_cost(cfg, tok_budget)} "
@@ -1032,6 +1137,19 @@ def cmd_status(args):
             print(f"  FLAT for {cfg['stops']['flat_rounds_n']} bar rounds — shelve it or re-cut it;"
                   f" running it again costs ~{calls_per_lane_round(cfg)} calls per round for no movement")
             print(f"    python3 scripts/gauntlet.py shelve --lane {lane} --dimension {dim} --reason \"...\"")
+        print()
+
+    esc = _escalation_evidence(rounds)
+    if esc:
+        print(f"Critic escalations: {esc['escalations']} — the stronger model agreed "
+              f"{esc['agreed']}× and overturned {esc['overturned']}× "
+              f"({int(esc['agreement_rate'] * 100)}% agreement, {fmt_cost(cfg, esc['tokens'])} spent).")
+        if esc["escalations"] >= 4 and esc["agreement_rate"] >= 0.9:
+            print("  The cheap critic is agreeing with the expensive one. Escalate less,"
+                  " or raise the bar so the comparison is harder.")
+        elif esc["escalations"] >= 4 and esc["agreement_rate"] <= 0.5:
+            print("  The cheap critic is being overturned half the time. Its verdicts are"
+                  " not load-bearing — raise the critic tier for this dimension.")
         print()
 
     # The trend read every wave, not only once the money is gone. A dimension
@@ -1089,6 +1207,18 @@ def cmd_report(args):
     else:
         lines += ["The run never escalated. Say whether that was the ladder working "
                   "(a cheap honest no) or the run stopping too early.", ""]
+
+    esc = _escalation_evidence(rounds)
+    if esc:
+        lines += [
+            "## Was the expensive critic worth it?", "",
+            f"{esc['escalations']} verdict(s) were escalated to a stronger critic. It agreed "
+            f"{esc['agreed']}× and overturned {esc['overturned']}× "
+            f"({int(esc['agreement_rate'] * 100)}% agreement), at {fmt_cost(cfg, esc['tokens'])}.", "",
+            "(lead agent: say what this means for the next run's critic tier — a high agreement "
+            "rate is evidence the cheap critic was sufficient, and the cheapest finding this "
+            "report can carry.)", "",
+        ]
 
     shelved = cfg.get("shelved") or []
     if shelved:
@@ -1186,6 +1316,16 @@ def build_state(root, cfg, rounds):
     for s in spend_recs:
         by_tier[str(s.get("tier", 0))] = by_tier.get(str(s.get("tier", 0)), 0) + (s.get("tokens") or 0)
 
+    # Where the money went by model — the view that shows whether the expensive
+    # tier is earning its multiplier or just absorbing the run.
+    by_model, calls_by_model = {}, {}
+    for rec in list(rounds) + list(spend_recs):
+        mid = rec.get("model")
+        if not mid:
+            continue
+        by_model[mid] = by_model.get(mid, 0) + (rec.get("tokens") or 0)
+        calls_by_model[mid] = calls_by_model.get(mid, 0) + 1
+
     bar_rounds = [r for r in rounds if r["mode"] in ("blind", "rubric")]
     state = {
         "schema": STATE_SCHEMA_VERSION,
@@ -1206,18 +1346,36 @@ def build_state(root, cfg, rounds):
             "hard_cap_waves": cfg["stops"].get("hard_cap_waves"),
             "hard_cap_tokens": cfg["stops"].get("hard_cap_tokens"),
         },
+        # Which model each tier label points at, what it costs relative to the
+        # cheapest, and how much of the run it actually consumed.
+        "models": {
+            "as_of": PRICES_AS_OF,
+            "roster": [
+                {"label": label, "id": resolve_model(cfg, label),
+                 "ratio": model_cost_ratio(cfg, label),
+                 "price": MODEL_PRICES.get(resolve_model(cfg, label)),
+                 "tokens": by_model.get(resolve_model(cfg, label), 0),
+                 "calls": calls_by_model.get(resolve_model(cfg, label), 0)}
+                for label in ("cheap", "mid", "high")
+            ],
+            "escalation": _escalation_evidence(rounds),
+            "attributed_calls": sum(calls_by_model.values()),
+        },
         "tier": {
             "index": cfg["effort"]["tier"],
             "name": spec["name"],
             "builder_model": spec["builder_model"],
             "critic_model": spec["critic_model"],
+            "builder_model_id": resolve_model(cfg, spec["builder_model"]),
+            "critic_model_id": resolve_model(cfg, spec["critic_model"]),
             "calls_per_lane_round": calls_per_lane_round(cfg),
             "allowance_tokens": tier_allowance(cfg),
             "ladder": [
                 {"index": i, "name": t["name"], "share": t["share"],
                  "lanes": t["lanes"], "dims": t["dims"],
                  "critic_calls": t["critic_calls"],
-                 "builder_model": t["builder_model"], "critic_model": t["critic_model"],
+                 "builder_model": resolve_model(cfg, t["builder_model"]),
+                 "critic_model": resolve_model(cfg, t["critic_model"]),
                  "state": ("done" if i < cfg["effort"]["tier"]
                            else "current" if i == cfg["effort"]["tier"] else "locked")}
                 for i, t in enumerate(ladder)
@@ -1235,6 +1393,7 @@ def build_state(root, cfg, rounds):
                                    if tok_budget and max_wave and spent else None),
             "by_role": by_role,
             "by_tier": by_tier,
+            "by_model": by_model,
             "priced_rounds": sum(1 for r in rounds if r.get("tokens")),
             "total_rounds": len(rounds),
         },
@@ -1293,6 +1452,7 @@ def build_state(root, cfg, rounds):
             "evidence": r.get("evidence"), "champion_ref": r.get("champion_ref"),
             "critic_framing": r.get("critic_framing"), "tier": r.get("tier", 0),
             "tokens": r.get("tokens"),
+            "model": r.get("model"), "escalated_from": r.get("escalated_from"),
         })
     return state
 
@@ -1338,6 +1498,9 @@ def main():
                    help="the budget the user actually pays; waves are not a unit of money")
     p.add_argument("--cost-per-mtok", type=float,
                    help="blended EUR per million tokens, so status can print money")
+    p.add_argument("--models",
+                   help="tier label to model id, comma separated "
+                        "(default: cheap=claude-haiku-4-5,mid=claude-sonnet-5,high=claude-opus-5)")
     p.add_argument("--flat-rounds-n", type=int,
                    help="bar rounds without movement before a dimension is flagged for shelving (default 3)")
     p.add_argument("--hard-cap-waves", type=int,
@@ -1364,12 +1527,18 @@ def main():
     p.add_argument("--critic-framing", default="default")
     p.add_argument("--tokens", type=int,
                    help="tokens the calls behind this record cost — without it the run cannot price itself")
+    p.add_argument("--model",
+                   help="model that produced this verdict — a tier label (cheap|mid|high) or a model id")
+    p.add_argument("--escalated-from",
+                   help="the model whose verdict this round re-judged, when a thin verdict was "
+                        "escalated to a stronger critic; makes 'was the cheap critic enough?' measurable")
     p.set_defaults(fn=cmd_log_round)
 
     p = sub.add_parser("spend", help="record spend not attached to a round (builders, smoother, lead passes)")
     p.add_argument("--tokens", type=int, required=True)
     p.add_argument("--role", default="builder", help="builder|smoother|lead|other")
     p.add_argument("--wave", type=int)
+    p.add_argument("--model", help="model that did the work — a tier label (cheap|mid|high) or a model id")
     p.add_argument("--note", required=True, help="what this bought")
     p.set_defaults(fn=cmd_spend)
 

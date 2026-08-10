@@ -102,11 +102,13 @@ gauntlet/
 
 ```bash
 python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf --bar-kind reference \
-    --budget-waves 12 --budget-tokens 20000000 --cost-per-mtok 9.0
+    --budget-waves 12 --budget-tokens 20000000 --cost-per-mtok 9.0 \
+    --models cheap=claude-haiku-4-5,mid=claude-sonnet-5,high=claude-opus-5
 python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
     --mode blind --winner other --margin clear --score 7 --severity major --gap "..." \
-    --evidence shots/w2r3.png --tokens 120000
-python3 scripts/gauntlet.py spend --tokens 300000 --role builder --note "lane a builder"
+    --evidence shots/w2r3.png --tokens 120000 --model cheap
+python3 scripts/gauntlet.py log-round ... --model high --escalated-from cheap  # re-judged a thin verdict
+python3 scripts/gauntlet.py spend --tokens 300000 --role builder --model high --note "lane a builder"
 python3 scripts/gauntlet.py tier      # current effort tier; is the next one earned?
 python3 scripts/gauntlet.py escalate --reason "..."   # buy the next tier, on evidence
 python3 scripts/gauntlet.py status    # streaks, spend, burn rate, flat dimensions, stops
@@ -198,6 +200,11 @@ a piece of evidence from the tier below it. Full model, gates and rationale:
 | 1 | pilot | ≤2 lanes, 1 wave | mid | cheap, 1 screening call | 15% |
 | 2 | campaign | all lanes, full waves | high | mid, split; escalate on `thin` | 40% |
 | 3 | polish | only lanes still moving | high | high, full split | 40% |
+
+`cheap`/`mid`/`high` are labels, not models. They resolve through `config.json`
+— by default `claude-haiku-4-5` / `claude-sonnet-5` / `claude-opus-5`, whose
+output tokens cost 1× / 3× / 5× respectively. Set them at intake with
+`--models cheap=…,mid=…,high=…` and put the roster in the contract.
 
 `gauntlet.py tier` prints whether the next tier is earned; `escalate --reason`
 buys it. The four gates — a round ran at this tier, the bar discriminates,
@@ -360,6 +367,11 @@ stop there and the script refuses to cross it. Full protocol:
   the user when to stop paying, and "≈ 12 subagent calls" is not a price.
 - **Effort goes up on evidence, never on optimism.** The gates are in the log;
   `escalate` enforces them.
+- **The most expensive model is not the default.** Roles get the model their job
+  needs — generation is where quality is bought, classification usually is not.
+  Record which model did what, escalate specific verdicts rather than whole runs,
+  and let the log say whether the expensive tier earned its multiplier.
+  → `references/cost-model.md`
 - **A flat dimension gets shelved, not re-run.** The wave boundary is where that
   decision belongs — not the moment the budget runs out.
 - **The budget is extended by the user or not at all.** Stop first, offer second,
@@ -385,6 +397,7 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Premature scale-up | Every lane opened at full effort before any verdict | Start at tier 0; `escalate` on gates |
 | Unsatisfiable critic | No verdict ever reaches `none`; only the budget can end the run | Calibrated scale; `none` is a valid verdict |
 | Cost blindness | Run priced in waves and calls; nobody knows what it spent | `--budget-tokens`, `--tokens` on every call |
+| Top-tier default | Every role on the strongest model; spend-by-model is one bar | Route by role; escalate verdicts, not runs; check it with `--escalated-from` |
 
 ## Degraded mode (no subagents)
 

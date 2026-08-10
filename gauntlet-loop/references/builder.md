@@ -41,8 +41,10 @@ paths you were given, stop and say which path you need. That escalation is cheap
 and it is usually a signal that the lane was cut too vaguely.
 
 **Report what you cost.** If you were given a token count for your call, state it
-in your handoff as `TOKENS: <n>`. The lead agent logs it, and the run uses it to
-price the next block of waves from measurement rather than guesswork.
+in your handoff as `TOKENS: <n>`, and name the model you are running on as
+`MODEL: <id>`. The lead agent logs both, and the run uses them to price the next
+block of waves from measurement rather than guesswork — and to say afterwards
+which tier the money actually went to.
 
 **Do not tune for the critic.** The critic's phrasing is not the target; the bar is.
 Optimising the wording of a rubric is the fastest way to make a loop produce

@@ -157,6 +157,29 @@ Diagnostic: if a run ends on budget with every dimension still open and every
 verdict still `minor`, read three verdicts in full before funding an extension.
 The problem is probably the critic, and more waves will not fix it.
 
+## Top-tier default
+
+**Signal.** Every role runs on the strongest available model. The spend-by-model
+view is one bar. Nobody can say what the cheaper tiers would have cost, because
+none of them ever ran.
+
+**Cause.** Model choice treated as a quality setting with one correct value,
+rather than as routing. It feels safe — nobody is ever blamed for using the best
+model — and it is the single easiest way to multiply a run's bill by five while
+changing almost nothing about the artifact.
+
+**Repair.** Route by role (`cost-model.md`): generation quality is the artifact
+and is worth paying for, classification usually is not. Then *check* the
+assumption instead of asserting it — escalate specific `thin` verdicts with
+`--escalated-from` and let `status` report how often the stronger critic actually
+disagreed. Near-total agreement is the finding: the cheap critic was already
+right, and the escalations bought confirmation. The inverse is a finding too, and
+the same mechanism produces it.
+
+**What this is not.** It is not licence to quietly move a running gauntlet onto a
+cheaper model because it looks expensive. The roster is in the contract; if the
+evidence says a tier is wrong, show the numbers and let the user decide.
+
 ## Cost blindness
 
 **Signal.** The run is priced in waves and subagent calls. Nobody, including you,

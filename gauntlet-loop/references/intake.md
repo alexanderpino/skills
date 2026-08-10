@@ -47,6 +47,9 @@ BUDGET   <tokens (and the money that is), plus waves — always set; whichever
          depletes first stops the run and triggers an extension offer.
          Optional hard cap: the ceiling extensions may not cross>
 LADDER   <starting tier and what each escalation costs; default tier 0 (probe)>
+MODELS   <which model each tier label uses, and what the top one costs relative
+         to the cheapest — the roster is part of the agreement, not an internal
+         detail. Default: haiku-4-5 / sonnet-5 / opus-5 at 1× / 3× / 5×>
 AUTONOMY <unattended until stop | check in between waves>
 BENCH    <where progress is visible>
 ```
@@ -109,6 +112,19 @@ dimension, cheap models) and buys its way up only on evidence from the log. An
 idea that does not work therefore costs a fifth of the budget, not all of it.
 Full model: `cost-model.md`. Users who want to skip straight to tier 2 can — but
 tell them what the ladder was protecting them from before they do.
+
+**Models.** Put the roster in the contract. Which model runs builders, which runs
+critics, and what the top tier costs relative to the cheapest — by default 5×,
+which is the number that makes the routing worth having. The default is
+`--models cheap=claude-haiku-4-5,mid=claude-sonnet-5,high=claude-opus-5`; propose
+it, and let the user override it there rather than changing it mid-run.
+
+Say plainly what the routing is for: **the most expensive model is not the
+default.** Generation quality is the artifact and is worth paying for; deciding
+which of two screenshots is closer to a reference usually is not. Say too that
+the run will *check* that assumption — escalated verdicts are compared against
+the ones they replaced, so the report can tell them whether the expensive critic
+earned its multiplier on this artifact.
 
 **Hard cap (optional).** For users who want long unattended running, pair a small
 budget with a cap rather than setting one huge budget:

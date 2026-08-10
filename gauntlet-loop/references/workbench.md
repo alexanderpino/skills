@@ -59,9 +59,18 @@ user does not have to interrupt anything to see where the run got to.
   rounds — shelve or re-cut), **shelved**, **retired**. Cards carry the streak
   counters as pips, a fixed-scale 0–10 score sparkline, recent margins, the open
   gap, the trend note, and the last evidence path
-- **Rounds** — the recent log, newest first, filterable by mode and lane
-- **Spend and history** — where the money went by role and by tier, granted
-  extensions, and the armed thresholds
+- **Rounds** — the recent log, newest first, filterable by mode and lane, each
+  row carrying the model that produced it (`sonnet-5 → opus-5` on an escalation)
+- **Spend and history** — the model roster with each tier's cost multiplier,
+  call count and share of spend; where the money went by role and by tier;
+  granted extensions; and the armed thresholds
+
+Two of those answer the question "was the expensive model worth it?" directly.
+The **Models** panel shows what each tier cost and how much of the run it
+carried. The **Critic escalations** tile shows how often a stronger critic
+overturned a cheaper one's verdict — near-total agreement means the escalations
+bought confirmation rather than information, and the board tints that amber
+rather than green.
 
 ### The spec contract
 
@@ -146,6 +155,11 @@ the report can say so.
 `tier` and `tokens` are what let the run price itself. `tier` is stamped
 automatically; `tokens` you pass, and a record without it is logged with a
 warning — a run that cannot say what it spent cannot say when to stop spending.
+
+`model` and `escalated_from` are what let it price its *model choices*. Pass
+`--model` (a tier label or a model id) on every round and every `spend`; pass
+`--escalated-from` when a round re-judges a cheaper critic's verdict. The pair
+turns "was the expensive critic worth it?" into arithmetic the report can do.
 
 **Spend that produced no round** — builders, the smoother, your own passes — goes
 in `gauntlet/spend.jsonl` via a separate command, because it is the larger half of

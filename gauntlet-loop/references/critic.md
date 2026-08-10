@@ -112,8 +112,14 @@ better than the champion, and how does it stand against the bar. Then:
 ## Reporting what you cost
 
 If you were given a token count for your own call, put it in the verdict as
-`TOKENS: <n>`. The lead agent logs it. A run that cannot price itself cannot tell
-the user when to stop paying.
+`TOKENS: <n>`, and name the model you are running on as `MODEL: <id>`. The lead
+agent logs both. A run that cannot price itself cannot tell the user when to stop
+paying, and a run that cannot say which model produced a verdict cannot tell them
+whether the expensive tier was worth buying.
+
+If you were spawned to **re-judge** a verdict a cheaper critic already gave, you
+are an escalation. You are not told what that critic concluded — that would
+defeat the point. Judge it cold; the lead agent compares the two afterwards.
 
 ## Standards
 

@@ -25,6 +25,9 @@ BUDGET   20M tokens ≈ €180 at €9/Mtok, and 8 waves. Whichever depletes fir
          the run. At tier 3 a wave is 3 lanes × (1 + 2×2) + 1 ≈ 16 calls
 LADDER   Start tier 0 (probe). Tiers 0–1 ≈ €36 of the €180 — if this is not
          working, that is what finding out costs
+MODELS   cheap=claude-haiku-4-5, mid=claude-sonnet-5, high=claude-opus-5
+         (1× / 3× / 5× on output). Builders buy the top tier from wave 2;
+         critics screen cheap and escalate only thin verdicts
 AUTONOMY Unattended; workbench regenerated per wave
 BENCH    gauntlet/workbench.html (renders gauntlet/state.json)
 ```
@@ -218,6 +221,11 @@ the source assets" — and `extend` would have refused the grant without `--forc
 
 - Bar: three reference heroes (visual) + LCP/CLS budgets (perf); never moved
 - Spend: 13.4M tokens ≈ €121 of €180 budgeted (67%); ended at tier 2 of 3
+- Models: haiku-4-5 ran 14 critic calls for €4; sonnet-5 ran the smoother and the
+  split critics for €18; opus-5 ran the builders for €99. **Six thin verdicts
+  were escalated to opus-5 and it agreed with all six** — €8 that bought
+  confirmation, not information. Next run: escalate only when a thin verdict
+  would retire a lane, or raise the bar so the comparison is harder
 - Ladder: tier 0 → 1 at €3.78 spent, tier 1 → 2 at €31. Both escalations paid for
   themselves; the false start in round zero cost €1.20 and saved a wave
 - `type-and-layout`: retired, 9 bar rounds, 1 revert, 1 re-cut
