@@ -852,6 +852,18 @@ desaturated cyan pushed toward blue — before any sky reflection is composited 
 not scattering, is the whole of pool colour, and it is why even a **shallow** pool is
 unmistakably cyan: the effect needs a bright bottom, not depth.
 
+**The saturation has to come from the bottom as well, because the water can only subtract.** With
+`b_b ≈ 0` there is no scattering term to *add* colour — the column is a pure Beer-Lambert filter
+that removes red and passes blue-green, and that is the whole of its contribution. A white liner
+therefore gives a bright but **desaturated** cyan, exactly as the numbers above show. The deeply
+saturated turquoise most people picture when they think "swimming pool" comes from a **blue
+liner**: a mid-blue PVC at roughly `(0.24, 0.54, 0.70)` returns about `(0.04, 0.45, 0.69)` — far
+more saturated than the white case and about a third darker, because a blue liner reflects less
+total light. This is the most useful default in the section: for a modern domestic pool start from
+a blue liner, not white plaster, and let the water *darken* it rather than colour it. A renderer
+that reaches for a saturation or tint control to get there is compensating for a bottom albedo
+that was never authored.
+
 Two predictions fall out, both checkable against reference photography:
 
 - **Change the liner and the water changes completely.** White → turquoise; sand → green-teal;
@@ -1271,6 +1283,15 @@ sunLighting += caustic;                                       // 4. irradiance, 
    low sun where entry and receiver points sit metres apart. Skipping the test altogether is the
    classic bug — **caustics crawling through the shadow on the bottom**. Nothing else in the frame
    announces "this is a scrolling texture" so loudly.
+   **And the gate is fractional, not binary, whenever the occluder is fabric or foliage.** Shade
+   cloth transmits roughly 15–30%, leaf canopy more, and the transmitted light is **diffuse** — so
+   it lifts the shadowed water without putting any caustic structure into it. That splits this gate
+   in two: the caustic term is still gated hard to zero, because no collimated beam survives the
+   fabric, while an **ambient** term is added underneath it. Drive that term from the solid angle
+   the panel subtends rather than from its footprint — a point two metres to the side still sees
+   most of it, and a `1/(1 + (d/R)²)` falloff about the centroid is enough. Ship the binary
+   version and the shadowed water goes far too dark, losing the cue that actually reads: under a
+   shade sail the caustics vanish while the water stays luminous.
 4. **Caustics are irradiance.** They multiply the sun's contribution to the receiver's BRDF; they
    are not added to albedo or to the final colour. Backwards, and they survive into shadow, into
    ambient-only lighting and into fog, and they stop responding to exposure.
