@@ -783,6 +783,31 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
   ([Sun glitter](#sun-glitter-the-sparkle-path)). So what is visibly trackable bouncing off the
   walls is the long stuff, and a renderer that spends its budget on capillary detail is spending
   it on the part that physically cannot persist.
+- **Wind is the second band, and it is small only in the units nobody shades with.** A light
+  breeze over metres of fetch makes waves a few millimetres high at a few centimetres wavelength —
+  negligible as *wave height*, and dominant as *slope*, because `slope = 2πa/λ`. Equal slope costs
+  amplitude proportional to wavelength, so a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at
+  16.5 cm (≈0.19 against ≈0.11). Shading sees slope. So the wind band contributes almost nothing
+  you can watch move and most of what makes the surface sparkle and the caustic net fine-grained.
+  Never budget the two bands by wave height.
+- **The two bands separate cleanly, and by the same cut on both sides.** Wind cannot force long
+  waves at metre-scale fetch, and viscosity will not let short waves cross the basin — the forcing
+  limit and the damping limit land in the same place, so a pool surface is naturally **two
+  superposed fields, not one spectrum**:
+
+| | Long band (≳10 cm) | Short band (≲5 cm) |
+|---|---|---|
+| Source | Return jets, swimmers — a fixed point | Wind, over the whole surface |
+| Structure | Coherent, reverberant, basin-modal, stationary in the basin frame | Incoherent, statistically homogeneous |
+| Reach | Rings around the basin many times | Dies in ~2 m; never reflects |
+| Carries | The visible undulation, the trackable motion | Most of the slope: sparkle, fine caustic texture |
+| Local shelter | **Unaffected** — passes straight through a lee | **Strongly modulated** — this is what a lee removes |
+
+  The last row is the one that catches people, and it is checkable against any photograph: in the
+  wind shadow of a sail or a hedge the surface goes glassy *but keeps undulating*, because the lee
+  kills the wind band while the jet waves cross it untouched. Apply the shelter/slope-variance
+  modulation to the **short band only**. Multiply it into the whole field — the obvious
+  implementation — and long waves visibly stop at the shadow line, which no water does.
 - **The edge contract inverts.** For open water this chapter mandates fading the sim patch to zero
   over the outer ~15% of its domain, because that boundary is a budget decision the player must
   not see ([Interactive simulation patches](#interactive-simulation-patches)). In a basin the rule
