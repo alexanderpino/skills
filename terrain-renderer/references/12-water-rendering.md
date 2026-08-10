@@ -1113,6 +1113,25 @@ tilt ~ 3s    sparse isolated glints; a 2D Gaussian slope field leaves ~1% of the
 tilt > ~4s   nothing. What the water shows there is sky reflection, not sun
 ```
 
+**At low sun the test is brutally azimuth-sensitive — and that makes it invertible.** With the sun
+low, both `L` and `V` are near-horizontal, so an azimuth miss translates almost fully into required
+tilt. Holding the eye at the mirror elevation, an 18.75° azimuth error costs **23° of tilt at a 21°
+sun, 7.8° at 50°, and 3.4° at 70°**: low-sun sparkle is pinned inside a narrow azimuth wedge, while
+a high sun forgives a lot. Run the test backwards and a photograph becomes a **measurement**. The
+geometry fixes the tilt the surface must supply, so the mere presence of sparkle puts a floor under
+the local rms slope:
+
+```
+required tilt 17.8 deg (measured sun + measured camera bearing)
+  s = 0.055  ->  5.7 sigma  ->  0.000 % of the surface  -> nothing visible
+  s = 0.090  ->  3.5 sigma  ->  0.25  %                 -> a sparse scatter of glints
+  s = 0.110  ->  2.8 sigma  ->  1.8   %                 -> a well-populated patch
+```
+
+So a sparkle patch beside glassy water is not a lighting accident: it localizes water roughly twice
+as rough as its surroundings, which is what a jet-stirred or gust-ruffled patch actually is. Use it
+as a calibration handle rather than tuning sparkle by eye.
+
 The common trap is a **low sun with a high camera**, because the two constraints multiply: the
 mirror elevation equals the sun's, *and* the observer must be near the anti-solar azimuth. A 21°
 sun viewed from a balcony 40° up and 70° off that azimuth needs ~47° of tilt — fifteen sigma, which

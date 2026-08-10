@@ -11,7 +11,9 @@ Contents: [Historical shadow ladder](#the-historical-shadow-ladder) ·
 [Heightfield-native shadows](#heightfield-native-shadows) ·
 [Virtual shadow maps](#virtual-shadow-maps) · [Self-occlusion, AO, and GI](#self-occlusion-ao-and-gi) ·
 [The normal pipeline across LOD](#the-normal-pipeline-across-lod) ·
-[Atmospheric integration](#atmospheric-integration) · [Time-of-day dynamics](#time-of-day-dynamics) ·
+[Atmospheric integration](#atmospheric-integration) ·
+[Where the sun angles come from](#where-the-sun-angles-come-from) ·
+[Time-of-day dynamics](#time-of-day-dynamics) ·
 [Pitfalls](#pitfalls) · [Sources](#sources--provenance)
 
 ## The historical shadow ladder
@@ -279,6 +281,32 @@ tier against `18`'s stable terrain proxy; they do not remove the far-field requi
   machinery it rides on, is `09`; the flat-world approximation here quietly assumes the sun
   reaches all atmosphere, which becomes visibly wrong somewhere around horizon-curvature
   altitudes.
+
+## Where the sun angles come from
+
+This chapter takes `sunElevation` and `sunAzimuth` as given, and for an invented world they are an
+art decision. The moment a shot has to match a **real place and time** — a plate, a location scan,
+"golden hour on the Algarve" — they stop being a dial and become a **computation**: latitude,
+longitude, date and UTC time through the standard solar-position algorithm (Meeus, *Astronomical
+Algorithms*; NOAA's implementation is the usual reference, well under a degree for any rendering
+purpose). Take it from a library. Do not hand-type the series into a renderer and do not reproduce
+it here — a mistyped periodic term is a silent multi-degree error, and this file's job is to say
+*that* you compute it, not to be the source of the coefficients.
+
+It is worth knowing how much rides on those two numbers, because a guessed sun does not look
+"slightly off", it breaks four things at once and only the first is obvious:
+
+| Quantity | Driven by | What a guessed angle costs |
+|---|---|---|
+| Shadow length and direction | elevation, azimuth | the visible mismatch — the one people do check |
+| **Sun colour**, via air mass `≈ 1/sin(elev)` | elevation | a 21° sun runs ~2.8 air masses and is distinctly golden; rendered near-white it reads as a noon sun no matter what the shadows do |
+| Refracted beam angle in water → caustic offset, slant path, the dark band a pool wall throws on its own floor | elevation | `12` |
+| **Glitter reachability** | elevation *and* azimuth | `12` — and this one is unforgiving at low sun, where sparkle can be geometrically impossible rather than merely faint |
+
+Sunrise/sunset from the same algorithm is a free sanity check on the brief: a sun computed 21° up
+at 18:41 local with sunset at 20:33 confirms "high summer, still broad daylight" instead of
+assuming it — and if the two disagree, the timezone or the UTC offset is wrong, which is the
+single most common way this goes silently astray.
 
 ## Time-of-day dynamics
 
