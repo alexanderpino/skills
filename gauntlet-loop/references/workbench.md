@@ -51,7 +51,8 @@ user does not have to interrupt anything to see where the run got to.
   whether the artifact is still moving; and any problems in the spec itself
 - **Stat rail** — wave against budget, spend against budget in the user's
   currency, burn rate and waves left at that rate, current tier and its models,
-  blind-versus-rubric evidence mix, and how many rounds are still unpriced
+  the blind/rubric/oracle evidence mix, how many rounds are still unpriced, and
+  **rounds not run** with the calls that restraint saved
 - **Effort ladder** — the four tiers with the current one marked, each showing
   its share of the budget and what it costs per round, plus every escalation and
   the evidence that bought it
@@ -116,7 +117,10 @@ end-of-run report is drafted from it.
 
 Two record shapes share the file, distinguished by `mode`:
 
-**Bar comparison** (`mode: blind | rubric`) — drives streaks and gaps:
+**Bar comparison** (`mode: blind | rubric | oracle`) — drives streaks and gaps.
+An `oracle` record is a *measurement*, not a model verdict: no critic tokens, no
+`--tokens` expected, and stronger evidence than either model mode, because
+nothing was judged.
 
 ```json
 {
@@ -160,6 +164,16 @@ warning — a run that cannot say what it spent cannot say when to stop spending
 `--model` (a tier label or a model id) on every round and every `spend`; pass
 `--escalated-from` when a round re-judges a cheaper critic's verdict. The pair
 turns "was the expensive critic worth it?" into arithmetic the report can do.
+
+**Rounds you decided not to run** go in `gauntlet/skips.jsonl` via `skip`, with a
+reason code and a conservative estimate of the critic calls saved. Management
+that is not recorded looks identical to a quiet run, and the report should be
+able to show what the restraint was worth:
+
+```bash
+python3 scripts/gauntlet.py skip --wave 4 --lane layout --dimension visual \
+    --reason-code no-change --note "builder returned the file unchanged"
+```
 
 **Spend that produced no round** — builders, the smoother, your own passes — goes
 in `gauntlet/spend.jsonl` via a separate command, because it is the larger half of

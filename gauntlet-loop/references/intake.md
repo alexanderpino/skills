@@ -75,6 +75,13 @@ verify a critic can actually reach the output: the screenshot harness works, the
 build runs, the benchmark produces numbers, the document renders. A loop where
 critics grade descriptions is not a gauntlet, it is a conversation.
 
+While you are there, note **which dimensions have a numeric oracle** — a frame
+time, an LCP, a bundle size, a passing test. Those dimensions do not need a model
+to judge them (`--mode oracle`, see `cost-model.md` §5), and knowing which they
+are before wave 1 is often the single largest saving available in the whole
+contract. Note the **no-change check** too: the command that tells you a builder
+actually touched its owned paths, so a round is never spent judging nothing.
+
 **Stop.** Ask explicitly. See `stop-conditions.md`. Users routinely want several
 armed at once and that is correct — first to fire wins.
 

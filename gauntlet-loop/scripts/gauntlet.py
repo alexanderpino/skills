@@ -7,7 +7,9 @@ long context.
 
 Commands:
   init        Create the gauntlet/ state directory and config
+  plan        Propose the next wave from the log, priced against running everything
   log-round   Append one validated comparison record to rounds.jsonl
+  skip        Record a round deliberately not run, and what it saved
   spend       Record token spend that is not attached to a logged round
   status      Per-lane/per-dimension streaks, revert rate, fired stop conditions
   tier        Current effort tier, its allowance, and whether escalation is earned
@@ -23,7 +25,12 @@ import json
 import sys
 from pathlib import Path
 
-MODES = ("blind", "rubric", "champion")
+# `oracle` is a bar comparison decided by measurement rather than by a model —
+# a frame time, an LCP number, a passing test. It costs no critic tokens and is
+# stronger evidence than either model mode, so it counts toward the streaks and
+# is reported separately in the evidence mix.
+MODES = ("blind", "rubric", "oracle", "champion")
+BAR_MODES = ("blind", "rubric", "oracle")
 WINNERS = ("ours", "other")
 MARGINS = ("decisive", "clear", "thin")
 SEVERITIES = ("major", "minor", "none")
@@ -416,7 +423,8 @@ def cmd_log_round(args):
     with (root / "rounds.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
     print(f"logged: wave {rec['wave']} lane {rec['lane']} [{rec['dimension']}] {rec['mode']} → {rec['winner']} ({rec['margin']})")
-    if args.tokens is None:
+    # An oracle round is a measurement; there is no model call to price.
+    if args.tokens is None and args.mode != "oracle":
         print("  note: no --tokens on this record — the run cannot price itself without them",
               file=sys.stderr)
 
@@ -478,7 +486,7 @@ def _lane_dim_status(rounds, cfg):
         keys.setdefault((r["lane"], r["dimension"]), []).append(r)
     out = {}
     for key, recs in keys.items():
-        bar_recs = [r for r in recs if r["mode"] in ("blind", "rubric")]
+        bar_recs = [r for r in recs if r["mode"] in BAR_MODES]
         champ_recs = [r for r in recs if r["mode"] == "champion"]
         bar_met, clean = _streaks(bar_recs)
         reverts = sum(1 for r in champ_recs if r.get("action") == "reverted")
@@ -599,7 +607,7 @@ def _extension_evidence(rounds, cfg, per, retired):
         lane, dim = key
         bar_recs = [
             r for r in rounds
-            if r["lane"] == lane and r["dimension"] == dim and r["mode"] in ("blind", "rubric")
+            if r["lane"] == lane and r["dimension"] == dim and r["mode"] in BAR_MODES
         ]
         t = _dimension_trend(bar_recs, flat_n=cfg["stops"].get("flat_rounds_n", 3))
         trends[key] = t
@@ -679,7 +687,7 @@ def _escalation_gates(root, cfg, rounds):
     """
     tier = cfg["effort"]["tier"]
     at_tier = [r for r in rounds if r.get("tier", 0) == tier]
-    bar_at_tier = [r for r in at_tier if r["mode"] in ("blind", "rubric")]
+    bar_at_tier = [r for r in at_tier if r["mode"] in BAR_MODES]
     gates = []
 
     gates.append((
@@ -1139,6 +1147,22 @@ def cmd_status(args):
             print(f"    python3 scripts/gauntlet.py shelve --lane {lane} --dimension {dim} --reason \"...\"")
         print()
 
+    skips = _load_jsonl(root / "skips.jsonl")
+    if skips:
+        saved = sum(s.get("tokens_saved_est") or 0 for s in skips)
+        print(f"Rounds not run: {len(skips)} — ~{sum(s.get('calls_saved') or 0 for s in skips)} calls"
+              + (f" ≈ {fmt_cost(cfg, saved)}" if saved else "") + " not spent.")
+        for code in SKIP_REASONS:
+            n = sum(1 for s in skips if s.get("reason_code") == code)
+            if n:
+                print(f"  {n}× {code}")
+        print()
+
+    oracle_n = sum(1 for r in rounds if r["mode"] == "oracle")
+    if oracle_n:
+        print(f"Oracle rounds: {oracle_n} of {sum(1 for r in rounds if r['mode'] in BAR_MODES)} "
+              "bar rounds were measured, not judged — no critic tokens, and stronger evidence.\n")
+
     esc = _escalation_evidence(rounds)
     if esc:
         print(f"Critic escalations: {esc['escalations']} — the stronger model agreed "
@@ -1247,7 +1271,25 @@ def cmd_report(args):
         ]
     blind = sum(1 for r in rounds if r["mode"] == "blind")
     rubric = sum(1 for r in rounds if r["mode"] == "rubric")
-    lines += [f"Verdict evidence: {blind} blind rounds, {rubric} rubric rounds (not equivalent evidence)", ""]
+    oracle = sum(1 for r in rounds if r["mode"] == "oracle")
+    lines += [f"Verdict evidence: {blind} blind, {rubric} rubric, {oracle} oracle rounds "
+              "(not equivalent evidence — an oracle round was measured, not judged)", ""]
+
+    skips = _load_jsonl(root / "skips.jsonl")
+    if skips:
+        saved = sum(s.get("tokens_saved_est") or 0 for s in skips)
+        lines += [
+            "## Rounds not run", "",
+            f"{len(skips)} round(s) were deliberately skipped, saving roughly "
+            f"{sum(s.get('calls_saved') or 0 for s in skips)} subagent calls"
+            + (f" (~{fmt_cost(cfg, saved)})" if saved else "") + ":", "",
+        ]
+        for code in SKIP_REASONS:
+            n = sum(1 for s in skips if s.get("reason_code") == code)
+            if n:
+                lines.append(f"- {n}× {code} — {SKIP_REASONS[code] or 'see the log'}")
+        lines += ["", "(lead agent: this is the management the run did. Say whether any of these "
+                  "skips turned out to be wrong.)", ""]
     lines += ["## Lanes", ""]
     for (lane, dim), s in sorted(per.items()):
         state = "shelved" if s["shelved"] else ("retired" if s["retired"] else "open")
@@ -1326,7 +1368,8 @@ def build_state(root, cfg, rounds):
         by_model[mid] = by_model.get(mid, 0) + (rec.get("tokens") or 0)
         calls_by_model[mid] = calls_by_model.get(mid, 0) + 1
 
-    bar_rounds = [r for r in rounds if r["mode"] in ("blind", "rubric")]
+    bar_rounds = [r for r in rounds if r["mode"] in BAR_MODES]
+    skips = _load_jsonl(root / "skips.jsonl")
     state = {
         "schema": STATE_SCHEMA_VERSION,
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -1394,12 +1437,28 @@ def build_state(root, cfg, rounds):
             "by_role": by_role,
             "by_tier": by_tier,
             "by_model": by_model,
+            # Oracle rounds cost nothing by construction, so they are not
+            # "unpriced" — counting them as missing data would nag about a
+            # number that correctly does not exist.
             "priced_rounds": sum(1 for r in rounds if r.get("tokens")),
-            "total_rounds": len(rounds),
+            "total_rounds": sum(1 for r in rounds if r["mode"] != "oracle"),
         },
         "evidence_mix": {
             "blind": sum(1 for r in bar_rounds if r["mode"] == "blind"),
             "rubric": sum(1 for r in bar_rounds if r["mode"] == "rubric"),
+            "oracle": sum(1 for r in bar_rounds if r["mode"] == "oracle"),
+        },
+        # Rounds deliberately not run. The cheapest round is the one you decide
+        # to skip, and without this the saving is invisible.
+        "skipped": {
+            "rounds": len(skips),
+            "calls_saved": sum(s.get("calls_saved") or 0 for s in skips),
+            "tokens_saved_est": sum(s.get("tokens_saved_est") or 0 for s in skips),
+            "by_reason": {
+                code: sum(1 for s in skips if s.get("reason_code") == code)
+                for code in SKIP_REASONS
+                if any(s.get("reason_code") == code for s in skips)
+            },
         },
         "extensions": cfg.get("extensions") or [],
         "shelved": cfg.get("shelved") or [],
@@ -1409,7 +1468,7 @@ def build_state(root, cfg, rounds):
 
     for (lane, dim), s in sorted(per.items()):
         recs = [r for r in rounds if r["lane"] == lane and r["dimension"] == dim]
-        bar_recs = [r for r in recs if r["mode"] in ("blind", "rubric")]
+        bar_recs = [r for r in recs if r["mode"] in BAR_MODES]
         last = bar_recs[-1] if bar_recs else None
         card = {
             "lane": lane, "dimension": dim,
@@ -1455,6 +1514,151 @@ def build_state(root, cfg, rounds):
             "model": r.get("model"), "escalated_from": r.get("escalated_from"),
         })
     return state
+
+
+SKIP_REASONS = {
+    "no-change": "the builder produced no change to its owned paths — nothing to judge",
+    "gap-too-small": "the open gap is smaller than another lane's, and the wave went there instead",
+    "oracle-unchanged": "the numeric measurement did not move, so no model was asked",
+    "structural": "the remaining distance is structural; a round would buy a revert",
+    "other": "",
+}
+
+
+def cmd_skip(args):
+    """Record a round that was deliberately not run, and what that saved.
+
+    The cheapest round in a gauntlet is the one you decide not to run. Recording
+    the decision keeps that from being invisible: without it, good management
+    looks identical to a quiet run and the report cannot show what restraint was
+    worth.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    if args.dimension not in dims:
+        die(f"dimension {args.dimension!r} is not declared in config.json ({', '.join(dims)})")
+    if args.reason_code not in SKIP_REASONS:
+        die(f"--reason-code must be one of {', '.join(SKIP_REASONS)}")
+    note = (args.note or "").strip()
+    if args.reason_code == "other" and len(note) < 12:
+        die("--reason-code other needs a --note saying what the actual reason was")
+
+    # Price it conservatively: the critic calls this dimension would have cost.
+    # The builder is only saved when every dimension of the lane is held, and
+    # claiming it here would flatter the number.
+    priced = [r for r in load_rounds(root) if r.get("tokens")]
+    per_critic = sum(r["tokens"] for r in priced) / len(priced) if len(priced) >= 3 else 0
+    calls_saved = tier_spec(cfg)["critic_calls"]
+    saved = int(calls_saved * per_critic)
+    rec = {
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "wave": args.wave,
+        "lane": args.lane,
+        "dimension": args.dimension,
+        "reason_code": args.reason_code,
+        "note": note,
+        "tier": cfg["effort"]["tier"],
+        "calls_saved": calls_saved,
+        "tokens_saved_est": saved,
+    }
+    with (root / "skips.jsonl").open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+    print(f"skipped {args.lane}/{args.dimension} at wave {args.wave} — {args.reason_code}")
+    print(f"  saved ~{calls_saved} critic call(s)"
+          + (f" ≈ {fmt_cost(cfg, saved)} at this run's measured rate" if saved else "")
+          + "; the builder is only saved too if every dimension of this lane is held")
+
+
+def cmd_plan(args):
+    """Propose the next wave: which lanes earn a round, which do not, and the cost.
+
+    The loop's default is to run every active lane every wave. That is the
+    expensive default and it is rarely the right one — a lane sitting on a
+    `minor` gap does not deserve the same compute as one sitting on a `major`.
+    This ranks what is open and prices both the proposed wave and the naive one.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    if not rounds:
+        print("no rounds logged yet — run the tier-0 probe first")
+        return
+    per, retired = _lane_dim_status(rounds, cfg)
+    max_wave = max(r["wave"] for r in rounds)
+    flat_n = cfg["stops"].get("flat_rounds_n", 3)
+
+    run, hold = [], []
+    for key, s in sorted(per.items()):
+        lane, dim = key
+        if s["shelved"]:
+            hold.append((key, "shelved", "parked; not scheduled"))
+        elif s["retired"]:
+            hold.append((key, "retired", "met the bar"))
+        elif s["flat"]:
+            hold.append((key, "flat", f"no movement in {flat_n} rounds — shelve or re-cut, do not re-run"))
+        else:
+            bar_recs = [r for r in rounds
+                        if r["lane"] == lane and r["dimension"] == dim and r["mode"] in BAR_MODES]
+            last = bar_recs[-1] if bar_recs else None
+            sev = (last or {}).get("severity") or "major"
+            gap = (last or {}).get("gap")
+            run.append((key, sev, SEVERITY_RANK.get(sev, 3),
+                        gap if gap and gap != "none" else None))
+
+    # Lanes declared at init that have never produced a round are invisible in
+    # the log; a plan that silently omits them is not a plan.
+    declared = cfg.get("lanes") or []
+    dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    seen = {lane for lane, _ in per}
+    for lane in declared:
+        if lane not in seen:
+            for dim in dims:
+                run.append(((lane, dim), "major", 3, "never run — no verdict exists yet"))
+
+    run.sort(key=lambda x: -x[2])
+    print(f"Plan for wave {max_wave + 1} — tier {cfg['effort']['tier']}, "
+          f"~{calls_per_lane_round(cfg)} calls per lane per round\n")
+
+    if not run:
+        print("Nothing is open. Raise the bar (announced), re-cut, or stop — do not run a wave.")
+        return
+
+    print("RUN (largest gap first):")
+    for (lane, dim), sev, _, gap in run:
+        note = "  clean — one more clean round retires it" if sev == "none" else ""
+        print(f"  [{lane} / {dim}]  severity {sev}{note}")
+        if gap:
+            print(f"      {gap}")
+    if hold:
+        print("\nHOLD:")
+        for (lane, dim), why, detail in hold:
+            print(f"  [{lane} / {dim}]  {why} — {detail}")
+
+    naive_lanes = sorted({lane for lane, _ in per})
+    proposed_lanes = sorted({lane for (lane, _), *_ in run})
+    cap = args.max_lanes
+    if cap and len(proposed_lanes) > cap:
+        kept = sorted({lane for (lane, _), *_ in run[:cap]})
+        print(f"\n--max-lanes {cap}: run {', '.join(kept)} this wave and hold the rest for the next.")
+        proposed_lanes = kept
+
+    print(f"\nProposed wave: {len(proposed_lanes)} lane(s), "
+          f"~{_projected_calls(cfg, 1, proposed_lanes)} calls")
+    t_prop = _projected_tokens(root, cfg, 1, proposed_lanes, rounds)
+    t_naive = _projected_tokens(root, cfg, 1, naive_lanes, rounds)
+    if t_prop and t_naive:
+        print(f"  ~{fmt_cost(cfg, t_prop)} — against ~{fmt_cost(cfg, t_naive)} "
+              f"to run all {len(naive_lanes)} lane(s) regardless of evidence "
+              f"(~{fmt_cost(cfg, t_naive - t_prop)} saved)")
+    else:
+        print("  (cannot price it — too few rounds carried --tokens)")
+
+    print("\nBefore spending a critic call on any of these:")
+    print("  - confirm the builder actually changed its owned paths; if not, "
+          "`skip --reason-code no-change` and re-brief instead of judging nothing")
+    print("  - for a dimension with a numeric bar, take the measurement and log "
+          "`--mode oracle`; a model does not need to read a number")
 
 
 def cmd_board(args):
@@ -1560,6 +1764,19 @@ def main():
     p.add_argument("--reason", required=True)
     p.add_argument("--force", action="store_true", help="shelve a dimension the log does not call flat")
     p.set_defaults(fn=cmd_shelve)
+
+    p = sub.add_parser("plan", help="propose the next wave from the log, and price it against running everything")
+    p.add_argument("--max-lanes", type=int, help="cap how many lanes this wave runs; the rest wait")
+    p.set_defaults(fn=cmd_plan)
+
+    p = sub.add_parser("skip", help="record a round deliberately not run, and what it saved")
+    p.add_argument("--wave", type=int, required=True)
+    p.add_argument("--lane", required=True)
+    p.add_argument("--dimension", required=True)
+    p.add_argument("--reason-code", required=True,
+                   help="no-change|gap-too-small|oracle-unchanged|structural|other")
+    p.add_argument("--note", help="required when --reason-code is other")
+    p.set_defaults(fn=cmd_skip)
 
     p = sub.add_parser("board", help="regenerate gauntlet/state.json for the workbench")
     p.set_defaults(fn=cmd_board)

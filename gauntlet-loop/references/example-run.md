@@ -107,10 +107,15 @@ capped at 7 cols; ours spans full width"). Perf dimension logged via rubric mode
 
 ```bash
 python3 scripts/gauntlet.py log-round --wave 2 --lane imagery --dimension perf \
-  --round 1 --mode rubric --winner other --margin clear --score 3 --severity major \
+  --round 1 --mode oracle --winner other --margin clear --score 3 --severity major \
   --gap "hero image 1.8MB uncompressed; LCP 3.4s vs 1.5s budget" \
-  --evidence gauntlet/bench/w1.json --tokens 60000
+  --evidence gauntlet/bench/w1.json
 ```
+
+Note the mode: LCP is a **number**, so no model was asked. `oracle` rounds cost
+no critic tokens and feed the streaks like any bar round. Over the run this
+removed roughly half the critic calls — `perf` was measured every time and only
+brought to a model once, at wave 5, to name why the number had stopped moving.
 
 Smoother pass: found one seam (typography's new type scale collided with
 layout's spacing tokens), fixed, logged.
@@ -131,7 +136,37 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane layout --dimension visual 
 A losing round is data: the next builder got "close the grid gap *without*
 breaking 1280px" and succeeded in round 3.
 
-## Wave 3 — a re-cut
+## Wave 3 — planning the wave instead of running it
+
+`plan` at the wave boundary ranked what was open and priced the alternative:
+
+```
+RUN (largest gap first):
+  [layout / visual]       severity major
+  [typography / visual]   severity minor
+HOLD:
+  [imagery / perf]        oracle unchanged since wave 2
+
+Proposed wave: 2 lane(s), ~11 calls
+  ~€14.20 — against ~€21.30 to run all 3 lane(s) regardless of evidence (~€7.10 saved)
+```
+
+`imagery` was held (`skip --reason-code oracle-unchanged`) — the measurement had
+not moved, so there was nothing for a builder to react to. Wave 3 ran two lanes.
+
+Wave 4's `layout` builder came back having escalated instead of editing: the fix
+needed a file it did not own. `git diff --quiet` on its owned paths confirmed
+nothing had changed, so no critic ran at all:
+
+```bash
+python3 scripts/gauntlet.py skip --wave 4 --lane layout --dimension visual \
+  --reason-code no-change --note "builder escalated for a file it does not own"
+```
+
+Ownership was transferred and the round re-briefed. Judging that unchanged
+artifact would have cost two calls to reproduce the wave-3 verdict word for word.
+
+## Wave 3b — a re-cut
 
 The smoother reported the same seam twice running: typography and layout kept
 fighting over vertical rhythm. Per `decomposition.md`, a recurring seam means the
@@ -231,7 +266,10 @@ the source assets" — and `extend` would have refused the grant without `--forc
 - `type-and-layout`: retired, 9 bar rounds, 1 revert, 1 re-cut
 - `imagery / perf`: **shelved** at wave 5, not retired — LCP 2.1s vs 1.5s target
 - `imagery / visual`: open — largest remaining gap: image texture quality vs references
-- Evidence: 14 blind rounds, 6 rubric rounds
+- Evidence: 14 blind, 1 rubric, 7 oracle rounds — `perf` was measured, not judged
+- Management: 5 rounds not run (2 no-change, 2 oracle-unchanged, 1 gap-too-small)
+  ≈ €11 of critic calls never spent; lanes ran serially from wave 3 after the
+  smoother reported the same seam twice
 - **Still improving at stop?** Visual: no — margins thin and flat for three
   rounds. Perf: retired. Recommendation: the imagery gap is an asset problem,
   not an iteration problem; commission or generate better source imagery, then

@@ -16,9 +16,24 @@ The method is Matt Shumer's, published 27 July 2026 as the technique behind the
 expansion: it adds an intake contract, a champion/challenger regression guard,
 deterministic state tooling, per-dimension bars, named failure modes, and a cost
 model — an escalating effort ladder, spend measured in tokens rather than waves,
-and mid-run shelving of work that stopped moving. When citing the method, credit
-Shumer for the pattern and be honest about which parts are this skill's
-additions.
+model routing by role, wave scheduling by evidence, and mid-run shelving of work
+that stopped moving. When citing the method, credit Shumer for the pattern and be
+honest about which parts are this skill's additions.
+
+**The published method is deliberately unbounded.** Shumer's instruction is *"Do
+not tell it to do three rounds and stop. Tell it to keep looping,"* alongside a
+recommendation to raise effort because "it costs much more, but the extra effort
+usually produces better work." A separate public implementation says the
+consequence outright: *"The loop will not finish on its own. You are the brake."*
+Everything this skill adds about budget, tiers and scheduling **is** that brake.
+A run that spent its whole budget was the method behaving exactly as published —
+say so plainly rather than treating it as a fault.
+
+One finding from the canonical run is worth carrying: **sequential single-owner
+passes beat parallel fan-out decisively** (its own scores went 3.59 → 4.14 →
+4.05 → 5.05 — three rounds of six parallel agents netted about half a point and
+regressed once; the jump came from one sequential pass). Fan-out is the method's
+most visible feature and its most over-used one. → `references/decomposition.md`
 
 ## What a Gauntlet Loop actually is
 
@@ -94,6 +109,7 @@ gauntlet/
 ├── bar/             # frozen bar artifacts — never edited after intake
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
+├── skips.jsonl      # rounds deliberately not run, and what each saved
 ├── spend.jsonl      # token spend that produced no round: builders, smoother
 ├── state.json       # the workbench spec (script-written); state.js beside it for file://
 ├── workbench.html   # copied from assets/ once — generic renderer, never hand-edited
@@ -108,7 +124,10 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --mode blind --winner other --margin clear --score 7 --severity major --gap "..." \
     --evidence shots/w2r3.png --tokens 120000 --model cheap
 python3 scripts/gauntlet.py log-round ... --model high --escalated-from cheap  # re-judged a thin verdict
+python3 scripts/gauntlet.py log-round ... --mode oracle --evidence "lighthouse: LCP 1.42s"  # measured, no critic
 python3 scripts/gauntlet.py spend --tokens 300000 --role builder --model high --note "lane a builder"
+python3 scripts/gauntlet.py plan --max-lanes 2   # which lanes earn a round, priced against running all
+python3 scripts/gauntlet.py skip --wave 4 --lane a --dimension visual --reason-code no-change
 python3 scripts/gauntlet.py tier      # current effort tier; is the next one earned?
 python3 scripts/gauntlet.py escalate --reason "..."   # buy the next tier, on evidence
 python3 scripts/gauntlet.py status    # streaks, spend, burn rate, flat dimensions, stops
@@ -234,6 +253,31 @@ that is the cheapest moment in the whole run to say it.
 
 A wave is one pass over the active lanes. Phases 3 and 4 cycle until a stop
 condition fires — this is the loop, not a sequence.
+
+**Plan the wave before running it. The loop's default — every active lane, every
+wave — is almost never right.**
+
+```bash
+python3 scripts/gauntlet.py plan [--max-lanes N]
+```
+
+`plan` ranks what is open by gap severity, holds what is flat, shelved or
+retired, and prices the proposed wave against running everything regardless of
+evidence. Then apply three gates before spending a single critic call
+(→ `references/cost-model.md` §5):
+
+1. **No change, no judgement.** Confirm the builder actually changed its owned
+   paths. If it did not, `skip --reason-code no-change` and re-brief it — judging
+   an unchanged artifact costs two calls to reproduce the last verdict.
+2. **A number does not need a model.** When a dimension has a numeric bar, take
+   the measurement and log `--mode oracle`. It costs no critic tokens, feeds the
+   streaks like any bar round, and is stronger evidence than a model verdict.
+   Call a model on that dimension only to name the gap when the number plateaus.
+3. **Serial unless genuinely independent.** → `references/decomposition.md`
+
+Record what you held: `skip --lane X --dimension Y --reason-code gap-too-small`.
+Restraint that is not logged is invisible, and the report should be able to show
+what the run chose not to spend.
 
 Per lane, per round:
 
@@ -374,6 +418,10 @@ stop there and the script refuses to cross it. Full protocol:
   → `references/cost-model.md`
 - **A flat dimension gets shelved, not re-run.** The wave boundary is where that
   decision belongs — not the moment the budget runs out.
+- **Never judge an artifact that did not change.** The gate is free; the two
+  critic calls it replaces are not.
+- **A numeric bar is measured, not judged.** Log it `--mode oracle` and spend the
+  model only on naming the gap when the number stops moving.
 - **The budget is extended by the user or not at all.** Stop first, offer second,
   resume only on a grant — and log the grant with its reason.
 - **Language Rules (ASD-STE100).** All visible text on the Kanban board (goals, gaps, next fixes) and reports must use Simplified Technical English: max 20-25 words per sentence, active voice, one instruction per sentence, no AI marketing language.
@@ -398,6 +446,9 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Unsatisfiable critic | No verdict ever reaches `none`; only the budget can end the run | Calibrated scale; `none` is a valid verdict |
 | Cost blindness | Run priced in waves and calls; nobody knows what it spent | `--budget-tokens`, `--tokens` on every call |
 | Top-tier default | Every role on the strongest model; spend-by-model is one bar | Route by role; escalate verdicts, not runs; check it with `--escalated-from` |
+| Unmanaged fan-out | Every lane run every wave; parallel by default on coupled work | `plan` before the wave; serial unless genuinely independent |
+| Judging nothing | Verdicts repeat because the artifact never changed | No-change gate; `skip --reason-code no-change` and re-brief |
+| Model reads a number | A critic call spent restating a measurement | `--mode oracle`; call a model only to name a plateau |
 
 ## Degraded mode (no subagents)
 

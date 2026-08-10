@@ -611,7 +611,8 @@ const COLUMNS = [
   ["retired", "Retired", "met the bar",
    "Nothing retired yet", "no dimension has met bar-met or clean-streak"],
 ];
-const MODE_FILTERS = [["all", "All"], ["blind", "Blind"], ["rubric", "Rubric"], ["champion", "Promotion"]];
+const MODE_FILTERS = [["all", "All"], ["blind", "Blind"], ["rubric", "Rubric"],
+                      ["oracle", "Oracle"], ["champion", "Promotion"]];
 
 let STATE = null, modeFilter = "all", laneFilter = "all", polling = true;
 
@@ -677,7 +678,7 @@ function plural(n, word, fallback) {
 
 /* ── spec validation ──────────────────────────────────────────────────── */
 const ENUMS = {
-  mode: ["blind", "rubric", "champion"],
+  mode: ["blind", "rubric", "oracle", "champion"],
   winner: ["ours", "other"],
   margin: ["decisive", "clear", "thin"],
   severity: ["major", "minor", "none"],
@@ -898,9 +899,15 @@ function renderRail(d) {
       esc.agreement_rate, esc.agreement_rate >= 0.9 ? "warn" : ""));
 
   const mix = d.evidence_mix;
-  if (mix && (mix.blind || mix.rubric))
+  if (mix && (mix.blind || mix.rubric || mix.oracle))
     rail.append(tile("Evidence", [String(mix.blind), "blind"],
-      `${mix.rubric} rubric — not equivalent evidence`));
+      `${mix.rubric} rubric · ${mix.oracle || 0} oracle — not equivalent evidence`));
+
+  const sk = d.skipped;
+  if (sk && sk.rounds)
+    rail.append(tile("Rounds not run", [String(sk.rounds), "skipped"],
+      `~${sk.calls_saved} call${sk.calls_saved === 1 ? "" : "s"} not spent`
+      + (sk.tokens_saved_est ? ` ≈ ${fmtTokens(sk.tokens_saved_est)} tok` : "")));
 
   if (has(sp.total_rounds) && sp.total_rounds > 0 && sp.priced_rounds < sp.total_rounds)
     rail.append(tile("Priced rounds", [String(sp.priced_rounds), "of " + sp.total_rounds],
@@ -1064,7 +1071,7 @@ function renderRounds(d) {
 
     const mode = el("td");
     mode.append(badge(r.mode === "champion" ? "promotion" : r.mode || "",
-      r.mode === "blind" ? "blind" : "ghost"));
+      r.mode === "blind" ? "blind" : r.mode === "oracle" ? "none" : "ghost"));
     if (has(r.model)) {
       const m = el("div", "row-model", shortModel(r.model));
       if (has(r.escalated_from)) {

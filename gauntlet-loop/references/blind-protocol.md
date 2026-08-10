@@ -49,7 +49,13 @@ Some comparisons cannot be blinded. Recognisable IP, a bar that is a numerical
 target rather than an artifact, a running application with obvious branding, a
 document in an unmistakable house style.
 
-Do not fake it. Switch to **rubric-against-reference**:
+**First check whether it needs a model at all.** A bar that is a numerical target
+is not a weak blind comparison — it is a *measurement*. Take the number and log
+`--mode oracle`; that is cheaper than rubric mode and stronger evidence than
+either model mode, because nothing was judged. Rubric mode is for comparisons a
+model must make but cannot make blind, not for numbers.
+
+For the rest, do not fake the blind. Switch to **rubric-against-reference**:
 
 - The critic is told which is which, and instead of picking a winner it scores our
   output against explicitly enumerated properties of the reference

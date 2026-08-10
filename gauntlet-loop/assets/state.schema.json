@@ -418,7 +418,7 @@
     },
     "evidence_mix": {
       "type": "object",
-      "description": "Blind versus rubric round counts. Not equivalent evidence, and the board labels them so.",
+      "description": "Blind, rubric and oracle bar-round counts. Not equivalent evidence, and the board labels them so.",
       "properties": {
         "blind": {
           "type": "integer",
@@ -427,6 +427,11 @@
         "rubric": {
           "type": "integer",
           "minimum": 0
+        },
+        "oracle": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bar rounds decided by measurement rather than by a model \u2014 no critic tokens, and stronger evidence."
         }
       }
     },
@@ -501,6 +506,32 @@
       "description": "Recent rounds, newest first. A glance surface, not an archive \u2014 rounds.jsonl stays the full record.",
       "items": {
         "$ref": "#/definitions/round"
+      }
+    },
+    "skipped": {
+      "type": "object",
+      "description": "Rounds deliberately not run. The cheapest round is the one management removes; without this the saving is invisible.",
+      "properties": {
+        "rounds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calls_saved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_saved_est": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Conservative estimate: the critic calls that dimension would have cost, at this run's measured rate."
+        },
+        "by_reason": {
+          "type": "object",
+          "description": "Counts keyed by reason code (no-change, gap-too-small, oracle-unchanged, structural, other).",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
       }
     }
   },
@@ -658,6 +689,7 @@
           "enum": [
             "blind",
             "rubric",
+            "oracle",
             "champion"
           ]
         },

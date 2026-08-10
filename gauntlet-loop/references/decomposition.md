@@ -45,16 +45,31 @@ have not run yet cost nothing and can be re-cut for free.
 A lane's cost is `1 + (critic calls × dimensions)` calls per round. That is the
 number to have in mind when deciding whether a seventh lane earns its place.
 
-## Parallel or serial
+## Parallel or serial — serial is the default
 
-Run lanes in parallel when they touch disjoint files and disjoint parts of the
-output. Run them serially when one lane's result changes what "good" means for
-another — lighting before materials, information architecture before paragraph
-polish, data layout before the systems that walk it.
+Fan-out is the method's most visible feature and its most over-used one. The
+canonical run's own write-up is blunt about it: **"Sequential single-owner passes
+beat parallel fan-out decisively."** Its numbers, scored out of 10 across rounds,
+were `3.59 → 4.14 → 4.05 → 5.05` — three rounds of six parallel agents each
+owning one directory produced a net of about half a point *and a regression in
+the middle*; the jump came from one sequential pass with a single owner per
+coupled concern.
 
-When unsure, serialise the pair for one wave and watch whether the second lane's
-critic keeps citing the first lane's territory. That is the dependency showing
-itself.
+That is a cost finding as much as a quality one. Parallel fan-out over coupled
+work costs many times more and scored worse. So:
+
+- **Run serially by default** when lanes touch the same concern, even loosely —
+  one owner, one pass, in order. Lighting before materials, information
+  architecture before paragraph polish, data layout before the systems that walk
+  it.
+- **Fan out only for genuinely independent work**: disjoint files, disjoint parts
+  of the output, and no lane whose result changes what "good" means for another.
+- **When unsure, serialise.** Watch whether the second lane's critic keeps citing
+  the first lane's territory — that is the dependency showing itself, and it is
+  cheaper to discover in one serial wave than in three parallel ones.
+
+Parallel lanes also raise the burn *rate*, so a fan-out that turns out to be
+wrong costs its mistake faster than a serial pass would.
 
 ## File ownership
 

@@ -157,6 +157,51 @@ Diagnostic: if a run ends on budget with every dimension still open and every
 verdict still `minor`, read three verdicts in full before funding an extension.
 The problem is probably the critic, and more waves will not fix it.
 
+## Unmanaged fan-out
+
+**Signal.** Every active lane gets a builder and its critics every wave,
+regardless of what the log says. Parallel by default, including on lanes that
+touch the same concern. The wave count is the only thing anyone decides.
+
+**Cause.** Treating the loop as a schedule rather than as a thing to be managed.
+The published method encourages exactly this — "tell it to keep looping" — and
+supplies no scheduler, so the default is to run everything until something stops
+it.
+
+**Repair.** `gauntlet.py plan` before each wave: rank the open dimensions by gap
+severity, hold what is flat or retired, cap with `--max-lanes`, and record what
+you held. And prefer serial passes on coupled work — the canonical run's own
+finding is that sequential single-owner passes beat parallel fan-out decisively
+(`decomposition.md`), which makes the expensive default the worse one too.
+
+## Judging nothing
+
+**Signal.** A verdict repeats the previous round almost verbatim. The gap text is
+identical. Diffing the artifact across the round shows no change.
+
+**Cause.** The builder produced nothing — it escalated, it failed silently, it
+decided the gap was already closed — and the loop judged the unchanged artifact
+anyway, because judging is what comes after building.
+
+**Repair.** A free deterministic gate before any critic call: `git diff --quiet`
+on the owned paths, a checksum, a pixel-diff of the render. No change means no
+judgement — `skip --reason-code no-change`, then re-brief the builder with the
+reason. The canonical run used the same shape at the other end, gating a final
+pass on "zero visual change" with automated pixel-diffing.
+
+## Model reads a number
+
+**Signal.** A critic call whose entire verdict restates a measurement the harness
+already produced: "LCP is 2.1s against a 1.5s budget, so the bar wins."
+
+**Cause.** Every dimension routed through the same model-critic pipeline,
+including the ones with a numeric oracle.
+
+**Repair.** `--mode oracle`. The measurement *is* the bar comparison: it costs no
+critic tokens, feeds the streaks like any bar round, and is stronger evidence
+than a model verdict because nothing was judged. Spend a model on that dimension
+only to name the gap once the number stops moving.
+
 ## Top-tier default
 
 **Signal.** Every role runs on the strongest available model. The spend-by-model

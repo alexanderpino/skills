@@ -4,13 +4,22 @@ A gauntlet is the most expensive shape of agent work there is: it deliberately
 spends compute to buy quality it cannot otherwise reach. That is fine, and it is
 exactly why the spend has to be *steered*. This file is the steering.
 
-Three ideas, in order of how much money they save:
+Five ideas, in order of how much money they save:
 
-1. **Buy effort in tiers.** Start at the cheapest tier that can produce a verdict.
-   Escalate only when the log says the artifact is worth more.
-2. **Price the run in the unit the user pays in.** Waves are not money.
-3. **Stop paying for the parts that stopped moving**, at the wave they stop
-   moving — not when the budget is gone.
+1. **Don't run the round.** The cheapest call is the one management removes —
+   a builder that changed nothing, a number a model doesn't need to read, a lane
+   whose gap is smaller than another's. → §5
+2. **Buy effort in tiers.** Start at the cheapest tier that can produce a verdict.
+   Escalate only when the log says the artifact is worth more. → §1
+3. **Route by role, and check the routing.** The most expensive model is not the
+   default, and the run can prove whether it was needed. → §2
+4. **Price the run in the unit the user pays in.** Waves are not money. → §4
+5. **Stop paying for the parts that stopped moving**, at the wave they stop
+   moving — not when the budget is gone. → §6
+
+The first one is listed first because it is the only one that removes calls
+rather than making them cheaper, and because the published method has no version
+of it at all.
 
 ## 1. The effort ladder
 
@@ -202,7 +211,102 @@ Round zero is the calibration gate: **run it, price it, extrapolate, and put the
 projected total in front of the user before wave 1.** One round of real data
 beats any estimate, and it costs one round.
 
-## 5. Stop paying for stalled work
+## 5. Manage the loop — the cheapest round is the one you don't run
+
+The published method is deliberately unbounded. Shumer's own instruction is
+*"Do not tell it to do three rounds and stop. Tell it to keep looping,"* paired
+with a recommendation to turn effort *up* because "it costs much more, but the
+extra effort usually produces better work." Another public implementation states
+the consequence plainly: *"The loop will not finish on its own. You are the
+brake."*
+
+So a run that consumed its whole budget is the method working as designed, not
+malfunctioning. Everything in this file is the brake. This section is the part
+that costs the least and saves the most, because it removes calls rather than
+making them cheaper.
+
+**The loop's default is to run every active lane every wave. That default is
+almost never right.** Four gates, cheapest first:
+
+### The no-change gate — free
+
+Before judging anything, confirm the builder actually changed its owned paths
+(`git diff --quiet`, a checksum, a pixel-diff of the render). A builder that
+produced nothing still costs two critic calls today, and the verdict is
+guaranteed to repeat the last one.
+
+```bash
+python3 scripts/gauntlet.py skip --wave 4 --lane layout --dimension visual \
+    --reason-code no-change --note "builder returned the file unchanged"
+```
+
+Then re-brief the builder with the reason — do not judge nothing.
+
+The canonical run used exactly this shape at the other end: its final pass was
+"constrained to produce **zero visual change**", with automated pixel-diffing as
+the gate. A deterministic check that costs nothing beats a model call that costs
+a euro, in both directions.
+
+### Oracle rounds — a number does not need a model to read it
+
+When a dimension has a numeric bar — frame time, LCP, bundle size, a passing
+test — the bar comparison is a **measurement**, not a judgement. Log it as
+`--mode oracle`:
+
+```bash
+python3 scripts/gauntlet.py log-round --wave 7 --lane imagery --dimension perf \
+    --round 6 --mode oracle --winner ours --margin clear --score 9 \
+    --severity none --evidence "lighthouse: LCP 1.42s vs 1.5s budget"
+```
+
+Oracle rounds cost **no critic tokens**, feed `bar-met` and `clean-streak` like
+any bar round, and are *stronger* evidence than either model mode — nothing was
+judged, something was measured. On a two-dimension run where one dimension is
+numeric, this removes roughly half the critic calls outright.
+
+A model is still worth calling on a numeric dimension for one thing: **naming the
+gap** when the number stops moving. Measure every round; ask a model why only
+when the measurement plateaus.
+
+### Wave scheduling — rank by gap, don't spread evenly
+
+A lane sitting on a `minor` gap does not deserve the same compute as one sitting
+on a `major`. `plan` reads the log, ranks what is open by severity, holds what is
+flat, shelved or retired, and prices the proposed wave against the naive one:
+
+```
+Plan for wave 7 — tier 2, ~5 calls per lane per round
+
+RUN (largest gap first):
+  [layout / visual]  severity minor
+      gutter rhythm fixed; hero CTA spacing still tighter than the reference
+HOLD:
+  [imagery / perf]  shelved — parked; not scheduled
+  [typography / visual]  retired — met the bar
+
+Proposed wave: 1 lane(s), ~6 calls
+  ~€19.69 — against ~€42.14 to run all 3 lane(s) regardless of evidence (~€22.46 saved)
+```
+
+`--max-lanes N` caps the wave further and holds the rest for the next one. Record
+what you held with `skip --reason-code gap-too-small`, so the report can show the
+restraint rather than leaving it invisible.
+
+### Serial over parallel on coupled work
+
+The largest structural saving is in `decomposition.md`: the canonical run found
+sequential single-owner passes beat parallel fan-out decisively, on quality as
+well as cost. Fan out only for genuinely independent work.
+
+### Keep the prefix stable so the bar caches
+
+Critics re-read the same frozen bar and contract every round. That is the most
+cacheable content in the method — but only if the prompt prefix is byte-identical
+between rounds. Point at the same paths in the same order, put the volatile part
+(this round's gap, this round's artifact) last, and never restate the bar from
+memory. A changing preamble silently re-bills the whole prefix every round.
+
+## 6. Stop paying for stalled work
 
 A dimension that has not moved in `flat_rounds_n` bar rounds (default 3) is
 flagged `FLAT` by `status`, at the wave boundary, with the cost of running it
