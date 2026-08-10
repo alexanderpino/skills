@@ -949,6 +949,35 @@ def cmd_extend(args):
     print("Record the extension in contract.md and on the workbench, then resume at the wave boundary.")
 
 
+def _fired_stops(cfg, rounds, per, retired, max_wave, spent):
+    """Every stop condition currently firing or signalling.
+
+    Shared by `status` and `board` so the terminal and the workbench cannot
+    disagree about whether the run should still be running.
+    """
+    fired = []
+    budget = cfg["stops"]["budget_waves"]
+    tok_budget = cfg["stops"].get("budget_tokens")
+    if max_wave >= budget:
+        fired.append(f"budget (wave {max_wave} >= {budget})")
+    if tok_budget and spent >= tok_budget:
+        fired.append(f"token budget ({fmt_cost(cfg, spent)} >= {fmt_cost(cfg, tok_budget)})")
+    allow = tier_allowance(cfg)
+    if allow and spent >= allow and cfg["effort"]["tier"] < len(cfg["effort"]["ladder"]) - 1:
+        fired.append(f"tier {cfg['effort']['tier']} allowance depleted — escalate on evidence (`tier`) or stop")
+    all_lanes = {lane for lane, _ in per}
+    if all_lanes and all_lanes == retired:
+        if any(s["shelved"] for s in per.values()):
+            fired.append("no lane is still running — some dimensions shelved rather than retired; "
+                         "the report must say which")
+        else:
+            fired.append("all lanes retired (bar-met / clean-streak)")
+    recent = [r for r in rounds if r["mode"] == "champion"][-6:]
+    if len(recent) >= 4 and sum(1 for r in recent if r.get("action") == "reverted") > len(recent) / 2:
+        fired.append("judgment signal: revert rate over 50% in recent rounds — likely at the ceiling")
+    return fired
+
+
 def cmd_status(args):
     root = Path(args.root)
     cfg = load_config(root)
@@ -1014,25 +1043,7 @@ def cmd_status(args):
             print(line)
         print(f"  read: {VERDICT_READS[verdict]}\n")
 
-    fired = []
-    if max_wave >= budget:
-        fired.append(f"budget (wave {max_wave} >= {budget})")
-    if tok_budget and spent >= tok_budget:
-        fired.append(f"token budget ({fmt_cost(cfg, spent)} >= {fmt_cost(cfg, tok_budget)})")
-    allow = tier_allowance(cfg)
-    if allow and spent >= allow and cfg["effort"]["tier"] < len(cfg["effort"]["ladder"]) - 1:
-        fired.append(f"tier {cfg['effort']['tier']} allowance depleted — escalate on evidence (`tier`) or stop")
-    all_lanes = {lane for lane, _ in per}
-    if all_lanes and all_lanes == retired:
-        if any(s["shelved"] for s in per.values()):
-            fired.append("no lane is still running — some dimensions shelved rather than retired; "
-                         "the report must say which")
-        else:
-            fired.append("all lanes retired (bar-met / clean-streak)")
-    total_champ = [r for r in rounds if r["mode"] == "champion"]
-    recent = total_champ[-6:]
-    if len(recent) >= 4 and sum(1 for r in recent if r.get("action") == "reverted") > len(recent) / 2:
-        fired.append("judgment signal: revert rate over 50% in recent rounds — likely at the ceiling")
+    fired = _fired_stops(cfg, rounds, per, retired, max_wave, spent)
     if fired:
         print("STOP CONDITIONS FIRED / SIGNALLED:")
         for f in fired:
@@ -1125,56 +1136,190 @@ def cmd_report(args):
     print(f"wrote {out}")
 
 
-def cmd_board(args):
-    """Write gauntlet/state.json — everything the workbench renders.
+STATE_SCHEMA_VERSION = 1
 
-    The board is generated, never hand-written. A subagent that has to open an
-    HTML file to report progress pays for the whole file every round; this makes
-    the progress surface cost one deterministic command instead.
+
+def _contract_goal(root):
+    """The GOAL line from contract.md, for the board's header.
+
+    Best-effort: the contract is prose written by the lead agent, so a missing
+    or reworded goal line degrades to no title rather than to an error.
     """
-    root = Path(args.root)
-    cfg = load_config(root)
-    rounds = load_rounds(root)
+    p = root / "contract.md"
+    if not p.exists():
+        return None
+    for line in p.read_text().splitlines():
+        s = line.strip().lstrip("*_# ").strip()
+        if s.upper().startswith("GOAL"):
+            return s[4:].lstrip(":*_ ").strip() or None
+    return None
+
+
+def build_state(root, cfg, rounds):
+    """The workbench spec: everything the board renders, in one document.
+
+    This is the contract between the run and the UI, the way an OpenAPI
+    document is the contract between a service and Swagger UI. The HTML is
+    generic and never edited; only this changes. Schema: references/workbench.md.
+    """
     per, retired = _lane_dim_status(rounds, cfg)
     max_wave = max((r["wave"] for r in rounds), default=0)
     spent = total_spend(root, rounds)
+    spend_recs = load_spend(root)
     tok_budget = cfg["stops"].get("budget_tokens")
+    rate = cfg.get("cost_eur_per_mtok")
     spec = tier_spec(cfg)
-    lines, verdict, _ = _extension_evidence(rounds, cfg, per, retired) if rounds else ([], "unclear", [])
+    ladder = cfg["effort"]["ladder"]
+    lines, verdict, open_lanes = (_extension_evidence(rounds, cfg, per, retired)
+                                  if rounds else ([], "unclear", []))
+    eur = (lambda t: round(t / 1_000_000 * rate, 2) if rate else None)
 
+    # Spend by role, so the board can say where the money went rather than only
+    # how much of it is gone. Critic calls are the ones attached to rounds.
+    by_role = {"critic": sum(r.get("tokens") or 0 for r in rounds)}
+    for s in spend_recs:
+        by_role[s.get("role", "other")] = by_role.get(s.get("role", "other"), 0) + (s.get("tokens") or 0)
+
+    by_tier = {}
+    for r in rounds:
+        by_tier[str(r.get("tier", 0))] = by_tier.get(str(r.get("tier", 0)), 0) + (r.get("tokens") or 0)
+    for s in spend_recs:
+        by_tier[str(s.get("tier", 0))] = by_tier.get(str(s.get("tier", 0)), 0) + (s.get("tokens") or 0)
+
+    bar_rounds = [r for r in rounds if r["mode"] in ("blind", "rubric")]
     state = {
+        "schema": STATE_SCHEMA_VERSION,
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "goal": _contract_goal(root),
+        "bar_kind": cfg.get("bar_kind"),
         "wave": max_wave,
         "budget_waves": cfg["stops"]["budget_waves"],
-        "extensions": [{"at_wave": e["at_wave"], "waves": e["waves"]} for e in cfg.get("extensions") or []],
-        "tier": {"index": cfg["effort"]["tier"], "name": spec["name"],
-                 "builder_model": spec["builder_model"], "critic_model": spec["critic_model"],
-                 "calls_per_lane_round": calls_per_lane_round(cfg)},
-        "spend": {"tokens": spent, "budget_tokens": tok_budget,
-                  "eur": round(spent / 1_000_000 * cfg["cost_eur_per_mtok"], 2)
-                  if cfg.get("cost_eur_per_mtok") else None,
-                  "pct": round(spent / tok_budget * 100) if tok_budget else None},
+        "initial_budget_waves": initial_budget(cfg),
         "read": verdict,
+        "read_note": VERDICT_READS.get(verdict),
+        "evidence_lines": [ln.strip() for ln in lines],
+        "fired": _fired_stops(cfg, rounds, per, retired, max_wave, spent),
+        "stops": {
+            "bar_met_n": cfg["stops"]["bar_met_n"],
+            "clean_streak_n": cfg["stops"]["clean_streak_n"],
+            "flat_rounds_n": cfg["stops"].get("flat_rounds_n", 3),
+            "hard_cap_waves": cfg["stops"].get("hard_cap_waves"),
+            "hard_cap_tokens": cfg["stops"].get("hard_cap_tokens"),
+        },
+        "tier": {
+            "index": cfg["effort"]["tier"],
+            "name": spec["name"],
+            "builder_model": spec["builder_model"],
+            "critic_model": spec["critic_model"],
+            "calls_per_lane_round": calls_per_lane_round(cfg),
+            "allowance_tokens": tier_allowance(cfg),
+            "ladder": [
+                {"index": i, "name": t["name"], "share": t["share"],
+                 "lanes": t["lanes"], "dims": t["dims"],
+                 "critic_calls": t["critic_calls"],
+                 "builder_model": t["builder_model"], "critic_model": t["critic_model"],
+                 "state": ("done" if i < cfg["effort"]["tier"]
+                           else "current" if i == cfg["effort"]["tier"] else "locked")}
+                for i, t in enumerate(ladder)
+            ],
+            "history": cfg["effort"].get("history") or [],
+        },
+        "spend": {
+            "tokens": spent,
+            "budget_tokens": tok_budget,
+            "eur": eur(spent),
+            "budget_eur": eur(tok_budget) if tok_budget else None,
+            "pct": round(spent / tok_budget * 100) if tok_budget else None,
+            "per_wave": int(spent / max_wave) if max_wave else None,
+            "waves_left_at_rate": (round((tok_budget - spent) / (spent / max_wave), 1)
+                                   if tok_budget and max_wave and spent else None),
+            "by_role": by_role,
+            "by_tier": by_tier,
+            "priced_rounds": sum(1 for r in rounds if r.get("tokens")),
+            "total_rounds": len(rounds),
+        },
+        "evidence_mix": {
+            "blind": sum(1 for r in bar_rounds if r["mode"] == "blind"),
+            "rubric": sum(1 for r in bar_rounds if r["mode"] == "rubric"),
+        },
+        "extensions": cfg.get("extensions") or [],
+        "shelved": cfg.get("shelved") or [],
         "columns": {"open": [], "flat": [], "shelved": [], "retired": []},
+        "rounds": [],
     }
+
     for (lane, dim), s in sorted(per.items()):
+        recs = [r for r in rounds if r["lane"] == lane and r["dimension"] == dim]
+        bar_recs = [r for r in recs if r["mode"] in ("blind", "rubric")]
+        last = bar_recs[-1] if bar_recs else None
         card = {
-            "lane": lane, "dimension": dim, "bar_rounds": s["bar_rounds"],
-            "promotions": s["promotions"], "reverts": s["reverts"],
+            "lane": lane, "dimension": dim,
+            "bar_rounds": s["bar_rounds"], "promotions": s["promotions"], "reverts": s["reverts"],
             "bar_met_streak": s["bar_met_streak"], "clean_streak": s["clean_streak"],
-            "margins": s["recent_margins"], "gap": s["open_gap"],
+            "bar_met_n": cfg["stops"]["bar_met_n"], "clean_streak_n": cfg["stops"]["clean_streak_n"],
+            "margins": s["recent_margins"],
+            "scores": [r["score"] for r in bar_recs][-12:],
+            "severity": last.get("severity") if last else None,
+            "gap": s["open_gap"],
+            "evidence": last.get("evidence") if last else None,
+            "rubric_share": s["rubric_share"],
+            "tokens": sum(r.get("tokens") or 0 for r in recs),
+            "trend": _dimension_trend(bar_recs, flat_n=cfg["stops"].get("flat_rounds_n", 3))["note"]
+            if bar_recs else None,
         }
         if s["shelved"]:
+            shelf = next((x for x in cfg.get("shelved") or []
+                          if x["lane"] == lane and x["dimension"] == dim), {})
+            card["shelved_reason"] = shelf.get("reason")
+            card["shelved_at_wave"] = shelf.get("at_wave")
             state["columns"]["shelved"].append(card)
         elif s["retired"]:
+            card["retired_by"] = ("bar-met" if s["bar_met_streak"] >= cfg["stops"]["bar_met_n"]
+                                  else "clean-streak")
             state["columns"]["retired"].append(card)
         elif s["flat"]:
             state["columns"]["flat"].append(card)
         else:
             state["columns"]["open"].append(card)
 
-    (root / "state.json").write_text(json.dumps(state, indent=2) + "\n")
-    print(f"wrote {root}/state.json — the workbench renders it; do not edit the HTML")
+    # Newest first, bounded — the board is a glance surface, not an archive.
+    # rounds.jsonl remains the full record.
+    for r in rounds[-80:][::-1]:
+        state["rounds"].append({
+            "ts": r.get("ts"), "wave": r["wave"], "round": r["round"],
+            "lane": r["lane"], "dimension": r["dimension"], "mode": r["mode"],
+            "winner": r["winner"], "margin": r["margin"], "score": r.get("score"),
+            "severity": r.get("severity"), "gap": r.get("gap"), "action": r.get("action"),
+            "evidence": r.get("evidence"), "champion_ref": r.get("champion_ref"),
+            "critic_framing": r.get("critic_framing"), "tier": r.get("tier", 0),
+            "tokens": r.get("tokens"),
+        })
+    return state
+
+
+def cmd_board(args):
+    """Write the workbench spec — everything the board renders.
+
+    The board is generated, never hand-written. A subagent that has to open an
+    HTML file to report progress pays for the whole file every round; this makes
+    the progress surface cost one deterministic command instead.
+
+    Two files, same content: `state.json` for anything that reads JSON, and
+    `state.js` (one assignment to `window.GAUNTLET_STATE`) so the board also
+    works when it is opened straight off disk, where browsers refuse to `fetch`
+    a local file.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    state = build_state(root, cfg, rounds)
+    blob = json.dumps(state, indent=2)
+    (root / "state.json").write_text(blob + "\n")
+    (root / "state.js").write_text(
+        "// Generated by gauntlet.py board. Do not edit; do not edit workbench.html either.\n"
+        "window.GAUNTLET_STATE = " + blob + ";\n"
+    )
+    print(f"wrote {root}/state.json and {root}/state.js — the workbench renders them; do not edit the HTML")
 
 
 def main():

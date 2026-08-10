@@ -7,12 +7,20 @@ loop is running.
 ## Phase 0: The Workbench (Must be step 1)
 
 Before proposing a contract, set up the live progress board.
+
 1. Copy `assets/workbench.html` from this skill to `gauntlet/workbench.html`.
-2. Open it in the user's browser (`start`, `open`, or `xdg-open`).
-3. The board renders `gauntlet/state.json`, which `gauntlet.py board` writes.
-   **Nobody edits the HTML** — not you, not a subagent. Regenerating the board is
-   one deterministic command; a subagent that has to open an HTML file to report
-   progress pays for the whole file every round it does so.
+   It is boilerplate — a generic renderer over one spec document, the way Swagger
+   UI renders an OpenAPI document. Copy it once; never edit it.
+2. `python3 scripts/gauntlet.py board` writes the spec (`state.json`, plus
+   `state.js` so the page also works when opened straight off disk).
+3. Open it in the user's browser (`start`, `open`, or `xdg-open`). For a live
+   board during an unattended run, serve the directory instead —
+   `python3 -m http.server` inside `gauntlet/` — and the page polls itself.
+
+**Nobody edits the HTML, and nobody hand-writes the spec** — not you, not a
+subagent. Regenerating the board is one deterministic command; a subagent that
+has to open an HTML file to report progress pays for the whole file every round
+it does so. → `workbench.md`
 
 ## How to run intake without interrogating anyone
 

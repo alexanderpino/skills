@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.invalid/gauntlet/state.schema.json",
+  "title": "Gauntlet workbench spec",
+  "description": "The document gauntlet/workbench.html renders. Normally written by `gauntlet.py board`; documented here so it can also be written by hand in degraded mode. Every field is optional except those in `required` — the board draws what is present and reports what is malformed, so a partial spec produces a smaller board rather than an error.",
+  "type": "object",
+  "required": ["wave", "columns"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "description": "Spec version. The board renders version 1 and warns on anything higher.",
+      "const": 1
+    },
+    "generated": {
+      "type": "string",
+      "description": "ISO-8601 UTC timestamp. The board greys out its status dot when this is more than 15 minutes old — a stale board is worse than no board.",
+      "format": "date-time"
+    },
+    "goal": {
+      "type": ["string", "null"],
+      "description": "The run's destination, one sentence. Read from the GOAL line of contract.md."
+    },
+    "bar_kind": {
+      "type": ["string", "null"],
+      "enum": ["reference", "acceptance criteria", "hybrid", null]
+    },
+    "wave": { "type": "integer", "minimum": 0 },
+    "budget_waves": { "type": ["integer", "null"], "minimum": 0 },
+    "initial_budget_waves": {
+      "type": ["integer", "null"],
+      "description": "The budget agreed at intake, before extensions. Shown so the board distinguishes 'agreed' from 'current'."
+    },
+    "read": {
+      "type": ["string", "null"],
+      "enum": ["improving", "mixed", "at-ceiling", "unclear", "nothing-open", null],
+      "description": "The log's read on whether the artifact is still moving. A reading, not a decision."
+    },
+    "read_note": { "type": ["string", "null"], "description": "One line explaining the read in words." },
+    "evidence_lines": {
+      "type": "array",
+      "description": "Per-open-dimension trend lines backing the read.",
+      "items": { "type": "string" }
+    },
+    "fired": {
+      "type": "array",
+      "description": "Stop conditions currently firing. A non-empty list means the run should not still be running, and the board says so in red.",
+      "items": { "type": "string" }
+    },
+    "stops": {
+      "type": "object",
+      "description": "The armed thresholds, for the reader who wants to know what retirement and shelving mean in this run.",
+      "properties": {
+        "bar_met_n": { "type": "integer", "minimum": 1 },
+        "clean_streak_n": { "type": "integer", "minimum": 1 },
+        "flat_rounds_n": { "type": "integer", "minimum": 2 },
+        "hard_cap_waves": { "type": ["integer", "null"] },
+        "hard_cap_tokens": { "type": ["integer", "null"] }
+      }
+    },
+    "tier": {
+      "type": "object",
+      "description": "Where the run sits on the effort ladder, and what that tier costs per round.",
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "builder_model": { "type": "string" },
+        "critic_model": { "type": "string" },
+        "calls_per_lane_round": { "type": "integer", "minimum": 1 },
+        "allowance_tokens": { "type": ["integer", "null"] },
+        "ladder": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "index": { "type": "integer" },
+              "name": { "type": "string" },
+              "share": { "type": "number", "minimum": 0, "maximum": 1 },
+              "lanes": { "type": ["integer", "null"] },
+              "dims": { "type": ["integer", "null"] },
+              "critic_calls": { "type": "integer", "minimum": 1 },
+              "builder_model": { "type": "string" },
+              "critic_model": { "type": "string" },
+              "state": { "type": "string", "enum": ["done", "current", "locked"] }
+            }
+          }
+        },
+        "history": {
+          "type": "array",
+          "description": "Every escalation, with the evidence that bought it.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "at_wave": { "type": "integer" },
+              "from_tier": { "type": "integer" },
+              "to_tier": { "type": "integer" },
+              "spend_at": { "type": "integer" },
+              "reason": { "type": "string" },
+              "log_read": { "type": "string" },
+              "forced": { "type": "boolean" },
+              "failing_gates": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "spend": {
+      "type": "object",
+      "description": "What the run has cost. Money is what the user is spending; tokens are how it is measured. When cost_eur_per_mtok was set at init, both are present and the board leads with money.",
+      "properties": {
+        "tokens": { "type": "integer", "minimum": 0 },
+        "budget_tokens": { "type": ["integer", "null"] },
+        "eur": { "type": ["number", "null"] },
+        "budget_eur": { "type": ["number", "null"] },
+        "pct": { "type": ["number", "null"] },
+        "per_wave": { "type": ["integer", "null"] },
+        "waves_left_at_rate": { "type": ["number", "null"] },
+        "by_role": {
+          "type": "object",
+          "description": "Tokens per role — builder, critic, smoother, lead, other.",
+          "additionalProperties": { "type": "integer" }
+        },
+        "by_tier": {
+          "type": "object",
+          "description": "Tokens per effort tier, keyed by tier index as a string.",
+          "additionalProperties": { "type": "integer" }
+        },
+        "priced_rounds": { "type": "integer", "minimum": 0 },
+        "total_rounds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "evidence_mix": {
+      "type": "object",
+      "description": "Blind versus rubric round counts. Not equivalent evidence, and the board labels them so.",
+      "properties": {
+        "blind": { "type": "integer", "minimum": 0 },
+        "rubric": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "description": "Granted budget extensions, in order.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "at_wave": { "type": "integer" },
+          "waves": { "type": "integer" },
+          "reason": { "type": "string" },
+          "log_read": { "type": "string" }
+        }
+      }
+    },
+    "shelved": {
+      "type": "array",
+      "description": "Dimensions parked mid-run. Parked is not retired: the report keeps their open gaps.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "lane": { "type": "string" },
+          "dimension": { "type": "string" },
+          "at_wave": { "type": "integer" },
+          "reason": { "type": "string" },
+          "open_gap": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "columns": {
+      "type": "object",
+      "description": "The Kanban. Every lane/dimension pair lives in exactly one column.",
+      "properties": {
+        "open": { "$ref": "#/definitions/cardList" },
+        "flat": { "$ref": "#/definitions/cardList" },
+        "shelved": { "$ref": "#/definitions/cardList" },
+        "retired": { "$ref": "#/definitions/cardList" }
+      }
+    },
+    "rounds": {
+      "type": "array",
+      "description": "Recent rounds, newest first. A glance surface, not an archive — rounds.jsonl stays the full record.",
+      "items": { "$ref": "#/definitions/round" }
+    }
+  },
+  "definitions": {
+    "cardList": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/card" }
+    },
+    "card": {
+      "type": "object",
+      "description": "One lane/dimension pair as the board draws it.",
+      "required": ["lane", "dimension"],
+      "properties": {
+        "lane": { "type": "string" },
+        "dimension": { "type": "string" },
+        "bar_rounds": { "type": "integer", "minimum": 0 },
+        "promotions": { "type": "integer", "minimum": 0 },
+        "reverts": { "type": "integer", "minimum": 0 },
+        "bar_met_streak": { "type": "integer", "minimum": 0 },
+        "clean_streak": { "type": "integer", "minimum": 0 },
+        "bar_met_n": { "type": "integer", "minimum": 1 },
+        "clean_streak_n": { "type": "integer", "minimum": 1 },
+        "margins": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["decisive", "clear", "thin"] }
+        },
+        "scores": {
+          "type": "array",
+          "description": "Bar-round scores in order, drawn as a sparkline on a fixed 0–10 scale.",
+          "items": { "type": "integer", "minimum": 0, "maximum": 10 }
+        },
+        "severity": { "type": ["string", "null"], "enum": ["major", "minor", "none", null] },
+        "gap": { "type": ["string", "null"], "description": "The open gap from the latest verdict, or null when the last round was clean." },
+        "evidence": { "type": ["string", "null"] },
+        "rubric_share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "trend": { "type": ["string", "null"] },
+        "shelved_reason": { "type": "string" },
+        "shelved_at_wave": { "type": "integer" },
+        "retired_by": { "type": "string", "enum": ["bar-met", "clean-streak"] }
+      }
+    },
+    "round": {
+      "type": "object",
+      "required": ["wave", "round", "lane", "dimension", "mode"],
+      "properties": {
+        "ts": { "type": "string" },
+        "wave": { "type": "integer" },
+        "round": { "type": "integer" },
+        "lane": { "type": "string" },
+        "dimension": { "type": "string" },
+        "mode": { "type": "string", "enum": ["blind", "rubric", "champion"] },
+        "winner": { "type": "string", "enum": ["ours", "other"] },
+        "margin": { "type": "string", "enum": ["decisive", "clear", "thin"] },
+        "score": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "severity": { "type": ["string", "null"], "enum": ["major", "minor", "none", null] },
+        "gap": { "type": ["string", "null"] },
+        "action": { "type": ["string", "null"], "enum": ["promoted", "reverted", null] },
+        "evidence": { "type": ["string", "null"] },
+        "champion_ref": { "type": ["string", "null"] },
+        "critic_framing": { "type": ["string", "null"] },
+        "tier": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

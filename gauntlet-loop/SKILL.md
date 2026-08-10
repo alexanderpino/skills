@@ -95,8 +95,8 @@ gauntlet/
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
 ├── spend.jsonl      # token spend that produced no round: builders, smoother
-├── state.json       # what the workbench renders (script-written)
-├── workbench.html   # live Kanban board — reads state.json, never hand-edited
+├── state.json       # the workbench spec (script-written); state.js beside it for file://
+├── workbench.html   # copied from assets/ once — generic renderer, never hand-edited
 └── report.md        # drafted by the script at the end, completed by you
 ```
 
@@ -129,8 +129,13 @@ validation is the point. Full layout, git conventions and the resume protocol:
 Never start looping without this settled. Read `references/intake.md`, then put a
 compact contract in front of the user and get confirmation. Set up the **Live
 Kanban Workbench** by copying `assets/workbench.html` to `gauntlet/workbench.html`
-and opening it in the user's browser; it renders `gauntlet/state.json`, which
-`gauntlet.py board` regenerates. Never edit the HTML, and never ask a subagent to.
+and opening it in the user's browser.
+
+The board is a generic renderer over one spec document, the way Swagger UI is a
+generic renderer over an OpenAPI document: `gauntlet.py board` writes
+`gauntlet/state.json`, and the page draws it. **Never edit the HTML, never ask a
+subagent to, and never hand-write the spec while the script owns it.**
+→ `references/workbench.md`
 
 Infer or propose everything you can; only **stop conditions** and **budget**
 genuinely require the user, because they encode how much time and money the run

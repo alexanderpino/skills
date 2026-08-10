@@ -4,137 +4,675 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gauntlet workbench</title>
+<!--
+  Gauntlet workbench — a generic renderer for one spec document.
+
+  This file is boilerplate. Copy it to gauntlet/workbench.html once and never
+  edit it again: it renders whatever is in gauntlet/state.json, the way Swagger
+  UI renders whatever is in an OpenAPI document. The run writes the spec; this
+  draws it.
+
+    python3 scripts/gauntlet.py board     # regenerates state.json + state.js
+
+  Loading works two ways so the board runs however it was opened:
+    - opened over http://  → fetches state.json every few seconds, live
+    - opened as file://    → falls back to state.js, which sets window.GAUNTLET_STATE
+                             (browsers refuse to fetch() local files; a plain
+                             <script src> is still allowed)
+
+  Anything missing from the spec is skipped rather than crashing, and anything
+  malformed is reported in a banner at the top — a spec written by hand should
+  tell you what it got wrong, not fail silently. Schema: references/workbench.md.
+-->
 <style>
   :root {
-    --bg: #f6f6f4; --panel: #fff; --ink: #14171a; --muted: #5c6570;
-    --line: #dcdfe3; --accent: #2f6f4f; --warn: #9a5b00; --stop: #a12b2b;
+    color-scheme: light dark;
+    --bg: #f5f5f3; --panel: #ffffff; --sunk: #efefec;
+    --ink: #14171a; --muted: #5f6873; --faint: #8b94a0;
+    --line: #dcdfe3; --line-soft: #e8eaed;
+    --accent: #2f6f4f; --warn: #97590a; --stop: #a32c2c; --info: #2b5f9e;
+    --radius: 9px;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14171a; --panel: #1c2024; --ink: #e8eaec; --muted: #99a2ad;
-      --line: #2c3238; --accent: #6fc79b; --warn: #e0a355; --stop: #e08585;
+    :root:not([data-theme="light"]) {
+      --bg: #131619; --panel: #1b1f23; --sunk: #16191d;
+      --ink: #e9ebed; --muted: #9aa3ae; --faint: #6d7681;
+      --line: #2b3137; --line-soft: #23282d;
+      --accent: #6cc79a; --warn: #d99a45; --stop: #e28585; --info: #79aae0;
     }
   }
+  [data-theme="dark"] {
+    --bg: #131619; --panel: #1b1f23; --sunk: #16191d;
+    --ink: #e9ebed; --muted: #9aa3ae; --faint: #6d7681;
+    --line: #2b3137; --line-soft: #23282d;
+    --accent: #6cc79a; --warn: #d99a45; --stop: #e28585; --info: #79aae0;
+  }
+
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 1.5rem; background: var(--bg); color: var(--ink);
-         font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  h1 { font-size: 1.1rem; margin: 0 0 .25rem; letter-spacing: .01em; }
-  .sub { color: var(--muted); font-size: .85rem; margin-bottom: 1.25rem; }
-  .bars { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-          padding: .6rem .9rem; min-width: 9rem; }
-  .stat .k { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .stat .v { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
-  .meter { height: 5px; background: var(--line); border-radius: 3px; margin-top: .4rem; overflow: hidden; }
-  .meter > i { display: block; height: 100%; background: var(--accent); }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    margin: 0; padding: 1.5rem 1.75rem 4rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
+       color: var(--faint); margin: 2rem 0 .75rem; font-weight: 600; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* ---- header ------------------------------------------------------- */
+  header { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem;
+           align-items: baseline; margin-bottom: .35rem; }
+  .goal { color: var(--muted); font-size: .95rem; flex: 1 1 22rem; min-width: 0; }
+  .meta { color: var(--faint); font-size: .78rem; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+         background: var(--accent); margin-right: .35rem; vertical-align: baseline; }
+  .dot.stale { background: var(--warn); }
+
+  /* ---- banners ------------------------------------------------------ */
+  .banner { border-radius: var(--radius); padding: .7rem .9rem; margin: 1rem 0;
+            font-size: .87rem; border: 1px solid var(--line); background: var(--panel); }
+  .banner.stop { border-color: var(--stop); }
+  .banner.stop b { color: var(--stop); }
+  .banner.warn { border-color: var(--warn); }
+  .banner.warn b { color: var(--warn); }
+  .banner ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+  .banner li { margin: .15rem 0; }
+
+  /* ---- stat rail ---------------------------------------------------- */
+  .rail { display: grid; gap: .7rem; margin-top: 1.1rem;
+          grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+  .stat { background: var(--panel); border: 1px solid var(--line);
+          border-radius: var(--radius); padding: .65rem .85rem .75rem; min-width: 0; }
+  .stat .k { font-size: .67rem; text-transform: uppercase; letter-spacing: .07em;
+             color: var(--faint); font-weight: 600; }
+  .stat .v { font-size: 1.2rem; font-variant-numeric: tabular-nums; margin-top: .1rem;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .sub { font-size: .74rem; color: var(--muted); margin-top: .1rem; }
+  .meter { height: 4px; background: var(--line-soft); border-radius: 3px;
+           margin-top: .5rem; overflow: hidden; }
+  .meter > i { display: block; height: 100%; background: var(--accent);
+               transition: width .4s ease; }
+  .meter.warn > i { background: var(--warn); }
   .meter.hot > i { background: var(--stop); }
-  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
-  .col h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em;
-            color: var(--muted); margin: 0 0 .5rem; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line);
-          border-radius: 6px; padding: .6rem .7rem; margin-bottom: .55rem; }
+
+  /* ---- ladder ------------------------------------------------------- */
+  .ladder { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .rung { flex: 1 1 9rem; background: var(--panel); border: 1px solid var(--line);
+          border-radius: var(--radius); padding: .55rem .75rem; opacity: .5; min-width: 0; }
+  .rung.done { opacity: .85; border-color: var(--accent); }
+  .rung.current { opacity: 1; border-color: var(--accent); border-width: 2px;
+                  padding: calc(.55rem - 1px) calc(.75rem - 1px); }
+  .rung .n { font-size: .67rem; color: var(--faint); letter-spacing: .07em;
+             text-transform: uppercase; font-weight: 600; }
+  .rung .name { font-weight: 600; }
+  .rung .d { font-size: .75rem; color: var(--muted); }
+
+  /* ---- kanban ------------------------------------------------------- */
+  .cols { display: grid; gap: 1rem;
+          grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+  .col > h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+              color: var(--faint); margin: 0 0 .6rem; font-weight: 600; }
+  .col > h3 .count { color: var(--ink); }
+  .card { background: var(--panel); border: 1px solid var(--line);
+          border-left: 3px solid var(--line); border-radius: var(--radius);
+          padding: .65rem .8rem; margin-bottom: .6rem; }
   .col.flat .card { border-left-color: var(--warn); }
-  .col.shelved .card { border-left-color: var(--muted); opacity: .75; }
+  .col.shelved .card { border-left-color: var(--faint); }
   .col.retired .card { border-left-color: var(--accent); }
-  .card .lane { font-weight: 600; }
-  .card .dim { color: var(--muted); font-weight: 400; }
-  .card .nums { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums;
-                margin-top: .25rem; }
-  .card .gap { font-size: .85rem; margin-top: .4rem; }
-  .read { margin-top: 1.25rem; font-size: .85rem; color: var(--muted); }
-  .empty { color: var(--muted); font-size: .82rem; font-style: italic; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+  .col.open .card { border-left-color: var(--info); }
+  .card .title { font-weight: 600; display: flex; justify-content: space-between;
+                 gap: .5rem; align-items: baseline; }
+  .card .title .dim { color: var(--muted); font-weight: 400; font-size: .9em; }
+  .card .nums { font-size: .76rem; color: var(--muted);
+                font-variant-numeric: tabular-nums; margin-top: .3rem; }
+  .card .gap { font-size: .87rem; margin-top: .45rem; }
+  .card .why { font-size: .78rem; color: var(--muted); margin-top: .4rem;
+               font-style: italic; }
+  .card .foot { font-size: .74rem; color: var(--faint); margin-top: .45rem;
+                word-break: break-all; }
+  .spark { display: block; margin-top: .45rem; }
+  .pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: .3rem; }
+  .pips i { width: 6px; height: 6px; border-radius: 50%; background: var(--line);
+            display: block; }
+  .pips i.on { background: var(--accent); }
+  .tag { display: inline-block; font-size: .68rem; padding: .05rem .4rem;
+         border-radius: 4px; border: 1px solid var(--line); color: var(--muted);
+         letter-spacing: .02em; white-space: nowrap; }
+  .tag.major { color: var(--stop); border-color: var(--stop); }
+  .tag.minor { color: var(--warn); border-color: var(--warn); }
+  .tag.none  { color: var(--accent); border-color: var(--accent); }
+  .tag.blind { color: var(--info); border-color: var(--info); }
+  .tag.reverted { color: var(--stop); border-color: var(--stop); }
+  .tag.promoted { color: var(--accent); border-color: var(--accent); }
+  .empty { color: var(--faint); font-size: .82rem; font-style: italic; }
+
+  /* ---- rounds table ------------------------------------------------- */
+  .scroll { overflow-x: auto; border: 1px solid var(--line);
+            border-radius: var(--radius); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 46rem; }
+  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line-soft);
+           vertical-align: top; }
+  th { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--faint); font-weight: 600; position: sticky; top: 0;
+       background: var(--panel); }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+  td.gap { min-width: 14rem; }
+  .filters { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .6rem; }
+  .filters button { font: inherit; font-size: .76rem; padding: .2rem .6rem;
+                    border-radius: 999px; border: 1px solid var(--line);
+                    background: var(--panel); color: var(--muted); cursor: pointer; }
+  .filters button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+
+  .split { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+  .list { background: var(--panel); border: 1px solid var(--line);
+          border-radius: var(--radius); padding: .7rem .9rem; font-size: .84rem; }
+  .list .k { font-size: .67rem; text-transform: uppercase; letter-spacing: .07em;
+             color: var(--faint); font-weight: 600; margin-bottom: .35rem; }
+  .list .row { display: flex; justify-content: space-between; gap: 1rem;
+               padding: .2rem 0; border-bottom: 1px solid var(--line-soft); }
+  .list .row:last-child { border-bottom: 0; }
+  .list .row .v { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  footer { margin-top: 2.5rem; color: var(--faint); font-size: .76rem; }
 </style>
 </head>
 <body>
-<h1>Gauntlet workbench</h1>
-<div class="sub" id="sub">loading <code>state.json</code>…</div>
-<div class="bars" id="bars"></div>
-<div class="cols" id="cols"></div>
-<div class="read" id="read"></div>
 
+<header>
+  <h1>Gauntlet workbench</h1>
+  <div class="goal" id="goal"></div>
+  <div class="meta" id="meta"><span class="dot"></span>loading…</div>
+</header>
+
+<div id="banners"></div>
+<div class="rail" id="rail"></div>
+
+<section id="ladder-section" hidden>
+  <h2>Effort ladder</h2>
+  <div class="ladder" id="ladder"></div>
+  <div class="meta" id="ladder-history" style="margin-top:.6rem"></div>
+</section>
+
+<section>
+  <h2>Lanes</h2>
+  <div class="cols" id="cols"></div>
+</section>
+
+<section id="rounds-section" hidden>
+  <h2>Rounds</h2>
+  <div class="filters" id="filters"></div>
+  <div class="scroll"><table id="rounds">
+    <thead><tr>
+      <th>W·R</th><th>Lane</th><th>Dim</th><th>Mode</th><th>Winner</th>
+      <th>Margin</th><th>Score</th><th>Sev</th><th>Gap</th><th>Evidence</th><th>Tok</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table></div>
+</section>
+
+<section id="detail-section" hidden>
+  <h2>Spend and history</h2>
+  <div class="split" id="detail"></div>
+</section>
+
+<footer id="footer"></footer>
+
+<script src="state.js" onerror="window.__stateJsMissing = true"></script>
 <script>
-// This board renders gauntlet/state.json, written by `gauntlet.py board`.
-// Nothing here is hand-edited — not by the lead agent, not by a subagent.
-// Regenerating progress costs one deterministic command, not a file rewrite.
-const COLUMNS = [
-  ["open", "Open"], ["flat", "Flat — shelve or re-cut"],
-  ["shelved", "Shelved"], ["retired", "Retired"],
-];
+"use strict";
 
+/* =====================================================================
+   Gauntlet workbench renderer.
+
+   One job: turn a spec document into a page. It knows the shape of the
+   spec (see validate() for the contract it enforces) and nothing about
+   how a gauntlet works. Every section renders only if its data is
+   present, so a partial spec — an early run, or one written by hand —
+   produces a smaller board rather than an error.
+   ===================================================================== */
+
+const POLL_MS = 5000;
+const COLUMNS = [
+  ["open",     "Open"],
+  ["flat",     "Flat — shelve or re-cut"],
+  ["shelved",  "Shelved"],
+  ["retired",  "Retired"],
+];
+const MODE_FILTERS = [["all", "All"], ["blind", "Blind"], ["rubric", "Rubric"], ["champion", "Promotion"]];
+
+let STATE = null;
+let modeFilter = "all";
+let laneFilter = "all";
+
+/* ---- tiny DOM helpers ---------------------------------------------- */
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
+  if (text !== undefined && text !== null) n.textContent = String(text);
   return n;
 }
+function clear(node) { node.replaceChildren(); return node; }
+function has(v) { return v !== undefined && v !== null && v !== ""; }
 
-function stat(k, v, frac) {
+/* ---- formatting ----------------------------------------------------- */
+function fmtTokens(n) {
+  if (!has(n)) return "—";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return Math.round(n / 1e3) + "k";
+  return String(n);
+}
+function fmtEur(n) { return has(n) ? "€" + Number(n).toFixed(2) : null; }
+function money(tokens, eur) {
+  const e = fmtEur(eur);
+  return e ? e : fmtTokens(tokens) + " tok";
+}
+function ago(iso) {
+  if (!has(iso)) return "";
+  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (!isFinite(secs)) return "";
+  if (secs < 90) return "just now";
+  if (secs < 5400) return Math.round(secs / 60) + " min ago";
+  if (secs < 172800) return Math.round(secs / 3600) + " h ago";
+  return Math.round(secs / 86400) + " d ago";
+}
+
+/* ---- spec validation ------------------------------------------------
+   The board is happy to render a partial spec, but it says what was
+   missing. A hand-written state.json should be told what it got wrong.
+   -------------------------------------------------------------------- */
+const ENUMS = {
+  mode: ["blind", "rubric", "champion"],
+  winner: ["ours", "other"],
+  margin: ["decisive", "clear", "thin"],
+  severity: ["major", "minor", "none"],
+  action: ["promoted", "reverted"],
+};
+
+function validate(d) {
+  const problems = [];
+  if (typeof d !== "object" || d === null) return ["spec is not an object"];
+  if (!has(d.wave)) problems.push("`wave` is missing");
+  if (!d.columns) problems.push("`columns` is missing — no lanes can be drawn");
+  else for (const [key] of COLUMNS) {
+    if (d.columns[key] !== undefined && !Array.isArray(d.columns[key]))
+      problems.push("`columns." + key + "` must be an array");
+  }
+  if (d.rounds !== undefined && !Array.isArray(d.rounds)) problems.push("`rounds` must be an array");
+  (Array.isArray(d.rounds) ? d.rounds : []).forEach((r, i) => {
+    for (const field of ["mode", "winner", "margin", "severity", "action"]) {
+      if (has(r[field]) && !ENUMS[field].includes(r[field]))
+        problems.push(`rounds[${i}].${field} = "${r[field]}" is not one of ${ENUMS[field].join(", ")}`);
+    }
+    if (has(r.score) && (r.score < 0 || r.score > 10))
+      problems.push(`rounds[${i}].score = ${r.score} is outside 0–10`);
+  });
+  if (has(d.schema) && d.schema > 1)
+    problems.push(`spec says schema ${d.schema}; this board renders schema 1 — some sections may be missing`);
+  return problems;
+}
+
+/* ---- sparkline ------------------------------------------------------
+   Scores across a dimension's bar rounds. Fixed 0–10 scale, because a
+   self-scaling sparkline turns 6→6→6 into a dramatic climb.
+   -------------------------------------------------------------------- */
+function sparkline(scores) {
+  const W = 132, H = 22, PAD = 2;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("class", "spark");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "scores " + scores.join(", ") + " out of 10");
+  const x = i => scores.length < 2 ? W / 2 : PAD + i * (W - 2 * PAD) / (scores.length - 1);
+  const y = v => H - PAD - (Math.max(0, Math.min(10, v)) / 10) * (H - 2 * PAD);
+  const path = document.createElementNS(svg.namespaceURI, "path");
+  path.setAttribute("d", scores.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" "));
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "1.5");
+  path.setAttribute("stroke-linejoin", "round");
+  path.setAttribute("opacity", ".65");
+  svg.append(path);
+  const last = document.createElementNS(svg.namespaceURI, "circle");
+  last.setAttribute("cx", x(scores.length - 1)); last.setAttribute("cy", y(scores[scores.length - 1]));
+  last.setAttribute("r", "2.2"); last.setAttribute("fill", "currentColor");
+  svg.append(last);
+  return svg;
+}
+
+function pips(done, total) {
+  const wrap = el("span", "pips");
+  for (let i = 0; i < total; i++) wrap.append(el("i", i < done ? "on" : null));
+  return wrap;
+}
+
+/* ---- sections -------------------------------------------------------- */
+function renderHeader(d) {
+  const goal = document.getElementById("goal");
+  clear(goal);
+  if (has(d.goal)) goal.textContent = d.goal;
+  const meta = clear(document.getElementById("meta"));
+  const stale = d.generated && (Date.now() - new Date(d.generated).getTime()) > 15 * 60000;
+  meta.append(el("span", "dot" + (stale ? " stale" : "")));
+  meta.append(document.createTextNode(
+    "spec " + ago(d.generated) + (has(d.bar_kind) ? " · bar: " + d.bar_kind : "")));
+}
+
+function renderBanners(d) {
+  const box = clear(document.getElementById("banners"));
+  const problems = validate(d);
+  if (problems.length) {
+    const b = el("div", "banner warn");
+    b.append(el("b", null, "This spec has problems the board worked around:"));
+    const ul = el("ul");
+    problems.forEach(p => ul.append(el("li", null, p)));
+    b.append(ul);
+    box.append(b);
+  }
+  if (Array.isArray(d.fired) && d.fired.length) {
+    const b = el("div", "banner stop");
+    b.append(el("b", null, "Stop conditions fired — the run should not still be running:"));
+    const ul = el("ul");
+    d.fired.forEach(f => ul.append(el("li", null, f)));
+    b.append(ul);
+    box.append(b);
+  }
+  if (has(d.read_note)) {
+    const b = el("div", "banner");
+    b.append(el("b", null, "Log read: " + (d.read || "") + " — "));
+    b.append(document.createTextNode(d.read_note));
+    if (Array.isArray(d.evidence_lines) && d.evidence_lines.length) {
+      const ul = el("ul");
+      d.evidence_lines.forEach(l => ul.append(el("li", null, l)));
+      b.append(ul);
+    }
+    box.append(b);
+  }
+}
+
+function stat(k, v, sub, frac) {
   const s = el("div", "stat");
   s.append(el("div", "k", k), el("div", "v", v));
-  if (frac !== undefined && frac !== null) {
-    const m = el("div", "meter" + (frac >= 0.9 ? " hot" : ""));
+  if (has(sub)) s.append(el("div", "sub", sub));
+  if (has(frac)) {
+    const cls = "meter" + (frac >= 1 ? " hot" : frac >= 0.8 ? " warn" : "");
+    const m = el("div", cls);
     const i = document.createElement("i");
-    i.style.width = Math.min(100, frac * 100).toFixed(0) + "%";
+    i.style.width = Math.min(100, Math.max(0, frac * 100)).toFixed(0) + "%";
     m.append(i);
     s.append(m);
   }
   return s;
 }
 
-function render(d) {
-  const ext = (d.extensions || []).reduce((a, e) => a + e.waves, 0);
-  document.getElementById("sub").textContent =
-    "generated " + d.generated + (ext ? ` · extended +${ext} wave(s)` : "");
+function renderRail(d) {
+  const rail = clear(document.getElementById("rail"));
+  const ext = (d.extensions || []).reduce((a, e) => a + (e.waves || 0), 0);
+  rail.append(stat("wave", `${d.wave ?? "—"} / ${d.budget_waves ?? "—"}`,
+    ext ? `initial ${d.initial_budget_waves}, extended +${ext}` : null,
+    d.budget_waves ? d.wave / d.budget_waves : null));
 
-  const bars = document.getElementById("bars");
-  bars.replaceChildren();
-  bars.append(stat("wave", `${d.wave} / ${d.budget_waves}`,
-                   d.budget_waves ? d.wave / d.budget_waves : null));
-  bars.append(stat("tier", `${d.tier.index} · ${d.tier.name}`));
-  bars.append(stat("models", `${d.tier.builder_model} / ${d.tier.critic_model}`));
-  bars.append(stat("calls per lane·round", d.tier.calls_per_lane_round));
   const sp = d.spend || {};
-  const spendText = sp.eur !== null && sp.eur !== undefined
-    ? `€${sp.eur.toFixed(2)}` : `${(sp.tokens / 1e6).toFixed(2)}M tok`;
-  bars.append(stat("spend", spendText, sp.pct !== null && sp.pct !== undefined ? sp.pct / 100 : null));
+  rail.append(stat("spend", money(sp.tokens, sp.eur),
+    has(sp.budget_tokens) ? "of " + money(sp.budget_tokens, sp.budget_eur) : "no budget set",
+    has(sp.pct) ? sp.pct / 100 : null));
 
-  const cols = document.getElementById("cols");
-  cols.replaceChildren();
-  for (const [key, label] of COLUMNS) {
-    const cards = (d.columns && d.columns[key]) || [];
-    const col = el("div", "col " + key);
-    col.append(el("h2", null, `${label} (${cards.length})`));
-    if (!cards.length) col.append(el("div", "empty", "none"));
-    for (const c of cards) {
-      const card = el("div", "card");
-      const head = el("div", "lane", c.lane + " ");
-      head.append(el("span", "dim", c.dimension));
-      card.append(head);
-      card.append(el("div", "nums",
-        `${c.bar_rounds} bar rounds · ${c.promotions}↑ ${c.reverts}↓ · ` +
-        `bar-met ${c.bar_met_streak} · clean ${c.clean_streak}` +
-        (c.margins && c.margins.length ? ` · ${c.margins.join(" → ")}` : "")));
-      if (c.gap) card.append(el("div", "gap", c.gap));
-      col.append(card);
-    }
-    cols.append(col);
+  if (has(sp.per_wave)) {
+    rail.append(stat("burn rate", money(sp.per_wave, sp.eur && sp.tokens ? sp.eur / sp.tokens * sp.per_wave : null) + "/wave",
+      has(sp.waves_left_at_rate) ? `~${sp.waves_left_at_rate} wave(s) left at this rate` : null));
   }
-  document.getElementById("read").textContent = d.read ? "log read: " + d.read : "";
+  const t = d.tier || {};
+  if (has(t.index)) {
+    rail.append(stat("tier", `${t.index} · ${t.name || ""}`,
+      `${t.builder_model || "?"} / ${t.critic_model || "?"} · ~${t.calls_per_lane_round ?? "?"} calls per lane·round`));
+  }
+  const mix = d.evidence_mix;
+  if (mix && (mix.blind || mix.rubric)) {
+    rail.append(stat("evidence", `${mix.blind} blind`, `${mix.rubric} rubric — not equivalent`));
+  }
+  if (has(sp.total_rounds) && sp.total_rounds > 0 && sp.priced_rounds < sp.total_rounds) {
+    rail.append(stat("priced rounds", `${sp.priced_rounds} / ${sp.total_rounds}`,
+      "unpriced rounds make every projection a guess"));
+  }
 }
 
+function renderLadder(d) {
+  const section = document.getElementById("ladder-section");
+  const t = d.tier || {};
+  if (!Array.isArray(t.ladder) || !t.ladder.length) { section.hidden = true; return; }
+  section.hidden = false;
+  const box = clear(document.getElementById("ladder"));
+  for (const rung of t.ladder) {
+    const n = el("div", "rung " + (rung.state || "locked"));
+    n.append(el("div", "n", `tier ${rung.index}` + (rung.state === "current" ? " · here" : "")));
+    n.append(el("div", "name", rung.name || ""));
+    const bits = [];
+    if (has(rung.share)) bits.push(Math.round(rung.share * 100) + "% of budget");
+    bits.push((rung.lanes || "all") + " lanes");
+    bits.push(rung.critic_calls === 1 ? "1 critic call" : rung.critic_calls + " critic calls");
+    bits.push(`${rung.builder_model}/${rung.critic_model}`);
+    n.append(el("div", "d", bits.join(" · ")));
+    box.append(n);
+  }
+  const hist = clear(document.getElementById("ladder-history"));
+  const h = t.history || [];
+  if (h.length) {
+    hist.textContent = h.map(e =>
+      `escalated at wave ${e.at_wave}: ${e.from_tier}→${e.to_tier} (${e.reason})`).join("  ·  ");
+  } else {
+    hist.textContent = "no escalation yet — the run is still proving itself at the cheapest tier";
+  }
+}
+
+function card(c, columnKey) {
+  const n = el("div", "card");
+  const title = el("div", "title");
+  const left = el("span", null, c.lane || "");
+  left.append(" ", el("span", "dim", c.dimension || ""));
+  title.append(left);
+  if (has(c.severity)) title.append(el("span", "tag " + c.severity, c.severity));
+  n.append(title);
+
+  const nums = [];
+  if (has(c.bar_rounds)) nums.push(`${c.bar_rounds} bar rounds`);
+  if (has(c.promotions) || has(c.reverts)) nums.push(`${c.promotions || 0}↑ ${c.reverts || 0}↓`);
+  if (has(c.tokens) && c.tokens) nums.push(fmtTokens(c.tokens) + " tok");
+  const numRow = el("div", "nums", nums.join(" · "));
+  if (columnKey === "open" && has(c.bar_met_n)) {
+    numRow.append(document.createTextNode(" · bar-met"));
+    numRow.append(pips(c.bar_met_streak || 0, c.bar_met_n));
+    numRow.append(document.createTextNode(" clean"));
+    numRow.append(pips(c.clean_streak || 0, c.clean_streak_n));
+  }
+  n.append(numRow);
+
+  if (Array.isArray(c.margins) && c.margins.length)
+    n.append(el("div", "nums", c.margins.join(" → ")));
+  if (Array.isArray(c.scores) && c.scores.length) n.append(sparkline(c.scores));
+  if (has(c.gap)) n.append(el("div", "gap", c.gap));
+  if (has(c.trend)) n.append(el("div", "why", c.trend));
+  if (has(c.shelved_reason))
+    n.append(el("div", "why", `shelved at wave ${c.shelved_at_wave}: ${c.shelved_reason}`));
+  if (has(c.retired_by)) n.append(el("div", "why", "retired on " + c.retired_by));
+  if (has(c.evidence)) n.append(el("div", "foot", "last evidence: " + c.evidence));
+  return n;
+}
+
+function renderColumns(d) {
+  const cols = clear(document.getElementById("cols"));
+  const data = d.columns || {};
+  for (const [key, label] of COLUMNS) {
+    const cards = Array.isArray(data[key]) ? data[key] : [];
+    const col = el("div", "col " + key);
+    const h = el("h3", null, label + " ");
+    h.append(el("span", "count", "(" + cards.length + ")"));
+    col.append(h);
+    if (!cards.length) col.append(el("div", "empty", "none"));
+    cards.forEach(c => col.append(card(c, key)));
+    cols.append(col);
+  }
+}
+
+function renderFilters(d) {
+  const box = clear(document.getElementById("filters"));
+  const lanes = ["all", ...new Set((d.rounds || []).map(r => r.lane).filter(Boolean))];
+  for (const [val, label] of MODE_FILTERS) {
+    const b = el("button", null, label);
+    b.setAttribute("aria-pressed", String(modeFilter === val));
+    b.onclick = () => { modeFilter = val; renderFilters(STATE); renderRounds(STATE); };
+    box.append(b);
+  }
+  if (lanes.length > 2) {
+    box.append(el("span", null, " "));
+    for (const lane of lanes) {
+      const b = el("button", null, lane === "all" ? "All lanes" : lane);
+      b.setAttribute("aria-pressed", String(laneFilter === lane));
+      b.onclick = () => { laneFilter = lane; renderFilters(STATE); renderRounds(STATE); };
+      box.append(b);
+    }
+  }
+}
+
+function renderRounds(d) {
+  const section = document.getElementById("rounds-section");
+  const rows = Array.isArray(d.rounds) ? d.rounds : [];
+  if (!rows.length) { section.hidden = true; return; }
+  section.hidden = false;
+  const tbody = clear(document.querySelector("#rounds tbody"));
+  const shown = rows.filter(r =>
+    (modeFilter === "all" || r.mode === modeFilter) &&
+    (laneFilter === "all" || r.lane === laneFilter));
+  if (!shown.length) {
+    const tr = el("tr");
+    const td = el("td", "empty", "no rounds match this filter");
+    td.colSpan = 11;
+    tr.append(td); tbody.append(tr);
+    return;
+  }
+  for (const r of shown) {
+    const tr = el("tr");
+    tr.append(el("td", "num", `${r.wave}·${r.round}`));
+    tr.append(el("td", null, r.lane || ""));
+    tr.append(el("td", null, r.dimension || ""));
+    const mode = el("td");
+    mode.append(el("span", "tag " + (r.mode === "blind" ? "blind" : ""), r.mode || ""));
+    tr.append(mode);
+    const win = el("td");
+    if (r.mode === "champion" && has(r.action)) win.append(el("span", "tag " + r.action, r.action));
+    else win.append(document.createTextNode(r.winner === "ours" ? "ours" : "bar"));
+    tr.append(win);
+    tr.append(el("td", null, r.margin || ""));
+    tr.append(el("td", "num", has(r.score) ? r.score + "/10" : "—"));
+    const sev = el("td");
+    if (has(r.severity)) sev.append(el("span", "tag " + r.severity, r.severity));
+    tr.append(sev);
+    tr.append(el("td", "gap", r.gap && r.gap !== "none" ? r.gap : ""));
+    tr.append(el("td", "num", r.evidence || ""));
+    tr.append(el("td", "num", has(r.tokens) ? fmtTokens(r.tokens) : "—"));
+    tbody.append(tr);
+  }
+}
+
+function renderDetail(d) {
+  const section = document.getElementById("detail-section");
+  const box = clear(document.getElementById("detail"));
+  const sp = d.spend || {};
+  let any = false;
+
+  const listOf = (title, entries) => {
+    if (!entries.length) return;
+    any = true;
+    const l = el("div", "list");
+    l.append(el("div", "k", title));
+    for (const [k, v] of entries) {
+      const row = el("div", "row");
+      row.append(el("span", null, k));
+      row.append(el("span", "v", v));
+      l.append(row);
+    }
+    box.append(l);
+  };
+
+  const rate = sp.eur && sp.tokens ? sp.eur / sp.tokens : null;
+  const asMoney = t => rate ? fmtEur(t * rate) : fmtTokens(t) + " tok";
+
+  listOf("Spend by role", Object.entries(sp.by_role || {})
+    .filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => [k, asMoney(v)]));
+
+  listOf("Spend by tier", Object.entries(sp.by_tier || {})
+    .filter(([, v]) => v > 0).sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => ["tier " + k, asMoney(v)]));
+
+  listOf("Budget extensions", (d.extensions || []).map(e =>
+    [`wave ${e.at_wave}: +${e.waves} wave(s)`, e.log_read || ""]));
+
+  const STOP_LABELS = {
+    bar_met_n: "wins in a row to retire",
+    clean_streak_n: "clean rounds to retire",
+    flat_rounds_n: "flat rounds before shelving",
+    hard_cap_waves: "hard cap (waves)",
+    hard_cap_tokens: "hard cap (tokens)",
+  };
+  listOf("Armed stops", Object.entries(d.stops || {})
+    .filter(([, v]) => has(v))
+    .map(([k, v]) => [STOP_LABELS[k] || k.replace(/_/g, " "),
+                      k === "hard_cap_tokens" ? fmtTokens(v) : String(v)]));
+
+  section.hidden = !any;
+}
+
+function render(d) {
+  STATE = d;
+  renderHeader(d);
+  renderBanners(d);
+  renderRail(d);
+  renderLadder(d);
+  renderColumns(d);
+  renderFilters(d);
+  renderRounds(d);
+  renderDetail(d);
+  document.getElementById("footer").textContent =
+    "This board renders gauntlet/state.json. Regenerate it with " +
+    "`python3 scripts/gauntlet.py board`. Nobody edits this HTML, and nobody edits the spec by hand " +
+    "while the script owns it.";
+}
+
+function fail(msg) {
+  const meta = clear(document.getElementById("meta"));
+  meta.append(el("span", "dot stale"));
+  meta.append(document.createTextNode(msg));
+}
+
+/* ---- loading --------------------------------------------------------
+   http:// gets live polling. file:// cannot fetch, so it renders the
+   state.js bootstrap once and says so rather than looking broken.
+   -------------------------------------------------------------------- */
+let polling = true;
 async function tick() {
   try {
     const r = await fetch("state.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
     render(await r.json());
   } catch (e) {
-    document.getElementById("sub").textContent =
-      "cannot read state.json — run `python3 scripts/gauntlet.py board`" +
-      " (and serve this directory over http if the browser blocks file:// fetches)";
+    if (window.GAUNTLET_STATE) {
+      render(window.GAUNTLET_STATE);
+      if (polling) {
+        polling = false;
+        document.getElementById("meta").append(document.createTextNode(
+          " · static snapshot (serve this directory over http for live updates)"));
+      }
+    } else if (window.__stateJsMissing) {
+      fail("no spec found — run `python3 scripts/gauntlet.py board`");
+    } else {
+      fail("could not read state.json: " + e.message);
+    }
   }
 }
 tick();
-setInterval(tick, 5000);
+setInterval(() => { if (polling) tick(); }, POLL_MS);
 </script>
 </body>
 </html>
