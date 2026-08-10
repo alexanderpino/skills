@@ -10,6 +10,10 @@ to make it feel like one thing again.
 - The bar
 - The list of lanes that ran this wave and what changed in each
 
+As paths, not pasted contents. "The complete artifact" is the one prompt in this
+method that can genuinely run away with a budget — read the parts the lanes
+actually touched this wave first, and widen only if a seam points outward.
+
 ## What you look for
 
 Seams between independently-improved parts:
@@ -42,6 +46,7 @@ FIXED: <one line each — what was inconsistent, what you did>
 LEFT ALONE: <seams you judged not worth touching, with reason>
 CONFLICTS: <lane vs lane, and which you preferred>
 STRUCTURAL: <anything that suggests the lane split itself is wrong>
+TOKENS: <your call's token count, if you were given one>
 ```
 
 That last field matters. If you keep finding the same seam wave after wave, the

@@ -5,7 +5,8 @@ description: Run an adversarial build-and-judge quality loop (Gauntlet Loop) to 
 
 # Gauntlet Loop
 
-> **Set the bar. Cut the lanes. Build. Judge blind. Run it again.**
+> **Set the bar. Probe it cheap. Cut the lanes. Build. Judge blind. Run it again —
+> and buy more effort only where the log says it is buying something.**
 
 ## Provenance
 
@@ -13,9 +14,11 @@ The method is Matt Shumer's, published 27 July 2026 as the technique behind the
 "Claude of Duty" run (`https://somethingbig.ai/gauntlet-loop`, prompt at
 `https://github.com/mshumer/Claude-of-Duty`). This skill is an operational
 expansion: it adds an intake contract, a champion/challenger regression guard,
-deterministic state tooling, per-dimension bars, and named failure modes. When
-citing the method, credit Shumer for the pattern and be honest about which parts
-are this skill's additions.
+deterministic state tooling, per-dimension bars, named failure modes, and a cost
+model — an escalating effort ladder, spend measured in tokens rather than waves,
+and mid-run shelving of work that stopped moving. When citing the method, credit
+Shumer for the pattern and be honest about which parts are this skill's
+additions.
 
 ## What a Gauntlet Loop actually is
 
@@ -28,13 +31,16 @@ binary, actual prose, actual measurements — and compares it against a concrete
 external bar, blind wherever the artifact allows. If the bar wins, the critic
 names the single largest remaining gap and the work goes back. Then another round.
 
-Three properties make it a gauntlet rather than a review:
+Four properties make it a gauntlet rather than a review:
 
 1. **The bar is external and inspectable.** Not "make it production-ready". A real
    reference the agent cannot argue its way around.
 2. **The builder never grades itself.** A builder has seen every decision it made
    and is therefore excellent at justifying them. Justification is the enemy here.
 3. **The round count is not scheduled.** Rounds are earned by gaps, not planned.
+4. **The effort is not scheduled either.** The loop starts at the cheapest tier
+   that can produce a verdict and buys its way up with evidence. An idea that
+   will not work dies as a probe, not as a campaign.
 
 ## When not to use this
 
@@ -61,9 +67,16 @@ Settle these before anything else:
   If the project has no VCS, `git init` it (with the user's consent) before wave 1.
 - **Writes are confined** to the project workspace and the `gauntlet/` state
   directory. Builders write only files they own this wave (`references/decomposition.md`). **Mission Control Integration:** If running under Mission Control, the Gauntlet Loop MUST initialize inside the assigned private worktree (`mc/<id>`), never at the repository root. All lanes cut must strictly respect the Implementer's Mission Control semantic leases.
-- **The budget stop is always armed.** An unattended loop without a ceiling is not
-  safe to agree to, so never offer one. When the budget depletes the run *stops* —
-  then you may **offer an extension in waves**. You may never take one.
+- **The budget stop is always armed, and it is denominated in tokens.** An
+  unattended loop without a ceiling is not safe to agree to, so never offer one.
+  Waves are not a unit of money — a wave costs whatever its lanes and dimensions
+  happen to cost — so set `--budget-tokens` alongside `--budget-waves` and let
+  whichever depletes first stop the run. Then you may **offer an extension**.
+  You may never take one.
+- **Effort is bought in tiers, not assumed.** Start at tier 0 and escalate only
+  on evidence (`references/cost-model.md`). Opening every lane at full effort
+  before anything has been judged is the single most expensive mistake available
+  in this skill.
 - **Subagents are what make critics honest.** Each critic needs its own clean
   context. Without subagents the method degrades — see "Degraded mode" below.
 
@@ -76,24 +89,36 @@ deterministically so they cannot drift over a long context.
 
 ```
 gauntlet/
-├── config.json      # lanes, dimensions, armed stop thresholds
+├── config.json      # lanes, dimensions, stop thresholds, effort tier, spend budget
 ├── contract.md      # the confirmed intake contract
 ├── bar/             # frozen bar artifacts — never edited after intake
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
-├── workbench.html   # live Kanban board (updated via #gauntlet-state JSON)
+├── spend.jsonl      # token spend that produced no round: builders, smoother
+├── state.json       # what the workbench renders (script-written)
+├── workbench.html   # live Kanban board — reads state.json, never hand-edited
 └── report.md        # drafted by the script at the end, completed by you
 ```
 
 ```bash
-python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf --bar-kind reference --budget-waves 12
+python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf --bar-kind reference \
+    --budget-waves 12 --budget-tokens 20000000 --cost-per-mtok 9.0
 python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
     --mode blind --winner other --margin clear --score 7 --severity major --gap "..." \
-    --evidence shots/w2r3.png
-python3 scripts/gauntlet.py status    # streaks, revert rate, fired stop conditions
-python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only after the user grants it
+    --evidence shots/w2r3.png --tokens 120000
+python3 scripts/gauntlet.py spend --tokens 300000 --role builder --note "lane a builder"
+python3 scripts/gauntlet.py tier      # current effort tier; is the next one earned?
+python3 scripts/gauntlet.py escalate --reason "..."   # buy the next tier, on evidence
+python3 scripts/gauntlet.py status    # streaks, spend, burn rate, flat dimensions, stops
+python3 scripts/gauntlet.py shelve --lane a --dimension perf --reason "..."   # park a stalled dimension
+python3 scripts/gauntlet.py board     # regenerate state.json for the workbench
+python3 scripts/gauntlet.py extend --waves 3 --tokens 5000000 --reason "..."  # only on a grant
 python3 scripts/gauntlet.py report    # draft the end-of-run report from the log
 ```
+
+Pass `--tokens` on every round and every builder call. Without them the run
+cannot price itself, `status` cannot print a burn rate, and every extension offer
+degrades from "≈ €30" to "≈ 12 subagent calls" — a unit no user can evaluate.
 
 Log every comparison through the script, never by hand-editing the file — the
 validation is the point. Full layout, git conventions and the resume protocol:
@@ -102,10 +127,14 @@ validation is the point. Full layout, git conventions and the resume protocol:
 ## Phase 0 — The contract
 
 Never start looping without this settled. Read `references/intake.md`, then put a
-compact contract in front of the user and get confirmation. 
-First, you must set up the **Live Kanban Workbench** by copying the HTML template to `gauntlet/workbench.html` and opening it in the user's browser.
-Infer or propose everything you can; only **stop conditions** and **budget** genuinely require the
-user, because they encode how much time and money the run may spend.
+compact contract in front of the user and get confirmation. Set up the **Live
+Kanban Workbench** by copying `assets/workbench.html` to `gauntlet/workbench.html`
+and opening it in the user's browser; it renders `gauntlet/state.json`, which
+`gauntlet.py board` regenerates. Never edit the HTML, and never ask a subagent to.
+
+Infer or propose everything you can; only **stop conditions** and **budget**
+genuinely require the user, because they encode how much time and money the run
+may spend.
 
 | Field | What it fixes |
 |---|---|
@@ -113,7 +142,8 @@ user, because they encode how much time and money the run may spend.
 | **Bar** | The concrete external comparator, per dimension. |
 | **Inspection** | How a critic will actually reach the output each round. |
 | **Stop** | Which conditions are armed, with thresholds → `config.json`. |
-| **Budget** | Ceiling on waves / wall clock / tokens. Always armed. Say that it is a checkpoint: when it runs out the run stops and you come back with an extension offer. Optionally agree a **hard cap** no extension may cross. |
+| **Budget** | Tokens first, waves second — priced in the user's currency. Always armed. Say that it is a checkpoint: when it runs out the run stops and you come back with an extension offer. Optionally agree a **hard cap** no extension may cross. |
+| **Ladder** | Where the run starts on the effort ladder and what each escalation will cost. Default: tier 0. |
 | **Autonomy** | Unattended until a stop fires, or check in at wave boundaries. |
 | **Workbench** | Where progress is visible without interrupting the run. |
 
@@ -151,12 +181,42 @@ versions is better, without needing the rest?*
 Assign file ownership per lane in `gauntlet/ownership.md`. One file, one owner,
 per wave. Sizing, parallel-vs-serial, and re-cutting: `references/decomposition.md`.
 
+## Phase 2b — The effort ladder
+
+Effort is bought, not assumed. The run starts at tier 0 and each escalation costs
+a piece of evidence from the tier below it. Full model, gates and rationale:
+`references/cost-model.md`.
+
+| Tier | Name | Scope | Builder | Critic | Share of budget |
+|---|---|---|---|---|---|
+| 0 | probe | 1 lane, 1 dimension, 1 round | mid | cheap, 1 collapsed call | 5% |
+| 1 | pilot | ≤2 lanes, 1 wave | mid | cheap, 1 screening call | 15% |
+| 2 | campaign | all lanes, full waves | high | mid, split; escalate on `thin` | 40% |
+| 3 | polish | only lanes still moving | high | high, full split | 40% |
+
+`gauntlet.py tier` prints whether the next tier is earned; `escalate --reason`
+buys it. The four gates — a round ran at this tier, the bar discriminates,
+inspection is live, the artifact is moving — are all computed from the log, and
+`escalate` refuses when one fails. That refusal is the mechanism working: it says
+more money would buy a bigger version of the problem you already have.
+
+The point of the shape: **an unpromising run dies having spent a fifth of the
+budget instead of all of it.** Say that at intake, because it is what makes an
+ambitious budget safe to agree to.
+
 ## Round zero — before any wave
 
-Run one build and one critic verdict on a single lane before scaling up. It costs
-almost nothing and surfaces the two failures that would otherwise waste hours: a
-broken inspection path, and a bar too soft for the critic to compare against. A
-vague round-zero verdict means fix the bar, not run the wave.
+Tier 0 *is* round zero: one build and one critic verdict on a single lane. It
+surfaces the two failures that would otherwise waste hours — a broken inspection
+path, and a bar too soft for the critic to compare against. A vague round-zero
+verdict means fix the bar, not run the wave.
+
+It is also the run's **price calibration**. Log what it cost
+(`log-round --tokens`, `spend --tokens`), then extrapolate to the proposed budget
+and put the projected total in front of the user *in their currency* before
+wave 1. One round of real measurement beats any estimate, and it costs one round.
+If the projection is disproportionate to the artifact, say so before wave 1 —
+that is the cheapest moment in the whole run to say it.
 
 ## Phase 3 — Run the waves
 
@@ -185,9 +245,28 @@ Per lane, per round:
    script rejects it. A verdict of severity `none` must still cite what it
    inspected, or it is a lazy critic, not a clean round.
 
-Two critic calls per round is the default. On cheap, fast-moving lanes you may
-collapse them into one call that answers both questions — but log two records,
-and prefer the full split whenever a round's outcome will trigger retirement.
+**How many critic calls is a tier decision, not a taste decision.** At tiers 0–1
+one collapsed screening call answers both questions; log two records regardless.
+From tier 2 the split is the default. In both cases, escalate a *specific* verdict
+to a stronger critic when it comes back `thin` and will decide a retirement — a
+`decisive` verdict does not get better on a bigger model. → `references/cost-model.md`
+
+## Phase 3b — Stop paying for stalled work
+
+At every wave boundary, `status` flags any dimension that has not moved in
+`flat_rounds_n` bar rounds (default 3) as `FLAT`, with the cost of running it
+again printed next to it. Shelve it:
+
+```bash
+python3 scripts/gauntlet.py shelve --lane imagery --dimension perf --reason "<log evidence>"
+```
+
+Shelved is **parked, not retired**: it stops consuming calls from the next wave,
+and the report keeps its open gap. `shelve` refuses a dimension the log does not
+call flat, so this cannot quietly become a way to abandon work that was climbing.
+
+A lane that stalls at wave 3 should cost three waves of calls, not twelve. The
+evidence is in the log from wave 3 — this is what puts it on the screen there.
 
 ## Phase 4 — Smooth
 
@@ -272,6 +351,12 @@ stop there and the script refuses to cross it. Full protocol:
   wandering downhill one plausible-sounding round at a time.
 - **Every comparison goes through the log.** State the model remembers is state
   the run will lose.
+- **Every call reports what it cost.** A run that cannot price itself cannot tell
+  the user when to stop paying, and "≈ 12 subagent calls" is not a price.
+- **Effort goes up on evidence, never on optimism.** The gates are in the log;
+  `escalate` enforces them.
+- **A flat dimension gets shelved, not re-run.** The wave boundary is where that
+  decision belongs — not the moment the budget runs out.
 - **The budget is extended by the user or not at all.** Stop first, offer second,
   resume only on a grant — and log the grant with its reason.
 - **Language Rules (ASD-STE100).** All visible text on the Kanban board (goals, gaps, next fixes) and reports must use Simplified Technical English: max 20-25 words per sentence, active voice, one instruction per sentence, no AI marketing language.
@@ -292,6 +377,9 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Ceiling denial | Same gap recurs; reverts climb | Re-cut or stop; `status` surfaces the signal |
 | Budget creep | Extensions granted repeatedly, each "nearly there" | Block-sized extensions, evidence per grant, hard cap |
 | Inspection rot | Stale or missing evidence | Re-verify the path at every wave boundary |
+| Premature scale-up | Every lane opened at full effort before any verdict | Start at tier 0; `escalate` on gates |
+| Unsatisfiable critic | No verdict ever reaches `none`; only the budget can end the run | Calibrated scale; `none` is a valid verdict |
+| Cost blindness | Run priced in waves and calls; nobody knows what it spent | `--budget-tokens`, `--tokens` on every call |
 
 ## Degraded mode (no subagents)
 
@@ -304,15 +392,23 @@ as a manual protocol rather than claiming to run it.
 
 ## Scale expectations
 
-Set these at intake so the budget means something: each round is one builder call
-plus up to two critic calls; a wave multiplies that by active lanes; smoothing
-adds one call per wave. A 3-lane, 10-wave run is therefore roughly 100 subagent
-invocations. Parallel lanes raise the burn *rate*, not the total. When the
-projected total looks disproportionate to the artifact, say so before starting.
+Calls per lane per round = **1 builder + (critic calls × dimensions)**. At tier 3
+with two dimensions that is 5, not 3 — the dimension multiplier is the term that
+gets forgotten, and forgetting it is how a budget the user agreed to becomes one
+they did not. A wave is `lanes × that + 1` for the smoother. `gauntlet.py`
+computes it from the current tier and the declared dimensions rather than from a
+constant.
 
-Price an extension the same way, over the lanes still open — a 3-wave extension
-on one surviving lane is ~12 calls, not another hundred. That arithmetic is what
-makes "3 more waves?" a question the user can actually answer.
+So a 3-lane, 2-dimension run at tier 3 is ~16 calls per wave, and ten of those
+waves is ~160 subagent invocations. Parallel lanes raise the burn *rate*, not the
+total. The ladder is what keeps that number from being what an *unpromising* run
+costs: tiers 0 and 1 together are a fifth of the budget.
+
+Then stop estimating and start measuring. After round zero the run knows its own
+per-call cost; `status` prints the burn rate and the waves of budget remaining at
+that rate, and both the extension offer and `extend` price the next block from
+this run's own calls. Quote money, not calls — "≈ €30 for three more waves on the
+one lane still moving" is a question a user can answer.
 
 ## Worked example
 
@@ -325,6 +421,7 @@ before your first run; point users at it when they ask what they are agreeing to
 Read at the relevant phase, not upfront:
 
 - `references/intake.md` — the contract; cold start; cost expectations
+- `references/cost-model.md` — the effort ladder, model tiering, context discipline, honest pricing
 - `references/bar-selection.md` — bar taxonomies; dimensions; finding a bar
 - `references/decomposition.md` — lane sizing, ownership, parallel vs serial
 - `references/blind-protocol.md` — honest blind comparison; champion mode; rubric fallback

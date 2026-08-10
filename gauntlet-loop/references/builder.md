@@ -10,6 +10,10 @@ against a bar you can look at yourself.
 - The current state of the artifact
 - The named gap from the last round, if there was one
 - Your file ownership: the exact paths you may write to this round
+- **Your read budget:** the paths you may read to do it
+
+All of these arrive as *paths*, not as pasted contents. Read what you need from
+disk. If something was restated into your prompt instead, prefer the file.
 
 ## What you do
 
@@ -29,6 +33,16 @@ against a bar you can look at yourself.
 **Stay in your lane's files.** Another builder owns the rest this wave. If closing
 the gap genuinely requires a file you do not own, stop and escalate to the lead
 agent rather than reaching across.
+
+**Stay inside your read budget.** You were given the paths that matter for this
+gap. A repository-wide sweep to "get oriented" costs more than the rest of the
+wave and re-runs every round; if the gap genuinely cannot be closed from the
+paths you were given, stop and say which path you need. That escalation is cheap
+and it is usually a signal that the lane was cut too vaguely.
+
+**Report what you cost.** If you were given a token count for your call, state it
+in your handoff as `TOKENS: <n>`. The lead agent logs it, and the run uses it to
+price the next block of waves from measurement rather than guesswork.
 
 **Do not tune for the critic.** The critic's phrasing is not the target; the bar is.
 Optimising the wording of a rubric is the fastest way to make a loop produce

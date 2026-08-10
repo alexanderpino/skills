@@ -27,9 +27,23 @@ strains to find any gap, wave overhead exceeds the work done. Merge upward.
 
 Retirement itself is governed by the armed stop conditions, computed per
 dimension by `gauntlet.py status` — not by feel. Your job here is the converse:
-when a lane retires, reallocate its compute to lanes with gaps left, and when a
-merged or re-cut lane appears, register it before its first round. Lane sets are
-not fixed for the run.
+when a lane retires or a dimension is shelved, reallocate its compute to lanes
+with gaps left, and when a merged or re-cut lane appears, register it before its
+first round. Lane sets are not fixed for the run.
+
+## Cut for the tier you are on
+
+At tier 0 you cut **one** lane — the one whose verdict would tell you most about
+whether the whole thing is worth funding. At tier 1, two. Only from tier 2 does
+the full cut go live (`cost-model.md`).
+
+This is not a watered-down decomposition. Cutting all six lanes and running one
+of them is exactly right: the cut is a hypothesis either way, and the probe is
+what tells you whether it was a good one before you pay for all six. Lanes that
+have not run yet cost nothing and can be re-cut for free.
+
+A lane's cost is `1 + (critic calls × dimensions)` calls per round. That is the
+number to have in mind when deciding whether a seventh lane earns its place.
 
 ## Parallel or serial
 

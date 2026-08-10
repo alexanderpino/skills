@@ -123,6 +123,71 @@ the budget becomes the checkpoint, the cap the ceiling. And when the honest read
 is "flat", say so — recommending a stop is the whole point of being the one who
 can read the log.
 
+## Premature scale-up
+
+**Signal.** Wave 1 opens every lane at full effort on the strongest models, before
+a single verdict exists. The run looks impressively busy by lunchtime.
+
+**Cause.** Treating the lane cut as a commitment rather than a hypothesis, and
+effort as a setting rather than a purchase.
+
+**Repair.** The effort ladder (`cost-model.md`). Start at tier 0: one lane, one
+dimension, cheap models, one collapsed critic call. Escalate only through
+`gauntlet.py escalate`, which checks four gates from the log and refuses when one
+fails. The whole value of the shape is that a run which turns out to be
+unpromising costs a fifth of the budget instead of all of it — and you only get
+that if the first tier is genuinely small.
+
+## Unsatisfiable critic
+
+**Signal.** No verdict ever reaches severity `none`. Streaks never build. Every
+lane runs until the money is gone, and the report's stop reason is always
+"budget". Score-wise, everything sits below whatever counts as a pass.
+
+**Cause.** A critic calibrated so that only perfection passes — the mirror image
+of sycophancy, and much easier to mistake for rigour. If the critic cannot ever
+say "nothing meaningful remains", then `bar-met` and `clean-streak` cannot fire,
+and budget depletion becomes the *only* way the run can end. The stop conditions
+are still in the config; they have just been made unreachable.
+
+**Repair.** A calibrated scale, not a pass mark (`critic.md`): 9 against a strong
+bar is an excellent result, not a failure. `none` is a legitimate and expected
+verdict, and its evidence requirement — not its rarity — is what keeps it honest.
+Diagnostic: if a run ends on budget with every dimension still open and every
+verdict still `minor`, read three verdicts in full before funding an extension.
+The problem is probably the critic, and more waves will not fix it.
+
+## Cost blindness
+
+**Signal.** The run is priced in waves and subagent calls. Nobody, including you,
+can say what it has spent. The first accurate number anyone sees is the invoice.
+
+**Cause.** Waves treated as a unit of money. A wave costs whatever its lanes,
+dimensions and tier happen to cost — a 3-lane 2-dimension wave at full split is
+five times a probe round, and that ratio is invisible in a wave count.
+
+**Repair.** `--budget-tokens` at intake with `--cost-per-mtok`, `--tokens` on
+every `log-round`, and `spend` for builders and the smoother. Then `status`
+prints spend, burn rate, and the waves of budget remaining at that rate, and the
+extension offer is priced in the user's currency from the run's own measured
+calls. Also: quote the real call arithmetic — 1 builder + (critic calls ×
+dimensions) — because dropping the dimension multiplier understates every
+multi-dimension run at intake, which is where it does the most damage.
+
+## Funding a stall
+
+**Signal.** A lane stopped moving at wave 3 and was still being run at wave 12,
+because nothing forced the question until the budget ran out.
+
+**Cause.** The trend evidence existed in the log the whole time; it was only
+*consulted* at depletion.
+
+**Repair.** `status` reads the trend at every wave boundary and flags any
+dimension flat for `flat_rounds_n` rounds, with the cost of running it again next
+to it. Shelve it (`gauntlet.py shelve`) and reallocate to lanes with gaps left.
+Shelved is parked, not retired: the report keeps the open gap, so this buys
+honesty as well as money.
+
 ## Inspection rot
 
 **Signal.** Critics stop citing specific evidence, or cite the same stale evidence

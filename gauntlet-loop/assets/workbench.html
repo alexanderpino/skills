@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gauntlet workbench</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #fff; --ink: #14171a; --muted: #5c6570;
+    --line: #dcdfe3; --accent: #2f6f4f; --warn: #9a5b00; --stop: #a12b2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a; --panel: #1c2024; --ink: #e8eaec; --muted: #99a2ad;
+      --line: #2c3238; --accent: #6fc79b; --warn: #e0a355; --stop: #e08585;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1.5rem; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { font-size: 1.1rem; margin: 0 0 .25rem; letter-spacing: .01em; }
+  .sub { color: var(--muted); font-size: .85rem; margin-bottom: 1.25rem; }
+  .bars { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+          padding: .6rem .9rem; min-width: 9rem; }
+  .stat .k { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .stat .v { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .meter { height: 5px; background: var(--line); border-radius: 3px; margin-top: .4rem; overflow: hidden; }
+  .meter > i { display: block; height: 100%; background: var(--accent); }
+  .meter.hot > i { background: var(--stop); }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+  .col h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em;
+            color: var(--muted); margin: 0 0 .5rem; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line);
+          border-radius: 6px; padding: .6rem .7rem; margin-bottom: .55rem; }
+  .col.flat .card { border-left-color: var(--warn); }
+  .col.shelved .card { border-left-color: var(--muted); opacity: .75; }
+  .col.retired .card { border-left-color: var(--accent); }
+  .card .lane { font-weight: 600; }
+  .card .dim { color: var(--muted); font-weight: 400; }
+  .card .nums { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums;
+                margin-top: .25rem; }
+  .card .gap { font-size: .85rem; margin-top: .4rem; }
+  .read { margin-top: 1.25rem; font-size: .85rem; color: var(--muted); }
+  .empty { color: var(--muted); font-size: .82rem; font-style: italic; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+</style>
+</head>
+<body>
+<h1>Gauntlet workbench</h1>
+<div class="sub" id="sub">loading <code>state.json</code>…</div>
+<div class="bars" id="bars"></div>
+<div class="cols" id="cols"></div>
+<div class="read" id="read"></div>
+
+<script>
+// This board renders gauntlet/state.json, written by `gauntlet.py board`.
+// Nothing here is hand-edited — not by the lead agent, not by a subagent.
+// Regenerating progress costs one deterministic command, not a file rewrite.
+const COLUMNS = [
+  ["open", "Open"], ["flat", "Flat — shelve or re-cut"],
+  ["shelved", "Shelved"], ["retired", "Retired"],
+];
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function stat(k, v, frac) {
+  const s = el("div", "stat");
+  s.append(el("div", "k", k), el("div", "v", v));
+  if (frac !== undefined && frac !== null) {
+    const m = el("div", "meter" + (frac >= 0.9 ? " hot" : ""));
+    const i = document.createElement("i");
+    i.style.width = Math.min(100, frac * 100).toFixed(0) + "%";
+    m.append(i);
+    s.append(m);
+  }
+  return s;
+}
+
+function render(d) {
+  const ext = (d.extensions || []).reduce((a, e) => a + e.waves, 0);
+  document.getElementById("sub").textContent =
+    "generated " + d.generated + (ext ? ` · extended +${ext} wave(s)` : "");
+
+  const bars = document.getElementById("bars");
+  bars.replaceChildren();
+  bars.append(stat("wave", `${d.wave} / ${d.budget_waves}`,
+                   d.budget_waves ? d.wave / d.budget_waves : null));
+  bars.append(stat("tier", `${d.tier.index} · ${d.tier.name}`));
+  bars.append(stat("models", `${d.tier.builder_model} / ${d.tier.critic_model}`));
+  bars.append(stat("calls per lane·round", d.tier.calls_per_lane_round));
+  const sp = d.spend || {};
+  const spendText = sp.eur !== null && sp.eur !== undefined
+    ? `€${sp.eur.toFixed(2)}` : `${(sp.tokens / 1e6).toFixed(2)}M tok`;
+  bars.append(stat("spend", spendText, sp.pct !== null && sp.pct !== undefined ? sp.pct / 100 : null));
+
+  const cols = document.getElementById("cols");
+  cols.replaceChildren();
+  for (const [key, label] of COLUMNS) {
+    const cards = (d.columns && d.columns[key]) || [];
+    const col = el("div", "col " + key);
+    col.append(el("h2", null, `${label} (${cards.length})`));
+    if (!cards.length) col.append(el("div", "empty", "none"));
+    for (const c of cards) {
+      const card = el("div", "card");
+      const head = el("div", "lane", c.lane + " ");
+      head.append(el("span", "dim", c.dimension));
+      card.append(head);
+      card.append(el("div", "nums",
+        `${c.bar_rounds} bar rounds · ${c.promotions}↑ ${c.reverts}↓ · ` +
+        `bar-met ${c.bar_met_streak} · clean ${c.clean_streak}` +
+        (c.margins && c.margins.length ? ` · ${c.margins.join(" → ")}` : "")));
+      if (c.gap) card.append(el("div", "gap", c.gap));
+      col.append(card);
+    }
+    cols.append(col);
+  }
+  document.getElementById("read").textContent = d.read ? "log read: " + d.read : "";
+}
+
+async function tick() {
+  try {
+    const r = await fetch("state.json", { cache: "no-store" });
+    render(await r.json());
+  } catch (e) {
+    document.getElementById("sub").textContent =
+      "cannot read state.json — run `python3 scripts/gauntlet.py board`" +
+      " (and serve this directory over http if the browser blocks file:// fetches)";
+  }
+}
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>

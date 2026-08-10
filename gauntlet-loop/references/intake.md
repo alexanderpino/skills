@@ -6,10 +6,13 @@ loop is running.
 
 ## Phase 0: The Workbench (Must be step 1)
 
-Before proposing a contract, you must set up the live progress board.
-1. Copy the provided HTML template to `gauntlet/workbench.html`.
-2. Open this file directly in the user's browser (e.g. using `start`, `open`, or `xdg-open`).
-3. Sub-agents MUST ONLY edit the `#gauntlet-state` JSON block within this HTML file. Never generate or rewrite the HTML structure itself.
+Before proposing a contract, set up the live progress board.
+1. Copy `assets/workbench.html` from this skill to `gauntlet/workbench.html`.
+2. Open it in the user's browser (`start`, `open`, or `xdg-open`).
+3. The board renders `gauntlet/state.json`, which `gauntlet.py board` writes.
+   **Nobody edits the HTML** — not you, not a subagent. Regenerating the board is
+   one deterministic command; a subagent that has to open an HTML file to report
+   progress pays for the whole file every round it does so.
 
 ## How to run intake without interrogating anyone
 
@@ -32,8 +35,10 @@ BAR      <the concrete comparator, and where its files live>
 INSPECT  <how a critic reaches the real output each round>
 LANES    <your proposed initial split, or "to be cut after first look">
 STOP     <which conditions are armed, with thresholds>
-BUDGET   <waves / wall clock / tokens — always set; stops and offers an extension
-         when it runs out. Optional hard cap: the ceiling extensions may not cross>
+BUDGET   <tokens (and the money that is), plus waves — always set; whichever
+         depletes first stops the run and triggers an extension offer.
+         Optional hard cap: the ceiling extensions may not cross>
+LADDER   <starting tier and what each escalation costs; default tier 0 (probe)>
 AUTONOMY <unattended until stop | check in between waves>
 BENCH    <where progress is visible>
 ```
@@ -63,23 +68,47 @@ critics grade descriptions is not a gauntlet, it is a conversation.
 armed at once and that is correct — first to fire wins.
 
 **Budget.** Always armed even when other conditions are. It is the backstop that
-makes unattended running safe to agree to. Give the user a scale to react to:
-each round is one builder call plus up to two critic calls; multiply by lanes per
-wave, add one smoother call per wave. State the projected total in the contract
-block ("8 waves ≈ 40–60 subagent invocations") so "budget: 8 waves" is a number
-they can actually evaluate. Parallel lanes raise the burn rate, not the total.
+makes unattended running safe to agree to.
+
+**Set it in tokens, and say what that is in money.** Waves are not a unit of
+money: a wave costs whatever its lanes, dimensions and effort tier happen to
+cost, and a budget denominated in waves is a budget the user cannot evaluate.
+
+```bash
+--budget-waves 8 --budget-tokens 20000000 --cost-per-mtok 9.0
+```
+
+Give the user the arithmetic behind it: calls per lane per round = 1 builder +
+(critic calls × dimensions), times lanes, plus one smoother per wave. State the
+projected total in the contract block — in their currency — so the budget line is
+a number they can react to. Parallel lanes raise the burn rate, not the total.
+
+Then stop estimating: **round zero prices the run.** Log its tokens, extrapolate,
+and put the measured projection in front of the user before wave 1. If it comes
+out disproportionate to the artifact, that is the cheapest possible moment to
+say so.
 
 Say what happens when it runs out, at intake, so nobody has to guess later: the
 run **stops**, reports, and comes back with an extension offer — a next block of
-waves, priced, with the log's read on whether the artifact is still improving.
-That makes the first budget a cheap first checkpoint rather than a bet on the
-whole run, and users pick a realistic number instead of an inflated one.
+waves, priced from the run's own measured cost, with the log's read on whether
+the artifact is still improving. That makes the first budget a cheap first
+checkpoint rather than a bet on the whole run, and users pick a realistic number
+instead of an inflated one.
+
+**Ladder.** Say where the run starts and what escalation costs, because it is the
+line that makes an ambitious budget safe: the run begins at tier 0 (one lane, one
+dimension, cheap models) and buys its way up only on evidence from the log. An
+idea that does not work therefore costs a fifth of the budget, not all of it.
+Full model: `cost-model.md`. Users who want to skip straight to tier 2 can — but
+tell them what the ladder was protecting them from before they do.
 
 **Hard cap (optional).** For users who want long unattended running, pair a small
 budget with a cap rather than setting one huge budget:
-`--budget-waves 8 --hard-cap-waves 20`. The budget is where you stop and report;
-the cap is the ceiling no extension may cross. Without a cap, every extension
-needs the user again — which is the safe default, not a shortcoming.
+`--budget-waves 8 --hard-cap-waves 20 --hard-cap-tokens 60000000`. The budget is
+where you stop and report; the cap is the ceiling no extension may cross. Cap
+both units — a token cap without a wave cap (or the reverse) leaves the other one
+free to run away. Without a cap, every extension needs the user again — which is
+the safe default, not a shortcoming.
 
 **Autonomy.** If the user wants check-ins, the natural boundary is the end of a
 wave, after smoothing — the artifact is coherent there and a decision is cheap.
@@ -96,12 +125,21 @@ the comparison from round 1.
 
 ## Before wave one
 
-Run a **round zero** on a single lane: one build, one critic, one verdict. It costs
-almost nothing and it surfaces the two failures that would otherwise waste hours —
-a broken inspection path, and a bar the critic cannot actually compare against.
+Run a **round zero** — which is simply tier 0 of the effort ladder: one lane, one
+dimension, one build, one critic, one verdict. It surfaces the two failures that
+would otherwise waste hours — a broken inspection path, and a bar the critic
+cannot actually compare against.
 
 If round zero produces a vague verdict, the bar is too soft. Fix it before scaling
-up to a full wave.
+up to a full wave. `gauntlet.py tier` refuses the escalation for you.
+
+Then price it. Log the tokens it cost, run `gauntlet.py status`, and give the user
+the projection before wave 1:
+
+> "Round zero cost ~420k tokens (≈ €3.80). At that rate the 8-wave budget lands
+> around €150–190. Still want 8, or should the pilot decide?"
+
+That sentence is worth more than every estimate in this file.
 
 ## Recording it
 
@@ -109,8 +147,9 @@ Initialise the state directory as part of confirming the contract:
 
 ```bash
 python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
-    --bar-kind <kind> --bar-met-n 2 --clean-streak-n 2 --budget-waves <N> \
-    [--hard-cap-waves <M>]
+    --bar-kind <kind> --bar-met-n 2 --clean-streak-n 2 \
+    --budget-waves <N> --budget-tokens <T> --cost-per-mtok <rate> \
+    [--hard-cap-waves <M>] [--hard-cap-tokens <C>] [--flat-rounds-n 3]
 ```
 
 

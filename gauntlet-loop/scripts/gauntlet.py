@@ -8,7 +8,11 @@ long context.
 Commands:
   init        Create the gauntlet/ state directory and config
   log-round   Append one validated comparison record to rounds.jsonl
+  spend       Record token spend that is not attached to a logged round
   status      Per-lane/per-dimension streaks, revert rate, fired stop conditions
+  tier        Current effort tier, its allowance, and whether escalation is earned
+  escalate    Move up the effort ladder once the evidence justifies the spend
+  shelve      Park a flat dimension so it stops consuming calls
   extend      Raise the wave budget after the user grants an extension
   report      Draft the end-of-run gauntlet report from the log
 """
@@ -25,26 +29,80 @@ MARGINS = ("decisive", "clear", "thin")
 SEVERITIES = ("major", "minor", "none")
 ACTIONS = ("promoted", "reverted")
 
+# The effort ladder. A gauntlet buys its way up, it does not start at the top:
+# each tier may spend `share` of the total token budget, and moving to the next
+# one costs a piece of evidence. An unpromising run therefore dies having spent
+# a fifth of the budget rather than all of it.
+#
+# `lanes`/`dims` are ceilings for the tier (null = no ceiling). `critic_calls`
+# is the number of critic calls per lane per round: 1 = one collapsed screening
+# call answering promotion and bar together, 2 = the full split, per dimension.
+DEFAULT_LADDER = [
+    {"name": "probe", "share": 0.05, "lanes": 1, "dims": 1,
+     "critic_calls": 1, "builder_model": "mid", "critic_model": "cheap"},
+    {"name": "pilot", "share": 0.15, "lanes": 2, "dims": None,
+     "critic_calls": 1, "builder_model": "mid", "critic_model": "cheap"},
+    {"name": "campaign", "share": 0.40, "lanes": None, "dims": None,
+     "critic_calls": 2, "builder_model": "high", "critic_model": "mid"},
+    {"name": "polish", "share": 0.40, "lanes": None, "dims": None,
+     "critic_calls": 2, "builder_model": "high", "critic_model": "high"},
+]
+
 DEFAULT_CONFIG = {
     "stops": {
         "bar_met_n": 2,
         "clean_streak_n": 2,
         "budget_waves": 12,
-        # Absolute ceiling no extension may cross. null = no ceiling agreed, in
+        # The budget the user actually pays. null = not set, which `status`
+        # complains about: waves are not a unit of money.
+        "budget_tokens": None,
+        # Absolute ceilings no extension may cross. null = no ceiling agreed, in
         # which case every extension needs the user again.
         "hard_cap_waves": None,
+        "hard_cap_tokens": None,
+        # A dimension that has not moved in this many bar rounds is flagged for
+        # shelving — it is buying reverts, not gap closure.
+        "flat_rounds_n": 3,
     },
     "dimensions": ["overall"],
     "lanes": [],
     "bar_kind": "reference",
+    # Blended price of a million tokens, for printing the budget in the unit the
+    # user thinks in. null = print tokens only.
+    "cost_eur_per_mtok": None,
+    "effort": {
+        "tier": 0,
+        "ladder": DEFAULT_LADDER,
+        # Appended by `escalate`: the run's history of "the evidence justified
+        # spending more per round".
+        "history": [],
+    },
+    # Appended by `shelve`: dimensions parked mid-run and why.
+    "shelved": [],
     # Granted budget extensions, appended by `extend`. The run's history of
     # "the budget ran out and the user chose to keep going".
     "extensions": [],
 }
 
-# One builder call plus up to two critic calls per lane per wave, plus one
-# smoother call per wave. Used to price an extension before it is granted.
-CALLS_PER_LANE_ROUND = 3
+
+def tier_spec(cfg, tier=None):
+    ladder = cfg.get("effort", {}).get("ladder") or DEFAULT_LADDER
+    t = cfg["effort"]["tier"] if tier is None else tier
+    return ladder[min(max(t, 0), len(ladder) - 1)]
+
+
+def calls_per_lane_round(cfg, tier=None):
+    """One builder call plus the tier's critic calls, per declared dimension.
+
+    The old flat 3 undercounted every multi-dimension run — a 2-dimension lane
+    at full split is 5 calls, not 3, and quoting 3 at intake is how a budget the
+    user agreed to turns into one they did not.
+    """
+    spec = tier_spec(cfg, tier)
+    dims = len(cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"])
+    if spec["dims"]:
+        dims = min(dims, spec["dims"])
+    return 1 + spec["critic_calls"] * dims
 
 
 def die(msg):
@@ -60,14 +118,24 @@ def load_config(root):
     # Backfill fields a config written by an older run will not have, so a
     # resumed run can still be extended.
     cfg.setdefault("extensions", [])
+    cfg.setdefault("shelved", [])
+    cfg.setdefault("cost_eur_per_mtok", None)
     cfg.setdefault("stops", {})
     for k, v in DEFAULT_CONFIG["stops"].items():
         cfg["stops"].setdefault(k, v)
+    effort = cfg.setdefault("effort", {})
+    effort.setdefault("tier", 0)
+    effort.setdefault("ladder", json.loads(json.dumps(DEFAULT_LADDER)))
+    effort.setdefault("history", [])
+    # Where this config came from, so helpers can reach the ledgers without
+    # every caller threading the path through. Stripped again on save.
+    cfg["_root"] = str(root)
     return cfg
 
 
 def save_config(root, cfg):
-    (root / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
+    out = {k: v for k, v in cfg.items() if k != "_root"}
+    (root / "config.json").write_text(json.dumps(out, indent=2) + "\n")
 
 
 def initial_budget(cfg):
@@ -76,8 +144,7 @@ def initial_budget(cfg):
     return ext[0]["from_waves"] if ext else cfg["stops"]["budget_waves"]
 
 
-def load_rounds(root):
-    p = root / "rounds.jsonl"
+def _load_jsonl(p):
     if not p.exists():
         return []
     out = []
@@ -88,8 +155,58 @@ def load_rounds(root):
         try:
             out.append(json.loads(line))
         except json.JSONDecodeError as e:
-            die(f"rounds.jsonl line {i} is corrupt: {e}")
+            die(f"{p.name} line {i} is corrupt: {e}")
     return out
+
+
+def load_rounds(root):
+    return _load_jsonl(root / "rounds.jsonl")
+
+
+def load_spend(root):
+    return _load_jsonl(root / "spend.jsonl")
+
+
+def total_spend(root, rounds=None):
+    """Every token the run has cost, from both ledgers.
+
+    Rounds carry the spend of the calls that produced them; spend.jsonl carries
+    everything else — builders, the smoother, the lead agent's own passes.
+    """
+    rounds = load_rounds(root) if rounds is None else rounds
+    return (sum(r.get("tokens") or 0 for r in rounds)
+            + sum(s.get("tokens") or 0 for s in load_spend(root)))
+
+
+def fmt_tokens(n):
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.2f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}k"
+    return str(n)
+
+
+def fmt_cost(cfg, tokens):
+    """Tokens, plus money whenever the run knows its own price."""
+    rate = cfg.get("cost_eur_per_mtok")
+    if not rate:
+        return f"{fmt_tokens(tokens)} tok"
+    return f"{fmt_tokens(tokens)} tok ≈ €{tokens / 1_000_000 * rate:,.2f}"
+
+
+def tier_allowance(cfg, tier=None):
+    """Cumulative token allowance up to and including a tier.
+
+    Cumulative, not per-tier: a probe that came in under budget hands its
+    unspent share up the ladder rather than losing it.
+    """
+    budget = cfg["stops"].get("budget_tokens")
+    if not budget:
+        return None
+    ladder = cfg["effort"]["ladder"]
+    t = cfg["effort"]["tier"] if tier is None else tier
+    t = min(max(t, 0), len(ladder) - 1)
+    return int(budget * sum(s["share"] for s in ladder[: t + 1]))
 
 
 def cmd_init(args):
@@ -113,10 +230,30 @@ def cmd_init(args):
         cfg["stops"]["clean_streak_n"] = args.clean_streak_n
     if args.budget_waves is not None:
         cfg["stops"]["budget_waves"] = args.budget_waves
+    if args.budget_tokens is not None:
+        if args.budget_tokens <= 0:
+            die("--budget-tokens must be positive")
+        cfg["stops"]["budget_tokens"] = args.budget_tokens
+    if args.flat_rounds_n is not None:
+        cfg["stops"]["flat_rounds_n"] = args.flat_rounds_n
+    if args.cost_per_mtok is not None:
+        cfg["cost_eur_per_mtok"] = args.cost_per_mtok
     if args.hard_cap_waves is not None:
         if args.hard_cap_waves < cfg["stops"]["budget_waves"]:
             die("hard-cap-waves is below budget-waves — the cap is the ceiling extensions may not cross")
         cfg["stops"]["hard_cap_waves"] = args.hard_cap_waves
+    if args.hard_cap_tokens is not None:
+        bt = cfg["stops"].get("budget_tokens")
+        if bt and args.hard_cap_tokens < bt:
+            die("hard-cap-tokens is below budget-tokens — the cap is the ceiling extensions may not cross")
+        cfg["stops"]["hard_cap_tokens"] = args.hard_cap_tokens
+    if not cfg["stops"].get("budget_tokens"):
+        print(
+            "warning: no --budget-tokens set. Waves are not a unit of money — a wave costs "
+            "whatever its lanes and dimensions happen to cost, and the run cannot tell you "
+            "what it spent. Set a token budget at intake.",
+            file=sys.stderr,
+        )
     if args.bar_kind:
         if args.bar_kind not in ("reference", "acceptance criteria", "hybrid"):
             die("bar-kind must be one of: reference, acceptance criteria, hybrid")
@@ -130,7 +267,16 @@ def cmd_init(args):
         if not p.exists():
             p.write_text(header)
     (root / "rounds.jsonl").touch()
+    (root / "spend.jsonl").touch()
+    spec = tier_spec(cfg)
     print(f"initialised {root}/ — freeze bar artifacts into {root}/bar/ before wave 1")
+    print(f"effort tier 0 ({spec['name']}): {spec['lanes'] or 'all'} lane(s), "
+          f"{spec['critic_calls']} critic call(s) per lane per round, "
+          f"builder={spec['builder_model']} critic={spec['critic_model']}")
+    allow = tier_allowance(cfg, 0)
+    if allow:
+        print(f"  tier allowance: {fmt_cost(cfg, allow)} of {fmt_cost(cfg, cfg['stops']['budget_tokens'])} total")
+    print("  run the probe, then `gauntlet.py tier` — do not open more lanes before the evidence does")
 
 
 def cmd_log_round(args):
@@ -160,6 +306,9 @@ def cmd_log_round(args):
     if not args.evidence:
         die("evidence is required — a verdict with nothing inspected is not a round")
 
+    if args.tokens is not None and args.tokens < 0:
+        die("--tokens must be non-negative")
+
     rec = {
         "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "wave": args.wave,
@@ -172,6 +321,8 @@ def cmd_log_round(args):
         "score": args.score,
         "evidence": args.evidence,
         "critic_framing": args.critic_framing,
+        "tier": cfg["effort"]["tier"],
+        "tokens": args.tokens,
     }
 
     if args.mode == "champion":
@@ -196,6 +347,36 @@ def cmd_log_round(args):
     with (root / "rounds.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
     print(f"logged: wave {rec['wave']} lane {rec['lane']} [{rec['dimension']}] {rec['mode']} → {rec['winner']} ({rec['margin']})")
+    if args.tokens is None:
+        print("  note: no --tokens on this record — the run cannot price itself without them",
+              file=sys.stderr)
+
+
+def cmd_spend(args):
+    """Record spend that produced no round: builders, the smoother, lead passes."""
+    root = Path(args.root)
+    cfg = load_config(root)
+    if args.tokens < 0:
+        die("--tokens must be non-negative")
+    note = (args.note or "").strip()
+    if not note:
+        die("--note is required — unattributed spend is how a budget disappears without a story")
+    rec = {
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "wave": args.wave,
+        "role": args.role,
+        "tokens": args.tokens,
+        "note": note,
+        "tier": cfg["effort"]["tier"],
+    }
+    with (root / "spend.jsonl").open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+    spent = total_spend(root)
+    budget = cfg["stops"].get("budget_tokens")
+    line = f"recorded {fmt_cost(cfg, args.tokens)} ({args.role}) — run total {fmt_cost(cfg, spent)}"
+    if budget:
+        line += f" of {fmt_cost(cfg, budget)} ({spent / budget * 100:.0f}%)"
+    print(line)
 
 
 def _streaks(records):
@@ -214,9 +395,14 @@ def _streaks(records):
     return bar_met, clean
 
 
+def _shelved_keys(cfg):
+    return {(s["lane"], s["dimension"]) for s in cfg.get("shelved") or []}
+
+
 def _lane_dim_status(rounds, cfg):
     """Returns {(lane, dim): stats} and set of retired lanes."""
     stops = cfg["stops"]
+    shelved = _shelved_keys(cfg)
     keys = {}
     for r in rounds:
         keys.setdefault((r["lane"], r["dimension"]), []).append(r)
@@ -239,6 +425,7 @@ def _lane_dim_status(rounds, cfg):
             if bar_recs and bar_recs[-1].get("severity") not in (None, "none")
             else None
         )
+        is_shelved = key in shelved
         out[key] = {
             "bar_rounds": len(bar_recs),
             "promotions": sum(1 for r in champ_recs if r.get("action") == "promoted"),
@@ -248,7 +435,13 @@ def _lane_dim_status(rounds, cfg):
             "recent_margins": margins,
             "rubric_share": round(rubric_share, 2),
             "open_gap": last_gap,
-            "retired": bar_met >= stops["bar_met_n"] or clean >= stops["clean_streak_n"],
+            "shelved": is_shelved,
+            # Shelved dimensions stop consuming calls, so they are closed for
+            # scheduling — but they are not retired, and the report says so.
+            "retired": (bar_met >= stops["bar_met_n"]
+                        or clean >= stops["clean_streak_n"]
+                        or is_shelved),
+            "flat": _is_flat(bar_recs, stops.get("flat_rounds_n", 3)),
         }
     # A lane retires only when every *declared* dimension has retired — a
     # dimension nobody ever judged must not let the lane out early.
@@ -259,6 +452,25 @@ def _lane_dim_status(rounds, cfg):
         if all(out.get((lane, d), {}).get("retired") for d in declared)
     }
     return out, retired_lanes
+
+
+def _is_flat(bar_recs, n):
+    """No movement across the last n bar rounds — the shelving signal.
+
+    Flat means: no score gain, no severity easing, no margin narrowing. It is
+    computed over the whole window, not the last pair, so one lucky round does
+    not un-flatten a dimension that has stalled.
+    """
+    if n < 2 or len(bar_recs) < n:
+        return False
+    recs = bar_recs[-n:]
+    scores = [r["score"] for r in recs]
+    sev = [SEVERITY_RANK.get(r.get("severity"), 3) for r in recs]
+    margins = [MARGIN_RANK[r["margin"]] for r in recs]
+    losing = [r for r in recs if r["winner"] == "other"]
+    return not (max(scores) > scores[0]
+                or min(sev) < sev[0]
+                or (len(losing) >= 2 and min(margins) < margins[0]))
 
 
 MARGIN_RANK = {"decisive": 3, "clear": 2, "thin": 1}
@@ -272,8 +484,16 @@ def _recent_revert_rate(rounds, window=6):
     return sum(1 for r in champ if r.get("action") == "reverted") / len(champ)
 
 
-def _dimension_trend(bar_recs, window=4):
-    """Is this dimension still moving? Computed from the log, not from feeling."""
+def _dimension_trend(bar_recs, window=4, flat_n=3):
+    """Is this dimension still moving? Computed from the log, not from feeling.
+
+    The recent window wins: a dimension that climbed early and has not moved in
+    its last `flat_n` rounds is flat, whatever the wider window says. Reading it
+    the other way round is how a stalled lane keeps getting funded on the
+    strength of progress it made four rounds ago.
+    """
+    if _is_flat(bar_recs, flat_n):
+        return {"improving": False, "note": f"flat for {flat_n} rounds"}
     recs = bar_recs[-window:]
     if len(recs) < 2:
         return {"improving": None, "note": "too few bar rounds to read a trend"}
@@ -311,7 +531,7 @@ def _extension_evidence(rounds, cfg, per, retired):
             r for r in rounds
             if r["lane"] == lane and r["dimension"] == dim and r["mode"] in ("blind", "rubric")
         ]
-        t = _dimension_trend(bar_recs)
+        t = _dimension_trend(bar_recs, flat_n=cfg["stops"].get("flat_rounds_n", 3))
         trends[key] = t
         mark = {True: "still moving", False: "flat", None: "unknown"}[t["improving"]]
         gap = per[key]["open_gap"] or "no gap named in the last verdict"
@@ -348,9 +568,231 @@ VERDICT_READS = {
 }
 
 
-def _projected_calls(waves, open_lanes):
+def _projected_calls(cfg, waves, open_lanes):
+    """Priced at the *current* tier — a polish-tier wave costs more than a probe."""
     lanes = max(1, len(open_lanes))
-    return waves * (lanes * CALLS_PER_LANE_ROUND + 1)
+    return waves * (lanes * calls_per_lane_round(cfg) + 1)
+
+
+def _projected_tokens(root, cfg, waves, open_lanes, rounds=None):
+    """Project the cost of N more waves from this run's own measured cost per call.
+
+    Estimating from a table is guessing; estimating from the log is arithmetic.
+    Returns None until the run has priced at least a few of its own calls.
+    """
+    rounds = load_rounds(root) if rounds is None else rounds
+    priced = [r for r in rounds if r.get("tokens")]
+    if len(priced) < 3:
+        return None
+    per_critic_call = sum(r["tokens"] for r in priced) / len(priced)
+    # Builders and the smoother are the expensive half and are recorded
+    # separately; use their own measured average when the run has one.
+    non_round = [s for s in load_spend(root) if s.get("tokens")]
+    per_other = (sum(s["tokens"] for s in non_round) / len(non_round)
+                 if non_round else per_critic_call * 2)
+    lanes = max(1, len(open_lanes))
+    spec = tier_spec(cfg)
+    dims = len(cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"])
+    if spec["dims"]:
+        dims = min(dims, spec["dims"])
+    critic_calls = waves * lanes * spec["critic_calls"] * dims
+    other_calls = waves * (lanes + 1)  # one builder per lane, one smoother
+    return int(critic_calls * per_critic_call + other_calls * per_other)
+
+
+def _escalation_gates(root, cfg, rounds):
+    """Has this tier earned the next one? Four gates, all computed from the log.
+
+    The ladder exists so that an idea that will not work dies cheap. Escalating
+    on optimism defeats the whole mechanism, so every gate is a fact in the log
+    rather than a judgement in the conversation.
+    """
+    tier = cfg["effort"]["tier"]
+    at_tier = [r for r in rounds if r.get("tier", 0) == tier]
+    bar_at_tier = [r for r in at_tier if r["mode"] in ("blind", "rubric")]
+    gates = []
+
+    gates.append((
+        "rounds at this tier",
+        len(bar_at_tier) >= 1,
+        f"{len(bar_at_tier)} bar round(s) logged at tier {tier}"
+        if bar_at_tier else "no bar round logged at this tier — run it before buying a bigger one",
+    ))
+
+    # The bar discriminates: at least one verdict that named something specific,
+    # or an evidence-backed clean verdict. A vague tier is a broken bar, and
+    # more money makes a broken bar no sharper.
+    actionable = [
+        r for r in bar_at_tier
+        if (r.get("severity") == "none" and r.get("evidence"))
+        or (r.get("gap") and len(r["gap"]) >= 20)
+    ]
+    gates.append((
+        "the bar discriminates",
+        bool(actionable),
+        f"{len(actionable)} verdict(s) named something specific"
+        if actionable else "verdicts are vague — sharpen the bar, do not escalate",
+    ))
+
+    # Inspection reached the real artifact. log-round already requires evidence;
+    # what this catches is the same stale evidence cited round after round.
+    evid = [r.get("evidence") for r in bar_at_tier if r.get("evidence")]
+    fresh = len(set(evid)) > 1 or len(evid) <= 1
+    gates.append((
+        "inspection is live",
+        fresh,
+        "evidence varies across rounds" if fresh
+        else "every round cites the same evidence — the inspection path is probably stale",
+    ))
+
+    # Movement. At tier 0 a single actionable verdict is the whole signal:
+    # a probe proves the loop can see and judge, not that the artifact climbed.
+    per, retired = _lane_dim_status(rounds, cfg)
+    _, verdict, _ = _extension_evidence(rounds, cfg, per, retired)
+    if tier == 0:
+        # A genuine probe is one or two rounds, and the only thing it has to
+        # prove is that the loop can see and judge. But a tier 0 that has been
+        # run long enough to stall has told you something else, and "it is only
+        # a probe" is not a reason to fund the next tier past it.
+        moving = bool(actionable) and verdict != "at-ceiling"
+        note = ("probe produced an actionable verdict" if moving
+                else "nothing to build on yet" if not actionable
+                else "the probe ran long enough to stall — fix or stop, do not scale")
+    else:
+        moving = verdict in ("improving", "mixed", "unclear")
+        note = f"log read: {verdict}"
+    gates.append(("the artifact is moving", moving, note))
+
+    return gates, verdict
+
+
+def cmd_tier(args):
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    ladder = cfg["effort"]["ladder"]
+    tier = cfg["effort"]["tier"]
+    spec = tier_spec(cfg)
+    spent = total_spend(root, rounds)
+    allow = tier_allowance(cfg)
+
+    print(f"effort tier {tier} of {len(ladder) - 1} — {spec['name']}")
+    print(f"  scope: {spec['lanes'] or 'all'} lane(s), {spec['dims'] or 'all'} dimension(s), "
+          f"{spec['critic_calls']} critic call(s) per lane per round")
+    print(f"  models: builder={spec['builder_model']}  critic={spec['critic_model']}")
+    print(f"  ~{calls_per_lane_round(cfg)} subagent calls per lane per round at this tier")
+    if allow:
+        pct = spent / allow * 100 if allow else 0
+        print(f"  spend: {fmt_cost(cfg, spent)} of {fmt_cost(cfg, allow)} allowed through this tier ({pct:.0f}%)")
+        if spent >= allow:
+            print("  TIER ALLOWANCE DEPLETED — escalate on evidence, or stop. Do not keep running here.")
+    else:
+        print(f"  spend: {fmt_cost(cfg, spent)} (no token budget set — set one at intake)")
+
+    for e in cfg["effort"]["history"]:
+        print(f"  escalated at wave {e['at_wave']}: tier {e['from_tier']} → {e['to_tier']} — {e['reason']}")
+
+    if tier >= len(ladder) - 1:
+        print("\nTop of the ladder. There is no more effort to buy — the remaining levers are "
+              "budget extensions, a re-cut, or stopping.")
+        return
+
+    gates, _ = _escalation_gates(root, cfg, rounds)
+    nxt = ladder[tier + 1]
+    print(f"\nGates to tier {tier + 1} ({nxt['name']}):")
+    for name, ok, note in gates:
+        print(f"  [{'x' if ok else ' '}] {name} — {note}")
+    if all(ok for _, ok, _ in gates):
+        print(f"\nEarned. Escalating raises cost per round to ~{calls_per_lane_round(cfg, tier + 1)} "
+              f"calls per lane, on {nxt['builder_model']}/{nxt['critic_model']} models.")
+        print("  python3 scripts/gauntlet.py escalate --reason \"<evidence from the log>\"")
+    else:
+        print("\nNot earned. Fix the failing gate at this tier's price, or stop the run. "
+              "Escalating past a failing gate buys a bigger version of the same problem.")
+
+
+def cmd_escalate(args):
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    ladder = cfg["effort"]["ladder"]
+    tier = cfg["effort"]["tier"]
+
+    if tier >= len(ladder) - 1:
+        die("already at the top of the effort ladder — extend the budget or re-cut, do not escalate")
+    reason = (args.reason or "").strip()
+    if len(reason) < 12:
+        die("--reason is required and must cite the log — escalating on optimism is what the ladder exists to prevent")
+
+    gates, verdict = _escalation_gates(root, cfg, rounds)
+    failing = [name for name, ok, _ in gates if not ok]
+    if failing and not args.force:
+        die(
+            "escalation gates not met: " + ", ".join(failing) + ". "
+            "Fix these at the current tier's price. Use --force only when the user was shown "
+            "the failing gates and chose to fund the next tier anyway."
+        )
+
+    max_wave = max((r["wave"] for r in rounds), default=0)
+    cfg["effort"]["history"].append({
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "at_wave": max_wave,
+        "from_tier": tier,
+        "to_tier": tier + 1,
+        "spend_at": total_spend(root, rounds),
+        "reason": reason,
+        "log_read": verdict,
+        "forced": bool(args.force),
+        "failing_gates": failing,
+    })
+    cfg["effort"]["tier"] = tier + 1
+    save_config(root, cfg)
+    spec = tier_spec(cfg)
+    print(f"escalated: tier {tier} → {tier + 1} ({spec['name']})")
+    print(f"  scope now: {spec['lanes'] or 'all'} lane(s), {spec['critic_calls']} critic call(s) per lane per round")
+    print(f"  models now: builder={spec['builder_model']}  critic={spec['critic_model']}")
+    print(f"  ~{calls_per_lane_round(cfg)} calls per lane per round (was {calls_per_lane_round(cfg, tier)})")
+    allow = tier_allowance(cfg)
+    if allow:
+        print(f"  allowance through this tier: {fmt_cost(cfg, allow)}")
+    print("Record the escalation in contract.md and on the workbench.")
+
+
+def cmd_shelve(args):
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    if args.dimension not in dims:
+        die(f"dimension {args.dimension!r} is not declared in config.json ({', '.join(dims)})")
+    reason = (args.reason or "").strip()
+    if len(reason) < 12:
+        die("--reason is required — say what the log shows, so the report can say why this was parked")
+    key = (args.lane, args.dimension)
+    if key in _shelved_keys(cfg):
+        die(f"{args.lane}/{args.dimension} is already shelved")
+
+    per, _ = _lane_dim_status(rounds, cfg)
+    s = per.get(key)
+    if s and not s["flat"] and not args.force:
+        die(
+            f"{args.lane}/{args.dimension} is not flat by the log "
+            f"(margins {' → '.join(s['recent_margins']) or '—'}) — shelving a moving dimension "
+            "throws away the gains it was about to make. Use --force if the user chose to park it."
+        )
+
+    cfg["shelved"].append({
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "lane": args.lane,
+        "dimension": args.dimension,
+        "at_wave": max((r["wave"] for r in rounds), default=0),
+        "reason": reason,
+        "open_gap": (s or {}).get("open_gap"),
+        "forced": bool(args.force),
+    })
+    save_config(root, cfg)
+    print(f"shelved {args.lane}/{args.dimension} — it stops consuming calls from the next wave")
+    print("  it is parked, not retired: the report keeps its open gap")
 
 
 def _print_extension_offer(rounds, cfg, per, retired, max_wave):
@@ -377,9 +819,17 @@ def _print_extension_offer(rounds, cfg, per, retired, max_wave):
               " `extend` refuses this read without --force.")
     else:
         suggested = min(4, cap - budget) if cap is not None else 4
-        print(f"\nSuggested next wave block: {min(2, suggested)}–{suggested} waves"
-              f" (~{_projected_calls(min(2, suggested), open_lanes)}–{_projected_calls(suggested, open_lanes)}"
+        lo = min(2, suggested)
+        print(f"\nSuggested next wave block: {lo}–{suggested} waves"
+              f" (~{_projected_calls(cfg, lo, open_lanes)}–{_projected_calls(cfg, suggested, open_lanes)}"
               f" subagent calls over {len(open_lanes) or 1} open lane(s)).")
+        root = Path(cfg.get("_root", "gauntlet"))
+        t_lo = _projected_tokens(root, cfg, lo, open_lanes, rounds)
+        t_hi = _projected_tokens(root, cfg, suggested, open_lanes, rounds)
+        if t_lo and t_hi:
+            print(f"  measured from this run: ~{fmt_cost(cfg, t_lo)} – {fmt_cost(cfg, t_hi)}")
+        else:
+            print("  (cannot price it — too few rounds carried --tokens; quote calls, not money)")
     if cap is not None:
         print(f"Hard cap: {cap} waves — {cap - budget} wave(s) of extension remain.")
     print("If the user grants it:")
@@ -407,9 +857,14 @@ def cmd_extend(args):
     max_wave = max((r["wave"] for r in rounds), default=0)
     if not rounds and not args.force:
         die("no rounds logged — raise --budget-waves at init instead of extending a run that has not started")
-    if max_wave < budget and not args.force:
+    # Either budget being depleted is grounds to extend: whichever ran out first
+    # is the one that stopped the run.
+    spent_now = total_spend(root, rounds)
+    tokens_depleted = bool(stops.get("budget_tokens")) and spent_now >= stops["budget_tokens"]
+    if max_wave < budget and not tokens_depleted and not args.force:
         die(
-            f"budget is not depleted (wave {max_wave} of {budget}) — extend when it runs out, "
+            f"neither budget is depleted (wave {max_wave} of {budget}; "
+            f"{fmt_cost(cfg, spent_now)} spent) — extend when one runs out, "
             "so the decision is made on evidence. Use --force to override."
         )
 
@@ -437,12 +892,38 @@ def cmd_extend(args):
             "continue anyway."
         )
 
+    tok_budget = stops.get("budget_tokens")
+    tok_cap = stops.get("hard_cap_tokens")
+    new_tok = tok_budget
+    if args.tokens is not None:
+        if args.tokens <= 0:
+            die("--tokens must be a positive number of additional tokens")
+        if not tok_budget:
+            die("no token budget to extend — this run was initialised without --budget-tokens")
+        new_tok = tok_budget + args.tokens
+        if tok_cap is not None and new_tok > tok_cap:
+            die(
+                f"extension would take the token budget to {fmt_tokens(new_tok)}, past the agreed "
+                f"hard cap of {fmt_tokens(tok_cap)}. Grant at most "
+                f"{fmt_tokens(max(0, tok_cap - tok_budget))} more, or ask the user to raise the cap."
+            )
+    elif tok_budget:
+        proj = _projected_tokens(root, cfg, args.waves, [], rounds)
+        print(
+            f"warning: {args.waves} more waves were granted but the token budget is unchanged at "
+            f"{fmt_cost(cfg, tok_budget)}" + (f" (projected need ~{fmt_cost(cfg, proj)})" if proj else "")
+            + " — the run will stop on tokens before it runs the waves. Pass --tokens too.",
+            file=sys.stderr,
+        )
+
     cfg["extensions"].append({
         "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "at_wave": max_wave,
         "from_waves": budget,
         "to_waves": new_budget,
         "waves": args.waves,
+        "from_tokens": tok_budget,
+        "to_tokens": new_tok,
         "reason": reason,
         "log_read": verdict,
         "forced": bool(args.force),
@@ -451,12 +932,17 @@ def cmd_extend(args):
         "against_log_read": bool(args.force and verdict == "at-ceiling"),
     })
     stops["budget_waves"] = new_budget
+    if new_tok is not None:
+        stops["budget_tokens"] = new_tok
     save_config(root, cfg)
 
     n = len(cfg["extensions"])
     print(f"budget extended: {budget} → {new_budget} waves (+{args.waves}); extension {n} of this run")
-    print(f"  projected: ~{_projected_calls(args.waves, open_lanes)} subagent calls over "
+    print(f"  projected: ~{_projected_calls(cfg, args.waves, open_lanes)} subagent calls over "
           f"{len(open_lanes) or 1} open lane(s)")
+    proj = _projected_tokens(root, cfg, args.waves, open_lanes, rounds)
+    if proj:
+        print(f"  projected spend: ~{fmt_cost(cfg, proj)} (measured from this run's own rounds)")
     print(f"  log read at grant time: {verdict}")
     if cap is not None:
         print(f"  hard cap {cap} waves — {cap - new_budget} wave(s) of extension remain")
@@ -473,6 +959,8 @@ def cmd_status(args):
     per, retired = _lane_dim_status(rounds, cfg)
     max_wave = max(r["wave"] for r in rounds)
     budget = cfg["stops"]["budget_waves"]
+    tok_budget = cfg["stops"].get("budget_tokens")
+    spent = total_spend(root, rounds)
 
     ext = cfg.get("extensions") or []
     ext_note = (
@@ -480,23 +968,67 @@ def cmd_status(args):
         + ", ".join(f"+{e['waves']}" for e in ext) + ")"
         if ext else ""
     )
-    print(f"wave {max_wave} of {budget} budgeted{ext_note}\n")
+    spec = tier_spec(cfg)
+    print(f"wave {max_wave} of {budget} budgeted{ext_note}")
+    print(f"tier {cfg['effort']['tier']} ({spec['name']}) — "
+          f"~{calls_per_lane_round(cfg)} calls per lane per round, "
+          f"builder={spec['builder_model']} critic={spec['critic_model']}")
+    if tok_budget:
+        allow = tier_allowance(cfg)
+        print(f"spend {fmt_cost(cfg, spent)} of {fmt_cost(cfg, tok_budget)} "
+              f"({spent / tok_budget * 100:.0f}%); tier allowance {fmt_cost(cfg, allow)}")
+        per_wave = spent / max_wave if max_wave else 0
+        if per_wave:
+            left = max(0, tok_budget - spent)
+            print(f"  burn rate {fmt_cost(cfg, int(per_wave))}/wave → "
+                  f"~{left / per_wave:.1f} wave(s) of budget left at this rate")
+    else:
+        print(f"spend {fmt_cost(cfg, spent)} — no token budget set; this run cannot tell you when to stop paying")
+    print()
+
     for (lane, dim), s in sorted(per.items()):
-        flag = " RETIRED" if s["retired"] else ""
+        if s["shelved"]:
+            flag = " SHELVED"
+        elif s["retired"]:
+            flag = " RETIRED"
+        else:
+            flag = ""
         print(f"[{lane} / {dim}]{flag}")
         print(f"  bar rounds {s['bar_rounds']}  promoted {s['promotions']}  reverted {s['reverts']}")
         print(f"  bar-met streak {s['bar_met_streak']}  clean streak {s['clean_streak']}  rubric share {s['rubric_share']}")
         print(f"  recent margins: {' → '.join(s['recent_margins']) or '—'}")
         if s["open_gap"]:
             print(f"  open gap: {s['open_gap']}")
+        if s["flat"] and not s["retired"]:
+            print(f"  FLAT for {cfg['stops']['flat_rounds_n']} bar rounds — shelve it or re-cut it;"
+                  f" running it again costs ~{calls_per_lane_round(cfg)} calls per round for no movement")
+            print(f"    python3 scripts/gauntlet.py shelve --lane {lane} --dimension {dim} --reason \"...\"")
         print()
+
+    # The trend read every wave, not only once the money is gone. A dimension
+    # that stalls at wave 3 should cost three waves of calls, not twelve.
+    lines, verdict, _ = _extension_evidence(rounds, cfg, per, retired)
+    if lines:
+        print("Mid-run read (act on this at the wave boundary):")
+        for line in lines:
+            print(line)
+        print(f"  read: {VERDICT_READS[verdict]}\n")
 
     fired = []
     if max_wave >= budget:
         fired.append(f"budget (wave {max_wave} >= {budget})")
+    if tok_budget and spent >= tok_budget:
+        fired.append(f"token budget ({fmt_cost(cfg, spent)} >= {fmt_cost(cfg, tok_budget)})")
+    allow = tier_allowance(cfg)
+    if allow and spent >= allow and cfg["effort"]["tier"] < len(cfg["effort"]["ladder"]) - 1:
+        fired.append(f"tier {cfg['effort']['tier']} allowance depleted — escalate on evidence (`tier`) or stop")
     all_lanes = {lane for lane, _ in per}
     if all_lanes and all_lanes == retired:
-        fired.append("all lanes retired (bar-met / clean-streak)")
+        if any(s["shelved"] for s in per.values()):
+            fired.append("no lane is still running — some dimensions shelved rather than retired; "
+                         "the report must say which")
+        else:
+            fired.append("all lanes retired (bar-met / clean-streak)")
     total_champ = [r for r in rounds if r["mode"] == "champion"]
     recent = total_champ[-6:]
     if len(recent) >= 4 and sum(1 for r in recent if r.get("action") == "reverted") > len(recent) / 2:
@@ -508,7 +1040,7 @@ def cmd_status(args):
     else:
         print("no stop condition fired")
 
-    if max_wave >= budget:
+    if max_wave >= budget or (tok_budget and spent >= tok_budget):
         _print_extension_offer(rounds, cfg, per, retired, max_wave)
 
 
@@ -519,8 +1051,41 @@ def cmd_report(args):
     if not rounds:
         die("no rounds to report on")
     per, retired = _lane_dim_status(rounds, cfg)
+    spent = total_spend(root, rounds)
+    tok_budget = cfg["stops"].get("budget_tokens")
     lines = ["# Gauntlet report (draft — lead agent completes the judgement fields)", ""]
-    lines += [f"Waves run: {max(r['wave'] for r in rounds)} of {cfg['stops']['budget_waves']} budgeted", ""]
+    lines += [f"Waves run: {max(r['wave'] for r in rounds)} of {cfg['stops']['budget_waves']} budgeted"]
+    if tok_budget:
+        lines += [f"Spend: {fmt_cost(cfg, spent)} of {fmt_cost(cfg, tok_budget)} budgeted "
+                  f"({spent / tok_budget * 100:.0f}%)"]
+    else:
+        lines += [f"Spend: {fmt_cost(cfg, spent)} recorded (no token budget was set — say so)"]
+    lines += [""]
+
+    hist = cfg["effort"].get("history") or []
+    spec = tier_spec(cfg)
+    lines += [f"## Effort ladder", "",
+              f"Ended at tier {cfg['effort']['tier']} ({spec['name']}).", ""]
+    if hist:
+        for e in hist:
+            forced = " *(forced past failing gates: " + ", ".join(e["failing_gates"]) + ")" if e.get("forced") else ""
+            lines.append(
+                f"- wave {e['at_wave']}: tier {e['from_tier']} → {e['to_tier']} at "
+                f"{fmt_cost(cfg, e['spend_at'])} spent — {e['reason']} [log read: {e['log_read']}]{forced}"
+            )
+        lines += ["", "(lead agent: say whether each escalation paid for itself — the probe that "
+                  "should not have been escalated is the cheapest lesson this report can carry)", ""]
+    else:
+        lines += ["The run never escalated. Say whether that was the ladder working "
+                  "(a cheap honest no) or the run stopping too early.", ""]
+
+    shelved = cfg.get("shelved") or []
+    if shelved:
+        lines += ["## Shelved dimensions (parked, not retired)", ""]
+        for s in shelved:
+            lines.append(f"- wave {s['at_wave']}: **{s['lane']} / {s['dimension']}** — {s['reason']}"
+                         + (f"; open gap: {s['open_gap']}" if s.get("open_gap") else ""))
+        lines += [""]
     ext = cfg.get("extensions") or []
     if ext:
         lines += [
@@ -544,7 +1109,7 @@ def cmd_report(args):
     lines += [f"Verdict evidence: {blind} blind rounds, {rubric} rubric rounds (not equivalent evidence)", ""]
     lines += ["## Lanes", ""]
     for (lane, dim), s in sorted(per.items()):
-        state = "retired" if s["retired"] else "open"
+        state = "shelved" if s["shelved"] else ("retired" if s["retired"] else "open")
         lines.append(f"- **{lane} / {dim}** — {state}; {s['bar_rounds']} bar rounds, {s['reverts']} reverts")
     lines += ["", "## Open gaps (do not soften this section)", ""]
     any_gap = False
@@ -560,6 +1125,58 @@ def cmd_report(args):
     print(f"wrote {out}")
 
 
+def cmd_board(args):
+    """Write gauntlet/state.json — everything the workbench renders.
+
+    The board is generated, never hand-written. A subagent that has to open an
+    HTML file to report progress pays for the whole file every round; this makes
+    the progress surface cost one deterministic command instead.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    per, retired = _lane_dim_status(rounds, cfg)
+    max_wave = max((r["wave"] for r in rounds), default=0)
+    spent = total_spend(root, rounds)
+    tok_budget = cfg["stops"].get("budget_tokens")
+    spec = tier_spec(cfg)
+    lines, verdict, _ = _extension_evidence(rounds, cfg, per, retired) if rounds else ([], "unclear", [])
+
+    state = {
+        "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "wave": max_wave,
+        "budget_waves": cfg["stops"]["budget_waves"],
+        "extensions": [{"at_wave": e["at_wave"], "waves": e["waves"]} for e in cfg.get("extensions") or []],
+        "tier": {"index": cfg["effort"]["tier"], "name": spec["name"],
+                 "builder_model": spec["builder_model"], "critic_model": spec["critic_model"],
+                 "calls_per_lane_round": calls_per_lane_round(cfg)},
+        "spend": {"tokens": spent, "budget_tokens": tok_budget,
+                  "eur": round(spent / 1_000_000 * cfg["cost_eur_per_mtok"], 2)
+                  if cfg.get("cost_eur_per_mtok") else None,
+                  "pct": round(spent / tok_budget * 100) if tok_budget else None},
+        "read": verdict,
+        "columns": {"open": [], "flat": [], "shelved": [], "retired": []},
+    }
+    for (lane, dim), s in sorted(per.items()):
+        card = {
+            "lane": lane, "dimension": dim, "bar_rounds": s["bar_rounds"],
+            "promotions": s["promotions"], "reverts": s["reverts"],
+            "bar_met_streak": s["bar_met_streak"], "clean_streak": s["clean_streak"],
+            "margins": s["recent_margins"], "gap": s["open_gap"],
+        }
+        if s["shelved"]:
+            state["columns"]["shelved"].append(card)
+        elif s["retired"]:
+            state["columns"]["retired"].append(card)
+        elif s["flat"]:
+            state["columns"]["flat"].append(card)
+        else:
+            state["columns"]["open"].append(card)
+
+    (root / "state.json").write_text(json.dumps(state, indent=2) + "\n")
+    print(f"wrote {root}/state.json — the workbench renders it; do not edit the HTML")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="gauntlet.py", description=__doc__)
     ap.add_argument("--root", default="gauntlet", help="state directory (default: gauntlet/)")
@@ -572,8 +1189,16 @@ def main():
     p.add_argument("--bar-met-n", type=int)
     p.add_argument("--clean-streak-n", type=int)
     p.add_argument("--budget-waves", type=int)
+    p.add_argument("--budget-tokens", type=int,
+                   help="the budget the user actually pays; waves are not a unit of money")
+    p.add_argument("--cost-per-mtok", type=float,
+                   help="blended EUR per million tokens, so status can print money")
+    p.add_argument("--flat-rounds-n", type=int,
+                   help="bar rounds without movement before a dimension is flagged for shelving (default 3)")
     p.add_argument("--hard-cap-waves", type=int,
                    help="absolute ceiling extensions may not cross (optional; agreed at intake)")
+    p.add_argument("--hard-cap-tokens", type=int,
+                   help="absolute token ceiling extensions may not cross (optional; agreed at intake)")
     p.add_argument("--force", action="store_true")
     p.set_defaults(fn=cmd_init)
 
@@ -592,13 +1217,42 @@ def main():
     p.add_argument("--action", help="promoted|reverted — champion mode only")
     p.add_argument("--champion-ref", help="git ref or snapshot path of the pre-round champion")
     p.add_argument("--critic-framing", default="default")
+    p.add_argument("--tokens", type=int,
+                   help="tokens the calls behind this record cost — without it the run cannot price itself")
     p.set_defaults(fn=cmd_log_round)
+
+    p = sub.add_parser("spend", help="record spend not attached to a round (builders, smoother, lead passes)")
+    p.add_argument("--tokens", type=int, required=True)
+    p.add_argument("--role", default="builder", help="builder|smoother|lead|other")
+    p.add_argument("--wave", type=int)
+    p.add_argument("--note", required=True, help="what this bought")
+    p.set_defaults(fn=cmd_spend)
 
     p = sub.add_parser("status")
     p.set_defaults(fn=cmd_status)
 
+    p = sub.add_parser("tier", help="current effort tier and whether escalation is earned")
+    p.set_defaults(fn=cmd_tier)
+
+    p = sub.add_parser("escalate", help="move up the effort ladder once the evidence justifies it")
+    p.add_argument("--reason", required=True, help="the evidence from the log that earned the next tier")
+    p.add_argument("--force", action="store_true",
+                   help="escalate past failing gates (user saw them and chose to fund it anyway)")
+    p.set_defaults(fn=cmd_escalate)
+
+    p = sub.add_parser("shelve", help="park a flat dimension so it stops consuming calls")
+    p.add_argument("--lane", required=True)
+    p.add_argument("--dimension", required=True)
+    p.add_argument("--reason", required=True)
+    p.add_argument("--force", action="store_true", help="shelve a dimension the log does not call flat")
+    p.set_defaults(fn=cmd_shelve)
+
+    p = sub.add_parser("board", help="regenerate gauntlet/state.json for the workbench")
+    p.set_defaults(fn=cmd_board)
+
     p = sub.add_parser("extend", help="raise the wave budget after the user grants an extension")
     p.add_argument("--waves", type=int, required=True, help="additional waves granted")
+    p.add_argument("--tokens", type=int, help="additional tokens granted alongside the waves")
     p.add_argument("--reason", required=True, help="the user's grant, justified from the log")
     p.add_argument("--force", action="store_true",
                    help="override the depleted-budget and at-ceiling guards (user chose anyway)")

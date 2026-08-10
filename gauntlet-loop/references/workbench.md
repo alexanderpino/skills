@@ -6,10 +6,26 @@ main reason people stop letting loops run long enough to work.
 
 ## The Live Kanban Workbench
 
-The workbench is an HTML file (`gauntlet/workbench.html`) that serves as a live Progress Board (Kanban).
-During Phase 0, the lead agent copies a provided HTML template to this location and opens it in the user's browser.
+The workbench is `gauntlet/workbench.html`, copied from this skill's
+`assets/workbench.html` during Phase 0 and opened in the user's browser. It polls
+`gauntlet/state.json` and re-renders itself.
 
-**CRITICAL RULE:** You and all sub-agents MUST ONLY edit the `#gauntlet-state` JSON block inside this HTML file. You must NEVER generate, modify, or rewrite the HTML structure itself.
+**CRITICAL RULE: nobody edits the HTML, and nobody edits `state.json` by hand.**
+Both are generated:
+
+```bash
+python3 scripts/gauntlet.py board     # rewrites gauntlet/state.json from the log
+```
+
+Run it at every wave boundary, and after `escalate`, `shelve` or `extend`. This
+is a cost decision as much as a correctness one: a subagent that has to open an
+HTML file to report its progress pays for the whole file, every round it does so,
+and a progress surface should not be one of the more expensive things in the run.
+
+The board shows four columns — **open**, **flat** (no movement in the last
+`flat_rounds_n` bar rounds; shelve or re-cut), **shelved**, **retired** — plus the
+current wave, effort tier, the models that tier runs, calls per lane per round,
+and spend against budget in the user's currency.
 
 ## Language Rules (ASD-STE100)
 
@@ -51,7 +67,9 @@ Two record shapes share the file, distinguished by `mode`:
   "severity": "minor",
   "gap": "no contact shadow where rock meets ground plane",
   "evidence": "gauntlet/shots/w3-terrain-r7.png",
-  "critic_framing": "domain-specialist"
+  "critic_framing": "domain-specialist",
+  "tier": 2,
+  "tokens": 130000
 }
 ```
 
@@ -74,6 +92,19 @@ past state recoverable and the "best champion" findable at stop time. Blind and
 rubric records are not equivalent evidence; `status` reports the rubric share so
 the report can say so.
 
+`tier` and `tokens` are what let the run price itself. `tier` is stamped
+automatically; `tokens` you pass, and a record without it is logged with a
+warning — a run that cannot say what it spent cannot say when to stop spending.
+
+**Spend that produced no round** — builders, the smoother, your own passes — goes
+in `gauntlet/spend.jsonl` via a separate command, because it is the larger half of
+the bill and the round log has nowhere to put it:
+
+```bash
+python3 scripts/gauntlet.py spend --tokens 300000 --role builder --wave 3 \
+    --note "terrain-lighting builder, contact-shadow gap"
+```
+
 ## Reading the log
 
 `gauntlet.py status` computes streaks, retirement, revert rates and fired stop
@@ -89,6 +120,11 @@ out of closeable gaps, or the lane is cut wrong.
 **The same gap recurring** across rounds after being marked closed — either the
 builder is not actually closing it, or it is structural and no amount of lane-level
 work will fix it. Escalate to a re-cut rather than running the same round again.
+
+**Burn rate against remaining budget.** `status` prints tokens per wave and how
+many waves of budget remain at that rate. When that number drops below the waves
+you still expect to need, the decision is now, not at depletion: shelve something,
+re-cut, or go back to the user early.
 
 ## Reporting at the end
 

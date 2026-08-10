@@ -34,9 +34,19 @@ meaningful one. Degenerate streaks are cheap for a lazy critic, which is why a
 `none` verdict with empty evidence is rejected and re-run.
 
 ### `budget`
-Ceiling on waves (config `budget_waves`), optionally also wall clock or tokens
-tracked outside the script. **Always armed**, even alongside the others — it is
-what makes an unattended run safe to agree to.
+Two ceilings, whichever depletes first: **tokens** (config `budget_tokens`) and
+**waves** (config `budget_waves`). **Always armed**, even alongside the others —
+it is what makes an unattended run safe to agree to.
+
+Tokens are the ceiling that matters, because tokens are what the user pays. A
+wave costs whatever its lanes, dimensions and effort tier happen to cost, so a
+run budgeted only in waves cannot tell anyone what it spent or when to stop
+paying. `status` prints spend, burn rate per wave, and how many waves of budget
+remain at that rate; the offer and `extend` price the next block from the run's
+own measured calls.
+
+Set both at intake. If only one is set, `init` warns — and the warning is the
+honest one: waves are not a unit of money.
 
 When it fires, stop cleanly at a wave boundary after smoothing rather than
 mid-lane. A coherent artifact one wave early beats an incoherent one at the
@@ -45,6 +55,40 @@ exact limit.
 Then offer an extension — see below. The budget running out says the money ran
 out, not that the artifact is finished, and the user needs to hear those as two
 separate facts.
+
+## Before the stops: shelving and the tier allowance
+
+Two mechanisms fire *during* the run, at wave boundaries, and both exist because
+the classic expensive failure is not "the run went past its budget" — it is "the
+run spent its whole budget on work that stopped moving at wave 3".
+
+### Shelving a flat dimension
+
+`status` flags any dimension with no movement across its last `flat_rounds_n` bar
+rounds (default 3) as `FLAT`, and prints what running it again costs. Flat means
+no score gain, no severity easing, no margin narrowing across the whole window —
+one lucky round does not un-flatten a stalled dimension, and a dimension that
+climbed early but has not moved lately reads as flat, not as improving.
+
+```bash
+python3 scripts/gauntlet.py shelve --lane imagery --dimension perf \
+    --reason "flat 3 rounds, revert rate 60%; remaining distance is source-asset quality"
+```
+
+Shelved is **parked, not retired.** It stops consuming calls from the next wave;
+the report keeps its open gap and lists it separately from anything that retired
+on `bar-met` or `clean-streak`. `shelve` refuses a dimension the log does not call
+flat, so it cannot become a quiet way to abandon work that was climbing.
+
+Shelving is reversible in the only way that matters: an extension can re-cut the
+lane around whatever made the dimension structural.
+
+### The tier allowance
+
+Each effort tier may spend its share of the token budget (`cost-model.md`). When
+that allowance depletes, `status` says so and the run has exactly two honest
+moves: escalate on evidence, or stop. Continuing at the same tier past its
+allowance is how the ladder gets quietly deleted.
 
 ## Extending the budget
 
@@ -108,12 +152,17 @@ Recommend against extending — and say why in one line — when:
 ### Recording the grant
 
 ```bash
-python3 scripts/gauntlet.py extend --waves 3 \
+python3 scripts/gauntlet.py extend --waves 3 --tokens 5000000 \
     --reason "imagery/visual score 5→7, severity major→minor; grain gap still closeable"
 ```
 
-The script raises `budget_waves`, appends the grant to `config.json` with the
-wave it was granted at and the log read at the time, and refuses:
+Grant both units. Waves without tokens means the run stops on tokens before it
+runs the waves the user just paid for — the script warns, and prints the measured
+projection so you can quote the right number.
+
+The script raises `budget_waves` and `budget_tokens`, appends the grant to
+`config.json` with the wave it was granted at and the log read at the time, and
+refuses:
 
 - a grant before the budget is actually depleted (evidence-free by construction)
 - a reason too thin to be evidence
@@ -153,7 +202,10 @@ condition.
 Typical unattended configuration:
 
 ```json
-{ "stops": { "bar_met_n": 2, "clean_streak_n": 2, "budget_waves": 12, "hard_cap_waves": null } }
+{ "stops": { "bar_met_n": 2, "clean_streak_n": 2,
+             "budget_waves": 12, "budget_tokens": 20000000,
+             "hard_cap_waves": null, "hard_cap_tokens": null,
+             "flat_rounds_n": 3 } }
 ```
 
 plus judgment armed by agreement. Per-dimension conditions retire dimensions;
@@ -172,6 +224,10 @@ Independent of configuration:
 - **Bar exhausted.** Every round wins decisively on every dimension — the
   comparator no longer discriminates. Raise the bar (announced) or stop; never
   keep running against a bar the artifact has passed.
+- **A tier that cannot be escalated out of.** The tier allowance is spent and the
+  gates still fail. More money at this tier buys more of the same verdict; more
+  money at the next tier buys a bigger version of whatever the failing gate is
+  telling you. Stop, or fix the gate.
 
 ## Stopping well
 

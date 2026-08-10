@@ -20,51 +20,93 @@ BAR      visual: screenshots of the three references at 1440×900 → gauntlet/b
          perf: LCP < 1.5s, CLS < 0.1 (Lighthouse, throttled) → gauntlet/bar/perf.md
 INSPECT  Playwright screenshot harness at 1440×900 + Lighthouse CI, both verified
 LANES    typography, layout-and-spacing, imagery  (proposed; may re-cut)
-STOP     bar-met N=2, clean-streak N=2, budget 8 waves, judgment armed
-BUDGET   8 waves ≈ 3 lanes × ~2 rounds × 3 calls ≈ 40–60 subagent invocations
-AUTONOMY Unattended; workbench.html updated per round
-BENCH    gauntlet/workbench.html
+STOP     bar-met N=2, clean-streak N=2, budget 8 waves / 20M tokens, judgment armed
+BUDGET   20M tokens ≈ €180 at €9/Mtok, and 8 waves. Whichever depletes first stops
+         the run. At tier 3 a wave is 3 lanes × (1 + 2×2) + 1 ≈ 16 calls
+LADDER   Start tier 0 (probe). Tiers 0–1 ≈ €36 of the €180 — if this is not
+         working, that is what finding out costs
+AUTONOMY Unattended; workbench regenerated per wave
+BENCH    gauntlet/workbench.html (renders gauntlet/state.json)
 ```
 
 ```bash
 python3 scripts/gauntlet.py init --lanes typography,layout,imagery \
-    --dimensions visual,perf --budget-waves 8
+    --dimensions visual,perf --budget-waves 8 --budget-tokens 20000000 \
+    --cost-per-mtok 9.0
 ```
 
 Working tree was dirty → asked the user to commit first. Bar screenshots frozen
-into `gauntlet/bar/`.
+into `gauntlet/bar/`. Three lanes were cut, but tier 0 runs only one — the other
+two cost nothing until they run, and can still be re-cut for free.
 
-## Round zero
+## Round zero — tier 0, the probe
 
-One build round on `typography` only, then one critic. The critic verdict came
-back *"B's type hierarchy is stronger"* with no measurable specifics — too soft.
-Diagnosis: the bar screenshots included whole pages, so the critic judged
-everything at once. Fix: cropped bar shots to the hero region only. Second
-round-zero verdict: *"A (ref): headline tracking is optically compensated at
-display size; B renders default tracking — visibly looser at 96px."* Actionable.
-Wave 1 may start.
+One build round on `typography` only, one collapsed critic call on a cheap model.
+The verdict came back *"B's type hierarchy is stronger"* with no measurable
+specifics — too soft.
 
-## Wave 1 (bootstrap — no champions exist yet)
+```bash
+python3 scripts/gauntlet.py tier
+#   [x] rounds at this tier — 1 bar round logged at tier 0
+#   [ ] the bar discriminates — verdicts are vague — sharpen the bar, do not escalate
+```
 
-Three builders in parallel, disjoint file ownership. No promotion comparisons
-(first round of each lane); one bar comparison per lane per dimension.
+The gate did its job: the fix was cheap because nothing had scaled yet. Diagnosis:
+the bar screenshots included whole pages, so the critic judged everything at once.
+Fix: cropped bar shots to the hero region only. Second round-zero verdict:
+*"A (ref): headline tracking is optically compensated at display size; B renders
+default tracking — visibly looser at 96px."* Actionable.
+
+Then the calibration that matters:
+
+```bash
+python3 scripts/gauntlet.py spend --tokens 300000 --role builder --note "probe builder, typography"
+python3 scripts/gauntlet.py status
+#   spend 420k tok ≈ €3.78 of 20.00M tok ≈ €180.00 (2%)
+```
+
+Put to the user before wave 1: *"Round zero cost ≈ €3.80 including the false
+start. Eight waves at three lanes lands around €150–190. Still eight?"* — they
+said yes, and now that yes is informed.
+
+```bash
+python3 scripts/gauntlet.py escalate --reason "probe verdict names optical tracking at 96px; inspection path verified after bar re-crop"
+#   escalated: tier 0 → 1 (pilot)
+```
+
+## Wave 1 — tier 1, the pilot
+
+Two lanes, not three: `typography` and `layout`. Mid-tier builders, cheap
+screening critics, one collapsed call each. No promotion comparisons (first round
+of each lane); one bar record per lane per dimension all the same.
 
 ```bash
 python3 scripts/gauntlet.py log-round --wave 1 --lane typography --dimension visual \
-  --round 1 --mode blind --winner other --margin decisive --severity major \
+  --round 1 --mode blind --winner other --margin decisive --score 4 --severity major \
   --gap "no optical tracking compensation at display sizes" \
-  --evidence gauntlet/shots/w1-typo-ab.png --critic-framing default
+  --evidence gauntlet/shots/w1-typo-ab.png --critic-framing default --tokens 95000
 ```
 
-Similar records for `layout` (major: "reference uses a 12-col grid with content
-capped at 7 cols; ours spans full width") and `imagery`. Perf dimension logged
-via rubric mode (a Lighthouse number cannot be blinded):
+At the wave boundary, both lanes had moved and the pilot allowance was 60% spent:
 
 ```bash
-python3 scripts/gauntlet.py log-round --wave 1 --lane imagery --dimension perf \
-  --round 1 --mode rubric --winner other --margin clear --severity major \
+python3 scripts/gauntlet.py escalate --reason "typography 4→6 severity major→minor, layout 3→6; both closing named gaps at pilot cost"
+#   escalated: tier 1 → 2 (campaign)
+#   ~5 calls per lane per round (was 3)
+```
+
+`imagery` joined the run here — its first round ever, at wave 2, and none of the
+budget went to it while the method was still unproven.
+
+Similar records for `layout` (major: "reference uses a 12-col grid with content
+capped at 7 cols; ours spans full width"). Perf dimension logged via rubric mode
+(a Lighthouse number cannot be blinded):
+
+```bash
+python3 scripts/gauntlet.py log-round --wave 2 --lane imagery --dimension perf \
+  --round 1 --mode rubric --winner other --margin clear --score 3 --severity major \
   --gap "hero image 1.8MB uncompressed; LCP 3.4s vs 1.5s budget" \
-  --evidence gauntlet/bench/w1.json
+  --evidence gauntlet/bench/w1.json --tokens 60000
 ```
 
 Smoother pass: found one seam (typography's new type scale collided with
@@ -79,8 +121,8 @@ critic's reasoning — not the builder's — went into round 3.
 
 ```bash
 python3 scripts/gauntlet.py log-round --wave 2 --lane layout --dimension visual \
-  --round 2 --mode champion --winner other --margin clear --action reverted \
-  --champion-ref 4f2a91c --evidence gauntlet/shots/w2-layout-champ.png
+  --round 2 --mode champion --winner other --margin clear --score 5 --action reverted \
+  --champion-ref 4f2a91c --evidence gauntlet/shots/w2-layout-champ.png --tokens 85000
 ```
 
 A losing round is data: the next builder got "close the grid gap *without*
@@ -93,20 +135,39 @@ fighting over vertical rhythm. Per `decomposition.md`, a recurring seam means th
 cut is wrong. Merged the two lanes into `type-and-layout` between waves; noted in
 the workbench that streak counters for both reset deliberately.
 
-## Waves 4–6
+## Waves 4–6 — a shelving
 
 `type-and-layout` visual: won blind rounds in waves 5 and 6 → bar-met streak 2 →
 dimension retired. Perf: LCP down to 1.4s → severity `none` twice → clean-streak
-retired. Lane retired. `imagery` visual kept losing on margin `thin` with gaps
-getting cosmetic ("grain texture in ref reads intentional; ours reads like
-compression").
+retired. Lane retired.
+
+`imagery` perf went flat: LCP stuck at 2.1s across three rounds, margins thin,
+two reverts. `status` at the wave-5 boundary said so and priced it:
+
+```
+[imagery / perf]
+  recent margins: thin → thin → thin
+  open gap: LCP 2.1s vs 1.5s; remaining cost is the source asset, not the pipeline
+  FLAT for 3 bar rounds — shelve it or re-cut it; running it again costs ~5 calls per round for no movement
+```
+
+```bash
+python3 scripts/gauntlet.py shelve --lane imagery --dimension perf \
+  --reason "flat 3 rounds at thin margin; remaining LCP distance is source asset quality, not pipeline"
+```
+
+That is roughly €25 of wave-6 and wave-7 calls that never happened. Under the old
+shape the same evidence sat unread in the log until the budget ran out.
+
+`imagery` visual kept losing on margin `thin` with gaps getting cosmetic ("grain
+texture in ref reads intentional; ours reads like compression").
 
 ## The stop
 
-`status` at the wave-6 boundary: one lane fully retired; `imagery` showing
-margins thin for three rounds and one revert — the judgment signal. Stopped on
-judgment with evidence, two waves under budget, rather than spending them on a
-lane at its ceiling.
+`status` at the wave-6 boundary: one lane fully retired, one dimension shelved,
+`imagery` visual showing margins thin for three rounds and one revert — the
+judgment signal. Stopped on judgment with evidence, two waves under budget and
+€60 under the token budget, rather than spending them on a lane at its ceiling.
 
 ```
 STOP CONDITIONS FIRED / SIGNALLED:
@@ -131,16 +192,22 @@ Evidence for the offer:
 
   read: every open dimension is still moving — an extension is likely to buy real gains
 
-Suggested next wave block: 2–4 waves (~8–16 subagent calls over 1 open lane(s)).
+Suggested next wave block: 2–4 waves (~12–24 subagent calls over 1 open lane(s)).
+  measured from this run: ~2.30M tok ≈ €20.70 – 4.60M tok ≈ €41.40
 ```
 
 Put to the user in four lines — what stopped, what is open, whether it is still
-moving, what more costs — and answered with "yes, three":
+moving, what more costs — with the cost measured from this run rather than
+estimated. Answered with "yes, three":
 
 ```bash
-python3 scripts/gauntlet.py extend --waves 3 \
+python3 scripts/gauntlet.py extend --waves 3 --tokens 4000000 \
     --reason "imagery/visual score 5→7, severity major→minor, 1 revert in 6; grain gap still closeable"
 ```
+
+Both units granted. Waves alone would have stopped on tokens partway through
+wave 10, having spent the money and delivered two of the three waves — the script
+warns when you try.
 
 Waves 9–11 then run on `imagery` alone; the report shows `initial 8, extended 1×:
 +3` and says whether those three waves earned their keep. Had the read come back
@@ -150,8 +217,12 @@ the source assets" — and `extend` would have refused the grant without `--forc
 ## The report (abridged)
 
 - Bar: three reference heroes (visual) + LCP/CLS budgets (perf); never moved
+- Spend: 13.4M tokens ≈ €121 of €180 budgeted (67%); ended at tier 2 of 3
+- Ladder: tier 0 → 1 at €3.78 spent, tier 1 → 2 at €31. Both escalations paid for
+  themselves; the false start in round zero cost €1.20 and saved a wave
 - `type-and-layout`: retired, 9 bar rounds, 1 revert, 1 re-cut
-- `imagery`: open — largest remaining gap: image texture quality vs references
+- `imagery / perf`: **shelved** at wave 5, not retired — LCP 2.1s vs 1.5s target
+- `imagery / visual`: open — largest remaining gap: image texture quality vs references
 - Evidence: 14 blind rounds, 6 rubric rounds
 - **Still improving at stop?** Visual: no — margins thin and flat for three
   rounds. Perf: retired. Recommendation: the imagery gap is an asset problem,
