@@ -738,8 +738,9 @@ optics, pass ordering, one wave evaluator — but most of the bands gate off.
 | Shore distance, foam band, wet sand | The strongest shoreline cue there is | **Degenerate.** The waterline is a hard edge on a vertical wall, not a gradient across a beach. Gate the shoreline-foam and wet-sand bands off; a static wet band and a meniscus line on wall and coping replace them |
 | Shoaling, refraction, breakers, run-up | Tier 2 shore band, the production default | **Off.** No sloping bed, no surf zone. A pool with breakers is not a storm, it is an ungated body type |
 | Whitecaps (Jacobian foam) | Wind-driven, from Force 3 up | **Off.** No fetch reaches the breaking threshold across 10 m of water |
-| Ambient wave spectrum | Fetch-limited wind sea, or full swell | Fetch is *metres*: the spectrum collapses onto the capillary–gravity floor — minimum phase speed ≈ 23.1 cm/s at ≈ 1.73 cm ([Calm water](#calm-water-the-low-energy-regime)) — and nothing above it |
-| Wave sources | Wind, swell, current | **Swimmers, jets, inflows.** The interactive sim patch stops being a detail layer and becomes the *primary* wave generator — budget it as such |
+| Ambient wind-wave spectrum | Fetch-limited wind sea, or full swell | Fetch is *metres*, so the wind-driven part collapses onto the capillary–gravity floor ([Calm water](#calm-water-the-low-energy-regime)) — and on a sheltered pool it is the **smallest** term, not the model |
+| Wave sources | Wind, swell, current | **The filtration return jets, then the walls.** Not a spectrum at all: a driven, reverberant basin response — see [The wave field is a driven basin](#the-wave-field-is-a-driven-basin-not-a-spectrum) |
+| Sim-patch edge contract | Fade to zero over the outer ~15% | **Inverted** — the domain edge is a real wall. Reflect it |
 | Depth ramp | The single strongest realism cue water has | 1–3 m of range; almost no dynamic range to spend. The depth cues that actually read are the wall/floor junction and the refracted straight-line grid |
 | Reflection | Planar is a hero-body-only luxury | One small flat body: **planar reflection is genuinely affordable**, and SSR behaves unusually well because the reflected geometry is close and on screen |
 | Caustics | A detail on the bed | **The dominant visual event** |
@@ -748,6 +749,52 @@ optics, pass ordering, one wave evaluator — but most of the bands gate off.
 The net effect is an inverted budget. On an ocean you spend on the surface and economize on the
 bottom; on a pool you spend on the bottom — caustics, bed albedo, refraction fidelity — and the
 surface is a nearly flat sheet with ripples on it.
+
+### The wave field is a driven basin, not a spectrum
+
+Reach for a directional wind spectrum on a sheltered pool and the result is *plausible and wrong*
+in a way a photograph exposes immediately. Real pool water is visibly organised, and it is
+organised by the plumbing and the walls.
+
+- **There is a source, and it is usually the filtration return.** The inlet jets run whenever the
+  pump runs, injecting a narrow band of gravity waves — order 10–30 cm — continuously and from a
+  fixed point. Swimmers add transients on top. On a sheltered pool, wind is the smallest
+  contributor, not the driver.
+- **The walls send it all back.** A smooth tiled vertical wall is a near-total reflector at these
+  wavelengths, so this is not a set of trains crossing an open domain — it is a **reverberant
+  basin response**: direct train plus reflections, superposing into standing structure whose nodal
+  lines are fixed by the geometry. Three consequences, all observable: the field is **not
+  statistically homogeneous**; the pattern is **stationary in the basin frame**, so the same
+  structure sits in the same place every day; and an individual train can be **traced from the
+  inlet to the far wall and back**, which is exactly what people report seeing.
+- **Which components survive to reverberate is a damping calculation, and it decides the look.**
+  Deep-water viscous decay is `α = 2νk²` (Lamb), amplitude `∝ exp(−2νk²t)`, and energy travels at
+  the group speed, so the useful figure is the **e-folding distance** `c_g/α`:
+
+```
+lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
+16.5 cm   38.1    343 s                 0.26 m/s   ~90 m   -> ~11 lengths of an 8 m pool
+ 3 cm     209      11.3 s               0.19 m/s   ~2.1 m  -> dies before the far wall
+```
+
+  The long, jet-driven components ring around the basin many times; the capillary end never
+  completes a crossing. A pool surface also almost always carries a film — sunscreen, body oils —
+  which kills the short end faster still, by the same slope-variance mechanism as a slick
+  ([Sun glitter](#sun-glitter-the-sparkle-path)). So what is visibly trackable bouncing off the
+  walls is the long stuff, and a renderer that spends its budget on capillary detail is spending
+  it on the part that physically cannot persist.
+- **The edge contract inverts.** For open water this chapter mandates fading the sim patch to zero
+  over the outer ~15% of its domain, because that boundary is a budget decision the player must
+  not see ([Interactive simulation patches](#interactive-simulation-patches)). In a basin the rule
+  is backwards: the domain boundary **is** a physical wall. Use reflecting boundary conditions
+  there and keep the fade only where a sim domain ends inside a larger body. Fading at a wall
+  deletes the most characteristic thing the water does.
+- **Two ways to build it.** A height-field sim patch over the basin with reflecting walls and a
+  driven source cell is the general answer and gives swimmer transients for free. For a static
+  basin with fixed inlets the analytic route is cheaper and exact enough: **method of images** —
+  sum cylindrical trains from the inlet and its mirror copies across the four walls, with `1/√r`
+  spreading and the damping above. One or two reflection orders already produce the criss-cross
+  structure; the rest is below the noise floor of the shading.
 
 ### Pool optics: the colour is the bottom, not the water
 
@@ -1770,6 +1817,14 @@ above except the TotK physics talk is community reconstruction or press/footage 
 - **A pool rendered with ocean defaults**: swell, whitecaps and a shoreline foam band on a 10 m
   body. The `bodyType` and fetch gates were never applied — see
   [Man-made water](#man-made-water-pools-tanks-and-channels).
+- **A pool driven by a wind spectrum**: statistically homogeneous ripple everywhere, no source, no
+  reflections, no standing structure. Plausible in isolation and obviously wrong beside a
+  photograph, because real pool water is organised by the return jets and the walls. Model the
+  basin response, not a sea — [The wave field is a driven
+  basin](#the-wave-field-is-a-driven-basin-not-a-spectrum).
+- **Sim patch faded out at a wall**: the open-water edge contract applied inside a basin, so wakes
+  and jet trains dissolve exactly where they should bounce. In a closed body the domain edge is
+  physical — reflect, do not fade.
 - **Pool colour art-directed into `scatterColor`**: treated water has `b_b ≈ 0` and no body colour
   of its own; the cyan comes from bottom albedo attenuated over the down-and-back path. A pool
   tinted through the scattering term reads identically over every liner and at every depth, which
@@ -2058,6 +2113,16 @@ above except the TotK physics talk is community reconstruction or press/footage 
   the `a(550) ≈ 0.0565 m⁻¹` value used in the worked round-trip example is from the same dataset
   by model knowledge and was **not** re-checked against the published table. The round-trip
   transmittances and the resulting `(0.13, 0.68, 0.79)` liner return are arithmetic done here.
+- **P/F** — The driven-basin model for pool waves. Viscous decay `α = 2νk²` for deep-water gravity
+  waves is Lamb's classical result (*Hydrodynamics*, §348-ish; attribution from model knowledge,
+  not re-checked); `c_g = (g + 3(σ/ρ)k²)/(2ω)` follows from differentiating the capillary–gravity
+  dispersion relation. The table's e-folding distances (~90 m at 16.5 cm, ~2.1 m at 3 cm, with
+  ν = 1.004×10⁻⁶ m²/s) were computed here and are reproducible from those two formulas. That the
+  filtration return is the dominant source, that tiled walls are near-total reflectors at these
+  wavelengths, and the edge-contract inversion, are this skill's framing from the physics plus
+  direct observation — **no measurement of a wall reflection coefficient was chased**, so treat
+  "near-total" as an argued approximation rather than a figure. The method-of-images construction
+  is standard acoustics/optics practice carried over.
 - **F** — That treated pool water sits outside every Jerlov class (`b_b ≈ 0`, `c ≈ a`, Secchi
   exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
   scattering one, and the man-made gating table: this skill's composition from the optics above
