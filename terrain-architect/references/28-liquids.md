@@ -311,6 +311,13 @@ liquid_body:
   bodyType                    # sea | lake | pond | river | stream | estuary | wetland (03)
                               #   the HYDROLOGICAL type — selects the engine's surface/animation
                               #   model: lake = wind waves only, river = flow, sea = swell+tide
+                              #   This enum is exhaustive for GENERATED water and deliberately so:
+                              #   it is classified from the fill mask and flow accumulation (03),
+                              #   and no classifier will ever emit a swimming pool, a tank or a
+                              #   canal. Man-made bodies are AUTHORED render-side, where the enum
+                              #   extends (pool | basin | tank | canal | reservoir) and most of
+                              #   the natural bands gate off — terrain-renderer 12, "Man-made
+                              #   water". Do not add them here; nothing upstream can produce them.
   fetchField                  # per-shoreline wave-exposure (12 sweep); the wind-wave driver for
                               #   lakes and enclosed water — NOT a flow field
   # causal state

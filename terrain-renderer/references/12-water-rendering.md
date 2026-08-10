@@ -5,9 +5,9 @@ surface datums, a depth field, a flow field. Everything that moves is made here.
 the engine side of that handoff: water surface geometry and its LOD (meshed or the meshless
 screen-space pass), ambient wave synthesis
 (Gerstner and FFT), shoal- and shore-aware shallow-water waves (shoaling, refraction, breakers,
-run-up), flow-driven river surfaces, local interactive simulation, water shading
-composition, shoreline integration, and the transparency/pass-ordering discipline water forces on
-the frame. Deep BRDF/scattering math routes to the physically-based-rendering skill; generation of
+run-up), flow-driven river surfaces, local interactive simulation, man-made bodies (pools, tanks,
+canals), water shading composition, caustics, shoreline integration, and the
+transparency/pass-ordering discipline water forces on the frame. Deep BRDF/scattering math routes to the physically-based-rendering skill; generation of
 water bodies, routing, and flow fields routes to terrain-architect (its `03`/`04` hydrology and the
 `08`/`27` output contract).
 
@@ -21,7 +21,9 @@ Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-re
 [Aerated water: foam, spray and whitewater](#aerated-water-foam-spray-and-whitewater) ·
 [Rivers: flow-driven surfaces](#rivers-flow-driven-surfaces) ·
 [Interactive simulation patches](#interactive-simulation-patches) ·
+[Man-made water: pools, tanks and channels](#man-made-water-pools-tanks-and-channels) ·
 [Shading and optics](#shading-and-optics) ·
+[Caustics: the other half of the light path](#caustics-the-other-half-of-the-light-path) ·
 [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) ·
 [Shoreline integration](#shoreline-integration) ·
 [Transparency & pass ordering](#transparency--pass-ordering) ·
@@ -714,6 +716,102 @@ shallow-water — Kass–Miller lineage) over a small moving domain centered on 
   the contract, not a cover-up, because the domain boundary is a budget decision the player must
   not see.
 
+## Man-made water: pools, tanks and channels
+
+A swimming pool, a fountain basin, a lock chamber, a reservoir, an irrigation canal, an industrial
+tank. These bodies never arrive from the generation handoff — terrain-architect *classifies*
+`bodyType` from the fill mask and flow accumulation (its `03`), and no classifier turns a gunite
+shell into a lake. They arrive **authored**, exactly as the engine-native water bodies do
+([Bodies are splines](#bodies-are-splines-and-the-splines-carve-the-terrain)), and the enum
+extends renderer-side:
+
+```
+bodyType += pool | basin | tank | canal | reservoir     # authored; never classified
+```
+
+They earn a section because nearly every default in this chapter is *wrong* for them, and wrong
+structurally rather than by a tuning margin. The contracts hold — depth field, `liquidBody`
+optics, pass ordering, one wave evaluator — but most of the bands gate off.
+
+| Machinery | Natural body | Man-made body |
+|---|---|---|
+| Shore distance, foam band, wet sand | The strongest shoreline cue there is | **Degenerate.** The waterline is a hard edge on a vertical wall, not a gradient across a beach. Gate the shoreline-foam and wet-sand bands off; a static wet band and a meniscus line on wall and coping replace them |
+| Shoaling, refraction, breakers, run-up | Tier 2 shore band, the production default | **Off.** No sloping bed, no surf zone. A pool with breakers is not a storm, it is an ungated body type |
+| Whitecaps (Jacobian foam) | Wind-driven, from Force 3 up | **Off.** No fetch reaches the breaking threshold across 10 m of water |
+| Ambient wave spectrum | Fetch-limited wind sea, or full swell | Fetch is *metres*: the spectrum collapses onto the capillary–gravity floor — minimum phase speed ≈ 23.1 cm/s at ≈ 1.73 cm ([Calm water](#calm-water-the-low-energy-regime)) — and nothing above it |
+| Wave sources | Wind, swell, current | **Swimmers, jets, inflows.** The interactive sim patch stops being a detail layer and becomes the *primary* wave generator — budget it as such |
+| Depth ramp | The single strongest realism cue water has | 1–3 m of range; almost no dynamic range to spend. The depth cues that actually read are the wall/floor junction and the refracted straight-line grid |
+| Reflection | Planar is a hero-body-only luxury | One small flat body: **planar reflection is genuinely affordable**, and SSR behaves unusually well because the reflected geometry is close and on screen |
+| Caustics | A detail on the bed | **The dominant visual event** |
+| Single-depth-layer limit | A real architectural constraint | A non-issue — one surface, nothing stacked |
+
+The net effect is an inverted budget. On an ocean you spend on the surface and economize on the
+bottom; on a pool you spend on the bottom — caustics, bed albedo, refraction fidelity — and the
+surface is a nearly flat sheet with ripples on it.
+
+### Pool optics: the colour is the bottom, not the water
+
+This is the part that is *not* a gating decision, and the part production gets wrong most often.
+The optical identity machinery in this chapter is built from oceanography — Jerlov types,
+Forel-Ule index, chlorophyll and CDOM. **A treated pool belongs to none of those classes**, and
+applying them is not a conservative approximation, it is the wrong model:
+
+- Filtration and flocculation remove precisely the particles that scatter. Backscatter
+  `b_b → ≈ 0`, beam attenuation `c → a`, and Secchi depth exceeds the body depth by design —
+  pool codes generally require the main drain to be visible from the deck.
+- With `b_b ≈ 0` the **scatter-colour term is essentially zero**. A pool has no body colour of its
+  own. A water shader that derives its colour from `scatterColor` is structurally incapable of
+  rendering one.
+
+What produces the colour is the **bottom albedo attenuated over the down-and-back path**. For a
+near-vertical view of a 1.5 m floor the light crosses ~3.0 m of water, and pure-water absorption
+([Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from))
+does the rest:
+
+```
+depth 1.5 m -> round trip 3.0 m,  transmittance = exp(-a * 3.0)
+  a(700 nm) = 0.62   m^-1  ->  0.16    red     nearly gone
+  a(550 nm) = 0.0565 m^-1  ->  0.84    green   barely touched
+  a(418 nm) = 0.0044 m^-1  ->  0.99    blue    untouched
+```
+
+A white liner at ~0.8 albedo therefore returns roughly `(0.13, 0.68, 0.79)` — a bright, strongly
+desaturated cyan pushed toward blue — before any sky reflection is composited on top. That ratio,
+not scattering, is the whole of pool colour, and it is why even a **shallow** pool is
+unmistakably cyan: the effect needs a bright bottom, not depth.
+
+Two predictions fall out, both checkable against reference photography:
+
+- **Change the liner and the water changes completely.** White → turquoise; sand → green-teal;
+  the dark-grey liner of current architectural fashion → near-black, because with `b_b ≈ 0` there
+  is nothing to fill the column and all that survives is the Fresnel reflection of the sky. If a
+  pool looks the same over every liner, the bottom-albedo term is missing from the shader.
+- **Colour is nearly depth-independent within one pool.** Across 1–3 m the round-trip
+  transmittance in green and blue barely moves and only red drops, so shallow end and deep end
+  differ far less than the ocean's ramp trains you to expect. A strong hue shift across a pool
+  floor is an artifact, not a depth cue.
+
+Art-direct the liner, not the water. The single knob that most reliably makes a pool read wrong is
+a `scatterColor` cranked toward cyan to compensate for a bottom that was never sampled.
+
+### The rest of the man-made checklist
+
+- **Straight lines are the fidelity test.** Tiled walls and rectangular coping hand the viewer a
+  known-straight reference that the refracted surface visibly bends — the most revealing test the
+  refraction path will ever get. It is also where the depth reject in
+  [Shading and optics](#shading-and-optics) earns its place: the deck, the coping and everything
+  standing on them sit *directly* adjacent to the water in screen space, so an unrejected
+  refraction sample smears them into the pool every frame.
+- **The waterline is geometry, not a fade.** On a vertical wall the shore-distance field carries
+  no information. Author the band instead: wet tile below the line, a meniscus with its own small
+  specular lift at it, a damp gradient above it from splash, and the static scale line at the tile
+  course.
+- **Inflows are the flow field.** Return jets and skimmer draw are the only steady flow, and they
+  are small and local — author them as sim-patch injections rather than exporting a flow raster
+  for a 10 m body.
+- **The gameplay surface is trivially correct here** — flat datum plus a centimetre of ripple — so
+  there is no excuse for the swim-volume mismatch in [Pitfalls](#pitfalls).
+
 ## Shading and optics
 
 BRDF math routes to physically-based-rendering; what this skill owns is the *composition* — which
@@ -787,10 +885,11 @@ at the end of this section.
   along shore tangent), whitecaps (Jacobian, above), flow foam (rivers, above). Composite as an
   opaque-ish albedo layer that *kills* the Fresnel reflection under it — foam is scattering
   froth, not glossy water, and reflective foam is an instant fake tell.
-- **Caustics**: an approximation, stated as such — an animated caustic texture (or a projection
-  of the wave normal map's focusing) on underwater terrain, masked by depth (fade out deep),
-  attenuated by the same extinction, and synced to the sun direction. Physically simulated
-  caustics are out of budget scope; route the theory to physically-based-rendering.
+- **Caustics** are the light that got *through* the surface and focused on the bed. They carry
+  their own pass, tier ladder and masking contract — see
+  [Caustics](#caustics-the-other-half-of-the-light-path). The one-line version: caustic brightness
+  is the inverse Jacobian of the refracted-ray map, it multiplies the sun term rather than the
+  albedo, and it is gated by sun visibility **at the surface**, not at the receiver.
 - **Underwater camera state** is a real state machine, not a fog tweak: on submersion switch to
   underwater fog (aggressive, chromatic, from the same `sigma`), render the surface from below
   (total internal reflection outside **Snell's window** — for water→air the critical angle is
@@ -929,6 +1028,135 @@ of **2–3** and eliminating the skewness entirely. So an oil slick, a wind shad
 or a current-convergence line should be rendered as a **local reduction of the slope-variance
 field** — which makes it appear as a smooth mirror-like patch against rough sea — not as a dark
 albedo decal. This is the mechanism behind every "glassy streak" on a real ocean.
+
+## Caustics: the other half of the light path
+
+Sun glitter is the light that bounced *off* the surface; caustics are the same focusing mechanism
+applied to the light that went *through* it. On open ocean they are a detail nobody looks at. On
+any clear shallow body — a reef flat, a river bed, a pool — they are the most recognizable thing
+water does, and the budget inverts accordingly ([Man-made water](#man-made-water-pools-tanks-and-channels)).
+
+**The physics, in one equation.** Refraction maps each surface point `p` to the point `q(p)` it
+illuminates on the bed. Flux is conserved along the ray tube, so receiver brightness is the
+inverse of how much that map stretches area:
+
+```
+i      = -L                                    # propagation direction of the sunlight, z up
+t(p)   = refract(i, n(p), 1.0/ior)             # Snell at the surface;  t.z < 0, heading down
+q(p)   = p.xy + t(p).xy * (d(p) / -t(p).z)     # where that ray meets the bed, d = depth below p
+E(q)   = E_sun / |det( dq/dp )|                # the caustic
+```
+
+Two consequences fall straight out, and both are load-bearing:
+
+- **Caustics are a curvature quantity, not a normal quantity.** `dq/dp` contains `dn/dp` — the
+  *second* derivative of the wave field, where surface shading is driven by the first. That is
+  why a normal map with no coherent height behind it produces caustics that visibly do not belong
+  to the surface above them, and why a normal map filtered one mip too far yields caustics that
+  are far too smooth while the surface itself still looks fine.
+- **The bright lines are where `det dq/dp` passes through zero** — the fold set of the map. This
+  is catastrophe optics, and it fixes the *shape* of a real caustic network: for a map from a
+  surface to a plane the only structurally stable singularities are **folds** (curves) and
+  **cusps** (isolated points where two fold branches meet tangentially). A caustic network is
+  therefore smooth bright curves that close, run off, or terminate in cusps. It is not a cell
+  tessellation — which is the specific reason the Voronoi fake reads wrong.
+
+### The tier ladder
+
+| Tier | Mechanism | Verdict |
+|---|---|---|
+| **0 · Authored texture** | One or two scrolling caustic textures at different scales and speeds to hide the loop | What most engines' starter water ships. Wrong in one specific and visible way: uncorrelated with the surface above it — when the water goes calm, the caustics keep churning |
+| **1 · Worley / Voronoi (`F2−F1`)** | Cellular noise, two octaves, animated feature points, small per-channel offset | The community default, and what most people mean by "a caustics shader". Cheap, passable in motion at distance, structurally wrong — below |
+| **2 · Caustic map from the real wave field** | Rasterize the refracted receiver positions from the light's view and accumulate; folds appear for free wherever several rays land in one texel | **The recommended default.** Shah, Konttinen & Pattanaik's caustics mapping and Wyman & Davis's image-space technique are the canonical formulations; GPU Gems 1 ch. 2 is the water-specific version. Costs one light-view pass over the wave grid |
+| **3 · Ray-traced / photon-mapped** | Photons traced through the surface (DXR), splatted or resampled | Hero water on RT hardware. Correct including multi-branch folds and the secondary caustics from total internal reflection. Theory routes to physically-based-rendering (`caustics.md`) |
+
+**Why the Voronoi fake is structurally wrong — and how to ship it anyway.** Worley `F2−F1` gives a
+network of bright lines around dark cells, which is why it convinces on a still frame. Three
+things separate it from the real thing, all of them consequences of the fold/cusp classification:
+
+1. **The wrong junctions.** A Voronoi edge network meets in *triple junctions* — three edges at a
+   vertex. A caustic network has none: fold curves meet only in **cusps**, where two branches join
+   tangentially, and fold curves may also simply end. The eye reads the difference as "cracked
+   glass" rather than "focused light" long before it can name it.
+2. **Uniform brightness along an edge.** Real fold lines vary strongly in intensity along their
+   length and blow out at cusps, because `det dq/dp` varies along the fold. Cell noise has no such
+   structure — every edge is as bright as every other.
+3. **No coupling to anything.** The pattern knows nothing of wind direction, wave anisotropy, or
+   depth. The most visible symptom is the one Tier 0 shares: **on mirror-calm water it keeps
+   animating**, where the correct answer is that a flat surface has a constant Jacobian and
+   therefore produces no caustic structure at all — just uniform light on the bed.
+
+If the budget demands it, ship it — but label it a fake in the material, scale cell size with
+depth so it respects at least that one law, and drive its animation amplitude from the wave
+amplitude so calm water goes flat.
+
+### The masking contract — four gates, and the third is the one that gets skipped
+
+```hlsl
+float3 caustic = SampleCausticMap(worldPos, time) * causticStrength;
+caustic *= 1.0 - saturate(verticalDepth / causticFadeDepth);  // 1. depth fade
+caustic *= exp(-sigmaPerBody * lightPathLength);              // 2. extinction along the LIGHT path
+caustic *= SunShadow(surfaceEntryPoint);                      // 3. sun must reach the SURFACE
+sunLighting += caustic;                                       // 4. irradiance, never albedo
+```
+
+1. **Depth fade on `verticalDepth`**, not on `rayDistance` — the distinction drawn in
+   [Shading and optics](#shading-and-optics). Two mechanisms converge on the same fade: extinction,
+   and the fact that the fold pattern spreads and overlaps into an unresolvable wash past the
+   focal depth.
+2. **Extinction along the *light* path**, which is a different distance from the camera path
+   already computed for refraction: `verticalDepth / cos(theta_t)` from surface to bed, with
+   `theta_t` the refracted sun angle. Reuse `rayDistance` here and caustics fade with camera angle
+   instead of sun angle — subtly wrong in every frame, and obviously wrong the moment the camera
+   moves while the sun does not.
+3. **Sun visibility sampled at the surface entry point, not at the receiver.** The occluder — a
+   shade sail, a parasol, a diving board, a tree, the pool wall at low sun — blocks the ray
+   *before* it enters the water, so the shadow test belongs to `p`, not `q`. Sampling the cascaded
+   shadow map at the receiver is the near-miss version: near-correct at high sun, visibly wrong at
+   low sun where entry and receiver points sit metres apart. Skipping the test altogether is the
+   classic bug — **caustics crawling through the shadow on the bottom**. Nothing else in the frame
+   announces "this is a scrolling texture" so loudly.
+4. **Caustics are irradiance.** They multiply the sun's contribution to the receiver's BRDF; they
+   are not added to albedo or to the final colour. Backwards, and they survive into shadow, into
+   ambient-only lighting and into fog, and they stop responding to exposure.
+
+**They fall on everything below the surface, not on the terrain.** Project in world space onto
+whatever the pass finds under the water plane — bed, walls, steps, props, swimmers. A caustic
+decal projected only onto the terrain heightfield leaves every object in the water conspicuously
+unlit by the brightest thing in the scene. The above-water counterpart — surface-reflected light
+dancing on a wall or a hull — is a second, weaker caustic on the reflection side, cheap from the
+same map and a strong cue for pools and harbours.
+
+**Sharpness has a physical floor, and it scales with depth.** The sun is not a point: its disc
+subtends **0.53°**, and refraction compresses that cone on entry by `cos(theta_i)/(n·cos(theta_t))`
+— near normal incidence simply `1/n`, so ≈ 0.53°/1.33 ≈ 0.40° ≈ 7.0 mrad. The penumbra grows
+linearly with depth:
+
+```
+blur ~= 7.0e-3 * depth   ->   ~0.7 cm per metre of depth (near-normal sun)
+  1.5 m pool floor -> ~1 cm      5 m -> ~3.5 cm      20 m reef -> ~14 cm
+```
+
+So caustic lines in a shallow pool are genuinely crisp and in deep water genuinely cannot be. A
+caustic map still pin-sharp at 20 m is over-resolved; one blurred to 5 cm at 1.5 m has thrown the
+effect away. Off-normal the compression is anisotropic, so a low sun stretches the blur along the
+sun azimuth. This is the same 0.53° that sets the glitter path above the surface — above the water
+it makes the highlight too *wide*, below it makes the caustic too *soft*.
+
+**Dispersion is visible and cheap.** Water's index falls across the visible band — roughly 1.337
+at 486 nm to 1.331 at 656 nm — so the three channels' fold sets do not coincide. The offset is
+small, but it lands on the highest-contrast feature in the image, which is why real caustic edges
+carry faint colour fringing. Refract per channel, or offset the sampled map per channel scaled
+with depth, rather than shipping a grey caustic.
+
+**Reusing the whitecap machinery — with one correction.** An FFT surface already computes a 2×2
+Jacobian determinant per grid point for whitecap foam
+([Aerated water](#aerated-water-foam-spray-and-whitewater)). That is **not** this Jacobian: the
+foam one is the folding of the surface's own horizontal displacement map, this one is the folding
+of the refracted-ray map onto the bed at depth `d`. Different maps, different fold sets. What
+transfers is the machinery — the finite-difference stencil, the determinant, the clamp against the
+`1/|det|` singularity, and the grid it runs on — so Tier 2 is usually a second dispatch over an
+existing buffer rather than new infrastructure.
 
 ## Distance and filtering: why far water turns to plastic
 
@@ -1459,6 +1687,26 @@ above except the TotK physics talk is community reconstruction or press/footage 
   velocity where waves move — crests ghost and smear. Write analytic velocity: reproject the hit
   point through the previous frame's view-projection (plus wave advection) into the velocity
   buffer.
+- **Caustics crawling through a shadow**: the sun is occluded above the water — a shade sail, a
+  tree, a diving board — and the caustic pattern plays across the shadow on the bed anyway. The
+  sun-visibility gate is missing, or it was sampled at the receiver instead of at the surface
+  entry point. Single most conspicuous caustics defect; see
+  [the masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped).
+- **Caustics added to albedo**: they then survive into shadow, into ambient-only lighting and into
+  fog, and stop responding to exposure. Caustics multiply the sun term; they are irradiance.
+- **Caustics projected onto terrain only**: the bed lights up and every swimmer, step, ladder and
+  prop in the water stays conspicuously unlit by the brightest thing in the scene. Project in world
+  space onto whatever the pass finds below the water plane.
+- **Caustics that animate on flat water**: a Tier 0/1 fake with no coupling to the wave field. A
+  flat surface has a constant Jacobian and produces *no* caustic structure — drive the pattern's
+  amplitude from the wave amplitude, or the trick announces itself the moment the water settles.
+- **A pool rendered with ocean defaults**: swell, whitecaps and a shoreline foam band on a 10 m
+  body. The `bodyType` and fetch gates were never applied — see
+  [Man-made water](#man-made-water-pools-tanks-and-channels).
+- **Pool colour art-directed into `scatterColor`**: treated water has `b_b ≈ 0` and no body colour
+  of its own; the cyan comes from bottom albedo attenuated over the down-and-back path. A pool
+  tinted through the scattering term reads identically over every liner and at every depth, which
+  is exactly the tell.
 
 ## Sources & provenance
 
@@ -1689,3 +1937,48 @@ above except the TotK physics talk is community reconstruction or press/footage 
 - **?** — Attribution of specific shallow-water shoaling approximations to particular shipped
   titles beyond the two talks above: multiple GDC/SIGGRAPH-Advances talks cover it; treat any
   further specific title claim as unverified.
+- **P** — Caustic brightness as the inverse Jacobian of the ray map (`E ∝ 1/|det ∂q/∂p|`):
+  conservation of flux in a ray tube, classical geometrical optics. No specific citation is owed
+  and none should be invented.
+- **P** — Fold/cusp classification of caustic structure — the claim that a caustic network has no
+  triple junctions, which is the load-bearing argument against the Voronoi fake. Whitney, "On
+  Singularities of Mappings of Euclidean Spaces I: Mappings of the Plane into the Plane", *Annals
+  of Mathematics* 62 (1955): the only structurally stable singularities of a smooth map of the
+  plane into the plane are folds and cusps. The optics reading is Berry & Upstill, "Catastrophe
+  Optics: Morphologies of Caustics and Their Diffraction Patterns", in E. Wolf (ed.), *Progress in
+  Optics* 18, North-Holland (1980), 257–346 — venue, volume and pages verified 2026-08; Whitney's
+  attribution is from model knowledge and was not re-checked against the paper.
+  [ADS](https://ui.adsabs.harvard.edu/abs/1980PrOpt..18..257B/abstract).
+- **P** — Image-space caustic maps (Tier 2): Shah, Konttinen & Pattanaik, "Caustics Mapping: An
+  Image-Space Technique for Real-Time Caustics", *IEEE TVCG* 13(2), 2007, 272–280
+  ([IEEE Xplore](https://ieeexplore.ieee.org/document/4069236/)); Wyman & Davis, "Interactive
+  Image-Space Techniques for Approximating Caustics", I3D 2006, 153–160
+  ([ACM DL](https://dl.acm.org/doi/10.1145/1111411.1111439)). Both verified 2026-08.
+- **D/F** — The water-specific practical build: Guardado & Sánchez-Crespo, "Rendering Water
+  Caustics", *GPU Gems* 1 ch. 2 (2004) — explicitly an aesthetics-driven approximation, not a
+  physical solution, and it says so itself. Verified 2026-08.
+  [NVIDIA](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-2-rendering-water-caustics).
+- **P** — Caustic sharpness floor from the solar disc: 0.53° subtense (the same figure used in
+  [Sun glitter](#sun-glitter-the-sparkle-path)), compressed on entry by `cos θ_i/(n cos θ_t)` —
+  differentiated Snell, `≈ 1/n` near normal incidence. Arithmetic (0.53°/1.33 ≈ 0.40° ≈ 7.0 mrad,
+  ≈ 0.7 cm blur per metre of depth) derived here and checked, not quoted from a source.
+- **P/?** — Visible-band dispersion of water (`n ≈ 1.337 at 486 nm` to `≈ 1.331 at 656 nm`):
+  standard optical data, quoted from model knowledge and **not** web-verified — treat the third
+  decimal as indicative. The qualitative claim (fold sets separate per channel, so caustic edges
+  fringe) is robust regardless.
+- **F** — The four-gate masking contract (depth fade, extinction along the light path, sun
+  visibility at the surface entry point, irradiance-not-albedo) and the tier ladder as a whole:
+  production practice assembled over the physics above. The shadow-at-entry-point rule is the one
+  most often skipped and is stated here as doctrine, not as a cited result.
+- **P** — Pool-water optics: pure-water absorption from the Pope & Fry dataset already cited above
+  — `a(700) ≈ 0.62`, `a(418) ≈ 0.0044 m⁻¹` as quoted in
+  [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from);
+  the `a(550) ≈ 0.0565 m⁻¹` value used in the worked round-trip example is from the same dataset
+  by model knowledge and was **not** re-checked against the published table. The round-trip
+  transmittances and the resulting `(0.13, 0.68, 0.79)` liner return are arithmetic done here.
+- **F** — That treated pool water sits outside every Jerlov class (`b_b ≈ 0`, `c ≈ a`, Secchi
+  exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
+  scattering one, and the man-made gating table: this skill's composition from the optics above
+  plus standard pool-operation practice. The "main drain visible from the deck" clarity
+  requirement is a widespread code provision, **not** verified against a specific standard —
+  do not cite a code section for it.

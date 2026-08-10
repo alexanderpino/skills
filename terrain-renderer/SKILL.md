@@ -3,14 +3,14 @@ name: terrain-renderer
 description: >-
   Principal terrain-rendering authority for real-time worlds, across every
   paradigm: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (Nanite
-  family), engine-native terrain (UE Landscape, Nanite Landscape, Mesh Terrain), blocky and
-  smooth voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
+  family), engine-native terrain (UE Landscape, Nanite Landscape, Mesh Terrain), blocky/smooth
+  voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
   raymarching, tiled streaming, splatmaps and virtual texturing,
   GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
-  shore breakers, rivers, fullscreen-triangle pass, SPH/PBF fluid sim, buoyancy,
-  whitewater), snow and weather
-  state, auxiliary maps, vegetation and scatter, roads/decals/deformation, physics handoff,
-  and tool viewports. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at
+  breakers, rivers, pools, caustics, fullscreen-triangle pass, SPH/PBF fluid sim,
+  buoyancy, whitewater), snow/weather
+  state, auxiliary maps, vegetation/scatter, roads/decals/deformation, physics handoff,
+  tool viewports. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at
   scale, simulating water, or
   streaming large worlds - even if 'terrain' is never said (heightmap renderer, Minecraft clone,
   planet renderer). Not for terrain generation (terrain-architect) or BRDF math
@@ -477,7 +477,7 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/09-planetary-precision.md` | Precision doctrine (camera-relative, rebasing, per-patch frames); reversed-Z/log depth; cube-sphere quadtrees; orbit-to-ground LOD; horizon culling; ECEF/ENU frames; procedural-on-demand planets |
 | `references/10-lighting-shadows.md` | CSM at km scale (splits, snapping, caster culling); heightfield ray-marched and horizon-map shadows; virtual shadow maps; terrain AO/GI; normal pipeline across LOD; aerial perspective, the fullscreen-triangle skybox seam, volumetric-fog boundary, god rays (post-process vs volumetric), volumetric-cloud seams, cloud shadows; time-of-day invalidation |
 | `references/11-verification-failures.md` | **The review chapter.** Failure catalogue (symptom → mechanism → fix → route); metrics and budget assertions; test controls (flat plane, analytic terrain, teleport, flythrough); mandatory debug views; profiling method; regression strategy |
-| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, shoal/shore-aware shallow-water waves (dispersion, shoaling, refraction, breakers, run-up, wave–current interaction; the shore-wave band; wave particles/packets), flow-mapped rivers, interactive GPU sim patches, optics (reflection/refraction/absorption, foam, underwater), shoreline integration, pass ordering; **engine-native water read as architecture** (bounded paged zones, the fused top-down water-info capture, sparse morphing quadtree surfaces, wave data assets with one CPU/GPU evaluator, the single-depth-layer volume pass and its limits) |
+| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, shoal/shore-aware shallow-water waves (dispersion, shoaling, refraction, breakers, run-up, wave–current interaction; the shore-wave band; wave particles/packets), flow-mapped rivers, interactive GPU sim patches, **man-made bodies** (pools, tanks, canals — which bands gate off, and why pool colour is bottom albedo rather than scattering), optics (reflection/refraction/absorption, foam, underwater), **caustics** (the ray-map Jacobian, the fold/cusp structure that indicts the Voronoi fake, the tier ladder and the four-gate masking contract), shoreline integration, pass ordering; **engine-native water read as architecture** (bounded paged zones, the fused top-down water-info capture, sparse morphing quadtree surfaces, wave data assets with one CPU/GPU evaluator, the single-depth-layer volume pass and its limits) |
 | `references/13-snow-weather-surface-state.md` | Seasons/snow evolution; camera-following state targets; deformable snow/mud/sand (deferred deformation); physical transient depth/compaction/melt lifecycle within the generator's envelope; post-RVT overlay doctrine; wetness/puddles/drying; VFX reaction boundary; persistence |
 | `references/14-auxiliary-maps-runtime.md` | **The aux-map consumer's manual.** Registry table (map → consumers → format → lifecycle); packing/residency/mip rules; derived-vs-shipped; cross-system fan-out and terrain/VFX/PostFX ownership; single-source-of-truth; dynamic writeback discipline |
 | `references/15-vegetation-scatter.md` | Vegetation & scatter evolution: CPU placement → GPU procedural instancing/culling; grass and wind; tree LOD/impostors/HLOD; alpha/overdraw doctrine; mandatory seating on the rendered morphed/displaced surface; weather/atmosphere consistency; budgets |
