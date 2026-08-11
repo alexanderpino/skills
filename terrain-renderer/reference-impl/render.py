@@ -1944,10 +1944,37 @@ def _gather(flat, samples):
     return out
 
 
-print("water-out pass: %d facets x %d water samples"
-      % (sum(DECK_NA) * len(DECK_S), _NRHO * _NPHI), flush=True)
-DECK = _deck_gather(False)
-DECK0 = _deck_gather(True)
+DECK_SAMP = [(float(s), float(edge_z(np.array([s]))[0]), _RHO) for s in DECK_S]
+# --- and the same gather aimed at the liner band -----------------------------
+# The band is a poolward-facing vertical strip standing ON the water, so it is
+# the receiver above with s pinned at the lip and qz swept over the band's own
+# 100 mm. Two things make it a separate family rather than two more DECK_S rows:
+#   * the RADIAL GRID has to follow the height. The integrand rho^2 cos(phi) qz
+#     / R^4 peaks at rho = qz, so a facet 6 mm up is lit almost entirely by
+#     water within a centimetre of it, and _RHO's fixed 10 mm floor would miss
+#     the whole peak. Each band height therefore gets its own log grid from
+#     0.25 qz out to 4 m, the basin's own width.
+#   * that same shift is the PHYSICS the bar is pointing at. The flat-water form
+#     factor is scale invariant -- a vertical facet over an infinite plane
+#     collects the same irradiance at any height -- so the band is not brighter
+#     than the coping because it catches more light. It is more LEGIBLE because
+#     the patch of surface it integrates shrinks with height: at 6 mm it reads a
+#     centimetre of water and resolves single caustic bands; at 100 mm it reads
+#     a decimetre; the coping at 300 mm back and 132 mm up reads half a metre
+#     and averages the net away. The contrast printed below is that statement
+#     measured, height by height.
+BAND_Z = np.array([0.006, 0.018, 0.045, 0.100]) * (FREEB / 0.100)
+_NRHO_B = 14
+BAND_SAMP = [(SLIP, float(z),
+              np.exp(np.linspace(np.log(0.25 * z), np.log(4.0), _NRHO_B)))
+             for z in BAND_Z]
+print("water-out pass: %d stone facets x %d water samples, plus %d band facets "
+      "x %d" % (sum(DECK_NA) * len(DECK_S), _NRHO * _NPHI,
+                sum(DECK_NA) * len(BAND_Z), _NRHO_B * _NPHI), flush=True)
+DECK = _gather(False, DECK_SAMP)
+DECK0 = _gather(True, DECK_SAMP)
+BANDG = _gather(False, BAND_SAMP)
+BANDG0 = _gather(True, BAND_SAMP)
 _fall = np.array([DECK0[2][si].mean() for si in range(len(DECK_S))])
 _fall /= _fall[0]
 print("  water-out falloff off the lip: " +
@@ -1956,14 +1983,24 @@ _pat = np.array([np.std(DECK[2][si, :, 1] / np.maximum(DECK0[2][si, :, 1], 1e-12
                  for si in range(len(DECK_S))])
 print("  pattern contrast (rms/mean of the lensed / flat ratio): " +
       "  ".join("%.2f" % p for p in _pat))
+# the flat gather up the band, against the scale-invariance claim above: a
+# vertical facet over an INFINITE flat plane collects the same irradiance at
+# every height, so any departure here is the basin's finite width plus the
+# quadrature, and it is reported rather than assumed away.
+_bfall = np.array([BANDG0[2][si, :, 1].mean() for si in range(len(BAND_Z))])
+print("  band, flat-water irradiance vs height (scale invariance says 1.00): " +
+      "  ".join("%.0fmm:%.2f" % (1000 * z, f / _bfall[-1])
+                for z, f in zip(BAND_Z, _bfall)))
 
 
-def deck_water(along, side, s):
-    """Bilinear lookup of the water-out map: pattern ratio, and derived falloff."""
+def _map_at(G, G0, lev, levs, along, side, ref):
+    """Bilinear lookup of a water-out gather in (level, along). Returns the
+    LENSED/FLAT ratio -- mean one by construction, so it modulates a DC instead
+    of adding energy to it -- and the flat gather relative to its value at level
+    `ref`, which is the falloff."""
     out = np.ones((len(along), 3)); fal = np.ones(len(along))
-    fs = np.interp(np.clip(s, DECK_S[0], DECK_S[-1]), DECK_S,
-                   np.arange(len(DECK_S)))
-    i0 = np.clip(fs.astype(np.int64), 0, len(DECK_S) - 2); ft = (fs - i0)[:, None]
+    fs = np.interp(np.clip(lev, levs[0], levs[-1]), levs, np.arange(len(levs)))
+    i0 = np.clip(fs.astype(np.int64), 0, len(levs) - 2); ft = (fs - i0)[:, None]
     for sd in range(4):
         m = side == sd
         if not m.any():
@@ -1971,7 +2008,7 @@ def deck_water(along, side, s):
         fa = np.clip((along[m] - (Y0 if sd < 2 else X0)) / DECK_DA - .5,
                      0, DECK_NA[sd] - 1.001)
         ja = fa.astype(np.int64); fj = (fa - ja)[:, None]
-        A, B = DECK[sd], DECK0[sd]
+        A, B = G[sd], G0[sd]
         j0, k0 = i0[m], ja
         def g(arr):
             lo = arr[j0, k0] * (1 - fj) + arr[j0, k0 + 1] * fj
@@ -1982,8 +2019,18 @@ def deck_water(along, side, s):
         # ? and the ratio is quadrature noise, not lensing. It is multiplied by a
         # ? falloff of order 0.01 there, so the clip changes nothing visible.
         out[m] = np.clip(num / np.maximum(den, 1e-12), 0., 4.)
-        fal[m] = den[:, 1] / max(DECK0[sd][0, :, 1].mean(), 1e-12)
+        fal[m] = den[:, 1] / max(G0[sd][ref, :, 1].mean(), 1e-12)
     return out, fal
+
+
+def deck_water(along, side, s):
+    """Bilinear lookup of the water-out map: pattern ratio, and derived falloff."""
+    return _map_at(DECK, DECK0, s, DECK_S, along, side, 0)
+
+
+def band_water(along, side, z):
+    """The same, up the liner band: `z` is height over the still waterline."""
+    return _map_at(BANDG, BANDG0, z, BAND_Z, along, side, len(BAND_Z) - 1)
 
 
 def _groove(c, per, hw, dep):
