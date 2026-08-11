@@ -198,7 +198,19 @@ def trace(jet, n_psi=161, n_step=900, dt=0.02, s_launch=(0.7, 1.0, 1.4, 1.9)):
             np.concatenate(PH, 1), np.concatenate(AM, 1))
 
 
-def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.055, sig_max=0.25, norm_r=0.40):
+def rms_slope(gx, gy):
+    """s = sqrt(<gx^2> + <gy^2>) = sqrt(total mean-square slope).
+
+    The same one definition field.py uses, restated here so this module has no
+    second opinion about what "rms slope" means. `build`'s rms_target is in these
+    units. It used to be normalised through sqrt(<gx^2 + gy^2>/2) -- the per-axis
+    rms, smaller by sqrt(2) -- while field.py's WIND and REVERB were normalised
+    through this one, so a wake target of 0.068 and a reverb target of 0.046 were
+    not comparable numbers even though they sat two lines apart."""
+    return float(np.sqrt(np.mean(np.asarray(gx) ** 2 + np.asarray(gy) ** 2)))
+
+
+def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.078, sig_max=0.25, norm_r=0.40):
     """Gabor reconstruction: every ray sample deposits a local plane wave over a
     window the size of its own ray tube. No hand-shaped envelope anywhere.
 
@@ -217,6 +229,11 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.055, sig_max=0.25, norm_r=0.
     whole basin instead is what silently turns a local disturbance into a
     pool-wide one: the further the wake wrongly reaches, the harder that
     normalisation pushes short-wave slope onto water that should be glassy.
+
+    It is measured with `rms_slope`, i.e. sqrt(<gx^2> + <gy^2>). The default of
+    0.078 is only a placeholder for a caller that omits it -- field.py always
+    passes WAKE_RMS -- and it is the old 0.055 restated in this unit
+    (0.055*sqrt(2) = 0.0778), not a new choice. `?` neither figure is measured.
     """
     X, K, PH, A = trace(jet)
     dxg = (x1 - x0) / nx; dyg = (y1 - y0) / ny
@@ -265,6 +282,6 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.055, sig_max=0.25, norm_r=0.
     s_pk = 0.91                                   # forcing peak, from the jet geometry
     cx, cy = jet.p + s_pk * jet.ax
     near = ((gxc[None, :] - cx) ** 2 + (gyc[:, None] - cy) ** 2) < norm_r ** 2
-    rms = np.sqrt((gx[near] ** 2 + gy[near] ** 2).mean() / 2)
+    rms = rms_slope(gx[near], gy[near])
     sc = rms_target / max(rms, 1e-9)
     return gx * sc, gy * sc

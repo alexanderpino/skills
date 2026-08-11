@@ -10,6 +10,32 @@ Bands, in the order they were forced on the model by observation:
   BOIL    the turbulent surface over the jet itself, riding a forced envelope
   WAKE    the jet's stationary wake, solved by eikonal ray tracing (wake.py)
 
+ONE DEFINITION OF rms SLOPE, AND WHY THE FILE INSISTS ON IT
+-----------------------------------------------------------
+Everywhere in this file, and in the chapter,
+
+    s = sqrt(<|grad h|^2>) = sqrt(<gx^2> + <gy^2>) = sqrt(total mean-square slope)
+
+There is a second, equally respectable convention -- the PER-AXIS rms,
+sqrt(<gx^2 + gy^2>/2), which is what an isotropic field's single-axis Gaussian
+width is -- and it is smaller by exactly sqrt(2). Both are "the rms slope". The
+file used to carry both at once: WIND and REVERB were normalised and printed as
+sqrt(total mss), NEAR and WAKE were normalised and printed per-axis, and the
+TOTAAL row added them in quadrature as though they were the same number. That is
+not a cosmetic defect. Because the two bands that use the per-axis form are
+normalised TO it, a target written as 0.024 put sqrt(2)*0.024 of actual slope on
+the water, so the mixed convention was in the water and not only in the printout,
+and the whole point of a slope budget -- weighing one band against another --
+was being done with two different units on the two sides of the scale.
+
+sqrt(total mss) is the convention picked because it is the one the rest of the
+doctrine already speaks: Cox & Munk quote total mean-square slope, the focusing
+number F = 0.25*d*s*k is written for it, and the chapter's independently measured
+far-field figures (0.016 short, 0.055 long) are in it. It is computed in exactly
+one place, `rms_slope`, and every band, every normaliser and every printed row
+goes through that function or its analytic twin `_plane_rms`. Writing the
+expression out by hand anywhere else is how the second convention got in.
+
 Slope budget, and why it is the whole game
 ------------------------------------------
 Caustic focusing on the bed goes as F = 0.25*d*s*k (d = 1.40 m, s = rms slope,
@@ -34,6 +60,28 @@ import wake as _wk
 X0, X1, Y0, Y1 = 0.0, 8.0, 0.0, 4.0
 rng = np.random.default_rng(20260810)
 
+
+def rms_slope(gx, gy):
+    """THE rms slope of a sampled gradient field. s = sqrt(<gx^2> + <gy^2>).
+
+    Every band, every normalisation target and every printed row in this file
+    goes through this function. See the convention block at the top: the reason
+    it exists is that the same quantity written out inline twice came out in two
+    different units, and no diagnostic could see it because each band's own
+    numbers stayed self-consistent."""
+    return float(np.sqrt(np.mean(np.asarray(gx) ** 2 + np.asarray(gy) ** 2)))
+
+
+def _plane_rms(sl):
+    """Same quantity for a superposition of plane waves, analytically.
+
+    A component with slope amplitude sl_i contributes sl_i*cos(phase) to the
+    gradient ALONG ITS OWN k, so <|grad h|^2> = sum_i sl_i^2 * <cos^2> =
+    sum_i sl_i^2 / 2 -- both gradient components together, not each. Hence the
+    /2 here is the <cos^2> factor and NOT a per-axis split, which is the exact
+    coincidence that made the two conventions hard to tell apart by eye."""
+    return np.sqrt(np.sum(np.asarray(sl) ** 2) / 2.0)
+
 # ---------------------------------------------------------------- the return jet
 # A pool return is a SUBMERGED ROUND TURBULENT JET, not a pulsing point. Its
 # surface footprint is then geometry, not an authored lobe:
@@ -55,11 +103,27 @@ C_MIN = (4 * 9.81 * SIGMA_W / 1000.0) ** 0.25   # 0.231 m/s, at lambda 17.1 mm
 S_SPREAD, B_DECAY, TURB_INT = 0.094, 5.8, 0.25
 ETA_C = 1.0                   # O(1) constant in eta ~ C u'^2 / g  (see provenance)
 NU = 1.004e-6
-WIND_RMS, JNEAR_RMS, REVERB_RMS = 0.016, 0.024, 0.046
-# The wake's rms slope in ITS OWN near field (inside 1.4 m of the forcing peak),
-# not an average over the basin. With the other bands at 0.073 there this puts the
-# local total at ~0.10 against 0.053 in the far field -- the documented pair.
-WAKE_RMS = 0.068
+# Band rms slopes, all as s = sqrt(<|grad h|^2>). Two of these were RESTATED, not
+# retuned, when the file was put on one convention: JNEAR and WAKE were normalised
+# through the per-axis expression, so the numbers written here were smaller by
+# sqrt(2) than the slope they actually put on the water.
+#     JNEAR  0.024 per-axis * sqrt(2) = 0.0339 -> 0.034
+#     WAKE   0.068 per-axis * sqrt(2) = 0.0962 -> 0.096
+# The water is unchanged to within the rounding: these are the same fields, read
+# in the unit the rest of the file uses. Nothing was scaled to preserve an old
+# printed total, and the printed totals duly moved (see _norm_jets).
+#
+# ? WIND_RMS and REVERB_RMS are CHOSEN, not derived -- there is no measurement
+# behind 0.016 and 0.046 in this file. The chapter's "0.016 short, 0.055 long"
+# was read off this implementation, so quoting it back as confirmation would be
+# circular. What the chapter does assert independently is a RATIO (near field
+# roughly twice the far field), and that is the number to judge these against.
+WIND_RMS, JNEAR_RMS, REVERB_RMS = 0.016, 0.034, 0.046
+# The wake's rms slope in ITS OWN near field (inside wake.build's norm_r = 0.40 m
+# of the forcing peak), not an average over the basin. The other four bands sum to
+# 0.075 over that patch, so sqrt(0.075^2 + 0.096^2) = 0.122 local against 0.058 in
+# the far field -- the documented pair, both now in sqrt(<|grad h|^2>).
+WAKE_RMS = 0.096
 
 _AIM = np.array([np.cos(JET_TILT) * np.cos(JET_AZ),
                  np.cos(JET_TILT) * np.sin(JET_AZ), np.sin(JET_TILT)])
@@ -84,7 +148,15 @@ def _alpha(k):
 def jet_envelope(X, Y):
     """rms surface slope forced by the jet's turbulence, from the jet geometry.
     eta ~ C u'^2 / g (stagnation scale of an eddy of velocity u'), and the eddy
-    size is the local jet width, so slope ~ eta / r_half."""
+    size is the local jet width, so slope ~ eta / r_half.
+
+    This is an ENVELOPE, one scalar, so it carries no per-axis/total ambiguity of
+    its own -- but it is used as BOIL's local rms slope (BOIL's plane set is
+    normalised to unit rms and then multiplied by this), so it inherits whatever
+    convention that normalisation uses. _plane goes through _plane_rms, so the
+    envelope is in sqrt(<|grad h|^2>) like everything else. ? the O(1) constant
+    ETA_C is genuinely unknown, so the LEVEL here is a scaling argument and only
+    the near/far ratio it produces is defensible."""
     px, py = X - np.float32(_ORIG[0]), Y - np.float32(_ORIG[1])
     pz = np.float32(0.0 - _ORIG[2])
     sax = px * np.float32(_AIM[0]) + py * np.float32(_AIM[1]) + pz * np.float32(_AIM[2])
@@ -121,7 +193,7 @@ def _report_jet():
 def _plane(nc, lo, hi, rms, spread_deg, seed):
     r = np.random.default_rng(seed)
     lam = np.exp(r.uniform(np.log(lo), np.log(hi), nc))
-    sl = r.uniform(0.5, 1.0, nc); sl *= rms / np.sqrt(np.sum(sl ** 2) / 2.0)
+    sl = r.uniform(0.5, 1.0, nc); sl *= rms / _plane_rms(sl)
     k = 2 * np.pi / lam
     th = (r.uniform(0, 2 * np.pi, nc) if spread_deg is None
           else r.normal(np.deg2rad(20.0), np.deg2rad(spread_deg), nc))
@@ -281,7 +353,7 @@ def _norm_jets():
     _report_jet()
     X, Y = np.meshgrid(np.linspace(0.3, X1 - 0.3, 260).astype(np.float32),
                        np.linspace(0.3, Y1 - 0.3, 130).astype(np.float32))
-    g = _cyl(X, Y); _SC['near'] = JNEAR_RMS / np.sqrt((g[0] ** 2 + g[1] ** 2).mean() / 2)
+    g = _cyl(X, Y); _SC['near'] = JNEAR_RMS / rms_slope(*g)
     _wake_field()                       # trace the rays once, before anything asks
     # how far does the wake stay visible?
     sax = np.linspace(0.1, 7.8, 300)
@@ -309,31 +381,64 @@ def _norm_jets():
     dn = 0.7 / 127.0; df = 2.0 / 255.0
     rows, near_v, far_v = [], 0.0, 0.0
 
-    shn = float(shelter(xxn, yyn).mean()); shf = float(shelter(xxf, yyf).mean())
-    kw = _plane_k(WIND)
-    rows.append(("WIND", WIND_RMS * shn, WIND_RMS * shf, kw))
-    kr = _plane_k(REVERB)
-    rows.append(("REVERB", REVERB_RMS, REVERB_RMS, kr))
-    gn = _cyl(xxn, yyn); gf = _cyl(xxf, yyf)
-    rows.append(("NEAR", np.sqrt((gn[0] ** 2 + gn[1] ** 2).mean() / 2),
-                 np.sqrt((gf[0] ** 2 + gf[1] ** 2).mean() / 2),
-                 _spec_k(gn[0], gn[1], dn, dn)))
-    en = float(np.sqrt((jet_envelope(xxn, yyn) ** 2).mean()))
-    ef = float(np.sqrt((jet_envelope(xxf, yyf) ** 2).mean()))
-    rows.append(("BOIL", en * 0.707, ef * 0.707, _plane_k(BOIL)))
-    gn = _wake(xxn, yyn); gf = _wake(xxf, yyf)
-    kwk = _spec_k(gn[0], gn[1], dn, dn)
-    rows.append(("WAKE", np.sqrt((gn[0] ** 2 + gn[1] ** 2).mean() / 2),
-                 np.sqrt((gf[0] ** 2 + gf[1] ** 2).mean() / 2), kwk))
+    # EVERY s below comes out of rms_slope (or _plane_rms, its analytic twin).
+    # No band writes its own rms expression -- that is what let two conventions
+    # coexist here, one of them reaching all the way into the normalisation.
+    # Every row is MEASURED on the two patches, none is the nominal constant read
+    # back out. That matters for the TOTAAL row: WIND and REVERB are finite sets
+    # of discrete components (20 and 44), so on a 2 m patch REVERB samples a few
+    # percent above its 0.046 ensemble value, and a table that printed 0.046 while
+    # the water carried 0.049 could not add up to the field's actual total.
+    shn = shelter(xxn, yyn).astype(np.float32); shf = shelter(xxf, yyf).astype(np.float32)
+    wxn, wyn = _gemm(WIND, xxn[0], yyn[:, 0]); wxf, wyf = _gemm(WIND, xxf[0], yyf[:, 0])
+    rows.append(("WIND", rms_slope(wxn * shn, wyn * shn),
+                 rms_slope(wxf * shf, wyf * shf), _plane_k(WIND)))
+    rxn, ryn = _gemm(REVERB, xxn[0], yyn[:, 0])
+    rxf, ryf = _gemm(REVERB, xxf[0], yyf[:, 0])
+    rows.append(("REVERB", rms_slope(rxn, ryn), rms_slope(rxf, ryf), _plane_k(REVERB)))
+    cn = _cyl(xxn, yyn); cf = _cyl(xxf, yyf)
+    rows.append(("NEAR", rms_slope(*cn), rms_slope(*cf), _spec_k(cn[0], cn[1], dn, dn)))
+    # BOIL rides the forcing envelope, so measure the product rather than
+    # inferring it: the plane set carries unit rms, the envelope carries the rest.
+    bxn, byn = _gemm(BOIL, xxn[0], yyn[:, 0]); en_ = jet_envelope(xxn, yyn)
+    bxf, byf = _gemm(BOIL, xxf[0], yyf[:, 0]); ef_ = jet_envelope(xxf, yyf)
+    rows.append(("BOIL", rms_slope(bxn * en_, byn * en_),
+                 rms_slope(bxf * ef_, byf * ef_), _plane_k(BOIL)))
+    wn = _wake(xxn, yyn); wf = _wake(xxf, yyf)
+    rows.append(("WAKE", rms_slope(*wn), rms_slope(*wf),
+                 _spec_k(wn[0], wn[1], dn, dn)))
 
     print("  band      lambda_dom   s(jet)  F(jet)   s(ver)  F(ver)")
     for nm, sn, sf, k in rows:
         near_v += sn ** 2; far_v += sf ** 2
         print("    %-7s %7.1f cm   %6.3f  %6.2f   %6.3f  %6.2f"
               % (nm, 200 * np.pi / k, sn, _focus(sn, k), sf, _focus(sf, k)))
+    # The chapter's "long band" is REVERB AND NEAR together -- both are basin-scale
+    # coherent water around 20 cm, and they are only separate rows here because
+    # they are generated differently. Reading field.py's REVERB row against the
+    # chapter's long band is comparing a part with a whole, which is a second way
+    # to get a mismatched F that has nothing to do with the rms convention. The
+    # lambda column below is the FAR-field value (that is the one the chapter
+    # quotes); each F uses its own patch's k.
+    ln = (rxn + cn[0], ryn + cn[1]); lf = (rxf + cf[0], ryf + cf[1])
+    kln = _spec_k(ln[0], ln[1], dn, dn); klf = _spec_k(lf[0], lf[1], df, df)
+    print("    %-7s %7.1f cm   %6.3f  %6.2f   %6.3f  %6.2f    (= REVERB + NEAR)"
+          % ("LANG", 200 * np.pi / klf, rms_slope(*ln), _focus(rms_slope(*ln), kln),
+             rms_slope(*lf), _focus(rms_slope(*lf), klf)))
     print("    %-7s %7s      %6.3f           %6.3f"
           % ("TOTAAL", "-", np.sqrt(near_v), np.sqrt(far_v)))
-    print("    doel: 0.09-0.11 bij de straal, 0.053 ver weg")
+    # Restated from the old mixed-convention pair (0.09-0.11 near, 0.053 far), not
+    # retuned to it. The far target was sqrt(0.016^2 + 0.046^2 + 0.020^2) with only
+    # the last term per-axis; putting NEAR in the same unit (0.020*sqrt(2) = 0.028)
+    # gives sqrt(0.016^2 + 0.046^2 + 0.028^2) = 0.056, and the measured patch runs
+    # 0.058 because REVERB samples a shade above its nominal 0.046 there. The near
+    # band moves from 0.09-0.11 to 0.11-0.14 the same way -- WIND and REVERB were
+    # already in this unit, NEAR/BOIL/WAKE were not, so the total gains 1.35x and
+    # not the full sqrt(2). The near/far RATIO, which is the part the chapter
+    # states independently ("roughly twice"), goes 1.79 -> 2.16 and is BETTER for
+    # the fix, because it was the one number the mixed units were distorting.
+    print("    doel: 0.11-0.14 bij de straal, 0.058 ver weg"
+          " (s = sqrt(<|grad h|^2>) overal)")
 
 
 def grad_grid(xs, ys):

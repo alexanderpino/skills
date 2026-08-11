@@ -48,5 +48,11 @@ medium**, and several things the chapter asserts invert when it does.
 
 Numbers this reproduces, each stated in the chapter:
 sun-disc penumbra 6.8 mm on the bed; caustic offset 1.37 m at 44.4 deg refraction;
-jet surface footprint peaking 0.91 m downstream; local rms slope 0.09 against
-0.053 far field; wake energy fan +-19 deg against a +-78 deg wavevector fan.
+jet surface footprint peaking 0.91 m downstream; local rms slope 0.12 against
+0.058 far field; wake energy fan +-19 deg against a +-78 deg wavevector fan.
+
+Slope convention, everywhere in this directory and in the chapter: `s` is
+`sqrt(<|grad h|^2>)`, the total mean-square slope, never the per-axis rms that is
+smaller by sqrt(2). Two of the five bands were once normalised in the per-axis
+convention while the rest used the total, which put two units on the two sides of
+the slope budget; `field.rms_slope` exists so that cannot recur.
