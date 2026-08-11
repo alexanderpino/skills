@@ -779,13 +779,19 @@ exposes immediately. Pool water is organised by the plumbing and the walls.
 | Carries | The visible undulation, the trackable motion | Most of the slope: sparkle, fine caustic texture |
 | Local shelter | **Unaffected** — passes straight through a lee | **Strongly modulated** — this is what a lee removes |
 
-  Shading sees slope, and `slope = 2πa/λ`, so equal slope costs amplitude proportional to
-  wavelength: a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at 16.5 cm (≈0.19 against ≈0.11).
-  **Never budget the two bands by wave height** — and never let the short band own the bed pattern
-  either: by the focusing number `F = 0.25·d·s·k` ([The focusing
-  number](#the-focusing-number-which-regime-the-bed-is-in)) it sits past focus over a 1–3 m floor
-  (`F ≈ 3` for a 3 cm ripple at 1.40 m) and writes an unresolvable wash, while the long band lands
-  near `F ≈ 0.4` and writes the readable cell net.
+Shading sees slope, and a single wave's slope is `2πa/λ`, so equal slope costs amplitude
+proportional to wavelength: a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at 16.5 cm, ≈0.19
+against ≈0.11. Those two are **single-wave** slopes at one illustrative amplitude, and they are not
+the **band rms slope** the focusing number takes — substituting one for the other is the standard
+way to publish an `F` nobody can reproduce. So never budget the two bands by wave height, and never
+let the short band own the bed pattern. Measured over the reference implementation's far field, away
+from the jet (`reference-impl/field.py`): short band `s ≈ 0.016` at a dominant `λ ≈ 3 cm`
+(`k ≈ 210 m⁻¹`), long band `s ≈ 0.05` at `λ ≈ 18 cm` (`k ≈ 35 m⁻¹`). Over the reference pool's
+1.40 m floor the focusing number `F = 0.25·d·s·k` ([The focusing
+number](#the-focusing-number-which-regime-the-bed-is-in)) puts the short band at `F ≈ 1.2` — at
+focus, but onto a 3 cm cell, and holding under a tenth of the slope variance, so it stipples the bed
+rather than organising it — and the long band at `F ≈ 0.6`, the fold onset, which is where the soft
+low-contrast net lives, at cells of its own wavelength.
 - **Shelter modulates the short band only.** In the wind shadow of a sail or a hedge the surface
   goes glassy *but keeps undulating*: the lee kills the wind band while the jet waves cross it
   untouched. Multiply a lee mask into the whole field and long waves stop dead at the shadow line,
@@ -836,16 +842,16 @@ float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase
   **early wall reflections** are the direct train plus its first-order mirror images across the
   walls (`1/√r` spreading, damping as above) — a handful of extra trains in the same sum; pushing
   the image count up instead buys a coherent lattice no basin shows and costs more. The **wind
-  band** is the existing short-wave detail set. The **jet wake**, being stationary, is a bake:
-  solve it once offline per fitting, store slope and forcing envelope in a small texture oriented
-  in the fitting's frame, and sample it — one fetch, no solver in the pass, and a fitting that
-  moves only moves its texture. The **lee** is a painted or baked mask. A sim patch with reflecting
-  walls and a driven source cell is the option that buys swimmer transients, at the usual patch
-  cost ([Interactive simulation patches](#interactive-simulation-patches)); the steady field does
-  not need it. The bed pattern then goes through the same caustics ladder as any other body
-  ([The tier ladder](#the-tier-ladder)) — the driven basin changes which band feeds it, not the
-  technique. And the tail's near-isotropy is a review test in its own right: a wind sea writes
-  streaky, direction-aligned caustics; a reverberant tail writes isotropic cells.
+  band** is the existing short-wave detail set. The **jet wake**, being stationary, is a bake: solve
+  it once offline per fitting, store slope and forcing envelope in a small texture in the fitting's
+  frame, and sample it — one fetch, no solver in the pass, and it rotates and tiles with the
+  fitting. The **lee** is a painted or baked mask. A **height-field** sim patch with reflecting walls
+  and a driven source cell buys swimmer transients at the usual patch cost ([Interactive simulation
+  patches](#interactive-simulation-patches)); the steady field does not need it. The bed pattern
+  then goes through the same caustics ladder as any other body ([The tier
+  ladder](#the-tier-ladder)) — the driven basin changes which band feeds it, not the technique. And
+  the tail's near-isotropy is a review test in its own right: a wind sea writes streaky,
+  direction-aligned caustics; a reverberant tail writes isotropic cells.
 
 ### Pool optics: the colour is the bottom, not the water
 
@@ -1232,12 +1238,17 @@ depth `d` the receiver point moves by `d·s·(1 − 1/n)`; focusing happens when
 ```
 F = d * (1 - 1/n) * s * k        # water: 1 - 1/1.333 = 0.25, so F ~= 0.25 * d * s * k
     F << 1   below focus  -> a soft, wide brightness modulation; no network
+    F ~  0.5 fold onset   -> the net just appears: present, soft-edged, low-contrast
     F ~= 1   at focus     -> the crisp net, folds and cusps resolved
     F >> 1   past focus   -> branches overlap into an unresolvable wash
 ```
 
 (Near-normal sun; at low sun an obliquity factor enters and the pattern stretches along the sun
-azimuth.) Three practical readings:
+azimuth.) The onset rung is not interpolation between the other two: on a narrow-band isotropic
+field the bed area lying behind a fold runs 0% at `F ≈ 0.3`, 0.4% at `F ≈ 0.5`, 7% at `F ≈ 0.8` and
+19% at `F ≈ 1.1` (computed here from the Jacobian, `D`), so the network arrives abruptly just below
+focus and only hardens through it. That onset is the regime a photographed pool sits in — a net that
+is legible but not blown to white. Three practical readings:
 
 - **Cell size on the receiver is of the order of the dominant wavelength**, so measuring caustic
   cells against a photograph is a direct readout of the wave field that produced them — a cheap
