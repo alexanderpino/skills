@@ -837,23 +837,41 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
   images for the coherent arcs near the inlet, and a random-phase spectrum for everything after
   that. This is the one place where a plain random-phase superposition is not a cheat but the
   correct description, and it is also much cheaper than a large image set.
-- **A return is a *directed* momentum source, and its two products have wildly different reach.**
-  Model it as a pulsing point and you get two related errors at once: the influence comes out
-  **radial** when the fitting clearly aims somewhere, and it reaches **far too far**. Fix both.
-  Give emission a lobe about the aim — `cos^p` is enough, with `p ≈ 4` for the long waves and
-  `≈ 12` for the boil, because short waves diffract less and stay in a tighter fan — and **reflect
-  the aim along with the source** whenever you mirror it in a wall. Then stop deriving both
-  products from one decay law:
+- **A return is a submerged round turbulent jet — take the footprint from the jet, not from an
+  authored lobe.** Modelling it as a pulsing point gives two errors at once: influence that comes
+  out **radial** when the fitting plainly aims somewhere, and influence that reaches **far too
+  far**. Both dissolve if you use the jet's own geometry, which is standard free-shear-flow
+  material and needs no invented shape:
 
 ```
-boil   (momentum, 1-2.5 cm)   e-folding 0.10 - 0.36 m   local, aimed, gone within a body length
-waves  (10-30 cm)             e-folding   70 - 390 m    leaves, reflects, reverberates
+half-width      r_half(s) = S·s                       S  ~ 0.094   (linear spreading)
+centreline      U_c(s)    = B·U0·d / s                B  ~ 5.8     (1/s decay)
+radial profile  U/U_c     = exp(-ln2 (r/r_half)^2)
+turbulence      u'        ~ 0.25 · U_c                on the axis
+surface slope   sigma     ~ C · u'^2 / (g · r_half)   eta ~ C u'^2/g over an eddy of size r_half
 ```
 
-  Clean-water viscosity alone leaves the boil reaching metres, which renders as a halo around the
-  fitting; the surface film every pool carries damps capillaries several times harder, and with
-  that the boil dies in tens of centimetres — which is what it visibly does. One source, two
-  reaches: a small aimed disturbance at the outlet, and waves from it still crossing the basin.
+  The free surface is a plane sitting at perpendicular distance `h` (the fitting depth) from the
+  axis, so the jet only reaches it once it has spread that far. That single fact produces the whole
+  observed behaviour for free: the disturbed patch is **elongated along the aim**, it **starts
+  downstream of the fitting rather than at it**, and it dies as `U_c` decays. For a 20 mm restricted
+  eyeball at ~13 m³/h (`U0 ≈ 11.5 m/s`) set 15 cm below the waterline and aimed 6° up, the peak
+  lands **0.9 m downstream** with a half-length of about 0.7 m and a local rms slope of **0.09**
+  against 0.053 in the far field — the factor of two that a sparkle patch implies, arrived at from
+  plumbing rather than from tuning.
+- **Which makes the fitted quantity a real spec.** `sigma ∝ (U0·d)²`, so matching an observed
+  roughness contrast constrains the **flow rate through the fitting**, not a shape exponent. That is
+  the difference between calibrating and inventing: the number you end up adjusting is one a pool
+  installer could read off a pump.
+- **The boil is forced, not radiated — do not give it a propagation law.** The short-wave roughness
+  is where the jet *is*; it is an envelope, not a train leaving a source. Only the long waves
+  radiate, reflect and reverberate, and those are bulk-damped by clean-water viscosity because a
+  surface film barely touches them. The film matters for the short end, and there the classical
+  **inextensible-film** limit applies: an unstretchable surface forces a Stokes layer of thickness
+  `√(2ν/ω)` beneath it, giving `α ≈ 0.35·k·√(νω)` against the clean-surface `2νk²` — a factor 3–9
+  over the 8–50 mm band, wavelength-dependent rather than a tuned multiplier. Do not extend that
+  limit to long waves: there the film simply stretches and the surface behaves as clean, which is
+  why real slicks flatten ripples and leave swell alone.
 - **The inlet's near field buys sparkle by raising frequency, not amplitude.** The boil at an outlet
   is broadband and *short*, and since `slope = 2πa/λ` short wavelength is the cheap way to buy
   slope — a few millimetres of 3 cm chop out-slopes a centimetre of 30 cm swell. So a small,
@@ -2286,12 +2304,24 @@ above except the TotK physics talk is community reconstruction or press/footage 
   direct observation — **no measurement of a wall reflection coefficient was chased**, so treat
   "near-total" as an argued approximation rather than a figure. The method-of-images construction
   is standard acoustics/optics practice carried over, as is the early-reflections-plus-diffuse-tail
-  split. The directed-jet numbers are calibration, not measurement: the `cos^p` lobe is a
-  convenient shape rather than a measured emission pattern, and the **film-damping multiplier** that
-  pulls the boil's reach down to tens of centimetres is a plausible tuning factor — Marangoni
-  damping of capillary waves by surface films is real and can be large, but no coefficient was
-  looked up. What is durable is the **ratio**: the momentum product dies within a body length while
-  the waves it launches cross the basin. The individual figures are fitted to reference imagery.
+  split.
+- **P/?** — The submerged-jet footprint. Linear spreading `r½ = S·s` and `1/s` centreline decay are
+  textbook free-shear-flow results (Pope, *Turbulent Flows*, ch. 5; Rajaratnam, *Turbulent Jets*)
+  and the structure was web-confirmed 2026-08; the **numerical constants** `S ≈ 0.094`, `B ≈ 5.8`
+  and axial turbulence intensity `≈ 0.25` are from model knowledge and were **not** confirmed
+  against a primary source — they vary by a few percent across experiments, which does not move the
+  footprint qualitatively. The surface-deformation link `η ~ C·u'²/g` is a scaling argument
+  (stagnation pressure of an eddy) with an **O(1) constant `C` that is genuinely unknown here**;
+  `C = 1` was used. Free-surface turbulence deserves better than this and the chapter should say so
+  rather than pretend otherwise.
+- **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
+  layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
+  the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
+  primary source** in a 2026-08 search — the literature found (Jenkins & Jacobs 1997; the
+  Alpers–Hühnerfuss slick line) confirms the clean-surface `2νk²` and the existence of strong
+  film enhancement, not the prefactor. Treat the factor 3–9 as indicative. The restriction to short
+  waves is physics, not caution: the inextensible limit needs film elasticity large against the
+  wave, which fails for swell.
 - **F** — That treated pool water sits outside every Jerlov class (`b_b ≈ 0`, `c ≈ a`, Secchi
   exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
   scattering one, and the man-made gating table: this skill's composition from the optics above
