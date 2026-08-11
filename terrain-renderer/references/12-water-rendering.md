@@ -578,6 +578,36 @@ i.e. liquid water is only ~1–40% of the volume — with **mean bubble diameter
 Whiteness comes from **multiple scattering across thousands of air–water interfaces**, not from
 pigment, which is why foam is broadband white in the visible where water barely absorbs.
 
+**One constant runs the mirror under the surface and the whiteness of foam.** An air bubble seen
+from the water side presents the same water→air interface as the surface seen from below, so it has
+the same critical angle, and the cosine-weighted flux beyond it is `1 − 1/n²` = **43.7%** at
+`n = 1.333`. Every bubble wall mirrors that share of everything striking it: one bubble reads
+silvered, a cloud of them reads white and opaque. A renderer that gets Snell's window right and
+takes foam whiteness from a painted albedo has special-cased one of the two faces of a single
+number. And **foam is white rather than tinted because the paths are short**: transmission over
+5 mm of water is 0.999 in red, so light bouncing between bubble walls never accumulates enough path
+to pick up the water's colour or the bed's. **Foam is many short paths where blue water is one long
+one** — which is why foam over a blue liner and foam over sand are the same white, and why tinting
+foam toward the body colour is wrong in every water.
+
+**"Aerated water" is two mechanisms that share only that constant**, and merging them is why
+jacuzzi water and surf usually get the same wrong effect:
+
+| | Surf, a fall, a breaking crest | An injected plume (jacuzzi, aeration jet) |
+|---|---|---|
+| Air enters | at the **surface**, folded in by the break | at **depth**, through an orifice under pressure |
+| Where it lives | a **skin**, optically thick within centimetres | a **volume** — a buoyant plume through the bulk |
+| Time | **transient**: each patch decays in seconds | **steady** while the pump runs |
+| Bubble sizes | very wide, microns to centimetres | narrow, set by the nozzle and the shear |
+| Renders as | a **coverage mask** you cannot see into | a **participating medium** you see partly through |
+| Also throws | **spray** — water in air, a third medium | nothing |
+
+The plume case is the one that needs the `a`/`b`/`g` split rather than a collapsed `sigma`, and it
+is the same machinery as [turbid water](#water-body-optical-identity-where-sigma-actually-comes-from)
+run to its high end. Note also which fittings do this: a pool's filtration return is submerged and
+pumps *water*, so it does not foam; a jacuzzi fitting deliberately aspirates air, which is a
+different fitting rather than a stronger one.
+
 **Foam albedo is a decay curve, not a constant** — and this is the most useful single fact here:
 
 | State | Visible reflectance | Reads as |
@@ -830,8 +860,8 @@ float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase
   linearly and decays as `1/s`, and cannot force the surface until it has spread far enough to reach
   it, so the disturbed patch is elongated along the aim and **starts downstream of the fitting
   rather than at it** — ~0.9 m downstream for a 20 mm restricted eyeball at ~13 m³/h set 15 cm deep,
-  half-length ~0.7 m, local rms slope roughly **twice** the far field — total `0.123` against
-  `0.058`, ratio **2.12**, on the reference implementation. The ratio is the claim, not the levels:
+  half-length ~0.7 m, local rms slope roughly **twice** the far field — total `0.122` against
+  `0.053–0.058`, ratio **2.1–2.3**, on the reference implementation. The ratio is the claim, not the levels:
   `η ~ C·u'²/g` carries an unknown O(1) constant (`?`) and both levels inherit the chosen bands (`?`).
   Its wake is a **narrow downstream band, not rings and not a Kelvin wedge**: the drift it drives,
   of order 1 m/s (0.8 bar through that eyeball is an 11.6 m/s jet), is strongly supercritical
@@ -1026,6 +1056,43 @@ at the end of this section.
   true split-screen meniscus (render both states, mask by the wave-displaced waterline in screen
   space — expensive, hero-camera only). The untreated version — one frame of neither-state
   garbage at the crossing — is a certified review catch.
+
+### The view from inside, and the split shot
+
+The submerged view is the same water and the same code seen from the other side, which makes it the
+strongest verification instrument a water renderer has: every above-water shortcut that survives by
+being invisible from a downward view becomes visible from underneath. Three things invert.
+
+- **Snell's window is the composition, and its rim is dispersive.** The whole above-water world
+  compresses into a cone of half angle `asin(1/n)` — 48.5° at green, 97° across — and outside it the
+  surface is a **perfect mirror**, reflectance exactly 1, showing the bed and walls folded back
+  down. There is no partial regime out there, which makes the rim the hardest edge in the frame.
+  On an IOR triple of 1.3320/1.3348/1.3400 the critical angle runs 48.655°/48.519°/48.268°, a
+  **0.39° fringe** with red outside blue (`D`) — the same three constants that fringe the caustics,
+  now landing on a hard edge instead of a soft one.
+- **Absorption acts along the *view* path for the first time**, so it reads as aerial perspective:
+  at `a = (0.264, 0.0565, 0.0092) m⁻¹` transmission over 5 m is `(0.27, 0.75, 0.96)`, and far
+  geometry loses three quarters of its red with contrast falling as it goes. That bounds this
+  chapter's own [pool-optics claim](#pool-optics-the-colour-is-the-bottom-not-the-water): *the
+  colour is the bottom, not the water* is a statement about a view from above, and from inside it
+  is false.
+- **Anything touching the surface from below carries a mirrored twin**, because the underside is a
+  mirror right up to the waterline: a wall, a step or a float meets its own image there,
+  corrugations and all. It is the most recognisable underwater cue after the window itself, and it
+  comes free from the same surface that writes the caustics.
+
+**The split shot — half in, half out — is a property of the port, not of the camera.** A
+mathematical point aperture at the datum gives a straight, degenerate split; a real front element of
+finite radius gives the waterline **traced across the port**, a curve that undulates with the
+passing waves and rides up and down them. So the port must be modelled explicitly, and which port
+is visible in the result: a **flat port** refracts, so the submerged half reads at `d/n` — 25%
+closer, 33% larger, field narrowing from 46° to ≈34° — while a **dome** restores the submerged half
+and narrows the **air** half instead. **No port leaves both halves native.** That yields the
+cheapest hard check in underwater rendering: one straight edge crossing the waterline — a wall, a
+coping, a mooring line — must **step in scale** through a flat port and run **unbroken** through a
+dome. A frame whose halves match while claiming a flat port has not chosen a port at all. And the
+magnification is the *interface*, not the water: a camera fully submerged with no port sees none,
+because nothing refracts between it and the subject.
 
 ### Water-body optical identity: where `sigma` actually comes from
 
@@ -1352,10 +1419,18 @@ perfect wetting, 2.73 mm at a 30° contact angle (`?`, unmeasured). The fillet i
 lengths across, so over roughly **5–10 mm** the tilt runs continuously from 90° at the wall to 0° at
 the flat surface, and that strip therefore holds **every** facet orientation — the specular
 condition is met inside it for any light in the sky at any sun elevation. It is the one exception to
-the reachability test above. On the open surface a far-field `s = 0.058` (per-axis `s/√2` = 2.35°)
-puts the 17.8° the measured sun-and-camera geometry above asks for at **7.6σ**, and the 34.5° a
+the reachability test above. On the open surface a far-field `s ≈ 0.056` (per-axis `s/√2` = 2.27°)
+puts the 17.8° the measured sun-and-camera geometry above asks for at **7.8σ**, and the 34.5° a
 straight-down view asks for at **15σ**: never, not rare. Hence a bright line at the waterline in nearly
 every pool photograph, glassy open water included — and wherever a river meets stone or a lake a jetty.
+
+That `s` is the *ensemble* figure — the quadrature sum of the band constants — and it is quoted
+that way on purpose. Any 2 m patch of the same field measures **0.053 to 0.058** depending on where
+it is taken, because a band synthesised from a few dozen discrete components has real sampling
+spread and the shelter mask varies underneath it (`D`). Quote the ensemble, treat a patch reading as
+one draw from it, and check that the conclusion survives the spread before publishing either: here
+17.8° runs 7.6σ–8.3σ and 34.5° runs 14.7σ–16.1σ across the whole range, which is "never" throughout.
+A doctrine that flips inside the sampling spread of its own measurement was never load-bearing.
 
 **It is the bevel highlight, not inverse ambient occlusion.** Both promote a sub-pixel feature to a
 shading term at a junction, but AO answers a *visibility* question and is an approximation, while
@@ -1532,6 +1607,19 @@ unlit by the brightest thing in the scene. The above-water counterpart — surfa
 dancing on a wall or a hull — is a second, weaker caustic on the reflection side, cheap from the
 same map and a strong cue for pools and harbours.
 
+**Interiors too dark and shadows too bright at once means a missing directional bounce.** Worth
+naming as a diagnostic, because each symptom alone reads as a tuning error and only the pair
+identifies the mechanism: a single flat ambient standing in for inter-reflection **under**-fills
+where a nearby bright surface should be bouncing (caustic cell interiors on the bed come out too
+dark) and **over**-fills where nothing should be (an occluder's shadow on the water comes out too
+bright). Errors of *opposite sign in one frame* are a missing transport path, never a constant that
+needs raising — and no better constant fixes it, because the source varies: on the reference pool
+the wall runs 2.2× in red from waterline to foot. Priced there, the walls take **35% of the bed's
+cosine-weighted hemisphere on average and 77% at the worst texel**, with a flat sky ambient applied
+over all of it, and **58%** of the total-internal-reflection return off the underside of the surface
+meets a wall before it can get back out (`D`). In an enclosed body — a pool, a tank, a canal, a
+harbour — the walls are a first-class light carrier, not a boundary condition.
+
 **Sharpness has a physical floor, and it scales with depth.** The sun is not a point: its disc
 subtends **0.53°**, and refraction compresses that cone on entry by `cos(theta_i)/(n·cos(theta_t))`
 — near normal incidence simply `1/n`, so ≈ 0.53°/1.33 ≈ 0.40° ≈ 7.0 mrad. The penumbra grows
@@ -1548,11 +1636,56 @@ effect away. Off-normal the compression is anisotropic, so a low sun stretches t
 sun azimuth. This is the same 0.53° that sets the glitter path above the surface — above the water
 it makes the highlight too *wide*, below it makes the caustic too *soft*.
 
+**And every other depth-derived quantity is a function too.** The penumbra is the easy case,
+because `depth` is visibly in the formula. The expensive failures come from constants *derived* at
+one depth and then applied everywhere: a penumbra kernel computed once at the deepest point and
+reused put **7× too much blur** on a 205 mm shallow, and a wall attenuated per texel over the full
+slant path dimmed a texel 200 mm under the waterline as though it sat under 1.96 m of water. State
+the rule and grep the code against it: **if the scene has more than one depth, every depth-derived
+quantity is a function, not a constant** — the extinction path, the slant, the penumbra and the
+focusing number, all at once. A single `depth` constant in a renderer with a sloping floor, a step
+flight or a bench is a bug list, not a parameter, and each of its symptoms will be diagnosed
+separately.
+
 **Dispersion is visible and cheap.** Water's index falls across the visible band — roughly 1.337
 at 486 nm to 1.331 at 656 nm — so the three channels' fold sets do not coincide. The offset is
 small, but it lands on the highest-contrast feature in the image, which is why real caustic edges
 carry faint colour fringing. Refract per channel, or offset the sampled map per channel scaled
 with depth, rather than shipping a grey caustic.
+
+### A channel is a band, not a wavelength
+
+Refracting three channels with three IORs is not just an approximation of dispersion — it is a
+**sampling scheme**, three delta wavelengths standing in for three broad sensor bands, and a
+three-point quadrature is only as good as the integrand is smooth over the sample spacing. Which
+part of the frame you are looking at decides whether it is:
+
+- On a **caustic fold** the integrand *is* smooth over the dispersion scale, so three samples are
+  plenty. That is why fold fringing always looks right, and why nobody suspects the scheme.
+- On an **opaque silhouette** seen through the surface — a step nosing, a ladder rail, a wall — the
+  integrand is a **step** at exactly that scale, and three deltas resolve a step as a **comb**:
+  three separately-placed edges, so the pixel between them carries one primary with the other two
+  missing. That is the saturated blue-and-yellow speckle on every refracted edge, and it is not
+  dispersion, it is aliasing *of* dispersion. Measured at 1.40 m: the red and blue images of the
+  bed land 9.8 mm apart, 2.1 output pixels, with 0.33% of water rays disagreeing about which
+  surface they hit (`D`).
+
+**The fix costs no extra rays.** `n(λ)` is already implicit in the constants you have — a
+two-parameter Cauchy fit through the three `(λ, n)` pairs reproduces all three to 5×10⁻⁵, so the
+three IORs were themselves drawn from one curve and the curve can be recovered from them. Give each
+channel the **Voronoi cell of the three nominals** as its band, and let the existing subsample grid
+carry the spectral integral: assign each subsample a different wavelength stratum inside its
+channel's band, laid out as a **Latin square** over the grid so the spectral index is decorrelated
+from sub-pixel position in *both* axes — otherwise the band integral comes out as a sub-pixel colour
+ramp rather than a mean. The box filter that resolves subsamples into a pixel was already an
+integral; it now performs the spectral one at the same time, for one multiply per ray.
+
+**The light path is band-integrated too, and by more than the view path.** The sun's own refraction
+spans each band, so every channel's fold is smeared before surface roughness or the sun disc enters:
+≈3.5 mm on the red fold at 1.40 m against ≈9.4 mm on the blue, measured across the beam like the
+6.8 mm sun-disc penumbra it sits beside (`D`, this sun and this depth). **Blue folds are physically
+softer than red ones** — a statement three deltas cannot express at all, and one reason a
+monochrome caustic map tinted per channel reads subtly wrong even when its offsets are right.
 
 **Reusing the whitecap machinery — with one correction.** An FFT surface already computes a 2×2
 Jacobian determinant per grid point for whitecap foam
@@ -1599,6 +1732,60 @@ Two details worth stealing verbatim: Nyquist argues the geometry cutoff should b
 but that over-blurs in practice — Bruneton et al. use **N_min = 1.0, N_max = 2.5** with a
 smoothstep between. And the variance must be **clamped to a minimum** matching the solar disc,
 or dead-calm water still produces a Dirac (see [Calm water](#calm-water-the-low-energy-regime)).
+
+### Pick the kernel on purpose, and give the variance a receiver
+
+Two decisions live inside "move the variance rather than lose it", and both are usually taken by
+default rather than made.
+
+**The kernel.** A pixel integrates the field over its footprint, so a component of wavenumber `k`
+survives at `a·W(k)` with `W` the kernel's transfer function. That is exact and assumes nothing
+about the field, which means the only real choice is `w(r)`:
+
+| Kernel | `W(k)` | Verdict |
+|---|---|---|
+| **Box** — the literal footprint | `sinc(k·fp/2)` | Zeros at `fp = λ`, negative lobes to **−0.217**: a band fades, **returns phase-inverted**, and fades again as the footprint grows with distance. A slow beat against distance — i.e. a moiré generator, which is the defect being removed |
+| **Tent** | `sinc²(k·fp/2)` | Positive, but still zeroed, and decays only as `1/k²` |
+| **Gaussian** | `exp(−k²σ²/2)` | Positive and monotone, so no band ever returns; the only kernel simultaneously separable *and* isotropic — all a scalar footprint with no orientation is entitled to assume — and it composes under convolution, so successive filters simply add variances |
+
+Then scale it deliberately. The box of width `fp` has `σ = fp/(2√3) = 0.2887·fp`, but a Gaussian
+that wide still passes **0.663** of the amplitude at the Nyquist wavenumber — 44% of the variance
+straight into the fold. Pinning half *amplitude* at the Nyquist wavelength instead gives
+`σ = √(2 ln 2)/π · fp = 0.3748·fp`, and the whole filter collapses to one checkable sentence:
+**a component is half gone when the footprint reaches half its wavelength**, and 94% gone at one
+wavelength (`P`, Fourier arithmetic recomputed here). Three rules go with it, each of which costs
+something to learn the other way:
+
+- **Attenuate amplitude, not variance.** Averaging is linear on the field, so the kernel acts on
+  the field and the resolved variance falls as `W²` by itself. Applying `W` to a variance
+  double-counts the filter.
+- **Filter per component, not per band.** A band spanning 17–70 mm has no single `k`; one nominal
+  wavenumber switches the band off where it should have narrowed it.
+- **Pass the *output* pixel's footprint, not the subsample's.** Shading is nonlinear in slope, so a
+  field left resolved to the subsample Nyquist still writes radiance harmonics above it.
+
+**Filtering without a receiver trades moiré for plastic** — it is the plastic-sea failure at the
+top of this section, arrived at one step earlier and on purpose. The removed variance has to go
+somewhere, and two things about the hand-off are not obvious:
+
+- **What was removed is a tensor, not a scalar.** A wind band is a spread about one azimuth and a
+  wake is directional, so a lobe widened by the trace alone is visibly wrong *across* the wind.
+  This is why Bruneton's 2×2 tensor is the right shape and a scalar roughness bump is not.
+- **The map from slope covariance to reflected-lobe covariance is not the identity.** An in-plane
+  slope perturbation swings the reflected ray by `2δ`, an out-of-plane one by `2δ·cos θ_v` with
+  `θ_v` measured from the surface normal — so `C = J Σ Jᵀ` with `J = diag(−2, −2cos θ_v)` in the
+  view-azimuth frame. The reflected ellipse is therefore **not similar to the slope ellipse**: a
+  camera 33° above the horizontal (`θ_v = 57°`) stretches it **1.8×** along the view azimuth, an
+  anisotropy the slope tensor never had. Checked against 400k Monte-Carlo perturbed reflections to
+  4% on the major axis and 8% on the minor (`D`).
+
+Convolving that into a `cos^n` lobe is closed-form and worth doing exactly rather than
+approximately: two Gaussians convolve to a Gaussian, covariances add, the integral is conserved (so
+the peak falls by `√(det Q₀/det Q)`), and writing the result back as a **directional** `n_eff` — the
+summed Gaussian's variance along the offset to the light — keeps the anisotropy and degenerates
+bit-for-bit to the unfiltered expression at zero variance. Insist on that last property: a filtered
+path that does not reduce *exactly* to the unfiltered one is a second shading model, and it will
+disagree with the first somewhere you are not looking.
 
 **Cause two: Fresnel that ignores roughness.** Plain Schlick assumes a *smooth* surface. On a
 rough surface at grazing incidence, microfacet masking means the effective reflectance is
