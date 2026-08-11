@@ -70,6 +70,29 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
   runs toward a purer cyan. *Visual reading; the lit-water red deficit already
   reported by three builders may be the same finding seen from the other side.*
 
+### B2b · The freeboard is taller, and it is blue liner
+
+> Reported directly by the reference observer, so it carries the same weight as
+> A–F: *"the edge of the pool should be a little higher. A blue side wall of about
+> 10 cm, and then the stones."*
+
+- **Freeboard ≈ 100 mm**, against the 75 mm the implementation builds. The
+  waterline sits about a hand's width below the stone, not a finger's.
+- **That band is the pool's own blue liner, not a tile or mosaic course.** In a
+  liner pool the liner runs up to a bead track just under the coping, so the
+  colour above the water is the same colour as below it. The implementation
+  currently puts a mosaic waterline course there; that is a different pool.
+- **It is above the waterline, so it is dry** — the wet band and the calcium bloom
+  belong at its foot, not across it.
+- **It is the best receiver in the frame for the water's own thrown light.** A
+  poolward-facing vertical strip 100 mm tall sitting directly on the surface is
+  exactly what the water-out gather was built for, and in a real pool it carries
+  the strongest, most obviously moving caustic bands anywhere in the picture —
+  brighter and more legible than the same light on the coping, because it is
+  closer to the water and paler. If that band renders as a flat blue stripe, the
+  gather is not reaching the one surface that shows it best.
+- The **meniscus line of B3 sits at its foot**, where the band meets the water.
+
 ### B3 · The meniscus line — a fifth photograph of the reference pool
 
 > A frame looking steeply down at the wall. It refines B2 rather than reversing
