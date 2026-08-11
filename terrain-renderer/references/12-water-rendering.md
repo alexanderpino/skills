@@ -863,6 +863,29 @@ surface slope   sigma     ~ C · u'^2 / (g · r_half)   eta ~ C u'^2/g over an e
   roughness contrast constrains the **flow rate through the fitting**, not a shape exponent. That is
   the difference between calibrating and inventing: the number you end up adjusting is one a pool
   installer could read off a pump.
+- **A jet's surface pattern cannot be circular, and the reason is a hard physical bound.** This is
+  the single most useful fact in this subsection, because it rules out the shape almost everyone
+  reaches for. A return's spec is a **pressure**, and Bernoulli turns it into a velocity:
+  `U0 = C_d·√(2ΔP/ρ)`, so 0.8 bar through a 20 mm eyeball is 11.6 m/s, 13 m³/h and ~43 N of thrust.
+  That momentum drives a **mean surface drift** — here peaking near **1.05 m/s** over the footprint.
+  Now the bound: water has a **minimum phase speed**,
+
+```
+c_min = (4gσ/ρ)^(1/4) = 0.231 m/s   at lambda = 17.1 mm
+```
+
+  and no surface wave of any wavelength travels slower. The drift's Froude number is therefore
+  `U/c_min ≈ 4.6` — **strongly supercritical, so nothing can propagate upstream at all**. Stationary
+  crests exist only within `±arccos(c_min/U) ≈ 78°` of the flow direction. A ring system requires a
+  source at rest in still water; a running return is neither, so its pattern is a **wedge**.
+- **Which wavelengths appear is then fixed, not chosen.** Stationary crests satisfy the Doppler
+  condition `c(k) = U·cos ψ`; on the gravity branch `k = g/(U cos ψ)²`, so the wake carries ~50 cm
+  along the axis, ~20 cm at 50°, and ~9 cm near the wedge edge. Nothing here is a tuning parameter:
+  give it a pressure and a nozzle and the spectrum falls out.
+- **And the wake is *steady*.** Because the source is bolted to the wall, the stationary pattern
+  stands still in the pool frame while the water runs through it — a strong and cheap tell against
+  video, and the opposite of the radiating rings a naive model produces. If a jet's pattern
+  animates outward, the model is wrong.
 - **The footprint is an extended source, so the arcs are centred on it — not on the fitting.**
   A photograph of a running return shows curved crest trains radiating from a centre that sits
   *out in the water*, a metre or so off the wall, with nothing between it and the fitting. That
@@ -2327,13 +2350,22 @@ above except the TotK physics talk is community reconstruction or press/footage 
   (stagnation pressure of an eddy) with an **O(1) constant `C` that is genuinely unknown here**;
   `C = 1` was used. Free-surface turbulence deserves better than this and the chapter should say so
   rather than pretend otherwise.
-- **? — the jet's mean drift is not modelled, and it shows.** Everything above treats the jet as a
-  source of *waves*. A jet also carries *momentum*, driving a mean surface current that advects and
-  refracts what it launched. In photographs that is visible immediately: the arcs are not clean
-  concentric rings but sheared, broken and curled into a wake. Reproducing that needs wave–current
-  interaction on the jet's own drift field — the machinery is already in this chapter for rivers
-  and nearshore currents, but it has **not** been applied here. A render built only from the
-  radiation model will look a little too tidy, and that is the reason.
+- **P** — The supercritical-wake argument. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the
+  standard capillary–gravity minimum already cited in [Calm water](#calm-water-the-low-energy-regime);
+  `U0 = C_d√(2ΔP/ρ)` is Bernoulli with an orifice discharge coefficient (`C_d ≈ 0.92` assumed, a
+  typical eyeball value taken from model knowledge); the stationary condition `c(k) = U·cos ψ` and
+  hence `k = g/(U cos ψ)²` is textbook wave–current interaction, the same Doppler machinery this
+  chapter cites for [wave–current interaction](#rivers-flow-driven-surfaces). The **conclusion**
+  — that a running return's pattern is a downstream wedge and cannot be a ring system — follows
+  from those with no free parameter, and is the durable part.
+- **? — the wake is built from locally-uniform current, not by ray tracing.** Each source along the
+  jet axis gets the stationary wake for *its own* local drift, superposed. The real drift decays
+  and spreads between source and observation point, which refracts the crests continuously; doing
+  that properly means integrating the eikonal through the current field. Consequences to expect in
+  a render built this way: the wedge boundary is **too sharp** (a hard downstream mask plus finite
+  angular sampling, where reality has a diffracted, smeared edge), and the crests are **straighter**
+  than a photograph's, which show them curling into the drift. The wedge geometry and the
+  wavelength ladder are right; the curvature is not modelled.
 - **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
   layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
   the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
