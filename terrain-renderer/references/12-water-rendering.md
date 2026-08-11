@@ -788,8 +788,18 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
   negligible as *wave height*, and dominant as *slope*, because `slope = 2πa/λ`. Equal slope costs
   amplitude proportional to wavelength, so a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at
   16.5 cm (≈0.19 against ≈0.11). Shading sees slope. So the wind band contributes almost nothing
-  you can watch move and most of what makes the surface sparkle and the caustic net fine-grained.
-  Never budget the two bands by wave height.
+  you can watch move and most of what makes the surface sparkle. Never budget the two bands by wave
+  height.
+- **But owning the slope budget is not the same as owning the caustic pattern**, and conflating the
+  two will wreck a render. Focusing goes as `F = 0.25·d·s·k`
+  ([The focusing number](#the-focusing-number-which-regime-the-bed-is-in)), so the short band hits
+  `F ≫ 1` long before the long band reaches `F ≈ 1`. At 1.40 m a 3 cm wind ripple at `s = 0.045`
+  sits at `F = 3.3` — **past focus**, contributing a fine unresolvable wash and no structure at
+  all — while a 30 cm jet wave at `s = 0.055` sits at `F = 0.40` and writes the readable cell net.
+  So the two bands write different things on the bed: **the short band owns sparkle and wash, the
+  long band owns the net.** Give the short band a slope budget large enough to dominate and the bed
+  pattern dissolves, however correct the individual numbers look. Judge the split by what the bed
+  shows, not by the slope arithmetic alone.
 - **The two bands separate cleanly, and by the same cut on both sides.** Wind cannot force long
   waves at metre-scale fetch, and viscosity will not let short waves cross the basin — the forcing
   limit and the damping limit land in the same place, so a pool surface is naturally **two
@@ -818,8 +828,20 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
   driven source cell is the general answer and gives swimmer transients for free. For a static
   basin with fixed inlets the analytic route is cheaper and exact enough: **method of images** —
   sum cylindrical trains from the inlet and its mirror copies across the four walls, with `1/√r`
-  spreading and the damping above. One or two reflection orders already produce the criss-cross
-  structure; the rest is below the noise floor of the shading.
+  spreading and the damping above.
+- **But do not build the whole field from images: split it early/late, as room acoustics does.**
+  Pushing the image count up produces a *coherent* interference lattice, and a real basin does not
+  look like that beyond a couple of metres from the source, because after several bounces the field
+  is **diffuse** — many arrivals, many directions, uncorrelated phases. The right structure is
+  therefore **explicit early reflections plus a statistical late tail**: direct plus first-order
+  images for the coherent arcs near the inlet, and a random-phase spectrum for everything after
+  that. This is the one place where a plain random-phase superposition is not a cheat but the
+  correct description, and it is also much cheaper than a large image set.
+- **The diffuse tail is near-isotropic, and that is checkable.** A wind sea carries a directional
+  spreading function and writes **streaky, direction-aligned** caustics; a reverberant basin tail
+  has lost its preferred direction and writes **isotropic cells**. Reading which one a reference
+  photograph shows tells you whether the body is wind-driven or plumbing-driven before you author
+  anything.
 
 ### Pool optics: the colour is the bottom, not the water
 
