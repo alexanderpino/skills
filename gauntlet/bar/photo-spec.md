@@ -142,3 +142,49 @@ becomes visible from underneath.
   to clear while anything past a few metres is a cyan haze; and there is a visible
   loss of *contrast*, not merely a colour shift, with distance. *Recollection of
   photographs in general, not of the reference pool. Judge accordingly.*
+
+## H · The split shot — lens half in, half out
+
+> Added mid-run by owner ruling, as the intended final test. Same weaker-evidence
+> caveat as G: no reference photograph exists, and every criterion below is either
+> derived or a recollection of over-under photographs in general.
+
+This is the terminal test for this project, and the reason is structural rather
+than aesthetic: it reads **one wave field three independent ways in one frame**,
+and the three readings must agree or the frame falls apart.
+
+1. **In profile**, as the wobbling boundary where the water crosses the lens.
+2. **From underneath**, as the rim and the wrinkling of Snell's window.
+3. **In projection**, as the caustic net those same slopes write on the bed.
+
+No shortcut survives that. A surface that exists only as a normal map has no
+profile; a caustic set that is not the Jacobian of that surface will not line up
+with the window above it; a wave whose amplitude was tuned for the view from above
+will read wrong in silhouette. The frame is self-checking in a way neither single
+view is.
+
+- **The split is a property of the port, not of the camera.** A mathematical point
+  aperture at `z = 0` produces a straight split along the plane's projection —
+  degenerate, and not what an over-under photograph looks like. A real front
+  element of finite radius produces a **curve**: the waterline traced across the
+  port, which undulates with the passing waves and rides up and down with them.
+  That undulation is reading (1) above, and it is the reading a renderer cannot
+  fake. **The port must therefore be modelled explicitly**, and which port is
+  chosen must be stated. *Derived.*
+- **Flat port versus dome port is a real, visible choice.** A flat port underwater
+  multiplies the effective focal length by `n` — the underwater half sees a
+  **1.33× narrower** field than the air half, with chromatic aberration toward the
+  frame edges. A dome port corrects both, which is why over-under photographs are
+  shot with one. Whichever is modelled, the two halves' fields of view must be
+  consistent with that choice, and a flat port whose halves match is wrong.
+  *Derived.*
+- **The exposure split is real and must not be flattened.** The submerged half is
+  substantially darker than the sunlit air half — that is why the shot needs a
+  split ND or an exposure compromise in reality. A render in which both halves are
+  perfectly exposed is wrong unless it says which compromise it made. The ratio
+  must be **measured off the render** and reported, never asserted. *Mechanism
+  derived; the ratio is not yet measured (`?`).*
+- **A waterline band, not a waterline edge.** Over-under photographs show a
+  narrow, disturbed, partly blurred band where the two regimes meet — meniscus on
+  the glass, droplets, a sliver where the surface is seen edge-on. A perfectly
+  clean boundary reads as CG immediately. *Recollection of photographs in general.*

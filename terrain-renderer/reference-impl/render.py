@@ -528,6 +528,22 @@ cos_i = SUN_DIR[2]
 sin_t = np.sqrt(1 - cos_i ** 2) / IOR[1]
 cos_t = np.sqrt(1 - sin_t ** 2)
 slant = DEPTH / cos_t
+# The refracted sun as ONE direction under the water. Two things downstream need
+# it: which faces of the step unit can be lit at all (measured near the camera
+# section), and where the sail's shadow lands on the BED rather than on the
+# surface -- 1.37 m east per 1.40 m of depth, which is why a shaded strip of bed
+# is nowhere near under the shaded strip of water.
+_thz = -SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])
+TSUN_DIR = np.array([_thz[0] * sin_t, _thz[1] * sin_t, -cos_t])
+
+
+def bed_sun(x, y, z):
+    """Sun visibility AT A BED POINT: sun_vis at the surface point one refracted
+    slant back up the beam. Used to label the sail's shadow where it actually
+    falls for the colour regression, and to check that the patches the
+    diagnostics average over are not straddling its edge."""
+    sl = -np.asarray(z, float) / (-TSUN_DIR[2])
+    return sun_vis(x - TSUN_DIR[0] * sl, y - TSUN_DIR[1] * sl)
 TSUN = 1.0 - (F0[1] + (1 - F0[1]) * (1 - cos_i) ** 5)   # 13% reflects at 69 deg incidence
 print('sun elev %.1f deg -> refracted %.1f deg, offset %.2f m, slant %.2f m, T %.3f'
       % (np.degrees(np.arcsin(cos_i)), np.degrees(np.arccos(cos_t)),
@@ -994,11 +1010,17 @@ def _sk(x0, x1, y0, y1):
     return s, np.sqrt((P * (kx * kx + ky * ky)).sum() / P.sum())
 
 
-_PATCH = [("top tread   ", STEP_Z[0], 5.45, 6.55, 3.45, 3.95),
-          ("2nd tread   ", STEP_Z[1], 5.70, 6.30, 2.88, 3.05),
+# Each patch is the largest rectangle that fits inside its own level -- a 1.0 m
+# chord of a 300 mm annulus, not a 170 mm square -- because the autocorrelation
+# below can only see a 20 cm cell if the patch is several cells long, and the
+# floor patch is east of where the sail's shadow lands ON THE BED (x 2.6-5.7,
+# one refracted offset east of where it lands on the water). A patch straddling
+# that edge reports the shadow's own width as the cell size: it read 438 mm.
+_PATCH = [("top tread   ", STEP_Z[0], 5.42, 6.58, 3.35, 3.97),
+          ("2nd tread   ", STEP_Z[1], 5.50, 6.50, 2.92, 3.23),
           ("bench       ", BENCH_Z, 2.65, 3.35, 3.65, 3.98),
-          ("3rd tread   ", STEP_Z[2], 5.70, 6.30, 2.55, 2.75),
-          ("floor       ", -DEPTH, 4.80, 6.50, 0.90, 2.30)]
+          ("3rd tread   ", STEP_Z[2], 5.50, 6.50, 2.60, 2.90),
+          ("floor       ", -DEPTH, 5.90, 7.40, 0.70, 2.10)]
 # F is a PER-BAND number -- that is the whole point of field.py's slope budget --
 # so the net-writing band is what decides whether a receiver has a legible net.
 # REVERB at 19.7 cm writes it; the all-band column is the same formula fed the
@@ -1011,7 +1033,7 @@ _PATCH = [("top tread   ", STEP_Z[0], 5.45, 6.55, 3.45, 3.95),
 # weaken the argument above, it is the argument: a slope-energy-weighted k that
 # the 2.8 cm capillary band drags to ~9.6 cm is the wrong k to put in F.
 _KNET = _fld._plane_k(_fld.REVERB)
-print("  receiver      depth  F(net,%.0fcm)  s_all  k_all  F(all)  cell (autocorr)"
+print("  receiver      depth  F(net,%.0fcm)  s_all  k_all  F(all)  cell   sun"
       % (200 * np.pi / _KNET))
 for nm, zz, x0, x1, y0, y1 in _PATCH:
     d = -zz
@@ -1025,9 +1047,11 @@ for nm, zz, x0, x1, y0, y1 in _PATCH:
     xa = min(max(.5 * (x0 + x1) - off, X0 + .65), X1 - .65)
     ya = min(max(.5 * (y0 + y1), Y0 + .65), Y1 - .65)
     s, k = _sk(xa - .6, xa + .6, ya - .6, ya + .6)
-    print("  %s %5.3f m     %5.2f      %.3f %6.1f  %5.2f    %4.0f mm"
+    _pu, _pv = np.meshgrid(np.linspace(x0, x1, 40), np.linspace(y0, y1, 40))
+    print("  %s %5.3f m     %5.2f      %.3f %6.1f  %5.2f  %4.0f mm  %3.0f%%"
           % (nm, d, 0.25 * d * _fld.REVERB_RMS * _KNET, s, k,
-             0.25 * d * s * k, 1000 * cell_size(x0, x1, y0, y1)))
+             0.25 * d * s * k, 1000 * cell_size(x0, x1, y0, y1),
+             100 * bed_sun(_pu, _pv, zz).mean()))
 
 
 def sky(dx, dy, dz):
@@ -1509,8 +1533,6 @@ PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
 # over five sample normals: what survives is a narrow band of faces that are
 # grazed by both at once. Refraction at the surface does not change a ray's
 # azimuth, only its elevation, so for a vertical face this test is exact.
-_th = -SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])
-TSUN_DIR = np.array([_th[0] * sin_t, _th[1] * sin_t, -cos_t])
 _a = np.linspace(0, 2 * np.pi, 1441)[:-1]
 _ca, _sa = np.cos(_a), np.sin(_a)
 _nlit = _nvis = _nboth = _ntot = 0.
@@ -1651,10 +1673,12 @@ def _regions():
     lb = np.zeros(W * H, np.int8)
     iw = np.flatnonzero(inp)
     flr = (WSID == 0) & (bed_z(WU, WV) <= -DEPTH + 1e-6)
+    sh = flr & (bed_sun(WU, WV, -DEPTH) < 0.02)             # under the sail
     lb[iw[WSID == 5]] = 1                                   # riser face
     lb[iw[(WSID == 0) & ~flr]] = 2                          # tread / bench top
-    lb[iw[flr]] = 3                                         # floor, 1.40 m down
+    lb[iw[flr & ~sh]] = 3                                   # floor, 1.40 m, sunlit
     lb[np.flatnonzero(pav)] = 4                             # stone
+    lb[iw[sh]] = 5                                          # floor in the shadow
     lb = lb.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
     lb = lb.reshape(H // SS, W // SS, SS * SS)
     return np.where((lb == lb[..., :1]).all(-1), lb[..., 0], -1)
@@ -1666,15 +1690,23 @@ def _sat(m):
 
 def colour_table(img, reg):
     print("colour regression (sRGB medians; saturation = (max-min)/max)")
-    for nm, k in (("riser face  ", 1), ("tread top   ", 2),
-                  ("floor 1.40 m", 3), ("coping stone", 4)):
+    lum = np.zeros(6)
+    for nm, k in (("riser face      ", 1), ("tread top       ", 2),
+                  ("floor, sunlit   ", 3), ("coping stone    ", 4),
+                  ("floor, in shadow", 5)):
         sel = reg == k
         if sel.sum() < 100:
             print("  %s   -- %d px, not measured" % (nm, sel.sum()))
             continue
         med = np.median(img[sel].reshape(-1, 3), 0)
+        lum[k] = med @ np.array([.2126, .7152, .0722])
         print("  %s  (%3.0f,%3.0f,%3.0f)  sat %.2f   %6d px"
               % (nm, med[0], med[1], med[2], _sat(med), sel.sum()))
+    # Bar section A: the water under the sail is "clearly luminous, roughly half
+    # the lit value". That is a ratio, so it is printed as one.
+    if lum[3] > 0 and lum[5] > 0:
+        print("  sail shadow / sunlit floor: %.2f of the luminance (the bar says"
+              " ~0.5, and NOT a dark hole)" % (lum[5] / lum[3]))
     # PAIRED, ROW BY ROW. Grazing angle and Fresnel are functions of the image
     # row, so the only way to say "the receiver is the difference" is to hold
     # the row fixed: take each region's median within a row, then the median of
