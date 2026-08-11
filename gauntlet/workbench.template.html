@@ -1,0 +1,394 @@
+<title>Gauntlet — zwembadwater</title>
+<style>
+:root{
+  --ink:#08181F; --ink-2:#2D4A53; --ink-3:#5C7A82;
+  --ground:#EDF2F2; --panel:#FFFFFF; --panel-2:#E3EBEB;
+  --rule:#C9D6D7; --rule-soft:#DCE5E5;
+  --water:#0B7F91; --water-deep:#075463;
+  --sun:#C4761B;
+  --ok:#2A7A5E; --warn:#A86C15; --bad:#A63F36;
+  --shadow:0 1px 2px rgba(8,24,31,.06), 0 8px 24px -12px rgba(8,24,31,.18);
+  --display:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#DCE9EB; --ink-2:#9BB4BA; --ink-3:#6E8C94;
+    --ground:#07161C; --panel:#0E2229; --panel-2:#132C34;
+    --rule:#1E3D46; --rule-soft:#17323A;
+    --water:#45C2D3; --water-deep:#8BDCE6;
+    --sun:#E0A050;
+    --ok:#4FB58C; --warn:#D6A045; --bad:#DE7167;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#DCE9EB; --ink-2:#9BB4BA; --ink-3:#6E8C94;
+  --ground:#07161C; --panel:#0E2229; --panel-2:#132C34;
+  --rule:#1E3D46; --rule-soft:#17323A;
+  --water:#45C2D3; --water-deep:#8BDCE6;
+  --sun:#E0A050;
+  --ok:#4FB58C; --warn:#D6A045; --bad:#DE7167;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--body); font-size:16px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 24px 96px}
+a{color:var(--water)}
+:focus-visible{outline:2px solid var(--sun); outline-offset:3px; border-radius:2px}
+
+/* ---------- masthead ---------- */
+.mast{padding:56px 0 0}
+.eyebrow{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 18px;
+}
+.mast h1{
+  font-family:var(--display); font-weight:600; font-size:clamp(34px,5.2vw,54px);
+  line-height:1.06; letter-spacing:-.012em; margin:0; text-wrap:balance;
+}
+.mast h1 em{font-style:italic; color:var(--water)}
+.deck{max-width:62ch; color:var(--ink-2); margin:18px 0 0; font-size:17px}
+
+.bar{
+  margin:36px 0 0; padding:22px 26px; background:var(--panel);
+  border:1px solid var(--rule); border-left:3px solid var(--sun);
+  box-shadow:var(--shadow);
+}
+.bar p{
+  margin:0; font-family:var(--display); font-size:clamp(19px,2.6vw,25px);
+  line-height:1.3; font-style:italic; text-wrap:balance;
+}
+.bar .src{
+  display:block; margin-top:12px; font-family:var(--mono); font-style:normal;
+  font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3);
+}
+
+.strip{
+  display:flex; flex-wrap:wrap; gap:0; margin:26px 0 0;
+  border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+}
+.strip div{
+  flex:1 1 150px; padding:14px 18px 14px 0; border-right:1px solid var(--rule-soft);
+}
+.strip div:last-child{border-right:0}
+.strip dt{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 4px;
+}
+.strip dd{margin:0; font-family:var(--mono); font-size:15px; font-variant-numeric:tabular-nums}
+
+/* ---------- sections ---------- */
+section{margin-top:72px}
+.head{display:flex; align-items:baseline; gap:16px; border-bottom:1px solid var(--rule); padding-bottom:10px; margin-bottom:28px}
+.head h2{
+  font-family:var(--display); font-weight:600; font-size:26px; letter-spacing:-.008em;
+  margin:0; flex:0 0 auto;
+}
+.head span{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); margin-left:auto; text-align:right;
+}
+
+/* ---------- lane board ---------- */
+.lanes{display:grid; grid-template-columns:repeat(auto-fit,minmax(268px,1fr)); gap:18px}
+.lane{
+  background:var(--panel); border:1px solid var(--rule); box-shadow:var(--shadow);
+  padding:20px 20px 18px; display:flex; flex-direction:column; gap:12px;
+}
+.lane header{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.lane h3{font-family:var(--mono); font-size:14px; letter-spacing:.06em; margin:0; text-transform:uppercase}
+.lane .dim{font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.08em; text-transform:uppercase}
+.score{display:flex; align-items:baseline; gap:8px; font-variant-numeric:tabular-nums}
+.score b{font-family:var(--display); font-size:40px; font-weight:600; line-height:1}
+.score small{font-family:var(--mono); font-size:12px; color:var(--ink-3)}
+.track{position:relative; height:6px; background:var(--panel-2); border-radius:0}
+.track i{position:absolute; inset:0 auto 0 0; background:var(--water); display:block}
+.track u{
+  position:absolute; top:-4px; bottom:-4px; left:95%; width:2px;
+  background:var(--sun); text-decoration:none;
+}
+.lane .files{font-family:var(--mono); font-size:11.5px; color:var(--ink-3); word-break:break-all}
+.lane .gap{font-size:14.5px; color:var(--ink-2); margin:0}
+.chip{
+  display:inline-block; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; padding:3px 8px; border:1px solid currentColor; color:var(--ink-3);
+}
+.chip.major{color:var(--bad)} .chip.minor{color:var(--warn)} .chip.done{color:var(--ok)}
+.chip.live{color:var(--water)}
+
+/* ---------- evidence ---------- */
+figure{margin:0 0 56px}
+figure:last-child{margin-bottom:0}
+.figtag{
+  display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ink-3); margin-bottom:10px;
+}
+.figtag b{color:var(--ink); font-weight:600; letter-spacing:.06em}
+figure img{
+  display:block; width:100%; height:auto; border:1px solid var(--rule);
+  background:var(--panel-2); box-shadow:var(--shadow);
+}
+figcaption{margin-top:16px; max-width:70ch}
+figcaption h3{font-family:var(--display); font-size:21px; font-weight:600; margin:0 0 8px; letter-spacing:-.006em}
+figcaption p{margin:0 0 12px; color:var(--ink-2)}
+.verdicts{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:9px}
+.verdicts li{
+  display:grid; grid-template-columns:82px 1fr; gap:14px; align-items:start;
+  padding-top:9px; border-top:1px solid var(--rule-soft); font-size:14.5px;
+}
+.verdicts li:first-child{border-top:0; padding-top:0}
+.verdicts b{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  padding-top:3px;
+}
+.v-pass b{color:var(--ok)} .v-part b{color:var(--warn)} .v-fail b{color:var(--bad)}
+
+/* ---------- log ---------- */
+.scroller{overflow-x:auto; border:1px solid var(--rule); background:var(--panel); box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; min-width:760px; font-size:14px}
+th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+thead th{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); border-bottom:1px solid var(--rule); white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+td.gapcell{color:var(--ink-2); min-width:320px}
+
+/* ---------- notes ---------- */
+.notes{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px}
+.note{background:var(--panel); border:1px solid var(--rule); border-top:3px solid var(--ink-3); padding:18px 20px}
+.note.defect{border-top-color:var(--bad)}
+.note.method{border-top-color:var(--water)}
+.note h3{font-family:var(--mono); font-size:12px; letter-spacing:.09em; text-transform:uppercase; margin:0 0 10px}
+.note p{margin:0 0 10px; font-size:14.5px; color:var(--ink-2)}
+.note p:last-child{margin-bottom:0}
+.note code{font-family:var(--mono); font-size:12.5px; background:var(--panel-2); padding:1px 5px; color:var(--ink)}
+
+footer{
+  margin-top:72px; padding-top:20px; border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; flex-wrap:wrap; gap:10px 28px;
+}
+@media (max-width:640px){
+  .verdicts li{grid-template-columns:1fr; gap:3px}
+  .strip div{flex-basis:50%; border-right:0}
+}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">gauntlet loop · run zwembadwater · golf 2 van 6</p>
+  <h1>Wat de bouwers <em>zien</em>,<br>zodat jij het ook ziet</h1>
+  <p class="deck">Elke ronde in deze loop wordt gescoord tegen één zin. Die zin staat hieronder,
+  daarna staat het bewijs waar hij tegenaan gehouden is — niet samengevat, maar de plaat zelf.</p>
+
+  <blockquote class="bar">
+    <p>Men moet zich gaan afvragen of het een foto is.</p>
+    <span class="src">de lat · gauntlet/bar/photo-spec.md · bevroren bij aanvang</span>
+  </blockquote>
+
+  <dl class="strip">
+    <div><dt>plaats</dt><dd>Aljezur, PT</dd></div>
+    <div><dt>opname</dt><dd>10-08-2026 18:41</dd></div>
+    <div><dt>zon</dt><dd>21.0° / 273.8°</dd></div>
+    <div><dt>luchtmassa</dt><dd>2.77</dd></div>
+    <div><dt>diepte</dt><dd>1.40 m</dd></div>
+    <div><dt>liner</dt><dd>blauw</dd></div>
+  </dl>
+</header>
+
+<section>
+  <div class="head"><h2>Stand per baan</h2><span>lat = 9.5 · streepje op de balk</span></div>
+  <div class="lanes">
+
+    <article class="lane">
+      <header><h3>surface</h3><span class="dim">physics</span></header>
+      <div class="score"><b>8.0</b><small>golf 2 · ronde 1</small></div>
+      <div class="track"><i style="width:80%"></i><u></u></div>
+      <p class="gap">Wake-band bemonsterde de golfvector-waaier alsof het de energie-waaier was, en
+      <code>wake.py</code> was dode code — de eikonal-oplosser draaide nergens. Hersteld: verre rms-helling
+      0.077 → 0.052, celmaat 19 cm gemeten met autocorrelatie.</p>
+      <div><span class="chip done">opgelost</span> <span class="chip">minor</span></div>
+      <p class="files">field.py · wake.py</p>
+    </article>
+
+    <article class="lane">
+      <header><h3>optics</h3><span class="dim">visual</span></header>
+      <div class="score"><b>2.0</b><small>ronde 0 · bouwer draait</small></div>
+      <div class="track"><i style="width:20%"></i><u></u></div>
+      <p class="gap">Ronde 0 faalde op de wereld, niet op het water: het grasvlak eindigde in een
+      getrapte rand tegen een lege gradiënt. Sindsdien is de opzet herkaderd op alleen water; die
+      nieuwe versie is nog niet door een criticus heen — de score hiernaast is dus oud.</p>
+      <div><span class="chip live">in behandeling</span> <span class="chip major">major</span></div>
+      <p class="files">render.py</p>
+    </article>
+
+    <article class="lane">
+      <header><h3>chapter</h3><span class="dim">prose</span></header>
+      <div class="score"><b>7.0</b><small>golf 2 · ronde 3</small></div>
+      <div class="track"><i style="width:70%"></i><u></u></div>
+      <p class="gap">De F-getallen in het hoofdstuk zijn niet na te rekenen: F≈3 en F≈0.4 noemen de
+      rms-helling <em>s</em> niet die F = 0.25·d·s·k nodig heeft, en de hellingen die twee alinea's
+      eerder staan geven 13.9 en 1.47. Open.</p>
+      <div><span class="chip minor">minor</span> <span class="chip">open</span></div>
+      <p class="files">references/12-water-rendering.md</p>
+    </article>
+
+  </div>
+</section>
+
+<section>
+  <div class="head"><h2>Het bewijs</h2><span>gauntlet/evidence/</span></div>
+
+  <figure>
+    <div class="figtag"><b>w1-optics-r1</b><span>render.py · 800 × 560 · huidige champion</span></div>
+    <img src="__IMG_POOL__" alt="Gerenderd zwembad van bovenaf schuin gezien, met caustics op de bodem en een lichtstreep op het wateroppervlak.">
+    <figcaption>
+      <h3>Waar de optiek nu staat</h3>
+      <p>Dit is wat <code>render.py</code> vandaag maakt, met het gecorrigeerde golfveld eronder.
+      Mijn eigen oordeel tegen de lat, sectie voor sectie — niet dat van een criticus:</p>
+      <ul class="verdicts">
+        <li class="v-part"><b>A kleur</b><span>Verzadiging en helderheid kloppen ongeveer, maar het water is over de hele plas even blauw. Er is geen dieptegradiënt: de Beer-Lambert-heenweg is korter vlak bij de rand dan midden in het bad, en dat zie je niet terug.</span></li>
+        <li class="v-fail"><b>B net</b><span>Celmaat is op spec (~19 cm), maar het contrast is te hoog en de cellen zijn te gelijkvormig. Interieurs zakken naar donkerblauw waar de lat "herkenbaar turquoise" eist. Het leest als een quilt: een patroon, geen licht.</span></li>
+        <li class="v-fail"><b>C schittering</b><span>De heldere baan bovenin is een brede weg, geen compacte pluk losse punten. En hij ligt rechts van het midden terwijl de jet links zit (y = 1.15) — dit is dus algemene zonneschittering, niet de ruwe plek boven de jet die de lat vraagt.</span></li>
+        <li class="v-fail"><b>F licht</b><span>De schaduwrand linksboven is echte natuurkunde — de geometrische schaduw van de westmuur — maar hij rendert als een geschilderde stap, omdat de bodem in de schaduw alleen vlakke ambient krijgt. Geen wandbounce, geen onderlinge weerkaatsing.</span></li>
+      </ul>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <div class="figtag"><b>w1-optics-r1-zoom</b><span>uitsnede bodem + rand</span></div>
+    <img src="__IMG_ZOOM__" alt="Uitsnede van de zwembadbodem waarop de celstructuur van de caustics en gekleurde randen zichtbaar zijn.">
+    <figcaption>
+      <h3>Van dichtbij: het verwijt in één plaat</h3>
+      <p>De kleurzoom op de vouwlijnen (dispersie, n<sub>R</sub> 1.3320 / n<sub>G</sub> 1.3348 /
+      n<sub>B</sub> 1.3400) is er en zit op de goede plek: alleen op de randen met het hoogste
+      contrast. Maar kijk naar de vorm van de cellen. Ze zijn gesloten, ongeveer even groot, en de
+      lijnen komen samen in knooppunten. Dat is precies de handtekening van de volgende plaat —
+      links, niet rechts.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <div class="figtag"><b>physics-voronoi-vs-caustic</b><span>meting · zelfde golfveld, twee methoden</span></div>
+    <img src="__IMG_VOR__" alt="Vergelijking van een Worley-ruispatroon links en een berekende caustic rechts, met uitvergrotingen eronder.">
+    <figcaption>
+      <h3>Waarom voronoi er alleen op lijkt</h3>
+      <p>Beide helften zijn op schaal en histogram gematcht, dus alleen de <em>vorm</em> verschilt.
+      Links is Worley F2−F1: de <b>cut locus</b> van cirkelfronten, en die heeft per definitie
+      drievoudige knooppunten en gesloten cellen. Rechts is de caustic van het echte golfveld
+      uitgerekend: de <b>focale verzameling</b>, met cusps en vouwlijnen die halverwege gewoon
+      ophouden. Geen enkele instelling laat links naar rechts convergeren — het zijn andere
+      meetkundige objecten. Dit is de plaat die de champion hierboven veroordeelt.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <div class="figtag"><b>physics-eikonal-wake</b><span>meting · eikonal, 161 stralen × 900 stappen</span></div>
+    <img src="__IMG_WAKE__" alt="Bovenaanzicht van het golfveld achter de inlaatjet: een smalle, gebogen bundel golven die schuin het bad in loopt en uitdooft.">
+    <figcaption>
+      <h3>Waarom het zog geen cirkel is</h3>
+      <p>De inlaatjet heeft richting, snelheid en kracht: 0.8 bar door een opening van 20 mm geeft
+      11.6 m/s en ~43 N stuwkracht. Het golfpatroon dat daaruit volgt is opgelost met eikonal-
+      stralen door het driftveld van de jet zelf. De waaier van <em>golfvectoren</em> is ±78°, maar
+      de waaier waarlangs de <em>energie</em> loopt is ±19° — die twee verwarren is de val die het
+      hoofdstuk met naam en toenaam noemt, en waar de vorige versie van <code>field.py</code>
+      precies in trapte. Het resultaat: een smalle, scheve, snel uitdovende bundel. Niet radiaal.</p>
+    </figcaption>
+  </figure>
+
+</section>
+
+<section>
+  <div class="head"><h2>Rondelogboek</h2><span>gauntlet/rounds.jsonl</span></div>
+  <div class="scroller">
+    <table>
+      <thead>
+        <tr><th>golf</th><th>baan</th><th>dim</th><th>modus</th><th>score</th><th>ernst</th><th>bevinding</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">0 · r0</td><td class="num">optics</td><td class="num">visual</td>
+          <td class="num">rubric</td><td class="num">2</td><td><span class="chip major">major</span></td>
+          <td class="gapcell">De wereld houdt zichtbaar op: het grasvlak eindigt in een getrapte rand tegen een lege gradiënt, geen horizon — de scène leest als een zwevende plak in een viewport.</td>
+        </tr>
+        <tr>
+          <td class="num">1 · r1</td><td class="num">chapter</td><td class="num">prose</td>
+          <td class="num">rubric</td><td class="num">6</td><td><span class="chip major">major</span></td>
+          <td class="gapcell">Het zwembadmateriaal is het hoofdstuk ontgroeid: 308 regels in een hoofdstuk over oceanen en rivieren; het driven-basin-blok alleen al 198 regels tegen 34 voor Gerstner/FFT.</td>
+        </tr>
+        <tr>
+          <td class="num">2 · r1</td><td class="num">surface</td><td class="num">physics</td>
+          <td class="num">rubric</td><td class="num">8</td><td><span class="chip minor">minor</span></td>
+          <td class="gapcell">Wake-band bemonsterde de golfvector-waaier als energie-waaier en was onzichtbaar voor het hellingsbudget; <code>wake.py</code> was dode code. Hersteld: verre rms 0.077 → 0.052, celmaat 19 cm.</td>
+        </tr>
+        <tr>
+          <td class="num">2 · r2</td><td class="num">chapter</td><td class="num">prose</td>
+          <td class="num">champion</td><td class="num">7</td><td><span class="chip done">gepromoveerd</span></td>
+          <td class="gapcell">Inkorting van 2413 naar 2278 regels gepromoveerd; pool-sectie 308 → 182 regels.</td>
+        </tr>
+        <tr>
+          <td class="num">2 · r3</td><td class="num">chapter</td><td class="num">prose</td>
+          <td class="num">rubric</td><td class="num">7</td><td><span class="chip minor">minor</span></td>
+          <td class="gapcell">F-getallen niet reproduceerbaar: F≈3 en F≈0.4 noemen de rms-helling <em>s</em> niet; de eerder gegeven hellingen geven 13.9 en 1.47. F≈0.4 krijgt bovendien het celnet toegeschreven dat de eigen ladder aan F≈1 geeft.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="head"><h2>Wat je hier níét ziet</h2><span>eerlijkheid boven volledigheid</span></div>
+  <div class="notes">
+
+    <div class="note defect">
+      <h3>ronde 0 is weg</h3>
+      <p>Ik logde ronde 0 met <code>--evidence terrain-renderer/reference-impl/pool_final.png</code>.
+      Dat pad wordt door élke render overschreven. De plaat waar die 2/10 op gegeven is bestaat
+      niet meer; alleen de zin van de criticus resteert.</p>
+      <p>Daarom bestaat <code>gauntlet/evidence/</code> nu, met een naam per golf en ronde.</p>
+    </div>
+
+    <div class="note method">
+      <h3>rubric, geen blind</h3>
+      <p>De critici kunnen jouw foto's niet openen — die bestaan alleen in dit gesprek. Ze
+      beoordelen tegen een geschreven specificatie die ik uit de foto's heb opgeschreven. Elke
+      visuele ronde staat daarom als <code>rubric</code> in het logboek, nooit als
+      <code>blind</code>.</p>
+    </div>
+
+    <div class="note defect">
+      <h3>een fout in de lat zelf</h3>
+      <p>Sectie B eiste oorspronkelijk "25–40 cellen over het zichtbare water". Toen de opzet op
+      ~3 m water herkaderd werd, werd dat aantal onhaalbaar terwijl de celmaat exact goed stond.
+      Een fout in de lat, niet in het artefact — hersteld en als correctie in het bestand blijven
+      staan, niet stilletjes weggepoetst.</p>
+    </div>
+
+    <div class="note">
+      <h3>nog niet gemodelleerd</h3>
+      <p>Onderwaterlampen in de wand. Niet vergeten, wel bewust uitgesteld: ze zetten drie dingen
+      op hun kop die het hoofdstuk nu beweert — verstrooiing wordt zichtbaar, Snells venster werkt
+      omgekeerd, en er komt een tweede, onafhankelijk caustic-systeem bij.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <span>budget 6 golven · nu golf 2</span>
+  <span>stop: bar-met ≥ 9.5 met schone reeks per dimensie</span>
+  <span>gegenereerd uit rounds.jsonl + evidence/</span>
+</footer>
+
+</div>
