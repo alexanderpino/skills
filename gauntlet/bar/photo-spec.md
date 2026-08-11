@@ -70,6 +70,37 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
   runs toward a purer cyan. *Visual reading; the lit-water red deficit already
   reported by three builders may be the same finding seen from the other side.*
 
+### B3 · The meniscus line — a fifth photograph of the reference pool
+
+> A frame looking steeply down at the wall. It refines B2 rather than reversing
+> it: **two different edges are involved and they behave differently.**
+
+- **The coping's arris stays hard** — B2 stands, unchanged.
+- **The waterline against the wall carries a thin bright line**, running the whole
+  length of the wall, sitting exactly at the junction and separating the shadowed
+  near-water below from the lit water beyond.
+- **The mechanism is the meniscus, and it is a certainty rather than a
+  coincidence.** Water climbs a wetted wall to `h = a·√(2(1−sin θ))` with
+  `a = √(σ/ρg) = 2.73 mm`: **3.86 mm** at perfect wetting, 2.7 mm at a 30°
+  contact angle. The fillet is a few capillary lengths wide, so across roughly
+  **5–10 mm** of surface the tilt runs continuously from 90° at the wall to 0° at
+  the flat surface. That strip therefore contains **every** facet orientation, so
+  the specular condition is satisfied somewhere in it for any light in the sky, at
+  any sun elevation, on any day. *Derived.*
+- **This is the one place on the surface where the glitter reachability test
+  cannot fail.** A level eye and a 21° sun need a facet tilted ~34.5° to mirror
+  the sun; the far-field rms slope is 0.058, i.e. 3.3°, which puts that tilt about
+  **10σ** out — unreachable, exactly as section C says of the open surface. The
+  meniscus reaches it by construction. Hence a bright waterline in essentially
+  every pool photograph, including the ones where the open water is glassy.
+  *Derived, and it explains a feature present in all five reference frames.*
+- **What this asks of the render.** A meniscus term exists in the implementation
+  but is applied as a dim ambient lift over a 10 mm scale. That is the wrong
+  category: it should be a **specular** strip a few millimetres wide, catching sun
+  and sky, and it should read as a *line* rather than as a softening. Getting it
+  right also gets the sunlit-versus-shadowed split either side of it, which is
+  what makes the edge read as a corner in three dimensions rather than a seam.
+
 ## C · Surface sparkle
 
 - A **compact patch of isolated bright points**, not a broad shimmering road.
