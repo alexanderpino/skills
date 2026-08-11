@@ -19,6 +19,7 @@ Contents: [The handoff, seen from the render side](#the-handoff-seen-from-the-re
 [Calm water: the low-energy regime](#calm-water-the-low-energy-regime) ·
 [Shallow water: shoaling, refraction, and breakers](#shallow-water-shoaling-refraction-and-breakers) ·
 [Aerated water: foam, spray and whitewater](#aerated-water-foam-spray-and-whitewater) ·
+[The subsurface plume](#the-subsurface-plume-the-bright-water-around-the-white-water) ·
 [Rivers: flow-driven surfaces](#rivers-flow-driven-surfaces) ·
 [Interactive simulation patches](#interactive-simulation-patches) ·
 [Shading and optics](#shading-and-optics) ·
@@ -593,7 +594,7 @@ differently and cost differently — see `19` for the simulation side:
 |---|---|---|---|
 | **Spray** | Above the surface | Ballistic — gravity + drag, decoupled from the fluid | Bright short-lived sprites; at high wind becomes a *participating medium*, not sprites |
 | **Foam** | On the surface | Advected with the surface flow, decaying | Albedo layer that **kills the Fresnel term beneath it** |
-| **Bubbles** | Below the surface | Buoyant, advected, rising to feed foam | Density term in the water volume; brightens *and* opacifies from below |
+| **Bubbles** | Below the surface | Buoyant, advected, rising to feed foam | Density term in the water volume; brightens *and* opacifies from below — [the subsurface plume](#the-subsurface-plume-the-bright-water-around-the-white-water) |
 
 Seed all three from the same criterion — the Jacobian/folding signal of
 [Ambient waves](#ambient-waves-gerstner-and-fft) offshore, the break mask of
@@ -608,6 +609,77 @@ collapses, and the depth-based colour ramp of
 stops applying. Practically, blend `sigma`/scatter toward a high-albedo, high-scattering,
 short-mean-free-path set as the aeration mask rises, and drive Fresnel to zero underneath. Foam
 that still reflects the sky is an instant tell.
+
+### The subsurface plume: the bright water around the white water
+
+Look at any wave breaking on rock and the white froth is the *smaller* half of
+the effect. The larger feature is a pale, milky, cyan-white cloud **under** the
+surface: it spreads well beyond the froth, wraps around the rock with the
+backwash, drifts off with the current, and is still there seconds after the
+white water has gone. Render only the surface foam and the water beside a
+breaking wave stays deep blue, which is the single clearest tell that the
+aeration model stops at the surface. The same volume is what a jacuzzi is made
+of, and a plunge pool, and the water beside a jetski.
+
+**Why it is bright, and why it is cyan rather than white.** Bubbles are
+enormous compared to the wavelength (0.16–1 mm against 0.4–0.7 µm), so they sit
+in the Mie/geometric regime where scattering is strong and nearly
+*wavelength-independent* — this is the identical mechanism the chapter already
+derives for [glacial flour](#water-body-optical-identity-where-sigma-actually-comes-from),
+with air in place of rock: flat backscatter shortens the mean photon path to
+order centimetres-to-a-metre, and over that short path `a_water` still removes
+red efficiently while barely touching blue-green. So a dense plume reads
+near-white, a thinning one reads pale cyan, and the fringe blends into the
+body's own colour. The knob that moves the hue is *concentration*, exactly as
+for flour.
+
+**It is a volume with memory, and that is what makes it look right.** The
+plume's behaviour after the wave is where a mask fails and a field succeeds:
+
+- **Size-sorted rise.** Big bubbles rise fast and degas within a second or two;
+  the fine fraction rises slowly and lingers. So a plume does not fade
+  uniformly — it **thins from the top down and outlives the froth that made
+  it**, which is why the bright water in a photograph taken after the wave has
+  no white water left on it. Two decay rates, not one.
+- **Advection.** It drifts with the flow field — alongshore, seaward on the
+  backwash, pooling in the eddy behind a rock. A plume pinned to where it was
+  born reads as a decal on the water.
+- **Depth extent.** It is injected at the surface and penetrates, so it hides
+  the bottom while it lasts. In breaking waves the production splits at the
+  **Hinze scale (~1 mm)** — larger bubbles from the collapsing air cavity,
+  smaller ones from droplet and jet impact, with different size-distribution
+  slopes (Deane & Stokes; see provenance).
+
+**Rendering it: a density field feeding the medium, not a texture on the
+surface.** The machinery already exists in this chapter — this is one more
+camera-following overlay (`13`'s doctrine, the same shape as the
+[interactive sim patch](#interactive-simulation-patches)):
+
+```
+aeration target (R8/R16, camera-following ring buffer, quarter-ish res)
+  inject   : break mask + shore impact + waterfall base + hull/propeller footprint
+  advect   : by the flow field, same field the foam uses
+  decay    : two rates - coarse fraction ~1-2 s, fine fraction ~10-30 s
+  consume  : scattering coefficient of the water volume, NOT its albedo
+```
+
+Then, in the volume pass (Single Layer Water's `b`/`PhaseG` inputs, or your own
+integration): **raise scattering, leave absorption alone.** That is the
+sediment-brightens / CDOM-darkens distinction from
+[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from)
+applied at its extreme — bubbles are the brightest scatterer in the chapter, and
+raising a lumped extinction instead of `b_b` turns the plume grey and murky,
+which is the opposite of the photograph. Push the phase term toward isotropic as
+density climbs; a strongly forward-scattering plume keeps looking like clear
+water. Cheap tier, if there is no volume pass to feed: blend the scatter colour
+toward white and shorten the visible depth by the aeration mask — but still
+**underneath** the surface shading, so the wave normals distort it and the foam
+sits on top of it.
+
+**The jacuzzi limit.** As void fraction climbs the medium goes optically thick
+within centimetres: no bottom, no refraction, a white volume with a visible top
+surface. Same code path, saturated — and the same reason a plunge pool base and
+a heavy shore break read as solid white from above while still being water.
 
 **Backlit crests.** A thin, sunlit-from-behind wave face glows green-turquoise because light is
 transmitted through a thin water sheet carrying suspended scatterers. The standard cheap
@@ -1415,6 +1487,25 @@ above except the TotK physics talk is community reconstruction or press/footage 
   energy between the systems, never sum them.
 - **Break-line dither/flicker**: the `H ≈ 0.78·h` mask evaluated against raw bathymetry noise.
   Filter depth at the wavelength scale before it drives wave response.
+- **Deep blue water right beside a breaking wave**: the aeration model stops at the surface, so
+  there is white froth on top and untouched body colour beneath it. The bright, milky, cyan-white
+  region around and under a break *is* the effect — a submerged bubble plume scattering strongly.
+  Add the volume term; foam alone cannot produce it.
+- **The plume painted on the water surface**: drawn as a white decal over the surface rather than
+  as a density in the volume, so it does not hide the bottom, is not distorted by the wave
+  normals above it, and slides across the surface like paint. It belongs *under* the surface
+  shading, with foam composited on top of it.
+- **Plume that dies with the froth**: aeration lifetime tied to the foam mask, so the bright water
+  vanishes the instant the white water does. The fine bubble fraction rises slowly and outlives
+  the coarse one — two decay rates, or the water goes blue a second too early.
+- **Plume rendered by raising extinction instead of scattering**: a lumped `sigma` bump makes
+  aerated water *darker and murkier*, the exact opposite of the photograph. Bubbles are the
+  chapter's strongest scatterer and change `b_b`, not `a` — the sediment-brightens rule at its
+  extreme. Push the phase term toward isotropic too, or a forward-scattering plume keeps reading
+  as clear water.
+- **Plume anchored where it was born**: aeration that ignores the flow field sits still while the
+  current visibly carries the real thing alongshore, seaward on the backwash, and into the eddy
+  behind a rock.
 - **Foam double-count in the surf zone**: Jacobian whitecaps and breaker foam both firing on
   the same crests. In the shore band, the breaker lifecycle owns foam; fade the Jacobian
   accumulator out with the ambient cascades.
@@ -1634,6 +1725,30 @@ above except the TotK physics talk is community reconstruction or press/footage 
   measurements and under-represents fresh foam — correct for sea-average radiometry, wrong for a
   hero breaking wave. Earlier spectral work: Frouin et al. (JGR Oceans, 1996); Kokhanovsky
   (JGR Oceans, 2004).
+- **P/?** — Deane & Stokes, "Scale dependence of bubble creation mechanisms in breaking waves",
+  *Nature* 418, 839–844 (2002): the **Hinze scale (~1 mm)** separating two bubble-production
+  mechanisms in a breaking wave — larger bubbles fragmenting from the collapsing air cavity,
+  smaller ones generated by droplet/jet impact — each following a different size-distribution
+  power law. Cited from model knowledge; **not fetched or page-verified this session**, so treat
+  the scale value and the two slopes as needing confirmation before they are quoted as numbers.
+  The transferable, higher-confidence part is qualitative and is what the plume section actually
+  uses: a breaking wave produces a *broad* bubble size distribution, and the size classes behave
+  differently afterwards.
+- **P/synthesis** — Subsurface plume optics. That bubbles scatter strongly and nearly
+  wavelength-independently follows from their size (0.16–1 mm, per Dierssen 2019 above) being
+  10³× the wavelength — the Mie/geometric regime. The resulting appearance is then the *same*
+  two-step this chapter derives for glacial flour in
+  [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from):
+  flat backscatter shortens the mean photon path, and over that short path pure water's own
+  absorption still removes red efficiently while barely touching blue-green — hence pale
+  cyan-white rather than neutral white, with concentration as the hue knob. Assembled here from
+  parts already grounded in this chapter rather than quoted from a bubble-plume radiative-transfer
+  study.
+- **F** — Bubble rise behaviour as used for the two-rate plume decay (millimetre bubbles rising
+  fast and degassing in seconds, the fine fraction lingering far longer): classical multiphase-flow
+  behaviour, textbook treatment in Clift, Grace & Weber, *Bubbles, Drops, and Particles*. The
+  specific decay constants given here are **tuning ranges, not measured values** — the ordering
+  (coarse fast, fine slow) is the load-bearing claim, not the seconds.
 - **T** — Barré-Brisebois & Bouchard, "Approximating Translucency for a Fast, Cheap and Convincing
   Subsurface Scattering Look" (GDC 2011; also GPU Pro 2; shipped in Frostbite 2): the
   view-dependent `dot(V, −L)` + thickness translucency approximation used for backlit wave crests.
