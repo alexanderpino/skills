@@ -93,3 +93,52 @@ to pass a photorealism test would teach the chapter nothing. So:
 - The image tolerates a phone's rendering: contrast and saturation slightly above
   a raw ACES curve is acceptable and expected; anything that only works *because*
   of that grade is not.
+
+## G · From inside the water — **added mid-run by owner ruling**
+
+> Re-frozen mid-run. The project owner extended the scope: *"it has to look as
+> good underwater as above water"*. Recorded here rather than silently appended,
+> because a bar that quietly follows the artifact is not a bar.
+>
+> **This section is weaker evidence than A–F and must be judged as such.** There
+> is no underwater reference photograph. A–F were written from three photographs
+> of the reference pool; G is written from physics and from what underwater
+> photographs of pools generally show. Where a criterion below is a derivation it
+> says so; where it is a recollection of photographs in general it says that too,
+> and a critic may not treat the two alike.
+
+The same overriding bar applies: a viewer should have to wonder whether it is a
+photograph. The submerged view is judged on the **same scene, same code, same
+water** — a second renderer tuned to look good from below would fail this section
+by construction, because the point of the view is that it cannot be tuned
+independently. It is the strongest verification instrument in the project: every
+above-water shortcut that survives by being invisible from a 33° downward view
+becomes visible from underneath.
+
+- **Snell's window is the composition.** The above-water world compresses into a
+  cone of half-angle `asin(1/n)` — 48.5° green, 97° across. Outside it the surface
+  is a **perfect mirror**, reflectance exactly 1, showing the bed, the walls and
+  the step unit folded back down. There is no partial regime out there. *Derived.*
+- **The rim carries a dispersive fringe of 0.39°**: critical angle 48.655° red /
+  48.519° green / 48.268° blue on the implementation's own IOR triple, red outside
+  blue. *Derived — from constants already in `render.py`.*
+- **The sun sits 4.1° inside the rim, not overhead.** 21.0° elevation is 69.0°
+  from vertical in air, refracting to 44.4° below the surface. It is crowded
+  against the window's edge, where compression and dispersion are greatest.
+  *Derived.*
+- **Absorption reads as aerial perspective.** The water column now lies between
+  camera and geometry, so `a = (0.25, 0.0565, 0.0092) /m` acts along the view
+  path: transmission `(0.29, 0.75, 0.96)` at 5 m. Far geometry loses two thirds of
+  its red and the frame goes cyan with distance, with contrast falling as it does.
+  *Derived.* Note this puts a limit on the chapter's "the colour is the bottom,
+  not the water", which is a claim about a view from above.
+- **The surface, seen from below, is a moving wrinkled mirror**, and the caustic
+  net on the bed is seen obliquely rather than face-on. Both are the existing
+  wave field viewed from a new side; neither may be a separate effect.
+  *Derived.*
+- **What underwater pool photographs generally show**, offered as weaker
+  criteria: the window's rim is the brightest thing in frame; the bed keeps its
+  caustics but at much lower contrast than from above; near-field water is close
+  to clear while anything past a few metres is a cyan haze; and there is a visible
+  loss of *contrast*, not merely a colour shift, with distance. *Recollection of
+  photographs in general, not of the reference pool. Judge accordingly.*

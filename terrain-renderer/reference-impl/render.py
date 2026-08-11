@@ -611,10 +611,17 @@ def cell_size(x0, x1, y0, y1, arr=None):
     F = np.fft.rfft2(p)
     ac = np.fft.irfft2(F * np.conj(F), s=p.shape)
     ac = ac / ac[0, 0]
-    n = min(ac.shape[1] // 3, ac.shape[0] // 3, 200)
-    rad = .5 * (ac[0, :n] + ac[:n, 0])            # along x and along y, averaged
-    z = np.flatnonzero(rad < 0.0)
-    return 2.0 * (z[0] if z.size else n) * _dx
+    # Each axis is read out to ITS OWN reach and only the axes that actually
+    # cross zero within it are averaged. A tread is an annulus 300 mm wide and
+    # metres long, so a single lag limit taken from the short axis reports the
+    # limit -- 114 mm, suspiciously close to twice a third of the patch -- and
+    # calls it a cell size. Returning nan when nothing crosses is the honest
+    # answer for a patch too small to hold a cell.
+    est = [2.0 * np.flatnonzero(c < 0.0)[0] * _dx
+           for c in (ac[:min(ac.shape[0] // 3, 200), 0],
+                     ac[0, :min(ac.shape[1] // 3, 200)])
+           if np.any(c < 0.0)]
+    return float(np.mean(est)) if est else float('nan')
 
 # Upwelling radiance of the lit water: liner albedo, lit through the whole light
 # path and looked at through a whole depth of water. The pool is a large, bright,
@@ -860,7 +867,7 @@ _DN = np.sqrt(1.0 - _U1)                    # along the outward normal
 _DT = np.sqrt(_U1) * np.cos(_PSI)           # along the tangent
 _DB = np.sqrt(_U1) * np.sin(_PSI)           # straight down; > 0 by construction
 
-RIS_MAP, RIS_FOOT = [], []
+RIS_MAP, RIS_FOOT, _mbs = [], [], []
 _rstat = np.zeros(3)                        # [bed+wall hits, riser hits, samples]
 for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
     _th = (np.arange(RIS_NT) + .5) / RIS_NT * 2 * np.pi
@@ -878,14 +885,20 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
     _NX = np.broadcast_to(_ct, _Z.shape).ravel().copy()
     _NY = np.broadcast_to(_st, _Z.shape).ravel().copy()
     _PZ = _Z.ravel()
-    _in = pool_sdf(_PX, _PY) < 0.0          # the half-circle outside the wall
+    # Only the arc INSIDE the basin is traced. The other half of a wall-set unit
+    # is behind the wall, where a ray leaves the box immediately and every
+    # distance is negative: garbage, and it would poison the map's neighbours
+    # through the bilinear read at the wall.
+    _ix = np.flatnonzero(pool_sdf(_PX, _PY) < 0.0)
+    _PX, _PY, _PZ2 = _PX[_ix], _PY[_ix], _PZ[_ix]
+    _NX, _NY = _NX[_ix], _NY[_ix]
     _acc = np.zeros((_PZ.size, 3))
     for _dn, _dt, _db in zip(_DN, _DT, _DB):
         _tx, _ty = _NX * _dn - _NY * _dt, _NY * _dn + _NX * _dt
-        _tz = np.full(_PZ.size, -_db)
+        _tz = np.full(_PZ2.size, -_db)
         _sd, _u, _v, _sm, _ = scene_hit(_PX + _NX * 1e-4, _PY + _NY * 1e-4,
-                                        _tx, _ty, _tz, _PZ)
-        _col = np.zeros((_PZ.size, 3))
+                                        _tx, _ty, _tz, _PZ2)
+        _col = np.zeros((_PZ2.size, 3))
         _m = _sd == 0
         if _m.any():
             _col[_m] = sample(bed_img['mono'], _u[_m], _v[_m], X0, X1, Y0, Y1)
@@ -898,18 +911,19 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
         # ? a gather ray that lands on ANOTHER riser contributes nothing. Those
         # ? faces are the dark side of the same terminator, so the error is one
         # ? bounce of a dim source; the share is printed and it is under 2%.
-        _acc += _col * np.exp(-ABS[None] * _sm[:, None])
-        _rstat += [(_in & (_sd != 5)).sum(), (_in & (_sd == 5)).sum(), _in.sum()]
-    RIS_MAP.append((0.5 * _acc / (RIS_NU * RIS_NP)).reshape(RIS_NZ, RIS_NT, 3))
+        _acc[_ix] += _col * np.exp(-ABS[None] * _sm[:, None])
+        _rstat += [(_sd != 5).sum(), (_sd == 5).sum(), _sd.size]
+    _acc *= 0.5 / (RIS_NU * RIS_NP)
+    _mbs.append(_acc[_ix].mean(0))
+    RIS_MAP.append(_acc.reshape(RIS_NZ, RIS_NT, 3))
 print("riser bounce: %d faces x %d directions; view-factor closure %.3f of the "
       "0.500 a vertical face has by geometry (%.1f%% of rays land on another "
       "riser and are dropped)"
       % (4 * RIS_NT * RIS_NZ, RIS_NU * RIS_NP,
          0.5 * _rstat[0] / max(_rstat[2], 1), 100 * _rstat[1] / max(_rstat[2], 1)))
-_mb = np.array([RIS_MAP[i].reshape(-1, 3).mean(0) for i in range(4)]).mean(0)
 print("  it adds %s of irradiance against %s of sky ambient on the same face "
       "-- and unlike the sky term it carries the caustic net"
-      % (np.round(_mb, 3), np.round(SKY_AMB * 0.5, 3)))
+      % (np.round(np.mean(_mbs, 0), 3), np.round(SKY_AMB * 0.5, 3)))
 
 # The TIR return arrives at SHALLOW angles -- everything the bed emits beyond the
 # critical angle 48.6 deg comes back down between 48.6 and 90 deg from vertical --
@@ -998,9 +1012,16 @@ print("  receiver      depth  F(net,%.0fcm)  s_all  k_all  F(all)  cell (autocor
       % (200 * np.pi / _KNET))
 for nm, zz, x0, x1, y0, y1 in _PATCH:
     d = -zz
-    # the water that lights this patch sits one refracted offset to the WEST
+    # The water that lights this patch sits one refracted offset to the WEST.
+    # The window over it is a fixed 1.2 m square rather than the patch's own
+    # footprint: a tread patch is 170 mm across the annulus, and a window
+    # narrower than a couple of wavelengths cannot see the 20 cm band at all --
+    # it measures the capillary floor and reports it as k, which is how the
+    # 2nd tread came out at k = 166 (3.8 cm) with the same water beside it at 66.
     off = d * np.tan(np.arccos(cos_t))
-    s, k = _sk(max(x0 - off, X0 + .05), max(x1 - off, X0 + .3), y0, y1)
+    xa = min(max(.5 * (x0 + x1) - off, X0 + .65), X1 - .65)
+    ya = min(max(.5 * (y0 + y1), Y0 + .65), Y1 - .65)
+    s, k = _sk(xa - .6, xa + .6, ya - .6, ya + .6)
     print("  %s %5.3f m     %5.2f      %.3f %6.1f  %5.2f    %4.0f mm"
           % (nm, d, 0.25 * d * _fld.REVERB_RMS * _KNET, s, k,
              0.25 * d * s * k, 1000 * cell_size(x0, x1, y0, y1)))
