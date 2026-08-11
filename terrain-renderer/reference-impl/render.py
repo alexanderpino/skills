@@ -319,8 +319,9 @@ STEP_BB = (min(STEP_C[0] - STEP_R[2], BENCH_C[0] - BENCH_R),
 #   C  jet boil      short waves at the outlet, e-folding ~2 m -> the local rough patch
 NU = 1.004e-6
 
-from field import (X0, X1, Y0, Y1, JET_XY, SIGMA_W, grad_grid, grad_points,
-                   normal_from_grad, jet_envelope, shelter, _norm_jets)
+from field import (X0, X1, Y0, Y1, JET_XY, SIGMA_W, LAM_MIN, FP_SIGMA,
+                   grad_grid, grad_points, slope_var_points, normal_from_grad,
+                   jet_envelope, shelter, rms_slope, _norm_jets)
 
 def refract(ix, iy, iz, nx, ny, nz, eta):
     cosi = -(ix * nx + iy * ny + iz * nz)
@@ -973,6 +974,31 @@ for wi in range(4):
     wall_img['disp'].append(shade(wall[wi][:3], T, WAO, dep=-VV, extra=WR))
     wall_img['mono'].append(shade([wall[wi][3]] * 3, T, WAO, dep=-VV, extra=WR))
 
+# WHAT THE MISSING WALL TERM IS WORTH, now that both halves of it exist as
+# numbers in one place. `_WSH` above is exactly the cosine-weighted FRACTION of a
+# bed point's hemisphere that is wall, in the same normalisation the riser gather
+# closes on -- (1/pi) INT cos dw over the hemisphere is 1 -- so a wall of mean
+# outgoing radiance L contributes L * _WSH in the units `shade` calls `amb`, and
+# what is being applied over that same share today is SKY_AMB. The difference,
+# per channel, IS the error, and it is signed:
+_LW = np.mean([w.reshape(-1, 3).mean(0) for w in wall_img['disp']], 0)
+_ERR = _WSH.mean() * (_LW - SKY_AMB * np.exp(-ABS * DEPTH * 1.55))
+print("the wall as a light carrier, priced: mean wall radiance %s against %s of "
+      "sky ambient reaching the bed. Over the %.1f%% of the hemisphere the walls "
+      "take, swapping one for the other would move the bed's ambient by %s per "
+      "channel -- signed, so the sign of each channel is the direction the flat "
+      "constant is wrong in."
+      % (np.round(_LW, 3), np.round(SKY_AMB * np.exp(-ABS * DEPTH * 1.55), 3),
+         100 * _WSH.mean(), np.round(_ERR, 3)))
+_wtop = np.mean([w[int(WNV * .95):].reshape(-1, 3).mean(0) for w in wall_img['disp']], 0)
+_wbot = np.mean([w[:int(WNV * .05)].reshape(-1, 3).mean(0) for w in wall_img['disp']], 0)
+print("  ...and it is not a constant to be corrected: the wall runs %s at the "
+      "waterline to %s at its foot, a factor %.1f in green over 1.40 m, so what "
+      "replaces SKY_AMB there has to be DIRECTIONAL. That is the return leg, and "
+      "it needs an UP-GOING intersector that scene_hit is not."
+      % (np.round(_wtop, 3), np.round(_wbot, 3),
+         _wtop[1] / max(_wbot[1], 1e-9)))
+
 # --- ONE BOUNCE OFF THE BED, ONTO THE RISERS ---------------------------------
 # The step region rendered NEUTRAL GREY: median sRGB (119, 128, 141) at
 # saturation 0.16, against 0.42 for open water in the SAME image row and 0.69
@@ -1296,13 +1322,157 @@ for nm, zz, x0, x1, y0, y1 in _PATCH:
              100 * bed_sun(_pu, _pv, zz).mean()))
 
 
-def sky(dx, dy, dz):
+# --------------------------------------------------------------------------- sky
+# The sun and its aureole live in the environment as three cos^n lobes. They are
+# named here rather than written inline because they are the ONLY angular
+# structure in this sky narrower than the reflection ellipse the footprint
+# filter creates below -- the sky gradient itself turns over 90 degrees and a
+# few degrees of blur does nothing to it, which is what makes convolving the
+# lobes alone the whole of the job and not an approximation of convenience.
+# A cos^n lobe is exp(-n th^2 / 2) near its peak, so its per-axis angular
+# variance is 1/n. Same three terms, same order, same amplitudes as before.
+SKY_LOBE = ((26.00, 12000., SUN_COL),                       # the disc
+            (2.60, 260., np.array([1., .90, .72])),         # the aureole
+            (1.15, 14., np.array([1., .92, .80])))          # the sky around it
+
+
+def _lobe_shape(n, cov):
+    """One cos^n lobe of the environment, convolved with the reflection ellipse
+    that the UNRESOLVED slope variance puts on the mirror direction.
+
+    Two Gaussians convolve to a Gaussian whose covariance is the sum and whose
+    INTEGRAL is unchanged, so the peak falls by sqrt(det Q_0 / det Q). Writing
+    the widened lobe back as cos^(n_eff) rather than as exp(-n_eff th^2 / 2)
+    costs nothing and buys the one property that matters here: at cov = None it
+    is EXACTLY the expression this file had before, so the unfiltered path is
+    bit-for-bit the old one and the sky behind the pool never moves.
+
+    n_eff is directional -- 1 / (u_hat^T Q u_hat), the variance of the summed
+    Gaussian along the direction of the offset to the sun -- which is how the
+    anisotropy survives. WIND is a 45 deg spread about the wind azimuth and the
+    wake is directional, so what the filter removes is a Cox-Munk ellipse and a
+    lobe widened by its trace would be visibly wrong across the wind. On the
+    axis (offset zero) every direction gives cos^n = 1 and only the peak factor
+    is doing anything, so the fallback there is the mean variance."""
+    if cov is None:
+        return 1.0, n
+    u1, u2, c11, c12, c22 = cov
+    q11 = 1.0 / n + c11
+    q22 = 1.0 / n + c22
+    det = np.maximum(q11 * q22 - c12 * c12, 1e-30)
+    g = (1.0 / n) / np.sqrt(det)
+    r2 = u1 * u1 + u2 * u2
+    w = np.where(r2 > 1e-16,
+                 (u1 * u1 * q11 + 2.0 * u1 * u2 * c12 + u2 * u2 * q22)
+                 / np.maximum(r2, 1e-16),
+                 0.5 * (q11 + q22))
+    return g, 1.0 / np.maximum(w, 1e-12)
+
+
+def sky(dx, dy, dz, cov=None):
     t = np.clip(dz, 0, 1)[:, None] ** .55
     col = SKY_HOR[None] * (1 - t) + SKY_TOP[None] * t
     cs = np.clip(dx * SUN_DIR[0] + dy * SUN_DIR[1] + dz * SUN_DIR[2], 0, 1)
-    return (col + SUN_COL[None] * 26. * (cs ** 12000)[:, None]
-            + np.array([1., .90, .72])[None] * 2.6 * (cs ** 260)[:, None]
-            + np.array([1., .92, .80])[None] * 1.15 * (cs ** 14)[:, None]) * 1.15
+    for amp, n, c in SKY_LOBE:
+        g, ne = _lobe_shape(n, cov)
+        if cov is None:
+            col = col + c[None] * amp * (cs ** ne)[:, None]
+        else:
+            col = col + c[None] * amp * (g * cs ** ne)[:, None]
+    return col * 1.15
+
+
+print("sky lobes: per-axis sigma %s deg -- these are the angular scales the "
+      "reflection ellipse has to be compared against"
+      % ", ".join("%.2f" % np.degrees(1.0 / np.sqrt(n)) for _, n, _ in SKY_LOBE))
+
+
+# --------------------------------------- the removed variance becomes a lobe
+# WHAT THIS FILE DID NOT HAVE, and had to grow before the footprint filter
+# could be turned on at all. The surface was a MIRROR: one normal per sample,
+# one reflected ray, one lookup into `sky`. There was no microfacet lobe to
+# feed, so `field.slope_var_points`' returned tensor had nowhere to go, and
+# narrowing the slope field without it is the exact failure the chapter's
+# "Distance and filtering" opens with -- the far water stops carrying slope
+# variance, its specular response collapses toward the mirror, and it reads as
+# shrink-wrapped perspex. Filtering and this term are one change, not two.
+#
+# THE DERIVATION, because the factors of two and the cos(theta_v) are the whole
+# content. Let the resolved normal be n and the unresolved slope be a zero-mean
+# Gaussian 2-vector d with covariance SIGMA (that IS the returned tensor). To
+# first order the normal tilts by -d, and R = 2(n.v)n - v gives
+#     dR = 2(dn.v) n + 2(n.v) dn.
+# Put the incidence plane in x-z with n = z and v = (sin tv, 0, cos tv):
+#   * d along the view azimuth (IN the plane): dR = -2 d_p e_hat -- the full
+#     factor two, because the tilt swings both the normal and the incidence
+#     angle;
+#   * d across it: dR = -2 cos(tv) d_q s_hat -- foreshortened, because an
+#     out-of-plane tilt only rotates the ray about the view direction.
+# So with J = diag(-2, -2 cos tv) in the frame (in-plane, across-plane),
+# C = J SIGMA' J^T, and the reflection ellipse is not similar to the slope
+# ellipse: it is stretched along the view azimuth by 1/cos(tv). At this
+# camera's 33 deg that is a 1.8x anisotropy the slope tensor never had, which
+# is a second reason a scalar roughness would be wrong here.
+#
+# e_hat and s_hat are the two directions perpendicular to R -- s_hat normal to
+# the incidence plane, e_hat completing it -- so the offset to the sun is just
+# its two components in that frame and no angles are ever formed.
+def _refl_ellipse(dvec, nx_, ny_, nz_, ndv_, rx_, ry_, rz_, vxx, vyy, vxy):
+    """(u1, u2, C11, C12, C22, sigma_v^2): the offset from the reflected ray to
+    the sun, the angular covariance the unresolved slope puts on that ray -- both
+    in the frame perpendicular to R -- and the one-direction slope variance along
+    the view azimuth, which is what the Fresnel term below needs."""
+    vx_, vy_, vz_ = -dvec[:, 0], -dvec[:, 1], -dvec[:, 2]
+    # the incidence plane's normal, then made perpendicular to R as well: rz_ is
+    # folded to |rz_| upstream for the sky lookup, and on those few rays s0 is
+    # not already perpendicular to the folded ray.
+    s0x = vy_ * nz_ - vz_ * ny_
+    s0y = vz_ * nx_ - vx_ * nz_
+    s0z = vx_ * ny_ - vy_ * nx_
+    d = s0x * rx_ + s0y * ry_ + s0z * rz_
+    s0x, s0y, s0z = s0x - d * rx_, s0y - d * ry_, s0z - d * rz_
+    inv = 1.0 / np.maximum(np.sqrt(s0x ** 2 + s0y ** 2 + s0z ** 2), 1e-9)
+    sx, sy, sz = s0x * inv, s0y * inv, s0z * inv
+    ex, ey, ez = ry_ * sz - rz_ * sy, rz_ * sx - rx_ * sz, rx_ * sy - ry_ * sx
+    # the slope tensor rotated into (along the view azimuth, across it). q_hat is
+    # (py, -px) rather than (-py, px) so that it points along s_hat: with
+    # v = (sin tv, 0, cos tv) the incidence normal is -y, and the sign of the
+    # cross term is the only place that choice shows.
+    ph = np.maximum(np.hypot(vx_, vy_), 1e-9)
+    px, py = vx_ / ph, vy_ / ph
+    a = px * px * vxx + 2.0 * px * py * vxy + py * py * vyy
+    b = py * py * vxx - 2.0 * px * py * vxy + px * px * vyy
+    cr = px * py * (vxx - vyy) + (py * py - px * px) * vxy
+    c11 = 4.0 * a
+    c12 = 4.0 * ndv_ * cr
+    c22 = 4.0 * ndv_ * ndv_ * b
+    u1 = SUN_DIR[0] * ex + SUN_DIR[1] * ey + SUN_DIR[2] * ez
+    u2 = SUN_DIR[0] * sx + SUN_DIR[1] * sy + SUN_DIR[2] * sz
+    return u1, u2, c11, c12, c22, a
+
+
+# Cause two on the chapter's own list, and the other half of what makes the
+# filter safe: plain Schlick is derived for a SMOOTH interface, and on a rough
+# one the microfacets mask each other at grazing incidence. Ship plain Schlick
+# on a low-variance distant surface and the far band goes to a near-100% mirror
+# -- the chrome-dome reading, which is the same defect as the plastic one seen
+# from the reflection side rather than the lobe side. Bruneton, Neyret &
+# Holzschuch (2010) fit the correction for sigma_v < 0.5:
+#     F = R + (1-R)(1-cos tv)^5 exp(-2.69 sigma_v) / (1 + 22.7 sigma_v^1.5)
+# and sigma_v is the ONE-DIRECTION slope rms along the view azimuth, not the
+# total -- the `a` component above, in the file's own tensor. Two constants,
+# both theirs, neither fitted here.
+#
+# It is fed the UNRESOLVED variance only, and that is the consistent reading for
+# a surface that is half resolved and half statistical: the traced normal is the
+# facet the pixel is actually looking at, so what still needs masking is the
+# sub-pixel remainder. It therefore goes to 1 as the footprint goes to zero and
+# the near water's Fresnel is untouched, which is the same boundary condition
+# the lobe widening has.
+def _fresnel_rough(ndv_, sv2):
+    sv = np.sqrt(np.maximum(sv2, 0.0))
+    r = np.exp(-2.69 * sv) / (1.0 + 22.7 * sv ** 1.5)
+    return F0[None] + (1 - F0[None]) * ((1 - ndv_) ** 5 * r)[:, None]
 
 
 _VN = rng.random((256, 256))
@@ -1759,6 +1929,22 @@ bgm = ~hit_sail & ~inp & ~pav             # nothing: the frame is water and ston
 
 PIXANG = 2. * np.tan(FOV / 2.) / H
 FOOT = t_hit * PIXANG / np.maximum(np.abs(D[:, 2]), .10)
+# THE FOOTPRINT THE FILTER IS FED, and the one line where a caller can get the
+# whole thing wrong. FOOT is one SUBSAMPLE of the SS x SS grid; the pixel the
+# image is stored at is SS times larger, and the difference decides the answer
+# rather than trimming it. Two independent reasons the output pixel is the right
+# one, and they point the same way:
+#   * SAMPLING. At 8 m the two are 8.6 and 25.8 mm while the wind band's
+#     dominant wave is 28 mm -- comfortably resolved by the subsample grid,
+#     hopelessly aliased by the grid the picture is kept on. Prefilter at the
+#     subsample rate and the moire survives into the file.
+#   * NONLINEARITY, which is the conservative half. Shading is not linear in
+#     slope -- Fresnel is a fifth power and the specular lobe is an exponential
+#     -- so a slope field sitting merely AT the subsample Nyquist still makes
+#     radiance harmonics well above it. Band-limiting the slope to the sampling
+#     rate does not band-limit what the shader makes of it, so the prefilter
+#     belongs at the rate the final image is stored at.
+FOOT_PX = FOOT * SS
 
 # --- what the water does within a hand's width of the wall -------------------
 # Three separate things, all of them missing before, and together they are the
@@ -1802,7 +1988,19 @@ print("meniscus: capillary length %.2f mm, climb %.2f mm at perfect wetting, "
       % (1000 * CAP_A, 1000 * MENIS_H, 1000 * MENIS_W))
 
 
-def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
+def surf_stats(x, y, fp):
+    """The PAIR the footprint filter has to be consumed as, and the reason this
+    is one function rather than two calls at the call site: the narrowed slope
+    field, and the slope-variance tensor that was narrowed out of it. Taking the
+    first without the second is the plastic-water failure; taking the second
+    without the first is double counting. `fp` is the OUTPUT pixel's footprint
+    on the water, `FOOT * SS`, never `FOOT`."""
+    gx, gy = grad_points(x, y, fp)
+    vxx, vyy, vxy = slope_var_points(x, y, fp)
+    return gx, gy, vxx, vyy, vxy
+
+
+def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     """Everything one camera ray does once it is over water: the surface normal
     from field.py, Fresnel, the sky reflection with the coping's overhang cut
     out of it, per-channel refraction INTO the pool, the traced hit, the bed /
@@ -1810,15 +2008,24 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
     and the meniscus. One function so the primary grid and the adaptive edge
     pass below are the same estimator sampled at different rates -- if they were
     two pieces of code, the refined pixels would differ from their neighbours by
-    more than the sampling."""
-    gxx_, gyy_ = grad_points(hw_x, hw_y)
+    more than the sampling.
+
+    `fp` is the output pixel's footprint on the water and `stats` is the
+    already-computed `surf_stats` for these points; the primary grid passes the
+    second because the disp and mono renders are the same rays and the field
+    does not depend on wavelength."""
+    if stats is None:
+        stats = surf_stats(hw_x, hw_y, fp)
+    gxx_, gyy_, vxx_, vyy_, vxy_ = stats
     nx_, ny_, nz_ = normal_from_grad(gxx_, gyy_)
     vx_, vy_, vz_ = -dvec[:, 0], -dvec[:, 1], -dvec[:, 2]
     ndv_ = np.clip(nx_ * vx_ + ny_ * vy_ + nz_ * vz_, 1e-4, 1.)
     rfx_, rfy_ = -vx_ + 2 * ndv_ * nx_, -vy_ + 2 * ndv_ * ny_
     rfz_ = np.abs(-vz_ + 2 * ndv_ * nz_)
-    refl_ = sky(rfx_, rfy_, rfz_)
-    fres_ = F0[None] + (1 - F0[None]) * ((1 - ndv_) ** 5)[:, None]
+    el = _refl_ellipse(dvec, nx_, ny_, nz_, ndv_, rfx_, rfy_, rfz_,
+                       vxx_, vyy_, vxy_)
+    refl_ = sky(rfx_, rfy_, rfz_, el[:5])
+    fres_ = _fresnel_rough(ndv_, el[5])
     in_w = -s_h                              # distance in from the wall face
     egx_, egy_, _ = pool_grad(hw_x, hw_y)
     toward = rfx_ * egx_ + rfy_ * egy_       # + = reflected ray heads at the wall
@@ -1880,6 +2087,87 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
 
 QSUB = ((SUBK[inp].astype(np.float64) + .5) / NSPEC)
 PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
+
+# The field does not depend on wavelength, so the disp and mono renders are the
+# same rays through the same water: the pair is computed once here rather than
+# twice inside water_shade.
+PRIM_STATS = surf_stats(hx[inp], hy[inp], FOOT_PX[inp])
+
+
+# ------------------------------------------- the filter and the lobe, measured
+# Four things have to be checkable, because between them they are the whole
+# claim: how big the footprint actually gets, that the SHORT bands leave while
+# the long ones stay, that what leaves arrives in the lobe, and how wide and how
+# ELLIPTICAL that lobe becomes. Every number below is read off the rays the
+# frame is actually made of, on a 1-in-29 subsample of them.
+_fs = np.arange(0, int(inp.sum()), 29)
+_fx, _fy = hx[inp][_fs], hy[inp][_fs]
+_ffp = FOOT_PX[inp][_fs]
+_fd = np.linalg.norm(np.stack([_fx, _fy], 1) - EYE[None, :2], axis=1)
+_s_un = rms_slope(*grad_points(_fx, _fy))
+_s_re = rms_slope(*grad_points(_fx, _fy, _ffp))
+_vxx, _vyy, _vxy = slope_var_points(_fx, _fy, _ffp)
+print("footprint filter, on the camera's own water rays:")
+print("  output pixel on the water: %.1f mm at the near coping, %.1f mm median, "
+      "%.1f mm at the far one -- against %.1f mm for the shortest wave the field "
+      "carries at all (2 pi sqrt(sigma/rho g), the minimum-phase-speed wave) and "
+      "%.0f mm for the net-writing band"
+      % (1000 * _ffp.min(), 1000 * np.median(_ffp), 1000 * _ffp.max(),
+         1000 * LAM_MIN, 200 * np.pi / _KNET))
+print("  s = sqrt(<|grad h|^2>): %.4f unfiltered, %.4f resolved, %.4f removed, "
+      "quadrature sum %.4f -- the check that the variance MOVED and was not lost"
+      % (_s_un, _s_re, float(np.sqrt(np.mean(_vxx + _vyy))),
+         np.hypot(_s_re, float(np.sqrt(np.mean(_vxx + _vyy))))))
+# the lobe, in degrees, because that is the unit the sun disc is quoted in
+_far = _fd > np.median(_fd)
+for _m, _nm in ((~_far, "near half"), (_far, "far half ")):
+    _tr = _vxx[_m] + _vyy[_m]
+    _dt = np.maximum(_vxx[_m] * _vyy[_m] - _vxy[_m] ** 2, 0.0)
+    _e1 = np.sqrt(np.maximum(0.5 * _tr + np.sqrt(np.maximum(.25 * _tr ** 2 - _dt, 0)), 0))
+    _e2 = np.sqrt(np.maximum(0.5 * _tr - np.sqrt(np.maximum(.25 * _tr ** 2 - _dt, 0)), 0))
+    print("    %s: fp %5.1f mm, removed slope sigma %.4f/%.4f (major/minor, "
+          "ratio %.2f) -> reflection lobe %.2f deg across, %.1fx the sun disc's "
+          "own %.2f deg"
+          % (_nm, 1000 * np.median(_ffp[_m]), np.median(_e1), np.median(_e2),
+             np.median(_e1) / max(np.median(_e2), 1e-9),
+             np.degrees(2 * np.median(_e1)),
+             2 * np.median(_e1) * np.sqrt(SKY_LOBE[0][1]),
+             np.degrees(1.0 / np.sqrt(SKY_LOBE[0][1]))))
+_pvx, _pvy = -D[inp][_fs, 0], -D[inp][_fs, 1]
+_pvn = np.hypot(_pvx, _pvy); _pvx /= _pvn; _pvy /= _pvn
+_sv2 = _pvx ** 2 * _vxx + 2 * _pvx * _pvy * _vxy + _pvy ** 2 * _vyy
+_frr = np.exp(-2.69 * np.sqrt(_sv2)) / (1 + 22.7 * _sv2 ** .75)
+print("  Fresnel roughness factor exp(-2.69 s_v)/(1 + 22.7 s_v^1.5) on the "
+      "one-direction unresolved slope (Bruneton et al. 2010): %.3f near, %.3f "
+      "far -- 1.000 is plain Schlick, and plain Schlick on a far surface with "
+      "no variance in it is the chrome-dome half of the same defect"
+      % (np.median(_frr[~_far]), np.median(_frr[_far])))
+# THE HOLE ON THE LIGHT SIDE, priced rather than argued. The caustic pass reads
+# grad_grid on the SUN's ray lattice, whose spacing is nothing like a camera
+# pixel's, and the bed map it writes is then read back through the surface at a
+# camera footprint that nobody filters against.
+_rayfp = max((X1 - X0) / RAY_NX, (Y1 - Y0) / RAY_NY)
+print("  the LIGHT path's own footprint is the sun ray spacing, %.2f mm: "
+      "%.0f samples across the shortest wave, so grad_grid needs no filter there "
+      "and is left unfiltered" % (1000 * _rayfp, LAM_MIN / _rayfp))
+# what the camera's pixel covers ON THE BED, which is the half that is NOT
+# closed: the beam narrows on entry by cos(ti)/(n cos(tt)) and then runs the
+# traced slant to the bed.
+_ns2 = normal_from_grad(*grad_points(_fx, _fy, _ffp))
+_tx2, _ty2, _tz2 = refract(D[inp][_fs, 0], D[inp][_fs, 1], D[inp][_fs, 2],
+                           _ns2[0], _ns2[1], _ns2[2], 1.0 / IOR[1])
+_sid2, _u2b, _v2b, _sm2, _ = scene_hit(_fx, _fy, _tx2, _ty2, _tz2)
+_cti = np.abs(D[inp][_fs, 2]); _ctt = np.abs(_tz2)
+_bedfp = _ffp + PIXANG * SS * _sm2 * (_cti / (IOR[1] * np.maximum(_ctt, 1e-6)))
+_caufp = sig_at(DEPTH) / FP_SIGMA          # the map's kernel as an equivalent fp
+print("  the camera pixel lands %.1f mm wide on the BED (median; %.1f mm at the "
+      "far end) against a caustic-map kernel worth %.1f mm of footprint -- so "
+      "the bed map is under-filtered by %.1fx out there, and that is the "
+      "residual aliasing route this round does NOT close. A mip of bed_img "
+      "would bleed one tread's radiance across a nosing into the next, which is "
+      "exactly what the per-depth blur above exists to avoid."
+      % (1000 * np.median(_bedfp), 1000 * np.percentile(_bedfp, 95),
+         1000 * _caufp, np.percentile(_bedfp, 95) / _caufp))
 
 
 # --------------------------------------------------- spec C, as a measurement
@@ -1955,13 +2243,28 @@ for _g in (10., 100.):
               "sits %.2f x its own height out from the glint"
               % (_g, _nm, _tv, 1.0 / np.tan(np.deg2rad(_tv))))
 # where the sun's azimuth line from THIS eye crosses the water, and what it
-# would take to make a glint there
-_shat = -SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])     # plan direction of gaze
+# would take to make a glint there.
+#
+# THE SIGN WAS WRONG AND THE WHOLE BLOCK WAS THEREFORE SILENT. It read
+# `-SUN_DIR[:2]`, which from an east-deck eye scans EAST, off the far side of
+# the pool: `_on` was empty for every sample, `if _on.any()` never fired, and
+# the three lines below -- including the one that reports where spec C's glint
+# window actually sits -- have never once printed. Nothing warned, because a
+# guarded print that never fires looks exactly like a print with nothing to say.
+# SUN_DIR points TOWARD the sun; a mirror image of the sun lies on the sun's
+# side of the eye, so the scan runs +SUN_DIR. The file already had the correct
+# sign 1400 lines up, in `_SHAT` for the coping lip, which is the tell: two
+# names for one direction and only one of them right.
+_shat = SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])      # plan direction of gaze
 _dscan = np.linspace(0.2, 14.0, 600)
 _lx, _ly = EYE[0] + _shat[0] * _dscan, EYE[1] + _shat[1] * _dscan
 _on = (pool_sdf(_lx, _ly) < SLIP)
 _tvv = np.degrees(np.arctan(EYE[2] / _dscan))
 _rr4 = np.tan(np.abs(np.deg2rad(_tvv) - np.arcsin(SUN_DIR[2])) / 2)
+# the local roughness ALONG that same line, read off the field rather than
+# assumed: the window is a statement about required slope, and whether anything
+# glints in it is a statement about the slope the water has there.
+_sscan = sample(_SLOC[..., None], _lx, _ly, X0, X1, Y0, Y1)[:, 0]
 if _on.any():
     _i0, _i1 = np.flatnonzero(_on)[[0, -1]]
     print("  the sun's azimuth line off this eye crosses water from (%.2f, %.2f) "
@@ -1976,13 +2279,23 @@ if _on.any():
                  _lx[_mb][-1], _lx[_mb][0]))
     _gb = _on & (_rr4 > _r_for_contrast(10.))
     if _gb.any():
+        # the contrast the field actually delivers inside the window, per the
+        # same p_j/p_c = (s_c/s_j)^2 exp(r^2 (1/s_c^2 - 1/s_j^2)) the window was
+        # derived from. This is the section C verdict, in one number.
+        _sj = _sscan[_gb]
+        _ct = ((_SC / _sj) ** 2
+               * np.exp(_rr4[_gb] ** 2 * (1 / _SC ** 2 - 1 / _sj ** 2)))
         print("    and spec C's glint window (>=10x contrast) is on the water at "
-              "x %.2f - %.2f, y %.2f - %.2f -- a return fitting whose boil "
-              "landed there would light it; the one at (%.2f, %.2f) is %.1f m "
-              "away from it"
+              "x %.2f - %.2f, y %.2f - %.2f; the local rms slope THERE runs "
+              "%.3f-%.3f against %.3f on the calm water, so the contrast the "
+              "field delivers in the window is %.0fx at best (%.0fx median)"
               % (min(_lx[_gb]), max(_lx[_gb]), min(_ly[_gb]), max(_ly[_gb]),
-                 JET_XY[0], JET_XY[1],
-                 np.hypot(_lx[_gb].mean() - JET_XY[0], _ly[_gb].mean() - JET_XY[1])))
+                 _sj.min(), _sj.max(), _SC, _ct.max(), np.median(_ct)))
+        print("      the return fitting is at (%.2f, %.2f); the window's centre "
+              "is (%.2f, %.2f), %.2f m away"
+              % (JET_XY[0], JET_XY[1], _lx[_gb].mean(), _ly[_gb].mean(),
+                 np.hypot(_lx[_gb].mean() - JET_XY[0],
+                          _ly[_gb].mean() - JET_XY[1])))
 print("  brightest glint density in frame sits at (%.2f, %.2f) where s = %.3f "
       "and r = %.3f" % (_GX[np.unravel_index(np.argmax(_DENS), _DENS.shape)],
                         _GY[np.unravel_index(np.argmax(_DENS), _DENS.shape)],
@@ -2197,13 +2510,18 @@ def _refine(idx, mode):
             hya = Ey + dv[:, 1] * th
             q = np.full(idx.size, (_APERM[a * n + b] + .5) / (n * n))
             c = np.zeros((idx.size, 3))
+            # the footprint is the OUTPUT pixel's, not this sample's: a refined
+            # pixel covers exactly the area an unrefined one does, it is only
+            # estimated from more rays. Filtering to the refinement rate would
+            # make the flagged pixels sharper than their neighbours, which is
+            # the seam this whole pass exists to remove.
+            ftw = th * PIXANG / np.maximum(np.abs(dv[:, 2]), .10) * SS
             if isw.any():
                 c[isw] = water_shade(hxa[isw], hya[isw], dv[isw], sh[isw],
-                                     mode, q[isw])[0]
+                                     mode, q[isw], fp=ftw[isw])[0]
             ps = ~isw & (dv[:, 2] < -1e-9)
             if ps.any():
-                ft = th[ps] * PIXANG / np.maximum(np.abs(dv[ps, 2]), .10)
-                c[ps] = paving(hxa[ps], hya[ps], sh[ps], dv[ps], ft)
+                c[ps] = paving(hxa[ps], hya[ps], sh[ps], dv[ps], ftw[ps] / SS)
             acc += c
     return acc / (n * n)
 
@@ -2219,7 +2537,7 @@ def render(mode):
         img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
     img[pav] = PAV_COL
     col, sidW, uW, vW, smW, cylW, occW, keyW = water_shade(
-        hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB)
+        hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB, stats=PRIM_STATS)
     img[inp] = col
     global WSID, WU, WV, EDGE_PX
     WSID, WU, WV = sidW, uW, vW           # green trace: what each water pixel sees
@@ -2352,6 +2670,69 @@ def colour_table(img, reg):
 
 REG = _regions()
 colour_table(hero, REG)
+
+
+# --- WHAT THE FILTER DID TO THE PICTURE, in the picture's own units ----------
+# The slope numbers above say the field was narrowed. They do not say whether
+# the moire left and the ripple stayed, and that is a statement about the IMAGE,
+# so it is measured on the image. Take the radial power spectrum of a window of
+# the encoded frame and split it in two:
+#   * 2-4 px, at and just above the output Nyquist. Nothing physical in this
+#     scene has structure there -- the finest wave the field carries is 17 mm
+#     and one output pixel is 26 mm at the far end -- so power in this band is
+#     the aliasing, and it is what should fall.
+#   * 12-45 px, which is where the 20 cm net and the ripple that survives the
+#     footprint actually live. This band must NOT fall; a filter that takes it
+#     has removed the water along with the artefact.
+# Two windows, near and far, because the whole point is that the filter is
+# distance-dependent: the near window is the control and should not move.
+def _band_rms(img, r0, r1, c0, c1):
+    p = img[r0:r1, c0:c1].astype(np.float64) @ np.array([.2126, .7152, .0722])
+    w = np.hanning(p.shape[0])[:, None] * np.hanning(p.shape[1])[None, :]
+    F = np.fft.rfft2((p - p.mean()) * w)
+    P = np.abs(F) ** 2
+    f = np.hypot(np.fft.fftfreq(p.shape[0])[:, None],
+                 np.fft.rfftfreq(p.shape[1])[None, :])
+    nrm = p.size * p.size * (w * w).mean()
+    return [np.sqrt(2. * P[(f >= 1. / hi) & (f < 1. / lo)].sum() / nrm)
+            for lo, hi in ((2., 4.), (12., 45.))], float(p.mean())
+
+
+_wpx = np.zeros(W * H, bool); _wpx[inp] = True
+_WATPX = _wpx.reshape(H // SS, SS, W // SS, SS).all((1, 3))
+_PFOOT = FOOT_PX.reshape(H // SS, SS, W // SS, SS).mean((1, 3))
+_PDIST = t_hit.reshape(H // SS, SS, W // SS, SS).mean((1, 3))
+
+
+def _longest_run(m):
+    """Widest contiguous run of True, as (start, stop)."""
+    d = np.diff(np.r_[0, m.astype(np.int8), 0])
+    a, b = np.flatnonzero(d == 1), np.flatnonzero(d == -1)
+    if not a.size:
+        return 0, 0
+    i = np.argmax(b - a)
+    return int(a[i]), int(b[i])
+
+
+_WIN = min(128, (H // SS) // 8)
+_rok = np.flatnonzero(_WATPX.sum(1) > (W // SS) // 4)
+print("far/near water, radial power in the encoded frame (rms sRGB levels):")
+if _rok.size > 2 * _WIN:
+    for _r0, _nm in ((_rok[0], "far "), (_rok[-1] - _WIN, "near")):
+        _r1 = _r0 + _WIN
+        _c0, _c1 = _longest_run(_WATPX[_r0:_r1].all(0))
+        if _c1 - _c0 < _WIN // 2:
+            print("  %s window: no clean run of water wide enough" % _nm)
+            continue
+        _cm = (_c0 + _c1) // 2
+        _c0, _c1 = max(_cm - _WIN, _c0), min(_cm + _WIN, _c1)
+        (_pa, _pb), _mu = _band_rms(hero, _r0, _r1, _c0, _c1)
+        print("  %s window rows %4d-%4d cols %3d-%3d: %.2f-%.2f m away, "
+              "pixel %.1f mm on the water | 2-4 px %6.3f | 12-45 px %6.3f | "
+              "mean luminance %.2f"
+              % (_nm, _r0, _r1, _c0, _c1, _PDIST[_r0:_r1, _c0:_c1].min(),
+                 _PDIST[_r0:_r1, _c0:_c1].max(),
+                 1000 * np.median(_PFOOT[_r0:_r1, _c0:_c1]), _pa, _pb, _mu))
 
 EDGE_DISP = EDGE_PX.copy()
 mono = encode(render('mono'))

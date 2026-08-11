@@ -51,7 +51,13 @@ def alpha_eff(k):
 
 
 class Jet:
-    def __init__(self, x, y, depth=0.15, tilt_deg=6.0, az_deg=20.0,
+    # The defaults are the scene's return fitting, so that a caller who omits
+    # them gets the pool this module was written for and not a stale one:
+    # az_deg went 20 -> 180 with the fitting's move to the east end wall
+    # (field.py's JET_AZ, photo-spec section C). field.py passes every one of
+    # these explicitly; the defaults are documentation, and a default that
+    # disagrees with the scene is a trap for the next caller.
+    def __init__(self, x, y, depth=0.15, tilt_deg=6.0, az_deg=180.0,
                  d=0.020, dp_bar=0.80, cd=0.92, S=0.094, B=5.8):
         self.p = np.array([x, y]); self.h = depth; self.S, self.B, self.d = S, B, d
         self.U0 = cd * np.sqrt(2 * dp_bar * 1e5 / RHO)

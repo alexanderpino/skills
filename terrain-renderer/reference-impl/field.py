@@ -220,10 +220,33 @@ def half_footprint(k):
 # The surface is a plane at radial distance h from the axis, so the jet only
 # reaches it once it has spread that far -- which is why the disturbed patch is
 # elongated along the aim and starts DOWNSTREAM of the fitting rather than at it.
-JET_XY = (0.10, 1.15)
+#
+# WHERE THE FITTING IS, AND WHY IT MOVED (photo-spec section C, wave-4 ruling).
+# The position used to be (0.10, 1.15) aimed 20 deg -- the far end of the pool
+# from the deck the frame is shot from, and a pure guess. Two lanes then proved
+# section C ("a compact patch of isolated glints over the rougher water, on
+# otherwise glassy water") unreachable with the fitting there: all specular
+# structure lies on ONE line in plan, the sun's bearing through the eye, so the
+# eye that lights a boil at (0.10, 1.15) has to stand over the water. The
+# criterion came from a photograph taken by a person standing at the poolside, so
+# a reachable geometry exists and it was the guess that was wrong.
+#
+# So: a single return in the EAST end wall, aimed west along the length of the
+# pool. Ordinary plumbing for a pool whose skimmer is at the far end, and the
+# glint line off the existing EYE (9.40, 1.95, 1.85) runs west at nearly constant
+# y through x ~ 7, which is where a boil from this wall lands. The camera does not
+# move; the fitting does.
+#
+# The DEPTH is the load-bearing number, not the position. r_half = 0.094*s, so the
+# jet only reaches the surface once it has spread by the fitting depth, and the
+# slope it forces there falls off a cliff with depth: 0.093 at 15 cm, 0.058 at
+# 17.5 cm (= the calm water, i.e. nothing left to find), 0.012 at a typical 30 cm.
+# 15 cm is kept -- shallow for a real return, and photo-spec section C records
+# that assumption as the price of the criterion rather than burying it here.
+JET_XY = (8.00, 2.00)         # east end wall, on the pool's own centre line
 JET_H = 0.15                  # fitting depth below the waterline (m)
 JET_TILT = np.deg2rad(6.0)    # aimed slightly up, as returns usually are
-JET_AZ = np.deg2rad(20.0)
+JET_AZ = np.deg2rad(180.0)    # due west, along the pool's length
 D_NOZZLE, DP_BAR, CD = 0.020, 0.80, 0.92   # 20 mm eyeball, return pressure in bar
 U0 = CD * np.sqrt(2 * DP_BAR * 1e5 / 1000.0)   # Bernoulli: 0.8 bar -> 11.6 m/s
 SIGMA_W = 0.0728                                # surface tension, N/m
@@ -307,7 +330,16 @@ def _report_jet():
              JET_H * 100, np.degrees(JET_TILT)))
     print("  oppervlakteverstoring piekt %.2f m stroomafwaarts, helling %.3f daar"
           % (sax[im], e[im]))
+    # ... and the same peak in WORLD coordinates, because that is the number the
+    # optics lane needs: section C is satisfied only if this point lands inside the
+    # glint window (the locus where the required facet slope is far enough out on
+    # the calm water's slope distribution that only the rough patch can reach it),
+    # and that window is a position on the water, not an offset along the jet axis.
     half = e > 0.5 * e[im]
+    print("  boil in wereldcoordinaten: piek (%.2f, %.2f), halfwaarde (%.2f, %.2f)"
+          " - (%.2f, %.2f), fitting (%.2f, %.2f) op %.0f cm diepte"
+          % (xs[im], ys[im], xs[half][0], ys[half][0], xs[half][-1], ys[half][-1],
+             JET_XY[0], JET_XY[1], JET_H * 100))
     print("  halfwaardelengte langs de as: %.2f - %.2f m"
           % (sax[half][0], sax[half][-1]))
     print("  demping, schoon vs inextensibele film (geldt alleen kort:")
@@ -353,6 +385,14 @@ BOIL = _plane(10, LAM_MIN, 0.045, 1.0, None, 17)
 # solve (wake.trace launches one fan per axial station, weighted by the forcing
 # envelope), so the arc centre still lands out in the water rather than on the
 # fitting -- it is just no longer a second, uncalibrated copy of the same physics.
+#
+# The source now sits ON the x = X1 wall, so its image in that wall COINCIDES with
+# it and the list carries the same point twice. That is not a bug to dedupe: a
+# monopole against a rigid wall radiates into a half space at doubled amplitude,
+# and two coincident entries is exactly how an image sum says so. (_SC renormalises
+# NEAR to JNEAR_RMS afterwards in any case, so the doubling sets the SHAPE -- one
+# strong source at the east wall instead of two half-strength ones a metre apart --
+# and not the level.)
 _IMG = [(JET_XY[0], JET_XY[1]), (-JET_XY[0], JET_XY[1]), (JET_XY[0], -JET_XY[1]),
         (2 * X1 - JET_XY[0], JET_XY[1]), (JET_XY[0], 2 * Y1 - JET_XY[1])]
 _NEAR = [(2 * np.pi / l, w) for l, w in ((0.30, 1.0), (0.21, 0.8), (0.15, 0.6))]
@@ -585,7 +625,18 @@ def _norm_jets():
     jx_, jy_ = JET_XY[0] + _pk * _AIM[0], JET_XY[1] + _pk * _AIM[1]
     xxn, yyn = np.meshgrid(np.linspace(jx_ - .35, jx_ + .35, 128).astype(np.float32),
                            np.linspace(jy_ - .35, jy_ + .35, 128).astype(np.float32))
-    xxf, yyf = np.meshgrid(np.linspace(5.0, 7.0, 256).astype(np.float32),
+    # THE FAR PATCH MOVED WITH THE FITTING, and it had to. It is not "somewhere
+    # else in the pool", it is "water the jet does not reach" -- that is the whole
+    # meaning of the s(ver) column and of the near/far ratio built on it. It used
+    # to sit at x 5-7 while the fitting was at the west end; with the fitting in
+    # the east wall that same square is 1-2 m downstream of the boil and measures
+    # WAKE 0.052 and NEAR 0.040, i.e. it had become a second near-field patch
+    # printing itself as the far field. Same size (2 x 2 m, so `df` below is
+    # unchanged) and same y range; only x moves, along the axis the jet moved
+    # along. Its centre is 4.1 m from the boil peak, it is clear of the entry step
+    # (x 4.5-7.5) and the bench lobe (y >= 3.5) so the F column's 1.40 m depth is
+    # the right one under all of it, and WAKE and BOIL both measure 0.000 on it.
+    xxf, yyf = np.meshgrid(np.linspace(2.0, 4.0, 256).astype(np.float32),
                            np.linspace(1.0, 3.0, 256).astype(np.float32))
     dn = 0.7 / 127.0; df = 2.0 / 255.0
     rows, near_v, far_v = [], 0.0, 0.0
@@ -658,6 +709,22 @@ def _norm_jets():
     # disagreement. Restating a target as though it were a measurement is the
     # same class of defect as the mixed convention this block documents: a
     # number that cannot be reproduced from anything the file computes.
+    # WHAT THE FITTING'S MOVE DID TO THIS TABLE, recorded and not absorbed. The
+    # target line below is unchanged -- it is what the chapter asserts, and moving
+    # it to meet a measurement would be the same defect as restating a target as
+    # though it were one. Measured, the far column now reads 0.053 where it read
+    # 0.058, and the whole difference is in the two rows that depend on WHERE the
+    # patch is rather than on how much slope the water carries:
+    #   REVERB 0.049 -> 0.044.  Sampling, not water: 44 discrete components on a
+    #     2 m square sit either side of their 0.046 ensemble value depending on
+    #     where the square is, and both readings are that spread.
+    #   NEAR   0.028 -> 0.026.  Real: NEAR is normalised over the whole basin, so
+    #     putting its source at the east wall (and coincident with its own image
+    #     there) redistributes it -- more on the jet, less at 4 m.
+    # The near column is intact (0.123 -> 0.122). The TOTAAL row is a quadrature
+    # sum of the rows above it, not a measurement of the field: on this patch the
+    # field itself measures 0.111, because REVERB and WAKE happen to sample
+    # anti-correlated over 0.7 m (see the ledger note in _report_footprint).
     print("    doel: 0.11-0.14 bij de straal, 0.058 ver weg"
           " (s = sqrt(<|grad h|^2>) overal)")
     _report_footprint(xxn, yyn, xxf, yyf)
@@ -735,6 +802,25 @@ def _report_footprint(xxn, yyn, xxf, yyf):
     # somewhere, so print it in the same units. sqrt(trace) of the removed
     # tensor is a removed rms slope; resolved and removed add in quadrature to
     # the unfiltered total, which is the check that nothing was invented.
+    #
+    # WHAT THIS CHECK CAN AND CANNOT CATCH, worth stating because the jet's move
+    # made the near row's residual visible. `rem` is summed BAND BY BAND, while
+    # `res` and `s0` are measured on the summed field, so the quadrature identity
+    # holds only up to the inter-band covariance -- exactly
+    #     res^2 + rem^2 - s0^2 = 2 * (sum_ij C_ij(filtered) - sum_ij C_ij),
+    # the amount by which filtering changes how the bands overlap. That is zero
+    # for independent bands and merely small for a finite realisation on a small
+    # patch. On the 0.7 m jet patch REVERB and WAKE sample at -0.0022 of shared
+    # variance (measured; the field there is 0.111 against a quadrature sum of
+    # rows of 0.122), and 8% of that covariance leaves with the filter, so the
+    # near row closes to 0.1116 against 0.1109 at fp 30 mm rather than to four
+    # decimals. The 2 m far patch still closes to four (0.0522 / 0.0521).
+    # So: a residual at the third decimal here is sample covariance and says
+    # nothing about the convention; a residual that GROWS with fp on the far
+    # patch, or one that appears on a band's own row, is the convention leak this
+    # check exists to catch. Per band the ledger still closes to four decimals --
+    # WAKE at fp 30 mm removes 0.0318 by the tensor against 0.0316 implied by its
+    # own filtered and unfiltered rms.
     for xx, yy, tag in ((xxn, yyn, "straal"), (xxf, yyf, "ver   ")):
         s0 = total_s(xx, yy, None)
         for fp in (0.010, 0.030):
@@ -834,7 +920,11 @@ def slope_var_points(x, y, fp):
     `_plane_rms(a * sqrt(1 - W^2))` -- and `_norm_jets` closes the loop every run
     by printing resolved and removed in quadrature against `rms_slope` of the
     unfiltered field. If a second convention ever gets in through this function,
-    that line stops adding up. It is the guard, not decoration.
+    that line stops adding up. It is the guard, not decoration -- but read the
+    note beside that print for what it can and cannot see: the sum here is band
+    by band while the field it is checked against is not, so the identity holds
+    only up to the inter-band sample covariance, a third-decimal effect on a
+    0.7 m patch and not a convention leak.
     """
     fv = _fp_var(fp)
     xf, yf = np.asarray(x, np.float32), np.asarray(y, np.float32)
