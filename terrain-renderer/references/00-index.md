@@ -48,8 +48,9 @@ and a route to "chapter 12" means whichever of them holds the answer:
 
 `12`'s executable half is `terrain-renderer/reference-impl/`, and its `validate.py` is the arbiter
 for the chapter's numeric claims: it checks the implementation against closed forms, published
-measurements and independent methods, and **exits non-zero on eight rows** — each a recorded
-finding with its tolerance justified from the estimator's own error, not a broken build.
+measurements and independent methods. It **exited non-zero on eight rows** for several rounds — each
+a recorded finding with its tolerance justified from the estimator's own error, not a broken build —
+and all eight are now closed, with no tolerance widened and four of them tightened.
 
 ## Master technique index
 

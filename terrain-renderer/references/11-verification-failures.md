@@ -282,11 +282,11 @@ look at the distribution.
   what makes a lookup table or a fitted approximation *defensible* rather than a guess — it was
   derived from the reference and is measured against it every run.
 
-### Three ways a measurement lies while looking like one
+### Four ways a measurement lies while looking like one
 
 Each of these has shipped in this project's own reference work, survived review, and cost a round to
-find. All three produce a number that is *reproducible in the wrong units* — which is exactly the
-class a golden-image test cannot catch, because nothing about the image is wrong.
+find. All four produce a number that is *reproducible and wrong* — which is exactly the class a
+golden-image test cannot catch, because nothing about the image is wrong.
 
 - **Compare light to light.** A ratio read off sRGB-encoded luminance, checked against a claim about
   *radiance*, is wrong by the encoding and not by a little: one shadow ratio read 0.82 against a
@@ -304,6 +304,22 @@ class a golden-image test cannot catch, because nothing about the image is wrong
   In one slope budget here, two of five bands normalised per-axis and three in the total; it shipped
   for months. One named function, called by everything, is the fix; a comment on each call site is
   not.
+- **A test and the code it checks must not share a premise.** The most expensive failure of the four,
+  because it produces a *green suite pointing at the wrong number*. In this project a constant
+  shipped at 0.563; the derivation written in the comment beside it evaluated to 0.635; the physics
+  gave 0.885. Both of the suite's rows — a 2M-point quadrature *and* a 4M-sample Monte-Carlo, filed
+  under different tiers as "independent methods" — had been transcribed from that comment's sentence
+  rather than from the interface. They agreed with each other to four digits and were both wrong, and
+  making the code satisfy them would have moved it onto the middle number with a passing run to
+  certify it. **Two methods that read the same premise are one method**, and no amount of estimator
+  independence rescues them. What breaks the tie is a check with nothing to transcribe: a **limit**
+  (open the cone to the full hemisphere and the answer is forced to ½), a **conservation identity**
+  (the angle at which a refraction routine stops returning a direction must equal the angle at which
+  the reflectance reaches 1 — different code, same physics), an **analytic special case** (the
+  Brewster reflectance is a closed-form number an approximation cannot hit), or the **same quantity
+  reached by unrelated code elsewhere in the file**. The procedural rule: derive the value from
+  physics, write the derivation down, and *then* pick a guard that could not have been written from
+  it. Do not make the two sides agree — make each one right separately and observe that they agree.
 
 **Pitfalls:** goldens that were never verified correct (a golden captured from a broken build
 enshrines the bug — review each golden by eye once, against the catalogue, before blessing it);

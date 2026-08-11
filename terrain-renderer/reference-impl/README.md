@@ -11,7 +11,7 @@ or falsified here.
 |---|---|
 | `field.py` | The water surface: wind, reverberant tail, wall reflections, jet boil, jet wake. Answers "what is the slope at (x,y)". Knows nothing about light. |
 | `wake.py`  | Eikonal ray tracing of the jet's stationary wake through its own drift field. |
-| `render.py`| Light: the caustic pass, liner and tile materials, Fresnel, sky, camera, tone map. |
+| `render.py`| Light: the caustic pass, liner and tile materials, Fresnel — the **exact equations at every water interface**, not Schlick, because an approximation justified only by speed does not belong in a reference and the far water's specular term is the brightest thing in the frame — sky, camera, tone map. |
 
 Sun position is the measured one for the reference photograph (Aljezur, 37.319N
 8.803W, 2026-08-10 18:41 WEST): elevation 21.0 deg, azimuth 273.75 deg.
@@ -27,7 +27,7 @@ not written here, in three tiers, in about 16 seconds — no render, no PNG.
 
 | Tier | Strength of evidence | Covers |
 |---|---|---|
-| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p), Snell and the critical angles, TIR, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux and the riser gather's closure |
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` |
 | 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min |
 | 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian |
 
@@ -58,9 +58,67 @@ something is the `REQUIRED` list: the loader raises if any name the suite tests 
 missing, so a restructured `render.py` produces a loud error rather than a quietly
 absent test.
 
-**It is failing on purpose.** The suite currently exits 1 on eight rows. Each is a
-finding recorded rather than patched — see the failure block it prints, which
-carries the numbers.
+**It is green, and that took work rather than tolerance.** The suite exited 1 on
+eight rows for several rounds — three absorption, two Schlick-vs-exact-Fresnel, one
+missing total-internal-reflection branch, and two on `TIR_VERT`. All eight are now
+closed with no tolerance widened; four tolerances were *tightened* to double
+round-off because the quantity they cover became an identity rather than an
+approximation.
+
+Two of those eight are worth knowing about even if you never read the code, because
+they are the reason the tolerance column is not the interesting one:
+
+- **`TIR_VERT` — a green test would have installed a second wrong number.** The
+  constant shipped 0.563; the derivation in the comment beside it evaluates to
+  0.635; the physics gives 0.885. The suite's two rows — a 2M-point quadrature and
+  a 4M-sample Monte-Carlo, filed as independent methods — had both been written
+  from that comment's sentence rather than from the interface, so they agreed with
+  each other and were both wrong. **Two methods that read the same premise are one
+  method.** What closed it was a check with nothing to transcribe: as `θ_c → 0` the
+  ratio is forced to exactly ½, which both wrong forms miss (0.239 and 0.318), and
+  that same ½ is now cross-checked against the riser gather's closure — unrelated
+  code, same number.
+- **Schlick was in a reference, and its error changes sign inside one frame.**
+  `_fresnel_rough` at zero variance was plain Schlick. Over the 38–79° of incidence
+  this camera spans, `Schlick/exact − 1` runs **−22.8% at 51.3°** and **+14.3% at
+  79°**, crossing zero at 67.1° — so the far water read too much like a mirror while
+  the mid water read too little, on the brightest term in the picture, and no single
+  multiplier could have fixed both. The renderer now evaluates `R_s` and `R_p`; the
+  guard is the closed-form Brewster value, which an approximation cannot reach
+  (Schlick misses it by 22%). Cost: **+1.1% of render time.**
+
+The general rule those two produced, now doctrine in `11`: **a test and the code it
+checks must not share a premise.** Derive the value from physics, write the
+derivation down, and then guard it with something that could not have been written
+from it — a limit, a conservation identity, an analytic special case, or the same
+quantity reached by unrelated code.
+
+## Known defect — the transmitted column has no `1/n²`
+
+Found while closing the eight above, **recorded rather than fixed**, because fixing
+it is a round of its own and this one is not on the list.
+
+`water_shade` composes `F(θ_v)·L_sky + (1 − F(θ_v))·L_bed`. `L_bed` comes out of
+`shade()` as `albedo × irradiance`, and that irradiance is the beam *already
+through the surface*, so `L_bed` is an **in-water** radiance. Radiance is not
+conserved across a refracting interface — `L/n²` is — so what leaves the water is
+`T(θ_v)·L_bed/n²`, and the `/n²` is not there. `n² = 1.774 / 1.782 / 1.796` on this
+file's three IORs.
+
+It is a **relative** error between the two columns of one pixel: the sky term is
+air-side and right, so the bed reads ~1.78× bright against it, which is exactly what
+the spec-C reflected-vs-transmitted diagnostic measures. The internal return
+(`bedret`) is not the missing factor — that is the light which *failed* to escape,
+coming back to re-light the bed, and it is already inside `L_bed`'s irradiance.
+
+Not fixed here for two reasons, both worth stating: the absolute level is entangled
+with `LINER_TINT`, the liner albedos and `EXPOSURE`, all fitted to a photograph with
+this factor absent, so applying it darkens the water column by 0.83 stops and every
+one of those has to be re-derived; and the claim needs its own guard that does not
+come from the same derivation — the natural one is a closed energy audit of the pool
+(apparent albedo against `T·ρ(1−R_int)/(1−ρ·R_int)`, which `R_EXT`/`R_INT` already
+supply). Full statement in `../references/12a-water-derivations.md`, *What did not
+reproduce*, item 5.
 
 ## Known defect — stone gets no direct sun on two sides
 
@@ -90,6 +148,18 @@ feature is mostly a matter of building the view, not of finding new physics.
   angle, so the camera sees the bed, the walls and the step unit folded back down.
   There is no partial regime out there, which makes the rim the hardest edge in
   the scene and the easiest thing to get visibly wrong.
+- **`refract()` now has the branch this pass is built on.** Past the critical
+  angle it returns the null vector `(0,0,0)`, and `is_tir(t)` is the predicate.
+  It used to clamp the radicand at zero and hand back a horizontal vector of
+  length `n·sin i > 1` — a direction that is not a direction, returned silently,
+  which is precisely the failure this pass would have inherited on its first
+  frame. Unreachable from every current call site (all five refract *into* the
+  water, `eta = 1/n < 1`, where no critical angle exists); the two whose `eta` is
+  computed rather than a literal assert which side of the interface they are on,
+  and this pass is the one that will flip that assert. The
+  suite bisects on `refract()`'s own output for the onset of the null return and
+  checks it against the angle at which the exact Fresnel reflectance reaches 1 —
+  two functions with no shared line of code, agreeing to 1e-4 deg.
 - **The rim is dispersive, and by a measurable amount.** With the file's own
   `IOR = 1.3320 / 1.3348 / 1.3400`, the critical angle runs 48.655 / 48.519 /
   48.268 deg — a **0.39 deg** spread, red rim outside blue. Same three constants
@@ -101,9 +171,14 @@ feature is mostly a matter of building the view, not of finding new physics.
   overhead in the window, it is crowded against its edge, which is where the
   window is most compressed and most dispersive.
 - **Absorption becomes aerial perspective.** This is the first view in the model
-  where the water column sits between the camera and the far geometry, so
-  `a = (0.25, 0.0565, 0.0092) /m` acts along the *view* path. Transmission at 5 m
-  is `(0.29, 0.75, 0.96)` — the far wall loses two thirds of its red and the scene
+  where the water column sits between the camera and the far geometry, so `a`
+  acts along the *view* path. `render.py` uses Pope & Fry (1997) averaged over
+  its own channel bands, `a = (0.2617, 0.05299, 0.01022) /m`; the chapter quotes
+  the same table point-sampled at its own 610/550/450 nm,
+  `a = (0.2644, 0.0565, 0.00922) /m`. **Same water, same table, two samplings of
+  it** — not two candidate waters, and `validate.py` checks both against the
+  published table so neither can drift. Transmission at 5 m is `(0.27, 0.77,
+  0.95)` — the far wall loses nearly three quarters of its red and the scene
   goes cyan with distance. The chapter's "the colour is the bottom, not the water"
   is a statement about a view from above; from inside, the water genuinely does
   colour the image.

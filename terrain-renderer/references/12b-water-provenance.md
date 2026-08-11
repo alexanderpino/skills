@@ -105,15 +105,22 @@ least-confident-claims ledger in `00-index.md`.
   ([omlc.org](https://omlc.org/spectra/water/data/pope97.dat), 2.5 nm steps, quoted in cm⁻¹), and
   the chapter's triple is now taken off it rather than from model knowledge: **a(610) = 0.2644,
   a(550) = 0.0565, a(450) = 0.00922 m⁻¹**. This corrects a long-standing 0.25 in the red — 5.4%
-  low — and settles a disagreement with the reference implementation, which carries
+  low — and settled a disagreement with the reference implementation, which then carried
   `(0.2750, 0.0546, 0.0145)`. **Neither triple was wrong wholesale, and the reason is that they are
   quoted at different wavelengths**: the implementation samples 620/545/460 nm, where Pope & Fry
-  give `(0.2755, 0.0511, 0.00979)`. Scored against its own sample points its red is right to 0.2%,
-  its green is 7% high, and its **blue is 48% high and simply wrong** — no source in this chapter
-  supports 0.0145 at 460 nm. Scored against the chapter's 610/550/450 the green and blue are exact
-  and only the red needed the fix. Two lessons kept as doctrine in the text: the sample wavelengths
-  are part of the constant, and a triple that disagrees with another triple may be disagreeing about
-  where it was sampled rather than about the water.
+  give `(0.2755, 0.0511, 0.00979)`. Scored against its own sample points its red was right to 0.2%,
+  its green 7% high, and its **blue 48% high and simply wrong** — no source in this chapter
+  supported 0.0145 at 460 nm, and it is Smith & Baker's 450 nm value to the digit. Scored against the
+  chapter's 610/550/450 the green and blue were exact and only the red needed the fix. Two lessons
+  kept as doctrine in the text: the sample wavelengths are part of the constant, and a triple that
+  disagrees with another triple may be disagreeing about where it was sampled rather than about the
+  water.
+  **Closed 2026-08 in the implementation**, which now carries the same table **averaged over its own
+  channel bands** (582.5–657.5 / 502.5–582.5 / 417.5–502.5 nm): `a = (0.2617, 0.05299, 0.01022) m⁻¹`.
+  That is a third reading of one measurement, not a third water — a band model wants the band mean,
+  a three-delta model wants the point values, and the chapter's own triple remains the point sample
+  at 610/550/450. All three are checked against this same transcribed table in `validate.py`, so no
+  one of them can drift without a row moving.
   ⚠️ **Do not use Smith & Baker (1981) for blue absorption** — that era's measurements were
   scattering-contaminated and give `a(420)` ~3.4× too high, which desaturates clear water.
   Smith & Baker remains correct for UV (<380 nm) and for `K_d`.
@@ -226,6 +233,15 @@ least-confident-claims ledger in `00-index.md`.
   2026-08. The screen-space UV-distortion refraction is an approximation of
   Snell bending, not the ray-traced result — the amplitude-Fresnel and Snell derivations live in
   physically-based-rendering (`pbr-fundamentals`, `volumes-and-sss`).
+  **The exact equations, and what an approximation of them costs.** `R_s`/`R_p` as used in
+  `reference-impl` are Born & Wolf, *Principles of Optics*, §1.5.2 (`P`, standard optics, re-derived
+  and checked here). Schlick, "An Inexpensive BRDF Model for Physically-based Rendering",
+  *Computer Graphics Forum* 13(3) 233–246 (1994) is the fit that was replaced there; it is quoted in
+  the original as ~1% of `R` for common dielectrics, and measured against the exact equations at
+  `n = 1.3348` it runs **+11.4% at 83.8°** and **+14.3% over the 38–79° incidence range the reference
+  frame spans** (`D`, 2026-08). The closed-form check that separates them with no quadrature is the
+  Brewster value `R(atan n) = ((n²−1)/(n²+1))²/2` — 0.03894/0.03948/0.04050 on this file's three
+  IORs, against Schlick's 0.0303/0.0306/0.0314, i.e. **22% low** (`P`, arithmetic).
 - **P/D** — [The view from inside, and the split shot](12-water-rendering.md#the-view-from-inside-and-the-split-shot).
   The critical angle, the exactness of total internal reflection outside it, the `d/n` apparent
   depth and the flat-port field narrowing (46° → ≈34° at `n = 1.333`) are textbook geometrical
@@ -409,8 +425,10 @@ least-confident-claims ledger in `00-index.md`.
   production practice assembled over the physics above. The shadow-at-entry-point rule is the one
   most often skipped and is stated here as doctrine, not as a cited result.
 - **P** — Pool-water optics: pure-water absorption from the Pope & Fry table read above, sampled at
-  this chapter's RGB points — `a = (0.2644, 0.0565, 0.0092) m⁻¹` at 610/550/450 nm; the 417.5 nm
-  absolute minimum is deliberately *not* used as a blue channel. The round-trip transmittances and
+  this chapter's RGB points — `a = (0.2644, 0.0565, 0.00922) m⁻¹` at 610/550/450 nm; the 417.5 nm
+  absolute minimum is deliberately *not* used as a blue channel. (`reference-impl` uses the same
+  table averaged over its own channel bands instead — `(0.2617, 0.05299, 0.01022)` — for the reason
+  given in the Pope & Fry entry above.) The round-trip transmittances and
   the resulting `(0.36, 0.68, 0.78)` white-liner and `(0.11, 0.46, 0.68)` blue-liner returns are
   arithmetic recomputed here on the corrected red, as are the liner albedos (`0.8` white,
   `(0.24, 0.54, 0.70)` mid-blue PVC), which are representative values, not measured product data.

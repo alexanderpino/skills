@@ -49,13 +49,19 @@ tier markers scattered through the prose (`P`, `D`, `?` …) all resolve against
 
 `validate.py` is what makes the reference implementation evidence rather than an illustration — it
 checks the renderer against things it did not write (closed forms, published measurements,
-independent methods), and **it currently exits non-zero on eight rows**. Those eight are recorded
-findings, not neglect. Every row prints expected, measured and tolerance, and every tolerance is
+independent methods). It **exited non-zero on eight rows** for several rounds — three absorption,
+two Fresnel, one missing total-internal-reflection branch, two on the vertical-face internal-return
+ratio — and those eight are now closed with no tolerance widened; four were *tightened*, because the
+quantity they cover became an identity rather than an approximation. They were recorded findings
+while they stood, not neglect. Every row prints expected, measured and tolerance, and every tolerance is
 justified from the *estimator's* own error or a published uncertainty, never from the disagreement
 it is being asked to excuse — so a FAIL means the number is outside what the measurement itself can
 explain, and the next question is which of the two sides is wrong, never whether the tolerance can
-move. A suite that passes because its tolerances were widened proves nothing. The file also ends
-with a list of what is not tested *at all*, which is as much the deliverable as the tests are.
+move. A suite that passes because its tolerances were widened proves nothing — and one that passes
+because its rows were transcribed from the sentence beside the constant proves less than nothing,
+which is what happened to two of those eight (see `11`, *Four ways a measurement lies while looking
+like one*). **A test and the code it checks must not share a premise.** The file also ends with a
+list of what is not tested *at all*, which is as much the deliverable as the tests are.
 
 ## Diagnostic index: symptom to mechanism
 
@@ -1197,6 +1203,24 @@ a_water   ~= (0.264, 0.0565, 0.0092) m^-1   # pure water at 610/550/450 nm, Pope
 #   (0.2755, 0.0511, 0.0098). Quote the sample points with the numbers, always
 ```
 
+**And a sampling point is not the only defensible reading of that curve.** A camera channel is a
+*band*, not a wavelength, so the quantity a renderer wants is `a` averaged over the band it actually
+integrates. Over the Voronoi cells of 620/545/460 nm — 582.5–657.5, 502.5–582.5, 417.5–502.5 nm,
+tiling with no gap and no overlap — the same Pope & Fry table gives
+
+```
+a_band ~= (0.2617, 0.05299, 0.01022) m^-1     # Pope & Fry 1997, averaged over the three bands
+```
+
+which is what `reference-impl/render.py` ships, and which differs from the point sample at those same
+nominal wavelengths by 5.0% / 3.7% / 4.4%, with the red sign opposite to the green and blue. Take
+whichever matches how the rest of the renderer samples spectrum — a three-delta model wants the point
+values, a band model wants these — but **take one, say which, and never present the two triples as
+competing waters.** They are one measurement read two ways, and the difference between them is the
+curvature of `a(λ)`, not a disagreement about water. (A band mean of `a` is itself an approximation:
+Beer–Lambert over a band is `−ln⟨exp(−a(λ)L)⟩`, not `⟨a⟩L`, and the two separate by ~1% of the red
+channel's transmittance over a 4 m path. It is first-order right where a point sample is not.)
+
 **A natural water is four optically significant components, and they add.** Pure water is always
 present and never varies; the other three are the shader's actual authoring dials, because each has
 a *distinct* visual signature:
@@ -1837,6 +1861,22 @@ float  F = R + (1.0-R) * pow(1.0-cosThetaV, 5.0)
 Also make sure the Smith masking/shadowing term is present in the sun lobe — that is what stops
 grazing-angle over-brightening, and with a statistical BRDF you get wave self-shadowing from it
 for free rather than needing a shadow map.
+
+**And check what the base curve is before blaming the roughness term.** The `pow(1-cosThetaV, 5)`
+above is Schlick (1994) — a fit whose only argument is that it avoids two square roots, quoted in the
+original as ~1% of `R` for common dielectrics. For **water it is far worse than that, and it changes
+sign inside one frame**: against the exact Fresnel equations at `n = 1.3348`, `Schlick/exact − 1`
+runs **−22.8% at 51.3°** and **+14.3% at 79°**, crossing zero at **67.1°** — and a shot from a normal
+standing eye height spans both. That is the part to keep: a one-sided error might be absorbed into
+some other constant, but this one makes the far water too mirror-like and the mid water not
+mirror-enough at the same time, so no single multiplier fixes it. On a shipping game the trade is
+still fine. On anything claiming to be a reference it is not, because the error lands on the specular
+term, which is the brightest thing in a water frame. Evaluate
+`R_s`, `R_p` and average them, and keep Bruneton's factor as a multiplier on the interface's grazing
+*rise above F0* — `F = F0 + (R_exact − F0)·r` — so both limits still hold exactly. The guard to put on
+it is the **Brewster identity**, `R(atan n) = ((n²−1)/(n²+1))²/2`, a closed-form number an
+approximation cannot reach: Schlick misses it by 22% while looking perfectly plausible everywhere
+else (`P`, `reference-impl`).
 
 **Cause three: binary whitecaps.** A per-pixel Jacobian threshold (as in
 [Ambient waves](#ambient-waves-gerstner-and-fft)) is correct up close and *disintegrates* at

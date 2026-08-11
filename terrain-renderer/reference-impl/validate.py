@@ -136,7 +136,8 @@ _HEAVY_TEXT = ('np.zeros((', 'np.meshgrid', 'rng.random((', 'np.linspace(X0 - 3'
 REQUIRED = [
     'IOR', 'LAM', 'ABS', 'F0', 'n_water', 'BAND', 'CAUCHY_A', 'CAUCHY_B',
     'SUN_DIR', 'SUN_COL', 'DEPTH', 'X0', 'X1', 'Y0', 'Y1', 'CYL',
-    'refract', 'scene_hit', 'box_hit', '_cyl_entry', 'splat', 'blur', 'sample',
+    'refract', 'is_tir', 'fresnel', 'tir_vert',
+    'scene_hit', 'box_hit', '_cyl_entry', 'splat', 'blur', 'sample',
     'bed_depth', 'bed_z', 'pool_sdf', 'edge_z',
     'cos_i', 'cos_t', 'sin_t', 'slant', 'TSUN', 'sig_at', 'SIG_EST',
     'TIR_FRAC', 'TIR_VERT', '_sky_vf', '_ris_closure', 'RIS_D0', 'RIS_D1',
@@ -238,11 +239,17 @@ def tier1_fresnel(R):
         check(1, 'R_s >= R_unpol >= R_p over 0-90 deg  [%s]' % nm,
               float(min(np.min(rs - ex), np.min(ex - rp)) >= -1e-15), 1.0, 0.0,
               'exact ordering for a real dielectric; boolean, no tolerance')
-    # -- SCHLICK, which is what the renderer actually evaluates. `_fresnel_rough`
-    # at zero unresolved variance is plain Schlick, so this measures the
-    # approximation the picture is made of against the exact equations.
+    # -- WHAT THE RENDERER ACTUALLY EVALUATES. `_fresnel_rough` at zero
+    # unresolved variance is the file's smooth-interface Fresnel, so this
+    # compares the curve the picture is made of against the exact equations,
+    # written out separately at the top of this file. It used to ship Schlick
+    # (1994) and it used to FAIL both rows: 0.0587 absolute at 83.8 deg (exact
+    # 0.5163 against 0.5751) and 0.0452 over the frame's own incidence range,
+    # i.e. +14.3% on the brightest term in the picture. The renderer now calls
+    # the exact equations, so what is left is two implementations of one closed
+    # form and the tolerance is TIGHTENED to double round-off, not relaxed.
     # The frame spans theta_v 11-52 deg above the water (render.py's own
-    # measurement), i.e. 38-79 deg of incidence, so the error is reported over
+    # measurement), i.e. 38-79 deg of incidence, so the comparison is made over
     # that range and over the full 0-90.
     n = IOR[1]
     for lo, hi, tag in ((0.0, 90.0, 'full 0-90 deg'), (38.0, 79.0, 'in-frame 38-79 deg')):
@@ -251,26 +258,40 @@ def tier1_fresnel(R):
         ex = fresnel_exact(ci, n)[0]
         sch = R._fresnel_rough(ci, np.zeros_like(ci))[:, 1]
         i = int(np.argmax(np.abs(ex - sch)))
-        # Schlick (1994) is quoted as ~1% of the reflectance for common
-        # dielectrics. For water at grazing it is far worse, and 0.02 absolute
-        # is chosen as "an error that cannot change the look": at the frame's
-        # own white point a 0.02 error in a reflectance of ~0.3 is a 7% error
-        # in the brightest term in the picture. It fails, and the number is
-        # the finding.
-        check(1, 'Schlick vs exact Fresnel, max |dR| (%s)' % tag,
-              float(np.abs(ex - sch).max()), 0.0, 0.02,
-              'Schlick 1994 claims ~1% of R for dielectrics; 0.02 absolute is the '
-              'level at which the specular term visibly changes')
+        check(1, 'render Fresnel vs exact Fresnel, max |dR| (%s)' % tag,
+              float(np.abs(ex - sch).max()), 0.0, 1e-14,
+              'two evaluations of one closed form; the only tolerance is double '
+              'round-off. Schlick, which this replaced, read 0.0587 here')
         info(1, '  ... worst at (%s)' % tag,
-             'theta %.1f deg: exact %.4f, Schlick %.4f (+%.1f%%)'
+             'theta %.1f deg: exact %.6f, render %.6f (%+.4f%%)'
              % (np.degrees(th[i]), ex[i], sch[i], 100 * (sch[i] / ex[i] - 1)),
-             'where Schlick departs most')
-    # -- TSUN, the sun's transmission into the water at 69 deg incidence, is
-    # Schlick in the file. Against exact Fresnel:
+             'where the two evaluations differ most')
+    # -- AND THE GUARD THAT DOES NOT GO THROUGH THE SAME EXPRESSION. At Brewster
+    # the p amplitude vanishes identically, so the unpolarised reflectance is
+    # exactly half the s branch, and the s branch there collapses to a closed-form
+    # NUMBER with no Fresnel evaluation in it at all:
+    #     cos i = 1/sqrt(1+n^2), cos t = n/sqrt(1+n^2)
+    #     r_s = (cos i - n cos t)/(cos i + n cos t) = (1 - n^2)/(1 + n^2)
+    #     R(theta_B) = ((n^2 - 1)/(n^2 + 1))^2 / 2
+    # This is the sharpest test of a reflectance model there is: it is a single
+    # number, it needs no quadrature and no table, and an approximation cannot
+    # hit it by construction -- Schlick gave 0.0306 against 0.0395 here, 22% low,
+    # while passing every grazing-behaviour eyeball test. It is checked against
+    # render.py's OWN `fresnel`, which is the thing the frame is drawn with.
+    for c, nm in enumerate('RGB'):
+        nn = IOR[c]
+        cb = np.cos(np.arctan(nn))
+        check(1, 'render fresnel at Brewster == ((n^2-1)/(n^2+1))^2/2  [%s]' % nm,
+              float(R.fresnel(cb)[c]), 0.5 * ((nn ** 2 - 1) / (nn ** 2 + 1)) ** 2,
+              1e-15, 'closed-form value of the unpolarised reflectance at the '
+                     'zero of R_p; no integral, no table, one double ulp')
+    check(1, 'render fresnel(1) == F0 (normal incidence)', R.fresnel(1.0), F0,
+          1e-15, 'algebraic identity; the two are computed by different code')
+    # -- TSUN, the sun's transmission into the water at 69 deg incidence.
     ex = 1.0 - fresnel_exact(R.cos_i, IOR[1])[0]
     check(1, 'TSUN (sun into water at 69 deg) vs exact Fresnel', R.TSUN, ex,
-          0.005, 'a 0.5% error in the beam entering the water is below the '
-                 'exposure quantisation of the frame')
+          1e-14, 'the file now evaluates the exact equations here too; double '
+                 'round-off. Schlick read 0.8729 against 0.8774')
     # -- the diffuse Fresnel reflectance the wet-liner model integrates. The
     # file uses a 512-point midpoint rule in mu; a 200k-point rule is the same
     # integral converged.
@@ -336,10 +357,11 @@ def tier1_snell(R):
               '3 dp; 1e-3 deg is that quotation precision', 'deg')
         # -- AND THE TEST THAT MATTERS: nothing may transmit past it. Water->air
         # beyond asin(1/n) is total internal reflection, so refract() must return
-        # either nothing or a flagged value. It returns a vector of length
+        # either nothing or a flagged value. It used to return a vector of length
         # n*sin(i) > 1 lying in the surface plane -- a direction that is not a
-        # direction. Currently unreachable (every call site has eta = 1/n < 1),
-        # but it is exactly the branch the README's Snell's-window pass needs.
+        # direction, handed back silently. Unreachable from today's call sites
+        # (all five pass eta = 1/n < 1), and exactly the branch the README's
+        # underwater pass is written around.
         if c == 1:
             # an UPWARD ray inside the water meeting the surface from below: the
             # interface normal handed to refract() must oppose the ray, so -z.
@@ -352,10 +374,42 @@ def tier1_snell(R):
                   float(np.abs(L).max()), 0.0, 1e-9,
                   'past TIR the transmitted direction must be null or flagged; a '
                   'returned vector of any length is a direction that does not exist')
-            info(1, '  ... what refract() returns past TIR instead',
-                 '|t| runs %.3f to %.3f (= n sin i), tz = %.3g'
-                 % (L.min(), L.max(), float(np.abs(tz2).max())),
-                 'a horizontal vector longer than unity')
+            check(1, 'is_tir() flags exactly those rays', float(R.is_tir(
+                tx2, ty2, tz2).mean()), 1.0, 0.0,
+                  'boolean over all 500 past-critical rays; no tolerance')
+            # -- and BELOW the critical angle it must still transmit a real unit
+            # vector, or "no transmission past TIR" could be passed by a function
+            # that transmits nothing at all.
+            thb = np.linspace(1e-3, np.arcsin(1.0 / n) - 1e-3, 500)
+            ix3, iz3 = np.sin(thb), np.cos(thb)
+            z3 = np.zeros_like(ix3)
+            tx3, ty3, tz3 = R.refract(ix3, z3, iz3, z3, z3, -np.ones_like(z3), n)
+            check(1, 'refract() still transmits a unit vector below TIR, water->air',
+                  float(np.abs(np.sqrt(tx3 ** 2 + ty3 ** 2 + tz3 ** 2) - 1).max()),
+                  0.0, 1e-12, 'algebraic identity over 500 sub-critical angles; '
+                              'the other half of the branch, so the null return '
+                              'cannot be passed by refusing to refract anything')
+            # -- THE PREMISE-INDEPENDENT ONE. Where refract() stops returning a
+            # direction and where the Fresnel reflectance reaches 1 are the SAME
+            # angle, and they are computed by two functions that share no line of
+            # code: one solves for cos t and tests its sign, the other forms the
+            # s and p amplitude ratios. Bisect on refract()'s own output for the
+            # onset -- no formula for it enters here -- and compare against the
+            # first angle at which the exact water->air R is 1 to machine zero.
+            lo_, hi_ = 0.0, np.pi / 2
+            for _ in range(200):
+                mid = 0.5 * (lo_ + hi_)
+                t_ = R.refract(np.sin(mid), 0.0, np.cos(mid), 0.0, 0.0, -1.0, n)
+                lo_, hi_ = (mid, hi_) if not R.is_tir(*t_) else (lo_, mid)
+            fr_ = np.linspace(0.0, np.pi / 2, 4000001)
+            # water -> air: the same equations with the index ratio inverted.
+            rr_ = fresnel_exact(np.cos(fr_), 1.0 / n)[0]
+            onset_f = float(fr_[int(np.argmax(rr_ >= 1.0 - 1e-15))])
+            check(1, 'refract() TIR onset == the angle exact Fresnel R reaches 1',
+                  np.degrees(0.5 * (lo_ + hi_)), np.degrees(onset_f), 1e-4,
+                  'two functions with no shared line: a bisection on refract()\'s '
+                  'own null return against a scan of the exact reflectance. '
+                  '1e-4 deg is the 4M-point scan\'s own grid spacing', 'deg')
     # -- the penumbra compression factor. Differentiating Snell gives
     # dtheta_t/dtheta_i = cos(i)/(n cos(t)); render.py uses exactly that to
     # shrink the 0.53 deg sun disc on entry. Checked against a numerical
@@ -394,8 +448,10 @@ def tier1_beer(R):
     # quantity and not a restatement of the expression.
     T = np.exp(-ABS * R.slant)
     check(1, 'transmittance over the 1.96 m refracted slant',
-          T, [0.5834, 0.8985, 0.9720], 5e-4,
-          "render.py prints this triple to 3 dp; 5e-4 is that precision")
+          T, [0.5990, 0.9014, 0.9802], 5e-4,
+          "render.py prints this triple to 3 dp; 5e-4 is that precision. It "
+          "moved from (0.583, 0.899, 0.972) when ABS became the Pope & Fry band "
+          "mean rather than a red point sample with a Smith & Baker blue")
     # -- multiplicativity. The renderer attenuates the light leg into the bed
     # map and the camera leg in water_shade, so the two-leg product must equal
     # the single-path law or the depth cue is wrong by a factor.
@@ -790,12 +846,20 @@ def tier2_absorption(R):
           'chosen before the measurement, not after')
     info(2, '  ... Pope & Fry point values at 620/545/460 nm', np.round(pf, 5),
          'the file states these three wavelengths itself')
-    info(2, '  ... ABS / Pope & Fry, per channel', np.round(R.ABS / pf, 4),
-         'red is Pope & Fry; blue is not')
+    info(2, '  ... ABS / Pope & Fry point values, per channel',
+         np.round(R.ABS / pf, 4),
+         'ABS is the BAND MEAN of this same table, so the residual here is the '
+         'curvature of a(lambda) across each band and nothing else')
     info(2, '  ... ABS / Smith & Baker 1981 at the same three', np.round(R.ABS / sb, 4),
-         'ABS[2] = 0.0145 is Smith & Baker\'s 450 nm value exactly')
+         'the file used to ship 0.0145 in blue, Smith & Baker\'s 450 nm value '
+         'exactly; it no longer does')
     # -- BAND INTEGRALS over the file's own Voronoi cells. This is the reading
-    # the file's own band doctrine demands, and it is the one to adopt.
+    # the file's own band doctrine demands, and it is the one render.py now
+    # ships: `a` averaged over 582.5-657.5 / 502.5-582.5 / 417.5-502.5 nm, the
+    # same cells every other spectral quantity in the renderer is sampled
+    # through. The tolerance stays 15% -- it was chosen before the measurement
+    # and has not been touched -- but the residual it now covers is a transcribed
+    # constant against a trapezoid of the published table, ~2e-4 relative.
     band = []
     for lo, hi in np.sort(R.BAND, axis=1) * 1000.0:
         xs = np.linspace(lo, hi, 801)
@@ -804,26 +868,46 @@ def tier2_absorption(R):
     check(2, 'ABS vs Pope & Fry band-integrated over the file\'s own BAND cells',
           R.ABS / band, [1., 1., 1.], 0.15, 'same justification as above')
     info(2, '  ... Pope & Fry averaged over BAND (582-658, 502-582, 418-502 nm)',
-         np.round(band, 5), 'the reading the file\'s own band model asks for')
-    # -- the chapter's / README's triple, at ITS stated wavelengths.
-    ch = np.array([0.264, 0.0565, 0.0092])
-    check(2, 'chapter a_water (0.264, 0.0565, 0.0092) vs Pope & Fry at 610/550/450',
+         np.round(band, 5), 'the reading the file\'s own band model asks for, '
+                            'and the one it now ships')
+    info(2, '  ... ABS - band mean, per channel, relative',
+         np.round(R.ABS / band - 1.0, 6),
+         'this is transcription error only; the two are the same integral')
+    # -- the chapter's triple, at ITS stated wavelengths. NOT an alternative
+    # water: the same Pope & Fry table point-sampled at 610/550/450 instead of
+    # averaged over the renderer's bands. Both are checked against the table, so
+    # neither can drift without a row moving.
+    ch = np.array([0.2644, 0.0565, 0.00922])
+    check(2, 'chapter a_water (0.2644, 0.0565, 0.00922) vs Pope & Fry at 610/550/450',
           ch / _tab(POPE_FRY_1997, [610, 550, 450]), [1., 1., 1.], 0.02,
           'the chapter states these ARE Pope & Fry at those wavelengths, so the '
           'only tolerance is its own 3-significant-figure quotation')
-    rm = np.array([0.25, 0.0565, 0.0092])
-    check(2, 'README a_water (0.25, ...) vs the chapter it quotes',
+    rm = np.array([0.2644, 0.0565, 0.00922])
+    check(2, 'README a_water vs the chapter it quotes',
           rm / ch, [1., 1., 1.], 0.02,
           'the README says it is quoting the chapter; 2% is its own rounding')
-    # -- the identification, which is what settles the dispute.
-    check(2, 'ABS blue is Smith & Baker 1981 at 450 nm', R.ABS[2],
-          SMITH_BAKER_1981[450], 1e-9,
-          'exact identity, printed to show provenance rather than to pass or fail')
-    # -- and what it costs, so the severity is a number and not an adjective.
-    over = np.exp(-R.ABS * 2 * R.slant) / np.exp(-band * 2 * R.slant)
-    info(2, '  ... cost on the shipped 3.92 m down-and-back path',
-         'transmittance ratio %s (blue is %.1f%% dark)'
-         % (np.round(over, 4), 100 * (1 - over[2])),
+    # -- THE IDENTIFICATION THAT SETTLED THE DISPUTE, now asserted the other way
+    # round. The file used to ship ABS[2] = 0.0145, which is Smith & Baker (1981)
+    # at 450 nm to the digit -- the wrong paper at the wrong wavelength, 48%
+    # above Pope & Fry, in a project whose provenance file bans Smith & Baker for
+    # blue by name (that era's blue carries scattering from natural water). This
+    # row exists so that value cannot come back unnoticed.
+    _dsb = float(np.min(np.abs(R.ABS[2] / np.array(
+        [SMITH_BAKER_1981[w] for w in (440, 450, 460)]) - 1.0)))
+    check(2, 'ABS blue is Pope & Fry, not Smith & Baker 1981',
+          float(_dsb > 0.10 and abs(R.ABS[2] / band[2] - 1.0) < 0.05), 1.0, 0.0,
+          'boolean, no tolerance: blue must sit within 5% of the Pope & Fry band '
+          'mean AND more than 10%% from every Smith & Baker value in 440-460 nm')
+    info(2, '  ... ABS blue against the two candidate tables',
+         'Pope & Fry band mean %+.2f%%, nearest Smith & Baker 440-460 %+.1f%%'
+         % (100 * (R.ABS[2] / band[2] - 1), 100 * _dsb),
+         'the identification that settled the dispute, kept as a regression')
+    # -- and what the correction was worth, so the severity is a number.
+    old = np.array([0.2750, 0.0546, 0.0145])
+    over = np.exp(-old * 2 * R.slant) / np.exp(-R.ABS * 2 * R.slant)
+    info(2, '  ... what the old triple cost on the 3.92 m down-and-back path',
+         'transmittance ratio %s (blue was %.1f%% dark, red %.1f%%)'
+         % (np.round(over, 4), 100 * (1 - over[2]), 100 * (1 - over[0])),
          'small here; the README\'s underwater 8 m view multiplies it by 4')
 
 
@@ -1238,33 +1322,74 @@ def tier3_geometry(R):
          % (R.TIR_FRAC, R.R_INT[1]),
          'the same interface, priced twice, 8.5%% apart; the bed return uses the '
          'smaller one')
-    # -- TIR_VERT: the ratio of the returning flux caught by a vertical face to
-    # that caught by the horizontal bed. Closed form in render.py; here by
-    # quadrature and by Monte-Carlo, both of the same physical statement.
-    #   emission from a Lambertian bed:  L cos t
-    #   solid angle:                     sin t dt dphi
-    #   receiver cosine, vertical face:  sin t * max(cos phi, 0),  <..> = 1/pi
-    #   receiver cosine, horizontal:     cos t
+    # -- TIR_VERT: the irradiance a vertical face collects from the returning
+    # field, over what the horizontal bed collects from it. Closed form in
+    # render.py; here by quadrature and by Monte-Carlo.
+    #
+    # THESE TWO ROWS USED TO BE WRONG TOGETHER, and how they got that way is the
+    # reason the file is written the way it is. Both were transcribed from the
+    # SENTENCE beside the constant in render.py -- "the returning flux has
+    # angular density cos(t) sin(t) dt" -- rather than from the interface. That
+    # density is the EMITTED-FLUX distribution, right for a flux fraction (it is
+    # how TIR_FRAC is derived) and wrong for a receiver's irradiance, because it
+    # already contains the horizontal receiver's own cosine. So a quadrature and
+    # a 4M-sample Monte-Carlo, nominally independent, agreed with each other on
+    # 0.635 -- and neither was measuring the physics. Two methods that read the
+    # same premise are one method.
+    #
+    # WHAT THE PHYSICS SAYS. Under a mirror the arriving field is a UNIFORM
+    # radiance L over the cone t > tc (a Lambertian bed's radiance is
+    # angle-independent, radiance is conserved along a ray, a perfect mirror
+    # preserves it). Each receiver's irradiance is then INT L (w.n)+ dw over that
+    # cone and nothing else:
+    #   horizontal:  (w.n) = cos t
+    #   vertical:    (w.n) = sin t * max(cos phi, 0)
+    # Both integrals are now written from THAT, in two ways that share nothing:
+    # a 1-D quadrature of the closed forms, and a Monte-Carlo that never forms an
+    # integrand at all -- it draws directions uniform in solid angle, throws away
+    # those inside the cone, and averages the two receiver cosines directly.
     th = np.linspace(tc, np.pi / 2, 2000001)
-    quad = (np.trapezoid(np.cos(th) * np.sin(th) ** 2, th) / np.pi) \
-        / np.trapezoid(np.cos(th) ** 2 * np.sin(th), th)
+    quad = (2.0 * np.trapezoid(np.sin(th) ** 2, th)) \
+        / (2.0 * np.pi * np.trapezoid(np.cos(th) * np.sin(th), th))
     K = 4000000
-    t2 = np.arccos(rng.random(K))              # uniform in solid angle
+    ct2 = rng.random(K)                        # cos t uniform => uniform in dw
+    st2 = np.sqrt(1.0 - ct2 ** 2)
     p2 = rng.uniform(0, 2 * np.pi, K)
-    m = t2 > tc
-    mcv = float((np.cos(t2[m]) * np.sin(t2[m]) * np.maximum(np.cos(p2[m]), 0)).sum()
-                / (np.cos(t2[m]) ** 2).sum())
-    check(3, 'TIR_VERT vs quadrature of the integral its comment states', R.TIR_VERT,
-          float(quad), 1e-3,
-          'both are the same one-dimensional integral; 1e-3 is the trapezoid\'s '
-          'own error on 2e6 points, which is under 1e-9')
-    check(3, 'TIR_VERT vs %dk uniform-solid-angle MC' % (K // 1000), R.TIR_VERT,
-          mcv, 4 * mcv / np.sqrt(m.sum()),
-          'MC 1 sigma is %.5f; 4 sigma' % (mcv / np.sqrt(m.sum())))
-    info(3, '  ... corrected TIR_VERT from the stated derivation',
-         '%.5f (code has %.5f, %.1f%% low)'
-         % (quad, R.TIR_VERT, 100 * (1 - R.TIR_VERT / quad)),
-         'see the report: the vertical-face integrand carries one sin(t) too many')
+    m = np.arccos(ct2) > tc
+    # E = INT L (w.n)+ dw estimated as 2 pi <(w.n)+ . 1[t>tc]>; the 2 pi and the
+    # sample count cancel in the ratio, so this is a ratio of two plain means.
+    mcv = float((st2[m] * np.maximum(np.cos(p2[m]), 0)).sum() / ct2[m].sum())
+    check(3, 'TIR_VERT vs quadrature of the arriving RADIANCE', R.TIR_VERT,
+          float(quad), 1e-6,
+          'both are the same pair of one-dimensional integrals; the trapezoid\'s '
+          'own error on 2e6 points is under 1e-11')
+    _se = float(np.std(np.where(m, st2 * np.maximum(np.cos(p2), 0), 0.0))
+                / np.sqrt(K) / (ct2[m].sum() / K))
+    check(3, 'TIR_VERT vs %dk uniform-solid-angle MC of the same field'
+          % (K // 1000), R.TIR_VERT, mcv, 4 * _se,
+          'MC 1 sigma on the numerator is %.5f; 4 sigma' % _se)
+    # -- THE GUARD THAT CANNOT SHARE THE PREMISE, and the one that would have
+    # caught the original defect on its own. As tc -> 0 the cone opens to the
+    # whole hemisphere, where a vertical face must collect EXACTLY half of what a
+    # horizontal one does. It is a limit, not a value: no quadrature, no MC, no
+    # sentence to transcribe. The shipped 0.563 form sends tc -> 0 to
+    # (1/(4 pi))/(1/3) = 0.2387 and the 0.635 form to 0.3183; only the radiance
+    # form lands on 1/2.
+    check(1, 'tir_vert(theta_c -> 0) == 1/2 exactly (the full hemisphere)',
+          float(R.tir_vert(0.0)), 0.5, 1e-15,
+          'algebraic limit of the closed form; one double ulp')
+    # -- and the same 1/2 arrived at from the other end of the file: the riser
+    # gather's estimator closes on 1/2 over its full range, by a completely
+    # different integral (a distance-importance-sampled view factor) over the
+    # same hemisphere. Two independent pieces of code, one number.
+    check(1, 'tir_vert(0) == the riser gather\'s full-range closure (both 1/2)',
+          float(R.tir_vert(0.0)), float(R._ris_closure(0.12, 1e-9, 1e9)), 1e-6,
+          'the same half-hemisphere identity reached by two unrelated '
+          'estimators; 1e-6 is the closure\'s own truncation at 1e-9/1e9 m')
+    info(3, '  ... TIR_VERT, three readings of one sentence',
+         'shipped-before 0.56271, the comment\'s own words 0.63476, physics '
+         '%.5f (code now %.5f)' % (quad, R.TIR_VERT),
+         'the suite asserted the middle one until this round')
     # -- the riser gather's estimator. _ris_closure is the analytic value of the
     # truncated view factor; the estimator that is actually run is a lattice of
     # (d, phi) samples with a closed-form weight. Sample that estimator directly.

@@ -718,13 +718,65 @@ looking.
 how the anisotropy survives. On the axis (offset zero) every direction gives `cos^n = 1` and only the
 peak factor does anything, so the fallback there is the mean variance.
 
+### The base curve: the exact Fresnel equations, not Schlick
+
+Before any roughness correction, the smooth-interface reflectance itself has to be right, and in a
+*reference* that means the equations rather than a fit to them. With `sin t = sin i / n`,
+
+```
+R_s = ((cos i - n cos t) / (cos i + n cos t))^2          # E perpendicular to the plane
+R_p = ((n cos i -   cos t) / (n cos i +   cos t))^2      # E in the plane
+R   = (R_s + R_p) / 2                                   # unpolarised sunlight
+```
+
+(`P`, Born & Wolf §1.5.2.) The implementation shipped Schlick (1994),
+`R ≈ F0 + (1 − F0)(1 − cos i)⁵`, at every water interface. Schlick's entire justification is that it
+avoids the two square roots above; its error is quoted in the original as ~1% of `R` for common
+dielectrics, and for water it is nothing of the sort. Measured against the exact equations at
+`n = 1.3348`:
+
+```
+worst absolute, over 0-90 deg     exact 0.5163 against Schlick 0.5751 at 83.8 deg
+over the frame's own incidence range (38-79 deg, measured in render.py),
+    Schlick / exact - 1  =  -22.8% at 51.3 deg   (exact 0.0360, Schlick 0.0278)
+                            +14.3% at 79.0 deg   (exact 0.3152, Schlick 0.3604)
+                        crossing zero at 67.1 deg
+the sun's transmission at 69 deg  exact 0.8774 against Schlick 0.8729
+```
+
+**The sign flip inside one frame is the finding**, not the grazing overshoot on its own. A one-sided
+error is a candidate for absorption into some other constant; this one is a fifth *low* on the mid
+water and a seventh *high* on the far water, so no single multiplier fixes both and the far band
+reads more like a mirror than it should while the mid band reads less. The far water's specular term
+is the brightest thing in the picture and the mid water is most of its area, so it lands on exactly
+the pixels a reflection model is judged by, in both directions at once — in a file whose only
+argument is being right. Measured on the frame: replacing the fit moved the spec-C corridor's median
+reflected radiance from 0.020 to 0.024 (**+20%**, the sub-67° half) while taking the far-window mean
+luminance down (the >67° half). An approximation whose whole justification is speed does not belong
+in it; the exact form costs one `sqrt` and one divide per channel, measured at **+1.1% of a full
+render** (5m23s → 5m27s at the reference resolution, all of this round's changes together — the
+Fresnel calls are the compute part of that).
+
+The premise-independent guard is the **Brewster identity**, and it is the sharpest test of a
+reflectance model there is because it is a closed-form *number* rather than another integral. At
+`θ_B = atan n` the p amplitude vanishes identically, `cos i = 1/√(1+n²)`, `cos t = n/√(1+n²)`, and
+
+```
+r_s = (cos i - n cos t)/(cos i + n cos t) = (1 - n^2)/(1 + n^2)
+R(theta_B) = ((n^2 - 1)/(n^2 + 1))^2 / 2         # 0.03894 / 0.03948 / 0.04050 at the three IORs
+```
+
+No quadrature, no table, nothing to transcribe. Schlick reads 0.0306 there — **22% low** — while
+passing every eyeball test of grazing behaviour, which is exactly why the guard has to be a value the
+approximation cannot reach rather than a shape it can.
+
 ### The companion term, without which filtering makes chrome instead of plastic
 
-Plain Schlick is derived for a *smooth* interface; on a rough one the microfacets mask each other at
-grazing incidence. Ship plain Schlick on a low-variance distant surface and the far band goes to a
-near-100% mirror — the chrome-dome reading, which is the same defect as the plastic one seen from the
-reflection side rather than the lobe side. Bruneton, Neyret & Holzschuch (2010) fit (`P`, used as
-published, constants not re-checked against the paper's data):
+The Fresnel equations are derived for a *smooth* interface; on a rough one the microfacets mask each
+other at grazing incidence. Ship the smooth curve on a low-variance distant surface and the far band
+goes to a near-100% mirror — the chrome-dome reading, which is the same defect as the plastic one seen
+from the reflection side rather than the lobe side. Bruneton, Neyret & Holzschuch (2010) fit (`P`,
+used as published, constants not re-checked against the paper's data):
 
 ```
 F = R + (1-R)(1-cos theta_v)^5 * exp(-2.69 sigma_v) / (1 + 22.7 sigma_v^1.5)      sigma_v < 0.5
@@ -735,9 +787,22 @@ and `σ_v` is the **one-direction** slope rms along the view azimuth, not the to
 still needs masking is the sub-pixel remainder — which gives it the same boundary condition as the
 lobe widening: identity as the footprint goes to zero.
 
+Composing it with the exact base needs one substitution and no new choice. Bruneton's `r` attenuates
+the interface's grazing **rise above `F0`**, and `(1 − F0)(1 − cos θ_v)⁵` was only ever Schlick's
+model *of* that rise, so the implementation now evaluates
+
+```
+F = F0 + (R_exact(cos theta_v) - F0) * r,        r = exp(-2.69 sv)/(1 + 22.7 sv^1.5)
+```
+
+which puts the thing in place of the model of it and changes nothing else. Both boundary conditions
+survive intact: `r → 1` gives exactly `R_exact`, `r → 0` gives `F0`.
+
 **Tests.** Tier 3 checks `C11`, `C22` and `C12` against 400k perturbed reflections (agreement 1.6%,
-1.1%, 1.4%) and the stretch against `1/cos θ_v` as an identity. The Bruneton constants are not
-checked.
+1.1%, 1.4%) and the stretch against `1/cos θ_v` as an identity. Tier 1 checks the renderer's own
+`fresnel` against the Brewster closed form to one ulp on all three channels, against `F0` at normal
+incidence, and against an independently written evaluation of the same equations over 0–90°. The
+Bruneton constants are not checked.
 
 ---
 
@@ -831,8 +896,9 @@ tier-2 or tier-3 check on the sky, and the elevation gradient has no referent at
 ## 7. The internal-reflection integrals
 
 **Derived from:** a Lambertian bed under a flat interface, and the critical angle. This section
-contains the one derivation in the file that **does not reproduce as shipped**, and the algebra is
-given in full for that reason.
+contained the one derivation in the file that **did not reproduce as shipped** — the implementation
+has since been corrected to the value derived below, and the algebra is kept in full, with the two
+wrong forms beside it, because the *way* the error survived a test suite is the transferable part.
 
 ### The horizontal receiver: `1 − 1/n²`
 
@@ -869,6 +935,40 @@ flat sky ambient applied over the whole hemisphere over-counts by exactly that s
 constant to be corrected either: the wall runs a factor 2.2 in red from waterline to foot, so what
 replaces the flat constant has to be **directional**.
 
+### The refraction map past that angle, which has to return nothing
+
+The same critical angle has a second consequence, on the other side of the interface and in code
+rather than in an integral. Writing the transmitted direction as `t = η·i + f·n`, orthogonality of
+the tangential part to `n` together with `|t| = 1` give `f = η cos i − cos t` with
+
+```
+k = cos^2 t = 1 - eta^2 (1 - cos^2 i),        eta = n_incident / n_transmitted
+```
+
+and `k < 0` **exactly** when `sin i > 1/η`, i.e. past `asin(1/η)`, which exists only for `η > 1` —
+looking out of the denser medium. Past it there is no transmitted direction at all.
+
+The implementation clamped `k` at zero and returned `η·i + η cos(i)·n` regardless: a vector of length
+`η sin i > 1` lying flat in the interface plane. **Not a unit vector, not the TIR reflection, not a
+flag — a direction that does not exist, returned silently.** Nothing downstream could tell it from a
+real one, because nothing downstream measured its length. It is unreachable from every current call
+site (all five refract *into* the water, `η = 1/n < 1`, where `k ≥ 1 − η² > 0`), and it is squarely on
+the path of the underwater-camera pass, which is written entirely around this branch: outside Snell's
+window the surface is a perfect mirror and *every* ray takes it.
+
+The contract now is the null vector `(0,0,0)`, with `is_tir(t)` as the predicate. Zero rather than a
+NaN or a fourth return value because it keeps the signature, it propagates to zero radiance rather
+than to a poisoned frame, and it is checkable with one dot product.
+
+**The premise-independent guard** is a conservation statement across two functions that share no line
+of code: the angle at which `refract` stops returning a direction and the angle at which the exact
+Fresnel reflectance reaches 1 are the **same angle**. One solves for `cos t` and tests its sign; the
+other forms the s and p amplitude ratios. The suite bisects on `refract`'s own output for the onset —
+no formula for the critical angle enters the measurement — and compares with a scan of `R(θ)`;
+they agree to 10⁻⁴ deg, which is the scan's grid spacing. A second row checks the complement, that
+sub-critical rays still come back as unit vectors, so "nothing transmits past TIR" cannot be passed by
+a function that transmits nothing at all.
+
 ### The vertical receiver, re-derived
 
 Now the ratio a vertical face collects relative to the horizontal bed the return map is normalised
@@ -892,19 +992,20 @@ face collects exactly half of a horizontal one under a uniform hemisphere, which
 riser gather closes on. And `E_horiz = πL cos²θ_c = πL·(1 − 1/n²)` is `TIR_FRAC` times the bed's own
 exitance `πL`, which is what the return map is normalised by, so the two halves are consistent.
 
-**What ships instead, and why it is wrong.** The implementation writes the returning field as an
-"angular density `cos t · sin t dt`" — the *emitted flux* distribution — and then multiplies by the
+**What used to ship, and why it was wrong** (corrected in the implementation; kept here because the
+*shape* of the error is the transferable part). The implementation wrote the returning field as an
+"angular density `cos t · sin t dt`" — the *emitted flux* distribution — and then multiplied by the
 receiver cosine. That weighting is correct for a **flux fraction** (it is how `TIR_FRAC` is derived)
 and wrong for a **receiver's irradiance from a distributed source**, because `cos t sin t` already
 contains the horizontal receiver's own cosine. Carrying it into the vertical case leaves a spurious
-`cos t` in the integrand. On top of that, the shipped expression carries a further stray `sin t`
-relative to the prose beside it. Three numbers result:
+`cos t` in the integrand. On top of that, the shipped expression carried a further stray `sin t`
+relative to the prose beside it. Three numbers resulted:
 
-| Form | Vertical numerator | Horizontal denominator | Ratio |
-|---|---|---|---|
-| **Shipped** | `∫cos t·sin³t dt/π = (1 − sin⁴θ_c)/(4π)` | `∫cos²t·sin t dt = cos³θ_c/3` | **0.563** |
-| Stated derivation / `validate.py`'s expectation | `∫cos t·sin²t dt/π = (1 − sin³θ_c)/(3π)` | `∫cos²t·sin t dt = cos³θ_c/3` | **0.635** |
-| **Correct (radiance)** | `2∫sin²t dt = π/2 − θ_c + sinθ_c cosθ_c` | `2π∫cos t·sin t dt = π cos²θ_c` | **0.885** |
+| Form | Vertical numerator | Horizontal denominator | Ratio | `θ_c → 0` limit |
+|---|---|---|---|---|
+| **Shipped until this round** | `∫cos t·sin³t dt/π = (1 − sin⁴θ_c)/(4π)` | `∫cos²t·sin t dt = cos³θ_c/3` | **0.563** | 0.239 |
+| Stated derivation / `validate.py`'s old expectation | `∫cos t·sin²t dt/π = (1 − sin³θ_c)/(3π)` | `∫cos²t·sin t dt = cos³θ_c/3` | **0.635** | 0.318 |
+| **Correct (radiance), and what now ships** | `2∫sin²t dt = π/2 − θ_c + sinθ_c cosθ_c` | `2π∫cos t·sin t dt = π cos²θ_c` | **0.885** | **½** |
 
 (all integrals over `t ∈ [θ_c, π/2]`. `P`, derived and checked numerically here against a 4M-sample
 uniform-solid-angle Monte-Carlo of the radiance field, which gives 0.8858 ± 0.0004.) Note that the
@@ -912,13 +1013,26 @@ denominator moves too: the first two rows weight the *horizontal* receiver by th
 density as well, so the error is not confined to the vertical half of the ratio — it merely fails to
 cancel.
 
+**The last column is the whole lesson.** Both wrong forms are perfectly good-looking integrals, and
+either can be checked to arbitrary precision against a quadrature or a Monte-Carlo *of itself*. What
+neither survives is a limit: open the cone to the full hemisphere and the answer is forced to be
+exactly ½, by the same half-hemisphere argument the [riser gather](#the-half-hemisphere-a-vertical-face-sees)
+closes on. A limit has no premise to share, which is why it is the check that was missing and the
+check that is now there.
+
 **Tests.** `TIR_FRAC` passes against a 2M-sample cosine-weighted Monte-Carlo and as an exact
-identity. `_sky_vf` passes against 400k-sample Monte-Carlo at three geometries. **`TIR_VERT` FAILS
-two rows** — against a quadrature of the integral its own comment states, and against a Monte-Carlo
-of the same statement. Both those rows expect 0.635, so **fixing the code to satisfy the suite would
-land on the middle column, which is also wrong**; the test and the code share one premise. That is
-the interesting shape of this finding: an independent method agreeing with a wrong derivation because
-it was written from the same sentence.
+identity. `_sky_vf` passes against 400k-sample Monte-Carlo at three geometries. `TIR_VERT` now passes
+four rows: a quadrature and a 4M-sample Monte-Carlo, **both rewritten from the arriving radiance
+rather than from the comment**, plus two that cannot share a premise with either — `tir_vert(0) = ½`
+exactly, and that same ½ checked against `_ris_closure`'s full-range value, which is a
+distance-importance-sampled view factor computed by unrelated code at the other end of the file.
+
+*How this got into the suite in the first place*, since it is the reason the whole round exists: the
+old quadrature **and** the old Monte-Carlo were both transcribed from the sentence beside the
+constant, not from the interface. Two nominally independent methods reading one premise are one
+method, and they agreed with each other on 0.635 while the code sat on 0.563. Satisfying the suite
+would have moved the code onto the middle column — replacing one wrong number with another, with a
+green run to certify it.
 
 ---
 
@@ -1179,9 +1293,58 @@ Two contaminations have to be divided out or the ratio measures something else:
   irradiance out before comparing, and the ratio lands on the round trip.
 
 State the direction of the mechanism, too, because the intuitive reading is inverted. With `b_b ≈ 0`
-a pool's water column has **no body colour and can only subtract**: it takes red (`a` is 0.275/m at
-620 nm against 0.0145 at 460), and what survives *reads* as cyan. The band is not "the wall colour
-without the cyan the water adds"; it is the same colour with nothing taken away.
+a pool's water column has **no body colour and can only subtract**: it takes red (`a` is 0.262/m over
+the red band against 0.0102/m over the blue), and what survives *reads* as cyan. The band is not "the
+wall colour without the cyan the water adds"; it is the same colour with nothing taken away.
+
+### Which sampling of Pope & Fry, and why it is a decision rather than a rounding
+
+`a(λ)` is a published curve; a renderer needs three numbers off it, and there are two defensible ways
+to take them. The implementation now takes the second, and this is the reasoning.
+
+```
+(a) POINT SAMPLE at the three nominal wavelengths 620/545/460 nm
+        a = (0.2755, 0.0511, 0.00979) m^-1
+(b) BAND MEAN over the file's own Voronoi cells, 582.5-657.5 / 502.5-582.5 / 417.5-502.5 nm
+        a = (0.26170, 0.052988, 0.010224) m^-1        <- what ships
+```
+
+Three reasons for (b), and none of them is that it looked better.
+
+- **It is what the file's own doctrine already says.** `render.py` states, in the block immediately
+  under the constant, that *a camera channel is a BAND, not a wavelength*; the bands are constructed
+  there as the Voronoi cells of the three nominal wavelengths and they tile 417.5–657.5 nm with no
+  gap and no overlap. Every *other* spectral quantity in the renderer is already sampled through
+  them — `n(λ)` for the dispersion sweep, the per-ray caustic `eta`, the spectral Latin square. Taking
+  `a` at a delta function while its neighbours are taken over a band is the inconsistency.
+- **`a` is the quantity where the difference bites hardest.** It runs 0.0896 → 0.3400 m⁻¹ across the
+  red band alone, so the point value and the band mean differ by **5.0%** there (3.7% green, 4.4%
+  blue, and the red's sign is opposite to both). A curve that steep is exactly the case a three-delta
+  quadrature handles worst, and the file already writes a page on that failure mode for silhouettes.
+- **It is checkable both ways.** Both readings are computed from the same transcribed table in
+  `validate.py`, and both rows are asserted, so the triple cannot drift towards either without a row
+  moving.
+
+The honest caveat, stated rather than buried: a band mean of `a` is still an approximation.
+Beer–Lambert over a band is `−ln⟨exp(−a(λ)L)⟩`, not `⟨a⟩L`, and the two separate as `L` grows —
+about 1% of the red channel's transmittance at the shipped 3.9 m path, more on the README's 8 m
+underwater view. It is first-order right where a point sample is not even that, and the exact
+treatment is a spectral integration this file does not do.
+
+**The chapter's triple is not an alternative to it.** `12` quotes `a = (0.2644, 0.0565, 0.00922) m⁻¹`
+at *its* sample points 610/550/450 nm. That is the same Pope & Fry table read at three different
+wavelengths — same water, same measurement, two samplings of one curve — and presenting the pair as
+competing values would be the same category error the blue defect below was. `validate.py` checks the
+chapter's triple against the table at 610/550/450 and the implementation's against the band integral,
+so the two are pinned separately to one source.
+
+**What was wrong before.** `ABS = (0.2750, 0.0546, 0.0145)`. Red was Pope & Fry at 620 nm to 0.2%,
+green was 6.9% high, and blue was `0.0145` — **Smith & Baker (1981) at 450 nm, exactly** — 48% above
+Pope & Fry at 460 nm and 42% above the blue band mean. The wrong paper at the wrong wavelength, in a
+project whose provenance appendix bans Smith & Baker for blue by name, because that era's blue
+carries scattering from natural water. Two independent passes reached the same identification. The
+regression guarding it is now written the other way round: blue must sit within 5% of the Pope & Fry
+band mean *and* more than 10% away from every Smith & Baker value in 440–460 nm.
 
 ### The companion: why a wet band is darker, with no free parameter
 
@@ -1204,12 +1367,10 @@ slant, `slant/depth = 1/cos θ_t`, monotonicity in path length, and the chapter'
 `exp(−a·3.0)` figures. `R_ext` is checked against a converged quadrature, `R_int` against its
 reciprocity form, and both `a_wet` boundary conditions exactly; tier 3 checks `R_int` against the
 Egan & Hilgeman empirical fit (0.09% agreement — an independent method). Tier 2 checks the absorption
-coefficients against Pope & Fry 1997 and Smith & Baker 1981, and **two of those rows FAIL**: the
-implementation's blue is 48% above Pope & Fry at 460 nm (42% band-integrated). That is a constant
-mismatch between the file and the published table, not a render error, and it propagates into every
-number in this section — the round-trip blue is 1.7% dark over the shipped 3.92 m path. **The
-dry-band regression itself has no test**; it is a measurement the frame makes, checked only against
-the prediction from the file's own `a`.
+coefficients against Pope & Fry 1997 and Smith & Baker 1981, point-sampled and band-integrated, and
+all of those rows now pass; the blue defect above cost the round-trip 1.7% over the shipped 3.92 m
+path and the red 5.3% the other way, both now removed. **The dry-band regression itself has no test**;
+it is a measurement the frame makes, checked only against the prediction from the file's own `a`.
 
 ---
 
@@ -1235,11 +1396,13 @@ method (a disagreement localises to one of the two methods).
 | Separable evaluation vs direct sum | grid vs point path | 3 | pass |
 | `C = JΣJᵀ`, `J = diag(−2, −2cos θ_v)` | 400k perturbed reflections | 3 | pass (1–2%) |
 | Stretch `= 1/cos θ_v` | identity | 3 | pass |
+| Exact Fresnel `R = (R_s + R_p)/2` as the base curve | `R(θ_B) = ((n²−1)/(n²+1))²/2` closed form; `R(0) = F0`; a separate evaluation over 0–90° | 1 | pass |
+| `refract()`'s TIR branch | bisection on its own null return vs the angle `R` reaches 1 | 1 | pass |
 | `n = 2/θ_s² − 1`, `Ω_sun`, `L_sun`, disc flux | closed-form identities | 1 | pass |
 | Rayleigh aureole flux `= mτ_R/8` of the beam | identity; Hansen & Travis `τ_R`; sun colour to 10⁻³ | 1 | pass |
 | `TIR_FRAC = 1 − 1/n²` | identity + 2M-sample cosine-weighted MC | 1, 3 | pass |
 | Rectangle view factor `_sky_vf` | 400k-sample MC at three geometries | 3 | pass |
-| **`TIR_VERT`** | quadrature and MC of the stated integral | 3 | **FAIL — and see below** |
+| **`TIR_VERT`** | `tir_vert(0) = ½` as a limit, cross-checked against `_ris_closure`'s own ½; quadrature and 4M-sample MC **of the arriving radiance** | 1, 3 | pass |
 | Riser gather closure `= ½`, truncation | closed form + MC of the shipped weight | 1, 3 | pass |
 | Stone/band gather (`ρ³cosφ·q/R⁴`) | — | — | **no test** |
 | Caustic pass vs analytic `1/\|J\|` | 1-D sinusoid, below and past focus | 1 | pass (0.086%, folds to 0.38 mm) |
@@ -1248,7 +1411,7 @@ method (a disagreement localises to one of the two methods).
 | Flat-surface degenerate case (offset, uniformity) | closed form | 1 | pass |
 | Beer–Lambert composition, slant, monotonicity | identities | 1 | pass |
 | `R_ext`, `R_int`, `a_wet` boundary conditions | quadrature; reciprocity; Egan & Hilgeman fit | 1, 3 | pass |
-| `a(λ)` itself | Pope & Fry 1997; Smith & Baker 1981 | 2 | **FAIL in blue (+48%)** |
+| `a(λ)` itself | Pope & Fry 1997 point-sampled *and* band-integrated; a Smith & Baker exclusion row | 2 | pass |
 | Dry-band absorption regression | — | — | **no test** |
 
 Also unguarded, and worth knowing before quoting any level from this material: the five-band
@@ -1260,21 +1423,27 @@ the −0.5…1.5 band on both axes — but nothing pins an individual band's lev
 
 ## What did not reproduce
 
-Three checks done while writing this file disagreed with the implementation's own comments. All three
-are recorded here rather than fixed, since this file does not own that code.
+Three checks done while writing this file disagreed with the implementation's own comments. The first
+has since been **corrected in the code** (this file did not own it then; the round that closed it
+did), and is kept here in full because the mechanism by which it survived a test suite is the
+transferable part. The other two stand as recorded. Two further disagreements were found while
+closing the first and are recorded here rather than fixed — one because it is one character of
+documentation, the other because it is a whole round of its own.
 
-1. **`TIR_VERT` — the vertical-face internal-reflection ratio.** Shipped 0.563; the derivation stated
-   beside it evaluates to 0.635; the correct value for a uniform Lambertian bed under a mirror is
-   **0.885**. The stated derivation weights the receiver integral by the *emitted flux* density
-   `cos t sin t`, which already contains the horizontal receiver's own cosine and so must not be
-   carried into the vertical case; the shipped expression additionally has one `sin t` too many
-   relative to that. The correct form is
-   `(π/2 − θ_c + sinθ_c cosθ_c)/(π cos²θ_c)`, confirmed here against a 4M-sample
-   uniform-solid-angle Monte-Carlo (0.8858 ± 0.0004) and against the full-hemisphere limit, which it
-   sends to exactly ½. **`validate.py`'s two failing rows expect the middle number**, so satisfying
-   the suite would replace one wrong value with another — the test and the code were written from the
-   same sentence, which is the general hazard of validating a derivation against a restatement of
-   itself. Full algebra in [§7](#7-the-internal-reflection-integrals).
+1. **`TIR_VERT` — the vertical-face internal-reflection ratio.** *Now fixed; shipped value 0.885.*
+   It shipped 0.563; the derivation stated beside it evaluates to 0.635; the correct value for a
+   uniform Lambertian bed under a mirror is **0.885**. The stated derivation weights the receiver
+   integral by the *emitted flux* density `cos t sin t`, which already contains the horizontal
+   receiver's own cosine and so must not be carried into the vertical case; the shipped expression
+   additionally had one `sin t` too many relative to that. The correct form is
+   `(π/2 − θ_c + sinθ_c cosθ_c)/(π cos²θ_c)`, confirmed against a 4M-sample uniform-solid-angle
+   Monte-Carlo (0.8858 ± 0.0004) and against the full-hemisphere limit, which it sends to exactly ½.
+   **`validate.py`'s two failing rows expected the middle number**, so satisfying the suite would have
+   replaced one wrong value with another — the test and the code were written from the same sentence,
+   which is the general hazard of validating a derivation against a restatement of itself. What
+   closed it was not a better estimator but a check with **no premise to share**: the `θ_c → 0` limit,
+   which is forced to be ½ and which both wrong forms miss (0.239 and 0.318). Full algebra in
+   [§7](#7-the-internal-reflection-integrals).
 2. **The wake's deep-water error claim.** `wake.py` says the gravity limit `g/c²` is "0.2% out where
    the wake lives (10–35 cm)". Recomputed from
    `k_deep/k_exact = ½(1 + √(1 − (c_min/c)⁴))`: **0.24% at 35 cm, 0.73% at 20 cm, 2.85% at 10 cm.**
@@ -1286,3 +1455,31 @@ are recorded here rather than fixed, since this file does not own that code.
    the *fraction* of the estimator's total 0.500, which is what the sentence around it means. A
    labelling slip, not an arithmetic one — the conclusion (half the weight comes from inside 30 cm)
    is correct.
+4. **`render.py`'s own header quotes `F0 = 0.0197`.** From the file's three IORs,
+   `F0 = ((n−1)/(n+1))²` is `(0.02027, 0.02056, 0.02111)`; 0.0197 is what `n = 1.3265` would give, a
+   number that appears nowhere else in the file. It is 3–7% low and it is a docstring, so nothing
+   computes from it — but it is exactly the class this round was cleaning up (a stated constant that
+   no longer follows from the code beside it), and it is the last one left in that header.
+5. **The transmitted column looks to be missing the `1/n²` radiance compression, and this one is
+   not cosmetic.** `water_shade` composes `out = F(θ_v)·L_sky + (1 − F(θ_v))·L_bed`, where `L_bed` is
+   built by `shade()` as `albedo × irradiance` — an **in-water** radiance, since its irradiance is
+   the beam already transmitted through the surface (`SUN_COL·cos_i·TSUN`) with the `1/π` carried by
+   `SUN_COL`'s own convention. Radiance is not conserved across a refracting interface; `L/n²` is.
+   Leaving the water, therefore,
+
+   ```
+   L_air = T(theta_v) * L_water / n^2,      n^2 = 1.774 / 1.782 / 1.796 on this file's three IORs
+   ```
+
+   and the `/n²` is absent. It is a **relative** error between the two columns of the same pixel: the
+   reflected sky term is air-side and correct, so the bed reads ~1.78× bright against it, which is the
+   one thing the spec-C reflected-vs-transmitted diagnostic exists to measure. The internal return
+   (`bedret`, `TIR_FRAC`) is *not* the missing factor — it is the light that failed to escape coming
+   back to re-light the bed, and it is already in `L_bed`'s irradiance, on the other side of the
+   division. Two reasons it is recorded rather than fixed here: the absolute level is entangled with
+   `LINER_TINT`, the liner albedos and `EXPOSURE`, all of which were fitted to a photograph with this
+   factor absent, so applying it darkens the water column by 0.83 stops and every one of those has to
+   be re-derived; and the claim deserves its own premise-independent guard before anything moves — the
+   natural one is a closed energy audit of the pool as a whole (apparent albedo against
+   `T·ρ(1−R_int)/(1−ρR_int)`, which the file already has the pieces for in `R_EXT`/`R_INT`). Not
+   touched, not compensated for, and stated here with the numbers so the next round can start from it.

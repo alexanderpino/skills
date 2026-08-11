@@ -12,7 +12,8 @@ Chain (terrain-renderer/references/12-water-rendering.md):
    -> ONE BOUNCE between bed and bed: total internal reflection off the underside
       of the surface, and a gather off the sunlit bed onto every vertical face --
       which is the whole of the light on a step riser seen from the anti-solar side
-   -> Fresnel with F0 from per-channel IOR (0.0197, not the 0.04 dielectric default)
+   -> the EXACT Fresnel equations at every water interface (not Schlick), with
+      F0 from per-channel IOR (0.0197, not the 0.04 dielectric default)
 
 Nothing in the caustic pattern is authored: no texture, no Voronoi, no noise.
 The chromatic fringing on the bed is emergent -- three IORs, three fold sets.
@@ -37,8 +38,87 @@ SHADOW_N = (2200, 1100)
 
 IOR = np.array([1.3320, 1.3348, 1.3400])     # 620 / 545 / 460 nm
 LAM = np.array([0.620, 0.545, 0.460])        # the wavelengths those three ARE, um
-ABS = np.array([0.2750, 0.0546, 0.0145])     # pure-water absorption, m^-1
+# Pure-water absorption, m^-1. PURE water -- Pope & Fry (1997), Appl. Opt.
+# 36(33) 8710-8723, the integrating-cavity measurement that is the modern
+# standard and the one this project's own bibliography names.
+#
+# THESE ARE BAND MEANS, NOT POINT SAMPLES, and that is a decision, not an
+# accident. `a(lambda)` at the three nominal wavelengths is (0.2755, 0.0511,
+# 0.00979); averaged over the Voronoi bands defined thirty lines below --
+# 582.5-657.5, 502.5-582.5, 417.5-502.5 nm, which is what a channel of this
+# renderer actually integrates -- the same table gives
+#
+#     a_band = (0.26170, 0.052988, 0.010224) m^-1
+#
+# The file's own doctrine two paragraphs down is that *a channel is a BAND, not
+# a wavelength*; the bands tile 417.5-657.5 with no gap and no overlap, and every
+# other spectral quantity here (n, the caustic eta, the dispersion sweep) is
+# already sampled through them. Taking `a` at a delta function while everything
+# beside it is taken over a band is the inconsistency, and `a` is the quantity
+# where it costs most: it is strongly curved across the red band (0.0896 at
+# 580 nm to 0.3400 at 650), so the point value and the band mean differ by 5.0%
+# there. The band reading is the one this file's own model asks for. (A band mean
+# of `a` is still an approximation -- Beer-Lambert over a band is the log of a
+# mean of exponentials, not the mean of the exponents -- but it is first-order
+# right where the point sample is not even that.)
+#
+# WHAT WAS WRONG BEFORE: (0.2750, 0.0546, 0.0145). Red was Pope & Fry at 620 nm
+# to 0.2%; green was 6.9% high; and blue was 0.0145, which is Smith & Baker
+# (1981) at 450 nm EXACTLY -- 48% above Pope & Fry, the wrong paper at the wrong
+# wavelength, in a project whose own provenance file bans Smith & Baker for blue
+# by name (that era's blue is contaminated by scattering in natural water).
+# Two independent passes reached the same identification. `validate.py` tier 2
+# checks this triple against both tables, point-sampled and band-integrated.
+ABS = np.array([0.2617, 0.05299, 0.01022])
 F0 = ((IOR - 1.0) / (IOR + 1.0)) ** 2
+
+
+# --- Fresnel, exactly, because this is a reference ---------------------------
+# The unpolarised reflectance of a smooth dielectric interface, from the Fresnel
+# equations themselves. With sin t = sin i / n (Snell),
+#
+#     R_s = ((cos i - n cos t)/(cos i + n cos t))^2      # E perpendicular
+#     R_p = ((n cos i -   cos t)/(n cos i +   cos t))^2  # E in the plane
+#     R   = (R_s + R_p)/2                                # unpolarised sunlight
+#
+# THIS FILE USED TO SHIP SCHLICK (1994), `F0 + (1-F0)(1-cos i)^5`, everywhere.
+# Schlick's whole justification is that it is one multiply-add cheaper than the
+# square roots above; its error is quoted as ~1% of R for common dielectrics and
+# for water it is nothing of the sort. Measured against the exact equations:
+#
+#     worst absolute, 0-90 deg   exact 0.5163 against Schlick 0.5751 at 83.8 deg
+#     over the frame's own incidence range (38-79 deg, render.py's own
+#       measurement of what this camera spans), Schlick / exact - 1 runs
+#           -22.8%  at 51.3 deg   (exact 0.0360 against Schlick 0.0278)
+#           +14.3%  at 79.0 deg   (exact 0.3152 against Schlick 0.3604)
+#       crossing zero at 67.1 deg
+#
+# AND THAT SIGN FLIP IS THE POINT. It is not a grazing-only overshoot that a
+# scale could absorb: inside one frame the fit is a fifth low on the mid water
+# and a seventh high on the far water, so the far band read too much like a
+# mirror while the mid band read too little, with no single multiplier able to
+# fix both. The far water's specular term is the brightest thing in the picture
+# and the mid water is most of its area, so the error sits on exactly the pixels
+# a reflection model is judged by, in both directions at once. An
+# approximation whose only argument is speed does not belong in a file whose only
+# argument is being right. The exact form costs one sqrt and one divide per
+# channel, measured at +1.1% of a full render (5m23s -> 5m27s at this resolution),
+# and that is the entire price of the 14%.
+#
+# Provenance: Born & Wolf, *Principles of Optics*, §1.5.2 (the Fresnel
+# coefficients); Schlick, *Computer Graphics Forum* 13(3) 233-246 (1994) for what
+# was replaced. Guarded in `validate.py` by three things that do not go through
+# the same expression: R(0) = F0, the Brewster identity R(atan n) = ((n^2-1)/
+# (n^2+1))^2 / 2 exactly (a closed-form NUMBER -- Schlick misses it by 22%), and
+# R_s >= R >= R_p over the whole range.
+def fresnel(cos_i):
+    """Exact unpolarised Fresnel reflectance, per channel. Returns (..., 3)."""
+    ci = np.clip(np.asarray(cos_i, float), 0.0, 1.0)[..., None]
+    ct = np.sqrt(np.maximum(1.0 - (1.0 - ci * ci) / IOR ** 2, 0.0))
+    rs = ((ci - IOR * ct) / (ci + IOR * ct)) ** 2
+    rp = ((IOR * ci - ct) / (IOR * ci + ct)) ** 2
+    return 0.5 * (rs + rp)
+
 
 # --- a camera channel is a BAND, not a wavelength ----------------------------
 # The three IORs above are three delta functions standing in for three broad
@@ -449,10 +529,56 @@ from field import (X0, X1, Y0, Y1, JET_XY, SIGMA_W, LAM_MIN, FP_SIGMA,
                    jet_envelope, shelter, rms_slope, _norm_jets)
 
 def refract(ix, iy, iz, nx, ny, nz, eta):
+    """Snell's law as a direction map, WITH its total-internal-reflection branch.
+
+    `eta` = n_incident / n_transmitted; `n` must oppose the incident ray. Writing
+    the transmitted direction as `t = eta*i + f*n`, orthogonality of the tangential
+    part to `n` and |t| = 1 give `f = eta*cos i - cos t` with
+
+        k = cos^2 t = 1 - eta^2 (1 - cos^2 i)
+
+    and k < 0 exactly when sin i > 1/eta -- the critical angle asin(1/eta), which
+    exists only for eta > 1 (looking OUT of the denser medium). Past it there is
+    no transmitted direction at all: every photon reflects, and the Fresnel R that
+    goes with this same interface is 1 there, identically.
+
+    THE BUG THIS FIXES. The old line clamped k at 0 and returned
+    `eta*i + eta*cos(i)*n` regardless -- a vector of length `eta*sin i > 1` lying
+    flat in the interface plane. Not a unit vector, not the TIR reflection, not a
+    flag: a direction that does not exist, handed back silently. Nothing
+    downstream could tell it from a real one, because nothing downstream measured
+    its length. Unreachable from today's call sites (all five pass eta = 1/n < 1,
+    air -> water, where k >= 1 - eta^2 >= 0), and squarely on the path of the
+    underwater-camera pass the README describes, which is written entirely around
+    this branch.
+
+    THE CONTRACT. Past the critical angle this returns the NULL vector (0, 0, 0);
+    `is_tir(t)` is the predicate. Zero was chosen over a NaN or a fourth return
+    value because it keeps the signature, it propagates to zero radiance rather
+    than to a poisoned frame, and it is checkable with one dot product -- which is
+    what `validate.py` does. The five call sites below cannot reach the branch, so
+    each declares which side of the interface it is on instead: an assert on eta
+    where the eta is computed there, a comment where it is a literal 1/IOR. The
+    onset of the null return is cross-checked in the suite against the angle at
+    which the exact Fresnel R reaches 1, i.e. against different code.
+    """
     cosi = -(ix * nx + iy * ny + iz * nz)
-    k = np.maximum(1.0 - eta * eta * (1.0 - cosi * cosi), 0.0)
-    f = eta * cosi - np.sqrt(k)
-    return eta * ix + f * nx, eta * iy + f * ny, eta * iz + f * nz
+    k = 1.0 - eta * eta * (1.0 - cosi * cosi)
+    f = eta * cosi - np.sqrt(np.maximum(k, 0.0))
+    tx, ty, tz = eta * ix + f * nx, eta * iy + f * ny, eta * iz + f * nz
+    # One reduction decides whether the branch was reached at all, so the eta < 1
+    # call sites pay a min() over the batch and nothing else.
+    if np.min(k) >= 0.0:
+        return tx, ty, tz
+    ok = k >= 0.0
+    return tx * ok, ty * ok, tz * ok
+
+
+def is_tir(tx, ty, tz):
+    """True where `refract` returned its null vector. A transmitted direction is
+    a unit vector, so |t|^2 is either 1 or 0 and the 0.5 threshold cannot be
+    reached by round-off from either side."""
+    return (tx * tx + ty * ty + tz * tz) < 0.5
 
 
 BIG = np.float32(1e9)
@@ -737,6 +863,11 @@ for j0 in range(0, RAY_NY, CH):
         else:
             lam_c = BAND[c, 0] + ((ql + c / 3.0) % 1.0) * (BAND[c, 1] - BAND[c, 0])
             eta_c = (1.0 / n_water(lam_c)).astype(np.float32)
+        # AIR -> WATER, so eta < 1 and refract() has no critical angle to hit:
+        # k = 1 - eta^2 sin^2(i) >= 1 - eta^2 > 0 for every normal the field can
+        # produce. The assert states which side of the interface this call site
+        # is on, and costs a comparison on one scalar rather than on 33 M rays.
+        assert np.all(eta_c < 1.0), 'caustic launch refracts INTO the water'
         tx, ty, tz = refract(np.float32(-SUN_DIR[0]), np.float32(-SUN_DIR[1]),
                              np.float32(-SUN_DIR[2]), nxl, nyl, nzl, eta_c)
         sid, u, v, _ = box_hit(XXl, YYl, tx, ty, tz)
@@ -784,7 +915,10 @@ def bed_sun(x, y, z):
     diagnostics average over are not straddling its edge."""
     sl = -np.asarray(z, float) / (-TSUN_DIR[2])
     return sun_vis(x - TSUN_DIR[0] * sl, y - TSUN_DIR[1] * sl)
-TSUN = 1.0 - (F0[1] + (1 - F0[1]) * (1 - cos_i) ** 5)   # 13% reflects at 69 deg incidence
+# The beam's transmission into the water at 69 deg incidence, from the exact
+# Fresnel equations (`fresnel` above). Schlick gave 0.8729 here against the exact
+# 0.8774 -- 0.5% of every photon that lights the bed, and it was the wrong 0.5%.
+TSUN = float(1.0 - fresnel(cos_i)[1])                   # 12% reflects at 69 deg
 print('sun elev %.1f deg -> refracted %.1f deg, offset %.2f m, slant %.2f m, T %.3f'
       % (np.degrees(np.arcsin(cos_i)), np.degrees(np.arccos(cos_t)),
          DEPTH * np.tan(np.arccos(cos_t)), slant, TSUN))
@@ -952,7 +1086,7 @@ def shade(cau, alb, ao=1.0, glow=None, dep=DEPTH, extra=None):
     """Receiver radiance. `dep` is the water OVER this texel, and it is a field,
     not a constant: the light path to it is dep/cos_t and the camera-side path is
     added later from the traced distance. This is where a tonal staircase over
-    the steps comes from -- exp(-a*dep) with a(red) = 0.275 is a third of a stop
+    the steps comes from -- exp(-a*dep) with a(red) = 0.262 is a third of a stop
     per 250 mm riser in red alone, which is what makes a tread read shallower."""
     o = np.zeros(cau[0].shape + (3,))
     sl = dep / cos_t
@@ -1359,17 +1493,52 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
 # The TIR return arrives at SHALLOW angles -- everything the bed emits beyond the
 # critical angle 48.6 deg comes back down between 48.6 and 90 deg from vertical --
 # so a vertical face intercepts it BETTER than the horizontal bed the bedret map
-# is normalised for. For a Lambertian bed the returning flux has angular density
-# cos(t) sin(t) dt over [tc, 90], so
-#   E_horiz ~ int cos^2(t) sin(t) dt      = cos^3(tc)/3            = 0.0969
-#   E_vert  ~ int sin^2(t) cos(t) sin(t) dt / pi = (1-sin^4(tc))/(4 pi) = 0.0545
-# (the 1/pi is <max(cos azimuth, 0)> over a full turn), giving 0.563. Derived,
-# not fitted -- but it does assume the arriving distribution is still the emitted
-# one after the metre-scale smear, which is only true because every bed point
-# emits the same distribution.
-_SC2 = 1.0 / IOR[1] ** 2
-TIR_VERT = ((1.0 - _SC2 ** 2) / (4 * np.pi)) / ((1.0 - _SC2) ** 1.5 / 3.0)
-print("  TIR return on a vertical face: %.3f of its value on the bed" % TIR_VERT)
+# is normalised for.
+#
+# START FROM RADIANCE, NOT FROM FLUX. Under the mirror the field arriving at a
+# point is a UNIFORM radiance L over the cone t > tc: a Lambertian bed's radiance
+# is angle-independent by definition, radiance is conserved along a ray, and a
+# perfect mirror preserves it. So each receiver's irradiance is its own cosine
+# integrated against that uniform radiance and NOTHING ELSE:
+#
+#   E_horiz = INT_{t>tc} L cos t dw            = 2 pi L INT cos t sin t dt
+#                                              = pi L cos^2(tc)
+#   E_vert  = INT_{t>tc} L (sin t cos ph)^+ dw = 2   L INT sin^2 t dt
+#                                              = L (pi/2 - tc + sin tc cos tc)
+#   TIR_VERT = (pi/2 - tc + sin tc cos tc) / (pi cos^2 tc)  =  0.885  at n = 1.3348
+#
+# (the vertical face's azimuth integral is INT max(cos ph, 0) dph = 2, not 2 pi).
+#
+# WHAT WAS WRONG, AND IT IS WORTH KEEPING. This shipped 0.563, from writing the
+# arriving field as the EMITTED FLUX density `cos t sin t dt` and then
+# multiplying by the receiver's cosine. That density is the right weight for a
+# flux FRACTION -- it is exactly how TIR_FRAC = 1 - 1/n^2 is derived one screen
+# up -- and it is the wrong weight for a receiver's irradiance from a distributed
+# source, because `cos t sin t` ALREADY carries the horizontal receiver's own
+# cosine. Carrying it into the vertical case leaves a spurious cos t in the
+# integrand; the shipped expression then had one further stray sin t on top of
+# that. Three numbers came out of one sentence: 0.563 shipped, 0.635 from the
+# comment's own words, 0.885 from the physics. Both of validate.py's rows
+# asserted 0.635, because its quadrature AND its Monte-Carlo were written from
+# that comment rather than from the interface -- two "independent" methods
+# sharing one wrong premise and agreeing with each other. Satisfying the suite
+# would have moved the code onto the middle number.
+#
+# THE CHECK THAT CANNOT SHARE THE PREMISE: as tc -> 0 the cone opens to the whole
+# hemisphere and the ratio must go to EXACTLY 1/2 -- a vertical face collects half
+# of what a horizontal one does under a uniform hemisphere. That is the same 1/2
+# the riser gather's estimator closes on, by a completely different integral over
+# the same geometry, and validate.py now asserts both against each other.
+def tir_vert(tc):
+    """Vertical-face / horizontal-bed irradiance from a uniform radiance filling
+    the cone t > tc. Exact; tir_vert(0) == 1/2 identically."""
+    return ((np.pi / 2 - tc + np.sin(tc) * np.cos(tc))
+            / (np.pi * np.cos(tc) ** 2))
+
+
+TIR_VERT = float(tir_vert(np.arcsin(1.0 / IOR[1])))
+print("  TIR return on a vertical face: %.3f of its value on the bed "
+      "(hemisphere limit %.3f)" % (TIR_VERT, tir_vert(0.0)))
 
 
 def riser_bounce(x, y, z, ci):
@@ -1762,10 +1931,10 @@ def _refl_ellipse(dvec, nx_, ny_, nz_, ndv_, rx_, ry_, rz_, vxx, vyy, vxy):
 
 
 # Cause two on the chapter's own list, and the other half of what makes the
-# filter safe: plain Schlick is derived for a SMOOTH interface, and on a rough
-# one the microfacets mask each other at grazing incidence. Ship plain Schlick
-# on a low-variance distant surface and the far band goes to a near-100% mirror
-# -- the chrome-dome reading, which is the same defect as the plastic one seen
+# filter safe: the Fresnel equations are derived for a SMOOTH interface, and on a
+# rough one the microfacets mask each other at grazing incidence. Ship the smooth
+# curve on a low-variance distant surface and the far band goes to a near-100%
+# mirror -- the chrome-dome reading, the same defect as the plastic one seen
 # from the reflection side rather than the lobe side. Bruneton, Neyret &
 # Holzschuch (2010) fit the correction for sigma_v < 0.5:
 #     F = R + (1-R)(1-cos tv)^5 exp(-2.69 sigma_v) / (1 + 22.7 sigma_v^1.5)
@@ -1779,10 +1948,20 @@ def _refl_ellipse(dvec, nx_, ny_, nz_, ndv_, rx_, ry_, rz_, vxx, vyy, vxy):
 # sub-pixel remainder. It therefore goes to 1 as the footprint goes to zero and
 # the near water's Fresnel is untouched, which is the same boundary condition
 # the lobe widening has.
+#
+# The base is now the EXACT Fresnel curve, not Schlick. Bruneton's factor `r`
+# multiplies the interface's grazing RISE above F0 -- which is what microfacet
+# masking attenuates -- so the composition is
+#     F = F0 + (F_exact(cos tv) - F0) * r
+# instead of F0 + (1 - F0)(1 - cos tv)^5 * r. `(1 - cos tv)^5 (1 - F0)` was only
+# ever Schlick's model OF that rise, so this substitutes the thing for the model
+# of it and changes nothing else. Both boundary conditions survive intact: r -> 1
+# (zero unresolved variance) gives exactly F_exact, which is now the exact
+# smooth-interface answer rather than one 14% wrong at 79 deg; r -> 0 gives F0.
 def _fresnel_rough(ndv_, sv2):
     sv = np.sqrt(np.maximum(sv2, 0.0))
-    r = np.exp(-2.69 * sv) / (1.0 + 22.7 * sv ** 1.5)
-    return F0[None] + (1 - F0[None]) * ((1 - ndv_) ** 5 * r)[:, None]
+    r = (np.exp(-2.69 * sv) / (1.0 + 22.7 * sv ** 1.5))[..., None]
+    return F0 + (fresnel(ndv_) - F0) * r
 
 
 _VN = rng.random((256, 256))
@@ -1967,6 +2146,8 @@ def _gather(flat, samples):
                     else:
                         nx_, ny_, nz_ = normal_from_grad(*grad_points(px, py))
                     cosi = -(wx * nx_ + wy * ny_ + wz * nz_)
+                    # eta = 1/n < 1: this facet looks DOWN through the surface
+                    # from the air, so there is no TIR branch to take.
                     tx, ty, tz = refract(wx, wy, wz, nx_, ny_, nz_, 1.0 / IOR[1])
                     sid, u, v, sm, _ = scene_hit(px, py, tx, ty, tz)
                     col = np.zeros((len(px), 3))
@@ -1980,8 +2161,7 @@ def _gather(flat, samples):
                             col[m] = sample(wall_img['mono'][wi], u[m], v[m],
                                             aa, bb, -DEPTH, 0.)
                     col = col * np.exp(-ABS[None] * sm[:, None])
-                    T = 1.0 - (F0[None] + (1 - F0[None]) *
-                               (1 - np.clip(cosi, 0, 1))[:, None] ** 5)
+                    T = 1.0 - fresnel(np.clip(cosi, 0, 1))    # exact, not Schlick
                     w = rr * cp * qz / R ** 4 * (rr * rr * dln * dphi)
                     acc[si] += np.where(ok[:, None], col * T * w, 0.0)
         out.append(acc)
@@ -2335,10 +2515,10 @@ def _stone(x, y, s, vdir, fp):
 #    what the water and the light add."
 # The pigment half is exactly right and the mechanism runs the other way, which
 # is this project's own doctrine: with b_b ~ 0 the column has no body colour and
-# can only SUBTRACT. It takes red -- ABS is 0.275/m at 620 nm against 0.0145 at
-# 460 -- and what survives READS as cyan. So the dry band and the bed are one
-# material differing by one path, and the frame therefore carries its own
-# absorption regression; it is printed at the end of the run.
+# can only SUBTRACT. It takes red -- ABS is 0.262/m over the red band against
+# 0.0102 over the blue -- and what survives READS as cyan. So the dry band and
+# the bed are one material differing by one path, and the frame therefore
+# carries its own absorption regression; it is printed at the end of the run.
 def liner_band(x, y, z, vdir):
     """The freeboard: FREEB of the pool's own blue liner with BEAD of grey
     concrete over it, both vertical and facing the pool, both DRY. Returns the
@@ -2730,7 +2910,7 @@ def _env_menis(rx, ry, rz):
     for amp, n, c in SKY_LOBE[1:]:                    # every lobe but the disc
         col = col + c[None] * amp * (cs ** n)[:, None]
     col = col * 1.15
-    fw = F0[None] + (1 - F0[None]) * (1 - az)[:, None] ** 5
+    fw = fresnel(az)                                  # exact, not Schlick
     return np.where((rz >= 0)[:, None], col, fw * col + (1 - fw) * WBOUNCE[None])
 
 
@@ -2796,7 +2976,7 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
         # Fresnel with the SAME roughness correction water_shade uses, and for
         # the same reason on both sides of the subtraction: the term returned
         # here is an excess over what water_shade already wrote, so if the
-        # baseline is priced with plain Schlick and the picture was drawn with
+        # baseline is priced with the smooth curve and the picture was drawn with
         # Bruneton's, the difference is a 19% error on a quantity of the same
         # size as the answer. `sv` is the one-direction unresolved slope rms
         # along the view azimuth -- `a_` below, the file's own `el[5]`.
@@ -2805,7 +2985,7 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
                                  + pyh[k] ** 2 * vyy_[k], 0.))
         _rgh = (np.exp(-2.69 * _sv) / (1. + 22.7 * _sv ** 1.5))[:, None]
         nc = np.clip(ndv, 1e-4, 1.)
-        Ff = F0[None, None] + (1 - F0[None, None]) * ((1 - nc) ** 5 * _rgh)[..., None]
+        Ff = F0 + (fresnel(nc) - F0) * _rgh[..., None]
         fil = np.where((ndv > 0)[..., None],
                        Ff * Le * (nc / MENIS_COS[None])[..., None], 0.)
         # --- the flat surface it replaces, at the same distances
@@ -2816,7 +2996,7 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
         # R_flat = 2 v_z z - v, whose horizontal part is -v_h, i.e. dvec's own
         L0 = _env_menis(dvec[k, 0], dvec[k, 1], Vz)[:, None]
         L0 = L0 * (1 - oc0)[..., None] + EDGE_REFL[None, None] * oc0[..., None]
-        F0v = F0[None] + (1 - F0[None]) * ((1 - Vz)[:, None] ** 5 * _rgh)
+        F0v = F0 + (fresnel(Vz) - F0) * _rgh
         flat = F0v[:, None] * L0 * Vz[:, None, None]
         ex = (fil - flat) * MENIS_WD[None, :, None]
         # --- the footprint kernel, folded at the wall (see the note above)
@@ -2868,8 +3048,7 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
                - np.arcsin(np.clip(Lt, -1, 1)))
         ea = np.sqrt(2. / qv)
         cl = .5 * (_erf((PHI_W - phs) * ea) - _erf(-phs * ea))
-        Fs = F0[None] + (1 - F0[None]) * ((1 - np.clip(nvs, 1e-4, 1))[:, None] ** 5
-                                          * _rgh)
+        Fs = F0 + (fresnel(np.clip(nvs, 1e-4, 1)) - F0) * _rgh
         amp = (np.clip(nvs, 0, None) * CAP_A * np.cos(.5 * phs)
                / np.maximum(np.sin(phs), 1e-6) * gpk * cl * svis
                * np.exp(-bet * bet / (2. * qv)) * np.sqrt(np.pi / 2.) * np.sqrt(qv))
@@ -2953,6 +3132,12 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
                 eta = 1.0 / n_water(BAND[c, 0] + qlam * (BAND[c, 1] - BAND[c, 0]))
             else:
                 eta = 1.0 / IOR[1]
+            # The camera looks DOWN into the water: eta = 1/n(lambda) < 1 for
+            # every wavelength in every band, so refract() cannot return its TIR
+            # null here. This is the call site the README's underwater pass will
+            # reuse with eta > 1, where it can and must -- hence the assert
+            # rather than a comment, on one scalar per channel.
+            assert np.all(eta < 1.0), 'the camera is above the water'
             tx, ty, tz = refract(dvec[:, 0], dvec[:, 1], dvec[:, 2],
                                  nx_, ny_, nz_, eta)
             geo[key] = scene_hit(hw_x, hw_y, tx, ty, tz) + (tz,)
@@ -3229,8 +3414,9 @@ _sv2 = _pvx ** 2 * _vxx + 2 * _pvx * _pvy * _vxy + _pvy ** 2 * _vyy
 _frr = np.exp(-2.69 * np.sqrt(_sv2)) / (1 + 22.7 * _sv2 ** .75)
 print("  Fresnel roughness factor exp(-2.69 s_v)/(1 + 22.7 s_v^1.5) on the "
       "one-direction unresolved slope (Bruneton et al. 2010): %.3f near, %.3f "
-      "far -- 1.000 is plain Schlick, and plain Schlick on a far surface with "
-      "no variance in it is the chrome-dome half of the same defect"
+      "far -- 1.000 is the bare smooth-interface Fresnel, and the smooth curve "
+      "on a far surface with no variance in it is the chrome-dome half of the "
+      "same defect"
       % (np.median(_frr[~_far]), np.median(_frr[_far])))
 # THE HOLE ON THE LIGHT SIDE, priced rather than argued. The caustic pass reads
 # grad_grid on the SUN's ray lattice, whose spacing is nothing like a camera
@@ -3245,7 +3431,7 @@ print("  the LIGHT path's own footprint is the sun ray spacing, %.2f mm: "
 # traced slant to the bed.
 _ns2 = normal_from_grad(*grad_points(_fx, _fy, _ffp))
 _tx2, _ty2, _tz2 = refract(D[inp][_fs, 0], D[inp][_fs, 1], D[inp][_fs, 2],
-                           _ns2[0], _ns2[1], _ns2[2], 1.0 / IOR[1])
+                           _ns2[0], _ns2[1], _ns2[2], 1.0 / IOR[1])   # eta < 1
 _sid2, _u2b, _v2b, _sm2, _ = scene_hit(_fx, _fy, _tx2, _ty2, _tz2)
 _cti = np.abs(D[inp][_fs, 2]); _ctt = np.abs(_tz2)
 _bedfp = _ffp + PIXANG * SS * _sm2 * (_cti / (IOR[1] * np.maximum(_ctt, 1e-6)))
@@ -3517,7 +3703,7 @@ _foot_s = FOOT[inp][_ss] * SS                    # metres per OUTPUT pixel
 
 def _hit_at(nn):
     tx, ty, tz = refract(_dsub[:, 0], _dsub[:, 1], _dsub[:, 2],
-                         _ns[0], _ns[1], _ns[2], 1.0 / nn)
+                         _ns[0], _ns[1], _ns[2], 1.0 / nn)      # eta = 1/n < 1
     sid, u, v, sm, _ = scene_hit(_hxs, _hys, tx, ty, tz)
     return np.stack([_hxs + tx * sm, _hys + ty * sm, tz * sm], 1), sid
 
@@ -3992,13 +4178,16 @@ print("  the water path: %.2f m down (refracted %.1f deg) + %.2f m up (median "
       % (_dnleg, np.degrees(np.arccos(cos_t)), _upleg, _dnleg + _upleg))
 print("  predicted bed/dry-band from ABS alone   %s"
       % np.round(np.exp(-ABS * (_dnleg + _upleg)), 3))
-print("    -- this file's ABS is %s /m; the README and the bar quote "
-      "(0.25, 0.0565, 0.0092), which over the same path gives %s. The two "
-      "differ by %.0f%% in red and %.0f%% in blue, and that is a CONSTANT "
-      "mismatch between the file and the doctrine, not a render error."
-      % (np.round(ABS, 4),
-         np.round(np.exp(-np.array([.25, .0565, .0092]) * (_dnleg + _upleg)), 3),
-         100 * (ABS[0] / .25 - 1), 100 * (ABS[2] / .0092 - 1)))
+_CHAP_A = np.array([0.2644, 0.0565, 0.00922])   # ch. 12 at ITS points, 610/550/450
+print("    -- this file's ABS is %s /m, Pope & Fry 1997 averaged over this "
+      "file's own bands (582-658 / 502-582 / 418-502 nm); the chapter quotes "
+      "%s at its own 610/550/450 nm sample points, giving %s over the same "
+      "path. SAME WATER, SAME TABLE, two samplings of it -- %+.0f%% red, "
+      "%+.0f%% green, %+.0f%% blue -- and not two candidate waters."
+      % (np.round(ABS, 5), np.round(_CHAP_A, 5),
+         np.round(np.exp(-_CHAP_A * (_dnleg + _upleg)), 3),
+         100 * (ABS[0] / _CHAP_A[0] - 1), 100 * (ABS[1] / _CHAP_A[1] - 1),
+         100 * (ABS[2] / _CHAP_A[2] - 1)))
 print("  measured on the maps: light leg %s, camera leg %s, round trip %s"
       % (np.round(_tdown, 3), np.round(np.exp(-ABS * _upleg), 3),
          np.round(_tmeas, 3)))
