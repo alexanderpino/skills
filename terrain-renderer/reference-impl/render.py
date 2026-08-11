@@ -2692,6 +2692,11 @@ BAND_RAY[np.flatnonzero(pav)[_bsel]] = True
 # own lighting: what is left is the pigment, and the pigment is the measurement.
 BAND_E = (liner_band(hx[pav][_bsel], hy[pav][_bsel], PAV_Z[_bsel],
                      D[pav][_bsel])[1] if _bsel.any() else np.zeros((1, 3)))
+# ...and their radiance, taken off the rays rather than off whole output pixels:
+# the band is a few pixels of a diagonal strip, so almost every output pixel on
+# it straddles an edge and the all-subsamples-agree rule the colour table uses
+# would throw the measurement away. These are the picture's own values.
+BAND_COL = PAV_COL[_bsel] if _bsel.any() else np.zeros((1, 3))
 print("the freeboard band: %d of %d subsample rays land on it, %d on the dry "
       "blue" % ((PAV_Z < ZLIP - 1e-5).sum(), pav.sum(), BAND_RAY.sum()))
 
@@ -3501,9 +3506,9 @@ print("    -- the light leg is ABOVE exp(-ABS*%.2f) = %s because the bed's "
       "ambient and its TIR return did not take that path; the gap is how much "
       "of the bed's light is not sun."
       % (_dnleg, np.round(np.exp(-ABS * _dnleg), 3)))
-if (REG == 6).sum() > 100 and (REG == 3).sum() > 100:
+if _bsel.any() and (REG == 3).sum() > 100:
     _lf = np.median(HDRP[REG == 3], 0)
-    _lb = np.median(HDRP[REG == 6], 0)
+    _lb = np.median(BAND_COL, 0)
     _eb = np.median(BAND_E, 0)
     _ef = np.median(BED_DRY[_fm] / np.maximum(LIN[_fm], 1e-12), 0)
     print("  IN THE PICTURE, linear light: sunlit floor %s / dry band %s = %s"
