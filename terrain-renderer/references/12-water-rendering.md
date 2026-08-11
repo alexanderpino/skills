@@ -863,6 +863,19 @@ surface slope   sigma     ~ C · u'^2 / (g · r_half)   eta ~ C u'^2/g over an e
   roughness contrast constrains the **flow rate through the fitting**, not a shape exponent. That is
   the difference between calibrating and inventing: the number you end up adjusting is one a pool
   installer could read off a pump.
+- **The footprint is an extended source, so the arcs are centred on it — not on the fitting.**
+  A photograph of a running return shows curved crest trains radiating from a centre that sits
+  *out in the water*, a metre or so off the wall, with nothing between it and the fitting. That
+  falls out of the geometry above: the jet cannot force the surface until it has spread to reach
+  it, so the forcing region is a stretch of the axis, not the outlet. Build it as a small **Huygens
+  sum** — a handful of secondary sources spaced along the axis at the surface, each weighted by the
+  local forcing envelope — and the arc centre lands where the jet actually surfaces. Radiating them
+  from the fitting instead puts the pattern's origin in the wall, which no photograph shows.
+- **Two decay lengths, both observable.** The forcing envelope has a half-length of well under a
+  metre, while the waves it launches are short-gravity (≈6–14 cm) and film-damped, so they fade
+  out around **3 m in an 8 m pool** — matching the common observation that a return's signature is
+  gone by mid-pool. Those two numbers, plus the offset of the arc centre, are three independent
+  checks a reference photograph gives you for free.
 - **The boil is forced, not radiated — do not give it a propagation law.** The short-wave roughness
   is where the jet *is*; it is an envelope, not a train leaving a source. Only the long waves
   radiate, reflect and reverberate, and those are bulk-damped by clean-water viscosity because a
@@ -2314,6 +2327,13 @@ above except the TotK physics talk is community reconstruction or press/footage 
   (stagnation pressure of an eddy) with an **O(1) constant `C` that is genuinely unknown here**;
   `C = 1` was used. Free-surface turbulence deserves better than this and the chapter should say so
   rather than pretend otherwise.
+- **? — the jet's mean drift is not modelled, and it shows.** Everything above treats the jet as a
+  source of *waves*. A jet also carries *momentum*, driving a mean surface current that advects and
+  refracts what it launched. In photographs that is visible immediately: the arcs are not clean
+  concentric rings but sheared, broken and curled into a wake. Reproducing that needs wave–current
+  interaction on the jet's own drift field — the machinery is already in this chapter for rivers
+  and nearshore currents, but it has **not** been applied here. A render built only from the
+  radiation model will look a little too tidy, and that is the reason.
 - **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
   layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
   the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
