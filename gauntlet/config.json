@@ -2,7 +2,7 @@
   "stops": {
     "bar_met_n": 2,
     "clean_streak_n": 2,
-    "budget_waves": 6,
+    "budget_waves": 7,
     "hard_cap_waves": null
   },
   "dimensions": [
@@ -16,5 +16,17 @@
     "chapter"
   ],
   "bar_kind": "reference",
-  "extensions": []
+  "extensions": [
+    {
+      "ts": "2026-08-11T15:34:14+00:00",
+      "at_wave": 6,
+      "from_waves": 6,
+      "to_waves": 7,
+      "waves": 1,
+      "reason": "Owner granted ONE wave. CAM_AZ sits 0.3 deg off the sun's bearing so the eye looks into the sun and the mirror point lands on the water; the reference photograph was taken at bearing 255 against a sun at 273.75. Measured, not suspected. CORRECTION: --waves is a delta, not a target, so this was first recorded as 6 -> 13. Corrected by hand to 6 -> 7, which is what the owner actually granted.",
+      "log_read": "nothing-open",
+      "forced": false,
+      "against_log_read": false
+    }
+  ]
 }
