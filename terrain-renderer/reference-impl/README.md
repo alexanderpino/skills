@@ -124,6 +124,41 @@ the bands are summed, so a 2.8 cm band vanishes once the footprint passes it
 while the 20 cm band survives. `render.py` already computes `FOOT` per ray and
 would simply pass it.
 
+## Not modelled yet — entrained air
+
+Raised with two references: surf breaking white over rocks, and the observation
+that a jacuzzi does the same thing. It is the **inverse of this whole model** and
+therefore belongs in its own pass, not folded into the pool optics.
+
+Everything here rests on `b_b ≈ 0`: treated water barely scatters, so it has no
+body colour and the cyan comes from the liner. Aerated water is the opposite
+extreme of the same equation — a dense cloud of bubbles is nothing *but*
+scattering.
+
+- **The number is one we already have.** An air bubble seen from the water side
+  has the same critical angle as the surface seen from below, 48.5°, so the same
+  `1 − 1/n² = 43.9%` of everything striking a bubble wall is totally reflected.
+  One bubble is silvery; a cloud of them is white and opaque. That single constant
+  runs the mirror outside Snell's window *and* the whiteness of foam — two
+  phenomena that look nothing alike.
+- **Why foam is white rather than tinted.** Absorption needs a long path:
+  transmission over 5 mm of water is `(0.999, 1.000, 1.000)`. Between bubbles the
+  paths are millimetres, so the scattered light never picks up the liner's or the
+  water's colour. Foam is many short paths; blue water is one long one.
+- **Fresh water and sea water differ, and a pool sits between them.** Clean fresh
+  water drains and collapses its bubbles quickly; sea-water surfactants stabilise
+  them, which is why surf foam persists on rock and a garden hose's does not. Pool
+  water carries sunscreen and body oils — the same film the chapter already uses
+  to damp the short wave band — so its foam is longer-lived than clean water's
+  (`?`, not quantified).
+- **It also makes the water opaque, not just white.** A jacuzzi hides its own
+  floor. Any implementation that tints the surface white without killing the view
+  of the bed has modelled the symptom.
+- **Real time:** a participating-medium term with a high albedo and a strong
+  forward-scattering phase function, plus a coverage mask driven by the forcing.
+  It needs the `a`/`b`/`g` split the chapter demands from `liquidBody`, for the
+  same reason the wall lights below do.
+
 ## Not modelled yet — submerged wall lights
 
 Requested for a later pass. Worth writing down now because it is not a small
