@@ -58,7 +58,7 @@ something is the `REQUIRED` list: the loader raises if any name the suite tests 
 missing, so a restructured `render.py` produces a loud error rather than a quietly
 absent test.
 
-**It is failing on purpose.** The suite currently exits 1 on ten rows. Each is a
+**It is failing on purpose.** The suite currently exits 1 on eight rows. Each is a
 finding recorded rather than patched — see the failure block it prints, which
 carries the numbers.
 

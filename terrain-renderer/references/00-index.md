@@ -35,6 +35,22 @@ not been checked against the primary sources**; (2) engine-doc links (Epic, Unit
 are version-sensitive and drift. When you verify a further row, upgrading this file is the
 right fix.
 
+## Where a chapter is more than one file
+
+Most chapters are one file, and the `Chapter` column below names it directly. **`12` is three**,
+and a route to "chapter 12" means whichever of them holds the answer:
+
+| File | Holds | Go there for |
+|---|---|---|
+| `12-water-rendering.md` | The chapter itself: doctrine, mechanisms, the **diagnostic index** near its front (symptom on screen → mechanism → section), and the pitfall catalogue | Everything by default |
+| `12a-water-derivations.md` | The **mathematics and pseudocode** behind results the chapter quotes in a line | Re-deriving a number, or carrying one to different constants |
+| `12b-water-provenance.md` | **Sources & provenance for all of `12`**: every tier, every citation, every `?`, and the `P/T/D/F/N/?` convention restated so it reads alone | Before citing anything out of `12` — including the rows tagged `12` in the table below |
+
+`12`'s executable half is `terrain-renderer/reference-impl/`, and its `validate.py` is the arbiter
+for the chapter's numeric claims: it checks the implementation against closed forms, published
+measurements and independent methods, and **exits non-zero on eight rows** — each a recorded
+finding with its tolerance justified from the estimator's own error, not a broken build.
+
 ## Master technique index
 
 | Technique / topic | Chapter | Canonical source | Tier | Link |
@@ -207,8 +223,10 @@ title as T/F tier unless a named talk is in hand.
 
 ## Least-confident-claims ledger
 
-Each chapter ends with `## Sources & provenance`; the claims their authors flagged as least
-certain are consolidated here so a reviewer knows where to spend verification effort first.
+Each chapter ends with `## Sources & provenance` — except `12`, whose appendix outgrew the chapter
+and now lives in `12b-water-provenance.md`, with a pointer left at both ends of `12`. The claims
+their authors flagged as least certain are consolidated here so a reviewer knows where to spend
+verification effort first.
 
 - `01`: GPU Zen 2 compute-tessellation attribution — **resolved 2026-07**: confirmed as
   Khoury, Dupuy & Riccio, "Adaptive GPU Tessellation with Compute Shaders", *GPU Zen 2* (2019);
