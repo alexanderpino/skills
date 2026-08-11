@@ -124,11 +124,30 @@ the bands are summed, so a 2.8 cm band vanishes once the footprint passes it
 while the 20 cm band survives. `render.py` already computes `FOOT` per ray and
 would simply pass it.
 
-## Not modelled yet — entrained air
+## Not modelled yet — entrained air, which is **two** mechanisms
 
-Raised with two references: surf breaking white over rocks, and the observation
-that a jacuzzi does the same thing. It is the **inverse of this whole model** and
-therefore belongs in its own pass, not folded into the pool optics.
+Raised with two references: surf breaking white over rocks, and a jacuzzi.
+
+> **Corrected on the owner's objection.** This first treated them as one topic.
+> They are not. They share an optics — the bubble constant below — and share
+> nothing else: the air arrives by a different route, lives in a different place
+> and dies on a different timescale, so they need different machinery.
+>
+> | | Surf on rock | Jacuzzi |
+> |---|---|---|
+> | Air enters | At the **surface**, folded in by a breaking crest | At **depth**, injected through an orifice under pressure |
+> | Where it lives | A **skin** — a whitecap layer on top, optically thick within a few cm | A **volume** — a buoyant plume rising through the bulk |
+> | Time | **Transient**: each breaker makes a patch that decays in seconds | **Steady** while the pump runs |
+> | Bubble sizes | Very wide, microns to centimetres | Narrow, set by the nozzle and the shear |
+> | Renders as | A **coverage mask on the surface** — you cannot see into it | A **participating medium** — you see partly through it |
+> | Also present | **Spray**: droplets in air, a third medium (water in air, not air in water) | None |
+>
+> This scene has **neither**. Its return jet is submerged and pumps water, not
+> air; a jacuzzi jet deliberately aspirates air, which is a different fitting.
+> Recorded so a future round does not assume the pool's jet should foam.
+
+Both are the **inverse of this whole model** and belong in their own pass, not
+folded into the pool optics.
 
 Everything here rests on `b_b ≈ 0`: treated water barely scatters, so it has no
 body colour and the cyan comes from the liner. Aerated water is the opposite
