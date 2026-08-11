@@ -9,6 +9,12 @@ the rays follow Hamilton's equations
     dx/dt =  dH/dk = c_g * khat + U(x)
     dk/dt = -dH/dx = -(grad U)^T k
 
+with c_g = dsigma/dk of THE SAME sigma -- see `c_group`. Both halves of the ray
+system and the launch condition are taken from one dispersion relation; using a
+gravity-only expression derived from a capillary-gravity sigma is what makes H
+stop being conserved, and `validate.py` catches it as a drift that does not fall
+when dt is halved.
+
 Phase accumulates as dphi = k.dx, and amplitude follows from wave-action
 conservation along the ray tube, A^2 * |dx/dt| * W = const, with W the tube width
 taken from neighbouring rays. Viscous decay exp(-int alpha dt), alpha = 2 nu k^2.
@@ -24,6 +30,84 @@ LAM_FILM = 0.075        # where the film stops being inextensible (see alpha_eff
 C_SRC = 0.186           # forcing coherence scale / jet half-width (footprint_sigma)
 
 
+def sigma_w(k):
+    """Intrinsic angular frequency, deep water, capillary-gravity.
+
+    sigma^2 = g k + (sigma_t/rho) k^3. This is THE dispersion relation of this
+    file: `c_group`, `k_stationary` and `alpha_eff` are all derived from this one
+    expression and from nothing else."""
+    k = np.asarray(k, float)
+    return np.sqrt(G * k + (SIG / RHO) * k ** 3)
+
+
+def c_group(k):
+    """Group speed dsigma/dk of the SAME sigma, not its gravity limit.
+
+        sigma = (g k + (sigma_t/rho) k^3)^(1/2)
+        dsigma/dk = (g + 3 (sigma_t/rho) k^2) / (2 sigma)
+
+    which is what dx/dt = dH/dk demands: H = sigma(|k|) + k.U, so
+    dH/dk = (dsigma/dk) khat + U and any other c_g makes the ray equations the
+    flow of a DIFFERENT Hamiltonian from the one the rays are evaluated against.
+
+    Deep-water gravity limit: sigma -> sqrt(gk) and this -> (1/2) sqrt(g/k), the
+    expression this file used to carry. The limit is not innocuous in this band:
+    at lambda = 34 mm the true c_g is 0.181 m/s against 0.116 from the gravity
+    form -- 36% low -- and at lambda = 17 mm it is 0.231 against 0.082, a factor
+    of three, because past the c_min minimum surface tension is the whole
+    restoring force and c_g turns round and RISES with k while sqrt(g/k) keeps
+    falling. The wake shortens as it travels (see `k_stationary`), so it walks
+    straight into the band where the limit is worst.
+
+    On the stationary branch itself the two terms have a tidy closed form: with
+    sigma = k c the quadratic below gives g = c^2 k - (sigma_t/rho) k^2, so
+        c_g = c/2 + sigma_t k / (rho c),
+    i.e. the familiar half the phase speed PLUS a capillary term that reaches
+    c/2 again at c = c_min, where c_g = c_min exactly."""
+    k = np.asarray(k, float)
+    return (G + 3.0 * (SIG / RHO) * k * k) / (2.0 * sigma_w(k))
+
+
+def k_stationary(c):
+    """Wavenumber of the wave a current holds still: the EXACT root of sigma(k) = k c.
+
+    A crest stands still in the lab frame when its intrinsic phase speed matches
+    the current component opposing it, sigma(k)/k = c. Squaring sigma^2 = g k +
+    (sigma_t/rho) k^3 and dividing by k gives a quadratic in k, not a power law:
+
+        (sigma_t/rho) k^2 - c^2 k + g = 0
+        k = rho ( c^2 -/+ sqrt(c^4 - c_min^4) ) / (2 sigma_t)
+
+    using c_min^4 = 4 g sigma_t / rho, which is C_MIN's own definition -- so the
+    discriminant vanishes at exactly the c_min that already sets the fan limit
+    arccos(c_min/U). The minus sign is the GRAVITY root (the longer of the two
+    waves that stand still in the same current); the plus sign is the capillary
+    root, a second, much shorter stationary wave this file does not launch.
+
+    Returned in the cancellation-free form obtained by multiplying through by the
+    conjugate, which is the same number to the last bit:
+
+        k = 2 g / ( c^2 + sqrt(c^4 - c_min^4) ).
+
+    Written that way the deep-water limit is obvious: c >> c_min sends it to
+    g/c^2, the expression this file used to launch. That limit is 0.2% out where
+    the wake lives (10-35 cm) and a FACTOR OF TWO out at the fan edge: at
+    c = c_min the exact root is k = sqrt(rho g / sigma_t), i.e. lambda = 17.1 mm
+    -- field.py's LAM_MIN, stated there as "17.1 mm, at c_min" -- while g/c^2
+    gives 34.2 mm. Launching the gravity limit while cutting the fan at the
+    capillary-aware arccos(c_min/U) took the two halves of one condition from
+    different branches, and left the fan edge carrying a wave that does not in
+    fact stand still (|H|/sigma = 0.088 at launch).
+
+    Mitigating, and recorded rather than leaned on: footprint_sigma's radiation
+    efficiency a0 = exp(-(k sigma_src)^2/2) is ~5e-3 at the fan edge, so the
+    error landed on components that barely radiate. That bounds the damage; it
+    does not make the launched wave stationary, and H is conserved along the ray
+    from whatever value it starts at, so a launch off the branch stays off it."""
+    c2 = np.asarray(c, float) ** 2
+    return 2.0 * G / (c2 + np.sqrt(np.maximum(c2 * c2 - C_MIN ** 4, 0.0)))
+
+
 def alpha_eff(k):
     """Amplitude decay rate along the ray.
 
@@ -37,13 +121,13 @@ def alpha_eff(k):
     tuned multiplier.
 
     This is the term that decides how far the jet's wake reaches. The wake
-    SHORTENS as it travels (k = g/(U cos psi)^2 with U decaying), so it walks
-    itself into the film-damped band and dies -- the observed "a return's
+    SHORTENS as it travels (k = k_stationary(U cos psi) with U decaying), so it
+    walks itself into the film-damped band and dies -- the observed "a return's
     signature is gone by mid-pool". Integrating it with the bulk value instead
     lets 5-10 cm waves ring across the whole basin, which loads the entire pool
     with short-wave slope and dissolves the bed caustic net.
     """
-    om = np.sqrt(G * k + (SIG / RHO) * k ** 3)
+    om = sigma_w(k)
     a_bulk = 2 * NU * k ** 2
     a_film = 0.3536 * k * np.sqrt(NU * om)
     w = 1.0 / (1.0 + (2 * np.pi / (k * LAM_FILM)) ** 2)     # ->1 short, ->0 long
@@ -88,7 +172,37 @@ class Jet:
         mag = Uc * np.exp(-np.log(2.0) * r2 / (rh * rh))
         return mag * self.ax[0], mag * self.ax[1]
 
-    def grad(self, x, y, e=0.01):
+    def grad(self, x, y, e=0.0005):
+        """Central difference of `drift`. THE STEP IS SET BY THE JET'S OWN WIDTH,
+        not by the drift error it happens to produce.
+
+        `drift` falls off across the axis as exp(-ln2 r^2 / r_half^2), so with
+        f = M exp(-b p^2), b = ln2/r_half^2, the central difference carries
+        f'_cd - f' = (e^2/6) f''' and
+
+            f'''/f' = -6b + 4 b^2 p^2   ->   relative error = -e^2 b   on the axis
+                                                            = -e^2 ln2 / r_half^2,
+
+        i.e. it is (e/r_half)^2 and nothing else. The half-width RUNS with the
+        station, r_half = S*s, so the binding case is the smallest s the rays
+        sample. The nearest launch station is s = 0.7 m, r_half = 66 mm, and
+        demanding a relative truncation <= 1e-4 there gives e <= 66*sqrt(1e-4/ln2)
+        = 0.79 mm. e = 0.5 mm sits inside that (4e-5 at s = 0.7 m, and still
+        5e-4 back at s = 0.2 m where r_half is only 19 mm).
+
+        There is no round-off floor to trade against at this step: the difference
+        U(x+e) - U(x-e) is ~2e|grad U| ~ 2e-2 m/s while the representation error
+        of U is ~eps*U ~ 2e-16, fourteen orders of margin, so the usual
+        sqrt(eps)-scaled optimum is nowhere near and e can simply be chosen small
+        enough for the geometry.
+
+        The old e = 10 mm was (10/66)^2 * ln2 = 1.6% of the gradient at s = 0.7 m
+        and 3.1% at the 47 mm half-width of s = 0.5 m -- a dt-INDEPENDENT error in
+        dk/dt, which is why it put a floor under |H - H0| that no step size could
+        lower. It is the remainder in validate.py's convergence test: with the
+        dispersion relation made consistent but this left at 10 mm the drift
+        stalls at 0.018 and the dt-halving ratio is 1.05; at 0.5 mm the drift is
+        0.0013 and the ratio is 0.248, which is the 1/4 an RK2 scheme owes."""
         ux1, uy1 = self.drift(x + e, y); ux0, uy0 = self.drift(x - e, y)
         ux3, uy3 = self.drift(x, y + e); ux2, uy2 = self.drift(x, y - e)
         return ((ux1 - ux0) / (2 * e), (uy1 - uy0) / (2 * e),
@@ -109,9 +223,10 @@ class Jet:
         """Coherence scale of the jet's forcing at the free surface.
 
         This term fixes the LAUNCH SPECTRUM, and leaving it out is the second half
-        of the wavevector-fan trap. The stationary condition k = g/(U cos psi)^2
-        says WHICH wavelengths can stand still in the drift; it says nothing about
-        which ones get excited. A forcing patch of rms size sigma radiates the
+        of the wavevector-fan trap. The stationary condition k = k_stationary(U
+        cos psi) says WHICH wavelengths can stand still in the drift; it says
+        nothing about which ones get excited. A forcing patch of rms size sigma
+        radiates the
         Fourier transform of itself, amplitude ~ exp(-k^2 sigma^2/2), so it cannot
         make waves short compared to its own coherence scale. Launch the fan flat
         instead and the fan-edge components arrive at full amplitude -- and they
@@ -152,7 +267,13 @@ def trace(jet, n_psi=161, n_step=900, dt=0.02, s_launch=(0.7, 1.0, 1.4, 1.9)):
         psi_max = np.arccos(C_MIN / U)
         psi = np.linspace(-psi_max * 0.985, psi_max * 0.985, n_psi)
         uh = np.array([Ux, Uy]) / U
-        kmag = G / (U * np.cos(psi)) ** 2                    # gravity branch, stationary
+        # The wave standing still against the current component c = U cos(psi):
+        # the EXACT gravity root of sigma(k) = k c, not its deep-water limit. The
+        # fan is cut at the same c_min this root's discriminant vanishes at, so
+        # both halves of the condition now come from one branch -- see
+        # `k_stationary`. khat below makes khat.U = -U cos(psi), hence
+        # H = sigma - k U cos(psi) = 0 identically at launch.
+        kmag = k_stationary(U * np.cos(psi))
         khat = np.stack([-uh[0] * np.cos(psi) + uh[1] * np.sin(psi),
                          -uh[1] * np.cos(psi) - uh[0] * np.sin(psi)], 1)
         x = np.repeat(p0[None, :], n_psi, 0)
@@ -164,7 +285,7 @@ def trace(jet, n_psi=161, n_step=900, dt=0.02, s_launch=(0.7, 1.0, 1.4, 1.9)):
         for _ in range(n_step):
             for _sub in (0, 1):                              # RK2
                 km = np.hypot(k[:, 0], k[:, 1]) + 1e-9
-                cg = 0.5 * np.sqrt(G / km)
+                cg = c_group(km)                 # dsigma/dk of H's own sigma
                 ux, uy = jet.drift(x[:, 0], x[:, 1])
                 vx = cg * k[:, 0] / km + ux
                 vy = cg * k[:, 1] / km + uy
@@ -187,14 +308,21 @@ def trace(jet, n_psi=161, n_step=900, dt=0.02, s_launch=(0.7, 1.0, 1.4, 1.9)):
         # wave action: A^2 |dx/dt| W = const, W from neighbouring rays
         W = np.gradient(X, axis=1); W = np.hypot(W[..., 0], W[..., 1])
         km = np.hypot(Kk[..., 0], Kk[..., 1]) + 1e-9
-        cg = 0.5 * np.sqrt(G / km)
+        cg = c_group(km)                         # the same c_g the rays flew at
         ux, uy = jet.drift(X[..., 0], X[..., 1])
         v = np.hypot(cg * Kk[..., 0] / km + ux, cg * Kk[..., 1] / km + uy)
         flux = np.maximum(v * W, 1e-6)
         # WHERE THE STEADY WAKE STOPS EXISTING, and it is not a taper.
         # v is the speed at which the pattern carries wave energy. The drift
-        # decays as 1/s, the stationary condition k = g/(U cos psi)^2 shortens the
-        # wave to compensate, and v falls with it. When v reaches c_min the
+        # decays as 1/s, the stationary condition shortens the wave to compensate
+        # (k = k_stationary(U cos psi)), and v falls with it. On the stationary
+        # branch c_g = c/2 + sigma_t k/(rho c) (see `c_group`), so the fall is not
+        # unbounded: the capillary term turns c_g round and the transport speed
+        # bottoms out at c_min rather than running to zero the way the gravity
+        # form 0.5 sqrt(g/k) does. That makes this cutoff BITE LATER and more
+        # softly than it did, which is the honest version of it -- the gravity
+        # form was killing the wake partly with an expression that does not hold
+        # in the band the wake shortens into. When v reaches c_min the
         # pattern can no longer outrun the slowest wave the surface supports at
         # all: it stops transporting energy away from where it was made, and the
         # film damping -- strongest in exactly the band the wake has shortened
@@ -238,8 +366,8 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.078, sig_max=0.25, norm_r=0.
     know their own k per component; this one arrives as a grid and would
     otherwise have to be filtered at a single nominal k for the whole basin --
     which would be wrong in exactly the place it matters, since the stationary
-    condition k = g/(U cos psi)^2 SHORTENS the wake as the drift decays, so its
-    wavelength runs from ~35 cm near the fitting to under 10 cm downstream. One
+    condition k = k_stationary(U cos psi) SHORTENS the wake as the drift decays,
+    so its wavelength runs from ~35 cm near the fitting to under 10 cm downstream. One
     number for the band would over-filter the source and under-filter the tail.
 
     THE WINDOW MUST BE WIDER THAN THE WAVE IT CARRIES. A Gabor atom narrower than

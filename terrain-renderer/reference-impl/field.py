@@ -465,10 +465,17 @@ _WK_U = _drift(_WK_S)
 
 # ---------------------------------------------------------------------- the wake
 # THE TRAP THIS BAND EXISTS TO AVOID. Stationary crests satisfy c(k) = U cos psi,
-# so on the gravity branch k = g/(U cos psi)^2 and the WAVEVECTOR fan opens to
-# +-arccos(c_min/U) ~ 78 deg. That fan is not the shape of the disturbance.
-# Energy travels at c_g*khat + U, and c_g = U cos psi / 2 <= U/2, so the current
-# dominates and the ENERGY fan is narrow and aligned with the jet. Summing plane
+# whose exact capillary-gravity root is wake.k_stationary -- NOT the deep-water
+# g/(U cos psi)^2, which is a factor of two out at the fan edge where c -> c_min
+# and the true wave is LAM_MIN, 17.1 mm. The WAVEVECTOR fan opens to
+# +-arccos(c_min/U) ~ 78 deg, the same c_min at which that root's discriminant
+# vanishes. That fan is not the shape of the disturbance. Energy travels at
+# c_g*khat + U with c_g = c/2 + sigma_t k/(rho c) on the stationary branch (see
+# wake.c_group), which is U/2 on the axis, dips through the capillary-gravity
+# minimum group speed 0.178 m/s and comes back to c_min = 0.231 m/s at the fan
+# edge -- never above U/2 by more than 0.1%. So the current still dominates and
+# the ENERGY fan is narrow and aligned with the jet (42 deg for 90% of the slope
+# variance, measured off the reconstruction). Summing plane
 # waves over the 78 deg wavevector fan -- the obvious implementation -- sprays the
 # whole basin with the fan-edge wavelengths (9 cm and shorter, and they carry the
 # MOST slope because slope ~ amp*k ~ 1/cos psi), which is exactly the band that
@@ -502,12 +509,15 @@ def _wake_field():
     are explicit plane-wave sets, so both quantities are exact for them; this one
     is a reconstructed grid and has to measure them. The mean square is a box
     mean over 21 texels = 21 cm, which is at least one wavelength of the
-    reconstructed field (17.5 cm, measured below, so 1.2 of them) -- and one full
+    reconstructed field (16.5 cm, measured below, so 1.27 of them) -- and one full
     period is the FLOOR a mean square of a sinusoid needs, since that is where
     <cos^2> integrates to 1/2. A window shorter than a wavelength would report
     the crest pattern itself as variance instead of averaging over it; a window
     somewhat longer only smooths the answer, which is why the box was left at 21
-    when the wake's own wavelength moved 19.3 -> 17.5 cm with the fitting's turn.
+    when the wake's own wavelength moved 19.3 -> 17.5 cm with the fitting's turn,
+    and again 17.5 -> 16.5 cm when wake.py's launch and group speed were put on
+    the exact capillary-gravity branch (the fan edge launches 27 mm where it used
+    to launch 38, so the reconstruction carries a little more short-wave slope).
     That slack is not free at the third decimal: `slope_var_points` multiplies
     this box mean by the pointwise (1 - W^2), so a box wider than the structure
     it averages puts the WAKE band's own removed-variance check about 1% out (see
@@ -570,10 +580,10 @@ def _wk_lookup(X, Y, keys):
 def _wake(X, Y, fv=None):
     """The traced wake, footprint-filtered at its own LOCAL wavenumber.
 
-    Per texel and not per band: the stationary condition k = g/(U cos psi)^2
-    shortens this wave as the drift decays, so the same band runs from ~35 cm at
-    the fitting to under 10 cm downstream, and one k for the whole basin would
-    over-filter the source while under-filtering the tail."""
+    Per texel and not per band: the stationary condition k = k_stationary(U cos
+    psi) shortens this wave as the drift decays, so the same band runs from
+    ~35 cm at the fitting to under 10 cm downstream, and one k for the whole
+    basin would over-filter the source while under-filtering the tail."""
     if fv is None:
         gx, gy = _wk_lookup(X, Y, ('gx', 'gy'))
         return gx, gy
@@ -886,8 +896,12 @@ def _report_footprint(xxn, yyn, xxf, yyf):
     # against a quadrature sum of rows of 0.122, and the near row closed to 0.1116
     # against 0.1109 at fp 30 mm -- the third decimal, not the fourth. Turning the
     # fitting 8.5 deg took the wake off that symmetry: the same pair now shares
-    # -0.00035, six times less, the field measures 0.1203 against 0.1219 of rows,
-    # and the near row closes to 0.1202 / 0.1203. Nothing about the CONVENTION
+    # -0.00035, six times less, the field measures 0.1202 against 0.1218 of rows,
+    # and the near row closes to 0.1202 / 0.1202. (Those read 0.1203 / 0.1219 /
+    # 0.1202 / 0.1203 before wake.py went onto the exact capillary-gravity branch;
+    # one count in the fourth decimal, and the shared variance did not move at
+    # all, which is the expected size for a wake whose field correlates 0.997
+    # with the one it replaced.) Nothing about the CONVENTION
     # changed between those two runs, which is the point -- the size of this
     # residual tracks how the bands happen to overlap on the patch, so it can
     # neither confirm nor condemn the units.
@@ -897,17 +911,19 @@ def _report_footprint(xxn, yyn, xxf, yyf):
     # check exists to catch.
     #
     # PER BAND the ledger does NOT close to four decimals, and the one band that
-    # misses says something real. WAKE at fp 30 mm on the jet patch removes 0.0386
-    # by the tensor against 0.0382 implied by its own filtered and unfiltered rms
-    # -- 1%, and it was 0.0318 against 0.0316, 0.6%, before the turn. The other
-    # four bands are component lists and their tensors are exact. WAKE's is not:
-    # `slope_var_points` multiplies a 21 cm BOX MEAN of the local mean square by a
-    # POINTWISE (1 - W^2), and those two disagree wherever the field's own
-    # structure correlates with the local wavenumber. The gap grew because the
-    # reconstruction's wavelength fell to 17.5 cm while the box stayed at 21 --
-    # see `_wake_field`. It is a smoothing error in a diagnostic, bounded and
-    # measured; the fix, if it ever matters, is to box-average W^2 with the
-    # variance rather than to widen or narrow the box.
+    # misses says something real. WAKE at fp 30 mm on the jet patch removes 0.0418
+    # by the tensor against 0.0413 implied by its own filtered and unfiltered rms
+    # -- 1.2%; it was 0.0386 against 0.0382, 1.1%, before wake.py went onto the
+    # exact capillary-gravity branch, and 0.0318 against 0.0316, 0.6%, before the
+    # turn. The other four bands are component lists and their tensors are exact.
+    # WAKE's is not: `slope_var_points` multiplies a 21 cm BOX MEAN of the local
+    # mean square by a POINTWISE (1 - W^2), and those two disagree wherever the
+    # field's own structure correlates with the local wavenumber. The gap grew
+    # both times for one reason -- the reconstruction's wavelength fell, 19.3 ->
+    # 17.5 -> 16.5 cm, while the box stayed at 21 -- see `_wake_field`. It is a
+    # smoothing error in a diagnostic, bounded and measured; the fix, if it ever
+    # matters, is to box-average W^2 with the variance rather than to widen or
+    # narrow the box.
     for xx, yy, tag in ((xxn, yyn, "straal"), (xxf, yyf, "ver   ")):
         s0 = total_s(xx, yy, None)
         for fp in (0.010, 0.030):
