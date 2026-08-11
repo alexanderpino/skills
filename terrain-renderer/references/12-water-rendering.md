@@ -880,8 +880,32 @@ c_min = (4gσ/ρ)^(1/4) = 0.231 m/s   at lambda = 17.1 mm
   source at rest in still water; a running return is neither, so its pattern is a **wedge**.
 - **Which wavelengths appear is then fixed, not chosen.** Stationary crests satisfy the Doppler
   condition `c(k) = U·cos ψ`; on the gravity branch `k = g/(U cos ψ)²`, so the wake carries ~50 cm
-  along the axis, ~20 cm at 50°, and ~9 cm near the wedge edge. Nothing here is a tuning parameter:
+  along the axis, ~20 cm at 50°, and ~9 cm near the fan edge. Nothing here is a tuning parameter:
   give it a pressure and a nozzle and the spectrum falls out.
+- **Solve the rays, do not assume the current is uniform — the difference is not cosmetic.** The
+  drift decays and spreads between source and observation point, so the honest formulation is the
+  eikonal one. With `H(x,k) = σ(k) + k·U(x) = 0` for a lab-steady pattern,
+
+```
+dx/dt =  ∂H/∂k = c_g·k̂ + U(x)          rays advect with group velocity PLUS the current
+dk/dt = -∂H/∂x = -(∇U)ᵀ k              the current gradient refracts them
+dφ    =  k·dx                           phase along the ray
+A²·|dx/dt|·W = const                    wave action, W the ray-tube width
+```
+
+  Two results come out that a locally-uniform treatment cannot produce, and both are visible in a
+  photograph. **Crests curve**, because `dk/dt ≠ 0` wherever the drift has a gradient. And **the
+  waves shorten as they travel** — median wavelength runs from ~35 cm near the source to ~4 cm
+  downstream — because `k = g/(U cos ψ)²` and `U` is decaying, so a wave held stationary by a
+  weakening current must get shorter to keep up. Neither is imposed; both fall out of the integration.
+- **Do not confuse the wavevector fan with the energy fan — this is the trap.** The `±78°` above is
+  the range of *wavevector* directions that can stand still in the flow. It is **not** the shape of
+  the disturbance. Energy travels at `c_g·k̂ + U`, and since `c_g = U·cos ψ/2 ≤ U/2` the current
+  dominates: solving the rays gives an energy fan of only **±19°** about the jet axis. So a fixed
+  source in a moving stream produces a **narrow band aligned with the jet**, not a Kelvin wedge —
+  the ship case is the mirror image (source moving, water still) and its wedge does not transfer.
+  Calling it a wedge, as an earlier reading of the same physics did, overstates the opening by four
+  times.
 - **And the wake is *steady*.** Because the source is bolted to the wall, the stationary pattern
   stands still in the pool frame while the water runs through it — a strong and cheap tell against
   video, and the opposite of the radiating rings a naive model produces. If a jet's pattern
@@ -2358,14 +2382,21 @@ above except the TotK physics talk is community reconstruction or press/footage 
   chapter cites for [wave–current interaction](#rivers-flow-driven-surfaces). The **conclusion**
   — that a running return's pattern is a downstream wedge and cannot be a ring system — follows
   from those with no free parameter, and is the durable part.
-- **? — the wake is built from locally-uniform current, not by ray tracing.** Each source along the
-  jet axis gets the stationary wake for *its own* local drift, superposed. The real drift decays
-  and spreads between source and observation point, which refracts the crests continuously; doing
-  that properly means integrating the eikonal through the current field. Consequences to expect in
-  a render built this way: the wedge boundary is **too sharp** (a hard downstream mask plus finite
-  angular sampling, where reality has a diffracted, smeared edge), and the crests are **straighter**
-  than a photograph's, which show them curling into the drift. The wedge geometry and the
-  wavelength ladder are right; the curvature is not modelled.
+- **P** — The eikonal formulation. `H = σ(k) + k·U`, Hamilton's equations for the rays, `dφ = k·dx`
+  and wave-action conservation `A²·|dx/dt|·W = const` are standard geometrical wave optics in a
+  moving medium (Whitham, *Linear and Nonlinear Waves*; the oceanographic form is Peregrine's
+  wave–current interaction, already cited by this chapter for
+  [rivers](#rivers-flow-driven-surfaces)). Attribution from model knowledge, not re-verified. The
+  crest curvature, the downstream shortening from ~35 cm to ~4 cm, and the ±19° energy fan are
+  **outputs of integrating it**, not assumptions — they are reproducible from the equations above
+  plus the jet drift field.
+- **? — the reconstruction, not the physics, is what is still rough.** Turning a ray set back into
+  a field is done here by depositing a Gabor atom per ray sample, sized to its own ray tube. That
+  leaves visible **staircase edges where rays terminate** — at the ends of the launch fan and at the
+  end of the integration — which are sampling artefacts and nothing to do with water. A cleaner
+  reconstruction (rasterizing the ray mesh with interpolated phase, or simply many more rays) would
+  remove them. Read the crest geometry and the wavelength trend from such a render; do not read its
+  outline.
 - **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
   layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
   the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
