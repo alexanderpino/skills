@@ -222,6 +222,51 @@ because it is the first thing a sceptical reader will challenge.
   Neither is present in a well-run pool, and both are absorbers, so both fit the
   existing machinery — they change `a`, not `b`.
 
+## 9c · Turbid water — the missing axis, not a missing feature
+
+Asked for directly, and it is the single generalisation this whole model still
+lacks: **`b` as a free parameter instead of a stated zero.** Four separate backlog
+items — the jacuzzi plume, submerged wall lights, the underwater camera's aerial
+perspective, and this — are all waiting on the same thing, which is the `a`/`b`/`g`
+split the chapter already demands from `liquidBody` and which nothing here
+exercises. Building it once serves all four.
+
+**Author it as a visibility distance, not as a coefficient.** Nobody knows what
+`b = 0.35 /m` looks like; everybody knows "you can just see the bottom". Secchi
+depth `Z ≈ 1.44/(c + K_d)` inverts to `a` and `b` and is the control an artist can
+actually set. Bracketed at green (`a = 0.0565 /m`), with `K_d` crude and marked
+`?`:
+
+| `b` /m | reads as | `ω₀` | Secchi | caustic contrast |
+|---|---|---|---|---|
+| 0 | this project's pool | 0.00 | 12.7 m | 1.00 |
+| 0.15 | faintly hazy | 0.73 | 4.7 m | 0.75 |
+| **0.35** | **caustics half gone** | 0.86 | 2.5 m | **0.50** |
+| 0.90 | bottom lost at 1.40 m | 0.94 | 1.1 m | 0.17 |
+| 3.0 | milky, jacuzzi | 0.98 | 0.4 m | 0.00 |
+
+**The order the symptoms arrive is the doctrine**, and it is not the order a
+reader expects. Caustic contrast falls as the unscattered fraction along the sun
+path, `exp(−b·1.96 m)`, so it **halves at `b ≈ 0.35 /m`** — where the Secchi depth
+is still 2.5 m and you can see the bottom of a 1.40 m pool perfectly well. So:
+
+1. **the caustic net fades first**, while the water still looks clear;
+2. then shadows lift, because scattering *adds* where absorption only subtracts;
+3. then distance hazes and the bed loses contrast;
+4. then the water acquires a body colour and reads milky rather than tinted;
+5. and from below, Snell's window loses its rim.
+
+A renderer that reaches for a white tint at step 4 has skipped the three steps
+that actually sell it, and steps 1–3 are cheap: a contrast multiplier on the
+existing caustic pass and a depth-dependent haze, no volumetric integration at
+all. That is the low tier of the ladder; the high tier is the same
+single-scattering machinery the wall lights need.
+
+Note `ω₀` rises to 0.73 by the time the water is only *faintly* hazy. Scattering
+takes over the light budget long before it takes over the look, which is why
+"treated water barely scatters" is a statement about a **very** narrow regime and
+should be written as one.
+
 ## 10 · The view from inside, and the split shot
 
 Scoped in `reference-impl/README.md` and in bar sections G and H, unbuilt, and

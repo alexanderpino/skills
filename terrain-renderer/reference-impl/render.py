@@ -3418,6 +3418,101 @@ REG = _regions()
 colour_table(hero, REG)
 
 
+# --- THE FREEBOARD BAND, MEASURED --------------------------------------------
+# Bar section B2b makes two falsifiable claims about this band and both are
+# measured here rather than admired.
+#
+# 1. "If that band renders as a FLAT BLUE STRIPE, the gather is not reaching the
+#    one surface that shows it best." So the band gets exactly the measurement
+#    the risers get: shade it along the wall, high-pass at 0.60 m (three cells of
+#    the 20 cm net), and compare the residual rms over the mean with the same
+#    high-pass on the bed radiance the gather is reading. The riser numbers are
+#    11-18% of the bed's own; anything of that order or better here is the
+#    gather arriving, and a few per cent is a stripe.
+print("the freeboard band, cell-scale contrast (0.60 m high-pass along the wall, "
+      "rms over mean) -- the same measurement the risers get:")
+_bx = (np.arange(DECK_NA[2]) + .5) * DECK_DA + X0
+_bwin = 0.30 / DECK_DA
+_bbed = sample(bed_img['mono'][..., 1:2], _bx, np.full_like(_bx, Y1 - .12),
+               X0, X1, Y0, Y1)[:, 0]
+_hbed = _hipass(_bbed, _bwin)
+for _z in BAND_Z:
+    _by = np.full_like(_bx, Y1 + SLIP)
+    _bp = np.stack([_bx, _by, np.full_like(_bx, _z)], 1)
+    _bd = _bp - EYE[None]
+    _bd /= np.linalg.norm(_bd, axis=1, keepdims=True)
+    _bc = liner_band(_bx, _by, np.full_like(_bx, _z), _bd)[0][:, 1]
+    _hb = _hipass(_bc, _bwin)
+    print("    %5.0f mm up the north wall:  band %.3f   bed beside it %.3f   "
+          "-> %3.0f%% of the bed's own%s"
+          % (1000 * _z, _hb.std() / max(_bc.mean(), 1e-9),
+             _hbed.std() / max(_bbed.mean(), 1e-9),
+             100 * (_hb.std() / max(_hbed.std(), 1e-12))
+             * (_bbed.mean() / max(_bc.mean(), 1e-9)),
+             "   (the grey bead)" if _z > FREEB else ""))
+
+# 2. THE PIGMENT, AND THE ABSORPTION IT CALIBRATES. The owner's reading of this
+#    band -- "that edge is the colour of the walls and floor of the pool; the
+#    cyan is what the water and the light add" -- is right about the pigment and
+#    inverted about the mechanism, which is this project's own doctrine: with
+#    b_b ~ 0 the column has no body colour and can only SUBTRACT. So the dry band
+#    and the bed are ONE material differing by ONE path, and the frame contains
+#    its own absorption regression. Three rows, because the raw picture ratio
+#    alone would be dominated by the lighting rather than by the water:
+#      * the PATH, predicted from this file's own ABS and the measured legs;
+#      * the PATH, measured as bed_img / BED_DRY (same maps, water taken out of
+#        the light leg) times the camera leg exp(-ABS * median slant);
+#      * the PICTURE ratio floor/band in linear light, and the same ratio with
+#        each receiver's own irradiance divided out, which is what should land on
+#        the row above it.
+_flr = ((WSID == 0) & (bed_z(WU, WV) <= -DEPTH + 1e-6)
+        & (bed_sun(WU, WV, -DEPTH) >= 0.02))
+_upleg = float(np.median(WSM[_flr])) if _flr.any() else float('nan')
+_dnleg = DEPTH / cos_t
+_fm = BDEP >= DEPTH - 1e-6
+_tdown = np.median((bed_img['disp'][_fm] / np.maximum(BED_DRY[_fm], 1e-12)), 0)
+_tmeas = _tdown * np.exp(-ABS * _upleg)
+print("liner pigment, ONE material seen two ways -- the frame's own absorption "
+      "regression:")
+print("  the water path: %.2f m down (refracted %.1f deg) + %.2f m up (median "
+      "traced camera slant on the sunlit floor) = %.2f m"
+      % (_dnleg, np.degrees(np.arccos(cos_t)), _upleg, _dnleg + _upleg))
+print("  predicted bed/dry-band from ABS alone   %s"
+      % np.round(np.exp(-ABS * (_dnleg + _upleg)), 3))
+print("    -- this file's ABS is %s /m; the README and the bar quote "
+      "(0.25, 0.0565, 0.0092), which over the same path gives %s. The two "
+      "differ by %.0f%% in red and %.0f%% in blue, and that is a CONSTANT "
+      "mismatch between the file and the doctrine, not a render error."
+      % (np.round(ABS, 4),
+         np.round(np.exp(-np.array([.25, .0565, .0092]) * (_dnleg + _upleg)), 3),
+         100 * (ABS[0] / .25 - 1), 100 * (ABS[2] / .0092 - 1)))
+print("  measured on the maps: light leg %s, camera leg %s, round trip %s"
+      % (np.round(_tdown, 3), np.round(np.exp(-ABS * _upleg), 3),
+         np.round(_tmeas, 3)))
+print("    -- the light leg is ABOVE exp(-ABS*%.2f) = %s because the bed's "
+      "ambient and its TIR return did not take that path; the gap is how much "
+      "of the bed's light is not sun."
+      % (_dnleg, np.round(np.exp(-ABS * _dnleg), 3)))
+if (REG == 6).sum() > 100 and (REG == 3).sum() > 100:
+    _lf = np.median(HDRP[REG == 3], 0)
+    _lb = np.median(HDRP[REG == 6], 0)
+    _eb = np.median(BAND_E, 0)
+    _ef = np.median(BED_DRY[_fm] / np.maximum(LIN[_fm], 1e-12), 0)
+    print("  IN THE PICTURE, linear light: sunlit floor %s / dry band %s = %s"
+          % (np.round(_lf, 3), np.round(_lb, 3), np.round(_lf / _lb, 3)))
+    print("    with each receiver's own irradiance divided out (floor %s, band "
+          "%s): %s -- compare the round trip above."
+          % (np.round(_ef, 3), np.round(_eb, 3),
+             np.round((_lf / _ef) / (_lb / _eb), 3)))
+    print("    the raw ratio is NOT the absorption: the band this frame can see "
+          "is on the NORTH wall, whose poolward normal faces 3.75 deg east of "
+          "due south while the sun is due west, so N.L = %.3f < 0 and the band "
+          "is a SHADED receiver against a sunlit floor. The east wall's band, "
+          "out of shot, has N.L = %.3f and would read as the pale strip the "
+          "sixth photograph shows."
+          % (-SUN_DIR[1], -SUN_DIR[0]))
+
+
 # --- SPEC C, ON THE PICTURE RATHER THAN ON THE FIELD -------------------------
 # The reachability diagnostic above says the glint DENSITY in the window beats
 # the calm water by three orders of magnitude, and the picture does not show it.
