@@ -70,7 +70,10 @@ WINNER: A | B
 MARGIN: decisive | clear | thin
 GAP SEVERITY: major | minor | none        (bar comparisons only)
 LARGEST GAP: <one specific, actionable difference — or "none">
-EVIDENCE: <what you looked at — file, measurement, screenshot, line range>
+EVIDENCE: <what you looked at — prefer a PATH (gauntlet/shots/w3-hero.png) over
+          a description; the workbench renders paths as a filmstrip and can
+          only print prose. A measurement (`lighthouse: LCP 1.42s`) is fine as
+          text — it is already checkable. A path you cite must exist.>
 CONFIDENCE: high | medium | low
 NOTES: <optional: second-order gaps, or a flag that the blind was compromised>
 ```

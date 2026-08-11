@@ -63,7 +63,16 @@ user does not have to interrupt anything to see where the run got to.
 - **Kanban** — **open**, **flat** (no movement in the last `flat_rounds_n` bar
   rounds — shelve or re-cut), **shelved**, **retired**. Cards carry the streak
   counters as pips, a fixed-scale 0–10 score sparkline, recent margins, the open
-  gap, the trend note, and the last evidence path
+  gap, the trend note, the last evidence path — and the **evidence filmstrip**
+- **The filmstrip** — each card's evidence in round order, oldest to newest, so
+  the artifact's own history is on the board rather than in a folder. Screenshots
+  and renders draw as thumbnails (click for a full-size view); inline
+  measurements (`lighthouse: LCP 1.42s`) draw as a small mono chip, because a
+  number is printable but not showable; a cited file that is **not on disk**
+  draws as a flagged tile and raises a banner. That last case is the one worth
+  building for — a critic citing a screenshot the harness stopped writing is
+  inspection rot (`failure-modes.md`), and a run can produce confident verdicts
+  for several rounds before anyone notices by eye
 - **Rounds** — the recent log, newest first, filterable by mode and lane, each
   row carrying the model that produced it (`sonnet-5 → opus-5` on an escalation)
 - **Spend and history** — the model roster with each tier's cost multiplier,
@@ -108,7 +117,17 @@ All visible text on the Kanban board (goals, gaps, next fixes) must be written i
   see at a glance what the run has cost against what they agreed to
 - Per lane: rounds run, current verdict, current named gap, clean-streak counter
 - **Evidence over time** — the artifact evolving, in whatever form it takes:
-  screenshots, rendered pages, drafts, benchmark numbers, test output
+  screenshots, rendered pages, drafts, benchmark numbers, test output. This is
+  what the filmstrip draws, and it is why **`--evidence` should be a path
+  whenever the artifact is inspectable**: a path the board can show, a prose
+  description it can only print. "hero renders correctly at 1440×900" is not
+  evidence a reader can check; `gauntlet/shots/w3-hero.png` is.
+
+  Paths are logged **relative to the project root** (`gauntlet/shots/w3.png`)
+  and the board rewrites them relative to itself, so the same log works whether
+  the workbench is served or opened off disk. Keep shots inside the state
+  directory (`gauntlet/shots/`) so a resumed or archived run still has its
+  evidence beside its log
 - Champion history, so a user can see whether it is still climbing
 - Reverts, visibly — a run that reverts often looks different from one that does not
 

@@ -24,8 +24,9 @@ Commands:
 import argparse
 import datetime
 import json
+import os
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 # `oracle` is a bar comparison decided by measurement rather than by a model —
 # a frame time, an LCP number, a passing test. It costs no critic tokens and is
@@ -1558,6 +1559,97 @@ def _contract_goal(root):
     return None
 
 
+# What an evidence string can be. Anything with a known media suffix is
+# something the board can *show*; everything else it can only print.
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg")
+FILE_SUFFIXES = IMAGE_SUFFIXES + (
+    ".html", ".htm", ".json", ".txt", ".md", ".csv", ".pdf", ".log", ".mp4", ".webm")
+
+
+def _evidence_ref(raw, root):
+    """Classify one evidence string and make it reachable from the board.
+
+    Evidence is either a path to something inspectable (a screenshot, a render,
+    a benchmark dump) or an inline measurement (`lighthouse: LCP 1.42s`). The
+    board can display the first and can only print the second, so the
+    difference gets decided here — deterministically, once — rather than by a
+    regex in the page.
+
+    Paths are rewritten **relative to the board's own directory**, because
+    evidence is logged relative to the project root (`gauntlet/shots/w3.png`)
+    while `workbench.html` is served from `gauntlet/` itself. Skipping that
+    rewrite puts a broken-image icon on every card, which reads exactly like a
+    dead screenshot harness — the false alarm most likely to send someone
+    debugging the wrong system.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    ref = {"raw": text, "kind": "text", "src": None, "exists": None}
+    # Measurements contain spaces; logged paths in this system do not. Treating
+    # a spaced string as text is the safe direction to be wrong in.
+    if any(ch.isspace() for ch in text):
+        return ref
+    suffix = PurePosixPath(text).suffix.lower()
+    if suffix not in FILE_SUFFIXES and "/" not in text:
+        return ref
+    ref["kind"] = "image" if suffix in IMAGE_SUFFIXES else "file"
+
+    root = Path(root)
+    as_path = Path(text)
+    # The two places a logged path can legitimately mean: relative to the state
+    # directory, or relative to the project root above it.
+    bases = [as_path] if as_path.is_absolute() else [root / text, root.parent / text]
+    for cand in bases:
+        try:
+            if cand.exists():
+                ref["src"] = os.path.relpath(cand.resolve(), root.resolve())
+                ref["exists"] = True
+                return ref
+        except OSError:
+            pass
+    # Not on disk. Still carried, still flagged: a cited file that is not there
+    # is a finding (`11` inspection rot), not something to drop silently.
+    ref["exists"] = False
+    prefix = root.name + "/"
+    ref["src"] = text[len(prefix):] if text.startswith(prefix) else text
+    return ref
+
+
+def _evidence_trail(recs, root, limit=14):
+    """One dimension's evidence, oldest → newest — the artifact over time.
+
+    This is the thing the doctrine has always asked the workbench for and the
+    board could not previously give: not the latest path as text, but the
+    sequence, so a glance shows whether the artifact is actually moving.
+    """
+    trail = []
+    for r in recs[-limit:]:
+        ref = _evidence_ref(r.get("evidence"), root)
+        if not ref:
+            continue
+        ref.update({"wave": r.get("wave"), "round": r.get("round"),
+                    "score": r.get("score"), "severity": r.get("severity"),
+                    "mode": r.get("mode")})
+        trail.append(ref)
+    return trail
+
+
+def _evidence_files(rounds, root):
+    """Run-wide evidence accounting, including what has gone missing."""
+    refs = [x for x in (_evidence_ref(r.get("evidence"), root) for r in rounds) if x]
+    files = [x for x in refs if x["kind"] != "text"]
+    missing = sorted({x["raw"] for x in files if x["exists"] is False})
+    return {
+        "records": len(refs),
+        "files": len(files),
+        "images": sum(1 for x in files if x["kind"] == "image"),
+        "measurements": sum(1 for x in refs if x["kind"] == "text"),
+        "missing": len(missing),
+        "missing_paths": missing[:6],
+    }
+
+
 def build_state(root, cfg, rounds):
     """The workbench spec: everything the board renders, in one document.
 
@@ -1695,6 +1787,8 @@ def build_state(root, cfg, rounds):
             "rubric": sum(1 for r in bar_rounds if r["mode"] == "rubric"),
             "oracle": sum(1 for r in bar_rounds if r["mode"] == "oracle"),
         },
+        # What was actually inspected, and whether it is still on disk.
+        "evidence_files": _evidence_files(rounds, root),
         # Rounds deliberately not run. The cheapest round is the one you decide
         # to skip, and without this the saving is invisible.
         "skipped": {
@@ -1727,6 +1821,7 @@ def build_state(root, cfg, rounds):
             "severity": last.get("severity") if last else None,
             "gap": s["open_gap"],
             "evidence": last.get("evidence") if last else None,
+            "evidence_trail": _evidence_trail(bar_recs, root),
             "rubric_share": s["rubric_share"],
             "tokens": sum(r.get("tokens") or 0 for r in recs),
             "trend": _dimension_trend(bar_recs, flat_n=cfg["stops"].get("flat_rounds_n", 3))["note"]

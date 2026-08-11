@@ -12,6 +12,7 @@ gauntlet/
 ├── config.json      # lanes, dimensions, stops, effort tier + ladder, shelved, extensions
 ├── contract.md      # confirmed intake contract — subagents read goal/rules here
 ├── bar/             # frozen bar artifacts; read-only after intake
+├── shots/           # per-round evidence the critics inspected; the board's filmstrip reads these
 ├── ownership.md     # file-ownership ledger, rewritten at each wave start
 ├── rounds.jsonl     # append-only, script-validated; the single source of truth
 ├── aims.jsonl       # append-only; each round's hypothesis and expectation, pre-stated
@@ -84,7 +85,10 @@ the true agreed ceiling rather than the intake number.
 
 ## What never goes only in context
 
-- Verdicts and their evidence → `rounds.jsonl`, via the script
+- Verdicts and their evidence → `rounds.jsonl`, via the script; the artifacts
+  themselves under `gauntlet/shots/`, so an archived run still has what its
+  critics actually looked at (a log citing screenshots nobody kept is a log of
+  claims, not of evidence)
 - What each round expected, and which approaches already missed → `aims.jsonl`
   (a resumed run that retries a failed approach because the ledger stayed in a
   lost context is hoping, not resuming)

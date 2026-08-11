@@ -435,6 +435,41 @@
         }
       }
     },
+    "evidence_files": {
+      "type": "object",
+      "description": "What the run actually inspected, and whether it is still on disk. A cited file that has gone missing is an inspection-rot finding, not a rendering detail.",
+      "properties": {
+        "records": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Evidence entries that name a path rather than an inline measurement."
+        },
+        "images": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measurements": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inline measurements (`lighthouse: LCP 1.42s`) — printable, not showable."
+        },
+        "missing": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 6
+        }
+      }
+    },
     "extensions": {
       "type": "array",
       "description": "Granted budget extensions, in order.",
@@ -769,6 +804,65 @@
             "string",
             "null"
           ]
+        },
+        "evidence_trail": {
+          "type": "array",
+          "description": "This dimension's evidence over time, oldest first — the artifact evolving. The board renders images as a filmstrip and prints measurements as chips.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "raw": {
+                "type": "string",
+                "description": "Exactly what was logged."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "file",
+                  "text"
+                ]
+              },
+              "src": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Path rewritten relative to the board's own directory, so it loads whether served or opened off disk. Null for inline measurements."
+              },
+              "exists": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "Whether the file was on disk when the spec was written. False renders as a flagged tile — a broken inspection path must be visible."
+              },
+              "wave": {
+                "type": "integer"
+              },
+              "round": {
+                "type": "integer"
+              },
+              "score": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "severity": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
         },
         "rubric_share": {
           "type": "number",

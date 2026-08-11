@@ -107,6 +107,7 @@ gauntlet/
 ├── config.json      # lanes, dimensions, stop thresholds, effort tier, spend budget
 ├── contract.md      # the confirmed intake contract
 ├── bar/             # frozen bar artifacts — never edited after intake
+├── shots/           # per-round evidence: screenshots, renders, benchmark dumps
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
 ├── aims.jsonl       # each round's hypothesis and expected outcome, stated before it ran

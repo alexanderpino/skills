@@ -389,6 +389,51 @@ section { margin-top: var(--s7); }
   font-family: var(--font-mono); font-size: 11px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Evidence filmstrip — the artifact over time, not just the latest path.
+   Horizontal scroll is deliberate: a long run's trail must stay one row so
+   the card keeps its glance-height. */
+.filmstrip {
+  display: flex; gap: var(--s2); margin-top: var(--s3);
+  overflow-x: auto; overscroll-behavior-x: contain;
+  padding-bottom: var(--s1); scrollbar-width: thin;
+}
+.shot { flex: 0 0 auto; width: 86px; }
+.shot .thumb {
+  display: block; width: 86px; height: 54px; padding: 0; cursor: zoom-in;
+  border: 1px solid var(--hairline-firm); border-radius: var(--r-sm);
+  background: var(--surface-sunk); overflow: hidden;
+}
+.shot .thumb:hover { border-color: var(--accent); }
+.shot .thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot .ph {
+  width: 86px; height: 54px; border-radius: var(--r-sm);
+  border: 1px dashed var(--hairline-firm); background: var(--surface-sunk);
+  display: grid; place-items: center; text-align: center;
+  font-size: 10px; line-height: 1.25; color: var(--text-3);
+  padding: 3px; overflow: hidden;
+}
+.shot .ph.mono { font-family: var(--font-mono); font-size: 9.5px; }
+.shot.missing .ph { border-color: var(--warn); color: var(--warn); }
+.shot .cap { margin-top: 3px; text-align: center; color: var(--text-3); }
+.lightbox {
+  position: fixed; inset: 0; z-index: 60; padding: var(--s5);
+  background: rgba(8, 10, 14, .78); display: grid; place-items: center;
+  gap: var(--s3); grid-auto-rows: min-content;
+}
+.lightbox img {
+  max-width: min(1280px, 94vw); max-height: 80vh;
+  border-radius: var(--r-md); box-shadow: 0 18px 48px rgba(0,0,0,.5);
+  background: #fff;
+}
+.lightbox .cap { color: #e9edf3; font-size: 13px; text-align: center; }
+.lightbox .cap .path { font-family: var(--font-mono); font-size: 11.5px; color: #9aa4b2; }
+.lightbox .close {
+  position: absolute; top: var(--s4); right: var(--s4);
+  color: #e9edf3; background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2); border-radius: var(--r-sm);
+  padding: var(--s2) var(--s3); font-size: 12px; cursor: pointer;
+}
 .streak { display: inline-flex; gap: 3px; align-items: center; }
 .streak i {
   width: 12px; height: 4px; border-radius: var(--r-full); background: var(--hairline-firm);
@@ -853,6 +898,13 @@ function renderBanners(d) {
       Array.isArray(d.evidence_lines) ? d.evidence_lines : []);
     box.append(b);
   }
+  // A cited file that is not on disk is inspection rot, not a rendering
+  // detail: the critics may have been grading nothing for several rounds.
+  const ev = d.evidence_files;
+  if (ev && ev.missing)
+    box.append(banner("warn", ICONS.alert,
+      `${ev.missing} cited evidence file(s) are not on disk — verify the inspection path before trusting recent verdicts.`,
+      Array.isArray(ev.missing_paths) ? ev.missing_paths : []));
   if (d.pace && has(d.pace.judging))
     box.append(banner("info", ICONS.info, "Judging strategy: ", [d.pace.judging]));
 }
@@ -980,6 +1032,82 @@ function renderLadder(d) {
   }
 }
 
+/* ── evidence filmstrip ───────────────────────────────────────────────────
+   The doctrine has always asked the board for "the artifact evolving" and the
+   board could only print the latest path. This shows the sequence: what was
+   inspected each round, in order, with the round it belongs to. */
+function shotPlaceholder(text, mono) {
+  return el("div", "ph" + (mono ? " mono" : ""), text);
+}
+
+function openShot(e, c) {
+  const box = el("div", "lightbox");
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  const img = document.createElement("img");
+  img.src = e.src;
+  img.alt = `${c.lane} ${c.dimension}, wave ${e.wave} round ${e.round}`;
+  const cap = el("div", "cap");
+  cap.append(`${c.lane} · ${c.dimension} — wave ${e.wave}, round ${e.round}`
+    + (has(e.score) ? ` · scored ${e.score}/10` : "")
+    + (has(e.severity) ? ` · ${e.severity}` : ""));
+  cap.append(el("div", "path", e.raw));
+  const close = el("button", "close", "Close ✕");
+  close.type = "button";
+  box.append(img, cap, close);
+
+  const prev = document.activeElement;
+  const shut = () => {
+    box.remove();
+    document.removeEventListener("keydown", onKey);
+    if (prev && prev.focus) prev.focus();
+  };
+  const onKey = ev => { if (ev.key === "Escape") shut(); };
+  box.addEventListener("click", ev => { if (ev.target === box) shut(); });
+  close.addEventListener("click", shut);
+  document.addEventListener("keydown", onKey);
+  document.body.append(box);
+  close.focus();
+}
+
+function filmstrip(c) {
+  const trail = Array.isArray(c.evidence_trail) ? c.evidence_trail : [];
+  if (!trail.length) return null;
+  const strip = el("div", "filmstrip");
+  for (const e of trail) {
+    const cell = el("div", "shot");
+    let thumb;
+    if (e.kind === "image" && e.exists !== false && has(e.src)) {
+      thumb = el("button", "thumb");
+      thumb.type = "button";
+      const img = document.createElement("img");
+      img.src = e.src;
+      img.alt = `${c.lane} ${c.dimension}, wave ${e.wave} round ${e.round}`;
+      img.loading = "lazy";
+      // Present in the spec but unreadable on the wire is still a broken
+      // inspection path — say so in place rather than showing a broken icon.
+      img.addEventListener("error", () => {
+        cell.classList.add("missing");
+        thumb.replaceChildren(shotPlaceholder("unreadable"));
+        thumb.style.cursor = "default";
+      });
+      thumb.append(img);
+      thumb.addEventListener("click", () => { if (thumb.querySelector("img")) openShot(e, c); });
+    } else if (e.exists === false) {
+      cell.classList.add("missing");
+      thumb = shotPlaceholder("missing");
+    } else if (e.kind === "text") {
+      thumb = shotPlaceholder(e.raw, true);
+    } else {
+      thumb = shotPlaceholder(e.kind === "file" ? "file" : "—");
+    }
+    thumb.title = e.raw;
+    cell.append(thumb, el("div", "cap t-micro", `w${e.wave}·r${e.round}`));
+    strip.append(cell);
+  }
+  return strip;
+}
+
 function laneCard(c, column) {
   const n = el("div", "card lane");
   const top = el("div", "lane-top");
@@ -1018,6 +1146,8 @@ function laneCard(c, column) {
   if (has(c.trend) && !has(c.shelved_reason)) n.append(el("div", "lane-note", c.trend));
   if (has(c.shelved_reason))
     n.append(el("div", "lane-note", `Shelved at wave ${c.shelved_at_wave}: ${c.shelved_reason}`));
+  const strip = filmstrip(c);
+  if (strip) n.append(strip);
   if (has(c.evidence)) {
     const f = el("div", "lane-foot");
     const p = el("span", "path", basename(c.evidence));
