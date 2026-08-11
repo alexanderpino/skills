@@ -1330,10 +1330,124 @@ for nm, zz, x0, x1, y0, y1 in _PATCH:
 # few degrees of blur does nothing to it, which is what makes convolving the
 # lobes alone the whole of the job and not an approximation of convenience.
 # A cos^n lobe is exp(-n th^2 / 2) near its peak, so its per-axis angular
-# variance is 1/n. Same three terms, same order, same amplitudes as before.
-SKY_LOBE = ((26.00, 12000., SUN_COL),                       # the disc
-            (2.60, 260., np.array([1., .90, .72])),         # the aureole
-            (1.15, 14., np.array([1., .92, .80])))          # the sky around it
+# variance is 1/n, and its flux over the hemisphere is 2 pi / (n + 1).
+#
+# ALL SIX NUMBERS BELOW WERE GUESSES AND ARE NOW DERIVED. The audit that used to
+# sit under this block priced the guess: the disc lobe's peak was 1563x under the
+# sun's own radiance and 7.8x too wide, and the three lobes together carried a
+# 35th of the direct beam. That is the whole of bar section C's complaint -- a
+# broad dim smear where the physics has a small blinding point -- so this round
+# replaces the amplitudes and the widths with the atmosphere.
+#
+# --- THE ATMOSPHERE, READ BACK OUT OF A CONSTANT THIS FILE ALREADY HAD --------
+# SUN_COL's COLOUR is not a choice. exp(-m tau_Rayleigh) at the bar's own air
+# mass 2.77, evaluated at this file's own three band centres and normalised to
+# red, is (1.0000, 0.8921, 0.6740); SUN_COL's triple is (1.000, 0.892, 0.674).
+# One part in 10^4 on two channels. So the beam that lights this scene has been
+# through a RAYLEIGH atmosphere at the stated air mass and nothing else, which
+# fixes three things at once: the air mass is not free, the reddening is not a
+# grade, and the aerosol optical depth SUN_COL was written with is ZERO. Every
+# lobe below is built on that atmosphere, and the one place a number is added to
+# it rather than read out of it is marked.
+def _tau_rayleigh(lam_um):
+    """Whole-atmosphere Rayleigh optical depth at sea level: the standard
+    0.008569 lam^-4 form with its two dispersion corrections (Hansen & Travis
+    1974). Not fitted here -- it is what makes the check above a check."""
+    return 0.008569 * lam_um ** -4 * (1. + 0.0113 * lam_um ** -2
+                                      + 0.00013 * lam_um ** -4)
+
+
+AIRMASS = 2.77                                     # the bar's, for elevation 21
+TAU_R = _tau_rayleigh(np.array([620., 545., 460.]) / 1000.)
+_TRAY = np.exp(-AIRMASS * TAU_R)
+print("atmosphere, read back out of SUN_COL rather than assumed:")
+print("  Rayleigh tau %s at 620/545/460 nm -> exp(-m tau)/red = %s at m = %.2f, "
+      "against SUN_COL's own %s. The sun's COLOUR in this file IS Rayleigh "
+      "extinction at the bar's air mass, to 1e-4, so the atmosphere it was "
+      "written with carries tau_aerosol = 0."
+      % (np.round(TAU_R, 4), np.round(_TRAY / _TRAY[0], 4), AIRMASS,
+         np.round(SUN_COL / SUN_COL[0], 4)))
+
+# --- LOBE 1, THE DISC: nothing free at all -----------------------------------
+# `shade` uses SUN_COL as E_n/pi, so E_n = pi*SUN_COL is the normal irradiance
+# and the disc's radiance is E_n / Omega_sun with Omega_sun the disc's own solid
+# angle. A cos^n lobe carries 2 pi / (n + 1); setting that equal to Omega_sun
+# gives n = 2/theta_s^2 - 1 and then a peak of L_sun makes the lobe's FLUX equal
+# the direct beam exactly. Peak, width and flux all land on the sun at once --
+# there is no amplitude left to choose, which is the point.
+THETA_SUN = np.deg2rad(0.53) / 2.0                 # solar angular radius
+OMEGA_SUN = np.pi * THETA_SUN ** 2                 # 6.72e-5 sr
+E_SUN = np.pi * SUN_COL                            # normal irradiance, 24.1 green
+L_SUN = E_SUN / OMEGA_SUN                          # 3.59e5 green
+N_DISC = 2.0 / THETA_SUN ** 2 - 1.0                # 93493
+
+# --- LOBES 2 AND 3, THE AEROSOL: one added assumption, stated ----------------
+# The aureole is single-scattered sunlight, and its radiance follows from the
+# same plane-parallel integral the beam does. Scattering at optical depth tau'
+# feeds the view direction at F_0 exp(-tau'/mu_0) omega P(Theta)/(4 pi) and the
+# result is attenuated out again; in the sun's OWN direction mu = mu_0 and the
+# integral collapses to
+#     L(Theta) = (F_0 / 4 pi) P(Theta) m tau_sca exp(-m tau)
+#              = (E_n / 4 pi) P(Theta) m tau_sca,
+# because F_0 exp(-m tau) is the beam that arrives, which is E_n. So the aureole
+# is E_n times a phase function times a slant scattering optical depth, and the
+# only number not already in this file is that optical depth.
+#
+# THE PHASE FUNCTION IS TWO LOBES, and that is physics rather than convenience.
+# For particles large against the wavelength the extinction efficiency tends to
+# 2, and exactly half of it is DIFFRACTION -- the Airy pattern of the particle's
+# own shadow. That half is the aureole: a forward peak whose width is set by the
+# particle, not by the medium. The other half is the refracted/reflected part,
+# which is broad and is well described by Henyey-Greenstein at the asymmetry
+# quoted for tropospheric aerosol. Two mechanisms, two widths, one optical depth.
+#
+#   width of the aureole   Airy half-power at sin th = 0.5145 lam / D, converted
+#                          to a Gaussian sigma by /sqrt(2 ln 2) and to cos^n by
+#                          n = 1/sigma^2. D = 2 r_eff of the COARSE mode.
+#   width of the body      cos^n matched to Henyey-Greenstein at half power:
+#                          cos th_h = (1 + g^2 - 2^(2/3) (1-g)^2) / (2 g).
+#
+# WHAT IS ASSUMED, marked because it cannot be read out of this file: the aerosol
+# optical depth itself (`?`), its single-scattering albedo (`?`), its Angstrom
+# exponent (`?`), the coarse mode's share of the scattering (`?`) and the two
+# widths' r_eff and g (`?`). SUN_COL says tau_a = 0, so any aerosol at all is an
+# ADDITION to this file's atmosphere and its extinction of the beam is NOT
+# applied -- SUN_COL feeds every diffuse surface in the frame and re-deriving it
+# is a whole round. The size of that inconsistency is printed below: the lobes
+# end up carrying the beam plus the scattered fraction rather than the beam.
+# The values are a clear coastal afternoon, and the aureole flux they produce is
+# cross-checked against the circumsolar ratio, which is a MEASURED quantity for
+# exactly this geometry (CSR ~ 0.05 for a clear sky, the fraction of the
+# beam-plus-circumsolar flux that arrives outside the disc).
+TAU_A550 = 0.10        # ? aerosol optical depth at 550 nm, clear coastal summer
+SSA_A = 0.95           # ? single-scattering albedo of that aerosol
+ANG_A = 1.0            # ? Angstrom exponent, tau_a ~ lam^-1
+PHI_COARSE = 0.50      # ? coarse mode's share of the aerosol scattering
+R_COARSE = 2.0e-6      # ? effective radius of that coarse mode, metres
+G_AER = 0.70           # ? asymmetry of the non-diffracted half
+F_DIFF = 0.5 * PHI_COARSE   # DERIVED from the two above: half of the coarse
+                            # mode's extinction is diffraction, and that half is
+                            # the only part narrow enough to be an aureole
+_LAM = np.array([620., 545., 460.]) * 1e-9
+TAU_A = TAU_A550 * (550e-9 / _LAM) ** ANG_A
+MTAU_SCA = AIRMASS * SSA_A * TAU_A                 # slant scattering depth
+_th_airy = 0.5145 * _LAM[1] / (2.0 * R_COARSE)     # half-power half-angle, green
+N_AURE = 1.0 / (_th_airy / np.sqrt(2. * np.log(2.))) ** 2
+_cos_hg = (1. + G_AER ** 2 - 2. ** (2. / 3.) * (1. - G_AER) ** 2) / (2. * G_AER)
+N_BODY = np.log(0.5) / np.log(_cos_hg)
+PHI_AURE = E_SUN * MTAU_SCA * F_DIFF               # flux, per channel
+PHI_BODY = E_SUN * MTAU_SCA * (1. - F_DIFF)
+L_AURE = PHI_AURE / (2. * np.pi / (N_AURE + 1.))   # peak radiance
+L_BODY = PHI_BODY / (2. * np.pi / (N_BODY + 1.))
+
+# sky() multiplies the WHOLE environment by 1.15, and the background wants it --
+# it is what makes what sky() returns agree with SKY_AMB. The three amplitudes
+# below are absolute RADIANCES and must not be scaled a second time, so each
+# carries 1/1.15 and the product is the derived peak exactly.
+_UNSCALE = 1.0 / 1.15
+SKY_LOBE = ((_UNSCALE, N_DISC, L_SUN),             # the disc
+            (_UNSCALE, N_AURE, L_AURE),            # the aureole: diffraction
+            (_UNSCALE, N_BODY, L_BODY))            # the sky around it: HG body
 
 
 def _lobe_shape(n, cov):
@@ -1387,8 +1501,10 @@ print("sky lobes: per-axis sigma %s deg -- these are the angular scales the "
       % ", ".join("%.2f" % np.degrees(1.0 / np.sqrt(n)) for _, n, _ in SKY_LOBE))
 
 # --- THE SUN AS A SOURCE, AUDITED AGAINST THE ENVIRONMENT THAT STANDS IN FOR IT
-# This is arithmetic on constants that were already in the file, and it says
-# something the frame has been quietly built on top of for several rounds.
+# The audit that priced the guess, now run against the derivation. It stays
+# because it is the check, not the finding: every quantity it prints is computed
+# from SKY_LOBE as shipped, so if a later round moves an amplitude the ratios
+# move with it and say so.
 #
 # `shade` uses SUN_COL as E_n/pi -- a Lambertian bed of albedo rho lit at
 # incidence cos_i comes out at rho*SUN_COL*cos_i, and rho*E/pi is the definition
@@ -1400,26 +1516,43 @@ print("sky lobes: per-axis sigma %s deg -- these are the angular scales the "
 #     L_sun = E_n / Omega_sun = pi * SUN_COL / (pi (0.53 deg / 2)^2)
 # The environment's three lobes are then measurable against it, in peak and in
 # flux (a cos^n lobe integrates to 2 pi/(n+1) sr over the hemisphere).
-OMEGA_SUN = np.pi * (np.deg2rad(0.53) / 2) ** 2
-L_SUN = np.pi * SUN_COL / OMEGA_SUN
 _lobe_flux = sum(amp * c * 1.15 * 2 * np.pi / (n + 1) for amp, n, c in SKY_LOBE)
+_disc_pk = SKY_LOBE[0][0] * SKY_LOBE[0][2][1] * 1.15
 print("  the sun's own radiance is pi*SUN_COL/Omega_sun = %.3g (green) in those "
-      "units; the disc lobe's PEAK is %.4g, so the reflected sun is %.0fx too "
-      "dim, and cos^%d covers %.2g sr against the disc's %.2g -- %.1fx too wide"
-      % (L_SUN[1], SKY_LOBE[0][0] * SKY_LOBE[0][2][1] * 1.15,
-         L_SUN[1] / (SKY_LOBE[0][0] * SKY_LOBE[0][2][1] * 1.15),
-         SKY_LOBE[0][1], 2 * np.pi / (SKY_LOBE[0][1] + 1), OMEGA_SUN,
+      "units; the disc lobe's PEAK is %.4g, so the reflected sun is %.3fx the "
+      "physical one, and cos^%.0f covers %.3g sr against the disc's %.3g -- "
+      "%.3fx its width"
+      % (L_SUN[1], _disc_pk, L_SUN[1] / _disc_pk, SKY_LOBE[0][1],
+         2 * np.pi / (SKY_LOBE[0][1] + 1), OMEGA_SUN,
          (2 * np.pi / (SKY_LOBE[0][1] + 1)) / OMEGA_SUN))
 print("  in FLUX, which is what a reflection actually integrates: all three "
       "lobes together carry %.3g against a direct beam of pi*SUN_COL = %.3g, a "
-      "factor %.0f. So what this frame calls a glint is the AUREOLE, not the "
-      "disc -- a broad dim smear where the physics has a small blinding point, "
-      "which is exactly the shape of bar section C's complaint (a broad "
-      "shimmering road where it asks for countable isolated points). NOT "
-      "changed this round: a 200x source is a whole round's worth of "
-      "revalidation and it lands on top of the lobe change, not beside it. It "
-      "is written down because it is derived, not guessed."
-      % (_lobe_flux[1], np.pi * SUN_COL[1], np.pi * SUN_COL[1] / _lobe_flux[1]))
+      "factor %.2f. The disc carries the beam exactly and the excess is the "
+      "aerosol scattered back in near the sun -- an atmosphere that scatters "
+      "%.0f%% of the beam into its own aureole while SUN_COL, being pure "
+      "Rayleigh, was never dimmed by it. That %.0f%% is the price of the two "
+      "assumed lobes and it is stated rather than hidden; it is not the 35x it "
+      "replaces."
+      % (_lobe_flux[1], E_SUN[1], _lobe_flux[1] / E_SUN[1],
+         100 * MTAU_SCA[1], 100 * MTAU_SCA[1]))
+print("  lobe        per-axis sigma      Omega (sr)     peak L        flux "
+      "(green, against a beam of %.1f)" % E_SUN[1])
+for _nm, (_amp, _n, _c) in zip(("disc    ", "aureole ", "body    "), SKY_LOBE):
+    print("    %s  %8.3f deg   %10.3g   %10.4g   %8.3g"
+          % (_nm, np.degrees(1. / np.sqrt(_n)), 2 * np.pi / (_n + 1),
+             _amp * _c[1] * 1.15, _amp * _c[1] * 1.15 * 2 * np.pi / (_n + 1)))
+# The aureole's one free number, cross-checked against a quantity that is
+# MEASURED for this exact geometry rather than assumed. The circumsolar ratio is
+# the fraction of the beam-plus-circumsolar flux that arrives outside the disc
+# but inside a 3.2 deg acceptance -- 0.05 for a clear sky, higher for haze.
+_csr_in = 1. - np.cos(np.deg2rad(3.2)) ** (N_AURE + 1.)
+_csr = PHI_AURE[1] * _csr_in / (PHI_AURE[1] * _csr_in + E_SUN[1])
+print("  aureole cross-check: %.0f%% of this lobe's flux falls inside the 3.2 "
+      "deg circumsolar acceptance, so it reads CSR = %.3f against the ~0.05 "
+      "measured for a clear sky. The assumed tau_a = %.2f is therefore %.1fx on "
+      "the DIM side of the measurement, which is the direction to be wrong in "
+      "here: this lobe is the one that can rebuild the broad road."
+      % (100 * _csr_in, _csr, TAU_A550, 0.05 / max(_csr, 1e-9)))
 
 
 # --------------------------------------- the removed variance becomes a lobe
@@ -2188,6 +2321,38 @@ for _m, _nm in ((~_far, "near half"), (_far, "far half ")):
              np.degrees(2 * np.median(_e1)),
              2 * np.median(_e1) * np.sqrt(SKY_LOBE[0][1]),
              np.degrees(1.0 / np.sqrt(SKY_LOBE[0][1]))))
+# --- CAN A 6.7e-5 sr SOURCE BE SAMPLED AT ALL AT 3x3? The question the disc
+# asks and the ellipse above does not answer. The ellipse is the variance the
+# filter REMOVED -- the sub-footprint remainder -- and convolving the lobe with
+# it is what stops the sun aliasing inside one pixel. It says nothing about what
+# happens BETWEEN pixels, and that is the part a delta source is destroyed by:
+# the resolved field still swings the mirror direction from one pixel to the
+# next, and if it swings further than the convolved lobe is wide, the sun's
+# image on the water is a set of curves THINNER than the sampling grid and no
+# amount of per-pixel convolution can integrate them.
+#
+# The criterion is a comparison of two angles, both measurable here:
+#   * the reflection direction's step per OUTPUT pixel, 2|d(grad h)| across one
+#     footprint -- a reflected ray turns by twice the slope change;
+#   * the convolved disc lobe's own width, sqrt(1/n + c11) along the same axis.
+# Their ratio is the number of independent mirror crossings a pixel steps over.
+# Below 1 the sun is resolved and its glints are real; above 1 the glints are a
+# sampling of curves and their COUNT is noise even where their statistics are
+# right. Measured, not asserted, and reported near and far because the whole
+# point of the filter is that the two ends of the frame are different.
+_dgx, _dgy = grad_points(_fx + _ffp, _fy, _ffp)
+_step = 2.0 * np.hypot(_dgx - grad_points(_fx, _fy, _ffp)[0],
+                       _dgy - grad_points(_fx, _fy, _ffp)[1])
+_lobew = np.sqrt(1.0 / SKY_LOBE[0][1] + 4.0 * _vxx)
+print("  the disc's SAMPLING test -- reflection direction steps %.2f deg per "
+      "output pixel near, %.2f deg far, against a convolved disc lobe %.2f deg "
+      "/ %.2f deg wide: the sun is stepped over by %.1fx near and %.1fx far. "
+      "Under 1 the disc is resolved; over it, the glints are a point sample of "
+      "curves and their number is Poisson noise on a real mean."
+      % (np.degrees(np.median(_step[~_far])), np.degrees(np.median(_step[_far])),
+         np.degrees(np.median(_lobew[~_far])), np.degrees(np.median(_lobew[_far])),
+         np.median(_step[~_far]) / np.median(_lobew[~_far]),
+         np.median(_step[_far]) / np.median(_lobew[_far])))
 _pvx, _pvy = -D[inp][_fs, 0], -D[inp][_fs, 1]
 _pvn = np.hypot(_pvx, _pvy); _pvx /= _pvn; _pvy /= _pvn
 _sv2 = _pvx ** 2 * _vxx + 2 * _pvx * _pvy * _vxy + _pvy ** 2 * _vyy
@@ -2768,6 +2933,37 @@ print("  -- section C asks for isolated bright points on otherwise smooth water,
       "column's p99.9 is the larger of the two, the bed's caustics are what the "
       "eye sees at the bright end and a glint-density contrast of any size "
       "cannot read through them.")
+# ...and a percentile is the WRONG statistic for a sparse population, which is
+# what a real disc makes: a p99.9 over a million rays cannot see a hundred
+# glints, so a criterion phrased as "sparse enough to COUNT" has to be counted.
+# The threshold is not a taste: it is the radiance at which the reflected column
+# ALONE saturates this file's own tone map, solved out of the ACES constants and
+# EXPOSURE so it follows them if either moves.
+_ys = ((250. / 255. + .055) / 1.055) ** 2.4
+_qa, _qb, _qc = 2.51 - 2.43 * _ys, .03 - .59 * _ys, -.14 * _ys
+L_WHITE = ((-_qb + np.sqrt(_qb ** 2 - 4 * _qa * _qc)) / (2 * _qa)) / EXPOSURE
+_PSPEC = np.zeros(W * H)
+_PSPEC[np.flatnonzero(inp)] = WSPEC
+_PSPEC = _PSPEC.reshape(H // SS, SS, W // SS, SS).mean((1, 3))
+print("  glints COUNTED, not sampled: a reflected luminance of %.2f whites out "
+      "an output pixel on its own (sRGB 250 through this file's ACES curve at "
+      "EXPOSURE %.3f)" % (L_WHITE, EXPOSURE))
+for _nm, _m in _zones:
+    _pm = np.zeros(W * H, bool)
+    _pm[np.flatnonzero(inp)] = _m
+    _pm = _pm.reshape(H // SS, SS, W // SS, SS).mean((1, 3)) > .5
+    if _pm.sum() < 100:
+        continue
+    _blown = _pm & (_PSPEC > L_WHITE)
+    _iso = _blown.copy()
+    for _dy in (-1, 0, 1):
+        for _dx in (-1, 0, 1):
+            if _dy or _dx:
+                _iso &= ~np.roll(np.roll(_blown, _dy, 0), _dx, 1)
+    print("    %s %6d output px, %5d blown by the reflection alone (%.3f%%), "
+          "of which %4d are single isolated pixels"
+          % (_nm, _pm.sum(), _blown.sum(), 100. * _blown.sum() / _pm.sum(),
+             _iso.sum()))
 
 
 # --- WHAT THE FILTER DID TO THE PICTURE, in the picture's own units ----------
