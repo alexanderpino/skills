@@ -58,18 +58,28 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
   estimated 2.5 m frame width).
 - The disturbance is **gone by mid-pool**.
 
-## E · Everything that is not water
+## E · Everything that is not water — **struck by owner ruling, wave 1**
 
-Called out separately because it is where a render most often fails the
-overriding bar:
+> Re-frozen mid-run. The project owner ruled scenery out of scope: *"we are not
+> going to place things like parasols or bushes"*. Recorded here rather than
+> silently edited, because a bar that quietly follows the artifact is not a bar.
 
-- Stone deck: large slabs, warm beige with real tonal variation between slabs,
-  visible joints, and dirt. Not a uniform tinted plane with a grid on it.
-- Grass in late low sun: strongly raked light, **long shadows**, variation in
-  tone and height. Not a flat green field.
-- The shade sail: a bright, translucent, **catenary-sagging** fabric — not a flat
-  rigid quad.
-- Sky and its reflection consistent with a clear sky at a 21° sun.
+The renderer verifies **water**. Props are a different project, and a garden built
+to pass a photorealism test would teach the chapter nothing. So:
+
+- **Out of scope:** lawn, planting, hedges, background scenery, horizon, deck
+  dressing, and the shade sail *as an object*. Do not invest in them; remove what
+  exists.
+- **Still in scope, because it is water physics and not decoration:** the
+  waterline where water meets the pool wall — coping edge, wall thickness, wet
+  band, meniscus. The critic's "the pool is a decal" finding stands.
+- **The sail survives only as an occluder**, because the shadow gate is a
+  documented claim: caustics vanish beneath it while the water stays luminous. Its
+  *shadow edge on the water* must be in frame; the fabric itself need not be.
+- **Composition follows from this.** Judge a frame filled by water, as the
+  reference close-up is. "Would a viewer wonder whether it is a photograph" now
+  means a photograph *of water*, which is both a fairer test of this artifact and
+  a harder one — there is nowhere for the water to hide.
 
 ## F · Light, globally
 
