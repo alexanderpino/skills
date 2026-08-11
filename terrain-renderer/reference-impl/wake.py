@@ -174,8 +174,23 @@ def trace(jet, n_psi=161, n_step=900, dt=0.02, s_launch=(0.7, 1.0, 1.4, 1.9)):
         ux, uy = jet.drift(X[..., 0], X[..., 1])
         v = np.hypot(cg * Kk[..., 0] / km + ux, cg * Kk[..., 1] / km + uy)
         flux = np.maximum(v * W, 1e-6)
+        # WHERE THE STEADY WAKE STOPS EXISTING, and it is not a taper.
+        # v is the speed at which the pattern carries wave energy. The drift
+        # decays as 1/s, the stationary condition k = g/(U cos psi)^2 shortens the
+        # wave to compensate, and v falls with it. When v reaches c_min the
+        # pattern can no longer outrun the slowest wave the surface supports at
+        # all: it stops transporting energy away from where it was made, and the
+        # film damping -- strongest in exactly the band the wake has shortened
+        # into by then -- consumes it in place. This is the same c_min bound that
+        # already fixes the +-78 deg wavevector fan and the Froude number, applied
+        # to the ray instead of to the launch, and it is what keeps the linear
+        # wave-action solution from running away: without it A stays flat while k
+        # rises fivefold, so the wake gets four times STEEPER downstream and
+        # floods mid-pool with 5 cm slope. The factor is cumulative -- energy lost
+        # is not recovered if the ray speeds up again.
+        esc = np.minimum.accumulate(np.clip((v - C_MIN) / C_MIN, 0.0, 1.0), axis=0)
         REF = 12                       # tube width is ~0 at the launch point
-        A = (w_src[i_src] * a0[None, :]
+        A = (w_src[i_src] * a0[None, :] * esc
              * np.sqrt(flux[REF:REF + 1] / flux) * np.exp(-At))
         A[:REF] = 0.0                  # do not deposit inside the source region
         P.append(X); K.append(Kk); PH.append(Ph); AM.append(A)
@@ -240,8 +255,11 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.055, sig_max=0.25, norm_r=0.
             c = A[t, i] * np.cos(PH[t, i] + K[t, i, 0] * ddx + K[t, i, 1] * ddy) * w
             num_x[ys_, xs_] += c * K[t, i, 0]; num_y[ys_, xs_] += c * K[t, i, 1]
             den[ys_, xs_] += w
-    den = np.maximum(den, 1e-9)
-    gx, gy = num_x / den, num_y / den
+    # num/den is a Nadaraya-Watson estimate; where a single window barely reaches,
+    # den is tiny and the division amplifies it into a hard-edged block. Regularise
+    # with a floor of order one window's own weight, which fades thin coverage out
+    # instead of magnifying it.
+    gx, gy = num_x / (den + 0.35), num_y / (den + 0.35)
     gxc = x0 + (np.arange(nx) + .5) * dxg
     gyc = y0 + (np.arange(ny) + .5) * ((y1 - y0) / ny)
     s_pk = 0.91                                   # forcing peak, from the jet geometry

@@ -176,8 +176,9 @@ def sail_surface(u, v):
     w = ((1 - u) * (1 - v))[..., None], (u * (1 - v))[..., None], \
         (u * v)[..., None], ((1 - u) * v)[..., None]
     p = w[0] * SAIL[0] + w[1] * SAIL[1] + w[2] * SAIL[2] + w[3] * SAIL[3]
+    cu, cv = np.clip(u, 0, 1), np.clip(v, 0, 1)
     return p - np.stack([np.zeros_like(u), np.zeros_like(u),
-                         SAIL_SAG * np.sin(np.pi * u) * np.sin(np.pi * v)], -1)
+                         SAIL_SAG * np.sin(np.pi * cu) * np.sin(np.pi * cv)], -1)
 
 
 def sail_inside(u, v):
@@ -193,10 +194,10 @@ SX = np.linspace(X0 - 3, X1 + 3, SHADOW_N[0])
 SY = np.linspace(Y0 - 3, Y1 + 3, SHADOW_N[1])
 _cov = np.zeros((SHADOW_N[1], SHADOW_N[0]))
 _den = np.zeros((SHADOW_N[1], SHADOW_N[0]))
-_NUV = 1500
+_NUV = 2400
 _uu = np.linspace(-0.18, 1.18, _NUV)
-for _j0 in range(0, _NUV, 250):
-    _U, _V = np.meshgrid(_uu, _uu[_j0:_j0 + 250])
+for _j0 in range(0, _NUV, 200):
+    _U, _V = np.meshgrid(_uu, _uu[_j0:_j0 + 200])
     _P = sail_surface(_U.ravel(), _V.ravel())
     _g = _P[:, :2] - SUN_DIR[None, :2] * (_P[:, 2:3] / SUN_DIR[2])
     _m = sail_inside(_U.ravel(), _V.ravel()).astype(np.float64)
@@ -214,22 +215,25 @@ print("sail shadow covers %.1f m2 of the basin" %
        ((SY[-1] - SY[0]) / SHADOW_N[1])))
 
 
-# The coping overhangs the wall, so near the WEST wall the sun is cut off by the
-# lip before it ever reaches the surface: it has to clear ZLIP over a horizontal
-# run of x, and tan(21 deg) is only 0.385. The band is 16 cm wide, and because
-# the refracted ray then travels 1.37 m east, its shadow lands out in the basin
-# rather than against the wall. Same test on the north wall gives 3 cm -- the
-# sun is 3.75 deg north of due west, so that wall barely shades anything.
-_LIPX = ZLIP * (abs(SUN_DIR[0]) / SUN_DIR[2]) + SLIP
-_LIPY = ZLIP * (abs(SUN_DIR[1]) / SUN_DIR[2]) + SLIP
-print("coping lip shades %.0f mm off the west wall, %.0f mm off the north wall"
-      % (_LIPX * 1000, _LIPY * 1000))
+# The coping overhangs the wall, so along the WEST wall the sun never reaches the
+# surface at all: it has to climb ZLIP = 43 mm to clear the lip and it only gains
+# 0.385 m per metre run, so a band of water against that wall is in shadow. The
+# refracted ray from the first LIT surface then travels 1.37 m east, so what you
+# see on the bed is not a dark strip against the wall but a dark strip out in the
+# basin. The same test on the NORTH wall gives 7 mm: the sun is 3.75 deg north of
+# due west, so it is climbing almost parallel to that wall.
+XLIP, YLIP = X0 - SLIP, Y1 + SLIP          # the lip, 20 mm proud of each face
+_RUNX = ZLIP * abs(SUN_DIR[0]) / SUN_DIR[2]
+_RUNY = ZLIP * abs(SUN_DIR[1]) / SUN_DIR[2]
+_LPEN = np.deg2rad(0.53) * (ZLIP / SUN_DIR[2])     # sun disc over a 12 cm run
+print("coping lip shades %.0f mm of water off the west wall, %.0f mm off the "
+      "north wall (penumbra %.1f mm)" % (_RUNX * 1000, _RUNY * 1000, _LPEN * 1000))
 
 
 def coping_vis(x, y):
     """Sun visibility at the water surface, cut by the coping lip itself."""
-    return (np.clip((x - X0 - SLIP) / max(_LIPX - SLIP, 1e-6), 0, 1) *
-            np.clip((Y1 - SLIP - y) / max(_LIPY - SLIP, 1e-6), 0, 1))
+    return (np.clip((x - XLIP - _RUNX) / _LPEN + .5, 0, 1) *
+            np.clip((YLIP - _RUNY - y) / _LPEN + .5, 0, 1))
 
 
 def sun_vis(x, y):
@@ -315,9 +319,32 @@ def liner(u, v):
 
 
 def tiles(u, v):
-    g = ((np.abs(((u / .20) % 1.) - .5) > .445) | (np.abs(((v / .20) % 1.) - .5) > .445))
-    base = (0.82 + .04 * np.sin(u * 17.) * np.sin(v * 21.)) * (1 - g) + .70 * g
-    return base[..., None] * LINER_TINT[None, None]
+    """The wall, and specifically the last 155 mm of it. v is depth, 0 at the
+    still waterline. A pool wall is not uniform down to the surface: it carries a
+    waterline course in small mosaic, and it carries the two marks the surface
+    itself leaves -- a chalky calcium bloom exactly at the mean level where
+    evaporation keeps depositing the hardness, and a thin dirt line a couple of
+    centimetres under it where the surface film collects and is never skimmed.
+    Those two lines are the reason a real pool edge does not read as a cut."""
+    lev = 0.82 + .04 * np.sin(u * 17.) * np.sin(v * 21.)
+    g = ((np.abs(((u / .25) % 1.) - .5) > .456) | (np.abs(((v / .25) % 1.) - .5) > .456))
+    lev = np.where(g, .70, lev)
+    alb = np.broadcast_to(LINER_TINT[None, None], lev.shape + (3,)).copy()
+
+    wl = v > -0.155                                        # waterline course
+    gm = ((np.abs(((u / .048) % 1.) - .5) > .40) |
+          ((np.abs(((v / .048) % 1.) - .5) > .40)))
+    lev = np.where(wl, np.where(gm, .90, .62 + .10 * np.sin(u * 131.) * np.sin(v * 97.)),
+                   lev)
+    alb = np.where(wl[..., None],
+                   (LINER_TINT * np.array([.60, .90, 1.03]))[None, None], alb)
+
+    cal = np.exp(-((v + .0070) / .0055) ** 2)              # calcium, at mean level
+    dirt = np.exp(-((v + .0235) / .0080) ** 2)             # surface film, just under
+    lev = lev * (1 + .60 * cal) * (1 - .40 * dirt)
+    w = (.78 * cal)[..., None]
+    alb = alb * (1 - w) + np.array([.95, .91, .84])[None, None] * w
+    return np.clip(lev, .04, 1.7)[..., None] * alb
 
 
 def sail_glow(u, v):
@@ -346,15 +373,23 @@ def shade(cau, alb, ao=1.0, glow=None):
 BU, BV = np.meshgrid(np.linspace(X0, X1, CAU_NX), np.linspace(Y0, Y1, CAU_NY))
 LIN = liner(BU, BV)
 GLOW = sail_glow(BU, BV)
-bed_img = {'disp': shade(bed[:3], LIN, glow=GLOW),
-           'mono': shade([bed[3]] * 3, LIN, glow=GLOW)}
+# The walls stand between the bed and half the sky, so the ambient term -- and
+# only the ambient term, the caustic already knows about geometry -- falls off
+# into the corners. 1 - 0.30 exp(-d/0.30) is a two-wall corner losing 60%.
+_dw = np.minimum(np.minimum(BU - X0, X1 - BU), np.minimum(BV - Y0, Y1 - BV))
+BED_AO = 1.0 - 0.30 * np.exp(-_dw / 0.30)
+bed_img = {'disp': shade(bed[:3], LIN, BED_AO, glow=GLOW),
+           'mono': shade([bed[3]] * 3, LIN, BED_AO, glow=GLOW)}
 wall_img = {'disp': [], 'mono': []}
 for wi in range(4):
     uu = np.linspace(Y0, Y1, WNU) if wi < 2 else np.linspace(X0, X1, WNU)
     UU, VV = np.meshgrid(uu, np.linspace(-DEPTH, 0.0, WNV))
     T = tiles(UU, VV)
-    wall_img['disp'].append(shade(wall[wi][:3], T, .78))
-    wall_img['mono'].append(shade([wall[wi][3]] * 3, T, .78))
+    # the coping overhangs the wall by 20 mm, so the last few centimetres of wall
+    # sit in its shade: the darkest thing in the pool is the line under the lip.
+    WAO = .78 * (1.0 - .58 * np.exp(VV / .028))
+    wall_img['disp'].append(shade(wall[wi][:3], T, WAO))
+    wall_img['mono'].append(shade([wall[wi][3]] * 3, T, WAO))
 
 
 def sample(img, u, v, u0, u1, v0, v1):

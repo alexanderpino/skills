@@ -836,13 +836,13 @@ float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase
   **early wall reflections** are the direct train plus its first-order mirror images across the
   walls (`1/√r` spreading, damping as above) — a handful of extra trains in the same sum; pushing
   the image count up instead buys a coherent lattice no basin shows and costs more. The **wind
-  band** is the existing short-wave detail set. The **jet wake** is steady in the basin frame, so
-  solve it once offline per fitting and bake slope plus forcing envelope into a small texture in
-  the fitting's frame — one fetch at runtime, no solver, and it rotates and tiles with the fitting.
-  The **lee** is a painted or baked mask. A height-field sim patch with reflecting walls and a
-  driven source cell is the option that buys swimmer transients, at the usual patch cost
-  ([Interactive simulation patches](#interactive-simulation-patches)); the steady field does not
-  need it. The bed pattern then goes through the same caustics ladder as any other body
+  band** is the existing short-wave detail set. The **jet wake**, being stationary, is a bake:
+  solve it once offline per fitting, store slope and forcing envelope in a small texture oriented
+  in the fitting's frame, and sample it — one fetch, no solver in the pass, and a fitting that
+  moves only moves its texture. The **lee** is a painted or baked mask. A sim patch with reflecting
+  walls and a driven source cell is the option that buys swimmer transients, at the usual patch
+  cost ([Interactive simulation patches](#interactive-simulation-patches)); the steady field does
+  not need it. The bed pattern then goes through the same caustics ladder as any other body
   ([The tier ladder](#the-tier-ladder)) — the driven basin changes which band feeds it, not the
   technique. And the tail's near-isotropy is a review test in its own right: a wind sea writes
   streaky, direction-aligned caustics; a reverberant tail writes isotropic cells.
@@ -2249,8 +2249,7 @@ above except the TotK physics talk is community reconstruction or press/footage 
   experiments, which does not move the footprint qualitatively. The surface-deformation link
   `η ~ C·u'²/g` is a scaling argument (stagnation pressure of an eddy) whose **O(1) constant `C` is
   genuinely unknown**; `C = 1` was used, which is why the chapter states the near-field roughness as
-  a ratio to the far field rather than as an rms slope. Free-surface turbulence is the weakest link
-  in this subsection.
+  a ratio to the far field rather than as an rms slope. This link is the weakest in the chain.
 - **P** — The wake geometry. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the standard
   capillary–gravity minimum already cited in [Calm water](#calm-water-the-low-energy-regime);
   `U0 = C_d√(2ΔP/ρ)` is Bernoulli with an orifice discharge coefficient (`C_d ≈ 0.92` assumed, a
@@ -2262,8 +2261,9 @@ above except the TotK physics talk is community reconstruction or press/footage 
   energy travels at `c_g·k̂ + U`; the figure is the output of integrating the ray equations
   (`H = σ(k) + k·U`, Hamilton's equations, wave-action conservation — standard geometrical wave
   optics in a moving medium, Whitham; attribution from model knowledge, not re-verified) through the
-  jet's decaying drift field, as are the crest curvature and the downstream shortening. Reproducible
-  from those equations plus a drift field; not a measured angle.
+  jet's decaying drift field — reproducible from those equations plus a drift field, not a measured
+  angle. That solve is an authoring-time step: because the pattern is stationary in the basin frame
+  it is baked to a texture, so nothing of this machinery runs in a frame.
 - **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
   layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
   the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
