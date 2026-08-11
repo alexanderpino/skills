@@ -33,6 +33,36 @@ hostile reviewer). Re-randomise A/B labels every comparison. Never pass the
 critic's exact wording forward as a build target — pass the *gap*, then have the
 builder look at the bar itself.
 
+## Assumed-absent bar
+
+**Signal.** The run reports that a case cannot be judged because no reference
+exists for it — and the user finds one in seconds. Or milder and more common:
+the bar set is exactly what the user pasted at intake, nothing more, and lanes
+working outside that coverage produce vague verdicts and stall. Asked where the
+references came from, the answer is "the ones you gave me".
+
+**Cause.** Treating the user as the research department. The published method
+assumes a bar is supplied and says nothing about going to get one, so the
+default behaviour is to work with whatever arrived and to report the rest as
+unbarrable. It looks diligent — it is reporting a real limitation — which is
+what makes it durable. And it is self-confirming: an unbarred case produces
+vague verdicts, which read as "this really is hard to judge".
+
+**Repair.** `bar-selection.md`'s three rules: the user's examples are a seed,
+not the corpus; **"no reference exists" is a claim that requires a search, and
+the search must be named**; and for photorealism the bar is reality, which is
+thoroughly photographed — "no reference for how that looks" is nearly always a
+statement about a search that was not run. Before wave 1, list the cases the
+run will be judged on and check each has something to compare against, filling
+holes while it is still cheap. `init` scaffolds `bar/SOURCES.md` for exactly
+this: what the bar is, where it came from, what was searched including empty
+searches, and which cases are and are not covered. An empty SOURCES file is a
+visible "nobody went looking".
+
+Diagnostic: if a critic's verdict says it could not compare because the bar does
+not cover the case, that is a bar-coverage bug, not a critic problem. Fill the
+coverage and re-run the round — do not accept the vague verdict into the log.
+
 ## Bar erosion
 
 **Signal.** Comparisons quietly get easier. Late-run wins are decisive where

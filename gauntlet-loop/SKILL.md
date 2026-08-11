@@ -107,6 +107,7 @@ gauntlet/
 ├── config.json      # lanes, dimensions, stop thresholds, effort tier, spend budget
 ├── contract.md      # the confirmed intake contract
 ├── bar/             # frozen bar artifacts — never edited after intake
+│   └── SOURCES.md   # where each bar came from, what was searched, what it does not cover
 ├── shots/           # per-round evidence: screenshots, renders, benchmark dumps
 ├── ownership.md     # file-ownership ledger, refreshed each wave
 ├── rounds.jsonl     # one validated record per comparison (script-written)
@@ -194,6 +195,17 @@ invent a fake baseline.
 
 The highest-leverage decision in the run. Read `references/bar-selection.md` for
 taxonomies per artifact class and for finding a bar when the user has none.
+
+**Go and find the bar. The user's examples are a seed, not the corpus.** A
+reference set that is exactly what was pasted at intake is the signature of a
+search that never happened. Before wave 1, list the cases the run will actually
+be judged on — for water: calm, storm, shore break, wake, underwater — and check
+each has something to compare against, filling the holes while nothing has been
+built yet. **"No reference exists" is a claim that requires a search, and the
+search must be named**; for a photorealism goal it is nearly always false, since
+the bar is reality and reality is thoroughly photographed. Record what you found
+and what you searched for in vain in `gauntlet/bar/SOURCES.md`, which `init`
+scaffolds empty for exactly this reason.
 
 Freeze bar artifacts under `gauntlet/bar/` at intake. Most real artifacts need
 more than one **dimension** (visual + frame time; clarity + completeness); declare
@@ -484,6 +496,10 @@ it as a finding, not a saving.
 - **Name the gap or the round didn't happen.** Enforced by the script.
 - **The bar never moves down.** Frozen at intake; raising it mid-run is allowed
   and announced.
+- **You go and find the bar.** The user's examples seed the search; they are not
+  the corpus, and "no reference exists" is a claim you may only make after
+  looking and only while saying what you looked for. A case the run will be
+  judged on gets a bar before wave 1, not an apology at wave 4.
 - **Losers get reverted.** Champion/challenger is what stops a long run from
   wandering downhill one plausible-sounding round at a time.
 - **Every comparison goes through the log.** State the model remembers is state
@@ -538,6 +554,7 @@ Read `references/failure-modes.md` before long unattended runs. The short list:
 | Convergence tax | One round per cosmetic gap once a dimension is down to minors | Batch the critic's NOTES into one brief; the champion guard makes it safe |
 | Build-and-hope | Rounds run with no stated expectation; misses look like bad luck | `aim` before every build; diagnose when the hit rate drops below half |
 | Comfort-first probe | POC proves the easy lane; the structural risk surfaces at tier 3 | Probe the riskiest lane; survey the rest before the campaign |
+| Assumed-absent bar | "No reference for this case" — and the user finds one in seconds | Search before claiming absence, name the search; cover the cases before wave 1 |
 
 ## Degraded mode (no subagents)
 

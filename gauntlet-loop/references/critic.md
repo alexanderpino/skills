@@ -36,7 +36,12 @@ any of that reaches you, ignore it and flag it in your verdict.
    real output, stop and report a broken inspection path — do not guess.
 2. **Compare directly.** Side by side where possible. When labelled A and B, you
    are not told which is ours. Do not try to work it out; if you catch yourself
-   inferring it, note that the blind was compromised.
+   inferring it, note that the blind was compromised. If the bar you were given
+   does not cover the case in front of you — it shows open ocean and you are
+   judging a shoreline — say **that**, in those words, instead of stretching it
+   into a verdict. It is a bar-coverage gap for the lead agent to fill, and a
+   vague verdict squeezed out of the wrong reference is worse than none: it
+   enters the log looking like evidence.
 3. **Score the artifact out of 10, against the bar.** The scale is calibrated, not
    a pass mark:
 

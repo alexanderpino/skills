@@ -68,7 +68,13 @@ judgement about approach, which is where a lot of the method's value sits.
 - `hybrid`: a combination of both.
 
 **Bar.** See `bar-selection.md`. Freeze the artifacts under `gauntlet/bar/` now,
-before any lane runs.
+before any lane runs — and **go and find them rather than waiting to be given
+them**. Whatever the user pasted is the seed of your search, not its result:
+list the cases the run will be judged on, get a reference for each, and record
+in `bar/SOURCES.md` where each came from and what you searched for without
+success. Presenting a contract whose bar is exactly the user's own examples,
+with the uncovered cases unmentioned, is how a run reaches wave 4 and announces
+that a case cannot be judged.
 
 **Inspection.** This is the field that silently kills runs. Before wave one,
 verify a critic can actually reach the output: the screenshot harness works, the

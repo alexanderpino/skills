@@ -429,9 +429,29 @@ def cmd_init(args):
             die("bar-kind must be one of: reference, acceptance criteria, hybrid")
         cfg["bar_kind"] = args.bar_kind
     save_config(root, cfg)
+    # The bar's provenance is scaffolded, not left to memory: an empty SOURCES
+    # file is a visible "nobody went looking", which is the difference between
+    # a bar that was chosen and one that was settled for (`bar-selection.md`).
+    dims_for_sources = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    bar_sources = (
+        "# Bar sources — where the bar came from, and what was searched\n\n"
+        "Fill this before wave 1. \"No reference exists\" is a claim; it needs a\n"
+        "search behind it, and the search goes here so a reader can check it.\n\n"
+        + "".join(
+            f"## {d}\n\n"
+            "- **Bar artifact(s):** `bar/…` — what a critic actually compares against\n"
+            "- **Where it came from:** supplied by the user / found (name the source)\n"
+            "- **Searched:** what you looked for and where, including searches that\n"
+            "  came back empty\n"
+            "- **Cases covered:** the situations this bar can judge\n"
+            "- **Cases NOT covered:** situations the run may hit that this bar cannot\n"
+            "  judge — fill these before they surface mid-run as \"no reference\"\n\n"
+            for d in dims_for_sources)
+    )
     for name, header in (
         ("contract.md", "# Gauntlet contract\n\n(goal / bar / inspection / stops / budget / autonomy / workbench)\n"),
         ("ownership.md", "# File ownership — refreshed every wave\n\n| lane | owned paths |\n|---|---|\n"),
+        ("bar/SOURCES.md", bar_sources),
     ):
         p = root / name
         if not p.exists():
