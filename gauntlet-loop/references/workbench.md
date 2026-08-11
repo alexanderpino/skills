@@ -66,11 +66,18 @@ user does not have to interrupt anything to see where the run got to.
   gap, the trend note — and the **evidence panel** below
 - **The evidence panel** — **the newest frame, shown**. Each card renders its
   most recent screenshot or render directly, at a size worth looking at, with
-  the wave/round and score under it; clicking opens it full-size. That is the
-  question a glance is asking — *what does it look like now* — so it costs no
-  interaction. The history behind it is a different question, so it costs a
-  click: **"N earlier frames"** expands the trail as a filmstrip, and those
-  thumbnails are not built or fetched until asked for.
+  the wave/round and score under it. That is the question a glance is asking —
+  *what does it look like now* — so it costs no interaction. The history behind
+  it is a different question, so it costs a click: **"N earlier frames"**
+  expands the trail as a filmstrip, and those thumbnails are not built or
+  fetched until asked for.
+
+  **Any frame enlarges when clicked** — the hero or any thumbnail — and the
+  enlarged view then steps through the lane's frames with the arrow keys or the
+  on-screen controls, captioned with wave, round and score. That is the move
+  the trail exists for: comparing round 3 against round 7 is how you see
+  whether the artifact is actually moving, and it should not require finding
+  two files in a folder.
 
   Two honesty rules are wired into the panel. When the newest record is *not*
   the frame on display — a measurement, or a file that has gone missing — it is

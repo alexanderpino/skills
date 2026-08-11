@@ -452,10 +452,14 @@ section { margin-top: var(--s7); }
 .shot .ph.mono { font-family: var(--font-mono); font-size: 9.5px; }
 .shot.missing .ph { border-color: var(--warn); color: var(--warn); }
 .shot .cap { margin-top: 3px; text-align: center; color: var(--text-3); }
+/* Flex, not grid: `place-items: center` centres each row's contents but leaves
+   the rows themselves packed at the top, which puts the image against the
+   ceiling and the side controls level with nothing. */
 .lightbox {
   position: fixed; inset: 0; z-index: 60; padding: var(--s5);
-  background: rgba(8, 10, 14, .78); display: grid; place-items: center;
-  gap: var(--s3); grid-auto-rows: min-content;
+  background: rgba(8, 10, 14, .78);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--s3);
 }
 .lightbox img {
   max-width: min(1280px, 94vw); max-height: 80vh;
@@ -464,6 +468,17 @@ section { margin-top: var(--s7); }
 }
 .lightbox .cap { color: #e9edf3; font-size: 13px; text-align: center; }
 .lightbox .cap .path { font-family: var(--font-mono); font-size: 11.5px; color: #9aa4b2; }
+.lightbox .cap .count { color: #9aa4b2; margin-top: var(--s1); }
+.lightbox .nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 68px; cursor: pointer;
+  color: #e9edf3; font-size: 26px; line-height: 1;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--r-sm);
+}
+.lightbox .nav:hover { background: rgba(255,255,255,.2); }
+.lightbox .nav.prev { left: var(--s4); }
+.lightbox .nav.next { right: var(--s4); }
 .lightbox .close {
   position: absolute; top: var(--s4); right: var(--s4);
   color: #e9edf3; background: rgba(255,255,255,.1);
@@ -1077,29 +1092,58 @@ function shotPlaceholder(text, mono) {
   return el("div", "ph" + (mono ? " mono" : ""), text);
 }
 
-function openShot(e, c) {
+/* Enlarged view. Once a frame is open the useful next move is comparison —
+   the whole reason to keep a trail — so the viewer steps through the lane's
+   frames with the arrow keys or the on-screen controls. */
+function openShot(e, c, frames) {
+  const list = (frames && frames.length) ? frames : [e];
+  let i = Math.max(0, list.indexOf(e));
+
   const box = el("div", "lightbox");
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-modal", "true");
+  box.setAttribute("aria-label", `Evidence for ${c.lane} ${c.dimension}`);
   const img = document.createElement("img");
-  img.src = e.src;
-  img.alt = `${c.lane} ${c.dimension}, wave ${e.wave} round ${e.round}`;
   const cap = el("div", "cap");
-  cap.append(`${c.lane} · ${c.dimension} — wave ${e.wave}, round ${e.round}`
-    + (has(e.score) ? ` · scored ${e.score}/10` : "")
-    + (has(e.severity) ? ` · ${e.severity}` : ""));
-  cap.append(el("div", "path", e.raw));
   const close = el("button", "close", "Close ✕");
   close.type = "button";
-  box.append(img, cap, close);
+  const back = el("button", "nav prev", "‹");
+  const fwd = el("button", "nav next", "›");
+  back.type = fwd.type = "button";
+  back.title = "Previous frame (←)"; fwd.title = "Next frame (→)";
 
-  const prev = document.activeElement;
+  function show(n) {
+    i = (n + list.length) % list.length;
+    const f = list[i];
+    img.src = f.src;
+    img.alt = `${c.lane} ${c.dimension}, wave ${f.wave} round ${f.round}`;
+    cap.replaceChildren();
+    cap.append(`${c.lane} · ${c.dimension} — wave ${f.wave}, round ${f.round}`
+      + (has(f.score) ? ` · scored ${f.score}/10` : "")
+      + (has(f.severity) ? ` · ${f.severity}` : ""));
+    cap.append(el("div", "path", f.raw));
+    if (list.length > 1) cap.append(el("div", "count t-micro", `frame ${i + 1} of ${list.length}`));
+  }
+  show(i);
+
+  box.append(img, cap, close);
+  if (list.length > 1) {
+    box.append(back, fwd);
+    back.addEventListener("click", ev => { ev.stopPropagation(); show(i - 1); });
+    fwd.addEventListener("click", ev => { ev.stopPropagation(); show(i + 1); });
+  }
+
+  const restore = document.activeElement;
   const shut = () => {
     box.remove();
     document.removeEventListener("keydown", onKey);
-    if (prev && prev.focus) prev.focus();
+    if (restore && restore.focus) restore.focus();
   };
-  const onKey = ev => { if (ev.key === "Escape") shut(); };
+  const onKey = ev => {
+    if (ev.key === "Escape") shut();
+    else if (ev.key === "ArrowLeft" && list.length > 1) show(i - 1);
+    else if (ev.key === "ArrowRight" && list.length > 1) show(i + 1);
+  };
   box.addEventListener("click", ev => { if (ev.target === box) shut(); });
   close.addEventListener("click", shut);
   document.addEventListener("keydown", onKey);
@@ -1115,8 +1159,9 @@ function evidenceBlock(c) {
   if (!trail.length) return null;
   const wrap = el("div", "evidence");
   const newest = trail[trail.length - 1];
-  const hero = [...trail].reverse()
-    .find(e => e.kind === "image" && e.exists !== false && has(e.src));
+  // Everything the enlarged viewer can page through, oldest → newest.
+  const viewable = trail.filter(e => e.kind === "image" && e.exists !== false && has(e.src));
+  const hero = viewable[viewable.length - 1];
 
   if (hero) {
     const btn = el("button", "ev-hero");
@@ -1129,7 +1174,7 @@ function evidenceBlock(c) {
       btn.replaceWith(el("div", "ev-latest missing", "latest frame is unreadable: " + hero.raw));
     });
     btn.append(img);
-    btn.addEventListener("click", () => openShot(hero, c));
+    btn.addEventListener("click", () => openShot(hero, c, viewable));
     wrap.append(btn);
     const cap = el("div", "ev-cap");
     cap.append(el("span", "t-micro", shotLabel(hero)));
@@ -1160,7 +1205,7 @@ function evidenceBlock(c) {
       btn.setAttribute("aria-expanded", String(!open));
       if (open) { if (strip) strip.hidden = true; return; }
       // Built on first request, so a long trail costs nothing until asked for.
-      if (!strip) { strip = filmstrip(c, earlier); wrap.append(strip); }
+      if (!strip) { strip = filmstrip(c, earlier, viewable); wrap.append(strip); }
       strip.hidden = false;
     });
     wrap.append(btn);
@@ -1168,9 +1213,11 @@ function evidenceBlock(c) {
   return wrap;
 }
 
-function filmstrip(c, entries) {
+function filmstrip(c, entries, viewable) {
   const trail = entries || (Array.isArray(c.evidence_trail) ? c.evidence_trail : []);
   if (!trail.length) return null;
+  const frames = viewable
+    || trail.filter(e => e.kind === "image" && e.exists !== false && has(e.src));
   const strip = el("div", "filmstrip");
   for (const e of trail) {
     const cell = el("div", "shot");
@@ -1190,7 +1237,9 @@ function filmstrip(c, entries) {
         thumb.style.cursor = "default";
       });
       thumb.append(img);
-      thumb.addEventListener("click", () => { if (thumb.querySelector("img")) openShot(e, c); });
+      thumb.addEventListener("click", () => {
+        if (thumb.querySelector("img")) openShot(e, c, frames);
+      });
     } else if (e.exists === false) {
       cell.classList.add("missing");
       thumb = shotPlaceholder("missing");
