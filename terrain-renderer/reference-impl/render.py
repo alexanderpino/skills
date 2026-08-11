@@ -2297,10 +2297,15 @@ def _stone(x, y, s, vdir, fp):
 #     band is not brighter than the coping because it catches more light.
 #   * what does change with height is the PATCH OF SURFACE it integrates. The
 #     gather's weight peaks at rho = qz, so a facet 6 mm up reads a centimetre
-#     of water and resolves single caustic bands; the coping, 300 mm back and
-#     150 mm up, reads half a metre and averages the net into a DC. That is the
-#     whole of "brighter and more legible ... because it is closer to the
-#     water", and the contrast printed after the render measures it.
+#     of water while one 120 mm up reads a decimetre. That is the mechanism B2b
+#     is pointing at -- and MEASURED IT IS WEAK over this band: the pattern
+#     contrast runs 0.17 at 6 mm to 0.14 at 120 mm, against 0.16 for the stone
+#     at the lip. 6 to 120 mm of blur is small against a 20 cm net, so the band
+#     does NOT out-contrast the coping per unit area. What it actually wins is
+#     ORIENTATION and AREA: it faces the pool with pf = 1 over an unbroken
+#     100 mm of vertical face, where the stone gets the same gather through the
+#     0.95*pf + 0.10*Nz of a bullnose and a few joint flanks. Both numbers are
+#     printed, so the claim is checkable rather than asserted.
 #   * and it is the LINER, not a material of its own: the same pigment as the
 #     bed with no water over it. Whether that reads PALE, as the sixth
 #     photograph shows it, is then a lighting question and not a pigment one --

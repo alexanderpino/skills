@@ -348,6 +348,80 @@ crossing the waterline says which port was modelled.
 
 ---
 
+## 11 · Two implementations: the numpy oracle and a WebGPU demonstration
+
+Agreed with the owner: **the numpy renderer becomes the absolute reference**, and
+a second implementation — WebGPU, animated, real time — becomes the demonstration.
+They are not competing versions of one thing; they answer different questions, and
+**the pair is the verification.**
+
+### Why two
+
+The chapter is written for games. Its tier ladder *asserts* that tier 2 — a
+caustic map rasterised in a light-view pass — approximates tier 3 well enough,
+and nobody has ever measured that. Worse, nothing in this project has yet shown
+that a single piece of its advice fits a frame budget. A GPU implementation closes
+both gaps at once, and its brief is **not "make it faster"** — it is *match the
+oracle within a stated tolerance*. That turns the ladder's central claim from an
+assertion into a measurement.
+
+Animation is the second reason. Several of the chapter's claims are **temporal**
+and a still frame cannot falsify any of them: that authored caustic textures keep
+churning when the water goes calm; that a correct caustic set is coherent with the
+surface above it; that the jet's boil is transient; and the reference observer's
+own opening remark, *you can follow the waves*. The oracle has no `t` at all —
+`field.py` is one frozen instant with fixed random phases.
+
+### What the oracle must **not** become
+
+Its value is not the picture. It is ~40 printed regressions per run — the colour
+table, the slope ledger, the corridor table, the silhouette regression, the
+closure test — all numpy reductions over intermediate buffers, plus every constant
+either derived in a comment or marked `?`. Porting it to the GPU would optimise
+for the one thing it is not for and lose the thing it is for. It stays slow,
+explicit, still-frame and instrumented. Parts of it also lean on f64: the eikonal
+solve, the Gabor reconstruction, the analytic cylinder intersection at 2 mm
+tolerance.
+
+### What it must earn before it can be called the reference
+
+Stating this because a reference that is itself unvalidated is just a second
+opinion. Today the oracle is **internally consistent**, not **externally
+correct**: every number is derived or marked, and every claim it makes about
+itself is checked — but almost nothing in it has been checked against anything
+outside this project except photographs, by eye. Three things would fix that:
+
+1. **Analytic test cases where a closed form exists** — a flat surface at every
+   view angle against the Fresnel curve, a point source in a clear medium, a
+   single sinusoid's caustic against the known Jacobian, absorption against
+   Beer-Lambert. Cheap, and each one either passes or finds something.
+2. **Published measurements, not just derivations** — pure-water absorption
+   against Pope & Fry, slope statistics against Cox & Munk, the submerged-jet
+   spreading constants against the turbulence literature. Several of these the
+   chapter already cites; the implementation has never been run against them.
+3. **Drive the `?` markers to zero or accept them explicitly.** Each one is a
+   place the reference cannot answer, and a reference should know its own gaps by
+   name. `WIND_RMS`, `REVERB_RMS`, `ETA_C`, `C_SRC`, the contact angle, the wake
+   carrier ratio, the aerosol optical depth.
+
+### What "matching" should mean
+
+**Match the diagnostics, not the pixels.** A raster tier will never reproduce the
+oracle pixel for pixel and should not be asked to — the two use different
+estimators and the difference is the whole point of having tiers. The contract is
+the printed physics: caustic cell size, the focusing number at each depth, the
+corridor contrast table, saturation by region, the sail-shadow ratio in **linear**
+light, the far-water firefly metric. Publish a tolerance per row and let the GPU
+version fail rows honestly rather than average its way to a passing image.
+
+One thing animation will expose immediately, and it should be expected rather than
+treated as a regression: the sun disc is **under-sampled between pixels** — the
+reflected direction steps 0.94° near and 1.82° far against a convolved disc lobe
+of 0.63°/1.11°, a factor 1.5–1.6. In a still that is Poisson noise on a correct
+mean and invisible. In motion it is flicker. The fix was scoped in wave 6 — a
+second `grad_points`/`slope_var_points` pair at a shading-bandwidth footprint for
+the specular path only — and it is now a prerequisite rather than a nicety.
+
 ## Method notes, if the chapter wants them
 
 - **Compare light to light.** A shadow ratio read off sRGB-encoded luminance
