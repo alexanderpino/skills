@@ -54,6 +54,76 @@ feature is mostly a matter of building the view, not of finding new physics.
   a Fresnel term, and the mirror side is the existing reflection path. Nothing
   here needs a path tracer.
 
+## Not modelled yet — the wall as a light carrier
+
+The single largest unmodelled transfer in the daylight scene, and it is now
+**measured rather than argued**. Two independent numbers say the same thing:
+
+- **58%** of the bed's total-internal-reflection return meets a wall before it
+  ever reaches the surface. Past 48.6° from vertical, 1.40 m of depth needs
+  ≥1.59 m of horizontal run and the basin is 4 m across. Those rays are dropped.
+- The **exact rectangle view factor** from a bed point to the water surface says
+  the walls take a large share of the bed's cosine-weighted hemisphere (printed
+  each run, mean and worst texel) — and `SKY_AMB` is currently applied over the
+  whole of it. So the flat blue ambient is over-counted by exactly that share,
+  and the directional term that should replace it is missing.
+
+That pairing is why the errors have **opposite signs**: caustic interiors on the
+deep floor come out too dark (nothing fills them from the side) while the sail's
+shadow comes out too bright (a flat constant fills what should be shadowed).
+One missing mechanism, two symptoms.
+
+What does not exist is the **return leg**. The receiving half is already here —
+`_riser_shade`'s gather is written for a vertical face and already reads
+`wall_img` when a gather ray lands on a wall — but wall → bed needs an *up-going*
+intersector, which `scene_hit` is not (it solves the first hit of a **downgoing**
+ray). That is the whole of the work, and it is a pass of its own.
+
+## Not modelled yet — the meniscus as a specular feature
+
+The waterline against a wall carries a thin bright line in every reference
+frame, and the mechanism is certain rather than incidental. The static 2-D
+meniscus on a vertical wall is `z = 2a·sin(φ/2)` with the capillary length
+`a = √(σ/ρg) = 2.72 mm`, so the water climbs `a√(2(1−sin θ_c))` — 3.85 mm at
+perfect wetting — and the fillet decays over a couple of capillary lengths.
+Across those ~5 mm the surface tilt runs continuously from 0 to 90°−θ_c, so the
+strip contains **every** facet orientation and the mirror condition for the sun,
+or for the bright horizon, is satisfied somewhere in it whatever the sun does.
+It is the one specular feature in the scene that cannot fail the reachability
+test the spec-C diagnostic applies to the open surface.
+
+`render.py` now takes its **width** from the capillary length instead of a
+guessed 10 mm, but the term is still an *ambient* lift and the mechanism is
+*specular*. Building it properly needs two things it does not have:
+
+- the sub-pixel integral over the fillet — surface at tilt φ occupies
+  `dx = a cos(φ/2) cos(φ)/sin(φ) dφ`, and the sun's 0.53° selects about 15 µm of
+  it, so the line's brightness is a flux per unit length of waterline divided by
+  the pixel footprint, not a shading term;
+- the **azimuth**. A meniscus tilts only perpendicular to its own waterline, so
+  the sun's mirror condition is reachable on the east and west walls of this
+  basin and not on the north and south, while the horizon's is reachable on all
+  four. A uniform bright line on all four walls would be wrong.
+
+## Not reachable from this file — per-band footprint filtering
+
+The far water aliases: the 2.8 cm capillary band is sampled at a pixel footprint
+that grows with distance and there is no distance-dependent narrowing of the
+slope distribution, so it beats against the pixel grid as a coarse moiré. The
+correct move is to **narrow the distribution, not blur the image** — a blur of
+the shaded result loses the specular statistics, which are the whole point.
+
+`render.py` cannot do it: it consumes `grad_points(x, y)` and gets one slope per
+point with no knowledge of which band contributed what. What `field.py` would
+have to expose is a footprint argument —
+
+    grad_points(x, y, fp)   # fp = the pixel's footprint on the surface, metres
+
+— with each band's contribution attenuated by its own `exp(−(k·fp)²/2)` before
+the bands are summed, so a 2.8 cm band vanishes once the footprint passes it
+while the 20 cm band survives. `render.py` already computes `FOOT` per ray and
+would simply pass it.
+
 ## Not modelled yet — submerged wall lights
 
 Requested for a later pass. Worth writing down now because it is not a small
@@ -88,6 +158,18 @@ Numbers this reproduces, each stated in the chapter:
 sun-disc penumbra 6.8 mm on the bed; caustic offset 1.37 m at 44.4 deg refraction;
 jet surface footprint peaking 0.91 m downstream; local rms slope 0.12 against
 0.058 far field; wake energy fan +-19 deg against a +-78 deg wavevector fan.
+
+A camera channel is a **band**, not a wavelength. `IOR = 1.3320/1.3348/1.3400`
+at 620/545/460 nm turns out to be Cauchy-consistent to 5e-5, so `n(λ)` is
+recovered from those three constants rather than added to them, and each channel
+is integrated over the Voronoi cell of its own nominal wavelength (417.5–657.5 nm
+tiled with no gap). This costs nothing — the sun's rays carry a jittered
+wavelength, and the camera's `SS×SS` subsample grid carries a Latin square of
+spectral strata, so the box filter does the spectral integral it was already
+doing the spatial one. It matters because three delta wavelengths are a 3-point
+quadrature: fine on a caustic fold, where the integrand is smooth over the
+9.8 mm (2.1 output pixel) red-to-blue spread, and an aliasing comb on an opaque
+silhouette, where the integrand is a step at exactly that scale.
 
 Slope convention, everywhere in this directory and in the chapter: `s` is
 `sqrt(<|grad h|^2>)`, the total mean-square slope, never the per-axis rms that is

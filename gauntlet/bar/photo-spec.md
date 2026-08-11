@@ -331,3 +331,39 @@ view is.
   bed folded back down, in both references — the top of the underwater half in the
   lagoon frame, and the upper band in the pool frame. It must be the same surface
   that writes the caustics below it. *Photograph.*
+
+## I · A floating object — added mid-run by owner ruling
+
+> Requested with a reference photograph of an inflatable ring in a pool. In scope
+> despite the section E scenery ruling, on the same grounds as the step flight: it
+> is not decoration, it is a **water-physics instrument**. Every criterion below is
+> a reading of the wave field or of the medium, and each one fails visibly if the
+> water is faked.
+
+A float earns its place because it touches the surface, which nothing else in this
+scene does. It therefore reads the wave field **in profile** — the same reading the
+split shot gets from the lens boundary, available from an ordinary above-water
+camera.
+
+- **It rides the waves.** Height and attitude follow the surface under it, so a
+  float that sits level on a moving surface is wrong, and one whose bob is not the
+  same field that writes the caustics is wrong differently. *Derived.*
+- **The waterline wraps it.** Its own meniscus runs right around the hull, at the
+  same capillary scale as section B3 and with the same specular consequence — a
+  bright rim where the fillet sweeps through the mirror direction. It is the
+  cheapest possible check that the meniscus term generalises off a straight wall.
+  *Derived.*
+- **It is cut in two by refraction.** The submerged part is displaced relative to
+  the part above, along the view ray, and the offset moves with the surface. Same
+  mechanism as the step nosings, but on a curved body at the surface where the
+  displacement is largest. *Derived.*
+- **Its shadow on the bed is a reduction, not a hole**, and the caustic net stays
+  legible inside it — visible in the reference frame, and the third independent
+  confirmation of the claim section B makes for the shade sail. The shadow is also
+  **displaced** from directly beneath, by the same 1.37 m the sun's refraction
+  gives everything else at this depth. *Photograph.*
+- **Its underside is lit by the pool**, not by the sky — the upwelling radiance
+  the coping already uses, now on a receiver that hangs over the water.
+  *Derived.*
+- **Out of scope for the float:** its own material beyond a plain diffuse
+  colour. It is an instrument; do not spend effort on printed graphics or seams.

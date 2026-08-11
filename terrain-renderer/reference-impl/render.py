@@ -319,7 +319,7 @@ STEP_BB = (min(STEP_C[0] - STEP_R[2], BENCH_C[0] - BENCH_R),
 #   C  jet boil      short waves at the outlet, e-folding ~2 m -> the local rough patch
 NU = 1.004e-6
 
-from field import (X0, X1, Y0, Y1, JET_XY, grad_grid, grad_points,
+from field import (X0, X1, Y0, Y1, JET_XY, SIGMA_W, grad_grid, grad_points,
                    normal_from_grad, jet_envelope, shelter, _norm_jets)
 
 def refract(ix, iy, iz, nx, ny, nz, eta):
@@ -927,23 +927,32 @@ print("TIR return: %.1f%% of the bed's own output comes back down; it adds %s "
 print("  ...but %.0f%% of it meets a wall before it reaches the surface (the "
       "unmodelled wall re-emission), and the survivors are smeared over metres"
       % (100 * (1.0 - _ok.mean())))
-# HOW BIG IS THE WALL, as a light carrier?  Not by argument -- by the same
-# closed form bed_ao already uses for a riser. A straight wall of height h at
-# distance a takes a cosine-weighted share (1 - a/sqrt(a^2+h^2))/2 of a bed
-# point's hemisphere. Summed over the four walls of this basin that is the
-# fraction of the sky the bed CANNOT see, and every bit of it is currently
-# credited to SKY_AMB anyway. This is the size of the missing term, and it is
-# the number to weigh a wall-re-emission pass against -- see the README.
-_WSH = np.zeros_like(BDEP)
-for _sd2, _dist in ((0, BU - X0), (1, X1 - BU), (2, BV - Y0), (3, Y1 - BV)):
-    _a = np.maximum(_dist, 1e-3)
-    _h = np.maximum(BDEP, 0.)                      # wall stands from bed to surface
-    _WSH += .5 * (1.0 - _a / np.hypot(_a, _h))
-print("  the four walls take %.1f%% of the bed's cosine-weighted hemisphere on "
-      "average (%.0f%% at the worst texel) -- and SKY_AMB is applied over the "
-      "WHOLE of it, so the flat ambient is over-counted by that share and the "
-      "directional wall term that should replace it is missing"
-      % (100 * _WSH.mean(), 100 * _WSH.max()))
+# HOW BIG IS THE WALL, as a light carrier?  Not by argument -- exactly. What a
+# bed point can see of the SKY is the water rectangle overhead, and the
+# cosine-weighted view factor from a horizontal differential element to a
+# parallel rectangle is closed form; split the rectangle at the point's own
+# (x, y) and sum the four quadrants:
+#   F(a, b, h) = (1/2pi)[ (a/r_a) atan(b/r_a) + (b/r_b) atan(a/r_b) ],
+#   r_a = sqrt(a^2 + h^2),  r_b = sqrt(b^2 + h^2)
+# Everything left over is WALL, and every bit of that is currently being
+# credited to SKY_AMB. This is the size of the missing term, and the number to
+# weigh a wall-re-emission pass against -- see the README backlog.
+def _sky_vf(x, y, h):
+    tot = 0.
+    for a in (x - X0, X1 - x):
+        for b in (y - Y0, Y1 - y):
+            ra, rb = np.hypot(a, h), np.hypot(b, h)
+            tot = tot + (a / ra * np.arctan(b / ra)
+                         + b / rb * np.arctan(a / rb)) / (2 * np.pi)
+    return tot
+
+
+_WSH = 1.0 - _sky_vf(BU, BV, np.maximum(BDEP, 1e-3))
+print("  the walls take %.1f%% of the bed's cosine-weighted hemisphere on "
+      "average (%.0f%% at the worst texel, exact rectangle view factor) -- and "
+      "SKY_AMB is applied over the WHOLE of it, so the flat ambient is "
+      "over-counted by that share and the directional wall term that should "
+      "replace it is missing" % (100 * _WSH.mean(), 100 * _WSH.max()))
 BEDRET = np.stack([sample(bedret[..., c:c + 1], BU.ravel(), BV.ravel(),
                           X0, X1, Y0, Y1)[:, 0].reshape(BU.shape)
                    for c in range(3)], -1)
@@ -1043,7 +1052,12 @@ for wi in range(4):
 # where the estimator has to be sharp and where the log spacing puts it.
 RIS_NT, RIS_NZ = 512, 24        # arc samples per cylinder (18 mm), height samples
 RIS_ND, RIS_NP = 20, 12         # distance strata x azimuth strata = 240 directions
-RIS_D0, RIS_D1 = 0.008, 30.0    # sampled range of bed distance, m
+RIS_D0, RIS_D1 = 0.006, 120.0   # sampled range of bed distance, m. The upper
+                                # end is far past the 8.9 m basin diagonal on
+                                # purpose: those are the near-horizon directions
+                                # that see the far WALL, and cutting them off
+                                # would show up as a closure deficit rather than
+                                # as a wrong picture. Priced exactly, below.
 RIS_HMIN = 0.020                # ? importance-sampling floor on the reference
                                 # ? height. It changes only the pdf, never the
                                 # ? estimate: a texel sitting on its own foot has
@@ -1757,6 +1771,35 @@ FOOT = t_hit * PIXANG / np.maximum(np.abs(D[:, 2]), .10)
 #  3  the meniscus.  Water wets the wall and climbs it; the curved sliver is
 #     brighter than the flat surface next to it.
 COP_REFL = np.array([.62, .57, .48]) * (SKY_DECK * .40 + WBOUNCE * .85)
+# The meniscus, with its width DERIVED instead of guessed. Water wets the wall
+# and climbs it; the 2-D static meniscus on a vertical wall is exactly
+#     z = 2 a sin(phi/2),      a = sqrt(sigma / rho g) = 2.72 mm
+# with phi the surface's inclination to the horizontal, so the climb at the wall
+# is h = a sqrt(2(1 - sin theta_c)) -- 3.85 mm at perfect wetting, 2.72 mm at a
+# 30 deg contact angle -- and the fillet decays over a couple of capillary
+# lengths. The 10 mm e-folding that used to be here was about twice that and was
+# not derived from anything.
+# WHAT IS STILL WRONG WITH IT, stated rather than left implicit: this is an
+# AMBIENT lift, and the mechanism is SPECULAR. Across that 5 mm strip the tilt
+# runs continuously from 0 to 90 - theta_c, so the strip contains EVERY facet
+# orientation and the mirror condition for the sun or for the bright horizon is
+# satisfied somewhere in it whatever the sun does -- which is why every pool
+# photograph has a bright waterline even when the open water is glassy, and it
+# is the one specular feature in this scene that cannot fail the reachability
+# test the spec-C diagnostic below applies to the open surface. Building it
+# properly needs the sub-pixel integral over the fillet (the surface at tilt phi
+# occupies dx = a cos(phi/2) cos(phi)/sin(phi) dphi, and the sun's 0.53 deg
+# selects 15 um of it), and it needs the AZIMUTH: a meniscus tilts only
+# perpendicular to its own waterline, so the sun's mirror condition is reachable
+# on the east and west walls and not on the north and south, while the horizon's
+# is reachable on all four. That is a pass of its own; it is scoped in the
+# README rather than half-built here.
+CAP_A = np.sqrt(SIGMA_W / (1000.0 * 9.81))          # capillary length, 2.72 mm
+MENIS_H = CAP_A * np.sqrt(2.0)                      # ? climb at contact angle 0
+MENIS_W = 2.0 * CAP_A                               # ? fillet reach, ~2 a
+print("meniscus: capillary length %.2f mm, climb %.2f mm at perfect wetting, "
+      "fillet %.1f mm wide (was a guessed 10 mm e-folding)"
+      % (1000 * CAP_A, 1000 * MENIS_H, 1000 * MENIS_W))
 
 
 def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
@@ -1783,11 +1826,12 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
     occ_ = np.where(toward > 0, np.clip(1. - over / ZD, 0, 1), 0.) ** .8
     refl_ = refl_ * (1 - occ_)[:, None] + COP_REFL[None] * occ_[:, None]
     lip_ao = 1. - .34 * np.exp(-(in_w + SLIP) / .045)
-    menis = np.exp(-np.maximum(in_w + SLIP, 0.) / .010)
+    menis = np.exp(-np.maximum(in_w + SLIP, 0.) / MENIS_W)
 
     water = np.zeros((hw_x.size, 3))
     geo, smG_ = {}, None
     sidG = uG = vG = cylG = None
+    keyc = np.zeros(hw_x.size, np.int32)      # what EACH channel saw, packed
     for c in range(3):
         key = c if mode == 'disp' else 0
         if key not in geo:
@@ -1817,6 +1861,12 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
         if m.any():
             col[m] = _riser_shade(u[m], v[m], tz[m] * sm[m], cyl[m], c, mode)
         water[:, c] = col * np.exp(-ABS[c] * sm)
+        # The three channels see the silhouette in three PLACES -- measured at
+        # 2.07 output pixels apart -- so a pixel can be clean in green and cut
+        # by the edge in red. Flagging on green alone would leave those unfixed,
+        # and they are the ones that come out coloured. Packed here at no cost:
+        # the traces are already done.
+        keyc += (sid.astype(np.int32) * 8 + (cyl.astype(np.int32) + 1)) * (64 ** c)
         if c == 1:
             smG_, sidG, uG, vG, cylG = sm, sid, u, v, cyl
     # the residual in-scatter of a treated pool: tiny, but it is a PATH integral,
@@ -1825,7 +1875,7 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
     water *= lip_ao[:, None]
     out = (fres_ * refl_ + (1 - fres_) * water
            + (SKY_AMB[None] * .17 + SUN_COL[None] * .006) * menis[:, None])
-    return out, sidG, uG, vG, smG_, cylG, occ_
+    return out, sidG, uG, vG, smG_, cylG, occ_, keyc
 
 
 QSUB = ((SUBK[inp].astype(np.float64) + .5) / NSPEC)
@@ -2106,12 +2156,13 @@ print("edge coverage error: %dx%d regular grid %.4f rms, %dx%d jittered %.4f "
       % (SS, SS, _CQ3, ADAPT_N, ADAPT_N, _CQA, _CQ3 / max(_CQA, 1e-9)))
 
 
-def _edge_pixels(sidW, smW, cylW):
-    """Output pixels whose SS x SS subsamples disagree about what they see."""
+def _edge_pixels(keyW, smW):
+    """Output pixels whose SS x SS subsamples disagree about what they see --
+    in ANY of the three channels, which are 2 px apart on a silhouette."""
     key = np.zeros(W * H, np.int32)
     key[pav] = 1
     iw = np.flatnonzero(inp)
-    key[iw] = 2 + sidW.astype(np.int32) * 8 + (cylW.astype(np.int32) + 1)
+    key[iw] = 2 + keyW
     K = key.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
     K = K.reshape(-1, SS * SS)
     flag = (K != K[:, :1]).any(1)
@@ -2167,15 +2218,16 @@ def render(mode):
     if bgm.any():
         img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
     img[pav] = PAV_COL
-    col, sidW, uW, vW, smW, cylW, occW = water_shade(
+    col, sidW, uW, vW, smW, cylW, occW, keyW = water_shade(
         hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB)
     img[inp] = col
-    global WSID, WU, WV
+    global WSID, WU, WV, EDGE_PX
     WSID, WU, WV = sidW, uW, vW           # green trace: what each water pixel sees
     if not _PRINTED:
         print("reflection of the coping occludes %.1f%% of the visible surface"
               % (100. * (occW > .5).mean()))
-    idx = _edge_pixels(sidW, smW, cylW)
+    idx = _edge_pixels(keyW, smW)
+    EDGE_PX = idx
     if idx.size:
         ref = _refine(idx, mode)
         nx_o = W // SS
@@ -2301,7 +2353,63 @@ def colour_table(img, reg):
 REG = _regions()
 colour_table(hero, REG)
 
+EDGE_DISP = EDGE_PX.copy()
 mono = encode(render('mono'))
+
+# --- THE SILHOUETTE REGRESSION ------------------------------------------------
+# The nosing speckle was two mechanisms multiplying, and this measures both.
+# `mono` traces one wavelength for all three channels, so it has EXACTLY the
+# same geometry, the same maps and the same coverage error as `hero` and no
+# dispersion at all. The difference between them at a pixel is therefore, by
+# construction, what the spectral model did there. Reported on the silhouette
+# pixels against their own neighbours: if the edges carry much more chroma
+# departure than the water beside them, three deltas are still combing the edge;
+# if the two are comparable, what is left on the edge is dispersion and not the
+# aliasing of dispersion.
+_hf, _mf = hero.astype(float), mono.astype(float)
+_dv2 = _hf - _mf
+_lum2 = _dv2 @ np.array([.2126, .7152, .0722])
+_chr = np.sqrt(((_dv2 - _lum2[..., None]) ** 2).sum(-1)).ravel()
+_wm = np.zeros(W * H // (SS * SS), bool)
+_wm[EDGE_DISP] = True
+_nb = _wm.reshape(H // SS, W // SS).copy()
+for _s in (1, -1):
+    _nb |= np.roll(_nb, _s, 0) | np.roll(_nb, _s, 1)
+_nb = _nb.ravel() & ~_wm
+_wat = np.zeros(W * H, bool)
+_wat[inp] = True
+_wat = _wat.reshape(H // SS, SS, W // SS, SS).all((1, 3)).ravel() & ~_wm & ~_nb
+print("silhouette regression: |disp - mono| chroma, median / p99 in sRGB levels")
+print("  on the %d silhouette pixels  %5.1f / %5.1f" %
+      (_wm.sum(), np.median(_chr[_wm]), np.percentile(_chr[_wm], 99)))
+print("  on their immediate neighbours %5.1f / %5.1f" %
+      (np.median(_chr[_nb]), np.percentile(_chr[_nb], 99)))
+print("  on open water elsewhere       %5.1f / %5.1f  (the dispersion the bar "
+      "asks for on the folds)" % (np.median(_chr[_wat]),
+                                  np.percentile(_chr[_wat], 99)))
+# ...and WHERE the strongest colour actually sits, which is the other half of
+# the same question. Greenness excess against a 5x5 local mean isolates the
+# single-primary pixels the eye reads as speckle; the bar allows them on the
+# caustic FOLDS ("faint colour fringing on the fold lines, on the highest
+# contrast edges only") and not on an opaque geometric edge. So the test is not
+# whether they exist but where they are.
+_gex = _hf[..., 1] - .5 * (_hf[..., 0] + _hf[..., 2])
+_locg = np.zeros_like(_gex)
+for _dy in (-2, -1, 0, 1, 2):
+    for _dx in (-2, -1, 0, 1, 2):
+        _locg += np.roll(np.roll(_gex, _dy, 0), _dx, 1)
+_gex = (_gex - _locg / 25.).ravel()
+_top = _gex > np.percentile(_gex, 99.9)
+_isr = np.zeros(W * H, bool)
+_isr[np.flatnonzero(inp)[WSID == 5]] = True
+_isr = _isr.reshape(H // SS, SS, W // SS, SS).any((1, 3)).ravel()
+print("  the strongest 0.1%% of single-primary pixels, split exclusively: %.0f%% "
+      "on the bed's own caustic folds, %.0f%% on a riser face, %.0f%% on a "
+      "silhouette -- the bar allows the first and not the last"
+      % (100 * (_top & ~_isr & ~_wm).sum() / max(_top.sum(), 1),
+         100 * (_top & _isr & ~_wm).sum() / max(_top.sum(), 1),
+         100 * (_top & _wm).sum() / max(_top.sum(), 1)))
+
 Image.fromarray(hero).save("pool_final.png")
 print("wrote pool.png")
 
