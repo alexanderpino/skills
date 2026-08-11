@@ -785,12 +785,12 @@ against ≈0.11. **Never budget the two bands by wave height.** Those two figure
 slopes at one illustrative amplitude, though, not the *band rms slope* the focusing number takes;
 substituting one for the other is how an `F` nobody can reproduce gets published. The band figures,
 measured on the reference implementation's far field away from the jet (`reference-impl/field.py`),
-are `s ≈ 0.016` at `λ ≈ 3 cm` (`k ≈ 210 m⁻¹`) short and `s ≈ 0.05` at `λ ≈ 18 cm` (`k ≈ 35 m⁻¹`)
+are `s ≈ 0.016` at `λ ≈ 3 cm` (`k ≈ 210 m⁻¹`) short and `s ≈ 0.055` at `λ ≈ 18 cm` (`k ≈ 35 m⁻¹`)
 long, so over the reference pool's 1.40 m floor `F = 0.25·d·s·k` ([The focusing
-number](#the-focusing-number-which-regime-the-bed-is-in)) puts them at `F ≈ 1.2` and `F ≈ 0.6`. Which
-is why the short band must not own the bed pattern: it is *at* focus, but onto a 3 cm cell, and it
-holds under a tenth of the slope variance — it stipples the bed, while the long band sits at the fold
-onset where the soft, low-contrast net lives.
+number](#the-focusing-number-which-regime-the-bed-is-in)) puts them at `F ≈ 1.2` and `F ≈ 0.7`.
+Which is why the short band must not own the bed pattern: it is *at* focus, but onto a 3 cm cell,
+and it holds under a tenth of the slope variance — it stipples the bed, while the long band sits
+between fold onset and focus, where the soft, low-contrast net lives.
 
 - **Shelter modulates the short band only.** In the wind shadow of a sail or a hedge the surface
   goes glassy *but keeps undulating*: the lee kills the wind band while the jet waves cross it
