@@ -55,8 +55,8 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 # 2.55 m over the east coping, 29 deg down, 22 deg lens: the frame runs from the
 # far coping (8.7 m, theta_v 16 deg) to 3.2 m out (theta_v 39 deg), so the glint
 # band lands on the jet's rough patch and the far half stays turquoise.
-EYE = np.array([8.30, 2.45, 2.55])    # east: the anti-solar side
-CAM_AZ = np.deg2rad(183.5)            # very nearly due west: see above
+EYE = np.array([8.30, 1.85, 2.55])    # east: the anti-solar side
+CAM_AZ = np.deg2rad(176.6)            # anti-solar to 0.4 deg: see above
 CAM_EL = np.deg2rad(-27.5)
 FOV = np.deg2rad(22.0)
 TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
@@ -423,19 +423,155 @@ def vnoise(x, y):
             (g(0, 1) * (1 - fx) + g(1, 1) * fx) * fy)
 
 
-def ground(x, y, grass):
-    v = np.asarray(sun_vis(x, y), float)[:, None]
-    if grass:
-        n = vnoise(x * 2.2, y * 2.2) * .6 + vnoise(x * 9., y * 9.) * .4
-        alb = np.array([.14, .29, .10])[None] * (.78 + .44 * n)[:, None]
-    else:
-        n = vnoise(x * 1.6, y * 1.6) * .7 + vnoise(x * 7.5, y * 7.5) * .3
-        j = ((np.abs(((x / .62) % 1.) - .5) > .478) |
-             (np.abs(((y / .62) % 1.) - .5) > .478)).astype(float)
-        alb = (np.array([.63, .51, .41])[None] * (.88 + .14 * n)[:, None]
-               * (1 - .14 * j)[:, None])
-    lift = SAIL_TAU * (1.0 - v) * sail_glow(x, y)[:, None]
-    return alb * (SUN_COL[None] * SUN_DIR[2] * (v + lift) * .30 + SKY_AMB[None] * .88)
+def vnoise_d(x, y):
+    """Same field, with its analytic gradient -- the paving needs slopes, not
+    values: at a 21 degree sun the relief is carried by N.L, not by albedo."""
+    xi, yi = np.floor(x).astype(np.int64), np.floor(y).astype(np.int64)
+    fx, fy = x - xi, y - yi
+    ux, uy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+    dux, duy = 6 * fx * (1 - fx), 6 * fy * (1 - fy)
+    g = lambda a, b: _VN[(yi + b) & 255, (xi + a) & 255]
+    a00, a10, a01, a11 = g(0, 0), g(1, 0), g(0, 1), g(1, 1)
+    k1, k2 = a10 - a00, a01 - a00
+    k3 = a00 - a10 - a01 + a11
+    return (a00 + k1 * ux + k2 * uy + k3 * ux * uy,
+            (k1 + k3 * uy) * dux, (k2 + k3 * ux) * duy)
+
+
+# --------------------------------------------------------------------------- the pool edge
+# The single thing this file used to get wrong. The water was a rectangle test
+# against a deck plane 55 mm up, so the two met along an aliased boolean line and
+# the pool read as a decal. It is replaced here by the actual section of a pool
+# edge, traced as a height field: wall, coping bedded on it and OVERHANGING its
+# face, bullnose rolled over the overhang, water 75 mm below the coping top.
+def pool_s(x, y):
+    """Outward distance from the pool rectangle in the max norm -- mitred corners,
+    and convex, which is what lets the march below take its shortcut."""
+    return np.maximum(np.abs(x - .5 * (X0 + X1)) - .5 * (X1 - X0),
+                      np.abs(y - .5 * (Y0 + Y1)) - .5 * (Y1 - Y0))
+
+
+def pool_grad(x, y):
+    a = np.abs(x - .5 * (X0 + X1)) - .5 * (X1 - X0)
+    b = np.abs(y - .5 * (Y0 + Y1)) - .5 * (Y1 - Y0)
+    e = a >= b
+    return (np.where(e, np.sign(x - .5 * (X0 + X1)), 0.),
+            np.where(e, 0., np.sign(y - .5 * (Y0 + Y1))), e)
+
+
+def edge_z(s):
+    d = np.clip(SBUL - s, 0., BULR)
+    return np.where(s >= SBUL, ZD, ZCEN + np.sqrt(np.maximum(BULR * BULR - d * d, 0.)))
+
+
+def gh(x, y):
+    s = pool_s(x, y)
+    return np.where(s < SLIP, 0.0, edge_z(s))
+
+
+def _hash(a, b, k=0.):
+    v = np.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453
+    return v - np.floor(v)
+
+
+def _groove(c, per, hw, dep):
+    """A joint every `per` metres. A 5 mm groove under a 21 degree sun is not a
+    drawn line: it is one face that catches the sun and one that cannot."""
+    f = (c / per) % 1.0
+    d = np.minimum(f, 1 - f) * per
+    return (-dep * np.clip(1 - d / hw, 0, 1),
+            np.where(d < hw, dep / hw * np.where(f < .5, 1., -1.), 0.),
+            np.clip(1 - d / hw, 0, 1), np.clip(1 - d / .050, 0, 1))
+
+
+def _notch(c, c0, hw, dep):
+    d = np.abs(c - c0)
+    return (-dep * np.clip(1 - d / hw, 0, 1),
+            np.where(d < hw, dep / hw * np.sign(c - c0), 0.),
+            np.clip(1 - d / hw, 0, 1), np.clip(1 - d / .050, 0, 1))
+
+
+def paving(x, y, s, vdir, fp):
+    """Coping course and terrace. In this frame it is a border, so it gets what a
+    border needs and nothing else: stone that changes stone to stone, joints with
+    a groove rather than a line, and the splash-damp band every coping carries
+    within a hand's width of the water -- darker, and glossy where the stone is
+    matt. No garden, no props."""
+    gx, gy, ex = pool_grad(x, y)
+    along = np.where(ex, y, x)
+    side = np.where(ex, np.where(gx > 0, 0., 1.), np.where(gy > 0, 2., 3.))
+    cop = s < COPW
+
+    # --- joints: coping runs across the course, the terrace is a 0.92 x 0.61 field
+    ja, dja, ga, wa = _groove(along + .19 * side, .55, .009, .0050)
+    jn, djn, gn, wn = _notch(s, COPW, .009, .0050)
+    row = np.floor(y / .61)
+    jx, djx, gxj, wxj = _groove(x + .46 * (row % 2.), .92, .008, .0045)
+    jy, djy, gyj, wyj = _groove(y, .61, .008, .0045)
+    dzx = np.where(cop, np.where(ex, 0., dja) + djn * gx, djx)
+    dzy = np.where(cop, np.where(ex, dja, 0.) + djn * gy, djy)
+    jm = np.where(cop, np.maximum(ga, gn), np.maximum(gxj, gyj))
+    jw = np.where(cop, np.maximum(wa, wn), np.maximum(wxj, wyj))
+
+    # --- micro relief, faded out once an octave is finer than the pixel footprint
+    n1, d1x, d1y = vnoise_d(x * 1.9, y * 1.9)
+    n2, d2x, d2y = vnoise_d(x * 8.5 + 11., y * 8.5 + 3.)
+    n3, d3x, d3y = vnoise_d(x * 33. + 5., y * 33. + 7.)
+    w2 = 1. / (1. + (2.6 * fp * 8.5) ** 2)
+    w3 = 1. / (1. + (2.6 * fp * 33.) ** 2)
+    dzx = dzx + .0055 * w2 * d2x * 8.5 + .0016 * w3 * d3x * 33.
+    dzy = dzy + .0055 * w2 * d2y * 8.5 + .0016 * w3 * d3y * 33.
+
+    # --- the bullnose, as a normal in (s, z)
+    d = np.clip(SBUL - s, 0., BULR)
+    nz0 = np.sqrt(np.maximum(BULR * BULR - d * d, 0.)) / BULR
+    ns0 = np.where(s < SBUL, -d / BULR, 0.)
+    Nx, Ny, Nz = ns0 * gx - dzx * nz0, ns0 * gy - dzy * nz0, nz0
+    inv = 1. / np.sqrt(Nx * Nx + Ny * Ny + Nz * Nz)
+    Nx, Ny, Nz = Nx * inv, Ny * inv, Nz * inv
+
+    # --- splash. The stone within ~15 cm of the lip is never dry at 18:41.
+    wr = WET * (.55 + .90 * vnoise(x * 2.6 + 31., y * 2.6 + 17.))
+    wet = np.clip(1. - (s - SLIP) / np.maximum(wr, .02), 0, 1) ** 1.4
+    spot = (np.clip((vnoise(x * 5.5 + 3., y * 5.5 + 9.) - .60) / .18, 0, 1) *
+            np.clip(1. - (s - SLIP) / .60, 0, 1))
+    wet = np.where(cop, np.maximum(wet, .60 * spot), .35 * spot)
+
+    # --- albedo
+    ks = np.where(cop, np.floor((along + .19 * side) / .55), np.floor((x + .46 * (row % 2.)) / .92))
+    kt = np.where(cop, side, row)
+    t1, t2 = _hash(ks, kt, 3.1), _hash(ks, kt, 11.7)
+    alb = np.where(cop[:, None], np.array([.660, .604, .502])[None],
+                   np.array([.618, .558, .466])[None])
+    alb = alb * (1. + .30 * (t1 - .5))[:, None]
+    alb = alb * (1. + np.stack([.10 * (t2 - .5), .015 * (t2 - .5), -.11 * (t2 - .5)], 1))
+    alb = alb * (1. + .13 * (n1 - .5) + .11 * w2 * (n2 - .5) + .09 * w3 * (n3 - .5))[:, None]
+    alb = alb * (1. - .42 * jm)[:, None]
+    alb = alb * (1. - .22 * jw * vnoise(x * 3.3 + 61., y * 3.3 + 41.))[:, None]
+    alb = alb * (1. - .36 * wet)[:, None]
+
+    # --- light
+    L = SUN_DIR
+    ndl = np.clip(Nx * L[0] + Ny * L[1] + Nz * L[2], 0, 1)
+    vis = np.asarray(sun_vis(x, y), float)
+    lift = SAIL_TAU * (1. - vis) * sail_glow(x, y)
+    skyv = (.55 + .45 * Nz) * (1. - .40 * jm)
+    col = alb * (SUN_COL[None] * (ndl * vis + SUN_DIR[2] * lift)[:, None] * .30
+                 + SKY_AMB[None] * (.88 * skyv)[:, None])
+
+    Vx, Vy, Vz = -vdir[:, 0], -vdir[:, 1], -vdir[:, 2]
+    Hx, Hy, Hz = L[0] + Vx, L[1] + Vy, L[2] + Vz
+    hn = 1. / np.sqrt(Hx * Hx + Hy * Hy + Hz * Hz)
+    Hx, Hy, Hz = Hx * hn, Hy * hn, Hz * hn
+    ndh = np.clip(Nx * Hx + Ny * Hy + Nz * Hz, 0, 1)
+    vdh = np.clip(Vx * Hx + Vy * Hy + Vz * Hz, 0, 1)
+    ndv = np.clip(Nx * Vx + Ny * Vy + Nz * Vz, 1e-3, 1)
+    m = 12. + 300. * wet
+    Fs = .045 + .955 * (1. - vdh) ** 5
+    col = col + (SUN_COL[None] * (Fs * (m + 8.) / (8. * np.pi) * ndh ** m
+                                  * ndl * vis * .30)[:, None])
+    Fv = .045 + .955 * (1. - ndv) ** 5
+    return col + SKY_AMB[None] * (Fv * (.09 + .55 * wet))[:, None]
 
 
 # --------------------------------------------------------------------------- camera
@@ -463,36 +599,97 @@ hit_sail = np.zeros(W * H, bool)
 for t3 in ((0, 1, 2), (0, 2, 3)):
     hit_sail |= tri(EYE, D, SAIL[t3[0]], SAIL[t3[1]], SAIL[t3[2]])
 
+# --- trace the pool edge as a height field ---------------------------------
+# gh() is flat almost everywhere, so almost every ray is settled by an endpoint
+# test and only the band of pixels that actually straddles the coping is marched.
+Ex, Ey, Ez = EYE
 with np.errstate(divide='ignore', invalid='ignore'):
-    sd = (0.055 - EYE[2]) / D[:, 2]
-    sw = (0.0 - EYE[2]) / D[:, 2]
-pdx, pdy = EYE[0] + D[:, 0] * sd, EYE[1] + D[:, 1] * sd
-pwx, pwy = EYE[0] + D[:, 0] * sw, EYE[1] + D[:, 1] * sw
-down = (D[:, 2] < 0) & ~hit_sail
-inp = down & (pwx > X0) & (pwx < X1) & (pwy > Y0) & (pwy < Y1)
-DK = (X0 - 1.7, X1 + 1.7, Y0 - 1.5, Y1 + 2.1)
-GR = (X0 - 6., X1 + 6., Y0 - 3., Y1 + 6.)
-dk = down & ~inp & (pdx > DK[0]) & (pdx < DK[1]) & (pdy > DK[2]) & (pdy < DK[3])
-gr = down & ~inp & ~dk & (pdx > GR[0]) & (pdx < GR[1]) & (pdy > GR[2]) & (pdy < GR[3])
-bgm = ~hit_sail & ~inp & ~dk & ~gr
+    t_top = (ZD - Ez) / D[:, 2]           # plane of the coping top
+    t_wat = (0.0 - Ez) / D[:, 2]          # the still waterline
+down = (D[:, 2] < -1e-9) & ~hit_sail
+t_top = np.where(down, t_top, BIG)
+t_wat = np.where(down, t_wat, BIG)
+_ax, _ay = Ex + D[:, 0] * t_top, Ey + D[:, 1] * t_top
+_bx, _by = Ex + D[:, 0] * t_wat, Ey + D[:, 1] * t_wat
+_sa, _sb = pool_s(_ax, _ay), pool_s(_bx, _by)
+# pool_s is convex, so on the segment it never exceeds its endpoints: both ends
+# inside the lip proves the whole 75 mm of ray is over open water.
+is_wat = down & (np.maximum(_sa, _sb) < SLIP)
+is_pav = down & (_sa >= SBUL)             # already on the flat at the top plane
+_mar = np.flatnonzero(down & ~is_wat & ~is_pav)
+t_hit = np.where(is_wat, t_wat, np.where(is_pav, t_top, BIG))
+print("edge march: %d of %d rays (%.2f%%) straddle the coping"
+      % (_mar.size, down.sum(), 100. * _mar.size / max(down.sum(), 1)))
+if _mar.size:
+    _t0, _t1 = t_top[_mar], t_wat[_mar]
+    _dx, _dy, _dz = D[_mar, 0], D[_mar, 1], D[_mar, 2]
+    _lo, _hi, _prev = _t0.copy(), _t1.copy(), _t0.copy()
+    _got = np.zeros(_mar.size, bool)
+    for _k in range(1, 25):
+        _t = _t0 + (_t1 - _t0) * (_k / 24.)
+        _f = (Ez + _dz * _t) - gh(Ex + _dx * _t, Ey + _dy * _t)
+        _n = (~_got) & (_f <= 0)
+        _lo = np.where(_n, _prev, _lo); _hi = np.where(_n, _t, _hi)
+        _got |= _n; _prev = _t
+    _lo = np.where(_got, _lo, _t1); _hi = np.where(_got, _hi, _t1)
+    for _ in range(16):
+        _m = .5 * (_lo + _hi)
+        _f = (Ez + _dz * _m) - gh(Ex + _dx * _m, Ey + _dy * _m)
+        _lo = np.where(_f > 0, _m, _lo); _hi = np.where(_f > 0, _hi, _m)
+    t_hit[_mar] = _hi
 
-ix, iy = pwx[inp], pwy[inp]
+hx, hy = Ex + D[:, 0] * t_hit, Ey + D[:, 1] * t_hit
+S_HIT = pool_s(hx, hy)
+inp = down & (S_HIT < SLIP + 1e-7)
+pav = down & ~inp
+bgm = ~hit_sail & ~inp & ~pav             # nothing: the frame is water and stone
+
+PIXANG = 2. * np.tan(FOV / 2.) / H
+FOOT = t_hit * PIXANG / np.maximum(np.abs(D[:, 2]), .10)
+
+ix, iy = hx[inp], hy[inp]
 gxx, gyy = grad_points(ix, iy)
 nx, ny, nz = normal_from_grad(gxx, gyy)
 dd = D[inp]
 vx, vy, vz = -dd[:, 0], -dd[:, 1], -dd[:, 2]
 ndv = np.clip(nx * vx + ny * vy + nz * vz, 1e-4, 1.)
-refl = sky(-vx + 2 * ndv * nx, -vy + 2 * ndv * ny, np.abs(-vz + 2 * ndv * nz))
+rfx, rfy = -vx + 2 * ndv * nx, -vy + 2 * ndv * ny
+rfz = np.abs(-vz + 2 * ndv * nz)
+refl = sky(rfx, rfy, rfz)
 fres = F0[None] + (1 - F0[None]) * ((1 - ndv) ** 5)[:, None]
+
+# --- what the water does within a hand's width of the wall -------------------
+# Three separate things, all of them missing before, and together they are the
+# whole reason a pool edge does not read as a cut in a coloured rectangle.
+#  1  the reflection.  The coping stands 75 mm over the water and overhangs the
+#     wall by 20 mm, so a reflected ray heading at the wall from close in hits
+#     the underside of the stone instead of the sky.  That is the dark band that
+#     hugs every real pool edge, and it wobbles because the ripples aim the ray.
+#  2  the ambient.  Under the overhang the water sees a fraction of the sky.
+#  3  the meniscus.  Water wets the wall and climbs it; the curved sliver is
+#     brighter than the flat surface next to it.
+IN_W = -pool_s(ix, iy)                      # distance in from the wall face
+_egx, _egy, _ = pool_grad(ix, iy)
+_toward = rfx * _egx + rfy * _egy           # + = the reflected ray heads at the wall
+_over = rfz * np.maximum(IN_W + SLIP, 0.) / np.maximum(_toward, 1e-6)
+_occ = np.where(_toward > 0, np.clip(1. - _over / ZD, 0, 1), 0.) ** .8
+COP_REFL = np.array([.62, .57, .48]) * (SKY_AMB * .42 + SUN_COL * .020)
+refl = refl * (1 - _occ)[:, None] + COP_REFL[None] * _occ[:, None]
+LIP_AO = 1. - .34 * np.exp(-(IN_W + SLIP) / .045)
+MENIS = np.exp(-np.maximum(IN_W + SLIP, 0.) / .010)
+print("reflection of the coping occludes %.1f%% of the visible surface"
+      % (100. * (_occ > .5).mean()))
+
+PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
 
 
 def render(mode):
     img = np.zeros((W * H, 3))
     img[hit_sail] = (np.array([.74, .72, .76])[None] *
                      (SKY_AMB[None] * 1.6 + SUN_COL[None] * .22))
-    img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
-    img[dk] = ground(pdx[dk], pdy[dk], False)
-    img[gr] = ground(pdx[gr], pdy[gr], True)
+    if bgm.any():
+        img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
+    img[pav] = PAV_COL
     water = np.zeros((inp.sum(), 3))
     bi, wim = bed_img[mode], wall_img[mode]
     for c in range(3):
@@ -510,7 +707,9 @@ def render(mode):
                 col[m] = sample(wim[wi][..., c:c + 1], u[m], v[m], a, b, -DEPTH, 0.)[:, 0]
         water[:, c] = col * np.exp(-ABS[c] * sm)
     water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * DEPTH))
-    img[inp] = fres * refl + (1 - fres) * water
+    water *= LIP_AO[:, None]
+    img[inp] = (fres * refl + (1 - fres) * water
+                + (SKY_AMB[None] * .17 + SUN_COL[None] * .006) * MENIS[:, None])
     return img.reshape(H, W, 3)
 
 
