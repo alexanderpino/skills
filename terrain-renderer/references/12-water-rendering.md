@@ -318,6 +318,15 @@ trouble — and wind cannot raise waves at all until it can push past that minim
 speed, which is why a breeze produces *patches* of ripple ("cat's paws") separated by glassy
 water rather than uniform texture.
 
+**One slope convention, fixed for the whole chapter.** `s` is the **total** rms slope,
+`s = √⟨|∇h|²⟩ = √(σ_x² + σ_y²)`; *slope variance* and *mean-square slope* mean `s²`. The per-axis
+`σ = s/√2` is equally standard and is what Gaussian and Rayleigh tail arithmetic takes, so where a
+formula needs it the relation is written at the point of use and the unit never switches silently.
+The mix is cheap to make and expensive to find: `/2` is the `⟨cos²⟩ = ½` of a plane-wave sum in one
+place and a per-axis split in another, so every band stays individually defensible while the budget
+summing them is wrong by `√2` on whichever band was restated. Quote the convention with every slope
+figure, and read `σ` from its label — it also carries surface tension, frequency and extinction.
+
 **Dead calm is genuinely hard, for a specific reason.** As slope variance → 0, a microfacet
 specular lobe collapses toward a Dirac, and energy conservation makes what survives brighter as it
 narrows. The result is a single blown-out pixel-ish highlight instead of a sun reflection with
@@ -784,13 +793,14 @@ proportional to wavelength: a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave a
 against ≈0.11. **Never budget the two bands by wave height.** Those two figures are *single-wave*
 slopes at one illustrative amplitude, though, not the *band rms slope* the focusing number takes;
 substituting one for the other is how an `F` nobody can reproduce gets published. The band figures,
-measured on the reference implementation's far field away from the jet (`reference-impl/field.py`),
-are `s ≈ 0.016` at `λ ≈ 3 cm` (`k ≈ 210 m⁻¹`) short and `s ≈ 0.055` at `λ ≈ 18 cm` (`k ≈ 35 m⁻¹`)
-long, so over the reference pool's 1.40 m floor `F = 0.25·d·s·k` ([The focusing
-number](#the-focusing-number-which-regime-the-bed-is-in)) puts them at `F ≈ 1.2` and `F ≈ 0.7`.
-Which is why the short band must not own the bed pattern: it is *at* focus, but onto a 3 cm cell,
-and it holds under a tenth of the slope variance — it stipples the bed, while the long band sits
-between fold onset and focus, where the soft, low-contrast net lives.
+read off the reference implementation's far field away from the jet (`reference-impl/field.py`) as
+total rms slope, are `s ≈ 0.016` at `λ ≈ 3 cm` (`k ≈ 210 m⁻¹`) short and `s ≈ 0.055` at `λ ≈ 18 cm`
+(`k ≈ 35 m⁻¹`) long — both **chosen inputs to that implementation, not measurements of water** (`?`),
+so read them as a budget and never as evidence for themselves. Over the reference pool's 1.40 m
+floor `F = 0.25·d·s·k` ([The focusing number](#the-focusing-number-which-regime-the-bed-is-in)) puts
+them at `F ≈ 1.2` and `F ≈ 0.7`. Which is why the short band must not own the bed pattern: it is
+*at* focus, but onto a 3 cm cell, and it holds under a tenth of the slope variance — it stipples the
+bed, while the long band sits between fold onset and focus, where the soft, low-contrast net lives.
 
 - **Shelter modulates the short band only.** In the wind shadow of a sail or a hedge the surface
   goes glassy *but keeps undulating*: the lee kills the wind band while the jet waves cross it
@@ -812,7 +822,7 @@ float3 wake    = WakeAtlas.SampleLevel(smp, WakeUV(worldPos, fitting), 0).xyz;
 float3 N       = normalize(float3(-(sLong + shelter * sShort + wake.xy), 1));
 
 // Same masks into the filtered-variance path, or distance filtering re-adds the sparkle the lee
-// removed. Slope scales linearly with a mask, so variance scales with its square.
+// removed. Slope scales linearly with a mask, so variance scales with its square. mss = total s^2.
 float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase;
 ```
 
@@ -820,8 +830,9 @@ float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase
   linearly and decays as `1/s`, and cannot force the surface until it has spread far enough to reach
   it, so the disturbed patch is elongated along the aim and **starts downstream of the fitting
   rather than at it** — ~0.9 m downstream for a 20 mm restricted eyeball at ~13 m³/h set 15 cm deep,
-  half-length ~0.7 m, local rms slope roughly **twice** the far field. That is a ratio and not an
-  absolute: the surface-deformation scaling `η ~ C·u'²/g` carries an unknown O(1) constant (`?`).
+  half-length ~0.7 m, local rms slope roughly **twice** the far field — total `0.123` against
+  `0.058`, ratio **2.12**, on the reference implementation. The ratio is the claim, not the levels:
+  `η ~ C·u'²/g` carries an unknown O(1) constant (`?`) and both levels inherit the chosen bands (`?`).
   Its wake is a **narrow downstream band, not rings and not a Kelvin wedge**: the drift it drives,
   of order 1 m/s (0.8 bar through that eyeball is an 11.6 m/s jet), is strongly supercritical
   against water's minimum phase speed of 0.231 m/s ([Calm
@@ -1076,11 +1087,11 @@ sea-surface slope distribution is enormously wider: Cox & Munk photographed sun 
 aircraft and fitted mean-square slope against wind speed,
 
 ```
-sigma_c^2 = 0.003 + 1.92e-3 * W        # crosswind component
-sigma_u^2 = 0.000 + 3.16e-3 * W        # up/downwind component
-sigma_c^2 + sigma_u^2 = 0.003 + 5.12e-3 * W
+sigma_c^2 = 0.003 + 1.92e-3 * W        # crosswind component   -- PER-AXIS variance
+sigma_u^2 = 0.000 + 3.16e-3 * W        # up/downwind component -- PER-AXIS variance
+sigma_c^2 + sigma_u^2 = s^2 = 0.003 + 5.12e-3 * W       # the TOTAL mss; s = rms slope
 #   W = wind speed in m/s AT 12.5 m (not the 10 m of standard wind data — convert)
-#   valid 1-14 m/s; at 14 m/s total mss ~= (tan 16 deg)^2, i.e. rms slope ~= 0.28
+#   valid 1-14 m/s; at 14 m/s s^2 ~= (tan 16 deg)^2, i.e. total rms slope s ~= 0.28
 ```
 
 so the reflected-direction spread is **tens of degrees** while the source is a fraction of one.
@@ -1109,14 +1120,14 @@ plus tier 2 within a fade radius.
 
 **Check reachability before budgeting for glitter at all.** A glint needs the surface to supply the
 normal that bisects sun and eye, and the surface can only supply what its slope distribution
-contains. One half-vector settles it: `tilt = angle(normalize(L + V), up)`, read against the rms
-slope `s`.
+contains. One half-vector settles it: `tilt = angle(normalize(L + V), up)`, read against the
+**per-axis** rms slope `sigma = s/sqrt(2)` — this tail is Rayleigh in `sigma`, not in the total `s`.
 
 ```
-tilt < ~2s   a glitter path -- the classic shimmering road
-tilt ~ 3s    sparse isolated glints; a 2D Gaussian slope field leaves ~1% of the
-             surface above 3 sigma in magnitude, and far less pointing the right way
-tilt > ~4s   nothing. What the water shows there is sky reflection, not sun
+tilt < ~2 sigma   a glitter path -- the classic shimmering road
+tilt ~  3 sigma   sparse isolated glints; |grad h| of a 2D Gaussian slope field is Rayleigh,
+                  so P(|grad h| > 3 sigma) = exp(-9/2) ~= 1%, far less of it aimed the right way
+tilt > ~4 sigma   nothing. What the water shows there is sky reflection, not sun
 ```
 
 **At low sun the test is brutally azimuth-sensitive — and that makes it invertible.** With the sun
@@ -1125,13 +1136,13 @@ tilt. Holding the eye at the mirror elevation, an 18.75° azimuth error costs **
 sun, 7.8° at 50°, and 3.4° at 70°**: low-sun sparkle is pinned inside a narrow azimuth wedge, while
 a high sun forgives a lot. Run the test backwards and a photograph becomes a **measurement**. The
 geometry fixes the tilt the surface must supply, so the mere presence of sparkle puts a floor under
-the local rms slope:
+the local total rms slope, quoted beside the per-axis `sigma = s/sqrt(2)` the tail actually eats:
 
 ```
 required tilt 17.8 deg (measured sun + measured camera bearing)
-  s = 0.055  ->  5.7 sigma  ->  0.000 % of the surface  -> nothing visible
-  s = 0.090  ->  3.5 sigma  ->  0.25  %                 -> a sparse scatter of glints
-  s = 0.110  ->  2.8 sigma  ->  1.8   %                 -> a well-populated patch
+  s = 0.078  (sigma 0.055)  ->  5.7 sigma  ->  0.000 %  -> nothing visible
+  s = 0.127  (sigma 0.090)  ->  3.5 sigma  ->  0.25  %  -> a sparse scatter of glints
+  s = 0.156  (sigma 0.110)  ->  2.8 sigma  ->  1.8   %  -> a well-populated patch
 ```
 
 So a sparkle patch beside glassy water is not a lighting accident: it localizes water roughly twice
@@ -1139,13 +1150,13 @@ as rough as its surroundings, which is what a jet-stirred or gust-ruffled patch 
 as a calibration handle rather than tuning sparkle by eye.
 
 The common trap is a **low sun with a high camera**, because the two constraints multiply: the
-mirror elevation equals the sun's, *and* the observer must be near the anti-solar azimuth. A 21°
-sun viewed from a balcony 40° up and 70° off that azimuth needs ~47° of tilt — fifteen sigma, which
-is not "rare" but *never*. Move the same camera into the anti-solar azimuth and the requirement
-drops to ~9.5°, about 3 sigma, and sparse glints appear. Two payoffs: do not spend a glitter tier
-on a shot that cannot show one, and when matching reference photography, the **presence, sparsity
-or absence of sparkle reads back the camera's azimuth relative to the sun** — a free forensic
-check on a plate before you start tuning anything.
+mirror elevation equals the sun's, *and* the observer must be near the anti-solar azimuth. A 21° sun
+viewed from a balcony 40° up and 70° off that azimuth needs ~47° of tilt — fifteen sigma at the
+table's top row, which is not "rare" but *never*. Move the same camera into the anti-solar azimuth
+and the requirement drops to ~9.5°, 3 sigma, and sparse glints appear. Two payoffs: do not spend a
+glitter tier on a shot that cannot show one, and when matching reference photography, the
+**presence, sparsity or absence of sparkle reads back the camera's azimuth relative to the sun** — a
+free forensic check on a plate before you start tuning anything.
 
 **Glitter is a filter applied to the wave field, not a texture applied to the water.** Note what
 separates tiers 1 and 2 from tier 3: the first two are *functions of the slope field*, the third
@@ -1231,8 +1242,8 @@ Two consequences fall straight out, and both are load-bearing:
 Whether a body shows a crisp caustic net, a soft wash, or nothing much is not a matter of taste,
 and it has a one-line estimate. A surface slope `s` turns the refracted ray by `s·(1 − 1/n)`, so at
 depth `d` the receiver point moves by `d·s·(1 − 1/n)`; focusing happens when that displacement's
-*gradient* reaches unity. With `k` the dominant wavenumber and `s` the **band rms slope** — never a
-single wave's `2πa/λ`, which is larger and lands you a rung or two up the ladder:
+*gradient* reaches unity. With `k` the dominant wavenumber and `s` the band's **total** rms slope —
+not the per-axis `σ = s/√2`, and never a single wave's `2πa/λ`; either lands you a rung or two up:
 
 ```
 F = d * (1 - 1/n) * s * k        # water: 1 - 1/1.333 = 0.25, so F ~= 0.25 * d * s * k
@@ -1411,7 +1422,7 @@ BRDF far, with no popping and no discontinuity.
 ```
 # per wave train i, with w_r = the fraction NOT resolved by geometry or normals:
 sigma_x^2, sigma_y^2  =  SUM_i  (k_i,x^2, k_i,y^2)/||k_i||^2 * (1 - sqrt(1 - ||k_i||^2 * w_r^2 * h_i^2))
-#   axes are along/across the wind - i.e. exactly the Cox-Munk ellipse from the glitter section
+#   axes along/across wind = the Cox-Munk ellipse: PER-AXIS, and sigma_x^2 + sigma_y^2 = s^2 (total)
 #   practical trick: total variance for ALL waves on the CPU, subtract the RESOLVED waves in the
 #   shader, so shader cost scales with resolved wave count and is MINIMAL for distant views
 ```
@@ -1428,7 +1439,7 @@ the horizon band goes to near-100% mirror — that is precisely the chrome-dome 
 one line, fitted for `sigma_v < 0.5`:
 
 ```hlsl
-float  sigma_v2 = sigma_x2*cos2Phi + sigma_y2*sin2Phi;        // slope variance toward the viewer
+float  sigma_v2 = sigma_x2*cos2Phi + sigma_y2*sin2Phi;        // ONE-DIRECTION variance, not s^2
 float  sigma_v  = sqrt(sigma_v2);
 float  F = R + (1.0-R) * pow(1.0-cosThetaV, 5.0)
              * exp(-2.69*sigma_v) / (1.0 + 22.7*pow(sigma_v, 1.5));   // Bruneton et al. 2010
@@ -2256,8 +2267,10 @@ above except the TotK physics talk is community reconstruction or press/footage 
   knowledge and were **not** confirmed against a primary source — they vary by a few percent across
   experiments, which does not move the footprint qualitatively. The surface-deformation link
   `η ~ C·u'²/g` is a scaling argument (stagnation pressure of an eddy) whose **O(1) constant `C` is
-  genuinely unknown**; `C = 1` was used, which is why the chapter states the near-field roughness as
-  a ratio to the far field rather than as an rms slope. This link is the weakest in the chain.
+  genuinely unknown**; `C = 1` was used, so the durable claim is the near/far **ratio** (`0.123` vs
+  `0.058` = 2.12, measured on `reference-impl/field.py` as total `√⟨|∇h|²⟩`), not either level: the
+  far field is set by that file's `WIND_RMS` and `REVERB_RMS`, which are **chosen, not measured**
+  (`?`), so citing them back as measurement would be circular. This link is the weakest in the chain.
 - **P** — The wake geometry. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the standard
   capillary–gravity minimum already cited in [Calm water](#calm-water-the-low-energy-regime);
   `U0 = C_d√(2ΔP/ρ)` is Bernoulli with an orifice discharge coefficient (`C_d ≈ 0.92` assumed, a
