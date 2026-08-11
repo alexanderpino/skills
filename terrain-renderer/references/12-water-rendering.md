@@ -837,6 +837,17 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
   images for the coherent arcs near the inlet, and a random-phase spectrum for everything after
   that. This is the one place where a plain random-phase superposition is not a cheat but the
   correct description, and it is also much cheaper than a large image set.
+- **The inlet's near field buys sparkle by raising frequency, not amplitude.** The boil at an outlet
+  is broadband and *short*, and since `slope = 2πa/λ` short wavelength is the cheap way to buy
+  slope — a few millimetres of 3 cm chop out-slopes a centimetre of 30 cm swell. So a small,
+  local, low-energy disturbance lifts local mean-square slope steeply: in a worked case, rms slope
+  **0.11 within a metre of the outlet against 0.054** in the calm far field. That factor of two is
+  exactly what pushes the slope tail across a specular threshold the rest of the pool cannot reach
+  ([reachability](#sun-glitter-the-sparkle-path)). Two consequences worth using: a sparkle patch on
+  an otherwise glassy pool **localizes the plumbing**, and because the added energy is short-wave
+  the glints are small and densely packed — the discrete-glint regime, not a few broad flashes.
+  Modelling it needs no special case: cylindrical spreading at `1/√r` puts the slope maximum at the
+  outlet on its own.
 - **The diffuse tail is near-isotropic, and that is checkable.** A wind sea carries a directional
   spreading function and writes **streaky, direction-aligned** caustics; a reverberant basin tail
   has lost its preferred direction and writes **isotropic cells**. Reading which one a reference
