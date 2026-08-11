@@ -871,6 +871,31 @@ Secchi depth exceeds the body depth by design. With `b_b ≈ 0` the **scatter-co
 essentially zero** — a pool has no body colour of its own, and a shader that derives its colour
 from `scatterColor` is structurally incapable of rendering one.
 
+**What the treatment actually puts in, and why none of it shows.** "Treated water" is doing real
+work in that sentence, and it is the first thing a sceptical reader challenges:
+
+- **Chlorine is a UV absorber, not a visible one.** Hypochlorite peaks at **292 nm**
+  (`ε ≈ 300–380 M⁻¹cm⁻¹`), hypochlorous acid at 235 nm; at a pool dose of 1–3 mg/L that is an
+  absorbance of roughly **0.5–1.5 per metre in the UV** — real, and why chlorine burns off in
+  sun — while by 450 nm the band has decayed far below water's own `a(450) = 0.0092 m⁻¹`. Chlorine
+  does not colour pool water at any dose anyone swims in.
+- **Dissolved calcium is colourless; *precipitated* calcium is not.** Ca²⁺ and carbonate absorb
+  nothing visible, but past roughly pH 7.8 the calcium leaves solution as microscopic CaCO₃ that
+  stays in suspension. That is **scattering**, and it is the one ordinary impurity that genuinely
+  breaks `b_b ≈ 0` — the standard milky pool.
+- **The two are told apart by the sign of the error, and that is the diagnostic to ship.**
+  Absorption only subtracts, so it darkens and shifts hue with path length; scattering **adds** — a
+  veiling glow, lifted shadows, hazed distance, and **blurred caustics**. A pool that has gone
+  cloudy loses its caustic net well before it looks obviously milky.
+- **Which means a photograph measures its own scattering.** A crisp caustic net at 1.40 m bounds
+  `b_b` directly: the net's blur is already accounted for by the sun-disc penumbra (6.8 mm at that
+  depth and that sun), so anything scattering appreciably more than that would show as a softer
+  net. Read off the artefact rather than assumed — no numeric bound was extracted this way (`?`).
+- **Two impurities that *would* recolour the water, so the exception is bounded:** dissolved
+  **copper**, from an algaecide or a corroding heat exchanger, which really does tint water
+  blue-green, and **CDOM** from leaf litter, which absorbs blue and pushes it yellow-green. Both
+  are absorbers, so both fit the machinery already here — they change `a`, never `b`.
+
 The colour is **bottom albedo attenuated over the down-and-back path**. For a near-vertical view of
 a 1.5 m floor the light crosses ~3.0 m of water, and pure-water absorption at this chapter's RGB
 sample points ([Water-body optical
@@ -878,12 +903,12 @@ identity](#water-body-optical-identity-where-sigma-actually-comes-from)) does th
 
 ```
 depth 1.5 m -> round trip 3.0 m,  transmittance = exp(-a * 3.0)
-  a(610 nm) = 0.25   m^-1  ->  0.47    red     more than halved
-  a(550 nm) = 0.056  m^-1  ->  0.85    green   barely touched
+  a(610 nm) = 0.2644 m^-1  ->  0.45    red     more than halved
+  a(550 nm) = 0.0565 m^-1  ->  0.84    green   barely touched
   a(450 nm) = 0.0092 m^-1  ->  0.97    blue    untouched
 ```
 
-A white liner at ~0.8 albedo therefore returns roughly `(0.38, 0.68, 0.78)` before any sky
+A white liner at ~0.8 albedo therefore returns roughly `(0.36, 0.68, 0.78)` before any sky
 reflection is composited on top: bright, cyan-leaning, and **desaturated** — because with `b_b ≈ 0`
 the column is a pure Beer-Lambert filter that can only subtract. The deeply saturated turquoise
 most people picture comes from a **blue liner**: a mid-blue PVC at roughly `(0.24, 0.54, 0.70)`
@@ -1021,24 +1046,65 @@ than blue-violet. In practice red is gone by ~5 m, orange by ~10 m, yellow by ~2
 
 ```
 sigma_RGB ~= (a + b_b) evaluated at ~610 / ~550 / ~450 nm
-a_water   ~= (0.25, 0.056, 0.0092) m^-1     # pure water at 610/550/450 nm, Pope & Fry 1997
+a_water   ~= (0.264, 0.0565, 0.0092) m^-1   # pure water at 610/550/450 nm, Pope & Fry 1997
 #   the absolute minimum is 0.0044 m^-1 at 418 nm - deep violet, below a typical B channel
+#   THE WAVELENGTHS ARE PART OF THE CONSTANT. a climbs 4% per 10 nm on the red shoulder and
+#   19% per 10 nm on the green one, so the SAME water at 620/545/460 nm is
+#   (0.2755, 0.0511, 0.0098). Quote the sample points with the numbers, always
 ```
 
-**Three constituents move water off pure blue,** and they are worth exposing as the shader's
-actual authoring dials because each has a *distinct* visual signature:
+**A natural water is four optically significant components, and they add.** Pure water is always
+present and never varies; the other three are the shader's actual authoring dials, because each has
+a *distinct* visual signature:
 
-| Constituent | Optical effect | Reads as |
-|---|---|---|
-| **Chlorophyll** (phytoplankton) | Absorbs blue (~440 nm) *and* red (~675 nm), leaving a transmission window at 550–570 nm | Green. Productive lakes, coastal blooms; pea-soup opaque at high load |
-| **CDOM** / tannins / "gelbstoff" | Absorbs steeply toward blue, `a(λ) = a₄₄₀·exp[−S(λ−440)]`, `S ≈ 0.012–0.022 nm⁻¹`. **Scatters not at all** | Transparent but *dark*. Tea/amber shallow, near-black deep |
-| **Suspended mineral sediment** | Scattering, near spectrally *flat* (`b_b ∝ λ^−0.5…−1` vs λ^−4.3 for water molecules) | Adds white → raises brightness. Turquoise → green → ochre as load climbs |
+| Constituent | Absorbs | Scatters | Reads as |
+|---|---|---|---|
+| **Pure water** | strongly in red, `a(610) = 0.264 m⁻¹` | molecularly, of order 10⁻³ m⁻¹ (`?`, not verified here) | The cyan. The floor of every water |
+| **Chlorophyll** (phytoplankton) | blue (~440 nm) *and* red (~675 nm), leaving a window at 550–570 nm | by the cells | Green. Productive lakes, coastal blooms; pea-soup opaque at high load |
+| **CDOM** / tannins / "gelbstoff" | steeply toward blue, `a(λ) = a₄₄₀·exp[−S(λ−440)]`, `S ≈ 0.012–0.022 nm⁻¹` | **nothing at all** — it is dissolved | Transparent but *dark*. Tea/amber shallow, near-black deep |
+| **Non-algal particles** (mineral sediment) | weakly, a similar exponential | **strongly**, near spectrally *flat* (`b_b ∝ λ^−0.5…−1` vs λ^−4.3 for water molecules) | Turbidity, haze, milkiness. Turquoise → green → ochre as load climbs |
 
 The critical distinction for a shader author: **CDOM darkens, sediment brightens.** They are not
-interchangeable "murkiness" sliders. Blackwater (Rio Negro, `a_CDOM(440) ≈ 9 m⁻¹`) kills blue
-within ~11 cm but passes red to ~1.4 m — so it reads amber in the shallows and, because CDOM
-contributes *no* backscatter, near-black and mirror-like over the channel. Model that with a
-turbidity slider and you get mud instead.
+interchangeable "murkiness" sliders — they are two independent axes that look nothing alike, brown
+and *clear* (a peat river: you can see the bottom, it is just brown) against pale and *opaque* (a
+stirred estuary). Blackwater (Rio Negro, `a_CDOM(440) ≈ 9 m⁻¹`) kills blue within ~11 cm but passes
+red to ~1.4 m — so it reads amber in the shallows and, because CDOM contributes *no* backscatter,
+near-black and mirror-like over the channel. Collapsing the two into one turbidity slider is the
+single most common way to make water look wrong, and it produces mud in both directions.
+
+**The Case 1 / Case 2 split is a count of free parameters, not a taxonomy.** *Case 1* waters — the
+open ocean — have everything covarying with chlorophyll, so **one number** describes them. *Case 2*
+— coastal, lake, river, estuary — have CDOM and particles varying independently of the plankton and
+of each other, so **three**. A treated swimming pool is the degenerate point where all three are
+≈ 0, which is exactly why the `b_b ≈ 0` of
+[Pool optics](#pool-optics-the-colour-is-the-bottom-not-the-water) holds there and nowhere else.
+Deciding which case a body is in decides how many dials its descriptor needs, before any spectrum
+is picked.
+
+**So take concentrations, not coefficients.** `a`, `b` and `g` are nine numbers across RGB and most
+of their combinations correspond to no water that exists; three or four constituent loads are fewer
+numbers, and **every** combination of them is a water that does. The spectra are literature rather
+than art direction. The `a`/`b`/`g` split this chapter asks of `liquidBody` is what a constituent
+model should *feed*; it is not what should be handed to an author.
+
+**The number that makes the case.** At this chapter's own three sample points, a modest CDOM load
+of `a_g(440) = 0.20 m⁻¹` on the standard exponential (`S = 0.014 nm⁻¹`) adds:
+
+| m⁻¹ | R 610 | G 550 | B 450 |
+|---|---|---|---|
+| pure water | 0.2644 | 0.0565 | 0.0092 |
+| + that CDOM | +0.0185 | +0.0429 | **+0.1739** |
+
+It multiplies **blue** absorption by **20×** and raises red by 7%. That is the whole difference
+between a peaty lake and a swimming pool — the same mechanism run from the other end. A pool
+subtracts red and reads cyan; a lake subtracts blue and reads brown. Nothing else needs to change,
+and a renderer reaching for a brown *tint* has abandoned machinery it already has.
+
+**It also sharpens the band warning above.** These spectra are far steeper than pure water's — an
+exponential in CDOM, narrow peaks in chlorophyll — so sampling them at three delta wavelengths is
+worse here than anywhere else in this chapter, and for the reason
+[A channel is a band](#a-channel-is-a-band-not-a-wavelength) gives: **a channel is a band, and the
+steeper the spectrum the more that matters.**
 
 **Glacial turquoise is not Rayleigh scattering.** This is stated all over the web and is
 physically impossible: rock flour is 2–65 µm, 10–100× the wavelength, firmly in the Mie/geometric
@@ -1066,6 +1132,41 @@ blue cast**, with all apparent brightness coming off the surface. Shallow clear 
 sand is luminous cyan because the *bottom* is the return path. A shader that maps "clear →
 bright cyan" gets the tropical shallows right and the drop-off catastrophically wrong; the reef
 edge is exactly where `b_b` stops being bottom-dominated and becomes molecular.
+
+**Turbidity is a missing axis, not a missing feature — and its symptoms arrive out of order.**
+Everything above treats `b` as a stated near-zero, and it is the one parameter a pool, a lake, a
+river mouth and a stirred estuary genuinely differ by. Author it as a **visibility distance rather
+than as a coefficient**: nobody knows what `b = 0.35 m⁻¹` looks like, everybody knows "you can just
+see the bottom". Bracketed at green (`a = 0.0565 m⁻¹`), with Secchi from `Z ≈ 1.44/(c + K_d)` and a
+crude `K_d ≈ a + 0.02·b` (`?` — the backscatter ratio is a placeholder, and the Secchi column moves
+with it):
+
+| `b` m⁻¹ | reads as | `ω₀ = b/(a+b)` | Secchi (`?`) | caustic contrast |
+|---|---|---|---|---|
+| 0 | a treated pool | 0.00 | 12.7 m | 1.00 |
+| 0.15 | faintly hazy | 0.73 | 5.4 m | 0.75 |
+| **0.35** | **caustics half gone** | 0.86 | 3.1 m | **0.50** |
+| 0.90 | bottom lost at 1.4 m | 0.94 | 1.4 m | 0.17 |
+| 3.0 | milky | 0.98 | 0.45 m | 0.00 |
+
+Caustic contrast is the unscattered fraction along the *sun* path, `exp(−b·L)` — here the 1.96 m
+slant of a 1.40 m pool under a 21° sun — so it **halves at `b ≈ 0.35 m⁻¹`**, where the Secchi depth
+is still three metres and the bottom is perfectly visible. The order that produces is not the order
+a reader expects:
+
+1. **the caustic net fades first**, while the water still looks clear;
+2. then shadows lift, because scattering *adds* where absorption only subtracts;
+3. then distance hazes and the bed loses contrast;
+4. then the water takes on a body colour and reads milky rather than tinted;
+5. and from below, Snell's window loses its rim.
+
+A renderer that reaches for a white tint at step 4 has skipped the three steps that actually sell
+it — and steps 1–3 are cheap: a contrast multiplier on the existing caustic pass plus a
+depth-dependent haze, no volumetric integration at all. That is the low tier of the ladder; the
+high tier is the same single-scattering machinery a submerged lamp or a bubble plume needs. Note
+also where `ω₀` sits by the time the water is only *faintly* hazy: 0.73. **Scattering takes over the
+light budget long before it takes over the look**, which is why "treated water barely scatters"
+describes a very narrow regime and should be written as one.
 
 **Presets.** Jerlov's water types (oceanic I, IA, IB, II, III; coastal 1C–9C) are the standard
 classification, defined by the spectral shape of `K_d`, and Morel's chlorophyll ladder maps them
@@ -1104,6 +1205,27 @@ low GGX alpha) on a normal-mapped surface produces one small blown-out highlight
 direction lands. Reality is the opposite: a *glitter path* stretching tens of degrees toward the
 observer, made of thousands of individually resolvable facets winking on and off. A tight lobe is
 not "glitter that needs more contrast" — it is the wrong shape of function.
+
+**And the *source* has to be a disc, or there is nothing to glitter with.** The lobe shape is only
+half the problem; the other half is what the environment says the sun is, and a `cos^n` "sun"
+fitted by eye is an **aureole, not a disc**. The error is enormous rather than marginal: audited on
+a reference implementation, the hand-fitted lobe peaked **1563× below** the sun's own radiance over
+a solid angle **7.8× too wide**, and all three sky lobes together carried **0.695 against a direct
+beam of 24.1** — a factor of 35 short (`D`). The symptom is not a dim sun. It is that glitter comes
+out as a **broad pale smear** where the physics has small blinding points, which presents as a
+tuning problem and is not one.
+
+Constrain it so nothing is left to choose. A `cos^n` lobe carries `2π/(n+1)` over the hemisphere,
+so `n = 2/θ_s² − 1` makes that flux identically `Ω_sun = π·θ_s²`; giving the lobe a peak of
+`L_sun = E_n/Ω_sun` then makes its flux equal the direct beam exactly. Peak, width and flux land on
+the sun together and there is no amplitude left to pick. At the solar angular radius
+`θ_s = 0.265°` that is `n ≈ 93 500` and `Ω_sun = 6.72×10⁻⁵ sr` (`P`, arithmetic recomputed here).
+The environment's sun and the directional light that casts the shadows then become **one quantity**,
+which is the property a glitter path needs and a fitted lobe cannot have.
+
+The rest of that argument belongs to `10` and is worth reading before building any sky for water to
+reflect: the environment must be **the atmosphere the beam came through**, and a sun colour already
+encodes its own air mass.
 
 **Three tiers, and the first two are not alternatives.**
 
@@ -1157,6 +1279,23 @@ and the requirement drops to ~9.5°, 3 sigma, and sparse glints appear. Two payo
 glitter tier on a shot that cannot show one, and when matching reference photography, the
 **presence, sparsity or absence of sparkle reads back the camera's azimuth relative to the sun** — a
 free forensic check on a plate before you start tuning anything.
+
+**Read as a layout constraint it is stronger still, and cheaper than anything it decides.** All
+specular structure lies on **one line in plan** — the sun's bearing through the eye — so the test
+constrains where a camera may *stand*, not merely what it will see:
+
+- **The mirror point cannot be removed.** Where the required tilt is zero, the mean surface itself
+  mirrors the sun, and zero is the mode of every slope distribution — so no amount of roughness,
+  filtering or lobe amplitude deletes a broad road there. If it is in frame it is in the picture,
+  and the only control is the aim.
+- **A rough patch's glint window is a window, not a point.** A rougher patch only out-glints calm
+  water past a contrast ratio, so its visible band sits at a *finite offset* either side of the
+  mirror direction — a steep branch and a grazing one. On the reference pool that is
+  `|θ_v − 21°|` between 15.3° and 18.5° for 10×–100× contrast (`D`): the sparkle sits beside the
+  mirror band, never on it, which is why "put the camera on the highlight" finds nothing.
+- **So the sun and the feature fix where the photographer may stand**, to within about half a metre
+  laterally. That is the difference between a shot criterion being satisfiable and not, and it
+  costs a page of arithmetic against a scene that costs weeks.
 
 **Glitter is a filter applied to the wave field, not a texture applied to the water.** Note what
 separates tiers 1 and 2 from tier 3: the first two are *functions of the slope field*, the third
