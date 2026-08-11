@@ -193,7 +193,7 @@ footer{
 <div class="wrap">
 
 <header class="mast">
-  <p class="eyebrow">gauntlet loop · run zwembadwater · golf 4 van 6</p>
+  <p class="eyebrow">gauntlet loop · run zwembadwater · golf 6 van 6 — budget op</p>
   <h1>Wat de bouwers <em>zien</em>,<br>zodat jij het ook ziet</h1>
   <p class="deck">Elke ronde in deze loop wordt gescoord tegen één zin. Die zin staat hieronder,
   daarna staat het bewijs waar hij tegenaan gehouden is — niet samengevat, maar de plaat zelf.</p>
@@ -257,7 +257,7 @@ footer{
   <div class="head"><h2>Het bewijs</h2><span>gauntlet/evidence/</span></div>
 
   <figure>
-    <div class="figtag"><b>w4-optics-r1</b><span>render.py · 800 × 1200 · huidige champion</span></div>
+    <div class="figtag"><b>w6-optics-r1</b><span>render.py · 800 × 1200 · huidige champion</span></div>
     <img src="__IMG_POOL__" alt="Gerenderd zwembad, portret, met een halfronde trap rechts en caustics over de bodem.">
     <figcaption>
       <h3>Waar de optiek nu staat</h3>
@@ -268,13 +268,14 @@ footer{
         <li class="v-pass"><b>A trap</b><span>Stootborden 0,89 verzadigd tegen 0,68 voor open water, na een echte bounce van de bezonnen bodem. Was 0,16 — grijs.</span></li>
         <li class="v-pass"><b>tell</b><span>De getrapte randen zijn weg. Het was aliasing van dispersie × kwantisatie van 3×3 dekking. Kleurafwijking op silhouetpixels nu 1,1 mediaan tegen 6,8 op open water — de randen dragen mínder kleurzoom dan het water zelf, en 88% van de sterkste enkelkanaalspixels zit op caustic-vouwen waar de lat ze toestaat.</span></li>
         <li class="v-part"><b>B donker · wand</b><span>De wanden nemen 35,3% van de halve bol van de bodem in beslag, tot 77% op de slechtste texel — en er staat één vlakke <code>SKY_AMB</code> over het geheel. Dat is de omvang van de ontbrekende term, nu gemeten. Uitgesteld: de terugweg wand→bodem vraagt een opwaartse doorsnijder die er niet is.</span></li>
-        <li class="v-fail"><b>C schittering</b><span>Nog steeds een brede baan in plaats van een compacte pluk boven de jet. Bewezen onbereikbaar vanaf ooghoogte bij deze indeling — dus de indeling moet veranderen, niet de natuurkunde.</span></li>
+        <li class="v-pass"><b>C · eerste helft</b><span>Boven de jet staat nu een compacte pluk losse uitgebeten punten: 2,58% van de corridor tegen 0,17% buiten de lijn op dezelfde afstand. Met de oude lobben waren dat er daar nul. De zonneschijf is afgeleid uit een atmosfeer die in <code>SUN_COL</code> zelf verstopt zat.</span></li>
+        <li class="v-fail"><b>C · tweede helft</b><span>De brede weg is er nog, en de reden is een fout in de scène, niet in de optiek: <code>CAM_AZ</code> ligt <b>0,3° van de zonsrichting</b>. Het oog stáát anti-solair maar <em>kijkt</em> de zon in. Jouw foto is genomen op peiling 255° tegen een zon op 273,75° — 18,75° ernaast. Wacht op arbitrage.</span></li>
       </ul>
     </figcaption>
   </figure>
 
   <figure>
-    <div class="figtag"><b>w4-optics-r1-zoom</b><span>uitsnede op de radiustrap</span></div>
+    <div class="figtag"><b>w6-optics-r1-zoom</b><span>uitsnede op de radiustrap</span></div>
     <img src="__IMG_ZOOM__" alt="Uitsnede van de halfronde trap onder water, met gebogen treden en caustics erover.">
     <figcaption>
       <h3>De trap, en de verklikker</h3>
@@ -289,11 +290,11 @@ footer{
   </figure>
 
   <figure>
-    <div class="figtag"><b>progressie</b><span>golf 1 → 2 → 4 · zelfde bad, zelfde zon</span></div>
+    <div class="figtag"><b>progressie</b><span>golf 1 → 2 → 6 · zelfde bad, zelfde zon</span></div>
     <div class="strip3">
       <div><img src="__IMG_W1__" alt="Render golf 1: schuin bovenaanzicht, harde celstructuur."><span>golf 1 · quilt, geen licht</span></div>
       <div><img src="__IMG_W2__" alt="Render golf 2: portret, hoektrap achterin."><span>golf 2 · rand als geometrie, trap grijs</span></div>
-      <div><img src="__IMG_W3__" alt="Render golf 4: portret met halfronde trap vooraan, gladde randen."><span>golf 4 · randen schoon, patroon op de treden</span></div>
+      <div><img src="__IMG_W3__" alt="Render golf 4: portret met halfronde trap vooraan, gladde randen."><span>golf 6 · echte zonneschijf</span></div>
     </div>
     <figcaption>
       <h3>Wat er tussen de rondes veranderde</h3>
@@ -432,7 +433,7 @@ footer{
 </section>
 
 <footer>
-  <span>budget 6 golven · nu golf 4</span>
+  <span>budget 6 golven · op</span>
   <span>stop: bar-met ≥ 9.5 met schone reeks per dimensie</span>
   <span>gegenereerd uit rounds.jsonl + evidence/</span>
 </footer>
