@@ -19,10 +19,13 @@ EVIDENCE = HERE / "evidence"
 
 # marker -> (file in evidence/, max width in px, jpeg quality)
 FIGURES = {
-    "__IMG_POOL__": ("w1-optics-r1.png", 1600, 88),
-    "__IMG_ZOOM__": ("w1-optics-r1-zoom.png", 1400, 88),
-    "__IMG_VOR__": ("physics-voronoi-vs-caustic.png", 1500, 84),
-    "__IMG_WAKE__": ("physics-eikonal-wake.png", 1400, 86),
+    "__IMG_POOL__": ("w3-optics-r1.png", 1200, 88),
+    "__IMG_ZOOM__": ("w3-optics-r1-zoom.png", 1000, 88),
+    "__IMG_W1__": ("w1-optics-r1.png", 720, 82),
+    "__IMG_W2__": ("w2-optics-r2.png", 560, 82),
+    "__IMG_W3__": ("w3-optics-r1.png", 560, 82),
+    "__IMG_VOR__": ("physics-voronoi-vs-caustic.png", 1400, 82),
+    "__IMG_WAKE__": ("physics-eikonal-wake.png", 1300, 86),
 }
 
 

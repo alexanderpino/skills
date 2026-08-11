@@ -178,7 +178,13 @@ footer{
   font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
   display:flex; flex-wrap:wrap; gap:10px 28px;
 }
+.strip3{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.strip3 div{display:flex; flex-direction:column; gap:8px}
+.strip3 img{border:1px solid var(--rule); width:100%; height:auto; display:block; background:var(--panel-2)}
+.strip3 span{font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; color:var(--ink-3)}
 @media (max-width:640px){
+  .strip3{grid-template-columns:1fr}
+
   .verdicts li{grid-template-columns:1fr; gap:3px}
   .strip div{flex-basis:50%; border-right:0}
 }
@@ -187,7 +193,7 @@ footer{
 <div class="wrap">
 
 <header class="mast">
-  <p class="eyebrow">gauntlet loop · run zwembadwater · golf 2 van 6</p>
+  <p class="eyebrow">gauntlet loop · run zwembadwater · golf 4 van 6</p>
   <h1>Wat de bouwers <em>zien</em>,<br>zodat jij het ook ziet</h1>
   <p class="deck">Elke ronde in deze loop wordt gescoord tegen één zin. Die zin staat hieronder,
   daarna staat het bewijs waar hij tegenaan gehouden is — niet samengevat, maar de plaat zelf.</p>
@@ -213,8 +219,8 @@ footer{
 
     <article class="lane">
       <header><h3>surface</h3><span class="dim">physics</span></header>
-      <div class="score"><b>8.0</b><small>golf 2 · ronde 1</small></div>
-      <div class="track"><i style="width:80%"></i><u></u></div>
+      <div class="score"><b>9.0</b><small>golf 4 · bouwer draait</small></div>
+      <div class="track"><i style="width:90%"></i><u></u></div>
       <p class="gap">Wake-band bemonsterde de golfvector-waaier alsof het de energie-waaier was, en
       <code>wake.py</code> was dode code — de eikonal-oplosser draaide nergens. Hersteld: verre rms-helling
       0.077 → 0.052, celmaat 19 cm gemeten met autocorrelatie.</p>
@@ -224,23 +230,24 @@ footer{
 
     <article class="lane">
       <header><h3>optics</h3><span class="dim">visual</span></header>
-      <div class="score"><b>2.0</b><small>ronde 0 · bouwer draait</small></div>
-      <div class="track"><i style="width:20%"></i><u></u></div>
-      <p class="gap">Ronde 0 faalde op de wereld, niet op het water: het grasvlak eindigde in een
-      getrapte rand tegen een lege gradiënt. Sindsdien is de opzet herkaderd op alleen water; die
-      nieuwe versie is nog niet door een criticus heen — de score hiernaast is dus oud.</p>
-      <div><span class="chip live">in behandeling</span> <span class="chip major">major</span></div>
+      <div class="score"><b>7.0</b><small>golf 3 · bouwer draait</small></div>
+      <div class="track"><i style="width:70%"></i><u></u></div>
+      <p class="gap">Van 2,0 naar hier in drie golven. Wat er nu nog als enige "gerenderd" roept zijn
+      de getrapte randen van de trapneuzen — gediagnosticeerd als aliasing van dispersie, niet als
+      te weinig monsters. Daaronder: de donkere kant van het net te diep en de schaduw te licht,
+      allebei uit één ontbrekende wandterm.</p>
+      <div><span class="chip live">in behandeling</span> <span class="chip minor">minor</span></div>
       <p class="files">render.py</p>
     </article>
 
     <article class="lane">
       <header><h3>chapter</h3><span class="dim">prose</span></header>
-      <div class="score"><b>7.0</b><small>golf 2 · ronde 3</small></div>
-      <div class="track"><i style="width:70%"></i><u></u></div>
-      <p class="gap">De F-getallen in het hoofdstuk zijn niet na te rekenen: F≈3 en F≈0.4 noemen de
-      rms-helling <em>s</em> niet die F = 0.25·d·s·k nodig heeft, en de hellingen die twee alinea's
-      eerder staan geven 13.9 en 1.47. Open.</p>
-      <div><span class="chip minor">minor</span> <span class="chip">open</span></div>
+      <div class="score"><b>9.0</b><small>golf 4 · met pensioen</small></div>
+      <div class="track"><i style="width:90%"></i><u></u></div>
+      <p class="gap">Twee schone rondes op rij, daarna heropend voor één toevoeging: de meniscuslijn
+      als plek waar de bereikbaarheidstoets niet kán falen. Die ronde haalde en passant twee foute
+      getallen uit de lat — allebei van mij.</p>
+      <div><span class="chip done">bar gehaald ×2</span></div>
       <p class="files">references/12-water-rendering.md</p>
     </article>
 
@@ -251,31 +258,50 @@ footer{
   <div class="head"><h2>Het bewijs</h2><span>gauntlet/evidence/</span></div>
 
   <figure>
-    <div class="figtag"><b>w1-optics-r1</b><span>render.py · 800 × 560 · huidige champion</span></div>
-    <img src="__IMG_POOL__" alt="Gerenderd zwembad van bovenaf schuin gezien, met caustics op de bodem en een lichtstreep op het wateroppervlak.">
+    <div class="figtag"><b>w3-optics-r1</b><span>render.py · 800 × 1200 · huidige champion</span></div>
+    <img src="__IMG_POOL__" alt="Gerenderd zwembad, portret, met een halfronde trap rechts en caustics over de bodem.">
     <figcaption>
       <h3>Waar de optiek nu staat</h3>
-      <p>Dit is wat <code>render.py</code> vandaag maakt, met het gecorrigeerde golfveld eronder.
-      Mijn eigen oordeel tegen de lat, sectie voor sectie — niet dat van een criticus:</p>
+      <p>Mijn eigen oordeel tegen de lat, sectie voor sectie — niet dat van een criticus:</p>
       <ul class="verdicts">
-        <li class="v-part"><b>A kleur</b><span>Verzadiging en helderheid kloppen ongeveer, maar het water is over de hele plas even blauw. Er is geen dieptegradiënt: de Beer-Lambert-heenweg is korter vlak bij de rand dan midden in het bad, en dat zie je niet terug.</span></li>
-        <li class="v-fail"><b>B net</b><span>Celmaat is op spec (~19 cm), maar het contrast is te hoog en de cellen zijn te gelijkvormig. Interieurs zakken naar donkerblauw waar de lat "herkenbaar turquoise" eist. Het leest als een quilt: een patroon, geen licht.</span></li>
-        <li class="v-fail"><b>C schittering</b><span>De heldere baan bovenin is een brede weg, geen compacte pluk losse punten. En hij ligt rechts van het midden terwijl de jet links zit (y = 1.15) — dit is dus algemene zonneschittering, niet de ruwe plek boven de jet die de lat vraagt.</span></li>
-        <li class="v-fail"><b>F licht</b><span>De schaduwrand linksboven is echte natuurkunde — de geometrische schaduw van de westmuur — maar hij rendert als een geschilderde stap, omdat de bodem in de schaduw alleen vlakke ambient krijgt. Geen wandbounce, geen onderlinge weerkaatsing.</span></li>
+        <li class="v-pass"><b>B net</b><span>Celmaat 231 mm met autocorrelatie gemeten, binnen de 15–30 cm van de lat. Slechts 0,82% van de bodem komt boven 230 en 0,02% boven 240: de heldere lijnen zijn niet uitgebeten.</span></li>
+        <li class="v-part"><b>B donker</b><span>13,9% van de bodem zit onder 120 bij een gemiddelde van 157. De donkere kant is te diep — en de schaduw meet 0,82 waar de lat 0,5 vraagt, dus die is juist te licht. Twee fouten met tegengesteld teken uit één ontbrekende term.</span></li>
+        <li class="v-pass"><b>A trap</b><span>Stootborden 0,89 verzadigd tegen 0,68 voor open water, na een echte bounce van de bezonnen bodem. Was 0,16 — grijs.</span></li>
+        <li class="v-fail"><b>tell</b><span>De neuzen van de treden hebben getrapte randen met verzadigde blauwe en gele spikkels. Aliasing van dispersie: drie delta-golflengtes lossen een sprong op als een kam. Wordt nu aangepakt.</span></li>
+        <li class="v-fail"><b>C schittering</b><span>Nog steeds een brede baan in plaats van een compacte pluk boven de jet. Bewezen onbereikbaar vanaf ooghoogte bij deze indeling — dus de indeling moet veranderen, niet de natuurkunde.</span></li>
       </ul>
     </figcaption>
   </figure>
 
   <figure>
-    <div class="figtag"><b>w1-optics-r1-zoom</b><span>uitsnede bodem + rand</span></div>
-    <img src="__IMG_ZOOM__" alt="Uitsnede van de zwembadbodem waarop de celstructuur van de caustics en gekleurde randen zichtbaar zijn.">
+    <div class="figtag"><b>w3-optics-r1-zoom</b><span>uitsnede op de radiustrap</span></div>
+    <img src="__IMG_ZOOM__" alt="Uitsnede van de halfronde trap onder water, met gebogen treden en caustics erover.">
     <figcaption>
-      <h3>Van dichtbij: het verwijt in één plaat</h3>
-      <p>De kleurzoom op de vouwlijnen (dispersie, n<sub>R</sub> 1.3320 / n<sub>G</sub> 1.3348 /
-      n<sub>B</sub> 1.3400) is er en zit op de goede plek: alleen op de randen met het hoogste
-      contrast. Maar kijk naar de vorm van de cellen. Ze zijn gesloten, ongeveer even groot, en de
-      lijnen komen samen in knooppunten. Dat is precies de handtekening van de volgende plaat —
-      links, niet rechts.</p>
+      <h3>De trap, en de verklikker</h3>
+      <p>De trap is er om <em>breking</em> leesbaar te maken: een vlakke bodem laat caustics zien,
+      geen refractie, want een vlak zonder lijnen heeft niets om te buigen. Gemeten aan deze neuzen:
+      12,9 mm verplaatsing rms, correlatie <b>0,72</b> met de radiale oppervlaktehelling op het
+      intreepunt, en een regressie <code>dr/ds</code> van 0,248 m tegen de gesloten vorm 0,226 m.
+      Er staat nergens een wobble-functie in het bestand.</p>
+      <p>En kijk dan naar de randen van de treden: getrapt, met gekleurde spikkels. Dat is wat er nu
+      als enige "gerenderd" roept.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <div class="figtag"><b>progressie</b><span>golf 1 → 2 → 3 · zelfde bad, zelfde zon</span></div>
+    <div class="strip3">
+      <div><img src="__IMG_W1__" alt="Render golf 1: schuin bovenaanzicht, harde celstructuur."><span>golf 1 · quilt, geen licht</span></div>
+      <div><img src="__IMG_W2__" alt="Render golf 2: portret, hoektrap achterin."><span>golf 2 · rand als geometrie, trap grijs</span></div>
+      <div><img src="__IMG_W3__" alt="Render golf 3: portret met halfronde trap vooraan."><span>golf 3 · trap vooraan, bounce erin</span></div>
+    </div>
+    <figcaption>
+      <h3>Wat er tussen de rondes veranderde</h3>
+      <p>Golf 1 → 2: de rand werd echte geometrie in plaats van een booleaanse rechthoek, en de
+      contrastcurve ging omlaag — die duwde de celinterieurs naar marineblauw. Golf 2 → 3: de trap
+      verhuisde van de verre hoek naar het midden van de noordwand, waardoor de gemeten
+      neusverplaatsing van 0,6 naar 2,6 pixels projecteert. Daar zat de hele reden dat je hem niet
+      zag.</p>
     </figcaption>
   </figure>
 
@@ -342,6 +368,21 @@ footer{
           <td class="num">rubric</td><td class="num">7</td><td><span class="chip minor">minor</span></td>
           <td class="gapcell">F-getallen niet reproduceerbaar: F≈3 en F≈0.4 noemen de rms-helling <em>s</em> niet; de eerder gegeven hellingen geven 13.9 en 1.47. F≈0.4 krijgt bovendien het celnet toegeschreven dat de eigen ladder aan F≈1 geeft.</td>
         </tr>
+        <tr>
+          <td class="num">3 · r5</td><td class="num">surface</td><td class="num">physics</td>
+          <td class="num">rubric</td><td class="num">9</td><td><span class="chip major">major</span></td>
+          <td class="gapcell">Gemengde rms-conventie zat in de <em>normalisatie</em>, niet alleen in de print: NEAR en WAKE normaliseerden per as, de rest op totale mss, dus beide draaiden √2 boven hun opgeschreven constante. Geherlabeld, niet herschaald — beeld identiek tot 0,2%. Eerlijk verre veld 0,058, bij de jet 0,123, verhouding 2,12.</td>
+        </tr>
+        <tr>
+          <td class="num">3 · r6</td><td class="num">chapter</td><td class="num">prose</td>
+          <td class="num">rubric</td><td class="num">9</td><td><span class="chip minor">minor</span></td>
+          <td class="gapcell">Dezelfde verwarring een niveau hoger: de glitter-tabel gebruikte een σ per as met het label <em>s</em>. Plus vier plekken die niemand had genoemd, waaronder een variantie in één richting waar een lezer <code>s²</code> in zou vullen en de horizon te sterk zou dempen.</td>
+        </tr>
+        <tr>
+          <td class="num">4 · r7</td><td class="num">chapter</td><td class="num">prose</td>
+          <td class="num">rubric</td><td class="num">9</td><td><span class="chip done">bar gehaald</span></td>
+          <td class="gapcell">Meniscussectie toegevoegd — de enige plek waar de bereikbaarheidstoets niet kán falen. Haalde twee foute getallen uit de lat: 34,5° is een blik recht naar beneden, geen ooghoogte, en de σ-telling deelde door de totale helling waar de staart per as loopt.</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -386,7 +427,7 @@ footer{
 </section>
 
 <footer>
-  <span>budget 6 golven · nu golf 2</span>
+  <span>budget 6 golven · nu golf 4</span>
   <span>stop: bar-met ≥ 9.5 met schone reeks per dimensie</span>
   <span>gegenereerd uit rounds.jsonl + evidence/</span>
 </footer>
