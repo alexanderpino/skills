@@ -2020,6 +2020,15 @@ _bfall = np.array([BANDG0[2][si, :, 1].mean() for si in range(len(BAND_Z))])
 print("  band, flat-water irradiance vs height (scale invariance says 1.00): " +
       "  ".join("%.0fmm:%.2f" % (1000 * z, f / _bfall[-1])
                 for z, f in zip(BAND_Z, _bfall)))
+# ...and the claim B2b actually makes -- that this band carries the pattern
+# BETTER than the coping does -- in the coping's own units, so the two lines can
+# be read against each other directly. Same estimator, same wall, same statistic.
+_bpat = np.array([np.std(BANDG[2][si, :, 1] / np.maximum(BANDG0[2][si, :, 1], 1e-12))
+                  for si in range(len(BAND_Z))])
+print("  band, pattern contrast in the SAME units as the line above: " +
+      "  ".join("%.0fmm:%.2f" % (1000 * z, p) for z, p in zip(BAND_Z, _bpat))
+      + "  -- against %.2f for the stone at the lip and %.2f half a metre back"
+      % (_pat[0], _pat[5]))
 
 
 def _map_at(G, G0, lev, levs, along, side, ref):
@@ -2292,8 +2301,14 @@ def _stone(x, y, s, vdir, fp):
 #     150 mm up, reads half a metre and averages the net into a DC. That is the
 #     whole of "brighter and more legible ... because it is closer to the
 #     water", and the contrast printed after the render measures it.
-#   * and the band is PALER than the stone in the channel that matters, because
-#     it is the liner: same pigment as the bed, with no water over it.
+#   * and it is the LINER, not a material of its own: the same pigment as the
+#     bed with no water over it. Whether that reads PALE, as the sixth
+#     photograph shows it, is then a lighting question and not a pigment one --
+#     the only band this frame can see is on the north wall, whose poolward
+#     normal has N.L < 0 against a due-west sun, so it is a shaded receiver and
+#     comes out DARKER than the sunlit water rather than paler. The east wall's
+#     band has N.L = 0.93 and would read pale. That is measured and printed
+#     after the render rather than corrected by a second colour.
 #
 # THE OWNER'S READING OF THIS BAND, and the calibration it buys:
 #   "That edge is the colour of the walls and floor of the pool. The cyan is
