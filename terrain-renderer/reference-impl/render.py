@@ -830,11 +830,14 @@ for wi in range(4):
 # WHY THE RISER HAS ALMOST NOTHING. The refracted sun runs east at 44.4 deg from
 # vertical, so a face is lit only if it faces west of the underwater terminator;
 # an anti-solar camera looks at east-facing surfaces by construction. The two
-# sets do not intersect -- no riser in this frame is both lit and visible, and
-# the print further down MEASURES that rather than asserting it. Direct sun on a
-# visible riser is not small here, it is identically zero. So the whole
-# appearance of the step region is indirect light, and the model had exactly one
-# indirect term: SKY_AMB * ao, a flat blue DC through the Snell window.
+# sets barely intersect, and the print further down MEASURES the overlap rather
+# than asserting it away: about 6% of the riser arc is both lit and visible, and
+# nowhere on it does min(N.L, N.V) exceed 0.10 -- the sun 84 deg off the normal
+# on a face the camera sees 84 deg off the normal. So direct sun on a visible
+# riser is not identically zero, it is a grazing tenth of one term on a sliver
+# a few pixels wide. The appearance of the step region is indirect light, and
+# the model had exactly one indirect term: SKY_AMB * ao, a flat blue DC through
+# the Snell window.
 #
 # THE MISSING TERM is one bounce off the sunlit tread and floor a few
 # centimetres in front of the riser. It is the bigger of the two and it is the
@@ -995,7 +998,7 @@ _PATCH = [("top tread   ", STEP_Z[0], 5.45, 6.55, 3.45, 3.95),
           ("2nd tread   ", STEP_Z[1], 5.70, 6.30, 2.88, 3.05),
           ("bench       ", BENCH_Z, 2.65, 3.35, 3.65, 3.98),
           ("3rd tread   ", STEP_Z[2], 5.70, 6.30, 2.55, 2.75),
-          ("floor       ", -DEPTH, 4.20, 6.20, 1.00, 2.40)]
+          ("floor       ", -DEPTH, 4.80, 6.50, 0.90, 2.30)]
 # F is a PER-BAND number -- that is the whole point of field.py's slope budget --
 # so the net-writing band is what decides whether a receiver has a legible net.
 # REVERB at 19.7 cm writes it; the all-band column is the same formula fed the
@@ -1501,10 +1504,11 @@ PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
 # which faces of the step unit can be lit at all. It travels east and 2.6 deg
 # south of east, so a riser is lit only if its outward normal has a westward
 # component -- and an anti-solar camera can only see normals with an EASTWARD
-# one. The two sets are disjoint, and the test below measures the overlap over
-# the whole riser arc of every cylinder instead of asserting it over five sample
-# normals. Refraction at the surface does not change a ray's azimuth, only its
-# elevation, so for a vertical face the visibility test is exact.
+# one. The two sets nearly exclude each other, and the test below measures the
+# overlap over the whole riser arc of every cylinder instead of asserting it
+# over five sample normals: what survives is a narrow band of faces that are
+# grazed by both at once. Refraction at the surface does not change a ray's
+# azimuth, only its elevation, so for a vertical face this test is exact.
 _th = -SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])
 TSUN_DIR = np.array([_th[0] * sin_t, _th[1] * sin_t, -cos_t])
 _a = np.linspace(0, 2 * np.pi, 1441)[:-1]
@@ -1656,29 +1660,36 @@ def _regions():
     return np.where((lb == lb[..., :1]).all(-1), lb[..., 0], -1)
 
 
-def _sat(px):
-    m = np.median(px.reshape(-1, 3), 0)
-    return m, (m.max() - m.min()) / max(m.max(), 1e-9)
+def _sat(m):
+    return (m.max() - m.min()) / max(m.max(), 1e-9)
 
 
 def colour_table(img, reg):
-    rows = np.flatnonzero((reg == 1).sum(1) >= 12)
-    band = np.zeros(reg.shape, bool)
-    if rows.size:
-        band[rows[0]:rows[-1] + 1] = True
     print("colour regression (sRGB medians; saturation = (max-min)/max)")
-    print("  the step's own rows are image rows %s"
-          % ((("%d-%d" % (rows[0], rows[-1])) if rows.size else "none")))
-    for nm, k, m in (("riser face      ", 1, band), ("tread top       ", 2, band),
-                     ("floor, same rows", 3, band), ("floor, all rows ", 3, None),
-                     ("coping stone    ", 4, None)):
-        sel = (reg == k) if m is None else ((reg == k) & m)
-        if sel.sum() < 30:
+    for nm, k in (("riser face  ", 1), ("tread top   ", 2),
+                  ("floor 1.40 m", 3), ("coping stone", 4)):
+        sel = reg == k
+        if sel.sum() < 100:
             print("  %s   -- %d px, not measured" % (nm, sel.sum()))
             continue
-        med, s = _sat(img[sel])
+        med = np.median(img[sel].reshape(-1, 3), 0)
         print("  %s  (%3.0f,%3.0f,%3.0f)  sat %.2f   %6d px"
-              % (nm, med[0], med[1], med[2], s, sel.sum()))
+              % (nm, med[0], med[1], med[2], _sat(med), sel.sum()))
+    # PAIRED, ROW BY ROW. Grazing angle and Fresnel are functions of the image
+    # row, so the only way to say "the receiver is the difference" is to hold
+    # the row fixed: take each region's median within a row, then the median of
+    # those over the rows where both regions have enough pixels to have one.
+    ok = ((reg == 1).sum(1) >= 20) & ((reg == 3).sum(1) >= 20)
+    rows = np.flatnonzero(ok)
+    if rows.size:
+        pr = np.array([[np.median(img[r][reg[r] == k], 0) for k in (1, 3)]
+                       for r in rows])
+        a, b = np.median(pr[:, 0], 0), np.median(pr[:, 1], 0)
+        print("  paired over the %d rows that hold both (%d-%d):" %
+              (rows.size, rows[0], rows[-1]))
+        print("     riser (%3.0f,%3.0f,%3.0f) sat %.2f   vs   open water "
+              "(%3.0f,%3.0f,%3.0f) sat %.2f"
+              % (a[0], a[1], a[2], _sat(a), b[0], b[1], b[2], _sat(b)))
 
 
 REG = _regions()
@@ -1721,8 +1732,8 @@ for (_cx, _cy, _R, _zt) in CYL[:3]:
     _zp.append(np.stack([_cx + (_R + .35) * np.cos(_a2),
                          _cy + (_R + .35) * np.sin(_a2), np.full(400, -DEPTH)], -1))
 _zpix = project(np.concatenate(_zp))
-_zpix = _zpix[(_zpix[:, 0] > -400) & (_zpix[:, 0] < W // SS + 400) &
-              (_zpix[:, 1] > -400) & (_zpix[:, 1] < H // SS + 400)]
+_zpix = _zpix[(_zpix[:, 0] > 0) & (_zpix[:, 0] < W // SS) &
+              (_zpix[:, 1] > 0) & (_zpix[:, 1] < H // SS)]
 ZX = int(np.clip(_zpix[:, 0].min() - 12, 0, W // SS - 40))
 ZY = int(np.clip(_zpix[:, 1].min() - 12, 0, H // SS - 40))
 ZW = int(np.clip(_zpix[:, 0].max() + 12, 0, W // SS) - ZX)
