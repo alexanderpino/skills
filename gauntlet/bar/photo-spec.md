@@ -171,13 +171,28 @@ view is.
   That undulation is reading (1) above, and it is the reading a renderer cannot
   fake. **The port must therefore be modelled explicitly**, and which port is
   chosen must be stated. *Derived.*
-- **Flat port versus dome port is a real, visible choice.** A flat port underwater
-  multiplies the effective focal length by `n` — the underwater half sees a
-  **1.33× narrower** field than the air half, with chromatic aberration toward the
-  frame edges. A dome port corrects both, which is why over-under photographs are
-  shot with one. Whichever is modelled, the two halves' fields of view must be
-  consistent with that choice, and a flat port whose halves match is wrong.
+- **Flat port versus dome port is a real, visible choice, and it shows up as
+  magnification.** A flat port is a refracting interface, so the submerged half is
+  magnified: apparent distance `d/n`, so objects read **25% closer and 33%
+  larger**, and the field narrows from 46° in air to **34.0°** in water. The
+  wavelength dependence puts a **0.105°** lateral chromatic spread at the frame
+  edge — 0.5% of the half-field, so a coloured fringe in the corners and nothing
+  at the centre. A dome port removes the magnification, at the price of a virtual
+  image a few dome-radii in front of the glass that the lens must focus on; that
+  is why over-under photographs are shot with a dome and a close-focus lens.
   *Derived.*
+- **Whichever port is modelled, the waterline is where it is proved.** With a flat
+  port, anything crossing the boundary — the pool wall, a coping edge, the step
+  unit's nosings — must **change scale across it**, by that same factor. With a
+  dome, it must run through unbroken. A flat port whose halves match, or a dome
+  that steps, is wrong on its own stated terms. This is the cheapest hard check in
+  the whole bar: one straight edge crossing the waterline settles it. *Derived.*
+- **The magnification is the interface, not the water.** A camera fully submerged
+  with no port sees no magnification at all — the medium is uniform and nothing
+  refracts between it and the subject. The same effect seen from the other side is
+  the apparent-depth compression the step flight already demonstrates. One
+  mechanism, three appearances; a renderer that produces them from three different
+  pieces of code has not modelled it. *Derived.*
 - **The exposure split is real and must not be flattened.** The submerged half is
   substantially darker than the sunlit air half — that is why the shot needs a
   split ND or an exposure compromise in reality. A render in which both halves are
