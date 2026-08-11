@@ -145,9 +145,15 @@ becomes visible from underneath.
 
 ## H · The split shot — lens half in, half out
 
-> Added mid-run by owner ruling, as the intended final test. Same weaker-evidence
-> caveat as G: no reference photograph exists, and every criterion below is either
-> derived or a recollection of over-under photographs in general.
+> Added mid-run by owner ruling, as the intended final test.
+>
+> **Evidence upgraded.** Two reference photographs were supplied for this section
+> after it was written: an over-under of an outrigger canoe in a shallow lagoon
+> over white sand, shot ultra-wide behind a dome port; and a swimming-pool frame
+> in which the camera sits just under the surface, so the air world arrives
+> through Snell's window. Neither is the reference pool, so H stays weaker than
+> A–F — but criteria below marked *photograph* are now read from an image rather
+> than recalled, and one criterion was **falsified** by them and corrected.
 
 This is the terminal test for this project, and the reason is structural rather
 than aesthetic: it reads **one wave field three independent ways in one frame**,
@@ -193,13 +199,35 @@ view is.
   the apparent-depth compression the step flight already demonstrates. One
   mechanism, three appearances; a renderer that produces them from three different
   pieces of code has not modelled it. *Derived.*
-- **The exposure split is real and must not be flattened.** The submerged half is
-  substantially darker than the sunlit air half — that is why the shot needs a
-  split ND or an exposure compromise in reality. A render in which both halves are
-  perfectly exposed is wrong unless it says which compromise it made. The ratio
-  must be **measured off the render** and reported, never asserted. *Mechanism
-  derived; the ratio is not yet measured (`?`).*
-- **A waterline band, not a waterline edge.** Over-under photographs show a
-  narrow, disturbed, partly blurred band where the two regimes meet — meniscus on
-  the glass, droplets, a sliver where the surface is seen edge-on. A perfectly
-  clean boundary reads as CG immediately. *Recollection of photographs in general.*
+- **~~The submerged half is substantially darker~~ — falsified by the reference
+  photographs, and the correction matters.** In the lagoon frame the underwater
+  half is over white sand at one to two metres and reads *as bright as the sky
+  half*, locally brighter. The darkness of a submerged half is not a property of
+  being underwater; it is `bed albedo × exp(−a·path)`, and over pale sand at short
+  path both factors are near one. The reference pool is a **blue liner at 1.40 m**,
+  which is the opposite corner of both, so this render's halves genuinely will
+  differ — but the render must produce that difference **from the liner and the
+  path**, and never from an exposure fudge applied to one half. Measure the ratio
+  off the render and report it. *Corrected against photograph; ratio not yet
+  measured (`?`).*
+- **A waterline band, not a waterline edge, and it is thick.** In the lagoon frame
+  the boundary is a translucent greenish-white **wedge** — a large fraction of the
+  frame height at one edge, tapering across — with visible internal structure, and
+  partly see-through rather than opaque. It is the surface seen edge-on plus the
+  meniscus riding the port, not a seam between two images. A clean boundary reads
+  as CG immediately, and so does a boundary of uniform thickness. *Photograph.*
+- **The band curves, and the curve carries two signals at once.** It arcs across
+  the lagoon frame and rises toward one side: the dome's own curvature plus the
+  wave riding up and down it. Separating those two is the point — the static part
+  belongs to the port, the moving part is reading (1) of the wave field.
+  *Photograph.*
+- **Objects crossing run continuous in both references.** The mooring rope and the
+  hull cross the boundary in the lagoon frame with no step in scale, which is the
+  dome signature and confirms the port check above. *Photograph.*
+- **A shadow on the bed is a reduction, not a hole.** The canoe's shadow on the
+  sand is clearly darker, yet the caustic net stays legible *inside* it — the same
+  claim section B makes for the shade sail, independently confirmed. *Photograph.*
+- **The underside of the surface is a mirror at grazing incidence**, showing the
+  bed folded back down, in both references — the top of the underwater half in the
+  lagoon frame, and the upper band in the pool frame. It must be the same surface
+  that writes the caustics below it. *Photograph.*
