@@ -157,33 +157,104 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 #     pixels of stone; the only place a pool edge can be read is the one under
 #     the photographer, so the bottom of the frame is put on it at 1.2 m.
 # Phone at chest height on the east deck, a metre back from the edge, 34 deg
-# down, portrait: bottom edge on the near coping (theta_v 57 deg), top edge on
-# the far coping (9.5 m, theta_v 11 deg), 7.4 m of water in between, and the
-# mirror direction for a 21 deg sun crossing it a fifth of the way down.
+# down, portrait: bottom edge on the near coping (theta_v 57 deg), top edge at
+# theta_v 11 deg and 9.5 m out, 8 m of ground in between -- all of it water
+# before the yaw below, two thirds of it after. The mirror direction
+# for a 21 deg sun used to cross that span a fifth of the way down; since the
+# yaw below it crosses 1.13 half-widths outside the left edge instead, which is
+# the whole point of the yaw.
 #
-# The lateral position moved 0.40 m north this round, to the pool's own centre
-# line. It is the only camera number that changed, and it is what puts the step
-# unit -- now set into the north wall at mid-length rather than 8 m away in the
-# far corner -- inside the 15.8 deg half-width of the frame. The sail moved with
-# it, by the same 0.70 m, so that its shadow EDGE stays in frame: the shadow gate
-# is a claim under test and it has to be visible to be judged.
+# The lateral position moved 0.40 m north an earlier round, to the pool's own
+# centre line, and that is what first put the step unit -- set into the north
+# wall at mid-length rather than 8 m away in the far corner -- inside the
+# 15.8 deg half-width of the frame. EYE has not moved since, and does not move
+# here: it is the wave-4 arbitration's, and every specular number in this file
+# is a function of it. Only the AIM changes below.
 EYE = np.array([9.40, 1.95, 1.85])    # east: the eye STANDS on the anti-solar side
-# ...and LOOKS the other way. The plan bearing from this eye to the sun is
-# atan2(SUN_DIR) = 176.25 deg and CAM_AZ is 176.6, so the frame is aimed within
-# 0.35 deg of the sun's own azimuth: the camera shoots INTO a 21 deg sun. The
-# note this line used to carry, "anti-solar to 0.4 deg", was true of the eye's
-# position and false of its aim, and the difference is the whole of what the
-# mirror-band diagnostic further down now prices. It is not a defect to fix
-# here -- it is the framing the wave-4 arbitration froze -- but it has to be
-# stated where the number lives, because everything section C says about
-# reachability is a statement about THIS angle.
-CAM_AZ = np.deg2rad(176.6)
+#
+# --- TWO AZIMUTH CONVENTIONS, AND THE DEFECT THAT LIVED BETWEEN THEM ----------
+# STATE THIS BEFORE USING ANY BEARING IN THIS FILE, because six waves passed
+# with a camera pointed at the sun and nobody saw it:
+#
+#   * CAM_AZ, and every bearing computed here with atan2(y, x), is the MATH
+#     convention -- radians CCW from +x, and +x is EAST, +y NORTH. Due west is
+#     180 deg, north is 90 deg.
+#   * the bar's solar azimuth, 273.75 deg, is the COMPASS convention -- degrees
+#     CW from north. Due west is 270 deg.
+#   * they convert as   math = 90 - compass  (mod 360),   compass = 90 - math.
+#
+# So the sun's plan bearing IN THIS FILE'S CONVENTION is 90 - 273.75 = 176.25
+# deg, which is what atan2(SUN_DIR[1], SUN_DIR[0]) returns, and the old
+# CAM_AZ = 176.6 deg was 0.35 deg from it, NOT the 97 deg that reading 176.6
+# against 273.75 in one convention suggests. That near-identity is exactly what
+# a reader skimming two numbers in two conventions cannot see, and it is how
+# "anti-solar to 0.4 deg" -- true of where the eye STANDS, false of where it
+# LOOKS -- survived six waves on this line.
+#
+# --- WHERE THE CAMERA POINTS NOW ---------------------------------------------
+# The bar was written from a photograph taken 18.75 deg off the sun's bearing,
+# and that offset is the only thing about the aim that section C is a statement
+# about. It is reproduced here EXACTLY, in this file's convention:
+#
+#       CAM_AZ = 176.25 - 18.75 = 157.50 deg    (compass 292.5 deg)
+#
+# THE MAGNITUDE IS THE MEASUREMENT AND THE SIGN IS THE SCENE'S. What the
+# reference fixes is the angle between the aim and the sun; it does not fix the
+# pool's own bearing relative to north, which was never measured and which is
+# what would decide the handedness. In THIS basin the sign is decided by the two
+# frame-critical features, and they decide it unanimously:
+#   * turning the aim 18.75 deg the other way (CAM_AZ 195 deg) takes the step
+#     unit -- north wall, mid-length, two waves in the placing -- to 0% in
+#     frame, measured on its own nosing arcs. It is the one feature that makes
+#     refraction legible and it cannot be re-placed from here.
+#   * turning it this way takes 96.5% of those nosings into frame (57.2% before)
+#     and takes the sail's shadow out, and the sail is an occluder whose ONLY
+#     constraint is that its shadow edge be in frame (bar section E). One of the
+#     two is movable at zero physical cost and the other is not.
+# Equivalently: this basin's long axis runs at compass 292.5 rather than 255,
+# i.e. the scene is the reference geometry mirrored about the sun's bearing.
+# Every quantity section C prices -- the offset angle, the required facet slope,
+# the reachability -- is invariant under that mirror.
+#
+# --- WHAT A YAW DOES AND DOES NOT MOVE ---------------------------------------
+# It moves NOTHING in the world. The specular condition at a surface point is
+# that the facet normal bisect L and V, and V is fixed by the point and by EYE;
+# CAM_AZ appears nowhere in it. So the sun's specular line still runs from EYE
+# along the sun's plan bearing, r = 0 still lands at (4.60, 2.26), and the jet's
+# boil is still 0.25 deg off that line and still inside the >=10x glint window.
+# A yaw is a statement about the FRAME, and what it buys is which of those the
+# frame contains: the mirror band sits 4.81 m out, where the line is 18.75 deg
+# off the aim and the frame is +-15.8 deg wide, so the road leaves the picture;
+# the glint window sits 1.4-2.5 m out, where the down-tilt widens the frame's
+# azimuthal reach to about +-20.3 deg, so it stays. That 1.4-2.5 m against
+# 3.5-7.2 m separation is the whole of what makes the fix possible, and it is a
+# property of THIS eye height and THIS sun elevation, not a general one.
+# THE PRICE, stated rather than discovered later: the frame no longer runs down
+# the pool's long axis, so it falls from 88.3% water to 66.0%, with 16.9% of it
+# north terrace. The composition-preserving alternative is to rotate the BASIN
+# by 18.75 deg instead -- same optics, water-filled frame -- but that is a
+# statement about the sun's bearing in scene coordinates, and it would carry the
+# glint window off the return fitting, which is field.py's and frozen.
+CAM_AZ = np.deg2rad(157.50)
 CAM_EL = np.deg2rad(-33.35)
 FOV = np.deg2rad(46.0)
 TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
                             np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
-SAIL = np.array([[-5.10, -0.20, 2.72], [-2.10, 0.20, 2.55],
-                 [-2.40, 2.60, 2.35], [-5.40, 2.20, 2.55]])
+# The sail follows the frame, as it did when the eye moved 0.40 m north and it
+# moved 0.70 m with it. Same quad, same heights, same shape: +1.50 m in y, which
+# is a TRANSLATION and not a reshaping. It is the whole of what the yaw above
+# costs elsewhere in the file, and it is not a free choice of composition --
+# section E keeps this object only as an occluder, and its one stated
+# requirement is that its shadow EDGE fall on water that is in shot. After the
+# yaw its shadow at the old y left the picture entirely (0% of the shadow edge
+# that lies on water was in frame, against 83.5% before), so the sail moves the
+# amount that puts the same SHARE of the visible water in shade as before:
+# 16.5% before the yaw, 17.1% after, with the shadow quad still landing wholly
+# inside the basin (its far corner reaches y = 3.70 against a wall at 4.00).
+# The shadow still clears the step unit and the section C glint window, so
+# neither the refraction test nor the sparkle test is shaded by it.
+SAIL = np.array([[-5.10, 1.30, 2.72], [-2.10, 1.70, 2.55],
+                 [-2.40, 4.10, 2.35], [-5.40, 3.70, 2.55]])
 EXPOSURE = 0.275      # the camera exposes for a 21-degree sun
 # ...and the radiance at which one term ALONE whites out a pixel, solved out of
 # the ACES constants in `encode` so it follows EXPOSURE if that moves. It is the
@@ -2546,14 +2617,18 @@ print("  brightest glint density in frame sits at (%.2f, %.2f) where s = %.3f "
 # section C rules out stops being an amplitude question and becomes a GEOMETRY
 # one, and the geometry is arithmetic on constants at the top of this file.
 #
-# CAM_AZ is within half a degree of the sun's own azimuth -- the comment up
-# there calls the eye "anti-solar", which is true of where it STANDS and false
-# of where it LOOKS. So the sun's specular line runs straight up the middle of
-# the frame, and the point on it where the required facet slope is exactly zero
-# sits at a ground distance EYE_z / tan(21 deg) from the eye. That point is on
-# the water and it is in shot. There is no roughness, no filter and no lobe
-# amplitude that removes it: r = 0 is the mode of every slope distribution, so
-# the mean surface itself mirrors the sun there.
+# The band is an OPTICS fact and its presence in the picture is a CAMERA fact,
+# and this block keeps the two apart. The point where the required facet slope
+# is exactly zero sits on the sun's plan bearing from the eye at a ground
+# distance EYE_z / tan(21 deg), on the water, whatever the camera does: r = 0 is
+# the mode of every slope distribution, so the mean surface itself mirrors the
+# sun there and no roughness, filter or lobe amplitude removes it. What the aim
+# decides is only whether that point is in shot -- so the radiance below is
+# still computed and still printed, and the framing is MEASURED with project()
+# rather than asserted from CAM_AZ. When this file's camera pointed within
+# 0.35 deg of the sun the answer was yes and the road ran up the middle of the
+# frame; at the bar's own 18.75 deg offset it is 1.13 half-widths outside the
+# left edge, which is what the corridor table below then reads on the picture.
 #
 # What it is worth is the Cox-Munk radiance, which is the microfacet estimator
 # with the sun as a small source and the facet horizontal:
@@ -2572,34 +2647,72 @@ _rp = ((IOR[1] * _ci - _ct2) / (IOR[1] * _ci + _ct2)) ** 2
 _Fm = .5 * (_rs + _rp)
 _Lmir = _Fm * (1. / (np.pi * _SC ** 2)) * E_SUN[1] / (4. * _ci)
 _bandhw = np.degrees(2 * np.arctan(_SC))          # where it falls by 1/e
-print("  the MIRROR BAND, which is a camera fact and not an optics one: CAM_AZ "
-      "is %.1f deg off the sun's azimuth, so the specular line runs up the "
-      "frame and r = 0 lands at (%.2f, %.2f), %.2f m out, %s. There the mean "
+# --- is any of it IN SHOT? Measured, on the same projection the picture uses.
+_NW, _NH = W // SS, H // SS
+
+
+def _in_frame(xy):
+    p = project(np.stack([np.atleast_1d(xy[0]), np.atleast_1d(xy[1]),
+                          np.zeros_like(np.atleast_1d(xy[0]))], 1))
+    return ((p[:, 0] >= 0) & (p[:, 0] < _NW) & (p[:, 1] >= 0) & (p[:, 1] < _NH),
+            p)
+
+
+_mirin, _mirpix = _in_frame((_xm, _ym))
+_linein, _linepix = _in_frame((_lx, _ly))
+_roadm = _on & (_rr4 < _RSTAR)
+_winm = _on & (_rr4 > _r_for_contrast(10.))
+print("  the MIRROR BAND, which is an optics fact whose PRESENCE IN THE PICTURE "
+      "is a camera fact: CAM_AZ is %.2f deg off the sun's azimuth (both in this "
+      "file's math convention), and r = 0 lands at (%.2f, %.2f), %.2f m out, "
+      "%s. There the mean "
       "surface itself mirrors the sun: F = %.3f at %.0f deg incidence and "
       "D(0) = 1/(pi s^2) = %.0f give a reflected radiance of %.0f against %.2f "
       "for a white card in the same sun -- %.0fx, and this file's white point "
       "is %.1f. It falls by 1/e over |theta_v - %.0f| < %.1f deg, i.e. %.2f to "
       "%.2f m out."
       % (np.degrees(abs(np.arctan2(_shat[1], _shat[0]) - CAM_AZ)),
-         _xm, _ym, _dmir, "ON THE WATER" if pool_sdf(np.array([_xm]),
-                                                     np.array([_ym]))[0] < 0
+         _xm, _ym, _dmir,
+         ("ON THE WATER and IN FRAME at pixel (%.0f, %.0f)"
+          % (_mirpix[0, 0], _mirpix[0, 1])) if
+         (pool_sdf(np.array([_xm]), np.array([_ym]))[0] < 0 and _mirin[0])
+         else ("on the water but OUT OF FRAME, at %.2f half-widths past the "
+               "edge" % (abs(2. * _mirpix[0, 0] / _NW - 1.)))
+         if pool_sdf(np.array([_xm]), np.array([_ym]))[0] < 0
          else "off the water",
          _Fm, np.degrees(np.arccos(_ci)), 1. / (np.pi * _SC ** 2), _Lmir,
          SUN_COL[1] * _ci, _Lmir / (SUN_COL[1] * _ci), L_WHITE,
          np.degrees(_ELS), _bandhw,
          EYE[2] / np.tan(_ELS + np.deg2rad(_bandhw)),
          EYE[2] / np.tan(_ELS - np.deg2rad(_bandhw))))
-print("    -- so bar section C's second clause ('everything else on the surface "
+print("    of the sun's azimuth line where it lies on water: the BROAD ROAD "
+      "(r < r*) is %.0f%% in frame, spec C's GLINT WINDOW (>=10x contrast) is "
+      "%.0f%% in frame -- and the two are separable only because the road sits "
+      "%.2f-%.2f m out and the window %.2f-%.2f m out, at %.1f deg off an aim "
+      "whose frame is +-15.8 deg wide at infinity and wider than that close in, "
+      "where the down-tilt puts the near water."
+      % (100. * _linein[_roadm].mean() if _roadm.any() else 0.,
+         100. * _linein[_winm].mean() if _winm.any() else 0.,
+         _dscan[_roadm][0] if _roadm.any() else 0.,
+         _dscan[_roadm][-1] if _roadm.any() else 0.,
+         _dscan[_winm][0] if _winm.any() else 0.,
+         _dscan[_winm][-1] if _winm.any() else 0.,
+         np.degrees(abs(np.arctan2(_shat[1], _shat[0]) - CAM_AZ))))
+print("    -- bar section C's second clause ('everything else on the surface "
       "is smooth: at this sun elevation and this camera height the specular "
-      "path is otherwise unreachable') is false for THIS AZIMUTH, and it is the "
-      "azimuth rather than the elevation or the height that decides it. The "
-      "bar's own section B3 derives its unreachability 'against a 21 deg sun at "
-      "ANTI-SOLAR azimuth', which is the other case. A frame aimed within half "
-      "a degree of the sun's bearing contains the mirror band by construction, "
-      "at any sun elevation and from any eye height, because the band sits "
-      "wherever theta_v equals the sun's elevation and this frame spans "
-      "theta_v 11-52 deg. Section C's FIRST clause is satisfied over the jet "
-      "and its second one cannot be, without a camera that is not this one.")
+      "path is otherwise unreachable') is a statement about the AZIMUTH between "
+      "the aim and the sun, not about the elevation or the height: the band "
+      "sits wherever theta_v equals the sun's elevation, so a frame aimed along "
+      "the sun's bearing contains it by construction, at any sun elevation and "
+      "from any eye height, and this frame spans theta_v 11-52 deg. The bar's "
+      "own section B3 derives its unreachability 'against a 21 deg sun at "
+      "ANTI-SOLAR azimuth', which is the other case. Six waves ran with the "
+      "aim 0.35 deg off the sun's bearing and the clause was false for that "
+      "azimuth; at the reference photograph's 18.75 deg it is the picture, not "
+      "the water, that changed -- the mean surface still mirrors the sun at "
+      "(%.2f, %.2f), it is simply no longer in shot. Section C's first clause "
+      "is unaffected: nothing about the jet's glints is a function of CAM_AZ."
+      % (_xm, _ym))
 
 
 # ------------------------------------------- how far apart are the three deltas
