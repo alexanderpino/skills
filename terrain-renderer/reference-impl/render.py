@@ -1886,11 +1886,26 @@ def gh(x, y):
 # the liner band's wet foot is built in this section and needs it. The long
 # derivation stays where the meniscus itself is applied to the water.
 CAP_A = np.sqrt(SIGMA_W / (1000.0 * 9.81))          # capillary length, 2.72 mm
-MENIS_H = CAP_A * np.sqrt(2.0)                      # ? climb at contact angle 0
-MENIS_W = 2.0 * CAP_A                               # ? fillet reach, ~2 a
-print("meniscus: capillary length %.2f mm, climb %.2f mm at perfect wetting, "
-      "fillet %.1f mm wide (was a guessed 10 mm e-folding)"
-      % (1000 * CAP_A, 1000 * MENIS_H, 1000 * MENIS_W))
+# ? THE CONTACT ANGLE IS THE ONE FREE NUMBER IN THE WHOLE FILLET, and it is
+# ? unmeasured. It sets the tilt AT the wall, phi_w = 90 - theta_c, and through
+# ? that both the climb h = a sqrt(2(1 - sin theta_c)) and the top of the range
+# ? the specular integral below sweeps. 0 -- perfect wetting -- is what this file
+# ? has assumed since the climb was first written, and it is kept here so that
+# ? MENIS_H and everything downstream of it (WETTOP, the wet foot) do not move.
+# ? A clean PVC sheet is nearer 80 deg; a liner in service, permanently wetted
+# ? and biofilmed, is nearer 0, and nobody has measured THIS one. The
+# ? sensitivity is printed instead of being hidden, here and at the line itself.
+THETA_C = 0.0
+PHI_W = np.pi / 2 - THETA_C                         # ? surface tilt at the wall
+MENIS_H = CAP_A * np.sqrt(2.0 * (1.0 - np.sin(THETA_C)))    # ? climb, at THETA_C
+MENIS_W = 2.0 * CAP_A                               # fillet reach, ~2 a
+print("meniscus: capillary length %.2f mm, climb %.2f mm at contact angle "
+      "%.0f deg (%s mm at 0/30/60 deg -- ? the angle is unmeasured), tilt at "
+      "the wall %.0f deg, fillet %.1f mm wide"
+      % (1000 * CAP_A, 1000 * MENIS_H, np.degrees(THETA_C),
+         " / ".join("%.2f" % (1000 * CAP_A * np.sqrt(2 * (1 - np.sin(np.deg2rad(t)))))
+                    for t in (0, 30, 60)),
+         np.degrees(PHI_W), 1000 * MENIS_W))
 
 DECK_S = np.array([SLIP, 0.02, 0.06, 0.14, 0.30, 0.55, 0.95])
 DECK_DA = 0.005                      # 5 mm along the run; the pattern's own
@@ -2556,6 +2571,7 @@ print("what the water reflects at the wall: %s, of which %.0f%% is liner band, "
       "%.0f%% bead, %.0f%% stone (was the stone's own %s)"
       % (np.round(EDGE_REFL, 3), 100 * FREEB / ZD, 100 * BEAD / ZD,
          100 * BULR / ZD, np.round(COP_REFL, 3)))
+# --------------------------------------------- THE MENISCUS, AS A FLUX INTEGRAL
 # The meniscus, with its width DERIVED instead of guessed. Water wets the wall
 # and climbs it; the 2-D static meniscus on a vertical wall is exactly
 #     z = 2 a sin(phi/2),      a = sqrt(sigma / rho g) = 2.72 mm
@@ -2564,23 +2580,289 @@ print("what the water reflects at the wall: %s, of which %.0f%% is liner band, "
 # 30 deg contact angle -- and the fillet decays over a couple of capillary
 # lengths. The 10 mm e-folding that used to be here was about twice that and was
 # not derived from anything.
-# WHAT IS STILL WRONG WITH IT, stated rather than left implicit: this is an
-# AMBIENT lift, and the mechanism is SPECULAR. Across that 5 mm strip the tilt
-# runs continuously from 0 to 90 - theta_c, so the strip contains EVERY facet
-# orientation and the mirror condition for the sun or for the bright horizon is
-# satisfied somewhere in it whatever the sun does -- which is why every pool
-# photograph has a bright waterline even when the open water is glassy, and it
-# is the one specular feature in this scene that cannot fail the reachability
-# test the spec-C diagnostic below applies to the open surface. Building it
-# properly needs the sub-pixel integral over the fillet (the surface at tilt phi
-# occupies dx = a cos(phi/2) cos(phi)/sin(phi) dphi, and the sun's 0.53 deg
-# selects 15 um of it), and it needs the AZIMUTH: a meniscus tilts only
-# perpendicular to its own waterline, so the sun's mirror condition is reachable
-# on the east and west walls and not on the north and south, while the horizon's
-# is reachable on all four. That is a pass of its own; it is scoped in the
-# README rather than half-built here.
-# CAP_A / MENIS_H / MENIS_W are defined with the pool-edge section above,
-# because the liner band's wet foot needs them too and it is built there.
+#
+# WHAT USED TO SIT HERE WAS AN AMBIENT LIFT AND THE MECHANISM IS SPECULAR. Two
+# builders wrote that down and deferred it; this is the pass that builds it.
+# Across the strip the tilt runs continuously from 0 at the flat surface to
+# phi_w = 90 - theta_c at the wall, so the strip holds EVERY facet orientation in
+# one plane and the mirror condition is met inside it for anything bright in the
+# sky -- the one specular feature in this scene that cannot fail the
+# reachability test the spec-C diagnostic applies to the open surface.
+#
+# THE INTEGRAL, AND WHAT IT IS DIVIDED BY. Differentiating the profile gives
+# dz = a cos(phi/2) dphi and dz/dx = -tan(phi), so the surface at tilt phi
+# occupies
+#       dx = a cos(phi/2) cos(phi) / sin(phi) dphi     (horizontally)
+#       ds = a cos(phi/2)          / sin(phi) dphi     (of arc)
+# and both are needed: the first says WHERE the facet is (which decides whether
+# the coping's undercut is in front of its mirror direction) and the second says
+# how much surface there is. A camera ray does not see the fillet, it sees a
+# pixel; so what is computed is a RADIANT INTENSITY PER UNIT LENGTH OF WATERLINE
+#
+#   I(v) = int_0^phi_w [ F(n.v) L_env(R(phi)) (n.v) / cos(phi)
+#                        - F(v_z) L_env(R_flat) v_z ] dx                 (W/sr/m)
+#
+# -- the fillet MINUS the flat surface it replaces, because water_shade has
+# already shaded that flat surface over the same millimetres and the term added
+# here has to be the excess or the baseline is counted twice. The subtraction is
+# also what makes the integral converge: dx diverges logarithmically as phi -> 0
+# while the bracket vanishes linearly in phi, so the product is finite and the
+# far tail costs nothing.
+#
+# The division is by the PIXEL FOOTPRINT MEASURED ACROSS THE WATERLINE. Writing
+# the result back as an equivalent radiance on the still plane,
+#       L_add(d) = I(v) P(d) / |v_z|,     int P dd = 1
+# any pixel that integrates L_add over its own footprint then gets exactly
+# I(v) * (length of waterline it contains) / (its solid angle * r^2), which is
+# the correct answer at every scale and needs no clamp: P is the fillet's own
+# d-profile convolved with the footprint, so where the fillet is resolved (the
+# footprint runs 3.7 mm at the near end of the north wall) it is a profile, and
+# where it is not (9.9 mm at the far end, against a 2.3 mm bright strip) the
+# same expression is a flux spread over one pixel. The chapter's "below ~1 px
+# clamp the screen width and scale the intensity by the same ratio" is what
+# that degenerates to; doing it as a convolution gets both regimes from one
+# expression and cannot produce the dashed line the clamp is warning about.
+#
+# THE FOLD AT d = 0. The convolution puts part of the flux at d < 0, which is
+# the WALL side of the junction -- and that is where it belongs: the fillet's
+# upper end stands h = 3.85 mm UP the wall, which this frame projects to 0.4-1.1
+# output pixels above the junction, i.e. onto the band's wet foot. Depositing it
+# there would move BAND_COL and the absorption regression that is measured off
+# it, so it is reflected back into the water side instead: flux-conserving, and
+# wrong by less than the pixel it is already spread over. `?` in the placement
+# only, never in the amount.
+#
+# WHICH WALL GETS THE SUN AND WHICH GETS THE HORIZON, derived rather than
+# assumed. A meniscus tilts only perpendicular to its own waterline, so with
+# t the along-wall unit vector and m the poolward one the reachable normals are
+# n(phi) = sin(phi) m + cos(phi) z, a one-parameter family in the (m, z) plane.
+# Reflecting v about it leaves the out-of-plane component alone -- R.t = -v.t for
+# every phi -- and rotates the in-plane part at twice the rate, so with
+# theta_v = atan2(v.m, v.z) and theta_l = atan2(L.m, L.z),
+#       R(phi) . L = sin(A) sin(B) + cos(A) cos(B) cos(2(phi - phi*))
+#       A = asin(-v.t),  B = asin(L.t),  phi* = (theta_v + theta_l) / 2
+# EXACTLY. Two consequences, and neither is the azimuth rule of thumb:
+#   * the closest the mirror direction ever comes to the sun is beta = A - B,
+#     which is zero where (L + v).t = 0. That is the half-vector test, and
+#     because v sweeps along the wall it is satisfied at ONE POINT on each of
+#     the four walls, not on two of them -- the eye is 3-9 m away, not at
+#     infinity, so "the sun is due west" does not by itself rule a wall out.
+#   * what rules a wall out is the COPING. The sun's mirror direction leaves at
+#     the in-plane angle theta_l, and the fillet sits millimetres from a wall
+#     carrying a lip ZD above it, so a mirror direction with any wallward tilt
+#     at all is looking at the underside of the stone. theta_l < 0 exactly when
+#     L.m < 0, so the sun's line is reachable on a wall if and only if the sun
+#     is on the POOLWARD side of that wall's vertical plane -- which is the same
+#     statement as the coping-shadow print at the top of this file (312 mm of
+#     water shaded off the west wall, 20 mm off the north), arrived at from the
+#     reflected side instead of the incident one.
+# For this scene that is: sun reachable on the EAST and SOUTH walls, occluded on
+# the NORTH and WEST. Both are built -- the disc is integrated analytically
+# because the 0.53 deg it subtends selects ~15 um of fillet that no quadrature
+# would sample, and the rest of the sky is integrated numerically -- and which
+# one lands where is measured and printed below rather than hard-coded.
+#
+# WHAT IS NOT BUILT, so that it is not read as built: the fillet also REFRACTS,
+# and a facet at 45 deg sends the camera ray somewhere quite different inside the
+# water. The transmitted column is 10x the reflected one, so that term is
+# potentially larger than this one; it needs the traced geometry rather than an
+# environment lookup and it is a pass of its own. This one is the specular half,
+# which is the half the chapter says carries the line.
+# CAP_A / MENIS_H / MENIS_W / THETA_C / PHI_W are defined with the pool-edge
+# section above, because the liner band's wet foot needs them too.
+MENIS_N = 64
+_mph = (np.arange(MENIS_N) + .5) / MENIS_N * PHI_W          # tilt nodes, midpoint
+_mdp = PHI_W / MENIS_N
+MENIS_DX = CAP_A * np.cos(_mph / 2) * np.cos(_mph) / np.sin(_mph)     # dd/dphi
+MENIS_WD = MENIS_DX * _mdp                                  # the node's width in d
+MENIS_D = np.cumsum(MENIS_WD[::-1])[::-1] - .5 * MENIS_WD   # d(phi), from the wall
+MENIS_SIN, MENIS_COS = np.sin(_mph), np.cos(_mph)
+MENIS_REACH = MENIS_D[0] + .5 * MENIS_WD[0]
+print("the fillet as a quadrature: %d tilt nodes over 0-%.0f deg; the surface at "
+      "tilt phi stands %s mm from the wall at phi = 80/60/45/30/20/10 deg, so "
+      "the whole of it above 30 deg is inside %.2f mm and the tabulated reach is "
+      "%.1f mm"
+      % (MENIS_N, np.degrees(PHI_W),
+         " / ".join("%.2f" % (1000 * np.interp(np.deg2rad(t), _mph, MENIS_D))
+                    for t in (80, 60, 45, 30, 20, 10)),
+         1000 * np.interp(np.deg2rad(30), _mph, MENIS_D), 1000 * MENIS_REACH))
+
+
+def _erf(x):
+    """Abramowitz & Stegun 7.1.26, |err| < 1.5e-7. Needed to CLIP the analytic
+    lobe integral to the tilts the fillet actually has: phi* can sit outside
+    [0, phi_w] and the Gaussian must be truncated there, not extrapolated."""
+    s, a = np.sign(x), np.abs(x)
+    t = 1. / (1. + .3275911 * a)
+    y = 1. - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
+               - .284496736) * t + .254829592) * t * np.exp(-a * a)
+    return s * y
+
+
+def _env_menis(rx, ry, rz):
+    """The environment along a fillet's mirror direction. The same sky() the open
+    water reads, MINUS the disc -- which is integrated analytically below and
+    would otherwise be counted twice, and which a 64-node sweep would hit or miss
+    at random anyway. Sub-horizon directions are not clamped to the horizon
+    colour: a mirror direction below the horizon is looking at the water further
+    out, so it gets one bounce off it -- Fresnel of the sky it would mirror, plus
+    what is coming UP out of the pool through the rest."""
+    az = np.abs(rz)
+    t = az[:, None] ** .55
+    col = SKY_HOR[None] * (1 - t) + SKY_TOP[None] * t
+    cs = np.clip(rx * SUN_DIR[0] + ry * SUN_DIR[1] + az * SUN_DIR[2], 0, 1)
+    for amp, n, c in SKY_LOBE[1:]:                    # every lobe but the disc
+        col = col + c[None] * amp * (cs ** n)[:, None]
+    col = col * 1.15
+    fw = F0[None] + (1 - F0[None]) * (1 - az)[:, None] ** 5
+    return np.where((rz >= 0)[:, None], col, fw * col + (1 - fw) * WBOUNCE[None])
+
+
+def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
+    """The fillet's specular excess over the flat water it replaces, returned as
+    a radiance to add to the ray. Evaluated only on the band of rays whose
+    footprint can reach the fillet at all -- everywhere else it is exactly zero,
+    which is what makes a 64-node quadrature affordable inside the main path."""
+    out = np.zeros((hw_x.size, 3))
+    if fp is None:
+        return out              # no footprint, no width to spread a flux over
+    d = np.maximum(SLIP - s_h, 0.)                # distance in from the waterline
+    gx, gy, _e = pool_grad(hw_x, hw_y)
+    mx, my = -gx, -gy                             # poolward horizontal, |m| = 1
+    tx, ty = -gy, gx                              # along the waterline
+    dh = np.maximum(np.hypot(dvec[:, 0], dvec[:, 1]), 1e-9)
+    pxh, pyh = dvec[:, 0] / dh, dvec[:, 1] / dh   # view azimuth, and across it
+    pm = pxh * mx + pyh * my
+    qm = -pyh * mx + pxh * my
+    # the footprint ACROSS the waterline. `fp` is the OUTPUT pixel's along the
+    # view azimuth (t*eps/|d_z|), so t*eps = fp*|d_z| and the two axes of the
+    # footprint ellipse recombine to this. The kernel is the SUBSAMPLE box --
+    # the SS x SS box filter supplies the rest of the output pixel's integral,
+    # and prefiltering at the output rate here would blur it twice. That is the
+    # opposite of the choice FOOT_PX makes upstream, and for the opposite
+    # reason: this term is LINEAR in what is deposited, so nothing it makes has
+    # harmonics above the rate it is filtered at.
+    w_m = np.abs(fp) * np.sqrt(pm * pm + (qm * dvec[:, 2]) ** 2)
+    sig = np.maximum(w_m / SS, 2e-4) / np.sqrt(12.)
+    sel = np.flatnonzero(d < MENIS_REACH + 3.5 * sig)
+    if not sel.size:
+        return out
+    for c0 in range(0, sel.size, 20000):
+        k = sel[c0:c0 + 20000]
+        Vm = -(dvec[k, 0] * mx[k] + dvec[k, 1] * my[k])
+        Vt = -(dvec[k, 0] * tx[k] + dvec[k, 1] * ty[k])
+        Vz = -dvec[k, 2]
+        Lt = SUN_DIR[0] * tx[k] + SUN_DIR[1] * ty[k]
+        Lm = SUN_DIR[0] * mx[k] + SUN_DIR[1] * my[k]
+        # --- the fillet, node by node
+        ndv = MENIS_SIN[None] * Vm[:, None] + MENIS_COS[None] * Vz[:, None]
+        Rm = 2. * ndv * MENIS_SIN[None] - Vm[:, None]
+        Rz = 2. * ndv * MENIS_COS[None] - Vz[:, None]
+        Rt = np.broadcast_to(-Vt[:, None], Rm.shape)
+        Rx = Rm * mx[k][:, None] + Rt * tx[k][:, None]
+        Ry = Rm * my[k][:, None] + Rt * ty[k][:, None]
+        # the coping's undercut, tested on the MIRROR direction: a ray heading at
+        # the wall from d millimetres away crosses it at over = R_z d / toward,
+        # and anything under ZD is stone rather than sky. water_shade's own
+        # version of this is a soft ramp in `over`, which is right there -- it
+        # stands in for the spread of normals inside one pixel of FLAT water.
+        # Here the normal is not a distribution but a quadrature node, so the
+        # test is a STEP; leaving it soft lets 11% of a 3.6e5 sun through a
+        # coping it is entirely behind. The transition sits at phi = theta_v/2,
+        # where the mirror direction runs parallel to the wall, and the 64 nodes
+        # resolve it to a node whose width in d is under 0.2 mm.
+        tw = -Rm
+        ov = np.where(tw > 1e-9, Rz * MENIS_D[None] / np.maximum(tw, 1e-9), BIG)
+        occ = np.where((tw > 1e-9) & (ov < ZD), 1., 0.)
+        Le = _env_menis(Rx.ravel(), Ry.ravel(), Rz.ravel()).reshape(
+            Rm.shape + (3,))
+        Le = Le * (1 - occ)[..., None] + EDGE_REFL[None, None] * occ[..., None]
+        # Fresnel with the SAME roughness correction water_shade uses, and for
+        # the same reason on both sides of the subtraction: the term returned
+        # here is an excess over what water_shade already wrote, so if the
+        # baseline is priced with plain Schlick and the picture was drawn with
+        # Bruneton's, the difference is a 19% error on a quantity of the same
+        # size as the answer. `sv` is the one-direction unresolved slope rms
+        # along the view azimuth -- `a_` below, the file's own `el[5]`.
+        _sv = np.sqrt(np.maximum(pxh[k] ** 2 * vxx_[k]
+                                 + 2 * pxh[k] * pyh[k] * vxy_[k]
+                                 + pyh[k] ** 2 * vyy_[k], 0.))
+        _rgh = (np.exp(-2.69 * _sv) / (1. + 22.7 * _sv ** 1.5))[:, None]
+        nc = np.clip(ndv, 1e-4, 1.)
+        Ff = F0[None, None] + (1 - F0[None, None]) * ((1 - nc) ** 5 * _rgh)[..., None]
+        fil = np.where((ndv > 0)[..., None],
+                       Ff * Le * (nc / MENIS_COS[None])[..., None], 0.)
+        # --- the flat surface it replaces, at the same distances
+        ov0 = np.where(Vm[:, None] > 1e-9,
+                       Vz[:, None] * MENIS_D[None] / np.maximum(Vm[:, None], 1e-9),
+                       BIG)
+        oc0 = np.where(Vm[:, None] > 1e-9, np.clip(1. - ov0 / ZD, 0, 1), 0.) ** .8
+        # R_flat = 2 v_z z - v, whose horizontal part is -v_h, i.e. dvec's own
+        L0 = _env_menis(dvec[k, 0], dvec[k, 1], Vz)[:, None]
+        L0 = L0 * (1 - oc0)[..., None] + EDGE_REFL[None, None] * oc0[..., None]
+        F0v = F0[None] + (1 - F0[None]) * ((1 - Vz)[:, None] ** 5 * _rgh)
+        flat = F0v[:, None] * L0 * Vz[:, None, None]
+        ex = (fil - flat) * MENIS_WD[None, :, None]
+        # --- the footprint kernel, folded at the wall (see the note above)
+        sg = sig[k][:, None]
+        dl = (d[k][:, None] - MENIS_D[None]) / sg
+        dr = (d[k][:, None] + MENIS_D[None]) / sg
+        K = (np.exp(-.5 * dl * dl) + np.exp(-.5 * dr * dr)) / (
+            sg * np.sqrt(2. * np.pi))
+        vzc = np.maximum(Vz, .05)[:, None]      # the frame's top row is 0.18
+        acc = (ex * K[..., None]).sum(1) / vzc
+        # --- the disc, analytically. cos^n is exp(-n psi^2/2) near its peak and
+        # phi sweeps the mirror direction at twice its own rate, so the integral
+        # over the fillet is a Gaussian in (phi - phi*) of per-axis variance
+        # 1/n + c -- c being the reflected-slope ellipse the footprint filter
+        # removed, fed in through the same widening _lobe_shape applies to the
+        # open water (`?` isotropic here: the fillet's own sweep is a line in
+        # the same tangent space and resolving the two ellipses against each
+        # other is a refinement on a term that is zero on both visible walls).
+        thV = np.arctan2(Vm, Vz)
+        thL = np.arctan2(Lm, SUN_DIR[2])
+        phs = .5 * (thV + thL)
+        nvs = np.sin(phs) * Vm + np.cos(phs) * Vz
+        Rsm = 2. * nvs * np.sin(phs) - Vm
+        Rsz = 2. * nvs * np.cos(phs) - Vz
+        tws = -Rsm
+        ds = np.interp(np.clip(phs, _mph[0], _mph[-1]), _mph, MENIS_D)
+        # WHETHER THE SUN REACHES THE FACET AT ALL, taken from the incident side
+        # with the file's own lip test rather than re-derived here: at the
+        # mirror configuration "the mirror direction clears the coping" and "the
+        # sun reaches the fillet" are the same statement, and coping_vis already
+        # carries the run to the lip along the sun's azimuth AND the 0.53 deg
+        # penumbra of that edge. It is evaluated at the FILLET's distance d*,
+        # not at the ray's -- the shadow edge is 20 mm out on the north wall and
+        # the fillet is inside 3 mm of it.
+        adv = gx[k] * _SHAT[0] + gy[k] * _SHAT[1]
+        run = np.where(adv > 1e-6, ds / np.maximum(adv, 1e-6), BIG)
+        svis = (np.clip((run - _LRUN) / _LPEN + .5, 0, 1)
+                * np.asarray(sail_vis(hw_x[k], hw_y[k]), float))
+        b_ = pyh[k] ** 2 * vxx_[k] - 2 * pxh[k] * pyh[k] * vxy_[k] + pxh[k] ** 2 * vyy_[k]
+        qv = 1. / N_DISC + np.maximum(2. * (_sv ** 2 + nvs * nvs * b_), 0.)
+        gpk = (1. / N_DISC) / qv
+        # the RESOLVED along-wall slope tilts the fillet out of its own plane,
+        # so the half-vector residual is not a property of the wall alone: it is
+        # where the wave field happens to carry it. That is why a real waterline
+        # sparkles along a stretch rather than glinting at one point.
+        nt = -(gxx_[k] * tx[k] + gyy_[k] * ty[k]) / np.sqrt(
+            1. + gxx_[k] ** 2 + gyy_[k] ** 2)
+        bet = (np.arcsin(np.clip(-Vt + 2. * nvs * nt, -1, 1))
+               - np.arcsin(np.clip(Lt, -1, 1)))
+        ea = np.sqrt(2. / qv)
+        cl = .5 * (_erf((PHI_W - phs) * ea) - _erf(-phs * ea))
+        Fs = F0[None] + (1 - F0[None]) * ((1 - np.clip(nvs, 1e-4, 1))[:, None] ** 5
+                                          * _rgh)
+        amp = (np.clip(nvs, 0, None) * CAP_A * np.cos(.5 * phs)
+               / np.maximum(np.sin(phs), 1e-6) * gpk * cl * svis
+               * np.exp(-bet * bet / (2. * qv)) * np.sqrt(np.pi / 2.) * np.sqrt(qv))
+        dsl, dsr = (d[k] - ds) / sig[k], (d[k] + ds) / sig[k]
+        Kd = (np.exp(-.5 * dsl * dsl) + np.exp(-.5 * dsr * dsr)) / (
+            sig[k] * np.sqrt(2. * np.pi))
+        acc += Fs * L_SUN[None] * (amp * Kd)[:, None] / vzc
+        out[k] = acc
+    return out
 
 
 def surf_stats(x, y, fp):
@@ -2639,7 +2921,7 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     occ_ = np.where(toward > 0, np.clip(1. - over / ZD, 0, 1), 0.) ** .8
     refl_ = refl_ * (1 - occ_)[:, None] + EDGE_REFL[None] * occ_[:, None]
     lip_ao = 1. - .34 * np.exp(-(in_w + SLIP) / .045)
-    menis = np.exp(-np.maximum(in_w + SLIP, 0.) / MENIS_W)
+    mnis_ = meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_)
 
     water = np.zeros((hw_x.size, 3))
     geo, smG_ = {}, None
@@ -2688,8 +2970,13 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     water *= lip_ao[:, None]
     spec_ = fres_ * refl_
     tran_ = (1 - fres_) * water
-    out = (spec_ + tran_
-           + (SKY_AMB[None] * .17 + SUN_COL[None] * .006) * menis[:, None])
+    # The meniscus is a correction to the SPECULAR column and it is allowed to be
+    # negative -- on a wall seen at 11 deg grazing the flat surface reflects the
+    # undercut at F = 0.36 while the fillet turns its facets toward the eye and
+    # reflects the sky at F = 0.02, and the fillet is then the DARKER of the two.
+    # It cannot take away more than the specular it is correcting, and that is
+    # the only clamp on it.
+    out = spec_ + tran_ + np.maximum(mnis_, -spec_)
     # the two halves are carried out separately as luminances so that spec C can
     # be judged on the right one. "A compact patch of isolated bright points" is
     # a statement about the REFLECTED term; if the transmitted bed beats it
@@ -2698,6 +2985,105 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     # be 300 MB on this ray count for a number that is a scalar.
     _Y = np.array([.2126, .7152, .0722])
     return (out, sidG, uG, vG, smG_, cylG, occ_, keyc, spec_ @ _Y, tran_ @ _Y)
+
+
+# ------------------------------------------ THE LINE, MEASURED BEFORE IT IS DRAWN
+# Every claim the block above makes is checkable off the same function the
+# picture is made with: probe a waterline point with a fan of rays running in
+# from the wall, and read the profile the pixel grid will actually receive.
+def _menis_probe(P, nd=401, span=.060):
+    """(peak radiance, FWHM in OUTPUT pixels, the integral I(v), the footprint
+    across the waterline, and where the point lands in the frame)."""
+    P = np.asarray(P, float)
+    gx, gy, _ = pool_grad(P[0], P[1])
+    px = P[0] - gx * np.linspace(0., span, nd)
+    py = P[1] - gy * np.linspace(0., span, nd)
+    dd = np.linspace(0., span, nd)
+    dv = np.stack([px, py, np.zeros(nd)], 1) - EYE[None]
+    tt = np.linalg.norm(dv, axis=1)
+    dv /= tt[:, None]
+    fpp = tt * PIXANG / np.maximum(np.abs(dv[:, 2]), .10) * SS
+    st = surf_stats(px, py, fpp)
+    Lc = meniscus(px, py, SLIP - dd, dv, fpp, *st)
+    y = Lc[:, 1]
+    dh = np.maximum(np.hypot(dv[:, 0], dv[:, 1]), 1e-9)
+    pm = (dv[:, 0] * -gx + dv[:, 1] * -gy) / dh
+    qm = (-dv[:, 1] * -gx + dv[:, 0] * -gy) / dh
+    w_m = fpp * np.sqrt(pm * pm + (qm * dv[:, 2]) ** 2)
+    ipk = int(np.argmax(np.abs(y)))
+    half = np.abs(y) >= .5 * abs(y[ipk])
+    fw = (np.flatnonzero(half)[-1] - np.flatnonzero(half)[0] + 1) * (span / (nd - 1))
+    return (y[ipk], fw / max(w_m[ipk], 1e-9), (y * -dv[:, 2]).sum() * span / (nd - 1),
+            w_m[0], project(P)[0], dd[ipk], Lc[ipk])
+
+
+_WLL = (("east ", np.array([1., 0.]), np.array([X1, 0.])),
+        ("north", np.array([0., 1.]), np.array([0., Y1])),
+        ("west ", np.array([-1., 0.]), np.array([X0, 0.])),
+        ("south", np.array([0., -1.]), np.array([0., Y0])))
+print("THE MENISCUS LINE, per wall. `m` is the poolward horizontal. The sun's own "
+      "line needs BOTH  (a) L.m > 0, or its mirror direction leaves under the "
+      "coping,  and (b) the half-vector residual beta = asin(-v.t) - asin(L.t) to "
+      "pass through zero on a stretch the frame can see:")
+for _nm, _no, _o0 in _WLL:
+    _m = -_no
+    _t = np.array([-_no[1], _no[0]])
+    _Lm = SUN_DIR[:2] @ _m
+    _Lt = SUN_DIR[:2] @ _t
+    _u = np.linspace(.03, (Y1 - Y0 if abs(_no[0]) > 0 else X1 - X0) - .03, 600)
+    _P = (np.stack([np.full_like(_u, _o0[0]), _u], 1) if abs(_no[0]) > 0
+          else np.stack([_u, np.full_like(_u, _o0[1])], 1)) + _no[None] * SLIP
+    _V = EYE[None, :2] - _P
+    _Vn = np.linalg.norm(np.concatenate([_V, np.full((len(_u), 1), EYE[2])], 1), axis=1)
+    _Vt = (_V @ _t) / _Vn
+    _bet = np.degrees(np.arcsin(np.clip(-_Vt, -1, 1))
+                      - np.arcsin(np.clip(_Lt, -1, 1)))
+    _pp = project(np.concatenate([_P, np.zeros((len(_u), 1))], 1))
+    _inf = ((_pp[:, 0] >= 0) & (_pp[:, 0] < W // SS) &
+            (_pp[:, 1] >= 0) & (_pp[:, 1] < H // SS))
+    _cr = np.flatnonzero(np.diff(np.sign(_bet)) != 0)
+    _cs = ("beta = 0 at %s, %s frame"
+           % (np.round(_P[_cr[0]], 2), "IN" if _inf[_cr[0]] else "out of")
+           ) if _cr.size else "beta never reaches 0 on this wall"
+    print("   %s wall: L.m = %+.3f -> the sun is %s, so its disc is %-9s | %s | "
+          "%3.0f%% of the waterline is in frame"
+          % (_nm, _Lm, "POOLWARD" if _Lm > 0 else "behind the wall",
+             "REACHABLE" if _Lm > 0 else "OCCLUDED", _cs, 100 * _inf.mean()))
+print("   -- and the coping-shadow print at the top of the file says the same "
+      "thing from the incident side: the lip shades the fillet on exactly the "
+      "walls whose L.m < 0.")
+print("   the line itself, probed with the render's own `meniscus` along the "
+      "waterlines this frame can see:")
+for _nm, _pts in (("north", [(x, Y1 + SLIP) for x in (0.4, 1.4, 2.4, 3.4, 4.4, 5.4, 6.4, 7.3)]),
+                  ("west ", [(X0 - SLIP, y) for y in (3.5, 3.9)]),
+                  ("east ", [(X1 + SLIP, y) for y in (2.09, 2.6, 3.2)])):
+    for _p in _pts:
+        _pk, _fw, _I, _w, _px, _dpk, _c3 = _menis_probe(np.array([_p[0], _p[1], 0.]))
+        print("     %s (%.2f, %.2f) px(%4.0f,%4.0f)%s  footprint across the line "
+              "%5.2f mm | peak %+8.4f at d = %.2f mm, %.2f output px wide | "
+              "I = %.3e W/sr/m | rgb %s"
+              % (_nm, _p[0], _p[1], _px[0], _px[1],
+                 "  " if (0 <= _px[0] < W // SS and 0 <= _px[1] < H // SS) else " *",
+                 1000 * _w, _pk, 1000 * _dpk, _fw, _I, np.round(_c3, 4)))
+print("     (* = outside the frame.  The east waterline is in the frame's plan "
+      "but not in its picture: the near coping's own arris stands in front of "
+      "it, which is why the sun's line -- reachable there and nowhere else in "
+      "shot -- cannot be seen.)")
+# What the ambient lift this replaces was worth, in the same units: it was
+# (SKY_AMB*0.17 + SUN_COL*0.006) with an exp(-d/2a) profile, so its flux per
+# unit of waterline is that times 2a times v_z, and the ratio is the price of
+# the guess.
+_pmid = np.array([2.4, Y1 + SLIP, 0.])
+_vzm = abs((EYE - _pmid)[2] / np.linalg.norm(EYE - _pmid))
+_amb = (SKY_AMB * .17 + SUN_COL * .006) * MENIS_W * _vzm
+print("   the AMBIENT lift this replaces was worth %s W/sr/m per unit of "
+      "waterline at x = 2.4 on the north wall (and the same everywhere, since it "
+      "knew about neither the sun nor the eye). The derived integral there is "
+      "%.3e in green, so the guess carried %.1fx the flux the physics has -- and "
+      "carried it flat, where the physics puts nearly all of it at the far end, "
+      "where the mirror direction passes closest to the sun."
+      % (np.round(_amb, 4), _menis_probe(_pmid)[2],
+         _amb[1] / max(_menis_probe(_pmid)[2], 1e-12)))
 
 
 QSUB = ((SUBK[inp].astype(np.float64) + .5) / NSPEC)
