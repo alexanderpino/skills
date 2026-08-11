@@ -270,14 +270,40 @@ L_WHITE = ((-_qb + np.sqrt(_qb ** 2 - 4 * _qa * _qc)) / (2 * _qa)) / EXPOSURE
 # number here is a dimension off a real coping stone, and each one does visible
 # work: the overhang makes the undercut the water sits in, the bullnose makes
 # the roll that catches or loses the sun depending on which side of the pool it
-# is, and the 75 mm freeboard makes the reflection of the coping in the water.
-ZD   =  0.075     # coping top, 75 mm above the still waterline (the freeboard)
-ZG   = -0.030     # lawn, if it ever gets in frame -- it does not
+# is, and the freeboard makes the reflection of the coping in the water.
+#
+# --- THE FREEBOARD IS THE LINER'S, NOT THE STONE'S ---------------------------
+# Bar section B2b, reported by the reference observer and therefore carrying
+# A-F weight: "the edge of the pool should be a little higher. A blue side wall
+# of about 10 cm, and then the stones."
+#
+# Read that as written and it fixes TWO numbers, not one, because the observer's
+# 10 cm and the file's old 75 mm are not the same measurement:
+#   * the observer's 10 cm is the height of the BLUE -- still water up to where
+#     the stone starts. In this section that is ZLIP, the lowest point of the
+#     bullnose, which is where a coping stone's visible underside is.
+#   * the file's 75 mm was ZD, the coping TOP, which is a bullnose radius higher
+#     than that, so the old blue band was 43 mm and the old stone started there.
+# So FREEB is the measured number and ZD follows from the stone's own section:
+#     FREEB 0.100  water -> underside of the stone   (the observer's 10 cm)
+#     ZD    0.132  water -> coping top               (was 0.075)
+# `?` if the observer instead meant the whole freeboard to the top of the stone,
+# ZD would be 0.100 and the blue would be 68 mm; nothing in the bar separates the
+# two readings, and the one taken here is the one that makes the sentence's own
+# clause -- "about 10 cm, AND THEN the stones" -- true of the blue.
+#
+# In a liner pool that band IS the liner: the sheet runs up the wall to a bead
+# track just under the coping, so the colour above the water is the colour below
+# it. It is shaded from LINER_TINT by `liner_band` below, not by `paving`, and
+# `tiles` no longer carries a mosaic course under it.
 BULR =  0.032     # bullnose radius
+FREEB=  0.100     # the blue liner band: still water to the underside of the stone
+ZD   =  FREEB + BULR   # coping top above the still waterline
+ZG   = -0.030     # lawn, if it ever gets in frame -- it does not
 SLIP = -0.020     # the coping overhangs the wall face by 20 mm, into the pool
 SBUL = SLIP + BULR
 ZCEN = ZD - BULR  # centre of the bullnose arc, in (s, z)
-ZLIP = ZCEN       # the lip: lowest point of the bullnose, 43 mm over the water
+ZLIP = ZCEN       # lowest point of the bullnose == the TOP OF THE BAND, = FREEB
 COPW =  0.34      # width of the coping course
 WET  =  0.210     # how far back from the lip the stone is still splash-damp
 # A real pool liner is BLUE, not white plaster. Absolute albedo ~ (0.24, 0.54, 0.70):
@@ -602,7 +628,8 @@ print("sail shadow covers %.1f m2 of the basin" %
 
 
 # The coping overhangs the wall, so along the WEST wall the sun never reaches the
-# surface at all: it has to climb ZLIP = 43 mm to clear the lip and it only gains
+# surface at all: it has to climb ZLIP -- now the 100 mm of the liner band, not
+# the old 43 mm -- to clear the lip and it only gains
 # 0.385 m per metre run, so a band of water against that wall is in shadow. The
 # refracted ray from the first LIT surface then travels 1.37 m east, so what you
 # see on the bed is not a dark strip against the wall but a dark strip out in the
@@ -612,8 +639,9 @@ print("sail shadow covers %.1f m2 of the basin" %
 # Written against pool_sdf, not against X0/Y1: walk from the water point toward
 # the sun's azimuth until the SDF reaches the lip value SLIP. The SDF changes at
 # rate (shat . grad s) along that walk, so the run to the lip is
-# (SLIP - s)/(shat . grad s) -- which is why the same 43 mm of freeboard costs
-# 112 mm on the wall the sun faces and 7 mm on the wall it runs along. A curved
+# (SLIP - s)/(shat . grad s) -- which is why the same freeboard costs a much
+# wider band on the wall the sun faces than on the wall it runs along; the two
+# are printed below rather than quoted here, since ZLIP now moves. A curved
 # boundary needs no new code here; only grad s changes.
 _SHAT = SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])   # horizontal, toward the sun
 _LRUN = ZLIP * np.linalg.norm(SUN_DIR[:2]) / SUN_DIR[2]   # run needed to clear it
@@ -635,18 +663,25 @@ print("coping lip shades %.0f mm of water off the west wall, %.0f mm off the "
 
 def coping_vis(x, y):
     """Sun visibility at the water surface, cut by the coping lip itself. Lit
-    where the run to the lip exceeds the run needed to clear its 43 mm."""
+    where the run to the lip exceeds the run needed to clear ZLIP."""
     return np.clip((_lip_run(x, y) - _LRUN) / _LPEN + .5, 0, 1)
 
 
-def sun_vis(x, y):
+def sail_vis(x, y):
+    """The sail's shadow alone. Split out from sun_vis because the freeboard
+    band is a face ON the lip, not water inside it: the lip cannot shade its own
+    poolward face (the bullnose rolls AWAY from the pool above it), so the band
+    takes this and not the coping cut below."""
     fu = np.clip((x - SX[0]) / (SX[-1] - SX[0]) * SHADOW_N[0] - .5, 0, SHADOW_N[0] - 1.001)
     fv = np.clip((y - SY[0]) / (SY[-1] - SY[0]) * SHADOW_N[1] - .5, 0, SHADOW_N[1] - 1.001)
     iu, iv = fu.astype(np.int64), fv.astype(np.int64)
     du, dv = fu - iu, fv - iv
-    s = ((SHADOW[iv, iu] * (1 - du) + SHADOW[iv, iu + 1] * du) * (1 - dv) +
-         (SHADOW[iv + 1, iu] * (1 - du) + SHADOW[iv + 1, iu + 1] * du) * dv)
-    return s * coping_vis(x, y)
+    return ((SHADOW[iv, iu] * (1 - du) + SHADOW[iv, iu + 1] * du) * (1 - dv) +
+            (SHADOW[iv + 1, iu] * (1 - du) + SHADOW[iv + 1, iu + 1] * du) * dv)
+
+
+def sun_vis(x, y):
+    return sail_vis(x, y) * coping_vis(x, y)
 
 
 # --------------------------------------------------------------------------- caustic pass
@@ -857,27 +892,30 @@ def liner(u, v):
 
 def tiles(u, v):
     """The wall, and specifically the last 155 mm of it. v is depth, 0 at the
-    still waterline. A pool wall is not uniform down to the surface: it carries a
-    waterline course in small mosaic, and it carries the two marks the surface
-    itself leaves -- a chalky calcium bloom exactly at the mean level where
-    evaporation keeps depositing the hardness, and a thin dirt line a couple of
-    centimetres under it where the surface film collects and is never skimmed.
-    Those two lines are the reason a real pool edge does not read as a cut."""
+    still waterline. A pool wall is not uniform down to the surface: it carries
+    the two marks the surface itself leaves -- a chalky calcium bloom exactly at
+    the mean level where evaporation keeps depositing the hardness, and a thin
+    dirt line a couple of centimetres under it where the surface film collects
+    and is never skimmed. Those two lines are the reason a real pool edge does
+    not read as a cut.
+
+    WHAT LEFT, and why. This used to put a 48 mm MOSAIC WATERLINE COURSE over
+    the top 155 mm of the wall -- a different, paler, greener albedo than the
+    liner under it. Bar section B2b says that is a different pool: the reference
+    is a LINER pool, the sheet runs unbroken from the floor up to a bead track
+    under the coping, so the colour above the water is the colour below it and
+    there is no course of anything at the waterline. The band above the water is
+    now built (`liner_band`), and it would have met a mosaic stripe at its own
+    foot. The two marks stay: they are deposits ON the liner, not a material.
+
+    `?` NOT FIXED HERE, and recorded rather than quietly changed: the 250 mm
+    grid of 11 mm darker lines below is still a TILE grid, and a liner pool has
+    no grout either. It is the rest of the wall rather than the band B2b is
+    about, so it is left for whoever owns that finding."""
     lev = 0.82 + .04 * np.sin(u * 17.) * np.sin(v * 21.)
     g = ((np.abs(((u / .25) % 1.) - .5) > .456) | (np.abs(((v / .25) % 1.) - .5) > .456))
     lev = np.where(g, .70, lev)
     alb = np.broadcast_to(LINER_TINT[None, None], lev.shape + (3,)).copy()
-
-    # The waterline course is 48 mm mosaic, but at 9 m and 11 degrees one tile is
-    # a pixel and a half, so it is carried as a smooth modulation rather than a
-    # hard grid: a two-level grid at that footprint is not detail, it is noise,
-    # and the wall image is prefiltered on a fixed grid with no footprint to
-    # filter against. Everything that survives the distance is smooth in u.
-    wl = v > -0.155                                        # waterline course
-    gm = .5 - .5 * np.cos(2 * np.pi * u / .048) * np.cos(2 * np.pi * v / .048)
-    lev = np.where(wl, .66 + .13 * gm + .04 * np.sin(u * 131.) * np.sin(v * 97.), lev)
-    alb = np.where(wl[..., None],
-                   (LINER_TINT * np.array([.62, .91, 1.03]))[None, None], alb)
 
     cal = np.exp(-((v + .0095) / .0115) ** 2)              # calcium, at mean level
     dirt = np.exp(-((v + .0330) / .0165) ** 2)             # surface film, just under
@@ -1836,22 +1874,29 @@ _RHO = np.exp(np.linspace(np.log(0.010), np.log(6.0), _NRHO))
 _PHI = np.linspace(-np.deg2rad(75.), np.deg2rad(75.), _NPHI)
 
 
-def _deck_gather(flat):
-    """Irradiance on a poolward-facing stone facet from the water surface.
+def _gather(flat, samples):
+    """Irradiance on a poolward-facing facet from the water surface.
     Polar quadrature over the water: for a facet at height qz above the still
     plane and a surface point at horizontal distance rho and bearing phi off the
     inward normal, R^2 = rho^2 + qz^2, the incoming direction carries
     (N.w) = rho cos(phi)/R and dOmega = (qz/R) dA/R^2, so the weight is
     rho cos(phi) qz / R^4 -- a 1/s falloff before Fresnel, and steeper after it,
     which is the 'near-grazing exit from a source of finite extent' the pattern
-    is supposed to have."""
+    is supposed to have.
+
+    `samples` is a list of (s, qz, rho_grid): where the facet sits back from the
+    lip, how high it stands over the still water, and the radial quadrature to
+    use. The stone facets are one family of those (s varies, qz = edge_z(s)) and
+    the liner band is another (s pinned at the lip, qz sweeping the band's own
+    height) -- the SAME estimator, which is the point: the band is not a new
+    light transport, it is the receiver this gather was built for, at last
+    pointed at the surface that shows it best."""
     out = []
     for sd in range(4):
         gx, gy, lx, ly, fx, fy = _DG[sd]
         a = (np.arange(DECK_NA[sd]) + .5) * DECK_DA + (Y0 if sd < 2 else X0)
-        acc = np.zeros((len(DECK_S), DECK_NA[sd], 3))
-        for si, s in enumerate(DECK_S):
-            qz = float(edge_z(np.array([s]))[0])
+        acc = np.zeros((len(samples), DECK_NA[sd], 3))
+        for si, (s, qz, rgrid) in enumerate(samples):
             bx = (fx + gx * s) if fx is not None else a
             by = (fy + gy * s) if fy is not None else a
             bx = np.broadcast_to(np.atleast_1d(bx), a.shape).astype(np.float64)
@@ -1859,10 +1904,10 @@ def _deck_gather(flat):
             for ph in _PHI:
                 cp, sp = np.cos(ph), np.sin(ph)
                 r0 = max((s - SLIP) / cp, 1e-3)
-                rho = _RHO[_RHO > r0]
+                rho = rgrid[rgrid > r0]
                 if not rho.size:
                     rho = np.array([r0 * 1.05])
-                dln = np.log(_RHO[-1] / _RHO[0]) / (_NRHO - 1)
+                dln = np.log(rgrid[-1] / rgrid[0]) / (len(rgrid) - 1)
                 dphi = (_PHI[-1] - _PHI[0]) / (_NPHI - 1)
                 for rr in rho:
                     px = bx - gx * rr * cp + lx * rr * sp

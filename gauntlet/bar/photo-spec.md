@@ -93,6 +93,28 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
   gather is not reaching the one surface that shows it best.
 - The **meniscus line of B3 sits at its foot**, where the band meets the water.
 
+> **Confirmed and refined by a sixth photograph of the reference pool** — a corner
+> of the wall shot from the deck, showing the full section. Same A–F weight.
+>
+> - **The section has three elements, not two:** water → blue liner wall → a
+>   narrow **grey concrete bead or edge beam** → sandstone coping. The grey strip
+>   is thin, maybe a fifth of the blue band, and it is what the liner's bead track
+>   sits behind. Two elements would read as a shortcut.
+> - **The dry band is markedly *paler* than the water**, not the same blue. Same
+>   liner, but lit directly and seen through no water at all, against liner seen
+>   through 1.40 m and a Beer-Lambert round trip. The contrast between the two
+>   across the waterline is one of the strongest tonal edges in the frame.
+> - **The waterline against this wall is soft, and it undulates.** There is a
+>   visible wet band at the foot of the blue and the line itself wobbles with the
+>   surface. This does **not** contradict B2: B2 is the *coping's arris* seen from
+>   above, which is cut stone and stays hard; this is the *wall's waterline*, which
+>   is exactly where B3 puts the meniscus. Two different edges, as B3 said.
+> - **A skimmer mouth is set into the wall at the waterline** — a white moulded
+>   throat, wider than it is tall, its opening straddling the surface. Recorded as
+>   an observation, **not** dispatched: it is a third change and this is a
+>   two-change wave. It also independently confirms the plumbing reasoning behind
+>   the wave-4 arbitration, since returns are placed opposite the skimmer.
+
 ### B3 · The meniscus line — a fifth photograph of the reference pool
 
 > A frame looking steeply down at the wall. It refines B2 rather than reversing
