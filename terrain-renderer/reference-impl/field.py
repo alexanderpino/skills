@@ -9,8 +9,27 @@ Bands, in the order they were forced on the model by observation:
   NEAR    early wall reflections from the jet, still coherent
   BOIL    the turbulent surface over the jet itself, riding a forced envelope
   WAKE    the jet's stationary wake, solved by eikonal ray tracing (wake.py)
+
+Slope budget, and why it is the whole game
+------------------------------------------
+Caustic focusing on the bed goes as F = 0.25*d*s*k (d = 1.40 m, s = rms slope,
+k = dominant wavenumber). F ~ 0.3-0.6 writes the soft readable cell net; F >> 1
+is past focus and writes fine high-variance speckle with no legible cells. So a
+band is not judged by its own slope but by its slope AT ITS OWN WAVENUMBER, and
+a band carrying too much slope at too short a wavelength washes the bed out
+however correct its individual numbers look.
+
+The net is written by REVERB (~20 cm) and NEAR (~20 cm). WIND and BOIL are past
+focus by construction and are allowed to be -- they own sparkle and wash, and
+their slope share is small. The WAKE is the dangerous one: it starts long
+(~35 cm) and SHORTENS as it travels, so it walks itself into the past-focus band.
+The only thing that keeps it honest is the film damping in wake.alpha_eff, which
+kills it at about 3 m -- and its normalisation, which is measured in its own near
+field, not averaged over the basin.
 """
 import numpy as np
+
+import wake as _wk
 
 X0, X1, Y0, Y1 = 0.0, 8.0, 0.0, 4.0
 rng = np.random.default_rng(20260810)
@@ -37,6 +56,10 @@ S_SPREAD, B_DECAY, TURB_INT = 0.094, 5.8, 0.25
 ETA_C = 1.0                   # O(1) constant in eta ~ C u'^2 / g  (see provenance)
 NU = 1.004e-6
 WIND_RMS, JNEAR_RMS, REVERB_RMS = 0.016, 0.024, 0.046
+# The wake's rms slope in ITS OWN near field (inside 1.4 m of the forcing peak),
+# not an average over the basin. With the other bands at 0.073 there this puts the
+# local total at ~0.10 against 0.053 in the far field -- the documented pair.
+WAKE_RMS = 0.068
 
 _AIM = np.array([np.cos(JET_TILT) * np.cos(JET_AZ),
                  np.cos(JET_TILT) * np.sin(JET_AZ), np.sin(JET_TILT)])
@@ -107,26 +130,27 @@ def _plane(nc, lo, hi, rms, spread_deg, seed):
                 ph=r.uniform(0, 2 * np.pi, nc) - om * 3.7)
 
 
-WIND = _plane(20, 0.015, 0.060, WIND_RMS, 45.0, 11)
+# Every band's short end is floored at LAM_MIN. Below the minimum phase speed
+# there is no propagating surface wave at all -- surface tension takes over as the
+# restoring force and the branch turns round -- so wind cannot force anything
+# finer and viscosity removes what is there. Octaves below LAM_MIN are detail the
+# physics forbids, and on a 1.40 m bed they are pure past-focus speckle: at
+# lambda = 8 mm even s = 0.01 gives F = 2.7.
+LAM_MIN = 2 * np.pi * np.sqrt(SIGMA_W / (1000.0 * 9.81))    # 17.1 mm, at c_min
+
+WIND = _plane(20, LAM_MIN, 0.070, WIND_RMS, 45.0, 11)
 REVERB = _plane(44, 0.120, 0.450, REVERB_RMS, None, 12)
 # the turbulent surface itself: very short, non-propagating, rides the envelope
-BOIL = _plane(10, 0.008, 0.025, 1.0, None, 17)
+BOIL = _plane(10, LAM_MIN, 0.045, 1.0, None, 17)
 
-# Secondary sources along the jet axis at the free surface, weighted by the
-# forcing envelope: a Huygens construction of an EXTENDED source. The waves that
-# leave it are the visible arcs, and they are centred on the footprint, not on
-# the fitting -- which is why the crest pattern's origin sits away from the wall.
-_NS = 8
-_S_AX = np.linspace(0.35, 2.6, _NS)
-_SRC = np.stack([JET_XY[0] + _S_AX * _AIM[0], JET_XY[1] + _S_AX * _AIM[1]], 1)
-_ARC = [(2 * np.pi / l, w) for l, w in ((0.130, 1.0), (0.095, 0.9), (0.065, 0.6))]
-_APH = np.random.default_rng(23).uniform(0, 2 * np.pi, len(_ARC))
-ARC_RMS = 0.055
-
+# The extended-source Huygens sum that used to live here is now inside the eikonal
+# solve (wake.trace launches one fan per axial station, weighted by the forcing
+# envelope), so the arc centre still lands out in the water rather than on the
+# fitting -- it is just no longer a second, uncalibrated copy of the same physics.
 _IMG = [(JET_XY[0], JET_XY[1]), (-JET_XY[0], JET_XY[1]), (JET_XY[0], -JET_XY[1]),
         (2 * X1 - JET_XY[0], JET_XY[1]), (JET_XY[0], 2 * Y1 - JET_XY[1])]
 _NEAR = [(2 * np.pi / l, w) for l, w in ((0.30, 1.0), (0.21, 0.8), (0.15, 0.6))]
-_SC = {'near': 1.0, 'arc': 1.0}
+_SC = {'near': 1.0}
 _PH = np.random.default_rng(13).uniform(0, 2 * np.pi, 8)
 
 
@@ -145,43 +169,51 @@ def _drift(sax):
 
 _WK_S = np.linspace(0.45, 2.4, 6)
 _WK_U = _drift(_WK_S)
-_WK_W = np.array([float(jet_envelope(np.float32(JET_XY[0] + a * _AIM[0]),
-                                     np.float32(JET_XY[1] + a * _AIM[1])))
-                  for a in _WK_S])
-_WK_W = _WK_W / max(_WK_W.sum(), 1e-9)
-_WPH = np.random.default_rng(29).uniform(0, 2 * np.pi, (len(_WK_S), 21))
-ARC_RMS = 0.055
+
+# ---------------------------------------------------------------------- the wake
+# THE TRAP THIS BAND EXISTS TO AVOID. Stationary crests satisfy c(k) = U cos psi,
+# so on the gravity branch k = g/(U cos psi)^2 and the WAVEVECTOR fan opens to
+# +-arccos(c_min/U) ~ 78 deg. That fan is not the shape of the disturbance.
+# Energy travels at c_g*khat + U, and c_g = U cos psi / 2 <= U/2, so the current
+# dominates and the ENERGY fan is narrow and aligned with the jet. Summing plane
+# waves over the 78 deg wavevector fan -- the obvious implementation -- sprays the
+# whole basin with the fan-edge wavelengths (9 cm and shorter, and they carry the
+# MOST slope because slope ~ amp*k ~ 1/cos psi), which is exactly the band that
+# destroys the bed caustics. So the fan is not sampled directly: the rays are
+# integrated, and the pattern lands where the energy actually goes.
+_WK_GRID = (800, 400)      # 10 mm texels; nothing under ~8 cm survives the film
+_WK_CACHE = {}
+
+
+def _wake_field():
+    """Eikonal solve, cached. Rays advect at c_g*khat + U(x) and refract on the
+    drift gradient; amplitude follows wave action along the ray tube and decays by
+    wake.alpha_eff. Nothing is masked or tapered: the reach is the damping."""
+    if not _WK_CACHE:
+        jet = _wk.Jet(JET_XY[0], JET_XY[1], depth=JET_H,
+                      tilt_deg=np.degrees(JET_TILT), az_deg=np.degrees(JET_AZ),
+                      d=D_NOZZLE, dp_bar=DP_BAR, cd=CD, S=S_SPREAD, B=B_DECAY)
+        gx, gy = _wk.build(jet, X0, X1, Y0, Y1, _WK_GRID[0], _WK_GRID[1],
+                           rms_target=WAKE_RMS)
+        _WK_CACHE['gx'] = gx.astype(np.float32)
+        _WK_CACHE['gy'] = gy.astype(np.float32)
+    return _WK_CACHE['gx'], _WK_CACHE['gy']
 
 
 def _wake(X, Y):
-    """Waves forced into a MOVING medium. Stationary crests satisfy the Doppler
-    condition c(k) = U cos(psi), so on the gravity branch k = g/(U cos psi)^2 --
-    a wedge of wavelengths, not a circle. With U/c_min = 3.8 here nothing can go
-    upstream at all, which is precisely why a jet's pattern cannot be round."""
-    dxh, dyh = np.float32(_AIM[0]), np.float32(_AIM[1])
-    n = np.hypot(dxh, dyh); dxh, dyh = dxh / n, dyh / n
-    gx = np.zeros(X.shape, np.float32); gy = np.zeros(X.shape, np.float32)
-    for i, (sa, Us, ws) in enumerate(zip(_WK_S, _WK_U, _WK_W)):
-        if Us <= C_MIN * 1.05:
-            continue
-        psi_max = np.arccos(C_MIN / Us) * 0.94
-        psis = np.linspace(-psi_max, psi_max, 21)
-        sx = np.float32(JET_XY[0] + sa * _AIM[0]); sy = np.float32(JET_XY[1] + sa * _AIM[1])
-        dx = X - sx; dy = Y - sy
-        along = dx * dxh + dy * dyh
-        r = np.sqrt(dx * dx + dy * dy) + np.float32(0.10)
-        down = (along > 0).astype(np.float32)
-        for j, psi in enumerate(psis):
-            c = Us * np.cos(psi)
-            k = 9.81 / (c * c)                       # gravity branch, stationary
-            om, cg, _ = _disp(k); al = _alpha(k)[0]  # 20-50 cm: bulk damping
-            kx = k * (dxh * np.cos(psi) - dyh * np.sin(psi))
-            ky = k * (dxh * np.sin(psi) + dyh * np.cos(psi))
-            amp = (ws * np.cos(psi) / np.sqrt(r) * np.exp(-al * r / cg)).astype(np.float32)
-            ph = (kx * dx + ky * dy + np.float32(_WPH[i, j])).astype(np.float32)
-            c_ = (amp * np.cos(ph) * down).astype(np.float32)
-            gx += c_ * np.float32(kx); gy += c_ * np.float32(ky)
-    return gx * _SC['arc'], gy * _SC['arc']
+    """Bilinear lookup into the traced wake. 5 mm texels; the shortest thing that
+    survives the film damping is ~10 cm, so this samples it many times over."""
+    gxg, gyg = _wake_field()
+    nx, ny = _WK_GRID
+    fu = np.clip((X - np.float32(X0)) / np.float32(X1 - X0) * nx - 0.5, 0, nx - 1.001)
+    fv = np.clip((Y - np.float32(Y0)) / np.float32(Y1 - Y0) * ny - 0.5, 0, ny - 1.001)
+    iu = fu.astype(np.int64); iv = fv.astype(np.int64)
+    du = (fu - iu).astype(np.float32); dv = (fv - iv).astype(np.float32)
+    out = []
+    for g in (gxg, gyg):
+        out.append(((g[iv, iu] * (1 - du) + g[iv, iu + 1] * du) * (1 - dv) +
+                    (g[iv + 1, iu] * (1 - du) + g[iv + 1, iu + 1] * du) * dv))
+    return out[0], out[1]
 
 
 def _cyl(X, Y):
@@ -220,13 +252,38 @@ def _pts(F, x, y):
     return gx, gy
 
 
+DEPTH_FOR_F = 1.40
+
+
+def _focus(s, k):
+    """F = 0.25 d s k. F >> 1 is past focus (speckle, no cells); F ~ 0.3-0.6 is the
+    soft readable net; the cell size on the bed runs with the dominant wavelength."""
+    return 0.25 * DEPTH_FOR_F * s * k
+
+
+def _spec_k(gx, gy, dx, dy):
+    """Slope-energy-weighted rms wavenumber of a gradient field on a regular grid."""
+    ny, nx = gx.shape
+    P = np.abs(np.fft.rfft2(gx)) ** 2 + np.abs(np.fft.rfft2(gy)) ** 2
+    kx = 2 * np.pi * np.fft.rfftfreq(nx, dx)[None, :]
+    ky = 2 * np.pi * np.fft.fftfreq(ny, dy)[:, None]
+    k2 = kx * kx + ky * ky
+    P[0, 0] = 0.0
+    return np.sqrt((P * k2).sum() / max(P.sum(), 1e-30))
+
+
+def _plane_k(F):
+    e = (F['amp'] * np.hypot(F['kx'], F['ky'])) ** 2
+    return np.sqrt((e * (F['kx'] ** 2 + F['ky'] ** 2)).sum() / e.sum())
+
+
 def _norm_jets():
     _report_jet()
     X, Y = np.meshgrid(np.linspace(0.3, X1 - 0.3, 260).astype(np.float32),
                        np.linspace(0.3, Y1 - 0.3, 130).astype(np.float32))
     g = _cyl(X, Y); _SC['near'] = JNEAR_RMS / np.sqrt((g[0] ** 2 + g[1] ** 2).mean() / 2)
-    g = _wake(X, Y); _SC['arc'] = ARC_RMS / np.sqrt((g[0] ** 2 + g[1] ** 2).mean() / 2)
-    # how far do the arcs stay visible?
+    _wake_field()                       # trace the rays once, before anything asks
+    # how far does the wake stay visible?
     sax = np.linspace(0.1, 7.8, 300)
     px = (JET_XY[0] + sax * _AIM[0]).astype(np.float32)
     py = (JET_XY[1] + sax * _AIM[1]).astype(np.float32)
@@ -236,17 +293,47 @@ def _norm_jets():
     print("  drift langs de as: " + " ".join("%.2f" % u for u in _WK_U) + " m/s")
     print("  Froude U/c_min = %.1f -> stationaire golven binnen +-%.0f graden"
           % (_WK_U.max() / C_MIN, np.degrees(np.arccos(C_MIN / _WK_U.max()))))
-    print("  zog zichtbaar tot %.1f m van de wand (bad is %.1f m)" % (vis[-1], X1))
+    print("  zog zichtbaar tot %.1f m van de bron (bad is %.1f m)" % (vis[-1], X1))
+
+    # ---- the slope budget, band by band, WITH the focusing number ---------------
+    # Nothing may be left out of this table. The defect it exists to catch is a
+    # band that is individually defensible and collectively fatal: correct slope,
+    # correct spectrum, wrong wavenumber for the depth, and no line anywhere that
+    # adds it up.
     _pk = 0.91
-    for lab, (cx, cy) in (("piek van de straal", (JET_XY[0] + _pk * _AIM[0],
-                                                  JET_XY[1] + _pk * _AIM[1])),
-                          ("ver weg (>4 m)", (6.0, 2.0))):
-        xx, yy = np.meshgrid(np.linspace(cx - .2, cx + .2, 90).astype(np.float32),
-                             np.linspace(cy - .2, cy + .2, 90).astype(np.float32))
-        g = _cyl(xx, yy); tot = (g[0] ** 2 + g[1] ** 2).mean() / 2
-        tot += (jet_envelope(xx, yy) ** 2).mean()
-        tot += REVERB_RMS ** 2 + (WIND_RMS * shelter(xx, yy).mean()) ** 2
-        print("  rms-helling %-19s %.3f" % (lab, np.sqrt(tot)))
+    jx_, jy_ = JET_XY[0] + _pk * _AIM[0], JET_XY[1] + _pk * _AIM[1]
+    xxn, yyn = np.meshgrid(np.linspace(jx_ - .35, jx_ + .35, 128).astype(np.float32),
+                           np.linspace(jy_ - .35, jy_ + .35, 128).astype(np.float32))
+    xxf, yyf = np.meshgrid(np.linspace(5.0, 7.0, 256).astype(np.float32),
+                           np.linspace(1.0, 3.0, 256).astype(np.float32))
+    dn = 0.7 / 127.0; df = 2.0 / 255.0
+    rows, near_v, far_v = [], 0.0, 0.0
+
+    shn = float(shelter(xxn, yyn).mean()); shf = float(shelter(xxf, yyf).mean())
+    kw = _plane_k(WIND)
+    rows.append(("WIND", WIND_RMS * shn, WIND_RMS * shf, kw))
+    kr = _plane_k(REVERB)
+    rows.append(("REVERB", REVERB_RMS, REVERB_RMS, kr))
+    gn = _cyl(xxn, yyn); gf = _cyl(xxf, yyf)
+    rows.append(("NEAR", np.sqrt((gn[0] ** 2 + gn[1] ** 2).mean() / 2),
+                 np.sqrt((gf[0] ** 2 + gf[1] ** 2).mean() / 2),
+                 _spec_k(gn[0], gn[1], dn, dn)))
+    en = float(np.sqrt((jet_envelope(xxn, yyn) ** 2).mean()))
+    ef = float(np.sqrt((jet_envelope(xxf, yyf) ** 2).mean()))
+    rows.append(("BOIL", en * 0.707, ef * 0.707, _plane_k(BOIL)))
+    gn = _wake(xxn, yyn); gf = _wake(xxf, yyf)
+    kwk = _spec_k(gn[0], gn[1], dn, dn)
+    rows.append(("WAKE", np.sqrt((gn[0] ** 2 + gn[1] ** 2).mean() / 2),
+                 np.sqrt((gf[0] ** 2 + gf[1] ** 2).mean() / 2), kwk))
+
+    print("  band      lambda_dom   s(jet)  F(jet)   s(ver)  F(ver)")
+    for nm, sn, sf, k in rows:
+        near_v += sn ** 2; far_v += sf ** 2
+        print("    %-7s %7.1f cm   %6.3f  %6.2f   %6.3f  %6.2f"
+              % (nm, 200 * np.pi / k, sn, _focus(sn, k), sf, _focus(sf, k)))
+    print("    %-7s %7s      %6.3f           %6.3f"
+          % ("TOTAAL", "-", np.sqrt(near_v), np.sqrt(far_v)))
+    print("    doel: 0.09-0.11 bij de straal, 0.053 ver weg")
 
 
 def grad_grid(xs, ys):

@@ -722,26 +722,24 @@ A swimming pool, a fountain basin, a lock chamber, a reservoir, an irrigation ca
 tank. These bodies never arrive from the generation handoff — terrain-architect *classifies*
 `bodyType` from the fill mask and flow accumulation (its `03`), and no classifier turns a gunite
 shell into a lake. They arrive **authored**, exactly as the engine-native water bodies do
-([Bodies are splines](#bodies-are-splines-and-the-splines-carve-the-terrain)), and the enum
-extends renderer-side:
+([Bodies are splines](#bodies-are-splines-and-the-splines-carve-the-terrain)), the enum extends
+renderer-side, and nearly every default in this chapter is wrong for them — structurally, not by a
+tuning margin. The contracts hold (depth field, `liquidBody` optics, pass ordering, one wave
+evaluator); most of the bands gate off.
 
 ```
 bodyType += pool | basin | tank | canal | reservoir     # authored; never classified
 ```
 
-They earn a section because nearly every default in this chapter is *wrong* for them, and wrong
-structurally rather than by a tuning margin. The contracts hold — depth field, `liquidBody`
-optics, pass ordering, one wave evaluator — but most of the bands gate off.
-
 | Machinery | Natural body | Man-made body |
 |---|---|---|
-| Shore distance, foam band, wet sand | The strongest shoreline cue there is | **Degenerate.** The waterline is a hard edge on a vertical wall, not a gradient across a beach. Gate the shoreline-foam and wet-sand bands off; a static wet band and a meniscus line on wall and coping replace them |
-| Shoaling, refraction, breakers, run-up | Tier 2 shore band, the production default | **Off.** No sloping bed, no surf zone. A pool with breakers is not a storm, it is an ungated body type |
+| Shore distance, foam band, wet sand | The strongest shoreline cue there is | **Degenerate** — the waterline is a hard edge on a vertical wall. Gate shoreline foam and wet sand off; a static wet band and a meniscus on wall and coping replace them |
+| Shoaling, refraction, breakers, run-up | Tier 2 shore band, the production default | **Off.** No sloping bed, no surf zone. A pool with breakers is an ungated body type, not a storm |
 | Whitecaps (Jacobian foam) | Wind-driven, from Force 3 up | **Off.** No fetch reaches the breaking threshold across 10 m of water |
-| Ambient wind-wave spectrum | Fetch-limited wind sea, or full swell | Fetch is *metres*, so the wind-driven part collapses onto the capillary–gravity floor ([Calm water](#calm-water-the-low-energy-regime)) — and on a sheltered pool it is the **smallest** term, not the model |
-| Wave sources | Wind, swell, current | **The filtration return jets, then the walls.** Not a spectrum at all: a driven, reverberant basin response — see [The wave field is a driven basin](#the-wave-field-is-a-driven-basin-not-a-spectrum) |
-| Sim-patch edge contract | Fade to zero over the outer ~15% | **Inverted** — the domain edge is a real wall. Reflect it |
-| Depth ramp | The single strongest realism cue water has | 1–3 m of range; almost no dynamic range to spend. The depth cues that actually read are the wall/floor junction and the refracted straight-line grid |
+| Ambient wind-wave spectrum | Fetch-limited wind sea, or full swell | Fetch is *metres*, so the wind-driven part collapses onto the capillary–gravity floor ([Calm water](#calm-water-the-low-energy-regime)) — the **smallest** term on a sheltered pool, not the model |
+| Wave sources | Wind, swell, current | **The return jets, then the walls** — a driven, reverberant basin response, not a spectrum: [The wave field is a driven basin](#the-wave-field-is-a-driven-basin-not-a-spectrum) |
+| Sim-patch edge contract | Fade to zero over the outer ~15% | **Inverted** — the domain edge is a real wall. Reflect it, and keep the fade only where a sim domain ends inside a larger body |
+| Depth ramp | The single strongest realism cue water has | 1–3 m of range, almost no dynamic range to spend. What reads instead is the wall/floor junction and the refracted straight-line grid |
 | Reflection | Planar is a hero-body-only luxury | One small flat body: **planar reflection is genuinely affordable**, and SSR behaves unusually well because the reflected geometry is close and on screen |
 | Caustics | A detail on the bed | **The dominant visual event** |
 | Single-depth-layer limit | A real architectural constraint | A non-issue — one surface, nothing stacked |
@@ -752,58 +750,26 @@ surface is a nearly flat sheet with ripples on it.
 
 ### The wave field is a driven basin, not a spectrum
 
-Reach for a directional wind spectrum on a sheltered pool and the result is *plausible and wrong*
-in a way a photograph exposes immediately. Real pool water is visibly organised, and it is
-organised by the plumbing and the walls.
+A directional wind spectrum on a sheltered pool is plausible and wrong in a way a photograph
+exposes immediately. Pool water is organised by the plumbing and the walls.
 
-- **There is a source, and it is usually the filtration return.** The inlet jets run whenever the
-  pump runs, injecting a narrow band of gravity waves — order 10–30 cm — continuously and from a
-  fixed point. Swimmers add transients on top. On a sheltered pool, wind is the smallest
-  contributor, not the driver.
-- **The walls send it all back.** A smooth tiled vertical wall is a near-total reflector at these
-  wavelengths, so this is not a set of trains crossing an open domain — it is a **reverberant
-  basin response**: direct train plus reflections, superposing into standing structure whose nodal
-  lines are fixed by the geometry. Three consequences, all observable: the field is **not
-  statistically homogeneous**; the pattern is **stationary in the basin frame**, so the same
-  structure sits in the same place every day; and an individual train can be **traced from the
-  inlet to the far wall and back**, which is exactly what people report seeing.
-- **Which components survive to reverberate is a damping calculation, and it decides the look.**
-  Deep-water viscous decay is `α = 2νk²` (Lamb), amplitude `∝ exp(−2νk²t)`, and energy travels at
-  the group speed, so the useful figure is the **e-folding distance** `c_g/α`:
-
-```
-lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
-16.5 cm   38.1    343 s                 0.26 m/s   ~90 m   -> ~11 lengths of an 8 m pool
- 3 cm     209      11.3 s               0.19 m/s   ~2.1 m  -> dies before the far wall
-```
-
-  The long, jet-driven components ring around the basin many times; the capillary end never
-  completes a crossing. A pool surface also almost always carries a film — sunscreen, body oils —
-  which kills the short end faster still, by the same slope-variance mechanism as a slick
-  ([Sun glitter](#sun-glitter-the-sparkle-path)). So what is visibly trackable bouncing off the
-  walls is the long stuff, and a renderer that spends its budget on capillary detail is spending
-  it on the part that physically cannot persist.
-- **Wind is the second band, and it is small only in the units nobody shades with.** A light
-  breeze over metres of fetch makes waves a few millimetres high at a few centimetres wavelength —
-  negligible as *wave height*, and dominant as *slope*, because `slope = 2πa/λ`. Equal slope costs
-  amplitude proportional to wavelength, so a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at
-  16.5 cm (≈0.19 against ≈0.11). Shading sees slope. So the wind band contributes almost nothing
-  you can watch move and most of what makes the surface sparkle. Never budget the two bands by wave
-  height.
-- **But owning the slope budget is not the same as owning the caustic pattern**, and conflating the
-  two will wreck a render. Focusing goes as `F = 0.25·d·s·k`
-  ([The focusing number](#the-focusing-number-which-regime-the-bed-is-in)), so the short band hits
-  `F ≫ 1` long before the long band reaches `F ≈ 1`. At 1.40 m a 3 cm wind ripple at `s = 0.045`
-  sits at `F = 3.3` — **past focus**, contributing a fine unresolvable wash and no structure at
-  all — while a 30 cm jet wave at `s = 0.055` sits at `F = 0.40` and writes the readable cell net.
-  So the two bands write different things on the bed: **the short band owns sparkle and wash, the
-  long band owns the net.** Give the short band a slope budget large enough to dominate and the bed
-  pattern dissolves, however correct the individual numbers look. Judge the split by what the bed
-  shows, not by the slope arithmetic alone.
-- **The two bands separate cleanly, and by the same cut on both sides.** Wind cannot force long
-  waves at metre-scale fetch, and viscosity will not let short waves cross the basin — the forcing
-  limit and the damping limit land in the same place, so a pool surface is naturally **two
-  superposed fields, not one spectrum**:
+- **The source is the filtration return; the walls send it all back.** The inlet jets inject a
+  narrow band of gravity waves — order 10–30 cm — continuously from a fixed point whenever the pump
+  runs, with swimmer transients on top; wind over metres of fetch is the smallest contributor. A
+  tiled wall is a near-total reflector at these wavelengths (argued from the physics; no reflection
+  coefficient was measured), so the result is a **reverberant basin response**: the field is **not
+  statistically homogeneous**, the pattern is **stationary in the basin frame** — the same
+  structure sits in the same place every day — and a train can be traced from the inlet to the far
+  wall and back.
+- **Damping sorts the field into two bands, and forcing sorts it the same way.** Deep-water viscous
+  decay `α = 2νk²` (Lamb) against the group speed gives an e-folding distance `c_g/α` of ~90 m at
+  16.5 cm — eleven lengths of an 8 m pool — but only ~2.1 m at 3 cm, which dies before the far wall.
+  A surface film (sunscreen, body oils) shortens the short end by roughly 3–9× again — the
+  inextensible-film limit, `α ≈ 0.35·k·√(νω)` against the clean-surface `2νk²`, with a prefactor
+  that is unconfirmed (`P/?`), so treat the factor as indicative — and leaves the long end alone,
+  because long waves stretch the film and see a clean surface. Wind meanwhile cannot force long
+  waves at metre-scale fetch, so forcing limit and damping limit land in the same place: a pool
+  surface is **two superposed fields, not one spectrum**.
 
 | | Long band (≳10 cm) | Short band (≲5 cm) |
 |---|---|---|
@@ -813,214 +779,122 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
 | Carries | The visible undulation, the trackable motion | Most of the slope: sparkle, fine caustic texture |
 | Local shelter | **Unaffected** — passes straight through a lee | **Strongly modulated** — this is what a lee removes |
 
-  The last row is the one that catches people, and it is checkable against any photograph: in the
-  wind shadow of a sail or a hedge the surface goes glassy *but keeps undulating*, because the lee
-  kills the wind band while the jet waves cross it untouched. Apply the shelter/slope-variance
-  modulation to the **short band only**. Multiply it into the whole field — the obvious
-  implementation — and long waves visibly stop at the shadow line, which no water does.
-- **The edge contract inverts.** For open water this chapter mandates fading the sim patch to zero
-  over the outer ~15% of its domain, because that boundary is a budget decision the player must
-  not see ([Interactive simulation patches](#interactive-simulation-patches)). In a basin the rule
-  is backwards: the domain boundary **is** a physical wall. Use reflecting boundary conditions
-  there and keep the fade only where a sim domain ends inside a larger body. Fading at a wall
-  deletes the most characteristic thing the water does.
-- **Two ways to build it.** A height-field sim patch over the basin with reflecting walls and a
-  driven source cell is the general answer and gives swimmer transients for free. For a static
-  basin with fixed inlets the analytic route is cheaper and exact enough: **method of images** —
-  sum cylindrical trains from the inlet and its mirror copies across the four walls, with `1/√r`
-  spreading and the damping above.
-- **But do not build the whole field from images: split it early/late, as room acoustics does.**
-  Pushing the image count up produces a *coherent* interference lattice, and a real basin does not
-  look like that beyond a couple of metres from the source, because after several bounces the field
-  is **diffuse** — many arrivals, many directions, uncorrelated phases. The right structure is
-  therefore **explicit early reflections plus a statistical late tail**: direct plus first-order
-  images for the coherent arcs near the inlet, and a random-phase spectrum for everything after
-  that. This is the one place where a plain random-phase superposition is not a cheat but the
-  correct description, and it is also much cheaper than a large image set.
-- **A return is a submerged round turbulent jet — take the footprint from the jet, not from an
-  authored lobe.** Modelling it as a pulsing point gives two errors at once: influence that comes
-  out **radial** when the fitting plainly aims somewhere, and influence that reaches **far too
-  far**. Both dissolve if you use the jet's own geometry, which is standard free-shear-flow
-  material and needs no invented shape:
+  Shading sees slope, and `slope = 2πa/λ`, so equal slope costs amplitude proportional to
+  wavelength: a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at 16.5 cm (≈0.19 against ≈0.11).
+  **Never budget the two bands by wave height** — and never let the short band own the bed pattern
+  either: by the focusing number `F = 0.25·d·s·k` ([The focusing
+  number](#the-focusing-number-which-regime-the-bed-is-in)) it sits past focus over a 1–3 m floor
+  (`F ≈ 3` for a 3 cm ripple at 1.40 m) and writes an unresolvable wash, while the long band lands
+  near `F ≈ 0.4` and writes the readable cell net.
+- **Shelter modulates the short band only.** In the wind shadow of a sail or a hedge the surface
+  goes glassy *but keeps undulating*: the lee kills the wind band while the jet waves cross it
+  untouched. Multiply a lee mask into the whole field and long waves stop dead at the shadow line,
+  which no water does.
 
-```
-half-width      r_half(s) = S·s                       S  ~ 0.094   (linear spreading)
-centreline      U_c(s)    = B·U0·d / s                B  ~ 5.8     (1/s decay)
-radial profile  U/U_c     = exp(-ln2 (r/r_half)^2)
-turbulence      u'        ~ 0.25 · U_c                on the axis
-surface slope   sigma     ~ C · u'^2 / (g · r_half)   eta ~ C u'^2/g over an eddy of size r_half
+```hlsl
+// Pool surface in a raster pass: two band fetches, one baked-wake fetch, one mask.
+float3 nLong   = BasinNormal(uv, t);         // >=10 cm: FFT cascade (flat spread) + image trains
+float3 nShort  = WindRippleNormal(uv, t);    // <=5 cm: the existing short-wave detail set
+float  shelter = SampleShelter(uv);          // painted/baked lee mask; 1 = exposed, 0 = full lee
+
+// Combine as SLOPES, not normals: slopes add, and the short band is the slope budget.
+float2 sLong   = nLong.xy  / max(nLong.z,  1e-4);
+float2 sShort  = nShort.xy / max(nShort.z, 1e-4);
+
+// The jet wake stands still in the basin frame, so it is a bake: one fetch in the fitting's own
+// frame. .xy = slope, .z = the forcing envelope that also drives near-field roughness.
+float3 wake    = WakeAtlas.SampleLevel(smp, WakeUV(worldPos, fitting), 0).xyz;
+float3 N       = normalize(float3(-(sLong + shelter * sShort + wake.xy), 1));
+
+// Same masks into the filtered-variance path, or distance filtering re-adds the sparkle the lee
+// removed. Slope scales linearly with a mask, so variance scales with its square.
+float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase;
 ```
 
-  The free surface is a plane sitting at perpendicular distance `h` (the fitting depth) from the
-  axis, so the jet only reaches it once it has spread that far. That single fact produces the whole
-  observed behaviour for free: the disturbed patch is **elongated along the aim**, it **starts
-  downstream of the fitting rather than at it**, and it dies as `U_c` decays. For a 20 mm restricted
-  eyeball at ~13 m³/h (`U0 ≈ 11.5 m/s`) set 15 cm below the waterline and aimed 6° up, the peak
-  lands **0.9 m downstream** with a half-length of about 0.7 m and a local rms slope of **0.09**
-  against 0.053 in the far field — the factor of two that a sparkle patch implies, arrived at from
-  plumbing rather than from tuning.
-- **Which makes the fitted quantity a real spec.** `sigma ∝ (U0·d)²`, so matching an observed
-  roughness contrast constrains the **flow rate through the fitting**, not a shape exponent. That is
-  the difference between calibrating and inventing: the number you end up adjusting is one a pool
-  installer could read off a pump.
-- **A jet's surface pattern cannot be circular, and the reason is a hard physical bound.** This is
-  the single most useful fact in this subsection, because it rules out the shape almost everyone
-  reaches for. A return's spec is a **pressure**, and Bernoulli turns it into a velocity:
-  `U0 = C_d·√(2ΔP/ρ)`, so 0.8 bar through a 20 mm eyeball is 11.6 m/s, 13 m³/h and ~43 N of thrust.
-  That momentum drives a **mean surface drift** — here peaking near **1.05 m/s** over the footprint.
-  Now the bound: water has a **minimum phase speed**,
-
-```
-c_min = (4gσ/ρ)^(1/4) = 0.231 m/s   at lambda = 17.1 mm
-```
-
-  and no surface wave of any wavelength travels slower. The drift's Froude number is therefore
-  `U/c_min ≈ 4.6` — **strongly supercritical, so nothing can propagate upstream at all**. Stationary
-  crests exist only within `±arccos(c_min/U) ≈ 78°` of the flow direction. A ring system requires a
-  source at rest in still water; a running return is neither, so its pattern is a **wedge**.
-- **Which wavelengths appear is then fixed, not chosen.** Stationary crests satisfy the Doppler
-  condition `c(k) = U·cos ψ`; on the gravity branch `k = g/(U cos ψ)²`, so the wake carries ~50 cm
-  along the axis, ~20 cm at 50°, and ~9 cm near the fan edge. Nothing here is a tuning parameter:
-  give it a pressure and a nozzle and the spectrum falls out.
-- **Solve the rays, do not assume the current is uniform — the difference is not cosmetic.** The
-  drift decays and spreads between source and observation point, so the honest formulation is the
-  eikonal one. With `H(x,k) = σ(k) + k·U(x) = 0` for a lab-steady pattern,
-
-```
-dx/dt =  ∂H/∂k = c_g·k̂ + U(x)          rays advect with group velocity PLUS the current
-dk/dt = -∂H/∂x = -(∇U)ᵀ k              the current gradient refracts them
-dφ    =  k·dx                           phase along the ray
-A²·|dx/dt|·W = const                    wave action, W the ray-tube width
-```
-
-  Two results come out that a locally-uniform treatment cannot produce, and both are visible in a
-  photograph. **Crests curve**, because `dk/dt ≠ 0` wherever the drift has a gradient. And **the
-  waves shorten as they travel** — median wavelength runs from ~35 cm near the source to ~4 cm
-  downstream — because `k = g/(U cos ψ)²` and `U` is decaying, so a wave held stationary by a
-  weakening current must get shorter to keep up. Neither is imposed; both fall out of the integration.
-- **Do not confuse the wavevector fan with the energy fan — this is the trap.** The `±78°` above is
-  the range of *wavevector* directions that can stand still in the flow. It is **not** the shape of
-  the disturbance. Energy travels at `c_g·k̂ + U`, and since `c_g = U·cos ψ/2 ≤ U/2` the current
-  dominates: solving the rays gives an energy fan of only **±19°** about the jet axis. So a fixed
-  source in a moving stream produces a **narrow band aligned with the jet**, not a Kelvin wedge —
-  the ship case is the mirror image (source moving, water still) and its wedge does not transfer.
-  Calling it a wedge, as an earlier reading of the same physics did, overstates the opening by four
-  times.
-- **And the wake is *steady*.** Because the source is bolted to the wall, the stationary pattern
-  stands still in the pool frame while the water runs through it — a strong and cheap tell against
-  video, and the opposite of the radiating rings a naive model produces. If a jet's pattern
-  animates outward, the model is wrong.
-- **The footprint is an extended source, so the arcs are centred on it — not on the fitting.**
-  A photograph of a running return shows curved crest trains radiating from a centre that sits
-  *out in the water*, a metre or so off the wall, with nothing between it and the fitting. That
-  falls out of the geometry above: the jet cannot force the surface until it has spread to reach
-  it, so the forcing region is a stretch of the axis, not the outlet. Build it as a small **Huygens
-  sum** — a handful of secondary sources spaced along the axis at the surface, each weighted by the
-  local forcing envelope — and the arc centre lands where the jet actually surfaces. Radiating them
-  from the fitting instead puts the pattern's origin in the wall, which no photograph shows.
-- **Two decay lengths, both observable.** The forcing envelope has a half-length of well under a
-  metre, while the waves it launches are short-gravity (≈6–14 cm) and film-damped, so they fade
-  out around **3 m in an 8 m pool** — matching the common observation that a return's signature is
-  gone by mid-pool. Those two numbers, plus the offset of the arc centre, are three independent
-  checks a reference photograph gives you for free.
-- **The boil is forced, not radiated — do not give it a propagation law.** The short-wave roughness
-  is where the jet *is*; it is an envelope, not a train leaving a source. Only the long waves
-  radiate, reflect and reverberate, and those are bulk-damped by clean-water viscosity because a
-  surface film barely touches them. The film matters for the short end, and there the classical
-  **inextensible-film** limit applies: an unstretchable surface forces a Stokes layer of thickness
-  `√(2ν/ω)` beneath it, giving `α ≈ 0.35·k·√(νω)` against the clean-surface `2νk²` — a factor 3–9
-  over the 8–50 mm band, wavelength-dependent rather than a tuned multiplier. Do not extend that
-  limit to long waves: there the film simply stretches and the surface behaves as clean, which is
-  why real slicks flatten ripples and leave swell alone.
-- **The inlet's near field buys sparkle by raising frequency, not amplitude.** The boil at an outlet
-  is broadband and *short*, and since `slope = 2πa/λ` short wavelength is the cheap way to buy
-  slope — a few millimetres of 3 cm chop out-slopes a centimetre of 30 cm swell. So a small,
-  local, low-energy disturbance lifts local mean-square slope steeply: in a worked case, rms slope
-  **0.11 within a metre of the outlet against 0.054** in the calm far field. That factor of two is
-  exactly what pushes the slope tail across a specular threshold the rest of the pool cannot reach
-  ([reachability](#sun-glitter-the-sparkle-path)). Two consequences worth using: a sparkle patch on
-  an otherwise glassy pool **localizes the plumbing**, and because the added energy is short-wave
-  the glints are small and densely packed — the discrete-glint regime, not a few broad flashes.
-  Modelling it needs no special case: cylindrical spreading at `1/√r` puts the slope maximum at the
-  outlet on its own.
-- **The diffuse tail is near-isotropic, and that is checkable.** A wind sea carries a directional
-  spreading function and writes **streaky, direction-aligned** caustics; a reverberant basin tail
-  has lost its preferred direction and writes **isotropic cells**. Reading which one a reference
-  photograph shows tells you whether the body is wind-driven or plumbing-driven before you author
-  anything.
+- **A return jet, taken from the jet and not from an authored lobe.** A submerged round jet spreads
+  linearly and decays as `1/s`, and cannot force the surface until it has spread far enough to reach
+  it, so the disturbed patch is elongated along the aim and **starts downstream of the fitting
+  rather than at it** — ~0.9 m downstream for a 20 mm restricted eyeball at ~13 m³/h set 15 cm deep,
+  half-length ~0.7 m, local rms slope roughly **twice** the far field (a ratio, not an absolute: the
+  surface-deformation scaling `η ~ C·u'²/g` carries an O(1) constant that is genuinely unknown,
+  `?`). Its wake is a **narrow downstream band, not rings and not a Kelvin wedge**: the drift it
+  drives, of order 1 m/s (0.8 bar through that eyeball is an 11.6 m/s jet), is strongly
+  supercritical against water's minimum phase speed of 0.231 m/s
+  ([Calm water](#calm-water-the-low-energy-regime)), so nothing propagates upstream — a ring system
+  needs a source at rest in still water — and because energy travels with the current
+  (`c_g ≤ U/2`) the fan is only **±19°** about the axis. The ship case, source moving through still
+  water, is the mirror image and its wedge does not transfer. Three checks a reference photograph
+  gives free: the pattern is **steady** in the pool frame (one that animates outward is a wrong
+  model), its crest arcs are centred a metre or so **out in the water** because the forcing region
+  is a stretch of the axis rather than the outlet, and what it launches fades out around **3 m in an
+  8 m pool**. Forcing scales as `(U0·d)²`, so what you calibrate against an observed roughness
+  contrast is the **flow rate through the fitting**, not a shape exponent — and none of it runs in
+  the frame, it sizes the bake below.
+- **What ships at frame rate.** Every band maps onto an evaluator this chapter already has, so
+  nothing new runs in the frame. The **diffuse tail** is random-phase and isotropic — an FFT
+  cascade with a flat directional spread, or a short Gerstner sum with scattered directions. The
+  **early wall reflections** are the direct train plus its first-order mirror images across the
+  walls (`1/√r` spreading, damping as above) — a handful of extra trains in the same sum; pushing
+  the image count up instead buys a coherent lattice no basin shows and costs more. The **wind
+  band** is the existing short-wave detail set. The **jet wake** is steady in the basin frame, so
+  solve it once offline per fitting and bake slope plus forcing envelope into a small texture in
+  the fitting's frame — one fetch at runtime, no solver, and it rotates and tiles with the fitting.
+  The **lee** is a painted or baked mask. A height-field sim patch with reflecting walls and a
+  driven source cell is the option that buys swimmer transients, at the usual patch cost
+  ([Interactive simulation patches](#interactive-simulation-patches)); the steady field does not
+  need it. The bed pattern then goes through the same caustics ladder as any other body
+  ([The tier ladder](#the-tier-ladder)) — the driven basin changes which band feeds it, not the
+  technique. And the tail's near-isotropy is a review test in its own right: a wind sea writes
+  streaky, direction-aligned caustics; a reverberant tail writes isotropic cells.
 
 ### Pool optics: the colour is the bottom, not the water
 
-This is the part that is *not* a gating decision, and the part production gets wrong most often.
 The optical identity machinery in this chapter is built from oceanography — Jerlov types,
-Forel-Ule index, chlorophyll and CDOM. **A treated pool belongs to none of those classes**, and
-applying them is not a conservative approximation, it is the wrong model:
+Forel-Ule index, chlorophyll and CDOM — and **a treated pool belongs to none of those classes**.
+Filtration and flocculation remove precisely the particles that scatter: `b_b → ≈ 0`, `c → a`, and
+Secchi depth exceeds the body depth by design. With `b_b ≈ 0` the **scatter-colour term is
+essentially zero** — a pool has no body colour of its own, and a shader that derives its colour
+from `scatterColor` is structurally incapable of rendering one.
 
-- Filtration and flocculation remove precisely the particles that scatter. Backscatter
-  `b_b → ≈ 0`, beam attenuation `c → a`, and Secchi depth exceeds the body depth by design —
-  pool codes generally require the main drain to be visible from the deck.
-- With `b_b ≈ 0` the **scatter-colour term is essentially zero**. A pool has no body colour of its
-  own. A water shader that derives its colour from `scatterColor` is structurally incapable of
-  rendering one.
-
-What produces the colour is the **bottom albedo attenuated over the down-and-back path**. For a
-near-vertical view of a 1.5 m floor the light crosses ~3.0 m of water, and pure-water absorption
-([Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from))
-does the rest:
+The colour is **bottom albedo attenuated over the down-and-back path**. For a near-vertical view of
+a 1.5 m floor the light crosses ~3.0 m of water, and pure-water absorption at this chapter's RGB
+sample points ([Water-body optical
+identity](#water-body-optical-identity-where-sigma-actually-comes-from)) does the rest:
 
 ```
 depth 1.5 m -> round trip 3.0 m,  transmittance = exp(-a * 3.0)
-  a(700 nm) = 0.62   m^-1  ->  0.16    red     nearly gone
-  a(550 nm) = 0.0565 m^-1  ->  0.84    green   barely touched
-  a(418 nm) = 0.0044 m^-1  ->  0.99    blue    untouched
+  a(610 nm) = 0.25   m^-1  ->  0.47    red     more than halved
+  a(550 nm) = 0.056  m^-1  ->  0.85    green   barely touched
+  a(450 nm) = 0.0092 m^-1  ->  0.97    blue    untouched
 ```
 
-A white liner at ~0.8 albedo therefore returns roughly `(0.13, 0.68, 0.79)` — a bright, strongly
-desaturated cyan pushed toward blue — before any sky reflection is composited on top. That ratio,
-not scattering, is the whole of pool colour, and it is why even a **shallow** pool is
-unmistakably cyan: the effect needs a bright bottom, not depth.
-
-**The saturation has to come from the bottom as well, because the water can only subtract.** With
-`b_b ≈ 0` there is no scattering term to *add* colour — the column is a pure Beer-Lambert filter
-that removes red and passes blue-green, and that is the whole of its contribution. A white liner
-therefore gives a bright but **desaturated** cyan, exactly as the numbers above show. The deeply
-saturated turquoise most people picture when they think "swimming pool" comes from a **blue
-liner**: a mid-blue PVC at roughly `(0.24, 0.54, 0.70)` returns about `(0.04, 0.45, 0.69)` — far
-more saturated than the white case and about a third darker, because a blue liner reflects less
-total light. This is the most useful default in the section: for a modern domestic pool start from
-a blue liner, not white plaster, and let the water *darken* it rather than colour it. A renderer
-that reaches for a saturation or tint control to get there is compensating for a bottom albedo
-that was never authored.
-
-Two predictions fall out, both checkable against reference photography:
-
-- **Change the liner and the water changes completely.** White → turquoise; sand → green-teal;
-  the dark-grey liner of current architectural fashion → near-black, because with `b_b ≈ 0` there
-  is nothing to fill the column and all that survives is the Fresnel reflection of the sky. If a
-  pool looks the same over every liner, the bottom-albedo term is missing from the shader.
-- **Colour is nearly depth-independent within one pool.** Across 1–3 m the round-trip
-  transmittance in green and blue barely moves and only red drops, so shallow end and deep end
-  differ far less than the ocean's ramp trains you to expect. A strong hue shift across a pool
-  floor is an artifact, not a depth cue.
-
-Art-direct the liner, not the water. The single knob that most reliably makes a pool read wrong is
-a `scatterColor` cranked toward cyan to compensate for a bottom that was never sampled.
+A white liner at ~0.8 albedo therefore returns roughly `(0.38, 0.68, 0.78)` before any sky
+reflection is composited on top: bright, cyan-leaning, and **desaturated** — because with `b_b ≈ 0`
+the column is a pure Beer-Lambert filter that can only subtract. The deeply saturated turquoise
+most people picture comes from a **blue liner**: a mid-blue PVC at roughly `(0.24, 0.54, 0.70)`
+returns about `(0.11, 0.46, 0.68)`, far more saturated and about a third darker. Start a modern
+domestic pool from a blue liner, not white plaster, and let the water *darken* it rather than
+colour it; reaching for a saturation or tint control instead is compensating for a bottom albedo
+that was never authored. Two consequences, both checkable against reference photography: **change
+the liner and the water changes completely** (sand → green-teal, the fashionable dark-grey liner →
+near-black, since nothing fills the column and only the Fresnel sky survives — a pool that looks
+the same over every liner has no bottom-albedo term), and **colour is nearly depth-independent
+within one pool**, since across 1–3 m blue hardly moves, green moves little, and red carries almost
+all of the change. A strong hue shift across a pool floor is an artifact, not a depth cue.
 
 ### The rest of the man-made checklist
 
 - **Straight lines are the fidelity test.** Tiled walls and rectangular coping hand the viewer a
-  known-straight reference that the refracted surface visibly bends — the most revealing test the
-  refraction path will ever get. It is also where the depth reject in
-  [Shading and optics](#shading-and-optics) earns its place: the deck, the coping and everything
+  known-straight reference that the refracted surface visibly bends. It is also where the depth
+  reject in [Shading and optics](#shading-and-optics) earns its place: deck, coping and everything
   standing on them sit *directly* adjacent to the water in screen space, so an unrejected
   refraction sample smears them into the pool every frame.
-- **The waterline is geometry, not a fade.** On a vertical wall the shore-distance field carries
-  no information. Author the band instead: wet tile below the line, a meniscus with its own small
-  specular lift at it, a damp gradient above it from splash, and the static scale line at the tile
-  course.
+- **The waterline is geometry, not a fade.** On a vertical wall the shore-distance field carries no
+  information. Author the band: wet tile below the line, a meniscus with its own small specular
+  lift at it, a damp gradient above it from splash, and the static scale line at the tile course.
 - **Inflows are the flow field.** Return jets and skimmer draw are the only steady flow, and they
-  are small and local — author them as sim-patch injections rather than exporting a flow raster
-  for a 10 m body.
+  are small and local — author them as sim-patch injections rather than exporting a flow raster for
+  a 10 m body.
 - **The gameplay surface is trivially correct here** — flat datum plus a centimetre of ripple — so
   there is no excuse for the swim-volume mismatch in [Pitfalls](#pitfalls).
 
@@ -2348,55 +2222,48 @@ above except the TotK physics talk is community reconstruction or press/footage 
   visibility at the surface entry point, irradiance-not-albedo) and the tier ladder as a whole:
   production practice assembled over the physics above. The shadow-at-entry-point rule is the one
   most often skipped and is stated here as doctrine, not as a cited result.
-- **P** — Pool-water optics: pure-water absorption from the Pope & Fry dataset already cited above
-  — `a(700) ≈ 0.62`, `a(418) ≈ 0.0044 m⁻¹` as quoted in
-  [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from);
-  the `a(550) ≈ 0.0565 m⁻¹` value used in the worked round-trip example is from the same dataset
-  by model knowledge and was **not** re-checked against the published table. The round-trip
-  transmittances and the resulting `(0.13, 0.68, 0.79)` liner return are arithmetic done here.
+- **P** — Pool-water optics: pure-water absorption from the Pope & Fry dataset already cited above,
+  sampled at this chapter's RGB points — `a ≈ (0.25, 0.056, 0.0092) m⁻¹` at 610/550/450 nm, as
+  quoted in [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from).
+  Those three values come from that dataset by model knowledge and were **not** re-checked against
+  the published table; the 418 nm absolute minimum is deliberately *not* used as a blue channel.
+  The round-trip transmittances and the resulting `(0.38, 0.68, 0.78)` white-liner and
+  `(0.11, 0.46, 0.68)` blue-liner returns are arithmetic done here, as are the liner albedos
+  (`0.8` white, `(0.24, 0.54, 0.70)` mid-blue PVC), which are representative values, not measured
+  product data.
 - **P/F** — The driven-basin model for pool waves. Viscous decay `α = 2νk²` for deep-water gravity
-  waves is Lamb's classical result (*Hydrodynamics*, §348-ish; attribution from model knowledge,
-  not re-checked); `c_g = (g + 3(σ/ρ)k²)/(2ω)` follows from differentiating the capillary–gravity
-  dispersion relation. The table's e-folding distances (~90 m at 16.5 cm, ~2.1 m at 3 cm, with
+  waves is Lamb's classical result (*Hydrodynamics*; attribution from model knowledge, not
+  re-checked); `c_g = (g + 3(σ/ρ)k²)/(2ω)` follows from differentiating the capillary–gravity
+  dispersion relation. The e-folding distances (~90 m at 16.5 cm, ~2.1 m at 3 cm, with
   ν = 1.004×10⁻⁶ m²/s) were computed here and are reproducible from those two formulas. That the
   filtration return is the dominant source, that tiled walls are near-total reflectors at these
-  wavelengths, and the edge-contract inversion, are this skill's framing from the physics plus
+  wavelengths, and the edge-contract inversion are this skill's framing from the physics plus
   direct observation — **no measurement of a wall reflection coefficient was chased**, so treat
   "near-total" as an argued approximation rather than a figure. The method-of-images construction
-  is standard acoustics/optics practice carried over, as is the early-reflections-plus-diffuse-tail
-  split.
-- **P/?** — The submerged-jet footprint. Linear spreading `r½ = S·s` and `1/s` centreline decay are
-  textbook free-shear-flow results (Pope, *Turbulent Flows*, ch. 5; Rajaratnam, *Turbulent Jets*)
-  and the structure was web-confirmed 2026-08; the **numerical constants** `S ≈ 0.094`, `B ≈ 5.8`
-  and axial turbulence intensity `≈ 0.25` are from model knowledge and were **not** confirmed
-  against a primary source — they vary by a few percent across experiments, which does not move the
-  footprint qualitatively. The surface-deformation link `η ~ C·u'²/g` is a scaling argument
-  (stagnation pressure of an eddy) with an **O(1) constant `C` that is genuinely unknown here**;
-  `C = 1` was used. Free-surface turbulence deserves better than this and the chapter should say so
-  rather than pretend otherwise.
-- **P** — The supercritical-wake argument. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the
-  standard capillary–gravity minimum already cited in [Calm water](#calm-water-the-low-energy-regime);
+  and the early-reflections-plus-diffuse-tail split are standard room-acoustics practice carried
+  over.
+- **P/?** — The submerged-jet footprint. Linear spreading `r½ ≈ 0.094·s` and `1/s` centreline decay
+  are textbook free-shear-flow results (Pope, *Turbulent Flows*, ch. 5; Rajaratnam, *Turbulent
+  Jets*) and the structure was web-confirmed 2026-08; the numerical constants are from model
+  knowledge and were **not** confirmed against a primary source — they vary by a few percent across
+  experiments, which does not move the footprint qualitatively. The surface-deformation link
+  `η ~ C·u'²/g` is a scaling argument (stagnation pressure of an eddy) whose **O(1) constant `C` is
+  genuinely unknown**; `C = 1` was used, which is why the chapter states the near-field roughness as
+  a ratio to the far field rather than as an rms slope. Free-surface turbulence is the weakest link
+  in this subsection.
+- **P** — The wake geometry. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the standard
+  capillary–gravity minimum already cited in [Calm water](#calm-water-the-low-energy-regime);
   `U0 = C_d√(2ΔP/ρ)` is Bernoulli with an orifice discharge coefficient (`C_d ≈ 0.92` assumed, a
-  typical eyeball value taken from model knowledge); the stationary condition `c(k) = U·cos ψ` and
-  hence `k = g/(U cos ψ)²` is textbook wave–current interaction, the same Doppler machinery this
-  chapter cites for [wave–current interaction](#rivers-flow-driven-surfaces). The **conclusion**
-  — that a running return's pattern is a downstream wedge and cannot be a ring system — follows
-  from those with no free parameter, and is the durable part.
-- **P** — The eikonal formulation. `H = σ(k) + k·U`, Hamilton's equations for the rays, `dφ = k·dx`
-  and wave-action conservation `A²·|dx/dt|·W = const` are standard geometrical wave optics in a
-  moving medium (Whitham, *Linear and Nonlinear Waves*; the oceanographic form is Peregrine's
-  wave–current interaction, already cited by this chapter for
-  [rivers](#rivers-flow-driven-surfaces)). Attribution from model knowledge, not re-verified. The
-  crest curvature, the downstream shortening from ~35 cm to ~4 cm, and the ±19° energy fan are
-  **outputs of integrating it**, not assumptions — they are reproducible from the equations above
-  plus the jet drift field.
-- **? — the reconstruction, not the physics, is what is still rough.** Turning a ray set back into
-  a field is done here by depositing a Gabor atom per ray sample, sized to its own ray tube. That
-  leaves visible **staircase edges where rays terminate** — at the ends of the launch fan and at the
-  end of the integration — which are sampling artefacts and nothing to do with water. A cleaner
-  reconstruction (rasterizing the ray mesh with interpolated phase, or simply many more rays) would
-  remove them. Read the crest geometry and the wavelength trend from such a render; do not read its
-  outline.
+  typical eyeball value from model knowledge); the stationary condition `c(k) = U·cos ψ` is textbook
+  wave–current interaction, the same Doppler machinery this chapter cites for
+  [rivers](#rivers-flow-driven-surfaces). That a running return's pattern is a narrow downstream
+  band and cannot be a ring system follows from those with no free parameter, and is the durable
+  part. The **±19° energy fan** is narrower than the ±78° range of stationary *wavevectors* because
+  energy travels at `c_g·k̂ + U`; the figure is the output of integrating the ray equations
+  (`H = σ(k) + k·U`, Hamilton's equations, wave-action conservation — standard geometrical wave
+  optics in a moving medium, Whitham; attribution from model knowledge, not re-verified) through the
+  jet's decaying drift field, as are the crest curvature and the downstream shortening. Reproducible
+  from those equations plus a drift field; not a measured angle.
 - **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
   layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
   the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
@@ -2408,6 +2275,4 @@ above except the TotK physics talk is community reconstruction or press/footage 
 - **F** — That treated pool water sits outside every Jerlov class (`b_b ≈ 0`, `c ≈ a`, Secchi
   exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
   scattering one, and the man-made gating table: this skill's composition from the optics above
-  plus standard pool-operation practice. The "main drain visible from the deck" clarity
-  requirement is a widespread code provision, **not** verified against a specific standard —
-  do not cite a code section for it.
+  plus standard pool-operation practice.

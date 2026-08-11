@@ -132,6 +132,7 @@ right fix.
 | Caustic structure: brightness as inverse ray-map Jacobian; folds and cusps only (the argument against Voronoi caustics) | `12` | Whitney, *Annals of Mathematics* 62 (1955) for the fold/cusp classification; Berry & Upstill, "Catastrophe Optics", *Progress in Optics* 18 (1980), 257–346 for the optics reading | P | [ADS](https://ui.adsabs.harvard.edu/abs/1980PrOpt..18..257B/abstract) |
 | Offline-correct caustics (photon mapping, manifold methods, the `SDS` limit) | `12` → PBR | Routed out: `physically-based-rendering/references/caustics.md` | P | — |
 | Man-made water bodies (pools, tanks, canals): which bands gate off; colour as bottom albedo, not scattering | `12` | This skill's composition over the Pope & Fry pure-water absorption already cited in `12`; the body-type extension is authored-side, never classified by terrain-architect `03` | F | — |
+| Driven-basin pool wave field: two-band split (jet-driven long band + wind short band), shelter on the short band only, reverberant wall reflections, submerged-jet footprint and its ±19° downstream wake | `12` | This skill's composition over classical results (Lamb viscous decay, free-shear-jet scaling, capillary–gravity minimum phase speed, wave–current ray theory); no canonical source for the pool application — see the ledger | P/F/? | — |
 | Deferred snow/mud deformation | `13` | Michels & Sikachev, GPU Pro 7 (talk form SIGGRAPH 2015); Barré-Brisebois, GDC 2014 (Batman); Surricchio, GDC 2023 (God of War Ragnarök) | P/T | [gdcvault Batman](https://gdcvault.com/play/1020177/Deformable-Snow-Rendering-in-Batman) |
 | Wet-surface shading (porosity darkening, roughness drop) | `13` | Lagarde, "Water drop" blog series, 2012–2013 | F/D | [seblagarde.wordpress.com](https://seblagarde.wordpress.com/2013/03/19/water-drop-3a-physically-based-wet-surfaces/) |
 | Transient season/weather overlays after RVT | `07` `13` | Cache-coherency doctrine; bounded local invalidation in engine docs, global-state exclusion is practice | D/F | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/runtime-virtual-texturing-in-unreal-engine) |
@@ -274,6 +275,24 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   stated 610/550/450 nm sample points. Glacial-flour turquoise upgraded from synthesis-only to
   P/synthesis — corroborated by glacial-lake reflectance studies (MRD 37(1) 2017; ERL 17 2022),
   the Rayleigh explanation stays refuted.
+- `12` (man-made water — the chapter's most speculative block, and the one to verify first):
+  the **driven-basin** account of a pool's wave field is this skill's composition, not a cited
+  model. Its ingredients are classical (Lamb's `α = 2νk²`, the capillary–gravity minimum phase
+  speed, free-shear-jet spreading and `1/s` decay, wave–current ray theory) but the assembly is
+  not, and three pieces are weaker than the prose density suggests. (1) The **submerged-jet
+  footprint**: the jet scaling is textbook, its numerical constants are model-knowledge, and the
+  surface-deformation link `η ~ C·u'²/g` carries an **O(1) constant that is genuinely unknown**
+  (`C = 1` was used) — which is why the chapter states near-field roughness as a *ratio* to the far
+  field, and why an absolute rms slope must not be quoted from it. (2) The **±19° energy fan** and
+  the crest curvature are outputs of integrating the ray equations through a modelled drift field,
+  reproducible but not measured; the supercritical conclusion (no ring system, no Kelvin wedge)
+  is the durable part and follows with no free parameter. (3) **Inextensible-film damping**
+  `α ≈ 0.35·k·√(νω)`: the Stokes-layer structure is solid, the prefactor could not be confirmed
+  against a primary source, so the 3–9× factor is indicative. Also unmeasured: "tiled walls are
+  near-total reflectors" is an argued approximation, not a figure. The pool-optics worked example
+  is arithmetic done in-chapter over Pope & Fry absorption sampled at the chapter's own RGB points
+  (610/550/450 nm — **not** the 418 nm absolute minimum, which is below a typical blue channel);
+  the liner albedos are representative values, not product data.
 - `12`, `03` (engine-native water, added 2026-08): every claim in the UE Water sections is D/N-tier
   engine documentation fetched 2026-08 — architecture, quadtree/tile defaults, body types and spline
   metadata, Landmass brush modes and the edit-layers requirement, Single Layer Water's inputs and its

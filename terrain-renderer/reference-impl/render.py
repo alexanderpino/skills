@@ -41,12 +41,46 @@ SKY_AMB = np.array([0.26, 0.42, 0.66]) * 2.15   # clear sky is still a big blue 
 SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
                          # it lifts the shadow without making caustics
 
-EYE = np.array([13.00, 2.40, 6.60])   # east: the anti-solar side
-TGT = np.array([3.60, 2.05, -0.30])
-FOV = np.deg2rad(44.0)
+# --- camera -----------------------------------------------------------------
+# The reference is a CLOSE-UP over the water: the frame is water, the pool edge
+# is a border at the top, and there is no garden in it. Two constraints fix the
+# viewpoint and neither is free:
+#   * the specular path.  A facet reflects the sun to the camera when its normal
+#     bisects L and V.  With the sun at 21 deg and the camera due east of the
+#     target, |theta_v - 21| < 12 deg keeps the required slope inside the field's
+#     rms (0.053 far, 0.092 over the jet) -- that is the ONLY band in which
+#     spec C's isolated glints can exist.  Look down at 60 deg and there is no
+#     sparkle anywhere, at any roughness.
+#   * the caustic net.  25-40 cells at 15-30 cm needs 4-8 m of water in frame.
+# 2.55 m over the east coping, 29 deg down, 22 deg lens: the frame runs from the
+# far coping (8.7 m, theta_v 16 deg) to 3.2 m out (theta_v 39 deg), so the glint
+# band lands on the jet's rough patch and the far half stays turquoise.
+EYE = np.array([8.30, 2.45, 2.55])    # east: the anti-solar side
+CAM_AZ = np.deg2rad(183.5)            # very nearly due west: see above
+CAM_EL = np.deg2rad(-27.5)
+FOV = np.deg2rad(22.0)
+TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
+                            np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
 SAIL = np.array([[-5.10, -0.90, 2.72], [-2.10, -0.50, 2.55],
                  [-2.40, 1.90, 2.35], [-5.40, 1.50, 2.55]])
 EXPOSURE = 0.275      # the camera exposes for a 21-degree sun
+
+# --- the pool edge, in section ----------------------------------------------
+# Not a boolean rectangle.  A poured wall, a coping course bedded on it that
+# OVERHANGS the wall face, and a bullnose rolled over that overhang.  Every
+# number here is a dimension off a real coping stone, and each one does visible
+# work: the overhang makes the undercut the water sits in, the bullnose makes
+# the roll that catches or loses the sun depending on which side of the pool it
+# is, and the 75 mm freeboard makes the reflection of the coping in the water.
+ZD   =  0.075     # coping top, 75 mm above the still waterline (the freeboard)
+ZG   = -0.030     # lawn, if it ever gets in frame -- it does not
+BULR =  0.032     # bullnose radius
+SLIP = -0.020     # the coping overhangs the wall face by 20 mm, into the pool
+SBUL = SLIP + BULR
+ZCEN = ZD - BULR  # centre of the bullnose arc, in (s, z)
+ZLIP = ZCEN       # the lip: lowest point of the bullnose, 43 mm over the water
+COPW =  0.34      # width of the coping course
+WET  =  0.155     # how far back from the lip the stone is still splash-damp
 # A real pool liner is BLUE, not white plaster. Absolute albedo ~ (0.24, 0.54, 0.70):
 # reflective enough to stay bright, saturated enough to carry the colour itself.
 LINER_TINT = np.array([0.30, 0.79, 0.92])
@@ -125,33 +159,77 @@ def blur(img, sig):
 
 
 # --------------------------------------------------------------------------- shade sail
-def _cw(p):
-    return sum((p[(i + 1) % len(p)][0] - p[i][0]) *
-               (p[(i + 1) % len(p)][1] + p[i][1]) for i in range(len(p))) > 0
+# The sail is here as an OCCLUDER and nothing else -- the shadow gate is the
+# claim under test (no caustics inside it, water still luminous), and its EDGE
+# is what lands in frame.  A tensioned sail is not a flat quad, so its shadow
+# edge is not a straight line: the fabric hangs in a catenary between the four
+# anchors and each edge is cut in a concave scallop so it can be tensioned at
+# all.  Both change the shadow's outline, so both are in the projection.  The
+# sail is not otherwise drawn: it sits above the top of the frame.
+SAIL_SAG = 0.24        # mid-panel droop below the bilinear surface, m
+SAIL_SCAL = 0.085      # edge scallop, as a fraction of the span
 
 
-SAIL_SHADOW_POLY = SAIL[:, :2] - SUN_DIR[:2][None] * (SAIL[:, 2:3] / SUN_DIR[2])
-_SCW = _cw(SAIL_SHADOW_POLY)
+def sail_surface(u, v):
+    """Point on the fabric. Bilinear between the four anchors, less a catenary
+    droop that vanishes at every edge (the edges are the tensioned ones)."""
+    w = ((1 - u) * (1 - v))[..., None], (u * (1 - v))[..., None], \
+        (u * v)[..., None], ((1 - u) * v)[..., None]
+    p = w[0] * SAIL[0] + w[1] * SAIL[1] + w[2] * SAIL[2] + w[3] * SAIL[3]
+    return p - np.stack([np.zeros_like(u), np.zeros_like(u),
+                         SAIL_SAG * np.sin(np.pi * u) * np.sin(np.pi * v)], -1)
 
 
-def sun_vis_hard(x, y):
-    inside = np.ones(np.shape(x), bool)
-    p = SAIL_SHADOW_POLY
-    for i in range(len(p)):
-        a, b = p[i], p[(i + 1) % len(p)]
-        cr = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0])
-        inside &= (cr <= 0) if _SCW else (cr >= 0)
-    return (~inside).astype(np.float32)
+def sail_inside(u, v):
+    c, s = SAIL_SCAL, np.sin
+    return ((v > c * s(np.pi * u)) & (v < 1 - c * s(np.pi * u)) &
+            (u > c * s(np.pi * v)) & (u < 1 - c * s(np.pi * v)))
 
+
+# Project the fabric to z = 0 along the sun and accumulate coverage. Sampling
+# (u, v) and normalising by the sample density is exact for any warped surface,
+# which a polygon projection is not once the panel sags.
+SX = np.linspace(X0 - 3, X1 + 3, SHADOW_N[0])
+SY = np.linspace(Y0 - 3, Y1 + 3, SHADOW_N[1])
+_cov = np.zeros((SHADOW_N[1], SHADOW_N[0]))
+_den = np.zeros((SHADOW_N[1], SHADOW_N[0]))
+_NUV = 1500
+_uu = np.linspace(-0.18, 1.18, _NUV)
+for _j0 in range(0, _NUV, 250):
+    _U, _V = np.meshgrid(_uu, _uu[_j0:_j0 + 250])
+    _P = sail_surface(_U.ravel(), _V.ravel())
+    _g = _P[:, :2] - SUN_DIR[None, :2] * (_P[:, 2:3] / SUN_DIR[2])
+    _m = sail_inside(_U.ravel(), _V.ravel()).astype(np.float64)
+    splat(_cov, _g[:, 0], _g[:, 1], _m, SX[0], SX[-1], SY[0], SY[-1])
+    splat(_den, _g[:, 0], _g[:, 1], np.ones_like(_m), SX[0], SX[-1], SY[0], SY[-1])
+SHADOW = 1.0 - _cov / np.maximum(_den, 1e-9)
+del _cov, _den
 
 # soft shadow: penumbra = 0.53 deg over the sail's slant height above the water
 _pen = np.deg2rad(0.53) * (SAIL[:, 2].mean() / SUN_DIR[2])
-SX = np.linspace(X0 - 3, X1 + 3, SHADOW_N[0])
-SY = np.linspace(Y0 - 3, Y1 + 3, SHADOW_N[1])
-_sxg, _syg = np.meshgrid(SX, SY)
-SHADOW = blur(sun_vis_hard(_sxg, _syg).astype(np.float64),
-              (_pen / 4.0) / ((SX[-1] - SX[0]) / SHADOW_N[0]))
+SHADOW = np.clip(blur(SHADOW, (_pen / 4.0) / ((SX[-1] - SX[0]) / SHADOW_N[0])), 0, 1)
 print("sail penumbra at the water: %.0f mm" % (_pen * 1000))
+print("sail shadow covers %.1f m2 of the basin" %
+      ((1 - SHADOW).sum() * ((SX[-1] - SX[0]) / SHADOW_N[0]) *
+       ((SY[-1] - SY[0]) / SHADOW_N[1])))
+
+
+# The coping overhangs the wall, so near the WEST wall the sun is cut off by the
+# lip before it ever reaches the surface: it has to clear ZLIP over a horizontal
+# run of x, and tan(21 deg) is only 0.385. The band is 16 cm wide, and because
+# the refracted ray then travels 1.37 m east, its shadow lands out in the basin
+# rather than against the wall. Same test on the north wall gives 3 cm -- the
+# sun is 3.75 deg north of due west, so that wall barely shades anything.
+_LIPX = ZLIP * (abs(SUN_DIR[0]) / SUN_DIR[2]) + SLIP
+_LIPY = ZLIP * (abs(SUN_DIR[1]) / SUN_DIR[2]) + SLIP
+print("coping lip shades %.0f mm off the west wall, %.0f mm off the north wall"
+      % (_LIPX * 1000, _LIPY * 1000))
+
+
+def coping_vis(x, y):
+    """Sun visibility at the water surface, cut by the coping lip itself."""
+    return (np.clip((x - X0 - SLIP) / max(_LIPX - SLIP, 1e-6), 0, 1) *
+            np.clip((Y1 - SLIP - y) / max(_LIPY - SLIP, 1e-6), 0, 1))
 
 
 def sun_vis(x, y):
@@ -159,8 +237,9 @@ def sun_vis(x, y):
     fv = np.clip((y - SY[0]) / (SY[-1] - SY[0]) * SHADOW_N[1] - .5, 0, SHADOW_N[1] - 1.001)
     iu, iv = fu.astype(np.int64), fv.astype(np.int64)
     du, dv = fu - iu, fv - iv
-    return ((SHADOW[iv, iu] * (1 - du) + SHADOW[iv, iu + 1] * du) * (1 - dv) +
-            (SHADOW[iv + 1, iu] * (1 - du) + SHADOW[iv + 1, iu + 1] * du) * dv)
+    s = ((SHADOW[iv, iu] * (1 - du) + SHADOW[iv, iu + 1] * du) * (1 - dv) +
+         (SHADOW[iv + 1, iu] * (1 - du) + SHADOW[iv + 1, iu + 1] * du) * dv)
+    return s * coping_vis(x, y)
 
 
 # --------------------------------------------------------------------------- caustic pass
