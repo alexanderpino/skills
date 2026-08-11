@@ -710,19 +710,16 @@ def slope_var_points(x, y, fp):
     vxx = np.zeros_like(xf); vyy = np.zeros_like(xf); vxy = np.zeros_like(xf)
     for F, env in ((WIND, shelter(xf, yf)), (REVERB, 1.0),
                    (BOIL, jet_envelope(xf, yf))):
-        k2 = F['k2']
-        lost = 1.0 - np.exp(-k2 * fv[..., None] if np.ndim(fv) else -k2 * fv)
-        a2 = (F['amp'] ** 2 * k2) * lost * 0.5           # per component
-        ux = F['kx'] / np.sqrt(k2); uy = F['ky'] / np.sqrt(k2)
-        e2 = env * env if np.ndim(env) else np.float32(env) ** 2
-        if np.ndim(fv):
-            vxx = vxx + e2 * (a2 * ux * ux).sum(-1)
-            vyy = vyy + e2 * (a2 * uy * uy).sum(-1)
-            vxy = vxy + e2 * (a2 * ux * uy).sum(-1)
-        else:
-            vxx = vxx + e2 * float((a2 * ux * ux).sum())
-            vyy = vyy + e2 * float((a2 * uy * uy).sum())
-            vxy = vxy + e2 * float((a2 * ux * uy).sum())
+        e2 = (env * env) if np.ndim(env) else np.float32(env) ** 2
+        # component by component rather than an (npoints, ncomponents) array:
+        # this is called on whole camera passes, and 44 REVERB components times
+        # a few million rays is a gigabyte of temporary for no reason.
+        for i in range(len(F['kx'])):
+            k2 = F['k2'][i]
+            h = 0.5 * (F['amp'][i] ** 2 * k2) * (1.0 - np.exp(-k2 * fv)) * e2
+            ux = F['kx'][i] / np.sqrt(k2); uy = F['ky'][i] / np.sqrt(k2)
+            vxx = vxx + h * (ux * ux); vyy = vyy + h * (uy * uy)
+            vxy = vxy + h * (ux * uy)
     # NEAR: a coherent sum of image sources, so its local amplitude is geometry
     # (1/sqrt(r) and the viscous decay), not a constant per component.
     for j, (k, w) in enumerate(_NEAR):
