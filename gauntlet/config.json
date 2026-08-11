@@ -1,0 +1,20 @@
+{
+  "stops": {
+    "bar_met_n": 2,
+    "clean_streak_n": 2,
+    "budget_waves": 6,
+    "hard_cap_waves": null
+  },
+  "dimensions": [
+    "physics",
+    "visual",
+    "prose"
+  ],
+  "lanes": [
+    "surface",
+    "optics",
+    "chapter"
+  ],
+  "bar_kind": "reference",
+  "extensions": []
+}
