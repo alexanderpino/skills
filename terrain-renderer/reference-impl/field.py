@@ -414,7 +414,9 @@ def _wake_field():
     and `vxx/vyy/vxy`, the local mean-square slope tensor. The other four bands
     are explicit plane-wave sets, so both quantities are exact for them; this one
     is a reconstructed grid and has to measure them. The mean square is a box
-    mean over 21 texels = 21 cm, which is about two wavelengths of the band -- a
+    mean over 21 texels = 21 cm, which is one wavelength of the reconstructed
+    field (19.3 cm, measured below) -- and one full period is exactly what a mean
+    square of a sinusoid needs, since that is where <cos^2> integrates to 1/2. A
     window shorter than a wavelength would report the crest pattern itself as
     variance instead of averaging over it."""
     if not _WK_CACHE:
@@ -425,7 +427,31 @@ def _wake_field():
                                rms_target=WAKE_RMS)
         _WK_CACHE['gx'] = gx.astype(np.float32)
         _WK_CACHE['gy'] = gy.astype(np.float32)
-        _WK_CACHE['k'] = kk.astype(np.float32)
+        # THE CARRIER IS NOT THE SCALE THAT ALIASES, and the gap is a factor of
+        # three. wake.build returns the |k| of the RAYS that deposited each
+        # texel -- 52 cm, slope-weighted, which is what the stationary condition
+        # says the wave is. The field they reconstruct carries its slope energy
+        # at 19 cm: a Gabor sum is atoms of finite width divided by a coverage
+        # map, and both the window edges and the Nadaraya-Watson division put
+        # structure at the WINDOW scale, which `wake.build`'s own docstring
+        # flags as the hazard it clamps sigma to control. What a pixel samples
+        # is the field, not the rays, so the footprint filter has to act at the
+        # field's scale. Both numbers are measured here -- `_spec_k` on the
+        # reconstruction and the slope-weighted mean of the carrier map -- and
+        # the carrier is rescaled by their ratio, which keeps the SPATIAL run
+        # that makes the map worth having (long at the source, short downstream)
+        # and puts the absolute scale where the energy actually is.
+        # ? the ratio is a single global number: the exact operation is to
+        # convolve the wake grid with the footprint Gaussian directly, i.e. a
+        # mip pyramid over fp, which needs no wavenumber at all. Over the
+        # footprints this scene reaches (<= 35 mm) the two differ by 5% on this
+        # band, so the pyramid is deferred rather than dismissed.
+        dxg = (X1 - X0) / _WK_GRID[0]; dyg = (Y1 - Y0) / _WK_GRID[1]
+        e = gx * gx + gy * gy
+        k_car = float(np.average(kk, weights=e))
+        k_fld = float(_spec_k(gx, gy, dxg, dyg))
+        _WK_CACHE['k'] = (kk * (k_fld / max(k_car, 1e-9))).astype(np.float32)
+        _WK_CACHE['kfix'] = (k_car, k_fld)
         for nm, a in (('vxx', gx * gx), ('vyy', gy * gy), ('vxy', gx * gy)):
             _WK_CACHE[nm] = _boxsm(a, 10).astype(np.float32)
     return _WK_CACHE['gx'], _WK_CACHE['gy']
@@ -618,10 +644,106 @@ def _norm_jets():
     # band moves from 0.09-0.11 to 0.11-0.14 the same way -- WIND and REVERB were
     # already in this unit, NEAR/BOIL/WAKE were not, so the total gains 1.35x and
     # not the full sqrt(2). The near/far RATIO, which is the part the chapter
-    # states independently ("roughly twice"), goes 1.79 -> 2.16 and is BETTER for
+    # states independently ("roughly twice"), goes 1.70 -> 2.11 and is BETTER for
     # the fix, because it was the one number the mixed units were distorting.
+    #
+    # That pair used to read 1.79 -> 2.16, and the correction is worth recording
+    # because those numbers were not arithmetic errors, they were the wrong
+    # QUANTITY: each is a ratio of the TARGET line two rows below this one, not
+    # of the totals the table actually measures. 2.16 is 0.125/0.058, the
+    # midpoint of the stated "0.11-0.14" over the stated far figure, and 1.79 is
+    # the same construction on the old stated pair, 0.095/0.053. Measured, the
+    # printed totals are 0.1228 and 0.0583, so the ratio is 2.11 -- 2.12 if you
+    # divide the three-decimal rows as printed, which is the whole spread of the
+    # disagreement. Restating a target as though it were a measurement is the
+    # same class of defect as the mixed convention this block documents: a
+    # number that cannot be reproduced from anything the file computes.
     print("    doel: 0.11-0.14 bij de straal, 0.058 ver weg"
           " (s = sqrt(<|grad h|^2>) overal)")
+    _report_footprint(xxn, yyn, xxf, yyf)
+
+
+def _report_footprint(xxn, yyn, xxf, yyf):
+    """The footprint filter, band by band, measured rather than quoted.
+
+    Two things have to be checkable here. First, that the SHORT bands leave and
+    the LONG bands stay -- a filter that takes the 20 cm net with the 2.8 cm
+    sparkle has removed the caustics along with the moire. Second, that the total
+    rms slope FALLS as the footprint grows, because that fall is the physical
+    content of the whole exercise and it is what a specular shader has to be told
+    about: the same water presents a narrower slope distribution to a pixel that
+    averages more of it, and if the removed variance is not handed on, the far
+    surface converges to its mean normal and reads as plastic."""
+
+    def band_s(xx, yy, which, fp):
+        fv = _fp_var(fp)
+        sh = shelter(xx, yy).astype(np.float32)
+        if which == 'WIND':
+            g = _gemm(WIND, xx[0], yy[:, 0], fv); return rms_slope(g[0] * sh, g[1] * sh)
+        if which == 'REVERB':
+            return rms_slope(*_gemm(REVERB, xx[0], yy[:, 0], fv))
+        if which == 'NEAR':
+            return rms_slope(*_cyl(xx, yy, fv))
+        if which == 'BOIL':
+            g = _gemm(BOIL, xx[0], yy[:, 0], fv); e = jet_envelope(xx, yy)
+            return rms_slope(g[0] * e, g[1] * e)
+        return rms_slope(*_wake(xx, yy, fv))
+
+    def total_s(xx, yy, fp):
+        return rms_slope(*grad_grid(xx[0], yy[:, 0], fp))
+
+    print("  voetafdrukfilter: Gauss, sigma = %.4f*fp; helft weg bij fp = lambda/2"
+          % FP_SIGMA)
+    _kc, _kf = _WK_CACHE['kfix']
+    print("    zog: draaggolf %.1f cm, maar het gereconstrueerde veld draagt zijn "
+          "hellingsenergie op %.1f cm -- filter op het tweede (factor %.2f)"
+          % (200 * np.pi / _kc, 200 * np.pi / _kf, _kf / _kc))
+    print("    band     op patch   fp(50% amp)  fp(50% var)   s over bij fp ="
+          "  10  20  30 mm")
+    for nm in ("WIND", "REVERB", "NEAR", "BOIL", "WAKE"):
+        # measure each band where it is actually present, or the ratio is 0/0
+        pn = band_s(xxn, yyn, nm, None); pf = band_s(xxf, yyf, nm, None)
+        xx, yy, s0, tag = ((xxn, yyn, pn, "straal") if pn >= pf
+                           else (xxf, yyf, pf, "ver   "))
+        lo, hi = 0.0, 1.0
+        for _ in range(40):                       # bisect on the band's own rms
+            mid = 0.5 * (lo + hi)
+            if band_s(xx, yy, nm, mid) > 0.5 * s0:
+                lo = mid
+            else:
+                hi = mid
+        fp_a = 0.5 * (lo + hi)
+        lo, hi = 0.0, 1.0
+        for _ in range(40):
+            mid = 0.5 * (lo + hi)
+            if band_s(xx, yy, nm, mid) > 0.70710678 * s0:
+                lo = mid
+            else:
+                hi = mid
+        fp_v = 0.5 * (lo + hi)
+        print("    %-7s  %s     %5.1f mm     %5.1f mm       %5.2f %5.2f %5.2f"
+              % (nm, tag, 1000 * fp_a, 1000 * fp_v,
+                 band_s(xx, yy, nm, 0.010) / s0, band_s(xx, yy, nm, 0.020) / s0,
+                 band_s(xx, yy, nm, 0.030) / s0))
+    print("    (fp(50% var) is fp(50% amp)/sqrt2: amplitude x W, variance x W^2)")
+    fps = (0.0, 0.005, 0.010, 0.020, 0.030, 0.040)
+    for xx, yy, tag in ((xxn, yyn, "straal"), (xxf, yyf, "ver   ")):
+        vals = [total_s(xx, yy, None if fp == 0 else fp) for fp in fps]
+        print("    s(totaal, %s) bij fp = " % tag
+              + "  ".join("%.0f:%.3f" % (1000 * fp, v) for fp, v in zip(fps, vals)))
+    # And the other half of the ledger: what left the field has to arrive
+    # somewhere, so print it in the same units. sqrt(trace) of the removed
+    # tensor is a removed rms slope; resolved and removed add in quadrature to
+    # the unfiltered total, which is the check that nothing was invented.
+    for xx, yy, tag in ((xxn, yyn, "straal"), (xxf, yyf, "ver   ")):
+        s0 = total_s(xx, yy, None)
+        for fp in (0.010, 0.030):
+            vxx, vyy, _ = slope_var_points(xx, yy, fp)
+            rem = float(np.sqrt(np.mean(vxx + vyy)))
+            res = total_s(xx, yy, fp)
+            print("    %s fp %2.0f mm: s opgelost %.4f, s verwijderd %.4f, "
+                  "kwadratensom %.4f tegen %.4f ongefilterd"
+                  % (tag, 1000 * fp, res, rem, np.hypot(res, rem), s0))
 
 
 def grad_grid(xs, ys, fp=None):
@@ -704,6 +826,15 @@ def slope_var_points(x, y, fp):
     1 - sqrt(1 - a^2 w_r^2), which differs from a^2 w_r^2/2 by 0.25% at the
     steepest slope in this basin (a ~ 0.1) and which would be a SECOND
     definition of variance sitting beside `_plane_rms`. One definition wins.
+
+    THE ONE PLACE THE CONVENTION COULD STILL DRIFT is right here: the file's rule
+    is that nobody writes the rms expression out by hand, and a tensor cannot go
+    through `_plane_rms`, which returns a scalar. So the trace is `_plane_rms`
+    written per component -- sqrt(vxx + vyy) is exactly
+    `_plane_rms(a * sqrt(1 - W^2))` -- and `_norm_jets` closes the loop every run
+    by printing resolved and removed in quadrature against `rms_slope` of the
+    unfiltered field. If a second convention ever gets in through this function,
+    that line stops adding up. It is the guard, not decoration.
     """
     fv = _fp_var(fp)
     xf, yf = np.asarray(x, np.float32), np.asarray(y, np.float32)
