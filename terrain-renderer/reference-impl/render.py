@@ -1386,6 +1386,41 @@ print("sky lobes: per-axis sigma %s deg -- these are the angular scales the "
       "reflection ellipse has to be compared against"
       % ", ".join("%.2f" % np.degrees(1.0 / np.sqrt(n)) for _, n, _ in SKY_LOBE))
 
+# --- THE SUN AS A SOURCE, AUDITED AGAINST THE ENVIRONMENT THAT STANDS IN FOR IT
+# This is arithmetic on constants that were already in the file, and it says
+# something the frame has been quietly built on top of for several rounds.
+#
+# `shade` uses SUN_COL as E_n/pi -- a Lambertian bed of albedo rho lit at
+# incidence cos_i comes out at rho*SUN_COL*cos_i, and rho*E/pi is the definition
+# -- so E_n = pi*SUN_COL. `sky` returns RADIANCE in the same units, which is
+# checkable independently: a uniform sky of radiance L gives E = pi*L, so the
+# diffuse SKY_AMB and the SKY_HOR/SKY_TOP that sky() returns are the same
+# quantity, and they agree to 4% in green. Both scales are therefore pinned, and
+# the sun's own radiance follows with nothing left free:
+#     L_sun = E_n / Omega_sun = pi * SUN_COL / (pi (0.53 deg / 2)^2)
+# The environment's three lobes are then measurable against it, in peak and in
+# flux (a cos^n lobe integrates to 2 pi/(n+1) sr over the hemisphere).
+OMEGA_SUN = np.pi * (np.deg2rad(0.53) / 2) ** 2
+L_SUN = np.pi * SUN_COL / OMEGA_SUN
+_lobe_flux = sum(amp * c * 1.15 * 2 * np.pi / (n + 1) for amp, n, c in SKY_LOBE)
+print("  the sun's own radiance is pi*SUN_COL/Omega_sun = %.3g (green) in those "
+      "units; the disc lobe's PEAK is %.4g, so the reflected sun is %.0fx too "
+      "dim, and cos^%d covers %.2g sr against the disc's %.2g -- %.1fx too wide"
+      % (L_SUN[1], SKY_LOBE[0][0] * SKY_LOBE[0][2][1] * 1.15,
+         L_SUN[1] / (SKY_LOBE[0][0] * SKY_LOBE[0][2][1] * 1.15),
+         SKY_LOBE[0][1], 2 * np.pi / (SKY_LOBE[0][1] + 1), OMEGA_SUN,
+         (2 * np.pi / (SKY_LOBE[0][1] + 1)) / OMEGA_SUN))
+print("  in FLUX, which is what a reflection actually integrates: all three "
+      "lobes together carry %.3g against a direct beam of pi*SUN_COL = %.3g, a "
+      "factor %.0f. So what this frame calls a glint is the AUREOLE, not the "
+      "disc -- a broad dim smear where the physics has a small blinding point, "
+      "which is exactly the shape of bar section C's complaint (a broad "
+      "shimmering road where it asks for countable isolated points). NOT "
+      "changed this round: a 200x source is a whole round's worth of "
+      "revalidation and it lands on top of the lobe change, not beside it. It "
+      "is written down because it is derived, not guessed."
+      % (_lobe_flux[1], np.pi * SUN_COL[1], np.pi * SUN_COL[1] / _lobe_flux[1]))
+
 
 # --------------------------------------- the removed variance becomes a lobe
 # WHAT THIS FILE DID NOT HAVE, and had to grow before the footprint filter
@@ -1994,8 +2029,19 @@ def surf_stats(x, y, fp):
     field, and the slope-variance tensor that was narrowed out of it. Taking the
     first without the second is the plastic-water failure; taking the second
     without the first is double counting. `fp` is the OUTPUT pixel's footprint
-    on the water, `FOOT * SS`, never `FOOT`."""
+    on the water, `FOOT * SS`, never `FOOT`.
+
+    `fp = None` means "no footprint", and it is guarded HERE rather than pushed
+    upstream: `grad_grid` and `grad_points` both accept None, `slope_var_points`
+    is the one entry point in field.py that does not, and asking for an
+    interface change to satisfy one caller is the wrong way round. No footprint
+    means nothing was removed, so the tensor is exactly zero -- which then runs
+    through the lobe and the Fresnel term as the identity, and the whole path
+    degenerates to the mirror this file had before."""
     gx, gy = grad_points(x, y, fp)
+    if fp is None:
+        z = np.zeros_like(gx)
+        return gx, gy, z, z, z
     vxx, vyy, vxy = slope_var_points(x, y, fp)
     return gx, gy, vxx, vyy, vxy
 
@@ -2080,9 +2126,18 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     # so it grows with the water actually crossed and is one more depth cue.
     water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * smG_))[:, None]
     water *= lip_ao[:, None]
-    out = (fres_ * refl_ + (1 - fres_) * water
+    spec_ = fres_ * refl_
+    tran_ = (1 - fres_) * water
+    out = (spec_ + tran_
            + (SKY_AMB[None] * .17 + SUN_COL[None] * .006) * menis[:, None])
-    return out, sidG, uG, vG, smG_, cylG, occ_, keyc
+    # the two halves are carried out separately as luminances so that spec C can
+    # be judged on the right one. "A compact patch of isolated bright points" is
+    # a statement about the REFLECTED term; if the transmitted bed beats it
+    # everywhere, no amount of glint-density contrast will show, and that is a
+    # measurement rather than an opinion. Luminance only -- the full pair would
+    # be 300 MB on this ray count for a number that is a scalar.
+    _Y = np.array([.2126, .7152, .0722])
+    return (out, sidG, uG, vG, smG_, cylG, occ_, keyc, spec_ @ _Y, tran_ @ _Y)
 
 
 QSUB = ((SUBK[inp].astype(np.float64) + .5) / NSPEC)
@@ -2283,14 +2338,20 @@ if _on.any():
         # same p_j/p_c = (s_c/s_j)^2 exp(r^2 (1/s_c^2 - 1/s_j^2)) the window was
         # derived from. This is the section C verdict, in one number.
         _sj = _sscan[_gb]
-        _ct = ((_SC / _sj) ** 2
-               * np.exp(_rr4[_gb] ** 2 * (1 / _SC ** 2 - 1 / _sj ** 2)))
+        # capped at 1e4 for the print only: the contrast is an exponential in
+        # r^2 and its raw value at the far end of the window runs to millions,
+        # which is a true number that tells a reader nothing. Anything past a
+        # few hundred is "the calm water cannot do this at all".
+        _ct = np.minimum(((_SC / _sj) ** 2
+                          * np.exp(_rr4[_gb] ** 2 * (1 / _SC ** 2 - 1 / _sj ** 2))),
+                         1e4)
         print("    and spec C's glint window (>=10x contrast) is on the water at "
               "x %.2f - %.2f, y %.2f - %.2f; the local rms slope THERE runs "
-              "%.3f-%.3f against %.3f on the calm water, so the contrast the "
-              "field delivers in the window is %.0fx at best (%.0fx median)"
+              "%.3f-%.3f against %.3f on the calm water, so the GLINT DENSITY "
+              "contrast the field delivers in the window is %.0fx median "
+              "(capped at 1e4)"
               % (min(_lx[_gb]), max(_lx[_gb]), min(_ly[_gb]), max(_ly[_gb]),
-                 _sj.min(), _sj.max(), _SC, _ct.max(), np.median(_ct)))
+                 _sj.min(), _sj.max(), _SC, np.median(_ct)))
         print("      the return fitting is at (%.2f, %.2f); the window's centre "
               "is (%.2f, %.2f), %.2f m away"
               % (JET_XY[0], JET_XY[1], _lx[_gb].mean(), _ly[_gb].mean(),
@@ -2536,11 +2597,12 @@ def render(mode):
     if bgm.any():
         img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
     img[pav] = PAV_COL
-    col, sidW, uW, vW, smW, cylW, occW, keyW = water_shade(
+    col, sidW, uW, vW, smW, cylW, occW, keyW, lspec, ltran = water_shade(
         hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB, stats=PRIM_STATS)
     img[inp] = col
-    global WSID, WU, WV, EDGE_PX
+    global WSID, WU, WV, EDGE_PX, WSPEC, WTRAN
     WSID, WU, WV = sidW, uW, vW           # green trace: what each water pixel sees
+    WSPEC, WTRAN = lspec, ltran
     if not _PRINTED:
         print("reflection of the coping occludes %.1f%% of the visible surface"
               % (100. * (occW > .5).mean()))
@@ -2672,6 +2734,42 @@ REG = _regions()
 colour_table(hero, REG)
 
 
+# --- SPEC C, ON THE PICTURE RATHER THAN ON THE FIELD -------------------------
+# The reachability diagnostic above says the glint DENSITY in the window beats
+# the calm water by three orders of magnitude, and the picture does not show it.
+# Those two are only in conflict if you assume the glints are what is bright
+# there, and this measures whether they are. Three corridors along the sun's
+# azimuth line off the eye -- the section C window, the broad road it rules out,
+# and the calm water off the line as a control -- each split into the REFLECTED
+# and TRANSMITTED halves of the same rays.
+_pex, _pey = hx[inp] - EYE[0], hy[inp] - EYE[1]
+_along = _pex * _shat[0] + _pey * _shat[1]
+_perp = np.abs(_pex * _shat[1] - _pey * _shat[0])
+_onl = _perp < 0.30
+_zones = [("spec C window   ", _onl & (hx[inp] > 6.86) & (hx[inp] < 7.96)),
+          ("broad road      ", _onl & (hx[inp] > 0.03) & (hx[inp] < 6.42)),
+          # the control sits 0.35-0.60 m off the line and no further: the frame
+          # is only +-0.68 m wide at the window's own distance, so a corridor a
+          # metre out is not in the picture at all.
+          ("off-line control", (_perp > 0.35) & (_perp < 0.60)
+           & (hx[inp] > 6.86) & (hx[inp] < 7.96))]
+print("spec C on the picture: reflected vs transmitted radiance, by corridor")
+for _nm, _m in _zones:
+    if _m.sum() < 500:
+        print("  %s  -- %d subsamples, not measured" % (_nm, _m.sum()))
+        continue
+    _sp, _tr = WSPEC[_m], WTRAN[_m]
+    print("  %s %7d rays: reflected median %6.3f p99.9 %7.3f | transmitted "
+          "median %6.3f p99.9 %7.3f | reflected wins on %4.1f%% of them"
+          % (_nm, _m.sum(), np.median(_sp), np.percentile(_sp, 99.9),
+             np.median(_tr), np.percentile(_tr, 99.9), 100 * (_sp > _tr).mean()))
+print("  -- section C asks for isolated bright points on otherwise smooth water, "
+      "which is a claim about the REFLECTED column. Where the transmitted "
+      "column's p99.9 is the larger of the two, the bed's caustics are what the "
+      "eye sees at the bright end and a glint-density contrast of any size "
+      "cannot read through them.")
+
+
 # --- WHAT THE FILTER DID TO THE PICTURE, in the picture's own units ----------
 # The slope numbers above say the field was narrowed. They do not say whether
 # the moire left and the ripple stayed, and that is a statement about the IMAGE,
@@ -2694,8 +2792,23 @@ def _band_rms(img, r0, r1, c0, c1):
     f = np.hypot(np.fft.fftfreq(p.shape[0])[:, None],
                  np.fft.rfftfreq(p.shape[1])[None, :])
     nrm = p.size * p.size * (w * w).mean()
-    return [np.sqrt(2. * P[(f >= 1. / hi) & (f < 1. / lo)].sum() / nrm)
-            for lo, hi in ((2., 4.), (12., 45.))], float(p.mean())
+    # THE FIREFLY COUNT, which turned out to be the number that actually moves.
+    # Band power alone does not separate "one blown pixel" from "a streak of the
+    # same total energy", and a streak is what glitter on rippled water is: the
+    # two have the SAME rms and look nothing alike. Isolated hot pixels are
+    # strict 8-neighbourhood maxima, so counting maxima per unit bright area
+    # separates them -- a speckle field is nearly all maxima, a set of coherent
+    # streaks has one maximum per streak. This is the specular-aliasing measure;
+    # the band powers stay because they are what says the RIPPLE survived.
+    mx = np.ones_like(p, bool)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dy or dx:
+                mx &= p > np.roll(np.roll(p, dy, 0), dx, 1)
+    hot = p > 200.
+    return ([np.sqrt(2. * P[(f >= 1. / hi) & (f < 1. / lo)].sum() / nrm)
+             for lo, hi in ((2., 4.), (12., 45.))], float(p.mean()),
+            float(hot.mean()), (mx & hot).sum() / max(hot.sum(), 1))
 
 
 _wpx = np.zeros(W * H, bool); _wpx[inp] = True
@@ -2726,13 +2839,15 @@ if _rok.size > 2 * _WIN:
             continue
         _cm = (_c0 + _c1) // 2
         _c0, _c1 = max(_cm - _WIN, _c0), min(_cm + _WIN, _c1)
-        (_pa, _pb), _mu = _band_rms(hero, _r0, _r1, _c0, _c1)
+        (_pa, _pb), _mu, _hf, _mr = _band_rms(hero, _r0, _r1, _c0, _c1)
         print("  %s window rows %4d-%4d cols %3d-%3d: %.2f-%.2f m away, "
               "pixel %.1f mm on the water | 2-4 px %6.3f | 12-45 px %6.3f | "
-              "mean luminance %.2f"
+              "mean luminance %.2f | %.1f%% over 200, of which %.3f are "
+              "isolated maxima"
               % (_nm, _r0, _r1, _c0, _c1, _PDIST[_r0:_r1, _c0:_c1].min(),
                  _PDIST[_r0:_r1, _c0:_c1].max(),
-                 1000 * np.median(_PFOOT[_r0:_r1, _c0:_c1]), _pa, _pb, _mu))
+                 1000 * np.median(_PFOOT[_r0:_r1, _c0:_c1]), _pa, _pb, _mu,
+                 100 * _hf, _mr))
 
 EDGE_DISP = EDGE_PX.copy()
 mono = encode(render('mono'))
