@@ -82,6 +82,134 @@ def _plane_rms(sl):
     coincidence that made the two conventions hard to tell apart by eye."""
     return np.sqrt(np.sum(np.asarray(sl) ** 2) / 2.0)
 
+
+# ------------------------------------------------- PER-BAND FOOTPRINT FILTERING
+# WHY A BAND HAS TO BE ATTENUATED, AND BY EXACTLY WHAT.
+#
+# A camera pixel does not sample the surface at a point, it integrates the
+# surface over its own footprint. Write that footprint's normalised weighting
+# function as w(r). Then what the pixel is entitled to see of a plane-wave
+# component of slope amplitude a and wavevector k is
+#
+#     INT w(r) a cos(k.(x+r) + phi) dr  =  a * W(k) * cos(k.x + phi),
+#     W(k) = INT w(r) exp(-i k.r) dr        (the footprint's transfer function)
+#
+# -- exact, and it assumes nothing about the field, only about the footprint. So
+# the per-band factor is the footprint kernel's own Fourier transform evaluated
+# at THAT BAND's k. Three consequences worth stating before the arithmetic:
+#
+# 1. IT MULTIPLIES AMPLITUDE, NOT VARIANCE, and that is a real distinction and
+#    not bookkeeping. Averaging is linear on the field, so it acts on the field;
+#    the resolved slope VARIANCE then falls as W^2 on its own. Multiplying the
+#    returned gradient by sqrt(W) instead -- "attenuate the variance by W" --
+#    would put W on the variance and sqrt(W) on the field, and those are two
+#    different surfaces. Downstream this matters because what a shader reads out
+#    of grad_points is a FIELD: it computes a normal from it, and a normal is a
+#    field quantity. The variance is a SECOND number and it has to be handed over
+#    separately, which is what `slope_var_points` below is for.
+# 2. THIS IS NOT A BLUR OF THE IMAGE. The image is a nonlinear function of the
+#    slope (Fresnel, a specular lobe, a refraction into the pool), so blurring
+#    the shaded result averages radiances, which destroys the specular statistics
+#    the whole model exists to produce. Narrowing the slope distribution first
+#    and shading the narrowed distribution is the chapter's "Distance and
+#    filtering" doctrine and it gives the correct answer for the same cost.
+# 3. WHAT IS REMOVED IS NOT DESTROYED, IT IS MOVED. See `slope_var_points`.
+#
+# WHICH w(r). Three candidates, and they do not agree:
+#     box of width fp    W = sinc(k fp/2)    zeros at fp = lambda, 2 lambda...,
+#                        negative lobes to -0.217, envelope falls only as 1/(k fp)
+#     tent               W = sinc^2(k fp/2)  positive, still has zeros, 1/k^2
+#     Gaussian, s.d. s   W = exp(-k^2 s^2/2) positive, monotone, no zeros
+# The box is the literal footprint of a box-filtered pixel and it is the wrong
+# choice here, for a reason that is the whole point of the exercise: a factor
+# that passes through zero and comes back NEGATIVE means a band fades out,
+# returns phase-inverted and fades again as the footprint grows with distance --
+# a slow beat against distance, which is a moire generator, which is the exact
+# defect being removed. Its 1/(k fp) envelope is also far too slow: at fp = 5x
+# the wavelength a box still passes 6% of the amplitude, oscillating.
+# The Gaussian is taken instead because (a) it is positive and monotone, so a
+# band fades once and stays faded; (b) it is the only kernel that is at once
+# separable and isotropic, which is all a SCALAR fp with no orientation is
+# entitled to assume -- the true footprint is an oriented parallelogram, and
+# pretending to know its axes from one number would be fake precision; (c) it
+# composes, footprint (*) reconstruction filter is another Gaussian with the
+# variances added, so nothing downstream has to re-derive it. That is the EWA
+# argument, and it is why texture filtering has used elliptical Gaussians for
+# forty years.
+#
+# THE SCALE, which is the part that has to be derived rather than assumed. The
+# README proposed exp(-(k fp)^2/2), i.e. this family with s = fp: a Gaussian
+# whose STANDARD DEVIATION is the whole footprint width, 2.67x wider than the
+# footprint it is standing in for. It does not merely remove the capillary band,
+# it takes the long bands with it -- at fp = 8 cm it leaves 4% of a 20 cm wave
+# that the grid is sampling 2.5 times per wavelength and resolving perfectly
+# well. Right family, undrived scale. Two anchors fix it:
+#   (a) SECOND MOMENT. A box of width fp has variance fp^2/12, so the matched
+#       Gaussian is s = fp/sqrt(12) = 0.2887 fp. This reproduces the averaging
+#       the pixel actually does -- and it is NOT an antialiasing filter: at the
+#       Nyquist wavenumber pi/fp it still passes 0.663 of the amplitude, 44% of
+#       the variance, straight into the fold. Reproducing a footprint and
+#       prefiltering for a footprint are different jobs, and only the second one
+#       is being asked for here.
+#   (b) NYQUIST. The sample spacing is fp, so the shortest representable wave is
+#       lambda = 2 fp. Pin the half-amplitude point there:
+#           exp(-(pi/fp)^2 s^2 / 2) = 1/2   ->   s = fp sqrt(2 ln 2)/pi
+#       = 0.3748 fp -- only 1.30x the second-moment match, the same deliberate
+#       mild over-blur that mip-mapping is and that Bruneton et al.'s
+#       N_min = 1.0 / N_max = 2.5 smoothstep is.
+# (b) is what is used, and it reduces the whole filter to one checkable sentence:
+#   A COMPONENT IS HALF GONE WHEN THE FOOTPRINT REACHES HALF ITS WAVELENGTH,
+#   and 94% gone (99.6% of its variance) when the footprint reaches its
+#   wavelength.
+#
+# WHAT fp IS, AND THE ONE WAY A CALLER CAN GET IT WRONG. fp is the footprint the
+# PIXEL integrates over, in metres. For render.py that is `FOOT * SS` -- the
+# output pixel, which render.py already computes under that name -- and NOT
+# `FOOT`, which is one subsample of an SSxSS grid. The difference is a factor SS
+# and it decides the answer: at 8 m from the eye the two are 8.6 mm and 25.8 mm
+# while the wind band is 28 mm, so the band is comfortably resolved by the
+# subsample grid and hopelessly aliased by the output grid, and only the second
+# reading removes it. The output pixel is also the conservative reading for a
+# second, independent reason: shading is a NONLINEAR function of slope, so a
+# slope field sitting merely at the subsample Nyquist still produces radiance
+# harmonics well above it. Band-limiting the slope to the sampling rate does not
+# band-limit what the shader makes of it, so the prefilter belongs at the rate
+# the final image is stored at.
+FP_SIGMA = np.sqrt(2.0 * np.log(2.0)) / np.pi        # 0.37478 -- derived above
+
+
+def _fp_var(fp):
+    """The Gaussian footprint's variance, (FP_SIGMA*fp)^2. `None` -> unfiltered.
+
+    Everything internal carries this rather than fp itself, because it is what
+    the exponent actually needs and because it is the quantity that ADDS when
+    filters compose. Scalar or per-point array; per-point is only meaningful for
+    the point-sampled path (`grad_points`), since the grid path is separable and
+    a per-texel footprint would break the separability the GEMM depends on."""
+    if fp is None:
+        return None
+    return (np.float32(FP_SIGMA) * np.asarray(fp, np.float32)) ** 2
+
+
+def band_weight(k, fp):
+    """Amplitude a component of wavenumber k keeps at footprint fp. W^2 is the
+    fraction of its slope VARIANCE that survives; 1 - W^2 is what moves out to
+    `slope_var_points`."""
+    v = _fp_var(fp)
+    k = np.asarray(k, np.float64)
+    return np.ones_like(k) if v is None else np.exp(-0.5 * k ** 2 * v)
+
+
+def half_footprint(k):
+    """The footprint at which a component of wavenumber k is half gone.
+
+    Falls out of the calibration above as exactly lambda/2, with no free
+    constant left in it: W = 1/2 needs k*s = sqrt(2 ln 2), and s = FP_SIGMA*fp
+    was chosen so that happens at k = pi/fp. The footprint at which half the
+    band's VARIANCE is gone is smaller by sqrt(2): lambda/(2 sqrt 2) = 0.354 lambda."""
+    return np.pi / np.asarray(k, float)
+
+
 # ---------------------------------------------------------------- the return jet
 # A pool return is a SUBMERGED ROUND TURBULENT JET, not a pulsing point. Its
 # surface footprint is then geometry, not an authored lobe:
@@ -198,7 +326,13 @@ def _plane(nc, lo, hi, rms, spread_deg, seed):
     th = (r.uniform(0, 2 * np.pi, nc) if spread_deg is None
           else r.normal(np.deg2rad(20.0), np.deg2rad(spread_deg), nc))
     om = _disp(k)[0]
-    return dict(kx=k * np.cos(th), ky=k * np.sin(th), amp=sl / k,
+    # k2 is carried so the footprint filter can be applied PER COMPONENT rather
+    # than per band. A band here spans two and a half octaves (WIND runs 17 to
+    # 70 mm), so one nominal k for the whole band would remove its long half
+    # together with its short half; per component, a band narrows as the
+    # footprint grows instead of switching off, which is what "narrow the
+    # distribution" means.
+    return dict(kx=k * np.cos(th), ky=k * np.sin(th), amp=sl / k, k2=k * k,
                 ph=r.uniform(0, 2 * np.pi, nc) - om * 3.7)
 
 
@@ -288,16 +422,17 @@ def _wake(X, Y):
     return out[0], out[1]
 
 
-def _cyl(X, Y):
+def _cyl(X, Y, fv=None):
     """Long waves radiated from the forcing region and its wall images. Long waves
     on a filmed surface are still bulk-damped, so the clean-water alpha applies."""
     gx = np.zeros(X.shape, np.float32); gy = np.zeros(X.shape, np.float32)
     for j, (k, w) in enumerate(_NEAR):
         om, cg, _ = _disp(k); al = _alpha(k)[0]
+        fw = 1.0 if fv is None else np.exp(-0.5 * k * k * fv)
         for xi, yi in _IMG:
             dx = X - np.float32(xi); dy = Y - np.float32(yi)
             r = np.sqrt(dx * dx + dy * dy) + np.float32(0.12)
-            a = w / np.sqrt(r) * np.exp(-al * r / cg)
+            a = w / np.sqrt(r) * np.exp(-al * r / cg) * fw
             c = (a * k * np.cos(k * r - om * 3.7 + _PH[j])).astype(np.float32)
             gx += c * dx / r; gy += c * dy / r
     return gx * _SC['near'], gy * _SC['near']

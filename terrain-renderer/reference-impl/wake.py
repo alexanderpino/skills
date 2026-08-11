@@ -214,6 +214,17 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.078, sig_max=0.25, norm_r=0.
     """Gabor reconstruction: every ray sample deposits a local plane wave over a
     window the size of its own ray tube. No hand-shaped envelope anywhere.
 
+    Returns `(gx, gy, kmap)`. `kmap` is the LOCAL wavenumber of the reconstructed
+    field, |k| averaged over the same Gabor windows that deposited the field, and
+    it exists so that field.py can footprint-filter this band the way it filters
+    the analytic ones. The other four bands are explicit sums of plane waves and
+    know their own k per component; this one arrives as a grid and would
+    otherwise have to be filtered at a single nominal k for the whole basin --
+    which would be wrong in exactly the place it matters, since the stationary
+    condition k = g/(U cos psi)^2 SHORTENS the wake as the drift decays, so its
+    wavelength runs from ~35 cm near the fitting to under 10 cm downstream. One
+    number for the band would over-filter the source and under-filter the tail.
+
     THE WINDOW MUST BE WIDER THAN THE WAVE IT CARRIES. A Gabor atom narrower than
     its own wavelength is not a local plane wave at all -- it is a wavelet whose
     own spectrum is centred near 1/sigma, and thousands of them at incoherent
@@ -238,6 +249,7 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.078, sig_max=0.25, norm_r=0.
     X, K, PH, A = trace(jet)
     dxg = (x1 - x0) / nx; dyg = (y1 - y0) / ny
     num_x = np.zeros((ny, nx)); num_y = np.zeros((ny, nx)); den = np.zeros((ny, nx))
+    num_k = np.zeros((ny, nx))
     W = np.gradient(X, axis=1); W = np.hypot(W[..., 0], W[..., 1])
     km = np.hypot(K[..., 0], K[..., 1]) + 1e-12
     lam = 2 * np.pi / km
@@ -272,11 +284,22 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.078, sig_max=0.25, norm_r=0.
             c = A[t, i] * np.cos(PH[t, i] + K[t, i, 0] * ddx + K[t, i, 1] * ddy) * w
             num_x[ys_, xs_] += c * K[t, i, 0]; num_y[ys_, xs_] += c * K[t, i, 1]
             den[ys_, xs_] += w
+            num_k[ys_, xs_] += w * km[t, i]
     # num/den is a Nadaraya-Watson estimate; where a single window barely reaches,
     # den is tiny and the division amplifies it into a hard-edged block. Regularise
     # with a floor of order one window's own weight, which fades thin coverage out
     # instead of magnifying it.
     gx, gy = num_x / (den + 0.35), num_y / (den + 0.35)
+    # kmap is a plain weighted mean, NOT regularised with the 0.35 floor: that
+    # floor is there to fade thin coverage out of the FIELD, and applying it to a
+    # wavenumber would pull k toward zero exactly where coverage is thin, i.e. it
+    # would report "very long waves" about water the wake barely reaches and so
+    # would protect that water from a filter it does not need protecting from.
+    # Where nothing was deposited the field is zero and k is irrelevant; fill
+    # those texels with the field's own mean k so the map has no holes.
+    kmap = num_k / np.maximum(den, 1e-9)
+    seen = den > 1e-6
+    kmap[~seen] = float(kmap[seen].mean()) if seen.any() else 1.0
     gxc = x0 + (np.arange(nx) + .5) * dxg
     gyc = y0 + (np.arange(ny) + .5) * ((y1 - y0) / ny)
     s_pk = 0.91                                   # forcing peak, from the jet geometry
@@ -284,4 +307,4 @@ def build(jet, x0, x1, y0, y1, nx, ny, rms_target=0.078, sig_max=0.25, norm_r=0.
     near = ((gxc[None, :] - cx) ** 2 + (gyc[:, None] - cy) ** 2) < norm_r ** 2
     rms = rms_slope(gx[near], gy[near])
     sc = rms_target / max(rms, 1e-9)
-    return gx * sc, gy * sc
+    return gx * sc, gy * sc, kmap
