@@ -20,7 +20,10 @@ from PIL import Image
 # --------------------------------------------------------------------------- config
 DEPTH = 1.40
 X0, X1, Y0, Y1 = 0.0, 8.0, 0.0, 4.0
-W, H = 2000, 1340          # rendered at 2x, averaged down: glints are rare events
+W, H = 2400, 3600          # rendered at SSx, averaged down: glints are rare
+SS = 3                     # events, and the waterline is a high-contrast edge
+                           # portrait: the frame runs from the coping at the
+                           # photographer's feet to the far coping, all water
 RAY_NX, RAY_NY = 8192, 4096          # 33.5 M forward rays per channel
 CAU_NX, CAU_NY = 2666, 1333          # 3 mm bed texels
 WNU, WNV = 1800, 340                 # wall caustic maps
@@ -38,6 +41,14 @@ SUN_COL = np.array([1.000, 0.892, 0.674]) * 8.6   # golden: AM 2.77, not a noon 
 SKY_TOP = np.array([0.26, 0.46, 0.98])
 SKY_HOR = np.array([0.86, 0.90, 0.98])
 SKY_AMB = np.array([0.26, 0.42, 0.66]) * 2.15   # clear sky is still a big blue source
+# ...but SKY_AMB is the sky the WATER sees: through the Snell window it is
+# zenith-weighted, and the zenith is the blue part. A horizontal stone surface
+# sees a cosine-weighted hemisphere instead, and at a 21 degree sun most of that
+# hemisphere's energy is in the aureole and the horizon band around the sun,
+# reddened by the same air mass 2.77 that makes SUN_COL golden. Feeding the
+# water's blue ambient to the stone is what made the deck come out neutral grey
+# in the previous frame: a warm albedo times a blue illuminant is grey.
+SKY_DECK = SKY_AMB * 0.30 + SUN_COL * 0.075
 SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
                          # it lifts the shadow without making caustics
 
@@ -52,13 +63,17 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 #     spec C's isolated glints can exist.  Look down at 60 deg and there is no
 #     sparkle anywhere, at any roughness.
 #   * the caustic net.  25-40 cells at 15-30 cm needs 4-8 m of water in frame.
-# 2.55 m over the east coping, 29 deg down, 22 deg lens: the frame runs from the
-# far coping (8.7 m, theta_v 16 deg) to 3.2 m out (theta_v 39 deg), so the glint
-# band lands on the jet's rough patch and the far half stays turquoise.
-EYE = np.array([8.30, 1.85, 2.55])    # east: the anti-solar side
+#   * the waterline has to be legible somewhere.  At the FAR coping it is four
+#     pixels of stone; the only place a pool edge can be read is the one under
+#     the photographer, so the bottom of the frame is put on it at 1.2 m.
+# Phone at chest height on the east deck, a metre back from the edge, 34 deg
+# down, portrait: bottom edge on the near coping (theta_v 57 deg), top edge on
+# the far coping (9.5 m, theta_v 11 deg), 7.4 m of water in between, and the
+# mirror direction for a 21 deg sun crossing it a fifth of the way down.
+EYE = np.array([9.40, 1.55, 1.85])    # east: the anti-solar side
 CAM_AZ = np.deg2rad(176.6)            # anti-solar to 0.4 deg: see above
-CAM_EL = np.deg2rad(-27.5)
-FOV = np.deg2rad(22.0)
+CAM_EL = np.deg2rad(-34.0)
+FOV = np.deg2rad(46.0)
 TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
                             np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
 SAIL = np.array([[-5.10, -0.90, 2.72], [-2.10, -0.50, 2.55],
@@ -331,17 +346,20 @@ def tiles(u, v):
     lev = np.where(g, .70, lev)
     alb = np.broadcast_to(LINER_TINT[None, None], lev.shape + (3,)).copy()
 
+    # The waterline course is 48 mm mosaic, but at 9 m and 11 degrees one tile is
+    # a pixel and a half, so it is carried as a smooth modulation rather than a
+    # hard grid: a two-level grid at that footprint is not detail, it is noise,
+    # and the wall image is prefiltered on a fixed grid with no footprint to
+    # filter against. Everything that survives the distance is smooth in u.
     wl = v > -0.155                                        # waterline course
-    gm = ((np.abs(((u / .048) % 1.) - .5) > .40) |
-          ((np.abs(((v / .048) % 1.) - .5) > .40)))
-    lev = np.where(wl, np.where(gm, .90, .62 + .10 * np.sin(u * 131.) * np.sin(v * 97.)),
-                   lev)
+    gm = .5 - .5 * np.cos(2 * np.pi * u / .048) * np.cos(2 * np.pi * v / .048)
+    lev = np.where(wl, .66 + .13 * gm + .04 * np.sin(u * 131.) * np.sin(v * 97.), lev)
     alb = np.where(wl[..., None],
-                   (LINER_TINT * np.array([.60, .90, 1.03]))[None, None], alb)
+                   (LINER_TINT * np.array([.62, .91, 1.03]))[None, None], alb)
 
-    cal = np.exp(-((v + .0070) / .0055) ** 2)              # calcium, at mean level
-    dirt = np.exp(-((v + .0235) / .0080) ** 2)             # surface film, just under
-    lev = lev * (1 + .60 * cal) * (1 - .40 * dirt)
+    cal = np.exp(-((v + .0095) / .0115) ** 2)              # calcium, at mean level
+    dirt = np.exp(-((v + .0330) / .0165) ** 2)             # surface film, just under
+    lev = lev * (1 + .34 * cal) * (1 - .22 * dirt)
     w = (.78 * cal)[..., None]
     alb = alb * (1 - w) + np.array([.95, .91, .84])[None, None] * w
     return np.clip(lev, .04, 1.7)[..., None] * alb
@@ -387,7 +405,7 @@ for wi in range(4):
     T = tiles(UU, VV)
     # the coping overhangs the wall by 20 mm, so the last few centimetres of wall
     # sit in its shade: the darkest thing in the pool is the line under the lip.
-    WAO = .78 * (1.0 - .58 * np.exp(VV / .028))
+    WAO = .78 * (1.0 - .32 * np.exp(VV / .055))
     wall_img['disp'].append(shade(wall[wi][:3], T, WAO))
     wall_img['mono'].append(shade([wall[wi][3]] * 3, T, WAO))
 
@@ -464,14 +482,38 @@ def edge_z(s):
     return np.where(s >= SBUL, ZD, ZCEN + np.sqrt(np.maximum(BULR * BULR - d * d, 0.)))
 
 
-def gh(x, y):
-    s = pool_s(x, y)
-    return np.where(s < SLIP, 0.0, edge_z(s))
-
-
 def _hash(a, b, k=0.):
     v = np.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453
     return v - np.floor(v)
+
+
+def _run(x, y):
+    """Position along the coping course, and which of the four sides it is on."""
+    gx, gy, e = pool_grad(x, y)
+    return np.where(e, y, x), np.where(e, np.where(gx > 0, 0., 1.),
+                                       np.where(gy > 0, 2., 3.)), gx, gy, e
+
+
+def lip_wobble(x, y):
+    """Coping stones are LAID, not extruded. Each sits a couple of millimetres
+    proud or shy of its neighbour and its arris is worn unevenly, so the line
+    where water meets stone is never straight. Amplitude 4 mm, which is a third
+    of a pixel at the far coping and four pixels at the near one -- and at the
+    near one a mathematically straight, stair-stepped waterline was the loudest
+    synthetic tell left in the frame. Physical, and it dithers the edge."""
+    a, sd, _, _, _ = _run(x, y)
+    k = np.floor((a + .19 * sd) / .55)
+    return (.0040 * (_hash(k, sd, 5.7) - .5) * 2.
+            + .0026 * (vnoise(a * 11., sd * 7.3 + .5) - .5) * 2.)
+
+
+def pool_se(x, y):
+    return pool_s(x, y) + lip_wobble(x, y)
+
+
+def gh(x, y):
+    s = pool_se(x, y)
+    return np.where(s < SLIP, 0.0, edge_z(s))
 
 
 def _groove(c, per, hw, dep):
@@ -497,9 +539,7 @@ def paving(x, y, s, vdir, fp):
     a groove rather than a line, and the splash-damp band every coping carries
     within a hand's width of the water -- darker, and glossy where the stone is
     matt. No garden, no props."""
-    gx, gy, ex = pool_grad(x, y)
-    along = np.where(ex, y, x)
-    side = np.where(ex, np.where(gx > 0, 0., 1.), np.where(gy > 0, 2., 3.))
+    along, side, gx, gy, ex = _run(x, y)
     cop = s < COPW
 
     # --- joints: coping runs across the course, the terrace is a 0.92 x 0.61 field
@@ -517,10 +557,16 @@ def paving(x, y, s, vdir, fp):
     n1, d1x, d1y = vnoise_d(x * 1.9, y * 1.9)
     n2, d2x, d2y = vnoise_d(x * 8.5 + 11., y * 8.5 + 3.)
     n3, d3x, d3y = vnoise_d(x * 33. + 5., y * 33. + 7.)
+    n4, d4x, d4y = vnoise_d(x * 128. + 19., y * 128. + 23.)
+    n5, d5x, d5y = vnoise_d(x * 430. + 2., y * 430. + 8.)
     w2 = 1. / (1. + (2.6 * fp * 8.5) ** 2)
     w3 = 1. / (1. + (2.6 * fp * 33.) ** 2)
-    dzx = dzx + .0055 * w2 * d2x * 8.5 + .0016 * w3 * d3x * 33.
-    dzy = dzy + .0055 * w2 * d2y * 8.5 + .0016 * w3 * d3y * 33.
+    w4 = 1. / (1. + (2.6 * fp * 128.) ** 2)
+    w5 = 1. / (1. + (2.6 * fp * 430.) ** 2)
+    dzx = (dzx + .0055 * w2 * d2x * 8.5 + .0016 * w3 * d3x * 33.
+           + .00040 * w4 * d4x * 128. + .00009 * w5 * d5x * 430.)
+    dzy = (dzy + .0055 * w2 * d2y * 8.5 + .0016 * w3 * d3y * 33.
+           + .00040 * w4 * d4y * 128. + .00009 * w5 * d5y * 430.)
 
     # --- the bullnose, as a normal in (s, z)
     d = np.clip(SBUL - s, 0., BULR)
@@ -535,7 +581,9 @@ def paving(x, y, s, vdir, fp):
     wet = np.clip(1. - (s - SLIP) / np.maximum(wr, .02), 0, 1) ** 1.4
     spot = (np.clip((vnoise(x * 5.5 + 3., y * 5.5 + 9.) - .60) / .18, 0, 1) *
             np.clip(1. - (s - SLIP) / .60, 0, 1))
+    wet = wet * (.62 + .76 * vnoise(x * 9.5 + 51., y * 9.5 + 13.))   # splash is patchy
     wet = np.where(cop, np.maximum(wet, .60 * spot), .35 * spot)
+    wet = np.minimum(wet * 1.35, 1.)
 
     # --- albedo
     ks = np.where(cop, np.floor((along + .19 * side) / .55), np.floor((x + .46 * (row % 2.)) / .92))
@@ -543,12 +591,13 @@ def paving(x, y, s, vdir, fp):
     t1, t2 = _hash(ks, kt, 3.1), _hash(ks, kt, 11.7)
     alb = np.where(cop[:, None], np.array([.660, .604, .502])[None],
                    np.array([.618, .558, .466])[None])
-    alb = alb * (1. + .30 * (t1 - .5))[:, None]
-    alb = alb * (1. + np.stack([.10 * (t2 - .5), .015 * (t2 - .5), -.11 * (t2 - .5)], 1))
-    alb = alb * (1. + .13 * (n1 - .5) + .11 * w2 * (n2 - .5) + .09 * w3 * (n3 - .5))[:, None]
+    alb = alb * (1. + .46 * (t1 - .5))[:, None]
+    alb = alb * (1. + np.stack([.20 * (t2 - .5), .03 * (t2 - .5), -.21 * (t2 - .5)], 1))
+    alb = alb * (1. + .13 * (n1 - .5) + .11 * w2 * (n2 - .5) + .09 * w3 * (n3 - .5)
+                 + .07 * w4 * (n4 - .5) + .05 * w5 * (n5 - .5))[:, None]
     alb = alb * (1. - .42 * jm)[:, None]
     alb = alb * (1. - .22 * jw * vnoise(x * 3.3 + 61., y * 3.3 + 41.))[:, None]
-    alb = alb * (1. - .36 * wet)[:, None]
+    alb = alb * (1. - .46 * wet)[:, None]
 
     # --- light
     L = SUN_DIR
@@ -557,7 +606,7 @@ def paving(x, y, s, vdir, fp):
     lift = SAIL_TAU * (1. - vis) * sail_glow(x, y)
     skyv = (.55 + .45 * Nz) * (1. - .40 * jm)
     col = alb * (SUN_COL[None] * (ndl * vis + SUN_DIR[2] * lift)[:, None] * .30
-                 + SKY_AMB[None] * (.88 * skyv)[:, None])
+                 + SKY_DECK[None] * skyv[:, None])
 
     Vx, Vy, Vz = -vdir[:, 0], -vdir[:, 1], -vdir[:, 2]
     Hx, Hy, Hz = L[0] + Vx, L[1] + Vy, L[2] + Vz
@@ -613,9 +662,10 @@ _ax, _ay = Ex + D[:, 0] * t_top, Ey + D[:, 1] * t_top
 _bx, _by = Ex + D[:, 0] * t_wat, Ey + D[:, 1] * t_wat
 _sa, _sb = pool_s(_ax, _ay), pool_s(_bx, _by)
 # pool_s is convex, so on the segment it never exceeds its endpoints: both ends
-# inside the lip proves the whole 75 mm of ray is over open water.
-is_wat = down & (np.maximum(_sa, _sb) < SLIP)
-is_pav = down & (_sa >= SBUL)             # already on the flat at the top plane
+# inside the lip proves the whole 75 mm of ray is over open water. 8 mm of slack
+# covers the laid-stone wobble, which is not convex.
+is_wat = down & (np.maximum(_sa, _sb) < SLIP - .008)
+is_pav = down & (_sa >= SBUL + .008)       # already on the flat at the top plane
 _mar = np.flatnonzero(down & ~is_wat & ~is_pav)
 t_hit = np.where(is_wat, t_wat, np.where(is_pav, t_top, BIG))
 print("edge march: %d of %d rays (%.2f%%) straddle the coping"
@@ -639,7 +689,7 @@ if _mar.size:
     t_hit[_mar] = _hi
 
 hx, hy = Ex + D[:, 0] * t_hit, Ey + D[:, 1] * t_hit
-S_HIT = pool_s(hx, hy)
+S_HIT = pool_se(hx, hy)
 inp = down & (S_HIT < SLIP + 1e-7)
 pav = down & ~inp
 bgm = ~hit_sail & ~inp & ~pav             # nothing: the frame is water and stone
@@ -668,12 +718,12 @@ fres = F0[None] + (1 - F0[None]) * ((1 - ndv) ** 5)[:, None]
 #  2  the ambient.  Under the overhang the water sees a fraction of the sky.
 #  3  the meniscus.  Water wets the wall and climbs it; the curved sliver is
 #     brighter than the flat surface next to it.
-IN_W = -pool_s(ix, iy)                      # distance in from the wall face
+IN_W = -S_HIT[inp]                          # distance in from the wall face
 _egx, _egy, _ = pool_grad(ix, iy)
 _toward = rfx * _egx + rfy * _egy           # + = the reflected ray heads at the wall
 _over = rfz * np.maximum(IN_W + SLIP, 0.) / np.maximum(_toward, 1e-6)
 _occ = np.where(_toward > 0, np.clip(1. - _over / ZD, 0, 1), 0.) ** .8
-COP_REFL = np.array([.62, .57, .48]) * (SKY_AMB * .42 + SUN_COL * .020)
+COP_REFL = np.array([.62, .57, .48]) * (SKY_AMB * .52 + SUN_COL * .034)
 refl = refl * (1 - _occ)[:, None] + COP_REFL[None] * _occ[:, None]
 LIP_AO = 1. - .34 * np.exp(-(IN_W + SLIP) / .045)
 MENIS = np.exp(-np.maximum(IN_W + SLIP, 0.) / .010)
@@ -714,7 +764,7 @@ def render(mode):
 
 
 def encode(hdr):
-    hdr = hdr.reshape(H // 2, 2, W // 2, 2, 3).mean((1, 3))
+    hdr = hdr.reshape(H // SS, SS, W // SS, SS, 3).mean((1, 3))
     x = hdr * EXPOSURE
     a, b, c, d, e = 2.51, .03, 2.43, .59, .14
     x = np.clip((x * (a * x + b)) / (x * (c * x + d) + e), 0, 1)
@@ -723,7 +773,10 @@ def encode(hdr):
     lum = (x * np.array([.2126, .7152, .0722])).sum(-1, keepdims=True)
     x = np.clip(lum + (x - lum) * 1.06, 0, 1)              # saturation, display-side
     #  1.06, not 1.22: with a blue liner the saturation is physical, not graded
-    x = np.clip((x - .5) * 1.10 + .5 + .012, 0, 1)          # gentle S, display-side
+    #  and the S below is 1.045, not 1.10: spec B's most-missed property is that
+    #  the caustic cell INTERIORS stay turquoise instead of dropping to navy, and
+    #  a display-side contrast boost is exactly what pushes them there.
+    x = np.clip((x - .5) * 1.045 + .5 + .020, 0, 1)         # gentle S, display-side
     return (x * 255 + .5).astype(np.uint8)
 
 
