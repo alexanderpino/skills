@@ -121,6 +121,46 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
 - Everything else on the surface is smooth: at this sun elevation and this camera
   height the specular path is otherwise unreachable.
 
+> **A load-bearing assumption, made explicit mid-run.** This criterion only has
+> anything to find if the return fitting is **unusually shallow**. The submerged
+> jet spreads as `r½ = 0.094·s`, so its surface footprint and the slope it forces
+> there depend sharply on how deep the fitting sits:
+>
+> | fitting depth | boil peaks at | forced rms slope there |
+> |---|---|---|
+> | 15 cm | 0.92 m | 0.093 |
+> | **17.5 cm** | 1.07 m | **0.058 — equal to the calm water** |
+> | 20 cm | 1.23 m | 0.039 |
+> | 30 cm (typical) | 1.84 m | 0.012 |
+>
+> Real returns sit **20–45 cm** below the waterline. Past about 17.5 cm the boil
+> is no rougher than the water around it, and there is then nothing for section C
+> to find **at any camera position**. So either the reference pool's fitting is
+> shallower than typical, or the roughness the observer saw has another source.
+> The scene assumes the former, because the observer reported the effect directly.
+> Recording it here so the assumption is visible rather than buried in a constant.
+
+> **Arbitration, wave 4 — the fitting moves, the camera does not.** The optics and
+> surface lanes independently proved this criterion unreachable as the scene
+> stood: the required eye lies **over the water** for every plausible standing
+> height, on both the steep and grazing branches, because all specular structure
+> lies on one line in plan — the sun's bearing through the eye — and the fitting
+> sat at the far end of the pool from the deck the frame is shot from.
+>
+> The fitting's position was a guess; the criterion came from a photograph a
+> person took while standing at the poolside, so a reachable geometry demonstrably
+> exists. Moving the guess to fit the evidence is not bending the scene to pass
+> the test — leaving it would keep a layout that contradicts the reference.
+>
+> **Ruled:** a single return in the **east end wall at y ≈ 2.0, ≤ 17.5 cm deep**.
+> Ordinary plumbing for a pool with the skimmer at the far end, and it satisfies
+> section C from the camera that is already there — the required eye computes to
+> (9.32, 1.85) against an existing `EYE` of (9.40, 1.95, 1.85). A chest-height
+> phone wants (8.72, 1.89), also dry stone. Two returns at the wall's quarter
+> points would each miss the glint line by ~0.7 m, which a **0.85 m sidestep along
+> the same deck** fixes. That is the whole difference the move buys: the remaining
+> freedom becomes a sidestep on stone instead of a five-metre swim.
+
 ## D · The jet, from the close-up photograph
 
 - **Curved crest trains** whose apparent origin is *out in the water*, roughly a
