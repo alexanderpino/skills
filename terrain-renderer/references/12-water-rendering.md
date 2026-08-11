@@ -756,42 +756,42 @@ exposes immediately. Pool water is organised by the plumbing and the walls.
 - **The source is the filtration return; the walls send it all back.** The inlet jets inject a
   narrow band of gravity waves — order 10–30 cm — continuously from a fixed point whenever the pump
   runs, with swimmer transients on top; wind over metres of fetch is the smallest contributor. A
-  tiled wall is a near-total reflector at these wavelengths (argued from the physics; no reflection
-  coefficient was measured), so the result is a **reverberant basin response**: the field is **not
-  statistically homogeneous**, the pattern is **stationary in the basin frame** — the same
-  structure sits in the same place every day — and a train can be traced from the inlet to the far
-  wall and back.
+  tiled wall is a near-total reflector at these wavelengths — argued from the physics, with no
+  reflection coefficient measured (`?`) — so the result is a **reverberant basin response**: the
+  field is **not statistically homogeneous**, the pattern is **stationary in the basin frame** (the
+  same structure sits in the same place every day), and a train can be traced from the inlet to the
+  far wall and back.
 - **Damping sorts the field into two bands, and forcing sorts it the same way.** Deep-water viscous
   decay `α = 2νk²` (Lamb) against the group speed gives an e-folding distance `c_g/α` of ~90 m at
   16.5 cm — eleven lengths of an 8 m pool — but only ~2.1 m at 3 cm, which dies before the far wall.
   A surface film (sunscreen, body oils) shortens the short end by roughly 3–9× again — the
-  inextensible-film limit, `α ≈ 0.35·k·√(νω)` against the clean-surface `2νk²`, with a prefactor
-  that is unconfirmed (`P/?`), so treat the factor as indicative — and leaves the long end alone,
-  because long waves stretch the film and see a clean surface. Wind meanwhile cannot force long
-  waves at metre-scale fetch, so forcing limit and damping limit land in the same place: a pool
-  surface is **two superposed fields, not one spectrum**.
+  inextensible-film limit `α ≈ 0.35·k·√(νω)` against the clean-surface `2νk²`, prefactor unconfirmed
+  (`P/?`), so the factor is indicative — and leaves the long end alone, because long waves stretch
+  the film and see a clean surface. Wind cannot force long waves at metre-scale fetch either, so
+  forcing limit and damping limit land in the same place: a pool surface is **two superposed fields,
+  not one spectrum**.
 
 | | Long band (≳10 cm) | Short band (≲5 cm) |
 |---|---|---|
 | Source | Return jets, swimmers — a fixed point | Wind, over the whole surface |
 | Structure | Coherent, reverberant, basin-modal, stationary in the basin frame | Incoherent, statistically homogeneous |
 | Reach | Rings around the basin many times | Dies in ~2 m; never reflects |
-| Carries | The visible undulation, the trackable motion | Most of the slope: sparkle, fine caustic texture |
+| Carries | The visible undulation, the trackable motion, and — once the film has eaten the short end — most of the slope | Sparkle and fine bed texture, on under a tenth of the slope variance |
 | Local shelter | **Unaffected** — passes straight through a lee | **Strongly modulated** — this is what a lee removes |
 
 Shading sees slope, and a single wave's slope is `2πa/λ`, so equal slope costs amplitude
 proportional to wavelength: a 1.5 mm ripple at 5 cm out-slopes a 3 mm jet wave at 16.5 cm, ≈0.19
-against ≈0.11. Those two are **single-wave** slopes at one illustrative amplitude, and they are not
-the **band rms slope** the focusing number takes — substituting one for the other is the standard
-way to publish an `F` nobody can reproduce. So never budget the two bands by wave height, and never
-let the short band own the bed pattern. Measured over the reference implementation's far field, away
-from the jet (`reference-impl/field.py`): short band `s ≈ 0.016` at a dominant `λ ≈ 3 cm`
-(`k ≈ 210 m⁻¹`), long band `s ≈ 0.05` at `λ ≈ 18 cm` (`k ≈ 35 m⁻¹`). Over the reference pool's
-1.40 m floor the focusing number `F = 0.25·d·s·k` ([The focusing
-number](#the-focusing-number-which-regime-the-bed-is-in)) puts the short band at `F ≈ 1.2` — at
-focus, but onto a 3 cm cell, and holding under a tenth of the slope variance, so it stipples the bed
-rather than organising it — and the long band at `F ≈ 0.6`, the fold onset, which is where the soft
-low-contrast net lives, at cells of its own wavelength.
+against ≈0.11. **Never budget the two bands by wave height.** Those two figures are *single-wave*
+slopes at one illustrative amplitude, though, not the *band rms slope* the focusing number takes;
+substituting one for the other is how an `F` nobody can reproduce gets published. The band figures,
+measured on the reference implementation's far field away from the jet (`reference-impl/field.py`),
+are `s ≈ 0.016` at `λ ≈ 3 cm` (`k ≈ 210 m⁻¹`) short and `s ≈ 0.05` at `λ ≈ 18 cm` (`k ≈ 35 m⁻¹`)
+long, so over the reference pool's 1.40 m floor `F = 0.25·d·s·k` ([The focusing
+number](#the-focusing-number-which-regime-the-bed-is-in)) puts them at `F ≈ 1.2` and `F ≈ 0.6`. Which
+is why the short band must not own the bed pattern: it is *at* focus, but onto a 3 cm cell, and it
+holds under a tenth of the slope variance — it stipples the bed, while the long band sits at the fold
+onset where the soft, low-contrast net lives.
+
 - **Shelter modulates the short band only.** In the wind shadow of a sail or a hedge the surface
   goes glassy *but keeps undulating*: the lee kills the wind band while the jet waves cross it
   untouched. Multiply a lee mask into the whole field and long waves stop dead at the shadow line,
@@ -807,8 +807,7 @@ float  shelter = SampleShelter(uv);          // painted/baked lee mask; 1 = expo
 float2 sLong   = nLong.xy  / max(nLong.z,  1e-4);
 float2 sShort  = nShort.xy / max(nShort.z, 1e-4);
 
-// The jet wake stands still in the basin frame, so it is a bake: one fetch in the fitting's own
-// frame. .xy = slope, .z = the forcing envelope that also drives near-field roughness.
+// The wake is a bake, one fetch in the fitting's frame. .xy = slope, .z = the forcing envelope.
 float3 wake    = WakeAtlas.SampleLevel(smp, WakeUV(worldPos, fitting), 0).xyz;
 float3 N       = normalize(float3(-(sLong + shelter * sShort + wake.xy), 1));
 
@@ -821,37 +820,36 @@ float mssShort = shelter * shelter * mssShortBase + wake.z * wake.z * mssJetBase
   linearly and decays as `1/s`, and cannot force the surface until it has spread far enough to reach
   it, so the disturbed patch is elongated along the aim and **starts downstream of the fitting
   rather than at it** — ~0.9 m downstream for a 20 mm restricted eyeball at ~13 m³/h set 15 cm deep,
-  half-length ~0.7 m, local rms slope roughly **twice** the far field (a ratio, not an absolute: the
-  surface-deformation scaling `η ~ C·u'²/g` carries an O(1) constant that is genuinely unknown,
-  `?`). Its wake is a **narrow downstream band, not rings and not a Kelvin wedge**: the drift it
-  drives, of order 1 m/s (0.8 bar through that eyeball is an 11.6 m/s jet), is strongly
-  supercritical against water's minimum phase speed of 0.231 m/s
-  ([Calm water](#calm-water-the-low-energy-regime)), so nothing propagates upstream — a ring system
-  needs a source at rest in still water — and because energy travels with the current
-  (`c_g ≤ U/2`) the fan is only **±19°** about the axis. The ship case, source moving through still
-  water, is the mirror image and its wedge does not transfer. Three checks a reference photograph
-  gives free: the pattern is **steady** in the pool frame (one that animates outward is a wrong
-  model), its crest arcs are centred a metre or so **out in the water** because the forcing region
-  is a stretch of the axis rather than the outlet, and what it launches fades out around **3 m in an
-  8 m pool**. Forcing scales as `(U0·d)²`, so what you calibrate against an observed roughness
-  contrast is the **flow rate through the fitting**, not a shape exponent — and none of it runs in
-  the frame, it sizes the bake below.
+  half-length ~0.7 m, local rms slope roughly **twice** the far field. That is a ratio and not an
+  absolute: the surface-deformation scaling `η ~ C·u'²/g` carries an unknown O(1) constant (`?`).
+  Its wake is a **narrow downstream band, not rings and not a Kelvin wedge**: the drift it drives,
+  of order 1 m/s (0.8 bar through that eyeball is an 11.6 m/s jet), is strongly supercritical
+  against water's minimum phase speed of 0.231 m/s ([Calm
+  water](#calm-water-the-low-energy-regime)), so nothing propagates upstream — a ring system needs a
+  source at rest in still water — and because energy travels with the current (`c_g ≤ U/2`) the fan
+  is only **±19°** about the axis. The ship case, source moving through still water, is the mirror
+  image and its wedge does not transfer. Three checks a reference photograph gives free: the pattern
+  is **steady** in the pool frame (one that animates outward is a wrong model), its crest arcs are
+  centred a metre or so **out in the water** because the forcing region is a stretch of the axis
+  rather than the outlet, and what it launches fades out around **3 m in an 8 m pool**. Forcing
+  scales as `(U0·d)²`, so what you calibrate against an observed roughness contrast is the **flow
+  rate through the fitting**, not a shape exponent.
 - **What ships at frame rate.** Every band maps onto an evaluator this chapter already has, so
-  nothing new runs in the frame. The **diffuse tail** is random-phase and isotropic — an FFT
-  cascade with a flat directional spread, or a short Gerstner sum with scattered directions. The
-  **early wall reflections** are the direct train plus its first-order mirror images across the
-  walls (`1/√r` spreading, damping as above) — a handful of extra trains in the same sum; pushing
-  the image count up instead buys a coherent lattice no basin shows and costs more. The **wind
-  band** is the existing short-wave detail set. The **jet wake**, being stationary, is a bake: solve
-  it once offline per fitting, store slope and forcing envelope in a small texture in the fitting's
-  frame, and sample it — one fetch, no solver in the pass, and it rotates and tiles with the
-  fitting. The **lee** is a painted or baked mask. A **height-field** sim patch with reflecting walls
-  and a driven source cell buys swimmer transients at the usual patch cost ([Interactive simulation
+  nothing new runs in the frame. The **diffuse tail** is random-phase and isotropic — an FFT cascade
+  with a flat directional spread, or a short Gerstner sum with scattered directions. The **early
+  wall reflections** are the direct train plus its first-order mirror images across the walls
+  (`1/√r` spreading, damping as above) — a handful of extra trains in the same sum; pushing the
+  image count up instead buys a coherent lattice no basin shows and costs more. The **wind band** is
+  the existing short-wave detail set. The **jet wake**, being stationary, is a bake: solve it once
+  offline per fitting, store slope and forcing envelope in a small texture in the fitting's frame,
+  and sample it — one fetch, no solver in the pass, and it rotates and tiles with the fitting. The
+  **lee** is a painted or baked mask. A **height-field** sim patch with reflecting walls and a
+  driven source cell buys swimmer transients at the usual patch cost ([Interactive simulation
   patches](#interactive-simulation-patches)); the steady field does not need it. The bed pattern
-  then goes through the same caustics ladder as any other body ([The tier
-  ladder](#the-tier-ladder)) — the driven basin changes which band feeds it, not the technique. And
-  the tail's near-isotropy is a review test in its own right: a wind sea writes streaky,
-  direction-aligned caustics; a reverberant tail writes isotropic cells.
+  then goes through the same caustics ladder as any other body ([The tier ladder](#the-tier-ladder))
+  — the driven basin changes which band feeds it, not the technique. And the tail's near-isotropy is
+  a review test in its own right: a wind sea writes streaky, direction-aligned caustics; a
+  reverberant tail writes isotropic cells.
 
 ### Pool optics: the colour is the bottom, not the water
 
@@ -1233,7 +1231,8 @@ Two consequences fall straight out, and both are load-bearing:
 Whether a body shows a crisp caustic net, a soft wash, or nothing much is not a matter of taste,
 and it has a one-line estimate. A surface slope `s` turns the refracted ray by `s·(1 − 1/n)`, so at
 depth `d` the receiver point moves by `d·s·(1 − 1/n)`; focusing happens when that displacement's
-*gradient* reaches unity. With `k` the dominant wavenumber and `s` the rms slope:
+*gradient* reaches unity. With `k` the dominant wavenumber and `s` the **band rms slope** — never a
+single wave's `2πa/λ`, which is larger and lands you a rung or two up the ladder:
 
 ```
 F = d * (1 - 1/n) * s * k        # water: 1 - 1/1.333 = 0.25, so F ~= 0.25 * d * s * k
@@ -1244,11 +1243,9 @@ F = d * (1 - 1/n) * s * k        # water: 1 - 1/1.333 = 0.25, so F ~= 0.25 * d *
 ```
 
 (Near-normal sun; at low sun an obliquity factor enters and the pattern stretches along the sun
-azimuth.) The onset rung is not interpolation between the other two: on a narrow-band isotropic
-field the bed area lying behind a fold runs 0% at `F ≈ 0.3`, 0.4% at `F ≈ 0.5`, 7% at `F ≈ 0.8` and
-19% at `F ≈ 1.1` (computed here from the Jacobian, `D`), so the network arrives abruptly just below
-focus and only hardens through it. That onset is the regime a photographed pool sits in — a net that
-is legible but not blown to white. Three practical readings:
+azimuth.) The onset rung is measured from the Jacobian, not interpolated: the folded fraction of bed
+area runs 0.0% at `F ≈ 0.3`, 0.4% at 0.5, 7% at 0.8 and 19% at 1.1 (`D`) — the net arrives abruptly
+below focus, and that onset, not focus, is where a photographed pool sits. Three practical readings:
 
 - **Cell size on the receiver is of the order of the dominant wavelength**, so measuring caustic
   cells against a photograph is a direct readout of the wave field that produced them — a cheap
@@ -2273,8 +2270,7 @@ above except the TotK physics talk is community reconstruction or press/footage 
   (`H = σ(k) + k·U`, Hamilton's equations, wave-action conservation — standard geometrical wave
   optics in a moving medium, Whitham; attribution from model knowledge, not re-verified) through the
   jet's decaying drift field — reproducible from those equations plus a drift field, not a measured
-  angle. That solve is an authoring-time step: because the pattern is stationary in the basin frame
-  it is baked to a texture, so nothing of this machinery runs in a frame.
+  angle.
 - **P/?** — Inextensible-film damping `α ≈ 0.35·k·√(νω)`. The *structure* follows from the Stokes
   layer an unstretchable surface forces beneath it and is not in doubt; the numerical prefactor is
   the classical Lamb/Levich result from model knowledge and **could not be confirmed against a
