@@ -16,6 +16,52 @@ or falsified here.
 Sun position is the measured one for the reference photograph (Aljezur, 37.319N
 8.803W, 2026-08-10 18:41 WEST): elevation 21.0 deg, azimuth 273.75 deg.
 
+## Validating it — `validate.py`
+
+    python3 validate.py          # runs everything, exits non-zero on any FAIL
+    python3 validate.py -v       # also prints every tolerance's justification
+
+`render.py` prints ~90 diagnostics per run and almost all of them check the
+implementation against itself. `validate.py` checks it against things that were
+not written here, in three tiers, in about 16 seconds — no render, no PNG.
+
+| Tier | Strength of evidence | Covers |
+|---|---|---|
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p), Snell and the critical angles, TIR, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux and the riser gather's closure |
+| 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min |
+| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian |
+
+The highest-value single test is the **sinusoid caustic**: for `h = a sin(kx)`
+under a vertical sun the whole pass is a 1-D map with an exact Jacobian, so the
+caustic pass — the least checkable thing in the renderer — gets a right answer to
+compare against. It matches to **0.086%** pointwise below focus and locates folds
+to **0.38 mm**. It also pins `F = 0.25·d·s·k`: the 0.25 is `1 − 1/n`, and fold
+onset for one sinusoid is `0.25/((1−1/n)√2) = 0.7048`.
+
+**It does not render a pixel.** The camera pass, the shadow map, the coping march,
+the material tables, the tone map and the individual band levels are all outside
+it; the file ends with a section naming every gap, and that list is as much the
+deliverable as the tests are.
+
+**Reading a failure.** Every row prints expected, measured and tolerance, and every
+tolerance is justified in a comment beside it — chosen from the *estimator's* own
+error (binning, Monte-Carlo variance, float32 accumulation) or from a published
+uncertainty, never from the measured disagreement. So a FAIL means the number is
+outside what the measurement itself can explain, and the next question is *which
+of the two sides is wrong*, never *can the tolerance move*. Rows marked INFO carry
+no assertion and never affect the exit code.
+
+**It loads `render.py` by slicing.** `render.py` has no `__main__` guard, so
+importing it would run the full render. `load_render()` parses the source and
+executes only the nodes that define things. The guard against that silently losing
+something is the `REQUIRED` list: the loader raises if any name the suite tests is
+missing, so a restructured `render.py` produces a loud error rather than a quietly
+absent test.
+
+**It is failing on purpose.** The suite currently exits 1 on ten rows. Each is a
+finding recorded rather than patched — see the failure block it prints, which
+carries the numbers.
+
 ## Known defect — stone gets no direct sun on two sides
 
 `sun_vis` applies `coping_vis` to stone. `coping_vis` is a **water-surface** term —
