@@ -237,16 +237,59 @@ def half_footprint(k):
 # y through x ~ 7, which is where a boil from this wall lands. The camera does not
 # move; the fitting does.
 #
+# AND THEN IT TURNED, for a reason that has nothing to do with the boil (wave-6
+# arbitration). Aimed due west the jet axis sat 3.4 deg off CAM_AZ (176.6 deg),
+# so the wake -- the one long, ordered, repeating structure in the frame --
+# projected as a near-vertical stripe up the centre column and read as a seam
+# rather than as water. Obliquity in PLAN is what turns a periodic train into a
+# pattern crossing the frame, and 3.4 deg is not obliquity.
+#
+# The turn is not free, because the boil has to stay in the specular window, and
+# that is what fixes the two numbers below. `jet_envelope` peaks a fixed 0.912 m
+# downstream of the fitting IN PLAN -- solved off the envelope itself, not
+# assumed, and it is az-independent because the jet is round; `_report_jet`
+# prints the same peak as 0.92 m because that figure is the coordinate along the
+# TILTED axis and this one is its plan projection. So a fitting constrained to
+# the east wall x = X1 has exactly one degree of freedom left once the aim is
+# chosen: turn the aim and the fitting slides along the wall to keep the boil
+# where it was. Requiring the boil to land ON the sun's azimuth line through the
+# eye -- y = 1.95 - 0.06554*(x - 9.40), which is where every specular feature in
+# this scene lives -- closes the system:
+#
+#     aim 188.5 deg  ->  fitting (8.00, 2.236)  ->  boil (7.099, 2.101)
+#
+# written below as 2.24, a rounded centimetre, which leaves the boil 4.6 mm off
+# the line -- three per cent of the boil's own half-width across the axis and two
+# orders under the 1.1 m of water the glint window spans, so the rounding is free.
+#
+# 11.9 deg off CAM_AZ instead of 3.4, at the cost of moving the fitting 0.24 m
+# off the pool's centre line. The boil does not move west at all (7.10 both ways)
+# and moves 0.10 m north, ONTO the line it was 0.10 m short of before: aimed due
+# west the boil landed at (7.10, 2.00) while the line passes through (7.10,
+# 2.10), so section C is slightly BETTER for the turn, not paid for by it.
+# render.py's own diagnostic is the check -- required facet slope 0.157 at the
+# boil against 0.132 for 10x contrast and 0.160 for 100x, so 73x, mid-window --
+# and it is measured there rather than asserted here.
+#
+# The due-west aim also put the jet axis exactly on y = 2.00, the pool's mirror
+# line, so the ray fan was exactly symmetric about it and every pair of rays at
+# +-psi deposited at mirrored points. That is a degenerate case, not a generic
+# one: it builds a standing pattern across the axis, which is the periodic
+# column the arbitration was called over. Breaking the symmetry is a side effect
+# of the turn rather than its purpose, but it is a real one, and it is visible in
+# the reconstructed field's own wavelength (21.5 -> 17.5 cm, printed below).
+#
 # The DEPTH is the load-bearing number, not the position. r_half = 0.094*s, so the
 # jet only reaches the surface once it has spread by the fitting depth, and the
 # slope it forces there falls off a cliff with depth: 0.093 at 15 cm, 0.058 at
 # 17.5 cm (= the calm water, i.e. nothing left to find), 0.012 at a typical 30 cm.
 # 15 cm is kept -- shallow for a real return, and photo-spec section C records
 # that assumption as the price of the criterion rather than burying it here.
-JET_XY = (8.00, 2.00)         # east end wall, on the pool's own centre line
+JET_XY = (8.00, 2.24)         # east end wall, 0.24 m north of the centre line
 JET_H = 0.15                  # fitting depth below the waterline (m)
 JET_TILT = np.deg2rad(6.0)    # aimed slightly up, as returns usually are
-JET_AZ = np.deg2rad(180.0)    # due west, along the pool's length
+JET_AZ = np.deg2rad(188.5)    # west and 8.5 deg south: the pair above, solved
+                              # together so the boil lands on the specular line
 D_NOZZLE, DP_BAR, CD = 0.020, 0.80, 0.92   # 20 mm eyeball, return pressure in bar
 U0 = CD * np.sqrt(2 * DP_BAR * 1e5 / 1000.0)   # Bernoulli: 0.8 bar -> 11.6 m/s
 SIGMA_W = 0.0728                                # surface tension, N/m
@@ -320,7 +363,11 @@ def jet_envelope(X, Y):
 
 
 def _report_jet():
-    sax = np.linspace(0.05, 7.5, 400)
+    # 2 mm of axial resolution, not 19: the fitting's position is SOLVED against
+    # this peak (see JET_XY), so a diagnostic that quantised it to a couple of
+    # centimetres would print a boil 1 cm from the one the geometry was built on
+    # and invite the next reader to reconcile a difference that is only the grid.
+    sax = np.linspace(0.05, 7.5, 4000)
     xs = (JET_XY[0] + sax * _AIM[0]).astype(np.float32)
     ys = (JET_XY[1] + sax * _AIM[1]).astype(np.float32)
     e = jet_envelope(xs, ys)
@@ -454,11 +501,17 @@ def _wake_field():
     and `vxx/vyy/vxy`, the local mean-square slope tensor. The other four bands
     are explicit plane-wave sets, so both quantities are exact for them; this one
     is a reconstructed grid and has to measure them. The mean square is a box
-    mean over 21 texels = 21 cm, which is one wavelength of the reconstructed
-    field (19.3 cm, measured below) -- and one full period is exactly what a mean
-    square of a sinusoid needs, since that is where <cos^2> integrates to 1/2. A
-    window shorter than a wavelength would report the crest pattern itself as
-    variance instead of averaging over it."""
+    mean over 21 texels = 21 cm, which is at least one wavelength of the
+    reconstructed field (17.5 cm, measured below, so 1.2 of them) -- and one full
+    period is the FLOOR a mean square of a sinusoid needs, since that is where
+    <cos^2> integrates to 1/2. A window shorter than a wavelength would report
+    the crest pattern itself as variance instead of averaging over it; a window
+    somewhat longer only smooths the answer, which is why the box was left at 21
+    when the wake's own wavelength moved 19.3 -> 17.5 cm with the fitting's turn.
+    That slack is not free at the third decimal: `slope_var_points` multiplies
+    this box mean by the pointwise (1 - W^2), so a box wider than the structure
+    it averages puts the WAKE band's own removed-variance check about 1% out (see
+    the ledger note in `_report_footprint`)."""
     if not _WK_CACHE:
         jet = _wk.Jet(JET_XY[0], JET_XY[1], depth=JET_H,
                       tilt_deg=np.degrees(JET_TILT), az_deg=np.degrees(JET_AZ),
@@ -469,9 +522,9 @@ def _wake_field():
         _WK_CACHE['gy'] = gy.astype(np.float32)
         # THE CARRIER IS NOT THE SCALE THAT ALIASES, and the gap is a factor of
         # three. wake.build returns the |k| of the RAYS that deposited each
-        # texel -- 52 cm, slope-weighted, which is what the stationary condition
+        # texel -- 53 cm, slope-weighted, which is what the stationary condition
         # says the wave is. The field they reconstruct carries its slope energy
-        # at 19 cm: a Gabor sum is atoms of finite width divided by a coverage
+        # at 17.5 cm: a Gabor sum is atoms of finite width divided by a coverage
         # map, and both the window edges and the Nadaraya-Watson division put
         # structure at the WINDOW scale, which `wake.build`'s own docstring
         # flags as the hazard it clamps sigma to control. What a pixel samples
@@ -723,8 +776,22 @@ def _norm_jets():
     #     there) redistributes it -- more on the jet, less at 4 m.
     # The near column is intact (0.123 -> 0.122). The TOTAAL row is a quadrature
     # sum of the rows above it, not a measurement of the field: on this patch the
-    # field itself measures 0.111, because REVERB and WAKE happen to sample
+    # field itself measures a shade under it, because REVERB and WAKE sample
     # anti-correlated over 0.7 m (see the ledger note in _report_footprint).
+    #
+    # AND WHAT THE WAVE-6 TURN DID, same discipline. The far column does not move
+    # at all (0.053): the far patch is water the jet does not reach, so turning
+    # the jet 8.5 deg cannot touch it, and the fact that WAKE and BOIL still
+    # measure 0.000 there is the check that the turn did not drag the disturbance
+    # across the basin. The near column is 0.122 either way, but two rows inside
+    # it swapped a little: REVERB 0.047 -> 0.045 and NEAR 0.046 -> 0.048, both
+    # because the 0.7 m patch moved 0.11 m with the boil, and neither is water
+    # changing. The one real change is the WAKE's dominant wavelength, 16.8 ->
+    # 13.8 cm on the patch (F 1.27 -> 1.55): aimed due west the jet axis lay on
+    # y = 2.00, the pool's own mirror line, so the ray fan was exactly symmetric
+    # about it and the two halves interfered into a standing pattern across the
+    # axis. That degeneracy is gone, and with it the anti-correlation the note
+    # below documents, which fell by a factor of six.
     print("    doel: 0.11-0.14 bij de straal, 0.058 ver weg"
           " (s = sqrt(<|grad h|^2>) overal)")
     _report_footprint(xxn, yyn, xxf, yyf)
@@ -803,24 +870,44 @@ def _report_footprint(xxn, yyn, xxf, yyf):
     # tensor is a removed rms slope; resolved and removed add in quadrature to
     # the unfiltered total, which is the check that nothing was invented.
     #
-    # WHAT THIS CHECK CAN AND CANNOT CATCH, worth stating because the jet's move
-    # made the near row's residual visible. `rem` is summed BAND BY BAND, while
+    # WHAT THIS CHECK CAN AND CANNOT CATCH. `rem` is summed BAND BY BAND, while
     # `res` and `s0` are measured on the summed field, so the quadrature identity
     # holds only up to the inter-band covariance -- exactly
     #     res^2 + rem^2 - s0^2 = 2 * (sum_ij C_ij(filtered) - sum_ij C_ij),
     # the amount by which filtering changes how the bands overlap. That is zero
     # for independent bands and merely small for a finite realisation on a small
-    # patch. On the 0.7 m jet patch REVERB and WAKE sample at -0.0022 of shared
-    # variance (measured; the field there is 0.111 against a quadrature sum of
-    # rows of 0.122), and 8% of that covariance leaves with the filter, so the
-    # near row closes to 0.1116 against 0.1109 at fp 30 mm rather than to four
-    # decimals. The 2 m far patch still closes to four (0.0522 / 0.0521).
+    # patch. Both patches now close to four decimals, and the far one always did.
+    #
+    # THIS NOTE USED TO RECORD A VISIBLE RESIDUAL AND NO LONGER CAN, which is
+    # worth keeping rather than deleting, because the residual went away for a
+    # reason and not by being tuned out. With the jet aimed due west its axis lay
+    # on y = 2.00 and the 0.7 m patch straddled the pool's mirror line; REVERB and
+    # WAKE sampled -0.0022 of shared variance there, the field measured 0.111
+    # against a quadrature sum of rows of 0.122, and the near row closed to 0.1116
+    # against 0.1109 at fp 30 mm -- the third decimal, not the fourth. Turning the
+    # fitting 8.5 deg took the wake off that symmetry: the same pair now shares
+    # -0.00035, six times less, the field measures 0.1203 against 0.1219 of rows,
+    # and the near row closes to 0.1202 / 0.1203. Nothing about the CONVENTION
+    # changed between those two runs, which is the point -- the size of this
+    # residual tracks how the bands happen to overlap on the patch, so it can
+    # neither confirm nor condemn the units.
     # So: a residual at the third decimal here is sample covariance and says
     # nothing about the convention; a residual that GROWS with fp on the far
     # patch, or one that appears on a band's own row, is the convention leak this
-    # check exists to catch. Per band the ledger still closes to four decimals --
-    # WAKE at fp 30 mm removes 0.0318 by the tensor against 0.0316 implied by its
-    # own filtered and unfiltered rms.
+    # check exists to catch.
+    #
+    # PER BAND the ledger does NOT close to four decimals, and the one band that
+    # misses says something real. WAKE at fp 30 mm on the jet patch removes 0.0386
+    # by the tensor against 0.0382 implied by its own filtered and unfiltered rms
+    # -- 1%, and it was 0.0318 against 0.0316, 0.6%, before the turn. The other
+    # four bands are component lists and their tensors are exact. WAKE's is not:
+    # `slope_var_points` multiplies a 21 cm BOX MEAN of the local mean square by a
+    # POINTWISE (1 - W^2), and those two disagree wherever the field's own
+    # structure correlates with the local wavenumber. The gap grew because the
+    # reconstruction's wavelength fell to 17.5 cm while the box stayed at 21 --
+    # see `_wake_field`. It is a smoothing error in a diagnostic, bounded and
+    # measured; the fix, if it ever matters, is to box-average W^2 with the
+    # variance rather than to widen or narrow the box.
     for xx, yy, tag in ((xxn, yyn, "straal"), (xxf, yyf, "ver   ")):
         s0 = total_s(xx, yy, None)
         for fp in (0.010, 0.030):
@@ -923,8 +1010,12 @@ def slope_var_points(x, y, fp):
     that line stops adding up. It is the guard, not decoration -- but read the
     note beside that print for what it can and cannot see: the sum here is band
     by band while the field it is checked against is not, so the identity holds
-    only up to the inter-band sample covariance, a third-decimal effect on a
-    0.7 m patch and not a convention leak.
+    only up to the inter-band sample covariance, which has been as large as a
+    third-decimal effect on a 0.7 m patch and is not a convention leak. The
+    WAKE term below has a second, smaller error of its own for a different
+    reason -- it is the only band whose tensor is measured off a grid rather
+    than summed over components, and the box it is measured over is wider than
+    the structure it averages, which is worth about 1% on that band alone.
     """
     fv = _fp_var(fp)
     xf, yf = np.asarray(x, np.float32), np.asarray(y, np.float32)

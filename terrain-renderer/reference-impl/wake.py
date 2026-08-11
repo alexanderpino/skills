@@ -54,10 +54,21 @@ class Jet:
     # The defaults are the scene's return fitting, so that a caller who omits
     # them gets the pool this module was written for and not a stale one:
     # az_deg went 20 -> 180 with the fitting's move to the east end wall
-    # (field.py's JET_AZ, photo-spec section C). field.py passes every one of
-    # these explicitly; the defaults are documentation, and a default that
-    # disagrees with the scene is a trap for the next caller.
-    def __init__(self, x, y, depth=0.15, tilt_deg=6.0, az_deg=180.0,
+    # (field.py's JET_AZ, photo-spec section C), and then 180 -> 188.5 when the
+    # wave-6 arbitration turned the fitting to get the wake off the camera
+    # azimuth. field.py passes every one of these explicitly; the defaults are
+    # documentation, and a default that disagrees with the scene is a trap for
+    # the next caller.
+    #
+    # NOTE that this azimuth is measured in PLAN: `ax` below is a unit vector in
+    # the (x, y) plane, so `s` is the plan-projected axial coordinate and not the
+    # slant distance along the tilted axis. field.py's `_AIM` is the 3-D axis, so
+    # its forcing peak reads 0.92 m along that axis but 0.912 m downstream in
+    # plan -- and it is the plan number the fitting's position was solved
+    # against. `s_pk` in `build` is written to two decimals, so nothing here
+    # turns on the 8 mm; it is recorded because a reader comparing the two files
+    # will otherwise find the same symbol meaning two things.
+    def __init__(self, x, y, depth=0.15, tilt_deg=6.0, az_deg=188.5,
                  d=0.020, dp_bar=0.80, cd=0.92, S=0.094, B=5.8):
         self.p = np.array([x, y]); self.h = depth; self.S, self.B, self.d = S, B, d
         self.U0 = cd * np.sqrt(2 * dp_bar * 1e5 / RHO)
