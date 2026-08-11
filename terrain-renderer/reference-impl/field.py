@@ -391,35 +391,76 @@ _WK_GRID = (800, 400)      # 10 mm texels; nothing under ~8 cm survives the film
 _WK_CACHE = {}
 
 
+def _boxsm(a, r):
+    """Separable box mean of half-width r texels, edges clamped. Used only to turn
+    the wake's single realisation into a LOCAL mean square -- see _wake_field."""
+    out = np.asarray(a, np.float64)
+    for ax in (0, 1):
+        n = out.shape[ax]
+        pad = [(0, 0), (0, 0)]; pad[ax] = (r + 1, r)
+        c = np.cumsum(np.pad(out, pad, mode='edge'), axis=ax)
+        hi = [slice(None)] * 2; lo = [slice(None)] * 2
+        hi[ax] = slice(2 * r + 1, 2 * r + 1 + n); lo[ax] = slice(0, n)
+        out = (c[tuple(hi)] - c[tuple(lo)]) / (2 * r + 1)
+    return out
+
+
 def _wake_field():
     """Eikonal solve, cached. Rays advect at c_g*khat + U(x) and refract on the
     drift gradient; amplitude follows wave action along the ray tube and decays by
-    wake.alpha_eff. Nothing is masked or tapered: the reach is the damping."""
+    wake.alpha_eff. Nothing is masked or tapered: the reach is the damping.
+
+    Cached alongside the field: `k`, the local wavenumber map wake.build returns,
+    and `vxx/vyy/vxy`, the local mean-square slope tensor. The other four bands
+    are explicit plane-wave sets, so both quantities are exact for them; this one
+    is a reconstructed grid and has to measure them. The mean square is a box
+    mean over 21 texels = 21 cm, which is about two wavelengths of the band -- a
+    window shorter than a wavelength would report the crest pattern itself as
+    variance instead of averaging over it."""
     if not _WK_CACHE:
         jet = _wk.Jet(JET_XY[0], JET_XY[1], depth=JET_H,
                       tilt_deg=np.degrees(JET_TILT), az_deg=np.degrees(JET_AZ),
                       d=D_NOZZLE, dp_bar=DP_BAR, cd=CD, S=S_SPREAD, B=B_DECAY)
-        gx, gy = _wk.build(jet, X0, X1, Y0, Y1, _WK_GRID[0], _WK_GRID[1],
-                           rms_target=WAKE_RMS)
+        gx, gy, kk = _wk.build(jet, X0, X1, Y0, Y1, _WK_GRID[0], _WK_GRID[1],
+                               rms_target=WAKE_RMS)
         _WK_CACHE['gx'] = gx.astype(np.float32)
         _WK_CACHE['gy'] = gy.astype(np.float32)
+        _WK_CACHE['k'] = kk.astype(np.float32)
+        for nm, a in (('vxx', gx * gx), ('vyy', gy * gy), ('vxy', gx * gy)):
+            _WK_CACHE[nm] = _boxsm(a, 10).astype(np.float32)
     return _WK_CACHE['gx'], _WK_CACHE['gy']
 
 
-def _wake(X, Y):
-    """Bilinear lookup into the traced wake. 5 mm texels; the shortest thing that
-    survives the film damping is ~10 cm, so this samples it many times over."""
-    gxg, gyg = _wake_field()
+def _wk_lookup(X, Y, keys):
+    """Bilinear lookup of any cached wake map. 10 mm texels; the shortest thing
+    that survives the film damping is ~10 cm, so this samples it many times over."""
+    _wake_field()
     nx, ny = _WK_GRID
     fu = np.clip((X - np.float32(X0)) / np.float32(X1 - X0) * nx - 0.5, 0, nx - 1.001)
-    fv = np.clip((Y - np.float32(Y0)) / np.float32(Y1 - Y0) * ny - 0.5, 0, ny - 1.001)
-    iu = fu.astype(np.int64); iv = fv.astype(np.int64)
-    du = (fu - iu).astype(np.float32); dv = (fv - iv).astype(np.float32)
+    fvv = np.clip((Y - np.float32(Y0)) / np.float32(Y1 - Y0) * ny - 0.5, 0, ny - 1.001)
+    iu = fu.astype(np.int64); iv = fvv.astype(np.int64)
+    du = (fu - iu).astype(np.float32); dv = (fvv - iv).astype(np.float32)
     out = []
-    for g in (gxg, gyg):
+    for key in keys:
+        g = _WK_CACHE[key]
         out.append(((g[iv, iu] * (1 - du) + g[iv, iu + 1] * du) * (1 - dv) +
                     (g[iv + 1, iu] * (1 - du) + g[iv + 1, iu + 1] * du) * dv))
-    return out[0], out[1]
+    return out
+
+
+def _wake(X, Y, fv=None):
+    """The traced wake, footprint-filtered at its own LOCAL wavenumber.
+
+    Per texel and not per band: the stationary condition k = g/(U cos psi)^2
+    shortens this wave as the drift decays, so the same band runs from ~35 cm at
+    the fitting to under 10 cm downstream, and one k for the whole basin would
+    over-filter the source while under-filtering the tail."""
+    if fv is None:
+        gx, gy = _wk_lookup(X, Y, ('gx', 'gy'))
+        return gx, gy
+    gx, gy, kk = _wk_lookup(X, Y, ('gx', 'gy', 'k'))
+    w = np.exp(-0.5 * kk * kk * fv)
+    return gx * w, gy * w
 
 
 def _cyl(X, Y, fv=None):
@@ -438,23 +479,30 @@ def _cyl(X, Y, fv=None):
     return gx * _SC['near'], gy * _SC['near']
 
 
-def _gemm(F, xs, ys):
+def _gemm(F, xs, ys, fv=None):
+    """Separable evaluation on a grid. `fv` (the footprint variance) has to be a
+    SCALAR here: the whole speed of this path is that x and y factorise, and a
+    per-texel footprint would not."""
+    amp = F['amp'] if fv is None else F['amp'] * np.exp(-0.5 * F['k2'] * fv)
     A = F['kx'][None, :] * xs[:, None] + F['ph'][None, :]
     cA, sA = np.cos(A), np.sin(A)
     B = F['ky'][None, :] * ys[:, None]
     P = np.concatenate([np.cos(B), np.sin(B)], 1).astype(np.float32)
     o = []
     for kk in (F['kx'], F['ky']):
-        Q = np.concatenate([(F['amp'] * kk)[None, :] * cA,
-                            -(F['amp'] * kk)[None, :] * sA], 1).T
+        Q = np.concatenate([(amp * kk)[None, :] * cA,
+                            -(amp * kk)[None, :] * sA], 1).T
         o.append(P @ Q.astype(np.float32))
     return o[0], o[1]
 
 
-def _pts(F, x, y):
+def _pts(F, x, y, fv=None):
+    """Point evaluation. `fv` may be a scalar or one value per point -- this is
+    the path the camera uses, and every camera ray has its own footprint."""
     gx = np.zeros_like(x); gy = np.zeros_like(x)
     for i in range(len(F['kx'])):
-        c = F['amp'][i] * np.cos(F['kx'][i] * x + F['ky'][i] * y + F['ph'][i])
+        a = F['amp'][i] if fv is None else F['amp'][i] * np.exp(-0.5 * F['k2'][i] * fv)
+        c = a * np.cos(F['kx'][i] * x + F['ky'][i] * y + F['ph'][i])
         gx += F['kx'][i] * c; gy += F['ky'][i] * c
     return gx, gy
 
@@ -576,32 +624,124 @@ def _norm_jets():
           " (s = sqrt(<|grad h|^2>) overal)")
 
 
-def grad_grid(xs, ys):
-    wx, wy = _gemm(WIND, xs, ys)
+def grad_grid(xs, ys, fp=None):
+    """Surface gradient on a separable grid.
+
+    `fp` is the pixel footprint in metres and it is OPTIONAL: omitted, this is
+    bit-for-bit the unfiltered field it always was, so a caller that has not
+    opted in is unaffected. It must be a scalar on this path (see `_gemm`).
+    Note that the caustic pass's "footprint" is the SUN's ray spacing, not a
+    camera pixel's, so it is a different number from render.py's FOOT and is not
+    interchangeable with it."""
+    fv = _fp_var(fp)
+    wx, wy = _gemm(WIND, xs, ys, fv)
     m = shelter(xs[None, :], ys[:, None]).astype(np.float32)
-    rx_, ry_ = _gemm(REVERB, xs, ys)
-    bx, by = _gemm(BOIL, xs, ys)
+    rx_, ry_ = _gemm(REVERB, xs, ys, fv)
+    bx, by = _gemm(BOIL, xs, ys, fv)
     gx, gy = wx * m + rx_, wy * m + ry_
     X = np.broadcast_to(xs[None, :].astype(np.float32), gx.shape)
     Y = np.broadcast_to(ys[:, None].astype(np.float32), gx.shape)
     env = jet_envelope(X, Y)
-    jx, jy = _cyl(X, Y)
-    ax_, ay_ = _wake(X, Y)
+    jx, jy = _cyl(X, Y, fv)
+    ax_, ay_ = _wake(X, Y, fv)
     return gx + jx + ax_ + bx * env, gy + jy + ay_ + by * env
 
 
-def grad_points(x, y):
-    wx, wy = _pts(WIND, x, y); m = shelter(x, y)
-    rx_, ry_ = _pts(REVERB, x, y)
-    bx, by = _pts(BOIL, x, y)
+def grad_points(x, y, fp=None):
+    """Surface gradient at arbitrary points -- the camera pass calls this.
+
+    `fp` is the pixel's footprint on the surface, in metres, scalar or one per
+    point, and it is OPTIONAL: omitted, this returns exactly the field it always
+    returned. Each band is attenuated at its own wavenumber before the bands are
+    summed, so the 2.8 cm and 2.4 cm bands leave the resolved field as the
+    footprint passes them while the 10-20 cm bands stay. The return shape does
+    not change; the variance that leaves is `slope_var_points`, and a consumer
+    that filters without reading that number has traded a moire for a plastic
+    sheet, which is the other failure in the same chapter section."""
+    fv = _fp_var(fp)
+    wx, wy = _pts(WIND, x, y, fv); m = shelter(x, y)
+    rx_, ry_ = _pts(REVERB, x, y, fv)
+    bx, by = _pts(BOIL, x, y, fv)
     xf, yf = x.astype(np.float32), y.astype(np.float32)
     env = jet_envelope(xf, yf)
-    jx, jy = _cyl(xf, yf)
-    ax_, ay_ = _wake(xf, yf)
+    jx, jy = _cyl(xf, yf, fv)
+    ax_, ay_ = _wake(xf, yf, fv)
     return (wx * m + rx_ + jx + ax_ + bx * env,
             wy * m + ry_ + jy + ay_ + by * env)
 
 
+def slope_var_points(x, y, fp):
+    """The slope variance the footprint filter TOOK OUT at each point.
+
+    Returns the symmetric 2x2 tensor (vxx, vyy, vxy) of removed mean-square
+    slope. Its TRACE is the removed total mean-square slope, so
+    sqrt(vxx + vyy) is a removed rms slope in the file's one convention,
+    s = sqrt(<|grad h|^2>) -- the tensor is a refinement of that convention, not
+    a second one, and collapsing it with `vxx + vyy` is always legal.
+
+    WHY THIS EXISTS AT ALL, and why the interface would be wrong without it. The
+    filter above narrows the slope distribution with distance, which is
+    physically correct -- the far water really does present a narrower
+    distribution to a pixel that averages more of it -- but the variance it
+    removes has not gone anywhere in the world, only out of the FIELD. Left
+    there, the far surface converges to its mean normal, the specular lobe
+    collapses toward a Dirac, and energy conservation makes the surviving
+    highlight brighter as it narrows: the far water goes from moire to
+    shrink-wrapped perspex, which is the failure the chapter opens that section
+    with. The variance has to arrive somewhere, and where it belongs is the
+    width of the specular lobe. So the honest interface is a pair -- a narrowed
+    field and the variance that was narrowed out of it -- and a consumer that
+    takes only the first has swapped one artefact for another.
+
+    The tensor rather than one scalar because the removed part is not isotropic:
+    WIND is a 45 deg spread about the wind azimuth and the wake is a directional
+    pattern, so what is removed is a Cox-Munk-like ellipse, and a lobe widened
+    isotropically by its trace would be visibly wrong across the wind.
+
+    Per component, a wave of slope amplitude a contributes a^2/2 to the total
+    mean square along its own k, so the part removed is a^2 (1 - W^2)/2 with
+    W^2 = exp(-k^2 s^2). The chapter writes this with a saturating form,
+    1 - sqrt(1 - a^2 w_r^2), which differs from a^2 w_r^2/2 by 0.25% at the
+    steepest slope in this basin (a ~ 0.1) and which would be a SECOND
+    definition of variance sitting beside `_plane_rms`. One definition wins.
+    """
+    fv = _fp_var(fp)
+    xf, yf = np.asarray(x, np.float32), np.asarray(y, np.float32)
+    vxx = np.zeros_like(xf); vyy = np.zeros_like(xf); vxy = np.zeros_like(xf)
+    for F, env in ((WIND, shelter(xf, yf)), (REVERB, 1.0),
+                   (BOIL, jet_envelope(xf, yf))):
+        k2 = F['k2']
+        lost = 1.0 - np.exp(-k2 * fv[..., None] if np.ndim(fv) else -k2 * fv)
+        a2 = (F['amp'] ** 2 * k2) * lost * 0.5           # per component
+        ux = F['kx'] / np.sqrt(k2); uy = F['ky'] / np.sqrt(k2)
+        e2 = env * env if np.ndim(env) else np.float32(env) ** 2
+        if np.ndim(fv):
+            vxx = vxx + e2 * (a2 * ux * ux).sum(-1)
+            vyy = vyy + e2 * (a2 * uy * uy).sum(-1)
+            vxy = vxy + e2 * (a2 * ux * uy).sum(-1)
+        else:
+            vxx = vxx + e2 * float((a2 * ux * ux).sum())
+            vyy = vyy + e2 * float((a2 * uy * uy).sum())
+            vxy = vxy + e2 * float((a2 * ux * uy).sum())
+    # NEAR: a coherent sum of image sources, so its local amplitude is geometry
+    # (1/sqrt(r) and the viscous decay), not a constant per component.
+    for j, (k, w) in enumerate(_NEAR):
+        om, cg, _ = _disp(k); al = _alpha(k)[0]
+        lost = 1.0 - np.exp(-k * k * fv)
+        for xi, yi in _IMG:
+            dx = xf - np.float32(xi); dy = yf - np.float32(yi)
+            r = np.sqrt(dx * dx + dy * dy) + np.float32(0.12)
+            a = _SC['near'] * w / np.sqrt(r) * np.exp(-al * r / cg) * k
+            h = 0.5 * a * a * lost
+            vxx = vxx + h * (dx / r) ** 2
+            vyy = vyy + h * (dy / r) ** 2
+            vxy = vxy + h * (dx * dy) / (r * r)
+    # WAKE: measured off the reconstructed grid rather than derived, because the
+    # band arrives as a field and not as a component list. The local mean square
+    # already IS a variance, so there is no factor of a half here.
+    kk, mxx, myy, mxy = _wk_lookup(xf, yf, ('k', 'vxx', 'vyy', 'vxy'))
+    lost = 1.0 - np.exp(-kk * kk * fv)
+    return vxx + lost * mxx, vyy + lost * myy, vxy + lost * mxy
 
 
 def normal_from_grad(gx, gy):
@@ -609,11 +749,11 @@ def normal_from_grad(gx, gy):
     return -gx * inv, -gy * inv, inv
 
 
-def surface_normal_grid(xs, ys):
+def surface_normal_grid(xs, ys, fp=None):
     """Normals on a separable grid -- the caustic pass calls this."""
-    return normal_from_grad(*grad_grid(xs, ys))
+    return normal_from_grad(*grad_grid(xs, ys, fp))
 
 
-def surface_normal_points(x, y):
+def surface_normal_points(x, y, fp=None):
     """Normals at arbitrary points -- the camera pass calls this."""
-    return normal_from_grad(*grad_points(x, y))
+    return normal_from_grad(*grad_points(x, y, fp))

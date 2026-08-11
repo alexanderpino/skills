@@ -230,13 +230,12 @@ footer{
 
     <article class="lane">
       <header><h3>optics</h3><span class="dim">visual</span></header>
-      <div class="score"><b>7.0</b><small>golf 3 · bouwer draait</small></div>
-      <div class="track"><i style="width:70%"></i><u></u></div>
-      <p class="gap">Van 2,0 naar hier in drie golven. Wat er nu nog als enige "gerenderd" roept zijn
-      de getrapte randen van de trapneuzen — gediagnosticeerd als aliasing van dispersie, niet als
-      te weinig monsters. Daaronder: de donkere kant van het net te diep en de schaduw te licht,
-      allebei uit één ontbrekende wandterm.</p>
-      <div><span class="chip live">in behandeling</span> <span class="chip minor">minor</span></div>
+      <div class="score"><b>8.0</b><small>golf 4 · ronde 8</small></div>
+      <div class="track"><i style="width:80%"></i><u></u></div>
+      <p class="gap">Van 2,0 naar hier in vier golven. De laatste kunstmatige verklikker is weg. Wat
+      er open blijft is één gemeten mechanisme — de wand als lichtdrager — plus de meniscus, die nog
+      in de verkeerde categorie zit, en sectie C, die bewijsbaar onbereikbaar is vanaf elk terras.</p>
+      <div><span class="chip minor">minor</span> <span class="chip">open</span></div>
       <p class="files">render.py</p>
     </article>
 
@@ -258,23 +257,24 @@ footer{
   <div class="head"><h2>Het bewijs</h2><span>gauntlet/evidence/</span></div>
 
   <figure>
-    <div class="figtag"><b>w3-optics-r1</b><span>render.py · 800 × 1200 · huidige champion</span></div>
+    <div class="figtag"><b>w4-optics-r1</b><span>render.py · 800 × 1200 · huidige champion</span></div>
     <img src="__IMG_POOL__" alt="Gerenderd zwembad, portret, met een halfronde trap rechts en caustics over de bodem.">
     <figcaption>
       <h3>Waar de optiek nu staat</h3>
       <p>Mijn eigen oordeel tegen de lat, sectie voor sectie — niet dat van een criticus:</p>
       <ul class="verdicts">
         <li class="v-pass"><b>B net</b><span>Celmaat 231 mm met autocorrelatie gemeten, binnen de 15–30 cm van de lat. Slechts 0,82% van de bodem komt boven 230 en 0,02% boven 240: de heldere lijnen zijn niet uitgebeten.</span></li>
-        <li class="v-part"><b>B donker</b><span>13,9% van de bodem zit onder 120 bij een gemiddelde van 157. De donkere kant is te diep — en de schaduw meet 0,82 waar de lat 0,5 vraagt, dus die is juist te licht. Twee fouten met tegengesteld teken uit één ontbrekende term.</span></li>
+        <li class="v-pass"><b>F schaduw</b><span>De 0,82 was grotendeels een eenheidsfout: de diagnose las sRGB-gecodeerde luminantie tegen een uitspraak over licht. De twee tripletten van de lat zelf staan 0,75 uit elkaar gecodeerd en 0,546 lineair; de render staat op 0,82 en 0,625. De beschaduwde bodem valt binnen de tolerantie op alle drie de kanalen — het is de <em>bezonnen</em> bodem die eruit ligt.</span></li>
         <li class="v-pass"><b>A trap</b><span>Stootborden 0,89 verzadigd tegen 0,68 voor open water, na een echte bounce van de bezonnen bodem. Was 0,16 — grijs.</span></li>
-        <li class="v-fail"><b>tell</b><span>De neuzen van de treden hebben getrapte randen met verzadigde blauwe en gele spikkels. Aliasing van dispersie: drie delta-golflengtes lossen een sprong op als een kam. Wordt nu aangepakt.</span></li>
+        <li class="v-pass"><b>tell</b><span>De getrapte randen zijn weg. Het was aliasing van dispersie × kwantisatie van 3×3 dekking. Kleurafwijking op silhouetpixels nu 1,1 mediaan tegen 6,8 op open water — de randen dragen mínder kleurzoom dan het water zelf, en 88% van de sterkste enkelkanaalspixels zit op caustic-vouwen waar de lat ze toestaat.</span></li>
+        <li class="v-part"><b>B donker · wand</b><span>De wanden nemen 35,3% van de halve bol van de bodem in beslag, tot 77% op de slechtste texel — en er staat één vlakke <code>SKY_AMB</code> over het geheel. Dat is de omvang van de ontbrekende term, nu gemeten. Uitgesteld: de terugweg wand→bodem vraagt een opwaartse doorsnijder die er niet is.</span></li>
         <li class="v-fail"><b>C schittering</b><span>Nog steeds een brede baan in plaats van een compacte pluk boven de jet. Bewezen onbereikbaar vanaf ooghoogte bij deze indeling — dus de indeling moet veranderen, niet de natuurkunde.</span></li>
       </ul>
     </figcaption>
   </figure>
 
   <figure>
-    <div class="figtag"><b>w3-optics-r1-zoom</b><span>uitsnede op de radiustrap</span></div>
+    <div class="figtag"><b>w4-optics-r1-zoom</b><span>uitsnede op de radiustrap</span></div>
     <img src="__IMG_ZOOM__" alt="Uitsnede van de halfronde trap onder water, met gebogen treden en caustics erover.">
     <figcaption>
       <h3>De trap, en de verklikker</h3>
@@ -289,11 +289,11 @@ footer{
   </figure>
 
   <figure>
-    <div class="figtag"><b>progressie</b><span>golf 1 → 2 → 3 · zelfde bad, zelfde zon</span></div>
+    <div class="figtag"><b>progressie</b><span>golf 1 → 2 → 4 · zelfde bad, zelfde zon</span></div>
     <div class="strip3">
       <div><img src="__IMG_W1__" alt="Render golf 1: schuin bovenaanzicht, harde celstructuur."><span>golf 1 · quilt, geen licht</span></div>
       <div><img src="__IMG_W2__" alt="Render golf 2: portret, hoektrap achterin."><span>golf 2 · rand als geometrie, trap grijs</span></div>
-      <div><img src="__IMG_W3__" alt="Render golf 3: portret met halfronde trap vooraan."><span>golf 3 · trap vooraan, bounce erin</span></div>
+      <div><img src="__IMG_W3__" alt="Render golf 4: portret met halfronde trap vooraan, gladde randen."><span>golf 4 · randen schoon, patroon op de treden</span></div>
     </div>
     <figcaption>
       <h3>Wat er tussen de rondes veranderde</h3>
@@ -382,6 +382,11 @@ footer{
           <td class="num">4 · r7</td><td class="num">chapter</td><td class="num">prose</td>
           <td class="num">rubric</td><td class="num">9</td><td><span class="chip done">bar gehaald</span></td>
           <td class="gapcell">Meniscussectie toegevoegd — de enige plek waar de bereikbaarheidstoets niet kán falen. Haalde twee foute getallen uit de lat: 34,5° is een blik recht naar beneden, geen ooghoogte, en de σ-telling deelde door de totale helling waar de staart per as loopt.</td>
+        </tr>
+        <tr>
+          <td class="num">4 · r8</td><td class="num">optics</td><td class="num">visual</td>
+          <td class="num">rubric</td><td class="num">8</td><td><span class="chip minor">minor</span></td>
+          <td class="gapcell">Spikkels op de trapneuzen opgelost: aliasing van dispersie (drie delta-golflengtes die een ondoorzichtige sprong als kam oplossen) maal kwantisatie van 3×3 dekking. Spectrale banden plus adaptieve randen op 64 monsters. Open: de terugweg wand→bodem, de meniscus als spiegelende strook, en sectie C.</td>
         </tr>
       </tbody>
     </table>
