@@ -348,12 +348,25 @@ crossing the waterline says which port was modelled.
 
 ---
 
-## 11 · Two implementations: the numpy oracle and a WebGPU demonstration
+## 11 · The numpy renderer is the reference — and must prove it
 
-Agreed with the owner: **the numpy renderer becomes the absolute reference**, and
-a second implementation — WebGPU, animated, real time — becomes the demonstration.
-They are not competing versions of one thing; they answer different questions, and
-**the pair is the verification.**
+**Owner ruling, and it sets the order of everything below.** Nothing built this
+session is thrown away; the numpy renderer becomes the **absolute reference**. The
+standing instruction is *prove the maths is right*. Games get lookup tables and
+approximations later, derived **from** the reference and measured against it —
+that is what makes an approximation defensible rather than a guess.
+
+**WebGPU is deferred**, deliberately and not for lack of merit. The next work is
+**other references** — the sea and the ocean — because a reference that has only
+ever been pointed at one 1.40 m pool with a blue liner has not been shown to
+generalise, and generalising it is worth more right now than making it fast. The
+section below is kept as written for when it comes back.
+
+> ### Deferred — a WebGPU demonstration
+>
+> A second implementation — animated, real time — as the *demonstration* beside
+> the oracle. They answer different questions and **the pair is the
+> verification.**
 
 ### Why two
 
