@@ -29,9 +29,14 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
 
 ## B · The caustic net on the bed
 
-- Cell size of order **15–30 cm** — perhaps 25–40 cells across the visible water.
-  Finer than that reads, in the words of the reference observer, "as if there is
-  a vibrator in the water".
+- Cell size of order **15–30 cm**. Finer than that reads, in the words of the
+  reference observer, "as if there is a vibrator in the water".
+  > **Corrected mid-run.** This originally read "perhaps 25–40 cells across the
+  > visible water", which was a proxy for cell size written when the frame held
+  > the whole pool. After the scope ruling reframed onto ~3 m of water, that count
+  > became unreachable while the size was exactly on spec — a bar defect, not an
+  > artifact defect. **Judge the size in metres, not the count in frame.** Measure
+  > it by autocorrelation if you can rather than by eye.
 - **Low contrast and soft-edged.** The bright lines are *not* blown to white over
   most of the area, and the cell interiors stay recognisably turquoise rather than
   dropping to navy. This is the single most-missed property.
