@@ -2514,7 +2514,23 @@ def trace_edge(dvec):
             lo = np.where(f > 0, m, lo); hi = np.where(f > 0, hi, m)
         th[mar] = hi
     sh = pool_se(Ex + dvec[:, 0] * th, Ey + dvec[:, 1] * th)
-    return th, sh, dn & (sh < SLIP + 1e-7), mar.size, dn.sum()
+    # WATER OR WALL, DECIDED ON THE HEIGHT OF THE HIT AND NOT ON ITS s. The two
+    # tests look interchangeable and are not, and the difference is most of the
+    # band. The freeboard is a VERTICAL face standing at s = SLIP, so every ray
+    # that lands on it converges to s = SLIP to the bisection's own tolerance --
+    # (t1 - t0)/24/2^16, about 3e-7 m of lateral travel -- and asking whether s
+    # is below SLIP by 1e-7 is then a coin toss on the last bits of the march.
+    # MEASURED: 80% of the band's rays were being handed to water_shade, which
+    # shaded them as a water surface climbing the wall. It never showed, because
+    # the ambient meniscus lift that used to sit in water_shade landed that
+    # surface within one sRGB level of the band beside it; removing the lift and
+    # putting the derived specular line in its place is what exposed it, as a
+    # 40-pixel dither over the whole band. The height test has the band's own
+    # ZLIP of margin instead of 1e-7: a water hit converges to z <= 0 by
+    # construction (the march keeps f = z - gh <= 0 and gh = 0 over water),
+    # while every hit on the band face is at 0 < z < ZLIP.
+    zh = Ez + dvec[:, 2] * th
+    return th, sh, dn & (zh < 1e-6), mar.size, dn.sum()
 
 
 t_hit, S_HIT, _isw, _nmar, _ndn = trace_edge(D)
@@ -2991,9 +3007,14 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
 # Every claim the block above makes is checkable off the same function the
 # picture is made with: probe a waterline point with a fan of rays running in
 # from the wall, and read the profile the pixel grid will actually receive.
-def _menis_probe(P, nd=401, span=.060):
+def _menis_probe(P, nd=401, span=.060, still=False):
     """(peak radiance, FWHM in OUTPUT pixels, the integral I(v), the footprint
-    across the waterline, and where the point lands in the frame)."""
+    across the waterline, and where the point lands in the frame).
+
+    `still=True` hands `meniscus` a zero RESOLVED slope, which is the only way to
+    read the sun's branch at its own maximum: with the wave field in, the
+    half-vector residual is where the waves happen to carry it and the crossing
+    computed from the mean surface is not where the glint actually lands."""
     P = np.asarray(P, float)
     gx, gy, _ = pool_grad(P[0], P[1])
     px = P[0] - gx * np.linspace(0., span, nd)
@@ -3004,6 +3025,8 @@ def _menis_probe(P, nd=401, span=.060):
     dv /= tt[:, None]
     fpp = tt * PIXANG / np.maximum(np.abs(dv[:, 2]), .10) * SS
     st = surf_stats(px, py, fpp)
+    if still:
+        st = (np.zeros(nd), np.zeros(nd)) + st[2:]
     Lc = meniscus(px, py, SLIP - dd, dv, fpp, *st)
     y = Lc[:, 1]
     dh = np.maximum(np.hypot(dv[:, 0], dv[:, 1]), 1e-9)
@@ -3073,6 +3096,23 @@ print("     (* = outside the frame.  The east waterline is in the frame's plan "
 # (SKY_AMB*0.17 + SUN_COL*0.006) with an exp(-d/2a) profile, so its flux per
 # unit of waterline is that times 2a times v_z, and the ratio is the price of
 # the guess.
+# WHAT THE SUN'S BRANCH IS WORTH where it is reachable, so that the half of this
+# term which this frame cannot show is priced rather than left as dead code. The
+# probe is run on the EAST wall at its own beta = 0, with the resolved wave slope
+# taken out -- with it in, the residual is wherever the waves carry it, which is
+# what makes a real waterline sparkle along a stretch instead of glinting at one
+# point, and is why the probe a few centimetres away reads nothing.
+_esun = np.array([X1 + SLIP, 2.09, 0.])
+_pk_s, _fw_s, _I_s, _w_s, _px_s, _d_s, _c_s = _menis_probe(_esun, still=True)
+print("   the SUN's branch, priced where it is reachable -- east wall at its own "
+      "beta = 0, (%.2f, %.2f), with the resolved wave slope taken out: I = %.3e "
+      "W/sr/m, peak %.1f at d = %.2f mm, which is %.1fx this file's white point "
+      "of %.1f. It is behind the near coping's arris in this frame (the ray that "
+      "grazes that arris meets the water %.0f mm out from the wall), so what the "
+      "picture can show of the meniscus is the horizon's branch alone."
+      % (_esun[0], _esun[1], _I_s, _pk_s, 1000 * _d_s, _pk_s / L_WHITE,
+         L_WHITE, 1000 * (ZD * (EYE[0] - X1 - SBUL) / (EYE[2] - ZD)
+                          - (SBUL - SLIP))))
 _pmid = np.array([2.4, Y1 + SLIP, 0.])
 _vzm = abs((EYE - _pmid)[2] / np.linalg.norm(EYE - _pmid))
 _amb = (SKY_AMB * .17 + SUN_COL * .006) * MENIS_W * _vzm
@@ -3869,6 +3909,60 @@ for _z in BAND_Z:
              100 * (_hb.std() / max(_hbed.std(), 1e-12))
              * (_bbed.mean() / max(_bc.mean(), 1e-9)),
              "   (the grey bead)" if _z > FREEB else ""))
+
+# --- AND THE MENISCUS LINE, READ OFF THE PICTURE -----------------------------
+# The flux integral is checked before the render; this is what the pixel grid
+# made of it. The profile is taken off the LINEAR frame at output resolution,
+# perpendicular to the waterline, so the numbers are radiances and not code
+# values -- and the line's own share is quoted as the integral divided by the
+# footprint it landed in, which is the whole of the claim in one number.
+print("the meniscus line IN THE PICTURE (linear frame, output resolution, "
+      "profile perpendicular to the north waterline; k = 0 is the junction "
+      "pixel, negative is up the band):")
+_LNY, _LNX = HDRP.shape[:2]
+for _lx in (0.6, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5):
+    _lp = np.array([_lx, Y1 + SLIP, 0.])
+    _q0 = project(_lp)[0]
+    _q1 = project(_lp + np.array([0., -.05, 0.]))[0]
+    _uu = (_q1 - _q0) / max(np.linalg.norm(_q1 - _q0), 1e-9)
+    _pr = []
+    for _k in range(-2, 11):
+        _q = _q0 + _uu * _k
+        _ii, _jj = int(round(_q[1])), int(round(_q[0]))
+        _pr.append(HDRP[_ii, _jj, 1] if (0 <= _ii < _LNY and 0 <= _jj < _LNX)
+                   else np.nan)
+    _pk, _fw, _II, _wm, _, _, _ = _menis_probe(_lp)
+    _ld = np.linalg.norm(EYE - _lp)
+    _vz = abs((EYE - _lp)[2]) / _ld
+    # the line's own share of the junction pixel: the integral spread over the
+    # footprint it fell in. `?` in the SPLIT between the junction pixel and its
+    # neighbour only -- the wobble moves the junction inside the pixel -- never
+    # in the total, which is the integral.
+    _sh = _II / max(_vz * _wm, 1e-12)
+    print("    x=%.1f  %.2f m away, %.2f mm of water per output pixel across the "
+          "line | band %s | water %s"
+          % (_lx, _ld, 1000 * _wm,
+             " ".join("%.3f" % v for v in _pr[:3]),
+             " ".join("%.3f" % v for v in _pr[3:10])))
+    print("           the fillet contributes %.4f of the first water pixel (%.0f%% "
+          "of it); at the SUBSAMPLE scale the deposit peaks at %.3f over the "
+          "%.2f mm that clears the undercut, against %.3f for the water beside "
+          "it"
+          % (_sh, 100 * _sh / max(_pr[3], 1e-9), _pk, 1000 * _fw * _wm,
+             float(np.nanmean(_pr[6:10]))))
+print("    -- read it as two separate limits, because they say different things. "
+      "The FOOTPRINT one is honest dilution: the strip that clears the undercut "
+      "is 0.8-1.7 mm of water against an output pixel of 4.2-9.7 mm, so the "
+      "flux arrives spread over 5 to 10 times its own width and nothing is "
+      "clamped to hide that. The OTHER one is this camera: the frame looks ALONG "
+      "the north wall, so the fillet's facets never present less than 64 deg of "
+      "incidence to it and their Fresnel is capped near 0.07 -- and the sun's "
+      "branch, which is the one that would blow, is under the coping on this "
+      "wall. The line is therefore real, correctly placed and correctly "
+      "coloured, and worth a fifth of the junction pixel at the far end falling "
+      "to nothing at the near one. It is not the blazing line the east wall "
+      "would carry, and this file will not manufacture one.")
+
 
 # 2. THE PIGMENT, AND THE ABSORPTION IT CALIBRATES. The owner's reading of this
 #    band -- "that edge is the colour of the walls and floor of the pool; the
