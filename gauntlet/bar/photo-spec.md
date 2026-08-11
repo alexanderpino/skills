@@ -44,6 +44,32 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
   highest-contrast edges only.
 - No caustics at all inside the sail's shadow.
 
+### B2 · The edge, from a fourth photograph of the reference pool
+
+> Supplied mid-run: a close frame of the coping meeting the water. Same status as
+> A–F — this is the reference pool itself, not a stand-in — and it **settles a
+> dispute** rather than adding a wish.
+
+- **The waterline against the coping is a clean, straight, hard line.** No visible
+  meniscus band, no damp band on the stone, no softening. A reviewer flagged the
+  render's hard edge as a defect and I forwarded it; the photograph shows the
+  reference pool doing exactly the same thing. **Do not soften this edge.** The
+  meniscus and wet-band machinery belongs where the wall is visible, and there it
+  already reads correctly. A future critic raising this again should be sent here.
+- **The stone is warm sandstone — pink-tan, not grey.** The render's coping is a
+  neutral grey-beige, which is a genuine mismatch against this frame. *Visual
+  reading, not a measurement.*
+- **The surface texture is finer and denser than the render's**, and carries a
+  clear directional grain: many small wrinkles rather than a few large ones. The
+  render currently reads coarser at the same apparent distance. *Visual reading.*
+- **The caustics seen through that surface are softer and lower in contrast than
+  the render's** — present and legible, but blended, with no hard bright lines.
+  This is the same "most-missed property" as section B, now with a picture behind
+  it. *Visual reading.*
+- Overall the water reads **less saturated and greener** than the render's, which
+  runs toward a purer cyan. *Visual reading; the lit-water red deficit already
+  reported by three builders may be the same finding seen from the other side.*
+
 ## C · Surface sparkle
 
 - A **compact patch of isolated bright points**, not a broad shimmering road.
