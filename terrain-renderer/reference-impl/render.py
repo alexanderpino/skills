@@ -36,8 +36,57 @@ WNU, WNV = 1800, 340                 # wall caustic maps
 SHADOW_N = (2200, 1100)
 
 IOR = np.array([1.3320, 1.3348, 1.3400])     # 620 / 545 / 460 nm
+LAM = np.array([0.620, 0.545, 0.460])        # the wavelengths those three ARE, um
 ABS = np.array([0.2750, 0.0546, 0.0145])     # pure-water absorption, m^-1
 F0 = ((IOR - 1.0) / (IOR + 1.0)) ** 2
+
+# --- a camera channel is a BAND, not a wavelength ----------------------------
+# The three IORs above are three delta functions standing in for three broad
+# sensor bands, and a 3-point quadrature is only as good as the integrand is
+# smooth over the sample spacing. On a caustic FOLD the integrand is smooth over
+# the dispersion scale and three samples are plenty -- that is why the fringing
+# on the folds reads correctly. On an OPAQUE SILHOUETTE the integrand is a step
+# AT the dispersion scale, and three deltas resolve a step as a comb: three
+# separately-placed edges, so the pixel between them carries one primary with
+# the other two missing. That is not dispersion, it is aliasing of dispersion,
+# and it is what put saturated blue and yellow speckle on every step nosing.
+# MEASURED before the fix: the red and blue images of the bed are separated by
+# 9.8 mm on the floor and 8.7 mm at the step unit, which is 2.1 and 2.4 OUTPUT
+# pixels -- and 0.33% of all water rays disagreed about WHICH surface they hit.
+#
+# n(lambda) is not a new constant: a two-parameter Cauchy fit through the three
+# (lambda, n) pairs already in the file reproduces all three to 5e-5, so the
+# three IORs were themselves drawn from one dispersion curve and the curve can
+# be recovered from them.
+_uu2 = 1.0 / LAM ** 2
+CAUCHY_B = (((_uu2 - _uu2.mean()) * (IOR - IOR.mean())).sum()
+            / ((_uu2 - _uu2.mean()) ** 2).sum())
+CAUCHY_A = IOR.mean() - CAUCHY_B * _uu2.mean()
+
+
+def n_water(lam_um):
+    """Refractive index at a wavelength, from the file's own three IORs."""
+    return CAUCHY_A + CAUCHY_B / np.asarray(lam_um) ** 2
+
+
+# The bands are the VORONOI CELLS of the three nominal wavelengths: edges at the
+# midpoints 582.5 and 502.5 nm, the outer edges mirrored so each band is centred
+# on its nominal. They then tile 417.5-657.5 nm with no gap and no overlap,
+# which is the minimum a three-channel sensor must do to reproduce a continuous
+# spectrum without holes. No new number enters -- only the three wavelengths
+# that were already here. A real Bayer CFA overlaps its neighbours instead of
+# tiling them (`?`), which would smear the edge slightly MORE than this, so the
+# tiling choice is the conservative one.
+_mid = 0.5 * (LAM[:-1] + LAM[1:])
+BAND = np.array([[_mid[0], 2 * LAM[0] - _mid[0]],
+                 [_mid[1], _mid[0]],
+                 [2 * LAM[2] - _mid[1], _mid[1]]])       # [lo, hi] um, per channel
+print("dispersion: n(lam) = %.5f + %.6f/lam[um]^2, max residual on the three "
+      "stated IORs %.1e" % (CAUCHY_A, CAUCHY_B, np.abs(n_water(LAM) - IOR).max()))
+print("  channel bands (nm): " + "  ".join(
+    "%s %.0f-%.0f  dn %.5f" % (nm, 1000 * b[0], 1000 * b[1],
+                               n_water(b[0]) - n_water(b[1]))
+    for nm, b in zip("RGB", BAND)))
 
 # NOAA solar position, Aljezur 37.319N 8.803W, 2026-08-10 18:41 WEST:
 #   elevation 21.02 deg, azimuth 273.75 deg (due west), air mass 2.77
@@ -494,6 +543,19 @@ print("caustic pass: %.1f M rays x 4 sets" % (RAY_NX * RAY_NY / 1e6))
 bed = [np.zeros((CAU_NY, CAU_NX)) for _ in range(4)]        # 0,1,2 = RGB ; 3 = mono
 wall = [[np.zeros((WNV, WNU)) for _ in range(4)] for _ in range(4)]
 IOR_SET = [IOR[0], IOR[1], IOR[2], IOR[1]]
+# The light path gets the SAME band model as the view path -- one dispersion
+# curve, used wherever a ray crosses the interface. Each ray of sets 0-2 carries
+# its own wavelength drawn from its channel's band by a golden-ratio (Weyl)
+# sequence on the ray index, which is maximally spread over any short run of
+# neighbouring rays, so a 3 mm bed texel holding ~9 rays sees ~9 well-separated
+# wavelengths rather than one. Set 3 stays strictly monochromatic at 545 nm:
+# it is the controlled A/B against which all of this is read, and a mono render
+# that had a band in it would prove nothing. Cost is one extra multiply per ray.
+# The band the sun's own refraction spans puts 3.4 mm of extra smear on the red
+# caustic at 1.40 m and 9.6 mm on the blue, against a 6.8 mm sun-disc penumbra
+# -- so blue folds are physically softer than red ones, which three deltas
+# could not express at all.
+_PHI1 = 0.6180339887498949
 
 rx = (np.arange(RAY_NX) + 0.5) / RAY_NX * (X1 - X0) + X0
 ry = (np.arange(RAY_NY) + 0.5) / RAY_NY * (Y1 - Y0) + Y0
@@ -509,10 +571,15 @@ for j0 in range(0, RAY_NY, CH):
     live = wgt > 1e-4 * cell
     XXl, YYl = XX[live], YY[live]
     nxl, nyl, nzl, wl = nx[live], ny[live], nz[live], wgt[live]
+    ql = ((np.arange(gx.size, dtype=np.float64) + j0 * RAY_NX) * _PHI1 % 1.0)[live]
     for c in range(4):
+        if c == 3:
+            eta_c = np.float32(1.0 / IOR_SET[c])
+        else:
+            lam_c = BAND[c, 0] + ((ql + c / 3.0) % 1.0) * (BAND[c, 1] - BAND[c, 0])
+            eta_c = (1.0 / n_water(lam_c)).astype(np.float32)
         tx, ty, tz = refract(np.float32(-SUN_DIR[0]), np.float32(-SUN_DIR[1]),
-                             np.float32(-SUN_DIR[2]), nxl, nyl, nzl,
-                             np.float32(1.0 / IOR_SET[c]))
+                             np.float32(-SUN_DIR[2]), nxl, nyl, nzl, eta_c)
         sid, u, v, _ = box_hit(XXl, YYl, tx, ty, tz)
         # sid 0 is EVERY horizontal receiver -- floor, tread, bench top -- and
         # (u, v) is (x, y) for all of them, so one map carries the whole bed.
@@ -836,6 +903,23 @@ print("TIR return: %.1f%% of the bed's own output comes back down; it adds %s "
 print("  ...but %.0f%% of it meets a wall before it reaches the surface (the "
       "unmodelled wall re-emission), and the survivors are smeared over metres"
       % (100 * (1.0 - _ok.mean())))
+# HOW BIG IS THE WALL, as a light carrier?  Not by argument -- by the same
+# closed form bed_ao already uses for a riser. A straight wall of height h at
+# distance a takes a cosine-weighted share (1 - a/sqrt(a^2+h^2))/2 of a bed
+# point's hemisphere. Summed over the four walls of this basin that is the
+# fraction of the sky the bed CANNOT see, and every bit of it is currently
+# credited to SKY_AMB anyway. This is the size of the missing term, and it is
+# the number to weigh a wall-re-emission pass against -- see the README.
+_WSH = np.zeros_like(BDEP)
+for _sd2, _dist in ((0, BU - X0), (1, X1 - BU), (2, BV - Y0), (3, Y1 - BV)):
+    _a = np.maximum(_dist, 1e-3)
+    _h = np.maximum(BDEP, 0.)                      # wall stands from bed to surface
+    _WSH += .5 * (1.0 - _a / np.hypot(_a, _h))
+print("  the four walls take %.1f%% of the bed's cosine-weighted hemisphere on "
+      "average (%.0f%% at the worst texel) -- and SKY_AMB is applied over the "
+      "WHOLE of it, so the flat ambient is over-counted by that share and the "
+      "directional wall term that should replace it is missing"
+      % (100 * _WSH.mean(), 100 * _WSH.max()))
 BEDRET = np.stack([sample(bedret[..., c:c + 1], BU.ravel(), BV.ravel(),
                           X0, X1, Y0, Y1)[:, 0].reshape(BU.shape)
                    for c in range(3)], -1)
@@ -896,31 +980,70 @@ for wi in range(4):
 # source is the dark part; the floor beyond is in full sun 0.7 m lower; and the
 # outer nosing hides some of that floor. No closed form spans those.
 #
-# THE ESTIMATOR is cosine-weighted about the outward normal and restricted to
-# the downgoing half of the hemisphere, which is exactly the half a vertical
+# THE ESTIMATOR integrates over the downgoing half of the hemisphere in front of
+# the face -- a quarter sphere, pi sr -- which is exactly the half a vertical
 # face can see the bed through; the upgoing half is the sky term already there,
-# so the two partition the hemisphere and nothing is counted twice. With
-# psi drawn uniformly on (0, pi) the pdf is 2 cos(t)/pi over that half, so
-# E = (pi/2) <L_real> = 0.5 <L>, L being the same albedo*irradiance product that
-# shade() returns. The closed form for a uniformly bright bed is then exactly
-# 0.5, and that is printed below as a regression test on the quadrature.
+# so the two partition the hemisphere and nothing is counted twice. It returns
+#   E = (1/pi) * INT L cos(t) dw          -> 0.500 for a uniformly bright bed,
+# L being the same albedo*irradiance product that shade() returns, and 0.500 is
+# printed below as a regression test on the quadrature.
+#
+# HOW THE DIRECTIONS ARE CHOSEN, and why the previous choice destroyed the very
+# thing this term exists to deliver. Cosine-weighted directions are the right
+# estimator for IRRADIANCE and they fixed the colour -- but they are drawn
+# without reference to the bed, so the 128 hit points landed anywhere from 5 cm
+# to 8 m away and only ~10 of them fell inside any one 20 cm caustic cell. The
+# set was shared by every texel, so that under-resolution is not pixel noise: it
+# is a fixed comb convolved with the caustic field, and it produced a smooth
+# blotch of the same amplitude as the pattern it was hiding. Measured: the map
+# carried rms/mean 0.30-0.37, all of it at scales far coarser than a cell.
+#
+# The fix is to importance-sample by DISTANCE ALONG THE BED, which is where the
+# structure lives. Sample (d, phi): d log-uniform on [D0, D1] and phi uniform on
+# (-pi/2, pi/2) about the outward normal, then aim at the point that far away on
+# the plane through this riser's own foot, at height h under the sample point:
+#     beta = atan(h/d),  w_hat = cos(beta)(cos(phi) n_hat + sin(phi) t_hat) - sin(beta) z
+# The solid-angle Jacobian is dw = d h/(h^2+d^2)^{3/2} dd dphi, so with those
+# pdfs the estimator weight is closed form:
+#     w = ln(D1/D0) * cos(phi) * d^3 h / (h^2 + d^2)^2
+# and its expectation over the full range is exactly 1/2 -- the same closure as
+# before, now with the truncation to [D0, D1] priced explicitly (printed below).
+# Nothing about the physics changed: same hemisphere, same cosine, same traced
+# occlusion. What changed is that the sample points now form a fixed POLAR
+# LATTICE ABOUT EACH TEXEL, log-spaced so every octave of distance gets the same
+# number of samples. A lattice that moves rigidly with the receiver turns the
+# gather into a convolution with a smooth kernel, which is exactly what a
+# near-field-dominated irradiance is; the previous comb could not be.
+# Half the weight comes from inside 30 cm for a texel 12 cm up (closed form:
+# (2/pi) INT_0^a d^2 h/(h^2+d^2)^2 dd = 0.539 at a = 0.30, h = 0.12), so this is
+# where the estimator has to be sharp and where the log spacing puts it.
 RIS_NT, RIS_NZ = 512, 24        # arc samples per cylinder (18 mm), height samples
-RIS_NU, RIS_NP = 16, 8          # stratified cosine x azimuth gather directions
-# ? 128 directions. The direction set is shared by every texel, so what is left
-# ? of the quadrature error is not pixel noise but a smooth field -- it reads as
-# ? soft blotching on a riser, which is the one artifact that could be mistaken
-# ? for the caustic pattern the term exists to deliver. 128 puts it under the
-# ? map's own bilinear smoothing; the number is chosen, not derived.
+RIS_ND, RIS_NP = 20, 12         # distance strata x azimuth strata = 240 directions
+RIS_D0, RIS_D1 = 0.008, 30.0    # sampled range of bed distance, m
+RIS_HMIN = 0.020                # ? importance-sampling floor on the reference
+                                # ? height. It changes only the pdf, never the
+                                # ? estimate: a texel sitting on its own foot has
+                                # ? h -> 0 and the whole lattice would collapse
+                                # ? onto the horizon. 20 mm is chosen.
 _rr2 = np.random.default_rng(90210)
-_U1 = ((np.arange(RIS_NU)[:, None] + _rr2.random((RIS_NU, RIS_NP))) / RIS_NU).ravel()
-_PSI = (np.pi * (np.arange(RIS_NP)[None, :] + _rr2.random((RIS_NU, RIS_NP)))
-        / RIS_NP).ravel()
-_DN = np.sqrt(1.0 - _U1)                    # along the outward normal
-_DT = np.sqrt(_U1) * np.cos(_PSI)           # along the tangent
-_DB = np.sqrt(_U1) * np.sin(_PSI)           # straight down; > 0 by construction
+_lnR = np.log(RIS_D1 / RIS_D0)
+_DD = RIS_D0 * np.exp(_lnR * ((np.arange(RIS_ND)[:, None]
+                               + _rr2.random((RIS_ND, RIS_NP))) / RIS_ND)).ravel()
+_PH = (np.pi * ((np.arange(RIS_NP)[None, :] + _rr2.random((RIS_ND, RIS_NP)))
+                / RIS_NP) - np.pi / 2).ravel()
+
+
+def _ris_closure(h, d0, d1):
+    """Exact (2/pi) INT_d0^d1 d^2 h/(h^2+d^2)^2 dd -- what fraction of the 0.500
+    the truncated distance range can reach. The part outside it is light from
+    directions the lattice never sends a ray in, so it is a real, priced loss."""
+    f = lambda d: h * (-d / (2 * (h * h + d * d)) + np.arctan(d / h) / (2 * h))
+    return (2 / np.pi) * (f(d1) - f(d0))
+
 
 RIS_MAP, RIS_FOOT, _mbs = [], [], []
 _rstat = np.zeros(3)                        # [bed+wall hits, riser hits, samples]
+_rtrunc = []
 for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
     _th = (np.arange(RIS_NT) + .5) / RIS_NT * 2 * np.pi
     _ct, _st = np.cos(_th), np.sin(_th)
@@ -944,10 +1067,18 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
     _ix = np.flatnonzero(pool_sdf(_PX, _PY) < 0.0)
     _PX, _PY, _PZ2 = _PX[_ix], _PY[_ix], _PZ[_ix]
     _NX, _NY = _NX[_ix], _NY[_ix]
+    # the reference height of each texel over its own foot: the height that
+    # decides where a given down-angle lands on the bed. Only the pdf uses it.
+    _HH = np.maximum(_PZ2 - np.broadcast_to(_zf, _Z.shape).ravel()[_ix], RIS_HMIN)
+    _rtrunc.append(_ris_closure(_HH, RIS_D0, RIS_D1))
     _acc = np.zeros((_PZ.size, 3))
-    for _dn, _dt, _db in zip(_DN, _DT, _DB):
-        _tx, _ty = _NX * _dn - _NY * _dt, _NY * _dn + _NX * _dt
-        _tz = np.full(_PZ2.size, -_db)
+    for _d, _ph in zip(_DD, _PH):
+        _r2 = _HH * _HH + _d * _d
+        _cb, _sb = _d / np.sqrt(_r2), _HH / np.sqrt(_r2)   # cos, sin of the dip
+        _cp, _sp = np.cos(_ph), np.sin(_ph)
+        _tx = _cb * (_NX * _cp - _NY * _sp)
+        _ty = _cb * (_NY * _cp + _NX * _sp)
+        _tz = -_sb
         _sd, _u, _v, _sm, _ = scene_hit(_PX + _NX * 1e-4, _PY + _NY * 1e-4,
                                         _tx, _ty, _tz, _PZ2)
         _col = np.zeros((_PZ2.size, 3))
@@ -963,19 +1094,59 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
         # ? a gather ray that lands on ANOTHER riser contributes nothing. Those
         # ? faces are the dark side of the same terminator, so the error is one
         # ? bounce of a dim source; the share is printed and it is under 2%.
-        _acc[_ix] += _col * np.exp(-ABS[None] * _sm[:, None])
-        _rstat += [(_sd != 5).sum(), (_sd == 5).sum(), _sd.size]
-    _acc *= 0.5 / (RIS_NU * RIS_NP)
+        _w = _lnR * _cp * _d ** 3 * _HH / (_r2 * _r2)
+        _acc[_ix] += _col * _w[:, None] * np.exp(-ABS[None] * _sm[:, None])
+        _rstat += [_w[_sd != 5].sum(), _w[_sd == 5].sum(), _sd.size]
+    _acc /= (RIS_ND * RIS_NP)
     _mbs.append(_acc[_ix].mean(0))
     RIS_MAP.append(_acc.reshape(RIS_NZ, RIS_NT, 3))
 print("riser bounce: %d faces x %d directions; view-factor closure %.3f of the "
-      "0.500 a vertical face has by geometry (%.1f%% of rays land on another "
-      "riser and are dropped)"
-      % (4 * RIS_NT * RIS_NZ, RIS_NU * RIS_NP,
-         0.5 * _rstat[0] / max(_rstat[2], 1), 100 * _rstat[1] / max(_rstat[2], 1)))
+      "0.500 a vertical face has by geometry (%.3f of it is the truncation to "
+      "%.0f mm - %.0f m, %.1f%% is rays dropped on another riser)"
+      % (4 * RIS_NT * RIS_NZ, RIS_ND * RIS_NP, _rstat[0] / max(_rstat[2], 1),
+         np.mean(np.concatenate(_rtrunc)), 1000 * RIS_D0, RIS_D1,
+         100 * _rstat[1] / max(_rstat[2], 1)))
 print("  it adds %s of irradiance against %s of sky ambient on the same face "
       "-- and unlike the sky term it carries the caustic net"
       % (np.round(np.mean(_mbs, 0), 3), np.round(SKY_AMB * 0.5, 3)))
+
+
+# --- does it actually CARRY the net?  Measure, do not assert. ----------------
+# The number that matters is not the map's total variance -- a self-shadow
+# gradient running round the arc gives that for free -- but the variance at
+# CAUSTIC SCALE. So the map is high-passed along the arc at 0.60 m (three cells
+# of the 20 cm net) and the residual is compared with the same high-pass applied
+# to the bed radiance the gather is reading, sampled along the line 60 mm
+# outside the same arc. The ratio is the fraction of the bed's own cell-scale
+# contrast that survives the hemisphere integral, and it has a ceiling well
+# under 1: a receiver 100-300 mm from the bed integrates over about one and a
+# half cells, so losing most of it is correct and losing all of it is not.
+def _hipass(a, w):
+    k = max(int(round(w)), 3)
+    p = np.concatenate([a[-k:], a, a[:k]])
+    c = np.cumsum(np.insert(p, 0, 0.))
+    sm = (c[2 * k + 1:] - c[:-2 * k - 1]) / (2 * k + 1)
+    return a - sm[:a.size]
+
+
+print("  cell-scale contrast carried (rms of a 0.60 m high-pass along the arc, "
+      "over the mean):")
+for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
+    _th = (np.arange(RIS_NT) + .5) / RIS_NT * 2 * np.pi
+    _px, _py = _cx + _R * np.cos(_th), _cy + _R * np.sin(_th)
+    _ok = pool_sdf(_px, _py) < 0
+    if _ok.sum() < 32:
+        continue
+    _kk = 0.30 / (2 * np.pi * _R / RIS_NT)          # half-window in samples
+    _rr3 = RIS_MAP[_i][RIS_NZ // 2, :, 1]
+    _bb = sample(bed_img['mono'][..., 1:2], _cx + (_R + .06) * np.cos(_th),
+                 _cy + (_R + .06) * np.sin(_th), X0, X1, Y0, Y1)[:, 0]
+    _hr, _hb = _hipass(_rr3, _kk)[_ok], _hipass(_bb, _kk)[_ok]
+    print("    cyl %d R=%.2f m:  riser %.3f   bed beside it %.3f   -> %.0f%% "
+          "of the bed's own" % (_i, _R, _hr.std() / max(_rr3[_ok].mean(), 1e-9),
+                                _hb.std() / max(_bb[_ok].mean(), 1e-9),
+                                100 * (_hr.std() / max(_hb.std(), 1e-12))
+                                * (_bb[_ok].mean() / max(_rr3[_ok].mean(), 1e-9))))
 
 # The TIR return arrives at SHALLOW angles -- everything the bed emits beyond the
 # critical angle 48.6 deg comes back down between 48.6 and 90 deg from vertical --
@@ -1465,72 +1636,72 @@ for t3 in ((0, 1, 2), (0, 2, 3)):
 # --- trace the pool edge as a height field ---------------------------------
 # gh() is flat almost everywhere, so almost every ray is settled by an endpoint
 # test and only the band of pixels that actually straddles the coping is marched.
+# Written as a FUNCTION of the ray set rather than over the fixed pixel grid,
+# because the adaptive edge pass below has to be able to fire extra rays through
+# a pixel and get exactly the same answer the primary grid would have given.
 Ex, Ey, Ez = EYE
-with np.errstate(divide='ignore', invalid='ignore'):
-    t_top = (ZD - Ez) / D[:, 2]           # plane of the coping top
-    t_wat = (0.0 - Ez) / D[:, 2]          # the still waterline
-down = (D[:, 2] < -1e-9) & ~hit_sail
-t_top = np.where(down, t_top, BIG)
-t_wat = np.where(down, t_wat, BIG)
-_ax, _ay = Ex + D[:, 0] * t_top, Ey + D[:, 1] * t_top
-_bx, _by = Ex + D[:, 0] * t_wat, Ey + D[:, 1] * t_wat
-_sa, _sb = pool_s(_ax, _ay), pool_s(_bx, _by)
-# THE SHORTCUT NEEDS CONVEXITY, and says so. pool_sdf is convex for the box, so
-# on the 75 mm segment between the coping-top plane and the waterline it never
-# exceeds its endpoints: both ends inside the lip proves the whole ray is over
-# open water, and no march is needed. A freeform boundary with a concave lobe --
-# a kidney's waist, a step unit cut out of the water -- breaks that, and the
-# endpoints would silently certify a ray that clips stone in between. So the
-# shortcut is GATED on POOL_CONVEX rather than assumed; with it off every
-# downgoing ray is marched, which costs about 30x on this band of pixels.
-# 8 mm of slack covers the laid-stone wobble, which is not convex either.
-if POOL_CONVEX:
-    is_wat = down & (np.maximum(_sa, _sb) < SLIP - .008)
-    is_pav = down & (_sa >= SBUL + .008)   # already on the flat at the top plane
-else:
-    is_wat = down & (np.maximum(_sa, _sb) < SLIP - .30)
-    is_pav = down & (np.minimum(_sa, _sb) >= SBUL + .30)
-_mar = np.flatnonzero(down & ~is_wat & ~is_pav)
-t_hit = np.where(is_wat, t_wat, np.where(is_pav, t_top, BIG))
-print("edge march: %d of %d rays (%.2f%%) straddle the coping"
-      % (_mar.size, down.sum(), 100. * _mar.size / max(down.sum(), 1)))
-if _mar.size:
-    _t0, _t1 = t_top[_mar], t_wat[_mar]
-    _dx, _dy, _dz = D[_mar, 0], D[_mar, 1], D[_mar, 2]
-    _lo, _hi, _prev = _t0.copy(), _t1.copy(), _t0.copy()
-    _got = np.zeros(_mar.size, bool)
-    for _k in range(1, 25):
-        _t = _t0 + (_t1 - _t0) * (_k / 24.)
-        _f = (Ez + _dz * _t) - gh(Ex + _dx * _t, Ey + _dy * _t)
-        _n = (~_got) & (_f <= 0)
-        _lo = np.where(_n, _prev, _lo); _hi = np.where(_n, _t, _hi)
-        _got |= _n; _prev = _t
-    _lo = np.where(_got, _lo, _t1); _hi = np.where(_got, _hi, _t1)
-    for _ in range(16):
-        _m = .5 * (_lo + _hi)
-        _f = (Ez + _dz * _m) - gh(Ex + _dx * _m, Ey + _dy * _m)
-        _lo = np.where(_f > 0, _m, _lo); _hi = np.where(_f > 0, _hi, _m)
-    t_hit[_mar] = _hi
 
+
+def trace_edge(dvec):
+    """(t, s, is_water) where a set of camera rays meets the pool edge field."""
+    dz = dvec[:, 2]
+    with np.errstate(divide='ignore', invalid='ignore'):
+        tt = (ZD - Ez) / dz               # plane of the coping top
+        tw = (0.0 - Ez) / dz              # the still waterline
+    dn = dz < -1e-9
+    tt = np.where(dn, tt, BIG)
+    tw = np.where(dn, tw, BIG)
+    sa = pool_s(Ex + dvec[:, 0] * tt, Ey + dvec[:, 1] * tt)
+    sb = pool_s(Ex + dvec[:, 0] * tw, Ey + dvec[:, 1] * tw)
+    # THE SHORTCUT NEEDS CONVEXITY, and says so. pool_sdf is convex for the box,
+    # so on the 75 mm segment between the coping-top plane and the waterline it
+    # never exceeds its endpoints: both ends inside the lip proves the whole ray
+    # is over open water, and no march is needed. A freeform boundary with a
+    # concave lobe -- a kidney's waist, a step unit cut out of the water --
+    # breaks that, and the endpoints would silently certify a ray that clips
+    # stone in between. So the shortcut is GATED on POOL_CONVEX rather than
+    # assumed; with it off every downgoing ray is marched, about 30x the cost on
+    # this band of pixels. 8 mm of slack covers the laid-stone wobble, which is
+    # not convex either.
+    if POOL_CONVEX:
+        iw = dn & (np.maximum(sa, sb) < SLIP - .008)
+        ip = dn & (sa >= SBUL + .008)
+    else:
+        iw = dn & (np.maximum(sa, sb) < SLIP - .30)
+        ip = dn & (np.minimum(sa, sb) >= SBUL + .30)
+    mar = np.flatnonzero(dn & ~iw & ~ip)
+    th = np.where(iw, tw, np.where(ip, tt, BIG))
+    if mar.size:
+        t0, t1 = tt[mar], tw[mar]
+        dx, dy, dz2 = dvec[mar, 0], dvec[mar, 1], dvec[mar, 2]
+        lo, hi, prev = t0.copy(), t1.copy(), t0.copy()
+        got = np.zeros(mar.size, bool)
+        for k in range(1, 25):
+            t = t0 + (t1 - t0) * (k / 24.)
+            f = (Ez + dz2 * t) - gh(Ex + dx * t, Ey + dy * t)
+            n = (~got) & (f <= 0)
+            lo = np.where(n, prev, lo); hi = np.where(n, t, hi)
+            got |= n; prev = t
+        lo = np.where(got, lo, t1); hi = np.where(got, hi, t1)
+        for _ in range(16):
+            m = .5 * (lo + hi)
+            f = (Ez + dz2 * m) - gh(Ex + dx * m, Ey + dy * m)
+            lo = np.where(f > 0, m, lo); hi = np.where(f > 0, hi, m)
+        th[mar] = hi
+    sh = pool_se(Ex + dvec[:, 0] * th, Ey + dvec[:, 1] * th)
+    return th, sh, dn & (sh < SLIP + 1e-7), mar.size, dn.sum()
+
+
+t_hit, S_HIT, _isw, _nmar, _ndn = trace_edge(D)
+print("edge march: %d of %d rays (%.2f%%) straddle the coping"
+      % (_nmar, _ndn, 100. * _nmar / max(_ndn, 1)))
 hx, hy = Ex + D[:, 0] * t_hit, Ey + D[:, 1] * t_hit
-S_HIT = pool_se(hx, hy)
-inp = down & (S_HIT < SLIP + 1e-7)
-pav = down & ~inp
+inp = _isw & ~hit_sail
+pav = (D[:, 2] < -1e-9) & ~hit_sail & ~inp
 bgm = ~hit_sail & ~inp & ~pav             # nothing: the frame is water and stone
 
 PIXANG = 2. * np.tan(FOV / 2.) / H
 FOOT = t_hit * PIXANG / np.maximum(np.abs(D[:, 2]), .10)
-
-ix, iy = hx[inp], hy[inp]
-gxx, gyy = grad_points(ix, iy)
-nx, ny, nz = normal_from_grad(gxx, gyy)
-dd = D[inp]
-vx, vy, vz = -dd[:, 0], -dd[:, 1], -dd[:, 2]
-ndv = np.clip(nx * vx + ny * vy + nz * vz, 1e-4, 1.)
-rfx, rfy = -vx + 2 * ndv * nx, -vy + 2 * ndv * ny
-rfz = np.abs(-vz + 2 * ndv * nz)
-refl = sky(rfx, rfy, rfz)
-fres = F0[None] + (1 - F0[None]) * ((1 - ndv) ** 5)[:, None]
 
 # --- what the water does within a hand's width of the wall -------------------
 # Three separate things, all of them missing before, and together they are the
@@ -1542,17 +1713,74 @@ fres = F0[None] + (1 - F0[None]) * ((1 - ndv) ** 5)[:, None]
 #  2  the ambient.  Under the overhang the water sees a fraction of the sky.
 #  3  the meniscus.  Water wets the wall and climbs it; the curved sliver is
 #     brighter than the flat surface next to it.
-IN_W = -S_HIT[inp]                          # distance in from the wall face
-_egx, _egy, _ = pool_grad(ix, iy)
-_toward = rfx * _egx + rfy * _egy           # + = the reflected ray heads at the wall
-_over = rfz * np.maximum(IN_W + SLIP, 0.) / np.maximum(_toward, 1e-6)
-_occ = np.where(_toward > 0, np.clip(1. - _over / ZD, 0, 1), 0.) ** .8
 COP_REFL = np.array([.62, .57, .48]) * (SKY_DECK * .40 + WBOUNCE * .85)
-refl = refl * (1 - _occ)[:, None] + COP_REFL[None] * _occ[:, None]
-LIP_AO = 1. - .34 * np.exp(-(IN_W + SLIP) / .045)
-MENIS = np.exp(-np.maximum(IN_W + SLIP, 0.) / .010)
-print("reflection of the coping occludes %.1f%% of the visible surface"
-      % (100. * (_occ > .5).mean()))
+
+
+def water_shade(hw_x, hw_y, dvec, s_h, mode, lamk):
+    """Everything one camera ray does once it is over water: the surface normal
+    from field.py, Fresnel, the sky reflection with the coping's overhang cut
+    out of it, per-channel refraction INTO the pool, the traced hit, the bed /
+    wall / riser maps, Beer-Lambert on the camera leg, the residual in-scatter
+    and the meniscus. One function so the primary grid and the adaptive edge
+    pass below are the same estimator sampled at different rates -- if they were
+    two pieces of code, the refined pixels would differ from their neighbours by
+    more than the sampling."""
+    gxx_, gyy_ = grad_points(hw_x, hw_y)
+    nx_, ny_, nz_ = normal_from_grad(gxx_, gyy_)
+    vx_, vy_, vz_ = -dvec[:, 0], -dvec[:, 1], -dvec[:, 2]
+    ndv_ = np.clip(nx_ * vx_ + ny_ * vy_ + nz_ * vz_, 1e-4, 1.)
+    rfx_, rfy_ = -vx_ + 2 * ndv_ * nx_, -vy_ + 2 * ndv_ * ny_
+    rfz_ = np.abs(-vz_ + 2 * ndv_ * nz_)
+    refl_ = sky(rfx_, rfy_, rfz_)
+    fres_ = F0[None] + (1 - F0[None]) * ((1 - ndv_) ** 5)[:, None]
+    in_w = -s_h                              # distance in from the wall face
+    egx_, egy_, _ = pool_grad(hw_x, hw_y)
+    toward = rfx_ * egx_ + rfy_ * egy_       # + = reflected ray heads at the wall
+    over = rfz_ * np.maximum(in_w + SLIP, 0.) / np.maximum(toward, 1e-6)
+    occ_ = np.where(toward > 0, np.clip(1. - over / ZD, 0, 1), 0.) ** .8
+    refl_ = refl_ * (1 - occ_)[:, None] + COP_REFL[None] * occ_[:, None]
+    lip_ao = 1. - .34 * np.exp(-(in_w + SLIP) / .045)
+    menis = np.exp(-np.maximum(in_w + SLIP, 0.) / .010)
+
+    water = np.zeros((hw_x.size, 3))
+    geo, smG_ = {}, None
+    sidG = uG = vG = cylG = None
+    for c in range(3):
+        key = c if mode == 'disp' else 0
+        if key not in geo:
+            # 'disp' gives every ray its own wavelength inside the channel's
+            # band; 'mono' is one wavelength for all three, so one trace serves
+            # them and the A/B carries no dispersion at all.
+            eta = ETA_TAB[c][lamk] if mode == 'disp' else 1.0 / IOR[1]
+            tx, ty, tz = refract(dvec[:, 0], dvec[:, 1], dvec[:, 2],
+                                 nx_, ny_, nz_, eta)
+            geo[key] = scene_hit(hw_x, hw_y, tx, ty, tz) + (tz,)
+        sid, u, v, sm, cyl, tz = geo[key]
+        col = np.zeros(len(u))
+        bi, wim = bed_img[mode], wall_img[mode]
+        m = sid == 0
+        if m.any():
+            col[m] = sample(bi[..., c:c + 1], u[m], v[m], X0, X1, Y0, Y1)[:, 0]
+        for wi, sv in enumerate((1, 2, 3, 4)):
+            m = sid == sv
+            if m.any():
+                a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
+                col[m] = sample(wim[wi][..., c:c + 1], u[m], v[m],
+                                a, b, -DEPTH, 0.)[:, 0]
+        m = sid == 5
+        if m.any():
+            col[m] = _riser_shade(u[m], v[m], tz[m] * sm[m], cyl[m], c, mode)
+        water[:, c] = col * np.exp(-ABS[c] * sm)
+        if c == 1:
+            smG_, sidG, uG, vG, cylG = sm, sid, u, v, cyl
+    # the residual in-scatter of a treated pool: tiny, but it is a PATH integral,
+    # so it grows with the water actually crossed and is one more depth cue.
+    water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * smG_))[:, None]
+    water *= lip_ao[:, None]
+    out = (fres_ * refl_ + (1 - fres_) * water
+           + (SKY_AMB[None] * .17 + SUN_COL[None] * .006) * menis[:, None])
+    return out, sidG, uG, vG, smG_, cylG, occ_
+
 
 PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
 
@@ -1721,9 +1949,18 @@ def _sat(m):
     return (m.max() - m.min()) / max(m.max(), 1e-9)
 
 
+def _srgb_lin(v):
+    """sRGB code value 0-255 back to linear light. The bar's section A numbers
+    are sRGB triples; every RATIO taken between two of them has to come back
+    here first or the encoding's power law is read as physics."""
+    x = np.asarray(v, float) / 255.
+    return np.where(x <= .04045, x / 12.92, ((x + .055) / 1.055) ** 2.4)
+
+
 def colour_table(img, reg):
     print("colour regression (sRGB medians; saturation = (max-min)/max)")
     lum = np.zeros(6)
+    llin = np.zeros(6)
     for nm, k in (("riser face      ", 1), ("tread top       ", 2),
                   ("floor, sunlit   ", 3), ("coping stone    ", 4),
                   ("floor, in shadow", 5)):
@@ -1733,13 +1970,24 @@ def colour_table(img, reg):
             continue
         med = np.median(img[sel].reshape(-1, 3), 0)
         lum[k] = med @ np.array([.2126, .7152, .0722])
+        llin[k] = _srgb_lin(med) @ np.array([.2126, .7152, .0722])
         print("  %s  (%3.0f,%3.0f,%3.0f)  sat %.2f   %6d px"
               % (nm, med[0], med[1], med[2], _sat(med), sel.sum()))
     # Bar section A: the water under the sail is "clearly luminous, roughly half
-    # the lit value". That is a ratio, so it is printed as one.
+    # the lit value". That is a ratio, so it is printed as one -- but IN WHICH
+    # UNITS. This line used to divide two sRGB-encoded luminances and compare the
+    # answer with 0.5, which is a units bug and it read as a physics defect:
+    # sRGB is a ~1/2.2 power law, so a factor of two in LIGHT reads as 0.73 in
+    # encoded luminance. The bar's own numbers settle it. Section A gives lit
+    # (120, 215, 225) and shaded (70, 165, 185); those two sRGB triples are
+    # 0.75 apart in ENCODED luminance and 0.546 apart in LINEAR luminance, so
+    # "roughly half the lit value" is the linear reading -- as it must be, since
+    # half the light is a statement about light. Both are printed; the linear one
+    # is the one to judge, and the bar's own value for it is 0.546.
     if lum[3] > 0 and lum[5] > 0:
-        print("  sail shadow / sunlit floor: %.2f of the luminance (the bar says"
-              " ~0.5, and NOT a dark hole)" % (lum[5] / lum[3]))
+        print("  sail shadow / sunlit floor: %.3f in LINEAR light (the bar's own "
+              "two sRGB triples give 0.546), %.2f in sRGB-encoded luminance "
+              "(the bar's give 0.75)" % (llin[5] / llin[3], lum[5] / lum[3]))
     # PAIRED, ROW BY ROW. Grazing angle and Fresnel are functions of the image
     # row, so the only way to say "the receiver is the difference" is to hold
     # the row fixed: take each region's median within a row, then the median of
