@@ -1908,7 +1908,14 @@ def cmd_aim(args):
         die("state at least one expectation (--expect-severity minor|none and/or --expect-score N) — "
             "without one the verdict cannot confirm or refute anything")
     if args.expect_severity is not None and args.expect_severity not in ("minor", "none"):
-        die("--expect-severity must be minor or none — aiming at major is not an improvement")
+        # The honest cold-start case lands here: a first build genuinely may be
+        # expected to come back `major`. That is not an aim, it is a forecast —
+        # and tier 0 does not take an artifact aim at all (`aim.md`), because
+        # the probe's hypothesis is about the apparatus, not the artifact.
+        die("--expect-severity must be minor or none — aiming at major is not an improvement.\n"
+            "  If this is a cold-start or probe round and `major` is the honest expectation, it "
+            "does not need an aim: tier 0 aims at the loop (does inspection work, does the bar "
+            "discriminate), and aim accounting starts at tier 1.")
     if args.expect_score is not None and not (0 <= args.expect_score <= 10):
         die("--expect-score must be 0-10")
 
