@@ -72,7 +72,7 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 # mirror direction for a 21 deg sun crossing it a fifth of the way down.
 EYE = np.array([9.40, 1.55, 1.85])    # east: the anti-solar side
 CAM_AZ = np.deg2rad(176.6)            # anti-solar to 0.4 deg: see above
-CAM_EL = np.deg2rad(-34.0)
+CAM_EL = np.deg2rad(-33.35)
 FOV = np.deg2rad(46.0)
 TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
                             np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
@@ -95,7 +95,7 @@ SBUL = SLIP + BULR
 ZCEN = ZD - BULR  # centre of the bullnose arc, in (s, z)
 ZLIP = ZCEN       # the lip: lowest point of the bullnose, 43 mm over the water
 COPW =  0.34      # width of the coping course
-WET  =  0.155     # how far back from the lip the stone is still splash-damp
+WET  =  0.210     # how far back from the lip the stone is still splash-damp
 # A real pool liner is BLUE, not white plaster. Absolute albedo ~ (0.24, 0.54, 0.70):
 # reflective enough to stay bright, saturated enough to carry the colour itself.
 LINER_TINT = np.array([0.30, 0.79, 0.92])
@@ -322,6 +322,19 @@ for c in range(4):
         wall[wi][c] = blur(wall[wi][c], sig_m / ((Y1 - Y0) / WNU))
 print("bed caustic: mean %.2f  p99 %.2f  max %.2f" %
       (bed[1].mean(), np.percentile(bed[1], 99), bed[1].max()))
+
+# Upwelling radiance of the lit water: liner albedo, lit through the whole light
+# path and looked at through a whole depth of water. The pool is a large, bright,
+# strongly coloured UPWARD source and the stone at its edge is lit by it. Without
+# this term the coping's bullnose -- which faces the water and therefore faces
+# away from a western sun -- comes out black, and a 3 cm black line compressed
+# into two pixels at the far coping is speckle, not a shadow line. With it, it is
+# the dim teal line a real pool edge has, and the coping picks up a cast from the
+# water for the first half metre, which real ones visibly do.
+WBOUNCE = 0.5 * LINER_TINT * 0.74 * (
+    SUN_COL * cos_i * TSUN * np.exp(-ABS * (slant + DEPTH)) + SKY_AMB * 0.8)
+print("water upwelling onto the coping: %s  (sky on stone: %s)"
+      % (np.round(WBOUNCE, 3), np.round(SKY_DECK, 3)))
 
 
 # --------------------------------------------------------------------------- materials
@@ -589,15 +602,15 @@ def paving(x, y, s, vdir, fp):
     ks = np.where(cop, np.floor((along + .19 * side) / .55), np.floor((x + .46 * (row % 2.)) / .92))
     kt = np.where(cop, side, row)
     t1, t2 = _hash(ks, kt, 3.1), _hash(ks, kt, 11.7)
-    alb = np.where(cop[:, None], np.array([.660, .604, .502])[None],
-                   np.array([.618, .558, .466])[None])
+    alb = np.where(cop[:, None], np.array([.700, .600, .452])[None],
+                   np.array([.662, .562, .428])[None])
     alb = alb * (1. + .46 * (t1 - .5))[:, None]
     alb = alb * (1. + np.stack([.20 * (t2 - .5), .03 * (t2 - .5), -.21 * (t2 - .5)], 1))
     alb = alb * (1. + .13 * (n1 - .5) + .11 * w2 * (n2 - .5) + .09 * w3 * (n3 - .5)
                  + .07 * w4 * (n4 - .5) + .05 * w5 * (n5 - .5))[:, None]
     alb = alb * (1. - .42 * jm)[:, None]
     alb = alb * (1. - .22 * jw * vnoise(x * 3.3 + 61., y * 3.3 + 41.))[:, None]
-    alb = alb * (1. - .46 * wet)[:, None]
+    alb = alb * (1. - .54 * wet)[:, None]
 
     # --- light
     L = SUN_DIR
@@ -605,8 +618,10 @@ def paving(x, y, s, vdir, fp):
     vis = np.asarray(sun_vis(x, y), float)
     lift = SAIL_TAU * (1. - vis) * sail_glow(x, y)
     skyv = (.55 + .45 * Nz) * (1. - .40 * jm)
+    pf = np.clip(-(Nx * gx + Ny * gy), 0, 1)          # how much it faces the pool
+    wv = (.95 * pf + .10 * Nz * np.exp(-np.maximum(s - SLIP, 0.) / .45)) * (1. - .40 * jm)
     col = alb * (SUN_COL[None] * (ndl * vis + SUN_DIR[2] * lift)[:, None] * .30
-                 + SKY_DECK[None] * skyv[:, None])
+                 + SKY_DECK[None] * skyv[:, None] + WBOUNCE[None] * wv[:, None])
 
     Vx, Vy, Vz = -vdir[:, 0], -vdir[:, 1], -vdir[:, 2]
     Hx, Hy, Hz = L[0] + Vx, L[1] + Vy, L[2] + Vz
@@ -723,7 +738,7 @@ _egx, _egy, _ = pool_grad(ix, iy)
 _toward = rfx * _egx + rfy * _egy           # + = the reflected ray heads at the wall
 _over = rfz * np.maximum(IN_W + SLIP, 0.) / np.maximum(_toward, 1e-6)
 _occ = np.where(_toward > 0, np.clip(1. - _over / ZD, 0, 1), 0.) ** .8
-COP_REFL = np.array([.62, .57, .48]) * (SKY_AMB * .52 + SUN_COL * .034)
+COP_REFL = np.array([.62, .57, .48]) * (SKY_DECK * .40 + WBOUNCE * .85)
 refl = refl * (1 - _occ)[:, None] + COP_REFL[None] * _occ[:, None]
 LIP_AO = 1. - .34 * np.exp(-(IN_W + SLIP) / .045)
 MENIS = np.exp(-np.maximum(IN_W + SLIP, 0.) / .010)
@@ -785,7 +800,7 @@ mono = encode(render('mono'))
 Image.fromarray(hero).save("pool_final.png")
 print("wrote pool.png")
 
-CX, CY, CW, CHh = 430, 330, 300, 200
+CX, CY, CW, CHh = 230, 560, 280, 190      # a patch of sunlit bed, not of deck
 S = 3
 
 
