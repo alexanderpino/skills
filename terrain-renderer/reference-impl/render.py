@@ -2677,9 +2677,13 @@ PAV_Z = Ez + D[pav, 2] * t_hit[pav]        # height of the stone/band hit
 PAV_COL = paving(hx[pav], hy[pav], PAV_Z, S_HIT[pav], D[pav], FOOT[pav])
 # which of those rays landed on the DRY BLUE, for the colour regression below:
 # on the liner, above the wet foot, below the grey bead.
-_bnd = np.flatnonzero(pav)
+_bsel = (PAV_Z > MENIS_H + ETA_RMS) & (PAV_Z < FREEB)
 BAND_RAY = np.zeros(W * H, bool)
-BAND_RAY[_bnd[(PAV_Z > MENIS_H + ETA_RMS) & (PAV_Z < FREEB)]] = True
+BAND_RAY[np.flatnonzero(pav)[_bsel]] = True
+# the irradiance those rays saw, kept so the band's COLOUR can be divided by its
+# own lighting: what is left is the pigment, and the pigment is the measurement.
+BAND_E = (liner_band(hx[pav][_bsel], hy[pav][_bsel], PAV_Z[_bsel],
+                     D[pav][_bsel])[1] if _bsel.any() else np.zeros((1, 3)))
 print("the freeboard band: %d of %d subsample rays land on it, %d on the dry "
       "blue" % ((PAV_Z < ZLIP - 1e-5).sum(), pav.sum(), BAND_RAY.sum()))
 
@@ -3315,7 +3319,12 @@ def encode(hdr):
     return (x * 255 + .5).astype(np.uint8)
 
 
-hero = encode(render('disp'))
+_hdr = render('disp')
+# the LINEAR frame, kept at output resolution: the absorption regression below
+# is a ratio between two radiances and it cannot be read off sRGB code values.
+HDRP = _hdr.reshape(H // SS, SS, W // SS, SS, 3).mean((1, 3))
+hero = encode(_hdr)
+del _hdr
 
 
 # --- THE COLOUR REGRESSION ---------------------------------------------------
