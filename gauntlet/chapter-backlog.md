@@ -187,6 +187,41 @@ mirror outside Snell's window *and* the whiteness of foam. And foam is white
 rather than tinted because absorption needs a long path — transmission over 5 mm
 is 0.999 in red — so **foam is many short paths where blue water is one long one**.
 
+## 9b · What is actually in pool water, and which parts of it are visible
+
+The chapter rests `b_b ≈ 0` on "treated water" without saying what the treatment
+puts in or why it does not show. Asked directly, and worth answering in the text
+because it is the first thing a sceptical reader will challenge.
+
+- **Chlorine is a UV absorber, not a visible one.** Hypochlorite peaks at
+  **292 nm** with `ε ≈ 300–378 M⁻¹cm⁻¹`; hypochlorous acid at 235 nm. At a pool
+  dose of 1–3 mg/L that is an absorbance of **0.5–1.5 per metre in the UV** —
+  real, and why chlorine burns off in sun — while at 450–610 nm the band has
+  decayed to far below water's own `a(450) = 0.0092 /m`. Chlorine does not colour
+  pool water at any dose you would swim in.
+- **Dissolved calcium is colourless. *Precipitated* calcium is not.** Ca²⁺ and
+  carbonate absorb nothing in the visible, but past about pH 7.8 the calcium comes
+  out of solution as microscopic CaCO₃ that stays in suspension — the standard
+  cause of a milky pool. That is **scattering**, and it is the one ordinary
+  impurity that genuinely breaks `b_b ≈ 0`.
+- **The visible difference between the two is the diagnostic**, and the chapter
+  should give it: absorption only subtracts, so it darkens and shifts hue with
+  path; scattering **adds** a veiling glow, lifts shadows, hazes distance, and
+  **blurs caustics**. A pool that has gone cloudy loses its caustic net before it
+  looks obviously milky.
+- **So a photograph measures its own scattering.** Sharp caustics at 1.40 m put a
+  ceiling on `b_b` directly: the net's blur is set by the sun-disc penumbra, 6.8 mm
+  at this depth, and any scattering contributing more than that would be visible
+  as a softer net. Every reference frame in this run has a crisp net, so the
+  reference pool's water is genuinely in the `b_b ≈ 0` regime — measured off the
+  artefact rather than assumed. Put a number on the bound if you can (`?`).
+- **Two impurities that *would* change the colour by absorption**, worth naming so
+  the exception is bounded: **dissolved copper**, from an algaecide or a corroding
+  heat exchanger, which really does tint water blue-green; and **coloured dissolved
+  organic matter**, which absorbs blue and pushes the water toward green-yellow.
+  Neither is present in a well-run pool, and both are absorbers, so both fit the
+  existing machinery — they change `a`, not `b`.
+
 ## 10 · The view from inside, and the split shot
 
 Scoped in `reference-impl/README.md` and in bar sections G and H, unbuilt, and

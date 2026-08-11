@@ -1097,6 +1097,13 @@ BEDRET = np.stack([sample(bedret[..., c:c + 1], BU.ravel(), BV.ravel(),
 
 bed_img = {'disp': shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=BDEP, extra=BEDRET),
            'mono': shade([bed[3]] * 3, LIN, BED_AO, glow=GLOW, dep=BDEP, extra=BEDRET)}
+# ...and THE SAME BED WITH THE WATER TAKEN OUT of the light leg, which is the
+# reference half of the absorption regression the freeboard band makes possible:
+# the dry band and the bed are one pigment differing by one path, so bed_img /
+# BED_DRY is that path, measured on the maps the picture is actually made from
+# rather than argued from constants. Costs one more `shade`; nothing samples it.
+BED_DRY = shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=np.zeros_like(BDEP),
+                extra=BEDRET)
 wall_img = {'disp': [], 'mono': []}
 for wi in range(4):
     uu = np.linspace(Y0, Y1, WNU) if wi < 2 else np.linspace(X0, X1, WNU)
@@ -1875,6 +1882,16 @@ def gh(x, y):
 # So the receiver normal used here is the POOLWARD HORIZONTAL one, and what the
 # flat top of the coping gets is only the sub-pixel-facet share of that (the
 # 0.10 below, which stays a `?`). The falloff is no longer a guessed exponential.
+# The capillary scale, hoisted here from the water-shading block below because
+# the liner band's wet foot is built in this section and needs it. The long
+# derivation stays where the meniscus itself is applied to the water.
+CAP_A = np.sqrt(SIGMA_W / (1000.0 * 9.81))          # capillary length, 2.72 mm
+MENIS_H = CAP_A * np.sqrt(2.0)                      # ? climb at contact angle 0
+MENIS_W = 2.0 * CAP_A                               # ? fillet reach, ~2 a
+print("meniscus: capillary length %.2f mm, climb %.2f mm at perfect wetting, "
+      "fillet %.1f mm wide (was a guessed 10 mm e-folding)"
+      % (1000 * CAP_A, 1000 * MENIS_H, 1000 * MENIS_W))
+
 DECK_S = np.array([SLIP, 0.02, 0.06, 0.14, 0.30, 0.55, 0.95])
 DECK_DA = 0.005                      # 5 mm along the run; the pattern's own
 DECK_NA = [int(round((Y1 - Y0) / DECK_DA))] * 2 + \
@@ -2045,6 +2062,90 @@ def band_water(along, side, z):
     return _map_at(BANDG, BANDG0, z, BAND_Z, along, side, len(BAND_Z) - 1)
 
 
+# --- WHERE THE WATER ACTUALLY MEETS THE WALL ---------------------------------
+# The sixth reference photograph shows the waterline against the WALL soft, wet
+# and undulating. That does NOT reverse bar section B2, and reading it as a
+# contradiction is the mistake B3 was written to prevent: B2 is the COPING'S
+# ARRIS, cut stone seen from above, and it stays hard. This is the WALL'S
+# waterline, a different edge, and B3 already puts the meniscus on it.
+#
+# render.py has no height field -- field.py answers slopes, not elevations --
+# but along a straight wall it does not need one. The surface elevation along
+# the wall is the LINE INTEGRAL of the along-wall slope component, which is
+# exact up to an additive constant, and the constant is the mean water level.
+# Integrating a zero-mean field is a random walk, so the result is high-passed
+# at 1 m: that removes only frequencies the field has no energy at (its longest
+# carrier is 0.53 m) and it kills the walk. Nothing is invented here -- the
+# wobble is the same wave field the caustics are, read along one line.
+def _waterline():
+    out = []
+    for sd in range(4):
+        gx, gy, lx, ly, fx, fy = _DG[sd]
+        a = (np.arange(DECK_NA[sd]) + .5) * DECK_DA + (Y0 if sd < 2 else X0)
+        px = (fx + gx * (SLIP - .030)) if fx is not None else a
+        py = (fy + gy * (SLIP - .030)) if fy is not None else a
+        px = np.broadcast_to(np.atleast_1d(px), a.shape).astype(np.float64)
+        py = np.broadcast_to(np.atleast_1d(py), a.shape).astype(np.float64)
+        sx, sy = grad_points(px, py)
+        eta = np.cumsum((sx * lx + sy * ly) * DECK_DA)
+        out.append(_hipass(eta - eta.mean(), 0.5 / DECK_DA))
+    return out
+
+
+WLINE = _waterline()
+ETA_RMS = float(np.mean([w.std() for w in WLINE]))
+print("waterline on the wall, reconstructed by integrating the along-wall slope: "
+      "rms %.2f mm, p2p %.2f mm -- against a meniscus climb of %.2f mm, so the "
+      "wobble and the fillet are the same size and the line is soft rather than "
+      "cut" % (1000 * ETA_RMS,
+               1000 * float(np.mean([w.max() - w.min() for w in WLINE])),
+               1000 * MENIS_H))
+
+
+def waterline(along, side):
+    """Local surface elevation where the water meets the wall, metres."""
+    out = np.zeros(len(along))
+    for sd in range(4):
+        m = side == sd
+        if not m.any():
+            continue
+        fa = np.clip((along[m] - (Y0 if sd < 2 else X0)) / DECK_DA - .5,
+                     0, DECK_NA[sd] - 1.001)
+        ja = fa.astype(np.int64); fj = fa - ja
+        out[m] = WLINE[sd][ja] * (1 - fj) + WLINE[sd][ja + 1] * fj
+    return out
+
+
+# --- WET LINER, DERIVED RATHER THAN DIALLED ----------------------------------
+# A film of water on a NON-POROUS substrate darkens it by a mechanism with no
+# free parameter: light crosses the air/water interface twice, and between the
+# crossings it is trapped by total internal reflection. With R_EXT the diffuse
+# external reflectance of that interface -- integrated below from THIS FILE'S
+# own per-channel Fresnel over a cosine-weighted hemisphere, so no constant
+# enters -- and R_INT = 1 - (1 - R_EXT)/n^2 by reciprocity, a substrate of dry
+# albedo `a` reads
+#       a_wet = R_EXT + (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
+# The wet band at the foot of the blue is therefore a measured fraction of the
+# dry one, and it is printed rather than chosen.
+_wmu = ((np.arange(512) + .5) / 512.)[:, None]
+_wct = np.sqrt(np.maximum(1. - (1. - _wmu ** 2) / IOR[None] ** 2, 0.))
+_wrs = ((_wmu - IOR[None] * _wct) / (_wmu + IOR[None] * _wct)) ** 2
+_wrp = ((IOR[None] * _wmu - _wct) / (IOR[None] * _wmu + _wct)) ** 2
+R_EXT = (2. * _wmu * .5 * (_wrs + _wrp)).mean(0)
+R_INT = 1. - (1. - R_EXT) / IOR ** 2
+
+
+def wet_albedo(a):
+    return R_EXT[None] + (1. - R_EXT[None]) * (1. - R_INT[None]) * a / (
+        1. - a * R_INT[None])
+
+
+print("wet liner: diffuse Fresnel R_ext %s, R_int %s (1 - (1-R_ext)/n^2), so a "
+      "wetted liner reads %s of its dry albedo" %
+      (np.round(R_EXT, 4), np.round(R_INT, 4),
+       np.round(wet_albedo(0.74 * LINER_TINT[None])[0] / (0.74 * LINER_TINT), 3)))
+
+
 def _groove(c, per, hw, dep):
     """A joint every `per` metres. A 5 mm groove under a 21 degree sun is not a
     drawn line: it is one face that catches the sun and one that cannot."""
@@ -2062,7 +2163,7 @@ def _notch(c, c0, hw, dep):
             np.clip(1 - d / hw, 0, 1), np.clip(1 - d / .050, 0, 1))
 
 
-def paving(x, y, s, vdir, fp):
+def _stone(x, y, s, vdir, fp):
     """Coping course and terrace. In this frame it is a border, so it gets what a
     border needs and nothing else: stone that changes stone to stone, joints with
     a groove rather than a line, and the splash-damp band every coping carries
@@ -2168,6 +2269,103 @@ def paving(x, y, s, vdir, fp):
                                   * ndl * vis * .30)[:, None])
     Fv = .045 + .955 * (1. - ndv) ** 5
     return col + SKY_AMB[None] * (Fv * (.09 + .55 * wet))[:, None]
+
+
+# --------------------------------------------------------- THE FREEBOARD BAND
+# Bar section B2b, and the receiver the water-out gather above was built for.
+# A poolward-facing VERTICAL strip standing directly on the surface is the best
+# receiver in the frame for the water's own thrown light -- better than the
+# coping, and for a reason that is geometry rather than taste:
+#
+#   * the flat-water form factor is SCALE INVARIANT. A vertical facet over an
+#     infinite plane collects the same irradiance at 6 mm as at 600 mm, so the
+#     band is not brighter than the coping because it catches more light.
+#   * what does change with height is the PATCH OF SURFACE it integrates. The
+#     gather's weight peaks at rho = qz, so a facet 6 mm up reads a centimetre
+#     of water and resolves single caustic bands; the coping, 300 mm back and
+#     150 mm up, reads half a metre and averages the net into a DC. That is the
+#     whole of "brighter and more legible ... because it is closer to the
+#     water", and the contrast printed after the render measures it.
+#   * and the band is PALER than the stone in the channel that matters, because
+#     it is the liner: same pigment as the bed, with no water over it.
+#
+# THE OWNER'S READING OF THIS BAND, and the calibration it buys:
+#   "That edge is the colour of the walls and floor of the pool. The cyan is
+#    what the water and the light add."
+# The pigment half is exactly right and the mechanism runs the other way, which
+# is this project's own doctrine: with b_b ~ 0 the column has no body colour and
+# can only SUBTRACT. It takes red -- ABS is 0.275/m at 620 nm against 0.0145 at
+# 460 -- and what survives READS as cyan. So the dry band and the bed are one
+# material differing by one path, and the frame therefore carries its own
+# absorption regression; it is printed at the end of the run.
+def liner_band(x, y, z, vdir):
+    """The freeboard: FREEB of the pool's own blue liner with BEAD of grey
+    concrete over it, both vertical and facing the pool, both DRY. Returns the
+    radiance and the irradiance that produced it, because the second is what
+    makes the band's colour a measurement of the liner rather than of the
+    lighting."""
+    along, side, gx, gy, _e = _run(x, y)
+    sd = side.astype(np.int64)
+    Nx, Ny = -gx, -gy                       # poolward horizontal, so Nz = 0
+    h = z - waterline(along, sd)            # height over the LOCAL water level
+    bead = z > FREEB                        # the grey concrete over the blue
+
+    # --- albedo. ONE material for the blue, and it is the one already here:
+    # the same 0.74 * LINER_TINT that `liner()` puts on the bed and that
+    # WBOUNCE is built from. No second colour is introduced, on purpose.
+    alb = np.broadcast_to(0.74 * LINER_TINT[None], (len(x), 3)).copy()
+    # the calcium bloom of `tiles`, continued across the waterline instead of
+    # being cut off at it -- it deposits at the MEAN level, so it is a function
+    # of z and does not wobble with h.
+    cal = np.exp(-((z + .0095) / .0115) ** 2)
+    w = (.78 * cal)[:, None]
+    alb = alb * (1 - w) + np.array([.95, .91, .84])[None] * w
+    # the wet foot: everything the surface has recently covered, which is the
+    # meniscus climb plus the wobble the waterline itself carries. Both are
+    # derived (MENIS_H, ETA_RMS), and the darkening is the wet-albedo above.
+    wetb = np.clip(1. - h / (MENIS_H + ETA_RMS), 0, 1) ** .8
+    alb = alb * (1 - wetb[:, None]) + wet_albedo(alb) * wetb[:, None]
+    # ? the bead's albedo is a visual reading of the sixth photograph, in the
+    # ? same status as the sandstone's: neutral grey concrete, slightly cool.
+    alb = np.where(bead[:, None], np.array([.40, .41, .42])[None], alb)
+
+    # --- light. A vertical facet's cosine-weighted hemisphere splits EXACTLY in
+    # half at the horizon -- sky above, water below -- so each half gets 0.50 and
+    # neither number is a choice. The lip cannot shade this face (the bullnose
+    # rolls away from the pool above it), so the sun term takes the sail's
+    # shadow alone and not coping_vis.
+    L = SUN_DIR
+    ndl = np.clip(Nx * L[0] + Ny * L[1], 0, 1)
+    vis = np.asarray(sail_vis(x, y), float)
+    lift = SAIL_TAU * (1. - vis) * sail_glow(x, y)
+    pat, fal = band_water(along, sd, z)
+    E = (SUN_COL[None] * (ndl * vis + SUN_DIR[2] * lift)[:, None] * .30
+         + SKY_DECK[None] * .50
+         + WBOUNCE[None] * pat * (.50 * fal)[:, None])
+    col = alb * E
+
+    # --- and the grazing sheen. A poolward-facing vertical face reflects the
+    # water in front of it, NOT the sky: the mirror direction from a horizontal
+    # normal to an eye above it points down into the basin. So the source is
+    # WBOUNCE. `?` R_EXT is water's; a dry PVC sheet is nearer 0.043 at normal
+    # incidence, and identical to this at the grazing angle the band is seen at.
+    Vx, Vy = -vdir[:, 0], -vdir[:, 1]
+    ndv = np.clip(Nx * Vx + Ny * Vy, 1e-3, 1)
+    Fv = R_EXT[None] + (1. - R_EXT[None]) * (1. - ndv)[:, None] ** 5
+    return col + WBOUNCE[None] * Fv * np.where(bead[:, None], .25, 1.), E
+
+
+def paving(x, y, z, s, vdir, fp):
+    """Everything a downgoing ray that missed the water can hit. The height
+    field drops vertically from the coping's lip to the still surface, so a hit
+    BELOW that lip is on the freeboard band and a hit at or above it is stone --
+    one test, and it is exact because the deck is flat at ZD and the bullnose
+    bottoms out at ZLIP."""
+    out = _stone(x, y, s, vdir, fp)
+    b = z < ZLIP - 1e-5
+    if b.any():
+        out[b] = liner_band(x[b], y[b], z[b], vdir[b])[0]
+    return out
 
 
 # --------------------------------------------------------------------------- camera
@@ -2314,6 +2512,22 @@ FOOT_PX = FOOT * SS
 #  3  the meniscus.  Water wets the wall and climbs it; the curved sliver is
 #     brighter than the flat surface next to it.
 COP_REFL = np.array([.62, .57, .48]) * (SKY_DECK * .40 + WBOUNCE * .85)
+# ...and what the water reflects there is now mostly LINER rather than stone. Of
+# the ZD of vertical face a near-wall reflected ray can strike, FREEB is blue
+# liner, BEAD is grey concrete and only the top BULR is the bullnose's underside.
+# Leaving COP_REFL alone would have the water reflecting a sandstone colour off a
+# surface this round just made blue -- an inconsistency introduced by the change
+# itself, so it is closed here. `?` in the WEIGHTING only: `over` below already
+# knows the height on the face the ray strikes, but resolving the mix per ray
+# needs the band's along-wall lookup inside water_shade, which is a pass of its
+# own. The area weighting is the mean of that, and it is exact for the mean.
+BAND_REFL = 0.74 * LINER_TINT * (SKY_DECK * .50 + WBOUNCE * .50)
+BEAD_REFL = np.array([.40, .41, .42]) * (SKY_DECK * .50 + WBOUNCE * .50)
+EDGE_REFL = (FREEB * BAND_REFL + BEAD * BEAD_REFL + BULR * COP_REFL) / ZD
+print("what the water reflects at the wall: %s, of which %.0f%% is liner band, "
+      "%.0f%% bead, %.0f%% stone (was the stone's own %s)"
+      % (np.round(EDGE_REFL, 3), 100 * FREEB / ZD, 100 * BEAD / ZD,
+         100 * BULR / ZD, np.round(COP_REFL, 3)))
 # The meniscus, with its width DERIVED instead of guessed. Water wets the wall
 # and climbs it; the 2-D static meniscus on a vertical wall is exactly
 #     z = 2 a sin(phi/2),      a = sqrt(sigma / rho g) = 2.72 mm
@@ -2337,12 +2551,8 @@ COP_REFL = np.array([.62, .57, .48]) * (SKY_DECK * .40 + WBOUNCE * .85)
 # on the east and west walls and not on the north and south, while the horizon's
 # is reachable on all four. That is a pass of its own; it is scoped in the
 # README rather than half-built here.
-CAP_A = np.sqrt(SIGMA_W / (1000.0 * 9.81))          # capillary length, 2.72 mm
-MENIS_H = CAP_A * np.sqrt(2.0)                      # ? climb at contact angle 0
-MENIS_W = 2.0 * CAP_A                               # ? fillet reach, ~2 a
-print("meniscus: capillary length %.2f mm, climb %.2f mm at perfect wetting, "
-      "fillet %.1f mm wide (was a guessed 10 mm e-folding)"
-      % (1000 * CAP_A, 1000 * MENIS_H, 1000 * MENIS_W))
+# CAP_A / MENIS_H / MENIS_W are defined with the pool-edge section above,
+# because the liner band's wet foot needs them too and it is built there.
 
 
 def surf_stats(x, y, fp):
@@ -2399,7 +2609,7 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     toward = rfx_ * egx_ + rfy_ * egy_       # + = reflected ray heads at the wall
     over = rfz_ * np.maximum(in_w + SLIP, 0.) / np.maximum(toward, 1e-6)
     occ_ = np.where(toward > 0, np.clip(1. - over / ZD, 0, 1), 0.) ** .8
-    refl_ = refl_ * (1 - occ_)[:, None] + COP_REFL[None] * occ_[:, None]
+    refl_ = refl_ * (1 - occ_)[:, None] + EDGE_REFL[None] * occ_[:, None]
     lip_ao = 1. - .34 * np.exp(-(in_w + SLIP) / .045)
     menis = np.exp(-np.maximum(in_w + SLIP, 0.) / MENIS_W)
 
@@ -2463,7 +2673,15 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
 
 
 QSUB = ((SUBK[inp].astype(np.float64) + .5) / NSPEC)
-PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
+PAV_Z = Ez + D[pav, 2] * t_hit[pav]        # height of the stone/band hit
+PAV_COL = paving(hx[pav], hy[pav], PAV_Z, S_HIT[pav], D[pav], FOOT[pav])
+# which of those rays landed on the DRY BLUE, for the colour regression below:
+# on the liner, above the wet foot, below the grey bead.
+_bnd = np.flatnonzero(pav)
+BAND_RAY = np.zeros(W * H, bool)
+BAND_RAY[_bnd[(PAV_Z > MENIS_H + ETA_RMS) & (PAV_Z < FREEB)]] = True
+print("the freeboard band: %d of %d subsample rays land on it, %d on the dry "
+      "blue" % ((PAV_Z < ZLIP - 1e-5).sum(), pav.sum(), BAND_RAY.sum()))
 
 # The field does not depend on wavelength, so the disp and mono renders are the
 # same rays through the same water: the pair is computed once here rather than
@@ -3037,7 +3255,8 @@ def _refine(idx, mode):
                                      mode, q[isw], fp=ftw[isw])[0]
             ps = ~isw & (dv[:, 2] < -1e-9)
             if ps.any():
-                c[ps] = paving(hxa[ps], hya[ps], sh[ps], dv[ps], ftw[ps] / SS)
+                c[ps] = paving(hxa[ps], hya[ps], Ez + dv[ps, 2] * th[ps],
+                               sh[ps], dv[ps], ftw[ps] / SS)
             acc += c
     return acc / (n * n)
 
@@ -3055,9 +3274,9 @@ def render(mode):
     col, sidW, uW, vW, smW, cylW, occW, keyW, lspec, ltran = water_shade(
         hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB, stats=PRIM_STATS)
     img[inp] = col
-    global WSID, WU, WV, EDGE_PX, WSPEC, WTRAN
+    global WSID, WU, WV, EDGE_PX, WSPEC, WTRAN, WSM
     WSID, WU, WV = sidW, uW, vW           # green trace: what each water pixel sees
-    WSPEC, WTRAN = lspec, ltran
+    WSPEC, WTRAN, WSM = lspec, ltran, smW
     if not _PRINTED:
         print("reflection of the coping occludes %.1f%% of the visible surface"
               % (100. * (occW > .5).mean()))
@@ -3120,6 +3339,7 @@ def _regions():
     lb[iw[flr & ~sh]] = 3                                   # floor, 1.40 m, sunlit
     lb[np.flatnonzero(pav)] = 4                             # stone
     lb[iw[sh]] = 5                                          # floor in the shadow
+    lb[BAND_RAY] = 6                                        # the dry blue band
     lb = lb.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
     lb = lb.reshape(H // SS, W // SS, SS * SS)
     return np.where((lb == lb[..., :1]).all(-1), lb[..., 0], -1)
@@ -3139,11 +3359,11 @@ def _srgb_lin(v):
 
 def colour_table(img, reg):
     print("colour regression (sRGB medians; saturation = (max-min)/max)")
-    lum = np.zeros(6)
-    llin = np.zeros(6)
+    lum = np.zeros(7)
+    llin = np.zeros(7)
     for nm, k in (("riser face      ", 1), ("tread top       ", 2),
                   ("floor, sunlit   ", 3), ("coping stone    ", 4),
-                  ("floor, in shadow", 5)):
+                  ("floor, in shadow", 5), ("freeboard, blue ", 6)):
         sel = reg == k
         if sel.sum() < 100:
             print("  %s   -- %d px, not measured" % (nm, sel.sum()))
