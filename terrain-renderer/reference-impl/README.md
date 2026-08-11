@@ -16,6 +16,21 @@ or falsified here.
 Sun position is the measured one for the reference photograph (Aljezur, 37.319N
 8.803W, 2026-08-10 18:41 WEST): elevation 21.0 deg, azimuth 273.75 deg.
 
+## Known defect — stone gets no direct sun on two sides
+
+`sun_vis` applies `coping_vis` to stone. `coping_vis` is a **water-surface** term —
+the run from a water point to the lip — and on a deck or coping point it returns 0
+for any face whose outward normal has a positive component toward the sun. So the
+north and west **copings and paving** are lit by `SKY_DECK` alone: no direct sun,
+no directional shading. `liner_band` sidesteps it through `sail_vis`; `paving` does
+not.
+
+The owner has ruled the **terrace** out of scope, and it is. The **coping** is not:
+bar section E keeps the coping, the wall thickness and the waterline in scope
+precisely because that is where water meets stone. So this is filed as *the coping
+loses its direct sun*, not as *the terrace is flat*, and should be picked up or
+dismissed on that basis.
+
 ## Not modelled yet — the camera under the water
 
 Requested for a later pass, and the largest single inversion left in the model:
