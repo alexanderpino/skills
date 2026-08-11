@@ -837,6 +837,23 @@ lambda    k       tau = 1/(2 nu k^2)    c_g        e-folding distance
   images for the coherent arcs near the inlet, and a random-phase spectrum for everything after
   that. This is the one place where a plain random-phase superposition is not a cheat but the
   correct description, and it is also much cheaper than a large image set.
+- **A return is a *directed* momentum source, and its two products have wildly different reach.**
+  Model it as a pulsing point and you get two related errors at once: the influence comes out
+  **radial** when the fitting clearly aims somewhere, and it reaches **far too far**. Fix both.
+  Give emission a lobe about the aim — `cos^p` is enough, with `p ≈ 4` for the long waves and
+  `≈ 12` for the boil, because short waves diffract less and stay in a tighter fan — and **reflect
+  the aim along with the source** whenever you mirror it in a wall. Then stop deriving both
+  products from one decay law:
+
+```
+boil   (momentum, 1-2.5 cm)   e-folding 0.10 - 0.36 m   local, aimed, gone within a body length
+waves  (10-30 cm)             e-folding   70 - 390 m    leaves, reflects, reverberates
+```
+
+  Clean-water viscosity alone leaves the boil reaching metres, which renders as a halo around the
+  fitting; the surface film every pool carries damps capillaries several times harder, and with
+  that the boil dies in tens of centimetres — which is what it visibly does. One source, two
+  reaches: a small aimed disturbance at the outlet, and waves from it still crossing the basin.
 - **The inlet's near field buys sparkle by raising frequency, not amplitude.** The boil at an outlet
   is broadband and *short*, and since `slope = 2πa/λ` short wavelength is the cheap way to buy
   slope — a few millimetres of 3 cm chop out-slopes a centimetre of 30 cm swell. So a small,
@@ -2268,7 +2285,13 @@ above except the TotK physics talk is community reconstruction or press/footage 
   wavelengths, and the edge-contract inversion, are this skill's framing from the physics plus
   direct observation — **no measurement of a wall reflection coefficient was chased**, so treat
   "near-total" as an argued approximation rather than a figure. The method-of-images construction
-  is standard acoustics/optics practice carried over.
+  is standard acoustics/optics practice carried over, as is the early-reflections-plus-diffuse-tail
+  split. The directed-jet numbers are calibration, not measurement: the `cos^p` lobe is a
+  convenient shape rather than a measured emission pattern, and the **film-damping multiplier** that
+  pulls the boil's reach down to tens of centimetres is a plausible tuning factor — Marangoni
+  damping of capillary waves by surface films is real and can be large, but no coefficient was
+  looked up. What is durable is the **ratio**: the momentum product dies within a body length while
+  the waves it launches cross the basin. The individual figures are fitted to reference imagery.
 - **F** — That treated pool water sits outside every Jerlov class (`b_b ≈ 0`, `c ≈ a`, Secchi
   exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
   scattering one, and the man-made gating table: this skill's composition from the optics above
