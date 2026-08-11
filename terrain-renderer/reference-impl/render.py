@@ -280,30 +280,42 @@ L_WHITE = ((-_qb + np.sqrt(_qb ** 2 - 4 * _qa * _qc)) / (2 * _qa)) / EXPOSURE
 # Read that as written and it fixes TWO numbers, not one, because the observer's
 # 10 cm and the file's old 75 mm are not the same measurement:
 #   * the observer's 10 cm is the height of the BLUE -- still water up to where
-#     the stone starts. In this section that is ZLIP, the lowest point of the
-#     bullnose, which is where a coping stone's visible underside is.
-#   * the file's 75 mm was ZD, the coping TOP, which is a bullnose radius higher
-#     than that, so the old blue band was 43 mm and the old stone started there.
-# So FREEB is the measured number and ZD follows from the stone's own section:
-#     FREEB 0.100  water -> underside of the stone   (the observer's 10 cm)
-#     ZD    0.132  water -> coping top               (was 0.075)
-# `?` if the observer instead meant the whole freeboard to the top of the stone,
-# ZD would be 0.100 and the blue would be 68 mm; nothing in the bar separates the
-# two readings, and the one taken here is the one that makes the sentence's own
-# clause -- "about 10 cm, AND THEN the stones" -- true of the blue.
+#     the built edge starts.
+#   * the file's 75 mm was ZD, the coping TOP, which is a bullnose radius and a
+#     bead higher than that, so the old blue band was 43 mm of STONE.
 #
-# In a liner pool that band IS the liner: the sheet runs up the wall to a bead
-# track just under the coping, so the colour above the water is the colour below
-# it. It is shaded from LINER_TINT by `liner_band` below, not by `paving`, and
-# `tiles` no longer carries a mosaic course under it.
+# A SIXTH REFERENCE PHOTOGRAPH, supplied mid-wave, shows that section in a
+# corner of the wall from the deck, and it has THREE elements rather than two:
+#     water | blue liner | a narrow GREY CONCRETE BEAD | sandstone coping
+# The grey sliver is roughly a fifth of the blue's height and it is what the
+# liner's bead track sits behind. It is not decoration: blue-straight-into-stone
+# reads extruded, and a 20 mm grey line is what makes the edge read as built.
+# So the section is stacked from the bottom up and ZD is the SUM rather than a
+# number of its own:
+#     FREEB 0.100  still water -> top of the blue     (the observer's 10 cm)
+#     BEAD  0.020  the grey bead                      (`?` a fifth of the blue,
+#                                                      a visual reading)
+#     ZLIP  0.120  -> underside of the stone
+#     ZD    0.152  -> coping top                      (was 0.075)
+# `?` if the observer's "10 cm" was instead the whole freeboard to the top of
+# the stone, ZD would be 0.100 and the blue about 50 mm; the reading taken here
+# is the one that makes the sentence's own clause -- "about 10 cm, AND THEN the
+# stones" -- a statement about the blue, and the sixth photograph's three-element
+# section is what settles it, since the grey bead has to come from somewhere.
+#
+# In a liner pool the blue band IS the liner: the sheet runs up the wall to that
+# bead track, so the colour above the water is the colour below it. It is shaded
+# from LINER_TINT by `liner_band` below, not by `paving`, and `tiles` no longer
+# carries a mosaic course under it.
 BULR =  0.032     # bullnose radius
-FREEB=  0.100     # the blue liner band: still water to the underside of the stone
-ZD   =  FREEB + BULR   # coping top above the still waterline
+FREEB=  0.100     # the blue liner band: still water to the grey bead
+BEAD =  0.020     # ? the grey concrete bead over it, a fifth of the blue
+ZD   =  FREEB + BEAD + BULR   # coping top above the still waterline
 ZG   = -0.030     # lawn, if it ever gets in frame -- it does not
 SLIP = -0.020     # the coping overhangs the wall face by 20 mm, into the pool
 SBUL = SLIP + BULR
 ZCEN = ZD - BULR  # centre of the bullnose arc, in (s, z)
-ZLIP = ZCEN       # lowest point of the bullnose == the TOP OF THE BAND, = FREEB
+ZLIP = ZCEN       # lowest point of the bullnose == top of the BEAD
 COPW =  0.34      # width of the coping course
 WET  =  0.210     # how far back from the lip the stone is still splash-damp
 # A real pool liner is BLUE, not white plaster. Absolute albedo ~ (0.24, 0.54, 0.70):
@@ -1963,7 +1975,7 @@ DECK_SAMP = [(float(s), float(edge_z(np.array([s]))[0]), _RHO) for s in DECK_S]
 #     a decimetre; the coping at 300 mm back and 132 mm up reads half a metre
 #     and averages the net away. The contrast printed below is that statement
 #     measured, height by height.
-BAND_Z = np.array([0.006, 0.018, 0.045, 0.100]) * (FREEB / 0.100)
+BAND_Z = np.exp(np.linspace(np.log(0.006), np.log(ZLIP), 4))
 _NRHO_B = 14
 BAND_SAMP = [(SLIP, float(z),
               np.exp(np.linspace(np.log(0.25 * z), np.log(4.0), _NRHO_B)))
