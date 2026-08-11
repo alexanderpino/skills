@@ -189,6 +189,19 @@ works as a mitigation and why it costs you the sharpness.
   per-wavelength folds separate naturally and caustic *edges* pick up colour — the highest-contrast
   feature in the image is exactly where the separation shows. In an RGB renderer, refracting three
   channels with three IORs is the cheap approximation.
+- **But three IORs are a three-point quadrature, and it fails where the integrand is a step.** A
+  channel is a *band*, not a wavelength, so three deltas approximate `∫ L(λ)·R(λ) dλ` and are only
+  as good as the integrand is smooth over the sample spacing. On a **fold** it is smooth at that
+  scale and three samples are plenty — which is why fold fringing always looks right and the scheme
+  is never suspected. On an **opaque silhouette seen through the interface** the integrand is a step
+  *at* the dispersion scale, and three deltas resolve a step as a **comb**: three separately-placed
+  edges, with the pixel between them carrying one primary and missing the other two. That saturated
+  edge speckle is aliasing *of* dispersion, not dispersion. The fix needs no extra paths: recover
+  `n(λ)` from the three `(λ, n)` pairs you already have (a two-parameter Cauchy fit reproduces them
+  to ~10⁻⁵), give each channel the Voronoi cell of the three nominals as its band, and stratify
+  wavelength across the existing subsample or path budget — the resolve filter is already an
+  integral. Worked through against a rendered water surface in terrain-renderer
+  `12-water-rendering.md`.
 - **Reflective caustics (catacaustics)** are the same mathematics with reflection instead of
   refraction, and they are the most-seen caustic in the world: the bright cusped curve in a mug of
   coffee is the catacaustic of the cylindrical wall, complete with the cusp the classification
@@ -228,6 +241,7 @@ gate at the surface entry point, and the irradiance-not-albedo rule — go to te
 | Caustics far too soft in a renderer that should be exact | Secondary-bounce roughness clamping is on |
 | Caustics disappeared when roughness was raised | Expected (§7) |
 | Bright lines meet in three-way junctions | A cell-noise fake, not a caustic (§1) |
+| Fold fringing looks right, but silhouettes seen through the interface carry saturated colour speckle | Three IORs sampling a step edge as a three-tooth comb — band aliasing, not dispersion (§8) |
 | Caustic smears or ghosts in animation | Temporal denoiser reprojecting caustics with the receiver's motion vectors (§6) |
 
 ## Sources

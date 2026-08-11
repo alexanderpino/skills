@@ -273,6 +273,37 @@ look at the distribution.
 - **Culling equivalence.** Culling off vs on: identical final image (culling may only remove
   invisible work). Mesh-shader path vs ExecuteIndirect fallback: identical within raster
   tolerance (`08`). Any visible diff is a correctness bug found for free.
+- **Where a reference implementation exists, match the diagnostics, not the pixels.** A cheap tier
+  and an offline oracle use different estimators and will never agree pixel for pixel — that
+  difference *is* the point of having tiers, so a perceptual image diff between them fails for the
+  wrong reason and gets its tolerance widened until it means nothing. Contract on the printed
+  physics instead: the quantities each tier claims to reproduce, with a published tolerance per row,
+  and let a tier fail rows honestly rather than average its way to a passing image. This is also
+  what makes a lookup table or a fitted approximation *defensible* rather than a guess — it was
+  derived from the reference and is measured against it every run.
+
+### Three ways a measurement lies while looking like one
+
+Each of these has shipped in this project's own reference work, survived review, and cost a round to
+find. All three produce a number that is *reproducible in the wrong units* — which is exactly the
+class a golden-image test cannot catch, because nothing about the image is wrong.
+
+- **Compare light to light.** A ratio read off sRGB-encoded luminance, checked against a claim about
+  *radiance*, is wrong by the encoding and not by a little: one shadow ratio read 0.82 against a
+  stated 0.5, where the same two colours are 0.546 apart in linear light. Most of the reported
+  defect was the transfer function. Any brightness ratio, contrast figure or albedo check states
+  which space it is in, and the tool that prints it does the conversion once.
+- **A ratio of targets is not a measurement.** Two figures in one implementation's own comments
+  turned out to be one *stated target* divided by another, presented as measured — and they were
+  therefore immune to every change to the thing they claimed to measure. The test is mechanical: can
+  the number be recomputed from a buffer the run actually produced? If it can only be recomputed
+  from other published numbers, it is a restatement, and it will not move when the code breaks.
+- **Name the convention once, upstream of every consumer.** Where two conventions differ by a factor
+  both expressions divide by — a per-axis versus a total variance, a half-angle versus a full one —
+  each consumer stays individually defensible while the budget summing them is wrong by that factor.
+  In one slope budget here, two of five bands normalised per-axis and three in the total; it shipped
+  for months. One named function, called by everything, is the fix; a comment on each call site is
+  not.
 
 **Pitfalls:** goldens that were never verified correct (a golden captured from a broken build
 enshrines the bug — review each golden by eye once, against the catalogue, before blessing it);

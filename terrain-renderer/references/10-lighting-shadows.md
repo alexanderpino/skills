@@ -308,6 +308,36 @@ at 18:41 local with sunset at 20:33 confirms "high summer, still broad daylight"
 assuming it — and if the two disagree, the timezone or the UTC offset is wrong, which is the
 single most common way this goes silently astray.
 
+### The sky must be the atmosphere the beam came through
+
+The sun and the sky are not two art assets. They are one atmosphere seen twice — the beam is what
+survived it, the sky is what was scattered out of the beam — and a renderer that authors them
+separately violates conservation in a way that is invisible in a still and structural everywhere
+else. Two rules follow, and both are cheap.
+
+**Adding scattering to the sky without removing it from the beam creates the light twice.** Aerosol
+in particular is tempting to add to the environment because it is what makes a hazy afternoon look
+like one, and it is exactly where a reflection is most sensitive. Priced on a water scene at
+`τ_a(550) = 0.10`: the same frame went to a mean luminance of **245/255 over the far water, 98% of
+it above 200**, with the shadow ratio inverted — a frame shot along the sun's azimuth cannot hold
+both a hazy sky and a legible surface (`D`). And the correction is not local: dimming the beam means
+changing the **sun colour**, which relights every diffuse surface in the frame. So the pair is one
+change or neither, and "just add a little aureole" is not a small edit.
+
+**A sun colour already encodes its own atmosphere — read it back before inventing a sky.** A
+hand-set golden sun is not free data; it is an optical depth and an air mass written down in another
+notation. Worked on one scene: `exp(−m·τ_Rayleigh)` at air mass 2.77 (the value the 21° elevation
+implies), evaluated at the renderer's own band centres and normalised to red, reproduced a hand-set
+sun colour to **one part in 10⁴** (`D`). That single check fixed three things at once — the air mass
+is no longer free, the reddening is physics rather than a colour grade, and the **aerosol optical
+depth that colour was written with is zero**, which then forbids the aureole above. Before building
+a sky for that sun to sit in, invert the colour you already have; if it does not come out as an
+atmosphere, the grade and the physics are already fighting.
+
+The consumer that exposes all of this first is water — see `12`'s
+[sun glitter](12-water-rendering.md#sun-glitter-the-sparkle-path), where a sun lobe fitted by eye
+turns small blinding points into a broad pale smear.
+
 ## Time-of-day dynamics
 
 A moving sun converts "bake it" into a caching-and-invalidation problem. Sort every shadow/light
@@ -365,6 +395,13 @@ data structure by what sun motion does to it:
   distance cue.
 - **Horizon-map azimuth banding**: too few baked azimuth bins shows shadow direction stepping as
   the sun sweeps; 16+ bins or angular interpolation with care at the wraparound.
+- **Sky scattering added without dimming the beam**: aerosol or aureole authored into the
+  environment while the directional light keeps its full radiance. The light now exists twice, and
+  it shows up first in reflections and wet surfaces rather than in the sky. The beam and the
+  environment are one atmosphere; change both or neither.
+- **A sun colour that is not any atmosphere**: a warm sun picked by eye that does not invert to an
+  air mass and an optical depth. It will disagree with the sky the moment the sky becomes physical,
+  and the disagreement is diagnosed as a tone-mapping problem for weeks.
 
 ## Sources & provenance
 
@@ -393,3 +430,5 @@ data structure by what sun motion does to it:
 | Normal-band migration across LOD; apron rule for tile-border normals | **F** + **D** (generator output contract) |
 | Lightmaps impractical at terrain scale (texel budget + dynamic sun) | **F** (arithmetic + practice) |
 | Normal-offset bias scaling with cascade texel size as primary anti-acne tool | **F/D** |
+| Rayleigh optical depth `τ ≈ 0.008569·λ⁻⁴` with its two dispersion corrections (Hansen & Travis 1974), used to invert a sun colour to an air mass | **P** (standard form; attribution from model knowledge, not re-verified) |
+| That a hand-set sun colour inverted to `exp(−m·τ_Rayleigh)` at air mass 2.77 to one part in 10⁴, and that the aerosol pair at `τ_a(550) = 0.10` drove far water to 245/255 with the shadow ratio inverted | **D** — both measured on `12`'s pool reference implementation against its own constants; the *rule* (one atmosphere, read the sun colour back) is this skill's composition from them |

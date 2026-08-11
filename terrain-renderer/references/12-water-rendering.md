@@ -1733,6 +1733,50 @@ but that over-blurs in practice — Bruneton et al. use **N_min = 1.0, N_max = 2
 smoothstep between. And the variance must be **clamped to a minimum** matching the solar disc,
 or dead-calm water still produces a Dirac (see [Calm water](#calm-water-the-low-energy-regime)).
 
+**Cause two: Fresnel that ignores roughness.** Plain Schlick assumes a *smooth* surface. On a
+rough surface at grazing incidence, microfacet masking means the effective reflectance is
+substantially lower than Schlick predicts. Ship plain Schlick on a low-variance distant ocean and
+the horizon band goes to near-100% mirror — that is precisely the chrome-dome look. The fix is
+one line, fitted for `sigma_v < 0.5`:
+
+```hlsl
+float  sigma_v2 = sigma_x2*cos2Phi + sigma_y2*sin2Phi;        // ONE-DIRECTION variance, not s^2
+float  sigma_v  = sqrt(sigma_v2);
+float  F = R + (1.0-R) * pow(1.0-cosThetaV, 5.0)
+             * exp(-2.69*sigma_v) / (1.0 + 22.7*pow(sigma_v, 1.5));   // Bruneton et al. 2010
+```
+
+Also make sure the Smith masking/shadowing term is present in the sun lobe — that is what stops
+grazing-angle over-brightening, and with a statistical BRDF you get wave self-shadowing from it
+for free rather than needing a shadow map.
+
+**Cause three: binary whitecaps.** A per-pixel Jacobian threshold (as in
+[Ambient waves](#ambient-waves-gerstner-and-fft)) is correct up close and *disintegrates* at
+distance: sub-pixel foam either aliases into shimmer or vanishes, so the far sea loses the
+speckle that tells the eye it is rough. The prefilterable fix assumes the Jacobian is normally
+distributed within the footprint and integrates the coverage in closed form:
+
+```
+W  ~=  0.5 + 0.5 * erf( (sqrt(2)/(2*sigma_A)) * (eps - mu_A) )
+#   mu_A, sigma_A^2 = mean and variance of the Jacobian over the pixel footprint
+#   BOTH are linearly prefilterable -> free hardware mipmapping and aniso filtering
+```
+
+Foam then has a correct *fractional coverage* at every distance instead of a binary mask.
+Ground-truth the amount against Monahan & O'Muircheartaigh's whitecap–wind relation,
+`W = 3.84e-6 * U^3.41` (U at 10 m): the exponent is steep enough that foam is essentially absent
+at 5 m/s (~0.1% coverage) and conspicuous by 15 m/s (~4%), so coverage must be driven by wind,
+not by a constant.
+
+**Cause four: everything else that flattens distance.** Missing aerial perspective (the horizon
+keeps full contrast and saturation and reads as a hard shell — share the atmosphere LUT with
+terrain, per `10`); a constant sky tint instead of a *variance-filtered* environment fetch, which
+throws away the sky gradient the reflection should carry; and missing water-leaving radiance
+(`I_sea ≈ L_sea·(1 − F̄)`), without which the surface only reflects and never transmits, so it has
+no volume at all — the literal shrink-wrap reading. A cheap trick worth knowing: put non-zero
+radiance *below* the horizon in the environment map, since downward-reflected rays physically
+re-reflect or refract; without it distant wave troughs go too dark.
+
 ### Pick the kernel on purpose, and give the variance a receiver
 
 Two decisions live inside "move the variance rather than lose it", and both are usually taken by
@@ -1786,50 +1830,6 @@ summed Gaussian's variance along the offset to the light — keeps the anisotrop
 bit-for-bit to the unfiltered expression at zero variance. Insist on that last property: a filtered
 path that does not reduce *exactly* to the unfiltered one is a second shading model, and it will
 disagree with the first somewhere you are not looking.
-
-**Cause two: Fresnel that ignores roughness.** Plain Schlick assumes a *smooth* surface. On a
-rough surface at grazing incidence, microfacet masking means the effective reflectance is
-substantially lower than Schlick predicts. Ship plain Schlick on a low-variance distant ocean and
-the horizon band goes to near-100% mirror — that is precisely the chrome-dome look. The fix is
-one line, fitted for `sigma_v < 0.5`:
-
-```hlsl
-float  sigma_v2 = sigma_x2*cos2Phi + sigma_y2*sin2Phi;        // ONE-DIRECTION variance, not s^2
-float  sigma_v  = sqrt(sigma_v2);
-float  F = R + (1.0-R) * pow(1.0-cosThetaV, 5.0)
-             * exp(-2.69*sigma_v) / (1.0 + 22.7*pow(sigma_v, 1.5));   // Bruneton et al. 2010
-```
-
-Also make sure the Smith masking/shadowing term is present in the sun lobe — that is what stops
-grazing-angle over-brightening, and with a statistical BRDF you get wave self-shadowing from it
-for free rather than needing a shadow map.
-
-**Cause three: binary whitecaps.** A per-pixel Jacobian threshold (as in
-[Ambient waves](#ambient-waves-gerstner-and-fft)) is correct up close and *disintegrates* at
-distance: sub-pixel foam either aliases into shimmer or vanishes, so the far sea loses the
-speckle that tells the eye it is rough. The prefilterable fix assumes the Jacobian is normally
-distributed within the footprint and integrates the coverage in closed form:
-
-```
-W  ~=  0.5 + 0.5 * erf( (sqrt(2)/(2*sigma_A)) * (eps - mu_A) )
-#   mu_A, sigma_A^2 = mean and variance of the Jacobian over the pixel footprint
-#   BOTH are linearly prefilterable -> free hardware mipmapping and aniso filtering
-```
-
-Foam then has a correct *fractional coverage* at every distance instead of a binary mask.
-Ground-truth the amount against Monahan & O'Muircheartaigh's whitecap–wind relation,
-`W = 3.84e-6 * U^3.41` (U at 10 m): the exponent is steep enough that foam is essentially absent
-at 5 m/s (~0.1% coverage) and conspicuous by 15 m/s (~4%), so coverage must be driven by wind,
-not by a constant.
-
-**Cause four: everything else that flattens distance.** Missing aerial perspective (the horizon
-keeps full contrast and saturation and reads as a hard shell — share the atmosphere LUT with
-terrain, per `10`); a constant sky tint instead of a *variance-filtered* environment fetch, which
-throws away the sky gradient the reflection should carry; and missing water-leaving radiance
-(`I_sea ≈ L_sea·(1 − F̄)`), without which the surface only reflects and never transmits, so it has
-no volume at all — the literal shrink-wrap reading. A cheap trick worth knowing: put non-zero
-radiance *below* the horizon in the environment map, since downward-reflected rays physically
-re-reflect or refract; without it distant wave troughs go too dark.
 
 **The unifying idea.** Cox & Munk's slope statistics, Bruneton's variance-fed BRDF, Toksvig and
 LEAN and Kaplanyan-style NDF filtering, and prefilterable whitecap coverage are all the same
@@ -2195,6 +2195,28 @@ above except the TotK physics talk is community reconstruction or press/footage 
 - **Distant sea turns to plastic**: slope variance from sub-pixel waves discarded instead of being
   folded into BRDF roughness. The lobe collapses toward a Dirac and energy conservation brightens
   what survives. Track the variance tensor and feed it the leftovers (Bruneton).
+- **A moiré that beats slowly with distance**: the footprint filter is a box — the literal pixel
+  footprint — so each band fades, **returns phase-inverted** through a negative sinc lobe, and
+  fades again as the footprint grows. Use a Gaussian at `σ = 0.3748·fp`; nothing else is positive
+  and monotone.
+- **Filtered water goes plastic instead of aliasing**: variance was removed from the field and
+  never given to the BRDF, or given to it as a scalar. It is a tensor, and the reflected ellipse is
+  not the slope ellipse — `C = J Σ Jᵀ`, `J = diag(−2, −2cos θ_v)`.
+- **Saturated colour speckle on every refracted edge**: three IORs are three delta wavelengths, and
+  a step edge at the dispersion scale resolves as a three-tooth comb. It is aliasing of dispersion,
+  not dispersion; integrate each channel's *band* over the subsample grid.
+- **Glitter comes out as a broad pale smear**: the environment's "sun" is an aureole fitted by eye,
+  not a disc. Constrain `n = 2/θ_s² − 1` with a peak of `E_n/Ω_sun` so peak, width and flux all land
+  on the sun, and make it the same quantity as the light that casts the shadows.
+- **A depth-derived constant applied at every depth**: a penumbra kernel, a slant path or a focusing
+  number computed once at the deepest point. Every one of them is a *function* of depth the moment
+  the body has a slope, a step or a bench, and each wrong one is diagnosed as a separate bug.
+- **CDOM and sediment behind one turbidity slider**: one absorbs and does not scatter, the other
+  scatters and barely absorbs, and they produce brown-and-clear against pale-and-opaque. Two axes,
+  never one; see [the constituent model](#water-body-optical-identity-where-sigma-actually-comes-from).
+- **A white tint reached for as soon as water should look dirty**: the caustic net fades first, then
+  shadows lift, then distance hazes — a body colour is the *fourth* symptom of rising `b`, and the
+  first three are a contrast multiplier and a haze term away.
 - **Chrome-dome horizon**: plain Schlick Fresnel on a low-variance distant ocean drives grazing
   reflectance to ~100%. Use the roughness-aware Fresnel fit and keep Smith masking in the sun lobe.
 - **Whitecaps shimmer or vanish at distance**: a binary per-pixel Jacobian threshold cannot be
@@ -2371,7 +2393,21 @@ above except the TotK physics talk is community reconstruction or press/footage 
   wind should produce.
 - **P** — Pope & Fry, "Absorption spectrum (380–700 nm) of pure water. II. Integrating cavity
   measurements" (Applied Optics 36(33), 8710–8723, 1997): the modern pure-water absorption
-  spectrum; minimum **0.0044 m⁻¹ at 418 nm**. Use this above 380 nm.
+  spectrum; minimum **0.0044 m⁻¹ at 417.5 nm**, 0.624 m⁻¹ at 700 nm, a ratio of 141. Use this
+  above 380 nm.
+  **The published table was read directly, 2026-08**, from the tabulated Pope & Fry spectrum
+  ([omlc.org](https://omlc.org/spectra/water/data/pope97.dat), 2.5 nm steps, quoted in cm⁻¹), and
+  the chapter's triple is now taken off it rather than from model knowledge: **a(610) = 0.2644,
+  a(550) = 0.0565, a(450) = 0.00922 m⁻¹**. This corrects a long-standing 0.25 in the red — 5.4%
+  low — and settles a disagreement with the reference implementation, which carries
+  `(0.2750, 0.0546, 0.0145)`. **Neither triple was wrong wholesale, and the reason is that they are
+  quoted at different wavelengths**: the implementation samples 620/545/460 nm, where Pope & Fry
+  give `(0.2755, 0.0511, 0.00979)`. Scored against its own sample points its red is right to 0.2%,
+  its green is 7% high, and its **blue is 48% high and simply wrong** — no source in this chapter
+  supports 0.0145 at 460 nm. Scored against the chapter's 610/550/450 the green and blue are exact
+  and only the red needed the fix. Two lessons kept as doctrine in the text: the sample wavelengths
+  are part of the constant, and a triple that disagrees with another triple may be disagreeing about
+  where it was sampled rather than about the water.
   ⚠️ **Do not use Smith & Baker (1981) for blue absorption** — that era's measurements were
   scattering-contaminated and give `a(420)` ~3.4× too high, which desaturates clear water.
   Smith & Baker remains correct for UV (<380 nm) and for `K_d`.
@@ -2484,6 +2520,16 @@ above except the TotK physics talk is community reconstruction or press/footage 
   2026-08. The screen-space UV-distortion refraction is an approximation of
   Snell bending, not the ray-traced result — the amplitude-Fresnel and Snell derivations live in
   physically-based-rendering (`pbr-fundamentals`, `volumes-and-sss`).
+- **P/D** — [The view from inside, and the split shot](#the-view-from-inside-and-the-split-shot).
+  The critical angle, the exactness of total internal reflection outside it, the `d/n` apparent
+  depth and the flat-port field narrowing (46° → ≈34° at `n = 1.333`) are textbook geometrical
+  optics, recomputed here. The **0.39° dispersive rim** is arithmetic on the reference
+  implementation's own IOR triple (`D`); the 5 m transmission `(0.27, 0.75, 0.96)` is Beer-Lambert
+  on the corrected pure-water triple. **No underwater or over-under photograph of the reference pool
+  exists**, so the port comparison rests on two supplied photographs of other water plus the optics
+  (`D/?`), and the behaviour of a dome port *in air* was not worked through (`?`). The mirrored-twin
+  cue and the "one straight edge settles which port" check are this chapter's composition, and both
+  are cheap to falsify.
 - **P** — Linear (Airy) wave theory — dispersion `ω² = gk·tanh(kh)`, shallow-water celerity
   `sqrt(g·h)`, Green's-law shoaling `a ∝ h^(-1/4)`, refraction: coastal-engineering canon;
   textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
@@ -2585,6 +2631,48 @@ above except the TotK physics talk is community reconstruction or press/footage 
   standard optical data, quoted from model knowledge and **not** web-verified — treat the third
   decimal as indicative. The qualitative claim (fold sets separate per channel, so caustic edges
   fringe) is robust regardless.
+- **P/D** — [A channel is a band](#a-channel-is-a-band-not-a-wavelength). That a three-IOR render is
+  a three-point spectral quadrature, and that a step edge at the dispersion scale therefore resolves
+  as a comb, is an argument rather than a cited result — but it is falsifiable and was falsified the
+  right way round: the silhouette speckle it predicts was present and the fold fringing it exempts
+  was correct. The 9.8 mm red/blue bed separation, the 2.1 output pixels and the 0.33% ray
+  disagreement are measured on the reference implementation (`D`). The Cauchy consistency (three
+  IORs recovered from a two-parameter fit to 5×10⁻⁵) was recomputed here. The **3.5 mm / 9.4 mm**
+  band smear on the red and blue folds is recomputed here from the Voronoi band edges of
+  620/545/460 nm and the 21° sun's refracted path, and quoted across the beam so that it compares
+  like-for-like with the 6.8 mm sun-disc penumbra; the implementation's own comment says 3.4/9.6 mm
+  from a slightly different band statistic, which is the size of the disagreement. The Latin-square
+  spectral stratification over the subsample grid is this chapter's composition — the idea is
+  ordinary stratified spectral sampling, the point worth keeping is that the resolve filter is
+  already an integral and can carry it for free.
+- **P/D** — [Pick the kernel on purpose](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver).
+  `W(k)` for box/tent/Gaussian, the sinc's −0.217 first negative lobe, `σ_box = 1/(2√3) = 0.2887·fp`,
+  the 0.663 amplitude (44% of variance) a box-matched Gaussian passes at Nyquist, and
+  `σ = √(2 ln 2)/π = 0.3748·fp` with its "half gone at `fp = λ/2`, 94% gone at `fp = λ`" reading are
+  all Fourier arithmetic, recomputed here. The reflection Jacobian `J = diag(−2, −2cos θ_v)` is
+  derived here from `r = 2(n·v)n − v` and is exact to first order; the 1.8× stretch is
+  `1/cos 57°`. Its Monte-Carlo validation (400k perturbed reflections, agreeing to 4% major / 8%
+  minor axis) is the reference implementation's (`D`). Which kernel to prefer, and the
+  attenuate-amplitude / per-component / output-footprint rules, are this chapter's composition from
+  that arithmetic.
+- **P/D** — [The sun must be a disc](#sun-glitter-the-sparkle-path). `n = 2/θ_s² − 1` making a
+  `cos^n` lobe's hemispherical flux `2π/(n+1)` equal `Ω_sun = πθ_s²` is exact for small `θ_s` and
+  was recomputed here (`n = 93 493`, `Ω_sun = 6.72×10⁻⁵ sr` at `θ_s = 0.265°`). The audit figures —
+  1563× under-peak, 7.8× over-width, three lobes carrying 0.695 against a direct beam of 24.1 — are
+  measured on the reference implementation against its own constants (`D`), so they price *that*
+  fitted lobe rather than fitted lobes in general; the failure mode they illustrate is the general
+  claim. The atmosphere half of the argument lives in `10`.
+- **D** — The wall as a light carrier, in
+  [Caustics](#caustics-the-other-half-of-the-light-path). The 35% mean / 77% worst-texel wall share
+  of the bed's cosine-weighted hemisphere is an exact rectangle view factor computed per texel; the
+  58% of the total-internal-reflection return meeting a wall follows from the 48.6° critical angle
+  needing ≥1.59 m of horizontal run out of 1.40 m of depth in a 4 m basin; the 2.2× red gradient
+  down the wall is measured. All three are properties of *that* basin — what transfers is the
+  opposite-sign diagnostic, which is this chapter's composition.
+- **P/D** — The bubble constant. `1 − 1/n²` is the cosine-weighted flux beyond the critical angle
+  and equals **43.7%** at `n = 1.333` (44.3% at 1.34) — arithmetic here, and the same quantity as
+  `cos²θ_c`. The 0.999 red transmission over 5 mm is Beer-Lambert on the corrected `a(610)`. The
+  surf/plume split is this chapter's composition; the physics in each column is standard.
 - **P/F** — Glitter as a level set of the slope field, and the four review tests that follow
   (trackable crests, dispersive multi-scale motion, phase-lock with the caustics, interference
   rather than cells). The geometry — a glint occurs where the normal is the sun/eye half-vector —
@@ -2596,21 +2684,44 @@ above except the TotK physics talk is community reconstruction or press/footage 
   `h = a·√(2(1 − sin θ))` are textbook capillary rise on a vertical plate; `a = 2.727 mm`, `h = 3.856`
   / `2.727 mm` at `θ = 0°`/`30°`, recomputed here (`σ = 0.0728`, `ρ = 998`, `g = 9.81` SI). Contact
   angle **unmeasured** (`?`) so the rise is a range; the 5–10 mm fillet is order-of-magnitude; the σ
-  counts use this chapter's convention (tilt ÷ per-axis `σ = s/√2`, in degrees) on the `s = 0.058`
-  far field; **occlusion versus cast shadow was never separated** (`?`). AO/bevel framing is composition.
+  counts use this chapter's convention (tilt ÷ per-axis `σ = s/√2`, in degrees) on an **ensemble**
+  far field of `s ≈ 0.056` — the quadrature sum of the reference implementation's three chosen band
+  constants, recomputed here — against which any 2 m patch of that field measures 0.053–0.058
+  depending on where it is taken (`D`, both readings printed by `reference-impl/field.py`). The
+  spread is finite-component sampling plus a varying shelter mask, not water, and the conclusion is
+  quoted across the whole of it (7.6σ–8.3σ, 14.7σ–16.1σ). **Occlusion versus cast shadow was never
+  separated** (`?`). AO/bevel framing is composition.
 - **F** — The four-gate masking contract (depth fade, extinction along the light path, sun
   visibility at the surface entry point, irradiance-not-albedo) and the tier ladder as a whole:
   production practice assembled over the physics above. The shadow-at-entry-point rule is the one
   most often skipped and is stated here as doctrine, not as a cited result.
-- **P** — Pool-water optics: pure-water absorption from the Pope & Fry dataset already cited above,
-  sampled at this chapter's RGB points — `a ≈ (0.25, 0.056, 0.0092) m⁻¹` at 610/550/450 nm, as
-  quoted in [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from).
-  Those three values come from that dataset by model knowledge and were **not** re-checked against
-  the published table; the 418 nm absolute minimum is deliberately *not* used as a blue channel.
-  The round-trip transmittances and the resulting `(0.38, 0.68, 0.78)` white-liner and
-  `(0.11, 0.46, 0.68)` blue-liner returns are arithmetic done here, as are the liner albedos
-  (`0.8` white, `(0.24, 0.54, 0.70)` mid-blue PVC), which are representative values, not measured
-  product data.
+- **P** — Pool-water optics: pure-water absorption from the Pope & Fry table read above, sampled at
+  this chapter's RGB points — `a = (0.2644, 0.0565, 0.0092) m⁻¹` at 610/550/450 nm; the 417.5 nm
+  absolute minimum is deliberately *not* used as a blue channel. The round-trip transmittances and
+  the resulting `(0.36, 0.68, 0.78)` white-liner and `(0.11, 0.46, 0.68)` blue-liner returns are
+  arithmetic recomputed here on the corrected red, as are the liner albedos (`0.8` white,
+  `(0.24, 0.54, 0.70)` mid-blue PVC), which are representative values, not measured product data.
+- **P/D** — Pool chemistry, in
+  [Pool optics](#pool-optics-the-colour-is-the-bottom-not-the-water). The hypochlorite absorption
+  peak at **292 nm** and hypochlorous acid at 235 nm, with `ε ≈ 300–380 M⁻¹cm⁻¹`, are standard
+  solution spectroscopy from model knowledge and were **not** chased to a primary source (`?` on the
+  molar absorptivity in particular). The **0.5–1.5 m⁻¹ in the UV** at a 1–3 mg/L dose is arithmetic
+  done here from that `ε` (dose as Cl₂, MW 70.9), and is reproducible from it. That precipitated
+  CaCO₃ above ~pH 7.8 is the standard cloudy-pool mechanism is pool-operation practice (`D`). The
+  absorption-subtracts / scattering-adds diagnostic and the "a sharp caustic net bounds `b_b`"
+  argument are this chapter's composition; **no numeric bound on `b_b` was extracted** (`?`).
+- **P/?** — The constituent model and the turbidity ladder. The four-component decomposition, the
+  CDOM exponential with `S ≈ 0.014 nm⁻¹`, and the Case-1/Case-2 free-parameter count are standard
+  ocean optics — Bricaud, Morel & Prieur (Limnology & Oceanography 26(1), 43–53, 1981) for the CDOM
+  exponential and its slope, Morel & Prieur (1977) for the case split, and the Ocean Optics Web
+  Book's Case-1 IOP model for the covariance structure; attributions are from model knowledge and
+  were **not** re-verified against the papers. The CDOM table (`+0.0185 / +0.0429 / +0.1739` at
+  610/550/450 for `a_g(440) = 0.20`) is arithmetic on that exponential, recomputed here. Pure
+  water's molecular scattering is marked `?` — it is of order 10⁻³ m⁻¹ at 550 nm but was not
+  verified. In the turbidity ladder, `ω₀` and the `exp(−b·1.96 m)` caustic contrast are exact given
+  the stated `a` and slant; the **Secchi column is `?`** — `Z ≈ 1.44/(c + K_d)` is the classical
+  Preisendorfer form and `K_d ≈ a + 0.02·b` is a placeholder backscatter ratio, so the depths are
+  indicative and the *ordering* of the five symptoms is the durable claim.
 - **P/F** — The driven-basin model for pool waves. Viscous decay `α = 2νk²` for deep-water gravity
   waves is Lamb's classical result (*Hydrodynamics*; attribution from model knowledge, not
   re-checked); `c_g = (g + 3(σ/ρ)k²)/(2ω)` follows from differentiating the capillary–gravity
@@ -2628,8 +2739,9 @@ above except the TotK physics talk is community reconstruction or press/footage 
   knowledge and were **not** confirmed against a primary source — they vary by a few percent across
   experiments, which does not move the footprint qualitatively. The surface-deformation link
   `η ~ C·u'²/g` is a scaling argument (stagnation pressure of an eddy) whose **O(1) constant `C` is
-  genuinely unknown**; `C = 1` was used, so the durable claim is the near/far **ratio** (`0.123` vs
-  `0.058` = 2.12, measured on `reference-impl/field.py` as total `√⟨|∇h|²⟩`), not either level: the
+  genuinely unknown**; `C = 1` was used, so the durable claim is the near/far **ratio** (`0.122`
+  against a far patch reading `0.053–0.058`, i.e. 2.1–2.3, measured on `reference-impl/field.py` as
+  total `√⟨|∇h|²⟩`; the spread is the far patch's position, not the jet), not either level: the
   far field is set by that file's `WIND_RMS` and `REVERB_RMS`, which are **chosen, not measured**
   (`?`), so citing them back as measurement would be circular. This link is the weakest in the chain.
 - **P** — The wake geometry. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the standard
