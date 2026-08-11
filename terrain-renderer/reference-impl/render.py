@@ -117,17 +117,41 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 #     rms (0.058 far, 0.123 over the jet) -- that is the ONLY band in which
 #     spec C's isolated glints can exist.  Look down at 60 deg and there is no
 #     sparkle anywhere, at any roughness.
-#     WHERE that band sits is fixed by the eye height alone: the mean surface
-#     mirrors the sun where theta_v = 21 deg, a ground distance h/tan(21) =
-#     2.607 h, so from 1.85 m it lands 4.8 m out, and the spread the far-field
-#     slope gives it (a facet tilt d moves the mirror angle by 2d, so +-2s =
-#     +-6.6 deg) makes it a ROAD from 3.5 m to 7.2 m rather than a patch. Spec C
-#     wants that patch over the jet with glassy water around it. The jet is at
-#     x = 0.10, which is 9.3 m from this eye, so the patch lands on it only from
-#     an eye 9.3/2.607 = 3.57 m up -- a first-floor window, not a deck. Spec C is
-#     therefore NOT reachable by moving this camera: it needs the jet near
-#     mid-pool or a far-field slope well under 0.058, and both of those live in
-#     field.py. Written down here rather than tuned around.
+#     WHERE the sparkle can sit is NOT the mirror band, and the previous note
+#     here had it exactly backwards. It said: the mean surface mirrors the sun
+#     at theta_v = 21 deg, a ground distance 2.607 h, so put that on the jet and
+#     you need a 3.57 m eye. But at the mirror point the required facet slope is
+#     ZERO, and a glassy surface reflects the sun's disc better than a rough one
+#     does -- the contrast between rough patch and calm water there is
+#     (s_calm/s_jet)^2 < 1, i.e. the jet would be the DARKER of the two. What
+#     lives at the mirror band is precisely the broad shimmering road spec C
+#     rules out, which is why this frame has one.
+#     Spec C's "compact patch of isolated points on otherwise glassy water" is
+#     the opposite regime: the required slope has to be far enough out on the
+#     calm water's slope distribution that the calm water cannot reach it, and
+#     still inside the rough patch's. That is a WINDOW in required slope, and
+#     the diagnostic further down measures both ends of it off the field itself
+#     (r* where the contrast crosses 1, and the r for 10x and 100x). It puts
+#     |theta_v - 21 deg| at roughly 16-19 deg, so the eye sits about 1.2 of its
+#     own heights out from the glint on the steep branch, or 12-30 on the
+#     grazing one -- NOT 2.6, and not 4.8 m from a 1.85 m eye.
+#     That changes the verdict's SHAPE. The steep branch says a poolside eye can
+#     hold a compact sparkle patch about 2 m in front of it. The obstruction is
+#     that all specular structure lies on ONE line in plan -- the sun's azimuth
+#     through the eye, which at azimuth 273.75 deg is due west at constant y --
+#     so the eye must sit within ~0.5 m of the glint's y and 1.2 h east of it.
+#     The jet is at (0.10, 1.15): the eye that lights it is at about (2.8, 1.3),
+#     which is over the water. Sweeping every deck closes it: the east deck is
+#     the only one whose westward line lies over water at all, and from x >= 8.4
+#     the jet is 7.5 m away, needing h = 6.4 m (steep) or h <= 0.75 m (grazing,
+#     and then the mirror road lands in the near foreground instead). So spec C
+#     is still unreachable for THIS jet -- but the miss is 1.9 m of camera, not
+#     1.7 m of camera height, and the fix names itself: a return fitting whose
+#     boil lands in the glint window the diagnostic prints. For this eye that
+#     window is on the water at x ~ 7, y ~ 2 -- a return in the EAST wall, which
+#     is where the plant room of a pool photographed from the east deck usually
+#     puts it. That is a scene-layout statement for field.py, with the target
+#     printed in world coordinates rather than argued for.
 #   * the caustic net.  25-40 cells at 15-30 cm needs 4-8 m of water in frame.
 #   * the waterline has to be legible somewhere.  At the FAR coping it is four
 #     pixels of stone; the only place a pool edge can be read is the one under
@@ -1553,8 +1577,14 @@ def paving(x, y, s, vdir, fp):
     ks = np.where(cop, np.floor((along + .19 * side) / .55), np.floor((x + .46 * (row % 2.)) / .92))
     kt = np.where(cop, side, row)
     t1, t2 = _hash(ks, kt, 3.1), _hash(ks, kt, 11.7)
-    alb = np.where(cop[:, None], np.array([.700, .600, .452])[None],
-                   np.array([.662, .562, .428])[None])
+    # ? Warm sandstone, pink-tan -- a visual reading of bar section B2's close
+    # ? frame of the coping, not a measurement. The previous values were a
+    # ? neutral grey-beige and rendered at saturation 0.20; the green is pulled
+    # ? down 5% against the red, which is what separates a sandstone from a
+    # ? limestone. The illuminant was already corrected (SKY_DECK), so this is
+    # ? the albedo half of the same finding and nothing else moved.
+    alb = np.where(cop[:, None], np.array([.715, .572, .438])[None],
+                   np.array([.676, .536, .414])[None])
     alb = alb * (1. + .46 * (t1 - .5))[:, None]
     alb = alb * (1. + np.stack([.20 * (t2 - .5), .03 * (t2 - .5), -.21 * (t2 - .5)], 1))
     alb = alb * (1. + .13 * (n1 - .5) + .11 * w2 * (n2 - .5) + .09 * w3 * (n3 - .5)
@@ -1609,6 +1639,19 @@ D = (fwd[None, None] + rgt[None, None] * (PX * tf * W / H)[..., None]
      + upv[None, None] * (PY * tf)[..., None])
 D /= np.linalg.norm(D, axis=2, keepdims=True)
 D = D.reshape(-1, 3)
+
+
+# The box filter that turns SS x SS subsamples into one pixel is already an
+# integral; make it do the SPECTRAL integral at the same time and it costs
+# nothing. Each subsample of a pixel is given a different wavelength stratum
+# inside its channel's band, laid out as a Latin square over the SS x SS grid so
+# that the spectral index is decorrelated from the sub-pixel position in both
+# axes -- otherwise the band integral would come out as a sub-pixel colour ramp
+# instead of a mean. (4i + 3j) mod 9 is a bijection on the 3x3 grid and moves by
+# 4 and 3 strata between neighbours, which is the most spread available.
+NSPEC = SS * SS
+_LATIN = np.array([[(4 * i + 3 * j) % NSPEC for j in range(SS)] for i in range(SS)])
+SUBK = np.tile(_LATIN, (H // SS, W // SS)).ravel().astype(np.int8)
 
 
 def project(P):
@@ -1716,7 +1759,7 @@ FOOT = t_hit * PIXANG / np.maximum(np.abs(D[:, 2]), .10)
 COP_REFL = np.array([.62, .57, .48]) * (SKY_DECK * .40 + WBOUNCE * .85)
 
 
-def water_shade(hw_x, hw_y, dvec, s_h, mode, lamk):
+def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam):
     """Everything one camera ray does once it is over water: the surface normal
     from field.py, Fresnel, the sky reflection with the coping's overhang cut
     out of it, per-channel refraction INTO the pool, the traced hit, the bed /
@@ -1751,7 +1794,10 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, lamk):
             # 'disp' gives every ray its own wavelength inside the channel's
             # band; 'mono' is one wavelength for all three, so one trace serves
             # them and the A/B carries no dispersion at all.
-            eta = ETA_TAB[c][lamk] if mode == 'disp' else 1.0 / IOR[1]
+            if mode == 'disp':
+                eta = 1.0 / n_water(BAND[c, 0] + qlam * (BAND[c, 1] - BAND[c, 0]))
+            else:
+                eta = 1.0 / IOR[1]
             tx, ty, tz = refract(dvec[:, 0], dvec[:, 1], dvec[:, 2],
                                  nx_, ny_, nz_, eta)
             geo[key] = scene_hit(hw_x, hw_y, tx, ty, tz) + (tz,)
@@ -1782,7 +1828,154 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, lamk):
     return out, sidG, uG, vG, smG_, cylG, occ_
 
 
+QSUB = ((SUBK[inp].astype(np.float64) + .5) / NSPEC)
 PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
+
+
+# --------------------------------------------------- spec C, as a measurement
+# The bar's section C is a statement about SPECULAR REACHABILITY, and it was
+# being argued about in a comment rather than measured. It is measurable, and
+# the measurement changes the conclusion.
+#
+# A facet reflects the sun to the eye when its normal bisects L and V, so the
+# required facet slope at a surface point is r = |H_xy| / H_z with H = L + V --
+# a field over the water, computed exactly below with no small-angle step. The
+# surface's slopes are near-Gaussian and isotropic with total mean-square
+# s^2 = <|grad h|^2>, so the density of glints goes as
+#       p(r) = exp(-(r/s)^2) / (pi s^2)
+# and the CONTRAST between the rough patch and the calm water around it is
+#       p_j/p_c = (s_c/s_j)^2 exp( r^2 (1/s_c^2 - 1/s_j^2) ).
+# Two things fall straight out of that, and both were got wrong before:
+#  * At the MIRROR POINT (r = 0) the contrast is (s_c/s_j)^2 < 1 -- the rough
+#    patch is DIMMER than the glassy water beside it, because a mirror
+#    concentrates the sun and a rough patch spreads it. So aiming the mirror
+#    band at the jet, which is what the previous camera note computed a 3.57 m
+#    eye height for, produces the exact opposite of what spec C describes. What
+#    sits at the mirror point is the broad shimmering road spec C rules out.
+#  * The contrast crosses 1 at r* = sqrt( ln(s_j^2/s_c^2) / (1/s_c^2 - 1/s_j^2) )
+#    and climbs fast after it. Spec C's "sparse, isolated, countable" is the
+#    band where the contrast is 10-100x and the patch still glints, which is a
+#    WINDOW IN r, not a point -- and it puts the required slope well ABOVE the
+#    calm water's rms, i.e. |theta_v - 21| well AWAY from zero.
+# Everything below is computed from the field itself and printed, so the camera
+# note above is a reading of these numbers rather than a claim over them.
+_GN = 320
+_gxs = np.linspace(X0, X1, _GN).astype(np.float32)
+_gys = np.linspace(Y0, Y1, _GN // 2).astype(np.float32)
+_ggx, _ggy = grad_grid(_gxs, _gys)
+_GX, _GY = np.meshgrid(_gxs.astype(np.float64), _gys.astype(np.float64))
+# local total mean-square slope over a 0.30 m window -- the patch a glint's
+# neighbourhood actually samples, not a basin average
+_SLOC = np.sqrt(np.maximum(blur((_ggx.astype(np.float64) ** 2
+                                 + _ggy.astype(np.float64) ** 2),
+                                0.15 / ((X1 - X0) / _GN)), 1e-12))
+_SC, _SJ = float(np.median(_SLOC)), float(_SLOC.max())
+_kk = np.unravel_index(np.argmax(_SLOC), _SLOC.shape)
+_RSTAR = np.sqrt(np.log(_SJ ** 2 / _SC ** 2) / (1 / _SC ** 2 - 1 / _SJ ** 2))
+
+
+def _r_for_contrast(g):
+    return np.sqrt((np.log(g) + np.log(_SJ ** 2 / _SC ** 2))
+                   / (1 / _SC ** 2 - 1 / _SJ ** 2))
+
+
+_VX, _VY, _VZ = EYE[0] - _GX, EYE[1] - _GY, EYE[2]
+_VL = np.sqrt(_VX ** 2 + _VY ** 2 + _VZ ** 2)
+_HX = _VX / _VL + SUN_DIR[0]
+_HY = _VY / _VL + SUN_DIR[1]
+_HZ = _VZ / _VL + SUN_DIR[2]
+_RREQ = np.hypot(_HX, _HY) / np.maximum(_HZ, 1e-9)
+_DENS = np.exp(-(_RREQ / _SLOC) ** 2) / (np.pi * _SLOC ** 2)
+print("spec C -- specular reachability, measured on the field itself:")
+print("  local rms slope: calm water %.3f (median), roughest %.3f at (%.2f, %.2f)"
+      % (_SC, _SJ, _GX[_kk], _GY[_kk]))
+print("  the rough patch only out-glints the calm water past r* = %.3f; 10x at "
+      "r = %.3f, 100x at r = %.3f -- i.e. |theta_v - 21 deg| between %.1f and "
+      "%.1f deg, NOT at the mirror band"
+      % (_RSTAR, _r_for_contrast(10.), _r_for_contrast(100.),
+         np.degrees(2 * np.arctan(_r_for_contrast(10.))),
+         np.degrees(2 * np.arctan(_r_for_contrast(100.)))))
+for _g in (10., 100.):
+    _dv = np.degrees(2 * np.arctan(_r_for_contrast(_g)))
+    for _sgn, _nm in ((+1, "steep"), (-1, "grazing")):
+        _tv = 21.0 + _sgn * _dv
+        if not 0.4 < _tv < 88.:
+            continue
+        print("    %3.0fx contrast, %-7s branch: theta_v %5.1f deg, so the eye "
+              "sits %.2f x its own height out from the glint"
+              % (_g, _nm, _tv, 1.0 / np.tan(np.deg2rad(_tv))))
+# where the sun's azimuth line from THIS eye crosses the water, and what it
+# would take to make a glint there
+_shat = -SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])     # plan direction of gaze
+_dscan = np.linspace(0.2, 14.0, 600)
+_lx, _ly = EYE[0] + _shat[0] * _dscan, EYE[1] + _shat[1] * _dscan
+_on = (pool_sdf(_lx, _ly) < SLIP)
+_tvv = np.degrees(np.arctan(EYE[2] / _dscan))
+_rr4 = np.tan(np.abs(np.deg2rad(_tvv) - np.arcsin(SUN_DIR[2])) / 2)
+if _on.any():
+    _i0, _i1 = np.flatnonzero(_on)[[0, -1]]
+    print("  the sun's azimuth line off this eye crosses water from (%.2f, %.2f) "
+          "to (%.2f, %.2f): theta_v %.1f-%.1f deg, required slope %.3f-%.3f"
+          % (_lx[_i0], _ly[_i0], _lx[_i1], _ly[_i1], _tvv[_i0], _tvv[_i1],
+             _rr4[_i0], _rr4[_i1]))
+    _mb = _on & (_rr4 < _RSTAR)
+    if _mb.any():
+        print("    of which the BROAD ROAD (r < r*, where calm water out-glints "
+              "rough) runs %.2f - %.2f m out, at x %.2f - %.2f"
+              % (_dscan[_mb][0], _dscan[_mb][-1],
+                 _lx[_mb][-1], _lx[_mb][0]))
+    _gb = _on & (_rr4 > _r_for_contrast(10.))
+    if _gb.any():
+        print("    and spec C's glint window (>=10x contrast) is on the water at "
+              "x %.2f - %.2f, y %.2f - %.2f -- a return fitting whose boil "
+              "landed there would light it; the one at (%.2f, %.2f) is %.1f m "
+              "away from it"
+              % (min(_lx[_gb]), max(_lx[_gb]), min(_ly[_gb]), max(_ly[_gb]),
+                 JET_XY[0], JET_XY[1],
+                 np.hypot(_lx[_gb].mean() - JET_XY[0], _ly[_gb].mean() - JET_XY[1])))
+print("  brightest glint density in frame sits at (%.2f, %.2f) where s = %.3f "
+      "and r = %.3f" % (_GX[np.unravel_index(np.argmax(_DENS), _DENS.shape)],
+                        _GY[np.unravel_index(np.argmax(_DENS), _DENS.shape)],
+                        _SLOC[np.unravel_index(np.argmax(_DENS), _DENS.shape)],
+                        _RREQ[np.unravel_index(np.argmax(_DENS), _DENS.shape)]))
+
+
+# ------------------------------------------- how far apart are the three deltas
+# The measurement that says the nosing speckle is aliased dispersion and not
+# dispersion. Take every 29th water ray, refract it at the two NOMINAL end
+# wavelengths and again at the two ends of the RED and BLUE bands, and report
+# how far apart the hits land -- in millimetres and in output pixels. If the
+# 620-460 separation is a pixel or more, three deltas cannot represent the smear
+# and will resolve any hard edge as three separate edges; if the within-band
+# separation is comparable, the band integral is what closes the gap.
+_ss = np.arange(0, int(inp.sum()), 29)
+_dsub = D[inp][_ss]
+_hxs, _hys = hx[inp][_ss], hy[inp][_ss]
+_ns = normal_from_grad(*grad_points(_hxs, _hys))
+_foot_s = FOOT[inp][_ss] * SS                    # metres per OUTPUT pixel
+
+
+def _hit_at(nn):
+    tx, ty, tz = refract(_dsub[:, 0], _dsub[:, 1], _dsub[:, 2],
+                         _ns[0], _ns[1], _ns[2], 1.0 / nn)
+    sid, u, v, sm, _ = scene_hit(_hxs, _hys, tx, ty, tz)
+    return np.stack([_hxs + tx * sm, _hys + ty * sm, tz * sm], 1), sid
+
+
+_pR, _sidR = _hit_at(IOR[0])
+_pB, _sidB = _hit_at(IOR[2])
+_sep = np.linalg.norm(_pR - _pB, axis=1)
+print("spectral sampling: R(620) to B(460) hits are %.1f mm apart = %.2f output "
+      "px; %.2f%% of rays disagree about WHICH surface they hit"
+      % (1000 * np.median(_sep), np.median(_sep / _foot_s),
+         100. * (_sidR != _sidB).mean()))
+for _c, _nm in ((0, 'R'), (2, 'B')):
+    _pa, _ = _hit_at(n_water(BAND[_c, 0]))
+    _pb, _ = _hit_at(n_water(BAND[_c, 1]))
+    _s2 = np.linalg.norm(_pa - _pb, axis=1)
+    print("  within the %s band alone: %.1f mm = %.2f output px, now integrated "
+         "by the %d spectral strata on the %dx%d subsample grid"
+          % (_nm, 1000 * np.median(_s2), np.median(_s2 / _foot_s), NSPEC, SS, SS))
 
 
 # The refracted sun UNDER the surface, as one direction: this is what decides
@@ -1857,6 +2050,116 @@ def _riser_shade(hxr, hyr, hzr, ci, c, mode):
         + tir + bnc)
 
 
+# --------------------------------------------------------------- adaptive edges
+# THE SECOND HALF OF THE SILHOUETTE FIX. Supersampling 3x3 and box-filtering is
+# an unbiased estimate of a pixel's mean radiance, but its VARIANCE on a pixel
+# that a hard edge crosses is not small: the coverage of a straight edge
+# estimated from a regular SS x SS grid is quantised to 1/SS^2, and the error is
+# not white -- it is a smooth function of where the edge sits, so along a slowly
+# curving arc it comes out as a periodic staircase, which is exactly what the
+# eye is built to see. Measured below by direct experiment rather than asserted.
+#
+# Raising SS globally is the wrong answer: the coverage error only matters on
+# the ~0.3% of pixels an edge crosses, and 6x6 over the whole frame is 4x the
+# rays and 4x the memory for the other 99.7%. So the pixels that need it are
+# FOUND and only they are resampled -- found by the sampling itself, not by a
+# heuristic: a pixel whose SS^2 subsamples disagree about which surface they see
+# (bed, wall, riser, which cylinder, stone) or about how far away it is, is by
+# definition a pixel the estimator is uncertain about. That covers the step's
+# nosings, the riser feet, the wall/floor junction AND the coping's inner arris,
+# which is the same defect on stone rather than on water.
+ADAPT_N = 8                     # 8x8 = 64 jittered samples on a flagged pixel
+ADAPT_JUMP = 1.10               # a 10% step in traced distance inside one pixel
+_ar = np.random.default_rng(13579)
+_APERM = _ar.permutation(ADAPT_N * ADAPT_N)     # spectral stratum per spatial one
+
+
+def _cover_rms(n, jitter, trials=40000):
+    """rms error of the coverage of a random straight edge through a unit pixel,
+    estimated from an n x n grid. This is the number the staircase is made of."""
+    g = np.random.default_rng(7).random((trials, 2))
+    th = np.random.default_rng(8).random(trials) * 2 * np.pi
+    cx, cy = np.cos(th), np.sin(th)
+    off = (np.random.default_rng(9).random(trials) - .5) * 1.4
+    r = np.random.default_rng(11)
+    if jitter:
+        sx = (np.arange(n)[:, None, None] + r.random((n, n, trials))) / n
+        sy = (np.arange(n)[None, :, None] + r.random((n, n, trials))) / n
+    else:
+        sx = np.broadcast_to(((np.arange(n) + .5) / n)[:, None, None], (n, n, trials))
+        sy = np.broadcast_to(((np.arange(n) + .5) / n)[None, :, None], (n, n, trials))
+    f = ((sx - .5) * cx + (sy - .5) * cy) < off
+    est = f.mean((0, 1))
+    # exact coverage by dense reference
+    m = 64
+    qx = np.broadcast_to(((np.arange(m) + .5) / m)[:, None, None], (m, m, trials))
+    qy = np.broadcast_to(((np.arange(m) + .5) / m)[None, :, None], (m, m, trials))
+    ref = ((((qx - .5) * cx + (qy - .5) * cy) < off)).mean((0, 1))
+    del g
+    return float(np.sqrt(((est - ref) ** 2).mean()))
+
+
+_CQ3, _CQA = _cover_rms(SS, False), _cover_rms(ADAPT_N, True)
+print("edge coverage error: %dx%d regular grid %.4f rms, %dx%d jittered %.4f "
+      "rms -- %.1fx, and across the measured nosing contrast that is the "
+      "difference between a visible staircase and none"
+      % (SS, SS, _CQ3, ADAPT_N, ADAPT_N, _CQA, _CQ3 / max(_CQA, 1e-9)))
+
+
+def _edge_pixels(sidW, smW, cylW):
+    """Output pixels whose SS x SS subsamples disagree about what they see."""
+    key = np.zeros(W * H, np.int32)
+    key[pav] = 1
+    iw = np.flatnonzero(inp)
+    key[iw] = 2 + sidW.astype(np.int32) * 8 + (cylW.astype(np.int32) + 1)
+    K = key.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
+    K = K.reshape(-1, SS * SS)
+    flag = (K != K[:, :1]).any(1)
+    dep = np.zeros(W * H, np.float32)
+    dep[iw] = smW.astype(np.float32)
+    Dp = dep.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
+    Dp = Dp.reshape(-1, SS * SS)
+    allw = (Dp > 0).all(1)
+    flag |= allw & (Dp.max(1) > ADAPT_JUMP * np.maximum(Dp.min(1), 1e-6))
+    return np.flatnonzero(flag)
+
+
+def _refine(idx, mode):
+    """Re-estimate flagged pixels with ADAPT_N^2 jittered samples, through the
+    SAME trace_edge / water_shade / paving the primary grid uses."""
+    nx_o = W // SS
+    py, px = idx // nx_o, idx % nx_o
+    acc = np.zeros((idx.size, 3))
+    rr = np.random.default_rng(24680)
+    n = ADAPT_N
+    for a in range(n):
+        for b in range(n):
+            fx = (b + rr.random(idx.size)) / n
+            fy = (a + rr.random(idx.size)) / n
+            pxn = (px * SS + fx * SS) / W * 2 - 1
+            pyn = 1 - (py * SS + fy * SS) / H * 2
+            dv = (fwd[None] + rgt[None] * (pxn * tf * W / H)[:, None]
+                  + upv[None] * (pyn * tf)[:, None])
+            dv /= np.linalg.norm(dv, axis=1, keepdims=True)
+            th, sh, isw, _, _ = trace_edge(dv)
+            hxa = Ex + dv[:, 0] * th
+            hya = Ey + dv[:, 1] * th
+            q = np.full(idx.size, (_APERM[a * n + b] + .5) / (n * n))
+            c = np.zeros((idx.size, 3))
+            if isw.any():
+                c[isw] = water_shade(hxa[isw], hya[isw], dv[isw], sh[isw],
+                                     mode, q[isw])[0]
+            ps = ~isw & (dv[:, 2] < -1e-9)
+            if ps.any():
+                ft = th[ps] * PIXANG / np.maximum(np.abs(dv[ps, 2]), .10)
+                c[ps] = paving(hxa[ps], hya[ps], sh[ps], dv[ps], ft)
+            acc += c
+    return acc / (n * n)
+
+
+_PRINTED = []
+
+
 def render(mode):
     img = np.zeros((W * H, 3))
     img[hit_sail] = (np.array([.74, .72, .76])[None] *
@@ -1864,38 +2167,28 @@ def render(mode):
     if bgm.any():
         img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
     img[pav] = PAV_COL
-    water = np.zeros((inp.sum(), 3))
-    bi, wim = bed_img[mode], wall_img[mode]
-    geo, smG = {}, None
-    for c in range(3):
-        eta = 1.0 / (IOR[c] if mode == 'disp' else IOR[1])
-        if eta not in geo:                    # mono: one trace serves all three
-            tx, ty, tz = refract(dd[:, 0], dd[:, 1], dd[:, 2], nx, ny, nz, eta)
-            geo[eta] = scene_hit(ix, iy, tx, ty, tz) + (tz,)
-        sid, u, v, sm, cyl, tz = geo[eta]
-        col = np.zeros(len(u))
-        m = sid == 0
-        if m.any():
-            col[m] = sample(bi[..., c:c + 1], u[m], v[m], X0, X1, Y0, Y1)[:, 0]
-        for wi, sv in enumerate((1, 2, 3, 4)):
-            m = sid == sv
-            if m.any():
-                a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
-                col[m] = sample(wim[wi][..., c:c + 1], u[m], v[m], a, b, -DEPTH, 0.)[:, 0]
-        m = sid == 5
-        if m.any():
-            col[m] = _riser_shade(u[m], v[m], tz[m] * sm[m], cyl[m], c, mode)
-        water[:, c] = col * np.exp(-ABS[c] * sm)
-        if c == 1:
-            smG = sm
-            global WSID, WU, WV
-            WSID, WU, WV = sid, u, v      # green trace: what each water pixel sees
-    # the residual in-scatter of a treated pool: tiny, but it is a PATH integral,
-    # so it grows with the water actually crossed and is one more depth cue.
-    water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * smG))[:, None]
-    water *= LIP_AO[:, None]
-    img[inp] = (fres * refl + (1 - fres) * water
-                + (SKY_AMB[None] * .17 + SUN_COL[None] * .006) * MENIS[:, None])
+    col, sidW, uW, vW, smW, cylW, occW = water_shade(
+        hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB)
+    img[inp] = col
+    global WSID, WU, WV
+    WSID, WU, WV = sidW, uW, vW           # green trace: what each water pixel sees
+    if not _PRINTED:
+        print("reflection of the coping occludes %.1f%% of the visible surface"
+              % (100. * (occW > .5).mean()))
+    idx = _edge_pixels(sidW, smW, cylW)
+    if idx.size:
+        ref = _refine(idx, mode)
+        nx_o = W // SS
+        r0, c0 = (idx // nx_o) * SS, (idx % nx_o) * SS
+        for a in range(SS):
+            for b in range(SS):
+                img[(r0 + a) * W + (c0 + b)] = ref
+    if not _PRINTED:
+        print("adaptive edges: %d of %d output pixels (%.3f%%) had subsamples "
+              "that disagreed and were re-estimated at %d samples"
+              % (idx.size, W * H // (SS * SS), 100. * idx.size / (W * H / SS / SS),
+                 ADAPT_N * ADAPT_N))
+        _PRINTED.append(1)
     return img.reshape(H, W, 3)
 
 

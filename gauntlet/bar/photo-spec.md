@@ -88,12 +88,23 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
   the specular condition is satisfied somewhere in it for any light in the sky, at
   any sun elevation, on any day. *Derived.*
 - **This is the one place on the surface where the glitter reachability test
-  cannot fail.** A level eye and a 21° sun need a facet tilted ~34.5° to mirror
-  the sun; the far-field rms slope is 0.058, i.e. 3.3°, which puts that tilt about
-  **10σ** out — unreachable, exactly as section C says of the open surface. The
-  meniscus reaches it by construction. Hence a bright waterline in essentially
+  cannot fail.** Against a 21° sun at anti-solar azimuth, a **straight-down** view
+  needs a facet tilted **34.5°**; the far-field rms slope is 0.058 total, i.e.
+  a per-axis σ of 0.0410 = 2.349°, which puts that tilt **14.7σ** out — a Rayleigh
+  tail of 1.4 × 10⁻⁴⁷. Unreachable, exactly as section C says of the open surface.
+  The meniscus reaches it by construction. Hence a bright waterline in essentially
   every pool photograph, including the ones where the open water is glassy.
   *Derived, and it explains a feature present in all five reference frames.*
+  > **Corrected mid-run, twice, by the chapter lane.** This first read "a level
+  > eye … about 10σ". Both figures were mine and both were wrong. 34.5° is
+  > `(90 − 21)/2`, which is a **nadir** view — the geometry of the B3 photograph,
+  > which looks steeply down — while a genuinely level eye needs only 10.5°, or
+  > 4.5σ. And the 10σ came from dividing by `atan(0.058) = 3.32°`, the **total**
+  > slope in degrees, where the tail is Rayleigh in the **per-axis** σ: precisely
+  > the convention mix that this project had the chapter warn about two rounds
+  > earlier. The conclusion survives either way — 4.5σ, 10σ and 15σ are all
+  > "never", not "rare" — but a bar that carries an unreproducible number has no
+  > business failing an artifact for one.
 - **What this asks of the render.** A meniscus term exists in the implementation
   but is applied as a dim ambient lift over a 10 mm scale. That is the wrong
   category: it should be a **specular** strip a few millimetres wide, catching sun

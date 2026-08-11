@@ -905,8 +905,8 @@ all of the change. A strong hue shift across a pool floor is an artifact, not a 
   standing on them sit *directly* adjacent to the water in screen space, so an unrejected
   refraction sample smears them into the pool every frame.
 - **The waterline is geometry, not a fade.** On a vertical wall the shore-distance field carries no
-  information. Author the band: wet tile below the line, a meniscus with its own small specular
-  lift at it, a damp gradient above it from splash, and the static scale line at the tile course.
+  information. Author the band: wet tile below the line, a damp gradient above from splash, the static
+  scale line at the tile course, a specular [meniscus](#the-meniscus-line-where-reachability-cannot-fail).
 - **Inflows are the flow field.** Return jets and skimmer draw are the only steady flow, and they
   are small and local — author them as sim-patch injections rather than exporting a flow raster for
   a 10 m body.
@@ -1146,8 +1146,8 @@ required tilt 17.8 deg (measured sun + measured camera bearing)
 ```
 
 So a sparkle patch beside glassy water is not a lighting accident: it localizes water roughly twice
-as rough as its surroundings, which is what a jet-stirred or gust-ruffled patch actually is. Use it
-as a calibration handle rather than tuning sparkle by eye.
+as rough as its surroundings — a jet-stirred or gust-ruffled patch, and a calibration handle rather
+than a knob.
 
 The common trap is a **low sun with a high camera**, because the two constraints multiply: the
 mirror elevation equals the sun's, *and* the observer must be near the anti-solar azimuth. A 21° sun
@@ -1204,6 +1204,35 @@ of **2–3** and eliminating the skewness entirely. So an oil slick, a wind shad
 or a current-convergence line should be rendered as a **local reduction of the slope-variance
 field** — which makes it appear as a smooth mirror-like patch against rough sea — not as a dark
 albedo decal. This is the mechanism behind every "glassy streak" on a real ocean.
+
+### The meniscus line: where reachability cannot fail
+
+Water climbs a wetted solid to `h = a·√(2(1 − sin θ))` on the capillary length `a = √(σ/ρg)` =
+**2.73 mm** (clean water at 20 °C, `σ = 0.0728 N/m`, `ρ = 998 kg/m³`): **3.86 mm** of rise at
+perfect wetting, 2.73 mm at a 30° contact angle (`?`, unmeasured). The fillet is a few capillary
+lengths across, so over roughly **5–10 mm** the tilt runs continuously from 90° at the wall to 0° at
+the flat surface, and that strip therefore holds **every** facet orientation — the specular
+condition is met inside it for any light in the sky at any sun elevation. It is the one exception to
+the reachability test above. On the open surface a far-field `s = 0.058` (per-axis `s/√2` = 2.35°)
+puts the 17.8° the measured sun-and-camera geometry above asks for at **7.6σ**, and the 34.5° a
+straight-down view asks for at **15σ**: never, not rare. Hence a bright line at the waterline in nearly
+every pool photograph, glassy open water included — and wherever a river meets stone or a lake a jetty.
+
+**It is the bevel highlight, not inverse ambient occlusion.** Both promote a sub-pixel feature to a
+shading term at a junction, but AO answers a *visibility* question and is an approximation, while
+this answers an *orientation* question and is real geometry merely left unresolved. The relative is
+the hard-surface edge highlight: a zero-radius edge never catches light and reads as fake, a
+fraction of a millimetre of chamfer glints, because a swept edge passes through all normals. Both
+are signs of one quantity, **curvature** — concave loses hemisphere and darkens, swept sweeps
+normals and glints — and a meniscus is both, so a dark band against the wall carries a thin bright
+line inside it. In the reference frames that band is probably dominated by the wall's **cast
+shadow** at a 21° sun rather than by occlusion; both contribute, ratio unmeasured (`?`).
+
+**Real-time form.** A thin strip on a known contour is a decal or a junction shader term, never a
+simulation: walk the wetted contour, shade a band a few millimetres wide as **specular** catching sun
+and sky, and below ~1 px clamp the screen width while scaling intensity by the same ratio, or it
+aliases into a dashed line. An ambient or roughness lift is the standard miss — wrong category, and
+it reads as a softened edge rather than the corner it is.
 
 ## Caustics: the other half of the light path
 
@@ -2237,6 +2266,12 @@ above except the TotK physics talk is community reconstruction or press/footage 
   `c = sqrt(g/k + σk/ρ)`) was derived and checked here. Framing these as *review tests*, and the
   claim that a still frame cannot separate real glitter from noise-perturbed specular, is this
   skill's composition — production observation, not a cited result.
+- **P/F** — [The meniscus line](#the-meniscus-line-where-reachability-cannot-fail). `a = √(σ/ρg)` and
+  `h = a·√(2(1 − sin θ))` are textbook capillary rise on a vertical plate; `a = 2.727 mm`, `h = 3.856`
+  / `2.727 mm` at `θ = 0°`/`30°`, recomputed here (`σ = 0.0728`, `ρ = 998`, `g = 9.81` SI). Contact
+  angle **unmeasured** (`?`) so the rise is a range; the 5–10 mm fillet is order-of-magnitude; the σ
+  counts use this chapter's convention (tilt ÷ per-axis `σ = s/√2`, in degrees) on the `s = 0.058`
+  far field; **occlusion versus cast shadow was never separated** (`?`). AO/bevel framing is composition.
 - **F** — The four-gate masking contract (depth fade, extinction along the light path, sun
   visibility at the surface entry point, irradiance-not-albedo) and the tier ladder as a whole:
   production practice assembled over the physics above. The shadow-at-entry-point rule is the one
