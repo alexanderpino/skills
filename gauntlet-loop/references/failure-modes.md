@@ -343,9 +343,10 @@ A loop that cannot see the artifact is not measuring anything, and it will keep
 producing confident verdicts anyway.
 
 The board now catches the common half of this without anyone looking: `board`
-checks every cited evidence path against the disk, draws a missing file as a
-flagged tile in the lane's filmstrip, and raises a banner naming the paths. The
-half it cannot catch is a harness that still writes files that no longer show
-the artifact — which is what the filmstrip itself is for: five rounds of
-identical thumbnails is the same signal as five rounds of identical verdicts,
-visible at a glance rather than by reading the log.
+checks every cited evidence path against the disk, flags a missing file on the
+lane's card, and raises a banner naming the paths. The half it cannot catch is a
+harness that still writes files that no longer show the artifact — which is why
+the newest frame is displayed on the card without being asked for: a screenshot
+that stopped changing is visible the moment anyone looks, and expanding the
+trail turns "five identical thumbnails" into the same signal as five identical
+verdicts.

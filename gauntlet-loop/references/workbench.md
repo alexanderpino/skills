@@ -63,16 +63,25 @@ user does not have to interrupt anything to see where the run got to.
 - **Kanban** — **open**, **flat** (no movement in the last `flat_rounds_n` bar
   rounds — shelve or re-cut), **shelved**, **retired**. Cards carry the streak
   counters as pips, a fixed-scale 0–10 score sparkline, recent margins, the open
-  gap, the trend note, the last evidence path — and the **evidence filmstrip**
-- **The filmstrip** — each card's evidence in round order, oldest to newest, so
-  the artifact's own history is on the board rather than in a folder. Screenshots
-  and renders draw as thumbnails (click for a full-size view); inline
-  measurements (`lighthouse: LCP 1.42s`) draw as a small mono chip, because a
-  number is printable but not showable; a cited file that is **not on disk**
-  draws as a flagged tile and raises a banner. That last case is the one worth
-  building for — a critic citing a screenshot the harness stopped writing is
-  inspection rot (`failure-modes.md`), and a run can produce confident verdicts
-  for several rounds before anyone notices by eye
+  gap, the trend note — and the **evidence panel** below
+- **The evidence panel** — **the newest frame, shown**. Each card renders its
+  most recent screenshot or render directly, at a size worth looking at, with
+  the wave/round and score under it; clicking opens it full-size. That is the
+  question a glance is asking — *what does it look like now* — so it costs no
+  interaction. The history behind it is a different question, so it costs a
+  click: **"N earlier frames"** expands the trail as a filmstrip, and those
+  thumbnails are not built or fetched until asked for.
+
+  Two honesty rules are wired into the panel. When the newest record is *not*
+  the frame on display — a measurement, or a file that has gone missing — it is
+  printed on its own line beneath, because an older frame presented as if it
+  were current is the one way this panel could lie. And a cited file that is
+  **not on disk** draws flagged, in the card and in a banner naming the paths:
+  a critic citing a screenshot the harness stopped writing is inspection rot
+  (`failure-modes.md`), and a run can produce confident verdicts for several
+  rounds before anyone notices by eye. Inline measurements
+  (`lighthouse: LCP 1.42s`) render as a mono chip — a number is printable, not
+  showable
 - **Rounds** — the recent log, newest first, filterable by mode and lane, each
   row carrying the model that produced it (`sonnet-5 → opus-5` on an escalation)
 - **Spend and history** — the model roster with each tier's cost multiplier,

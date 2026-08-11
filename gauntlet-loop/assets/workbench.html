@@ -389,9 +389,45 @@ section { margin-top: var(--s7); }
   font-family: var(--font-mono); font-size: 11px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Evidence filmstrip — the artifact over time, not just the latest path.
-   Horizontal scroll is deliberate: a long run's trail must stay one row so
-   the card keeps its glance-height. */
+/* Evidence — the newest frame is shown, the history is asked for.
+   A glance surface has one job: the current state of the artifact, full size,
+   with no interaction. Everything older is a question the user may or may not
+   have, so it costs a click and does not load until it is asked for. */
+.evidence { margin-top: var(--s3); }
+.ev-hero {
+  display: block; width: 100%; padding: 0; cursor: zoom-in; overflow: hidden;
+  border: 1px solid var(--hairline-firm); border-radius: var(--r-sm);
+  background: var(--surface-sunk);
+}
+.ev-hero:hover { border-color: var(--accent); }
+.ev-hero:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* `contain`, not `cover`: a cropped screenshot is a misleading screenshot. */
+.ev-hero img { display: block; width: 100%; height: 158px; object-fit: contain; }
+.ev-cap {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--s2); margin-top: var(--s1); color: var(--text-3);
+}
+.ev-cap .path {
+  font-family: var(--font-mono); font-size: 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.ev-latest {
+  margin-top: var(--s2); padding: var(--s2); border-radius: var(--r-sm);
+  background: var(--surface-sunk); border: 1px solid var(--hairline);
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ev-latest.missing { border-color: var(--warn); color: var(--warn); }
+.ev-more {
+  margin-top: var(--s2); padding: 0; background: none; border: 0; cursor: pointer;
+  color: var(--text-3); font-size: 11.5px; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.ev-more:hover { color: var(--accent); }
+.ev-more .chev { transition: transform .12s ease; }
+.ev-more[aria-expanded="true"] .chev { transform: rotate(90deg); }
+/* The expanded history. Horizontal scroll is deliberate: a long run's trail
+   must stay one row so the card keeps its glance-height. */
 .filmstrip {
   display: flex; gap: var(--s2); margin-top: var(--s3);
   overflow-x: auto; overscroll-behavior-x: contain;
@@ -1032,10 +1068,11 @@ function renderLadder(d) {
   }
 }
 
-/* ── evidence filmstrip ───────────────────────────────────────────────────
+/* ── evidence ─────────────────────────────────────────────────────────────
    The doctrine has always asked the board for "the artifact evolving" and the
-   board could only print the latest path. This shows the sequence: what was
-   inspected each round, in order, with the round it belongs to. */
+   board could only print the latest path. Now: the newest frame is on screen
+   at a size worth looking at, and the trail behind it is one click away and
+   not fetched until then. */
 function shotPlaceholder(text, mono) {
   return el("div", "ph" + (mono ? " mono" : ""), text);
 }
@@ -1070,8 +1107,69 @@ function openShot(e, c) {
   close.focus();
 }
 
-function filmstrip(c) {
+const shotLabel = e => `w${e.wave}·r${e.round}`
+  + (has(e.score) ? ` · ${e.score}/10` : "");
+
+function evidenceBlock(c) {
   const trail = Array.isArray(c.evidence_trail) ? c.evidence_trail : [];
+  if (!trail.length) return null;
+  const wrap = el("div", "evidence");
+  const newest = trail[trail.length - 1];
+  const hero = [...trail].reverse()
+    .find(e => e.kind === "image" && e.exists !== false && has(e.src));
+
+  if (hero) {
+    const btn = el("button", "ev-hero");
+    btn.type = "button";
+    btn.title = hero.raw;
+    const img = document.createElement("img");
+    img.src = hero.src;
+    img.alt = `${c.lane} ${c.dimension}, wave ${hero.wave} round ${hero.round}`;
+    img.addEventListener("error", () => {
+      btn.replaceWith(el("div", "ev-latest missing", "latest frame is unreadable: " + hero.raw));
+    });
+    btn.append(img);
+    btn.addEventListener("click", () => openShot(hero, c));
+    wrap.append(btn);
+    const cap = el("div", "ev-cap");
+    cap.append(el("span", "t-micro", shotLabel(hero)));
+    cap.append(el("span", "path", basename(hero.raw)));
+    wrap.append(cap);
+  }
+
+  // When the newest record is not the frame above — a measurement, or a file
+  // that has gone missing — say so in place. An older frame presented as if it
+  // were current is the one way this panel could lie.
+  if (newest !== hero) {
+    const line = el("div", "ev-latest" + (newest.exists === false ? " missing" : ""));
+    line.textContent = (newest.exists === false ? "missing: " : "") + newest.raw;
+    line.title = `wave ${newest.wave}, round ${newest.round}`;
+    wrap.append(line);
+  }
+
+  const earlier = trail.filter(e => e !== hero && e !== newest);
+  if (earlier.length) {
+    const btn = el("button", "ev-more");
+    btn.type = "button";
+    btn.setAttribute("aria-expanded", "false");
+    const chev = icon("M6 3.5 10.5 8 6 12.5", 12); chev.classList.add("chev");
+    btn.append(chev, plural(earlier.length, "earlier frame"));
+    let strip = null;
+    btn.addEventListener("click", () => {
+      const open = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", String(!open));
+      if (open) { if (strip) strip.hidden = true; return; }
+      // Built on first request, so a long trail costs nothing until asked for.
+      if (!strip) { strip = filmstrip(c, earlier); wrap.append(strip); }
+      strip.hidden = false;
+    });
+    wrap.append(btn);
+  }
+  return wrap;
+}
+
+function filmstrip(c, entries) {
+  const trail = entries || (Array.isArray(c.evidence_trail) ? c.evidence_trail : []);
   if (!trail.length) return null;
   const strip = el("div", "filmstrip");
   for (const e of trail) {
@@ -1102,7 +1200,7 @@ function filmstrip(c) {
       thumb = shotPlaceholder(e.kind === "file" ? "file" : "—");
     }
     thumb.title = e.raw;
-    cell.append(thumb, el("div", "cap t-micro", `w${e.wave}·r${e.round}`));
+    cell.append(thumb, el("div", "cap t-micro", shotLabel(e)));
     strip.append(cell);
   }
   return strip;
@@ -1146,9 +1244,12 @@ function laneCard(c, column) {
   if (has(c.trend) && !has(c.shelved_reason)) n.append(el("div", "lane-note", c.trend));
   if (has(c.shelved_reason))
     n.append(el("div", "lane-note", `Shelved at wave ${c.shelved_at_wave}: ${c.shelved_reason}`));
-  const strip = filmstrip(c);
-  if (strip) n.append(strip);
-  if (has(c.evidence)) {
+  const ev = evidenceBlock(c);
+  if (ev) n.append(ev);
+  // The evidence block already names what was inspected; a foot repeating the
+  // same path says it twice. Kept for specs with no trail (hand-written, or an
+  // older schema version).
+  else if (has(c.evidence)) {
     const f = el("div", "lane-foot");
     const p = el("span", "path", basename(c.evidence));
     p.title = c.evidence;
