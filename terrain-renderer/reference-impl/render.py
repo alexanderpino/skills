@@ -62,7 +62,7 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 #   * the specular path.  A facet reflects the sun to the camera when its normal
 #     bisects L and V.  With the sun at 21 deg and the camera due east of the
 #     target, |theta_v - 21| < 12 deg keeps the required slope inside the field's
-#     rms (0.053 far, 0.092 over the jet) -- that is the ONLY band in which
+#     rms (0.058 far, 0.123 over the jet) -- that is the ONLY band in which
 #     spec C's isolated glints can exist.  Look down at 60 deg and there is no
 #     sparkle anywhere, at any roughness.
 #   * the caustic net.  25-40 cells at 15-30 cm needs 4-8 m of water in frame.
@@ -73,14 +73,21 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 # down, portrait: bottom edge on the near coping (theta_v 57 deg), top edge on
 # the far coping (9.5 m, theta_v 11 deg), 7.4 m of water in between, and the
 # mirror direction for a 21 deg sun crossing it a fifth of the way down.
-EYE = np.array([9.40, 1.55, 1.85])    # east: the anti-solar side
+#
+# The lateral position moved 0.40 m north this round, to the pool's own centre
+# line. It is the only camera number that changed, and it is what puts the step
+# unit -- now set into the north wall at mid-length rather than 8 m away in the
+# far corner -- inside the 15.8 deg half-width of the frame. The sail moved with
+# it, by the same 0.70 m, so that its shadow EDGE stays in frame: the shadow gate
+# is a claim under test and it has to be visible to be judged.
+EYE = np.array([9.40, 1.95, 1.85])    # east: the anti-solar side
 CAM_AZ = np.deg2rad(176.6)            # anti-solar to 0.4 deg: see above
 CAM_EL = np.deg2rad(-33.35)
 FOV = np.deg2rad(46.0)
 TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
                             np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
-SAIL = np.array([[-5.10, -0.90, 2.72], [-2.10, -0.50, 2.55],
-                 [-2.40, 1.90, 2.35], [-5.40, 1.50, 2.55]])
+SAIL = np.array([[-5.10, -0.20, 2.72], [-2.10, 0.20, 2.55],
+                 [-2.40, 2.60, 2.35], [-5.40, 2.20, 2.55]])
 EXPOSURE = 0.275      # the camera exposes for a 21-degree sun
 
 # --- the pool edge, in section ----------------------------------------------
@@ -137,31 +144,47 @@ def pool_sdf_grad(x, y):
 
 
 # --- the bed, as a field ------------------------------------------------------
-# A RADIUS CORNER STEP -- the "wedding cake" unit every vinyl-liner pool has --
-# swept into the north-west corner, plus a bench lobe along the north wall. Both
-# are part of the LINER SHELL: same vinyl, same colour, continuous over the form.
+# A RADIUS ENTRY STEP -- the "wedding cake" unit every vinyl-liner pool has --
+# set into the north wall at mid-length, plus a bench lobe further west. Both are
+# part of the LINER SHELL: same vinyl, same colour, continuous over the form.
 # They are not a stone insert, and they are not decoration: they are the only
 # straight-ish edges in the basin, and a circular nosing is the specific shape
 # that a decorative wobble cannot fake. A wobbling straight line is a line with
 # noise on it; a circular arc seen through a wavy interface stays a coherent arc
 # whose local tangent swings, and only a real refracted view ray does that.
 #
-# Dimensions are a standard unit: tread 300 mm, riser 240/250 mm, three treads,
-# sweeping 2.20 m along each wall. The last drop to the floor is 700 mm -- that
-# is what a three-tread unit in a 1.40 m basin actually does; you sit on it.
-# WHERE it sits is a composition choice, not a derivation, and it was made
-# against the sun rather than against the frame: the descent direction of a
-# tread decides whether its own nosing shadows it. The refracted sun travels
-# EAST underwater at 44.4 deg from vertical, so a tread that steps down toward
-# the east is 80% self-shadowed and shows no caustic at all. Sweeping the unit
-# from the west wall round to the north wall puts the descent between east and
-# south, and the shadow crossing the tread falls from 244 mm to 16 mm across
-# that sweep -- so the unit is lit where it faces the camera and self-shaded at
-# its far end, which is a gradient that fell out of the geometry.
-STEP_C = np.array([X0, Y1])                       # the arcs are centred on the corner
-STEP_R = np.array([1.60, 1.90, 2.20])             # nosing radii, 300 mm treads
+# Dimensions are a standard unit: tread 300 mm, riser 240/255 mm, three treads,
+# 3.0 m along the wall and 1.5 m out into the water. The last drop to the floor
+# is 700 mm -- that is what a three-tread unit in a 1.40 m basin actually does;
+# you sit on it.
+#
+# WHERE IT SITS. Two constraints, and the previous placement satisfied only one.
+#  * THE SUN, which is not a composition choice.  The refracted sun travels EAST
+#    under water at 44.4 deg from vertical, so a tread that steps down toward the
+#    east lies in its own nosing's shadow: 235 mm of a 300 mm tread. A flight
+#    whose descent sweeps through east is 80% self-shadowed and shows no caustic
+#    at all. Both of the west-wall corners descend eastward over half their
+#    sweep. A unit centred on a side wall sweeps its descent through the whole
+#    half-circle, so the self-shadow runs from 235 mm at the east end to 16 mm at
+#    the south point -- a gradient that falls out of the geometry, and every
+#    tread that faces the camera keeps a lit outer strip.
+#  * THE FRAME, which the last placement lost.  At 7.5-9 m the flight is seen at
+#    theta_v 11-14 deg: the treads foreshorten to 24% of their width, the whole
+#    unit is 130 px of a 1200 px frame, the 12.9 mm nosing wobble projects to
+#    0.6 px, and Fresnel on the surface above it is 0.25-0.36, which puts a
+#    near-neutral sky reflection over everything the unit was built to show.
+#    A 90 deg CORNER unit cannot be brought closer: from a viewpoint near its own
+#    corner a 2.2 m quarter-arc subtends 40-60 deg of azimuth and leaves the
+#    31.6 deg frame. A half-circle centred on the wall does not have that
+#    problem -- its bulge points at the camera and its ends recede -- so at
+#    x = 6.0 the outer nosing comes to 3.4 m, theta_v 28 deg, Fresnel 0.05, and
+#    the arcs sweep 90 deg of frame instead of 15.
+# The unit sits east of the mirror band (theta_v 21 deg, at 4.8 m) rather than
+# under it, so the sun glitter road crosses OPEN water beyond the steps.
+STEP_C = np.array([6.00, Y1])                     # the arcs are centred ON the wall
+STEP_R = np.array([0.90, 1.20, 1.50])             # nosing radii, 300 mm treads
 STEP_Z = np.array([-0.205, -0.445, -0.700])       # tread levels below still water
-BENCH_C = np.array([3.70, 4.30])                  # the bench lobe: a disc cut by
+BENCH_C = np.array([3.00, 4.35])                  # the bench lobe: a disc cut by
 BENCH_R = 0.85                                    # the north wall, so its leading
 BENCH_Z = -0.445                                  # edge is an arc, at tread-2 level
 NOSE_R = 0.025          # ? nosings are eased, not arrised -- 25 mm reads as the
@@ -222,10 +245,13 @@ def refract(ix, iy, iz, nx, ny, nz, eta):
 BIG = np.float32(1e9)
 
 
-def _cyl_entry(px, py, tx, ty, tz):
+def _cyl_entry(px, py, tx, ty, tz, pz=0.0):
     """Entry point of a downgoing ray into the UNION of the bed cylinders.
     Returns (t, is_riser, which). The union's first entry is the minimum of the
-    per-solid entries, so no CSG walk is needed -- only four quadratics."""
+    per-solid entries, so no CSG walk is needed -- only four quadratics.
+    `pz` is the ray's starting height; 0 (the still surface) for every caustic
+    and camera ray, negative for the inter-reflection gather, which starts on a
+    riser. It used to be hard-coded to 0 in the two places z enters."""
     n = px.shape
     bt = np.full(n, BIG); bf = np.zeros(n, bool); bi = np.full(n, -1, np.int8)
     a = tx * tx + ty * ty
@@ -244,7 +270,7 @@ def _cyl_entry(px, py, tx, ty, tz):
         t2 = np.where(hit, (-b + sq) * 0.5 * inva, -BIG)
         t1 = np.where(vert, np.where(c < 0.0, -BIG, BIG), t1)
         t2 = np.where(vert, np.where(c < 0.0, BIG, -BIG), t2)
-        tc = np.where(down, ztop / tzd, BIG)
+        tc = np.where(down, (ztop - pz) / tzd, BIG)
         tin = np.maximum(t1, tc)
         ok = (tin < t2) & (tin > 1e-6) & (tin < bt)
         bt = np.where(ok, tin, bt)
@@ -253,8 +279,10 @@ def _cyl_entry(px, py, tx, ty, tz):
     return bt, bf, bi
 
 
-def scene_hit(px, py, tx, ty, tz):
-    """First hit of a downgoing ray in the pool. Surface ids:
+def scene_hit(px, py, tx, ty, tz, pz=0.0):
+    """First hit of a downgoing ray in the pool, starting at height `pz`
+    (0 = the still surface, which is where every caustic and camera ray starts).
+    Surface ids:
          0 = a horizontal bed face -- floor, tread or bench top; (u,v) = (x,y)
          1..4 = the walls x0, x1, y0, y1;                        (u,v) = (along,z)
          5 = a cylindrical riser of the step unit;               (u,v) = (x,y)
@@ -262,7 +290,7 @@ def scene_hit(px, py, tx, ty, tz):
     outward normal without a second intersection."""
     with np.errstate(divide='ignore', invalid='ignore'):
         s = np.stack([
-            np.where(tz < -1e-9, -DEPTH / tz, BIG),
+            np.where(tz < -1e-9, (-DEPTH - pz) / tz, BIG),
             np.where(tx < -1e-9, (X0 - px) / tx, BIG),
             np.where(tx > 1e-9, (X1 - px) / tx, BIG),
             np.where(ty < -1e-9, (Y0 - py) / ty, BIG),
@@ -274,21 +302,22 @@ def scene_hit(px, py, tx, ty, tz):
 
     # Prune: a ray can only meet the step unit if its horizontal run crosses the
     # unit's plan bounding box. Everything else keeps the flat-floor fast path.
-    L = np.minimum(sm, DEPTH / np.maximum(-tz, 1e-9))
+    L = np.minimum(sm, (DEPTH + pz) / np.maximum(-tz, 1e-9))
     ax, bx2 = px, px + tx * L
     ay, by2 = py, py + ty * L
     near = ((np.minimum(ax, bx2) <= STEP_BB[1]) & (np.maximum(ax, bx2) >= STEP_BB[0]) &
             (np.minimum(ay, by2) <= STEP_BB[3]) & (np.maximum(ay, by2) >= STEP_BB[2]))
     idx = np.flatnonzero(near)
     if idx.size:
-        ct, cf, ci = _cyl_entry(px[idx], py[idx], tx[idx], ty[idx], tz[idx])
+        pzi = pz if np.ndim(pz) == 0 else pz[idx]
+        ct, cf, ci = _cyl_entry(px[idx], py[idx], tx[idx], ty[idx], tz[idx], pzi)
         take = ct < sm[idx]
         j = idx[take]
         sm[j] = ct[take]
         sid[j] = np.where(cf[take], 5, 0).astype(np.int8)
         cyl[j] = ci[take]
 
-    hx, hy, hz = px + tx * sm, py + ty * sm, tz * sm
+    hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
     u = np.where((sid == 0) | (sid == 5), hx, np.where(sid <= 2, hy, hx))
     v = np.where((sid == 0) | (sid == 5), hy, hz)
     return sid, u, v, sm, cyl
@@ -780,18 +809,166 @@ for wi in range(4):
     wall_img['disp'].append(shade(wall[wi][:3], T, WAO, dep=-VV, extra=WR))
     wall_img['mono'].append(shade([wall[wi][3]] * 3, T, WAO, dep=-VV, extra=WR))
 
+# --- ONE BOUNCE OFF THE BED, ONTO THE RISERS ---------------------------------
+# The step region rendered NEUTRAL GREY: median sRGB (119, 128, 141) at
+# saturation 0.16, against 0.42 for open water in the SAME image row and 0.69
+# for the floor nearer the camera. Same row is the same grazing angle and the
+# same Fresnel, so the surface reflection was not the cause; the receiver was.
+# The bar says the saturation comes from the liner and that the water column can
+# only subtract, so a near-neutral region is a statement that light reached the
+# camera without going through water or off the liner. What was happening is
+# arithmetic: the riser's own radiance was so low that the (horizon-coloured,
+# nearly neutral) sky reflection won by default at 36% Fresnel.
+#
+# WHY THE RISER HAS ALMOST NOTHING. The refracted sun runs east at 44.4 deg from
+# vertical, so a face is lit only if it faces west of the underwater terminator;
+# an anti-solar camera looks at east-facing surfaces by construction. The two
+# sets do not intersect -- no riser in this frame is both lit and visible, and
+# the print further down MEASURES that rather than asserting it. Direct sun on a
+# visible riser is not small here, it is identically zero. So the whole
+# appearance of the step region is indirect light, and the model had exactly one
+# indirect term: SKY_AMB * ao, a flat blue DC through the Snell window.
+#
+# THE MISSING TERM is one bounce off the sunlit tread and floor a few
+# centimetres in front of the riser. It is the bigger of the two and it is the
+# one that carries colour and structure: the liner is a diffuse reflector of
+# albedo (0.24, 0.54, 0.70) carrying the caustic net, so what arrives from below
+# is bright cyan and spatially varying, and a real riser visibly shows the net
+# moving on it.
+#
+# IT IS A GATHER, NOT A FORM FACTOR, for two reasons. The pattern is the point --
+# a form factor would deliver the right energy with no net on it. And the bed a
+# riser sees is a staircase, not a plane: the tread in front is 43% in the
+# riser's own shadow, the floor beyond it is in full sun 0.7 m lower, and the
+# outer nosing hides part of that floor. No closed form spans those.
+#
+# THE ESTIMATOR is cosine-weighted about the outward normal and restricted to
+# the downgoing half of the hemisphere, which is exactly the half a vertical
+# face can see the bed through; the upgoing half is the sky term already there,
+# so the two partition the hemisphere and nothing is counted twice. With
+# psi drawn uniformly on (0, pi) the pdf is 2 cos(t)/pi over that half, so
+# E = (pi/2) <L_real> = 0.5 <L>, L being the same albedo*irradiance product that
+# shade() returns. The closed form for a uniformly bright bed is then exactly
+# 0.5, and that is printed below as a regression test on the quadrature.
+RIS_NT, RIS_NZ = 512, 24        # arc samples per cylinder (18 mm), height samples
+RIS_NU, RIS_NP = 8, 8           # stratified cosine x azimuth gather directions
+_rr2 = np.random.default_rng(90210)
+_U1 = ((np.arange(RIS_NU)[:, None] + _rr2.random((RIS_NU, RIS_NP))) / RIS_NU).ravel()
+_PSI = (np.pi * (np.arange(RIS_NP)[None, :] + _rr2.random((RIS_NU, RIS_NP)))
+        / RIS_NP).ravel()
+_DN = np.sqrt(1.0 - _U1)                    # along the outward normal
+_DT = np.sqrt(_U1) * np.cos(_PSI)           # along the tangent
+_DB = np.sqrt(_U1) * np.sin(_PSI)           # straight down; > 0 by construction
+
+RIS_MAP, RIS_FOOT = [], []
+_rstat = np.zeros(3)                        # [bed+wall hits, riser hits, samples]
+for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
+    _th = (np.arange(RIS_NT) + .5) / RIS_NT * 2 * np.pi
+    _ct, _st = np.cos(_th), np.sin(_th)
+    # the riser's FOOT is whatever the bed does just outside this cylinder --
+    # the next tread down, or the floor. Read, not tabulated, so the map needs
+    # no edit when a level moves.
+    _zf = np.minimum(bed_z(_cx + (_R + 2e-3) * _ct, _cy + (_R + 2e-3) * _st),
+                     _zt - 1e-3)
+    RIS_FOOT.append(_zf)
+    _tt = (np.arange(RIS_NZ) + .5) / RIS_NZ
+    _Z = (_zf[None, :] + _tt[:, None] * (_zt - _zf)[None, :])
+    _PX = np.broadcast_to(_cx + _R * _ct, _Z.shape).ravel()
+    _PY = np.broadcast_to(_cy + _R * _st, _Z.shape).ravel()
+    _NX = np.broadcast_to(_ct, _Z.shape).ravel().copy()
+    _NY = np.broadcast_to(_st, _Z.shape).ravel().copy()
+    _PZ = _Z.ravel()
+    _in = pool_sdf(_PX, _PY) < 0.0          # the half-circle outside the wall
+    _acc = np.zeros((_PZ.size, 3))
+    for _dn, _dt, _db in zip(_DN, _DT, _DB):
+        _tx, _ty = _NX * _dn - _NY * _dt, _NY * _dn + _NX * _dt
+        _tz = np.full(_PZ.size, -_db)
+        _sd, _u, _v, _sm, _ = scene_hit(_PX + _NX * 1e-4, _PY + _NY * 1e-4,
+                                        _tx, _ty, _tz, _PZ)
+        _col = np.zeros((_PZ.size, 3))
+        _m = _sd == 0
+        if _m.any():
+            _col[_m] = sample(bed_img['mono'], _u[_m], _v[_m], X0, X1, Y0, Y1)
+        for _wi, _sv in enumerate((1, 2, 3, 4)):
+            _m = _sd == _sv
+            if _m.any():
+                _a, _b = (Y0, Y1) if _sv <= 2 else (X0, X1)
+                _col[_m] = sample(wall_img['mono'][_wi], _u[_m], _v[_m],
+                                  _a, _b, -DEPTH, 0.)
+        # ? a gather ray that lands on ANOTHER riser contributes nothing. Those
+        # ? faces are the dark side of the same terminator, so the error is one
+        # ? bounce of a dim source; the share is printed and it is under 2%.
+        _acc += _col * np.exp(-ABS[None] * _sm[:, None])
+        _rstat += [(_in & (_sd != 5)).sum(), (_in & (_sd == 5)).sum(), _in.sum()]
+    RIS_MAP.append((0.5 * _acc / (RIS_NU * RIS_NP)).reshape(RIS_NZ, RIS_NT, 3))
+print("riser bounce: %d faces x %d directions; view-factor closure %.3f of the "
+      "0.500 a vertical face has by geometry (%.1f%% of rays land on another "
+      "riser and are dropped)"
+      % (4 * RIS_NT * RIS_NZ, RIS_NU * RIS_NP,
+         0.5 * _rstat[0] / max(_rstat[2], 1), 100 * _rstat[1] / max(_rstat[2], 1)))
+_mb = np.array([RIS_MAP[i].reshape(-1, 3).mean(0) for i in range(4)]).mean(0)
+print("  it adds %s of irradiance against %s of sky ambient on the same face "
+      "-- and unlike the sky term it carries the caustic net"
+      % (np.round(_mb, 3), np.round(SKY_AMB * 0.5, 3)))
+
+# The TIR return arrives at SHALLOW angles -- everything the bed emits beyond the
+# critical angle 48.6 deg comes back down between 48.6 and 90 deg from vertical --
+# so a vertical face intercepts it BETTER than the horizontal bed the bedret map
+# is normalised for. For a Lambertian bed the returning flux has angular density
+# cos(t) sin(t) dt over [tc, 90], so
+#   E_horiz ~ int cos^2(t) sin(t) dt      = cos^3(tc)/3            = 0.0969
+#   E_vert  ~ int sin^2(t) cos(t) sin(t) dt / pi = (1-sin^4(tc))/(4 pi) = 0.0545
+# (the 1/pi is <max(cos azimuth, 0)> over a full turn), giving 0.563. Derived,
+# not fitted -- but it does assume the arriving distribution is still the emitted
+# one after the metre-scale smear, which is only true because every bed point
+# emits the same distribution.
+_SC2 = 1.0 / IOR[1] ** 2
+TIR_VERT = ((1.0 - _SC2 ** 2) / (4 * np.pi)) / ((1.0 - _SC2) ** 1.5 / 3.0)
+print("  TIR return on a vertical face: %.3f of its value on the bed" % TIR_VERT)
+
+
+def riser_bounce(x, y, z, ci):
+    """Bilinear read of the bounce map. Theta wraps; height is normalised to the
+    riser's own foot, so a 240 mm riser and the 700 mm drop to the floor carry
+    the same map without either being resampled."""
+    out = np.zeros((x.size, 3))
+    for i, (cx, cy, R, ztop) in enumerate(CYL):
+        m = ci == i
+        if not m.any():
+            continue
+        fa = (np.arctan2(y[m] - cy, x[m] - cx) % (2 * np.pi)) / (2 * np.pi) * RIS_NT - .5
+        ja = np.floor(fa).astype(np.int64)
+        fj = (fa - ja)[:, None]
+        j0, j1 = ja % RIS_NT, (ja + 1) % RIS_NT
+        zf = RIS_FOOT[i][j0] * (1 - fj[:, 0]) + RIS_FOOT[i][j1] * fj[:, 0]
+        fb = np.clip((z[m] - zf) / np.maximum(ztop - zf, 1e-6), 0, 1) * RIS_NZ - .5
+        kb = np.clip(fb, 0, RIS_NZ - 1.001).astype(np.int64)
+        fk = np.clip(fb - kb, 0, 1)[:, None]
+        A = RIS_MAP[i]
+        out[m] = ((A[kb, j0] * (1 - fj) + A[kb, j1] * fj) * (1 - fk) +
+                  (A[kb + 1, j0] * (1 - fj) + A[kb + 1, j1] * fj) * fk)
+    return out
+
 # --- the depth ladder, measured ----------------------------------------------
 # F = 0.25 d s k with s and k taken from the field itself over the water that
 # actually lights each receiver, so the number moves with the depth and nothing
 # else. Cell size is the autocorrelation reading, in the same units the bar uses.
 from field import grad_grid as _gg
+import field as _fld
 
 
 def _sk(x0, x1, y0, y1):
     xs = np.linspace(x0, x1, 192).astype(np.float32)
     ys = np.linspace(y0, y1, 192).astype(np.float32)
     gx, gy = _gg(xs, ys)
-    s = np.sqrt((gx ** 2 + gy ** 2).mean() / 2.0)
+    # ONE slope convention, and it is field.py's: s = sqrt(<|grad h|^2>), the
+    # total mean-square slope. This line used to divide by 2 -- the per-axis rms,
+    # smaller by sqrt(2) -- while the F(net) column beside it was fed
+    # field.REVERB_RMS, which is total. Two units in one printed table, which is
+    # exactly the defect the surface lane had just removed from field.py. Calling
+    # rms_slope rather than writing the expression out again is the fix that
+    # sticks: there is now no second place where the convention can drift.
+    s = _fld.rms_slope(gx, gy)
     dx, dy = (x1 - x0) / 191., (y1 - y0) / 191.
     P = np.abs(np.fft.rfft2(gx)) ** 2 + np.abs(np.fft.rfft2(gy)) ** 2
     kx = 2 * np.pi * np.fft.rfftfreq(192, dx)[None, :]
@@ -800,19 +977,22 @@ def _sk(x0, x1, y0, y1):
     return s, np.sqrt((P * (kx * kx + ky * ky)).sum() / P.sum())
 
 
-_PATCH = [("top tread   ", STEP_Z[0], 0.55, 1.35, 3.20, 3.90),
-          ("2nd tread   ", STEP_Z[1], 0.95, 1.55, 3.05, 3.55),
-          ("bench       ", BENCH_Z, 3.10, 4.25, 3.55, 3.95),
-          ("3rd tread   ", STEP_Z[2], 1.45, 2.05, 2.55, 3.10),
-          ("floor       ", -DEPTH, 4.20, 6.20, 1.20, 2.80)]
+_PATCH = [("top tread   ", STEP_Z[0], 5.45, 6.55, 3.45, 3.95),
+          ("2nd tread   ", STEP_Z[1], 5.70, 6.30, 2.88, 3.05),
+          ("bench       ", BENCH_Z, 2.65, 3.35, 3.65, 3.98),
+          ("3rd tread   ", STEP_Z[2], 5.70, 6.30, 2.55, 2.75),
+          ("floor       ", -DEPTH, 4.20, 6.20, 1.00, 2.40)]
 # F is a PER-BAND number -- that is the whole point of field.py's slope budget --
 # so the net-writing band is what decides whether a receiver has a legible net.
 # REVERB at 19.7 cm writes it; the all-band column is the same formula fed the
 # slope-energy-weighted k, which the capillary floor drags down to ~8 cm and
 # which therefore says "past focus" about water that plainly is not. Both are
 # printed because reporting only the second is exactly the mistake the slope
-# budget exists to catch.
-import field as _fld
+# budget exists to catch. Corrected to the total-mss convention the F(all) column
+# now crosses 1.0 on the floor -- so the all-band reading says "past focus" about
+# the one receiver whose net is plainly legible in the frame. That does not
+# weaken the argument above, it is the argument: a slope-energy-weighted k that
+# the 2.8 cm capillary band drags to ~9.6 cm is the wrong k to put in F.
 _KNET = _fld._plane_k(_fld.REVERB)
 print("  receiver      depth  F(net,%.0fcm)  s_all  k_all  F(all)  cell (autocorr)"
       % (200 * np.pi / _KNET))
@@ -1179,6 +1359,15 @@ D /= np.linalg.norm(D, axis=2, keepdims=True)
 D = D.reshape(-1, 3)
 
 
+def project(P):
+    """World point -> pixel in the ENCODED image (after the SS box filter), so
+    the crops below are aimed at geometry rather than at remembered numbers."""
+    d = np.atleast_2d(np.asarray(P, float)) - EYE[None]
+    f = np.maximum(d @ fwd, 1e-6)
+    return np.stack([(((d @ rgt) / f / (tf * W / H) + 1) * .5 * W - .5) / SS,
+                     ((1 - (d @ upv) / f / tf) * .5 * H - .5) / SS], -1)
+
+
 def tri(o, d, a, b, c):
     e1, e2 = b - a, c - a
     p = np.cross(d, e2); det = p @ e1
@@ -1288,26 +1477,49 @@ PAV_COL = paving(hx[pav], hy[pav], S_HIT[pav], D[pav], FOOT[pav])
 
 
 # The refracted sun UNDER the surface, as one direction: this is what decides
-# which faces of the step unit can be lit at all. Every riser of the corner unit
-# faces somewhere between due east and due south, and the refracted sun travels
-# east and 2.6 deg south of east, so all of them are on the dark side of the
-# terminator -- the dark line under each nosing is not an effect, it is the
-# absence of light. The bench lobe's rim turns through west and does catch it.
+# which faces of the step unit can be lit at all. It travels east and 2.6 deg
+# south of east, so a riser is lit only if its outward normal has a westward
+# component -- and an anti-solar camera can only see normals with an EASTWARD
+# one. The two sets are disjoint, and the test below measures the overlap over
+# the whole riser arc of every cylinder instead of asserting it over five sample
+# normals. Refraction at the surface does not change a ray's azimuth, only its
+# elevation, so for a vertical face the visibility test is exact.
 _th = -SUN_DIR[:2] / np.linalg.norm(SUN_DIR[:2])
 TSUN_DIR = np.array([_th[0] * sin_t, _th[1] * sin_t, -cos_t])
-_az = np.linspace(0, -np.pi / 2, 5)
-print("refracted sun under water: (%.3f, %.3f, %.3f); N.L on the step risers "
-      "%s -> all in shade" % (TSUN_DIR[0], TSUN_DIR[1], TSUN_DIR[2],
-      " ".join("%+.3f" % v for v in
-               (-np.cos(_az) * TSUN_DIR[0] - np.sin(_az) * TSUN_DIR[1]))))
+_a = np.linspace(0, 2 * np.pi, 1441)[:-1]
+_ca, _sa = np.cos(_a), np.sin(_a)
+_nlit = _nvis = _nboth = _ntot = 0.
+_best = -9.
+for (_cx, _cy, _R, _zt) in CYL:
+    _px, _py = _cx + _R * _ca, _cy + _R * _sa
+    _ok = ((pool_sdf(_px, _py) < 0) &
+           (bed_z(_cx + (_R + 2e-3) * _ca, _cy + (_R + 2e-3) * _sa) < _zt - 1e-3))
+    _nl = -(_ca * TSUN_DIR[0] + _sa * TSUN_DIR[1])
+    _dx, _dy = EYE[0] - _px, EYE[1] - _py
+    _nv = (_ca * _dx + _sa * _dy) / np.hypot(_dx, _dy)
+    _nlit += (_ok & (_nl > 0)).sum(); _nvis += (_ok & (_nv > 0)).sum()
+    _nboth += (_ok & (_nl > 0) & (_nv > 0)).sum(); _ntot += _ok.sum()
+    _best = max(_best, np.where(_ok, np.minimum(_nl, _nv), -9.).max())
+print("refracted sun under water: (%.3f, %.3f, %.3f)" % tuple(TSUN_DIR))
+print("  riser arc in the basin: %.0f%% lit, %.0f%% faces the camera, %.1f%% both;"
+      " the best any face manages is min(N.L, N.V) = %+.3f -- so the light on"
+      " every riser this frame can see is entirely indirect"
+      % (100 * _nlit / _ntot, 100 * _nvis / _ntot, 100 * _nboth / _ntot, _best))
 
 
 def _riser_shade(hxr, hyr, hzr, ci, c, mode):
     """A cylindrical riser of the step unit. No caustic map is rasterised for
     these faces: the caustic pass drops the rays that reach them (that IS the
     cast shadow), and the mean refracted sun grazes them 2.6 deg on the dark
-    side. What is left is sky through the water and the crescent of the bench
-    rim that turns to face west."""
+    side wherever the camera can see them. Four terms, in the order they matter:
+      * the BOUNCE off the sunlit bed in front, gathered above -- the largest,
+        the one that carries the caustic net, and the one whose absence rendered
+        this whole region neutral grey;
+      * the TIR return, arriving shallow and so favouring a vertical face;
+      * sky through the Snell window, over the upgoing half hemisphere only;
+      * direct sun, which is nonzero only on the crescent that turns west and is
+        never visible from an anti-solar camera. It is kept because it is real,
+        not because it is seen."""
     cx = np.array([c_[0] for c_ in CYL])[ci]
     cy = np.array([c_[1] for c_ in CYL])[ci]
     RR = np.array([c_[2] for c_ in CYL])[ci]
@@ -1326,10 +1538,15 @@ def _riser_shade(hxr, hyr, hzr, ci, c, mode):
     # ? none. Only the bench crescent is lit at all, so this is a 6-pixel term.
     cau = sample((bed[c] if mode == 'disp' else bed[3])[..., None],
                  hxr + ox * .030, hyr + oy * .030, X0, X1, Y0, Y1)[:, 0]
-    ao = bed_ao(hxr, hyr, hzr) * .5 * (1. + Nz)
+    aow = bed_ao(hxr, hyr, hzr)
+    ao = aow * .5 * (1. + Nz)          # a vertical face sees half the sky
+    bnc = riser_bounce(hxr, hyr, hzr, ci)[:, c]
+    tir = sample(bedret[..., c:c + 1], hxr, hyr, X0, X1, Y0, Y1)[:, 0] * \
+        aow * (TIR_VERT + (1. - TIR_VERT) * Nz)
     return LINER_TINT[c] * lev * (
         SUN_COL[c] * cos_i * TSUN * cau * (ndl / cos_t) * np.exp(-ABS[c] * d / cos_t)
-        + SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55))
+        + SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55)
+        + tir + bnc)
 
 
 def render(mode):
@@ -1363,6 +1580,8 @@ def render(mode):
         water[:, c] = col * np.exp(-ABS[c] * sm)
         if c == 1:
             smG = sm
+            global WSID, WU, WV
+            WSID, WU, WV = sid, u, v      # green trace: what each water pixel sees
     # the residual in-scatter of a treated pool: tiny, but it is a PATH integral,
     # so it grows with the water actually crossed and is one more depth cue.
     water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * smG))[:, None]
@@ -1390,11 +1609,70 @@ def encode(hdr):
 
 
 hero = encode(render('disp'))
+
+
+# --- THE COLOUR REGRESSION ---------------------------------------------------
+# The defect this round existed to fix does not show up in any of the numbers
+# above: every term in _riser_shade was defensible on its own and the region
+# still came out neutral. So it is measured here, in the units the bar's section
+# A is written in -- the sRGB (max - min)/max of a region's MEDIAN colour.
+#
+# Two rules make the reading mean something. Regions are compared WITHIN THE SAME
+# IMAGE ROWS, because grazing angle and Fresnel are functions of the row, and
+# holding them fixed is what makes the difference attributable to the receiver.
+# And a downsampled pixel counts only if all SS^2 of its subsamples belong to one
+# region, so nothing on a silhouette edge is mixed into either side.
+def _regions():
+    lb = np.zeros(W * H, np.int8)
+    iw = np.flatnonzero(inp)
+    flr = (WSID == 0) & (bed_z(WU, WV) <= -DEPTH + 1e-6)
+    lb[iw[WSID == 5]] = 1                                   # riser face
+    lb[iw[(WSID == 0) & ~flr]] = 2                          # tread / bench top
+    lb[iw[flr]] = 3                                         # floor, 1.40 m down
+    lb[np.flatnonzero(pav)] = 4                             # stone
+    lb = lb.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
+    lb = lb.reshape(H // SS, W // SS, SS * SS)
+    return np.where((lb == lb[..., :1]).all(-1), lb[..., 0], -1)
+
+
+def _sat(px):
+    m = np.median(px.reshape(-1, 3), 0)
+    return m, (m.max() - m.min()) / max(m.max(), 1e-9)
+
+
+def colour_table(img, reg):
+    rows = np.flatnonzero((reg == 1).sum(1) >= 12)
+    band = np.zeros(reg.shape, bool)
+    if rows.size:
+        band[rows[0]:rows[-1] + 1] = True
+    print("colour regression (sRGB medians; saturation = (max-min)/max)")
+    print("  the step's own rows are image rows %s"
+          % ((("%d-%d" % (rows[0], rows[-1])) if rows.size else "none")))
+    for nm, k, m in (("riser face      ", 1, band), ("tread top       ", 2, band),
+                     ("floor, same rows", 3, band), ("floor, all rows ", 3, None),
+                     ("coping stone    ", 4, None)):
+        sel = (reg == k) if m is None else ((reg == k) & m)
+        if sel.sum() < 30:
+            print("  %s   -- %d px, not measured" % (nm, sel.sum()))
+            continue
+        med, s = _sat(img[sel])
+        print("  %s  (%3.0f,%3.0f,%3.0f)  sat %.2f   %6d px"
+              % (nm, med[0], med[1], med[2], s, sel.sum()))
+
+
+REG = _regions()
+colour_table(hero, REG)
+
 mono = encode(render('mono'))
 Image.fromarray(hero).save("pool_final.png")
 print("wrote pool.png")
 
-CX, CY, CW, CHh = 230, 560, 280, 190      # a patch of sunlit bed, not of deck
+# A patch of sunlit floor between the camera and the step unit -- aimed by
+# projecting the point, not by a remembered pixel index.
+CW, CHh = 280, 190
+_c = project([4.90, 1.60, -DEPTH])[0]
+CX = int(np.clip(_c[0] - CW / 2, 0, W // SS - CW))
+CY = int(np.clip(_c[1] - CHh / 2, 0, H // SS - CHh))
 S = 3
 
 
@@ -1407,12 +1685,28 @@ A, B = crop(mono, 'mono'), crop(hero, 'disp')
 cmp = Image.new('RGB', (A.width * 2 + 18, A.height), (16, 18, 20))
 cmp.paste(A, (0, 0)); cmp.paste(B, (A.width + 18, 0))
 cmp.save("pool_final_dispersion.png")
-# The zoom is aimed at the radius corner step, because that is where the claims
-# under test are legible: three arc nosings displaced and undulating with the
-# same slope field that writes the caustics, a tonal staircase from the shorter
-# Beer-Lambert path over each tread, a dark line under each nosing, and the
-# unit's own cast shadow out on the floor.
-ZX, ZY, ZW, ZH = 415, 8, 385, 270
+# The zoom is aimed at the radius step, because that is where the claims under
+# test are legible: three arc nosings displaced and undulating with the same
+# slope field that writes the caustics, a tonal staircase from the shorter
+# Beer-Lambert path over each tread, a shaded riser under each nosing carrying
+# the bounce off the tread in front of it, and the unit's own cast shadow out on
+# the floor. The rectangle is the projected bounding box of the three nosings
+# plus the strip of floor outside them, so it follows the unit if it moves.
+_zp = []
+for (_cx, _cy, _R, _zt) in CYL[:3]:
+    _a2 = np.linspace(np.pi, 2 * np.pi, 400)      # the half circle in the water
+    _zp.append(np.stack([_cx + _R * np.cos(_a2), _cy + _R * np.sin(_a2),
+                         np.full(400, _zt)], -1))
+    _zp.append(np.stack([_cx + (_R + .35) * np.cos(_a2),
+                         _cy + (_R + .35) * np.sin(_a2), np.full(400, -DEPTH)], -1))
+_zpix = project(np.concatenate(_zp))
+_zpix = _zpix[(_zpix[:, 0] > -400) & (_zpix[:, 0] < W // SS + 400) &
+              (_zpix[:, 1] > -400) & (_zpix[:, 1] < H // SS + 400)]
+ZX = int(np.clip(_zpix[:, 0].min() - 12, 0, W // SS - 40))
+ZY = int(np.clip(_zpix[:, 1].min() - 12, 0, H // SS - 40))
+ZW = int(np.clip(_zpix[:, 0].max() + 12, 0, W // SS) - ZX)
+ZH = int(np.clip(_zpix[:, 1].max() + 12, 0, H // SS) - ZY)
+print("zoom on the step unit: %dx%d px at (%d, %d)" % (ZW, ZH, ZX, ZY))
 Image.fromarray(hero[ZY:ZY + ZH, ZX:ZX + ZW]).resize(
     (ZW * S, ZH * S), Image.LANCZOS).save("pool_final_zoom.png")
 print("wrote pool_dispersion.png, pool_zoom.png")

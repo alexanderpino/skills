@@ -16,6 +16,44 @@ or falsified here.
 Sun position is the measured one for the reference photograph (Aljezur, 37.319N
 8.803W, 2026-08-10 18:41 WEST): elevation 21.0 deg, azimuth 273.75 deg.
 
+## Not modelled yet — the camera under the water
+
+Requested for a later pass, and the largest single inversion left in the model:
+everything above is a view *into* the medium, this is a view *from inside* it.
+Numbers below are computed from the constants already in `render.py`, so the
+feature is mostly a matter of building the view, not of finding new physics.
+
+- **Snell's window.** The whole above-water world compresses into a cone of half
+  angle `asin(1/n)` overhead — 48.5 deg green, so 97 deg across. Outside that cone
+  the surface is a **perfect mirror**: reflectance is exactly 1 beyond the critical
+  angle, so the camera sees the bed, the walls and the step unit folded back down.
+  There is no partial regime out there, which makes the rim the hardest edge in
+  the scene and the easiest thing to get visibly wrong.
+- **The rim is dispersive, and by a measurable amount.** With the file's own
+  `IOR = 1.3320 / 1.3348 / 1.3400`, the critical angle runs 48.655 / 48.519 /
+  48.268 deg — a **0.39 deg** spread, red rim outside blue. Same three constants
+  that already produce the fringing on the bed caustics, used on a hard edge
+  instead of a soft one.
+- **The sun sits just inside the rim, at this sun elevation.** 21.0 deg elevation
+  is 69.0 deg from vertical in air, refracting to **44.4 deg** from vertical below
+  the surface — only **4.1 deg** inside the window's edge. So the sun is not
+  overhead in the window, it is crowded against its edge, which is where the
+  window is most compressed and most dispersive.
+- **Absorption becomes aerial perspective.** This is the first view in the model
+  where the water column sits between the camera and the far geometry, so
+  `a = (0.25, 0.0565, 0.0092) /m` acts along the *view* path. Transmission at 5 m
+  is `(0.29, 0.75, 0.96)` — the far wall loses two thirds of its red and the scene
+  goes cyan with distance. The chapter's "the colour is the bottom, not the water"
+  is a statement about a view from above; from inside, the water genuinely does
+  colour the image.
+- **`b_b ~ 0` gets its real test here.** Backscatter that is negligible over a
+  1.4 m round trip from above is what produces the visible beam structure and the
+  contrast loss along an 8 m horizontal path. Same reason the wall lights below
+  need the `a`/`b`/`g` split rather than one collapsed `sigma`.
+- **Real time:** the window is a single `dot(N, V)` against the critical angle plus
+  a Fresnel term, and the mirror side is the existing reflection path. Nothing
+  here needs a path tracer.
+
 ## Not modelled yet — submerged wall lights
 
 Requested for a later pass. Worth writing down now because it is not a small
