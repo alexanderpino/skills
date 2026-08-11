@@ -9,6 +9,9 @@ Chain (terrain-renderer/references/12-water-rendering.md):
    -> sun visibility sampled AT THE SURFACE ENTRY POINT (shade sail), with penumbra
    -> Beer-Lambert over the light path, then again over the camera path
    -> liner albedo * transmittance   (b_b ~ 0: pool colour is the bottom, not scattering)
+   -> ONE BOUNCE between bed and bed: total internal reflection off the underside
+      of the surface, and a gather off the sunlit bed onto every vertical face --
+      which is the whole of the light on a step riser seen from the anti-solar side
    -> Fresnel with F0 from per-channel IOR (0.0197, not the 0.04 dielectric default)
 
 Nothing in the caustic pattern is authored: no texture, no Voronoi, no noise.
@@ -65,6 +68,17 @@ SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
 #     rms (0.058 far, 0.123 over the jet) -- that is the ONLY band in which
 #     spec C's isolated glints can exist.  Look down at 60 deg and there is no
 #     sparkle anywhere, at any roughness.
+#     WHERE that band sits is fixed by the eye height alone: the mean surface
+#     mirrors the sun where theta_v = 21 deg, a ground distance h/tan(21) =
+#     2.607 h, so from 1.85 m it lands 4.8 m out, and the spread the far-field
+#     slope gives it (a facet tilt d moves the mirror angle by 2d, so +-2s =
+#     +-6.6 deg) makes it a ROAD from 3.5 m to 7.2 m rather than a patch. Spec C
+#     wants that patch over the jet with glassy water around it. The jet is at
+#     x = 0.10, which is 9.3 m from this eye, so the patch lands on it only from
+#     an eye 9.3/2.607 = 3.57 m up -- a first-floor window, not a deck. Spec C is
+#     therefore NOT reachable by moving this camera: it needs the jet near
+#     mid-pool or a far-field slope well under 0.058, and both of those live in
+#     field.py. Written down here rather than tuned around.
 #   * the caustic net.  25-40 cells at 15-30 cm needs 4-8 m of water in frame.
 #   * the waterline has to be legible somewhere.  At the FAR coping it is four
 #     pixels of stone; the only place a pool edge can be read is the one under
@@ -192,7 +206,7 @@ NOSE_R = 0.025          # ? nosings are eased, not arrised -- 25 mm reads as the
 
 
 def bed_z(x, y):
-    """Height of the bed under (x, y). The floor, the corner step, the bench."""
+    """Height of the bed under (x, y). The floor, the radius step, the bench."""
     r = np.sqrt((x - STEP_C[0]) ** 2 + (y - STEP_C[1]) ** 2)
     z = np.where(r <= STEP_R[0], STEP_Z[0],
                  np.where(r <= STEP_R[1], STEP_Z[1],
@@ -812,6 +826,16 @@ print("TIR return: %.1f%% of the bed's own output comes back down; it adds %s "
       "to the bed against %s of sky ambient"
       % (100 * TIR_FRAC, np.round(bedret.reshape(-1, 3).mean(0), 3),
          np.round(SKY_AMB * np.exp(-ABS * DEPTH * 1.55), 3)))
+# ...and the reason that is so much smaller than 43.9% of a bright bed sounds:
+# everything past the critical angle leaves the bed at more than 48.6 deg from
+# vertical, so from 1.40 m down it needs at least 1.59 m of horizontal run to
+# reach the surface at all. In a basin 4 m across, most of it meets a WALL
+# first. Those rays are dropped here, which makes the wall the single largest
+# unmodelled carrier of light in this scene -- see the riser gather below, which
+# is the receiving half of exactly that transfer, written for a vertical face.
+print("  ...but %.0f%% of it meets a wall before it reaches the surface (the "
+      "unmodelled wall re-emission), and the survivors are smeared over metres"
+      % (100 * (1.0 - _ok.mean())))
 BEDRET = np.stack([sample(bedret[..., c:c + 1], BU.ravel(), BV.ravel(),
                           X0, X1, Y0, Y1)[:, 0].reshape(BU.shape)
                    for c in range(3)], -1)
@@ -856,17 +880,21 @@ for wi in range(4):
 # the Snell window.
 #
 # THE MISSING TERM is one bounce off the sunlit tread and floor a few
-# centimetres in front of the riser. It is the bigger of the two and it is the
-# one that carries colour and structure: the liner is a diffuse reflector of
-# albedo (0.24, 0.54, 0.70) carrying the caustic net, so what arrives from below
-# is bright cyan and spatially varying, and a real riser visibly shows the net
-# moving on it.
+# centimetres in front of the riser. Measured below it is (0.13, 0.57, 0.72)
+# against (0.28, 0.45, 0.71) of sky on the same face -- comparable in blue,
+# larger in green, smaller in red -- so it does not merely brighten the riser,
+# it MOVES ITS COLOUR, which is the whole of the defect. It is also the only one
+# of the two that carries structure: the liner is a diffuse reflector of albedo
+# (0.24, 0.54, 0.70) carrying the caustic net, and a real riser visibly shows
+# the net moving on it.
 #
 # IT IS A GATHER, NOT A FORM FACTOR, for two reasons. The pattern is the point --
 # a form factor would deliver the right energy with no net on it. And the bed a
-# riser sees is a staircase, not a plane: the tread in front is 43% in the
-# riser's own shadow, the floor beyond it is in full sun 0.7 m lower, and the
-# outer nosing hides part of that floor. No closed form spans those.
+# riser sees is a staircase, not a plane: the tread in front carries the riser's
+# OWN shadow, from 235 mm of its 300 mm at the east end of the sweep down to
+# 16 mm at the south point, so the nearest and most heavily weighted part of the
+# source is the dark part; the floor beyond is in full sun 0.7 m lower; and the
+# outer nosing hides some of that floor. No closed form spans those.
 #
 # THE ESTIMATOR is cosine-weighted about the outward normal and restricted to
 # the downgoing half of the hemisphere, which is exactly the half a vertical
@@ -877,7 +905,12 @@ for wi in range(4):
 # shade() returns. The closed form for a uniformly bright bed is then exactly
 # 0.5, and that is printed below as a regression test on the quadrature.
 RIS_NT, RIS_NZ = 512, 24        # arc samples per cylinder (18 mm), height samples
-RIS_NU, RIS_NP = 8, 8           # stratified cosine x azimuth gather directions
+RIS_NU, RIS_NP = 16, 8          # stratified cosine x azimuth gather directions
+# ? 128 directions. The direction set is shared by every texel, so what is left
+# ? of the quadrature error is not pixel noise but a smooth field -- it reads as
+# ? soft blotching on a riser, which is the one artifact that could be mistaken
+# ? for the caustic pattern the term exists to deliver. 128 puts it under the
+# ? map's own bilinear smoothing; the number is chosen, not derived.
 _rr2 = np.random.default_rng(90210)
 _U1 = ((np.arange(RIS_NU)[:, None] + _rr2.random((RIS_NU, RIS_NP))) / RIS_NU).ravel()
 _PSI = (np.pi * (np.arange(RIS_NP)[None, :] + _rr2.random((RIS_NU, RIS_NP)))
@@ -1756,13 +1789,16 @@ cmp.save("pool_final_dispersion.png")
 # the bounce off the tread in front of it, and the unit's own cast shadow out on
 # the floor. The rectangle is the projected bounding box of the three nosings
 # plus the strip of floor outside them, so it follows the unit if it moves.
+# nosing arc and foot arc of every riser, which bounds the unit exactly. The
+# projection is a straight line -- no refraction -- so a deep point lands lower
+# in the crop than the camera really sees it: the box is a bound, not a fit.
 _zp = []
 for (_cx, _cy, _R, _zt) in CYL[:3]:
     _a2 = np.linspace(np.pi, 2 * np.pi, 400)      # the half circle in the water
-    _zp.append(np.stack([_cx + _R * np.cos(_a2), _cy + _R * np.sin(_a2),
-                         np.full(400, _zt)], -1))
-    _zp.append(np.stack([_cx + (_R + .35) * np.cos(_a2),
-                         _cy + (_R + .35) * np.sin(_a2), np.full(400, -DEPTH)], -1))
+    _c2, _s2 = np.cos(_a2), np.sin(_a2)
+    _zp.append(np.stack([_cx + _R * _c2, _cy + _R * _s2, np.full(400, _zt)], -1))
+    _zp.append(np.stack([_cx + (_R + .06) * _c2, _cy + (_R + .06) * _s2,
+                         bed_z(_cx + (_R + .06) * _c2, _cy + (_R + .06) * _s2)], -1))
 _zpix = project(np.concatenate(_zp))
 _zpix = _zpix[(_zpix[:, 0] > 0) & (_zpix[:, 0] < W // SS) &
               (_zpix[:, 1] > 0) & (_zpix[:, 1] < H // SS)]

@@ -143,6 +143,27 @@ becomes visible from underneath.
   loss of *contrast*, not merely a colour shift, with distance. *Recollection of
   photographs in general, not of the reference pool. Judge accordingly.*
 
+**Read from a supplied underwater reference** — a child on an inflatable, shot
+from below looking up — and therefore stronger than the recollections above:
+
+- **The sun is a blazing disc inside the window, not a gradient.** It reads as a
+  small blown highlight with flare, sitting well inside the rim, while the rest of
+  the window carries the compressed sky around it. *Photograph.*
+- **Anything touching the surface from below carries a mirrored twin.** The
+  inflatable and its reflection in the surface's underside meet along the
+  waterline, corrugations and all, so the object reads as doubled about that line.
+  For this pool the same must hold for the **wall and the coping seen from
+  below**: the wall must meet its own mirror image at the waterline. It is the
+  single most recognisable underwater cue after the window itself, and it comes
+  free from the same surface. *Photograph.*
+- **Bubbles are silvered spheres**, not pale dots — total internal reflection
+  inside them mirrors the scene. Not needed for a still pool, but the mechanism is
+  the same one that makes the surface a mirror outside the window, so a renderer
+  that gets one and not the other has special-cased something. *Photograph.*
+- **Translucent objects lit from above glow from within.** Out of scope here
+  (nothing floats in this scene) but noted so it is not mistaken for a missing
+  feature. *Photograph.*
+
 ## H · The split shot — lens half in, half out
 
 > Added mid-run by owner ruling, as the intended final test.
@@ -187,6 +208,17 @@ view is.
   image a few dome-radii in front of the glass that the lens must focus on; that
   is why over-under photographs are shot with a dome and a close-focus lens.
   *Derived.*
+- **The dome is not free — it moves the cost to the air half.** A controlled
+  reference was supplied for exactly this: the same 16 mm focal length shot
+  through a 180 mm dome and an 82 mm flat port, same aperture, same shutter, same
+  pool. The flat-port frame keeps the lens's native, very wide **air** field —
+  palms on both sides, the whole building — while its submerged half is the
+  narrowed, magnified one. The dome frame restores the submerged half and shows a
+  visibly **narrower slice of the same air scene** at the same focal length,
+  behaving as a strong negative meniscus in air. So there is no port that leaves
+  both halves native, and a render claiming one has not chosen a port at all.
+  *Read from the comparison photograph, not derived — the optics of a dome in air
+  were not worked through here (`?`).*
 - **Whichever port is modelled, the waterline is where it is proved.** With a flat
   port, anything crossing the boundary — the pool wall, a coping edge, the step
   unit's nosings — must **change scale across it**, by that same factor. With a
