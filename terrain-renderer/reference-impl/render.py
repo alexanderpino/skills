@@ -2094,12 +2094,18 @@ def _waterline():
 
 WLINE = _waterline()
 ETA_RMS = float(np.mean([w.std() for w in WLINE]))
+# How far up the liner is still wet: the meniscus climb plus a couple of sigma
+# of that wobble, which is everything the surface has recently covered. Both
+# terms are derived, so the wet band's HEIGHT is a prediction and not a look --
+# and the prediction is that on a still pool it is under a centimetre.
+WETTOP = MENIS_H + 2.0 * ETA_RMS
 print("waterline on the wall, reconstructed by integrating the along-wall slope: "
       "rms %.2f mm, p2p %.2f mm -- against a meniscus climb of %.2f mm, so the "
       "wobble and the fillet are the same size and the line is soft rather than "
-      "cut" % (1000 * ETA_RMS,
-               1000 * float(np.mean([w.max() - w.min() for w in WLINE])),
-               1000 * MENIS_H))
+      "cut; the liner is wet to %.1f mm"
+      % (1000 * ETA_RMS,
+         1000 * float(np.mean([w.max() - w.min() for w in WLINE])),
+         1000 * MENIS_H, 1000 * WETTOP))
 
 
 def waterline(along, side):
@@ -2323,7 +2329,7 @@ def liner_band(x, y, z, vdir):
     # the wet foot: everything the surface has recently covered, which is the
     # meniscus climb plus the wobble the waterline itself carries. Both are
     # derived (MENIS_H, ETA_RMS), and the darkening is the wet-albedo above.
-    wetb = np.clip(1. - h / (MENIS_H + ETA_RMS), 0, 1) ** .8
+    wetb = np.clip(1. - h / WETTOP, 0, 1) ** .8
     alb = alb * (1 - wetb[:, None]) + wet_albedo(alb) * wetb[:, None]
     # ? the bead's albedo is a visual reading of the sixth photograph, in the
     # ? same status as the sandstone's: neutral grey concrete, slightly cool.
@@ -2351,6 +2357,8 @@ def liner_band(x, y, z, vdir):
     # incidence, and identical to this at the grazing angle the band is seen at.
     Vx, Vy = -vdir[:, 0], -vdir[:, 1]
     ndv = np.clip(Nx * Vx + Ny * Vy, 1e-3, 1)
+    # ? the 0.25 on the bead: cast concrete is rough where a vinyl sheet is not,
+    # ? so most of its Fresnel goes into a lobe far wider than this view.
     Fv = R_EXT[None] + (1. - R_EXT[None]) * (1. - ndv)[:, None] ** 5
     return col + WBOUNCE[None] * Fv * np.where(bead[:, None], .25, 1.), E
 
@@ -2677,7 +2685,7 @@ PAV_Z = Ez + D[pav, 2] * t_hit[pav]        # height of the stone/band hit
 PAV_COL = paving(hx[pav], hy[pav], PAV_Z, S_HIT[pav], D[pav], FOOT[pav])
 # which of those rays landed on the DRY BLUE, for the colour regression below:
 # on the liner, above the wet foot, below the grey bead.
-_bsel = (PAV_Z > MENIS_H + ETA_RMS) & (PAV_Z < FREEB)
+_bsel = (PAV_Z > WETTOP) & (PAV_Z < FREEB)
 BAND_RAY = np.zeros(W * H, bool)
 BAND_RAY[np.flatnonzero(pav)[_bsel]] = True
 # the irradiance those rays saw, kept so the band's COLOUR can be divided by its

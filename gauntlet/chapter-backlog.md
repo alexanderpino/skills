@@ -267,6 +267,68 @@ takes over the light budget long before it takes over the look, which is why
 "treated water barely scatters" is a statement about a **very** narrow regime and
 should be written as one.
 
+## 9d · What a water body is *made of* — the parameterisation, before sea and ocean
+
+The owner's framing is the right one and it should decide the architecture: pool
+water is not a special case to be hard-coded, it is **one point in a space**, and
+the sea and the ocean are other points in the same space. Ocean optics already has
+this space and the chapter should adopt it rather than inventing one.
+
+**A natural water is four optically significant components, and they add.**
+
+| component | absorbs | scatters | what it does to the look |
+|---|---|---|---|
+| **pure water** | strongly in red, `a(610) = 0.25 /m` | very weakly, molecular (`?` — `b_w(550) ≈ 0.002 /m`, not verified here) | the cyan. Always present, never varies. |
+| **phytoplankton** | peaks at 440 and 675 nm | by the cells | green. The *only* variable in open ocean. |
+| **CDOM** / gelbstoff | `a_g(λ) = a_g(440)·e^(−S(λ−440))`, `S ≈ 0.014 /nm` | **nothing** | yellow-brown. Dissolved, so it cannot scatter. |
+| **non-algal particles** | weakly, similar exponential | **strongly** | turbidity, haze, milkiness. |
+
+Two structural facts fall out and both are doctrine:
+
+- **CDOM absorbs and does not scatter; NAP scatters and barely absorbs.** So
+  "dirty water" splits into two independent axes that look nothing alike: brown
+  and *clear* (a peat river — you see the bottom, it is just brown) versus pale
+  and *opaque* (a stirred estuary). Collapsing them into one "turbidity" slider is
+  the single most common way to make water look wrong.
+- **The classification is not a taxonomy, it is a count of free parameters.**
+  *Case 1* waters — the open ocean — have everything covarying with chlorophyll,
+  so **one number** describes them. *Case 2* — coastal, lake, river — have CDOM
+  and NAP varying independently, so **three**. A swimming pool is the degenerate
+  point where all three constituents are ≈ 0, which is exactly *why* `b_b ≈ 0`
+  holds there and nowhere else.
+
+**What this asks of the interface.** Take **concentrations, not coefficients.**
+`a`, `b` and `g` are nine numbers across RGB and most of their combinations
+correspond to no real water at all; three or four constituent loads are fewer
+numbers and every combination is a water that exists. The spectra are literature,
+not art direction. This is what the chapter's `a`/`b`/`g` split on `liquidBody`
+should be *fed by*, rather than exposed as.
+
+**The number that makes the case.** At this project's own three RGB sample
+points, a modest CDOM load of `a_g(440) = 0.20`:
+
+| /m | R 610 | G 550 | B 450 |
+|---|---|---|---|
+| pure water | 0.2500 | 0.0565 | 0.0092 |
+| + that CDOM | +0.0185 | +0.0429 | **+0.1739** |
+
+It multiplies **blue** absorption by **20×** and leaves red essentially untouched.
+That is the whole difference between a peaty lake and a swimming pool: the same
+mechanism, run from the other end. A pool subtracts red and looks cyan; a lake
+subtracts blue and looks brown. Nothing else needs to change.
+
+**And it sharpens the RGB-sampling warning the chapter already carries.** These
+spectra are far steeper than pure water's — an exponential in CDOM, narrow peaks
+in chlorophyll — so sampling them at three delta wavelengths is worse here than
+anywhere else in the chapter. Same finding as the dispersion work in item 1, one
+level up: **a channel is a band, and the steeper the spectrum the more that
+matters.**
+
+Sources to cite properly when this is written: Bricaud, Morel & Prieur (1981) for
+the CDOM exponential and `S ≈ 0.014`; the Ocean Optics Web Book's Case-1 IOP model
+for the covariance structure; Pope & Fry (1997) for pure-water absorption, which
+the chapter should already be citing for the three numbers it uses.
+
 ## 10 · The view from inside, and the split shot
 
 Scoped in `reference-impl/README.md` and in bar sections G and H, unbuilt, and
