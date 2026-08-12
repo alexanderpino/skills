@@ -1582,6 +1582,50 @@ Two consequences fall straight out, and both are load-bearing:
   therefore smooth bright curves that close, run off, or terminate in cusps. It is not a cell
   tessellation — which is the specific reason the Voronoi fake reads wrong.
 
+### Caustics above the waterline, and why they are the sharper ones
+
+Water throws caustics **upward** as well as down — onto a coping, a wall, a hull, a harbour arch,
+the underside of a jetty. They are among the most recognisable things water does and they arrive by
+**two different paths**, which must not be collapsed into one term.
+
+- **Reflected.** The wavy surface is a curved *mirror*. It focuses exactly as a lens does — same
+  ray-map Jacobian, same folds and cusps — and it costs one Fresnel reflection.
+- **Transmitted (the water-out path).** Light that entered, lit the bed, came back up and refracted
+  out. It carries the bed's own caustic net outward, and it costs `T · albedo · T / n²` plus the
+  absorption of the round trip.
+
+**The reflected path focuses eight times harder, and that is the number to remember.** A surface
+slope `s` turns a refracted ray by `s(1 − 1/n) = 0.25s`, but a mirror tilted by `s` deflects by
+`2s`. So against the bed's `F = 0.25·d·s·k` the reflected caustic runs
+
+    F_reflected = 2·L·s·k          L = path from the water to the receiving surface
+
+a ratio of **7.97** at water's IOR (`D`). At this chapter's own far-field figures — `s = 0.058`,
+`λ_dom = 17 cm` — that puts a wall **0.30 m** from the water at the same focus the bed reaches at
+**1.40 m**.
+
+Three consequences follow, and the first is the one that gets rendered wrong:
+
+- **Above-water caustics go past focus almost immediately.** At `L = 1 m`, `F_reflected ≈ 4.2` —
+  the [unresolvable-wash rung](#the-focusing-number-which-regime-the-bed-is-in). So a crisp net on
+  stone exists only within a few tens of centimetres of the water; beyond that it is a **wash of
+  moving light with no cell structure**, and a renderer that projects the bed's net onto a distant
+  wall is showing a pattern that is two rungs too sharp for its own geometry.
+- **The reflected path usually dominates**, because the geometry that puts a surface near water is
+  also the geometry that makes the reflection grazing, where Fresnel runs from 0.3 to 1 — while the
+  transmitted path is paying two transmissions, a liner albedo, `1/n²` and a round trip of
+  absorption. Build the mirror path first; the water-out path is the *colour*, not the brightness.
+- **A low sun makes them streaks, not cells.** The mirror sends the beam back up at the sun's own
+  elevation, so at 21° it strikes nearby vertical surfaces at a shallow angle and stretches the
+  pattern along the wall — the long ropes of light on a harbour wall, not the net on a pool floor.
+
+**Real time:** this is the [existing caustic map](#the-tier-ladder) run once more with the *mirror*
+direction in place of the refracted one, projected from the water's plane onto the receiving
+geometry. No new machinery, and it obeys the same
+[four gates](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) — in
+particular the fourth: it is **irradiance on the receiver**, added to its lighting, never a
+multiplier on its albedo.
+
 ### The focusing number: which regime the bed is in
 
 Whether a body shows a crisp caustic net, a soft wash, or nothing much is not a matter of taste,
