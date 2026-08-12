@@ -152,7 +152,7 @@ REQUIRED = [
     'MENIS_COS', 'MENIS_REACH', 'MENIS_LIFT', 'PHI_W', 'THETA_C', '_mph',
     '_menis_weights', '_menis_under', '_env_menis', 'meniscus',
     'MENIS_TIR_REACH', 'EDGE_REFL', 'surf_stats', 'pool_grad',
-    'EYE', 'PIXANG', 'SS', 'SLIP',
+    'EYE', 'PIXANG', 'SS', 'SLIP', 'sail_vis',
 ]
 
 
@@ -1564,8 +1564,9 @@ def tier_meniscus(R):
                                   (-0.10, 0.99, 'near wall, steep')):
                 n = np.hypot(Vm0, Vz0)
                 Vm, Vz = Vm0 / n, Vz0 / n
-                ndv, wf, wl = R._menis_weights(np.array([Vm]), np.array([Vz]))
-                got = float((wf - wl).sum())
+                ndv, wf, wl, wo, isil = R._menis_weights(
+                    np.array([Vm]), np.array([Vz]))
+                got = float((wf + wo - wl).sum())
                 vis = np.flatnonzero(ndv[0] > 0)
                 # z at the visible arc's steep end, taken at the CELL EDGE
                 phe = (ph[vis[-1]] + .5 * (ph[1] - ph[0])) if vis.size else 0.0
@@ -1582,34 +1583,68 @@ def tier_meniscus(R):
              R.MENIS_COS, R.MENIS_REACH, R.PHI_W) = old
 
     # ------------------------------------------------ 4. the brute-force march
-    # The identity above is blind to the shape and the RK4 row does not know
-    # about the eye. This one is neither: a parallel fan of rays is cast at the
-    # RK4-marched polyline, each ray's first hit is found by a linear scan, and
-    # the projected area is accumulated as the perpendicular spacing between
-    # consecutive hits. No quadrature, no closed form, no telescoping -- the
-    # geometric definition of "projected area", measured.
+    # The identity above is blind to the SHAPE -- it telescopes to the endpoints
+    # -- and the RK4 row does not know about the eye. This one is neither. A
+    # parallel fan of rays is cast at the RK4-marched polyline and each ray is
+    # MARCHED until it passes below the surface; the tilt of the facet it lands
+    # on is recorded, and the rays are histogrammed into the shipped
+    # quadrature's own cells. What that measures is the projected area PER CELL
+    # -- rays per cell times the fan spacing -- which is what the deposit's
+    # placement depends on and what neither of the rows above can see. No
+    # quadrature, no closed form, no telescoping: the geometric definition of a
+    # projection, counted.
     tc = 0.0
     oph, odd, ozz = _menis_ode(R, tc, a, nstep=200000)
     ph, wd, dd, zz, sn, cs, reach = R.menis_tables(tc, a, R.MENIS_N)
+    keep = odd <= reach
+    pd, pz = odd[keep], ozz[keep]
     for Vm0, Vz0 in ((0.51, 0.46), (0.216, 0.197)):
-        n = np.hypot(Vm0, Vz0)
-        Vm, Vz = Vm0 / n, Vz0 / n
-        # keep only the marched polyline inside the tabulated reach, so the two
-        # measure the same piece of surface
-        m = odd <= reach
-        pd, pz = odd[m], ozz[m]
-        # perpendicular coordinate of each polyline vertex, in the plane
-        perp = (-Vz * pd + Vm * pz)
-        # visible <=> n.V > 0; the whole fillet, for Vm > 0
-        proj = float(np.abs(np.diff(perp)).sum()) * 1.0
-        ndv, wf, wl = R._menis_weights(np.array([Vm]), np.array([Vz]))
-        check(3, 'fillet projected area, 64-node quadrature vs a %dk-vertex ray '
-              'march  [Vm = %.3f]' % (pd.size // 1000, Vm),
-              float(wf.sum()), proj, 2e-3,
-              'the march sums |d(perp)| over the RK4 polyline -- the definition '
-              'of a projection -- against the shipped sum of ds*(n.V); 2e-3 '
-              'relative covers the 64-node rule and the polyline truncation',
-              unit='m', rel=True)
+        vn = np.hypot(Vm0, Vz0)
+        um, uz = Vm0 / vn, Vz0 / vn              # in-plane unit view, toward eye
+        # fan axis: perpendicular to the view, in the (poolward, up) plane
+        ex_, ez_ = -uz, um
+        M, S = 4000, 3000
+        q0 = -uz * reach + um * 0.0              # perp of the outer end
+        q1 = -uz * 0.0 + um * (2 * a)            # perp of the wall end, with slack
+        qq = np.linspace(min(q0, q1) - 2e-3, max(q0, q1) + 2e-3, M)
+        dq = float(qq[1] - qq[0])
+        # each ray starts well outside the fillet and marches toward the surface
+        t = np.linspace(0.0, 0.10, S)[None, :]
+        rd = qq[:, None] * ex_ + 0.05 * um - um * t
+        rz = qq[:, None] * ez_ + 0.05 * uz - uz * t
+        # the surface height under each marched point: the profile inside the
+        # reach, zero outside it, and the wall (an infinite cliff) at d < 0
+        zs = np.interp(np.clip(rd, 0.0, reach), pd[::-1], pz[::-1])
+        zs = np.where(rd > reach, 0.0, zs)
+        below = (rz <= zs) & (rd >= 0.0)
+        hit = below.any(1)
+        first = np.argmax(below, 1)
+        hd = rd[np.arange(M), first]
+        # which cell of the shipped quadrature the ray landed in
+        phh = np.interp(np.clip(hd, 0.0, reach), pd[::-1], oph[keep][::-1])
+        edges = np.concatenate([[0.0], .5 * (ph[1:] + ph[:-1]), [np.pi / 2]])
+        cnt, _ = np.histogram(phh[hit & (hd <= reach)], bins=edges)
+        meas = cnt * dq * vn                      # projected area per cell
+        ndv, wf, wl, wo, isil = R._menis_weights(np.array([um * vn]),
+                                                 np.array([uz * vn]))
+        want = wf[0]
+        # group into 8 super-cells: one ray of quantisation on a cell that holds
+        # only a few rays is 30%, and the row is about the distribution, not
+        # about a single node
+        g = 8
+        mg = meas.reshape(g, -1).sum(1)
+        wg = want.reshape(g, -1).sum(1)
+        err = float(np.max(np.abs(mg - wg)))
+        check(3, 'fillet projected area per cell, quadrature vs a %d-ray march '
+              'of the marched profile  [Vm = %.3f]' % (M, um * vn),
+              err, 0.0, 3 * dq * vn,
+              'the fan resolves the projection to one spacing, %.1f um, and a '
+              'cell boundary can move a ray either way; 3 spacings is the '
+              'tolerance on the worst of 8 super-cells' % (1e6 * dq),
+              unit='m')
+        check(3, '  ... and their total  [Vm = %.3f]' % (um * vn),
+              float(meas.sum()), float(want.sum()), 4 * dq * vn,
+              'the same fan, summed; 4 spacings covers the two end cells')
 
     # ---------------------------------------- 5. the deposit, integrated back
     # THE CLOSURE ACROSS ALL THREE TERMS. Hand `meniscus` a scene of unit
@@ -1625,11 +1660,17 @@ def tier_meniscus(R):
     # folded Gaussian's normalisation, and the fold at d = 0 that reflects flux
     # back out of the wall. None of them is computed anywhere as a total, so
     # there is no line of render.py this row can be reading back.
-    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN)
+    # a unit scene: sky, coping undercut and everything under the water all 1,
+    # and the sun's disc switched off so that what is left is exactly the two
+    # environment-weighted columns. `sail_vis` is stubbed with it because the
+    # slice does not build the shade-sail map and the disc term is the only
+    # caller; with L_SUN zero it multiplies nothing.
+    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN, R.sail_vis)
     R._env_menis = lambda rx, ry, rz: np.ones((np.asarray(rx).size, 3))
     R._menis_under = lambda sid, u, v, sm, cyl, tz, mode: np.ones((sid.size, 3))
     R.EDGE_REFL = np.ones(3)
     R.L_SUN = np.zeros(3)
+    R.sail_vis = lambda x, y: np.ones(np.asarray(x).shape)
     try:
         for P, tag in ((np.array([1.40, R.Y1 + R.SLIP, 0.]), 'north wall, 8.4 m'),
                        (np.array([5.40, R.Y1 + R.SLIP, 0.]), 'north wall, 4.8 m')):
@@ -1646,8 +1687,8 @@ def tier_meniscus(R):
             vz = np.maximum(-dv[:, 2], .05)
             got = float(np.trapezoid(Lc[:, 1] * vz, ddv))
             Vm = -(dv[:, 0] * -gx + dv[:, 1] * -gy)
-            ndv, wf, wl = R._menis_weights(Vm, -dv[:, 2])
-            exp = float(np.mean((wf - wl).sum(1)))
+            ndv, wf, wl, wo, isil = R._menis_weights(Vm, -dv[:, 2])
+            exp = float(np.mean((wf + wo - wl).sum(1)))
             check(3, 'the deposit integrates back to the excess area  [%s]' % tag,
                   got, exp, 0.02,
                   'the view direction rotates across the 80 mm fan, so I(v) is '
@@ -1713,7 +1754,8 @@ def tier_meniscus(R):
              % dep(np.pi / 2 - 1e-9, a),
              'the fillet is gone and the term is the flat surface minus itself')
     finally:
-        R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN = stash
+        (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN,
+         R.sail_vis) = stash
 
     # ------------------------------------------------- 7. the reachability algebra
     # render.py claims R(phi).L = sin A sin B + cos A cos B cos(2(phi - phi*))
@@ -1724,45 +1766,62 @@ def tier_meniscus(R):
     # reflect v about it, dot with L -- over random configurations.
     rng = np.random.default_rng(20260812)
     K = 4000
-    err = 0.0
-    errb = 0.0
-    errz = 0.0
-    for _ in range(40):
-        m3 = np.array([1., 0., 0.])
-        t3 = np.array([0., 1., 0.])
-        z3 = np.array([0., 0., 1.])
-        v = rng.normal(size=3)
-        v /= np.linalg.norm(v)
-        v = v * np.sign(-v[2]) if v[2] > 0 else v      # the eye is above
-        L = rng.normal(size=3)
+    m3 = np.array([1., 0., 0.])
+    t3 = np.array([0., 1., 0.])
+    z3 = np.array([0., 0., 1.])
+    ph = np.linspace(0, np.pi / 2, K)
+    n3 = np.sin(ph)[:, None] * m3 + np.cos(ph)[:, None] * z3
+    err = errb = errs = 0.0
+    for _ in range(60):
+        V = rng.normal(size=3)                    # toward the eye: V_z > 0
+        V /= np.linalg.norm(V)
+        V[2] = abs(V[2])
+        V /= np.linalg.norm(V)
+        L = rng.normal(size=3)                    # toward the sun: L_z > 0
         L /= np.linalg.norm(L)
-        L = L * np.sign(L[2]) if L[2] < 0 else L       # the sun is above
-        ph = np.linspace(0, np.pi / 2, K)
-        n3 = np.sin(ph)[:, None] * m3 + np.cos(ph)[:, None] * z3
-        ndv = -(n3 @ v)
-        Rv = v[None] + 2 * ndv[:, None] * n3
+        L[2] = abs(L[2])
+        L /= np.linalg.norm(L)
+        ndv = n3 @ V
+        Rv = 2 * ndv[:, None] * n3 - V[None]      # the mirror direction
         dot = Rv @ L
-        A = np.arcsin(np.clip(-(v @ t3), -1, 1))
+        A = np.arcsin(np.clip(-(V @ t3), -1, 1))
         B = np.arcsin(np.clip(L @ t3, -1, 1))
-        thv = np.arctan2(-(v @ m3), -(v @ z3))
+        thv = np.arctan2(V @ m3, V @ z3)
         thl = np.arctan2(L @ m3, L @ z3)
         phs = .5 * (thv + thl)
         pred = np.sin(A) * np.sin(B) + np.cos(A) * np.cos(B) * np.cos(2 * (ph - phs))
         err = max(err, float(np.max(np.abs(dot - pred))))
-        # the closest approach, over the WHOLE circle of phi (the claim is about
-        # the family, not about the clipped sweep)
-        phf = np.linspace(-np.pi, np.pi, 20001)
-        pf = np.sin(A) * np.sin(B) + np.cos(A) * np.cos(B) * np.cos(2 * (phf - phs))
-        errb = max(errb, abs(float(np.max(pf)) - np.cos(A - B)))
-        errz = max(errz, abs(float(np.max(pf)) - 1.0) - abs(float((L + v) @ t3)) * 0)
-    check(1, 'R(phi).L closed form vs literal reflection, max |err| over 40 '
-          'random (v, L)', err, 0.0, 1e-12,
-          'both sides are exact algebra in double precision; 1e-12 is round-off '
-          'on a 4000-node sweep')
+        # the closest approach over the WHOLE family of tilts, not the clipped
+        # sweep: max over phi of cos(2(phi - phi*)) is 1, so the maximum is
+        # cos(A - B) identically
+        phf = np.linspace(phs - np.pi, phs + np.pi, 8193)
+        nf = np.sin(phf)[:, None] * m3 + np.cos(phf)[:, None] * z3
+        Rf = 2 * (nf @ V)[:, None] * nf - V[None]
+        errb = max(errb, abs(float(np.max(Rf @ L)) - np.cos(A - B)))
+        # and it reaches 1 -- the mirror direction hits the sun exactly -- iff
+        # (L + V).t = 0. Constructed, not scanned: rotate L about the vertical
+        # until its t-component matches -V.t, which is the half-vector residual
+        # written the other way round.
+        lt = -(V @ t3)
+        lm = L @ m3
+        lz = L @ z3
+        sc = np.sqrt(max(1.0 - lt * lt, 0.0)) / max(np.hypot(lm, lz), 1e-12)
+        L2 = lt * t3 + sc * (lm * m3 + lz * z3)
+        errs = max(errs, abs(float(np.max(Rf @ L2)) - 1.0))
+    check(1, 'R(phi).L closed form vs literal reflection, max |err| over 60 '
+          'random (V, L)', err, 0.0, 1e-14,
+          'both sides are exact algebra in double precision on a 4000-node '
+          'sweep; 1e-14 is round-off')
     check(1, 'closest approach of the mirror direction to the sun == cos(A - B)',
-          errb, 0.0, 1e-9,
-          'the maximum of cos(2(phi - phi*)) is 1, so the closed form\'s maximum '
-          'is cos(A - B) identically; 1e-9 is the 20001-node scan\'s own grid')
+          errb, 0.0, 3e-7,
+          'the 8193-node scan can miss the peak by half a spacing, dphi/2 = '
+          '3.8e-4 rad, and a quadratic maximum then reads low by (2*dphi/2)^2/2 '
+          '= 3e-7; the tolerance is that grid error, not a fit')
+    check(1, 'the sun is EXACTLY reachable iff (L + V).t = 0, over 60 '
+          'constructed configurations', errs, 0.0, 3e-7,
+          'same scan, same grid error. L is rebuilt with L.t = -V.t and nothing '
+          'else changed, so the residual is zero by construction and the mirror '
+          'direction must pass through the sun for some tilt')
 
     # ----------------------------------------- 8. the internal-reflection term
     # THE HYPOTHESIS THAT DID NOT SURVIVE, kept as a row so that it cannot be

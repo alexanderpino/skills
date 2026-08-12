@@ -2961,36 +2961,47 @@ def _menis_weights(Vm, Vz):
         w_fil = ds (n.V) = dx (n.V)/cos(phi)      the facet's projected area
         w_flt = dx  Vz                            the flat strip's
 
-    BOTH ARE GATED ON THE SAME VISIBILITY, and that is the whole of the second
-    line. A facet with n.V <= 0 turns away from the eye, and on a NEAR wall --
-    where the eye looks poolward over the coping -- that is every facet steeper
-    than atan(Vz/|Vm|), because the fillet's own crest at the wall stands in
-    front of them. Over that stretch of d the flat model drew flat water and the
-    real scene shows the crest and the wall above it. Subtracting the flat strip
-    there while adding nothing back is not conservative and not small: it is the
-    whole TRANSMITTED column over a centimetre of width, and it read as -2.1e-3
-    W/sr/m on the east wall against +1.6e-3 on the west. The gate was latent
-    while only the reflected half existed (Fresnel 0.05 made the hole invisible)
-    and the transmitted half is what exposed it.
+    THE FILLET OCCLUDES ITSELF ON A NEAR WALL, and that is the third return
+    value. A facet with n.V <= 0 turns away from the eye, and where the eye
+    looks POOLWARD over the coping that is every facet steeper than
+    atan(Vz/|Vm|): the fillet's own crest at the wall stands in front of them.
+    `w_fil` is gated on that. But the flat strip they replace must NOT be gated
+    with them -- the eye's rays over that stretch of d still carry radiance, and
+    what they carry is the crest, seen at its silhouette tilt, not nothing.
+    Dropping both sides there subtracts the whole transmitted column over a
+    centimetre of width and puts a hole in its place; it read as -2.1e-3 W/sr/m
+    on the east wall against +1.6e-3 on the west. So `w_occ` carries those nodes
+    at the FLAT projected area -- the solid angle the eye spends on them is not
+    changed by what fills it -- and the caller weights them with the radiance of
+    the last visible facet, `isil`. The defect was latent while only the
+    reflected half existed (Fresnel 0.05 made the hole invisible) and building
+    the transmitted half is what exposed it.
 
-    WHAT THE GATED SUM IS, exactly. With ds sin(phi) = dz and ds cos(phi) = -dd,
+    WHAT THE SUM IS, exactly. With ds sin(phi) = dz and ds cos(phi) = -dd,
 
-        SUM (w_fil - w_flt) = INT (Vm dz - Vz dd) - Vz INT (-dd)
-                            = Vm z(phi*)
+        SUM (w_fil + w_occ - w_flt) = INT_vis (Vm dz - Vz dd) + Vz d(phi*)
+                                      - Vz d(start)
+                                    = Vm z(phi*)
 
-    where phi* is the steepest visible tilt -- phi_w, and so z = h, whenever the
-    eye is poolward of the fillet. The excess projected area of the fillet is the
-    poolward view component times the CLIMB, and nothing else: a projected-area
-    identity, true for any monotone profile, which the quadrature nowhere
-    encodes and which `validate.py` asserts against this function's own output
-    and against a brute-force parallel-ray march of the analytic profile."""
+    -- phi_w, and so z = h, whenever the eye is poolward of the fillet. The
+    excess projected area of the fillet is the poolward view component times the
+    CLIMB, and nothing else: a projected-area identity, true for any monotone
+    profile, which the quadrature nowhere encodes, which survives the occluded
+    branch untouched, and which `validate.py` asserts against this function's
+    own output and against a brute-force parallel-ray march of the profile."""
     Vm = np.asarray(Vm)
     Vz = np.asarray(Vz)
     ndv = MENIS_SIN[None] * Vm[:, None] + MENIS_COS[None] * Vz[:, None]
     vis = ndv > 0.
+    w_flt = np.broadcast_to(np.maximum(Vz, 0.)[:, None],
+                            ndv.shape) * MENIS_WD[None]
     w_fil = np.where(vis, ndv, 0.) / MENIS_COS[None] * MENIS_WD[None]
-    w_flt = np.where(vis, np.maximum(Vz, 0.)[:, None], 0.) * MENIS_WD[None]
-    return ndv, w_fil, w_flt
+    w_occ = np.where(vis, 0., 1.) * w_flt
+    # the silhouette node: the steepest facet still facing the eye. ndv is
+    # monotone in phi for fixed (Vm, Vz), so the visible set is a prefix and
+    # this is one argmax rather than a search.
+    isil = np.maximum(vis.sum(1) - 1, 0)
+    return ndv, w_fil, w_flt, w_occ, isil
 
 
 def _riser_shade(hxr, hyr, hzr, ci, c, mode):
@@ -3154,7 +3165,8 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
         # --- the fillet, node by node
         # the projected areas both columns are built on, and the ONLY place the
         # quadrature's geometry is written down -- see `_menis_weights`.
-        ndv, W_FIL, W_FLT = _menis_weights(Vm, Vz)
+        ndv, W_FIL, W_FLT, W_OCC, ISIL = _menis_weights(Vm, Vz)
+        _kk = np.arange(k.size)
         Rm = 2. * ndv * MENIS_SIN[None] - Vm[:, None]
         Rz = 2. * ndv * MENIS_COS[None] - Vz[:, None]
         Rt = np.broadcast_to(-Vt[:, None], Rm.shape)
@@ -3189,7 +3201,10 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
         _rgh = (np.exp(-2.69 * _sv) / (1. + 22.7 * _sv ** 1.5))[:, None]
         nc = np.clip(ndv, 1e-4, 1.)
         Ff = F0 + (fresnel(nc) - F0) * _rgh[..., None]
-        fil = Ff * Le * W_FIL[..., None]
+        # the silhouette facet, whose radiance fills the self-occluded stretch
+        _Fs_ = Ff[_kk, ISIL][:, None]
+        fil = Ff * Le * W_FIL[..., None] + _Fs_ * Le[_kk, ISIL][:, None] * \
+            W_OCC[..., None]
         # --- the flat surface it replaces, at the same distances
         ov0 = np.where(Vm[:, None] > 1e-9,
                        Vz[:, None] * MENIS_D[None] / np.maximum(Vm[:, None], 1e-9),
@@ -3253,7 +3268,8 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
         Lu0 = _menis_under(_g0[0], _g0[1], _g0[2], _g0[3], _g0[4],
                            (t0z[:, None] * _f0).ravel(),
                            mode).reshape(ndv.shape + (3,))
-        filT = (1. - Ff) * Lu * W_FIL[..., None]
+        filT = (1. - Ff) * Lu * W_FIL[..., None] + \
+            (1. - _Fs_) * Lu[_kk, ISIL][:, None] * W_OCC[..., None]
         flatT = (1. - F0v)[:, None] * Lu0 * W_FLT[..., None]
         exT = filT - flatT
         ex = ex + exT
