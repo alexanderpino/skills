@@ -1083,6 +1083,50 @@ Two consequences for how a scene is authored:
   so it pins `rho` on its own — and the ratio between it and the submerged bed then pins the
   absorption path. Two measurements from one photograph, and neither needs a reference chart.
 
+### Saying it in OpenPBR, and where the mapping stops
+
+The two-material contract above is not this chapter's invention — it is what a standard surface
+model already asks for, so state it in those terms and a reader can author it in a DCC tool without
+translating. In **OpenPBR Surface** the medium's absorption is carried by a transmission depth and
+colour that *are* Beer–Lambert: `transmission_depth` `λ_T` is the distance at which white light
+becomes exactly `transmission_color` `T`, so
+
+    a(lambda) = -ln(T) / lambda_T          and        T = exp(-a * lambda_T)
+
+This chapter's pool, written out (`D`, from `a = (0.2617, 0.05299, 0.01022) m⁻¹`):
+
+    base_color            (0.24, 0.54, 0.70)     # the liner -- the choice that sets the colour
+    specular_ior          1.333
+    transmission_depth    1.0                    # metres; the scale is free, T follows
+    transmission_color    (0.770, 0.948, 0.990)  # ... or (0.351, 0.809, 0.960) at depth 4.0
+    transmission_scatter  (0, 0, 0)              # b_b ~ 0 in treated water
+    transmission_scatter_anisotropy  g           # only once the water is not treated
+
+Note what that makes visible: **`transmission_scatter` is the turbidity axis**, and setting it
+non-zero is the same act as leaving Case 1 water — it is where a pool becomes a lake.
+
+**Where the mapping stops, and it stops early.** A standard surface model describes *one material
+with a homogeneous interior bounded by its own surface*. A body of water is not that. It is a
+**medium bounded by two different materials** — the wave surface above and the liner below — and
+several of this chapter's central problems live in the gap:
+
+- **The bed is not the material's own back face.** Its depth varies, and the medium's path length is
+  a field over the surface, not a thickness of the object.
+- **Caustics are transport, not material.** No surface parameter produces them; they are the
+  Jacobian of a refracted ray map ([tier ladder](#the-tier-ladder)), and a rasteriser has to build
+  them as a pass whatever its material model says.
+- **The trapped series is geometry.** A path tracer recovers `1/(1 − ρ·R_int)` by bouncing; a
+  surface model with a single transmission event does not, and a fullscreen-triangle pass must carry
+  it explicitly or a white-bottomed pool comes out 60% dark.
+- **The camera may be inside the medium.** Every standard surface model assumes it is outside
+  looking in. [Snell's window and the split shot](#the-view-from-inside-and-the-split-shot) are not
+  material states at all.
+
+So: take the *material* half from OpenPBR and let it be authored the way everything else in the
+scene is; keep the *transport* half here. The division is exactly this chapter's tier ladders — and
+a project that expects its material model to deliver the second half will discover the shortfall at
+the point where the water starts to matter.
+
 ### The rest of the man-made checklist
 
 - **Straight lines are the fidelity test.** Tiled walls and rectangular coping hand the viewer a
