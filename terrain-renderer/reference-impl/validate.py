@@ -1647,7 +1647,7 @@ def tier_meniscus(R):
             mid = .5 * (lo + hi)
             sm_, _, _ = solid(mid)
             lo = np.where(sm_, lo, mid)
-            hi = np.where(sm_, hi, mid)
+            hi = np.where(sm_, mid, hi)
         _, hd, hz = solid(hi)
         # a ray that passes over the crest lands on the WALL above the fillet,
         # not on the fillet; the fillet's own top is at z = h

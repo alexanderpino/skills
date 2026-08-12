@@ -3571,6 +3571,43 @@ print("     (* = outside the frame.  The east waterline is in the frame's plan "
       "but not in its picture: the near coping's own arris stands in front of "
       "it, which is why the sun's line -- reachable there and nowhere else in "
       "shot -- cannot be seen.)")
+# WHERE THE TRANSMITTED COLUMN ACTUALLY GOES, traced rather than asserted. The
+# derivation says a 45 deg facet bends the camera ray hard into the water and
+# that it lands on something near; this measures what, and how near, with the
+# file's own refract() and scene_hit().
+print("   the TRANSMITTED column, traced: what the fillet's own facets aim the "
+      "camera ray at, node by node (surface ids 0 bed / 1-4 walls / 5 riser):")
+for _nm, _pt in (("north", np.array([1.40, Y1 + SLIP, 0.])),
+                 ("north", np.array([6.40, Y1 + SLIP, 0.])),
+                 ("west ", np.array([X0 - SLIP, 3.50, 0.])),
+                 ("east ", np.array([X1 + SLIP, 2.60, 0.]))):
+    _gx, _gy, _ = pool_grad(_pt[0], _pt[1])
+    _mx, _my = -_gx, -_gy
+    _dv = (_pt - EYE) / np.linalg.norm(_pt - EYE)
+    _Vm = -(_dv[0] * _mx + _dv[1] * _my)
+    _Vz = -_dv[2]
+    _nd, _wf, _wl, _wo, _is = _menis_weights(np.array([_Vm]), np.array([_Vz]))
+    _nx = _mx * MENIS_SIN
+    _ny = _my * MENIS_SIN
+    _tx, _ty, _tz = refract(np.full(MENIS_N, _dv[0]), np.full(MENIS_N, _dv[1]),
+                            np.full(MENIS_N, _dv[2]), _nx, _ny, np.array(MENIS_COS),
+                            1.0 / IOR[1])
+    _sid, _u, _v, _sm, _cy = scene_hit(_pt[0] + _mx * MENIS_D,
+                                       _pt[1] + _my * MENIS_D,
+                                       _tx, _ty, _tz, MENIS_Z)
+    _vs = _nd[0] > 0
+    _cnt = {int(k): int((_sid[_vs] == k).sum()) for k in np.unique(_sid[_vs])}
+    _w4 = _vs & np.isin(_sid, (1, 2, 3, 4))
+    _hi = 1000 * np.max(_v[_w4]) if _w4.any() else np.nan
+    _lo = 1000 * np.min(_v[_w4]) if _w4.any() else np.nan
+    print("     %s (%.2f, %.2f): %d of %d facets face the eye; they hit %s. "
+          "%d of them reach a wall, between %+.1f and %+.1f mm about the still "
+          "waterline, over a leg of %.1f to %.0f mm of water. Every node's t_z "
+          "is negative (the largest is %+.4f), which is the refuted "
+          "internal-reflection term, measured on this frame's own geometry."
+          % (_nm, _pt[0], _pt[1], int(_vs.sum()), MENIS_N, _cnt, int(_w4.sum()),
+             _lo, _hi, 1000 * np.min(_sm[_vs]), 1000 * np.max(_sm[_vs]),
+             np.max(_tz)))
 # What the ambient lift this replaces was worth, in the same units: it was
 # (SKY_AMB*0.17 + SUN_COL*0.006) with an exp(-d/2a) profile, so its flux per
 # unit of waterline is that times 2a times v_z, and the ratio is the price of
