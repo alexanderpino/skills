@@ -1776,10 +1776,15 @@ _recip = (_ABED * _WSH.mean(), float((_wara * _wvfa[:, 0]).sum()))
 print("  reciprocity, bed <-> wall: A_bed * F(bed->wall) = %.2f m2 (exact "
       "rectangle view factor, %.1f%% of the bed's hemisphere over %.0f m2) "
       "against A_wall * F(wall->bed) = %.2f m2 (the gather's own lattice over "
-      "%.1f m2 of wetted wall) -- %+.1f%%, and what is left over is the step "
-      "unit, which the rectangle formula counts as wall and the gather counts "
-      "as riser and drops (%.1f%% of its rays)"
+      "%.1f m2 of wetted wall, of %.1f m2 of wall plane) -- %+.1f%%, and the "
+      "whole of the gap is the step unit, pushing the same way twice: the "
+      "rectangle formula counts its risers as part of the bed's non-sky "
+      "hemisphere, while the gather drops the rays that land on them (%.1f%%) "
+      "and the wall buried behind it is not wall. The version with nothing "
+      "left over is validate.py's, on an empty box, where this same estimator "
+      "and this same formula close to 3.1%%."
       % (_recip[0], 100 * _WSH.mean(), _ABED, _recip[1], _AWALL,
+         2 * ((X1 - X0) + (Y1 - Y0)) * DEPTH,
          100 * (_recip[1] / _recip[0] - 1), 100 * _wvfa[:, 2].mean()))
 
 WBNC_FULL = []
@@ -4841,8 +4846,8 @@ del _hdr
 # receiver the absorption regression is taken over -- so putting 8 into the same
 # array would have quietly redefined an existing calibration by removing its far
 # strip. Two arrays, one purity rule, nothing above this line moves.
-WALL_BAND_Z = 0.250        # how far down the wall region 7 reaches
-WALL_FRONT = (0.20, 0.80)  # how far out from the wall region 8 is taken
+WALL_BAND_Z = (0.100, 0.250)   # the two wall strips, 7 and 9
+WALL_FRONT = (0.20, 0.80)      # how far out from the wall region 8 is taken
 
 
 def _purity(lb):
@@ -4877,7 +4882,9 @@ def _wall_regions():
     sh = flr & (bed_sun(WU, WV, -DEPTH) < 0.02)
     xmax = STEP_C[0] - STEP_R[-1] - .10
     lb[BAND_RAY] = 6
-    lb[iw[(WSID == 4) & (WV > -WALL_BAND_Z) & (WV <= 0.) & (WU < xmax)]] = 7
+    nw = (WSID == 4) & (WV <= 0.) & (WU < xmax)
+    lb[iw[nw & (WV > -WALL_BAND_Z[0])]] = 7
+    lb[iw[nw & (WV <= -WALL_BAND_Z[0]) & (WV > -WALL_BAND_Z[1])]] = 9
     lb[iw[flr & ~sh & (WU < xmax)
           & (Y1 - WV > WALL_FRONT[0]) & (Y1 - WV < WALL_FRONT[1])]] = 8
     return _purity(lb)
@@ -4897,12 +4904,13 @@ def _srgb_lin(v):
 
 def colour_table(img, reg, wreg):
     print("colour regression (sRGB medians; saturation = (max-min)/max)")
-    lum = np.zeros(9)
-    llin = np.zeros(9)
+    lum = np.zeros(10)
+    llin = np.zeros(10)
     for nm, k in (("riser face      ", 1), ("tread top       ", 2),
                   ("floor, sunlit   ", 3), ("coping stone    ", 4),
                   ("floor, in shadow", 5), ("freeboard, blue ", 6),
-                  ("wall, submerged ", 7), ("water in front  ", 8)):
+                  ("wall,   0-100 mm", 7), ("wall, 100-250 mm", 9),
+                  ("water in front  ", 8)):
         sel = (reg if k < 7 else wreg) == k
         if sel.sum() < 100:
             print("  %s   -- %d px, not measured" % (nm, sel.sum()))
@@ -4928,6 +4936,13 @@ def colour_table(img, reg, wreg):
               "-> %s (the photograph says the wall is the lighter)"
               % (lum[7], lum[8], "wall LIGHTER" if lum[7] > lum[8] else
                  "wall darker -- NOT the photograph's ordering"))
+    if lum[7] > 0 and lum[9] > 0:
+        print("            -- and this frame's wall is the NORTH one, the only "
+              "one of four the refracted sun never reaches (`cau` 0.000 against "
+              "0.920 on the east wall, printed with the gather above). The "
+              "ordering the photographs show is a SUNLIT wall against shaded "
+              "water; the term closed this round is the indirect half of it, "
+              "and its own ceiling is 0.5*alb_wall of the floor's radiance.")
     # Bar section A: the water under the sail is "clearly luminous, roughly half
     # the lit value". That is a ratio, so it is printed as one -- but IN WHICH
     # UNITS. This line used to divide two sRGB-encoded luminances and compare the
@@ -4975,8 +4990,8 @@ _plw = np.zeros((W * H, 2))
 _plw[np.flatnonzero(inp), 0] = WSPEC
 _plw[np.flatnonzero(inp), 1] = WTRAN
 _plw = _plw.reshape(H // SS, SS, W // SS, SS, 2).mean((1, 3))
-for _nm, _k in (("submerged wall", 7), ("water in front", 8),
-                ("floor, sunlit ", 3)):
+for _nm, _k in (("wall,   0-100 mm", 7), ("wall, 100-250 mm", 9),
+                ("water in front  ", 8), ("floor, sunlit   ", 3)):
     _s = (REG if _k < 7 else WREG) == _k
     if _s.sum() >= 100:
         _a, _b = np.median(_plw[_s, 0]), np.median(_plw[_s, 1])
