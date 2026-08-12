@@ -707,3 +707,75 @@ water still sees plus the bed's own inter-reflection. Raising `SAIL_TAU` to
 lighten a shadow would be fitting a fabric constant to a tone curve — two errors
 at once. Measure the render's shaded-to-lit ratio, report it against "above one
 half", and if it falls short, find which of the three contributions is missing.
+
+#### J2d · The camera is an iPhone 16 Pro, and that adds a third failure — a colour-management one
+
+> Owner ruling: the nine reference photographs were shot on an **iPhone 16 Pro**.
+> Recorded because it changes one of the confounds from a judgement call into a
+> computation.
+
+iPhone photographs are tagged **Display P3**, not sRGB, and have been since the
+iPhone 7. Anything that reads their channel values as sRGB — a naive `PIL` open,
+a screenshot pasted into a chat, a pipeline that drops the ICC profile — is not
+making an estimation error. It is making a **colour-management error**, and
+unlike J2's white balance and J2c's tone curve it is not a processing choice by
+the camera at all: it is introduced downstream, by the reader.
+
+**It is quantified, and the quantity is large where it hurts.** Both spaces are
+D65, so the conversion is one matrix on linear values:
+
+```
+P3 -> sRGB   [ 1.2249  -0.2249   0.     ]
+             [-0.0421   1.0421   0.     ]
+             [-0.0196  -0.0786   1.0983 ]
+```
+
+Applied to plausible readings off these frames:
+
+| encoded triple | read as sRGB, R/B | correctly, R/B | change |
+|---|---|---|---|
+| water `(140, 200, 205)` | 0.430 | 0.309 | **−28%** |
+| water `(120, 205, 210)` | 0.291 | 0.141 | **−51%** |
+| sandstone `(210, 180, 150)` | — | — | moves ~1 sRGB level |
+
+**The asymmetry is the whole point, and it is structural rather than accidental.**
+Saturated cyan sits near the edge of the sRGB gamut, where the wider P3 primaries
+have most of their extra room; warm near-neutrals sit well inside both. So the
+error is largest on the most saturated thing in frame — which is, in every
+comparison anyone actually cares about, the subject. A pipeline that silently
+mishandles this desaturates exactly what is being measured and leaves the
+reference surfaces alone, so nothing looks wrong.
+
+**Three independent mechanisms now agree on the sign.** The observer's own report
+(J2b), the white balance of a cyan-dominated frame (J2), and this gamut
+handling — different causes, same direction: **the water is more cyan in reality
+than the delivered frames show, and materially so.** The lead agent's readings
+off these photographs therefore overstate the water's red, and every red-deficit
+figure quoted from them is an over-estimate of the render's real gap.
+
+**And once again the level finding does not move.** The stone shifts by about one
+sRGB level and the water's luminance by about 3%, because luminance weights red
+at 0.2126 and only red moves. The open measurement — water against sunlit
+sandstone in one exposure, render near 0.40 against all three frames at or above
+1 — survives its third attempted confound in a row. At some point that stops
+being luck and starts being evidence.
+
+**What would close it properly, in order of strength.** Available cheaply because
+the observer is at the pool:
+
+1. **One frame in ProRAW (DNG).** Linear, no display tone curve, white balance
+   carried as metadata rather than baked in. This retires J2 and J2c together
+   rather than bounding them.
+2. **A neutral of known reflectance in frame** — a sheet of white paper or a white
+   towel on the coping, in the same sun. Fixes the white balance *and* gives a
+   level anchor at a known albedo (~0.85 for copy paper). Cheapest, and the only
+   one that makes an absolute reading possible from an ordinary capture.
+3. **The original file with its EXIF.** ISO, shutter and aperture give the metered
+   scene luminance as `L = K·N²/(ISO·t)`, `K ≈ 12.5` cd·s/m²·ISO⁻¹ — turning a
+   source of ratios into an approximate photometer. Weakest of the three, because
+   auto-exposure meters a scene average and multi-frame HDR muddies what "the"
+   exposure even means, but it is the only one that costs nothing to obtain.
+
+Everything measured against these photographs so far is **relative**. Any of the
+three above makes an absolute check possible, which is the difference between
+knowing the render's proportions are right and knowing its exposure is.
