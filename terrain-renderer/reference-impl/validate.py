@@ -141,7 +141,11 @@ REQUIRED = [
     'bed_depth', 'bed_z', 'pool_sdf', 'edge_z',
     'cos_i', 'cos_t', 'sin_t', 'slant', 'TSUN', 'sig_at', 'SIG_EST',
     'TIR_FRAC', 'TIR_VERT', '_sky_vf', '_ris_closure', 'RIS_D0', 'RIS_D1',
-    'RIS_ND', 'RIS_NP', 'RIS_HMIN',
+    'RIS_ND', 'RIS_NP', 'RIS_HMIN', '_DD', '_PH', '_lnR',
+    # the gather, now shared by the risers and the pool walls, and the partition
+    # of the wall's hemisphere that keeps the sky from being counted twice
+    'bounce_gather', 'bed_wall_src', 'wall_shade', 'WALL_SKY', 'WB_NU', 'WB_NZ',
+    'WALL_BAND_Z', 'WALL_FRONT',
     'R_EXT', 'R_INT', 'wet_albedo', '_fresnel_rough', '_refl_ellipse',
     '_lobe_shape', 'sky', 'SKY_LOBE', 'E_SUN', 'L_SUN', 'OMEGA_SUN', 'N_DISC',
     'N_AURE', 'L_AURE', 'AIRMASS', 'TAU_R', '_tau_rayleigh', 'THETA_SUN',
@@ -1774,6 +1778,24 @@ def tier3_geometry(R):
           float(R.tir_vert(0.0)), float(R._ris_closure(0.12, 1e-9, 1e9)), 1e-6,
           'the same half-hemisphere identity reached by two unrelated '
           'estimators; 1e-6 is the closure\'s own truncation at 1e-9/1e9 m')
+    # -- AND THE SAME 1/2 A THIRD TIME, where it is a PARTITION and not a
+    # closure. `WALL_SKY` is what the wall's sky ambient is multiplied by now
+    # that the gather supplies the downgoing half of the same hemisphere. If the
+    # two do not sum to one hemisphere the wall is either lit twice over the
+    # half they overlap on or not at all over the half they miss, and the whole
+    # of the bed-onto-wall round is that arithmetic. So: the share the sky keeps
+    # and the share the gather closes on must add to exactly 1, with the second
+    # taken from the gather's own analytic closure and not from the constant.
+    check(1, 'WALL_SKY + the gather\'s full-range closure == 1 (one hemisphere, '
+             'counted once)',
+          float(R.WALL_SKY) + float(R._ris_closure(0.35, 1e-9, 1e9)), 1.0, 1e-6,
+          'a partition of the wall\'s hemisphere: whatever the bed supplies has '
+          'to come OUT of the sky term, and both halves are 1/2 exactly. 1e-6 '
+          'is the closure\'s own truncation at 1e-9/1e9 m')
+    check(1, 'WALL_SKY == tir_vert(0), the same half from the interface side',
+          float(R.WALL_SKY), float(R.tir_vert(0.0)), 1e-15,
+          'a vertical face collects half of what a horizontal one does under a '
+          'uniform hemisphere; algebraic limit, one double ulp')
     info(3, '  ... TIR_VERT, three readings of one sentence',
          'shipped-before 0.56271, the comment\'s own words 0.63476, physics '
          '%.5f (code now %.5f)' % (quad, R.TIR_VERT),
@@ -1793,6 +1815,124 @@ def tier3_geometry(R):
           est, ref, 4 * float(w.std()) / np.sqrt(K),
           'the estimator\'s own standard error over %dk samples is %.5f; 4 sigma'
           % (K // 1000, float(w.std()) / np.sqrt(K)))
+    # -- THE SHIPPED LATTICE, at the heights the WALLS added. The row above
+    # samples the weight at random; the picture is made with 240 FIXED
+    # directions (20 log-spaced distance strata x 12 azimuth strata, jittered
+    # once at import), so its error is not a standard error -- it is a
+    # deterministic quadrature bias that is a function of the face's height over
+    # its own foot. On a riser that height is 20-240 mm; on a wall it runs to
+    # 1.40 m, an order of magnitude the lattice had never been asked for. This
+    # measures that bias against the closed form, and the next row's tolerance
+    # is taken FROM it rather than from the disagreement it is testing.
+    hs = np.array([0.03, 0.06, 0.12, 0.25, 0.50, 1.00, 1.40])
+    r2 = hs[:, None] ** 2 + R._DD[None] ** 2
+    lat = (R._lnR * np.cos(R._PH)[None] * R._DD[None] ** 3
+           * hs[:, None] / (r2 * r2)).mean(1)
+    exa = R._ris_closure(hs, R.RIS_D0, R.RIS_D1)
+    LAT_ERR = float(np.max(np.abs(lat / exa - 1.0)))
+    check(3, 'the SHIPPED %d-direction lattice vs _ris_closure, 30 mm - 1.40 m'
+          % (R.RIS_ND * R.RIS_NP), lat, exa, 0.05, rel=True,
+          why='a 20x12 stratified lattice jittered once integrates a kernel '
+              'whose width is h; over 30 mm - 1.40 m the worst stratum error is '
+              '%.1f%% and 5%% is the bound this asserts it stays inside'
+              % (100 * LAT_ERR))
+    info(3, '  ... worst lattice bias over those heights', '%.2f%%'
+         % (100 * LAT_ERR),
+         'systematic, not noise: every texel shares the same 240 directions')
+    # -- THE BED <-> WALL TRANSFER, BY RECIPROCITY. This is the conservation
+    # identity behind the round that lit the pool walls, and the two sides of it
+    # are computed by code that shares nothing but the pool's dimensions.
+    #
+    # WHAT IS BEING ASSERTED. For any two surfaces exchanging diffuse light the
+    # view-factor kernel cos(t1) cos(t2)/(pi r^2) is symmetric, so
+    #     A_bed * F(bed -> wall)  ==  A_wall * F(wall -> bed).
+    # render.py already had the LEFT side in closed form: `_sky_vf` is the exact
+    # cosine-weighted view factor from a bed point to the water rectangle
+    # overhead (Hottel's differential-element-to-parallel-rectangle formula) and
+    # everything left over is wall -- that is the 35% the file has printed every
+    # run since wave 5 as the size of the term it did not have. The RIGHT side
+    # did not exist until the gather was pointed at the walls; it is
+    # `bounce_gather`, a distance-importance-sampled lattice quadrature over the
+    # wall's own hemisphere, run here with a UNIT RADIANCE on the bed and an
+    # empty box, so what comes back is pure geometry.
+    #
+    # Neither side can be right by construction. One is an arctangent formula
+    # evaluated over the floor; the other is 240 traced rays per texel with a
+    # closed-form Jacobian weight, evaluated over the walls. They meet only
+    # through the reciprocity theorem.
+    #
+    # AND THE EMPTY BOX IS THE POINT, not a convenience: reciprocity between
+    # `_sky_vf` and the gather is EXACT only where the two agree on what a wall
+    # is, and in the real basin they do not -- the step unit is a riser to the
+    # gather and part of the bed point's non-sky hemisphere to the rectangle
+    # formula. render.py prints the real-scene version of this same pair, with
+    # that gap named; the row here is the version with nothing left over.
+    X0_, X1_, Y0_, Y1_, DP = R.X0, R.X1, R.Y0, R.Y1, R.DEPTH
+    BIGV = 1e9
+
+    def box_hit(px, py, tx, ty, tz, pz):
+        """First hit of a downgoing ray in an EMPTY box: flat bed at -DEPTH over
+        the plan rectangle, four vertical walls, open top. Written here, from the
+        box, so that it shares no line with render.py's `scene_hit`."""
+        px, py = np.broadcast_arrays(np.asarray(px, float), np.asarray(py, float))
+        pz = np.broadcast_to(np.asarray(pz, float), px.shape)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            s = np.stack([np.where(tz < -1e-12, (-DP - pz) / tz, BIGV),
+                          np.where(tx < -1e-12, (X0_ - px) / tx, BIGV),
+                          np.where(tx > 1e-12, (X1_ - px) / tx, BIGV),
+                          np.where(ty < -1e-12, (Y0_ - py) / ty, BIGV),
+                          np.where(ty > 1e-12, (Y1_ - py) / ty, BIGV)])
+        s = np.where(np.isfinite(s) & (s > 1e-12), s, BIGV)
+        sid = np.argmin(s, 0).astype(np.int8)
+        sm = np.take_along_axis(s, sid[None].astype(np.intp), 0)[0]
+        hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
+        u = np.where(sid == 0, hx, np.where(sid <= 2, hy, hx))
+        return sid, u, np.where(sid == 0, hy, hz), sm, np.full(px.shape, -1, np.int8)
+
+    def unit_on_bed(sd, u, v, sm):
+        """A radiance of 1 on the bed, 0 everywhere else, and NO absorption --
+        so the gather returns the view factor and not a light level."""
+        return np.repeat((sd == 0)[:, None].astype(float), 3, 1)
+
+    NU, NZ = 96, 32
+    A_wall, wall_side, closure = 0.0, 0.0, []
+    for nx, ny, ax, along in ((1, 0, X0_, 0), (-1, 0, X1_, 0),
+                              (0, 1, Y0_, 1), (0, -1, Y1_, 1)):
+        e = np.linspace(X0_, X1_, NU + 1) if along else np.linspace(Y0_, Y1_, NU + 1)
+        uu = .5 * (e[:-1] + e[1:])
+        ez = np.linspace(-DP, 0.0, NZ + 1)
+        zz = .5 * (ez[:-1] + ez[1:])
+        U, Z = np.meshgrid(uu, zz)
+        px = U.ravel() if along else np.full(U.size, float(ax))
+        py = np.full(U.size, float(ax)) if along else U.ravel()
+        hh = Z.ravel() + DP                       # exact: the foot IS the bed
+        _, vf = R.bounce_gather(px, py, Z.ravel(), nx, ny, hh,
+                                src=unit_on_bed, hit=box_hit)
+        L = (X1_ - X0_) if along else (Y1_ - Y0_)
+        A_wall += L * DP
+        wall_side += L * DP * float(vf[:, 0].mean())
+        closure.append(float(vf[:, :2].sum(1).mean()))
+    n = 600
+    ex_ = np.linspace(X0_, X1_, n + 1)
+    ey_ = np.linspace(Y0_, Y1_, n + 1)
+    XX, YY = np.meshgrid(.5 * (ex_[:-1] + ex_[1:]), .5 * (ey_[:-1] + ey_[1:]))
+    A_bed = (X1_ - X0_) * (Y1_ - Y0_)
+    bed_side = A_bed * float((1.0 - R._sky_vf(XX, YY, DP)).mean())
+    check(3, 'bed <-> wall reciprocity: A_wall F(wall->bed) == A_bed F(bed->wall)',
+          wall_side, bed_side, 1.5 * LAT_ERR, rel=True,
+          why='the shipped lattice\'s own closure error at these heights is '
+              '%.1f%% (row above), which is a floor on any transfer it '
+              'computes; the extra half is the 12 azimuth strata resolving the '
+              'bed/far-wall horizon, which the closure test does not exercise. '
+              'Nothing here is fitted to the disagreement: 1.5x%.1f%% = %.1f%%'
+              % (100 * LAT_ERR, 100 * LAT_ERR, 150 * LAT_ERR),
+          unit='m2')
+    info(3, '  ... the two sides, and the wall\'s own hemisphere split',
+         'A_bed F = %.3f m2 over %.1f m2 of bed, A_wall F = %.3f m2 over %.1f '
+         'm2 of wall; F(wall->bed) = %.3f of the %.3f the gather closes on'
+         % (bed_side, A_bed, wall_side, A_wall, wall_side / A_wall,
+            float(np.mean(closure))),
+         'the rest of the wall\'s downgoing half is the other three walls')
 
 
 _ODE_CACHE = {}

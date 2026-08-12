@@ -1802,6 +1802,50 @@ for _k in (1, 11, 26, WB_NZ - 2):
              _hcb.std() / max(_cbed.mean(), 1e-9),
              100 * (_hw.std() / max(_hcb.std(), 1e-12))
              * (_cbed.mean() / max(_cw.mean(), 1e-9))))
+# THE FOUR WALLS ARE NOT ONE WALL, and the picture only ever shows one of them.
+# The refracted sun runs (+0.698, -0.046, -0.715): eastward and slightly south,
+# so it lands on the EAST wall face-on and grazes the SOUTH one, and the west
+# and north walls are on the dark side of the underwater terminator and carry no
+# caustic at all. A photograph looking down into a pool sees the whole perimeter
+# and reads the bright walls; this frame is anti-solar and looks along the NORTH
+# wall, which is the one wall of the four that direct light never reaches. That
+# is a statement about which wall is in shot, not about the wall term, and it is
+# printed per wall so it can be read rather than argued.
+print("  per wall, the top %.0f mm -- the band a top-down photograph reads. "
+      "`cau` is the mean refracted-sun caustic ON the wall, which is what the "
+      "underwater terminator decides:" % (1000 * 0.25))
+_k0 = int(WNV * (DEPTH - 0.25) / (DEPTH + WTOP))
+for _wi, _nm in ((0, 'west  (x0)'), (1, 'east  (x1)'), (2, 'south (y0)'),
+                 (3, 'north (y1)')):
+    _L = wall_img['disp'][_wi][_k0:, :, :].reshape(-1, 3).mean(0)
+    _B = WBNC_FULL[_wi][_k0:, :, :].reshape(-1, 3).mean(0)
+    print("    %s  radiance %s   bed-bounce irradiance %s (sky on the same face "
+          "%s)   cau %.3f"
+          % (_nm, np.round(_L, 3), np.round(_B, 3),
+             np.round(SKY_AMB * WALL_SKY * .78, 3), wall[_wi][3][_k0:].mean()))
+# THE CEILING ON THE WHOLE TERM, stated as an inequality so that nobody has to
+# discover it as a disappointment. A Lambertian floor's radiance does not depend
+# on where it is viewed from, so there is no sense in which a wall "catches" the
+# floor's light and "turns it toward the eye" -- it can only re-emit what it
+# absorbs, over a half hemisphere:
+#      E_wall <= 0.5 * L_floor        (the downgoing half, uniform L)
+#      L_wall  = alb_wall * E_wall
+#  =>  L_wall / L_floor <= 0.5 * alb_wall,
+# which for this pool's own liner is about 0.30 in green. A wall lit ONLY by the
+# floor beside it CANNOT out-radiate that floor, in this or any renderer, and no
+# gather can be tuned into doing so. The three ways the ordering does invert in
+# a photograph are all outside this term: the wall is lit DIRECTLY by the
+# refracted sun (the east and south walls above, `cau` > 0); or the floor being
+# compared is in shadow; or the wall is a paler material than the floor -- a
+# mosaic waterline course, which bar section B2b rules out for this liner pool.
+# Transport is the only thing left and it is small: 3.4 m more water on the
+# floor's round trip is exp(-ABS*3.4) = 0.84 in green, 0.41 in red.
+_LF = bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
+_LN = wall_img['disp'][3][_k0:].reshape(-1, 3).mean(0)
+print("  the ceiling, measured: 0.5*alb_wall = %s. North wall's top 250 mm "
+      "reads %s against a deep floor of %s -- %s of it, inside the bound on "
+      "every channel." % (np.round(.5 * .82 * LINER_TINT, 3), np.round(_LN, 3),
+                          np.round(_LF, 3), np.round(_LN / _LF, 3)))
 
 # WHAT THE MISSING WALL TERM IS WORTH, now that both halves of it exist as
 # numbers in one place. `_WSH` above is exactly the cosine-weighted FRACTION of a
@@ -4759,8 +4803,21 @@ del _hdr
 #   8  the deep floor 0.2-0.8 m out from that same wall
 # All three are taken on the NORTH wall west of the step unit, because that is
 # the stretch this frame sees all three of at once.
+#
+# THEY ARE LABELLED IN A SECOND ARRAY, and that is not tidiness. Region 8 is a
+# strip of the same sunlit floor region 3 already owns, and region 3 is the
+# receiver the absorption regression is taken over -- so putting 8 into the same
+# array would have quietly redefined an existing calibration by removing its far
+# strip. Two arrays, one purity rule, nothing above this line moves.
 WALL_BAND_Z = 0.250        # how far down the wall region 7 reaches
 WALL_FRONT = (0.20, 0.80)  # how far out from the wall region 8 is taken
+
+
+def _purity(lb):
+    """A downsampled pixel keeps its label only if all SS^2 subsamples agree."""
+    lb = lb.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
+    lb = lb.reshape(H // SS, W // SS, SS * SS)
+    return np.where((lb == lb[..., :1]).all(-1), lb[..., 0], -1)
 
 
 def _regions():
@@ -4774,15 +4831,24 @@ def _regions():
     lb[np.flatnonzero(pav)] = 4                             # stone
     lb[iw[sh]] = 5                                          # floor in the shadow
     lb[BAND_RAY] = 6                                        # the dry blue band
-    # sid 4 is the north wall; for a wall hit (u, v) = (along, z), for a bed hit
-    # (u, v) = (x, y), so the same `WU < xmax` reads as x on both.
+    return _purity(lb)
+
+
+def _wall_regions():
+    """6, 7 and 8: the dry band, the submerged wall under it, and the water in
+    front of that wall. `sid` 4 is the north wall; for a wall hit (u, v) is
+    (along, z) and for a bed hit it is (x, y), so the same `WU < xmax` reads as
+    x on both and `Y1 - WV` is the distance out from the wall on the bed."""
+    lb = np.zeros(W * H, np.int8)
+    iw = np.flatnonzero(inp)
+    flr = (WSID == 0) & (bed_z(WU, WV) <= -DEPTH + 1e-6)
+    sh = flr & (bed_sun(WU, WV, -DEPTH) < 0.02)
     xmax = STEP_C[0] - STEP_R[-1] - .10
+    lb[BAND_RAY] = 6
     lb[iw[(WSID == 4) & (WV > -WALL_BAND_Z) & (WV <= 0.) & (WU < xmax)]] = 7
     lb[iw[flr & ~sh & (WU < xmax)
           & (Y1 - WV > WALL_FRONT[0]) & (Y1 - WV < WALL_FRONT[1])]] = 8
-    lb = lb.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
-    lb = lb.reshape(H // SS, W // SS, SS * SS)
-    return np.where((lb == lb[..., :1]).all(-1), lb[..., 0], -1)
+    return _purity(lb)
 
 
 def _sat(m):
@@ -4797,7 +4863,7 @@ def _srgb_lin(v):
     return np.where(x <= .04045, x / 12.92, ((x + .055) / 1.055) ** 2.4)
 
 
-def colour_table(img, reg):
+def colour_table(img, reg, wreg):
     print("colour regression (sRGB medians; saturation = (max-min)/max)")
     lum = np.zeros(9)
     llin = np.zeros(9)
@@ -4805,7 +4871,7 @@ def colour_table(img, reg):
                   ("floor, sunlit   ", 3), ("coping stone    ", 4),
                   ("floor, in shadow", 5), ("freeboard, blue ", 6),
                   ("wall, submerged ", 7), ("water in front  ", 8)):
-        sel = reg == k
+        sel = (reg if k < 7 else wreg) == k
         if sel.sum() < 100:
             print("  %s   -- %d px, not measured" % (nm, sel.sum()))
             continue
@@ -4863,7 +4929,8 @@ def colour_table(img, reg):
 
 
 REG = _regions()
-colour_table(hero, REG)
+WREG = _wall_regions()
+colour_table(hero, REG, WREG)
 # ...and WHAT IS IN THOSE PIXELS, because a receiver term can only move the part
 # of a pixel that came out of the water. The submerged wall sits at the top of
 # the frame where theta_v is 11 deg and the smooth-interface Fresnel is 0.36, so
@@ -4878,7 +4945,7 @@ _plw[np.flatnonzero(inp), 1] = WTRAN
 _plw = _plw.reshape(H // SS, SS, W // SS, SS, 2).mean((1, 3))
 for _nm, _k in (("submerged wall", 7), ("water in front", 8),
                 ("floor, sunlit ", 3)):
-    _s = REG == _k
+    _s = (REG if _k < 7 else WREG) == _k
     if _s.sum() >= 100:
         _a, _b = np.median(_plw[_s, 0]), np.median(_plw[_s, 1])
         print("  %s: reflected %.3f + transmitted %.3f -> the sky reflection is "
