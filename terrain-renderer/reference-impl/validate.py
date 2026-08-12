@@ -2034,6 +2034,17 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
       splat that spends them is not.
 
   TESTED IN PART
+    * The meniscus. Its GEOMETRY is now well covered -- a force balance on the
+      tabulated columns, an RK4 march of the Young-Laplace IVP, a
+      projected-area identity, a brute-force ray march, a unit-radiance closure
+      that integrates the shipped deposit back to that identity, and the two
+      limits a -> 0 and theta_c -> 90 deg. What is NOT covered is the RADIANCE
+      the two columns read: `_env_menis` and the traced bed / wall / riser maps
+      are both stubbed out to unit for the closure row, so nothing here says the
+      line is the right COLOUR or the right BRIGHTNESS -- only that it carries
+      the flux the geometry allows and splits it correctly between reflection
+      and transmission. The near-wall fold (Vm < 0) is a bounded approximation
+      rather than a model and is not exercised by this frame.
     * Fresnel: the exact equations, the Brewster zero and the diffuse integrals
       are covered. The roughness correction's two constants (2.69 and 22.7,
       Bruneton et al. 2010) are used as published and are not checked against
