@@ -289,9 +289,16 @@ art decision. The moment a shot has to match a **real place and time** — a pla
 "golden hour on the Algarve" — they stop being a dial and become a **computation**: latitude,
 longitude, date and UTC time through the standard solar-position algorithm (Meeus, *Astronomical
 Algorithms*; NOAA's implementation is the usual reference, well under a degree for any rendering
-purpose). Take it from a library. Do not hand-type the series into a renderer and do not reproduce
-it here — a mistyped periodic term is a silent multi-degree error, and this file's job is to say
-*that* you compute it, not to be the source of the coefficients.
+purpose). Take the **full-precision** series from a library: Meeus's periodic terms run to hundreds
+of coefficients, a mistyped one is a silent multi-degree error, and nothing in a renderer needs that
+accuracy. What is worth having written down — and is written out
+[below](#computing-the-illuminant-from-a-place-and-a-time) — is the **low-order NOAA form**: a
+truncated equation of centre and a closed-form equation of time, a page long, good to well under a
+tenth of a degree for any date a renderer will be handed. It is written here for two reasons. A
+reader who has to *check* someone else's sun, or reconcile two of them, cannot do it against a
+library call. And the one genuinely dangerous step in the whole computation is in its last three
+lines, where a branch chosen wrongly moves the sun by tens of degrees while leaving the elevation
+exactly right.
 
 It is worth knowing how much rides on those two numbers, because a guessed sun does not look
 "slightly off", it breaks four things at once and only the first is obvious:
@@ -307,6 +314,145 @@ Sunrise/sunset from the same algorithm is a free sanity check on the brief: a su
 at 18:41 local with sunset at 20:33 confirms "high summer, still broad daylight" instead of
 assuming it — and if the two disagree, the timezone or the UTC offset is wrong, which is the
 single most common way this goes silently astray.
+
+### Computing the illuminant from a place and a time
+
+A photograph with a place, a date and a clock time carries a **fully determined illuminant**, and
+recovering it is the first step of any comparison between a render and that photograph — not an
+optional refinement. Until the frame's sun is known, a disagreement in shadow direction, in water
+colour or in the ratio between two surfaces cannot be attributed to the renderer, because the
+illuminant is a free variable soaking up the residual. The chain is short and every step is
+standard: **solar declination** `δ` and the **equation of time** from the Julian century, **hour
+angle** from true solar time, **solar zenith angle** and azimuth from the spherical triangle, then
+Bennett's **refraction** correction and the Kasten–Young **relative optical air mass**.
+
+```
+# --- date to Julian century -------------------------------------------------
+JD  = julian_day(Y, M, D) + (t_local_hours - tz_hours) / 24     # tz in hours east
+T   = (JD - 2451545.0) / 36525.0                                # Julian centuries; TT ~ UT here
+
+# --- the sun's apparent longitude -------------------------------------------
+L0  = (280.46646 + T*(36000.76983 + T*0.0003032)) mod 360       # geometric mean longitude, deg
+M_a =  357.52911 + T*(35999.05029 - 0.0001537*T)                # geometric mean anomaly, deg
+ecc =  0.016708634 - T*(0.000042037 + 0.0000001267*T)
+C   =  sin(M_a)*(1.914602 - T*(0.004817 + 0.000014*T))          # equation of centre, deg
+     + sin(2*M_a)*(0.019993 - 0.000101*T)
+     + sin(3*M_a)*0.000289
+Om  =  125.04 - 1934.136*T                                      # lunar node, for the nutation term
+lam =  L0 + C - 0.00569 - 0.00478*sin(Om)                       # apparent longitude, deg
+
+# --- obliquity and declination ----------------------------------------------
+e0  =  23 + (26 + (21.448 - T*(46.8150 + T*(0.00059 - T*0.001813)))/60)/60
+eps =  e0 + 0.00256*cos(Om)                                     # true obliquity, deg
+decl=  asin( sin(eps) * sin(lam) )                              # solar declination, deg
+
+# --- equation of time, in minutes -------------------------------------------
+y   =  tan(eps/2)^2
+EoT =  4 * degrees( y*sin(2*L0) - 2*ecc*sin(M_a) + 4*ecc*y*sin(M_a)*cos(2*L0)
+                    - 0.5*y*y*sin(4*L0) - 1.25*ecc*ecc*sin(2*M_a) )
+
+# --- true solar time and hour angle -----------------------------------------
+TST = (t_local_minutes + EoT + 4*lon_east_deg - 60*tz_hours) mod 1440
+ha  = TST/4 - 180                                # deg;  ha < 0 morning,  ha > 0 afternoon
+
+# --- the spherical triangle --------------------------------------------------
+cos_zen = sin(lat)*sin(decl) + cos(lat)*cos(decl)*cos(ha)
+zen     = acos(clamp(cos_zen, -1, 1))            # solar zenith angle
+h       = 90 - zen                               # true (geometric) elevation
+
+# azimuth, measured clockwise from north -- USE THIS FORM, see the trap below
+az      = ( degrees( atan2( sin(ha),
+                            cos(ha)*sin(lat) - tan(decl)*cos(lat) ) ) + 180 ) mod 360
+
+# --- refraction, then air mass on the REFRACTED elevation --------------------
+R       = (1/60) * cot( h + 7.31/(h + 4.4) )     # Bennett, degrees
+h_app   = h + R
+m       = 1 / ( sin(h_app) + 0.50572*(h_app + 6.07995)^-1.6364 )   # Kasten-Young
+```
+
+Three notes on the tail, because each is a place a correct-looking implementation quietly goes
+wrong, and they are worth different amounts — the first is negligible and is recorded so that it
+stops being asked, the second is a fraction of a percent, and the third is unbounded.
+Bennett's formula is written for *apparent* altitude; Sæmundsson's `1.02·cot(h + 10.3/(h + 5.11))`
+is its true-altitude twin, and above 20° the two differ by **under 0.001°** — below anything that
+matters, so either is fine as long as one is used (`D`, recomputed here). Kasten–Young is usually
+quoted against zenith angle as `1/(cos ζ + 0.50572·(96.07995 − ζ)^−1.6364)`; the elevation form
+above is the same expression, and it must be fed the **refracted** elevation — the difference is
+0.2% at 21° and negligible at 57°, but the naive `1/sin h` is 0.6% off at 21° and diverges from
+there. And `4·lon_east_deg` means **east-positive** longitude: a western site takes a negative
+number, and getting that sign wrong shifts true solar time by twice the longitude correction while
+leaving everything downstream self-consistent.
+
+Worked on the two suns this skill's water chapter is calibrated against — Aljezur, Portugal
+(37.3167° N, 8.8000° W), WEST = UTC+1 (`D`, recomputed here in full):
+
+| | 2026-08-10, 18:41 | 2026-08-12, 15:28 |
+|---|---|---|
+| declination `δ` | 15.400° | 14.843° |
+| equation of time | −5.35 min | −5.04 min |
+| local solar noon | 13:40.5 | 13:40.2 |
+| hour angle `ha` | **+75.11°** (5.01 h past noon) | **+26.94°** (1.80 h past noon) |
+| solar zenith angle | 69.02° | 32.79° |
+| elevation, true → refracted | 20.975° → **21.02°** | 57.207° → **57.22°** |
+| azimuth (from north) | **273.75°** — due west | **233.96°** — south-west |
+| air mass `m` (Kasten–Young) | **2.771** | **1.189** |
+| shadow bearing, length | 93.75°, 2.60 × height | 53.96°, **0.64 × height** |
+
+Everything a comparison needs follows from those two rows, and the *water* consequences — how much
+of the beam enters the surface, how far it travels to the bed, and which of those differences cancel
+in a ratio and which do not — are worked in
+[`12`](12-water-rendering.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
+
+### The quadrant trap, and why the elevation stays right
+
+The azimuth is the one output of that chain with a **branch in it**, and it is the reason the
+pseudocode above uses `atan2`. The `acos` forms are algebraically correct and ubiquitous, and there
+are two of them measured from **different origins**, each with its own afternoon rule:
+
+```
+FORM N -- measured from NORTH
+    cos A_N = ( sin(decl) - sin(h)*sin(lat) ) / ( cos(h)*cos(lat) )
+    A_N = acos(...) in [0, 180]      morning: az = A_N        afternoon: az = 360 - A_N
+
+FORM S -- measured from SOUTH (the NOAA spreadsheet's form)
+    cos A_S = ( sin(lat)*cos(zen) - sin(decl) ) / ( cos(lat)*sin(zen) )
+    A_S = acos(...) in [0, 180]      morning: az = 180 - A_S  afternoon: az = 180 + A_S
+```
+
+Both give 233.96° for the 15:28 sun above. **Crossing them does not fail; it returns a plausible
+number.** Form S's `A_S = 53.96°` put through Form N's afternoon rule gives `360 − 53.96 =`
+**306.04°** — a north-*west* sun, **72.08° wrong** (`D`, recomputed here), and Form N's `A_N` put
+through Form S's rule lands on the same 306.04° from the other side. The elevation is untouched: it
+comes from `cos ζ`, which has no branch, so every other check a reader is likely to run still
+passes. This exact error placed a mid-afternoon August sun in the northwest during this project's
+own reference work, and it invalidates every shadow in a comparison while looking like a small
+transcription slip.
+
+Three guards, in the order they are worth running:
+
+- **Ship `atan2`.** The two-argument form has no branch and no origin ambiguity; the `acos` forms
+  belong in a cross-check, not in the renderer. Agreement between the two is a real guard rather
+  than a restatement, because what is being tested — the branch — is precisely what they do not
+  share (`11`, [a test and the code it checks must not share a
+  premise](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)).
+- **Bracket it with the rise/set azimuths.** Compute `cos A_rise = (sin δ − sin h₀ sin φ)/(cos h₀
+  cos φ)` at the horizon `h₀ = −0.833°`; the azimuth is confined all day to the arc running from
+  `A_rise` to `360 − A_rise` **through the meridian the sun culminates on**. Whenever `|δ| < |φ|`
+  and both are the same sign — every mid-latitude case — that arc contains 180° and the bracket is
+  simply `(A_rise, 360 − A_rise)`: on the date above, **(70.5°, 289.5°)**, which afternoon narrows
+  to (180°, 289.5°). 306.04° is outside it and the check catches it; 233.96° is inside (`D`). In the
+  tropics with `δ > φ` the sun culminates north of the zenith and the arc is the complementary one —
+  state which case you are in rather than hard-coding the mid-latitude bracket.
+- **Check the shadow against the frame.** The bearing is `az − 180`, so a reference photograph
+  containing any vertical object with a visible shadow settles the azimuth to a few degrees for
+  free — 53.96° at 0.64 × height here. This is the only one of the three that tests the *whole*
+  chain, timezone and longitude sign included.
+
+The cost of getting it wrong is set out in the table above: shadows swing 72° across the frame,
+every water-side quantity that depends on azimuth (glitter reachability, the direction the refracted
+beam offsets the caustic net, which wall the sun lands on) moves with them, and the elevation-driven
+quantities — colour, air mass, slant path — stay right, so the render disagrees with the photograph
+in a pattern that reads as a *shading* problem rather than as a wrong sun.
 
 ### The sky must be the atmosphere the beam came through
 
@@ -431,4 +577,9 @@ data structure by what sun motion does to it:
 | Lightmaps impractical at terrain scale (texel budget + dynamic sun) | **F** (arithmetic + practice) |
 | Normal-offset bias scaling with cascade texel size as primary anti-acne tool | **F/D** |
 | Rayleigh optical depth `τ ≈ 0.008569·λ⁻⁴` with its two dispersion corrections (Hansen & Travis 1974), used to invert a sun colour to an air mass | **P** (standard form; attribution from model knowledge, not re-verified) |
+| The low-order solar-position algorithm in [Computing the illuminant](#computing-the-illuminant-from-a-place-and-a-time) — truncated equation of centre, closed-form equation of time, hour angle, spherical triangle | **P** (Meeus, *Astronomical Algorithms*, as truncated by NOAA's Solar Calculator; coefficients transcribed from that standard form and **not** re-derived — the check that they are right is the worked table, which reproduces two independently-stated suns) |
+| Bennett (1982) refraction `R = cot(h + 7.31/(h + 4.4))` arcmin, and that its Sæmundsson true-altitude twin `1.02·cot(h + 10.3/(h + 5.11))` differs by <0.001° above 20° elevation | **P** (both formulae standard) + **D** (the agreement recomputed here, 2026-08) |
+| Kasten & Young (1989) relative optical air mass `1/(cos ζ + 0.50572·(96.07995 − ζ)^−1.6364)`, and the elevation-form identity used above | **P** (standard; the algebraic restatement and the 0.2%/0.6% error figures against refracted-vs-true and against `1/sin h` are arithmetic here) |
+| The Aljezur table — δ, EoT, solar noon, hour angle, zenith, elevation, azimuth, air mass and shadow bearing/length for 2026-08-10 18:41 and 2026-08-12 15:28 WEST at 37.3167 N, 8.8000 W | **D** — computed here from the algorithm above; they reproduce the two suns `12`'s reference work was stated with (21.0°/273.75°/2.77 and 57.22°/233.96°/1.189) to the digits those were quoted at |
+| The quadrant trap: two `acos` azimuth forms with different origins, each with its own afternoon branch, and that crossing them returns **306.04°** against a correct **233.96°** — a 72.08° error with the elevation untouched | **D** (recomputed here) + **F** (that it is a *common* error is this skill's experience, including its own; the arithmetic is not in doubt) |
 | That a hand-set sun colour inverted to `exp(−m·τ_Rayleigh)` at air mass 2.77 to one part in 10⁴, and that the aerosol pair at `τ_a(550) = 0.10` drove far water to 245/255 with the shadow ratio inverted | **D** — both measured on `12`'s pool reference implementation against its own constants; the *rule* (one atmosphere, read the sun colour back) is this skill's composition from them |

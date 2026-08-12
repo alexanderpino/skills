@@ -282,7 +282,7 @@ look at the distribution.
   what makes a lookup table or a fitted approximation *defensible* rather than a guess — it was
   derived from the reference and is measured against it every run.
 
-### Six ways a measurement lies while looking like one
+### Seven ways a measurement lies while looking like one
 
 Each of these has shipped in this project's own reference work, survived review, and cost a round to
 find. All of them produce a number that is *reproducible and wrong* — which is exactly the class a
@@ -355,6 +355,133 @@ golden-image test cannot catch, because nothing about the image is wrong.
   rule: for each interface, enumerate the transports across it, and check that each has a row that
   is not a ratio taken on one side. Water's case, with the arithmetic and the constants, is in
   [`12`](12-water-rendering.md#radiance-is-not-conserved-across-the-interface).
+- **A phone photograph is not a colorimeter, and it fails on three separate axes.** The newest, the
+  one most likely to cost a week, and the only entry here where the instrument is outside the
+  codebase. A reference photograph is treated as ground truth about a renderer's chromaticity and
+  level; it is neither, and the three reasons are independent, hit different quantities, and must be
+  diagnosed apart. **Automatic white balance rescales the channels of the very thing being
+  measured** — a frame dominated by cyan water is pushed toward neutral, so absolute sRGB triples
+  read off it are not evidence about chromaticity, and the push is *largest exactly where the
+  subject is most saturated*, which is where the measurement matters most. **A display-referred tone
+  curve rescales level, non-uniformly** — inverting the sRGB EOTF recovers display-referred linear,
+  not scene-referred linear, and the residual is an S-curve with a deepened toe. **And Display P3
+  read as sRGB corrupts chromaticity again, downstream, in the reader's own pipeline** — iPhone
+  captures have been tagged Display P3 since the iPhone 7, and any open that drops the ICC profile,
+  any screenshot, any tool that assumes sRGB, silently reinterprets the numbers. All three are
+  invisible in the file. The sorting table is the deliverable, because a reader with a failed
+  comparison can use it to tell which one they have:
+
+  | Failure | Where it happens | What it distorts | What survives it |
+  |---|---|---|---|
+  | Automatic white balance | in camera | **chromaticity**, worst at high saturation | luminance; within-frame pairs |
+  | Display-referred tone curve | in camera | **level**, non-uniformly | pairs **close in level** |
+  | Display P3 read as sRGB | in the reader's pipeline | **chromaticity**, worst at high saturation | luminance, to ~1% |
+
+  The third is the only one that is fully computable, so compute it. Both spaces are D65, so the
+  correction is one matrix on **linear** values (`D`, derived here from the two primary sets and the
+  D65 white point, not quoted):
+
+  ```
+  P3 -> sRGB, linear      [ 1.224940  -0.224940   0.       ]
+                          [-0.042057   1.042057   0.       ]
+                          [-0.019638  -0.078636   1.098274 ]
+  ```
+
+  **The asymmetry is the part worth teaching, and it is structural rather than incidental.**
+  Saturated colours sit near the sRGB gamut boundary, which is exactly where the wider P3 primaries
+  have their extra room; warm near-neutrals sit well inside both gamuts. Worked on plausible triples
+  (`D`, recomputed here; ratios in linear light, code shifts in 8-bit sRGB):
+
+  | Subject, as 8-bit code values | R/B ratio error if read as sRGB | Red code shift | Luminance error |
+  |---|---|---|---|
+  | Pool water `(140, 200, 205)` | **−28.2%** | −19 levels | +0.97% |
+  | Saturated water `(120, 205, 210)` | **−51.5%** | −34 levels | +1.29% |
+  | Shaded water `(70, 165, 185)` | **outside the sRGB gamut** — the correct red is *negative* | clipped to 0 | +1.40% |
+  | Warm sandstone `(210, 180, 150)` | +13.5% | +6 levels | −0.41% |
+  | Grey stone `(180, 175, 170)` | +2.2% | +1 level | −0.06% |
+
+  So the error is 13–23× larger on the subject than on the neutral reference surfaces beside it,
+  and on a saturated cyan it is not an error at all but a **gamut failure**: that colour has no sRGB
+  representation, so any sRGB-clamped comparison is measuring the clamp. Nothing in the image looks
+  wrong while this happens, because the surfaces a reader would sanity-check against are the ones it
+  leaves alone. Luminance, by contrast, survives to about **1%** — not because the transform
+  preserves it (a colorimetric transform preserves `Y` exactly) but because the two spaces'
+  luminance weights differ only modestly, `(0.2126, 0.7152, 0.0722)` against
+  `(0.2290, 0.6917, 0.0793)` (`D`). A *luminance* ratio read off a P3 file misread as sRGB is still
+  usable; a *chromaticity* read off it is not.
+
+**The remedy, stated as a method rather than as a warning: ratios internal to one frame, and pairs
+close in level.** Two surfaces in one exposure share the white balance, the exposure and the colour
+space, so those three factors divide out of their ratio — which is the same structural fact as the
+sixth entry above, used the other way round: a ratio is blind to whatever multiplies both its terms,
+a liability when that factor is the subject and an asset when it is the confound. **The precondition
+is that a tone curve is not a multiplier.** It is a smooth nonlinearity, so locally it acts as a
+gain plus a local gamma: a pair at *similar* levels rides nearly the same slope and comes through
+close to intact, while a pair far apart in level — sunlit against shadowed — sits on two very
+different slopes and is exactly where the curve does its damage. So prefer within-frame pairs, and
+among them prefer pairs close in level; where the question genuinely is a shadow-to-lit ratio, a
+photograph gives a sign and an ordering but not a number, and the limit is quoted with the number.
+The choice of *which* pair is the rest of the method, and the rule is to **pick the pair that
+cancels the thing you are not testing**. This project's water work found three, each cancelling
+something different:
+
+| Pair, in one exposure | What cancels | What it therefore tests |
+|---|---|---|
+| Lit subject / shaded subject | the material — one pigment, two illuminations | the ambient-to-direct balance |
+| Two surfaces both seen **through** the medium | the interface, the Fresnel entry term and the `n²` | the two albedos and the two path lengths |
+| The same material with and without the medium's path | the material, the interface and the `n²` | the **path alone** — an absorption measurement |
+
+The third is a real technique and not a hypothetical: a liner pool's dry freeboard band above the
+waterline is the same sheet of pigment as the submerged bed, lit directly, with no water path, no
+interface and no `n²` between it and the eye, so it pins the albedo on its own and its ratio against
+the bed then pins the absorption path — two measurements from one photograph, no reference chart,
+and the target is in the frame for nothing. The arithmetic is
+[`12a`](12a-water-derivations.md#the-calibration); what it defends against a fitted-constants
+objection is [`12`](12-water-rendering.md#radiance-is-not-conserved-across-the-interface).
+
+**State which way each bias runs, so a bound survives even when the value does not.** A biased
+instrument with a *known sign* still yields a one-sided bound, and recovering one is almost always
+better than discarding the frame. Because the tone curve deepens the toe, a shaded-to-lit ratio read
+off a photograph is a **lower bound** on the true ratio — the real shadow is lighter than it
+looks — which is a usable measurement provided it is quoted as a bound. The same applies to white
+balance once the scene's dominant hue is known, and it converts into the actionable rule for anyone
+matching a render to a photograph: **a render tuned to hit a photograph's channel values exactly has
+been tuned to the camera's white balance.** The correct target is displaced from the photograph in
+the direction of the scene's dominant hue — a correct render of a cyan-dominated pool should land
+slightly *more* cyan than the frame, not matched to it — and the same holds for any saturated
+subject: foliage, skin, sand, a painted wall. This project got an independent confirmation of both
+the direction and the magnitude: the observer who was present when the reference frames were shot,
+asked nothing about colour management, volunteered that the photographs looked much like reality
+with the water *perhaps slightly more cyan in life*. Prediction and report were arrived at
+separately and agree on sign, and the hedging bounds the size — which is why the honest statement is
+not "phone frames are useless for colour" but the sharper one that the frames stay usable as a
+**reference** while staying unusable as a **colorimeter**.
+
+Two habits that episode is worth keeping for. **Split a finding into the parts new evidence reaches
+and the parts it does not** — "more cyan" is a statement about hue and says nothing about level, so
+it moved that project's chromaticity finding and left its luminance finding, a water-to-sunlit-stone
+ratio in one exposure, exactly where it was. And **do not fit a material constant to a camera.** On
+learning that a render's shadow is deeper than the reference, the tempting move is to raise the
+occluder's transmission constant; that fits a *fabric* parameter to a *tone curve*, two errors
+compounded and invisible afterwards. A shadow's depth in frame is the fabric's transmission plus the
+sky the shaded region still sees plus the bed's inter-reflection — attribute the discrepancy to one
+of those three before anything moves.
+
+**What to ask for instead**, in descending order of strength, because all three failures are
+properties of the *deliverable* and not of the subject:
+
+1. **A RAW/DNG capture.** Linear, no display tone curve, white balance carried as metadata rather
+   than baked in — it retires two of the three failures outright and makes the third explicit.
+2. **A neutral of known reflectance in the frame.** White copy paper is ≈0.85 diffuse and costs
+   nothing; it fixes the white balance *and* supplies a level anchor, which no ratio can.
+3. **The original file's EXIF.** From aperture, shutter and ISO the metered scene luminance follows
+   as `L = K·N²/(ISO·t)` with `K ≈ 12.5`, which turns a source of ratios into a rough photometer.
+   Weakest of the three — auto-exposure meters a scene average and multi-frame HDR blurs what "the"
+   exposure was — but it costs nothing to obtain and is often still in the file.
+
+The general lesson is the one that governs every comparison against a photograph: **without one of
+those, the comparison is only ever *relative*.** A renderer can have every proportion in the frame
+right and its absolute exposure wrong, and no amount of ratio discipline will discover it.
 
 **Pitfalls:** goldens that were never verified correct (a golden captured from a broken build
 enshrines the bug — review each golden by eye once, against the catalogue, before blessing it);
@@ -413,3 +540,10 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | Budget bands (px/tri, culling-ms, latency percentiles) | **?** (directionally sound; exact numbers are per-title judgment) |
 | PIX / Nsight / RenderDoc / Radeon GPU Profiler roles; RenderDoc replay timings not production costs | **D** + **F** (usage caveat) |
 | Checklist ordering by defect frequency | **F** (experience-shaped, unverifiable) |
+| That iPhone captures are tagged Display P3 (since iPhone 7), and that dropping the ICC profile reinterprets them as sRGB | **D** (Apple's documented capture behaviour) + **F** (that the drop is a common pipeline accident) |
+| The `P3 → sRGB` linear matrix `[[1.224940, −0.224940, 0], [−0.042057, 1.042057, 0], [−0.019638, −0.078636, 1.098274]]` | **D** — derived here (2026-08) from the two primary sets and the shared D65 white point via XYZ, not quoted from a table; reproducible from those primaries alone |
+| The misread-P3 error table — −28.2% / −51.5% R/B on water triples, +13.5% on warm sandstone, +2.2% on grey stone, `(70,165,185)` falling outside the sRGB gamut, luminance error ≈1% | **D** — arithmetic here on that matrix, in linear light, for *those* triples; the transferable claim is the **asymmetry** (largest on the saturated subject, smallest on the neutral references) and its cause, not the percentages |
+| That the sRGB and Display P3 luminance weights are `(0.2126, 0.7152, 0.0722)` and `(0.2290, 0.6917, 0.0793)`, hence a ~1% luminance error from the misread | **P** (both are the `Y` rows of the standard primary matrices) + **D** (recomputed here) |
+| That automatic white balance biases a saturated frame toward neutral, and that a display-referred tone curve deepens the toe — with the sign of each, and the resulting one-sided bounds | **F** (universal camera-pipeline behaviour; no single citation) + **D** (direction and rough magnitude independently confirmed by an observer present at the reference shoot, for *one* subject — a bounded corroboration, not a calibration) |
+| The within-frame-ratio method, the "prefer pairs close in level" precondition, and the three cancelling pairs | **F/D** — the tone-curve precondition is the local-slope argument (arithmetic); which pairs cancel what is derivation (`12a`); that this is the right instrument is this skill's composition, and it was corrected mid-project after the tone curve was pointed out |
+| `L = K·N²/(ISO·t)`, `K ≈ 12.5`, as the EXIF route to a scene luminance | **P** (the ISO 2720 / standard reflected-light-meter relation; `K` in 10.6–13.4 by manufacturer, 12.5 for Canon/Nikon — quoted from model knowledge, **not** re-verified against the standard, so treat it as ±10%) |

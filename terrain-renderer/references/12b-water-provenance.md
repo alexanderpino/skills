@@ -267,7 +267,47 @@ least-confident-claims ledger in `00-index.md`.
   without the divisor and 1.31 with a `1/n` — is energy conservation and contains no constant of the
   renderer (`P`, arithmetic). The **verification** half of this entry, and why a Fresnel suite cannot
   see any of it, is `11`'s
-  [sixth way a measurement lies](11-verification-failures.md#six-ways-a-measurement-lies-while-looking-like-one).
+  [sixth way a measurement lies](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+- **P/D** — [The illuminant is part of the
+  comparison](12-water-rendering.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
+  The **solar position** half lives in [`10`](10-lighting-shadows.md#computing-the-illuminant-from-a-place-and-a-time)
+  and carries its own provenance rows there — the low-order NOAA/Meeus algorithm (`P`), Bennett
+  refraction (`P`), Kasten–Young air mass (`P`), and the Aljezur table computed here (`D`). What is
+  this file's to price is the **water** half, and all of it is arithmetic recomputed here on the
+  reference implementation's own IOR triple (`D`): the incidence angles 68.98°/32.78°; the
+  unpolarised transmitted shares **87.76% / 97.78%** (exact Fresnel, `n = 1.3348`, spread 0.1% across
+  the three channels and 0.02% between `n = 1.333` and `n = 1.3348`); the refracted angles
+  44.37°/23.93°; the slant paths **1.959 m / 1.532 m** to a 1.40 m bed and the 1.370 m / 0.621 m
+  horizontal offsets; the **1.114×** Fresnel factor, the **1.118×** red one-way path factor at
+  `a(610) = 0.2644 m⁻¹`, and their product **1.246×**. Those are properties of *that* depth and
+  those two suns; what transfers is the **cancellation rule** — that `sin h` and air-mass
+  attenuation are common to any two horizontal receivers and therefore cancel in their ratio, while
+  the Fresnel entry share and the slant path do not — which is this chapter's composition from
+  standard radiometry and has no free parameter in it. The `sin h` figure 2.34 and the per-channel
+  2.58 / 2.75 / 3.23 irradiance ratio are arithmetic here on the same Rayleigh optical depths `10`
+  uses. The **reddening inference rule** is `exp(−m·τ_R(λ))` (`P`, the form and its Hansen & Travis
+  corrections are cited in `10`) evaluated at this chapter's band centres: `SUN_COL`'s red-to-blue
+  **1.484** against **1.184** for a true air-mass-1.189 illuminant, hence **1.253× redder** (`D`,
+  recomputed here). ⚠️ **A correction made in this pass:** the 1.484 figure had been quoted as the
+  size of the confound, which compares the render's sun to a *flat white* illuminant rather than to
+  the photograph's own; the confound is the 1.253, and the qualitative conclusion — that the
+  illuminant difference runs the wrong way to explain a red *deficit* — is unchanged by the
+  correction. The two limits stated at the end of the section (the ambient-to-direct mixture does
+  not cancel, and none of it survives a nonlinear camera) are this chapter's composition, the second
+  routing to [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+- **D/?** — The two claims in that section and in the
+  [diagnostic index](12-water-rendering.md#diagnostic-index-symptom-to-mechanism) that are about
+  *this* project's open finding rather than about physics: that the render's water reads less red
+  than the reference photograph's, and that the measured water-to-sunlit-stone ratio gap is about
+  twice the 1.246 the illuminant difference can account for. Both are measured on `reference-impl`
+  against photographs of the reference pool (`D` for the render side) but the photographic side is
+  **not** a colorimetric measurement (`?`) — it is a phone frame, and what it can and cannot support
+  is [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one), whose
+  provenance table prices the Display-P3 and tone-curve figures the index row quotes. The finding is
+  recorded here as open, which is the only status it can have until a RAW capture or an in-frame
+  neutral exists. What is durable regardless is the **inference rule**: a confound whose direction
+  is known either shrinks a discrepancy or strengthens it, and it must be signed before it is
+  invoked.
 - **P/D** — [The view from inside, and the split shot](12-water-rendering.md#the-view-from-inside-and-the-split-shot).
   The critical angle, the exactness of total internal reflection outside it, the `d/n` apparent
   depth and the flat-port field narrowing (46° → ≈34° at `n = 1.333`) are textbook geometrical

@@ -60,8 +60,8 @@ it is being asked to excuse — so a FAIL means the number is outside what the m
 explain, and the next question is which of the two sides is wrong, never whether the tolerance can
 move. A suite that passes because its tolerances were widened proves nothing — and one that passes
 because its rows were transcribed from the sentence beside the constant proves less than nothing,
-which is what happened to two of those eight (see `11`, *Four ways a measurement lies while looking
-like one*). **A test and the code it checks must not share a premise.** The file also ends with a
+which is what happened to two of those eight (see `11`, *[Seven ways a measurement lies while looking
+like one](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)*). **A test and the code it checks must not share a premise.** The file also ends with a
 list of what is not tested *at all*, which is as much the deliverable as the tests are.
 
 ## Diagnostic index: symptom to mechanism
@@ -101,6 +101,10 @@ the reference implementation or read off a photograph, not supposed.
 | Sparkle convincing in a screenshot, obviously wrong on a pan | Noise-perturbed specular is **not a function of the slope field**, so its glints ride nothing; real ones ride crests and stay trackable for a second of footage. The test for glitter is temporal | [Sun glitter](#sun-glitter-the-sparkle-path) |
 | A wake or a jet train reads as a **seam** up the frame rather than as water | Its axis in *plan* sits within a few degrees of the camera azimuth, so a long ordered train projects as a near-vertical stripe. Obliquity in plan is the control; amplitude is not | [The wave field is a driven basin](#the-wave-field-is-a-driven-basin-not-a-spectrum) |
 | Swell crossing shallow water at the wind angle, hitting the beach diagonally | Wave phase taken from the **wind** rather than from a depth-driven travel-time field, so nothing refracts. Crests parallel to every shore is the cue the eye checks first | [Shallow water](#shallow-water-shoaling-refraction-and-breakers) |
+| My water is the wrong colour against a reference photograph, and no constant fixes it without breaking something else | The **photograph's sun was never computed**, so the illuminant is an unpinned free variable soaking up the residual. From a place, a date and a time it is fully determined — and its elevation alone moves the transmitted share (87.8→97.8%) and the slant path to the bed (1.96→1.53 m) between two ordinary afternoon suns | [The illuminant is part of the comparison](#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not) |
+| Shadows in the render point plausibly but disagree with the reference by tens of degrees, while the sun's *height* is clearly right | The azimuth's `acos` branch, taken from the wrong one of two conventions. Elevation comes from `cos ζ`, which has no branch, so it stays correct and every other check still passes — a 72° error that reads as a shading problem | [`10`, the quadrant trap](10-lighting-shadows.md#the-quadrant-trap-and-why-the-elevation-stays-right) |
+| A water-to-deck ratio disagrees with the reference, and the low sun is offered as the explanation | Both are **horizontal receivers**, so `sin h` and the air-mass attenuation are identical on them and cancel exactly in the ratio. What does *not* cancel is only the Fresnel entry share and the slant path — 1.25× between a 21° and a 57° sun, and nothing beyond that is available | [The illuminant is part of the comparison](#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not) |
+| Absolute sRGB triples read off a reference photograph will not reconcile with the render, and the disagreement changes between frames of the same pool | The camera, not the renderer: automatic white balance rescales chromaticity toward neutral hardest where the subject is most saturated, a display tone curve rescales level non-uniformly, and a Display P3 file read as sRGB shifts a water pixel's R/B by 28–52% while leaving the stone beside it near-untouched | [`11`, seven ways](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one) |
 
 Two habits make the table worth more than the sum of its rows. **Read pairs, not symptoms** — the
 dark-interiors/bright-shadows row is diagnostic only as a pair, because either half alone reads as
@@ -1363,7 +1367,87 @@ closed energy audit: a body with a perfect white Lambertian bed and no absorptio
 apparent albedo of **exactly 1**; composed with the divisor it is 1, without it **1.73**, with a
 `1/n` instead **1.31**. Neither guard contains a constant of the renderer. Why a large suite of
 Fresnel tests could not see any of this — and why that generalises past water — is
-[`11`](11-verification-failures.md#six-ways-a-measurement-lies-while-looking-like-one).
+[`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+
+### The illuminant is part of the comparison: what cancels and what does not
+
+A render is compared to a photograph by holding everything but the renderer fixed, and the largest
+thing that is usually *not* held fixed is the sun. A frame that arrives with a place, a date and a
+clock time carries a fully determined illuminant — elevation, azimuth and relative optical air mass
+are a computation, not an estimate, and `10` gives the algorithm and its
+[one dangerous branch](10-lighting-shadows.md#the-quadrant-trap-and-why-the-elevation-stays-right).
+Compute it before arguing about water. Until it is known, every discrepancy has a free variable to
+hide behind, and "the light was different" is unfalsifiable rather than merely unproven.
+
+What the elevation does to water, on the two suns this chapter's reference pool was photographed
+under (Aljezur; the position mathematics and the full table are in
+[`10`](10-lighting-shadows.md#computing-the-illuminant-from-a-place-and-a-time)):
+
+| | 18:41, elevation 21.02° | 15:28, elevation 57.22° |
+|---|---|---|
+| incidence at the surface `θ_i = 90 − h` | 68.98° | **32.78°** |
+| transmitted share `1 − R(θ_i)`, unpolarised, `n = 1.3348` | **87.76%** | **97.78%** |
+| refracted angle `θ_t` | 44.37° | 23.93° |
+| slant path to a 1.40 m bed, `d/cos θ_t` | **1.959 m** | **1.532 m** |
+| horizontal offset of the refracted beam at that bed | 1.370 m | 0.621 m |
+| air mass | 2.771 | 1.189 |
+
+All six are functions of **elevation alone** (`D`, recomputed here on the reference
+implementation's IOR triple; the transmitted share moves by 0.1% across its three channels and by
+0.02% between `n = 1.333` and `n = 1.3348`, so a single figure is honest at this precision).
+
+**The cancellation rule, which is what decides whether a comparison means anything.** A deck and a
+water surface are both **horizontal receivers**, so the `sin h` projection factor and the air-mass
+attenuation of the beam are *identical* on the two of them and cancel exactly in any water-to-deck
+ratio. Between these two suns that is a factor of 2.34 in `sin h` and another 1.10–1.38 per channel
+in atmospheric transmittance — a combined 2.58 / 2.75 / 3.23 in RGB (`D`) — which is large enough
+that it will be reached for as an explanation, and it explains nothing about a ratio. **A quantity
+that cancels in the measurement may not be invoked to excuse a discrepancy in that measurement.**
+The same argument disposes of the illuminant's *chromaticity* for such a ratio: to the extent both
+receivers are dominated by the direct beam, `E(λ)` divides out per channel, and what is left is the
+water's own absorption over its own path against the two albedos. This is the same structural point
+as `11`'s [sixth way](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)
+read forwards instead of backwards: a ratio is blind to whatever multiplies both of its terms — a
+liability when the thing you are testing is that factor, and an asset when it is the confound.
+
+What does **not** cancel is exactly the two rows of the table that belong to the water and not to
+the geometry of a horizontal plane:
+
+- **the Fresnel share entering the surface**, because the deck takes the whole beam at any elevation
+  while the water admits only `1 − R(θ_i)`: **1.114×** in the higher sun's favour;
+- **the slant path to the bed**, because the beam's leg through the medium is `d/cos θ_t`: 1.532 m
+  against 1.959 m, worth **1.118×** in red at `a(610) = 0.2644 m⁻¹`. Only the *down* leg moves — a
+  near-vertical view's return leg is the depth itself in both cases — so this is the whole of it,
+  not half of a round trip.
+
+Together the two are **1.246×** in the red on a near-vertical view (`D`) — the whole of what a
+high sun buys the water against the deck beside it, and the number a discrepancy in a water-to-deck
+ratio has to be **smaller** than before the sun can be blamed for it. On this project's own
+reference frames the measured gap is about twice that again, so the confound covers part of it and
+does not close it (the measurement itself is still open, `?`).
+
+**Air mass reddens the beam, and it can run either way against you — so state the direction and
+check it.** The relation is `exp(−m·τ_Rayleigh(λ))`, the same inversion `10` uses to read an
+[atmosphere back out of a sun colour](10-lighting-shadows.md#the-sky-must-be-the-atmosphere-the-beam-came-through):
+a low sun is golden, a high sun is near-white, and a redder illuminant must give redder water,
+because with `b_b ≈ 0` the column can only subtract from whatever fell on it. That makes a usable
+**inference rule for signed discrepancies**: work out which way the illuminant difference pushes,
+and a discrepancy that runs the *other* way is strengthened rather than explained. Worked here: the
+reference implementation's `SUN_COL = (1.000, 0.892, 0.674)` inverts to air mass 2.77, i.e. a
+red-to-blue ratio of **1.484**, against **1.184** for a genuine air-mass-1.189 illuminant at the
+same band centres — so the render's sun is **1.253× redder** than the sun the 15:28 photograph was
+shot under (`D`, recomputed here; the bare 1.484 figure compares the render's sun to a flat white
+illuminant rather than to the photograph's, which overstates the confound by that same 1.253). The
+render's water is nonetheless *less* red than the photograph's. A redder sun producing less red
+water is a discrepancy the confound makes **worse**, and the finding survives it.
+
+Two limits on all of the above, both worth stating before a number is quoted from it. The
+cancellation is exact only for the direct beam: the sky's share of a receiver's irradiance rises as
+the sun drops, and sky and beam have different chromaticities, so a low-sun frame carries an
+ambient-to-direct mixture that a high-sun frame does not — which is precisely why the lit/shaded
+pair below is a *separate* instrument from the water/deck one. And none of it survives a camera
+that is not linear: what a photograph can support is in
+[`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
 
 ### The view from inside, and the split shot
 
