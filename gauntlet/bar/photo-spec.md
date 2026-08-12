@@ -452,3 +452,90 @@ camera.
   *Derived.*
 - **Out of scope for the float:** its own material beyond a plain diffuse
   colour. It is an instrument; do not spend effort on printed graphics or seams.
+
+## J · The whole pool from a high oblique — a seventh and eighth photograph of the reference pool
+
+> Supplied late, and **the strongest new evidence since intake**: the first views
+> of the reference pool from *above*, and the first that contain the whole basin
+> at once. A–F were all written from low standpoints, where the water is read at
+> 60–80° incidence and the sky reflection is a large share of every pixel. These
+> two are the opposite corner of the same Fresnel curve, which is exactly why they
+> are worth a section of their own rather than a footnote to A.
+>
+> Both are shot from an upper storey or balcony, steeply down, one along the pool
+> and one across a corner with the lawn and loungers in frame. Neither carries a
+> measurable scale or a colour chart, so **every criterion below is a visual
+> reading and none is a measurement**; where a ratio would settle something, it is
+> marked as a ratio the render must produce and report, not one read off the
+> photograph.
+
+### What the two frames agree on
+
+- **The water is pale, and it is pale nearly everywhere.** Over the whole basin
+  it reads a light cyan-turquoise. There is no navy region, no deep blue at the
+  far end, and no dark centre — the only distinctly darker area in either frame is
+  a narrow band hugging the far wall. This is the tonality the project owner has
+  been asserting from the start (*"Ik verwacht gewoon licht water"*), and here it
+  is in the reference pool rather than in a general recollection. *Photograph.*
+- **It is not a contradiction of the low-angle frames, and the render must show
+  why.** At this depression the surface is near 40–45° incidence, where Fresnel is
+  a couple of percent and essentially the whole pixel is the bed; at the low
+  standpoints of A–F it is 60–80°, where the sky is a large fraction. **The same
+  water and the same code must produce both tonalities from the geometry alone.**
+  A render that needs a different constant for the two viewpoints has failed this
+  section, and it has failed it in the exact way the project's method rule
+  forbids. *Derived from the two viewpoints; the reconciliation is the test.*
+- **The caustic net covers the entire bed at low contrast.** Fine, dense, evenly
+  spread, with the bright lines a modest factor over the cells rather than blown
+  white. From directly above the net reads as texture over the whole floor; there
+  is no region where it dies out and none where it clips. *Photograph.*
+- **The ripple is legible as relief, not just as a caustic.** The surface's own
+  wrinkling shows in how the net is displaced and stretched, and near the far edge
+  the surface turns specular and picks up the sky. One field, two readings, in one
+  frame. *Photograph.*
+- **A large soft shadow crosses the water in the second frame, and the caustic net
+  stays legible inside it.** It is darker, plainly, and it is still a net. This is
+  now the **fourth independent confirmation** of the claim section B makes for the
+  shade sail — after the sail itself, the canoe's shadow on the lagoon sand, and
+  the float. A shadow that is a hole in the caustics is the single most common
+  synthetic tell in pool rendering, and the reference pool refuses it again.
+  *Photograph.*
+- **The submerged wall reads darker than the freeboard above it, in both frames**
+  — the opposite ordering to the low-angle sunlit photographs that drove the wall
+  work. **Both orderings are real and the render must produce both**, because the
+  submerged wall is seen here at grazing incidence through a long slant path while
+  the low-angle frames catch it under direct sun. This is a prediction to test,
+  not a target to dial: measure the ratio at both geometries and report them
+  together. If one geometry only comes out by moving a constant, the constant is
+  wrong. *Photograph, with the reconciliation derived.*
+- **The coping throws a thin hard shadow at the waterline.** The slabs overhang,
+  and the line under them is dark, narrow and crisp — consistent with B2's ruling
+  that the coping arris is cut stone and therefore hard, while the wall's own
+  waterline is soft. *Photograph.*
+- **The fittings are in the wall and they are visible from above:** circular return
+  eyeballs and rectangular skimmer throats, pale against the liner. Section D's jet
+  already exists in the scene; what is new is that from this angle the fitting
+  itself is part of the picture rather than only its boil. *Photograph.*
+
+### What these frames make available that nothing else did
+
+A **whole-basin view with a calibrated sun** — same pool, same liner, same depth
+as A–F. The render already has a wide frame (`gauntlet/evidence/w12-wide.png`),
+built by moving the camera on a scratch copy. That frame was made with no
+reference to judge it against. **These two photographs are that reference**, and
+the wide view stops being a nice picture and becomes a test.
+
+The specific thing to settle: the wide render's far half reads deep navy where
+both photographs read pale cyan throughout. Two candidate causes, and they are
+distinguishable —
+
+1. **Geometry.** The wide render's eye is lower, so it reads the surface nearer
+   grazing and the sky takes a larger share. If this is the whole story, rendering
+   at the photographs' own depression must close it, with **no constant touched**.
+2. **Transport.** The bed's upwelling radiance at the far end is too low, so the
+   sky wins a contest it should lose. This would be a real defect and would show
+   up as the far bed being too dark *before* the surface is applied.
+
+Render the geometry first and report the split. Do not adjust anything until the
+two candidates have been separated — this is precisely the arbitration section C
+needed in wave 4 and got, and the same discipline applies.
