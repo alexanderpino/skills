@@ -1036,6 +1036,53 @@ the same over every liner has no bottom-albedo term), and **colour is nearly dep
 within one pool**, since across 1–3 m blue hardly moves, green moves little, and red carries almost
 all of the change. A strong hue shift across a pool floor is an artifact, not a depth cue.
 
+### The two materials a pool actually has, and neither is "water"
+
+A pool is a **boundary** and a **medium**, and a renderer needs both stated. The medium is the
+`a`/`b`/`g` this chapter already demands from
+[`liquidBody`](#water-body-optical-identity-where-sigma-actually-comes-from); in treated water it
+is pure water and nothing else, so it is not a choice. **The boundary is the choice, and it is the
+one that decides what the pool looks like** — because with `b_b ≈ 0` the water can only subtract,
+so every photon that reaches the eye from below has been off the liner.
+
+So the contract is two lines, and the second is the interesting one:
+
+    liquidBody : a(lambda), b(lambda), g          # the medium -- pure water, for a treated pool
+    poolLiner  : rho(lambda), sheen               # the boundary -- spectral albedo, and wet vs dry
+
+**Liner albedo is not proportional to what you see, and that surprises people.** Light that returns
+from the liner meets the underside of the surface, where a diffuse internal reflectance of
+`R_int ≈ 0.476` sends about half of it back down for another bounce. That trapped series is
+`1/(1 − ρ·R_int)`, so its *gain* rises with the albedo — and a dark liner therefore loses twice,
+once on each return and again on the bounces it never gets:
+
+| Liner | ρ (green) | Trapped gain | Apparent | Against white |
+|---|---|---|---|---|
+| White | 0.80 | **1.61×** | 1.21 | 1.00 |
+| Light blue | 0.65 | 1.45× | 0.88 | 0.73 |
+| Sand / beige | 0.55 | 1.35× | 0.70 | 0.58 |
+| Mid blue *(this chapter's default)* | 0.50 | 1.31× | 0.61 | 0.51 |
+| Dark grey | 0.15 | 1.08× | 0.15 | 0.13 |
+| Anthracite / black | 0.05 | 1.02× | 0.05 | **0.04** |
+
+A black liner returns **4%** of what a white one does where its albedo is 6% of it (`D`). That is
+why an anthracite pool reads almost as a mirror — with nothing coming back from below, the surface
+reflection is all that is left, and the body goes near-black. It is also why the same water, the
+same sun and the same depth can look like the Caribbean or like a slate tank: **you are choosing
+the pool's colour when you choose its lining, not when you tint its water.**
+
+Two consequences for how a scene is authored:
+
+- **Tinting the medium to get a colour is the error this section exists to prevent.** It produces
+  water that stays coloured in a shadow, does not deepen with depth, and cannot be made pale by a
+  white bottom — three things a photograph refutes immediately.
+- **Wet is not dry.** The liner above the waterline and the same liner below it are one pigment,
+  but the wet one reads `(0.85, 0.79, 0.82)` of the dry (`D`), because the water film adds an
+  internal reflection the dry surface does not have. That makes the dry band a **free calibration
+  target**: it is the pigment with no water path, no interface and no `n²` between it and the eye,
+  so it pins `rho` on its own — and the ratio between it and the submerged bed then pins the
+  absorption path. Two measurements from one photograph, and neither needs a reference chart.
+
 ### The rest of the man-made checklist
 
 - **Straight lines are the fidelity test.** Tiled walls and rectangular coping hand the viewer a
