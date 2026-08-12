@@ -2872,8 +2872,26 @@ _mdp = PHI_W / MENIS_N
 MENIS_DX = CAP_A * np.cos(_mph / 2) * np.cos(_mph) / np.sin(_mph)     # dd/dphi
 MENIS_WD = MENIS_DX * _mdp                                  # the node's width in d
 MENIS_D = np.cumsum(MENIS_WD[::-1])[::-1] - .5 * MENIS_WD   # d(phi), from the wall
+MENIS_Z = 2. * CAP_A * np.sin(_mph / 2.)                    # z(phi), the profile
 MENIS_SIN, MENIS_COS = np.sin(_mph), np.cos(_mph)
 MENIS_REACH = MENIS_D[0] + .5 * MENIS_WD[0]
+# THE FORCE BALANCE THE TABLE HAS TO SATISFY, printed because it is the one
+# statement about this quadrature that does not come from the profile at all.
+# The weight of the liquid the fillet raises above the far-field level, per unit
+# of waterline, is carried by the vertical pull of the surface at the wall:
+#       rho g INT z dx  =  sigma cos(theta_c)  =  sigma sin(phi_w)
+# and with z = 2a sin(phi/2), dx = a cos(phi/2) cos(phi)/sin(phi) dphi the left
+# side integrates to rho g a^2 sin(phi_w) = sigma sin(phi_w), identically. It is
+# a global balance on the SAME two tabulated columns the flux integral sweeps,
+# arrived at from Newton rather than from Young-Laplace, so a table that is
+# self-consistently wrong fails it. `validate.py` asserts it; the residual is
+# quadrature error and nothing else.
+MENIS_LIFT = float((MENIS_Z * MENIS_WD).sum() * 1000.0 * 9.81)
+print("the fillet's force balance: rho g INT z dx = %.5f N/m against sigma "
+      "cos(theta_c) = %.5f N/m, %.2f%% apart on %d nodes -- the quadrature's own "
+      "error, and the only check on the profile that is not the profile"
+      % (MENIS_LIFT, SIGMA_W * np.sin(PHI_W),
+         100 * abs(MENIS_LIFT / max(SIGMA_W * np.sin(PHI_W), 1e-30) - 1), MENIS_N))
 print("the fillet as a quadrature: %d tilt nodes over 0-%.0f deg; the surface at "
       "tilt phi stands %s mm from the wall at phi = 80/60/45/30/20/10 deg, so "
       "the whole of it above 30 deg is inside %.2f mm and the tabulated reach is "
@@ -2914,11 +2932,158 @@ def _env_menis(rx, ry, rz):
     return np.where((rz >= 0)[:, None], col, fw * col + (1 - fw) * WBOUNCE[None])
 
 
-def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
-    """The fillet's specular excess over the flat water it replaces, returned as
-    a radiance to add to the ray. Evaluated only on the band of rays whose
+def _menis_weights(Vm, Vz):
+    """The fillet's PROJECTED AREA toward the eye, node by node, and that of the
+    flat strip it replaces -- per unit length of waterline, in metres.
+
+    Fresnel-free and environment-free: this is the geometry both columns share,
+    and it is factored out so that it can be measured a completely different way.
+    `V` points from the surface TOWARD the eye, decomposed on the wall's own
+    (poolward, along, up) frame; only Vm and Vz enter, because the fillet's
+    normal has no along-wall component.
+
+        n(phi).V = sin(phi) Vm + cos(phi) Vz
+        w_fil = ds (n.V) = dx (n.V)/cos(phi)      the facet's projected area
+        w_flt = dx  Vz                            the flat strip's
+
+    The sum over nodes of (w_fil - w_flt) is the fillet's excess projected area,
+    and that is a length that a ray march can measure without knowing any of
+    this: cast a parallel fan at the analytic profile and take the width of the
+    shadow. `validate.py` does exactly that."""
+    ndv = MENIS_SIN[None] * np.asarray(Vm)[:, None] + \
+        MENIS_COS[None] * np.asarray(Vz)[:, None]
+    w_fil = np.maximum(ndv, 0.) / MENIS_COS[None] * MENIS_WD[None]
+    w_flt = np.maximum(np.asarray(Vz), 0.)[:, None] * MENIS_WD[None]
+    return ndv, w_fil, w_flt
+
+
+def _riser_shade(hxr, hyr, hzr, ci, c, mode):
+    """A cylindrical riser of the step unit. No caustic map is rasterised for
+    these faces: the caustic pass drops the rays that reach them (that IS the
+    cast shadow), and the mean refracted sun grazes them 2.6 deg on the dark
+    side wherever the camera can see them. Four terms, in the order they matter:
+      * the BOUNCE off the sunlit bed in front, gathered above -- the largest,
+        the one that carries the caustic net, and the one whose absence rendered
+        this whole region neutral grey;
+      * the TIR return, arriving shallow and so favouring a vertical face;
+      * sky through the Snell window, over the upgoing half hemisphere only;
+      * direct sun, which is nonzero only on the crescent that turns west and is
+        never visible from an anti-solar camera. It is kept because it is real,
+        not because it is seen."""
+    cx = np.array([c_[0] for c_ in CYL])[ci]
+    cy = np.array([c_[1] for c_ in CYL])[ci]
+    RR = np.array([c_[2] for c_ in CYL])[ci]
+    zt = np.array([c_[3] for c_ in CYL])[ci]
+    ox, oy = (hxr - cx) / RR, (hyr - cy) / RR
+    # eased nosing: the top NOSE_R of the riser rolls over to meet the tread.
+    # ? shading-only round-over -- 25 mm is under one pixel of silhouette here.
+    th = np.clip((hzr - (zt - NOSE_R)) / NOSE_R, 0, 1) * (np.pi / 4)
+    Nx, Ny, Nz = ox * np.cos(th), oy * np.cos(th), np.sin(th)
+    d = -hzr
+    lev = np.clip(0.74 + 0.030 * (0.5 + 0.5 * np.sin(hxr * 3.1 + .7)
+                                  * np.sin(hyr * 4.3 - .4) - 0.6), .05, .95)
+    ndl = np.clip(Nx * -TSUN_DIR[0] + Ny * -TSUN_DIR[1] + Nz * -TSUN_DIR[2], 0, 1)
+    # ? the caustic that lands on a riser is read off the bed map 30 mm radially
+    # ? outside it -- the map is indexed by bed position and a vertical face has
+    # ? none. Only the bench crescent is lit at all, so this is a 6-pixel term.
+    cau = sample((bed[c] if mode == 'disp' else bed[3])[..., None],
+                 hxr + ox * .030, hyr + oy * .030, X0, X1, Y0, Y1)[:, 0]
+    aow = bed_ao(hxr, hyr, hzr)
+    ao = aow * .5 * (1. + Nz)          # a vertical face sees half the sky
+    bnc = riser_bounce(hxr, hyr, hzr, ci)[:, c]
+    tir = sample(bedret[..., c:c + 1], hxr, hyr, X0, X1, Y0, Y1)[:, 0] * \
+        aow * (TIR_VERT + (1. - TIR_VERT) * Nz)
+    return LINER_TINT[c] * lev * (
+        SUN_COL[c] * cos_i * TSUN * cau * (ndl / cos_t) * np.exp(-ABS[c] * d / cos_t)
+        + SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55)
+        + tir + bnc)
+
+
+# --- THE FILLET'S UNDERSIDE IS NOT ON A CAMERA PATH, and the reason is one line
+# A previous round asked whether the strip of surface just poolward of the
+# junction, seen from above THROUGH the water, shows the sunlit bed by total
+# internal reflection off the fillet's underside -- reflectance exactly 1 past
+# 48.5 deg, against 0.02-0.07 for the external specular, which would make it 15
+# to 50 times the term that ships. The fillet does hold every tilt, so the
+# CRITICAL-ANGLE condition is met inside it by construction; the argument fails
+# one step earlier, on whether a camera ray can arrive there at all.
+#
+# Write the transmitted direction as t = eta i + f n with n opposing i. Then
+#       f = eta cos_i - cos_t,   cos_t = sqrt(1 - eta^2 + eta^2 cos_i^2)
+#       f > 0  <=>  eta^2 cos_i^2 > 1 - eta^2 + eta^2 cos_i^2  <=>  eta^2 > 1.
+# A camera above the water refracts IN, eta = 1/n = 0.749 < 1, so f < 0 strictly
+# -- at every incidence, with no exceptions and no grazing limit. A static
+# meniscus on a vertical wall carries tilts phi in [0, 90 deg], so its normal has
+# n_z = cos(phi) >= 0, and a camera above the water has i_z < 0. Hence
+#       t_z = eta i_z + f cos(phi)  <  0     IDENTICALLY,
+# and the refracted ray descends everywhere inside the water. It cannot arrive
+# at the underside of a surface that lies above it. The fillet's underside
+# subtends EXACTLY ZERO solid angle from any camera above the waterline -- not a
+# small angle, not one this frame happens to miss; zero, for every eye position,
+# every wall and every contact angle.
+#
+# So the mechanism is real and the geometry never reaches it on a camera path:
+# the sweep argument that makes the meniscus SPECULARLY reachable establishes
+# that a required tilt exists somewhere in the strip, and reachability of a TILT
+# is not reachability of a POSITION. The underside is reached only from below,
+# by light already in the water, which is the bed-return term (TIR_FRAC /
+# TIR_VERT) and is built. A brute-force march of 215000 refracted camera rays
+# against the analytic profile, over all four walls and every tilt, found 0
+# underside hits and is the row `validate.py` carries.
+MENIS_TIR_REACH = 0.0        # solid angle of the fillet's underside, per camera
+
+
+def _menis_under(sid, u, v, sm, cyl, tzc, mode):
+    """What comes back up a fillet's TRANSMITTED ray: the same bed, wall and
+    riser maps `water_shade` reads for the flat surface, with the same
+    Beer-Lambert on the leg. Factored out of the loop below for two reasons --
+    the flat baseline and the fillet's own column must read it through the same
+    code or the subtraction measures the difference between two shaders rather
+    than between two geometries, and `validate.py` substitutes a unit radiance
+    here to test the fillet's geometry without building the maps."""
+    col = np.zeros((sid.size, 3))
+    bi, wim = bed_img[mode], wall_img[mode]
+    for c in range(3):
+        m = sid == 0
+        if m.any():
+            col[m, c] = sample(bi[..., c:c + 1], u[m], v[m], X0, X1, Y0, Y1)[:, 0]
+        for wi, sv in enumerate((1, 2, 3, 4)):
+            m = sid == sv
+            if m.any():
+                a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
+                col[m, c] = sample(wim[wi][..., c:c + 1], u[m], v[m],
+                                   a, b, -DEPTH, 0.)[:, 0]
+        m = sid == 5
+        if m.any():
+            col[m, c] = _riser_shade(u[m], v[m], tzc[m] * sm[m], cyl[m], c, mode)
+    return col * np.exp(-ABS[None] * sm[:, None])
+
+
+def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
+             mode='disp'):
+    """The fillet's excess over the flat water it replaces, returned as a
+    radiance to add to the ray. Evaluated only on the band of rays whose
     footprint can reach the fillet at all -- everywhere else it is exactly zero,
-    which is what makes a 64-node quadrature affordable inside the main path."""
+    which is what makes a 64-node quadrature affordable inside the main path.
+
+    TWO columns, on one quadrature and one set of projected areas:
+      * REFLECTED -- the facets mirror sky and sun. Fresnel 0.02-0.07 where this
+        camera sees them, which is why it is faint, plus the sun's disc handled
+        analytically because 0.53 deg selects ~15 um of fillet that no 64-node
+        sweep would find.
+      * TRANSMITTED -- the facets are also a cylindrical lens, and a facet turned
+        toward the eye passes 0.93-0.98 of what is behind it. The ray is TRACED,
+        not looked up: from the node's own position on the profile, refracted
+        with the node's own normal, through the same `scene_hit` and the same bed
+        / wall / riser maps the flat surface reads. On the walls this frame can
+        see it lands on the liner within 20 mm of the waterline; where the fillet
+        is on the near wall it goes poolward into the basin instead.
+    A third was tested and refuted -- see MENIS_TIR_REACH above; the fillet's
+    underside subtends zero solid angle from any camera above the water.
+
+    The subtraction is per column and against the SAME flat surface: `water_shade`
+    has already written both a reflected and a transmitted column over these
+    millimetres, and what is added here is the excess of each."""
     out = np.zeros((hw_x.size, 3))
     if fp is None:
         return out              # no footprint, no width to spread a flux over
@@ -2951,7 +3116,9 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
         Lt = SUN_DIR[0] * tx[k] + SUN_DIR[1] * ty[k]
         Lm = SUN_DIR[0] * mx[k] + SUN_DIR[1] * my[k]
         # --- the fillet, node by node
-        ndv = MENIS_SIN[None] * Vm[:, None] + MENIS_COS[None] * Vz[:, None]
+        # the projected areas both columns are built on, and the ONLY place the
+        # quadrature's geometry is written down -- see `_menis_weights`.
+        ndv, W_FIL, W_FLT = _menis_weights(Vm, Vz)
         Rm = 2. * ndv * MENIS_SIN[None] - Vm[:, None]
         Rz = 2. * ndv * MENIS_COS[None] - Vz[:, None]
         Rt = np.broadcast_to(-Vt[:, None], Rm.shape)
@@ -2986,8 +3153,7 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
         _rgh = (np.exp(-2.69 * _sv) / (1. + 22.7 * _sv ** 1.5))[:, None]
         nc = np.clip(ndv, 1e-4, 1.)
         Ff = F0 + (fresnel(nc) - F0) * _rgh[..., None]
-        fil = np.where((ndv > 0)[..., None],
-                       Ff * Le * (nc / MENIS_COS[None])[..., None], 0.)
+        fil = Ff * Le * W_FIL[..., None]
         # --- the flat surface it replaces, at the same distances
         ov0 = np.where(Vm[:, None] > 1e-9,
                        Vz[:, None] * MENIS_D[None] / np.maximum(Vm[:, None], 1e-9),
@@ -2997,8 +3163,62 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_):
         L0 = _env_menis(dvec[k, 0], dvec[k, 1], Vz)[:, None]
         L0 = L0 * (1 - oc0)[..., None] + EDGE_REFL[None, None] * oc0[..., None]
         F0v = F0 + (fresnel(Vz) - F0) * _rgh
-        flat = F0v[:, None] * L0 * Vz[:, None, None]
-        ex = (fil - flat) * MENIS_WD[None, :, None]
+        flat = F0v[:, None] * L0 * W_FLT[..., None]
+        ex = fil - flat
+        # ---------------------------------------- THE TRANSMITTED COLUMN, TRACED
+        # A facet at 45 deg bends the camera ray hard into the water, and where
+        # this camera sees the fillet it passes 0.93-0.98 against the 0.02-0.07
+        # it reflects. That column cannot be an environment lookup: the ray goes
+        # somewhere specific and near, so it is traced with the file's own
+        # `scene_hit` from the node's own place on the profile -- d(phi) in from
+        # the waterline and z(phi) above the still level -- and the flat baseline
+        # is traced from the SAME plan positions at z = 0, so the difference is
+        # between two geometries and not between two shaders.
+        #
+        # `?` THE GEOMETRY IS ACHROMATIC: the trace uses eta = 1/IOR[1] for all
+        # three channels, as the reflected column above uses one mirror
+        # direction. The maps and the Fresnel are per channel. Over a leg this
+        # short the three hits are microns apart, against a 3.7 mm output pixel.
+        #
+        # NOTE, AND IT IS NOT FIXED HERE: this column inherits `water_shade`'s
+        # missing 1/n^2 radiance compression on refraction, and it must, because
+        # what it is subtracting was drawn without it. Correcting it here alone
+        # would put a 0.83-stop step across the junction. It is entangled with
+        # LINER_TINT and EXPOSURE and is a round of its own; the README and
+        # `12a` carry it. This term makes it MORE visible, not less: the
+        # transmitted column now carries the waterline as well as the field.
+        wl_x = hw_x[k] + gx[k] * (SLIP - s_h[k])      # the waterline point
+        wl_y = hw_y[k] + gy[k] * (SLIP - s_h[k])
+        nd_x = (wl_x[:, None] + mx[k][:, None] * MENIS_D[None]).ravel()
+        nd_y = (wl_y[:, None] + my[k][:, None] * MENIS_D[None]).ravel()
+        _eta = 1.0 / IOR[1]
+        assert _eta < 1.0, 'the camera is above the water'
+        _ns = MENIS_SIN[None]
+        _ix = np.broadcast_to(dvec[k, 0][:, None], ndv.shape).ravel()
+        _iy = np.broadcast_to(dvec[k, 1][:, None], ndv.shape).ravel()
+        _iz = np.broadcast_to(dvec[k, 2][:, None], ndv.shape).ravel()
+        _nx = (mx[k][:, None] * _ns).ravel()
+        _ny = (my[k][:, None] * _ns).ravel()
+        _nz = np.broadcast_to(MENIS_COS[None], ndv.shape).ravel()
+        ttx, tty, ttz = refract(_ix, _iy, _iz, _nx, _ny, _nz, _eta)
+        _pz = np.broadcast_to(MENIS_Z[None], ndv.shape).ravel()
+        _g = scene_hit(nd_x, nd_y, ttx, tty, ttz, _pz)
+        Lu = _menis_under(_g[0], _g[1], _g[2], _g[3], _g[4], ttz,
+                          mode).reshape(ndv.shape + (3,))
+        # the flat surface it replaces, traced from the same plan positions
+        t0x, t0y, t0z = refract(dvec[k, 0], dvec[k, 1], dvec[k, 2],
+                                np.zeros_like(Vz), np.zeros_like(Vz),
+                                np.ones_like(Vz), _eta)
+        _f0 = np.broadcast_to(np.ones(ndv.shape[1]), ndv.shape)
+        _g0 = scene_hit(nd_x, nd_y,
+                        (t0x[:, None] * _f0).ravel(), (t0y[:, None] * _f0).ravel(),
+                        (t0z[:, None] * _f0).ravel(), 0.0)
+        Lu0 = _menis_under(_g0[0], _g0[1], _g0[2], _g0[3], _g0[4],
+                           (t0z[:, None] * _f0).ravel(),
+                           mode).reshape(ndv.shape + (3,))
+        filT = (1. - Ff) * Lu * W_FIL[..., None]
+        flatT = (1. - F0v)[:, None] * Lu0 * W_FLT[..., None]
+        ex = ex + (filT - flatT)
         # --- the footprint kernel, folded at the wall (see the note above)
         sg = sig[k][:, None]
         dl = (d[k][:, None] - MENIS_D[None]) / sg
@@ -3116,7 +3336,8 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     occ_ = np.where(toward > 0, np.clip(1. - over / ZD, 0, 1), 0.) ** .8
     refl_ = refl_ * (1 - occ_)[:, None] + EDGE_REFL[None] * occ_[:, None]
     lip_ao = 1. - .34 * np.exp(-(in_w + SLIP) / .045)
-    mnis_ = meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_)
+    mnis_ = meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
+                     mode)
 
     water = np.zeros((hw_x.size, 3))
     geo, smG_ = {}, None
@@ -3171,13 +3392,17 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     water *= lip_ao[:, None]
     spec_ = fres_ * refl_
     tran_ = (1 - fres_) * water
-    # The meniscus is a correction to the SPECULAR column and it is allowed to be
+    # The meniscus is a correction to BOTH columns and it is allowed to be
     # negative -- on a wall seen at 11 deg grazing the flat surface reflects the
     # undercut at F = 0.36 while the fillet turns its facets toward the eye and
-    # reflects the sky at F = 0.02, and the fillet is then the DARKER of the two.
-    # It cannot take away more than the specular it is correcting, and that is
-    # the only clamp on it.
-    out = spec_ + tran_ + np.maximum(mnis_, -spec_)
+    # reflects the sky at F = 0.02, and the fillet's reflected half is then the
+    # DARKER of the two. It cannot take away more than the columns it is
+    # correcting, and that is the only clamp on it. The floor moved from -spec_
+    # to -(spec_ + tran_) when the transmitted half was built: clamping the sum
+    # of two corrections against one of the two columns would have made the
+    # clamp bind on the transmitted excess, which is the larger and the positive
+    # one, and turned a floor into a ceiling on the wrong term.
+    out = spec_ + tran_ + np.maximum(mnis_, -(spec_ + tran_))
     # the two halves are carried out separately as luminances so that spec C can
     # be judged on the right one. "A compact patch of isolated bright points" is
     # a statement about the REFLECTED term; if the transmitted bed beats it
@@ -3752,48 +3977,6 @@ print("  riser arc in the basin: %.0f%% lit, %.0f%% faces the camera, %.1f%% bot
       " the best any face manages is min(N.L, N.V) = %+.3f -- so the light on"
       " every riser this frame can see is entirely indirect"
       % (100 * _nlit / _ntot, 100 * _nvis / _ntot, 100 * _nboth / _ntot, _best))
-
-
-def _riser_shade(hxr, hyr, hzr, ci, c, mode):
-    """A cylindrical riser of the step unit. No caustic map is rasterised for
-    these faces: the caustic pass drops the rays that reach them (that IS the
-    cast shadow), and the mean refracted sun grazes them 2.6 deg on the dark
-    side wherever the camera can see them. Four terms, in the order they matter:
-      * the BOUNCE off the sunlit bed in front, gathered above -- the largest,
-        the one that carries the caustic net, and the one whose absence rendered
-        this whole region neutral grey;
-      * the TIR return, arriving shallow and so favouring a vertical face;
-      * sky through the Snell window, over the upgoing half hemisphere only;
-      * direct sun, which is nonzero only on the crescent that turns west and is
-        never visible from an anti-solar camera. It is kept because it is real,
-        not because it is seen."""
-    cx = np.array([c_[0] for c_ in CYL])[ci]
-    cy = np.array([c_[1] for c_ in CYL])[ci]
-    RR = np.array([c_[2] for c_ in CYL])[ci]
-    zt = np.array([c_[3] for c_ in CYL])[ci]
-    ox, oy = (hxr - cx) / RR, (hyr - cy) / RR
-    # eased nosing: the top NOSE_R of the riser rolls over to meet the tread.
-    # ? shading-only round-over -- 25 mm is under one pixel of silhouette here.
-    th = np.clip((hzr - (zt - NOSE_R)) / NOSE_R, 0, 1) * (np.pi / 4)
-    Nx, Ny, Nz = ox * np.cos(th), oy * np.cos(th), np.sin(th)
-    d = -hzr
-    lev = np.clip(0.74 + 0.030 * (0.5 + 0.5 * np.sin(hxr * 3.1 + .7)
-                                  * np.sin(hyr * 4.3 - .4) - 0.6), .05, .95)
-    ndl = np.clip(Nx * -TSUN_DIR[0] + Ny * -TSUN_DIR[1] + Nz * -TSUN_DIR[2], 0, 1)
-    # ? the caustic that lands on a riser is read off the bed map 30 mm radially
-    # ? outside it -- the map is indexed by bed position and a vertical face has
-    # ? none. Only the bench crescent is lit at all, so this is a 6-pixel term.
-    cau = sample((bed[c] if mode == 'disp' else bed[3])[..., None],
-                 hxr + ox * .030, hyr + oy * .030, X0, X1, Y0, Y1)[:, 0]
-    aow = bed_ao(hxr, hyr, hzr)
-    ao = aow * .5 * (1. + Nz)          # a vertical face sees half the sky
-    bnc = riser_bounce(hxr, hyr, hzr, ci)[:, c]
-    tir = sample(bedret[..., c:c + 1], hxr, hyr, X0, X1, Y0, Y1)[:, 0] * \
-        aow * (TIR_VERT + (1. - TIR_VERT) * Nz)
-    return LINER_TINT[c] * lev * (
-        SUN_COL[c] * cos_i * TSUN * cau * (ndl / cos_t) * np.exp(-ABS[c] * d / cos_t)
-        + SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55)
-        + tir + bnc)
 
 
 # --------------------------------------------------------------- adaptive edges
