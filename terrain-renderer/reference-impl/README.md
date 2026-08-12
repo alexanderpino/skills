@@ -446,6 +446,16 @@ weight and the same closure, so the two receivers cannot drift apart. What is
 per-receiver is only the grid, the outward normal, and where the foot is read
 from — `bed_z` just outside the cylinder, or just inside the wall face.
 
+**Nothing in it is fitted.** The round introduces exactly three numbers: the
+partition `WALL_SKY = 0.5`, which is derived and asserted twice against unrelated
+code, and the two grid resolutions `WB_NU, WB_NZ`, which are marked `?` and
+cannot change the term's size — the estimator's weight integrates to the same
+closure at any sample count. Every level in the result comes from radiances the
+file already computed. The two judgement calls that were made after seeing a
+number both moved the result **away** from the expected one and were kept:
+excluding the buried texels took the printed reciprocity from +7.8% to −12.1%,
+and splitting the wall band at 100 mm took the measured strip from 89.2 to 79.4.
+
 **It was not a parameter change.** Four things had to be built around it:
 
 - **The sky had to come out.** A face that gains the gather without losing the
@@ -475,6 +485,17 @@ a quarter in red, because the bed's light crosses metres of water to reach a
 wall. It carries **12–16% of the bed's own cell-scale contrast**, the same
 11–17% the risers carry, so the wall shows the caustic net moving on it and not
 a uniform lift.
+
+**And the bed's shadows arrive as shadows.** The gather reads `bed_img` at each
+traced hit, never an average, so structure of every scale is in it; what a
+hemisphere integral does is low-pass it at a width equal to the height above the
+foot. The sail's shadow lands on the floor at the east end, so the run reads it
+off the east wall: 36 mm above the floor the wall's bounce is **6.29×** brighter
+under the sun than under the shadow, where the bed itself runs **7.53×** — the
+wall keeps **91%** of the shadow's depth in log terms. The closed form says why
+that number is a function of height: at 36 mm up, 91% of the face's own
+half-hemisphere is bed inside 300 mm, so an edge arrives as an edge; at 1.40 m
+up only 9% is inside a metre, so the same edge arrives as a two-metre gradient.
 
 **The conservation identity that guards it.** The bed → wall transfer is checked
 against the exact rectangle view factor the file has printed since wave 5 — the
@@ -519,6 +540,15 @@ green** — saturation 0.78 → 0.82 — which is the term doing what it does on
 risers: moving the colour more than the level. The ordering the photographs
 assert is not reached, and the inequality above says why. A third of that pixel
 is reflected sky (38% → 35%), which no receiver term touches.
+
+**The ordering is a prediction this mechanism makes, not a specification it was
+built to meet**, and it is worth being explicit that it was not reached and was
+not reached for. Every number above moved because a term that was physically
+absent is now present; none moved because anything was tuned. If the reader
+wants the ordering, the two places to look are the `0.30` open below — the dry
+band's own calibration, which is the *other* side of the pair and has no
+derivation — and the return leg, not this gather, which is at 0.77–0.87 of the
+ceiling arithmetic allows it.
 
 **Everything else that moved, and why.** Three things read the wall maps, so
 three things moved, and each is the wall map arriving somewhere rather than a

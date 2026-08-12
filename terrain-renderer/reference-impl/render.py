@@ -1702,6 +1702,15 @@ for wi in range(4):
 # ? is lifted to its own foot rather than left inside solid, so the map stays
 # ? finite and continuous there; nothing reads those texels except the bilinear
 # ? tap of their neighbours.
+#
+# NOTHING BELOW SETS A LEVEL. The only numbers this round introduces are these
+# two resolutions and the 0.5 partition; the 0.5 is derived and asserted twice
+# in validate.py, and these two are `?` -- they decide how finely the term is
+# SAMPLED and cannot change its size, since the estimator's weight integrates to
+# the same closure at any count. 288 along an 8 m wall is 28 mm against the
+# 204 mm caustic cell the run measures, so about seven samples per cell; 40 in
+# height is 35 mm against a field whose own scale is the height above the foot.
+# ? Neither ratio is derived, and neither was chosen by looking at the picture.
 WB_NU, WB_NZ = 288, 40
 WB_N = [np.array([1., 0.]), np.array([-1., 0.]),
         np.array([0., 1.]), np.array([0., -1.])]      # inward normals, x0 x1 y0 y1
@@ -1844,6 +1853,44 @@ for _wi, _nm in ((0, 'west  (x0)'), (1, 'east  (x1)'), (2, 'south (y0)'),
           "%s)   cau %.3f"
           % (_nm, np.round(_L, 3), np.round(_B, 3),
              np.round(SKY_AMB * WALL_SKY * .78, 3), wall[_wi][3][_k0:].mean()))
+# DOES THE BED'S OWN SHADOW ARRIVE, or only its mean? The gather reads
+# `bed_img` at each traced hit, not an average, so structure of every scale is
+# in it -- but a hemisphere integral is a low-pass whose width is the height
+# above the foot, and the closed form above says how wide: at 36 mm up, 91% of
+# the face's own half-hemisphere is bed inside 300 mm, so a shadow edge arrives
+# nearly as an edge; at 1.40 m up only 9% is inside a metre, so the same edge
+# arrives as a gradient two metres wide. The sail hangs west of the pool and the
+# sun is 21 deg in the west, so its shadow lands on the FLOOR at the east end --
+# which makes the east wall the one to read this on, and the measurement is the
+# wall's bounce against the sunlit fraction of the bed 120 mm in front of it.
+_ey = np.linspace(Y0, Y1, WB_NU)
+_esf = bed_sun(np.full_like(_ey, X1 - .12), _ey, -DEPTH)
+_ebn = WBNC[1][1, :, 1]
+_elo, _ehi = _esf < .10, _esf > .90
+if _elo.sum() > 4 and _ehi.sum() > 4:
+    print("  the sail's shadow, propagated onto a wall: along the east wall %.0f "
+          "mm above the floor, the bed 120 mm out is shadowed over %.1f m of the "
+          "%.0f m run. The wall's bounce reads %.3f under the shadow against "
+          "%.3f under the sun -- a factor %.2f, where the BED itself runs a "
+          "factor %.2f. So a shadow arrives as a shadow, at %.0f%% of its own "
+          "depth, and it is the receiver's hemisphere and not an average that "
+          "loses the rest."
+          % (1000 * (WB_Z[1] + DEPTH), _elo.mean() * (Y1 - Y0), Y1 - Y0,
+             _ebn[_elo].mean(), _ebn[_ehi].mean(),
+             _ebn[_ehi].mean() / max(_ebn[_elo].mean(), 1e-9),
+             (lambda b: b[_ehi].mean() / max(b[_elo].mean(), 1e-9))(
+                 sample(bed_img['mono'][..., 1:2], np.full_like(_ey, X1 - .12),
+                        _ey, X0, X1, Y0, Y1)[:, 0]),
+             100 * np.log(_ebn[_ehi].mean() / max(_ebn[_elo].mean(), 1e-9))
+             / max(np.log((lambda b: b[_ehi].mean() / max(b[_elo].mean(), 1e-9))(
+                 sample(bed_img['mono'][..., 1:2], np.full_like(_ey, X1 - .12),
+                        _ey, X0, X1, Y0, Y1)[:, 0])), 1e-9)))
+else:
+    print("  the sail's shadow does not reach the east wall's own foot this "
+          "frame (%.0f%% of the run is under 10%% sun, %.0f%% over 90%%), so "
+          "the shadow-propagation reading is not taken"
+          % (100 * _elo.mean(), 100 * _ehi.mean()))
+
 # THE CEILING ON THE BOUNCE, stated as an inequality so that nobody has to
 # discover it as a disappointment. A Lambertian floor's radiance does not depend
 # on where it is viewed from, so there is no sense in which a wall "catches" the
@@ -4846,6 +4893,18 @@ del _hdr
 # receiver the absorption regression is taken over -- so putting 8 into the same
 # array would have quietly redefined an existing calibration by removing its far
 # strip. Two arrays, one purity rule, nothing above this line moves.
+#
+# ? All three windows below are CHOICES about where to measure, not physics, and
+# ? they touch no pixel -- they select pixels that are already drawn. They are
+# ? marked because the provenance rule applies to a measurement's definition as
+# ? much as to a constant: someone reading a verdict is entitled to know that the
+# ? 100 mm and the 0.20-0.80 m were picked and not derived. For the record they
+# ? were not picked to flatter the result: splitting the wall at 100 mm made the
+# ? band this round is judged on DARKER (79.4 against 89.2 for the single
+# ? 0-250 mm strip it replaced), because the first centimetres sit in the
+# ? coping's shade. The split is there because the coping shades the sky over
+# ? that strip and not the bed bounce, so the two halves move differently and
+# ? averaging them hides which.
 WALL_BAND_Z = (0.100, 0.250)   # the two wall strips, 7 and 9
 WALL_FRONT = (0.20, 0.80)      # how far out from the wall region 8 is taken
 
