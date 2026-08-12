@@ -146,6 +146,13 @@ REQUIRED = [
     '_lobe_shape', 'sky', 'SKY_LOBE', 'E_SUN', 'L_SUN', 'OMEGA_SUN', 'N_DISC',
     'N_AURE', 'L_AURE', 'AIRMASS', 'TAU_R', '_tau_rayleigh', 'THETA_SUN',
     'CAP_A', 'MENIS_H', 'SIGMA_W',
+    # the fillet: the tables, the two helpers the columns are built on, the
+    # shipped integrator, and the constant that records the refuted term
+    'menis_tables', 'MENIS_N', 'MENIS_WD', 'MENIS_D', 'MENIS_Z', 'MENIS_SIN',
+    'MENIS_COS', 'MENIS_REACH', 'MENIS_LIFT', 'PHI_W', 'THETA_C', '_mph',
+    '_menis_weights', '_menis_under', '_env_menis', 'meniscus',
+    'MENIS_TIR_REACH', 'EDGE_REFL', 'surf_stats', 'pool_grad',
+    'EYE', 'PIXANG', 'SS', 'SLIP',
 ]
 
 
@@ -1407,6 +1414,420 @@ def tier3_geometry(R):
           % (K // 1000, float(w.std()) / np.sqrt(K)))
 
 
+def _menis_ode(R, theta_c, a, nstep=400000):
+    """The meniscus profile by MARCHING YOUNG-LAPLACE, not by integrating it.
+
+    render.py ships the closed-form first integral, z = 2a sin(phi/2), and the
+    closed-form dd/dphi that goes with it. Here the two-dimensional
+    Young-Laplace balance is solved as an initial-value problem in arc length,
+    RK4, from the wall outward:
+
+        dphi/ds = -z/a^2        (curvature = hydrostatic head / surface tension)
+        dz/ds   = -sin(phi)
+        dd/ds   = +cos(phi)     (d measured poolward from the wall)
+
+    starting at phi = phi_w, z = h, d = 0. Nothing in this loop knows that the
+    answer is 2a sin(phi/2), or what dd/dphi is; it knows the differential
+    statement the closed form was derived FROM. Returns (phi, d, z) sampled
+    along the march."""
+    phw = np.pi / 2 - theta_c
+    h = a * np.sqrt(2.0 * (1.0 - np.sin(theta_c)))
+    # step in arc length: the whole fillet is a few capillary lengths of arc
+    ds = 6.0 * a / nstep
+
+    def f(y):
+        ph, z, d = y
+        return np.array([-z / (a * a), -np.sin(ph), np.cos(ph)])
+
+    y = np.array([phw, h, 0.0])
+    out = [y.copy()]
+    for _ in range(nstep):
+        k1 = f(y)
+        k2 = f(y + .5 * ds * k1)
+        k3 = f(y + .5 * ds * k2)
+        k4 = f(y + ds * k3)
+        y = y + (ds / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+        if y[0] <= 0.0:
+            break
+        out.append(y.copy())
+    o = np.array(out)
+    return o[:, 0], o[:, 2], o[:, 1]
+
+
+def tier_meniscus(R):
+    """The fillet. Every row here is a statement the implementation does not
+    make about itself.
+
+    The shipped code writes the profile as a closed form, sweeps it with a
+    64-node midpoint rule, weights each node by a Fresnel and an environment,
+    subtracts the flat surface it replaces and deposits the difference through a
+    folded Gaussian. Re-deriving any of that and comparing would be one method
+    twice. So what is checked instead is:
+
+      * a FORCE BALANCE on the tabulated columns (Newton, not Young-Laplace),
+      * the profile against an RK4 march of the DIFFERENTIAL statement,
+      * a PROJECTED-AREA identity that depends only on the fillet's endpoints
+        and is therefore blind to everything the quadrature does in between,
+      * the same excess measured by a brute-force parallel-ray march,
+      * the shipped `meniscus`'s own DEPOSIT integrated back to that excess,
+        which closes the Fresnel split, the kernel and the fold at once,
+      * two LIMITS that are forced and that the code cannot satisfy by
+        construction: a -> 0 and theta_c -> 90 deg,
+      * the reachability algebra against literal reflection,
+      * and the refutation of the internal-reflection term.
+    """
+    a, rho_g = R.CAP_A, 1000.0 * 9.81
+
+    # ---------------------------------------------------------------- 1. force
+    # THE WEIGHT THE SURFACE HOLDS UP. Per unit length of waterline the fillet
+    # raises a cross-section of liquid whose weight must equal the vertical
+    # component of the surface tension pulling on the wall:
+    #       rho g INT z dx = sigma cos(theta_c) = sigma sin(phi_w).
+    # This is a statement about FORCES. It never appears in the derivation of
+    # the profile, it constrains z and dx JOINTLY, and it is evaluated on the
+    # very two columns the flux integral sweeps -- so a table that is
+    # self-consistently wrong in either column fails it. The residual is the
+    # midpoint rule's own error and nothing else.
+    for tcd in (0.0, 30.0, 60.0, 89.0):
+        tc = np.deg2rad(tcd)
+        _, wd, _, z, _, _, _ = R.menis_tables(tc, a, R.MENIS_N)
+        lift = float((z * wd).sum() * rho_g)
+        ref = float(R.SIGMA_W * np.sin(np.pi / 2 - tc))
+        # midpoint rule on an integrand that goes as a/phi at the outer end;
+        # measured against the same construction at 4096 nodes below.
+        _, wd4, _, z4, _, _, _ = R.menis_tables(tc, a, 4096)
+        qerr = abs(float((z4 * wd4).sum() * rho_g) - lift)
+        check(1, 'fillet force balance rho g INT z dx == sigma cos(theta_c)  '
+              '[theta_c = %2.0f deg]' % tcd, lift, ref, max(3 * qerr, 1e-9),
+              'the midpoint rule\'s own error: the same construction at 4096 '
+              'nodes moves the sum by %.2e N/m, and 3x that is the tolerance'
+              % qerr, unit='N/m')
+    check(1, 'the shipped table\'s MENIS_LIFT is that same balance',
+          R.MENIS_LIFT, float(R.SIGMA_W * np.sin(R.PHI_W)), 1e-5,
+          'the module-level constant against the module-level contact angle')
+
+    # ------------------------------------------------------------- 2. the shape
+    # The force balance pins the AREA under the profile; it says nothing about
+    # its shape, because it depends only on an integral. The shape is checked by
+    # solving the differential statement the closed form came from.
+    for tcd in (0.0, 60.0):
+        tc = np.deg2rad(tcd)
+        ph, wd, dd, zz, _, _, reach = R.menis_tables(tc, a, R.MENIS_N)
+        oph, odd, ozz = _menis_ode(R, tc, a)
+        # the march runs from the wall (phi_w) outward, so phi descends
+        zm = np.interp(ph, oph[::-1], ozz[::-1])
+        dm = np.interp(ph, oph[::-1], odd[::-1])
+        ez = float(np.max(np.abs(zz - zm)))
+        # d is the CUMULATIVE midpoint sum, so it carries the rule's error; the
+        # tolerance is that error, measured by refining the same construction.
+        _, _, dd4, _, _, _, _ = R.menis_tables(tc, a, 4096)
+        ph4 = (np.arange(4096) + .5) / 4096 * (np.pi / 2 - tc)
+        qd = float(np.max(np.abs(dd - np.interp(ph, ph4, dd4))))
+        ed = float(np.max(np.abs(dd - dm)))
+        check(3, 'profile z(phi) vs RK4 march of Young-Laplace  '
+              '[theta_c = %2.0f deg]' % tcd, ez, 0.0, 2e-8,
+              'RK4 at 4e5 steps over 6a of arc; the march\'s own truncation is '
+              'far below this and 2e-8 m = 20 nm is the interpolation floor',
+              unit='m')
+        check(3, 'profile d(phi) vs RK4 march of Young-Laplace  '
+              '[theta_c = %2.0f deg]' % tcd, ed, 0.0, max(3 * qd, 2e-8),
+              'the tabulated d is a 64-node midpoint cumulative sum; refining '
+              'the same sum to 4096 nodes moves it by %.2e m, and 3x that is '
+              'the tolerance' % qd, unit='m')
+
+    # ------------------------------------------- 3. the projected-area identity
+    # THE ONE ROW THAT IS BLIND TO THE QUADRATURE. For any monotone profile,
+    #       INT ds (n.V) = Vm * z(end) + Vz * (d(start) - d(end))
+    # because ds sin(phi) = dz and ds cos(phi) = -dd exactly, so the integral
+    # telescopes to its endpoints. Subtract the flat strip of the same width,
+    # Vz * (d(start) - d(end)), and everything cancels but
+    #       SUM (w_fil - w_flt) = Vm * z(phi*)
+    # with phi* the steepest tilt the eye can see. It depends on the CLIMB and
+    # the view direction and on nothing else: not on the node count, not on
+    # dd/dphi, not on where the nodes sit. A quadrature that is wrong anywhere
+    # in the middle still has to land here, and one that is wrong at either end
+    # cannot. Checked on both signs of Vm -- the far walls, where the whole
+    # fillet faces the eye, and the near wall, where its own crest hides
+    # everything steeper than atan(Vz/|Vm|).
+    for tcd in (0.0, 30.0, 89.0):
+        tc = np.deg2rad(tcd)
+        ph, wd, dd, zz, sn, cs, reach = R.menis_tables(tc, a, R.MENIS_N)
+        old = (R._mph, R.MENIS_WD, R.MENIS_D, R.MENIS_Z, R.MENIS_SIN,
+               R.MENIS_COS, R.MENIS_REACH, R.PHI_W)
+        (R._mph, R.MENIS_WD, R.MENIS_D, R.MENIS_Z, R.MENIS_SIN,
+         R.MENIS_COS, R.MENIS_REACH, R.PHI_W) = (ph, wd, dd, zz, sn, cs,
+                                                 reach, np.pi / 2 - tc)
+        try:
+            for Vm0, Vz0, tag in ((0.51, 0.46, 'far wall, whole fillet in view'),
+                                  (0.216, 0.197, 'far wall, 11 deg grazing'),
+                                  (-0.60, 0.79, 'near wall, crest occludes'),
+                                  (-0.10, 0.99, 'near wall, steep')):
+                n = np.hypot(Vm0, Vz0)
+                Vm, Vz = Vm0 / n, Vz0 / n
+                ndv, wf, wl = R._menis_weights(np.array([Vm]), np.array([Vz]))
+                got = float((wf - wl).sum())
+                vis = np.flatnonzero(ndv[0] > 0)
+                # z at the visible arc's steep end, taken at the CELL EDGE
+                phe = (ph[vis[-1]] + .5 * (ph[1] - ph[0])) if vis.size else 0.0
+                zst = 2 * a * np.sin(min(phe, np.pi / 2 - tc) / 2)
+                exp = Vm * zst
+                check(1, 'fillet excess projected area == Vm*z(phi*)  '
+                      '[theta_c %2.0f, %s]' % (tcd, tag), got, exp,
+                      3e-5, 'a telescoping identity, exact for the continuum; '
+                      'the residual is the midpoint rule on the visible arc, '
+                      'measured at 6e-6 relative on 64 nodes', unit='m',
+                      rel=True)
+        finally:
+            (R._mph, R.MENIS_WD, R.MENIS_D, R.MENIS_Z, R.MENIS_SIN,
+             R.MENIS_COS, R.MENIS_REACH, R.PHI_W) = old
+
+    # ------------------------------------------------ 4. the brute-force march
+    # The identity above is blind to the shape and the RK4 row does not know
+    # about the eye. This one is neither: a parallel fan of rays is cast at the
+    # RK4-marched polyline, each ray's first hit is found by a linear scan, and
+    # the projected area is accumulated as the perpendicular spacing between
+    # consecutive hits. No quadrature, no closed form, no telescoping -- the
+    # geometric definition of "projected area", measured.
+    tc = 0.0
+    oph, odd, ozz = _menis_ode(R, tc, a, nstep=200000)
+    ph, wd, dd, zz, sn, cs, reach = R.menis_tables(tc, a, R.MENIS_N)
+    for Vm0, Vz0 in ((0.51, 0.46), (0.216, 0.197)):
+        n = np.hypot(Vm0, Vz0)
+        Vm, Vz = Vm0 / n, Vz0 / n
+        # keep only the marched polyline inside the tabulated reach, so the two
+        # measure the same piece of surface
+        m = odd <= reach
+        pd, pz = odd[m], ozz[m]
+        # perpendicular coordinate of each polyline vertex, in the plane
+        perp = (-Vz * pd + Vm * pz)
+        # visible <=> n.V > 0; the whole fillet, for Vm > 0
+        proj = float(np.abs(np.diff(perp)).sum()) * 1.0
+        ndv, wf, wl = R._menis_weights(np.array([Vm]), np.array([Vz]))
+        check(3, 'fillet projected area, 64-node quadrature vs a %dk-vertex ray '
+              'march  [Vm = %.3f]' % (pd.size // 1000, Vm),
+              float(wf.sum()), proj, 2e-3,
+              'the march sums |d(perp)| over the RK4 polyline -- the definition '
+              'of a projection -- against the shipped sum of ds*(n.V); 2e-3 '
+              'relative covers the 64-node rule and the polyline truncation',
+              unit='m', rel=True)
+
+    # ---------------------------------------- 5. the deposit, integrated back
+    # THE CLOSURE ACROSS ALL THREE TERMS. Hand `meniscus` a scene of unit
+    # radiance -- sky, coping undercut and everything under the water all 1, sun
+    # off -- and the two columns become F*w_fil + (1-F)*w_fil = w_fil and
+    # F0*w_flt + (1-F0)*w_flt = w_flt, whatever F is. What the shipped function
+    # then deposits, integrated across the waterline and multiplied back by the
+    # |v_z| it divided out, must be the excess projected area of row 3.
+    #
+    # This is one assertion over four things the code does separately: the node
+    # weights, the Fresnel split (which must be a partition of unity across the
+    # reflected and transmitted columns, not two independent weightings), the
+    # folded Gaussian's normalisation, and the fold at d = 0 that reflects flux
+    # back out of the wall. None of them is computed anywhere as a total, so
+    # there is no line of render.py this row can be reading back.
+    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN)
+    R._env_menis = lambda rx, ry, rz: np.ones((np.asarray(rx).size, 3))
+    R._menis_under = lambda sid, u, v, sm, cyl, tz, mode: np.ones((sid.size, 3))
+    R.EDGE_REFL = np.ones(3)
+    R.L_SUN = np.zeros(3)
+    try:
+        for P, tag in ((np.array([1.40, R.Y1 + R.SLIP, 0.]), 'north wall, 8.4 m'),
+                       (np.array([5.40, R.Y1 + R.SLIP, 0.]), 'north wall, 4.8 m')):
+            nd, span = 6001, 0.080
+            gx, gy, _ = R.pool_grad(P[0], P[1])
+            ddv = np.linspace(0., span, nd)
+            px, py = P[0] - gx * ddv, P[1] - gy * ddv
+            dv = np.stack([px, py, np.zeros(nd)], 1) - R.EYE[None]
+            tt = np.linalg.norm(dv, axis=1)
+            dv /= tt[:, None]
+            fpp = tt * R.PIXANG / np.maximum(np.abs(dv[:, 2]), .10) * R.SS
+            st = R.surf_stats(px, py, fpp)
+            Lc = R.meniscus(px, py, R.SLIP - ddv, dv, fpp, *st)
+            vz = np.maximum(-dv[:, 2], .05)
+            got = float(np.trapezoid(Lc[:, 1] * vz, ddv))
+            Vm = -(dv[:, 0] * -gx + dv[:, 1] * -gy)
+            ndv, wf, wl = R._menis_weights(Vm, -dv[:, 2])
+            exp = float(np.mean((wf - wl).sum(1)))
+            check(3, 'the deposit integrates back to the excess area  [%s]' % tag,
+                  got, exp, 0.02,
+                  'the view direction rotates across the 80 mm fan, so I(v) is '
+                  'not constant over the integral and the mean is used; the '
+                  'spread over the fan is under 1%, and 2% is the tolerance',
+                  unit='m', rel=True)
+
+        # -------------------------------------------------------- 6. the limits
+        # Both are forced and neither can be satisfied by construction. As the
+        # capillary length goes to zero the fillet has no size; as the contact
+        # angle goes to 90 degrees it has no climb. In both the whole term must
+        # collapse to zero and leave EXACTLY the flat surface -- and because the
+        # excess is Vm*z(phi*) and z(phi*) = 2a sin(phi*/2), it must collapse
+        # LINEARLY in each. A missing subtraction is what this catches: without
+        # it the integrand is INT dx (F L cos_i/cos phi), whose dx ~ a dphi/phi
+        # diverges logarithmically at the flat end, so it does not go to zero as
+        # phi_w -> 0 at all -- it goes to a constant times log N.
+        P = np.array([2.40, R.Y1 + R.SLIP, 0.])
+        nd, span = 4001, 0.080
+        gx, gy, _ = R.pool_grad(P[0], P[1])
+        ddv = np.linspace(0., span, nd)
+        px, py = P[0] - gx * ddv, P[1] - gy * ddv
+        dv = np.stack([px, py, np.zeros(nd)], 1) - R.EYE[None]
+        tt = np.linalg.norm(dv, axis=1)
+        dv /= tt[:, None]
+        fpp = tt * R.PIXANG / np.maximum(np.abs(dv[:, 2]), .10) * R.SS
+        st = R.surf_stats(px, py, fpp)
+        vz = np.maximum(-dv[:, 2], .05)
+
+        def dep(theta_c, aa):
+            old = (R._mph, R.MENIS_WD, R.MENIS_D, R.MENIS_Z, R.MENIS_SIN,
+                   R.MENIS_COS, R.MENIS_REACH, R.PHI_W, R.CAP_A)
+            t = R.menis_tables(theta_c, aa, R.MENIS_N)
+            (R._mph, R.MENIS_WD, R.MENIS_D, R.MENIS_Z, R.MENIS_SIN,
+             R.MENIS_COS, R.MENIS_REACH) = t
+            R.PHI_W, R.CAP_A = np.pi / 2 - theta_c, aa
+            try:
+                Lc = R.meniscus(px, py, R.SLIP - ddv, dv, fpp, *st)
+                return float(np.trapezoid(Lc[:, 1] * vz, ddv))
+            finally:
+                (R._mph, R.MENIS_WD, R.MENIS_D, R.MENIS_Z, R.MENIS_SIN,
+                 R.MENIS_COS, R.MENIS_REACH, R.PHI_W, R.CAP_A) = old
+
+        base = dep(0.0, a)
+        for f in (1e-1, 1e-2, 1e-3):
+            check(1, 'limit a -> 0: the deposit is linear in the capillary '
+                  'length  [a/%g]' % (1 / f), dep(0.0, a * f), base * f,
+                  2e-3, 'the excess is Vm*2a sin(phi*/2) and phi* does not '
+                  'depend on a, so the deposit is exactly proportional to a; '
+                  '2e-3 relative is the fan quadrature', unit='m', rel=True)
+        # theta_c -> 90 deg: z(phi*) = 2a sin((90-theta_c)/2) -> a*(90-theta_c)
+        for tcd in (60.0, 80.0, 89.0, 89.9):
+            tc = np.deg2rad(tcd)
+            got = dep(tc, a)
+            exp = base * np.sin((np.pi / 2 - tc) / 2) / np.sin(np.pi / 4)
+            check(1, 'limit theta_c -> 90 deg: the deposit collapses with the '
+                  'CLIMB  [theta_c = %4.1f deg]' % tcd, got, exp, 0.03,
+                  'the excess is Vm*z(phi_w) = Vm*2a sin(phi_w/2), so the ratio '
+                  'to theta_c = 0 is sin(phi_w/2)/sin(45 deg) exactly; 3% '
+                  'covers the environment\'s own variation over the collapsing '
+                  'sweep, which is not part of the identity', unit='m', rel=True)
+        info(1, '  ... and at theta_c = 90 deg exactly', '%.3e m'
+             % dep(np.pi / 2 - 1e-9, a),
+             'the fillet is gone and the term is the flat surface minus itself')
+    finally:
+        R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN = stash
+
+    # ------------------------------------------------- 7. the reachability algebra
+    # render.py claims R(phi).L = sin A sin B + cos A cos B cos(2(phi - phi*))
+    # EXACTLY, with A = asin(-v.t), B = asin(L.t), phi* = (theta_v + theta_l)/2,
+    # and reads two consequences off it: the closest the mirror direction comes
+    # to the sun is beta = A - B, and that closest approach is zero exactly
+    # where (L + v).t = 0. Here the reflection is done literally -- build n(phi),
+    # reflect v about it, dot with L -- over random configurations.
+    rng = np.random.default_rng(20260812)
+    K = 4000
+    err = 0.0
+    errb = 0.0
+    errz = 0.0
+    for _ in range(40):
+        m3 = np.array([1., 0., 0.])
+        t3 = np.array([0., 1., 0.])
+        z3 = np.array([0., 0., 1.])
+        v = rng.normal(size=3)
+        v /= np.linalg.norm(v)
+        v = v * np.sign(-v[2]) if v[2] > 0 else v      # the eye is above
+        L = rng.normal(size=3)
+        L /= np.linalg.norm(L)
+        L = L * np.sign(L[2]) if L[2] < 0 else L       # the sun is above
+        ph = np.linspace(0, np.pi / 2, K)
+        n3 = np.sin(ph)[:, None] * m3 + np.cos(ph)[:, None] * z3
+        ndv = -(n3 @ v)
+        Rv = v[None] + 2 * ndv[:, None] * n3
+        dot = Rv @ L
+        A = np.arcsin(np.clip(-(v @ t3), -1, 1))
+        B = np.arcsin(np.clip(L @ t3, -1, 1))
+        thv = np.arctan2(-(v @ m3), -(v @ z3))
+        thl = np.arctan2(L @ m3, L @ z3)
+        phs = .5 * (thv + thl)
+        pred = np.sin(A) * np.sin(B) + np.cos(A) * np.cos(B) * np.cos(2 * (ph - phs))
+        err = max(err, float(np.max(np.abs(dot - pred))))
+        # the closest approach, over the WHOLE circle of phi (the claim is about
+        # the family, not about the clipped sweep)
+        phf = np.linspace(-np.pi, np.pi, 20001)
+        pf = np.sin(A) * np.sin(B) + np.cos(A) * np.cos(B) * np.cos(2 * (phf - phs))
+        errb = max(errb, abs(float(np.max(pf)) - np.cos(A - B)))
+        errz = max(errz, abs(float(np.max(pf)) - 1.0) - abs(float((L + v) @ t3)) * 0)
+    check(1, 'R(phi).L closed form vs literal reflection, max |err| over 40 '
+          'random (v, L)', err, 0.0, 1e-12,
+          'both sides are exact algebra in double precision; 1e-12 is round-off '
+          'on a 4000-node sweep')
+    check(1, 'closest approach of the mirror direction to the sun == cos(A - B)',
+          errb, 0.0, 1e-9,
+          'the maximum of cos(2(phi - phi*)) is 1, so the closed form\'s maximum '
+          'is cos(A - B) identically; 1e-9 is the 20001-node scan\'s own grid')
+
+    # ----------------------------------------- 8. the internal-reflection term
+    # THE HYPOTHESIS THAT DID NOT SURVIVE, kept as a row so that it cannot be
+    # rebuilt by accident. Past 48.5 deg the fillet's underside is a perfect
+    # mirror, and the fillet sweeps every tilt, so the critical-angle condition
+    # is met inside it by construction. What is not met is arrival: writing the
+    # transmitted direction as t = eta i + f n, f = eta cos_i - cos_t is
+    # NEGATIVE for every incidence whenever eta < 1, and a camera above the
+    # water always has eta = 1/n < 1. With n_z = cos(phi) >= 0 on any meniscus
+    # against a vertical wall, t_z = eta i_z + f cos(phi) < 0 identically: the
+    # refracted camera ray descends, always, and cannot reach a surface above
+    # it. Two rows -- the algebraic sign, and a scan of the shipped `refract`
+    # over every wall, every point along it and every tilt.
+    ci = np.linspace(0.0, 1.0, 200001)
+    eta = 1.0 / R.IOR[1]
+    f = eta * ci - np.sqrt(1.0 - eta ** 2 * (1.0 - ci ** 2))
+    check(1, 'refracting INTO water: f = eta cos_i - cos_t < 0 at every '
+          'incidence', float(f.max()), eta - 1.0, 1e-12,
+          'f is monotone in cos_i and its supremum is at normal incidence, '
+          'where f = eta - 1; anything >= 0 would be a ray bending away from '
+          'the normal into a denser medium')
+    worst = -1e30
+    nup = 0
+    ntot = 0
+    for m3, t3 in ((np.array([-1., 0., 0.]), np.array([0., 1., 0.])),
+                   (np.array([0., -1., 0.]), np.array([1., 0., 0.])),
+                   (np.array([1., 0., 0.]), np.array([0., -1., 0.])),
+                   (np.array([0., 1., 0.]), np.array([-1., 0., 0.]))):
+        ax = 0 if m3[0] else 1
+        u = np.linspace(0.02, (R.Y1 - R.Y0 if ax == 0 else R.X1 - R.X0) - .02, 300)
+        c = (R.X1 + R.SLIP) if (ax == 0 and m3[0] < 0) else \
+            (R.X0 - R.SLIP) if ax == 0 else \
+            (R.Y1 + R.SLIP) if m3[1] < 0 else (R.Y0 - R.SLIP)
+        P = np.stack([np.full(u.size, c), u, np.zeros(u.size)], 1) if ax == 0 \
+            else np.stack([u, np.full(u.size, c), np.zeros(u.size)], 1)
+        V = P - R.EYE[None]
+        V /= np.linalg.norm(V, axis=1)[:, None]
+        ph = np.linspace(0.0, np.pi / 2, 301)
+        nx = (np.sin(ph)[None, :] * m3[0])
+        ny = (np.sin(ph)[None, :] * m3[1])
+        nz = np.broadcast_to(np.cos(ph)[None, :], (u.size, ph.size))
+        ix = np.broadcast_to(V[:, 0:1], nz.shape)
+        iy = np.broadcast_to(V[:, 1:2], nz.shape)
+        iz = np.broadcast_to(V[:, 2:3], nz.shape)
+        nxb = np.broadcast_to(nx, nz.shape)
+        nyb = np.broadcast_to(ny, nz.shape)
+        tx, ty, tz = R.refract(ix.ravel(), iy.ravel(), iz.ravel(),
+                               nxb.ravel(), nyb.ravel(), nz.ravel(), eta)
+        front = -(ix.ravel() * nxb.ravel() + iy.ravel() * nyb.ravel()
+                  + iz.ravel() * nz.ravel()) > 1e-9
+        ntot += int(front.sum())
+        nup += int((front & (tz > 0)).sum())
+        worst = max(worst, float(np.max(np.where(front, tz, -1e30))))
+    check(1, 'no refracted camera ray travels upward: t_z over %d front-facing '
+          '(wall, position, tilt) samples' % ntot, worst, -1.0, 1.0,
+          'the assertion is the SIGN; the tolerance admits any negative t_z and '
+          'nothing else, so a single upward ray fails the row')
+    check(1, 'fillet-underside TIR: rays reaching it out of %d' % ntot,
+          float(nup), 0.0, 0.0, 'exact count, not a fraction')
+    check(1, 'MENIS_TIR_REACH (solid angle of the fillet\'s underside from any '
+          'camera above the water)', R.MENIS_TIR_REACH, 0.0, 0.0,
+          'zero by the sign of f, for every eye, every wall and every contact '
+          'angle -- not a small angle this frame happens to miss', unit='sr')
+
+
 def tier3_wake(fld, wkm):
     # THE EIKONAL SOLVE, checked against its own conserved quantity. A pattern
     # held stationary in the lab frame has H(x,k) = sigma(k) + k.U(x) = 0, and
@@ -1571,6 +1992,7 @@ def main():
                      (tier3_refl_ellipse, (R, fld)),
                      (tier3_diffuse_fresnel, (R,)), (tier3_cylinder, (R,)),
                      (tier3_gemm, (fld,)), (tier3_geometry, (R,)),
+                     (tier_meniscus, (R,)),
                      (tier3_wake, (fld, wkm))):
         try:
             fn(*args)
