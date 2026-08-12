@@ -87,10 +87,11 @@ the reference implementation or read off a photograph, not supposed.
 | A shadowed region on the bed is a dark hole | The sun-visibility gate treated as **binary** when the occluder is fabric or foliage. Shade cloth transmits ~15–30% *diffusely*: the caustic term is still gated hard to zero, and an ambient term belongs underneath it | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | The caustic pattern plays across a shadow on the bed | The same gate missing altogether, or sampled at the **receiver** instead of at the surface entry point — metres apart at low sun. Nothing else announces "this is a scrolling texture" so loudly | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | Caustics keep moving after the water has gone calm | An authored or cell-noise caustic, **uncorrelated with the surface above it**. A flat surface has a constant Jacobian and produces no caustic structure at all | [The tier ladder](#the-tier-ladder) |
-| The caustic net fades while the water still looks perfectly clear | Rising `b`, and this is scattering's **first** symptom: contrast along the sun path halves at `b ≈ 0.35 m⁻¹`, where Secchi depth is still ~3 m. A body colour is the *fourth* symptom, not the first | [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from) |
+| The caustic net fades while the water still looks perfectly clear | Rising `b`, and this is scattering's **first** symptom: contrast along the sun path halves at `b ≈ 0.35 m⁻¹`, where Secchi depth is still ~3 m. A body colour is the *fourth* symptom, not the first | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
 | A caustic net still pin-sharp at 20 m, or blurred away in a 1.5 m pool | A penumbra kernel **computed at one depth and reused**. The sun's disc sets ~0.7 cm of blur per metre; every depth-derived quantity is a *function* the moment the body has a slope, a step or a bench | [Caustics](#caustics-the-other-half-of-the-light-path) |
+| The submerged bed reads far murkier than the water column above it, or the column far clearer than the bed | **One extinction coefficient driving both paths.** The sightline through the bed is beam attenuation `c`; the depth-tinted column is diffuse attenuation `K_d`; they differ by 5–20×, so a single constant has one of the two wrong by that factor and no value of it is right | [Shading and optics](#shading-and-optics) |
 | Water uniformly coloured whatever the depth | The depth field ignored — absorption run off a **constant instead of the bathymetry**, so the shallow→deep ramp, the strongest realism cue water has, never happens | [Shading and optics](#shading-and-optics) |
-| Deep clear water rendered bright cyan | Reflectance goes as `b_b/a`, and in clear water `b_b` is molecular and tiny: deep clear water is **near-black**. Bright cyan is *shallow* water over a bright bottom | [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from) |
+| Deep clear water rendered bright cyan | Reflectance goes as `b_b/a`, and in clear water `b_b` is molecular and tiny: deep clear water is **near-black**. Bright cyan is *shallow* water over a bright bottom | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
 | A pool that looks the same over every liner, and at every depth | Its colour was art-directed into the **scatter term**. Treated water has `b_b ≈ 0` and no body colour of its own; what is seen is bottom albedo attenuated over the down-and-back path | [Pool optics](#pool-optics-the-colour-is-the-bottom-not-the-water) |
 | No bright line where the water meets a wall, a jetty or a stone | The meniscus modelled as an **ambient or roughness lift** rather than a specular strip. A few millimetres of fillet holds every facet orientation, which is why that line survives sun-and-camera geometry nothing else in the frame can reach | [The meniscus line](#the-meniscus-line-where-reachability-cannot-fail) |
 | Objects above the water smear into it — a dock post, a torso, the coping | The refracted sample was **not depth-rejected**, so it landed on geometry nearer than the water surface | [Shading and optics](#shading-and-optics) |
@@ -116,7 +117,7 @@ inputs, and the doctrine is that they are *sufficient*:
 | Water depth | Scalar field: `waterSurface - solidTop`, 0 on dry land | Absorption ramp, shoaling, shoreline fade, sim boundary |
 | Flow / velocity | 2D vector field (m/s), from routing + discharge, plus the nearshore surface circulation — longshore current, rip jets, inlet/river-mouth jets (terrain-architect `12`) | Flow-map advection, foam alignment, particle steering, sim boundary inflow, wave–current interaction |
 | Shore distance | Signed/unsigned distance to the waterline | Shoreline foam bands, wet-sand band (`13`/`14`), LOD bias near the line |
-| `liquidBody[i]` | Per-body record (terrain-architect `28`, registered in its `08`/`27`): `bodyType` (sea / lake / pond / river / stream / estuary / wetland), `ior`, derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour), the fetch/exposure field for enclosed water, causal state, QA fields (Secchi, Jerlov/Forel-Ule class) | **`bodyType` selects the surface model**: sea gets swell + tide + nearshore circulation; a lake gets **fetch-limited wind waves only** — no swell, no current (suppress the residual-swell component of [Calm water](#calm-water-the-low-energy-regime) on lakes, and scale the wave spectrum by the fetch field); rivers get flow. Also **the source of `sigmaPerBody`, `scatterColorPerBody`, and the Fresnel `F0`** — see [Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from). `ior` drives surface Fresnel and refraction bending (never hardcode 1.33); beam attenuation `c` drives sharp sightlines; `K_d` drives the diffuse depth column |
+| `liquidBody[i]` | Per-body record (terrain-architect `28`, registered in its `08`/`27`): `bodyType` (sea / lake / pond / river / stream / estuary / wetland), `ior`, derived optics (`a_RGB`, `b_b_RGB`, `c_RGB`, `K_d_RGB`, scatter colour), the fetch/exposure field for enclosed water, causal state, QA fields (Secchi, Jerlov/Forel-Ule class) | **`bodyType` selects the surface model**: sea gets swell + tide + nearshore circulation; a lake gets **fetch-limited wind waves only** — no swell, no current (suppress the residual-swell component of [Calm water](#calm-water-the-low-energy-regime) on lakes, and scale the wave spectrum by the fetch field); rivers get flow. Also **the source of the medium's IOPs and of the surface's `specular_ior`** — see [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from), and [the vocabulary rule](#the-vocabulary-and-which-half-of-it-you-can-look-up) for why the record's own field names are kept while what they feed is named in OpenPBR and IOP terms. `ior` populates `specular_ior`, which drives surface Fresnel and refraction bending (never hardcode 1.33); beam attenuation `c` drives sharp sightlines; `K_d` drives the diffuse depth column |
 
 The solid terrain below the water is real terrain — bathymetry generated to dry-land standards —
 and it is the collision floor, the refraction target, and the depth source. Two hard rules fall
@@ -444,7 +445,7 @@ misclassification tell (the handoff table above; terrain-architect `03`).
 spray is absent (below Force 5), whitecap machinery contributes nothing, and displacement is
 negligible — so the geometry and foam budgets collapse and can be spent on reflection quality
 instead. What does *not* vanish is the water-body optics of
-[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from):
+[Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from):
 with no surface agitation to scatter light, depth-dependent absorption and the bottom return are
 the entire look of a calm shallow lake.
 
@@ -677,7 +678,7 @@ jacuzzi water and surf usually get the same wrong effect:
 | Also throws | **spray** — water in air, a third medium | nothing |
 
 The plume case is the one that needs the `a`/`b`/`g` split rather than a collapsed `sigma`, and it
-is the same machinery as [turbid water](#water-body-optical-identity-where-sigma-actually-comes-from)
+is the same machinery as [turbid water](#water-body-optical-identity-where-the-iops-come-from)
 run to its high end. Note also which fittings do this: a pool's filtration return is submerged and
 pumps *water*, so it does not foam; a jacuzzi fitting deliberately aspirates air, which is a
 different fitting rather than a stronger one.
@@ -719,8 +720,8 @@ them.
 **Aerated water changes the water's own optics, not just its albedo.** Where bubble density is
 high, scattering swamps absorption: the body colour washes out toward white, transparency
 collapses, and the depth-based colour ramp of
-[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from)
-stops applying. Practically, blend `sigma`/scatter toward a high-albedo, high-scattering,
+[Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from)
+stops applying. Practically, blend the IOPs toward a high-albedo, high-scattering,
 short-mean-free-path set as the aeration mask rises, and drive Fresnel to zero underneath. Foam
 that still reflects the sky is an instant tell.
 
@@ -864,7 +865,9 @@ surface is a nearly flat sheet with ripples on it.
 ### The wave field is a driven basin, not a spectrum
 
 A directional wind spectrum on a sheltered pool is plausible and wrong in a way a photograph
-exposes immediately. Pool water is organised by the plumbing and the walls.
+exposes immediately. Pool water is organised by the plumbing and the walls. "**Driven basin**" is
+this chapter's phrase for that, not a term of art (`?`); the construction under it is standard room
+acoustics, and the physics is the ordinary capillary–gravity kind.
 
 - **The source is the filtration return; the walls send it all back.** The inlet jets inject a
   narrow band of gravity waves — order 10–30 cm — continuously from a fixed point whenever the pump
@@ -983,7 +986,7 @@ Forel-Ule index, chlorophyll and CDOM — and **a treated pool belongs to none o
 Filtration and flocculation remove precisely the particles that scatter: `b_b → ≈ 0`, `c → a`, and
 Secchi depth exceeds the body depth by design. With `b_b ≈ 0` the **scatter-colour term is
 essentially zero** — a pool has no body colour of its own, and a shader that derives its colour
-from `scatterColor` is structurally incapable of rendering one.
+from `L_scatter` is structurally incapable of rendering one.
 
 **What the treatment actually puts in, and why none of it shows.** "Treated water" is doing real
 work in that sentence, and it is the first thing a sceptical reader challenges:
@@ -1013,7 +1016,7 @@ work in that sentence, and it is the first thing a sceptical reader challenges:
 The colour is **bottom albedo attenuated over the down-and-back path**. For a near-vertical view of
 a 1.5 m floor the light crosses ~3.0 m of water, and pure-water absorption at this chapter's RGB
 sample points ([Water-body optical
-identity](#water-body-optical-identity-where-sigma-actually-comes-from)) does the rest:
+identity](#water-body-optical-identity-where-the-iops-come-from)) does the rest:
 
 ```
 depth 1.5 m -> round trip 3.0 m,  transmittance = exp(-a * 3.0)
@@ -1040,19 +1043,21 @@ all of the change. A strong hue shift across a pool floor is an artifact, not a 
 
 A pool is a **boundary** and a **medium**, and a renderer needs both stated. The medium is the
 `a`/`b`/`g` this chapter already demands from
-[`liquidBody`](#water-body-optical-identity-where-sigma-actually-comes-from); in treated water it
-is pure water and nothing else, so it is not a choice. **The boundary is the choice, and it is the
+[`liquidBody`](#water-body-optical-identity-where-the-iops-come-from); in treated water it
+is pure water and nothing else, so it is not a choice — the same three inherent optical properties
+under the [vocabulary rule](#the-vocabulary-and-which-half-of-it-you-can-look-up), never a tint. **The boundary is the choice, and it is the
 one that decides what the pool looks like** — because with `b_b ≈ 0` the water can only subtract,
 so every photon that reaches the eye from below has been off the liner.
 
 So the contract is two lines, and the second is the interesting one:
 
-    liquidBody : a(lambda), b(lambda), g          # the medium -- pure water, for a treated pool
-    poolLiner  : rho(lambda), sheen               # the boundary -- spectral albedo, and wet vs dry
+    medium : a(lambda), b(lambda), g                        # IOPs -- pure water, for a treated pool
+    liner  : base_color, base_weight, specular_roughness    # the boundary -- albedo, and wet vs dry
 
 **Liner albedo is not proportional to what you see, and that surprises people.** Light that returns
 from the liner meets the underside of the surface, where a diffuse internal reflectance of
-`R_int ≈ 0.476` sends about half of it back down for another bounce. That trapped series is
+`R_int ≈ 0.476` sends about half of it back down for another bounce. That trapped series — the
+ordinary geometric interreflection sum, under a name that is this chapter's own — is
 `1/(1 − ρ·R_int)`, so its *gain* rises with the albedo — and a dark liner therefore loses twice,
 once on each return and again on the bounces it never gets:
 
@@ -1096,19 +1101,30 @@ becomes exactly `transmission_color` `T`, so
 This chapter's pool, written out (`D`, from `a = (0.2617, 0.05299, 0.01022) m⁻¹`):
 
     base_color            (0.24, 0.54, 0.70)     # the liner -- the choice that sets the colour
-    specular_ior          1.333
+    base_weight           1.0
+    specular_ior          1.333                  # water; never the generic dielectric 1.5
     transmission_depth    1.0                    # metres; the scale is free, T follows
     transmission_color    (0.770, 0.948, 0.990)  # ... or (0.351, 0.809, 0.960) at depth 4.0
-    transmission_scatter  (0, 0, 0)              # b_b ~ 0 in treated water
+    transmission_scatter  (0, 0, 0)              # b ~ 0 in treated water
     transmission_scatter_anisotropy  g           # only once the water is not treated
 
-Note what that makes visible: **`transmission_scatter` is the turbidity axis**, and setting it
-non-zero is the same act as leaving Case 1 water — it is where a pool becomes a lake.
+Note what that makes visible: **`transmission_scatter` is the turbidity axis** — it is `b`, with
+`transmission_scatter_anisotropy` carrying `g` — and setting it non-zero is the same act as leaving
+Case 1 water: it is where a pool becomes a lake.
+
+**There is no `waterColor` in that list, and the absence is the doctrine.** A parameter with that
+name invites precisely the error the section above exists to prevent, because a colour multiplied
+into a medium is not a distance and knows nothing about one: it gives water that stays coloured in
+shadow, does not deepen with depth, and cannot be made pale by a white bottom. The transmission
+*pair* cannot express that mistake — `transmission_color` means nothing without
+`transmission_depth`, which is the entire reason it is written as two values and not one swatch.
 
 **Where the mapping stops, and it stops early.** A standard surface model describes *one material
-with a homogeneous interior bounded by its own surface*. A body of water is not that. It is a
-**medium bounded by two different materials** — the wave surface above and the liner below — and
-several of this chapter's central problems live in the gap:
+with a homogeneous interior bounded by its own surface* — MaterialX draws the same picture from the
+other end, layering a transmissive BSDF over a volume distribution function whose own documented
+example is "colored glass or turbid water" (`P`). A body of water is not that. It is a **medium
+bounded by two different materials** — the wave surface above and the liner below — and several of
+this chapter's central problems live in the gap:
 
 - **The bed is not the material's own back face.** Its depth varies, and the medium's path length is
   a field over the surface, not a thickness of the object.
@@ -1126,6 +1142,64 @@ So: take the *material* half from OpenPBR and let it be authored the way everyth
 scene is; keep the *transport* half here. The division is exactly this chapter's tier ladders — and
 a project that expects its material model to deliver the second half will discover the shortfall at
 the point where the water starts to matter.
+
+### The vocabulary, and which half of it you can look up
+
+That division is also the naming rule, and this chapter takes **both** halves from existing
+standards rather than coining a house style. The point of borrowing a vocabulary is that a reader
+can look a term up; a coined name that merely *looks* borrowed defeats it, and sends someone
+hunting through a material browser for a quantity that was never going to be there.
+
+- **The interface is OpenPBR** (`P`): `base_color`, `base_weight`, `specular_ior`,
+  `specular_roughness`, `transmission_color`, `transmission_depth`, `transmission_scatter`,
+  `transmission_scatter_anisotropy`. A name from that list means what OpenPBR says it means and is
+  authorable in a material editor.
+- **The medium is IOPs** — ocean optics' *inherent* optical properties, so called because they
+  belong to the water alone and not to the light falling on it: absorption `a`, scattering `b`,
+  backscattering `b_b`, beam attenuation `c = a + b`, and the phase function with its asymmetry
+  `g`, the coefficients in m⁻¹. These are measurable, they are what the literature tabulates, and
+  they are what [Water-body optical
+  identity](#water-body-optical-identity-where-the-iops-come-from) spends its length on.
+- **What a renderer computes from them are AOPs** — *apparent* optical properties, which depend on
+  the medium **and** on the illumination geometry: diffuse attenuation `K_d`, reflectance, the
+  radiance a column returns. An IOP can be authored; an AOP is a result, and authoring one directly
+  is the same category error as `waterColor`.
+
+The IOP/AOP split is Preisendorfer's and is the standard division in the field (`P`) — the same
+material/transport line, drawn decades before anyone was rendering water by people who were
+measuring it. So no house prefix and no invented parameter names are needed anywhere:
+**OpenPBR names the boundary, IOPs name the medium, AOPs name what comes back, and everything left
+over is a pass.**
+
+**Three terms in this chapter are its own coinage, and are labelled so you do not go looking for
+them.** A coinage that reads like a standard is worse than one that admits it:
+
+| Term | Status |
+|---|---|
+| **Focusing number** `F = 0.25·d·s·k` | **Ours.** Every ingredient is standard — ray deflection, the Jacobian, catastrophe theory's folds and cusps — but the dimensionless group and its four rungs are assembled here, and no established name for it was found (`?`). Useful enough to keep; never cite it as literature |
+| **Driven basin**, for pool waves as a forced reverberant response rather than a spectrum | **Ours.** The construction is carried over from room acoustics, where early-reflections-plus-diffuse-tail is standard practice; the phrase is not a term of art in water rendering (`?`) |
+| **Trapped series**, for the interreflection sum `1/(1 − ρ·R_int)` | **Ours** as a *name* only. The sum is the ordinary geometric interreflection series and `R_int ≈ 0.476` is a standard internal-reflectance figure |
+
+Everything else that reads like jargon is standard, and knowing the field it comes from is what
+lets you check it. **Radiance, irradiance and radiant intensity** are SI radiometry and are used
+here *exactly*: the `1/n²` factors in the caustic budget and in [Underwater, a load-time constant
+is two constants](#underwater-a-load-time-constant-is-two-constants) are radiance-conservation
+bookkeeping and nothing else, and a renderer that treats radiance as a synonym for brightness drops
+them silently. **BSDF/BRDF/BTDF**, **Fresnel reflectance and transmittance**, the **critical angle**
+and **Snell's window** are optics; **mean square slope** is Cox & Munk's own term; **capillary
+length** and **Young–Laplace** are surface physics; **eikonal**, **Hamiltonian** and **wave action**
+are wave mechanics; **optical depth**, **single-scattering albedo**, **Secchi depth**, **Jerlov
+type** and **Case 1 / Case 2 water** are ocean optics. **Turbidity** is standard as well — as a
+*water-quality* measure in NTU — which is exactly why it is the wrong shader parameter: one
+nephelometric scalar cannot carry two independent axes, and the pitfall list has two entries about
+what happens when it is asked to.
+
+A third kind of name appears in the [UE Water plugin
+section](#engine-native-water-the-ue-water-plugin-read-as-architecture) — `Water Zone`, `Water Info
+Texture`, `Single Layer Water`, `PhaseG`, `Tile Size`, `N Points Per Frame`. **Those are Epic's
+names for Epic's things**, quoted verbatim so the section can be checked against the documentation,
+and deliberately not translated. The same holds for `liquidBody[i]` and its fields, which are
+terrain-architect's export names, not this chapter's.
 
 ### The rest of the man-made checklist
 
@@ -1160,7 +1234,7 @@ color = lerp(refracted_underwater, reflected_environment, Fresnel(NdotV))
   distance-filtering problems compound it. But natural liquids span IOR ~1.31–1.47 (ice → seawater
   → brine → oil), i.e. `F0` from ~0.018 to ~0.036 — a **2× reflectance spread**, so a brine pool
   reflects visibly more than the lake beside it. Take `ior` from the `liquidBody` descriptor
-  (terrain-architect `28`) rather than hardcoding 1.33. Use the roughness-aware
+  (terrain-architect `28`) into `specular_ior` rather than hardcoding 1.33. Use the roughness-aware
   form of [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) at
   grazing angles; the `F0 = ((n−1)/(n+1))²` derivation and the amplitude-Fresnel details route to
   physically-based-rendering.
@@ -1188,30 +1262,36 @@ float3 refracted = SceneColor.Sample(s, uvR).rgb;
 ```
 
 - **Absorption and scattering with depth**: extinguish the refracted color per channel with the
-  water-traversal distance — `exp(-sigma * dist)` with `sigma.r > sigma.g > sigma.b` for natural
-  water — and blend toward a scattering color as extinction saturates. The traversal distance
-  comes from scene depth vs surface depth along the view ray *and* from the exported depth field
-  for the vertical component; the shallow→deep color ramp is the single strongest realism cue
-  water has, and it is entirely a function of the generator's bathymetry. Flat-colored water is
-  almost always a missing/ignored depth field.
+  water-traversal distance — Beer–Lambert on `c`, whose red component exceeds green exceeds blue
+  for natural water — and add the column's own returned radiance as that transmission saturates.
+  The traversal distance comes from scene depth vs surface depth along the view ray *and* from the
+  exported depth field for the vertical component; the shallow→deep color ramp is the single
+  strongest realism cue water has, and it is entirely a function of the generator's bathymetry.
+  Flat-colored water is almost always a missing/ignored depth field.
 
 ```hlsl
 float rayDistance   = max(SceneLinearDepth(bottomUV) - waterLinearDepth, 0.0); // metres in water
 float verticalDepth = WaterDepth(worldXZ);                                     // bathymetry field
-float3 T             = exp(-sigmaPerBody * rayDistance);                        // Beer-Lambert
-float3 waterColor    = refracted * T + scatterColorPerBody * (1.0 - T);
+
+float3 T_beam  = exp(-c_RGB   * rayDistance);    // beam attenuation: the bed's OWN radiance
+float3 T_diff  = exp(-K_d_RGB * verticalDepth);  // diffuse attenuation: the light column
+float3 L_water = refracted * T_beam + L_scatter * (1.0 - T_diff);
 
 shoreMask   = saturate(verticalDepth / shoreFadeDepth);
 causticMask = 1.0 - saturate(verticalDepth / causticFadeDepth);
 ```
 
-`rayDistance` controls optical extinction along the camera path; `verticalDepth` controls the
-shore regime, caustic survival, and shallow-wave response. They are related but not
-interchangeable. `sigma` and scatter color belong to the water-body descriptor — ocean, clear
-lake, and turbid river must not share one global absorption constant. What that descriptor
-contains, and where its numbers come from, is
-[Water-body optical identity](#water-body-optical-identity-where-sigma-actually-comes-from)
-at the end of this section.
+Three things about that block. `rayDistance` controls extinction along the camera path;
+`verticalDepth` controls the shore regime, caustic survival, and shallow-wave response — related,
+never interchangeable. The two terms are **not** a lerp and their weights do not sum to one: they
+are two transport paths, not two ends of a blend. And **`c` and `K_d` are two coefficients, not
+one** — the trap named in
+[Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) below, easy to
+ship because one lumped extinction looks reasonable until someone measures it. `c` runs 5–20×
+larger than `K_d`, so whichever of the two a single constant was fitted to, the other term is wrong
+by that factor. `L_scatter` is the radiance the column returns: an **AOP**, computed from `b_b`,
+`K_d` and the incident irradiance, never an authored swatch. All of it belongs to the water-body
+descriptor — ocean, clear lake, and turbid river must not share one global constant.
 - **Foam** is three masks with one compositor: shoreline foam (depth + shore distance, advected
   along shore tangent), whitecaps (Jacobian, above), flow foam (rivers, above). Composite as an
   opaque-ish albedo layer that *kills* the Fresnel reflection under it — foam is scattering
@@ -1222,7 +1302,7 @@ at the end of this section.
   is the inverse Jacobian of the refracted-ray map, it multiplies the sun term rather than the
   albedo, and it is gated by sun visibility **at the surface**, not at the receiver.
 - **Underwater camera state** is a real state machine, not a fog tweak: on submersion switch to
-  underwater fog (aggressive, chromatic, from the same `sigma`), render the surface from below
+  underwater fog (aggressive, chromatic, from the same IOPs), render the surface from below
   (total internal reflection outside **Snell's window** — for water→air the critical angle is
   `arcsin(1/1.33) ≈ 48.6°`, so the whole above-water world compresses into a ~97°-wide bright
   circle overhead and everything outside it mirrors the bottom; a cheap, high-value cue), and
@@ -1269,12 +1349,15 @@ dome. A frame whose halves match while claiming a flat port has not chosen a por
 magnification is the *interface*, not the water: a camera fully submerged with no port sees none,
 because nothing refracts between it and the subject.
 
-### Water-body optical identity: where `sigma` actually comes from
+### Water-body optical identity: where the IOPs come from
 
-Most water shaders expose `sigma` and a scatter colour as art-directed swatches. They are
-measurable physical quantities, and picking them from oceanography instead of from a colour
-picker is the cheapest realism win in the whole chapter — it is what separates "blue-tinted
-glass" from *this specific water*. The generation-side producer of this descriptor is
+Most water shaders expose one lumped `sigma` and a scatter colour as art-directed swatches. Both
+are the wrong shape: the quantities underneath are **inherent optical properties**, they are
+measured rather than picked, and taking them from oceanography instead of from a colour picker is
+the cheapest realism win in the whole chapter — it is what separates "blue-tinted glass" from
+*this specific water*. (`sigma` is also worth retiring on its own account: this chapter needs the
+symbol for surface tension and for per-axis rms slope, both standard uses, and a third meaning
+invented for extinction collides with both.) The generation-side producer of this descriptor is
 terrain-architect's liquid property bundle (its `28`, exported as `liquidBody[i]` in its
 `08`/`27` contract) — when the pipeline ships it, consume it rather than re-authoring; this
 section is the theory for reviewing those values and the fallback for pipelines that lack them.
@@ -1287,7 +1370,7 @@ than blue-violet. In practice red is gone by ~5 m, orange by ~10 m, yellow by ~2
 ~40 m. That single ratio is the entire shallow→deep colour ramp, and it is *not* sky reflection.
 
 ```
-sigma_RGB ~= (a + b_b) evaluated at ~610 / ~550 / ~450 nm
+c_RGB     =  (a + b) evaluated at ~610 / ~550 / ~450 nm     # beam attenuation, the IOP
 a_water   ~= (0.264, 0.0565, 0.0092) m^-1   # pure water at 610/550/450 nm, Pope & Fry 1997
 #   the absolute minimum is 0.0044 m^-1 at 418 nm - deep violet, below a typical B channel
 #   THE WAVELENGTHS ARE PART OF THE CONSTANT. a climbs 4% per 10 nm on the red shoulder and
@@ -1378,7 +1461,7 @@ lake drifts in hue across the melt season.
 **Authoring handle: Secchi depth.** The cleanest bridge between an artist-legible dial and the
 shader is `Z_SD ≈ 1 / min_λ K_d` (Lee et al. 2015) — "you can see four metres down" fixes the
 minimum of the diffuse attenuation spectrum, and *which wavelength* that minimum sits at is the
-water's hue. Author clarity plus a water class; solve for `sigma`.
+water's hue. Author clarity plus a water class; solve for the IOPs.
 
 **One trap worth stating:** `c = a + b` (beam attenuation) and `K_d` (diffuse attenuation) are
 different coefficients, and `c` is typically 5–20× larger because forward scattering dominates
@@ -1395,8 +1478,9 @@ edge is exactly where `b_b` stops being bottom-dominated and becomes molecular.
 
 **Turbidity is a missing axis, not a missing feature — and its symptoms arrive out of order.**
 Everything above treats `b` as a stated near-zero, and it is the one parameter a pool, a lake, a
-river mouth and a stirred estuary genuinely differ by. Author it as a **visibility distance rather
-than as a coefficient**: nobody knows what `b = 0.35 m⁻¹` looks like, everybody knows "you can just
+river mouth and a stirred estuary genuinely differ by. It is `b` and `g` — `transmission_scatter`
+and `transmission_scatter_anisotropy` on the material side — and never a single scalar, whatever
+the NTU meter reads. Author it as a **visibility distance rather than as a coefficient**: nobody knows what `b = 0.35 m⁻¹` looks like, everybody knows "you can just
 see the bottom". Bracketed at green (`a = 0.0565 m⁻¹`), with Secchi from `Z ≈ 1.44/(c + K_d)` and a
 crude `K_d ≈ a + 0.02·b` (`?` — the backscatter ratio is a placeholder, and the Secchi column moves
 with it):
@@ -1747,7 +1831,9 @@ multiplier on its albedo.
 ### The focusing number: which regime the bed is in
 
 Whether a body shows a crisp caustic net, a soft wash, or nothing much is not a matter of taste,
-and it has a one-line estimate. A surface slope `s` turns the refracted ray by `s·(1 − 1/n)`, so at
+and it has a one-line estimate. **The name is this chapter's**, not a standard dimensionless group
+([the vocabulary rule](#the-vocabulary-and-which-half-of-it-you-can-look-up)) — the ingredients
+below are all standard, the bundling is ours, and it should not be cited as literature. A surface slope `s` turns the refracted ray by `s·(1 − 1/n)`, so at
 depth `d` the receiver point moves by `d·s·(1 − 1/n)`; focusing happens when that displacement's
 *gradient* reaches unity. With `k` the dominant wavenumber and `s` the band's **total** rms slope —
 not the per-axis `σ = s/√2`, and never a single wave's `2πa/λ`; either lands you a rung or two up:
@@ -1830,7 +1916,7 @@ amplitude so calm water goes flat.
 ```hlsl
 float3 caustic = SampleCausticMap(worldPos, time) * causticStrength;
 caustic *= 1.0 - saturate(verticalDepth / causticFadeDepth);  // 1. depth fade
-caustic *= exp(-sigmaPerBody * lightPathLength);              // 2. extinction along the LIGHT path
+caustic *= exp(-c_RGB * lightPathLength);                     // 2. extinction along the LIGHT path
 caustic *= SunShadow(surfaceEntryPoint);                      // 3. sun must reach the SURFACE
 sunLighting += caustic;                                       // 4. irradiance, never albedo
 ```
@@ -1839,7 +1925,8 @@ sunLighting += caustic;                                       // 4. irradiance, 
    [Shading and optics](#shading-and-optics). Two mechanisms converge on the same fade: extinction,
    and the fact that the fold pattern spreads and overlaps into an unresolvable wash past the
    focal depth.
-2. **Extinction along the *light* path**, which is a different distance from the camera path
+2. **Extinction along the *light* path**, on beam attenuation `c` because a caustic is what is
+   left of a collimated beam, and a different distance from the camera path
    already computed for refraction: `verticalDepth / cos(theta_t)` from surface to bed, with
    `theta_t` the refracted sun angle. Reuse `rayDistance` here and caustics fade with camera angle
    instead of sun angle — subtly wrong in every frame, and obviously wrong the moment the camera
@@ -2305,7 +2392,7 @@ problem rather than a parameterisation one.
 at the same `τ` look opposite, because what separates them is the single-scattering albedo
 `ω₀ = b/(a + b)`, 0.00 against 0.98. The transferable index is `(τ, ω₀, g)` plus the boundary
 albedo — which is the same
-[count of free parameters](#water-body-optical-identity-where-sigma-actually-comes-from) the
+[count of free parameters](#water-body-optical-identity-where-the-iops-come-from) the
 chapter uses to separate Case 1 from Case 2 water. And take `τ` from the **right** coefficient: `c`
 for a sharp sightline, `K_d` for the diffuse column, never one constant for both.
 
@@ -2435,12 +2522,13 @@ not one lumped extinction — a **phase-asymmetry term** (`PhaseG`, forward-scat
 at positive values, isotropic at zero), and a colour-scale multiplier on what is seen through the
 water; opacity blends the volume's response against the surface BRDF.
 
-Two lessons, one of them a correction to the shorthand used earlier in this chapter:
+Two lessons, and the first is corroboration from a shipped engine:
 
-- **The a/b split with a phase term is the right shader interface.** `sigma` as used in
-  [Shading and optics](#shading-and-optics) is `a + b_b` already collapsed; the engine that shipped
-  asks for `a` and `b` separately plus `g` — which is exactly what terrain-architect's `28` exports
-  and this chapter's own optics section derives. Where the pipeline has that descriptor, wire
+- **The a/b split with a phase term is the right shader interface.** A widely deployed engine asks
+  its authors for `a` and `b` separately plus `g` — the IOPs, under their own names, and refusing
+  the lumped extinction that most water shaders expose. That is exactly what terrain-architect's
+  `28` exports, what [the vocabulary rule](#the-vocabulary-and-which-half-of-it-you-can-look-up)
+  requires, and what this chapter's optics section derives. Where the pipeline has that descriptor, wire
   absorption and scattering to their own inputs instead of pre-summing them: the sum discards the
   forward-scattering behaviour that separates a bright-but-murky silty river from a
   dark-but-transparent tannin one (the CDOM-darkens/sediment-brightens rule).
@@ -2615,7 +2703,7 @@ above except the TotK physics talk is community reconstruction or press/footage 
   the body has a slope, a step or a bench, and each wrong one is diagnosed as a separate bug.
 - **CDOM and sediment behind one turbidity slider**: one absorbs and does not scatter, the other
   scatters and barely absorbs, and they produce brown-and-clear against pale-and-opaque. Two axes,
-  never one; see [the constituent model](#water-body-optical-identity-where-sigma-actually-comes-from).
+  never one; see [the constituent model](#water-body-optical-identity-where-the-iops-come-from).
 - **A white tint reached for as soon as water should look dirty**: the caustic net fades first, then
   shadows lift, then distance hazes — a body colour is the *fourth* symptom of rising `b`, and the
   first three are a contrast multiplier and a haze term away.
@@ -2642,7 +2730,8 @@ above except the TotK physics talk is community reconstruction or press/footage 
   dielectric 0.04 (IOR 1.5). Water is IOR 1.33 → `F0 ≈ 0.02`; the default doubles surface
   reflectance.
 - **Every liquid equally reflective**: `F0` hardcoded to water's value. Brine, oil and meltwater
-  differ (IOR ~1.31–1.47, `F0` ~0.018–0.036); take `ior` from the `liquidBody` descriptor.
+  differ (IOR ~1.31–1.47, `F0` ~0.018–0.036); take `ior` from the `liquidBody` descriptor into
+  `specular_ior`.
 - **Refraction leaking objects above water**: missing depth reject on the distorted sample. The
   single most common shipped water bug; the fix is four shader lines (above).
 - **SSR dropout at grazing/screen edge**: mirror-bright water goes flat exactly at the horizon
@@ -2668,10 +2757,14 @@ above except the TotK physics talk is community reconstruction or press/footage 
   crossing a pool, a pond on an island seen across the sea — the second surface simply is not there.
   This is the shading model's structural limit, not a bug to tune; either the level avoids stacked
   bodies or those bodies go through sorted transparency instead.
-- **Absorption and scattering collapsed into one extinction**: a single `sigma` cannot distinguish
-  bright-and-murky (sediment) from dark-and-clear (CDOM), and the phase asymmetry that aims
-  scattering at the sun is gone with it. Wire `a`, `b` and `g` to their own inputs where the shader
-  takes them, from the `liquidBody` descriptor (terrain-architect `28`).
+- **Absorption and scattering collapsed into one extinction**: one lumped coefficient cannot
+  distinguish bright-and-murky (sediment) from dark-and-clear (CDOM), and the phase asymmetry that
+  aims scattering at the sun is gone with it. Wire `a`, `b` and `g` to their own inputs where the
+  shader takes them, from the `liquidBody` descriptor (terrain-architect `28`).
+- **One coefficient driving both the sightline and the light column**: `c` (beam attenuation) and
+  `K_d` (diffuse attenuation) differ by 5–20×, so a shader with a single extinction has one of its
+  two terms wrong by that factor — the refracted bed too murky, or the depth-tinted column too
+  clear. Two coefficients, two paths; both are in the descriptor already.
 - **Shared water capture sized to the zone, not the river**: one top-down info texture spanning
   kilometres gives a narrow river a handful of texels across, so banks quantize and flow smears into
   the ground value. Budget by texels-across-narrowest-body; shrink the zone or raise the resolution.
@@ -2738,8 +2831,14 @@ above except the TotK physics talk is community reconstruction or press/footage 
 - **Sim patch faded out at a wall**: the open-water edge contract applied inside a basin, so wakes
   and jet trains dissolve exactly where they should bounce. In a closed body the domain edge is
   physical — reflect, do not fade.
-- **Pool colour art-directed into `scatterColor`**: treated water has `b_b ≈ 0` and no body colour
-  of its own; the cyan comes from bottom albedo attenuated over the down-and-back path. A pool
+- **A shader parameter called `waterColor`, or any colour-without-a-distance**: the name is the
+  bug, because a colour multiplied into a medium cannot know how far the light travelled. The
+  symptoms are three and a photograph refutes each: it stays coloured in shadow, it does not deepen
+  with depth, and a white bottom cannot make it pale. Author `transmission_color` **with**
+  `transmission_depth`, which is a pair precisely so the mistake is unsayable — see
+  [Saying it in OpenPBR](#saying-it-in-openpbr-and-where-the-mapping-stops).
+- **Pool colour art-directed into the scatter term**: `L_scatter` is a *result* — an AOP — and
+  treated water has `b_b ≈ 0`, so it has no body colour of its own; the cyan comes from bottom albedo attenuated over the down-and-back path. A pool
   tinted through the scattering term reads identically over every liner and at every depth, which
   is exactly the tell.
 

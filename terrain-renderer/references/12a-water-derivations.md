@@ -1363,6 +1363,10 @@ found, so nothing in the pass assumes a single depth.
 
 ### The focusing number, derived
 
+(The *name* is `12`'s own, not a standard dimensionless group — see [the vocabulary
+rule](12-water-rendering.md#the-vocabulary-and-which-half-of-it-you-can-look-up). What follows is
+the derivation; everything in it is standard.)
+
 A surface slope `s` turns the refracted ray by `s(1 − 1/n)`, so at depth `d` the landing point moves
 by `d·s(1 − 1/n)`; focusing happens when the *gradient* of that displacement reaches unity. For
 `h = a sin(kx)` under a vertical sun over a flat bed the whole pass is a 1-D map with an exact

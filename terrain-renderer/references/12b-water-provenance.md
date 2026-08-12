@@ -129,7 +129,7 @@ least-confident-claims ledger in `00-index.md`.
 - **P** — Lee et al., "Secchi disk depth: A new theory and mechanistic model for underwater
   visibility" (Remote Sensing of Environment 169, 139–149, 2015): shows the classical Secchi
   relation is not derivable from radiative transfer and replaces it with `Z_SD ≈ 1/min_λ K_d` —
-  the artist-dial-to-`sigma` bridge. The classical `K_PAR = 1.44/Z_SD` constant is Holmes (1970),
+  the artist-dial-to-IOP bridge. The classical `K_PAR = 1.44/Z_SD` constant is Holmes (1970),
   the best-performing of ~13 published constants spanning 1.27–1.86.
 - **P** — Jerlov, *Marine Optics* 2nd ed. (Elsevier, 1976), Tables XXVI–XXVII; Solonenko & Mobley,
   "Inherent optical properties of Jerlov water types" (Applied Optics 54(17), 5392–5401, 2015);
@@ -432,6 +432,47 @@ least-confident-claims ledger in `00-index.md`.
   the resulting `(0.36, 0.68, 0.78)` white-liner and `(0.11, 0.46, 0.68)` blue-liner returns are
   arithmetic recomputed here on the corrected red, as are the liner albedos (`0.8` white,
   `(0.24, 0.54, 0.70)` mid-blue PVC), which are representative values, not measured product data.
+- **P** — The chapter's vocabulary, in [Saying it in
+  OpenPBR](12-water-rendering.md#saying-it-in-openpbr-and-where-the-mapping-stops) and [The
+  vocabulary](12-water-rendering.md#the-vocabulary-and-which-half-of-it-you-can-look-up). Two
+  standards, no house style.
+  **OpenPBR Surface** supplies the interface names (`base_color`, `base_weight`, `specular_ior`,
+  `specular_roughness`, `transmission_color`, `transmission_depth`, `transmission_scatter`,
+  `transmission_scatter_anisotropy`) and the semantics this chapter relies on — in particular that
+  `transmission_depth` is the distance at which white light becomes exactly `transmission_color`,
+  which is what makes `a = −ln(T)/λ_T` an identity rather than a fit. The specification is the
+  OpenPBR Surface specification (Adobe/Autodesk, under the Academy Software Foundation); the
+  chapter's inversion of the pair and the RGB values quoted from it are arithmetic done here (`D`).
+  **The IOP/AOP division** — inherent optical properties belonging to the medium alone (`a`, `b`,
+  `b_b`, `c = a + b`, the phase function and `g`), apparent optical properties depending also on
+  the light field (`K_d`, reflectances) — is Preisendorfer's, standard in ocean optics, and is
+  visible in the title of a source already cited above: Solonenko & Mobley, "*Inherent* optical
+  properties of Jerlov water types". Attribution of the division to Preisendorfer specifically is
+  from model knowledge and was **not** chased to *Hydrologic Optics* (1976) (`?`); that the
+  division itself is the field's standard vocabulary is not in doubt.
+  **MaterialX** was checked (2026-08, specification sources on the AcademySoftwareFoundation
+  repository) for whether it already names the medium-with-boundaries side, so that this chapter
+  would not coin a third vocabulary. It names the medium's *optics* and nothing beyond them: a
+  `volume` shader node built from VDF and EDF components, `absorption_vdf(absorption)` and
+  `anisotropic_vdf(absorption, scattering, anisotropy)` in m⁻¹ — the same `a`, `b`, `g` — composed
+  under a transmissive BSDF with a `<layer>` node, whose own documented example is "colored glass
+  or turbid water", which is a direct corroboration of this chapter's boundary-plus-medium framing.
+  It does **not** name a bounded body, a thickness or depth field, a per-body property set, or
+  anything about render passes; geometry association runs through `MaterialAssign` inside a `Look`,
+  which assigns a material rather than describing a body. Renderer-specific MaterialX extensions
+  were not surveyed (`?`). Because MaterialX's medium inputs are the IOPs under other spellings,
+  adopting IOP names costs nothing in recognisability and gains the measurement literature.
+- **F/?** — The coinage audit in the same section. That **focusing number**, **driven basin** and
+  **trapped series** are this chapter's own names is asserted from a failure to find them
+  established, not from a systematic literature survey (`?` — a wrongly-claimed coinage is the
+  cheap error here, and the labels are written so that it stays cheap). The terms listed as
+  standard are standard: SI radiometry for radiance/irradiance/radiant intensity, Cox & Munk for
+  mean square slope, Morel & Prieur for Case 1 / Case 2, and the rest as cited in their own entries
+  above. That **`c` and `K_d` must be two coefficients and not one** is Preisendorfer's division
+  applied, plus the 5–20× ratio already cited in the optics entries; the correction of the
+  chapter's own shading pseudocode to use both was made 2026-08 and is `F` — the *ratio* is sourced,
+  the two-term composite (`refracted·T_beam + L_scatter·(1 − T_diff)`) is a renderer construction
+  and not a solution of the radiative transfer equation.
 - **P/D** — Pool chemistry, in
   [Pool optics](12-water-rendering.md#pool-optics-the-colour-is-the-bottom-not-the-water). The hypochlorite absorption
   peak at **292 nm** and hypochlorous acid at 235 nm, with `ε ≈ 300–380 M⁻¹cm⁻¹`, are standard
