@@ -1619,6 +1619,33 @@ Three consequences follow, and the first is the one that gets rendered wrong:
   elevation, so at 21° it strikes nearby vertical surfaces at a shallow angle and stretches the
   pattern along the wall — the long ropes of light on a harbour wall, not the net on a pool floor.
 
+**And the sun angle gates the whole effect — twice, in the same direction.** The mirror returns
+the beam at the sun's own elevation, so the elevation decides *where it lands*; and the Fresnel
+reflectance of a horizontal surface rises steeply as the sun drops, so it also decides *how much
+goes up at all*. The two compound, which is why above-water caustics are a **morning-and-evening
+phenomenon** and why a renderer that shows them at noon is showing something that is not there.
+
+| Sun elevation | Fresnel off the water | Beam leaves at | Height on a wall 1 m away | Band height |
+|---|---|---|---|---|
+| 10° | **0.349** | 10° | 0.18 m | 0.24 m |
+| 21° | 0.123 | 21° | 0.38 m | 0.27 m |
+| 35° | 0.044 | 35° | 0.70 m | 0.35 m |
+| 50° | 0.025 | 50° | 1.19 m | 0.58 m |
+| 70° | **0.021** | 70° | 2.75 m | 2.22 m |
+
+A 21° sun therefore puts **5.9×** the energy on a nearby wall that a 70° sun does, and puts it in a
+band a quarter of a metre tall at knee height instead of smeared over two metres above head height
+(`D`). At high sun the reflected beam still exists — it just goes nearly straight up, which is why
+the surfaces that keep their caustics at noon are **undersides**: a jetty, an arch, a hull, a
+ceiling.
+
+The band's *height* is the third reading of the reachability argument: the beam's angular spread is
+**twice** the surface's rms slope, `2s = 6.6°` at this chapter's far-field figure, so a wall's lit
+band measures the roughness directly. Glassy water gives a hard-edged stripe; a chop widens it and
+softens its edges. Same inversion as [glitter](#sun-glitter-the-sparkle-path) and the
+[Snell window's rim](#the-view-from-inside-and-the-split-shot) — the pattern is a readout of the
+slope distribution, not a decoration on top of it.
+
 **Real time:** this is the [existing caustic map](#the-tier-ladder) run once more with the *mirror*
 direction in place of the refracted one, projected from the water's plane onto the receiving
 geometry. No new machinery, and it obeys the same
