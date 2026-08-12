@@ -663,3 +663,53 @@ generous for a wall in an 8 × 4 m basin. If the render carries the trap in full
 and still cannot produce the ordering, that form factor is where the error is and
 another term is missing. The render arbitrates — not the lead agent and not a
 second opinion.
+
+### 2c · "Surface reflection" names two opposite things, and the pool's interior depends on which
+
+> Owner question: *"Oppervlakte reflectie is toch ook wat terugkaatst vanaf de
+> oppervlakte zelf?"* Yes — and that is the ordinary reading of the term. It is
+> also the **wrong half** for this mechanism, which makes the ambiguity worth a
+> chapter entry rather than a footnote.
+
+One interface, two sides, opposite signs:
+
+| | cosine-weighted | at the 57.22° sun | what it does |
+|---|---|---|---|
+| **external**, light arriving from above | **6.669%** | 2.22% | never enters the water — a **loss**. It is the sky and the glint you see *on* a pool, and it cannot light anything inside one |
+| **internal**, light arriving from below | **47.617%** | — | stays in the basin — the **trap** |
+
+A factor of **7.14** between the two faces of one mirror, and Walsh ties them
+exactly: `n²(1 − R_int) = 0.93331` against `1 − R_ext = 0.93331`.
+
+**The asymmetry is the critical angle, and the internal figure decomposes
+cleanly** — worth writing out, because the split is the physical content:
+
+```
+total internal reflection beyond 48.519°   43.874 %   (= 1 − 1/n²)
+partial Fresnel inside the cone             3.743 %
+                                           47.617 %
+```
+
+From below, nearly half of all directions lie past the critical angle, where the
+surface is a **perfect** mirror. From above no such angle exists — no direction
+is totally reflected. That, and nothing else, is where the factor of seven comes
+from.
+
+**And `1 − 1/n² = 43.9%` is a constant the chapter already spends twice.** An air
+bubble seen from the water side has the same critical angle as the surface seen
+from below, so the same figure that runs the mirror outside Snell's window also
+makes foam white. One number, three phenomena that look nothing alike.
+
+**Correction to 2b, which the ambiguity forces.** That entry credited the second
+opinion with naming the right mechanism last. That credit assumed it meant
+*internal* reflection. If it meant external — the ordinary sense, and the one the
+owner's question reaches for — then **none** of its three mechanisms is the cause,
+since that face of the interface is a loss term. The credit is withdrawn to
+conditional: the reading cannot be checked from the quoted text.
+
+**For the chapter.** This is a term renderers break on. Two words, opposite sign,
+a factor of seven, and both meanings are correct English. Name them apart
+wherever the chapter uses either — *external Fresnel reflectance* and *internal
+diffuse reflectance* / *total internal reflection* — and give the pair with its
+Walsh identity in one place so a reader can never be confused about which is
+meant.
