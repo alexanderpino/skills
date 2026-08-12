@@ -11,6 +11,14 @@ or falsified here.
                                #        pool_under.png -- the camera under the
                                #        water. The hero frame is bit-identical
                                #        either way; see the section below.
+    POOL_WIDE=1 python3 render.py             # the whole basin from a high
+                               #        oblique: pool_wide.png and its two
+                               #        companions. Same physics, same
+                               #        constants, only the camera moves --
+                               #        it is the frame the water/stone ratio
+                               #        was first measured on, and it is a
+                               #        switch rather than a scratch copy so
+                               #        that number can be re-run.
 
 | File | Owns |
 |---|---|
@@ -32,9 +40,9 @@ not written here, in three tiers, in about 35 seconds — no render, no PNG.
 
 | Tier | Strength of evidence | Covers |
 |---|---|---|
-| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation and a closed energy audit of the whole pool**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, and **the `n²` radiance gain closed against the air-side transmitted flux** |
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation, `2E_3(0) = 1`, the diffuse path being longer than the vertical one, and a lossless white-bedded pool composed through the shipped `rho_water` coming to exactly 1**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, and **the `n²` radiance gain closed against the air-side transmitted flux** |
 | 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min |
-| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 240-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, and a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve |
+| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 960-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, **`rho_water` at the file's own absorption against a 400 000-photon random walk, and `2E_3` by Gauss-Legendre against the exponential-integral recurrence**, and a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve |
 
 The highest-value single test is the **sinusoid caustic**: for `h = a sin(kx)`
 under a vertical sun the whole pass is a 1-D map with an exact Jacobian, so the
@@ -70,8 +78,10 @@ closed with no tolerance widened; four tolerances were *tightened* to double
 round-off because the quantity they cover became an identity rather than an
 approximation.
 
-**It is now 215 rows and 0 FAIL, up from 196.** The 19 newest are the underwater
-camera's, and they are listed with the section below. The 27 before them are the
+**It is now 225 rows and 0 FAIL, up from 215.** The 10 newest are the pool's
+closed-form albedo and the photon walk that guards it, and why the audit they
+replace was blind is written up in the first section below. The 19 before them are
+the underwater camera's, and they are listed with the section further down. The 27 before them are the
 guards on the six defects closed below plus the four on the wall gather, and each
 was checked the only way a guard can be: by putting the defect back. Reverting the
 `1/n²` fails 6 rows, writing `1/n` instead of `1/n²` fails the same 6, putting
@@ -116,6 +126,335 @@ checks must not share a premise.** Derive the value from physics, write the
 derivation down, and then guard it with something that could not have been written
 from it — a limit, a conservation identity, an analytic special case, or the same
 quantity reached by unrelated code.
+
+## Refuted — the water is **not** dark by a factor of two, and the two errors that made it look that way
+
+This round was handed a finding: *the render's water is too dark against its own
+physics, by a factor of 1.5–2.5*, from a closed form predicting a
+water-to-sunlit-stone luminance ratio of **0.61–1.00** against **0.401** measured
+off `gauntlet/evidence/w12-wide.png`. It was to be recomputed before being acted
+on. It was, and it does not survive: **the prediction is 13% high and the
+measurement is 1.8× low, and between them they are the whole of the factor.**
+The render's water agrees with a corrected closed form to **−4.8%**.
+
+Both halves are now computed every run, in `render.py` under *the pool's apparent
+albedo*, so neither can be re-derived by hand again.
+
+### The prediction, corrected twice
+
+The chain's shape was right and two of its factors were not. The form as handed:
+
+```
+rho_eff = T_slant · rho_bed · (1 − R_int) / (1 − rho_bed · T_round · R_int)
+```
+
+- **The up leg is missing from the numerator.** The bed's light has to *cross the
+  column* before it can escape; the form has a round trip in its denominator and
+  no one-way transmission at all in its numerator. Worth **1/T_up** — 13% in
+  luminance at 1.40 m, 85% in red.
+- **The two integrals do not factorise, and the error changes sign between them.**
+  `T_up · (1 − R_int)` treats attenuation and escape as independent. They are
+  strongly correlated: a steep ray escapes *and* crosses less water, a grazing one
+  is totally reflected *and* crosses more. The product of the means understates
+  the mean of the product by **19.4% in red, 5.1% in green, 1.1% in blue**; the
+  round trip is correlated the other way and the factorised form *over*states it
+  by **30% in red**. So the file now writes one integral each, over the water-side
+  cosine, with the exact internal Fresnel inside them:
+
+```
+T_esc = ∫ 2μ exp(−a d/μ) (1 − R_int(μ)) dμ      = 0.3403 / 0.4795 / 0.5106
+G_rt  = ∫ 2μ exp(−2a d/μ)    R_int(μ)  dμ      = 0.0965 / 0.3277 / 0.4445
+rho_w = (1 − R_ext(sun)) · T_slant · rho_bed · T_esc / (1 − rho_bed · G_rt)
+```
+
+The interface constants themselves were checked and they hold: `R_int_diff =
+0.47617`, `R_ext_diff = 0.06669`, Walsh exact to float64 — nothing there moved.
+
+| writing | rho_water (lum) | against the corrected form |
+|---|---|---|
+| as handed, no up leg | **0.2550** | **+12.9%** |
+| with the up leg, factorised | 0.2197 | −2.7% |
+| **joint integrals** | **0.2259** | — |
+| **the render, measured** | **0.2151** | **−4.8%** |
+
+### The measurement, corrected twice
+
+`0.401` is reproducible — this round measured **0.395** off the same PNG — and it
+is not the quantity the closed form predicts. **Three** distortions sit between
+them, two of which the bar already names for *photographs* and neither of those
+had ever been applied to the render's own output:
+
+- **It is a median on a right-skewed field.** A caustic net is bright folds over
+  dim cells, so its distribution has a long right tail and its median sits well
+  under its mean — measured on the transmitted column over the sunlit floor, the
+  median is **0.786** of the mean. A median over water therefore reads the caustic
+  *cell* while the same median over smooth stone reads the stone. Worth **−4.7%**
+  on the wide frame (0.706 → 0.673) and −4.6% on the hero (0.735 → 0.701).
+- **It is display-referred.** `colour_table` reads sRGB code values, which have
+  been through the ACES curve *and* a display-side S. Inverting the sRGB EOTF
+  recovers display-linear, not scene-linear — which is precisely the failure bar
+  section **J2c** pins on the reference photographs, here committed by the
+  render's own pipeline. Worth a further **−0.4%** on the wide frame
+  (0.673 → 0.670) and −3.4% on the hero (0.701 → 0.677), and the two surfaces are
+  far apart in level, which J2c says is the regime the curve hurts worst.
+
+- **And it is taken over a different surface.** The closed form is about *sunlit
+  bed under water*. `0.401` was taken over **all** the water in the frame — which
+  on that camera includes the sail's shadow and the 1.37 m strip along the far
+  wall that the refracted beam never reaches, because the beam walks east and the
+  west wall shadows the bed behind it. That is the dark band in the frame, and it
+  is physics, not a deficit. Worth **×0.590**, and it is the largest of the three.
+
+`0.706 × 0.953 × 0.996 × 0.590 = 0.395`, which is the number the round opened on,
+with every link measured rather than argued.
+
+The wide camera is now a switch on the shipped file (`POOL_WIDE=1`, writing
+`pool_wide.png`) rather than a scratch copy nobody can re-run, and it reports the
+same statistics. It reproduces the archived frame: the same crude
+all-water-vs-all-stone segmentation gives **0.395 on both**, to three decimals,
+with identical medians. So the chain is complete and each link is measured:
+
+| reading of the same wide frame | value |
+|---|---|
+| sunlit floor / stone, transmitted mean over mean, scene-linear | **0.706** (closed form 0.677) |
+| … as a median over median, scene-linear | 0.673 |
+| … display-linear off the PNG | 0.670 |
+| … over **all** water rather than the sunlit floor | **0.395** |
+
+**The four readings of one frame, hero, in one exposure:**
+
+| | water / sunlit stone |
+|---|---|
+| transmitted column, mean / mean, scene-linear | **0.735** (closed form: 0.771) |
+| + the reflected sky, glitter held out | 0.772 |
+| median / median, scene-linear | 0.701 |
+| median / median, display-linear off the PNG | 0.677 |
+
+A note on the reflected column, because it makes any whole-pixel mean useless: its
+mean over the sunlit floor is **18.12** against a median of **0.031**, a factor of
+**577**, and all of it is sun glitter at `L_SUN = 3.6e5`. A mean taken over the
+whole pixel is that factor's hostage.
+
+### What *is* wrong, and it is two ~25% errors of opposite sign
+
+The agreement above is not innocent. Measured at the bed, against the closed
+form's own beam term — beam × `T_slant` × the closed series — the render is
+**25.2% short in luminance** (0.887 / 0.734 / 0.635 per channel), and the sky the
+form has no room for is worth **+21.5%** on the same bed. Neither is small and
+they very nearly cancel. The short side decomposes exactly:
+
+- **`cau` over the sunlit deep floor means 0.906** of the incident, not 1 — a
+  factor **0.907**. The sail takes 5.1 m² and the 44.4° refracted beam walks
+  1.37 m east, so its last 1.37 m lands on the **east wall**. That light is not
+  lost — the wall gather reads it back — but it is not on the bed, and a closed
+  form for an infinite basin has no wall to put it on. This is the *walls* entry
+  on the finding's own list of simplifications, the one it said could move the
+  prediction toward the render. It does, by 9.4%.
+- **the trap is carried at one truncated bounce** — a factor **0.827**. It adds
+  ×1.0217 in green where the closed series is ×1.2354. Three causes and all three
+  are geometry the closed form has no room for: the cone taken is
+  `1 − 1/n² = 0.4387` and not `R_int = 0.4762` (the partial Fresnel *inside* the
+  cone is dropped), **58%** of that cone meets a wall before it reaches the
+  surface, and the returning half is splatted onto walls as well as bed.
+
+`0.907 × 0.827 = 0.750` against the 0.734 measured in green; the last 2% is the
+liner's own mottle and the bed's ambient occlusion, which the closed form does not
+carry either. And the sky that fills the hole is 22% of the green and 38% of the
+blue that lights this floor.
+
+So the answer to the brief's first named suspect — *is the trapped series applied
+to the bed at all* — is **no: one term of it is, over the wrong cone, for the 42%
+that reaches the surface.** The second suspect, a doubled `1/n²`, is not there:
+`out_of_water` is applied exactly once on the bed's route to the eye and the
+hemispherical row in `validate.py` still holds it to `1 − R_int`. The third — the
+bed's sky — *is* there, and it is the term filling the trap's hole.
+
+### Why the energy audit was blind, and what it does now
+
+`validate.py`'s *"closed energy audit of the whole pool"* is nothing of the kind,
+and reading what it borrows says why: **one name.** It computes its own `E_w` and
+its own `L_w`, passes them through `out_of_water`, and integrates back. So:
+
+- **it never asks render.py for the series.** It closes `1/(1 − ρ R_int)` itself,
+  so a renderer that truncates the trap at one bounce over the wrong cone cannot
+  register.
+- **it has no absorption and no depth.** Every path length in it is exactly 1, so
+  the up leg — the term the prediction was missing — cannot appear in it either
+  way.
+- **it has no basin.** No walls to take the beam, no sail.
+
+It is a good unit test of one divisor wearing the title of an audit. Two rows now
+go through the shipped chain instead, and it takes **both** because each is blind
+where the other sees:
+
+- **the lossless limit**, `R_ext(sun) + rho_water(1, a=0) == 1` — energy
+  conservation, right-hand side the number 1, no constant of `render.py` in it.
+  It pins the *shape* of the series.
+- **a 400 000-photon walk** at the file's own `ABS`. A photon enters at the
+  refracted angle, crosses to the bed, is redrawn from a cosine law, attenuates
+  over its **own** `1/μ`, meets the exact internal Fresnel and either escapes or
+  comes back. Nothing in it is an average of anything, which is the only way a
+  *correlated* integral can be checked — a second quadrature would have shared the
+  premise. It agrees with the closed form to **0.1%**.
+
+Each guard was fired on the bug it was written for, by putting the bug back:
+
+| bug reintroduced | rows that FAIL |
+|---|---|
+| drop the leading 2 in `2·E₃` | 7 |
+| drop the up leg from the numerator | 2 — and **only the walk** sees it at nonzero absorption |
+| one-way transmittance where the round trip belongs | 1 — **only the walk** |
+| factorise `T_esc` back into `T_diff·(1 − R_int)` | 2 |
+
+The lossless limit alone passes three of those four. That is the same blindness
+the old audit had, caught this time before it shipped.
+
+## Closed — the step unit's stripes, and the diagnosis that was wrong
+
+Wave 13 marked `RIS_NT = 512` as the cause of the visible banding on the step unit
+in `gauntlet/evidence/w13-underwater.png` — 18.4 mm arc bins, 26 output pixels
+wide at 1.2 m, *"striped with the estimator's own noise"*, sized at ≈4×. The hero
+was frozen then and it is not now, so the first thing this round did was spend it.
+
+**It is not the cause.** Arc bins 512 → 2048 **and** the gather's directions
+240 → 960 — 4× and 4×, both acting on `bnc` and on nothing else — moved the stripe
+rms on that frame's own near riser from **1.372 to 1.363** encoded levels. A term
+that can be quartered in noise without moving the artefact is not the artefact.
+
+**What it is, measured.** `_riser_shade` now returns its four terms on request,
+and they are measured along the outer nosing's own face — arc-scale rms, and the
+spread *up* the face at fixed arc. A term with arc structure and **no z structure**
+is a vertical comb, which is exactly what the eye was seeing:
+
+| term | share of the face | arc rms | z rms | z/arc |
+|---|---|---|---|---|
+| direct sun, **before** | 30.8% | 41.1% | 0 by construction | **0** |
+| direct sun, after | 50.6% | 62.4% | 58.7% | **0.941** |
+| sky ambient | 12.4% | 4.3% | 2.8% | 0.658 |
+| TIR return | 1.8% | 0.7% | 0.3% | 0.466 |
+| bed bounce | 35.1% | 1.1% | 8.9% | 7.90 |
+
+The caustic pass **drops** the rays that reach a riser — that is the unit's cast
+shadow on the floor behind it — so no map is rasterised for these faces and the
+bed's map stands in. It stood in at the face's own `(x, y)`, 30 mm radially out,
+**with no dependence on height**: whatever the bed's 3 mm-texel pattern was doing
+at that one point was smeared up the whole 240 mm of riser. A field with structure
+at 3 mm and none at all in `z` is a comb.
+
+**Where the read belongs, derived.** The refracted beam is one direction and flux
+is conserved along it, so the point at height `z` is lit by the beam that, had the
+face not been there, would have landed at
+
+```
+(x, y) + (z − z_foot) · TSUN_DIR_xy / (−TSUN_DIR_z)     — 249 mm of run on the tallest riser
+```
+
+which is a function of `z`. Reading there is not a smoothing of the artefact, it
+is the removal of its cause; the `ndl / cos_t` beside it — flux per horizontal
+area turned into flux per face area — was already right and is unchanged.
+
+**Result: the stripe rms falls 1.372 → 0.816**, the term's z/arc goes from 0 to
+0.941, and the face reads as a caustic net running at the beam's own angle instead
+of as a comb.
+
+**The cost, stated.** The two resolution changes are **kept** even though they did
+not fix the tell, because they fix something else that is measured: the riser
+map's cell-scale contrast falls from **11–18%** of the bed's own to **6–12%**, so
+about 40% of what it was carrying was the estimator's noise, and the bilinear
+read's crease at 26 output pixels was real. They cost the gather **9.2 s → 36.1 s**
+(+27 s, **+7%** of a full render) and the maps 4.7 MB. The caustic-read fix costs
+one `bed_z` call and two adds per riser sample, and is inside the timing noise.
+
+`?` What is still a proxy: the bed map is focused at each texel's own depth, so
+using it at the face's height ignores the focusing over that 0.25 m of run. The
+folds move by less than their own width over it. The honest fix is to rasterise a
+riser caustic map in the pass itself — `sid == 5` hits carry a cylinder index and
+a height already — and that is a pass of its own, filed below.
+
+## Open — the submerged wall is short by a factor of two, and it is a *separate* fault
+
+The round also asked for the owner's second observation to be measured beside the
+first: *the submerged walls are lighter than the dry liner band above them, on
+every side*. **They are separate faults.** The water-to-stone ratio is level; this
+one is not.
+
+| | scene-linear luminance, / dry band |
+|---|---|
+| wall, 0–100 mm below the line | **0.470** (through 11–144 mm of water) |
+| wall, 100–250 mm | **0.581** (through 150–391 mm) |
+| what the observation requires | **> 1** |
+
+**The path is not the explanation and the bins say so in the wrong direction.**
+This frame sees the top of the wall through *centimetres* of water, not metres,
+and binned by the traced leg the ratio *rises* — because a deeper texel sees more
+of the bed. The bins are reading depth, not absorption; Beer–Lambert over the
+whole span is worth 0.971–0.995. A receiver short by a factor of two at 10 mm of
+water is short in the **receiver**.
+
+**The entry fee, before any light is counted.** The submerged wall is an in-water
+radiance seen from the air, so it takes `out_of_water` — a division by `n²` — and
+the dry band 10 cm above it takes nothing. The wall has to be **1.78× brighter
+than the band below the surface merely to draw level with it above the surface**.
+And the two are one pigment: `tiles` is `0.82 × LINER_TINT` against `liner_band`'s
+`0.74 ×` the same, so the wall is the *more* reflective of the two by 11%.
+
+**Where it is short, derived from the file's own `tir_vert`.** A submerged
+vertical face's upgoing half-hemisphere is not the sky. It is the underside of the
+surface, and that underside is two different things either side of the critical
+angle: inside the Snell cone the transmitted sky, compressed into 48.5° about the
+**vertical** — the worst placement there is for a vertical receiver — and outside
+it, over `1 − 1/n²` of the directions, a perfect mirror showing the pool's own
+upwelling field. `WALL_SKY = 0.5` is exactly right as a *partition* of a
+hemisphere and is not a description of what fills the upper half:
+
+```
+E_vert(hemisphere)/E_bed(hemisphere) = tir_vert(0)              = 0.500
+E_vert(cone t>tc)  /E_bed(cone t>tc) = TIR_VERT                 = 0.885
+E_bed(cone)        /E_bed(hemisphere)= 1 − 1/n² = TIR_FRAC      = 0.439
+=> the WINDOW's share of a vertical face, against the bed's:
+   (0.5 − TIR_VERT·TIR_FRAC) · n²                               = 0.199
+```
+
+The render hands it `WALL_SKY × WAO = 0.50 × 0.78 = 0.390`, **over-giving the sky
+by ×1.96**; and what should fill the rest of that upper half — the 47.6% the
+underside returns — comes from the same one-bounce TIR pass, carrying ×1.0217 of
+the closed series' ×1.2354. Over-count the sky, under-count the mirror, and they
+do not cancel.
+
+**This is the convergence the backlog predicted, arriving with one of its two
+halves.** The internal radiance field *is* too weak, by about the factor the
+owner's observation implies; the water-to-stone ratio simply does not depend on
+it, because the bed's own light is dominated by the beam and the sky rather than
+by the trap. Closing it needs the wall → bed return leg, which needs an up-going
+intersector `scene_hit` is not — the same blocker already filed below — plus the
+submerged wall's sky replaced by the window's share and the mirror. **Not done
+here, and not half-done: moving `WALL_SKY` alone would darken the wall further,
+which is the wrong direction and would be a constant moved to fit a picture.**
+
+## What moved in the picture
+
+The hero is no longer frozen and it moved, in the two places the changes touch and
+nowhere else — **15.6% of pixels, mean |Δ| 0.29 levels, worst 84**, mean encoded
+luminance 132.91 → 132.85.
+
+| sRGB median | before (`w13-hero-above.png`) | after |
+|---|---|---|
+| riser face | (13, 87, 123) lum 73.9 | (13, 86, 123) lum 73.2 |
+| wall, 100–250 mm | (33, 106, 144) lum 93.2 | (33, 105, 142) lum 92.4 |
+| tread top | (72, 159, 180) | unchanged |
+| floor, sunlit | (52, 151, 171) | unchanged |
+| coping stone | (180, 164, 139) | unchanged |
+| freeboard, dry blue band | (45, 153, 173) | unchanged |
+
+The riser moves because its caustic read moved; the wall's deeper strip moves
+because the gather that lights it now runs 960 directions. Everything else in the
+frame is bit-identical, which is what a change confined to `_riser_shade` and to a
+sampling density should look like. The underwater frame moves far more, because
+the step unit fills it.
+
+Archived: `gauntlet/evidence/w14-hero-above.png`, `w14-underwater.png`,
+`w14-underwater-risers.png` and `w14-wide.png` — the last comparable with
+`w12-wide.png` and now reproducible with `POOL_WIDE=1`.
 
 ## Closed — the transmitted column now carries its `1/n²`
 
@@ -777,6 +1116,25 @@ The bed, the floor, the coping stone, the sail shadow and the sunlit-floor /
 dry-band absorption regression are **identical to the digit**. Nothing was
 rebalanced to accommodate the change.
 
+## Not modelled yet — a caustic map for the risers
+
+`_riser_shade` reads the **bed's** caustic map as a stand-in for the caustic on a
+vertical face, because the caustic pass drops the rays that reach a riser. The
+read is now in the right place — the refracted beam's continuation to the face's
+own foot, which is a function of height and therefore not a comb — but it is still
+a proxy, and it is 50.6% of that face's light.
+
+What it costs to do properly is one more map in the pass that already exists.
+`box_hit` returns `sid == 5` with a cylinder index, and the splat needs
+`(arc, height)` and a per-texel area instead of `(x, y)` and `bt`. The two things
+to get right are both already solved for the bed: the texel area on a cylinder is
+`R·dθ·dz`, and the density estimate needs the same `sig_at` kernel, because the
+riser strip is about 2.7 m² catching perhaps 6% of the launch — roughly 34 rays
+per 4.6 × 10 mm texel against the bed's 9, so the noise is comparable and so is
+the smoothing that answers it. Doing it removes the last `?` on the step unit and
+deletes the `ndl / cos_t` projection with it, since the arriving density would
+then be measured on the face rather than converted onto it.
+
 ## Not modelled yet — the return leg, wall → bed
 
 The receiving half is now built (above). The **return leg** is not: the bed's
@@ -802,6 +1160,16 @@ What blocks it is one thing: wall → bed needs an *up-going* intersector, which
 replaces `SKY_AMB` there has to be **directional** — the wall runs
 `(0.335, 0.920, 1.186)` at the waterline to `(0.125, 0.759, 1.131)` at its foot.
 That is a pass of its own.
+
+**This round put a price on it and joined it to a second symptom.** The same 58%
+is why the light trap arrives at ×1.0217 on the bed where the closed series is
+×1.2354, and the same missing internal field is why the submerged wall reads 0.47
+of the dry band above it where the owner's observation puts it over 1. One pass
+closes both, and neither should be closed by moving a constant in the meantime —
+the two sections above say why in numbers. `scene_hit_under` now exists and
+solves an any-direction ray, which is most of the blocker: what is left is the
+receiver side, a directional replacement for `SKY_AMB` over the 35.3% of the bed's
+hemisphere that is wall.
 
 ## The meniscus, and the one term of it that was refuted
 

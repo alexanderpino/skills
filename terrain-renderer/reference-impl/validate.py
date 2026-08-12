@@ -148,6 +148,8 @@ REQUIRED = [
     'WALL_BAND_Z', 'WALL_FRONT',
     'R_EXT', 'R_INT', 'wet_albedo', '_fresnel_rough', '_refl_ellipse',
     '_lobe_shape', 'sky', 'SKY_LOBE', 'E_SUN', 'L_SUN', 'OMEGA_SUN', 'N_DISC',
+    '_e3', 'T_DIFF_UP', 'trap_gain', 'rho_water', 'slab_esc', 'slab_trap',
+    'R_INT_MU',
     'N_AURE', 'L_AURE', 'AIRMASS', 'TAU_R', '_tau_rayleigh', 'THETA_SUN',
     'CAP_A', 'MENIS_H', 'SIGMA_W',
     # the fillet: the tables, the two helpers the columns are built on, the
@@ -1268,6 +1270,161 @@ def tier_interface(R):
               'the trapped series in closed form. They share no line of code. '
               '1e-3 relative is the two quadratures\' own spread', rel=True)
 
+    # === WHY THAT AUDIT WAS BLIND, AND THE ROWS THAT ARE NOT ==================
+    # The block above calls itself "a closed energy audit of the whole pool" and
+    # it is nothing of the kind. Read what it borrows from render.py: ONE name,
+    # `out_of_water`, sandwiched between an `E_w` and an `L_w` this file writes
+    # itself. Everything the round that follows went looking for is on the other
+    # side of that sandwich --
+    #
+    #   * whether render.py applies the trapped series TO THE BED at all. The
+    #     audit closes the series in its own `1/(1 - rho r_int)` and never asks
+    #     the renderer for it. The shipped bedret pass truncates at ONE bounce
+    #     over the TIR cone alone and drops the 58% of that cone that meets a
+    #     wall; the audit is arithmetically incapable of noticing.
+    #   * absorption. `apparent_albedo` has no `a` and no depth: every path
+    #     length in it is exactly 1. So the up leg -- the term the round's own
+    #     closed form was found to be missing -- cannot appear in it either way.
+    #   * geometry. There is no basin: no walls to take the beam, no sail.
+    #
+    # It is a good unit test of one divisor wearing the title of an audit. The
+    # rows below go through the shipped chain instead: `rho_water` IS what
+    # render.py's diagnostics quote, and the right-hand side is still the number
+    # 1. The other half of the fix is in render.py, which now prints the three
+    # scene terms the closed form has no room for, each signed and measured.
+    check(1, '2 E_3(0) == 1 exactly (a transparent slab transmits all of it)',
+          R._e3(0.0), np.ones(1), 1e-14,
+          'the cosine measure 2 mu dmu integrates to 1; this is the row that '
+          'catches a dropped leading 2, which halves every path in the chain')
+    # -- 2 E_3 by a route with nothing in common with a Gauss-Legendre rule on
+    #    mu: the exponential-integral recurrence E_{n+1} = (e^-x - x E_n)/n run
+    #    down to E_1, and E_1 by its own convergent series. Two quadratures
+    #    would have shared a premise; a recurrence and a series do not.
+    EULER = 0.5772156649015329
+    def _E1(x):
+        s, t = -EULER - np.log(x), 1.0
+        for k in range(1, 80):
+            t = t * (-x) / k
+            s = s - t / k
+        return s
+    xs = R.ABS * R.DEPTH
+    rec = np.array([np.exp(-x) * (1. - x) + x * x * _E1(x) for x in xs])
+    check(3, 'T_DIFF_UP == e^-x (1-x) + x^2 E_1(x)  [quadrature vs recurrence]',
+          R.T_DIFF_UP, rec, 1e-10,
+          'E_3 by the recurrence from E_1, with E_1 by its own series -- no '
+          'quadrature node in common with render.py\'s 400-point Gauss-Legendre '
+          'rule. 1e-10 is float64 accumulation over 80 series terms')
+    between(1, 'the diffuse path is LONGER than the vertical: 2E_3(ad) < e^-ad',
+            float(np.max(R.T_DIFF_UP - np.exp(-xs))), -1.0, -1e-4,
+            'an inequality, not a fit: a cosine-distributed pencil crosses the '
+          'slab at 1/mu >= 1, so its mean transmittance cannot reach the '
+            'vertical one. It is 0.542 against 0.694 in red, and a chain that '
+            'used exp(-a d) here would be 28% high on that channel')
+
+    # -- THE AUDIT, RE-COMPOSED THROUGH THE SHIPPED CHAIN.
+    _cs = float(R.cos_i)
+    check(1, 'LOSSLESS WHITE POOL through rho_water: R(sun) + rho_w == 1',
+          R.fresnel(_cs) + R.rho_water(1.0, absorb=0.0), np.ones(3), 1e-12,
+          'energy conservation, and the right-hand side is the number 1. Unlike '
+          'the audit above this goes through render.py\'s own transport: drop '
+          'the up leg from its numerator and the row reads 1/T_up too high; put '
+          'a one-way transmittance where the round trip belongs and it misses '
+          'too. 1e-12 is float64 -- at zero absorption there is no quadrature '
+          'left in it')
+    for rho in (0.222, 0.585, 0.681, 0.95):
+        # the same limit off unity, against a formula written HERE from this
+        # file's own quadratured r_int -- `wet_albedo`'s algebra with R_ext
+        # swapped for the directional R(sun), which is the only difference
+        # between a thin film under a diffuse sky and a pool under a beam.
+        rs = np.array([float(fresnel_exact(np.array([_cs]), nc)[0][0])
+                       for nc in n])
+        exp_ = rs + (1. - rs) * (1. - r_int) * rho / (1. - rho * r_int)
+        check(3, 'lossless pool albedo == wet_albedo\'s algebra at R(sun), '
+                 'rho=%.3f' % rho,
+              R.fresnel(_cs) + R.rho_water(rho, absorb=0.0), exp_, 1e-3,
+              'render.py composes a beam, a bed, an up leg and a series; this '
+              'side is the closed geometric sum written out with r_int taken '
+              'from this file\'s own 20000-node quadrature through the TIR '
+              'cone. 1e-3 relative is that quadrature\'s spread', rel=True)
+
+    # -- AND THE TRUNCATION, PRICED. This is the row that would have caught the
+    #    shipped bedret pass, and it is INFO because the deficit is real, named
+    #    in the README and not closed this round: closing it needs a wall -> bed
+    #    return leg, which needs an up-going intersector `scene_hit` is not.
+    # -- THE WHOLE CHAIN AT THE FILE'S OWN ABSORPTION, AGAINST A PHOTON WALK.
+    # The lossless limit above pins the SHAPE of the series and is blind to
+    # every path length in it, because at a = 0 every path is 1. Two of the
+    # three errors this round found -- a numerator missing its up leg, and a
+    # one-way transmittance where a round trip belongs -- pass that limit
+    # untouched, and they were caught here instead. A second quadrature would
+    # have shared the premise; this is an analog random walk: a photon enters
+    # at the refracted angle, crosses to the bed, is redrawn from a cosine law,
+    # attenuates over its OWN 1/mu, meets the exact internal Fresnel and either
+    # escapes or comes back. Nothing in it is an average of anything.
+    rng = np.random.default_rng(20260812)
+    NMC = 400_000
+    ci_s = float(R.cos_i)
+    st = np.sqrt(1. - ci_s ** 2) / n
+    tsl = np.exp(-R.ABS * R.DEPTH / np.sqrt(1. - st ** 2))
+    rsun = np.array([float(fresnel_exact(np.array([ci_s]), nc)[0][0]) for nc in n])
+    rb = np.array([0.222, 0.585, 0.681])
+
+    def _rint_mu(mu, nc):
+        sa = nc * np.sqrt(np.maximum(1. - mu ** 2, 0.))
+        ca = np.sqrt(np.maximum(1. - sa ** 2, 0.))
+        rs = ((nc * mu - ca) / (nc * mu + ca)) ** 2
+        rp = ((nc * ca - mu) / (nc * ca + mu)) ** 2
+        return np.where(sa >= 1., 1., .5 * (rs + rp))
+
+    mc = np.zeros(3)
+    for c in range(3):
+        wt = np.full(NMC, (1. - rsun[c]) * tsl[c] * rb[c])
+        esc = 0.0
+        for _ in range(80):
+            mu = np.sqrt(rng.random(NMC))            # cosine law off the bed
+            wt = wt * np.exp(-R.ABS[c] * R.DEPTH / mu)
+            rr = _rint_mu(mu, n[c])
+            esc += float((wt * (1. - rr)).sum())
+            wt = wt * rr * np.exp(-R.ABS[c] * R.DEPTH / mu) * rb[c]
+            if wt.sum() < 1e-12 * NMC:
+                break
+        mc[c] = esc / NMC
+    check(3, 'rho_water at the file\'s own ABS vs a %dk-photon walk' % (NMC // 1000),
+          R.rho_water(rb), mc, 4e-3,
+          'the walk\'s own standard error on 400k photons is under 1e-3 '
+          'relative; 4e-3 covers it and the direction-sampling bias with room '
+          'to spare. Factorising T_esc fails this row by 5-19%%, and dropping '
+          'the up leg by 85%% in red -- neither of which the lossless limit '
+          'above can see', rel=True)
+    info(3, '  ... the two wrong writings of the same chain, on this row',
+         'factorised %s | no up leg %s | walk %s'
+         % (np.round(R._e3(R.ABS * R.DEPTH) * (1. - r_int) * (1. - rsun) * tsl
+                     * rb / (1. - rb * R._e3(R.ABS * R.DEPTH) ** 2 * r_int), 5),
+            np.round((1. - r_int) * (1. - rsun) * tsl * rb
+                     / (1. - rb * R._e3(R.ABS * R.DEPTH) ** 2 * r_int), 5),
+            np.round(mc, 5)),
+         'both pass the lossless limit and both fail the walk; that is why the '
+         'walk is here')
+
+    full = R.trap_gain(rb)
+    one_cone = R.trap_gain(rb, bounces=1, cone_only=True)
+    info(1, 'the trapped series, closed vs the shipped pass\'s own model',
+         'closed %s | one bounce over the TIR cone %s | ratio %s'
+         % (np.round(full, 4), np.round(one_cone, 4),
+            np.round(one_cone / full, 4)),
+         'render.py returns the bed\'s light once, over 1 - 1/n^2 of the '
+         'directions instead of R_int, and only for the share that reaches the '
+         'surface without meeting a wall. The first two are arithmetic and are '
+         'priced here; the third is geometry and is priced in the render\'s own '
+         'print. This is what the audit above cannot see, because it never asks '
+         'render.py for the series at all')
+    between(1, 'the truncated trap is a LOWER bound on the closed one',
+            float(np.max(one_cone - full)), -1.0, 0.0,
+            'a truncated geometric series with a smaller ratio cannot exceed the '
+          'closed one with the larger. It is the sign that matters: a render '
+            'short of its own trap is dark, never bright, so this deficit can '
+            'never be mistaken for the opposite defect the 1/n^2 round closed')
+
 
 # ============================ TIER 1 / 3: WHERE THE SUBMERGED WALLS STAND
 # `scene_hit` used to put the four walls on the PLAN RECTANGLE, s = 0, while
@@ -1824,8 +1981,8 @@ def tier3_geometry(R):
           'the estimator\'s own standard error over %dk samples is %.5f; 4 sigma'
           % (K // 1000, float(w.std()) / np.sqrt(K)))
     # -- THE SHIPPED LATTICE, at the heights the WALLS added. The row above
-    # samples the weight at random; the picture is made with 240 FIXED
-    # directions (20 log-spaced distance strata x 12 azimuth strata, jittered
+    # samples the weight at random; the picture is made with 960 FIXED
+    # directions (40 log-spaced distance strata x 24 azimuth strata, jittered
     # once at import), so its error is not a standard error -- it is a
     # deterministic quadrature bias that is a function of the face's height over
     # its own foot. On a riser that height is 20-240 mm; on a wall it runs to
@@ -1846,7 +2003,8 @@ def tier3_geometry(R):
               % (100 * LAT_ERR))
     info(3, '  ... worst lattice bias over those heights', '%.2f%%'
          % (100 * LAT_ERR),
-         'systematic, not noise: every texel shares the same 240 directions')
+         'systematic, not noise: every texel shares the same lattice, so the '
+         'bias is a function of the height and not of the texel')
     # -- THE BED <-> WALL TRANSFER, BY RECIPROCITY. This is the conservation
     # identity behind the round that lit the pool walls, and the two sides of it
     # are computed by code that shares nothing but the pool's dimensions.
@@ -1865,7 +2023,7 @@ def tier3_geometry(R):
     # empty box, so what comes back is pure geometry.
     #
     # Neither side can be right by construction. One is an arctangent formula
-    # evaluated over the floor; the other is 240 traced rays per texel with a
+    # evaluated over the floor; the other is 960 traced rays per texel with a
     # closed-form Jacobian weight, evaluated over the walls. They meet only
     # through the reciprocity theorem.
     #
@@ -2574,9 +2732,15 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
       field, on 672 points over all four sides. What is still untested is the
       SAIL half of it, which is stubbed to 1 for that row.)
     * `_riser_shade` and the riser bounce MAP -- the closure of its estimator is
-      tested, the map it produces is not.
+      tested, the map it produces is not. Nor is the term that was found to be
+      striping the step unit: `_riser_shade` reads the BED's caustic map as a
+      stand-in for a caustic on a vertical face, and nothing here says the point
+      it now reads -- the refracted beam's continuation to the face's own foot --
+      is the right one. What says it is render.py's own arc-scale print, which
+      measures each of the four terms' structure along AND up the face and would
+      show a height-independent term as a z/arc of zero.
     * The WALL bounce map, and here the gap has a shape worth naming. What is
-      tested is the estimator's GEOMETRY: the shipped 240-direction lattice
+      tested is the estimator's GEOMETRY: the shipped 960-direction lattice
       against `_ris_closure` over the wall's own height range, and the bed <->
       wall transfer against the exact rectangle view factor by reciprocity, both
       with a unit radiance and an empty box substituted for the scene. What is
@@ -2586,7 +2750,12 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
       render.py's own `wall bounce:` print, which measures the term's size every
       run, and the ordering verdict in the colour regression.
     * The bed-return (TIR) map: TIR_FRAC and TIR_VERT are tested, the 2.4 M-ray
-      splat that spends them is not.
+      splat that spends them is not. Its TRUNCATION is now priced -- one bounce
+      over the TIR cone against the closed series, in a row above -- but that row
+      compares two closed forms; no row here reads the splat's own output, and
+      the 58% of the cone it drops on the walls is measured only by render.py's
+      own print. This is the largest single gap in the file's transport and it is
+      the one the README's water/stone section ends on.
 
   TESTED IN PART
     * The meniscus. Its GEOMETRY is now well covered -- a force balance on the

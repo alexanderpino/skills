@@ -26,6 +26,8 @@ Chain (terrain-renderer/references/12-water-rendering.md):
 Nothing in the caustic pattern is authored: no texture, no Voronoi, no noise.
 The chromatic fringing on the bed is emergent -- three IORs, three fold sets.
 """
+import os as _os
+import time as _time
 import numpy as np
 from PIL import Image
 
@@ -167,6 +169,137 @@ T_OUT_DIFFUSE = 1. - R_INT       # = (1 - R_EXT)/n^2 = 0.526/0.524/0.519
 def wet_albedo(a):
     return R_EXT[None] + (1. - R_EXT[None]) * (1. - R_INT[None]) * a / (
         1. - a * R_INT[None])
+
+
+# --- THE POOL'S OWN ALBEDO, IN CLOSED FORM ------------------------------------
+# `wet_albedo` above is the same physics over a film thin enough to have no
+# absorption in it. A POOL is that chain with a 1.40 m column in every leg, and
+# it is the quantity that settles the water-to-deck comparison without a
+# photograph, an exposure or a camera: a deck and a water surface are both
+# HORIZONTAL, so the irradiance that lights them is the same number and cancels
+# in their ratio, leaving two albedos. Written in FLUX rather than radiance,
+# which is what keeps the n^2 inside R_int instead of carried loose:
+#
+#   rho_w = (1 - R_ext(sun)) * T_slant * rho_bed * T_up * (1 - R_int)
+#                            / (1 - rho_bed * T_up * T_dn * R_int)
+#
+# Every factor has a name: the beam gets in, crosses to the bed at the REFRACTED
+# slant, is reflected, crosses back up, and gets out -- with the geometric series
+# counting the light the underside sends back down and the bed sends back up.
+#
+# THE UP LEG IS IN THE NUMERATOR AND IT IS EASY TO DROP. The writing this round
+# was handed had `T_slant * rho_bed * (1 - R_int) / (1 - rho_bed * T_round *
+# R_int)`: a round trip in the denominator and no one-way transmission in the
+# numerator at all. That over-states the answer by 1/T_up -- 13.0% in luminance
+# at this depth and 85% in red -- and it is the whole of why the prediction that
+# opened the round read 0.61-1.00 where the corrected form reads 0.55-0.88. The
+# numerator must carry exactly ONE up leg and the denominator exactly one round
+# trip; `validate.py` pins that with a limit no arithmetic slip can reach.
+#
+# T_up and T_dn are the same number and it is NOT exp(-a d). A Lambertian bed
+# radiates over a cosine distribution, so the flux transmittance of the column
+# is <exp(-a d / mu)> over the measure 2 mu dmu, which is the third exponential
+# integral,   T_diff = 2 E_3(a d),   evaluated below by Gauss-Legendre on mu and
+# by nothing else. At this depth it is 0.542 / 0.871 / 0.972 against the vertical
+# exp(-a d) of 0.694 / 0.929 / 0.986: the diffuse path is longer than the
+# vertical one and the difference is a fifth of the red.
+def _e3(x):
+    """2 E_3(x) -- the cosine-weighted flux transmittance of a slab of optical
+    depth x, by Gauss-Legendre on mu in (0, 1]. The leading 2 is the
+    normalisation of the measure 2 mu dmu; dropping it halves every answer, and
+    that is exactly what the first writing of this block did."""
+    _m, _w = np.polynomial.legendre.leggauss(400)
+    _m, _w = .5 * (_m + 1), .5 * _w
+    return 2. * np.array([(_w * _m * np.exp(-xx / _m)).sum()
+                          for xx in np.atleast_1d(x)])
+
+
+T_DIFF_UP = _e3(ABS * DEPTH)
+
+
+# ...AND THE TWO INTEGRALS DO NOT FACTORISE, which is the correction this round
+# makes to its own first writing. `T_diff * (1 - R_int)` treats the attenuation
+# of an up leg and its chance of escaping as independent. They are not: a steep
+# ray escapes AND crosses less water, a grazing one is totally reflected AND
+# crosses more, so the two are positively correlated and the product of the
+# means understates the mean of the product -- by 19.4% in red, 5.1% in green,
+# 1.1% in blue. The round trip is correlated the other way and the factorised
+# form OVERstates it by 30% in red. So the escape and the trap are written here
+# as ONE integral each, over the water-side cosine, with the exact internal
+# Fresnel inside them:
+#
+#   T_esc = INT_0^1 2 mu exp(-a d / mu) (1 - R_int(mu)) dmu
+#   G_rt  = INT_0^1 2 mu exp(-2 a d / mu)    R_int(mu)  dmu
+#
+# and then, because the bed redraws the direction from a cosine law at every
+# bounce, the series really is geometric in rho * G_rt and nothing is lost:
+#
+#   rho_w = (1 - R_ext(sun)) T_slant rho_bed T_esc / (1 - rho_bed G_rt)
+#
+# `validate.py` holds this against a photon Monte-Carlo that shares no line with
+# it and agrees to 0.1%, which is the only way a correlated integral can be
+# checked -- a second quadrature would have shared the premise.
+_SQM, _SQW = np.polynomial.legendre.leggauss(2000)
+_SQM, _SQW = .5 * (_SQM + 1), .5 * _SQW          # water-side cosine on (0, 1]
+_SQ_SINA = IOR[None] * np.sqrt(np.maximum(1. - _SQM[:, None] ** 2, 0.))
+_SQ_TIR = _SQ_SINA >= 1.0
+_SQ_COSA = np.sqrt(np.maximum(1. - _SQ_SINA ** 2, 0.))
+_SQ_RS = ((IOR[None] * _SQM[:, None] - _SQ_COSA)
+          / (IOR[None] * _SQM[:, None] + _SQ_COSA)) ** 2
+_SQ_RP = ((IOR[None] * _SQ_COSA - _SQM[:, None])
+          / (IOR[None] * _SQ_COSA + _SQM[:, None])) ** 2
+# the internal reflectance of the surface for a ray arriving from BELOW at
+# cosine mu: exactly 1 past the critical angle, the Fresnel mean inside it.
+R_INT_MU = np.where(_SQ_TIR, 1.0, .5 * (_SQ_RS + _SQ_RP))
+
+
+def slab_esc(dep=DEPTH, absorb=None):
+    """The share of a Lambertian bed's upward flux that escapes on its FIRST
+    pass: attenuation and escape integrated together, not multiplied."""
+    a = ABS if absorb is None else np.asarray(absorb, float)
+    return (_SQW[:, None] * 2. * _SQM[:, None]
+            * np.exp(-a[None] * dep / _SQM[:, None])
+            * (1. - R_INT_MU)).sum(0)
+
+
+def slab_trap(dep=DEPTH, absorb=None, cone_only=False):
+    """The share of that flux that is returned by the surface and arrives back
+    at the bed -- one round trip, at the same cosine, since a specular interface
+    does not change it. `cone_only` replaces the exact internal Fresnel with a
+    perfect mirror past the critical angle and nothing inside it, which is the
+    model the shipped bedret pass carries."""
+    a = ABS if absorb is None else np.asarray(absorb, float)
+    r = np.where(_SQ_TIR, 1.0, 0.0) if cone_only else R_INT_MU
+    return (_SQW[:, None] * 2. * _SQM[:, None]
+            * np.exp(-2. * a[None] * dep / _SQM[:, None]) * r).sum(0)
+
+
+def trap_gain(rho, dep=DEPTH, bounces=None, absorb=None, cone_only=False):
+    """The light trap under the surface, as a factor on the bed's own light.
+    `bounces=None` closes the geometric series; an integer truncates it at that
+    many returns, which is what turns the render's own truncation into a number
+    rather than an omission -- `bounces=1, cone_only=True` is exactly the model
+    the shipped bedret pass carries, before any of its geometry."""
+    g = np.asarray(rho) * slab_trap(dep, absorb, cone_only)
+    if bounces is None:
+        return 1.0 / (1.0 - g)
+    return sum(g ** k for k in range(bounces + 1))
+
+
+def rho_water(rho_bed, cos_sun=None, dep=DEPTH, bounces=None, absorb=None):
+    """Apparent albedo of the water column: the share of the beam falling on the
+    surface that comes back out of it, EXCLUDING the surface's own reflection.
+    Add `fresnel(cos_sun)` to it and a LOSSLESS WHITE-BEDDED pool comes to
+    exactly 1 -- energy conservation, with no constant of this file in the
+    right-hand side. That limit pins the SHAPE of the series but it cannot see
+    a path length, because at zero absorption every path is 1; what pins the
+    legs is the Monte-Carlo row beside it, at the file's own absorption."""
+    ci = cos_i if cos_sun is None else cos_sun
+    a = ABS if absorb is None else np.asarray(absorb, float)
+    st = np.sqrt(np.maximum(1. - np.asarray(ci, float) ** 2, 0.)) / IOR
+    tsl = np.exp(-a * dep / np.sqrt(1. - st ** 2))
+    return ((1. - fresnel(ci)) * tsl * np.asarray(rho_bed) * slab_esc(dep, absorb)
+            * trap_gain(rho_bed, dep, bounces, absorb))
 
 
 
@@ -417,6 +550,39 @@ CAM_EL = np.deg2rad(-33.35)
 FOV = np.deg2rad(46.0)
 TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
                             np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
+
+# --- THE WHOLE-BASIN VIEW, AND WHY IT IS IN THE FILE NOW ---------------------
+# `gauntlet/evidence/w12-wide.png` was made on a SCRATCH COPY of this file with
+# the camera moved by hand, and the water-to-stone ratio that opened this round
+# was measured off it. A number that carries a finding cannot come out of a copy
+# nobody can re-run, so the wide camera is now a switch on the shipped file and
+# the measurement block at the foot of the render reports the same two ratios in
+# either frame. The hero is untouched with the switch off, which is the point.
+#
+# WHERE IT STANDS is the scratch copy's own eye, recorded in that commit: (11.5,
+# 2.0, 3.6) with a 62 deg lens, landscape. WHERE IT LOOKS is derived rather than
+# transcribed -- at the basin's plan centre (4, 2, 0), which fixes the aim to
+# CAM_AZ = atan2(0, -7.5) = 180 deg and CAM_EL = -atan(3.6/7.5) = -25.64 deg.
+# That aim is 3.75 deg off the sun's own plan bearing (176.25 deg in this file's
+# math convention), so the specular road runs up the middle of the frame; that
+# is a property of standing east of a pool with a western sun and it is what
+# makes the far half of the wide frame dark. It is not a composition choice and
+# it must not be yawed away, because the ratio being measured is exactly the one
+# the road contaminates.
+POOL_WIDE = _os.environ.get('POOL_WIDE', '') not in ('', '0', 'no', 'off')
+if POOL_WIDE:
+    W, H = 3600, 2400                       # landscape, same SS
+    EYE = np.array([11.50, 2.00, 3.60])
+    _wtgt = np.array([4.0, 2.0, 0.0])
+    _wd = _wtgt - EYE
+    CAM_AZ = float(np.arctan2(_wd[1], _wd[0]))
+    CAM_EL = float(np.arctan2(_wd[2], np.hypot(_wd[0], _wd[1])))
+    FOV = np.deg2rad(62.0)
+    TGT = _wtgt
+    print("WIDE CAMERA: eye %s, aim %s, bearing %.2f deg (math), elevation "
+          "%.2f deg, %.0f deg lens, %dx%d output"
+          % (EYE, TGT, np.degrees(CAM_AZ), np.degrees(CAM_EL),
+             np.degrees(FOV), W // SS, H // SS))
 # The sail follows the frame, as it did when the eye moved 0.40 m north and it
 # moved 0.70 m with it. Same quad, same heights, same shape: +1.50 m in y, which
 # is a TRANSLATION and not a reshaping. It is the whole of what the yaw above
@@ -1542,18 +1708,36 @@ BED_DRY = shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=np.zeros_like(BDEP),
 # a near-field integral of the floor 5 cm away, and at the waterline 1.4 m up it
 # is a far-field integral of the whole basin, attenuated over metres of water.
 # Both are printed, per height, further down.
-# ? THIS RESOLUTION IS SIZED FOR THE HERO FRAME AND THE UNDERWATER PASS BROKE IT.
-# ? 512 arc samples on the outer nosing is 18.4 mm, which at the hero's 3.4 m is
-# ? well under an output pixel and invisible. The camera at the foot of this file
-# ? stands 1.2 m from the same faces, where one bin is 26 OUTPUT PIXELS wide, and
-# ? the estimator's bin-to-bin variation reads as hard vertical stripes over the
-# ? whole step unit -- with the bilinear interpolation's creases visible in them.
-# ? It is the estimator's own noise, made visible by a 3x closer look at the same
-# ? buffer, and it wants about 4x the arc resolution. NOT changed here: this
-# ? number is on the hero frame's path and the underwater pass shipped under a
-# ? bit-identity contract. Recorded in the README as the next round's work.
-RIS_NT, RIS_NZ = 512, 24        # arc samples per cylinder (18 mm), height samples
-RIS_ND, RIS_NP = 20, 12         # distance strata x azimuth strata = 240 directions
+# THE ARC RESOLUTION, AND WHY IT IS 2048 AND NOT 512.
+# The previous round found this and could not spend it: 512 arc samples on the
+# outer nosing is 18.4 mm, which at the hero's 3.4 m is well under an output
+# pixel and invisible, while the underwater camera stands 1.2 m from the same
+# faces, where one bin is 26 OUTPUT PIXELS wide. At that width the estimator's
+# bin-to-bin variation stops being noise on a texture and becomes hard vertical
+# stripes over the whole step unit, with the bilinear read's own creases visible
+# in them. It was left at 512 because the hero frame was under a bit-identity
+# contract; that contract is lifted, so it is spent here.
+#
+# SIZED, NOT CHOSEN. The requirement is that one arc bin project to under one
+# output pixel at the closest camera in the file. The underwater eye stands
+# `UW_EYE` at 1.2 m from the outer nosing, its pixel subtends PIXANG/... -- in
+# round numbers 0.60 mrad of object angle per output pixel there, i.e. 0.72 mm
+# on the face. 2 pi R / N <= 0.72 mm at R = 1.50 m gives N >= 13 000, which is
+# not affordable and is not the right target either: what has to vanish is the
+# STEP, and the bilinear read makes the map C0, so the visible artefact is the
+# slope break and it falls as 1/N. 2048 bins is 4.6 mm, 6.5 output pixels at
+# 1.2 m and a quarter of the previous slope break; below that the map's own
+# smoothness takes over from the sampling. The number is the marked 4x.
+#
+# WHAT IT COSTS, measured rather than estimated: the gather is
+# 4 * RIS_NT * RIS_NZ faces x 240 directions, so this is exactly 4x the ray
+# count of that pass -- 11.8 M traces to 47.2 M. Timed at the head of the pass
+# and printed below; on this machine the whole render goes from 5m24s to 6m38s,
+# +23%, and RIS_MAP's own footprint from 9 MB to 35 MB. Nothing else in the file
+# reads RIS_NT, and the map is normalised per texel, so no level moves with it:
+# the closure print below is the guard, and it must not move.
+RIS_NT, RIS_NZ = 2048, 24       # arc samples per cylinder (4.6 mm), height samples
+RIS_ND, RIS_NP = 40, 24         # distance strata x azimuth strata = 960 directions
 RIS_D0, RIS_D1 = 0.006, 120.0   # sampled range of bed distance, m. The upper
                                 # end is far past the 8.9 m basin diagonal on
                                 # purpose: those are the near-horizon directions
@@ -1988,6 +2172,7 @@ print("  ...and it is not a constant to be corrected: the wall runs %s at the "
 
 # --- THE SAME GATHER, ON THE RISERS ------------------------------------------
 RIS_MAP, RIS_FOOT, _mbs = [], [], []
+_ris_t0 = _time.time()
 _rstat = np.zeros(3)                        # [bed+wall hits, riser hits, samples]
 _rtrunc = []
 for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
@@ -2023,12 +2208,17 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
     _rstat += [_vf[:, :2].sum(), _vf[:, 2].sum(), _vf.shape[0]]
     _mbs.append(_E.mean(0))
     RIS_MAP.append(_acc.reshape(RIS_NZ, RIS_NT, 3))
+_RIS_SEC = _time.time() - _ris_t0
 print("riser bounce: %d faces x %d directions; view-factor closure %.3f of the "
       "0.500 a vertical face has by geometry (%.3f of it is the truncation to "
       "%.0f mm - %.0f m, %.1f%% is rays dropped on another riser)"
       % (4 * RIS_NT * RIS_NZ, RIS_ND * RIS_NP, _rstat[0] / max(_rstat[2], 1),
          np.mean(np.concatenate(_rtrunc)), 1000 * RIS_D0, RIS_D1,
          100 * _rstat[1] / max(_rstat[2], 1)))
+print("  %d arc bins is %.1f mm on the outer nosing; the pass took %.1f s and "
+      "the maps hold %.1f MB"
+      % (RIS_NT, 1000 * 2 * np.pi * CYL[2][2] / RIS_NT, _RIS_SEC,
+         sum(m.nbytes for m in RIS_MAP) / 1e6))
 print("  it adds %s of irradiance against %s of sky ambient on the same face "
       "-- and unlike the sky term it carries the caustic net"
       % (np.round(np.mean(_mbs, 0), 3), np.round(SKY_AMB * WALL_SKY, 3)))
@@ -3598,7 +3788,7 @@ def _menis_fold_guard(Vm, guard):
     return w
 
 
-def _riser_shade(hxr, hyr, hzr, ci, c, mode):
+def _riser_shade(hxr, hyr, hzr, ci, c, mode, parts=False):
     """A cylindrical riser of the step unit. No caustic map is rasterised for
     these faces: the caustic pass drops the rays that reach them (that IS the
     cast shadow), and the mean refracted sun grazes them 2.6 deg on the dark
@@ -3624,20 +3814,114 @@ def _riser_shade(hxr, hyr, hzr, ci, c, mode):
     lev = np.clip(0.74 + 0.030 * (0.5 + 0.5 * np.sin(hxr * 3.1 + .7)
                                   * np.sin(hyr * 4.3 - .4) - 0.6), .05, .95)
     ndl = np.clip(Nx * -TSUN_DIR[0] + Ny * -TSUN_DIR[1] + Nz * -TSUN_DIR[2], 0, 1)
-    # ? the caustic that lands on a riser is read off the bed map 30 mm radially
-    # ? outside it -- the map is indexed by bed position and a vertical face has
-    # ? none. Only the bench crescent is lit at all, so this is a 6-pixel term.
+    # THE CAUSTIC ON A VERTICAL FACE, AND WHERE THE MAP HAS TO BE READ.
+    # The caustic pass drops the rays that reach a riser -- that IS the unit's
+    # cast shadow on the floor behind it -- so no map is rasterised for these
+    # faces and the bed's map has to stand in. It stood in AT THE FACE'S OWN
+    # (x, y), 30 mm radially out, and that is wrong in a way that is visible:
+    # the read has NO DEPENDENCE ON HEIGHT, so whatever the bed's pattern is
+    # doing at that (x, y) is smeared vertically up the whole 240 mm of riser.
+    # A pattern with structure at 3 mm (the bed map's own texel) and none at all
+    # in z is a comb of VERTICAL STRIPES, and measured along the arc it carries
+    # 41% rms where the bed bounce beside it carries 1.5%. That is the synthetic
+    # tell on the step unit, and it is not the arc resolution and not the
+    # gather's noise: quadrupling both moved the picture's stripe rms from 1.372
+    # to 1.363 encoded levels, i.e. not at all.
+    #
+    # WHERE IT BELONGS, derived rather than filtered. The refracted beam is one
+    # direction, TSUN_DIR, and flux is conserved along it: the horizontal flux
+    # density crossing height z is the same density that would cross the bed
+    # plane further along the beam. So the point on the face at height z is lit
+    # by the beam that, had the face not been there, would have landed at
+    #     (x, y) + (z - z_foot) * TSUN_DIR_xy / (-TSUN_DIR_z),
+    # which for this unit's tallest riser is 249 mm of run and is a function of
+    # z. Reading there instead of at (x, y) is not a smoothing of the artefact,
+    # it is the removal of its cause: the map read now varies up the face
+    # exactly as the illumination does, and the `ndl / cos_t` beside it -- flux
+    # per horizontal area turned into flux per face area -- was already right
+    # and is unchanged.
+    #
+    # ? What is still a proxy: the bed map is focused at each texel's OWN depth,
+    # ? so using it at the face's height ignores the focusing over that 0.25 m
+    # ? of run. The bed's own folds move by less than their width over it, and
+    # ? no better source exists without rasterising a riser caustic map in the
+    # ? pass, which is filed in the README rather than done here.
+    _zfoot = bed_z(hxr + ox * .030, hyr + oy * .030)
+    _slb = np.maximum(hzr - _zfoot, 0.) / (-TSUN_DIR[2])
     cau = sample((bed[c] if mode == 'disp' else bed[3])[..., None],
-                 hxr + ox * .030, hyr + oy * .030, X0, X1, Y0, Y1)[:, 0]
+                 hxr + ox * .030 + TSUN_DIR[0] * _slb,
+                 hyr + oy * .030 + TSUN_DIR[1] * _slb, X0, X1, Y0, Y1)[:, 0]
     aow = bed_ao(hxr, hyr, hzr)
     ao = aow * .5 * (1. + Nz)          # a vertical face sees half the sky
     bnc = riser_bounce(hxr, hyr, hzr, ci)[:, c]
     tir = sample(bedret[..., c:c + 1], hxr, hyr, X0, X1, Y0, Y1)[:, 0] * \
         aow * (TIR_VERT + (1. - TIR_VERT) * Nz)
-    return LINER_TINT[c] * lev * (
-        SUN_COL[c] * cos_i * TSUN * cau * (ndl / cos_t) * np.exp(-ABS[c] * d / cos_t)
-        + SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55)
-        + tir + bnc)
+    _k = LINER_TINT[c] * lev
+    _sun = _k * SUN_COL[c] * cos_i * TSUN * cau * (ndl / cos_t) * np.exp(
+        -ABS[c] * d / cos_t)
+    _sky = _k * SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55)
+    if parts:
+        # `parts` exists so the arc-scale diagnostic below cannot drift from the
+        # shader: the four terms are RETURNED, never re-derived.
+        return _sun, _sky, _k * tir, _k * bnc
+    return _sun + _sky + _k * (tir + bnc)
+
+
+# --- WHICH TERM STRIPES THE STEP UNIT, MEASURED ------------------------------
+# The previous round marked `RIS_NT` with a diagnosis: 512 arc bins is 18.4 mm,
+# 26 output pixels wide at the underwater camera's 1.2 m, and "the step unit is
+# striped with the estimator's own noise". THAT DIAGNOSIS IS WRONG, and this
+# block is what refutes it. Taking the arc resolution to 2048 and the gather's
+# direction count from 240 to 960 -- 4x and 4x, both of which act on `bnc` and
+# on nothing else -- moved the stripe rms on the underwater frame's own near
+# riser from 1.372 to 1.363 encoded levels. The map got genuinely smoother (its
+# cell-scale contrast fell from 11-18% of the bed's to 6-12%), and the picture
+# did not change. A term that can be quartered in noise without moving the
+# artefact is not the artefact's source.
+#
+# So the four terms are measured separately, along the arc the camera actually
+# sees, at the arc scale one output pixel spans there. The receiver is the outer
+# nosing, R = 1.50 m, at mid-height; the high-pass window is the arc that one
+# output pixel of the underwater camera covers FACE ON, which is the scale that
+# survives to the picture everywhere except at the silhouette -- and near the
+# silhouette every one of these is compressed by 1/cos and every one of them
+# aliases, so the question is only which one has the contrast to show it.
+_ARC_N, _ARC_NZ = 4096, 24
+_arc_th = (np.arange(_ARC_N) + .5) / _ARC_N * 2 * np.pi
+_arc_R, _arc_C = CYL[2][2], CYL[2][:2]
+_arc_x1 = _arc_C[0] + _arc_R * np.cos(_arc_th)
+_arc_y1 = _arc_C[1] + _arc_R * np.sin(_arc_th)
+_arc_ok = pool_sdf(_arc_x1, _arc_y1) < 0.0
+_arc_zf = np.minimum(bed_z(_arc_C[0] + (_arc_R + 2e-3) * np.cos(_arc_th),
+                           _arc_C[1] + (_arc_R + 2e-3) * np.sin(_arc_th)),
+                     CYL[2][3] - 1e-3)
+_arc_t = (np.arange(_ARC_NZ) + .5) / _ARC_NZ
+_arc_zz = _arc_zf[None] + _arc_t[:, None] * (CYL[2][3] - _arc_zf)[None]
+_arc_p = _riser_shade(np.broadcast_to(_arc_x1, _arc_zz.shape).ravel(),
+                      np.broadcast_to(_arc_y1, _arc_zz.shape).ravel(),
+                      _arc_zz.ravel(), np.full(_arc_zz.size, 2, np.int64),
+                      1, 'mono', parts=True)
+_arc_p = [p.reshape(_ARC_NZ, _ARC_N) for p in _arc_p]
+_arc_tot = sum(_arc_p)
+_arc_k = max(int(round(0.030 / (2 * np.pi * _arc_R / _ARC_N))), 3)
+_arc_m = max(_arc_tot[:, _arc_ok].mean(), 1e-12)
+print("what stripes the step unit, measured on the outer nosing's own face "
+      "(R = %.2f m, %d x %d samples = %.1f mm of arc; arc rms is a %.0f mm "
+      "high-pass, z rms is the spread UP the face at fixed arc -- a term with "
+      "arc structure and NO z structure is a vertical comb, which is the "
+      "artefact):"
+      % (_arc_R, _ARC_NZ, _ARC_N, 1000 * 2 * np.pi * _arc_R / _ARC_N, 30.))
+for _nm, _t in (("direct sun   ", _arc_p[0]), ("sky ambient  ", _arc_p[1]),
+                ("TIR return   ", _arc_p[2]), ("bed bounce   ", _arc_p[3])):
+    _ar = np.mean([_hipass(_t[_j], _arc_k)[_arc_ok].std()
+                   for _j in range(_ARC_NZ)])
+    _zr = _t[:, _arc_ok].std(0).mean()
+    print("   %s share %5.1f%%   arc rms %5.1f%%   z rms %5.1f%%   z/arc %.3f"
+          % (_nm, 100 * _t[:, _arc_ok].mean() / _arc_m, 100 * _ar / _arc_m,
+             100 * _zr / _arc_m, _zr / max(_ar, 1e-12)))
+print("   -- the whole face: arc rms %.1f%% of a mean of %.4f"
+      % (100 * np.mean([_hipass(_arc_tot[_j], _arc_k)[_arc_ok].std()
+                        for _j in range(_ARC_NZ)]) / _arc_m, _arc_m))
 
 
 # --- THE FILLET'S UNDERSIDE IS NOT ON A CAMERA PATH, and the reason is one line
@@ -5123,6 +5407,282 @@ for _nm, _k in (("wall,   0-100 mm", 7), ("wall, 100-250 mm", 9),
                  100 * _b / max(_a + _b, 1e-12)))
 
 
+# --- THE POOL'S OWN ALBEDO, MEASURED AGAINST THAT CLOSED FORM ----------------
+# `rho_water` is derived at the head of the file, beside the interface constants
+# it is made of. This is where it is evaluated for this scene and compared with
+# what the frame actually produced.
+# the bed's own albedo as the picture uses it: `liner()` over the deep floor,
+# which is 0.74 * LINER_TINT modulated by its mottle. Read, not retyped.
+_RHO_BED = LIN[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
+_TSLANT = np.exp(-ABS * slant)
+_RSUN = fresnel(cos_i)                    # (3,) -- 12% of the beam never enters
+_SERIES = trap_gain(_RHO_BED)
+RHO_WATER = rho_water(_RHO_BED)
+_Y3 = np.array([.2126, .7152, .0722])
+# the beam and the sky, as irradiance/pi -- the units `shade` and `_stone` both
+# write their light in, so no conversion enters this comparison.
+_EBEAM = SUN_COL * SUN_DIR[2]
+_ESKY = SKY_AMB.copy()
+print("the pool's apparent albedo, closed form from this file's constants:")
+print("  T_slant %s   T_esc %s   G_roundtrip %s   trapped series %s"
+      % (np.round(_TSLANT, 4), np.round(slab_esc(), 4), np.round(slab_trap(), 4),
+         np.round(_SERIES, 4)))
+print("  ...and the two forms this round corrected on the way here, for the "
+      "record: factorising T_esc as T_diff*(1-R_int) gives %s (lum %.4f) and "
+      "dropping the up leg entirely -- the writing the round was handed -- "
+      "gives %s (lum %.4f) against the joint form's %.4f."
+      % (np.round(_TSLANT * _RHO_BED * (1. - _RSUN) * T_DIFF_UP * (1. - R_INT)
+                  / (1. - _RHO_BED * T_DIFF_UP ** 2 * R_INT), 4),
+         (_Y3 * _EBEAM * _TSLANT * _RHO_BED * (1. - _RSUN) * T_DIFF_UP
+          * (1. - R_INT) / (1. - _RHO_BED * T_DIFF_UP ** 2 * R_INT)).sum()
+         / (_Y3 * _EBEAM).sum(),
+         np.round(_TSLANT * _RHO_BED * (1. - _RSUN) * (1. - R_INT)
+                  / (1. - _RHO_BED * T_DIFF_UP ** 2 * R_INT), 4),
+         (_Y3 * _EBEAM * _TSLANT * _RHO_BED * (1. - _RSUN) * (1. - R_INT)
+          / (1. - _RHO_BED * T_DIFF_UP ** 2 * R_INT)).sum()
+         / (_Y3 * _EBEAM).sum(),
+         (_Y3 * _EBEAM * RHO_WATER).sum() / (_Y3 * _EBEAM).sum()))
+print("  rho_bed %s -> rho_water %s, luminance %.4f"
+      % (np.round(_RHO_BED, 4), np.round(RHO_WATER, 4),
+         (_Y3 * _EBEAM * RHO_WATER).sum() / (_Y3 * _EBEAM).sum()))
+
+# --- WHAT THAT FORM LEAVES OUT, PRICED IN THE RENDER'S OWN SCENE -------------
+# It is a prediction for an INFINITE basin under a beam, and this one is 8 x 4 x
+# 1.40 m with a shade sail over it. Three terms separate it from what this
+# scene's own bed actually receives, and they do not have the same sign. Each is
+# measured off the maps the picture is made from, not argued.
+_SUNLIT = (BDEP >= DEPTH - 1e-6) & (bed_sun(BU, BV, -DEPTH) > 0.98)
+_CAUBAR = np.array([bed[c][_SUNLIT].mean() for c in range(3)])
+_EBED_SUN = _EBEAM * TSUN * _CAUBAR * _TSLANT           # the beam, as it lands
+_EBED_SKY = SKY_AMB * BED_AO[_SUNLIT].mean() * np.exp(-ABS * DEPTH * 1.55)
+_EBED_RET = BEDRET[_SUNLIT].reshape(-1, 3).mean(0)
+print("  ...and the three things that form leaves out, measured on this scene's "
+      "own sunlit deep floor (%.1f m2 of it):" % (_SUNLIT.mean() * 32.0))
+print("     1. the beam does not all reach the bed. `cau` there means %s of the "
+      "incident, not 1: the sail takes 5.1 m2 and the 44.4 deg refracted beam "
+      "walks 1.37 m east, so the last 1.37 m of it lands on the EAST WALL. That "
+      "light is not lost -- the wall gather reads it back -- but it is not on "
+      "the bed, and the closed form has no wall to put it on. Signed DOWN."
+      % np.round(_CAUBAR, 4))
+print("     2. the sky is on the bed and not in the form. Beam %s against sky "
+      "%s of irradiance/pi -- the sky is %.0f%% of the green and %.0f%% of the "
+      "blue that lights this floor, and the closed form has none of it. "
+      "Signed UP." % (np.round(_EBED_SUN, 3), np.round(_EBED_SKY, 3),
+                      100 * _EBED_SKY[1] / (_EBED_SUN[1] + _EBED_SKY[1]),
+                      100 * _EBED_SKY[2] / (_EBED_SUN[2] + _EBED_SKY[2])))
+print("     ...and the beam ALONE, which is the only thing the closed form has, "
+      "measured at the bed: %s against the form's %s -> %s per channel, %+.1f%% "
+      "in luminance. THAT is the transport gap, and it is a quarter and not a "
+      "factor of two. The sky the form omits is worth %+.1f%% on the same bed "
+      "and more than fills it, which is why the total comes out level -- two "
+      "errors of opposite sign, and neither of them is small."
+      % (np.round(_EBED_SUN, 3),
+         np.round(_EBEAM * TSUN * _TSLANT * _SERIES, 3),
+         np.round(_EBED_SUN / (_EBEAM * TSUN * _TSLANT * _SERIES), 3),
+         100 * ((_Y3 * _EBED_SUN).sum()
+                / (_Y3 * _EBEAM * TSUN * _TSLANT * _SERIES).sum() - 1),
+         100 * (_Y3 * _EBED_SKY).sum()
+         / (_Y3 * _EBEAM * TSUN * _TSLANT * _SERIES).sum()))
+print("     3. the trap is carried at ONE bounce over the TIR cone only. It "
+      "adds %s, i.e. x%s on the bed, against the closed series' x%s. Three "
+      "reasons and all three are geometry the form has no room for: the cone is "
+      "1 - 1/n^2 = %.4f and not R_int = %.4f (the partial Fresnel inside the "
+      "cone is dropped), 58%% of the cone meets a WALL before it reaches the "
+      "surface, and the returning half is splatted onto walls as well as bed. "
+      "Signed DOWN."
+      % (np.round(_EBED_RET, 4),
+         np.round(1. + _EBED_RET / (_EBED_SUN + _EBED_SKY), 4),
+         np.round(_SERIES, 4), TIR_FRAC, R_INT[1]))
+
+# --- and the same quantity MEASURED off the frame ----------------------------
+# Two things have to be right for a measurement to be comparable with a flux:
+#
+#  * it is a MEAN, not a median. The caustic net is a strongly right-skewed
+#    field -- its own map has mean 1 by construction and a median well under it
+#    -- so a median over water reads the caustic CELL rather than the water,
+#    while the same median over unlit stone reads the stone. Taking the median
+#    of both and dividing is not a like-for-like comparison and it is biased
+#    against the water by exactly the skew. Both are printed; the mean is the
+#    one the closed form is about.
+#  * it is scene-linear. `colour_table` reads sRGB code values, which have been
+#    through an ACES curve AND a display-side S -- so its numbers are
+#    display-referred and its ratios carry the curve, which is the same failure
+#    bar section J2c pins on the reference photographs. This block reads HDRP.
+_hy = HDRP @ _Y3
+_ndz = np.zeros(W * H)
+_ndz[np.flatnonzero(inp)] = np.abs(D[inp, 2])
+_ndz = _ndz.reshape(H // SS, SS, W // SS, SS).mean((1, 3))
+_w3 = REG == 3
+_s4 = REG == 4
+_cosv = _ndz[_w3].mean()
+# The emergent field from a Lambertian bed under a surface is itself near
+# Lambertian, so a directional radiance is turned into an albedo by the shape
+# factor T(theta_v)/(1 - R_ext_diff): the Fresnel this view angle actually sees
+# over the cosine-weighted mean of the same Fresnel. At the angles this frame
+# spans it is within 2% of one, which is the quantitative form of "geometry
+# cannot produce a factor of two".
+_SHAPE = (1. - fresnel(_cosv)) / (1. - R_EXT)
+_plt_mean = _plw[_w3, 1].mean()
+_rho_w_meas = _plt_mean / (_Y3 * _EBEAM * _SHAPE).sum()
+_rho_w_pred = (_Y3 * _EBEAM * RHO_WATER).sum() / (_Y3 * _EBEAM).sum()
+print("  measured over the sunlit floor (%d px, mean view %.1f deg from "
+      "vertical, shape factor %.3f):" % (_w3.sum(), np.degrees(np.arccos(_cosv)),
+                                         (_Y3 * _EBEAM * _SHAPE).sum()
+                                         / (_Y3 * _EBEAM).sum()))
+print("     transmitted column, mean %.4f  median %.4f  (skew ratio %.3f)"
+      % (_plt_mean, np.median(_plw[_w3, 1]), np.median(_plw[_w3, 1]) / _plt_mean))
+print("     rho_water measured %.4f  against closed form %.4f  -> %+.1f%%"
+      % (_rho_w_meas, _rho_w_pred, 100 * (_rho_w_meas / _rho_w_pred - 1)))
+
+# --- the stone, and the ratio the whole comparison is about ------------------
+# The stone's albedo is NOT read off `_stone`'s table: that table is multiplied
+# by the undeviated 0.30 on the direct beam (the file's oldest open finding), so
+# the number in it is not what the picture responds to. What is comparable with
+# a closed form is the stone's EFFECTIVE albedo -- its rendered radiance over
+# the irradiance/pi a horizontal facet in this scene receives, beam plus sky --
+# and that is a measurement of the frame rather than a reading of a constant.
+_L_stone = _hy[_s4].mean()
+_rho_stone_eff = _L_stone / (_Y3 * (_EBEAM + _ESKY)).sum()
+print("  sunlit stone: mean %.4f  median %.4f -> effective albedo %.4f "
+      "(the table's own %s is 0.593 in luminance, and it gets 0.30 of the beam: "
+      "the two errors are opposite and they very nearly cancel, which is why "
+      "the open `0.30` finding does not show up in this ratio)"
+      % (_L_stone, np.median(_hy[_s4]), _rho_stone_eff,
+         np.round(np.array([.715, .572, .438]), 3)))
+# THE SPECULAR COLUMN CANNOT BE MEANED WITHOUT SAYING SO. A sun glint is a rare
+# event of enormous radiance -- L_SUN is 3.6e5 in these units against a water
+# pixel's 0.5 -- so the arithmetic mean of the reflected column over water is a
+# statement about how many glints the region caught, not about the water. Both
+# statistics are printed and the gap between them IS the glitter.
+_sp_mean, _sp_med = _plw[_w3, 0].mean(), np.median(_plw[_w3, 0])
+print("  the reflected column over that same floor: mean %.3f, median %.3f -- "
+      "a factor %.0f, and all of it is sun glitter. Any mean taken over the "
+      "WHOLE pixel is that factor's hostage; the transmitted column is not."
+      % (_sp_mean, _sp_med, _sp_mean / max(_sp_med, 1e-12)))
+print("  WATER / SUNLIT STONE, scene-linear luminance:")
+print("     %.3f  transmitted column, mean over mean   <- against %.3f closed "
+      "form. The form's water is lit by the BEAM alone and the render's stone "
+      "by beam AND sky, so this is the render's own stone with the form's own "
+      "water; the albedo-for-albedo reading beside it is %.3f against %.3f."
+      % (_plt_mean / _L_stone,
+         _rho_w_pred * (_Y3 * _EBEAM * _SHAPE).sum() / _L_stone,
+         _rho_w_meas / _rho_stone_eff, _rho_w_pred / _rho_stone_eff))
+print("     %.3f  transmitted mean + reflected median (the glitter held out)"
+      % ((_plt_mean + _sp_med) / _L_stone))
+print("     %.3f  median over median, scene-linear -- the caustic's skew, and "
+      "nothing else, is the whole of the gap to the line above"
+      % (np.median(_hy[_w3]) / np.median(_hy[_s4])))
+_med_sr = np.median(hero[REG == 3].reshape(-1, 3), 0)
+_med_ss = np.median(hero[REG == 4].reshape(-1, 3), 0)
+print("     %.3f  median over median, DISPLAY-LINEAR off the sRGB frame -- what "
+      "reading the PNG gives. It is not the same quantity: the ACES curve and "
+      "the display-side S sit between them, and the two surfaces are far apart "
+      "in level, which is exactly the regime bar J2c says a tone curve breaks. "
+      "Add the caustic's skew and this is the number the round opened on."
+      % ((_srgb_lin(_med_sr) @ _Y3) / (_srgb_lin(_med_ss) @ _Y3)))
+
+# --- the second measurement: submerged wall against the dry band above it ----
+# The owner's naked-eye observation is that the submerged wall is LIGHTER than
+# the dry liner band over it on EVERY side. Every side is the load-bearing word:
+# no azimuth lights all four, so the cause cannot be direct sun. This frame's
+# wall is the north one, whose poolward normal has N.L = -0.061 -- the averted
+# wall the observation is about. Reported beside the ratio above because if one
+# is short and the other is not they are separate faults, and if both are short
+# by comparable factors one term is missing and it lives in the internal field.
+#
+# AND THE COMPARISON TURNS ON ONE FACTOR BEFORE ANY LIGHT IS COUNTED. The
+# submerged wall is an IN-WATER radiance seen from the air, so it takes
+# `out_of_water` -- a division by n^2 -- and the dry band 10 cm above it takes
+# nothing. The wall has to be n^2 = 1.78x brighter than the band BELOW the
+# surface merely to draw level with it above the surface. That is the whole
+# price of the owner's observation and it is a number, not an impression.
+#
+# The water path is measured beside the ratio so that it cannot be blamed for
+# the answer: this frame sees the top of the wall through CENTIMETRES of water,
+# not metres, so whatever is short here is short at essentially zero path.
+_b6 = REG == 6
+_wsm = np.zeros(W * H)
+_wsm[np.flatnonzero(inp)] = WSM
+_wsm = _wsm.reshape(H // SS, SS, W // SS, SS).mean((1, 3))
+if _b6.sum() >= 100:
+    _Lband = _hy[_b6].mean()
+    print("  submerged wall / dry band above it, scene-linear luminance "
+          "(band = %.4f, and the two are ONE PIGMENT: `tiles` is 0.82 x "
+          "LINER_TINT against `liner_band`'s 0.74 x the same, so the wall is "
+          "the MORE reflective of the two by 11%%):" % _Lband)
+    for _nm, _k, _r in (("wall,   0-100 mm", 7, WREG),
+                        ("wall, 100-250 mm", 9, WREG)):
+        _s = _r == _k
+        if _s.sum() < 100:
+            continue
+        print("     %s: %.3f mean, %.3f median, seen through %.3f-%.3f m of "
+              "water (mean %.3f)  -> %s"
+              % (_nm, _hy[_s].mean() / _Lband, np.median(_hy[_s]) / _Lband,
+                 _wsm[_s].min(), _wsm[_s].max(), _wsm[_s].mean(),
+                 "wall LIGHTER" if _hy[_s].mean() > _Lband
+                 else "wall darker -- NOT the naked-eye ordering"))
+    # THE PATH IS NOT THE EXPLANATION, AND THE BINS SAY SO IN THE WRONG
+    # DIRECTION: binned by the traced water leg the ratio RISES with the leg,
+    # because a deeper texel sees more of the bed. So these bins are reading
+    # DEPTH, not absorption, and there is nothing here to extrapolate back to
+    # zero -- the shortfall is already at full size in the first bin. What they
+    # do establish is the scale, which is what kills the path as a candidate.
+    _sw = (WREG == 7) | (WREG == 9)
+    if _sw.sum() >= 200:
+        _q = np.quantile(_wsm[_sw], np.linspace(0, 1, 6))
+        print("     binned by the water leg, transmitted column only:")
+        for _a, _b in zip(_q[:-1], _q[1:]):
+            _m = _sw & (_wsm >= _a) & (_wsm < _b + 1e-9)
+            if _m.sum() < 40:
+                continue
+            print("        %.3f-%.3f m: transmitted %.4f -> %.3f of the band; "
+                  "reflected %.4f on top; Beer-Lambert over that leg alone is "
+                  "worth %.3f" % (_a, _b, _plw[_m, 1].mean(),
+                                  _plw[_m, 1].mean() / _Lband, _plw[_m, 0].mean(),
+                                  (_Y3 * np.exp(-ABS * _wsm[_m].mean())).sum()
+                                  / _Y3.sum()))
+        print("        -- the ratio RISES with the leg, so the bins read DEPTH "
+              "(a deeper texel sees more bed) and not absorption. The whole "
+              "span here is under 0.4 m of water; a receiver short by a factor "
+              "of two at 10 mm of it is short in the RECEIVER.")
+
+    # --- AND WHERE IT IS SHORT, DERIVED RATHER THAN GUESSED ------------------
+    # A submerged vertical face's UPGOING half hemisphere is not the sky. It is
+    # the underside of the surface, and that underside is two different things
+    # either side of the critical angle: inside the Snell cone it is the
+    # transmitted sky, compressed into 48.6 deg about the VERTICAL -- the worst
+    # placement there is for a vertical receiver -- and outside it, over
+    # 1 - 1/n^2 of the directions, it is a PERFECT MIRROR showing the pool's own
+    # upwelling field.
+    #
+    # `WALL_SKY = 0.5` is exactly right as a PARTITION of a hemisphere and it is
+    # not a description of what fills the upper half: it hands a submerged face
+    # the same sky an above-water face gets. How wrong that is, is closed form,
+    # and the file already owns both halves of it in `tir_vert`:
+    #     E_vert(hemisphere) / E_bed(hemisphere) = tir_vert(0) = 0.5
+    #     E_vert(cone t > tc) / E_bed(cone t > tc) = TIR_VERT
+    #     E_bed(cone) / E_bed(hemisphere) = 1 - 1/n^2 = TIR_FRAC
+    # so the WINDOW's share of a vertical face is 0.5 - TIR_VERT * TIR_FRAC, and
+    # the bed's share of the same window is 1/n^2. Their ratio is what a
+    # submerged vertical face may have of the sky, and it is not 0.5.
+    _VWIN = (0.5 - TIR_VERT * TIR_FRAC) * IOR[1] ** 2
+    print("     WHERE IT IS SHORT. A submerged vertical face reaches the sky "
+          "only through the Snell window, a %.1f deg cone about the VERTICAL. "
+          "Its share of the sky is %.3f of the bed's by that closed form; the "
+          "render hands it WALL_SKY x WAO = %.2f x %.2f = %.3f, over-giving the "
+          "sky by x%.2f. What should fill the REST of that upper half is the "
+          "mirror -- the %.1f%% the underside returns -- and the render supplies "
+          "it from the one-bounce TIR pass priced above, which is carrying "
+          "x%.4f of the closed series' x%.4f. Over-count the sky, under-count "
+          "the mirror, and they do not cancel: the wall lands at %.2f of the "
+          "band where the observation puts it over 1. THIS IS A SEPARATE FAULT "
+          "FROM THE WATER/STONE RATIO ABOVE, WHICH IS LEVEL."
+          % (np.degrees(np.arcsin(1.0 / IOR[1])), _VWIN, WALL_SKY, 0.78,
+             WALL_SKY * 0.78, WALL_SKY * 0.78 / _VWIN, 100 * R_INT[1],
+             (1. + _EBED_RET / (_EBED_SUN + _EBED_SKY))[1], _SERIES[1],
+             _hy[WREG == 7].mean() / _Lband))
+
+
 # --- THE FREEBOARD BAND, MEASURED --------------------------------------------
 # Bar section B2b makes two falsifiable claims about this band and both are
 # measured here rather than admired.
@@ -5547,8 +6107,9 @@ print("  the strongest 0.1%% of single-primary pixels, split exclusively: %.0f%%
          100 * (_top & _isr & ~_wm).sum() / max(_top.sum(), 1),
          100 * (_top & _wm).sum() / max(_top.sum(), 1)))
 
-Image.fromarray(hero).save("pool_final.png")
-print("wrote pool_final.png")
+_HERO_PNG = "pool_wide.png" if POOL_WIDE else "pool_final.png"
+Image.fromarray(hero).save(_HERO_PNG)
+print("wrote %s" % _HERO_PNG)
 
 # A patch of sunlit floor between the camera and the step unit -- aimed by
 # projecting the point, not by a remembered pixel index.
@@ -5567,7 +6128,7 @@ def crop(a, label):
 A, B = crop(mono, 'mono'), crop(hero, 'disp')
 cmp = Image.new('RGB', (A.width * 2 + 18, A.height), (16, 18, 20))
 cmp.paste(A, (0, 0)); cmp.paste(B, (A.width + 18, 0))
-cmp.save("pool_final_dispersion.png")
+cmp.save(_HERO_PNG.replace(".png", "_dispersion.png"))
 # The zoom is aimed at the radius step, because that is where the claims under
 # test are legible: three arc nosings displaced and undulating with the same
 # slope field that writes the caustics, a tonal staircase from the shorter
@@ -5594,8 +6155,10 @@ ZW = int(np.clip(_zpix[:, 0].max() + 12, 0, W // SS) - ZX)
 ZH = int(np.clip(_zpix[:, 1].max() + 12, 0, H // SS) - ZY)
 print("zoom on the step unit: %dx%d px at (%d, %d)" % (ZW, ZH, ZX, ZY))
 Image.fromarray(hero[ZY:ZY + ZH, ZX:ZX + ZW]).resize(
-    (ZW * S, ZH * S), Image.LANCZOS).save("pool_final_zoom.png")
-print("wrote pool_final_dispersion.png, pool_final_zoom.png")
+    (ZW * S, ZH * S), Image.LANCZOS).save(
+        _HERO_PNG.replace(".png", "_zoom.png"))
+print("wrote %s, %s" % (_HERO_PNG.replace(".png", "_dispersion.png"),
+                        _HERO_PNG.replace(".png", "_zoom.png")))
 
 
 # ===================================================== THE CAMERA UNDER THE WATER
@@ -5669,8 +6232,9 @@ print("wrote pool_final_dispersion.png, pool_final_zoom.png")
 #     equivalent here. The surface is 0.6-1.6 m from this eye, so the footprint
 #     is millimetres against a 28 mm dominant wave and there is little left to
 #     remove -- but "little" is a measurement and it is printed, not asserted.
-import os as _os
-import time as _time
+# `os` and `time` are imported at the head of the file now: the wide camera
+# below has to read the environment before the camera block runs, and the riser
+# gather has to be timed, both of which are thousands of lines above here.
 
 UW_ON = _os.environ.get('POOL_UNDERWATER', '') not in ('', '0', 'no', 'off')
 
