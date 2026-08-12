@@ -242,6 +242,32 @@ least-confident-claims ledger in `00-index.md`.
   frame spans** (`D`, 2026-08). The closed-form check that separates them with no quadrature is the
   Brewster value `R(atan n) = ((n²−1)/(n²+1))²/2` — 0.03894/0.03948/0.04050 on this file's three
   IORs, against Schlick's 0.0303/0.0306/0.0314, i.e. **22% low** (`P`, arithmetic).
+- **P/D** — [Radiance is not conserved across the
+  interface](12-water-rendering.md#radiance-is-not-conserved-across-the-interface). The invariance of
+  `L/n²` across a refracting boundary is standard radiometry — the **n-squared law for radiance**,
+  also called the *fundamental theorem of radiometry*, a consequence of the étendue `n² dA dΩ` being
+  the conserved quantity. Cite **Nicodemus, "Radiance", *American Journal of Physics* 31(5) 368–377
+  (1963)** (`P`, verified 2026-08: the paper states `L/n²` invariant along a ray *and across a
+  smooth boundary between lossless media*). For the water-specific statement and the same
+  arithmetic, the [Ocean Optics Web Book](https://www.oceanopticsbook.info/) carries it under that
+  name with an in-water-to-air reduction of 1.76 at its own `n` (`D`, ocean-optics reference text);
+  Preisendorfer's *Hydrologic Optics* is the usual deeper citation but **the specific volume and
+  section were not confirmed here — do not cite it for this without checking** (`?`).
+  `n² = 1.774/1.782/1.796` and the 0.827–0.844 stops are arithmetic on the reference
+  implementation's IOR triple (`D`); the 1.78× is that, not a general constant — it moves with the
+  body's IOR exactly as `F0` does. **Walsh's relation** `n²(1 − R_int) = 1 − R_ext`: the identity is
+  `P` (a two-line consequence of the n² law plus Fresnel reciprocity, and quadratured both ways in
+  `reference-impl/validate.py`), and it is cross-checked there against the independent Egan &
+  Hilgeman (1979) empirical fit for internal diffuse reflectance to 0.09%. The **name** is the
+  attribution that could not be closed: it is widely attached to J. W. T. Walsh, "The reflection
+  factor of a polished glass surface for diffused light", *Illumination Research Technical Paper*
+  No. 2 (1926), but the original was not read here (`?` on the name, not on the relation). The
+  diffuse figures `1 − R_int = 0.526/0.524/0.519` and `R_int ≈ 0.476` are quadratures here (`D`).
+  The energy audit — a lossless body with a white Lambertian bed returns **exactly 1**, against 1.73
+  without the divisor and 1.31 with a `1/n` — is energy conservation and contains no constant of the
+  renderer (`P`, arithmetic). The **verification** half of this entry, and why a Fresnel suite cannot
+  see any of it, is `11`'s
+  [sixth way a measurement lies](11-verification-failures.md#six-ways-a-measurement-lies-while-looking-like-one).
 - **P/D** — [The view from inside, and the split shot](12-water-rendering.md#the-view-from-inside-and-the-split-shot).
   The critical angle, the exactness of total internal reflection outside it, the `d/n` apparent
   depth and the flat-port field narrowing (46° → ≈34° at `n = 1.333`) are textbook geometrical
@@ -398,6 +424,23 @@ least-confident-claims ledger in `00-index.md`.
   of it and not the direct sun. Both are properties of that step unit at that sun; the transferable
   claim is that a receiver with no direct sun and one flat ambient loses its *colour* as well as
   its level, and that the bounce is the term carrying the caustic net onto a vertical face.
+  The **ceiling on that bounce**, added in the same section, is the half of this entry that is *not*
+  a property of the basin. A Lambertian source is view-independent, so a neighbour cannot
+  concentrate it; the form factor from a differential element on a plane to the adjoining infinite
+  perpendicular plane is exactly **½** — standard radiative transfer, in any view-factor catalogue
+  (Hottel & Sarofim, *Radiative Transfer*, 1967; Modest, *Radiative Heat Transfer*), and recomputed
+  here two ways, in closed form (the neighbour fills half the cosine-weighted hemisphere, the sky the
+  other half) and against a 4M-sample cosine-weighted Monte-Carlo, **0.49996** (`P` + arithmetic,
+  2026-08). Hence `L_wall ≤ ρ_wall·L_floor/2` for *any* diffuse-lit neighbour — a cave wall, a
+  canyon, a light well — with no water in the argument. What is measured on this basin (`D`) are the
+  numbers that price it: `ρ_wall = 0.82·LINER_TINT = (0.246, 0.648, 0.754)`, so the ceiling is
+  **12 / 32 / 38 %** of the floor's radiance; the shipped gather delivers **0.77 / 0.83 / 0.87** of
+  that ceiling, which is the fact that turns "add more bounce" into a dead end; and the east/north
+  split — **2.63 / 1.63 / 1.39×** the deep floor on the wall the refracted sun lands on against
+  **0.34 / 0.57 / 0.72×** on the one it never reaches (direct caustic 0.000) — is that sun, that
+  basin and that liner. The transferable claim is the inequality and the diagnostic that follows it:
+  the *ordering* of two surfaces at one depth through one water is invariant to exposure, tone curve
+  and white point, being a ratio of radiances within a single frame.
 - **P/D** — The bubble constant. `1 − 1/n²` is the cosine-weighted flux beyond the critical angle
   and equals **43.7%** at `n = 1.333` (44.3% at 1.34) — arithmetic here, and the same quantity as
   `cos²θ_c`. The 0.999 red transmission over 5 mm is Beer-Lambert on the corrected `a(610)`. The

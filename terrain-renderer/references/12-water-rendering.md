@@ -83,6 +83,8 @@ the reference implementation or read off a photograph, not supposed.
 | The far surface breaks into a coarse moiré | The other end of the same trade: **no distance-dependent narrowing of the slope distribution**, so a band is still sampled at a footprint wider than itself. The fix narrows the distribution per component; it cannot be applied to the shaded result afterwards, because shading is nonlinear in slope | [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) |
 | A moiré that *beats* slowly with distance — a band fades, returns, fades again | The footprint filter is a **box**: its sinc has negative lobes to −0.217, so the band comes back phase-inverted as the footprint grows. Gaussian at `σ = 0.3748·fp`, which is the only kernel positive and monotone | [Pick the kernel](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver) |
 | Caustic cell interiors too dark **and** an occluder's shadow too bright, in one frame | One flat ambient standing in for a **directional inter-reflection**: it under-fills where a lit surface should be bouncing and over-fills where nothing should. Errors of opposite sign in one frame are a missing transport path, never a constant that needs raising | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
+| The seen bottom reads bright against the sky reflected in the same pixel, and no exposure fixes both at once | **Radiance is not conserved across a refracting interface** — `L/n²` is. The reflected column is air-side and right; the transmitted one is an in-water radiance shipped without its `1/n²`, so it is 1.78× hot. A *relative* error inside one pixel, which is why a grade cannot absorb it | [Radiance is not conserved](#radiance-is-not-conserved-across-the-interface) |
+| A submerged wall is too dark, and adding more bounce does not help | The refracted sun does not reach it. A surface lit only by a neighbouring diffuse one is capped at **half its own albedo** times that neighbour's radiance — the form factor to an adjoining infinite plane is exactly ½ — so a floor-lit wall is *necessarily* darker than the floor and no gather can be tuned past it | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | A submerged step's riser, or a shaded wall face, renders flat and near-neutral grey | The third symptom of that same missing leg: the receiver gets **no direct sun and one flat ambient**, so a grazing sky reflection wins by default and the bounce that should carry both colour and the caustic net is absent | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | A shadowed region on the bed is a dark hole | The sun-visibility gate treated as **binary** when the occluder is fabric or foliage. Shade cloth transmits ~15–30% *diffusely*: the caustic term is still gated hard to zero, and an ambient term belongs underneath it | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | The caustic pattern plays across a shadow on the bed | The same gate missing altogether, or sampled at the **receiver** instead of at the surface entry point — metres apart at low sun. Nothing else announces "this is a scrolling texture" so loudly | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
@@ -1182,10 +1184,12 @@ them.** A coinage that reads like a standard is worse than one that admits it:
 
 Everything else that reads like jargon is standard, and knowing the field it comes from is what
 lets you check it. **Radiance, irradiance and radiant intensity** are SI radiometry and are used
-here *exactly*: the `1/n²` factors in the caustic budget and in [Underwater, a load-time constant
-is two constants](#underwater-a-load-time-constant-is-two-constants) are radiance-conservation
+here *exactly*: the `1/n²` factors in the caustic budget, on [the transmitted
+column](#radiance-is-not-conserved-across-the-interface) and in
+[Underwater, a load-time constant is two
+constants](#underwater-a-load-time-constant-is-two-constants) are radiance-conservation
 bookkeeping and nothing else, and a renderer that treats radiance as a synonym for brightness drops
-them silently. **BSDF/BRDF/BTDF**, **Fresnel reflectance and transmittance**, the **critical angle**
+them silently. **Form factor** is standard radiative-transfer too, and is used here exactly. **BSDF/BRDF/BTDF**, **Fresnel reflectance and transmittance**, the **critical angle**
 and **Snell's window** are optics; **mean square slope** is Cox & Munk's own term; **capillary
 length** and **Young–Laplace** are surface physics; **eikonal**, **Hamiltonian** and **wave action**
 are wave mechanics; **optical depth**, **single-scattering albedo**, **Secchi depth**, **Jerlov
@@ -1311,6 +1315,55 @@ descriptor — ocean, clear lake, and turbid river must not share one global con
   true split-screen meniscus (render both states, mask by the wave-displaced waterline in screen
   space — expensive, hero-camera only). The untreated version — one frame of neither-state
   garbage at the crossing — is a certified review catch.
+
+### Radiance is not conserved across the interface
+
+The composition at the top of this section reads as a blend of two radiances, and it is not one.
+The reflected term is measured in **air**; the refracted term — bottom albedo times the irradiance
+that got through the surface — is measured in **water**, and radiance does not survive a change of
+index. What is invariant along a pencil is **`L/n²`**, because the étendue `n² dA dΩ` is. So the
+transmitted column leaves the water as
+
+```
+L_air = T(theta_v) * L_in / n^2,     n^2 = 1.774 / 1.782 / 1.796 on an IOR triple of 1.3320/1.3348/1.3400
+```
+
+and a shader that omits the divisor renders the bed **1.78× too bright** — 0.827 to 0.844 stops.
+
+**No exposure setting absorbs it, because it is a *relative* error inside one pixel.** The sky term
+is air-side and already correct, so the two columns of the same `lerp` disagree by `n²`. That is
+exactly the reflected-versus-transmitted ratio a water body is judged on, and a grade cannot move
+one half of a pixel. This project shipped the omission for its whole run.
+
+**The diffuse form, and the trap that follows it.** For a Lambertian source under the surface the
+same transport integrates to `(1 − R_ext)/n² = 1 − R_int` — **0.526 / 0.524 / 0.519** on those
+IORs, Walsh's relation, and the same `R_int ≈ 0.476` that drives the [trapped
+series](#the-two-materials-a-pool-actually-has-and-neither-is-water). A renderer will happily carry
+that on **one** route out of the interface and not on another: `reference-impl` had a hand-written
+`0.5` on the diffuse route (upwelling radiance onto the surrounding stone) while the camera's own
+route through the `lerp` had nothing at all. Two exits from one interface disagreeing by `n²`, with
+nothing in the file comparing them. Enumerate every place light leaves the medium and check that
+they all divide by the same thing.
+
+**Fitted constants do not launder it, but you need something to prove that with.** The standard
+objection is that albedos and exposure were fitted to a photograph with the factor absent and may
+be compensating for it, so applying the divisor and raising exposure to compensate would only move
+the error. What breaks that circle is a calibration target with **no water path**: here, the [dry
+liner band](#the-two-materials-a-pool-actually-has-and-neither-is-water) above the waterline — same
+pigment, no absorption, no interface and no `n²` between it and the eye, so its radiance over its
+own irradiance reads the albedo directly. A pigment secretly carrying a missing 1.78 would have to
+sit 78% off a published PVC value; measured, it was within 8%, and neither the liner tint nor the
+exposure moved when the divisor went in. Absent such a target, fix the physics and *state* that the
+constants fitted around it are now suspect — do not raise exposure to put the brightness back.
+
+**Two guards, and neither could have been written from the derivation.** Walsh's relation
+`n²(1 − R_int) = 1 − R_ext`, with both sides quadratured independently, pins the **exponent** and
+not merely the presence of a factor — at `n¹` the two sides part by 25% and at `n³` by 33%. And a
+closed energy audit: a body with a perfect white Lambertian bed and no absorption must have an
+apparent albedo of **exactly 1**; composed with the divisor it is 1, without it **1.73**, with a
+`1/n` instead **1.31**. Neither guard contains a constant of the renderer. Why a large suite of
+Fresnel tests could not see any of this — and why that generalises past water — is
+[`11`](11-verification-failures.md#six-ways-a-measurement-lies-while-looking-like-one).
 
 ### The view from inside, and the split shot
 
@@ -1981,6 +2034,37 @@ missing is one bounce off the sunlit tread and floor a few centimetres in front 
 does not merely brighten the receiver — it **moves its colour**, and it is the only one of the two
 terms that carries the caustic net onto a vertical surface. A riser lit by a flat ambient is a
 riser with no net moving on it, which is the cheapest way to spot the defect in a still frame.
+
+**And that bounce has a hard ceiling, which is the other half of the same diagnostic.** A
+Lambertian surface's radiance is **view-independent**, so a neighbouring surface cannot concentrate
+its light — it can only re-emit what it absorbs. The form factor from a point on a wall to the
+adjoining infinite floor is exactly **½** (the floor fills half the wall's cosine-weighted
+hemisphere; everything above the floor plane fills the other half), so `E = ½·π·L_floor` and
+
+```
+L_wall = rho_wall * L_floor / 2
+```
+
+A surface lit *only* by a neighbouring diffuse surface is therefore **necessarily darker than it**
+— at most `rho/2`, which on the reference pool's wall albedo `(0.25, 0.65, 0.75)` is **12 / 32 /
+38 %** of the floor's radiance. This is not a pool fact: it bounds a cave wall beside a lit floor, a
+canyon wall, the shaft of a light well, any receiver whose only source is a diffuse neighbour.
+
+**The renderer rule that follows is a stop sign.** If a submerged wall renders too dark, *adding
+bounce cannot fix it* and a multiplier on the gather is the wrong move — on the reference pool the
+gather already sits at **0.77 / 0.83 / 0.87** of its own theoretical maximum, so there is no
+headroom in the term at all. Check instead whether the **refracted sun reaches that wall**. When a
+photograph shows a submerged wall reading *brighter* than the water beside it, that wall is
+directly lit, and which wall is bright is decided by where the refracted beam lands — nothing else
+in the transport can produce that ordering. In this scene the split is stark: the east wall carries
+the refracted sun and reads **2.63 / 1.63 / 1.39×** the deep floor's radiance, while the north wall
+— the one wall of four the refracted beam never reaches, direct caustic **0.000** — reads
+0.34 / 0.57 / 0.72× the same floor, on the same liner at the same depth (`D`).
+
+That last comparison is worth keeping as an instrument. The **ordering** between two surfaces at
+the same depth, seen through the same water, is invariant to exposure, tone curve and white point —
+it is a ratio of radiances in one frame — which makes it one of the very few checks a grade cannot
+fake.
 
 **Sharpness has a physical floor, and it scales with depth.** The sun is not a point: its disc
 subtends **0.53°**, and refraction compresses that cone on entry by `cos(theta_i)/(n·cos(theta_t))`

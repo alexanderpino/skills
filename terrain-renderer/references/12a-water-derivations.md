@@ -1738,7 +1738,7 @@ A seventh disagreement, found while closing the four, is recorded after item 6 a
    - **Walsh's relation**, `n²(1 − R_int) = 1 − R_ext`, with *both* sides quadratured inside
      `validate.py` — the internal one the long way, through the whole total-internal-reflection cone
      rather than by reciprocity. It pins the **exponent**, not merely the presence of a factor: at
-     `n¹` and at `n³` the two sides differ by 33% either way.
+     `n¹` the two sides differ by 25%, at `n³` by 33%.
    - **A closed energy audit.** A pool with a perfect white Lambertian bed and no absorption must
      have an apparent albedo of **exactly 1**. The right-hand side of that row is the number 1 and no
      constant of `render.py` enters it. Composed through `out_of_water` it is 1; composed as the file

@@ -282,10 +282,10 @@ look at the distribution.
   what makes a lookup table or a fitted approximation *defensible* rather than a guess — it was
   derived from the reference and is measured against it every run.
 
-### Five ways a measurement lies while looking like one
+### Six ways a measurement lies while looking like one
 
 Each of these has shipped in this project's own reference work, survived review, and cost a round to
-find. All four produce a number that is *reproducible and wrong* — which is exactly the class a
+find. All of them produce a number that is *reproducible and wrong* — which is exactly the class a
 golden-image test cannot catch, because nothing about the image is wrong.
 
 - **Compare light to light.** A ratio read off sRGB-encoded luminance, checked against a claim about
@@ -335,6 +335,26 @@ golden-image test cannot catch, because nothing about the image is wrong.
   normals; *does a path from the source to the sensor pass through it* is a question about positions,
   and it is answered by tracing, not by sweeping. A refuted term with the geometry written down is a
   good outcome; a built one that is quietly zero, or quietly not, is not.
+- **A boundary has two transports, and testing one is not testing the other.** The most recent, and
+  the one with the widest reach outside graphics. This project's water suite covered the exact
+  Fresnel equations about as thoroughly as a suite can — normal incidence, grazing, the s/p
+  ordering, the Brewster zero as a closed-form value an approximation cannot reach, the critical
+  angle from two directions, the shipped curve against the exact one — and not one of those rows
+  could see that the renderer was missing the `1/n²` radiance compression on light *leaving* the
+  water, an error of 1.78× that shipped for the project's whole run. The reason is mechanical and it
+  generalises: **every one of those rows asked what happens to a *ratio***, and `n²` cancels in a
+  ratio. Reflectance is a ratio; a transmittance is a ratio; the s-to-p ordering is a ratio. The
+  quantity the interface actually transforms — the radiance itself, where `L/n²` is the invariant
+  and `L` is not — was never on the stand. State it as a rule and it applies to any boundary a
+  renderer has: **a test that only ever compares two things measured on the same side of a boundary
+  cannot see a factor the boundary applies to both.** The guards that do see it are the ones that
+  cross it — a **conservation identity written across the interface** (Walsh's relation
+  `n²(1 − R_int) = 1 − R_ext`, which pins the exponent, not merely the presence of a factor) and a
+  **closed energy audit end to end** (a lossless body must return exactly what fell on it; the
+  right-hand side is the number 1 and no constant of the renderer appears in it). The procedural
+  rule: for each interface, enumerate the transports across it, and check that each has a row that
+  is not a ratio taken on one side. Water's case, with the arithmetic and the constants, is in
+  [`12`](12-water-rendering.md#radiance-is-not-conserved-across-the-interface).
 
 **Pitfalls:** goldens that were never verified correct (a golden captured from a broken build
 enshrines the bug — review each golden by eye once, against the catalogue, before blessing it);
