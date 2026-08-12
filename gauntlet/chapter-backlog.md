@@ -534,3 +534,80 @@ and whether the bed's irradiance is missing the sky. `validate.py` already
 carries a closed energy audit that returns exactly 1 for a white bed with no
 absorption — **it passes today, so whatever is wrong survives it**, and finding
 out why is itself a finding about the suite.
+
+---
+
+## Two owner rulings, and a convergence between them
+
+### 1 · Caustics are a wave field, not a cellular texture
+
+> *"Dat zijn golfbewegingen vanuit verschillende richtingen en geen voronoi …
+> hoewel dat er in statische toestand wel op lijkt … maar dat is niet juist te
+> animeren."*
+
+**The reference implementation already complies**, and says so at `render.py:26`:
+*"Nothing in the caustic pattern is authored: no texture, no Voronoi, no noise."*
+The pattern is the refracted image of a real wave field; the chromatic fringing on
+the bed is emergent from three IORs and three fold sets. The word "Voronoi" in the
+file is an unrelated use — the **Voronoi cells of the three nominal wavelengths in
+spectral space**, the partition that tiles 417.5–657.5 nm without gap or overlap.
+A name collision, and this branch's own name still carries it.
+
+**The ruling is a real-time claim and belongs in the chapter as one.** A cellular
+texture matches a caustic net in a still frame and cannot animate correctly,
+because a caustic is the **Jacobian of the refracted map of a surface** — its
+brightness is `1/|det J|` — and a Voronoi diagram is not the Jacobian of anything
+that moves. Under animation the failure is specific and recognisable: cell walls
+that slide and re-link instead of folding, cusps that never form or annihilate,
+and no dependence on depth. The existing comparison is at
+`gauntlet/evidence/physics-voronoi-vs-caustic.png`.
+
+Check whether `12-water-rendering.md`'s caustic tier ladder names this failure
+mode explicitly. If it does not, it should: the cellular-texture caustic is
+probably the single most widely shipped wrong water effect, and the chapter's job
+is to let a reader recognise it in someone else's engine.
+
+### 2 · The submerged walls are lighter than the dry band, on every side
+
+> *"De wanden onder water zijn aan alle kanten lichter dan de wanden boven water.
+> Dat komt waarschijnlijk door verstrooiing van licht."*
+
+**"Aan alle kanten" is the load-bearing word and it does real work.** Direct sun
+cannot reach all four walls at any azimuth, so an ordering that holds on every
+side has an **orientation-independent** cause. That eliminates direct light as the
+explanation — which matters, because the previous round's conclusion attributed
+the low-angle photographs' ordering to exactly that.
+
+**It does not contradict the floor-lit wall ceiling.** That result — a Lambertian
+wall lit only by an adjoining floor is capped at `ρ_wall · L_floor / 2` by the
+form factor, hence necessarily darker than the floor — is about *wall against
+floor*. This observation is about *wall below the line against wall above it*.
+Different comparison; both can hold.
+
+**Scattering is probably not the mechanism, and the number says why.** Treated
+pool water has `b_b` of order 0.002 m⁻¹, so over a 2 m path the backscattered
+fraction is about half a percent — nothing against a bed albedo of 0.585.
+Scattering produces the *veil* of turbid water; it cannot visibly brighten a wall.
+The owner's observation stands; the proposed mechanism is the wrong size.
+
+**The likely mechanism is the light trap.** A submerged wall is immersed in a
+field fed by the sunlit bed over half a hemisphere, plus the 47.6% the surface
+returns from below by total internal reflection, plus the Snell window. The dry
+band is a 100 mm vertical strip under an overhanging coping seeing a fraction of
+sky and the water beneath it. A first-pass estimate puts the two **within a few
+percent of each other**, with form factors loose enough to go either way — so the
+render should be able to produce the observed ordering, and the ordering is a
+sharp test rather than a soft one.
+
+### The convergence, which is why these two are recorded together
+
+If the render **cannot** produce the ordering, the pool's internal radiance field
+is too weak — and that is the **same 1.5–2.5× transport deficit** derived from the
+water-to-deck ratio above. An owner's naked-eye observation and a closed-form
+prediction, arrived at independently, may be pointing at one missing term.
+
+**Test them as one thing.** Measure, in the same render: the water-to-sunlit-stone
+luminance ratio, and the submerged-wall-to-dry-band ratio on a wall that faces
+*away* from the sun. If one is short and the other is not, they are separate
+faults and the convergence was a coincidence. If both are short by comparable
+factors, there is a single term missing and it lives in the internal field.
