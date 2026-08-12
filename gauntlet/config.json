@@ -2,7 +2,7 @@
   "stops": {
     "bar_met_n": 2,
     "clean_streak_n": 2,
-    "budget_waves": 7,
+    "budget_waves": 10,
     "hard_cap_waves": null
   },
   "dimensions": [
@@ -25,6 +25,17 @@
       "waves": 1,
       "reason": "Owner granted ONE wave. CAM_AZ sits 0.3 deg off the sun's bearing so the eye looks into the sun and the mirror point lands on the water; the reference photograph was taken at bearing 255 against a sun at 273.75. Measured, not suspected. CORRECTION: --waves is a delta, not a target, so this was first recorded as 6 -> 13. Corrected by hand to 6 -> 7, which is what the owner actually granted.",
       "log_read": "nothing-open",
+      "forced": false,
+      "against_log_read": false
+    },
+    {
+      "ts": "2026-08-12T14:18:33+00:00",
+      "at_wave": 12,
+      "from_waves": 7,
+      "to_waves": 10,
+      "waves": 3,
+      "reason": "Owner ruling: 'Rond het zwembad af, start nog een paar gauntlet loop waves indien nodig', with five reference photographs attached -- three of them split-shot or looking-up-from-below. Sections G and H of the bar are the only ones never rendered; both stand in README.md under 'Not modelled yet'. Three waves: G (the camera inside the water), H (the split shot, port modelled explicitly), and one closing judgement wave.",
+      "log_read": "G and H unrendered; refract() TIR branch built but unreached from any call site",
       "forced": false,
       "against_log_read": false
     }
