@@ -611,3 +611,55 @@ luminance ratio, and the submerged-wall-to-dry-band ratio on a wall that faces
 *away* from the sun. If one is short and the other is not, they are separate
 faults and the convergence was a coincidence. If both are short by comparable
 factors, there is a single term missing and it lives in the internal field.
+
+### 2b · In-scattering tested, and why it is not the mechanism
+
+> A second opinion was put to the project: *"Dit effect wordt primair veroorzaakt
+> door in-scattering (volumetrische lichtverstrooiing), in combinatie met caustics
+> en oppervlaktereflectie."* Recorded with its test, because a hypothesis that is
+> refuted with numbers is worth more in this file than one that was never raised.
+
+All three named mechanisms are real. At pool scale the ranking inverts, and the
+owner's own constraint — *every* side — eliminates two of the three outright.
+
+**In-scattering, computed.** A near-horizontal view ray gathers light from the
+downwelling field at a scattering angle near 90°, which is where the particulate
+phase function has its minimum: `p̃(90°) ≈ 0.002 sr⁻¹` (Petzold) against 0.0796
+for isotropic — a factor of 40 down. Against a bed-lit wall radiance of
+42.1 W m⁻² sr⁻¹ over a 2 m path:
+
+| `b` (m⁻¹) | water | in-scattered | share of the wall |
+|---|---|---|---|
+| 0.0025 | pure water (Morel) | 0.008 | 0.02% |
+| 0.05 | a clean pool | 0.155 | 0.37% |
+| 0.1 | a working pool | 0.309 | 0.73% |
+| 0.5 | visibly cloudy | 1.546 | 3.67% |
+| 2.0 | unswimmable | 6.182 | 14.7% |
+
+**And the photograph refutes it from the other side, which is the stronger
+argument.** In-scattering needs `b ≈ 2 m⁻¹` to contribute even 15%. At that
+turbidity **94%** of the light reaching a 1.40 m bed has been scattered at least
+once, and the caustic net is a blur. The supplied frames show a *fine, sharp,
+dense* net at that depth. **The photograph that displays the effect bounds the
+`b` that could have caused it.** A hypothesis refuted by its own evidence.
+
+**Caustics on the walls** are real and can be strong, but they arrive on the
+refracted solar beam and reach only walls facing the sun. On the averted walls
+there are none. Fails *every side* on its own.
+
+**Surface reflection is the light trap, and it is the only orientation-independent
+member of the three.** The underside returns 47.6% of all upwelling light
+diffusely, regardless of which wall stands beneath it. The second opinion's list
+contains the right answer and ranks it last.
+
+**Where in-scattering *is* the answer**, so this is not read as a dismissal of the
+mechanism: it is what flattens underwater scenes with range, and it is the whole
+of turbid water. `12`'s `a`/`b`/`g` split exists for it. It is simply not what
+lights a wall at two metres in treated water.
+
+**What would falsify the light-trap answer**, stated because the estimate has a
+weak link: `E_wall = ½·π·L_bed` treats the bed as an extended source, which is
+generous for a wall in an 8 × 4 m basin. If the render carries the trap in full
+and still cannot produce the ordering, that form factor is where the error is and
+another term is missing. The render arbitrates — not the lead agent and not a
+second opinion.
