@@ -578,14 +578,18 @@ horizon as the eye comes closer; the transmitted column **rises**, because `V_m`
 it is looking at gets nearer and brighter. That crossover is why the shipped line was a bright patch
 at the far end fading to nothing at the near one, and why the whole term now reads as a line.
 
-*Two things this column inherits rather than owns.* It carries `water_shade`'s **missing `1/n²`**,
-and it must: what it subtracts was drawn without it, and correcting one side alone would put a
-0.83-stop step across the junction. It makes that defect *more* visible, not less, because the
-transmitted column now carries the waterline as well as the field. And `scene_hit` places the
-submerged walls on the plan rectangle while the water surface ends at `s = SLIP`, 20 mm inside it, so
-every traced hit — the fillet's and the flat baseline's alike — lands about 5 mm lower on the liner
-than the geometry says. It very nearly cancels in the difference; it is recorded in *What did not
-reproduce*.
+*Two things this column used to inherit rather than own, both closed in the round after it was
+written.* It carried `water_shade`'s **missing `1/n²`**, and it had to: what it subtracts was drawn
+without it, and correcting one side alone would have put a 0.83-stop step across the junction. Both
+sides now cross the interface inside `_menis_under`, which returns an air-side radiance — deliberately
+there and not in the caller, so that the reflected and transmitted columns stay a partition of unity
+in the caller's own units and the unit-radiance closure row keeps its "whatever `F` is" property. And
+`scene_hit` used to place the submerged walls on the plan rectangle while the water surface ends at
+`s = SLIP`, 20 mm inside it, so every traced hit — the fillet's and the flat baseline's alike —
+landed about 5 mm lower on the liner than the geometry said; it very nearly cancelled in the
+difference. The four planes now stand at `s = SLIP`, and the traced column lands between −45.7 and
++3.8 mm of the still line on the north wall where it used to land between −118.8 and −1.1 mm. Both
+are written up in *What did not reproduce*, items 5 and 6.
 
 ### Self-occlusion, and the hole it left
 
@@ -1551,8 +1555,28 @@ reciprocity form, and both `a_wet` boundary conditions exactly; tier 3 checks `R
 Egan & Hilgeman empirical fit (0.09% agreement — an independent method). Tier 2 checks the absorption
 coefficients against Pope & Fry 1997 and Smith & Baker 1981, point-sampled and band-integrated, and
 all of those rows now pass; the blue defect above cost the round-trip 1.7% over the shipped 3.92 m
-path and the red 5.3% the other way, both now removed. **The dry-band regression itself has no test**;
-it is a measurement the frame makes, checked only against the prediction from the file's own `a`.
+path and the red 5.3% the other way, both now removed. **The dry-band regression itself still has no
+test**; it is a measurement the frame makes, checked only against the prediction from the file's own
+`a`.
+
+**What the band DID buy, and it was not a test.** When the `1/n²` was applied (item 5 of *What did not
+reproduce*), the question was whether `LINER_TINT`, the liner albedos and `EXPOSURE` had been
+absorbing the missing factor — because if they had, applying it and re-fitting them would just move
+the error. The band settles it with no free parameter, because it is the same pigment with **no water
+path, no interface and no `n²`** between it and the eye: its radiance over its own irradiance is the
+albedo, full stop. Measured `(0.271, 0.727, 0.835)` against this file's `0.74·LINER_TINT =
+(0.222, 0.585, 0.681)` and chapter 12's mid-blue PVC `(0.24, 0.54, 0.70)` — inside 8%, where a
+pigment carrying the factor would have to sit 78% out. So nothing was re-fitted, and the rendered
+band moved by one sRGB level while the water beside it fell 0.83 stops.
+
+**One caveat on the printed row, stated rather than arranged away.** The picture-side ratio (sunlit
+floor over dry band, each divided by its own irradiance) does **not** close on
+`T(θ_v)/n²·exp(−a·L)`, and it is not made to. Two things separate them: the floor pixel is not the
+transmitted column alone — the reflected sky is ~6% of its luminance and the band has no sky term to
+divide out against — and the two medians are not the same estimator, one being a per-point radiance
+over a per-point irradiance and the other a median *picture* pixel over a median *map* irradiance,
+which a skewed caustic net does not let commute. The row is a consistency check with a known sign.
+What actually measures the absorption is the map row above it, which is exact.
 
 ---
 
@@ -1612,13 +1636,18 @@ the −0.5…1.5 band on both axes — but nothing pins an individual band's lev
 
 ## What did not reproduce
 
-Three checks done while writing this file disagreed with the implementation's own comments. The first
-has since been **corrected in the code** (this file did not own it then; the round that closed it
-did), and is kept here in full because the mechanism by which it survived a test suite is the
-transferable part. The other two stand as recorded. Two further disagreements were found while
-closing the first and are recorded here rather than fixed — one because it is one character of
-documentation, the other because it is a whole round of its own. A sixth was found while building
-the meniscus's transmitted column and is recorded as item 6.
+Six checks recorded here disagreed with the implementation. **Four of the six are now closed in the
+code** — items 1, 4, 5 and 6, the ones that were about the *model* rather than about a sentence
+beside it — and every one of them is kept in full, because the mechanism by which a wrong number
+survives a test suite is the transferable part, and deleting the record would throw exactly that
+away. Each closed item now carries what it was, what closed it, and the guard that would have caught
+it; where the guard is the more interesting half, that is said.
+
+**Items 2 and 3 stay open**, and deliberately: both are comments in `wake.py` and `render.py` whose
+prose overstates or mislabels a number the code gets right, and both sit inside blocks this round was
+told not to touch. They are one-line corrections for whoever owns those blocks, not for this round.
+
+A seventh disagreement, found while closing the four, is recorded after item 6 and is **open**.
 
 1. **`TIR_VERT` — the vertical-face internal-reflection ratio.** *Now fixed; shipped value 0.885.*
    It shipped 0.563; the derivation stated beside it evaluates to 0.635; the correct value for a
@@ -1645,51 +1674,152 @@ the meniscus's transmitted column and is recorded as item 6.
    the *fraction* of the estimator's total 0.500, which is what the sentence around it means. A
    labelling slip, not an arithmetic one — the conclusion (half the weight comes from inside 30 cm)
    is correct.
-4. **`render.py`'s own header quotes `F0 = 0.0197`.** From the file's three IORs,
-   `F0 = ((n−1)/(n+1))²` is `(0.02027, 0.02056, 0.02111)`; 0.0197 is what `n = 1.3265` would give, a
-   number that appears nowhere else in the file. It is 3–7% low and it is a docstring, so nothing
-   computes from it — but it is exactly the class this round was cleaning up (a stated constant that
-   no longer follows from the code beside it), and it is the last one left in that header.
-5. **The transmitted column looks to be missing the `1/n²` radiance compression, and this one is
-   not cosmetic.** `water_shade` composes `out = F(θ_v)·L_sky + (1 − F(θ_v))·L_bed`, where `L_bed` is
-   built by `shade()` as `albedo × irradiance` — an **in-water** radiance, since its irradiance is
-   the beam already transmitted through the surface (`SUN_COL·cos_i·TSUN`) with the `1/π` carried by
-   `SUN_COL`'s own convention. Radiance is not conserved across a refracting interface; `L/n²` is.
-   Leaving the water, therefore,
+4. **`render.py`'s own header quoted `F0 = 0.0197`.** *Now fixed; the header quotes all three.*
+   From the file's three IORs, `F0 = ((n−1)/(n+1))²` is `(0.02027, 0.02056, 0.02111)`; 0.0197 is what
+   `n = 1.3265` would give, a number that appears nowhere else in the file. It was 3–7% low and it
+   was a docstring, so nothing computed from it — but it is exactly the class of thing this project
+   cleans up: a stated constant that no longer follows from the code beside it. `validate.py` already
+   asserts `F0` against `IOR` to float round-off, so the pair cannot drift again in silence. The
+   same round fixed the file's other cosmetic slip, `wrote pool.png` printed while writing
+   `pool_final.png`.
+
+5. **The transmitted column was missing the `1/n²` radiance compression.** *Now fixed; there is one
+   function, `out_of_water`, and three call sites.* `water_shade` composed
+   `out = F(θ_v)·L_sky + (1 − F(θ_v))·L_bed`, where `L_bed` is built by `shade()` as
+   `albedo × irradiance` — an **in-water** radiance, since its irradiance is the beam already
+   transmitted through the surface (`SUN_COL·cos_i·TSUN`) with the `1/π` carried by `SUN_COL`'s own
+   convention. Radiance is not conserved across a refracting interface; `L/n²` is, because a
+   pencil's étendue `n² dA dΩ` is. Leaving the water, therefore,
 
    ```
    L_air = T(theta_v) * L_water / n^2,      n^2 = 1.774 / 1.782 / 1.796 on this file's three IORs
    ```
 
-   and the `/n²` is absent. It is a **relative** error between the two columns of the same pixel: the
-   reflected sky term is air-side and correct, so the bed reads ~1.78× bright against it, which is the
-   one thing the spec-C reflected-vs-transmitted diagnostic exists to measure. The internal return
-   (`bedret`, `TIR_FRAC`) is *not* the missing factor — it is the light that failed to escape coming
-   back to re-light the bed, and it is already in `L_bed`'s irradiance, on the other side of the
-   division. Two reasons it is recorded rather than fixed here: the absolute level is entangled with
-   `LINER_TINT`, the liner albedos and `EXPOSURE`, all of which were fitted to a photograph with this
-   factor absent, so applying it darkens the water column by 0.83 stops and every one of those has to
-   be re-derived; and the claim deserves its own premise-independent guard before anything moves — the
-   natural one is a closed energy audit of the pool as a whole (apparent albedo against
-   `T·ρ(1−R_int)/(1−ρR_int)`, which the file already has the pieces for in `R_EXT`/`R_INT`). Not
-   touched, not compensated for, and stated here with the numbers so the next round can start from it.
+   and the `/n²` was absent — 0.827 to 0.844 stops. It was a **relative** error between the two
+   columns of the same pixel: the reflected sky term is air-side and correct, so the bed read ~1.78×
+   bright against it, which is the one thing the spec-C reflected-vs-transmitted diagnostic exists to
+   measure, and which no exposure could have absorbed. The internal return (`bedret`, `TIR_FRAC`) is
+   *not* the missing factor — it is the light that failed to escape coming back to re-light the bed,
+   and it is already in `L_bed`'s irradiance, on the other side of the division.
 
-6. **The submerged walls sit 20 mm outside the surface they meet.** Found while tracing the
-   meniscus's transmitted column, **recorded rather than fixed**, because it is a property of
-   `scene_hit` and moves every transmitted ray in the frame rather than only the ones at the
-   waterline.
+   **Why the suite did not have it.** Eleven rows covered the exact Fresnel equations, one of them
+   a value an approximation cannot reach. Not one of them ever asked what happens to a *radiance*;
+   they all asked what happens to a *ratio*, and a ratio is exactly where this factor cancels. The
+   shape of the hole is the transferable part: an interface has two transports and the suite only
+   knew about one of them.
+
+   **What closed the calibration.** The stated reason for recording rather than fixing was that
+   `LINER_TINT`, the liner albedos and `EXPOSURE` were fitted to a photograph with the factor absent
+   and might be compensating for it, so applying the divisor and raising `EXPOSURE` to put the
+   brightness back would install the error somewhere else. What breaks that circle is the dry liner
+   band of §10: it is **the same pigment with no water path at all**, so it has no absorption, no
+   interface and no `n²` anywhere between it and the eye, and its radiance over its own irradiance is
+   a direct readout of the albedo. Measured on the frame it is `(0.271, 0.727, 0.835)`; the file's
+   `0.74·LINER_TINT` is `(0.222, 0.585, 0.681)`; chapter 12's mid-blue PVC liner is
+   `(0.24, 0.54, 0.70)`. **−7 / +8 / −3 per cent.** A pigment carrying a missing factor of 1.78 would
+   have to sit 78% off a published PVC. So the factor was never in the pigment, and neither
+   `LINER_TINT` nor `EXPOSURE` moved. The rendered dry band confirms it from the other side: it moved
+   by **one sRGB level**, (44,151,172) → (45,153,173), while the water beside it fell 0.83 stops.
+
+   **One constant did move, and it was the same factor written by hand.** `WBOUNCE`, the pool's
+   upwelling radiance onto the stone at its edge, led with a bare `0.5`. That is the *diffuse* form
+   of this transport — `1 − R_int = (1 − R_ext)/n² = (0.5263, 0.5238, 0.5193)`, which the file already
+   computes for the wet-liner term of §10 — rounded down by 4.5% with no derivation beside it. So the
+   file **already carried the `1/n²` on one route out of the surface** while the camera's route went
+   without: two exits from one interface disagreeing by `n²`, and nothing in the file compared them.
+   `WBOUNCE` now takes `T_OUT_DIFFUSE` and rises 4.8%.
+
+   **The guard, which is the part that could not be written from the derivation.** Three rows:
+
+   - **Walsh's relation**, `n²(1 − R_int) = 1 − R_ext`, with *both* sides quadratured inside
+     `validate.py` — the internal one the long way, through the whole total-internal-reflection cone
+     rather than by reciprocity. It pins the **exponent**, not merely the presence of a factor: at
+     `n¹` and at `n³` the two sides differ by 33% either way.
+   - **A closed energy audit.** A pool with a perfect white Lambertian bed and no absorption must
+     have an apparent albedo of **exactly 1**. The right-hand side of that row is the number 1 and no
+     constant of `render.py` enters it. Composed through `out_of_water` it is 1; composed as the file
+     shipped, **1.723 / 1.730 / 1.742**; composed with `1/n`, **1.310**.
+   - **The same audit off unity against `wet_albedo`**, which reaches the same physical quantity by
+     summing a trapped geometric series and is itself guarded against the Egan & Hilgeman fit.
+
+   **And the image is darker, which is the answer.** Open water goes (81,192,204) → (56,155,170)
+   sRGB, the sunlit floor (74,189,205) → (52,151,171), the far water's mean encoded luminance
+   152.7 → 131.5. Nothing was raised to put it back.
+
+6. **The submerged walls stood 20 mm outside the surface they met.** *Now fixed; the four planes are
+   `XW0, XW1, YW0, YW1`, at `s = SLIP`.* Found while tracing the meniscus's transmitted column, and
+   closed in the same round as item 5 because both of them make the dry-band regression of §10 be
+   re-read.
 
    The water's plan boundary — the vertical face carrying the liner band, the line the height field
-   cliffs at, the line the meniscus climbs — stands at `s = SLIP = −0.020`. `scene_hit` puts the four
-   submerged walls on the plan rectangle, `s = 0`. So a refracted camera ray travels 20 mm further
-   before it meets the wall than the geometry above it says, and lands correspondingly deeper: with
-   this frame's refracted descent that is about **5 mm lower on the liner**, against a wall map whose
-   own coping-shade term has a 55 mm scale at the top. Everywhere else in the basin 5 mm out of 1.40 m
-   is nothing; at the waterline it is the whole gradient.
-
-   It very nearly cancels in the meniscus's own subtraction — the fillet's traced ray and the flat
+   cliffs at, the line the meniscus climbs — stands at `s = SLIP = −0.020`. `scene_hit` put the four
+   submerged walls on the plan rectangle, `s = 0`, which is the coping's bedding line and not a
+   surface anything can see. So a refracted camera ray travelled 20 mm further before it met the wall
+   than the geometry above it said, and landed correspondingly deeper: about **5 mm lower on the
+   liner**, against a wall map whose own coping-shade term has a 55 mm scale at the top. Everywhere
+   else in the basin 5 mm out of 1.40 m is nothing; at the waterline it is the whole gradient. It
+   very nearly cancelled inside the meniscus's own subtraction — the fillet's traced ray and the flat
    baseline's are both displaced by it, and what is added is the difference — which is why the term
-   was built on `scene_hit` as it stands rather than on a corrected plane. Building it on a corrected
-   plane would have made the *excess* consistent with a wall the rest of the frame does not have.
-   Fixing it properly means moving the four planes in `scene_hit` to `SLIP` and re-deriving the
-   dry-band absorption regression that is measured off the band immediately above them.
+   was built on `scene_hit` as it stood.
+
+   Two consequences came with the move and neither was reachable before it:
+
+   - **A backward root is a miss.** The laid-stone wobble lets a water hit sit up to ~7 mm outside
+     the wall plane it belongs to, and such a ray travels *away* from that plane, so it never meets
+     it. With the walls on the rectangle that root was zero; with them moved in it is negative, and
+     unguarded it wins the `argmin` and traces backwards through the eye.
+   - **The caustic launch grid spans the rectangle**, whose outer 20 mm is coping rather than water,
+     so 1.5% of the sun rays were being launched off stone. It never showed while a wall stood at
+     `t = 0` under them. Now masked on `pool_sdf < SLIP`.
+
+   Measured on the fillet's own traced column: on the north wall at *x* = 1.40 m the transmitted rays
+   used to land between −118.8 and −1.1 mm of the still line over 29–175 mm of water; they now land
+   between −45.7 and +3.8 mm over 0–67 mm. On the west wall, 20.4–44 mm of water becomes 0–17 mm.
+
+   **The guard is two constructions of one surface, plus a march.** `scene_hit` does not call
+   `pool_sdf` and never has, so `validate.py` fires 6000 rays and asserts that every wall hit lands
+   on `pool_sdf == SLIP` to float round-off — on the planes this shipped with, that row reads 0.020
+   exactly — that no traced segment leaves the boundary, and, independently, that a 1 mm march of the
+   bed height field finds the same first hit to within its own step.
+
+7. **The `0.30` on every above-water direct-sun term. OPEN.** Found while closing the six above.
+   `_stone` and `liner_band` both write the direct beam as `SUN_COL·(N·L·vis + …)·0.30`, while
+   `shade()` — the bed, the walls, the treads — writes it as `SUN_COL·cos_i·TSUN·cau` with no such
+   factor. `SUN_COL` is `E/π` by the file's own stated convention, which `validate.py` asserts as
+   `E_SUN == π·SUN_COL`, so a Lambertian facet in this beam has radiance `ρ·SUN_COL·(N·L)` and the
+   stone is being given **0.30 of it — 1.74 stops under** the beam that lights the bed at full
+   strength. `SKY_DECK`'s own `SKY_AMB·0.30 + SUN_COL·0.075` carries a derivation in the comment
+   above it; this `0.30` carries none anywhere in the file.
+
+   Left open on purpose. It is a **calibration** question and the reference is a photograph this
+   round does not have, so moving it would be the compensating move that item 5 refused. Its blast
+   radius is the whole above-water half — coping, paving, freeboard band, and the `WBOUNCE`/`SKY_DECK`
+   balance — and it is entangled with albedos already marked `?` as visual readings. And the frame
+   moved underneath it twice in this round: the water fell 0.83 stops and two of the four copings
+   gained their direct sun, so whatever balance this constant was dialled against no longer holds.
+   What is not in doubt is that two receivers in one frame are being given the same beam at a ratio
+   of 3.33, with a derivation on one side and nothing on the other.
+
+## Three more, closed in the same round, that this file did not carry
+
+They belong to `render.py`'s own README rather than to a derivation, but the record is one record:
+
+- **The near-wall fold (`Vm < 0`) is now enforced rather than bounded in prose.** `_menis_weights`
+  priced it at `|Vm|·h`, at most 3.9 mm of projected area per metre of waterline and signed negative,
+  and observed that this frame never reaches it. `meniscus` now takes `guard=True` on every path that
+  draws a pixel and raises the moment a selected ray has `Vm < 0`; `_menis_probe`, which deliberately
+  walks the east and south waterlines to *report* the bound, is the one caller that passes
+  `guard=False`. `validate.py` holds both halves — a north-wall configuration renders, an east-wall
+  one is refused.
+- **The wall map ran out above `z = 0`.** The fillet's steeper facets aim the transmitted ray 1–4 mm
+  above the still line and `sample` clamped that to the map's top row. The bound is analytic: a
+  refracted camera ray descends everywhere (`t_z < 0` identically — the same algebra that refutes the
+  underside term in §3), so a ray launched at most `MENIS_H` above the still line can only land below
+  it. The maps now run to `WTOP = MENIS_H = 3.85 mm`, one texel row out of 340, and a 128 304-hit
+  march of the whole fan asserts the highest landing is inside it — two-sided, so a short map fails
+  high and a bound nothing reaches fails low.
+- **`sun_vis` applied `coping_vis` to stone.** `coping_vis` is a water-surface term and on a stone
+  point it returns 0 for every side whose outward normal has a positive component toward the sun, so
+  the north and west copings and paving got no direct sun at all. Stone now takes `stone_vis`, which
+  is the sail alone, and the guard is a 2 mm shadow march of the real height field from 672 points on
+  all four copings.

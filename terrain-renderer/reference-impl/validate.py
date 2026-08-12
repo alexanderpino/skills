@@ -1225,7 +1225,7 @@ def tier_interface(R):
     check(1, 'T_OUT_DIFFUSE, the factor WBOUNCE now carries, == 1 - R_int',
           R.T_OUT_DIFFUSE, 1. - r_int, 5e-4,
           'the same transport in its diffuse form. The bare 0.5 it replaced '
-          'misses this by 4.7%, which is why it is derived now')
+          'misses this by 4.5%, which is why it is derived now')
 
     # -- THE CLOSED ENERGY AUDIT.
     def apparent_albedo(rho, divisor=True):
@@ -2407,8 +2407,11 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
   TESTED ONLY AGAINST ITSELF, and would need a second implementation
     * The whole camera pass: projection, subsample grid, adaptive edge refine,
       the spectral Latin square. Nothing here renders a pixel.
-    * The shade sail's shadow map, the coping's height-field march, the
-      freeboard band, the waterline, the deck and liner gathers.
+    * The shade sail's shadow map, the freeboard band, the waterline, the deck
+      and liner gathers. (The coping's height-field march is no longer in this
+      list: `stone_vis` is now checked against a 2 mm shadow march of the same
+      field, on 672 points over all four sides. What is still untested is the
+      SAIL half of it, which is stubbed to 1 for that row.)
     * `_riser_shade` and the riser bounce MAP -- the closure of its estimator is
       tested, the map it produces is not.
     * The bed-return (TIR) map: TIR_FRAC and TIR_VERT are tested, the 2.4 M-ray
@@ -2424,8 +2427,12 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
       are both stubbed out to unit for the closure row, so nothing here says the
       line is the right COLOUR or the right BRIGHTNESS -- only that it carries
       the flux the geometry allows and splits it correctly between reflection
-      and transmission. The near-wall fold (Vm < 0) is a bounded approximation
-      rather than a model and is not exercised by this frame.
+      and transmission -- a property that survives the 1/n^2 only because the
+      divisor lives inside `_menis_under`, so both columns are air-side in the
+      caller's units. The near-wall fold (Vm < 0) is still a bounded
+      approximation rather than a model; what changed is that the bound is now
+      ENFORCED -- `meniscus` raises on any picture path that reaches it, and two
+      rows here fire it both ways.
     * Fresnel: the exact equations, the Brewster zero and the diffuse integrals
       are covered. The roughness correction's two constants (2.69 and 22.7,
       Bruneton et al. 2010) are used as published and are not checked against

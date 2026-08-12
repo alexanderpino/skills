@@ -1184,7 +1184,7 @@ def cell_size(x0, x1, y0, y1, arr=None):
 # crossing `out_of_water` applies to the camera's transmitted column -- but
 # diffusely, over the whole hemisphere a stone facet gathers from, which is
 # exactly T_OUT_DIFFUSE = 1 - R_INT = (1 - R_EXT)/n^2. It shipped as a bare
-# `0.5`, i.e. that number rounded down by 4.7% with no derivation beside it, and
+# `0.5`, i.e. that number rounded down by 4.5% with no derivation beside it, and
 # it is worth writing down that the file therefore already HAD the 1/n^2 on this
 # path while the camera path went without: the two routes out of the same
 # surface disagreed by a factor of n^2 and nothing compared them.
@@ -3805,6 +3805,14 @@ for _nm, _pts in (("north", [(x, Y1 + SLIP) for x in (0.4, 1.4, 2.4, 3.4, 4.4, 5
                  "  " if (0 <= _px[0] < W // SS and 0 <= _px[1] < H // SS) else " *",
                  1000 * _w, _pk, 1000 * _dpk, _fw, _I, _sp[0], _sp[1], _sp[2],
                  np.round(_c3, 4)))
+print("   the NEAR-WALL FOLD, which is now a guard and not a comment: the worst "
+      "|Vm|*h any of the probes above reached is %.3f mm of unresolved "
+      "projected area per metre of waterline (east and south walls, where the "
+      "eye looks poolward over the coping and the fillet folds in projection); "
+      "on every path that draws a pixel it is %.3f mm, and `meniscus` raises "
+      "above %.1e m. The bound is |Vm|*h <= h = %.2f mm."
+      % (1000 * _MENIS_FOLD[0], 1000 * _MENIS_FOLD[1], MENIS_FOLD_TOL,
+         1000 * MENIS_H))
 print("     (* = outside the frame.  The east waterline is in the frame's plan "
       "but not in its picture: the near coping's own arris stands in front of "
       "it, which is why the sun's line -- reachable there and nowhere else in "
@@ -4701,7 +4709,12 @@ _flr = ((WSID == 0) & (bed_z(WU, WV) <= -DEPTH + 1e-6)
         & (bed_sun(WU, WV, -DEPTH) >= 0.02))
 _upleg = float(np.median(WSM[_flr])) if _flr.any() else float('nan')
 _dnleg = DEPTH / cos_t
-_fm = BDEP >= DEPTH - 1e-6
+# The reference receiver has to be the SAME POPULATION the picture side is
+# measured over, or the comparison carries the sail's shadow as well as the
+# water. REG == 3 is the deepest floor OUTSIDE the shadow; `_fm` is now the same
+# set of texels, which it was not before -- it took every deepest-floor texel,
+# shadowed or not, against a sunlit-only picture median.
+_fm = (BDEP >= DEPTH - 1e-6) & (bed_sun(BU, BV, -DEPTH) >= 0.98)
 _tdown = np.median((bed_img['disp'][_fm] / np.maximum(BED_DRY[_fm], 1e-12)), 0)
 _tmeas = _tdown * np.exp(-ABS * _upleg)
 print("liner pigment, ONE material seen two ways -- the frame's own absorption "
@@ -4736,7 +4749,8 @@ if _bsel.any() and (REG == 3).sum() > 100:
     print("  IN THE PICTURE, linear light: sunlit floor %s / dry band %s = %s"
           % (np.round(_lf, 3), np.round(_lb, 3), np.round(_lf / _lb, 3)))
     print("    with each receiver's own irradiance divided out (floor %s, band "
-          "%s): %s -- compare the round trip above."
+          "%s): %s -- compare the THREE-FACTOR prediction four lines down, "
+          "which is the round trip times the interface."
           % (np.round(_ef, 3), np.round(_eb, 3),
              np.round((_lf / _ef) / (_lb / _eb), 3)))
     print("    the raw ratio is NOT the absorption: the band this frame can see "
@@ -4746,6 +4760,67 @@ if _bsel.any() and (REG == 3).sum() > 100:
           "out of shot, has N.L = %.3f and would read as the pale strip the "
           "sixth photograph shows."
           % (-SUN_DIR[1], -SUN_DIR[0]))
+    # ---------- AND WHAT THE PAIR PINS, now that the interface transport is on
+    # the transmitted column. This is the calibration the 1/n^2 round was told
+    # to stand on, written out as the three factors it separates into, because
+    # the whole value of the dry band is that the three do not mix:
+    #
+    #   THE PIGMENT is read off the band and NOTHING ELSE touches it. The band
+    #   is the same liner sheet with no water over it, no interface between it
+    #   and the eye, and no n^2 anywhere in its path -- so albedo = radiance /
+    #   its own irradiance, and that number cannot absorb an error in the water
+    #   column even in principle.
+    #
+    #   THE PATH is the ratio, and it is measured on the maps above.
+    #
+    #   THE INTERFACE is what is left, T(theta_v)/n^2, and it has nowhere to
+    #   hide once the other two are pinned: it multiplies the transmitted column
+    #   and not the band.
+    _alb = _lb / np.maximum(_eb, 1e-12)
+    _pvc = np.array([0.24, 0.54, 0.70])          # ch. 12, mid-blue PVC liner
+    print("    THE PIGMENT, read straight off the band (radiance / its own "
+          "irradiance): %s. The file's own 0.74*LINER_TINT is %s and chapter "
+          "12's mid-blue PVC is %s -- %+.0f/%+.0f/%+.0f%% apart. THAT IS THE "
+          "POINT: if the liner albedo had been carrying the missing 1/n^2 it "
+          "would have to sit a factor 1.78 off a published PVC, and it sits "
+          "inside 8%%. The factor was never in the pigment."
+          % (np.round(_alb, 3), np.round(0.74 * LINER_TINT, 3), np.round(_pvc, 3),
+             100 * (0.74 * LINER_TINT[0] / _pvc[0] - 1),
+             100 * (0.74 * LINER_TINT[1] / _pvc[1] - 1),
+             100 * (0.74 * LINER_TINT[2] / _pvc[2] - 1)))
+    _Tv = float(np.mean(1. - fresnel(np.abs(D[inp][:, 2]))[1]))
+    print("    THE INTERFACE: mean T(theta_v) over the water rays is %.3f and "
+          "1/n^2 is %s, so what the transmitted column is multiplied by on its "
+          "way out is %s. Applied since this round; it was T alone before, "
+          "which made the bed read n^2 = 1.78x bright against the sky term in "
+          "the same pixel -- a RELATIVE error inside one pixel, which is why "
+          "no exposure could have absorbed it and why EXPOSURE has not moved."
+          % (_Tv, np.round(1. / N2, 4), np.round(_Tv / N2, 4)))
+    print("    predicted transmitted/dry-band, all three factors: T/n^2 * "
+          "exp(-ABS*L) = %s" % np.round(_Tv / N2 * np.exp(-ABS * (_dnleg + _upleg)), 4))
+    # ...and how much of that picture pixel is the transmitted column at all.
+    # Luminance, because that is what the render carries per ray; the remainder
+    # is the reflected sky, which is air-side and takes no transport.
+    _pl = np.zeros((W * H, 2))
+    _pl[np.flatnonzero(inp), 0] = WSPEC
+    _pl[np.flatnonzero(inp), 1] = WTRAN
+    _pl = _pl.reshape(H // SS, SS, W // SS, SS, 2).mean((1, 3))
+    _fs, _ft = _pl[REG == 3, 0], _pl[REG == 3, 1]
+    _tr3 = np.median(_ft) / max(np.median(_fs) + np.median(_ft), 1e-12)
+    print("    -- AND THE PICTURE RATIO IS NOT A CLOSURE ON THAT, which is "
+          "worth saying plainly rather than arithmetically arranging. Two "
+          "things separate them and only one is measured here. (i) The pixel "
+          "is not the transmitted column alone: over the sunlit floor the "
+          "reflected sky is %.0f%% of its luminance (median %.3f reflected "
+          "against %.3f transmitted), and the band has no sky term to match, "
+          "so nothing divides it out. (ii) The two medians are not the same "
+          "estimator -- the band's is a per-point radiance over a per-point "
+          "irradiance, the floor's is a median PICTURE pixel over a median MAP "
+          "irradiance, and a caustic net is skewed enough that the two do not "
+          "commute. The row is a consistency check with a known sign, not a "
+          "regression; what the frame actually MEASURES the absorption with is "
+          "the map row above it, which is exact."
+          % (100 * (1 - _tr3), np.median(_fs), np.median(_ft)))
 
 
 # --- SPEC C, ON THE PICTURE RATHER THAN ON THE FIELD -------------------------
