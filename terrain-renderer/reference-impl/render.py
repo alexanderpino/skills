@@ -13,7 +13,15 @@ Chain (terrain-renderer/references/12-water-rendering.md):
       of the surface, and a gather off the sunlit bed onto every vertical face --
       which is the whole of the light on a step riser seen from the anti-solar side
    -> the EXACT Fresnel equations at every water interface (not Schlick), with
-      F0 from per-channel IOR (0.0197, not the 0.04 dielectric default)
+      F0 from per-channel IOR -- (0.02027, 0.02056, 0.02111), not the 0.04
+      dielectric default. (This line used to quote a single 0.0197, which is
+      n = 1.3265 and appears nowhere else in the file; recorded as item 4 of
+      12a's `What did not reproduce` and corrected here. The three numbers are
+      printed by `validate.py` from IOR itself, so the docstring cannot drift
+      from the constant again without a row moving.)
+   -> and the RADIANCE COMPRESSION that goes with those equations: what leaves
+      the water is T(theta_v) L_water / n^2, never T L_water. See
+      `out_of_water` below.
 
 Nothing in the caustic pattern is authored: no texture, no Voronoi, no noise.
 The chromatic fringing on the bed is emergent -- three IORs, three fold sets.
@@ -71,6 +79,74 @@ LAM = np.array([0.620, 0.545, 0.460])        # the wavelengths those three ARE, 
 # checks this triple against both tables, point-sampled and band-integrated.
 ABS = np.array([0.2617, 0.05299, 0.01022])
 F0 = ((IOR - 1.0) / (IOR + 1.0)) ** 2
+
+# --- WHAT LEAVES THE WATER, AND THE FACTOR THAT IS NOT FRESNEL ---------------
+# Radiance is NOT conserved across a refracting interface. What is conserved
+# along a ray is the basic radiance L/n^2, because a pencil's etendue n^2 dA
+# dOmega is: Snell compresses the solid angle by exactly the factor n^2 that the
+# projected area does not. So an in-water radiance L_w arriving at the surface
+# leaves as
+#
+#       L_air(theta_v) = T(theta_v) * L_w / n^2,     n^2 = 1.774/1.782/1.796
+#
+# and Fresnel's T alone is only PART of the transport. This is not a fudge and
+# it is not small: 1/n^2 is 0.827-0.844 stops, and it applies to the transmitted
+# column of every water pixel while the reflected column beside it is air-side
+# and already right -- so leaving it out is a RELATIVE error between the two
+# halves of one pixel, which is the one thing no exposure can absorb.
+#
+# TWO CHECKS THAT IT IS THE RIGHT WAY UP. Both are in `validate.py`:
+#   * hemispherically, (1/pi) INT T(mu) (1/n^2) cos dw over the air-side
+#     hemisphere is (1 - R_EXT)/n^2 = 1 - R_INT -- the diffuse transmittance OUT
+#     of water, which the file already computes by reciprocity for the wet-liner
+#     term and which the Egan & Hilgeman fit agrees with to 0.09%.
+#   * energetically, a pool with a PERFECT WHITE bed and no absorption must have
+#     an apparent albedo of exactly 1. Composed through this function it does;
+#     composed without the divisor it comes to 1.73, which is not a taste.
+# It was shipped without the divisor for several rounds and is item 5 of 12a's
+# `What did not reproduce`; what it had been absorbing is written up there.
+N2 = IOR ** 2
+
+
+def out_of_water(L_w):
+    """An in-water radiance, as seen from the air side of the surface. Fresnel's
+    T is applied by the caller (it depends on the view angle); this is the part
+    that does not, and it is the part that was missing. ONE function so that
+    there is exactly one place in the file where a radiance crosses out of the
+    medium, and so that `validate.py` has something to integrate."""
+    return np.asarray(L_w) / N2[None]
+
+
+# --- WET LINER, DERIVED RATHER THAN DIALLED ----------------------------------
+# A film of water on a NON-POROUS substrate darkens it by a mechanism with no
+# free parameter: light crosses the air/water interface twice, and between the
+# crossings it is trapped by total internal reflection. With R_EXT the diffuse
+# external reflectance of that interface -- integrated here from THIS FILE'S
+# own per-channel Fresnel over a cosine-weighted hemisphere, so no constant
+# enters -- and R_INT = 1 - (1 - R_EXT)/n^2 by reciprocity, a substrate of dry
+# albedo `a` reads
+#       a_wet = R_EXT + (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
+# The wet band at the foot of the blue is therefore a measured fraction of the
+# dry one, and it is printed rather than chosen.
+#
+# HOISTED TO HERE from beside the freeboard band, because `1 - R_INT` is the
+# DIFFUSE form of `out_of_water` above -- (1 - R_EXT)/n^2, the share of an
+# isotropic in-water radiance that gets out at all -- and WBOUNCE, six hundred
+# lines below, needs exactly that number. It used to carry a hand-written 0.5
+# in its place. Same interface, same transport, two call sites; now one source.
+_wmu = ((np.arange(512) + .5) / 512.)[:, None]
+_wct = np.sqrt(np.maximum(1. - (1. - _wmu ** 2) / IOR[None] ** 2, 0.))
+_wrs = ((_wmu - IOR[None] * _wct) / (_wmu + IOR[None] * _wct)) ** 2
+_wrp = ((IOR[None] * _wmu - _wct) / (IOR[None] * _wmu + _wct)) ** 2
+R_EXT = (2. * _wmu * .5 * (_wrs + _wrp)).mean(0)
+R_INT = 1. - (1. - R_EXT) / IOR ** 2
+T_OUT_DIFFUSE = 1. - R_INT       # = (1 - R_EXT)/n^2 = 0.526/0.524/0.519
+
+
+def wet_albedo(a):
+    return R_EXT[None] + (1. - R_EXT[None]) * (1. - R_INT[None]) * a / (
+        1. - a * R_INT[None])
+
 
 
 # --- Fresnel, exactly, because this is a reference ---------------------------
@@ -394,6 +470,20 @@ ZD   =  FREEB + BEAD + BULR   # coping top above the still waterline
 ZG   = -0.030     # lawn, if it ever gets in frame -- it does not
 SLIP = -0.020     # the coping overhangs the wall face by 20 mm, into the pool
 SBUL = SLIP + BULR
+# THE WALL FACE IS AT s = SLIP, NOT AT s = 0, AND scene_hit NOW KNOWS IT.
+# One vertical plane per side carries the whole edge: the bullnose bottoms out
+# on it at ZLIP, the grey bead and the blue freeboard band stand on it, `gh`
+# cliffs to the water on it, the meniscus climbs it, and the liner runs down it
+# to the floor. Its s is SLIP -- 20 mm inside the plan rectangle that pool_sdf
+# measures from, which is the coping's bedding line and not a surface anything
+# can see. `scene_hit` used to put the four submerged walls on the RECTANGLE, so
+# every refracted camera ray ran 20 mm too far before it met the liner and
+# landed about 5 mm too low on it, against a wall map whose coping-shade term
+# has a 55 mm scale at the top. Recorded as item 6 of 12a's `What did not
+# reproduce` and closed here, together with item 5 because they share the
+# absorption regression that has to be re-read afterwards.
+XW0, XW1 = X0 - SLIP, X1 + SLIP        # 0.020 .. 7.980
+YW0, YW1 = Y0 - SLIP, Y1 + SLIP        # 0.020 .. 3.980
 ZCEN = ZD - BULR  # centre of the bullnose arc, in (s, z)
 ZLIP = ZCEN       # lowest point of the bullnose == top of the BEAD
 COPW =  0.34      # width of the coping course
@@ -528,6 +618,38 @@ from field import (X0, X1, Y0, Y1, JET_XY, SIGMA_W, LAM_MIN, FP_SIGMA,
                    grad_grid, grad_points, slope_var_points, normal_from_grad,
                    jet_envelope, shelter, rms_slope, _norm_jets)
 
+# --- THE CAPILLARY SCALE, hoisted to the top of the file ---------------------
+# It used to sit with the water-out gather, which was already a hoist from the
+# meniscus block that owns the derivation. It has to come further still, because
+# the WALL MAPS are built above both and their vertical extent is set by the
+# climb: the fillet's transmitted rays start as high as MENIS_H over the still
+# line and a refracted camera ray descends everywhere (`t_z < 0` identically --
+# see the underside argument by the meniscus), so MENIS_H is a strict upper
+# bound on where any of them can land, and a map that stops at z = 0 has to
+# clamp them. The long derivation stays where the meniscus is applied.
+CAP_A = np.sqrt(SIGMA_W / (1000.0 * 9.81))          # capillary length, 2.72 mm
+# ? THE CONTACT ANGLE IS THE ONE FREE NUMBER IN THE WHOLE FILLET, and it is
+# ? unmeasured. It sets the tilt AT the wall, phi_w = 90 - theta_c, and through
+# ? that both the climb h = a sqrt(2(1 - sin theta_c)) and the top of the range
+# ? the specular integral below sweeps. 0 -- perfect wetting -- is what this file
+# ? has assumed since the climb was first written, and it is kept here so that
+# ? MENIS_H and everything downstream of it (WETTOP, the wet foot) do not move.
+# ? A clean PVC sheet is nearer 80 deg; a liner in service, permanently wetted
+# ? and biofilmed, is nearer 0, and nobody has measured THIS one. The
+# ? sensitivity is printed instead of being hidden, here and at the line itself.
+THETA_C = 0.0
+PHI_W = np.pi / 2 - THETA_C                         # ? surface tilt at the wall
+MENIS_H = CAP_A * np.sqrt(2.0 * (1.0 - np.sin(THETA_C)))    # ? climb, at THETA_C
+MENIS_W = 2.0 * CAP_A                               # fillet reach, ~2 a
+# ...and the wall maps therefore run to WTOP rather than to 0. The extra strip
+# is 3.85 mm on a 4.13 mm texel, so it costs one row out of 340 and it is the
+# difference between reading the top of the fillet's column off a surface of its
+# own and reading it off a clamp. Recorded as the `?` in `_menis_under` and
+# closed here; `validate.py` marches the fillet's whole transmitted fan and
+# asserts the highest hit is inside this and above zero, so the row is neither
+# vacuous nor satisfiable by shrinking the map.
+WTOP = float(MENIS_H)
+
 def refract(ix, iy, iz, nx, ny, nz, eta):
     """Snell's law as a direction map, WITH its total-internal-reflection branch.
 
@@ -630,11 +752,19 @@ def scene_hit(px, py, tx, ty, tz, pz=0.0):
     with np.errstate(divide='ignore', invalid='ignore'):
         s = np.stack([
             np.where(tz < -1e-9, (-DEPTH - pz) / tz, BIG),
-            np.where(tx < -1e-9, (X0 - px) / tx, BIG),
-            np.where(tx > 1e-9, (X1 - px) / tx, BIG),
-            np.where(ty < -1e-9, (Y0 - py) / ty, BIG),
-            np.where(ty > 1e-9, (Y1 - py) / ty, BIG)])
+            np.where(tx < -1e-9, (XW0 - px) / tx, BIG),
+            np.where(tx > 1e-9, (XW1 - px) / tx, BIG),
+            np.where(ty < -1e-9, (YW0 - py) / ty, BIG),
+            np.where(ty > 1e-9, (YW1 - py) / ty, BIG)])
     s = np.where(np.isfinite(s), s, BIG)
+    # A BACKWARD ROOT IS A MISS, and moving the walls inward is what makes that
+    # reachable: the laid-stone wobble lets a water hit sit up to ~7 mm outside
+    # the wall plane it belongs to, and such a ray is travelling AWAY from that
+    # plane (a ray outside it and travelling toward it takes the opposite wall's
+    # branch), so it never meets it. Without this the negative root wins the
+    # argmin and the trace goes backwards through the eye. The floor's root is
+    # positive for every downgoing ray, so the argmin always has a candidate.
+    s = np.where(s > 1e-9, s, BIG)
     sid = np.argmin(s, 0).astype(np.int8)
     sm = np.take_along_axis(s, sid[None].astype(np.intp), 0)[0]
     cyl = np.full(px.shape, -1, np.int8)
@@ -819,7 +949,25 @@ def sail_vis(x, y):
 
 
 def sun_vis(x, y):
+    """Sun visibility ON THE WATER SURFACE, and only there: the sail's shadow
+    times the coping lip's. Every caller is a point on or under the water --
+    the caustic launch grid, `bed_sun`'s surface entry point. Stone takes
+    `sail_vis` alone (see `_stone`), because `coping_vis` measures the run from
+    a point INSIDE the pool to the lip and is meaningless outside it."""
     return sail_vis(x, y) * coping_vis(x, y)
+
+
+def stone_vis(x, y):
+    """Sun visibility on STONE -- the coping course and the paving behind it.
+    The sail is the only occluder in the scene above the water: the coping is
+    the highest thing in it, its own arris shades only what is below it (which
+    is water and band, not stone), and the far coping's shadow reaches
+    ZD/tan(21 deg) = 0.40 m, which lands on water on every side. Named rather
+    than inlined so `validate.py` can march the real height field toward the sun
+    from a grid of coping points and compare -- which is what caught this
+    returning `sun_vis` and putting the north and west copings in permanent
+    shade."""
+    return sail_vis(x, y)
 
 
 # --------------------------------------------------------------------------- caustic pass
@@ -852,7 +1000,15 @@ for j0 in range(0, RAY_NY, CH):
     XX = np.broadcast_to(rx[None, :], gx.shape).ravel().astype(np.float32)
     YY = np.broadcast_to(yy[:, None], gx.shape).ravel().astype(np.float32)
     nx, ny, nz = normal_from_grad(gx.ravel(), gy.ravel())
-    wgt = (sun_vis(XX, YY) * cell).astype(np.float64)
+    # ...and only where there IS water. The launch grid spans the plan
+    # rectangle, whose outer 20 mm is coping rather than surface (the water's
+    # boundary is s = SLIP), so 1.5% of the rays used to be launched off stone.
+    # It never showed while the walls stood on the same rectangle, because such
+    # a ray met a wall at t = 0; with the walls moved in to where they belong it
+    # would start OUTSIDE the basin, which is not somewhere a sun ray refracts
+    # into the water from. Masked rather than clamped.
+    wgt = (sun_vis(XX, YY) * cell
+           * (pool_sdf(XX, YY) < SLIP)).astype(np.float64)
     live = wgt > 1e-4 * cell
     XXl, YYl = XX[live], YY[live]
     nxl, nyl, nzl, wl = nx[live], ny[live], nz[live], wgt[live]
@@ -884,12 +1040,13 @@ for j0 in range(0, RAY_NY, CH):
             m = sid == sv
             if m.any():
                 a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
-                splat(wall[wi][c], u[m], v[m], wl[m], a, b, -DEPTH, 0.0)
+                splat(wall[wi][c], u[m], v[m], wl[m], a, b, -DEPTH, WTOP)
     if (j0 // CH) % 4 == 0:
         print("  rows %d/%d" % (j0, RAY_NY), flush=True)
 
 bt = ((X1 - X0) / CAU_NX) * ((Y1 - Y0) / CAU_NY)
-wt = [((Y1 - Y0) / WNU) * (DEPTH / WNV)] * 2 + [((X1 - X0) / WNU) * (DEPTH / WNV)] * 2
+wt = [((Y1 - Y0) / WNU) * ((DEPTH + WTOP) / WNV)] * 2 + \
+     [((X1 - X0) / WNU) * ((DEPTH + WTOP) / WNV)] * 2
 for c in range(4):
     bed[c] /= bt
     for wi in range(4):
@@ -1021,10 +1178,24 @@ def cell_size(x0, x1, y0, y1, arr=None):
 # into two pixels at the far coping is speckle, not a shadow line. With it, it is
 # the dim teal line a real pool edge has, and the coping picks up a cast from the
 # water for the first half metre, which real ones visibly do.
-WBOUNCE = 0.5 * LINER_TINT * 0.74 * (
+#
+# THE LEADING FACTOR IS THE EXIT TRANSPORT, AND IT IS NOW DERIVED. This term is
+# an in-water radiance being looked at from the air, so it takes the same
+# crossing `out_of_water` applies to the camera's transmitted column -- but
+# diffusely, over the whole hemisphere a stone facet gathers from, which is
+# exactly T_OUT_DIFFUSE = 1 - R_INT = (1 - R_EXT)/n^2. It shipped as a bare
+# `0.5`, i.e. that number rounded down by 4.7% with no derivation beside it, and
+# it is worth writing down that the file therefore already HAD the 1/n^2 on this
+# path while the camera path went without: the two routes out of the same
+# surface disagreed by a factor of n^2 and nothing compared them.
+WBOUNCE = T_OUT_DIFFUSE * LINER_TINT * 0.74 * (
     SUN_COL * cos_i * TSUN * np.exp(-ABS * (slant + DEPTH)) + SKY_AMB * 0.8)
 print("water upwelling onto the coping: %s  (sky on stone: %s)"
       % (np.round(WBOUNCE, 3), np.round(SKY_DECK, 3)))
+print("  the exit transport on it is 1 - R_int = %s, which is (1 - R_ext)/n^2 "
+      "-- the diffuse form of the same 1/n^2 `out_of_water` applies per ray. It "
+      "shipped as a bare 0.5 (%.1f%% low)."
+      % (np.round(T_OUT_DIFFUSE, 4), 100 * (1 - 0.5 / T_OUT_DIFFUSE[1])))
 
 
 # --------------------------------------------------------------------------- materials
@@ -1180,8 +1351,8 @@ for c in range(3):
         m = _sid == sv
         a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
         wa = np.zeros((WNV // 4, WNU // 4))
-        splat(wa, _u2[m], _v2[m], w[m], a, b, -DEPTH, 0.0)
-        wa /= ((b - a) / (WNU // 4)) * (DEPTH / (WNV // 4))
+        splat(wa, _u2[m], _v2[m], w[m], a, b, -DEPTH, WTOP)
+        wa /= ((b - a) / (WNU // 4)) * ((DEPTH + WTOP) / (WNV // 4))
         _wch[wi].append(blur(wa, 1.6))
 bedret = np.stack(_bch, -1)
 wallret = [np.stack(_wch[wi], -1) for wi in range(4)]
@@ -1241,16 +1412,24 @@ BED_DRY = shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=np.zeros_like(BDEP),
 wall_img = {'disp': [], 'mono': []}
 for wi in range(4):
     uu = np.linspace(Y0, Y1, WNU) if wi < 2 else np.linspace(X0, X1, WNU)
-    UU, VV = np.meshgrid(uu, np.linspace(-DEPTH, 0.0, WNV))
+    UU, VV = np.meshgrid(uu, np.linspace(-DEPTH, WTOP, WNV))
     T = tiles(UU, VV)
     WR = np.stack([sample(wallret[wi][..., c:c + 1], UU.ravel(), VV.ravel(),
-                          uu[0], uu[-1], -DEPTH, 0.)[:, 0].reshape(UU.shape)
+                          uu[0], uu[-1], -DEPTH, WTOP)[:, 0].reshape(UU.shape)
                    for c in range(3)], -1)
     # the coping overhangs the wall by 20 mm, so the last few centimetres of wall
     # sit in its shade: the darkest thing in the pool is the line under the lip.
     WAO = .78 * (1.0 - .32 * np.exp(VV / .055))
-    wall_img['disp'].append(shade(wall[wi][:3], T, WAO, dep=-VV, extra=WR))
-    wall_img['mono'].append(shade([wall[wi][3]] * 3, T, WAO, dep=-VV, extra=WR))
+    # ...and the map runs WTOP ABOVE the still line now, over the fillet's own
+    # climb. Those texels carry no caustic (no sun ray can land above the still
+    # surface, so `wall` is identically zero there -- which is the right answer,
+    # not a gap) and no water column over them either, hence the clamp on `dep`:
+    # a negative depth would run Beer-Lambert backwards and AMPLIFY. What is
+    # left is the ambient under the coping's shade, which is what the top of a
+    # fillet actually shows.
+    DEP = np.maximum(-VV, 0.)
+    wall_img['disp'].append(shade(wall[wi][:3], T, WAO, dep=DEP, extra=WR))
+    wall_img['mono'].append(shade([wall[wi][3]] * 3, T, WAO, dep=DEP, extra=WR))
 
 # WHAT THE MISSING WALL TERM IS WORTH, now that both halves of it exist as
 # numbers in one place. `_WSH` above is exactly the cosine-weighted FRACTION of a
@@ -1432,7 +1611,7 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
             if _m.any():
                 _a, _b = (Y0, Y1) if _sv <= 2 else (X0, X1)
                 _col[_m] = sample(wall_img['mono'][_wi], _u[_m], _v[_m],
-                                  _a, _b, -DEPTH, 0.)
+                                  _a, _b, -DEPTH, WTOP)
         # ? a gather ray that lands on ANOTHER riser contributes nothing. Those
         # ? faces are the dark side of the same terminator, so the error is one
         # ? bounce of a dim source; the share is printed and it is under 2%.
@@ -2061,23 +2240,6 @@ def gh(x, y):
 # So the receiver normal used here is the POOLWARD HORIZONTAL one, and what the
 # flat top of the coping gets is only the sub-pixel-facet share of that (the
 # 0.10 below, which stays a `?`). The falloff is no longer a guessed exponential.
-# The capillary scale, hoisted here from the water-shading block below because
-# the liner band's wet foot is built in this section and needs it. The long
-# derivation stays where the meniscus itself is applied to the water.
-CAP_A = np.sqrt(SIGMA_W / (1000.0 * 9.81))          # capillary length, 2.72 mm
-# ? THE CONTACT ANGLE IS THE ONE FREE NUMBER IN THE WHOLE FILLET, and it is
-# ? unmeasured. It sets the tilt AT the wall, phi_w = 90 - theta_c, and through
-# ? that both the climb h = a sqrt(2(1 - sin theta_c)) and the top of the range
-# ? the specular integral below sweeps. 0 -- perfect wetting -- is what this file
-# ? has assumed since the climb was first written, and it is kept here so that
-# ? MENIS_H and everything downstream of it (WETTOP, the wet foot) do not move.
-# ? A clean PVC sheet is nearer 80 deg; a liner in service, permanently wetted
-# ? and biofilmed, is nearer 0, and nobody has measured THIS one. The
-# ? sensitivity is printed instead of being hidden, here and at the line itself.
-THETA_C = 0.0
-PHI_W = np.pi / 2 - THETA_C                         # ? surface tilt at the wall
-MENIS_H = CAP_A * np.sqrt(2.0 * (1.0 - np.sin(THETA_C)))    # ? climb, at THETA_C
-MENIS_W = 2.0 * CAP_A                               # fillet reach, ~2 a
 print("meniscus: capillary length %.2f mm, climb %.2f mm at contact angle "
       "%.0f deg (%s mm at 0/30/60 deg -- ? the angle is unmeasured), tilt at "
       "the wall %.0f deg, fillet %.1f mm wide"
@@ -2159,8 +2321,15 @@ def _gather(flat, samples):
                         if m.any():
                             aa, bb = (Y0, Y1) if sv <= 2 else (X0, X1)
                             col[m] = sample(wall_img['mono'][wi], u[m], v[m],
-                                            aa, bb, -DEPTH, 0.)
-                    col = col * np.exp(-ABS[None] * sm[:, None])
+                                            aa, bb, -DEPTH, WTOP)
+                    # out of the water, same crossing as every other exit path.
+                    # It CANCELS here -- `_map_at` returns only the lensed/flat
+                    # ratio and a relative falloff, and the DC this modulates is
+                    # WBOUNCE, which carries its own diffuse form of the factor
+                    # -- but it is applied anyway so that there is no place in
+                    # the file where an in-water radiance is read from the air
+                    # without it.
+                    col = out_of_water(col * np.exp(-ABS[None] * sm[:, None]))
                     T = 1.0 - fresnel(np.clip(cosi, 0, 1))    # exact, not Schlick
                     w = rr * cp * qz / R ** 4 * (rr * rr * dln * dphi)
                     acc[si] += np.where(ok[:, None], col * T * w, 0.0)
@@ -2326,30 +2495,6 @@ def waterline(along, side):
     return out
 
 
-# --- WET LINER, DERIVED RATHER THAN DIALLED ----------------------------------
-# A film of water on a NON-POROUS substrate darkens it by a mechanism with no
-# free parameter: light crosses the air/water interface twice, and between the
-# crossings it is trapped by total internal reflection. With R_EXT the diffuse
-# external reflectance of that interface -- integrated below from THIS FILE'S
-# own per-channel Fresnel over a cosine-weighted hemisphere, so no constant
-# enters -- and R_INT = 1 - (1 - R_EXT)/n^2 by reciprocity, a substrate of dry
-# albedo `a` reads
-#       a_wet = R_EXT + (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
-# The wet band at the foot of the blue is therefore a measured fraction of the
-# dry one, and it is printed rather than chosen.
-_wmu = ((np.arange(512) + .5) / 512.)[:, None]
-_wct = np.sqrt(np.maximum(1. - (1. - _wmu ** 2) / IOR[None] ** 2, 0.))
-_wrs = ((_wmu - IOR[None] * _wct) / (_wmu + IOR[None] * _wct)) ** 2
-_wrp = ((IOR[None] * _wmu - _wct) / (IOR[None] * _wmu + _wct)) ** 2
-R_EXT = (2. * _wmu * .5 * (_wrs + _wrp)).mean(0)
-R_INT = 1. - (1. - R_EXT) / IOR ** 2
-
-
-def wet_albedo(a):
-    return R_EXT[None] + (1. - R_EXT[None]) * (1. - R_INT[None]) * a / (
-        1. - a * R_INT[None])
-
-
 print("wet liner: diffuse Fresnel R_ext %s, R_int %s (1 - (1-R_ext)/n^2), so a "
       "wetted liner reads %s of its dry albedo" %
       (np.round(R_EXT, 4), np.round(R_INT, 4),
@@ -2448,7 +2593,21 @@ def _stone(x, y, s, vdir, fp):
     # --- light
     L = SUN_DIR
     ndl = np.clip(Nx * L[0] + Ny * L[1] + Nz * L[2], 0, 1)
-    vis = np.asarray(sun_vis(x, y), float)
+    # THE SAIL AND NOTHING ELSE, and this used to be `sun_vis`. `coping_vis` is
+    # a WATER-SURFACE term: the run from a point on the surface to the coping's
+    # lip, measured along the sun's azimuth, against the run needed to clear
+    # ZLIP. Evaluated on a point that is ON the stone rather than under it, its
+    # numerator (SLIP - pool_sdf) is negative on every side whose outward normal
+    # has a positive component toward the sun -- the north and west here -- so
+    # it returned a flat 0 and those two copings and their paving got SKY_DECK
+    # alone: no direct sun, no directional shading, no sheen, on stone the sun
+    # is falling on. `liner_band` already sidestepped it through `sail_vis`;
+    # this did not. Nothing else can shade the coping: it is the highest thing
+    # in the scene bar the sail, and the far coping's own shadow reaches
+    # ZD/tan(21 deg) = 0.40 m, which lands on water. The 2-line fix is that the
+    # occluder set for a stone point is the sail, and `validate.py` marches the
+    # real geometry toward the sun from a grid of coping points to say so.
+    vis = np.asarray(stone_vis(x, y), float)
     lift = SAIL_TAU * (1. - vis) * sail_glow(x, y)
     skyv = (.55 + .45 * Nz) * (1. - .40 * jm)
     pf = np.clip(-(Nx * gx + Ny * gy), 0, 1)          # how much it faces the pool
@@ -2990,19 +3149,26 @@ def _menis_weights(Vm, Vz):
     branch untouched, and which `validate.py` asserts against this function's
     own output and against a brute-force parallel-ray march of the profile.
 
-    `?` AND ON A NEAR WALL IT IS ONLY A BOUND. Where Vm < 0 the fillet FOLDS in
-    projection -- perp(d) = -Vz d + Vm z(d) turns round at phi*, so a strip of
-    the view is crossed twice -- and a one-dimensional sweep over phi with a
-    visibility gate cannot resolve a fold. What the eye really finds over the
-    |Vm|*h of view the fillet vacates is the liner band standing above the
-    crest, and this returns the crest's own radiance for it instead. The error
-    is bounded by |Vm| * h -- at most 3.9 mm of projected area per metre of
-    waterline, and 2.3 mm at the east wall's own geometry -- and it is signed
-    negative. THIS FRAME NEVER REACHES IT: the fillet is on a near wall only on
-    the east and south, the east waterline is behind the near coping's arris and
-    0% of the south's is in shot, so `sel` never selects a ray there. Priced
-    rather than hidden, and it is the first thing to build if the camera ever
-    moves to the other side of the pool."""
+    `?` AND ON A NEAR WALL IT IS ONLY A BOUND -- NOW ENFORCED RATHER THAN
+    STATED. Where Vm < 0 the fillet FOLDS in projection -- perp(d) = -Vz d +
+    Vm z(d) turns round at phi*, so a strip of the view is crossed twice -- and
+    a one-dimensional sweep over phi with a visibility gate cannot resolve a
+    fold. What the eye really finds over the |Vm|*h of view the fillet vacates
+    is the liner band standing above the crest, and this returns the crest's own
+    radiance for it instead. The error is bounded by |Vm| * h -- at most 3.9 mm
+    of projected area per metre of waterline, and 2.3 mm at the east wall's own
+    geometry -- and it is signed negative. THIS FRAME NEVER REACHES IT: the
+    fillet is on a near wall only on the east and south, the east waterline is
+    behind the near coping's arris and 0% of the south's is in shot, so `sel`
+    never selects a ray there.
+
+    That last sentence used to be a comment, and a bound that nothing enforces
+    is a comment. `meniscus` now takes `guard=True` on every path that makes a
+    picture and RAISES the moment a selected ray has Vm < 0, quoting the
+    unresolved area; `_menis_probe`, which deliberately walks the east wall to
+    report the bound, is the one caller that passes `guard=False`.
+    `validate.py` holds both halves: that a north-wall configuration does not
+    trip it, and that an east-wall one does."""
     Vm = np.asarray(Vm)
     Vz = np.asarray(Vz)
     ndv = MENIS_SIN[None] * Vm[:, None] + MENIS_COS[None] * Vz[:, None]
@@ -3016,6 +3182,37 @@ def _menis_weights(Vm, Vz):
     # this is one argmax rather than a search.
     isil = np.maximum(vis.sum(1) - 1, 0)
     return ndv, w_fil, w_flt, w_occ, isil
+
+
+# The fold's price, in the units the bound is stated in: metres of projected
+# area per metre of waterline. The tolerance is not a taste -- it is "no ray at
+# all", set a thousand times under the smallest fold a single node could carry
+# (MENIS_H/MENIS_N = 60 um) so that float noise on Vm at a wall the eye is
+# exactly parallel to cannot trip it and nothing else can fail to.
+MENIS_FOLD_TOL = 6e-8
+_MENIS_FOLD = [0.0, 0.0]     # [worst seen on any call, worst on a guarded one]
+
+
+def _menis_fold_guard(Vm, guard):
+    """Record -- and on a picture path, refuse -- the near-wall fold."""
+    w = float(np.max(np.maximum(-np.asarray(Vm, float), 0.))) * MENIS_H
+    _MENIS_FOLD[0] = max(_MENIS_FOLD[0], w)
+    if not guard:
+        return w
+    _MENIS_FOLD[1] = max(_MENIS_FOLD[1], w)
+    if w > MENIS_FOLD_TOL:
+        raise AssertionError(
+            "meniscus: the NEAR-WALL FOLD is reachable in this frame. A "
+            "selected ray has Vm = %.4f, so the fillet folds in projection and "
+            "the 1-D sweep over phi cannot resolve it: %.3f mm of projected "
+            "area per metre of waterline is being filled with the crest's own "
+            "radiance instead of with the liner band that stands behind it, "
+            "signed negative. Tolerance is %.1e m. This is the bound in "
+            "`_menis_weights`, and it was written on the fact that no camera "
+            "ray in the reference frame reaches a near wall -- which has just "
+            "stopped being true. Resolve the fold before rendering this view."
+            % (-w / MENIS_H, 1000 * w, MENIS_FOLD_TOL))
+    return w
 
 
 def _riser_shade(hxr, hyr, hzr, ci, c, mode):
@@ -3095,9 +3292,16 @@ MENIS_TIR_REACH = 0.0        # solid angle of the fillet's underside, per camera
 
 
 def _menis_under(sid, u, v, sm, cyl, tzc, mode):
-    """What comes back up a fillet's TRANSMITTED ray: the same bed, wall and
+    """What comes back OUT of a fillet's TRANSMITTED ray: the same bed, wall and
     riser maps `water_shade` reads for the flat surface, with the same
-    Beer-Lambert on the leg. Factored out of the loop below for two reasons --
+    Beer-Lambert on the leg and the same `out_of_water` crossing at the end, so
+    what this returns is an AIR-SIDE radiance and the caller's `(1 - F)` is the
+    whole of the remaining transport. Putting the 1/n^2 here rather than in the
+    caller keeps the reflected and transmitted columns a partition of unity in
+    the caller's own units, which is the premise `validate.py`'s unit-radiance
+    closure row rests on -- stub this to 1 and the two columns still sum to the
+    projected area, whatever F is. Factored out of the loop below for two more
+    reasons --
     the flat baseline and the fillet's own column must read it through the same
     code or the subtraction measures the difference between two shaders rather
     than between two geometries, and `validate.py` substitutes a unit radiance
@@ -3124,15 +3328,15 @@ def _menis_under(sid, u, v, sm, cyl, tzc, mode):
             if m.any():
                 a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
                 col[m, c] = sample(wim[wi][..., c:c + 1], u[m], v[m],
-                                   a, b, -DEPTH, 0.)[:, 0]
+                                   a, b, -DEPTH, WTOP)[:, 0]
         m = sid == 5
         if m.any():
             col[m, c] = _riser_shade(u[m], v[m], tzc[m] * sm[m], cyl[m], c, mode)
-    return col * np.exp(-ABS[None] * sm[:, None])
+    return out_of_water(col * np.exp(-ABS[None] * sm[:, None]))
 
 
 def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
-             mode='disp', parts=None):
+             mode='disp', parts=None, guard=True):
     """The fillet's excess over the flat water it replaces, returned as a
     radiance to add to the ray. Evaluated only on the band of rays whose
     footprint can reach the fillet at all -- everywhere else it is exactly zero,
@@ -3185,6 +3389,8 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
         Vm = -(dvec[k, 0] * mx[k] + dvec[k, 1] * my[k])
         Vt = -(dvec[k, 0] * tx[k] + dvec[k, 1] * ty[k])
         Vz = -dvec[k, 2]
+        # the near-wall fold, priced and refused -- see `_menis_fold_guard`
+        _menis_fold_guard(Vm, guard)
         Lt = SUN_DIR[0] * tx[k] + SUN_DIR[1] * ty[k]
         Lm = SUN_DIR[0] * mx[k] + SUN_DIR[1] * my[k]
         # --- the fillet, node by node
@@ -3257,13 +3463,13 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
         # direction. The maps and the Fresnel are per channel. Over a leg this
         # short the three hits are microns apart, against a 3.7 mm output pixel.
         #
-        # NOTE, AND IT IS NOT FIXED HERE: this column inherits `water_shade`'s
-        # missing 1/n^2 radiance compression on refraction, and it must, because
-        # what it is subtracting was drawn without it. Correcting it here alone
-        # would put a 0.83-stop step across the junction. It is entangled with
-        # LINER_TINT and EXPOSURE and is a round of its own; the README and
-        # `12a` carry it. This term makes it MORE visible, not less: the
-        # transmitted column now carries the waterline as well as the field.
+        # THE 1/n^2 IS NOW ON BOTH SIDES OF THE SUBTRACTION, and it had to move
+        # on both at once. This column and the flat baseline it is subtracted
+        # from both read `_menis_under`, which applies `out_of_water` at its
+        # return, so the excess is the difference between two AIR-SIDE
+        # radiances. Correcting the open field alone -- or this alone -- would
+        # have put a 0.83-stop step across the junction, which is why the
+        # earlier round recorded the defect rather than half-fixing it.
         wl_x = hw_x[k] + gx[k] * (SLIP - s_h[k])      # the waterline point
         wl_y = hw_y[k] + gy[k] * (SLIP - s_h[k])
         nd_x = (wl_x[:, None] + mx[k][:, None] * MENIS_D[None]).ravel()
@@ -3461,7 +3667,7 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
             if m.any():
                 a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
                 col[m] = sample(wim[wi][..., c:c + 1], u[m], v[m],
-                                a, b, -DEPTH, 0.)[:, 0]
+                                a, b, -DEPTH, WTOP)[:, 0]
         m = sid == 5
         if m.any():
             col[m] = _riser_shade(u[m], v[m], tz[m] * sm[m], cyl[m], c, mode)
@@ -3478,8 +3684,13 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     # so it grows with the water actually crossed and is one more depth cue.
     water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * smG_))[:, None]
     water *= lip_ao[:, None]
+    # ...and here it crosses the surface. `water` up to this line is an IN-WATER
+    # radiance -- every term in it, the maps, the Beer-Lambert leg and the
+    # in-scatter alike, was generated below the interface -- so the transport out
+    # is T(theta_v) * L_w / n^2 and not T * L_w. The reflected column beside it
+    # is air-side and takes nothing. See `out_of_water` at the top of the file.
     spec_ = fres_ * refl_
-    tran_ = (1 - fres_) * water
+    tran_ = (1 - fres_) * out_of_water(water)
     # The meniscus is a correction to BOTH columns and it is allowed to be
     # negative -- on a wall seen at 11 deg grazing the flat surface reflects the
     # undercut at F = 0.36 while the fillet turns its facets toward the eye and
@@ -3526,7 +3737,9 @@ def _menis_probe(P, nd=401, span=.060, still=False):
     if still:
         st = (np.zeros(nd), np.zeros(nd)) + st[2:]
     pt = {n: np.zeros((nd, 3)) for n in ('refl', 'tran', 'disc')}
-    Lc = meniscus(px, py, SLIP - dd, dv, fpp, *st, parts=pt)
+    # guard OFF: this probe deliberately walks the east and south walls, where
+    # Vm < 0, in order to report the bound the picture path refuses.
+    Lc = meniscus(px, py, SLIP - dd, dv, fpp, *st, parts=pt, guard=False)
     y = Lc[:, 1]
     dh = np.maximum(np.hypot(dv[:, 0], dv[:, 1]), 1e-9)
     pm = (dv[:, 0] * -gx + dv[:, 1] * -gy) / dh
@@ -4736,7 +4949,7 @@ print("  the strongest 0.1%% of single-primary pixels, split exclusively: %.0f%%
          100 * (_top & _wm).sum() / max(_top.sum(), 1)))
 
 Image.fromarray(hero).save("pool_final.png")
-print("wrote pool.png")
+print("wrote pool_final.png")
 
 # A patch of sunlit floor between the camera and the step unit -- aimed by
 # projecting the point, not by a remembered pixel index.
@@ -4783,4 +4996,4 @@ ZH = int(np.clip(_zpix[:, 1].max() + 12, 0, H // SS) - ZY)
 print("zoom on the step unit: %dx%d px at (%d, %d)" % (ZW, ZH, ZX, ZY))
 Image.fromarray(hero[ZY:ZY + ZH, ZX:ZX + ZW]).resize(
     (ZW * S, ZH * S), Image.LANCZOS).save("pool_final_zoom.png")
-print("wrote pool_dispersion.png, pool_zoom.png")
+print("wrote pool_final_dispersion.png, pool_final_zoom.png")

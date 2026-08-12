@@ -153,6 +153,13 @@ REQUIRED = [
     '_menis_weights', '_menis_under', '_env_menis', 'meniscus',
     'MENIS_TIR_REACH', 'EDGE_REFL', 'surf_stats', 'pool_grad',
     'EYE', 'PIXANG', 'SS', 'SLIP', 'sail_vis',
+    # the six defects closed in the round that follows: the interface
+    # transport, the wall planes, the map's top, the fold guard and the
+    # stone's own sun term
+    'N2', 'out_of_water', 'T_OUT_DIFFUSE', 'WTOP',
+    'XW0', 'XW1', 'YW0', 'YW1', 'pool_sdf_grad',
+    'MENIS_FOLD_TOL', '_menis_fold_guard',
+    'stone_vis', 'sun_vis', 'coping_vis', 'SBUL', 'COPW', 'ZD', 'ZLIP',
 ]
 
 
@@ -1151,6 +1158,380 @@ def tier3_refl_ellipse(R, fld):
           'algebraic consequence of J = diag(-2, -2 cos tv); float round-off')
 
 
+# ================================== TIER 1: THE INTERFACE, AS A TRANSPORT
+# THE ROW THAT WOULD HAVE CAUGHT THE MISSING 1/n^2, and the reason it sits apart
+# from the Fresnel block: Fresnel is only HALF of what happens to a radiance at
+# a refracting interface. The other half is that radiance is not conserved at
+# all -- L/n^2 is, because a pencil's etendue n^2 dA dOmega is -- and render.py
+# shipped for several rounds with T applied and the 1/n^2 absent. Every Fresnel
+# row in this file passed throughout, because none of them ever asked what
+# happens to a RADIANCE; they asked what happens to a ratio, and a ratio is
+# where this factor cancels.
+#
+# What closes it is an audit with nothing to transcribe. Put a PERFECT WHITE
+# Lambertian bed under a flat surface with no absorption, light it with a
+# uniform sky, and compose it the way render.py composes -- down through the
+# interface, off the bed, back up through `out_of_water`. The pool's apparent
+# albedo must then be EXACTLY 1, because a lossless system cannot do anything
+# else. With the divisor it is 1; without it, 1.73, and no tolerance argument
+# reaches that. Both crossings use THIS file's own `fresnel_exact`, so the only
+# thing borrowed from render.py is the quantity under test.
+def tier_interface(R):
+    n = R.IOR
+    NQ = 20000
+    mu = (np.arange(NQ) + .5) / NQ                # cosine in air / in water
+
+    # -- the two diffuse Fresnel integrals, both computed here.
+    r_ext = np.array([np.mean(2. * mu * fresnel_exact(mu, nc)[0]) for nc in n])
+
+    def _rint(nc):
+        """Water -> air, cosine-weighted, INCLUDING the whole TIR cone. Past the
+        critical angle the reflectance is exactly 1 and that cone is 1 - 1/n^2
+        of the hemisphere, which is most of the answer."""
+        sa = np.sqrt(np.maximum(1. - mu ** 2, 0.)) * nc      # sine in air
+        ca = np.sqrt(np.maximum(1. - sa ** 2, 0.))
+        r = np.where(sa >= 1., 1., fresnel_exact(ca, nc)[0])
+        return float(np.mean(2. * mu * r))
+    r_int = np.array([_rint(nc) for nc in n])
+    Tbar = np.array([np.mean(2. * mu * (1. - fresnel_exact(mu, nc)[0]))
+                     for nc in n])
+
+    # WALSH'S RELATION, which pins the EXPONENT and not merely the presence of a
+    # factor: n^2 (1 - R_int) = 1 - R_ext is an exact consequence of Fresnel
+    # reciprocity and holds for the square and for no other power.
+    check(1, 'Walsh: n^2 (1 - R_int) == 1 - R_ext  [two quadratures, both here]',
+          n ** 2 * (1. - r_int), 1. - r_ext, 3e-4,
+          'exact identity; 3e-4 is the 20000-node midpoint rule against the '
+          'square-root corner the TIR cone puts in the integrand')
+    info(1, '  ... the same product at n^1 and n^3, for scale',
+         'n^1 %s | n^3 %s | 1 - R_ext = %s'
+         % (np.round(n * (1 - r_int), 4), np.round(n ** 3 * (1 - r_int), 4),
+            np.round(1 - r_ext, 4)),
+         'the identity picks out the square and nothing else, so a wrong power '
+         'is as visible here as a missing factor')
+    check(3, 'R_EXT / R_INT as shipped, vs this file\'s own quadratures',
+          np.concatenate([R.R_EXT, R.R_INT]), np.concatenate([r_ext, r_int]),
+          5e-4,
+          'render.py integrates R_EXT on 512 nodes and gets R_INT by '
+          'reciprocity; this integrates both directly on 20000 and gets R_INT '
+          'the long way, through the TIR cone. 5e-4 is the coarse rule\'s error')
+
+    # -- THE HEMISPHERICAL FORM OF THE FACTOR UNDER TEST.
+    check(1, 'INT T(mu) out_of_water(1) 2 mu dmu == 1 - R_int',
+          Tbar * R.out_of_water(np.ones((1, 3)))[0], 1. - r_int, 3e-4,
+          'the exit transport, hemispherically averaged, evaluated THROUGH the '
+          'shipped function. Without the 1/n^2 it reads 0.93 against 0.52 -- a '
+          'clean factor n^2; with a 1/n instead it reads 0.70')
+    check(1, 'T_OUT_DIFFUSE, the factor WBOUNCE now carries, == 1 - R_int',
+          R.T_OUT_DIFFUSE, 1. - r_int, 5e-4,
+          'the same transport in its diffuse form. The bare 0.5 it replaced '
+          'misses this by 4.7%, which is why it is derived now')
+
+    # -- THE CLOSED ENERGY AUDIT.
+    def apparent_albedo(rho, divisor=True):
+        E_w = (1. - r_ext) / (1. - rho * r_int)       # in-water bed irradiance
+        L_w = rho * E_w / np.pi                       # in-water bed radiance
+        L_a = R.out_of_water(L_w[None])[0]            # <- THE THING UNDER TEST
+        if not divisor:
+            L_a = L_a * R.IOR ** 2
+        return r_ext + Tbar * np.pi * L_a
+
+    check(1, 'a LOSSLESS pool (white bed, no absorption) has albedo exactly 1',
+          apparent_albedo(1.0), np.ones(3), 5e-4,
+          'energy conservation and nothing else -- the right-hand side is the '
+          'number 1, and no constant of render.py enters it. 5e-4 is the two '
+          'quadratures; composed without the 1/n^2 the row reads 1.73, a pool '
+          'returning 73% more light than fell on it')
+    info(1, '  ... the same audit with the divisor taken back out',
+         np.round(apparent_albedo(1.0, divisor=False), 3),
+         'what the file shipped for several rounds, in the energy books')
+    # -- and off unity, against the file's own wet-liner formula: the same
+    # physical quantity reached by unrelated code (a geometric series over
+    # trapped bounces), itself already guarded against Egan & Hilgeman.
+    for rho in (0.222, 0.585, 0.681, 0.95):
+        check(3, 'apparent albedo of the pool == wet_albedo(%.3f)' % rho,
+              apparent_albedo(rho), R.wet_albedo(np.array([[rho] * 3]))[0],
+              1e-3,
+              'this side integrates the transport ray by ray; wet_albedo sums '
+              'the trapped series in closed form. They share no line of code. '
+              '1e-3 relative is the two quadratures\' own spread', rel=True)
+
+
+# ============================ TIER 1 / 3: WHERE THE SUBMERGED WALLS STAND
+# `scene_hit` used to put the four walls on the PLAN RECTANGLE, s = 0, while
+# every other piece of the edge -- the vertical face the freeboard band stands
+# on, the line `gh` cliffs at, the line the meniscus climbs -- stands 20 mm
+# inside it at s = SLIP. Nothing caught it because nothing ever asked the two
+# constructions the same question. These rows ask it two ways.
+def tier_wall_plane(R):
+    rng = np.random.default_rng(20260812)
+    N = 6000
+    px = rng.uniform(R.X0 + .3, R.X1 - .3, N)
+    py = rng.uniform(R.Y0 + .3, R.Y1 - .3, N)
+    th = rng.uniform(0., 2 * np.pi, N)
+    el = rng.uniform(.04, 1.35, N)
+    tx, ty = np.cos(th) * np.cos(el), np.sin(th) * np.cos(el)
+    tz = -np.sin(el)
+    sid, u, v, sm, cyl = R.scene_hit(px, py, tx, ty, tz)
+    hx, hy = px + tx * sm, py + ty * sm
+    w = (sid >= 1) & (sid <= 4)
+    # (1) THE PLANE ITSELF, read back through pool_sdf -- which `scene_hit` does
+    # not call and has never called. Two constructions of the same surface.
+    check(1, 'every wall hit lands on pool_sdf == SLIP  [%d of %d rays]'
+          % (int(w.sum()), N),
+          float(np.max(np.abs(R.pool_sdf(hx[w], hy[w]) - R.SLIP))), 0.0, 1e-12,
+          'the four planes and the plan boundary are the same surface, so the '
+          'residual is float round-off on a subtraction of order 8 m. On the '
+          'planes this shipped with (s = 0) this row reads 0.020 exactly',
+          unit='m')
+    # (2) and nothing is reached THROUGH the boundary: every hit is the FIRST.
+    eps = np.linspace(0., 1., 65)[1:-1]
+    ins = np.max([np.max(R.pool_sdf(px + tx * sm * e, py + ty * sm * e))
+                  for e in eps])
+    between(1, 'the whole traced segment stays inside the water boundary',
+            float(ins), -8.0, R.SLIP,
+            'a first-hit solver that overshot a wall would put part of the '
+            'segment OUTSIDE s = SLIP, so the assertion is one-sided: the '
+            'worst interior sample of 6000 segments must still be at or '
+            'within the boundary. On the planes this shipped with it reaches '
+            's = 0', unit='m')
+    # (3) THE INDEPENDENT METHOD: march the same rays through the height field
+    # instead of solving five planes. `bed_z` is the bed as a height field and
+    # `pool_sdf` is the boundary; neither is used by scene_hit's arithmetic.
+    K = 400
+    tt = np.linspace(0., 12., 12001)[None, :]
+    j = rng.choice(N, K, replace=False)
+    mx = px[j][:, None] + tx[j][:, None] * tt
+    my = py[j][:, None] + ty[j][:, None] * tt
+    mz = tz[j][:, None] * tt
+    solid = (mz <= R.bed_z(mx, my)) | (R.pool_sdf(mx, my) >= R.SLIP)
+    first = np.argmax(solid, 1).astype(float) * (12. / 12000.)
+    ok = solid.any(1)
+    d = np.abs(first[ok] - sm[j][ok])
+    check(3, 'a 1 mm march of the height field finds the same first hit',
+          float(np.percentile(d, 99)), 0.0, 1.1e-3,
+          'the march quantises the answer to its own 1 mm step, so the whole '
+          'tolerance is that step; the 99th percentile rather than the max '
+          'because a ray landing exactly on an edge splits between two steps',
+          unit='m')
+    info(3, '  ... median march-vs-solve disagreement',
+         '%.2e m over %d rays' % (float(np.median(d)), int(ok.sum())),
+         'half a step is what a quantised march should give')
+
+
+# ================== TIER 3: DOES THE WALL MAP COVER THE FILLET'S COLUMN?
+# The fillet's transmitted rays start as high as MENIS_H above the still line
+# and a refracted camera ray descends everywhere (t_z < 0 identically -- the
+# same algebra that refutes the underside term, tested in section 8 below), so
+# MENIS_H is a STRICT upper bound on where one of them can land. The map used to
+# stop at z = 0 and `sample` clamped the top 3.9 mm of the column onto its first
+# texel. It now runs to WTOP; this marches the whole fan and says both that the
+# bound is respected and that it is not vacuous.
+def tier_map_extent(R):
+    check(1, 'WTOP, the wall map\'s top, == MENIS_H, the climb', R.WTOP,
+          float(R.MENIS_H), 0.0,
+          'the map is extended to the analytic bound, not to a round number')
+    m4 = ((np.array([1., 0.]), lambda a: (np.full_like(a, R.X0 - R.SLIP), a)),
+          (np.array([-1., 0.]), lambda a: (np.full_like(a, R.X1 + R.SLIP), a)),
+          (np.array([0., 1.]), lambda a: (a, np.full_like(a, R.Y0 - R.SLIP))),
+          (np.array([0., -1.]), lambda a: (a, np.full_like(a, R.Y1 + R.SLIP))))
+    eyes = [R.EYE, np.array([-1.40, 2.00, 1.60]), np.array([4.00, -1.30, 2.40]),
+            np.array([4.00, 2.00, 0.28]), np.array([9.40, 5.20, 3.10])]
+    hi, lo, nwall, rise = -1e9, 1e9, 0, -1e9
+    for tcd in (0.0, 40.0, 80.0):
+        t = R.menis_tables(np.deg2rad(tcd), R.CAP_A, R.MENIS_N)
+        _mph, WD, MD, MZ, MS, MC, _re = t
+        for mvec, pos in m4:
+            a = np.linspace(0.25, 3.75, 40)
+            for eye in eyes:
+                bx, by = pos(a)
+                nd_x = (bx[:, None] + mvec[0] * MD[None]).ravel()
+                nd_y = (by[:, None] + mvec[1] * MD[None]).ravel()
+                pz = np.broadcast_to(MZ[None], (a.size, MD.size)).ravel()
+                P = np.stack([nd_x, nd_y, pz], 1) - eye[None]
+                P /= np.linalg.norm(P, axis=1, keepdims=True)
+                nx = np.broadcast_to(mvec[0] * MS[None], (a.size, MD.size)).ravel()
+                ny = np.broadcast_to(mvec[1] * MS[None], (a.size, MD.size)).ravel()
+                nz = np.broadcast_to(MC[None], (a.size, MD.size)).ravel()
+                ndv = -(P[:, 0] * nx + P[:, 1] * ny + P[:, 2] * nz)
+                tx, ty, tz = R.refract(P[:, 0], P[:, 1], P[:, 2], nx, ny, nz,
+                                       1.0 / R.IOR[1])
+                sid, uu, vv, sm, _ = R.scene_hit(nd_x, nd_y, tx, ty, tz, pz)
+                sel = (sid >= 1) & (sid <= 4) & (ndv > 0.)
+                if not sel.any():
+                    continue
+                nwall += int(sel.sum())
+                hi = max(hi, float(vv[sel].max()))
+                lo = min(lo, float(vv[sel].min()))
+                rise = max(rise, float((vv[sel] - pz[sel]).max()))
+    between(1, 'no fillet ray ever RISES: max(z_hit - z_launch) <= 0', rise,
+            -1.0, 0.0,
+            'f = eta cos_i - cos_t < 0 for eta < 1, and n_z = cos(phi) >= 0 on '
+            'a meniscus against a vertical wall, so t_z < 0 identically and '
+            'the bound MENIS_H is strict. One-sided, over %d traced wall hits '
+            'across 4 walls, 5 eye positions and 3 contact angles' % nwall,
+            unit='m')
+    check(3, 'the highest wall hit is INSIDE the map  [%d hits, 4 walls, 5 eye '
+          'positions, theta_c 0-80 deg]' % nwall, hi, R.WTOP - 5e-4, 5e-4,
+          'the bound is MENIS_H = %.2f mm and the map now runs to it. The row '
+          'is two-sided on purpose: a map that stopped short would fail high, '
+          'and a bound nothing reaches would fail low, which is how a vacuous '
+          'row is caught' % (1000 * R.MENIS_H), unit='m')
+    info(3, '  ... the fillet\'s transmitted column, in z',
+         'lands between %.2f mm and %+.2f mm of the still line; the map runs '
+         '-1400.00 to %+.2f mm' % (1000 * lo, 1000 * hi, 1000 * R.WTOP),
+         'the top 3.9 mm of it used to be read off the map\'s first texel')
+
+
+# ===================== TIER 1: THE NEAR-WALL FOLD, WHICH IS NOW ENFORCED
+# `_menis_weights` prices the fold at |Vm| * h and says this frame never reaches
+# it. That was a comment. It is now a guard, and these rows hold both halves of
+# it: that it does not fire where the reference frame lives, and that it does
+# fire where the bound applies.
+def tier_fold(R):
+    check(1, 'the fold guard passes a FAR wall (Vm > 0)',
+          R._menis_fold_guard(np.array([0.31, 0.88]), True), 0.0, 0.0,
+          'max(-Vm, 0) is identically zero there, so the reported area is '
+          'exactly zero and no tolerance is involved', unit='m')
+    raised = 0
+    try:
+        R._menis_fold_guard(np.array([0.31, -0.42]), True)
+    except AssertionError:
+        raised = 1
+    check(1, 'the fold guard RAISES on a NEAR wall (Vm < 0)', raised, 1, 0,
+          'a bound that nothing enforces is a comment; this is the row that '
+          'makes it a guard')
+    check(1, 'the area it reports is |Vm| * h',
+          R._menis_fold_guard(np.array([-0.42]), False),
+          0.42 * float(R.MENIS_H), 1e-15,
+          'the bound as stated in `_menis_weights`, evaluated', unit='m')
+    check(1, 'the tolerance is under one node of climb',
+          float(R.MENIS_FOLD_TOL < R.MENIS_H / R.MENIS_N / 100.), 1.0, 0.0,
+          'MENIS_H/MENIS_N is 60 um, the smallest fold a single quadrature '
+          'node could carry; the tolerance is a thousandth of that, so it is '
+          '"no ray at all" rather than a budget')
+    # -- end to end, through `meniscus` itself, on the two walls that differ.
+    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN, R.sail_vis)
+    R._env_menis = lambda rx, ry, rz: np.ones((np.asarray(rx).size, 3))
+    R._menis_under = lambda sid, u, v, sm, cyl, tz, mode: np.ones((sid.size, 3))
+    R.EDGE_REFL = np.ones(3)
+    R.L_SUN = np.zeros(3)
+    R.sail_vis = lambda x, y: np.ones(np.asarray(x).shape)
+    try:
+        def run(P):
+            nd, span = 401, 0.040
+            gx, gy, _ = R.pool_grad(P[0], P[1])
+            dd = np.linspace(0., span, nd)
+            px, py = P[0] - gx * dd, P[1] - gy * dd
+            dv = np.stack([px, py, np.zeros(nd)], 1) - R.EYE[None]
+            tt = np.linalg.norm(dv, axis=1)
+            dv /= tt[:, None]
+            fpp = tt * R.PIXANG / np.maximum(np.abs(dv[:, 2]), .10) * R.SS
+            st = R.surf_stats(px, py, fpp)
+            return R.meniscus(px, py, R.SLIP - dd, dv, fpp, *st)
+        run(np.array([3.40, R.Y1 + R.SLIP, 0.]))
+        okn = 1
+    except AssertionError:
+        okn = 0
+    try:
+        run(np.array([R.X1 + R.SLIP, 2.60, 0.]))
+        oke = 0
+    except AssertionError:
+        oke = 1
+    finally:
+        (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN,
+         R.sail_vis) = stash
+    check(1, 'meniscus() runs on the NORTH waterline (the frame\'s own)', okn,
+          1, 0, 'Vm = +0.94 there; the reference frame must render')
+    check(1, 'meniscus() REFUSES the EAST waterline (a near wall)', oke, 1, 0,
+          'Vm = -0.61 there. The east waterline is behind the near coping\'s '
+          'arris in this frame and no camera ray selects it, which is exactly '
+          'the condition the comment rested on and the guard now enforces')
+
+
+# ===================== TIER 1 / 3: DOES THE SUN REACH THE COPING?
+# `sun_vis` = sail_vis * coping_vis, and `coping_vis` is a WATER-SURFACE term:
+# the run from a point inside the pool to the lip. Applied to a point ON the
+# stone its numerator goes negative on every side whose outward normal has a
+# positive component toward the sun, so it returned a flat 0 and the north and
+# west copings lost their direct sun entirely. The march below is the answer the
+# geometry gives; `stone_vis` now has to match it.
+def tier_stone_sun(R):
+    def gz(x, y):
+        """The pool-edge height field, minus the laid-stone wobble -- a +-4 mm
+        dither the slice cannot build (its noise table is one of the skipped
+        allocations) and one that cannot change a 21 deg ray's answer over the
+        metres this marches."""
+        s = R.pool_sdf(x, y)
+        return np.where(s < R.SLIP, 0.0, R.edge_z(s))
+
+    ss = np.linspace(R.SBUL + .002, R.COPW - .002, 12)      # coping TOP only
+    aa = np.linspace(.35, 3.65, 14)
+    PX, PY, SIDE = [], [], []
+    for k, (nm, mk) in enumerate((('west ', lambda s, a: (R.X0 - s, a)),
+                                  ('east ', lambda s, a: (R.X1 + s, a)),
+                                  ('south', lambda s, a: (a * 2., R.Y0 - s)),
+                                  ('north', lambda s, a: (a * 2., R.Y1 + s)))):
+        S, A = np.meshgrid(ss, aa)
+        x, y = mk(S.ravel(), A.ravel())
+        PX.append(np.asarray(x, float)); PY.append(np.asarray(y, float))
+        SIDE.append(np.full(x.size, k))
+    PXa, PYa, SIDEa = np.concatenate(PX), np.concatenate(PY), np.concatenate(SIDE)
+    z0 = gz(PXa, PYa)
+    # -- the march. Step toward the sun and ask whether the height field ever
+    # rises above the ray. Nothing else in the scene is above the water.
+    tt = np.linspace(0., 14., 7001)[None, :]
+    occ = np.zeros(PXa.size, bool)
+    for c0 in range(0, PXa.size, 128):
+        sl = slice(c0, c0 + 128)
+        rx = PXa[sl][:, None] + R.SUN_DIR[0] * tt
+        ry = PYa[sl][:, None] + R.SUN_DIR[1] * tt
+        rz = z0[sl][:, None] + R.SUN_DIR[2] * tt
+        occ[sl] = ((rz + 2e-4) < gz(rx, ry)).any(1)
+    check(1, 'the sun reaches EVERY coping-top point (2 mm march of the height '
+          'field, %d points on 4 sides)' % PXa.size, int(occ.sum()), 0, 0,
+          'the coping is the highest thing in the scene bar the sail, and the '
+          'far coping\'s own shadow reaches ZD/tan(21 deg) = 0.40 m, which '
+          'lands on water. So the geometric answer is "lit", everywhere, and '
+          'it is not a tolerance')
+    stash = R.sail_vis
+    R.sail_vis = lambda x, y: np.ones(np.asarray(x).shape)
+    try:
+        sv = np.asarray(R.stone_vis(PXa, PYa), float)
+        uv = np.asarray(R.sun_vis(PXa, PYa), float)
+    finally:
+        R.sail_vis = stash
+    check(1, 'stone_vis agrees with the march on every coping-top point',
+          float(np.abs(sv - (~occ).astype(float)).max()), 0.0, 0.0,
+          'sail_vis is stubbed to 1 for this row (the slice does not build the '
+          'shade-sail map), so what is left IS the coping question. With the '
+          '`sun_vis` this used to call, the row reads 1.0 on 50% of the points')
+    info(1, '  ... what sun_vis gives on the same points, per side',
+         '  '.join('%s %.2f' % (nm, uv[SIDEa == k].mean())
+                   for k, nm in enumerate(('west', 'east', 'south', 'north'))),
+         'coping_vis is 0 wherever the outward normal has a positive component '
+         'toward the sun -- west and north here -- which is why it may not be '
+         'asked about stone at all')
+    # -- and the one place the coping DOES shade itself, recorded rather than
+    # claimed away: the bottom of the bullnose on the sun-facing sides.
+    sb = np.linspace(R.SLIP + .001, R.SBUL - .001, 24)
+    bx = R.X0 - sb
+    by = np.full_like(sb, 2.0)
+    bz = gz(bx, by)
+    rx = bx[:, None] + R.SUN_DIR[0] * tt
+    ry = by[:, None] + R.SUN_DIR[1] * tt
+    rz = bz[:, None] + R.SUN_DIR[2] * tt
+    bocc = ((rz + 2e-4) < gz(rx, ry)).any(1)
+    nl = -R.SUN_DIR[0]       # the west bullnose faces +x; the sun is at -x
+    info(1, '  ... the west bullnose shades its own foot',
+         '%.0f%% of the roll-over, up to s = %+.1f mm; N.L there is %+.3f'
+         % (100 * bocc.mean(), 1000 * sb[bocc].max() if bocc.any() else 0., nl),
+         'real, unmodelled and worth nothing: those facets face the pool, so '
+         'the sun is behind them and their own N.L is negative. Recorded so '
+         'that a camera on the other side of the pool does not inherit it '
+         'silently')
+
+
 def tier3_diffuse_fresnel(R):
     # R_INT is derived here by reciprocity from a quadrature of the file's own
     # Fresnel. There is an entirely separate, empirical expression for the same
@@ -2093,6 +2474,9 @@ def main():
                      (tier2_absorption, (R,)), (tier2_coxmunk, (R, fld)),
                      (tier2_jet, (fld, wkm)), (tier2_dispersion, (fld, wkm)),
                      (tier3_refl_ellipse, (R, fld)),
+                     (tier_interface, (R,)), (tier_wall_plane, (R,)),
+                     (tier_map_extent, (R,)), (tier_fold, (R,)),
+                     (tier_stone_sun, (R,)),
                      (tier3_diffuse_fresnel, (R,)), (tier3_cylinder, (R,)),
                      (tier3_gemm, (fld,)), (tier3_geometry, (R,)),
                      (tier_meniscus, (R,)),
