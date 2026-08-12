@@ -1712,14 +1712,21 @@ def tier_meniscus(R):
             Lc = R.meniscus(px, py, R.SLIP - ddv, dv, fpp, *st)
             vz = np.maximum(-dv[:, 2], .05)
             got = float(np.trapezoid(Lc[:, 1] * vz, ddv))
+            # what it must come to: the folded kernel puts each node's excess at
+            # that node's own d and integrates to 1 over d >= 0, so the total is
+            # the sum of the per-node excesses evaluated at the view direction
+            # each node actually sits under -- not at the fan's mean, which is a
+            # different direction 40 mm out
             Vm = -(dv[:, 0] * -gx + dv[:, 1] * -gy)
-            ndv, wf, wl, wo, isil = R._menis_weights(Vm, -dv[:, 2])
-            exp = float(np.mean((wf + wo - wl).sum(1)))
+            jn = np.searchsorted(ddv, R.MENIS_D)
+            ndv, wf, wl, wo, isil = R._menis_weights(Vm[jn], -dv[jn, 2])
+            exp = float(np.diagonal(wf + wo - wl).sum())
             check(3, 'the deposit integrates back to the excess area  [%s]' % tag,
-                  got, exp, 0.02,
-                  'the view direction rotates across the 80 mm fan, so I(v) is '
-                  'not constant over the integral and the mean is used; the '
-                  'spread over the fan is under 1%, and 2% is the tolerance',
+                  got, exp, 1e-3,
+                  'the kernel is normalised over d >= 0, so the identity is '
+                  'exact; what is left is that K is up to 3 mm wide and the '
+                  'view direction turns 0.02 deg across that, worth 4e-4 in '
+                  'Vm, plus the trapezoid on a %d-point fan at 13 um' % nd,
                   unit='m', rel=True)
 
         # -------------------------------------------------------- 6. the limits

@@ -426,7 +426,10 @@ prefactor, and the deposit lattice the traced rays actually make.
 ## 3. The meniscus
 
 **Derived from:** Young–Laplace for a two-dimensional interface against hydrostatic pressure, plus a
-contact angle. Everything below except the contact angle is closed form.
+contact angle. The profile, the two differentials, the flux integral, the reachability algebra and
+the projected-area identity are closed form; the contact angle is unmeasured (`?`); the transmitted
+column's *source* is traced rather than derived, because the refracted ray goes somewhere specific
+and near. Three transport terms were proposed, **two are built and the third is refuted below.**
 
 ### The profile
 
@@ -474,12 +477,20 @@ that is the foreshortening factor that appears in the integral below.
 ### The integral, and what it is divided by
 
 A camera ray does not see the fillet; it sees a pixel. So what is computed is a **radiant intensity
-per unit length of waterline**, `W/sr/m`:
+per unit length of waterline**, `W/sr/m`. There are **two columns** and they run on one sweep, one
+set of projected areas and one Fresnel:
 
 ```
-I(v) = int_0^phi_w [ F(n.v) L_env(R(phi)) (n.v) / cos(phi)
-                     - F(v_z) L_env(R_flat) v_z ] dx
+I(v) = int_0^phi_w [   F(n.v)  L_env(R(phi))    (n.v)/cos(phi)      # reflected
+                   + (1-F(n.v)) L_trace(T(phi)) (n.v)/cos(phi)      # transmitted
+                   -   F(v_z)  L_env(R_flat)    v_z
+                   - (1-F(v_z)) L_trace(T_flat) v_z             ] dx
 ```
+
+`R(φ)` is the mirror direction and is an environment lookup; `T(φ)` is the **refracted** direction
+and is not — it goes somewhere specific and near, and has to be traced. A third mechanism, total
+internal reflection off the fillet's underside, was proposed and is **refuted below**: it subtends
+zero solid angle from any camera above the water.
 
 **The subtraction is the fillet minus the flat surface it replaces**, and it does two jobs at once.
 It prevents double counting — the water shader has already shaded that flat surface over the same
@@ -507,6 +518,95 @@ the dashed line the clamp is warning about**.
 at `d < 0`, the wall side of the junction — where it physically belongs, since the fillet's top
 stands `h` up the wall. Reflecting it back into the water side is flux-conserving and wrong by less
 than the pixel it is already spread over.
+
+### The projected-area identity, which is what makes the whole thing checkable
+
+Everything the two columns share is a pair of areas per node — the facet's projected area toward the
+eye and the flat strip's. With `V` the direction **toward** the eye, decomposed on the wall's own
+`(m, t, z)` frame,
+
+```
+w_fil = ds (n.V) = dx (n.V)/cos(phi),     w_flt = dx V_z
+```
+
+and because `ds sin φ = dz` and `ds cos φ = −dd` exactly, `∫ds(n·V) = ∫(V_m dz − V_z dd)`
+**telescopes to its endpoints**. Subtract the flat strip of the same width and everything in the
+middle cancels:
+
+```
+SUM (w_fil - w_flt) = V_m * z(phi*)          phi* = the steepest visible tilt
+                    = V_m * h                whenever the eye is poolward
+```
+
+**The fillet's excess projected area is the poolward view component times the climb, and nothing
+else.** Not the node count, not `dd/dφ`, not where the nodes sit — a quadrature that is wrong
+anywhere in the middle still has to land here, and one that is wrong at either end cannot. On the
+reference frame that is 0.83 mm per metre of waterline at the far end of the north wall and 2.30 mm
+at the near end, against a flat strip of 3.0 and 8.3 mm: the fillet adds **28% more surface facing
+the eye**, all of it within 15 mm of the wall.
+
+The identity is blind to the *shape*, since it telescopes. So the shape is checked separately, by
+solving the differential statement the closed form came from — see *Tests*.
+
+### The transmitted column, and where the ray actually goes
+
+Fresnel at the incidences this camera sees the fillet at is 0.02–0.07 near, 0.33 grazing. What the
+facets **pass** is the complement, so the transmitted column starts 15–50× ahead of the reflected one
+and the only question is what is behind it. Traced, with the file's own `refract` and `scene_hit`,
+from each node's own place on the profile (`d(φ)` in from the waterline, `z(φ)` above the still
+level):
+
+- On the **north** and **west** walls — the two the reference frame sees — **all 64 facets face the
+  eye and all 64 land on that wall's own liner**, between 1 and 119 mm below the waterline, over a
+  leg of 20 to 175 mm of water. Not the bed: the wall, a few centimetres under the line, which is
+  the brightest and least absorbed liner in the basin.
+- On the **east** wall, where the eye looks poolward over the coping, 37 of 64 face the eye and they
+  go the other way — 34 into the bed, 3 into the far wall, over legs of 0.3 to 1.6 m.
+
+The result, in the same `W/sr/m` the reflected column is quoted in, on the north waterline:
+
+| distance | reflected | transmitted | ratio |
+|---|---|---|---|
+| 9.41 m (x = 0.4) | 1.34e-4 | 2.74e-4 | 2.0× |
+| 7.52 m (x = 2.4) | 9.88e-5 | 3.87e-4 | 3.9× |
+| 5.70 m (x = 4.4) | 5.34e-5 | 5.93e-4 | 11× |
+| 4.07 m (x = 6.4) | 1.97e-5 | 1.32e-3 | 67× |
+| 3.46 m (x = 7.3) | 1.75e-5 | 1.23e-3 | 70× |
+
+The reflected column **falls** along the wall, because the mirror direction runs away from the
+horizon as the eye comes closer; the transmitted column **rises**, because `V_m` rises and the wall
+it is looking at gets nearer and brighter. That crossover is why the shipped line was a bright patch
+at the far end fading to nothing at the near one, and why the whole term now reads as a line.
+
+*Two things this column inherits rather than owns.* It carries `water_shade`'s **missing `1/n²`**,
+and it must: what it subtracts was drawn without it, and correcting one side alone would put a
+0.83-stop step across the junction. It makes that defect *more* visible, not less, because the
+transmitted column now carries the waterline as well as the field. And `scene_hit` places the
+submerged walls on the plan rectangle while the water surface ends at `s = SLIP`, 20 mm inside it, so
+every traced hit — the fillet's and the flat baseline's alike — lands about 5 mm lower on the liner
+than the geometry says. It very nearly cancels in the difference; it is recorded in *What did not
+reproduce*.
+
+### Self-occlusion, and the hole it left
+
+A facet with `n·V ≤ 0` turns away from the eye. On a **near** wall that is every facet steeper than
+`atan(V_z/|V_m|)`, because the fillet's own crest stands in front of them. Gating the fillet's term
+on that is right; gating the flat term with it is not — the eye's rays over that stretch still carry
+radiance, and what they carry is the crest, not nothing. Dropping both sides subtracts the whole
+transmitted column over a centimetre of width and puts a hole there: **−2.1e-3 W/sr/m on the east
+wall against +1.6e-3 on the west**. The defect was latent for as long as only the reflected half
+existed — Fresnel 0.05 made the hole invisible — and building the transmitted half is what exposed
+it. What now ships carries those nodes at the flat projected area, weighted with the radiance of the
+last visible facet.
+
+*And on a near wall that is still only a bound (`?`).* Where `V_m < 0` the fillet **folds in
+projection** — `perp(d) = −V_z d + V_m z(d)` turns round at `φ*` — and a one-dimensional sweep over
+`φ` cannot resolve a fold. What the eye really finds over the `|V_m|·h` of view the fillet vacates is
+the liner band standing above the crest. The error is bounded by `|V_m|·h`: at most 3.9 mm of
+projected area per metre of waterline, 2.3 mm at the east wall's own geometry, signed negative. **The
+reference frame never reaches it** — the fillet is on a near wall only to the east and south, the
+east waterline is behind the near coping's arris and 0% of the south's is in shot — and it is the
+first thing to build if the camera moves to the other side of the pool.
 
 ### Reachability: the one specular feature that cannot fail, and the two conditions that gate it
 
@@ -552,16 +652,98 @@ stands in for the spread of normals inside one pixel; here the normal is a quadr
 distribution, and leaving it soft lets 11% of a `3.6×10⁵` sun through a coping it is entirely behind
 (`D`). The transition sits at `φ = θ_v/2`, where the mirror direction runs parallel to the wall.
 
-**What is not built, so it is not read as built:** the fillet also *refracts*, and the transmitted
-column is ~10× the reflected one, so that term is potentially larger than this one. It needs traced
-geometry rather than an environment lookup.
+### The third term, proposed and refuted
 
-**Tests.** **None in `validate.py`.** The profile, the flux integral, the reachability algebra and
-the convolution are checked only by the render's own probe, which reads the line off the same
-function that draws it. The capillary length is tested (2.724 mm against `√(σ_t/ρg)` and against the
-published 2.72). This is the largest untested derivation in the file, and the honest reading is that
-its *algebra* is verifiable on paper — everything above is closed form — while its *implementation*
-is not independently checked.
+The proposal: looking down at the junction you look *through* water at the **underside** of the
+fillet, and beyond the critical angle (48.5°) that underside is a perfect mirror — reflectance
+exactly 1, against 0.02–0.07 for the external specular — showing the sunlit bed. The fillet sweeps
+every tilt across ~5 mm, so the critical-angle condition is met inside it *by construction*: the same
+argument that makes the meniscus specularly reachable, applied to a mechanism 15–50× stronger.
+
+**It fails one step earlier, on arrival, and the reason is one line.** Write the transmitted
+direction as `t = η i + f n` with `n` opposing the incident ray. Then
+
+```
+f = eta cos_i - cos_t,      cos_t = sqrt(1 - eta^2 + eta^2 cos_i^2)
+f > 0  <=>  eta^2 cos_i^2 > 1 - eta^2 + eta^2 cos_i^2  <=>  eta^2 > 1
+```
+
+A camera above the water refracts **in**, `η = 1/n = 0.749 < 1`, so **`f < 0` strictly** — at every
+incidence, with no grazing exception; its supremum is `η − 1 = −0.251` at normal incidence. A static
+meniscus on a vertical wall carries tilts `φ ∈ [0, 90°]`, so its normal has `n_z = cos φ ≥ 0`, and a
+camera above the water has `i_z < 0`. Hence
+
+```
+t_z = eta i_z + f cos(phi)  <  0        IDENTICALLY
+```
+
+**The refracted camera ray descends everywhere inside the water.** It cannot arrive at the underside
+of a surface that lies above it. The fillet's underside subtends **exactly zero** solid angle from
+any camera above the waterline — not a small angle, not one this frame happens to miss: zero, for
+every eye position, every wall and every contact angle. Measured as well as derived: a scan of 1.29
+million (wall, position along it, tilt) samples over all four walls found `t_z < 0` on every
+front-facing one, worst case `−0.142`; a brute-force march of 215 000 refracted rays against the
+analytic profile found **0** underside hits.
+
+**The transferable part is the failure of the sweep argument.** Reachability of a *tilt* is not
+reachability of a *position*. The fillet does hold every normal, and that is enough for the specular
+term, where the eye and the source are both outside; it is not enough for a mechanism that needs the
+ray to get behind the surface. The underside is reached only from below, by light already in the
+water — which is the bed-return term (`TIR_FRAC` / `TIR_VERT`, §7), and which is built.
+
+`MENIS_TIR_REACH = 0.0` records it in the implementation so that it cannot be rebuilt by accident,
+and `validate.py` carries three rows on it.
+
+**Tests.** **Eight groups, 39 rows, all passing — the term went from the largest unguarded
+derivation in this file to one of the better guarded.** Every one of them is a statement the
+implementation does not make about itself:
+
+- **A force balance on the tabulated columns.** The weight the fillet raises per unit of waterline is
+  carried by the vertical pull of the surface at the wall: `ρg ∫z dx = σ cos θ_c = σ sin φ_w`, which
+  the profile integrates to `ρg a² sin φ_w = σ sin φ_w` identically. This is **Newton, not
+  Young–Laplace** — it never appears in the derivation above, it constrains `z` and `dx` *jointly*,
+  and it is evaluated on the very two columns the flux integral sweeps, so a table that is
+  self-consistently wrong in either fails it. Closes to 0.003% on the shipped 64 nodes; tolerance is
+  the midpoint rule's own error, measured by refining to 4096.
+- **The shape, against an RK4 march of the differential statement.** The force balance pins the *area*
+  under the profile and says nothing about its shape. So `dφ/ds = −z/a²`, `dz/ds = −sin φ`,
+  `dd/ds = cos φ` is integrated as an initial-value problem from the wall outward. Nothing in that
+  loop knows the answer is `2a sin(φ/2)`. Agrees to 4×10⁻¹⁴ m in `z`.
+- **The projected-area identity**, `Σ(w_fil − w_flt) = V_m z(φ*)`, on both signs of `V_m` and at
+  θ_c = 0/30/89°. 6×10⁻⁶ relative — it is exact for the continuum and the residual is the quadrature.
+- **A brute-force ray march.** A 4000-ray parallel fan is cast at the RK4 polyline and each ray is
+  marched — coarse grid to bracket, bisection to finish, because the crest is 30 µm of `d` and a
+  uniform step fine enough to resolve it over 100 mm of march would be 4×10⁷ samples. What it
+  measures is the projection *counted*, and unlike the identity it would notice a fold or an
+  occlusion. Agrees to under 4 fan spacings.
+- **The deposit, integrated back.** Hand `meniscus` a scene of **unit radiance** — sky, coping
+  undercut and everything under the water all 1, sun off — and the two columns collapse to
+  `F·w_fil + (1−F)·w_fil = w_fil` whatever `F` is. What the shipped function then deposits,
+  integrated across the waterline and multiplied back by the `|v_z|` it divided out, must be the
+  excess projected area. **One assertion over four separate things**: the node weights, the Fresnel
+  split (which has to be a partition of unity across the two columns, not two independent
+  weightings), the folded Gaussian's normalisation, and the fold at `d = 0`. None of them is
+  computed anywhere as a total, so there is no line of `render.py` the row can be reading back.
+- **Two limits, both forced.** As `a → 0` the fillet has no size; as `θ_c → 90°` it has no climb. The
+  deposit must collapse **linearly** in each — that is what the identity forces, since
+  `z(φ*) = 2a sin(φ*/2)`. This is the row that kills a missing subtraction: without it the integrand
+  is `∫dx F L cos_i/cos φ`, whose `dx ≈ a dφ/φ` diverges logarithmically at the flat end, so it does
+  not go to zero as `φ_w → 0` at all — it goes to a constant times `log N`. Checked at `a/10`,
+  `a/100`, `a/1000` and at θ_c = 60/80/89/89.9°; at θ_c = 90° exactly the deposit is 7×10⁻¹³ m.
+- **The reachability algebra against literal reflection.** `R(φ)·L` from the closed form against
+  building `n(φ)`, reflecting and dotting, over 60 random `(V, L)`: 9×10⁻¹⁶. The closest approach is
+  `cos(A − B)` to the scan's own grid error, and it reaches 1 exactly — the mirror direction passes
+  through the sun — on 60 configurations *constructed* to have `(L + V)·t = 0`.
+  *(Note on the convention: `v` in the formula above is the direction toward the **eye**, not the
+  incident ray. With the incident ray the first term changes sign. The implementation is consistent
+  with what is written here; a reader who substitutes the other `v` will get a residual of 1.8.)*
+- **The refutation**, three rows: `f < 0` at every incidence as an algebraic sign, `t_z < 0` over
+  323 400 front-facing samples of the shipped `refract`, and 0 underside hits out of the same.
+
+What is **still not guarded**: the environment the reflected column reads (`_env_menis`) and the maps
+the transmitted column traces into are stubbed out for the closure row, so what is checked is the
+geometry and the split, not the radiance. The contact angle remains `?` and unmeasured, and every
+row above is run across its whole plausible range rather than at one value.
 
 ---
 
@@ -1391,7 +1573,14 @@ method (a disagreement localises to one of the two methods).
 | Ray equations + `c_g` consistency | `\|H − H₀\|` halving ratio 0.248 vs 0.25 owed | 3 | pass |
 | Gabor window floor ≥ ½λ | atom carries 1.12 k vs 4.63 k at a narrow window | 3 | pass |
 | Wave action, `c_min` transport cutoff, film damping | — | — | **no test** |
-| Meniscus profile, flux integral, reachability algebra | — | — | **no test** (capillary length only) |
+| Meniscus profile (shape) | RK4 march of the Young–Laplace IVP, from the wall outward | 3 | pass (4×10⁻¹⁴ m) |
+| Meniscus quadrature (`z` and `dx` jointly) | force balance `ρg∫z dx = σ cos θ_c`, at four contact angles | 1 | pass (0.003%) |
+| Fillet excess projected area | telescoping identity `V_m z(φ*)`, both signs of `V_m`; 4000-ray brute-force march | 1, 3 | pass |
+| The deposit: node weights, Fresnel split, kernel, fold | unit-radiance closure integrated back to the excess area | 3 | pass (2%) |
+| Both terms → 0 as `a → 0` and as `θ_c → 90°` | forced limits, linear in each | 1 | pass |
+| Reachability algebra `R(φ)·L`, `β = A − B` | literal reflection over 60 random `(V, L)`; constructed `(L+V)·t = 0` | 1 | pass (9×10⁻¹⁶) |
+| Internal reflection off the fillet's underside | **refuted**: `f = η cos_i − cos_t < 0`, so `t_z < 0` identically; 323 400-sample scan, 0 hits | 1 | pass |
+| The radiance the two columns read (`_env_menis`, the traced maps) | — | — | **no test** (stubbed for the closure row) |
 | `W(k)`, `σ_w = 0.3748·fp`, `half_footprint = λ/2` | closed-form identities | 1 | pass |
 | Separable evaluation vs direct sum | grid vs point path | 3 | pass |
 | `C = JΣJᵀ`, `J = diag(−2, −2cos θ_v)` | 400k perturbed reflections | 3 | pass (1–2%) |
@@ -1428,7 +1617,8 @@ has since been **corrected in the code** (this file did not own it then; the rou
 did), and is kept here in full because the mechanism by which it survived a test suite is the
 transferable part. The other two stand as recorded. Two further disagreements were found while
 closing the first and are recorded here rather than fixed — one because it is one character of
-documentation, the other because it is a whole round of its own.
+documentation, the other because it is a whole round of its own. A sixth was found while building
+the meniscus's transmitted column and is recorded as item 6.
 
 1. **`TIR_VERT` — the vertical-face internal-reflection ratio.** *Now fixed; shipped value 0.885.*
    It shipped 0.563; the derivation stated beside it evaluates to 0.635; the correct value for a
@@ -1483,3 +1673,23 @@ documentation, the other because it is a whole round of its own.
    natural one is a closed energy audit of the pool as a whole (apparent albedo against
    `T·ρ(1−R_int)/(1−ρR_int)`, which the file already has the pieces for in `R_EXT`/`R_INT`). Not
    touched, not compensated for, and stated here with the numbers so the next round can start from it.
+
+6. **The submerged walls sit 20 mm outside the surface they meet.** Found while tracing the
+   meniscus's transmitted column, **recorded rather than fixed**, because it is a property of
+   `scene_hit` and moves every transmitted ray in the frame rather than only the ones at the
+   waterline.
+
+   The water's plan boundary — the vertical face carrying the liner band, the line the height field
+   cliffs at, the line the meniscus climbs — stands at `s = SLIP = −0.020`. `scene_hit` puts the four
+   submerged walls on the plan rectangle, `s = 0`. So a refracted camera ray travels 20 mm further
+   before it meets the wall than the geometry above it says, and lands correspondingly deeper: with
+   this frame's refracted descent that is about **5 mm lower on the liner**, against a wall map whose
+   own coping-shade term has a 55 mm scale at the top. Everywhere else in the basin 5 mm out of 1.40 m
+   is nothing; at the waterline it is the whole gradient.
+
+   It very nearly cancels in the meniscus's own subtraction — the fillet's traced ray and the flat
+   baseline's are both displaced by it, and what is added is the difference — which is why the term
+   was built on `scene_hit` as it stands rather than on a corrected plane. Building it on a corrected
+   plane would have made the *excess* consistent with a wall the rest of the frame does not have.
+   Fixing it properly means moving the four planes in `scene_hit` to `SLIP` and re-deriving the
+   dry-band absorption regression that is measured off the band immediately above them.

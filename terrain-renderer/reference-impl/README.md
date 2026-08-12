@@ -23,13 +23,13 @@ Sun position is the measured one for the reference photograph (Aljezur, 37.319N
 
 `render.py` prints ~90 diagnostics per run and almost all of them check the
 implementation against itself. `validate.py` checks it against things that were
-not written here, in three tiers, in about 16 seconds — no render, no PNG.
+not written here, in three tiers, in about 35 seconds — no render, no PNG.
 
 | Tier | Strength of evidence | Covers |
 |---|---|---|
-| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` |
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½`, the meniscus's force balance and projected-area identity and its two collapse limits, and the sign that refutes the fillet's internal-reflection term |
 | 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min |
-| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian |
+| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile and a 4000-ray fan vs its projected area |
 
 The highest-value single test is the **sinusoid caustic**: for `h = a sin(kx)`
 under a vertical sun the whole pass is a 1-D map with an exact Jacobian, so the
@@ -110,6 +110,12 @@ air-side and right, so the bed reads ~1.78× bright against it, which is exactly
 the spec-C reflected-vs-transmitted diagnostic measures. The internal return
 (`bedret`) is not the missing factor — that is the light which *failed* to escape,
 coming back to re-light the bed, and it is already inside `L_bed`'s irradiance.
+
+The meniscus's transmitted column, built after this was recorded, **inherits the
+same omission and makes it more visible** — the transmitted column now carries the
+waterline as well as the open field. It had to: what that term subtracts was drawn
+without the factor, so correcting one side alone would put a 0.83-stop step across
+the junction. Not compensated for anywhere else.
 
 Not fixed here for two reasons, both worth stating: the absolute level is entangled
 with `LINER_TINT`, the liner albedos and `EXPOSURE`, all fitted to a photograph with
@@ -215,31 +221,67 @@ What does not exist is the **return leg**. The receiving half is already here �
 intersector, which `scene_hit` is not (it solves the first hit of a **downgoing**
 ray). That is the whole of the work, and it is a pass of its own.
 
-## Not modelled yet — the meniscus as a specular feature
+## The meniscus, and the one term of it that was refuted
 
-The waterline against a wall carries a thin bright line in every reference
-frame, and the mechanism is certain rather than incidental. The static 2-D
-meniscus on a vertical wall is `z = 2a·sin(φ/2)` with the capillary length
-`a = √(σ/ρg) = 2.72 mm`, so the water climbs `a√(2(1−sin θ_c))` — 3.85 mm at
-perfect wetting — and the fillet decays over a couple of capillary lengths.
-Across those ~5 mm the surface tilt runs continuously from 0 to 90°−θ_c, so the
-strip contains **every** facet orientation and the mirror condition for the sun,
-or for the bright horizon, is satisfied somewhere in it whatever the sun does.
-It is the one specular feature in the scene that cannot fail the reachability
-test the spec-C diagnostic applies to the open surface.
+The waterline against a wall carries a thin bright line in every reference frame,
+and the mechanism is certain rather than incidental. The static 2-D meniscus on a
+vertical wall is `z = 2a·sin(φ/2)` with the capillary length `a = √(σ/ρg) =
+2.72 mm`, so the water climbs `a√(2(1−sin θ_c))` — 3.85 mm at perfect wetting — and
+the fillet decays over a couple of capillary lengths. Across those ~5 mm the tilt
+runs continuously from 0 to 90°−θ_c, so the strip contains **every** facet
+orientation.
 
-`render.py` now takes its **width** from the capillary length instead of a
-guessed 10 mm, but the term is still an *ambient* lift and the mechanism is
-*specular*. Building it properly needs two things it does not have:
+Three transport terms were proposed for it. **Two are built and one is refuted.**
 
-- the sub-pixel integral over the fillet — surface at tilt φ occupies
-  `dx = a cos(φ/2) cos(φ)/sin(φ) dφ`, and the sun's 0.53° selects about 15 µm of
-  it, so the line's brightness is a flux per unit length of waterline divided by
-  the pixel footprint, not a shading term;
-- the **azimuth**. A meniscus tilts only perpendicular to its own waterline, so
-  the sun's mirror condition is reachable on the east and west walls of this
-  basin and not on the north and south, while the horizon's is reachable on all
-  four. A uniform bright line on all four walls would be wrong.
+1. **External specular.** The facets mirror sky and sun to the eye. Fresnel is
+   0.02–0.07 where this camera sees them, which is why it is faint. Its
+   reachability rule needs the sun poolward of the wall's plane *and* the
+   half-vector residual to pass through zero somewhere visible; on this frame the
+   sun's branch is reachable only on the east wall and hidden there behind the
+   near coping's arris, so what shows is the horizon's branch.
+2. **Refraction through the fillet.** A facet turned toward the eye passes
+   0.93–0.98 of what is behind it, so this column starts 15–50× ahead. It is
+   **traced**, not looked up: on the north and west walls all 64 facets land on
+   that wall's own liner, 1–119 mm under the waterline. It runs 2× the reflected
+   column at the far end of the north wall and **70× at the near end**, which is
+   what turns a bright patch that faded to nothing into a line along the whole
+   wall.
+3. **Total internal reflection off the fillet's underside — refuted.** Past 48.5°
+   that underside is a perfect mirror, and the fillet holds every tilt, so the
+   critical-angle condition is met by construction. It fails on *arrival*:
+   writing `t = η i + f n`, `f = η cos_i − cos_t` is negative for every incidence
+   whenever `η < 1`, and a camera above the water always has `η = 1/n`. With
+   `n_z = cos φ ≥ 0` on any meniscus against a vertical wall, `t_z < 0`
+   identically — the refracted camera ray descends everywhere, and cannot reach a
+   surface above it. **The underside subtends exactly zero solid angle from any
+   camera above the waterline.** `MENIS_TIR_REACH = 0.0` records it; three rows of
+   `validate.py` hold it there. Reachability of a *tilt* is not reachability of a
+   *position*.
+
+The whole term is now guarded by 39 rows — a force balance on the tabulated
+columns, an RK4 march of the Young–Laplace IVP, a projected-area identity, a
+4000-ray brute-force march, a unit-radiance closure that integrates the shipped
+deposit back to that identity, and the two limits `a → 0` and `θ_c → 90°`. Full
+derivation and the test rationale in
+`../references/12a-water-derivations.md` §3.
+
+The contact angle is still **unmeasured** (`?`) and every row is run across its
+whole plausible range rather than at one value.
+
+## Known defect — the submerged walls sit 20 mm outside the surface they meet
+
+Found while tracing the meniscus's transmitted column, **recorded rather than
+fixed.** The water's plan boundary — the vertical face carrying the liner band,
+the line the height field cliffs at, the line the meniscus climbs — stands at
+`s = SLIP = −0.020`. `scene_hit` puts the four submerged walls on the plan
+rectangle, `s = 0`. A refracted camera ray therefore travels 20 mm further before
+it meets the wall than the geometry above it says, and lands about **5 mm lower on
+the liner**, against a wall map whose coping-shade term has a 55 mm scale at the
+top. Elsewhere in a 1.40 m basin that is nothing; at the waterline it is the whole
+gradient. It very nearly cancels inside the meniscus's own subtraction, since the
+fillet's traced ray and its flat baseline are displaced alike. Fixing it means
+moving the four planes in `scene_hit` and re-deriving the dry-band absorption
+regression measured off the band immediately above them.
 
 ## Not reachable from this file — per-band footprint filtering
 

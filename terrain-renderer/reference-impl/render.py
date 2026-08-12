@@ -2988,7 +2988,21 @@ def _menis_weights(Vm, Vz):
     CLIMB, and nothing else: a projected-area identity, true for any monotone
     profile, which the quadrature nowhere encodes, which survives the occluded
     branch untouched, and which `validate.py` asserts against this function's
-    own output and against a brute-force parallel-ray march of the profile."""
+    own output and against a brute-force parallel-ray march of the profile.
+
+    `?` AND ON A NEAR WALL IT IS ONLY A BOUND. Where Vm < 0 the fillet FOLDS in
+    projection -- perp(d) = -Vz d + Vm z(d) turns round at phi*, so a strip of
+    the view is crossed twice -- and a one-dimensional sweep over phi with a
+    visibility gate cannot resolve a fold. What the eye really finds over the
+    |Vm|*h of view the fillet vacates is the liner band standing above the
+    crest, and this returns the crest's own radiance for it instead. The error
+    is bounded by |Vm| * h -- at most 3.9 mm of projected area per metre of
+    waterline, and 2.3 mm at the east wall's own geometry -- and it is signed
+    negative. THIS FRAME NEVER REACHES IT: the fillet is on a near wall only on
+    the east and south, the east waterline is behind the near coping's arris and
+    0% of the south's is in shot, so `sel` never selects a ray there. Priced
+    rather than hidden, and it is the first thing to build if the camera ever
+    moves to the other side of the pool."""
     Vm = np.asarray(Vm)
     Vz = np.asarray(Vz)
     ndv = MENIS_SIN[None] * Vm[:, None] + MENIS_COS[None] * Vz[:, None]
@@ -3087,7 +3101,18 @@ def _menis_under(sid, u, v, sm, cyl, tzc, mode):
     the flat baseline and the fillet's own column must read it through the same
     code or the subtraction measures the difference between two shaders rather
     than between two geometries, and `validate.py` substitutes a unit radiance
-    here to test the fillet's geometry without building the maps."""
+    here to test the fillet's geometry without building the maps.
+
+    `?` ABOVE THE STILL WATERLINE THE WALL MAP RUNS OUT. The fillet's steeper
+    facets aim the ray at the wall a millimetre or two ABOVE z = 0 -- inside the
+    climb, at liner that is under the fillet rather than under the pool -- and
+    `sample` clamps that to the map's top row. Same liner, wetted either way, and
+    the row it clamps to is the one in the coping's own shade, which is where the
+    ray is looking; but it is a clamp, and the honest reading is that the top
+    3.9 mm of the fillet's transmitted column is read off the first texel rather
+    than off a surface of its own. It is `?` in the SOURCE, never in the amount:
+    the projected area that carries it is exact and is what `validate.py`
+    checks."""
     col = np.zeros((sid.size, 3))
     bi, wim = bed_img[mode], wall_img[mode]
     for c in range(3):
@@ -4426,18 +4451,23 @@ for _lx in (0.6, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5):
           "it"
           % (_sh, 100 * _sh / max(_pr[3], 1e-9), _pk, 1000 * _fw * _wm,
              float(np.nanmean(_pr[6:10]))))
-print("    -- read it as two separate limits, because they say different things. "
-      "The FOOTPRINT one is honest dilution: the strip that clears the undercut "
-      "is 0.8-1.7 mm of water against an output pixel of 4.2-9.7 mm, so the "
-      "flux arrives spread over 5 to 10 times its own width and nothing is "
-      "clamped to hide that. The OTHER one is this camera: the frame looks ALONG "
-      "the north wall, so the fillet's facets never present less than 64 deg of "
-      "incidence to it and their Fresnel is capped near 0.07 -- and the sun's "
-      "branch, which is the one that would blow, is under the coping on this "
-      "wall. The line is therefore real, correctly placed and correctly "
-      "coloured, and worth a fifth of the junction pixel at the far end falling "
-      "to nothing at the near one. It is not the blazing line the east wall "
-      "would carry, and this file will not manufacture one.")
+print("    -- the FOOTPRINT limit is honest dilution and has not moved: the strip "
+      "that clears the undercut is 0.8-1.7 mm of water against an output pixel "
+      "of 4.2-9.7 mm, so the flux arrives spread over 5 to 10 times its own "
+      "width and nothing is clamped to hide that. What HAS moved is which "
+      "column carries it. The frame looks ALONG the north wall, so the fillet's "
+      "facets never present less than 64 deg of incidence and their REFLECTANCE "
+      "is capped near 0.07 -- but their TRANSMITTANCE is the complement, and the "
+      "traced column behind it is that wall's own liner a few centimetres under "
+      "the line. The reflected half falls from 1.3e-4 to 1.8e-5 W/sr/m along the "
+      "wall as the mirror direction leaves the horizon; the transmitted half "
+      "RISES from 2.7e-4 to 1.2e-3 as the poolward view component grows, and it "
+      "is 2x the reflected one at the far end and 70x at the near one. That "
+      "crossover is why the line reads along the whole wall instead of as a "
+      "patch at the far end, and it is the reachability argument doing its work "
+      "on the column that was left out rather than on the one that was built. "
+      "The sun's branch is still under the coping here and is still not "
+      "manufactured.")
 
 
 # 2. THE PIGMENT, AND THE ABSORPTION IT CALIBRATES. The owner's reading of this

@@ -282,7 +282,7 @@ look at the distribution.
   what makes a lookup table or a fitted approximation *defensible* rather than a guess — it was
   derived from the reference and is measured against it every run.
 
-### Four ways a measurement lies while looking like one
+### Five ways a measurement lies while looking like one
 
 Each of these has shipped in this project's own reference work, survived review, and cost a round to
 find. All four produce a number that is *reproducible and wrong* — which is exactly the class a
@@ -320,6 +320,21 @@ golden-image test cannot catch, because nothing about the image is wrong.
   reached by unrelated code elsewhere in the file**. The procedural rule: derive the value from
   physics, write the derivation down, and *then* pick a guard that could not have been written from
   it. Do not make the two sides agree — make each one right separately and observe that they agree.
+- **An existence argument is not an arrival argument.** The newest of the five, and the cheapest to
+  catch if the question is asked in the right order. A meniscus sweeps every surface tilt from 0 to
+  90° across five millimetres, so any condition stated on the *normal* is met somewhere inside it by
+  construction — that is what makes the waterline the one specular feature in a scene that cannot
+  fail a reachability test. The same argument was then applied to total internal reflection off the
+  fillet's **underside**: reflectance exactly 1 past 48.5°, 15–50× the external specular, and the
+  critical angle certainly reached. It is reached, and the term is exactly zero. Writing the
+  refracted direction as `t = η i + f n`, `f = η cos_i − cos_t` is negative for **every** incidence
+  whenever `η < 1`, so a camera above the water sends `t_z < 0` identically: the ray descends and can
+  never arrive at a surface above it. **Reachability of a tilt is not reachability of a position**,
+  and the sweep argument only ever established the first. The procedural rule is to separate the two
+  questions before building anything: *does the geometry admit the configuration* is a question about
+  normals; *does a path from the source to the sensor pass through it* is a question about positions,
+  and it is answered by tracing, not by sweeping. A refuted term with the geometry written down is a
+  good outcome; a built one that is quietly zero, or quietly not, is not.
 
 **Pitfalls:** goldens that were never verified correct (a golden captured from a broken build
 enshrines the bug — review each golden by eye once, against the catalogue, before blessing it);
