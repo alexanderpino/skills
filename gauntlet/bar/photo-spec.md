@@ -622,3 +622,41 @@ separates the two candidates named in J cleanly:
 Either way the answer arrives without a single constant being touched, which is
 the only way this project is allowed to arrive at it. **Report both renders side
 by side with the three within-frame ratios above measured on each.**
+
+#### J2b · The observer bounds the white-balance error, from having been there
+
+> Owner testimony, given after J2 was written and therefore carrying the same
+> weight as A–F under this file's standing rule for the reference observer:
+> *"De foto's zien er niet bijzonder anders uit dan de werkelijkheid. Misschien
+> dat het zwembadwater in werkelijkheid nog iets cyaan is, meer naar de blauwe
+> kant."*
+
+This is the strongest available check on J2's white-balance caveat, and it does
+two things at once — which is why it is recorded rather than folded into J2.
+
+- **It confirms the mechanism and its direction, independently.** Automatic white
+  balance on a cyan-dominated frame pushes toward neutral, i.e. *away from* cyan
+  and *toward* red. An observer who was present reports the residual as exactly
+  that: reality is the more cyan of the two. The prediction and the report were
+  arrived at separately, and they agree on sign.
+- **It bounds the magnitude, and the bound is small.** *"Niet bijzonder anders"*,
+  and the correction is hedged with *"misschien... iets"*. So the frames are
+  usable as a colour reference after all — J2's prohibition on absolute triples
+  softens to a caution — while the three within-frame ratios stay the preferred
+  instrument because they need no such judgement.
+
+**What it changes about the open finding, stated separately because the two halves
+have different answers.**
+
+- **The chromaticity gap shrinks.** If the true water is more cyan than the
+  photograph, the photograph overstates its red, so the render's red deficit
+  against reality is *smaller* than the deficit measured against the frames. How
+  much smaller is not quantified and must not be guessed. **The target moves with
+  it: a correct render should come out slightly more cyan than these
+  photographs, not matched to them.** A render tuned to hit the frames exactly
+  would be tuned to the camera's white balance.
+- **The level gap does not move at all.** *More cyan* is a statement about hue.
+  It says nothing about luminance, and the finding that carries the weight is a
+  luminance ratio — water against sunlit sandstone in the same exposure, which the
+  render puts near 0.40 where all three frames read at or above 1. Nothing in this
+  testimony touches that, and it remains the thing to explain.
