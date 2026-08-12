@@ -468,6 +468,16 @@ camera.
 > reading and none is a measurement**; where a ratio would settle something, it is
 > marked as a ratio the render must produce and report, not one read off the
 > photograph.
+>
+> **Upgraded by an owner ruling after J2 was written:** these two were taken
+> *"slechts minuten eerder"* than the ninth photograph. They therefore carry
+> **J2's computed sun** — elevation **57.22°**, azimuth **233.96°** (SW), air mass
+> **1.189** — and stop being uncalibrated. Every quantitative caveat below still
+> holds for *colour*, because they are the same white-balanced phone frames, but
+> anything that depends on the **light's geometry** — shadow direction and length,
+> the beam's incidence at the surface, its slant path to the bed — is now
+> computable for them, and J2's list of confounds applies to all three frames as
+> one set.
 
 ### What the two frames agree on
 
