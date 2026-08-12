@@ -2041,6 +2041,57 @@ Water is the classic hard transparency case, and the frame must be structured fo
    example, with its inputs and limits, in
    [Engine-native water](#engine-native-water-the-ue-water-plugin-read-as-architecture).
 
+## What to pre-cook, and what to recompute
+
+Water is where teams reach for lookup tables first and profile them last. The decision rule is
+one line: **tabulate what is expensive, low-dimensional, and independent of this frame's
+radiance.** If it depends on what is lit right now it is a per-frame pass, not a table; if it is
+cheap in closed form, evaluating beats fetching, because a texture fetch carries a latency a
+polynomial does not.
+
+That splits this chapter's machinery four ways, and the boundaries are not where intuition puts
+them.
+
+| | What | Why it lands here |
+|---|---|---|
+| **Simulate per frame** | The wave field (FFT cascade or Gerstner set, as displacement + slope targets); the caustic map | Both change with the water every frame. The caustic map is not a candidate *for* a table — [it already is the tier-2 precompute](#the-tier-ladder) |
+| **Static geometric table** | The gathers' form factors; the meniscus line's integral; single-scattering in a turbid slab | Expensive, two or three dimensions, and a function of geometry and angles rather than of what is lit |
+| **Constant, resolved at load** | The internal-reflection integrals `1 − 1/n²` and the vertical-receiver form; the diffuse Fresnel pair; band-integrated absorption | Scalars once `n` and the band edges are fixed. A table would be a one-texel texture |
+| **Reformulate, do not tabulate** | Fresnel; the sun's disc lobe; the roughness correction | Cheaper, or numerically safer, written out |
+
+Three of those need the reasoning, because each is a place where the obvious move is wrong.
+
+**A gather does not go in a table whole.** The integral it computes depends on the bed's radiance,
+which changes every frame, so tabulating the result bakes one lighting condition. What is static is
+the **geometric** half — the fraction of the hemisphere the receiver sees, as a function of its
+height above the bed, its orientation, and its distance to the edge. Two or three smooth
+dimensions. Multiply by the bed's mean radiance at runtime and carry the caustic modulation
+separately. Geometry in the table, light in the shader, and the split is what makes it transfer
+between scenes.
+
+**The meniscus line is the strongest candidate in the whole model**, and for reasons worth naming
+because they generalise: it is expensive (an integral over the fillet's whole tilt range), genuinely
+low-dimensional (view elevation against the wall, sun azimuth against the wall's normal, local wave
+slope), and confined to a curve rather than an area, so the table is read along a thin locus and
+stays in cache. Cost concentrated on few pixels is the profile a table is *for*.
+
+**The sun's disc must be rewritten, not tabulated.** Pinning peak, width and flux to the disc
+simultaneously gives an exponent `n = 2/θ_s² − 1`, which is order 10⁵ — and `pow(cosθ, 1e5)` in
+fp32 is a catastrophe of cancellation near the peak, exactly where the term matters. The Gaussian
+in angle it converges to is the same lobe, evaluated safely, and it convolves with a slope
+distribution in closed form ([Pick the kernel](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver)).
+The same logic retires the other two: exact Fresnel is a handful of flops, and the roughness
+correction is *already* a fit — a closed-form table needing no memory.
+
+**The trap, and it is the one that wastes a month.** A table fitted to one body of water is not a
+table, it is a bake. Parameterise dimensionlessly wherever the physics allows — the meniscus in
+units of the capillary length `a = √(σ/ρg)`, the gathers in units of depth, scattering in optical
+depth `c·L` rather than metres — or the table will not survive the move from a pool to the sea, and
+the failure will look like an art problem rather than a parameterisation one. **Generate them from
+a reference implementation rather than by hand**, and the error is then measurable in the same
+quantities the reference already reports, which is what tells you whether the parameterisation
+transferred.
+
 ## Engine-native water: the UE Water plugin, read as architecture
 
 Most teams inside a licensed engine never assemble the machinery above from parts — they inherit a
